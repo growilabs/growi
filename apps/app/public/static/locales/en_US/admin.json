@@ -10,6 +10,7 @@
   "only_me": "Only me",
   "only_inside_the_group": "Only inside the group",
   "optional": "Optional",
+  "days": "days",
   "security_settings": {
     "security_settings": "Security Settings",
     "scope_of_page_disclosure": "Scope of page disclosure",

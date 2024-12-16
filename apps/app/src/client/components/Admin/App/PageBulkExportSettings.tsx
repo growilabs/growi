@@ -118,7 +118,7 @@ const PageBulkExportSettings = (): JSX.Element => {
                 >
                   {Array.from({ length: 7 }, (_, i) => i + 1).map(number => (
                     <option key={`be-download-expiration-option-${number}`} value={number}>
-                      {number}{t('admin:days')}
+                      {number} {t('admin:days')}
                     </option>
                   ))}
                 </select>
