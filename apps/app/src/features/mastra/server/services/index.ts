@@ -9,6 +9,31 @@ import { streamText, generateText } from 'ai';
 import { z } from 'zod';
 
 
+const fileSearch = (prompt: string) => {
+  const result = streamText({
+    model: openai('gpt-4o'),
+    prompt,
+    tools: {
+      file_search: openai.tools.fileSearch({
+        vectorStoreIds: ['vs_68b964a09b848191ba2dbee3bf360234'],
+        maxNumResults: 10,
+        ranking: {
+          ranker: 'auto',
+        },
+      }),
+    },
+
+    providerOptions: {
+      openai: {
+        store: true,
+      },
+    },
+    // Force file search tool:
+    toolChoice: { type: 'tool', toolName: 'file_search' },
+  });
+  return result;
+};
+
 const generatePreMessageStep = createStep({
   id: 'generate-pre-message-step',
   inputSchema: z.object({
@@ -62,29 +87,9 @@ const fileSearchStep = createStep({
   execute: async({ inputData, writer }) => {
     const { prompt } = inputData;
 
-    const result = streamText({
-      model: openai('gpt-4o'),
-      prompt: inputData.prompt,
-      tools: {
-        file_search: openai.tools.fileSearch({
-          vectorStoreIds: ['vs_68b964a09b848191ba2dbee3bf360234'],
-          maxNumResults: 10,
-          ranking: {
-            ranker: 'auto',
-          },
-        }),
-      },
+    const fileSearchResult = fileSearch(prompt);
 
-      providerOptions: {
-        openai: {
-          store: true,
-        },
-      },
-      // Force file search tool:
-      toolChoice: { type: 'tool', toolName: 'file_search' },
-    });
-
-    for await (const text of result.textStream) {
+    for await (const text of fileSearchResult.textStream) {
       await writer.write({
         type: 'file-search-event',
         text,
@@ -110,9 +115,86 @@ const fileSearchWorkflow = createWorkflow({
   .commit();
 
 
+const fileSearchTool = createTool({
+  id: 'file-search-tool',
+  description: "Get results based on user prompts using OpenAI's fileSearch'",
+  inputSchema: z.object({
+    prompt: z.string().describe('user prompt'),
+  }),
+  outputSchema: z.object({
+    output: z.any().describe('file search results'),
+  }),
+
+  execute: async({ context, writer }) => {
+    const { prompt } = context;
+
+    const result = fileSearch(prompt);
+
+    for await (const text of result.textStream) {
+      await writer.write({
+        type: 'file-search-event',
+        text,
+      });
+    }
+
+    return { length: prompt.length };
+  },
+});
+
+
+const growiAgent = new Agent({
+  name: 'GROWI agent',
+  instructions: `
+    You are an Agent that performs GROWI operations based on prompts from users. Currently, the only supported tool is 'file-search-tool'.
+  `,
+  model: openai('gpt-4o'),
+  tools: { fileSearchTool },
+});
+
+const growiAgentStep = createStep({
+  id: 'growi-agent-step',
+  inputSchema: z.object({
+    prompt: z.string(),
+  }),
+  outputSchema: z.object({
+    value: z.string(),
+  }),
+  execute: async({ inputData, writer }) => {
+    const { prompt } = inputData;
+
+    const agent = mastra.getAgent('growiAgent');
+    const stream = await agent.streamVNext(prompt);
+
+    for await (const chunk of stream.fullStream) {
+      if (chunk?.payload?.output?.type === 'growi-agent-event' || chunk?.payload?.output?.type === 'file-search-event') {
+        console.log(chunk.payload.output.text);
+      }
+    }
+
+    return {
+      value: prompt,
+    };
+  },
+});
+
+const growiAgentWorkflow = createWorkflow({
+  id: 'growi-agent-workflow',
+  inputSchema: z.object({
+    prompt: z.string().describe('Prompt for the GROWI agent'),
+  }),
+  outputSchema: z.object({
+    value: z.string().describe('Response from the GROWI agent'),
+  }),
+})
+  .parallel([generatePreMessageStep, growiAgentStep])
+  .commit();
+
+
 export const mastra = new Mastra({
+  agents: { growiAgent },
   workflows: {
     fileSearchWorkflow,
+    growiAgentWorkflow,
   },
 });
 
