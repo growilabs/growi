@@ -1,13 +1,13 @@
 import { createReadStream } from 'fs';
 import path from 'path';
 
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { NextFunction, Request, Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 import multer from 'multer';
 
-import { SCOPE } from '@growi/core/dist/interfaces';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { isG2GTransferError } from '~/server/models/vo/g2g-transfer-error';
 import { configManager } from '~/server/service/config-manager';
@@ -509,6 +509,7 @@ module.exports = (crowi: Crowi): Router => {
       }
       catch (err) {
         logger.error(err);
+        console.log('err', err);
         return res.apiv3Err(new ErrorV3('Error occurred while generating transfer key.', 'failed_to_generate_key'));
       }
 
