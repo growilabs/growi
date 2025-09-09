@@ -1,9 +1,7 @@
 import { ErrorV3 } from '@growi/core/dist/models';
-import { body, param } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
-import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
@@ -11,26 +9,6 @@ const logger = loggerFactory('growi:routes:apiv3:content-disposition-settings');
 const express = require('express');
 
 const router = express.Router();
-
-const validator = {
-  updateContentDisposition: [
-    param('mimeType')
-      .exists()
-      .notEmpty()
-      .withMessage('MIME type is required')
-      .bail()
-      .matches(/^.+\/.+$/)
-      .custom((value) => {
-        const mimeTypeDefaults = configManager.getConfig('attachments:contentDisposition:mimeTypeOverrides');
-        return Object.keys(mimeTypeDefaults).includes(value);
-      })
-      .withMessage('Invalid or unconfigurable MIME type specified.'),
-
-    body('disposition')
-      .isIn(['inline', 'attachment'])
-      .withMessage('`disposition` must be either "inline" or "attachment".'),
-  ],
-};
 
 /*
  * @swagger
