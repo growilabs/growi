@@ -58,8 +58,8 @@ export type IGrowiAdditionalInfoByOptions<T extends GrowiInfoOptions> =
       ? IAdditionalUserCountInfo
       : Record<string, never>) &
     (T['includePageCountInfo'] extends true
-    ? IAdditionalPageCountInfo
-    : Record<string, never>);
+      ? IAdditionalPageCountInfo
+      : Record<string, never>);
 
 // Helper type to check if any option is enabled
 export type HasAnyOption<T extends GrowiInfoOptions> =
