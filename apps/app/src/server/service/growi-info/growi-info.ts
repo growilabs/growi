@@ -5,7 +5,7 @@ import type {
   GrowiInfoOptions,
   IGrowiAdditionalInfoResult,
 } from '@growi/core';
-import type { IUser } from '@growi/core/dist/interfaces';
+import type { IUser, IPage } from '@growi/core/dist/interfaces';
 import { GrowiWikiType } from '@growi/core/dist/interfaces';
 import { pathUtils } from '@growi/core/dist/utils';
 import type { Model } from 'mongoose';
@@ -22,6 +22,7 @@ const FULL_ADDITIONAL_INFO_OPTIONS = {
   includeAttachmentInfo: true,
   includeInstalledInfo: true,
   includeUserCountInfo: true,
+  includePageCountInfo: true,
 } as const;
 
 
@@ -116,9 +117,10 @@ export class GrowiInfoService {
 
   private async getAdditionalInfoByOptions<T extends GrowiInfoOptions>(options: T): Promise<IGrowiAdditionalInfoResult<T>> {
     const User = mongoose.model<IUser, Model<IUser>>('User');
+    const Page = mongoose.model<IPage, Model<IPage>>('Page');
 
     // Check if any option is enabled to determine if we should return additional info
-    const hasAnyOption = options.includeAttachmentInfo || options.includeInstalledInfo || options.includeUserCountInfo;
+    const hasAnyOption = options.includeAttachmentInfo || options.includeInstalledInfo || options.includeUserCountInfo || options.includePageCountInfo;
 
     if (!hasAnyOption) {
       return undefined as IGrowiAdditionalInfoResult<T>;
@@ -137,6 +139,7 @@ export class GrowiInfoService {
       installedAtByOldestUser: Date | null;
       currentUsersCount: number;
       currentActiveUsersCount: number;
+      currentPagesCount: number;
     }> = {
       attachmentType: configManager.getConfig('app:fileUploadType'),
       activeExternalAccountTypes,
@@ -161,6 +164,11 @@ export class GrowiInfoService {
 
       partialResult.currentUsersCount = currentUsersCount;
       partialResult.currentActiveUsersCount = currentActiveUsersCount;
+    }
+
+    if (options.includePageCountInfo) {
+      const currentPagesCount = await Page.countDocuments();
+      partialResult.currentPagesCount = currentPagesCount;
     }
 
     return partialResult as IGrowiAdditionalInfoResult<T>;
