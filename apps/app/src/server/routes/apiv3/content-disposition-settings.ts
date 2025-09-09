@@ -10,14 +10,6 @@ const express = require('express');
 
 const router = express.Router();
 
-/*
- * @swagger
- *
- *  components:
- *    schemas:
- *    parameters:
- *      - $ref: '#/components/parameters/MimeTypePathParam'
-  */
 module.exports = (crowi) => {
   const loginRequiredStrictly = require('~/server/middlewares/login-required')(crowi);
   const adminRequired = require('~/server/middlewares/admin-required')(crowi);
@@ -140,6 +132,7 @@ module.exports = (crowi) => {
  *       - cookieAuth: []
  *     responses:
  *       200:
+ *         description: Successfully set strict content disposition settings.
  *         content:
  *           application/json:
  *             schema:
@@ -219,6 +212,7 @@ module.exports = (crowi) => {
  *       - cookieAuth: []
  *     responses:
  *       200:
+ *         description: Successfully set lax content disposition settings.
  *         content:
  *           application/json:
  *             schema:
