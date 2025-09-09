@@ -85,7 +85,7 @@ describe('addPageCountsMetrics', () => {
       await callback(mockResult);
 
       expect(mockGrowiInfoService.getGrowiInfo).toHaveBeenCalledWith({
-        includeUserCountInfo: true,
+        includePageCountInfo: true,
       });
       expect(mockResult.observe).toHaveBeenCalledWith(mockPageCountGauge, 1234);
     });

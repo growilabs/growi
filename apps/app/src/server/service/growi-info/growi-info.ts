@@ -13,9 +13,13 @@ import mongoose from 'mongoose';
 
 import { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 import { Config } from '~/server/models/config';
+import createPageModel from '~/server/models/page';
 import { aclService } from '~/server/service/acl';
 import { configManager } from '~/server/service/config-manager';
 import { getGrowiVersion } from '~/utils/growi-version';
+import loggerFactory from '~/utils/logger';
+
+const logger = loggerFactory('growi:passwordReset');
 
 // Local preset for full additional info
 const FULL_ADDITIONAL_INFO_OPTIONS = {
@@ -117,7 +121,7 @@ export class GrowiInfoService {
 
   private async getAdditionalInfoByOptions<T extends GrowiInfoOptions>(options: T): Promise<IGrowiAdditionalInfoResult<T>> {
     const User = mongoose.model<IUser, Model<IUser>>('User');
-    const Page = mongoose.model<IPage, Model<IPage>>('Page');
+    const Page = createPageModel(null);
 
     // Check if any option is enabled to determine if we should return additional info
     const hasAnyOption = options.includeAttachmentInfo || options.includeInstalledInfo || options.includeUserCountInfo || options.includePageCountInfo;
@@ -168,6 +172,7 @@ export class GrowiInfoService {
 
     if (options.includePageCountInfo) {
       const currentPagesCount = await Page.countDocuments();
+      logger.info('カレントページカウント', currentPagesCount);
       partialResult.currentPagesCount = currentPagesCount;
     }
 
