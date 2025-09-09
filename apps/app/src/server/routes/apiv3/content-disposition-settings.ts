@@ -151,6 +151,29 @@ module.exports = (crowi) => {
     }
   });
 
+  /**
+ * @swagger
+ *
+ * /content-disposition-settings/strict:
+ *   put:
+ *     tags: [Content-Disposition Settings]
+ *     summary: Set content disposition settings for configurable MIME types to strict.
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 contentDispositionSettings:
+ *                   type: object
+ *                   additionalProperties:
+ *                     type: string
+ *                     description: inline or attachment
+ *
+ */
   router.put(
     '/strict',
     loginRequiredStrictly,
@@ -207,6 +230,29 @@ module.exports = (crowi) => {
     },
   );
 
+  /**
+ * @swagger
+ *
+ * /content-disposition-settings/lax:
+ *   put:
+ *     tags: [Content-Disposition Settings]
+ *     summary: Set content disposition settings for configurable MIME types to lax.
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 contentDispositionSettings:
+ *                   type: object
+ *                   additionalProperties:
+ *                     type: string
+ *                     description: inline or attachment
+ *
+ */
   router.put(
     '/lax',
     loginRequiredStrictly,
