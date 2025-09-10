@@ -1,10 +1,9 @@
 import { ErrorV3 } from '@growi/core/dist/models';
-import { body, param } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
-import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { configManager } from '~/server/service/config-manager';
+import { strictMimeTypeSettings, laxMimeTypeSettings } from '~/server/service/file-uploader/utils/security';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:routes:apiv3:content-disposition-settings');
@@ -12,34 +11,6 @@ const express = require('express');
 
 const router = express.Router();
 
-const validator = {
-  updateContentDisposition: [
-    param('mimeType')
-      .exists()
-      .notEmpty()
-      .withMessage('MIME type is required')
-      .bail()
-      .matches(/^.+\/.+$/)
-      .custom((value) => {
-        const mimeTypeDefaults = configManager.getConfig('attachments:contentDisposition:mimeTypeOverrides');
-        return Object.keys(mimeTypeDefaults).includes(value);
-      })
-      .withMessage('Invalid or unconfigurable MIME type specified.'),
-
-    body('disposition')
-      .isIn(['inline', 'attachment']) // Validate that it's one of these two strings
-      .withMessage('`disposition` must be either "inline" or "attachment".'),
-  ],
-};
-
-/*
- * @swagger
- *
- *  components:
- *    schemas:
- *    parameters:
- *      - $ref: '#/components/parameters/MimeTypePathParam'
-  */
 module.exports = (crowi) => {
   const loginRequiredStrictly = require('~/server/middlewares/login-required')(crowi);
   const adminRequired = require('~/server/middlewares/admin-required')(crowi);
@@ -72,9 +43,8 @@ module.exports = (crowi) => {
  */
   router.get('/', loginRequiredStrictly, adminRequired, async(req, res) => {
     try {
-
-      const mimeTypeDefaults = configManager.getConfig('attachments:contentDisposition:mimeTypeOverrides');
-      const contentDispositionSettings: Record<string, 'inline' | 'attachment'> = mimeTypeDefaults;
+      const currentDispositionSettings = configManager.getConfig('attachments:contentDisposition:mimeTypeOverrides');
+      const contentDispositionSettings: Record<string, 'inline' | 'attachment'> = currentDispositionSettings;
 
       return res.apiv3({ contentDispositionSettings });
     }
@@ -87,77 +57,101 @@ module.exports = (crowi) => {
   /**
  * @swagger
  *
- * paths:
- *    /content-disposition-settings/{mimeType}:
- *      put:
- *        tags: [Content Disposition Settings]
- *        summary: Update content disposition setting for a specific MIME type
- *        security:
- *          - cookieAuth: []
- *        parameters:
- *          - $ref: '#/components/parameters/MimeTypePathParam'
- *        requestBody:
- *          required: true
- *          content:
- *            application/json:
- *              schema:
- *                type: object
- *                required:
- *                  - disposition
- *                properties:
- *                  disposition:
+ * /content-disposition-settings/strict:
+ *   put:
+ *     tags: [Content-Disposition Settings]
+ *     summary: Set content disposition settings for configurable MIME types to strict.
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully set strict content disposition settings.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 contentDispositionSettings:
+ *                   type: object
+ *                   additionalProperties:
  *                     type: string
- *        responses:
- *          200:
- *            description: Successfully updated content disposition setting
- *            content:
- *              application/json:
- *                schema:
- *                  type: object
- *                  properties:
- *                    setting:
- *                       type: object
- *                       properties:
- *                         mimeType:
- *                           type: string
- *                         disposition:
- *                           type: string
+ *                     description: inline or attachment
+ *
  */
   router.put(
-    '/:mimeType(*)',
+    '/strict',
     loginRequiredStrictly,
     adminRequired,
     addActivity,
-    validator.updateContentDisposition,
-    apiV3FormValidator,
     async(req, res) => {
-      const { mimeType } = req.params;
-      const { disposition } = req.body;
 
       try {
-        const currentMimeTypeDefaults = configManager.getConfig('attachments:contentDisposition:mimeTypeOverrides');
-
-        const newDisposition: 'inline' | 'attachment' = disposition;
-
-        const updatedMimeTypeDefaults = {
-          ...currentMimeTypeDefaults,
-          [mimeType]: newDisposition,
-        };
-
-        await configManager.updateConfigs({ 'attachments:contentDisposition:mimeTypeOverrides': updatedMimeTypeDefaults });
-        const updatedDispositionFromDb = configManager.getConfig('attachments:contentDisposition:mimeTypeOverrides')[mimeType];
+        await configManager.updateConfigs({ 'attachments:contentDisposition:mimeTypeOverrides': strictMimeTypeSettings });
 
         const parameters = {
           action: SupportedAction.ACTION_ADMIN_ATTACHMENT_DISPOSITION_UPDATE,
-          mimeType,
-          disposition: updatedDispositionFromDb,
+          contentDispositionSettings: strictMimeTypeSettings,
+          currentMode: 'strict',
         };
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
-        return res.apiv3({ mimeType, disposition: updatedDispositionFromDb });
+        return res.apiv3({ currentMode: 'strict', contentDispositionSettings: strictMimeTypeSettings });
       }
       catch (err) {
-        const msg = `Error occurred in updating content disposition for MIME type: ${mimeType}`;
+        const msg = 'Error occurred in updating content disposition for MIME types';
+        logger.error(msg, err);
+        return res.apiv3Err(
+          new ErrorV3(msg, 'update-content-disposition-failed'),
+        );
+      }
+    },
+  );
+
+  /**
+ * @swagger
+ *
+ * /content-disposition-settings/lax:
+ *   put:
+ *     tags: [Content-Disposition Settings]
+ *     summary: Set content disposition settings for configurable MIME types to lax.
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully set lax content disposition settings.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 contentDispositionSettings:
+ *                   type: object
+ *                   additionalProperties:
+ *                     type: string
+ *                     description: inline or attachment
+ *
+ */
+  router.put(
+    '/lax',
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    async(req, res) => {
+
+      try {
+        await configManager.updateConfigs({ 'attachments:contentDisposition:mimeTypeOverrides': laxMimeTypeSettings });
+
+        const parameters = {
+          action: SupportedAction.ACTION_ADMIN_ATTACHMENT_DISPOSITION_UPDATE,
+          contentDispositionSettings: laxMimeTypeSettings,
+          currentMode: 'lax',
+        };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+
+        return res.apiv3({ currentMode: 'lax', contentDispositionSettings: laxMimeTypeSettings });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating content disposition for MIME types';
         logger.error(msg, err);
         return res.apiv3Err(
           new ErrorV3(msg, 'update-content-disposition-failed'),

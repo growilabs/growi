@@ -544,12 +544,30 @@ export const CONFIG_DEFINITIONS = {
   // Attachment Content-Disposition settings
   'attachments:contentDisposition:mimeTypeOverrides': defineConfig<Record<string, 'inline' | 'attachment'>>({
     defaultValue: {
-      'text/html': 'attachment',
-      'image/svg+xml': 'attachment',
+      // Documents
       'application/pdf': 'attachment',
       'application/json': 'attachment',
+      'text/plain': 'attachment',
       'text/csv': 'attachment',
-      'font/*': 'attachment',
+      'text/html': 'attachment',
+
+      // Images
+      'image/jpeg': 'attachment',
+      'image/png': 'attachment',
+      'image/gif': 'attachment',
+      'image/webp': 'attachment',
+      'image/svg+xml': 'attachment',
+
+      // Audio and Video
+      'audio/mpeg': 'attachment',
+      'video/mp4': 'attachment',
+      'video/webm': 'attachment',
+
+      // Fonts
+      'font/woff2': 'attachment',
+      'font/woff': 'attachment',
+      'font/ttf': 'attachment',
+      'font/otf': 'attachment',
     },
   }),
 
