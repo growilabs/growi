@@ -18,16 +18,15 @@ queue_rules:
       - -check-failure ~= ci-app-
       - -check-failure ~= ci-slackbot-
       - -check-failure ~= test-prod-node22 /
-
+    autoqueue: true
 pull_request_rules:
   - name: Automatic queue to merge
     conditions:
-      - '#approved-reviews-by >= 1'
-      - '#changes-requested-reviews-by = 0'
-      - '#review-requested = 0'
+      - "#approved-reviews-by >= 1"
+      - "#changes-requested-reviews-by = 0"
+      - "#review-requested = 0"
     actions:
       queue:
-
   - name: Automatic merge for Preparing next version
     conditions:
       - author = github-actions[bot]
