@@ -3,9 +3,7 @@ services:
     image: mcr.microsoft.com/devcontainers/base:ubuntu
     volumes:
       - ..:/workspace/growi:delegated
-      - pnpm-store:/workspace/growi/.pnpm-store
-      - node_modules:/workspace/growi/node_modules
-      - buildcache_app:/workspace/growi/apps/app/.next
+      - pnpm-store:/workspace/.pnpm-store
       - ../../growi-docker-compose:/workspace/growi-docker-compose:delegated
       - ../../share:/workspace/share:delegated
       - page_bulk_export_tmp:/tmp/page-bulk-export
@@ -47,8 +45,6 @@ services:
 
 volumes:
   pnpm-store:
-  node_modules:
-  buildcache_app:
   page_bulk_export_tmp:
 
 networks:

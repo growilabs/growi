@@ -105,7 +105,7 @@ jobs:
   build-app-image:
     needs: create-github-release
 
-    uses: weseek/growi/.github/workflows/reusable-app-build-image.yml@master
+    uses: growilabs/growi/.github/workflows/reusable-app-build-image.yml@master
     with:
       source-version: refs/tags/v${{ needs.create-github-release.outputs.RELEASED_VERSION }}
       image-name: weseek/growi
@@ -117,7 +117,7 @@ jobs:
   publish-app-image:
     needs: [determine-tags, build-app-image]
 
-    uses: weseek/growi/.github/workflows/reusable-app-create-manifests.yml@master
+    uses: growilabs/growi/.github/workflows/reusable-app-create-manifests.yml@master
     with:
       tags: ${{ needs.determine-tags.outputs.TAGS }}
       registry: docker.io

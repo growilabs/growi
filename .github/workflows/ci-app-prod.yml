@@ -40,7 +40,7 @@ concurrency:
 jobs:
 
   test-prod-node20:
-    uses: weseek/growi/.github/workflows/reusable-app-prod.yml@master
+    uses: growilabs/growi/.github/workflows/reusable-app-prod.yml@master
     if: |
       ( github.event_name == 'push'
         || github.base_ref == 'master'
@@ -55,7 +55,7 @@ jobs:
 
 
   test-prod-node22:
-    uses: weseek/growi/.github/workflows/reusable-app-prod.yml@master
+    uses: growilabs/growi/.github/workflows/reusable-app-prod.yml@master
     if: |
       ( github.event_name == 'push'
         || github.base_ref == 'master'
@@ -71,7 +71,7 @@ jobs:
   # run-reg-suit-node20:
   #   needs: [test-prod-node20]
 
-  #   uses: weseek/growi/.github/workflows/reusable-app-reg-suit.yml@master
+  #   uses: growilabs/growi/.github/workflows/reusable-app-reg-suit.yml@master
 
   #   if: always()
 
