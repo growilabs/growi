@@ -8,15 +8,16 @@ import { LlmEditorAssistantDiffSchema } from './llm-response-schemas';
 
 // Request schemas
 export const EditRequestBodySchema = z.object({
+  threadId: z.string(),
+  aiAssistantId: z.string().optional(),
   userMessage: z.string(),
   pageBody: z.string(),
+  selectedText: z.string().optional(),
+  selectedPosition: z.number().optional(),
   isPageBodyPartial: z.boolean().optional()
     .describe('Whether the page body is a partial content'),
   partialPageBodyStartIndex: z.number().optional()
     .describe('0-based index for the start of the partial page body'),
-  selectedText: z.string().optional(),
-  selectedPosition: z.number().optional(),
-  threadId: z.string().optional(),
 });
 
 // Type definitions

@@ -21,14 +21,20 @@ import { ThreadType } from '../../interfaces/thread-relation';
 import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
 import { useAiAssistantSidebar } from '../stores/ai-assistant';
 import { useSWRMUTxMessages } from '../stores/message';
-import { useSWRMUTxThreads } from '../stores/thread';
+import { useSWRMUTxThreads, useSWRINFxRecentThreads } from '../stores/thread';
 
 interface CreateThread {
   (aiAssistantId: string, initialUserMessage: string): Promise<IThreadRelationHasId>;
 }
 
+type PostMessageArgs = {
+  aiAssistantId: string;
+  threadId: string;
+  formData: FormData;
+};
+
 interface PostMessage {
-  (aiAssistantId: string, threadId: string, formData: FormData): Promise<Response>;
+  (args: PostMessageArgs): Promise<Response>;
 }
 
 interface ProcessMessage {
@@ -67,8 +73,8 @@ type UseKnowledgeAssistant = () => {
 export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
   // Hooks
   const { data: aiAssistantSidebarData } = useAiAssistantSidebar();
-  const { aiAssistantData } = aiAssistantSidebarData ?? {};
-  const { threadData } = aiAssistantSidebarData ?? {};
+  const { aiAssistantData, threadData } = aiAssistantSidebarData ?? {};
+  const { mutate: mutateRecentThreads } = useSWRINFxRecentThreads();
   const { trigger: mutateThreadData } = useSWRMUTxThreads(aiAssistantData?._id);
   const { t } = useTranslation();
 
@@ -79,9 +85,6 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
       extendedThinkingMode: false,
     },
   });
-
-  // States
-  const [currentThreadTitle, setCurrentThreadId] = useState(threadData?.title);
 
   // Functions
   const resetForm = useCallback(() => {
@@ -98,15 +101,13 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
     });
     const thread = response.data;
 
-    setCurrentThreadId(thread.title);
-
     // No need to await because data is not used
     mutateThreadData();
 
     return thread;
   }, [mutateThreadData]);
 
-  const postMessage: PostMessage = useCallback(async(aiAssistantId, threadId, formData) => {
+  const postMessage: PostMessage = useCallback(async({ aiAssistantId, threadId, formData }) => {
     const response = await fetch('/_api/v3/openai/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -118,8 +119,11 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
         extendedThinkingMode: form.getValues('extendedThinkingMode'),
       }),
     });
+
+    mutateRecentThreads();
+
     return response;
-  }, [form]);
+  }, [form, mutateRecentThreads]);
 
   const processMessage: ProcessMessage = useCallback((data, handler) => {
     handleIfSuccessfullyParsed(data, SseMessageSchema, (data: SseMessage) => {
@@ -137,8 +141,8 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
   }, []);
 
   const headerText = useMemo(() => {
-    return <>{currentThreadTitle ?? aiAssistantData?.name}</>;
-  }, [aiAssistantData?.name, currentThreadTitle]);
+    return <>{threadData?.title ?? aiAssistantData?.name}</>;
+  }, [aiAssistantData?.name, threadData?.title]);
 
   const placeHolder = useMemo(() => { return 'sidebar_ai_assistant.knowledge_assistant_placeholder' }, []);
 

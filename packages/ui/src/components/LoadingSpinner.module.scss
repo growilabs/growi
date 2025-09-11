@@ -2,7 +2,7 @@
   animation: animation-rotate 750ms infinite linear;
 }
 
-// refs: https://github.com/weseek/growi/blob/master/apps/app/src/styles/atoms/_spinners.scss
+// refs: https://github.com/growilabs/growi/blob/master/apps/app/src/styles/atoms/_spinners.scss
 @keyframes animation-rotate {
   100% {
     transform: rotate(360deg);
@@ -37,4 +37,3 @@
     transform: rotate(360deg);
   }
 }
-

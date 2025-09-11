@@ -5,11 +5,12 @@ import userGroupModelFactory from '~/server/models/user-group';
 import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
-
 const logger = loggerFactory('growi:migrate:abolish-page-group-relation');
 
 async function isCollectionExists(db, collectionName) {
-  const collections = await db.listCollections({ name: collectionName }).toArray();
+  const collections = await db
+    .listCollections({ name: collectionName })
+    .toArray();
   return collections.length > 0;
 }
 
@@ -28,14 +29,16 @@ async function isCollectionExists(db, collectionName) {
  *   - Page model has 'grantedGroup' field newly
  */
 module.exports = {
-
   async up(db) {
     logger.info('Apply migration');
     await mongoose.connect(getMongoUri(), mongoOptions);
 
-    const isPagegrouprelationsExists = await isCollectionExists(db, 'pagegrouprelations');
+    const isPagegrouprelationsExists = await isCollectionExists(
+      db,
+      'pagegrouprelations',
+    );
     if (!isPagegrouprelationsExists) {
-      logger.info("'pagegrouprelations' collection doesn't exist");   // eslint-disable-line
+      logger.info("'pagegrouprelations' collection doesn't exist"); // eslint-disable-line
       logger.info('Migration has successfully applied');
       return;
     }
@@ -44,7 +47,10 @@ module.exports = {
     const UserGroup = userGroupModelFactory();
 
     // retrieve all documents from 'pagegrouprelations'
-    const relations = await db.collection('pagegrouprelations').find().toArray();
+    const relations = await db
+      .collection('pagegrouprelations')
+      .find()
+      .toArray();
 
     /* eslint-disable no-await-in-loop */
     for (const relation of relations) {
@@ -115,5 +121,4 @@ module.exports = {
 
     logger.info('Migration has been successfully rollbacked');
   },
-
 };

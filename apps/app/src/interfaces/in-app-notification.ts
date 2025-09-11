@@ -1,6 +1,6 @@
 import type { IUser } from '@growi/core';
 
-import type { SupportedTargetModelType, SupportedActionType } from './activity';
+import type { SupportedActionType, SupportedTargetModelType } from './activity';
 
 export enum InAppNotificationStatuses {
   STATUS_UNOPENED = 'UNOPENED',
@@ -8,22 +8,22 @@ export enum InAppNotificationStatuses {
 }
 
 export interface IInAppNotification<T = unknown> {
-  user: IUser
-  targetModel: SupportedTargetModelType
-  target: T
-  action: SupportedActionType
-  status: InAppNotificationStatuses
-  actionUsers: IUser[]
-  createdAt: Date
-  snapshot: string
-  parsedSnapshot?: any
+  user: IUser;
+  targetModel: SupportedTargetModelType;
+  target: T;
+  action: SupportedActionType;
+  status: InAppNotificationStatuses;
+  actionUsers: IUser[];
+  createdAt: Date;
+  snapshot: string;
+  parsedSnapshot?: any;
 }
 
 /*
-* Note:
-* Need to use mongoose PaginateResult as a type after upgrading mongoose v6.0.0.
-* Until then, use the original "PaginateResult".
-*/
+ * Note:
+ * Need to use mongoose PaginateResult as a type after upgrading mongoose v6.0.0.
+ * Until then, use the original "PaginateResult".
+ */
 export interface PaginateResult<T> {
   docs: T[];
   hasNextPage: boolean;
@@ -39,11 +39,11 @@ export interface PaginateResult<T> {
 }
 
 /*
-* In App Notification Settings
-*/
+ * In App Notification Settings
+ */
 
 export enum subscribeRuleNames {
-  PAGE_CREATE = 'PAGE_CREATE'
+  PAGE_CREATE = 'PAGE_CREATE',
 }
 
 export enum SubscribeRuleDescriptions {

@@ -2,9 +2,11 @@ import {
   SseMessageSchema,
   SseDetectedDiffSchema,
   SseFinalizedSchema,
+  EditRequestBodySchema,
   type SseMessage,
   type SseDetectedDiff,
   type SseFinalized,
+  type EditRequestBody,
 } from './sse-schemas';
 
 describe('sse-schemas', () => {
@@ -216,7 +218,128 @@ describe('sse-schemas', () => {
     });
   });
 
+  describe('EditRequestBodySchema', () => {
+    test('should validate valid edit request body with all required fields', () => {
+      const validRequest = {
+        threadId: 'thread-123',
+        userMessage: 'Please update this code',
+        pageBody: 'function example() { return true; }',
+      };
+
+      const result = EditRequestBodySchema.safeParse(validRequest);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.threadId).toBe(validRequest.threadId);
+        expect(result.data.userMessage).toBe(validRequest.userMessage);
+        expect(result.data.pageBody).toBe(validRequest.pageBody);
+      }
+    });
+
+    test('should validate edit request with optional fields', () => {
+      const validRequest = {
+        threadId: 'thread-456',
+        aiAssistantId: 'assistant-789',
+        userMessage: 'Add logging functionality',
+        pageBody: 'const data = getData();',
+        selectedText: 'const data',
+        selectedPosition: 5,
+        isPageBodyPartial: true,
+        partialPageBodyStartIndex: 10,
+      };
+
+      const result = EditRequestBodySchema.safeParse(validRequest);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.aiAssistantId).toBe(validRequest.aiAssistantId);
+        expect(result.data.selectedText).toBe(validRequest.selectedText);
+        expect(result.data.selectedPosition).toBe(validRequest.selectedPosition);
+        expect(result.data.isPageBodyPartial).toBe(validRequest.isPageBodyPartial);
+        expect(result.data.partialPageBodyStartIndex).toBe(validRequest.partialPageBodyStartIndex);
+      }
+    });
+
+    test('should fail when threadId is missing', () => {
+      const invalidRequest = {
+        userMessage: 'Update code',
+        pageBody: 'code here',
+      };
+
+      const result = EditRequestBodySchema.safeParse(invalidRequest);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].path).toEqual(['threadId']);
+      }
+    });
+
+    test('should fail when userMessage is missing', () => {
+      const invalidRequest = {
+        threadId: 'thread-123',
+        pageBody: 'code here',
+      };
+
+      const result = EditRequestBodySchema.safeParse(invalidRequest);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].path).toEqual(['userMessage']);
+      }
+    });
+
+    test('should fail when pageBody is missing', () => {
+      const invalidRequest = {
+        threadId: 'thread-123',
+        userMessage: 'Update code',
+      };
+
+      const result = EditRequestBodySchema.safeParse(invalidRequest);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].path).toEqual(['pageBody']);
+      }
+    });
+
+    test('should validate when optional fields are omitted', () => {
+      const validRequest = {
+        threadId: 'thread-123',
+        userMessage: 'Simple update',
+        pageBody: 'function test() {}',
+      };
+
+      const result = EditRequestBodySchema.safeParse(validRequest);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.aiAssistantId).toBeUndefined();
+        expect(result.data.selectedText).toBeUndefined();
+        expect(result.data.selectedPosition).toBeUndefined();
+        expect(result.data.isPageBodyPartial).toBeUndefined();
+        expect(result.data.partialPageBodyStartIndex).toBeUndefined();
+      }
+    });
+
+    test('should allow extra fields (non-strict mode)', () => {
+      const validRequest = {
+        threadId: 'thread-123',
+        userMessage: 'Update code',
+        pageBody: 'code here',
+        extraField: 'ignored',
+      };
+
+      const result = EditRequestBodySchema.safeParse(validRequest);
+      expect(result.success).toBe(true);
+    });
+  });
+
   describe('Type inference', () => {
+    test('EditRequestBody type should match schema', () => {
+      const editRequest: EditRequestBody = {
+        threadId: 'thread-123',
+        userMessage: 'Test message',
+        pageBody: 'const test = true;',
+      };
+
+      const result = EditRequestBodySchema.safeParse(editRequest);
+      expect(result.success).toBe(true);
+    });
+
     test('SseMessage type should match schema', () => {
       const message: SseMessage = {
         appendedMessage: 'Test message',

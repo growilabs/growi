@@ -1,13 +1,20 @@
+import { useCallback } from 'react';
+
 import type { HasObjectId, IExternalAccount, IUser } from '@growi/core/dist/interfaces';
 import { useTranslation } from 'next-i18next';
 import type { SWRConfiguration, SWRResponse } from 'swr';
 import useSWR from 'swr';
 
+import type {
+  IResGenerateAccessToken, IResGetAccessToken, IAccessTokenInfo,
+} from '~/interfaces/access-token';
 import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 import { useIsGuestUser } from '~/stores-universal/context';
 import loggerFactory from '~/utils/logger';
 
-import { apiv3Get, apiv3Put } from '../client/util/apiv3-client';
+import {
+  apiv3Delete, apiv3Get, apiv3Put, apiv3Post,
+} from '../client/util/apiv3-client';
 
 import { useStaticSWR } from './use-static-swr';
 
@@ -109,4 +116,37 @@ export const useSWRxPersonalExternalAccounts = (): SWRResponse<(IExternalAccount
     '/personal-setting/external-accounts',
     endpoint => apiv3Get(endpoint).then(response => response.data.externalAccounts),
   );
+};
+
+
+interface IAccessTokenOption {
+  generateAccessToken: (info: IAccessTokenInfo) => Promise<IResGenerateAccessToken>,
+  deleteAccessToken: (tokenId: string) => Promise<void>,
+  deleteAllAccessTokens: (userId: string) => Promise<void>,
+}
+
+export const useSWRxAccessToken = (): SWRResponse< IResGetAccessToken[] | null, Error> & IAccessTokenOption => {
+  const generateAccessToken = useCallback(async(info) => {
+    const res = await apiv3Post<IResGenerateAccessToken>('/personal-setting/access-token', info);
+    return res.data;
+  }, []);
+  const deleteAccessToken = useCallback(async(tokenId: string) => {
+    await apiv3Delete('/personal-setting/access-token', { tokenId });
+  }, []);
+  const deleteAllAccessTokens = useCallback(async() => {
+    await apiv3Delete('/personal-setting/access-token/all');
+  }, []);
+
+  const swrResult = useSWR(
+    '/personal-setting/access-token',
+    endpoint => apiv3Get(endpoint).then(response => response.data.accessTokens),
+  );
+
+  return {
+    ...swrResult,
+    generateAccessToken,
+    deleteAccessToken,
+    deleteAllAccessTokens,
+  };
+
 };

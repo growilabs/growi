@@ -142,7 +142,6 @@
   "edited this page": "edited this page.",
   "List Drafts": "Drafts",
   "Deleted Pages": "Deleted Pages",
-  "Questionnaire": "Questionnaire",
   "Disassociate": "Disassociate",
   "No bookmarks yet": "No bookmarks yet",
   "add_bookmark": "Add to Bookmarks",
@@ -222,6 +221,9 @@
       "profile_image2": "Set up AWS or enable local uploads."
     }
   },
+  "API Token Settings": "API token settings",
+  "Current API Token": "Current API token",
+  "Update API Token": "Update API token",
   "page_me_apitoken": {
     "api_token": "API Token",
     "notice": {
@@ -230,6 +232,35 @@
       "update_token2": "You will need to update the API token in any existing processes."
     },
     "form_help": {}
+  },
+  "Access Token Settings": "Access token settings",
+  "page_me_access_token": {
+    "access_token": "Access token",
+    "expiredAt": "Expiration date",
+    "description": "Description",
+    "scope": "Scope",
+    "scope_read": "Read",
+    "action": "Action",
+    "create_token": "Create Token",
+    "no_tokens_found": "No access tokens found",
+    "new_token": {
+      "title": "New access token",
+      "copy_to_clipboard": "Copy to clipboard",
+      "message": "This token will only be displayed once. Please save it securely."
+    },
+    "modal": {
+      "message": "Are you sure you want to delete this access token?",
+      "alert": "This action cannot be undone.",
+      "delete_token": "Delete Token"
+    },
+    "form": {
+      "title": "Create New Access Token",
+      "expiredAt_desc": "Select when this access token should expire.",
+      "description_desc": "Provide a description to help you identify this token later",
+      "description_max_length": "Description must be less than {{length}} characters",
+      "scope_desc": "Select the scope of the access token."
+    },
+    "copy_to_clipboard": "Copy to clipboard"
   },
   "Password": "Password",
   "Password Settings": "Password settings",
@@ -261,9 +292,6 @@
   },
   "API Settings": "API settings",
   "Other Settings": "Other Settings",
-  "API Token Settings": "API token settings",
-  "Current API Token": "Current API token",
-  "Update API Token": "Update API token",
   "in_app_notification_settings": {
     "in_app_notification_settings": "In-App Notification Settings",
     "subscribe_settings": "Settings to automatically subscribe (Receive notifications) to pages",
@@ -479,9 +507,27 @@
       "Search in Editor": "Search in Editor",
       "Move Line": "Move Line",
       "Copy Line": "Copy Line",
-      "Toggle Line": "Toggle Line Comment",
       "Insert Line": "Insert Line",
-      "Post Comment": "(Post Comment)"
+      "Post Comment": "(Post Comment)",
+      "Multiple Cursors": "Multiple Cursors",
+      "Or Alt Click": "or Alt + Click"
+    },
+    "format": {
+      "title": "Format Settings (Editor)",
+      "Bold": "Bold",
+      "Italic": "Italic",
+      "Strikethrough": "Strikethrough",
+      "Code Text": "Code Text",
+      "Hyperlink": "Hyperlink"
+    },
+    "line_settings": {
+      "title": "Line Settings (Editor)",
+      "Bullet List": "Bullet List",
+      "Numbered List": "Numbered List",
+      "Quote": "Quote",
+      "Code Block": "Code Block",
+      "Comment Out": "Comment Out",
+      "Comment Out Desc": "(Hide)"
     }
   },
   "modal_resolve_conflict": {
@@ -497,6 +543,8 @@
   },
   "sidebar_ai_assistant": {
     "reference_pages_label": "Reference pages",
+    "recent_chat": "Recent chat",
+    "no_recent_chat": "No recent chat",
     "placeholder": "Ask me anything.",
     "knowledge_assistant_placeholder": "Ask me anything.",
     "editor_assistant_placeholder": "Can I help you with anything?",
@@ -552,6 +600,17 @@
       "create_failed": "Failed to create assistant",
       "update_failed": "Failed to update assistant"
     },
+    "select_source_pages": "Select pages for the assistant to reference",
+    "search_reference_pages_by_keyword": "Search for pages the assistant will reference by keyword",
+    "search_by_keyword": "Search by keyword",
+    "enter_keywords": "Enter keywords",
+    "max_items_space_separated_hint": "Enter up to 5 items separated by spaces",
+    "select_assistant_reference_pages": "Select pages for the assistant to reference",
+    "reference_pages": "Reference pages",
+    "no_pages_selected": "No pages selected",
+    "can_add_later": "You can add more later",
+    "next": "Next",
+    "select_from_page_tree": "Select from page tree",
     "edit_page_description": "Edit pages that the assistant can reference.<br> The assistant can reference up to {{limitLearnablePageCountPerAssistant}} pages including child pages.",
     "default_instruction": "You are the knowledge assistant for this Wiki.\n\n## Multilingual Support:\nRespond in the same language the user uses in their input.\n",
     "add_page_button": "Add page",
@@ -603,11 +662,12 @@
   "default_ai_assistant": {
     "not_set": "Default assistant is not set"
   },
-  "ai_assistant_tree": {
+  "ai_assistant_substance": {
     "add_assistant": "Add Assistant",
     "my_assistants": "My Assistants",
     "team_assistants": "Team Assistants",
     "thread_does_not_exist": "No threads exist",
+    "recent_threads": "Recent Items",
     "toaster": {
       "ai_assistant_deleted_success": "Assistant deleted",
       "ai_assistant_deleted_failed": "Failed to delete assistant",
@@ -615,6 +675,10 @@
       "thread_deleted_failed": "Failed to delete thread",
       "ai_assistant_set_default_success": "Default assistant set successfully",
       "ai_assistant_set_default_failed": "Failed to set default assistant"
+    },
+    "delete_modal": {
+      "title": "Delete Assistant",
+      "confirm_message": "Are you sure you want to delete this assistant?"
     }
   },
   "link_edit": {
@@ -833,7 +897,7 @@
     "Password field is required": "Password field is required.",
     "Username or E-mail has invalid characters": "Username or E-mail has invalid characters.",
     "user_not_found": "User not found.",
-    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>DuplicatedUsernameException occured</strong></p><p class='mb-0'> Your {{ failedProviderForDuplicatedUsernameException }} authentication was succeeded, but a new user could not be created. See the issue <a href='https://github.com/weseek/growi/issues/193'>#193</a>.</p>"
+    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>DuplicatedUsernameException occured</strong></p><p class='mb-0'> Your {{ failedProviderForDuplicatedUsernameException }} authentication was succeeded, but a new user could not be created. See the issue <a href='https://github.com/growilabs/growi/issues/193'>#193</a>.</p>"
   },
   "grid_edit": {
     "create_bootstrap_4_grid": "Create Bootstrap 4 Grid",
@@ -957,23 +1021,6 @@
   "v5_page_migration": {
     "page_tree_not_avaliable": "Page tree feature is not available yet.",
     "go_to_settings": "Go to settings to enable the feature"
-  },
-  "questionnaire": {
-    "give_us_feedback": "Give us feedback for improvements",
-    "thank_you_for_answering": "Thank you for answering",
-    "additional_feedback": "Send us additional feedback from the user icon dropdown.",
-    "dont_show_again": "Don`t show again",
-    "deny": "Don't answer",
-    "agree": "Agree",
-    "disagree": "Disagree",
-    "answer": "Answer",
-    "no_answer": "No answer",
-    "settings": "Questionnaire settings",
-    "failed_to_send": "Failed to send feedback",
-    "denied": "The questionnaire won't be shown again",
-    "personal_settings_explanation": "Questionnaires for improving GROWI will be shown. If you have other feedbacks, you can send them from the user icon dropdown.",
-    "enable_questionnaire": "Enable questionnaire",
-    "disabled_by_admin": "Questionnaire is disabled by admin"
   },
   "tag_edit_modal": {
     "edit_tags": "Edit Tags",

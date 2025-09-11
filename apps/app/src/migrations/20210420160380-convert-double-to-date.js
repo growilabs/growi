@@ -1,7 +1,11 @@
 import mongoose from 'mongoose';
 
 import getPageModel from '~/server/models/page';
-import { getModelSafely, getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
+import {
+  getModelSafely,
+  getMongoUri,
+  mongoOptions,
+} from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:remove-crowi-lauout');
@@ -31,7 +35,6 @@ module.exports = {
     await Page.bulkWrite(operations);
 
     logger.info('Migration has successfully applied');
-
   },
 
   down(db) {

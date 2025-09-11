@@ -8,7 +8,7 @@ on:
         default: ${{ github.sha }}
       image-name:
         type: string
-        default: weseek/growi
+        default: growilabs/growi
       tag-temporary:
         type: string
         default: latest

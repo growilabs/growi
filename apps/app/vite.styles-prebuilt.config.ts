@@ -6,9 +6,7 @@ export default defineConfig({
   build: {
     outDir: 'src/styles/prebuilt',
     rollupOptions: {
-      input: [
-        '/src/styles/vendor.scss',
-      ],
+      input: ['/src/styles/vendor.scss'],
       output: {
         assetFileNames: '[name].[ext]', // not attach hash
       },

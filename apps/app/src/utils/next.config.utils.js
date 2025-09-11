@@ -24,10 +24,10 @@ exports.listScopedPackages = (scopes, opts = defaultOpts) => {
 
   nodeModulesPaths.forEach((nodeModulesPath) => {
     fs.readdirSync(nodeModulesPath)
-      .filter(name => scopes.includes(name))
+      .filter((name) => scopes.includes(name))
       .forEach((scope) => {
         fs.readdirSync(path.resolve(nodeModulesPath, scope))
-          .filter(name => !name.startsWith('.'))
+          .filter((name) => !name.startsWith('.'))
           .forEach((folderName) => {
             const packageJsonPath = path.resolve(
               nodeModulesPath,
@@ -57,8 +57,8 @@ exports.listPrefixedPackages = (prefixes, opts = defaultOpts) => {
 
   nodeModulesPaths.forEach((nodeModulesPath) => {
     fs.readdirSync(nodeModulesPath)
-      .filter(name => prefixes.some(prefix => name.startsWith(prefix)))
-      .filter(name => !name.startsWith('.'))
+      .filter((name) => prefixes.some((prefix) => name.startsWith(prefix)))
+      .filter((name) => !name.startsWith('.'))
       .forEach((folderName) => {
         const packageJsonPath = path.resolve(
           nodeModulesPath,

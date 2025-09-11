@@ -68,9 +68,6 @@ export const CONFIG_KEYS = [
   'app:auditLogActionGroupSize',
   'app:auditLogAdditionalActions',
   'app:auditLogExcludeActions',
-  'app:questionnaireServerOrigin',
-  'app:questionnaireCronSchedule',
-  'app:questionnaireCronMaxHoursUntilRequest',
   'app:serviceType',
   'app:deploymentType',
   'app:ssrMaxRevisionBodyLength',
@@ -268,6 +265,7 @@ export const CONFIG_KEYS = [
   // OpenTelemetry Settings
   'otel:enabled',
   'otel:isAppSiteUrlHashed',
+  'otel:anonymizeInBestEffort',
   'otel:serviceInstanceId',
 
   // S2S Messaging Pubsub Settings
@@ -280,10 +278,6 @@ export const CONFIG_KEYS = [
   's2cMessagingPubsub:connectionsLimit',
   's2cMessagingPubsub:connectionsLimitForAdmin',
   's2cMessagingPubsub:connectionsLimitForGuest',
-
-  // Questionnaire Settings
-  'questionnaire:isQuestionnaireEnabled',
-  'questionnaire:isAppSiteUrlHashed',
 
   // Notification Settings
   'notification:owner-page:isEnabled',
@@ -332,6 +326,8 @@ export const CONFIG_KEYS = [
   'app:isBulkExportPagesEnabled',
   'env:useOnlyEnvVars:app:isBulkExportPagesEnabled',
 
+  // Access Token Settings
+  'accessToken:deletionCronExpression',
 ] as const;
 
 
@@ -437,9 +433,9 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'FILE_UPLOAD_TOTAL_LIMIT',
     defaultValue: Infinity,
   }),
-  'app:elasticsearchVersion': defineConfig<number>({
+  'app:elasticsearchVersion': defineConfig<7|8|9>({
     envVarName: 'ELASTICSEARCH_VERSION',
-    defaultValue: 8,
+    defaultValue: 9,
   }),
   'app:elasticsearchUri': defineConfig<string | undefined>({
     envVarName: 'ELASTICSEARCH_URI',
@@ -501,25 +497,13 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'AUDIT_LOG_EXCLUDE_ACTIONS',
     defaultValue: undefined,
   }),
-  'app:questionnaireServerOrigin': defineConfig<string>({
-    envVarName: 'QUESTIONNAIRE_SERVER_ORIGIN',
-    defaultValue: 'https://q.growi.org',
-  }),
-  'app:questionnaireCronSchedule': defineConfig<string>({
-    envVarName: 'QUESTIONNAIRE_CRON_SCHEDULE',
-    defaultValue: '0 22 * * *',
-  }),
-  'app:questionnaireCronMaxHoursUntilRequest': defineConfig<number>({
-    envVarName: 'QUESTIONNAIRE_CRON_MAX_HOURS_UNTIL_REQUEST',
-    defaultValue: 4,
-  }),
   'app:serviceType': defineConfig<GrowiServiceType>({
     envVarName: 'SERVICE_TYPE',
     defaultValue: GrowiServiceType.onPremise,
   }),
   'app:deploymentType': defineConfig<GrowiDeploymentType>({
     envVarName: 'DEPLOYMENT_TYPE',
-    defaultValue: GrowiDeploymentType.others,
+    defaultValue: GrowiDeploymentType.node,
   }),
   'app:ssrMaxRevisionBodyLength': defineConfig<number>({
     envVarName: 'SSR_MAX_REVISION_BODY_LENGTH',
@@ -1127,10 +1111,14 @@ export const CONFIG_DEFINITIONS = {
   // OpenTelemetry Settings
   'otel:enabled': defineConfig<boolean>({
     envVarName: 'OPENTELEMETRY_ENABLED',
-    defaultValue: false,
+    defaultValue: true,
   }),
   'otel:isAppSiteUrlHashed': defineConfig<boolean>({
     envVarName: 'OPENTELEMETRY_IS_APP_SITE_URL_HASHED',
+    defaultValue: false,
+  }),
+  'otel:anonymizeInBestEffort': defineConfig<boolean>({
+    envVarName: 'OPENTELEMETRY_ANONYMIZE_IN_BEST_EFFORT',
     defaultValue: false,
   }),
   'otel:serviceInstanceId': defineConfig<string | undefined>({
@@ -1168,16 +1156,6 @@ export const CONFIG_DEFINITIONS = {
   's2cMessagingPubsub:connectionsLimitForGuest': defineConfig<number>({
     envVarName: 'S2CMSG_PUBSUB_CONNECTIONS_LIMIT_FOR_GUEST',
     defaultValue: 2000,
-  }),
-
-  // Questionnaire Settings
-  'questionnaire:isQuestionnaireEnabled': defineConfig<boolean>({
-    envVarName: 'QUESTIONNAIRE_IS_ENABLE_QUESTIONNAIRE',
-    defaultValue: true,
-  }),
-  'questionnaire:isAppSiteUrlHashed': defineConfig<boolean>({
-    envVarName: 'QUESTIONNAIRE_IS_APP_SITE_URL_HASHED',
-    defaultValue: false,
   }),
 
   // Notification Settings
@@ -1313,6 +1291,12 @@ export const CONFIG_DEFINITIONS = {
   'env:useOnlyEnvVars:app:isBulkExportPagesEnabled': defineConfig<boolean>({
     envVarName: 'BULK_EXPORT_PAGES_ENABLED_USES_ONLY_ENV_VARS',
     defaultValue: false,
+  }),
+
+  // Access Token Settings
+  'accessToken:deletionCronExpression': defineConfig<string>({
+    envVarName: 'ACCESS_TOKEN_DELETION_CRON_EXPRESSION',
+    defaultValue: '0 15 * * *',
   }),
 } as const;
 

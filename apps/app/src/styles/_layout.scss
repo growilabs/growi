@@ -42,8 +42,12 @@ body {
 .main {
   margin-top: 1rem;
 
-  @include bs.media-breakpoint-up(lg) {
+  @include bs.media-breakpoint-up(md) {
     margin-top: 2rem;
+  }
+
+  @include bs.media-breakpoint-up(lg) {
+    margin-top: 4rem;
   }
 }
 

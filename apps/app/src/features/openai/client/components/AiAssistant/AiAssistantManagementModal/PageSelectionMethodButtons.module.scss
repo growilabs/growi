@@ -1,0 +1,28 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+// == Colors
+.page-selection-method-buttons :global {
+  .page-selection-method-btn {
+      &:hover {
+        color: var(--bs-primary);
+        background-color: rgba(var(--bs-primary-rgb), 0.1);
+        border-color: var(--bs-primary) !important;
+      }
+    }
+}
+
+@include bs.color-mode(light) {
+  .page-selection-method-buttons :global {
+    .page-selection-method-btn {
+      border: 2px solid bs.$gray-300;
+    }
+  }
+}
+
+@include bs.color-mode(dark) {
+  .page-selection-method-buttons :global {
+    .page-selection-method-btn {
+      border: 2px solid bs.$gray-700;
+    }
+  }
+}

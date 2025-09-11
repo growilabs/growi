@@ -1,7 +1,7 @@
-import fs from 'fs';
-import path from 'path';
-import { Readable, Writable } from 'stream';
-import { pipeline as pipelinePromise } from 'stream/promises';
+import fs from 'node:fs';
+import path from 'node:path';
+import { Readable, Writable } from 'node:stream';
+import { pipeline as pipelinePromise } from 'node:stream/promises';
 
 import { OnInit } from '@tsed/common';
 import { Service } from '@tsed/di';
@@ -24,8 +24,9 @@ export const JobStatus = {
   PDF_EXPORT_DONE: 'PDF_EXPORT_DONE',
 } as const;
 
-export type JobStatusSharedWithGrowi = typeof JobStatusSharedWithGrowi[keyof typeof JobStatusSharedWithGrowi]
-export type JobStatus = typeof JobStatus[keyof typeof JobStatus]
+export type JobStatusSharedWithGrowi =
+  (typeof JobStatusSharedWithGrowi)[keyof typeof JobStatusSharedWithGrowi];
+export type JobStatus = (typeof JobStatus)[keyof typeof JobStatus];
 
 interface JobInfo {
   expirationDate: Date;
@@ -35,7 +36,6 @@ interface JobInfo {
 
 @Service()
 class PdfConvertService implements OnInit {
-
   private puppeteerCluster: Cluster | undefined;
 
   private maxConcurrency = 1;
@@ -43,8 +43,6 @@ class PdfConvertService implements OnInit {
   private convertRetryLimit = 5;
 
   private tmpOutputRootDir = '/tmp/page-bulk-export';
-
-  private tmpHtmlDir = `${this.tmpOutputRootDir}/html`;
 
   private jobList: {
     [key: string]: JobInfo;
@@ -65,17 +63,16 @@ class PdfConvertService implements OnInit {
    * @param appId application ID for GROWI.cloud
    */
   async registerOrUpdateJob(
-      jobId: string,
-      expirationDate: Date,
-      status: JobStatusSharedWithGrowi,
-      appId?: number,
+    jobId: string,
+    expirationDate: Date,
+    status: JobStatusSharedWithGrowi,
+    appId?: number,
   ): Promise<void> {
     const isJobNew = !(jobId in this.jobList);
 
     if (isJobNew) {
       this.jobList[jobId] = { expirationDate, status };
-    }
-    else {
+    } else {
       const jobInfo = this.jobList[jobId];
       jobInfo.expirationDate = expirationDate;
 
@@ -133,9 +130,11 @@ class PdfConvertService implements OnInit {
 
   private isJobCompleted(jobId: string): boolean {
     if (this.jobList[jobId] == null) return true;
-    return this.jobList[jobId].status === JobStatus.PDF_EXPORT_DONE || this.jobList[jobId].status === JobStatus.FAILED;
+    return (
+      this.jobList[jobId].status === JobStatus.PDF_EXPORT_DONE ||
+      this.jobList[jobId].status === JobStatus.FAILED
+    );
   }
-
 
   /**
    * Read html files from shared fs path, convert them to pdf, and save them to shared fs path.
@@ -143,10 +142,13 @@ class PdfConvertService implements OnInit {
    * @param jobId PageBulkExportJob ID
    * @param appId application ID for GROWI.cloud
    */
-  private async readHtmlAndConvertToPdfUntilFinish(jobId: string, appId?: number): Promise<void> {
+  private async readHtmlAndConvertToPdfUntilFinish(
+    jobId: string,
+    appId?: number,
+  ): Promise<void> {
     while (!this.isJobCompleted(jobId)) {
       // eslint-disable-next-line no-await-in-loop
-      await new Promise(resolve => setTimeout(resolve, 10 * 1000));
+      await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
 
       try {
         if (new Date() > this.jobList[jobId].expirationDate) {
@@ -160,11 +162,12 @@ class PdfConvertService implements OnInit {
         // eslint-disable-next-line no-await-in-loop
         await pipelinePromise(htmlReadable, pdfWritable);
         this.jobList[jobId].currentStream = undefined;
-      }
-      catch (err) {
+      } catch (err) {
         this.logger.error('Failed to convert html to pdf', err);
         this.jobList[jobId].status = JobStatus.FAILED;
-        this.jobList[jobId].currentStream?.destroy(new Error('Failed to convert html to pdf'));
+        this.jobList[jobId].currentStream?.destroy(
+          new Error('Failed to convert html to pdf'),
+        );
         break;
       }
     }
@@ -177,8 +180,15 @@ class PdfConvertService implements OnInit {
    * @returns readable stream
    */
   private getHtmlReadable(jobId: string, appId?: number): Readable {
-    const jobHtmlDir = path.join(this.tmpHtmlDir, appId?.toString() ?? '', jobId);
-    const htmlFileEntries = fs.readdirSync(jobHtmlDir, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile());
+    const jobHtmlDir = path.join(
+      this.tmpOutputRootDir,
+      appId?.toString() ?? '',
+      'html',
+      jobId,
+    );
+    const htmlFileEntries = fs
+      .readdirSync(jobHtmlDir, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile());
     let index = 0;
 
     const jobList = this.jobList;
@@ -187,7 +197,10 @@ class PdfConvertService implements OnInit {
       objectMode: true,
       async read() {
         if (index >= htmlFileEntries.length) {
-          if (jobList[jobId].status === JobStatus.HTML_EXPORT_DONE && htmlFileEntries.length === 0) {
+          if (
+            jobList[jobId].status === JobStatus.HTML_EXPORT_DONE &&
+            htmlFileEntries.length === 0
+          ) {
             jobList[jobId].status = JobStatus.PDF_EXPORT_DONE;
           }
           this.push(null);
@@ -212,8 +225,23 @@ class PdfConvertService implements OnInit {
   private getPdfWritable(): Writable {
     return new Writable({
       objectMode: true,
-      write: async(pageInfo: PageInfo, encoding, callback) => {
-        const fileOutputPath = pageInfo.htmlFilePath.replace(new RegExp(`^${this.tmpHtmlDir}`), this.tmpOutputRootDir).replace(/\.html$/, '.pdf');
+      write: async (pageInfo: PageInfo, encoding, callback) => {
+        const pattern = new RegExp(
+          `^${this.tmpOutputRootDir}(?:\\/([0-9]+))?\\/html\\/(.+?)\\.html$`,
+        );
+
+        const match = pageInfo.htmlFilePath.match(pattern);
+        if (match == null) {
+          // Skip to next pageInfo if path doesn't match expected layout
+          callback();
+          return;
+        }
+
+        // match[1] → optional numeric dir, match[2] → basename (without extension)
+        const numericSegment = match[1] ? `/${match[1]}` : '';
+        const baseName = match[2];
+
+        const fileOutputPath = `${this.tmpOutputRootDir}${numericSegment}/${baseName}.pdf`;
         const fileOutputParentPath = this.getParentPath(fileOutputPath);
 
         try {
@@ -222,8 +250,7 @@ class PdfConvertService implements OnInit {
           await fs.promises.writeFile(fileOutputPath, pdfBody);
 
           await fs.promises.rm(pageInfo.htmlFilePath, { force: true });
-        }
-        catch (err) {
+        } catch (err) {
           if (err instanceof Error) {
             callback(err);
           }
@@ -240,13 +267,15 @@ class PdfConvertService implements OnInit {
    * @returns converted pdf
    */
   private async convertHtmlToPdf(htmlString: string): Promise<Buffer> {
-    const executeConvert = async(retries: number): Promise<Buffer> => {
+    const executeConvert = async (retries: number): Promise<Buffer> => {
       try {
         return this.puppeteerCluster?.execute(htmlString);
-      }
-      catch (err) {
+      } catch (err) {
         if (retries > 0) {
-          this.logger.error('Failed to convert markdown to pdf. Retrying...', err);
+          this.logger.error(
+            'Failed to convert markdown to pdf. Retrying...',
+            err,
+          );
           return executeConvert(retries - 1);
         }
         throw err;
@@ -268,9 +297,13 @@ class PdfConvertService implements OnInit {
       concurrency: Cluster.CONCURRENCY_PAGE,
       maxConcurrency: this.maxConcurrency,
       workerCreationDelay: 10000,
+      puppeteerOptions: {
+        // ref) https://github.com/growilabs/growi/pull/10192
+        args: ['--no-sandbox'],
+      },
     });
 
-    await this.puppeteerCluster.task(async({ page, data: htmlString }) => {
+    await this.puppeteerCluster.task(async ({ page, data: htmlString }) => {
       await page.setContent(htmlString, { waitUntil: 'domcontentloaded' });
       await page.addStyleTag({
         content: `
@@ -282,7 +315,10 @@ class PdfConvertService implements OnInit {
       await page.emulateMediaType('screen');
       const pdfResult = await page.pdf({
         margin: {
-          top: '100px', right: '50px', bottom: '100px', left: '50px',
+          top: '100px',
+          right: '50px',
+          bottom: '100px',
+          left: '50px',
         },
         printBackground: true,
         format: 'A4',
@@ -303,7 +339,6 @@ class PdfConvertService implements OnInit {
     }
     return parentPath;
   }
-
 }
 
 export default PdfConvertService;

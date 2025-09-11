@@ -1,6 +1,5 @@
-import type React from 'react';
-
 import type { GrowiFacade } from '@growi/core';
+import type React from 'react';
 
 declare global {
   interface Window {

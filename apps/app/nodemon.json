@@ -1,9 +1,6 @@
 {
   "ext": "js,ts,json",
-  "watch": [
-    ".",
-    "../../packages/**/dist"
-  ],
+  "watch": [".", "../../packages/**/dist"],
   "ignore": [
     ".next",
     "public/static",

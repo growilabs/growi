@@ -12,7 +12,6 @@ import math from 'remark-math';
 import deepmerge from 'ts-deepmerge';
 import type { Pluggable, PluginTuple } from 'unified';
 
-
 import { CodeBlock } from '~/components/ReactMarkdownComponents/CodeBlock';
 import { NextLink } from '~/components/ReactMarkdownComponents/NextLink';
 import type { RendererOptions } from '~/interfaces/renderer-options';
@@ -22,6 +21,7 @@ import loggerFactory from '~/utils/logger';
 
 import { tagNames as recommendedTagNames, attributes as recommendedAttributes } from './recommended-whitelist';
 import * as addClass from './rehype-plugins/add-class';
+import * as addInlineProperty from './rehype-plugins/add-inline-code-property';
 import { relativeLinks } from './rehype-plugins/relative-links';
 import { relativeLinksByPukiwikiLikeLinker } from './rehype-plugins/relative-links-by-pukiwiki-like-linker';
 import * as codeBlock from './remark-plugins/codeblock';
@@ -115,6 +115,7 @@ export const generateCommonOptions = (pagePath: string|undefined): RendererOptio
       [addClass.rehypePlugin, {
         table: 'table table-bordered',
       }],
+      addInlineProperty.rehypePlugin,
     ],
     components: {
       a: NextLink,

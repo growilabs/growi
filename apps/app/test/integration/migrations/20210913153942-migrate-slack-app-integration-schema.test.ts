@@ -1,29 +1,35 @@
-import { Collection } from 'mongodb';
+import type { Collection } from 'mongodb';
 import mongoose from 'mongoose';
 
 import migrate from '~/migrations/20210913153942-migrate-slack-app-integration-schema';
 
 describe('migrate-slack-app-integration-schema', () => {
-
   let collection: Collection;
 
-  beforeAll(async() => {
+  beforeAll(async () => {
     collection = mongoose.connection.collection('slackappintegrations');
 
     await collection.insertMany([
       {
-        tokenGtoP: 'tokenGtoP1', tokenPtoG: 'tokenPtoG1', permissionsForBroadcastUseCommands: { foo: true }, permissionsForSingleUseCommands: { bar: true },
+        tokenGtoP: 'tokenGtoP1',
+        tokenPtoG: 'tokenPtoG1',
+        permissionsForBroadcastUseCommands: { foo: true },
+        permissionsForSingleUseCommands: { bar: true },
       },
       {
-        tokenGtoP: 'tokenGtoP2', tokenPtoG: 'tokenPtoG2', supportedCommandsForBroadcastUse: ['foo'], supportedCommandsForSingleUse: ['bar'],
+        tokenGtoP: 'tokenGtoP2',
+        tokenPtoG: 'tokenPtoG2',
+        supportedCommandsForBroadcastUse: ['foo'],
+        supportedCommandsForSingleUse: ['bar'],
       },
       {
-        tokenGtoP: 'tokenGtoP3', tokenPtoG: 'tokenPtoG3',
+        tokenGtoP: 'tokenGtoP3',
+        tokenPtoG: 'tokenPtoG3',
       },
     ]);
   });
 
-  test('up is applied successfully', async() => {
+  test('up is applied successfully', async () => {
     // setup
     const doc1 = await collection.findOne({ tokenGtoP: 'tokenGtoP1' });
     const doc2 = await collection.findOne({ tokenGtoP: 'tokenGtoP2' });
@@ -46,12 +52,8 @@ describe('migrate-slack-app-integration-schema', () => {
       _id: doc2?._id,
       tokenGtoP: 'tokenGtoP2',
       tokenPtoG: 'tokenPtoG2',
-      supportedCommandsForBroadcastUse: [
-        'foo',
-      ],
-      supportedCommandsForSingleUse: [
-        'bar',
-      ],
+      supportedCommandsForBroadcastUse: ['foo'],
+      supportedCommandsForSingleUse: ['bar'],
     });
     expect(doc3).toStrictEqual({
       _id: doc3?._id,
@@ -116,5 +118,4 @@ describe('migrate-slack-app-integration-schema', () => {
       },
     });
   });
-
 });

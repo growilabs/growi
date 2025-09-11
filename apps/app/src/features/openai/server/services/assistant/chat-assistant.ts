@@ -4,7 +4,9 @@ import { configManager } from '~/server/service/config-manager';
 
 import { AssistantType } from './assistant-types';
 import { getOrCreateAssistant } from './create-assistant';
-import { instructionsForFileSearch, instructionsForInformationTypes, instructionsForInjectionCountermeasures } from './instructions/commons';
+import {
+  instructionsForFileSearch, instructionsForInformationTypes, instructionsForInjectionCountermeasures, instructionsForSystem,
+} from './instructions/commons';
 
 
 const instructionsForResponseModes = `## Response Modes
@@ -63,6 +65,10 @@ export const getOrCreateChatAssistant = async(): Promise<OpenAI.Beta.Assistant> 
     instructions: `# Your Role
 You are an Knowledge Assistant for GROWI, a markdown wiki system.
 Your task is to respond to user requests with relevant answers and help them obtain the information they need.
+---
+
+${instructionsForSystem}
+
 ---
 
 ${instructionsForInjectionCountermeasures}

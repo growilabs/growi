@@ -1,0 +1,7 @@
+.thread-list :global {
+  li {
+    &:hover {
+      background-color: var(--bs-secondary-bg) !important;
+    }
+  }
+}

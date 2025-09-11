@@ -1,10 +1,36 @@
 # Changelog
 
-## [Unreleased](https://github.com/weseek/growi/compare/v7.2.8...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.2.10...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
 
-## [v7.2.8](https://github.com/weseek/growi/compare/v7.2.7...v7.2.8) - 2025-06-26
+## [v7.2.10](https://github.com/weseek/growi/compare/v7.2.9...v7.2.10) - 2025-08-20
+
+### 🐛 Bug Fixes
+
+* fix: Auto-scroll to anchor for page view (for v7.2.x) (#10241) @miya
+* fix: OpenTelemetry metrics setup (#10219) @yuki-takei
+* fix: Share link copy button couldn't be pressed (#10221) @yuki-takei
+* fix: Mermaid diagrams are not displayed when svg ids are duplicated (for v7.2.x) (#10184) @miya
+
+### 🧰 Maintenance
+
+* support: Change OpenTelemetry configuration (#10218) @yuki-takei
+
+## [v7.2.9](https://github.com/growilabs/growi/compare/v7.2.8...v7.2.9) - 2025-07-01
+
+### 🚀 Improvement
+
+* imprv(ai): Assistant instructions (#10129) @yuki-takei
+* imprv: OpenTelemetry phase 2 (#10095) @yuki-takei
+* imprv: Adjust margin-top for .main at md and lg breakpoints (#10131) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Sharelink expiration date parsing when the date is cleared by the calendar UI (#10132) @yuki-takei
+* fix: Cannot change file upload destination to "MongoDB (GridFS)" or "local" for dev/7.2.x (#10119) @miya
+
+## [v7.2.8](https://github.com/growilabs/growi/compare/v7.2.7...v7.2.8) - 2025-06-26
 
 ### 💎 Features
 
@@ -34,7 +60,7 @@
 * support: Configure biome for presentation package (#10067) @arafubeatbox
 * ci(deps): bump next from 14.2.26 to 14.2.30 (#10068) @[dependabot[bot]](https://github.com/apps/dependabot)
 
-## [v7.2.7](https://github.com/weseek/growi/compare/v7.2.6...v7.2.7) - 2025-06-11
+## [v7.2.7](https://github.com/growilabs/growi/compare/v7.2.6...v7.2.7) - 2025-06-11
 
 ### 🐛 Bug Fixes
 
@@ -49,7 +75,7 @@
 * support: Configure biome for preset-themes package (#10055) @arafubeatbox
 * support: Configure biome for remark-drawio package (#10033) @arafubeatbox
 
-## [v7.2.6](https://github.com/weseek/growi/compare/v7.2.5...v7.2.6) - 2025-06-10
+## [v7.2.6](https://github.com/growilabs/growi/compare/v7.2.5...v7.2.6) - 2025-06-10
 
 ### 💎 Features
 
@@ -79,7 +105,7 @@
 * support: OpenAPI operationId generation (#10009) @yuki-takei
 * support: Configure biome for remark-growi-directive (#9999) @arafubeatbox
 
-## [v7.2.5](https://github.com/weseek/growi/compare/v7.2.4...v7.2.5) - 2025-05-28
+## [v7.2.5](https://github.com/growilabs/growi/compare/v7.2.4...v7.2.5) - 2025-05-28
 
 ### 💎 Features
 
@@ -105,13 +131,13 @@
 * support: UI package biome migration (#9945) @arafubeatbox
 * support: Migrate linter/formatter to biome for @growi/slack package (#9917) @arafubeatbox
 
-## [v7.2.4](https://github.com/weseek/growi/compare/v7.2.3...v7.2.4) - 2025-05-15
+## [v7.2.4](https://github.com/growilabs/growi/compare/v7.2.3...v7.2.4) - 2025-05-15
 
 ### 🐛 Bug Fixes
 
 * fix: Picture size (#9938) @yuki-takei
 
-## [v7.2.3](https://github.com/weseek/growi/compare/v7.2.2...v7.2.3) - 2025-05-14
+## [v7.2.3](https://github.com/growilabs/growi/compare/v7.2.2...v7.2.3) - 2025-05-14
 
 ### 💎 Features
 
@@ -146,13 +172,13 @@
 * support(pdf-converter): Improve the official docker image size for pdf-converter (#9880) @yuki-takei
 * support: Improve the official docker image size (#9874) @yuki-takei
 
-## [v7.2.2](https://github.com/weseek/growi/compare/v7.2.1...v7.2.2) - 2025-04-17
+## [v7.2.2](https://github.com/growilabs/growi/compare/v7.2.1...v7.2.2) - 2025-04-17
 
 ### 🐛 Bug Fixes
 
 * fix: Export page API is broken (#9870) @yuki-takei
 
-## [v7.2.1](https://github.com/weseek/growi/compare/v7.2.0...v7.2.1) - 2025-04-16
+## [v7.2.1](https://github.com/growilabs/growi/compare/v7.2.0...v7.2.1) - 2025-04-16
 
 ### 💎 Features
 
@@ -187,7 +213,7 @@
 * ci(deps): bump docker/build-push-action from 4 to 6 (#9638) @[dependabot[bot]](https://github.com/apps/dependabot)
 * ci(deps): bump release-drafter/release-drafter from 5 to 6 (#9637) @[dependabot[bot]](https://github.com/apps/dependabot)
 
-## [v7.2.0](https://github.com/weseek/growi/compare/v7.1.9...v7.2.0) - 2025-03-11
+## [v7.2.0](https://github.com/growilabs/growi/compare/v7.1.9...v7.2.0) - 2025-03-11
 
 ### 💎 Features
 
@@ -224,7 +250,7 @@
 * ci(deps): bump myrotvorets/info-from-package-json-action from 2.0.1 to 2.0.2 (#9558) @dependabot
 * support: Remove legacy ConfigManager (#9624) @yuki-takei
 
-## [v7.1.9](https://github.com/weseek/growi/compare/v7.1.8...v7.1.9) - 2025-02-03
+## [v7.1.9](https://github.com/growilabs/growi/compare/v7.1.8...v7.1.9) - 2025-02-03
 
 ### 💎 Features
 
@@ -247,13 +273,13 @@
 * ci(deps): bump mongoose from 6.13.0 to 6.13.6 (#9570) @dependabot
 * ci(deps): bump katex from 0.16.11 to 0.16.21 (#9564) @dependabot
 
-## [v7.1.8](https://github.com/weseek/growi/compare/v7.1.7...v7.1.8) - 2025-01-21
+## [v7.1.8](https://github.com/growilabs/growi/compare/v7.1.7...v7.1.8) - 2025-01-21
 
 ### 🐛 Bug Fixes
 
 * fix: Escape page path when generating RegExp to find ancestors children (#9550) @yuki-takei
 
-## [v7.1.7](https://github.com/weseek/growi/compare/v7.1.6...v7.1.7) - 2025-01-16
+## [v7.1.7](https://github.com/growilabs/growi/compare/v7.1.6...v7.1.7) - 2025-01-16
 
 ### 🐛 Bug Fixes
 
@@ -268,7 +294,7 @@
 * ci(deps): bump next from 14.2.15 to 14.2.21 (#9538) @dependabot
 * ci(deps-dev): bump @marp-team/marp-core from 3.9.0 to 3.9.1 (#9530) @dependabot
 
-## [v7.1.6](https://github.com/weseek/growi/compare/v7.1.5...v7.1.6) - 2024-12-26
+## [v7.1.6](https://github.com/growilabs/growi/compare/v7.1.5...v7.1.6) - 2024-12-26
 
 ### 💎 Features
 
@@ -285,7 +311,7 @@
 
 * ci(deps): bump next from 14.2.13 to 14.2.15 (#9501) @dependabot
 
-## [v7.1.5](https://github.com/weseek/growi/compare/v7.1.4...v7.1.5) - 2024-12-13
+## [v7.1.5](https://github.com/growilabs/growi/compare/v7.1.4...v7.1.5) - 2024-12-13
 
 ### 🚀 Improvement
 
@@ -298,13 +324,13 @@
 * fix: Put `/` before the page name (#9471) @Ryosei-Fukushima
 * fix: Cannot comment when comments from rom user are allowed (#9472) @miya
 
-## [v7.1.4](https://github.com/weseek/growi/compare/v7.1.3...v7.1.4) - 2024-11-26
+## [v7.1.4](https://github.com/growilabs/growi/compare/v7.1.3...v7.1.4) - 2024-11-26
 
 ### 🐛 Bug Fixes
 
 * fix: Failed to export the page markdown (#9444) @miya
 
-## [v7.1.3](https://github.com/weseek/growi/compare/v7.1.2...v7.1.3) - 2024-11-26
+## [v7.1.3](https://github.com/growilabs/growi/compare/v7.1.2...v7.1.3) - 2024-11-26
 
 ### 💎 Features
 
@@ -321,7 +347,7 @@
 * fix: Notification for new user creation (#9434) @yuki-takei
 * fix:  Deleted pages appear in the page tree (#9337) @reiji-h
 
-## [v7.1.2](https://github.com/weseek/growi/compare/v7.1.1...v7.1.2) - 2024-11-18
+## [v7.1.2](https://github.com/growilabs/growi/compare/v7.1.1...v7.1.2) - 2024-11-18
 
 ### 🚀 Improvement
 
@@ -340,7 +366,7 @@
 * support: Import OpenAI features dynamically (#9413) @yuki-takei
 * support: Welcome back Hufflepuff badger (#9403) @satof3
 
-## [v7.1.1](https://github.com/weseek/growi/compare/v7.1.0...v7.1.1) - 2024-11-12
+## [v7.1.1](https://github.com/growilabs/growi/compare/v7.1.0...v7.1.1) - 2024-11-12
 
 ### 💎 Features
 
@@ -380,7 +406,7 @@
 * support: Avoid using req.t() (#9149) @shironegi39
 * support: Stop managing font files with Git LFS (#9351) @yuki-takei
 
-## [v7.1.0](https://github.com/weseek/growi/compare/v7.0.23...v7.1.0) - 2024-10-31
+## [v7.1.0](https://github.com/growilabs/growi/compare/v7.0.23...v7.1.0) - 2024-10-31
 
 ### BREAKING CHANGES
 
@@ -423,7 +449,7 @@
 * support: Maintenance API docs generation (#9302) @yuki-takei
 * support: Omit docs route (#9299) @yuki-takei
 
-## [v7.0.23](https://github.com/weseek/growi/compare/v7.0.22...v7.0.23) - 2024-10-24
+## [v7.0.23](https://github.com/growilabs/growi/compare/v7.0.22...v7.0.23) - 2024-10-24
 
 ### 🐛 Bug Fixes
 
@@ -434,14 +460,14 @@
 * support: Maintenance API docs generation (#9302) @yuki-takei
 * support: Omit docs route (#9299) @yuki-takei
 
-## [v7.0.22](https://github.com/weseek/growi/compare/v7.0.21...v7.0.22) - 2024-10-21
+## [v7.0.22](https://github.com/growilabs/growi/compare/v7.0.21...v7.0.22) - 2024-10-21
 
 ### 🐛 Bug Fixes
 
 * fix: Edit button appear for the side of header (#9270) @yuki-takei
 * fix: Collaborative editing occurs unstable behavior (#9267) @yuki-takei
 
-## [v7.0.21](https://github.com/weseek/growi/compare/v7.0.20...v7.0.21) - 2024-10-15
+## [v7.0.21](https://github.com/growilabs/growi/compare/v7.0.20...v7.0.21) - 2024-10-15
 
 ### 🚀 Improvement
 
@@ -459,7 +485,7 @@
 
 * support: Upgrade codemirror and yjs packages (#9218) @yuki-takei
 
-## [v7.0.20](https://github.com/weseek/growi/compare/v7.0.19...v7.0.20) - 2024-09-25
+## [v7.0.20](https://github.com/growilabs/growi/compare/v7.0.19...v7.0.20) - 2024-09-25
 
 ### 🚀 Improvement
 
@@ -493,7 +519,7 @@
 * ci(deps): bump express from 4.19.2 to 4.20.0 (#9110) @dependabot
 * ci(deps): bump body-parser from 1.20.2 to 1.20.3 (#9109) @dependabot
 
-## [v7.0.19](https://github.com/weseek/growi/compare/v7.0.18...v7.0.19) - 2024-09-12
+## [v7.0.19](https://github.com/growilabs/growi/compare/v7.0.18...v7.0.19) - 2024-09-12
 
 ### 🐛 Bug Fixes
 
@@ -502,7 +528,7 @@
 * fix: Updated content is not reflected on the View screen even after refreshing the page (#9086) @miya
 * fix: Removing comment doesn't work (#9083) @yuki-takei
 
-## [v7.0.18](https://github.com/weseek/growi/compare/v7.0.17...v7.0.18) - 2024-09-09
+## [v7.0.18](https://github.com/growilabs/growi/compare/v7.0.17...v7.0.18) - 2024-09-09
 
 ### 🚀 Improvement
 
@@ -526,7 +552,7 @@
 * support: Omit Cypress (#9065) @miya
 * ci(deps): bump unzip-stream from 0.3.1 to 0.3.2 (#9049) @dependabot
 
-## [v7.0.17](https://github.com/weseek/growi/compare/v7.0.16...v7.0.17) - 2024-08-26
+## [v7.0.17](https://github.com/growilabs/growi/compare/v7.0.16...v7.0.17) - 2024-08-26
 
 ### 🚀 Improvement
 
@@ -553,7 +579,7 @@
 * support: Update import lines (#9018) @yuki-takei
 * support: Typescriptize REPL launcher (#9013) @yuki-takei
 
-## [v7.0.16](https://github.com/weseek/growi/compare/v7.0.15...v7.0.16) - 2024-07-31
+## [v7.0.16](https://github.com/growilabs/growi/compare/v7.0.15...v7.0.16) - 2024-07-31
 
 ### 💎 Features
 
@@ -575,7 +601,7 @@
 * fix: Non-admin user gets 500 error when opening history modal (#9001) @miya
 * fix: Enable page creation under GRANT_RESTRICTED pages (#8996) @arafubeatbox
 
-## [v7.0.15](https://github.com/weseek/growi/compare/v7.0.14...v7.0.15) - 2024-07-23
+## [v7.0.15](https://github.com/growilabs/growi/compare/v7.0.14...v7.0.15) - 2024-07-23
 
 ### 🐛 Bug Fixes
 
@@ -587,7 +613,7 @@
 
 * support: Chage text size in sidebar (#8965) @satof3
 
-## [v7.0.14](https://github.com/weseek/growi/compare/v7.0.13...v7.0.14) - 2024-07-19
+## [v7.0.14](https://github.com/growilabs/growi/compare/v7.0.13...v7.0.14) - 2024-07-19
 
 ### 🐛 Bug Fixes
 
@@ -609,7 +635,7 @@
 
 * support: Normalize Revision.pageId (for #8954) (#8973) @miya
 
-## [v7.0.13](https://github.com/weseek/growi/compare/v7.0.12...v7.0.13) - 2024-07-16
+## [v7.0.13](https://github.com/growilabs/growi/compare/v7.0.12...v7.0.13) - 2024-07-16
 
 ### 💎 Features
 
@@ -630,7 +656,7 @@
 * ci(deps): bump nodemailer from 6.6.2 to 6.9.14 (#8928) @dependabot
 * support: Update favicon (#8957) @satof3
 
-## [v7.0.12](https://github.com/weseek/growi/compare/v7.0.11...v7.0.12) - 2024-07-10
+## [v7.0.12](https://github.com/growilabs/growi/compare/v7.0.11...v7.0.12) - 2024-07-10
 
 ### 🚀 Improvement
 
@@ -662,7 +688,7 @@
 * support: Upgrade vitest (#8920) @yuki-takei
 * support: Upgrade playwright (#8921) @yuki-takei
 
-## [v7.0.11](https://github.com/weseek/growi/compare/v7.0.10...v7.0.11) - 2024-06-25
+## [v7.0.11](https://github.com/growilabs/growi/compare/v7.0.10...v7.0.11) - 2024-06-25
 
 ### 💎 Features
 
@@ -688,7 +714,7 @@
 * support: Decrease max SSR body length (#8895) @yuki-takei
 * support: Use typescript-transform-paths instead of tsconfig-paths (#8892) @yuki-takei
 
-## [v7.0.10](https://github.com/weseek/growi/compare/v7.0.9...v7.0.10) - 2024-06-13
+## [v7.0.10](https://github.com/growilabs/growi/compare/v7.0.9...v7.0.10) - 2024-06-13
 
 ### 💎 Features
 
@@ -716,14 +742,14 @@
 * support: Add playwright test for installer (#8874) @yuki-takei
 * support: Upgrade turbo to v2 (#8875) @yuki-takei
 
-## [v7.0.9](https://github.com/weseek/growi/compare/v7.0.8...v7.0.9) - 2024-05-30
+## [v7.0.9](https://github.com/growilabs/growi/compare/v7.0.8...v7.0.9) - 2024-05-30
 
 ### 🐛 Bug Fixes
 
 * fix: Supress warning of checkbox (#8865) @yuki-takei
 * fix: Editor package import/export (#8864) @yuki-takei
 
-## [v7.0.8](https://github.com/weseek/growi/compare/v7.0.7...v7.0.8) - 2024-05-30
+## [v7.0.8](https://github.com/growilabs/growi/compare/v7.0.7...v7.0.8) - 2024-05-30
 
 ### 💎 Features
 
@@ -744,7 +770,7 @@
 
 * support: Reorganize editor module exports (#8846) @yuki-takei
 
-## [v7.0.7](https://github.com/weseek/growi/compare/v7.0.6...v7.0.7) - 2024-05-27
+## [v7.0.7](https://github.com/growilabs/growi/compare/v7.0.6...v7.0.7) - 2024-05-27
 
 ### 🚀 Improvement
 
@@ -761,7 +787,7 @@
 * support: Upgrade yjs packages (#8839) @yuki-takei
 * support: Upgrade stylelint (#8835) @yuki-takei
 
-## [v7.0.6](https://github.com/weseek/growi/compare/v7.0.5...v7.0.6) - 2024-05-20
+## [v7.0.6](https://github.com/growilabs/growi/compare/v7.0.5...v7.0.6) - 2024-05-20
 
 ### 🐛 Bug Fixes
 
@@ -771,7 +797,7 @@
 
 * support: Publish @growi/core-styles package (#8819) @yuki-takei
 
-## [v7.0.5](https://github.com/weseek/growi/compare/v7.0.4...v7.0.5) - 2024-05-20
+## [v7.0.5](https://github.com/growilabs/growi/compare/v7.0.4...v7.0.5) - 2024-05-20
 
 ### 🚀 Improvement
 
@@ -790,7 +816,7 @@
 
 * support: Modify env var for S3 Object-ACL (#8805) @yuki-takei
 
-## [v7.0.4](https://github.com/weseek/growi/compare/v7.0.3...v7.0.4) - 2024-05-13
+## [v7.0.4](https://github.com/growilabs/growi/compare/v7.0.3...v7.0.4) - 2024-05-13
 
 ### 💎 Features
 
@@ -815,7 +841,7 @@
 
 * ci(deps): bump ejs from 3.1.9 to 3.1.10 (#8784) @dependabot
 
-## [v7.0.3](https://github.com/weseek/growi/compare/v7.0.2...v7.0.3) - 2024-05-01
+## [v7.0.3](https://github.com/growilabs/growi/compare/v7.0.2...v7.0.3) - 2024-05-01
 
 ### 🚀 Improvement
 
@@ -858,7 +884,7 @@
 * ci(deps): bump typeorm from 0.2.32 to 0.3.0 (#8602) @dependabot
 * support: Upgrade date-fns (#8744) @yuki-takei
 
-## [v7.0.2](https://github.com/weseek/growi/compare/v7.0.1...v7.0.2) - 2024-04-17
+## [v7.0.2](https://github.com/growilabs/growi/compare/v7.0.1...v7.0.2) - 2024-04-17
 
 ### 💎 Features
 
@@ -910,7 +936,7 @@
 * ci(deps): bump undici from 5.21.2 to 5.28.4 (#8686) @dependabot
 * ci(deps-dev): bump vite from 4.5.2 to 4.5.3 (#8675) @dependabot
 
-## [v7.0.1](https://github.com/weseek/growi/compare/v7.0.0...v7.0.1) - 2024-04-02
+## [v7.0.1](https://github.com/growilabs/growi/compare/v7.0.0...v7.0.1) - 2024-04-02
 
 ### 🚀 Improvement
 
@@ -938,7 +964,7 @@
 * support: Add light and dark badge color (#8652) @satof3
 * support: Omit configurations for publishing to GitHub Container Registry(ghcr.io) (#8628) @yuki-takei
 
-## [v7.0.0](https://github.com/weseek/growi/compare/v6.3.2...v7.0.0) - 2024-03-27
+## [v7.0.0](https://github.com/growilabs/growi/compare/v6.3.2...v7.0.0) - 2024-03-27
 
 ### BREAKING CHANGES
 
@@ -1053,7 +1079,7 @@
 * support: Upgrade to reactstrap v9 (#7984) @jam411
 * support: Update CodeMirror to v6 (#7968) @yuki-takei
 
-## [v6.3.2](https://github.com/weseek/growi/compare/v6.3.1...v6.3.2) - 2024-03-25
+## [v6.3.2](https://github.com/growilabs/growi/compare/v6.3.1...v6.3.2) - 2024-03-25
 
 ### 🐛 Bug Fixes
 
@@ -1063,7 +1089,7 @@
 
 * ci(deps): bump ip from 2.0.0 to 2.0.1 (#8508) @dependabot
 
-## [v6.3.1](https://github.com/weseek/growi/compare/v6.3.0...v6.3.1) - 2024-02-01
+## [v6.3.1](https://github.com/growilabs/growi/compare/v6.3.0...v6.3.1) - 2024-02-01
 
 ### 💎 Features
 
@@ -1090,7 +1116,7 @@
 * support: React Testing Library (#8393) @miya
 * ci(deps-dev): bump vite from 4.5.1 to 4.5.2 (#8392) @dependabot
 
-## [v6.3.0](https://github.com/weseek/growi/compare/v6.2.5...v6.3.0) - 2023-12-14
+## [v6.3.0](https://github.com/growilabs/growi/compare/v6.2.5...v6.3.0) - 2023-12-14
 
 ### BREAKING CHANGES
 
@@ -1118,13 +1144,13 @@
 * support: TypeScriptize attachment codes (#8243) @yuki-takei
 * support: Remove obsolete route for attachment on MongoDB GridFS (#8239) @yuki-takei
 
-## [v6.2.5](https://github.com/weseek/growi/compare/v6.2.4...v6.2.5) - 2023-12-14
+## [v6.2.5](https://github.com/growilabs/growi/compare/v6.2.4...v6.2.5) - 2023-12-14
 
 ### 🐛 Bug Fixes
 
 * fix: Update deleteCompletelyUserHomeBySystem for v4 process (#8289) @jam411
 
-## [v6.2.4](https://github.com/weseek/growi/compare/v6.2.3...v6.2.4) - 2023-11-29
+## [v6.2.4](https://github.com/growilabs/growi/compare/v6.2.3...v6.2.4) - 2023-11-29
 
 ### 💎 Features
 
@@ -1143,14 +1169,14 @@
 
 * support: Refactor deleteCompletelyUserHomeBySystem (#8262) @jam411
 
-## [v6.2.3](https://github.com/weseek/growi/compare/v6.2.2...v6.2.3) - 2023-11-13
+## [v6.2.3](https://github.com/growilabs/growi/compare/v6.2.2...v6.2.3) - 2023-11-13
 
 ### 🚀 Improvement
 
 - imprv: Certify shared page attachment middleware (#8211) @yuki-takei
 - imprv: Printing styles 2 (#8203) @yuki-takei
 
-## [v6.2.2](https://github.com/weseek/growi/compare/v6.2.1...v6.2.2) - 2023-10-30
+## [v6.2.2](https://github.com/growilabs/growi/compare/v6.2.1...v6.2.2) - 2023-10-30
 
 ### 🚀 Improvement
 
@@ -1167,7 +1193,7 @@
 - ci(deps): bump amannn/action-semantic-pull-request from 5.0.2 to 5.3.0 (#8127) @dependabot
 - ci(deps): bump aws-actions/configure-aws-credentials from 2 to 4 (#8128) @dependabot
 
-## [v6.2.1](https://github.com/weseek/growi/compare/v6.2.0...v6.2.1) - 2023-10-03
+## [v6.2.1](https://github.com/growilabs/growi/compare/v6.2.0...v6.2.1) - 2023-10-03
 
 ### BREAKING CHANGES
 
@@ -1191,7 +1217,7 @@
 - ci(deps): bump get-func-name from 2.0.0 to 2.0.2 (#8119) @dependabot
 - support: Omit promster (#8105) @yuki-takei
 
-## [v6.2.0](https://github.com/weseek/growi/compare/v6.1.12...v6.2.0) - 2023-09-14
+## [v6.2.0](https://github.com/growilabs/growi/compare/v6.1.12...v6.2.0) - 2023-09-14
 
 ### 💎 Features
 
@@ -1226,33 +1252,33 @@
 - support: Improve build settings (#7919) @yuki-takei
 - support: Url to join to the slack team (#8073) @WNomunomu
 
-## [v6.1.15](https://github.com/weseek/growi/compare/v6.1.14...v6.1.15) - 2023-09-11
+## [v6.1.15](https://github.com/growilabs/growi/compare/v6.1.14...v6.1.15) - 2023-09-11
 
 ### 🚀 Improvement
 
 - imprv: Add CSP style-src for Safari and Content-Disposition of attachment (for v6.1.x) (#8057) @yuki-takei
 
-## [v6.1.14](https://github.com/weseek/growi/compare/v6.1.13...v6.1.14) - 2023-08-22
+## [v6.1.14](https://github.com/growilabs/growi/compare/v6.1.13...v6.1.14) - 2023-08-22
 
 ### 🐛 Bug Fixes
 
 - fix: Add option to lightbox (6.1.x) (#8003) @yuki-takei
 
-## [v6.1.13](https://github.com/weseek/growi/compare/v6.1.12...v6.1.13) - 2023-08-17
+## [v6.1.13](https://github.com/growilabs/growi/compare/v6.1.12...v6.1.13) - 2023-08-17
 
 ### 🐛 Bug Fixes
 
 - fix: Do not work img tag if use style property (#7988) @jam411
 - fix: "Searching..." label appearing unnecessarily (#7990) @yuki-takei
 
-## [v6.1.12](https://github.com/weseek/growi/compare/v6.1.11...v6.1.12) - 2023-08-14
+## [v6.1.12](https://github.com/growilabs/growi/compare/v6.1.11...v6.1.12) - 2023-08-14
 
 ### 🐛 Bug Fixes
 
 - fix: Consider an empty page when renaming and duplicating (v6.1.x) (#7980) @yuki-takei
 - fix: Do not work image tag properties (#7977) @jam411
 
-## [v6.1.11](https://github.com/weseek/growi/compare/v6.1.10...v6.1.11) - 2023-08-07
+## [v6.1.11](https://github.com/growilabs/growi/compare/v6.1.10...v6.1.11) - 2023-08-07
 
 ### 🐛 Bug Fixes
 
@@ -1260,7 +1286,7 @@
 - fix: Transitioning to a non-existent page under "/me" results in a 500 error (#7946) @miya
 - fix: Auto-scroll search result content 2 (#7943) @yuki-takei
 
-## [v6.1.10](https://github.com/weseek/growi/compare/v6.1.9...v6.1.10) - 2023-08-01
+## [v6.1.10](https://github.com/growilabs/growi/compare/v6.1.9...v6.1.10) - 2023-08-01
 
 ### 🐛 Bug Fixes
 
@@ -1268,7 +1294,7 @@
 - fix: SWR settings for searching (#7940) @yuki-takei
 - fix: Auto-scroll search result content (#7935) @yuki-takei
 
-## [v6.1.9](https://github.com/weseek/growi/compare/v6.1.8...v6.1.9) - 2023-07-31
+## [v6.1.9](https://github.com/growilabs/growi/compare/v6.1.8...v6.1.9) - 2023-07-31
 
 ### 💎 Features
 
@@ -1288,7 +1314,7 @@
 - fix: Revert dynamic import. (#7923) @TatsuyaIse
 - fix: Questionnaire wikiType (#7907) @TatsuyaIse
 
-## [v6.1.8](https://github.com/weseek/growi/compare/v6.1.7...v6.1.8) - 2023-07-24
+## [v6.1.8](https://github.com/growilabs/growi/compare/v6.1.7...v6.1.8) - 2023-07-24
 
 ### 💎 Features
 
@@ -1311,7 +1337,7 @@
 - ci(deps): bump mongoose from 6.11.1 to 6.11.3 (#7891) @dependabot
 - ci(deps): bump word-wrap from 1.2.3 to 1.2.4 (#7892) @dependabot
 
-## [v6.1.7](https://github.com/weseek/growi/compare/v6.1.6...v6.1.7) - 2023-07-19
+## [v6.1.7](https://github.com/growilabs/growi/compare/v6.1.6...v6.1.7) - 2023-07-19
 
 ### 💎 Features
 
@@ -1333,7 +1359,7 @@
 
 - support: Render SearchPageBase in CSR (#7889) @yuki-takei
 
-## [v6.1.6](https://github.com/weseek/growi/compare/v6.1.5...v6.1.6) - 2023-07-12
+## [v6.1.6](https://github.com/growilabs/growi/compare/v6.1.5...v6.1.6) - 2023-07-12
 
 ### 🐛 Bug Fixes
 
@@ -1341,7 +1367,7 @@
 - fix: The official docker image missed preset-templates (#7865) @yuki-takei
 - fix: SSL connection error to Elasticsearch8 using self certificate (#7818) @miya
 
-## [v6.1.5](https://github.com/weseek/growi/compare/v6.1.4...v6.1.5) - 2023-07-10
+## [v6.1.5](https://github.com/growilabs/growi/compare/v6.1.4...v6.1.5) - 2023-07-10
 
 ### 💎 Features
 
@@ -1376,7 +1402,7 @@
 
 - support: Dependencies specification for local packages (#7809) @yuki-takei
 
-## [v6.1.4](https://github.com/weseek/growi/compare/v6.1.3...v6.1.4) - 2023-06-12
+## [v6.1.4](https://github.com/growilabs/growi/compare/v6.1.3...v6.1.4) - 2023-06-12
 
 ### 💎 Features
 
@@ -1392,7 +1418,7 @@
 - fix: Slack channels data for User Triggered Notification is not loaded (#7794) @yuki-takei
 - fix: The input of the editor is cleared when an attachment is added when a new page editing (#7788) @miya
 
-## [v6.1.3](https://github.com/weseek/growi/compare/v6.1.2...v6.1.3) - 2023-06-07
+## [v6.1.3](https://github.com/growilabs/growi/compare/v6.1.2...v6.1.3) - 2023-06-07
 
 ### 💎 Features
 
@@ -1420,7 +1446,7 @@
 - support: Refactor ConfigManager (#7752) @yuki-takei
 - support: Convert unit tests by Jest to Vitest (#7749) @yuki-takei
 
-## [v6.1.2](https://github.com/weseek/growi/compare/v6.1.1...v6.1.2) - 2023-05-25
+## [v6.1.2](https://github.com/growilabs/growi/compare/v6.1.1...v6.1.2) - 2023-05-25
 
 ### 🚀 Improvement
 
@@ -1439,7 +1465,7 @@
 - ci(deps): bump aws-actions/configure-aws-credentials from 1 to 2 (#7620) @dependabot
 - ci(deps): bump hugo19941994/delete-draft-releases from 1.0.0 to 1.0.1 (#7448) @dependabot
 
-## [v6.1.1](https://github.com/weseek/growi/compare/v6.1.0...v6.1.1) - 2023-05-24
+## [v6.1.1](https://github.com/growilabs/growi/compare/v6.1.0...v6.1.1) - 2023-05-24
 
 ### 🐛 Bug Fixes
 
@@ -1450,7 +1476,7 @@
 - fix: The user's bookmarks are displayed on unrelated user's home (#7668) @miya
 - fix: The user's bookmarks are updated by unrelated user's operation (#7670) @jam411
 
-## [v6.1.0](https://github.com/weseek/growi/compare/v6.0.15...v6.1.0) - 2023-05-17
+## [v6.1.0](https://github.com/growilabs/growi/compare/v6.0.15...v6.1.0) - 2023-05-17
 
 ### BREAKING CHANGES
 
@@ -1513,7 +1539,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - support: Replaced by IAttachmentHasId (#7629) @reiji-h
 - support: Migrate to Turborepo (#7417) @yuki-takei
 
-## [v6.0.15](https://github.com/weseek/growi/compare/v6.0.14...v6.0.15) - 2023-04-10
+## [v6.0.15](https://github.com/growilabs/growi/compare/v6.0.14...v6.0.15) - 2023-04-10
 
 ### 🐛 Bug Fixes
 
@@ -1524,14 +1550,14 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: Username incremental search is not working in comment (#7548) @mudana-grune
 - fix: H6 line-height (#7541) @yukendev
 
-## [v6.0.14](https://github.com/weseek/growi/compare/v6.0.13...v6.0.14) - 2023-04-04
+## [v6.0.14](https://github.com/growilabs/growi/compare/v6.0.13...v6.0.14) - 2023-04-04
 
 ### 🐛 Bug Fixes
 
 - fix(drawio): Set compressXml option (#7536) @yuki-takei
 - fix(drawio): Rendering uncompressed data (#7537) @yuki-takei
 
-## [v6.0.13](https://github.com/weseek/growi/compare/v6.0.12...v6.0.13) - 2023-04-03
+## [v6.0.13](https://github.com/growilabs/growi/compare/v6.0.12...v6.0.13) - 2023-04-03
 
 ### 🐛 Bug Fixes
 
@@ -1539,13 +1565,13 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: The "search" command of the GROWI bot is not functioning (#7525) @miya
 - fix: Lsx filter and except option do not work when the path includes special characters (#7523) @yuki-takei
 
-## [v6.0.12](https://github.com/weseek/growi/compare/v6.0.11...v6.0.12) - 2023-03-30
+## [v6.0.12](https://github.com/growilabs/growi/compare/v6.0.11...v6.0.12) - 2023-03-30
 
 ### 🐛 Bug Fixes
 
 - fix: DrawioViewer script URL (#7518) @yuki-takei
 
-## [v6.0.11](https://github.com/weseek/growi/compare/v6.0.10...v6.0.11) - 2023-03-29
+## [v6.0.11](https://github.com/growilabs/growi/compare/v6.0.10...v6.0.11) - 2023-03-29
 
 ### 🚀 Improvement
 
@@ -1557,7 +1583,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: The same level template page is being applied to lower level pages unintentionally (#7510) @miya
 - fix: Supress `activeTab` prop type error (#7504) @jam411
 
-## [v6.0.10](https://github.com/weseek/growi/compare/v6.0.9...v6.0.10) - 2023-03-23
+## [v6.0.10](https://github.com/growilabs/growi/compare/v6.0.9...v6.0.10) - 2023-03-23
 
 ### 🚀 Improvement
 
@@ -1574,7 +1600,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: Responses 500 status code when invalid regular expressions are inputted to lsx's execpt option (#7488) @jam411
 - fix: Page paths in search results are not displayed correctly (#7463) @miya
 
-## [v6.0.9](https://github.com/weseek/growi/compare/v6.0.8...v6.0.9) - 2023-03-14
+## [v6.0.9](https://github.com/growilabs/growi/compare/v6.0.8...v6.0.9) - 2023-03-14
 
 ### 💎 Features
 
@@ -1596,7 +1622,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - support: Bump Next.js to v13 (#7458) @yuki-takei
 
-## [v6.0.8](https://github.com/weseek/growi/compare/v6.0.7...v6.0.8) - 2023-03-06
+## [v6.0.8](https://github.com/growilabs/growi/compare/v6.0.7...v6.0.8) - 2023-03-06
 
 ### 💎 Features
 
@@ -1616,7 +1642,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: Color of the close icon in modal header (#7419) @ayaka0417
 - fix: Behavior when conflicts occur when saving pages (#7425) @miya
 
-## [v6.0.7](https://github.com/weseek/growi/compare/v6.0.6...v6.0.7) - 2023-02-21
+## [v6.0.7](https://github.com/growilabs/growi/compare/v6.0.6...v6.0.7) - 2023-02-21
 
 ### 💎 Features
 
@@ -1643,7 +1669,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: Sidebar mode on editor doesn't work in HackMD tab (#7396) @yuki-takei
 - fix: Can't controll slack notification button in comment editor (#7389) @yukendev
 
-## [v6.0.6](https://github.com/weseek/growi/compare/v6.0.5...v6.0.6) - 2023-02-14
+## [v6.0.6](https://github.com/growilabs/growi/compare/v6.0.5...v6.0.6) - 2023-02-14
 
 ### 💎 Features
 
@@ -1693,7 +1719,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - support: Bump SWR to v2 (#7318) @yuki-takei
 - support: Add test for View and Edit contents when saving (#7323) @yukendev
 
-## [v6.0.5](https://github.com/weseek/growi/compare/v6.0.4...v6.0.5) - 2023-01-30
+## [v6.0.5](https://github.com/growilabs/growi/compare/v6.0.4...v6.0.5) - 2023-01-30
 
 ### 🚀 Improvement
 
@@ -1708,7 +1734,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: GrowiContextualSubNavigation style is broken (#7304) @jam411
 - fix: Markdown in the editor reverted when save with shortcut (#7301) @yukendev
 
-## [v6.0.4](https://github.com/weseek/growi/compare/v6.0.3...v6.0.4) - 2023-01-25
+## [v6.0.4](https://github.com/growilabs/growi/compare/v6.0.3...v6.0.4) - 2023-01-25
 
 ### 🐛 Bug Fixes
 
@@ -1719,7 +1745,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - ci(deps): bump ua-parser-js from 0.7.31 to 0.7.33 (#7293) @dependabot
 
-## [v6.0.3](https://github.com/weseek/growi/compare/v6.0.2...v6.0.3) - 2023-01-24
+## [v6.0.3](https://github.com/growilabs/growi/compare/v6.0.2...v6.0.3) - 2023-01-24
 
 ### 💎 Features
 
@@ -1757,7 +1783,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - support: Build container images with AWS CodeBuild (#7258) @yuki-takei
 
-## [v6.0.2](https://github.com/weseek/growi/compare/v6.0.1...v6.0.2) - 2023-01-10
+## [v6.0.2](https://github.com/growilabs/growi/compare/v6.0.1...v6.0.2) - 2023-01-10
 
 ### 🐛 Bug Fixes
 
@@ -1770,7 +1796,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - ci(deps-dev): bump textlint-rule-no-doubled-joshi from 4.0.0 to 4.0.1 (#7222) @dependabot
 
-## [v6.0.1](https://github.com/weseek/growi/compare/v6.0.0...v6.0.1) - 2023-01-07
+## [v6.0.1](https://github.com/growilabs/growi/compare/v6.0.0...v6.0.1) - 2023-01-07
 
 ### 🚀 Improvement
 
@@ -1796,7 +1822,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - ci(Mergify): configuration update (#7202) @yuki-takei
 - support: Uninstall swig-template (#7192) @yuki-takei
 
-## [v6.0.0](https://github.com/weseek/growi/compare/v5.1.8...v6.0.0) - 2022-12-27
+## [v6.0.0](https://github.com/growilabs/growi/compare/v5.1.8...v6.0.0) - 2022-12-27
 
 ### 💎 Features
 
@@ -1809,7 +1835,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - support: Request scoped SWR (#6742) @yuki-takei
 - support: Build preset themes within external package (#7057) @yuki-takei
 
-## [v5.1.8](https://github.com/weseek/growi/compare/v5.1.7...v5.1.8) - 2022-11-17
+## [v5.1.8](https://github.com/growilabs/growi/compare/v5.1.7...v5.1.8) - 2022-11-17
 
 ### 🐛 Bug Fixes
 
@@ -1817,20 +1843,20 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: Updating page content width is not working (#6914) @yukendev
 - fix: Create page at installer (#6930) @hakumizuki @yuki-takei
 
-## [v5.1.7](https://github.com/weseek/growi/compare/v5.1.6...v5.1.7) - 2022-10-26
+## [v5.1.7](https://github.com/growilabs/growi/compare/v5.1.6...v5.1.7) - 2022-10-26
 
 ### 🐛 Bug Fixes
 
 - fix: Page move event notification message (#6823) @hakumizuki
 
-## [v5.1.6](https://github.com/weseek/growi/compare/v5.1.5...v5.1.6) - 2022-10-19
+## [v5.1.6](https://github.com/growilabs/growi/compare/v5.1.5...v5.1.6) - 2022-10-19
 
 ### 🐛 Bug Fixes
 
 - fix: image not showing and exceed crop modal area (#6712) @mudana-grune
 - fix: Conflict Diff Modal Error getCurrentOptionsToSave is not a function (#6745) @kaoritokashiki
 
-## [v5.1.5](https://github.com/weseek/growi/compare/v5.1.4...v5.1.5) - 2022-10-04
+## [v5.1.5](https://github.com/growilabs/growi/compare/v5.1.4...v5.1.5) - 2022-10-04
 
 ### 💎 Features
 
@@ -1845,7 +1871,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix(auditlog): Attachment download is displayed even if the filter is unchecked (#6688) @miya
 - fix: firstName and lastName japanese translations in SAML  (#6631) @kaoritokashiki
 
-## [v5.1.4](https://github.com/weseek/growi/compare/v5.1.3...v5.1.4) - 2022-09-12
+## [v5.1.4](https://github.com/growilabs/growi/compare/v5.1.3...v5.1.4) - 2022-09-12
 
 ### 💎 Features
 
@@ -1864,7 +1890,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: Pagetree input hit enter (#6526) @hakumizuki
 - fix: Disallow retrieval of revision data that does not match the page (#6537) @miya
 
-## [v5.1.3](https://github.com/weseek/growi/compare/v5.1.2...v5.1.3) - 2022-08-28
+## [v5.1.3](https://github.com/growilabs/growi/compare/v5.1.2...v5.1.3) - 2022-08-28
 
 ### 💎 Features
 
@@ -1885,7 +1911,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - support: Use vscode-stylelint (#6430) @yuki-takei
 
-## [v5.1.2](https://github.com/weseek/growi/compare/v5.1.1...v5.1.2) - 2022-08-03
+## [v5.1.2](https://github.com/growilabs/growi/compare/v5.1.1...v5.1.2) - 2022-08-03
 
 ### 💎 Features
 
@@ -1904,7 +1930,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - support: Make Editor component Functional Component and TypeScript (#6374) @yukendev
 
-## [v5.1.1](https://github.com/weseek/growi/compare/v5.1.0...v5.1.1) - 2022-08-01
+## [v5.1.1](https://github.com/growilabs/growi/compare/v5.1.0...v5.1.1) - 2022-08-01
 
 ### 💎 Features
 
@@ -1924,7 +1950,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: Migration script for inserting NamedQuery (#6364) @yuki-takei
 - fix: "Error: cannnot get grant label" occured with lsx (#6348) @yukendev
 
-## [v5.1.0](https://github.com/weseek/growi/compare/v5.0.11...v5.1.0) - 2022-07-21
+## [v5.1.0](https://github.com/growilabs/growi/compare/v5.0.11...v5.1.0) - 2022-07-21
 
 ### 💎 Features
 
@@ -1955,7 +1981,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - support: Refactor growi renderer using hooks (#6223) @hakumizuki
 - imprv: Omit Personal Container (#6182) @kaoritokashiki
 
-## [v5.0.11](https://github.com/weseek/growi/compare/v5.0.10...v5.0.11) - 2022-07-05
+## [v5.0.11](https://github.com/growilabs/growi/compare/v5.0.10...v5.0.11) - 2022-07-05
 
 ### 💎 Features
 
@@ -1975,7 +2001,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - support: Ease rate limit temporary (#6191) @yuki-takei
 - support: Omit page history container and page revision comparer container (#6185) @yukendev
 
-## [v5.0.10](https://github.com/weseek/growi/compare/v5.0.9...v5.0.10) - 2022-06-27
+## [v5.0.10](https://github.com/growilabs/growi/compare/v5.0.9...v5.0.10) - 2022-06-27
 
 ### 💎 Features
 
@@ -2004,7 +2030,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - support: Omit comment container (#6147) @yuki-takei
 - support: Upgrade typescript to ^4.6.0 (#6082) @hakumizuki
 
-## [v5.0.9](https://github.com/weseek/growi/compare/v5.0.8...v5.0.9) - 2022-06-13
+## [v5.0.9](https://github.com/growilabs/growi/compare/v5.0.8...v5.0.9) - 2022-06-13
 
 ### 🚀 Improvement
 
@@ -2018,7 +2044,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: Getting page API is broken (#6023) @yuki-takei
 - fix: MathJax does not working (#6020) @yuki-takei
 
-## [v5.0.8](https://github.com/weseek/growi/compare/v5.0.7...v5.0.8) - 2022-06-07
+## [v5.0.8](https://github.com/growilabs/growi/compare/v5.0.7...v5.0.8) - 2022-06-07
 
 ### 🚀 Improvement
 
@@ -2044,7 +2070,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - support: Enable garbage collection at runtime with expose-gc package (#5986) @yuki-takei
 - support: Upgrade aws-sdk to v3 (#5863) @mudana-grune
 
-## [v4.5.22](https://github.com/weseek/growi/compare/v4.5.21...v4.5.22) - 2022-06-07
+## [v4.5.22](https://github.com/growilabs/growi/compare/v4.5.21...v4.5.22) - 2022-06-07
 
 ### 🐛 Bug Fixes
 
@@ -2056,7 +2082,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - support: Enable garbage collection at runtime with expose-gc package (#5998) @kaoritokashiki
 
-## [v5.0.7](https://github.com/weseek/growi/compare/v5.0.6...v5.0.7) - 2022-05-30
+## [v5.0.7](https://github.com/growilabs/growi/compare/v5.0.6...v5.0.7) - 2022-05-30
 
 ### 💎 Features
 
@@ -2070,7 +2096,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: Show pagename on toastr when page deleted (#5772) @hirokei-camel
 - fix: Search result screen is broken under content 100% setting (#5917) @jam411
 
-## [v5.0.6](https://github.com/weseek/growi/compare/v5.0.5...v5.0.6) - 2022-05-27
+## [v5.0.6](https://github.com/growilabs/growi/compare/v5.0.5...v5.0.6) - 2022-05-27
 
 ### 💎 Features
 
@@ -2095,14 +2121,14 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: Can not toggle textlint function on v5.0.x (#5854) @kaoritokashiki
 - fix(google-oauth2): Automatically bind external accounts  does not work on v5.0.x (#5886) @kaoritokashiki
 
-## [v4.5.21](https://github.com/weseek/growi/compare/v4.5.20...v4.5.21) - 2022-05-23
+## [v4.5.21](https://github.com/growilabs/growi/compare/v4.5.20...v4.5.21) - 2022-05-23
 
 ### 🐛 Bug Fixes
 
-- fix: Can not toggle textlint function on v4.5.x (https://github.com/weseek/growi/pull/5855) @kaoritokashiki
-- fix: Error on searching (https://github.com/weseek/growi/pull/5873) @miya
+- fix: Can not toggle textlint function on v4.5.x (https://github.com/growilabs/growi/pull/5855) @kaoritokashiki
+- fix: Error on searching (https://github.com/growilabs/growi/pull/5873) @miya
 
-## [v5.0.5](https://github.com/weseek/growi/compare/v5.0.4...v5.0.5) - 2022-05-16
+## [v5.0.5](https://github.com/growilabs/growi/compare/v5.0.4...v5.0.5) - 2022-05-16
 
 ### 💎 Features
 
@@ -2126,13 +2152,13 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - support: Typescriptize tag model (#5778) @kaoritokashiki
 
-## [v4.5.20](https://github.com/weseek/growi/compare/v4.5.19...v4.5.20) - 2022-05-12
+## [v4.5.20](https://github.com/growilabs/growi/compare/v4.5.19...v4.5.20) - 2022-05-12
 
 ### 🐛 Bug Fixes
 
 - fix: Guest user cannot access share link pages (#5819) @kaoritokashiki
 
-## [v5.0.4](https://github.com/weseek/growi/compare/v5.0.3...v5.0.4) - 2022-04-28
+## [v5.0.4](https://github.com/growilabs/growi/compare/v5.0.3...v5.0.4) - 2022-04-28
 
 ### 💎 Features
 
@@ -2158,14 +2184,14 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: Too many footstamps icons are shown by lsx output 2 (#5763) @yuki-takei
 - fix:  footstamp-icon size (#5759) @kaoritokashiki
 
-## [v4.5.19](https://github.com/weseek/growi/compare/v4.5.18...v4.5.19) - 2022-04-28
+## [v4.5.19](https://github.com/growilabs/growi/compare/v4.5.18...v4.5.19) - 2022-04-28
 
 ### 🐛 Bug Fixes
 
 - fix: Swiping to previous/next page for Mac users (4.5.x) (#5758) @hirokei-camel
 - fix: Get attachment list api without "page" parameter returns 500 response (#5726) @miya
 
-## [v5.0.3](https://github.com/weseek/growi/compare/v5.0.2...v5.0.3) - 2022-04-21
+## [v5.0.3](https://github.com/growilabs/growi/compare/v5.0.2...v5.0.3) - 2022-04-21
 
 ### 💎 Features
 
@@ -2182,14 +2208,14 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: New user notification email is also sent TO: deleted_at_<epoch_time>@deleted (#5735) @yuki-takei
 - fix: Too many footstamps icons are shown by lsx output (#5727) @yuki-takei
 
-## [v5.0.2](https://github.com/weseek/growi/compare/v5.0.1...v5.0.2) - 2022-04-15
+## [v5.0.2](https://github.com/growilabs/growi/compare/v5.0.1...v5.0.2) - 2022-04-15
 
 ### 🐛 Bug Fixes
 
 - fix: Edit button to open built-in editor does not work when HackMD is disabled (#5719) @yuki-takei
 - fix: Share link list occures error when related page is not found (#5718) @yuki-takei
 
-## [v5.0.1](https://github.com/weseek/growi/compare/v5.0.0...v5.0.1) - 2022-04-15
+## [v5.0.1](https://github.com/growilabs/growi/compare/v5.0.0...v5.0.1) - 2022-04-15
 
 ### 💎 Features
 
@@ -2230,7 +2256,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - support: Migration for setting sparce option to slack member id (#5694) @kaoritokashiki
 - support: Update eslint-config-weseek (#5673) @yuki-takei
 
-## [v4.5.18](https://github.com/weseek/growi/compare/v4.5.17...v4.5.18) - 2022-04-15
+## [v4.5.18](https://github.com/growilabs/growi/compare/v4.5.17...v4.5.18) - 2022-04-15
 
 ### 🐛 Bug Fixes
 
@@ -2238,13 +2264,13 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: Prevent auto completing email with username stored by browser in /me page for v4.5.x (#5703) @Yohei-Shiina
 - fix: Page view count stops at 15 (#5705) @miya
 
-## [v4.5.17](https://github.com/weseek/growi/compare/v4.5.16...v4.5.17) - 2022-04-07
+## [v4.5.17](https://github.com/growilabs/growi/compare/v4.5.16...v4.5.17) - 2022-04-07
 
 ### 🐛 Bug Fixes
 
 - fix: Elasticsearch doesn't work properly on production (#5676) @Yohei-Shiina
 
-## [v4.5.16](https://github.com/weseek/growi/compare/v4.5.15...v4.5.16) - 2022-04-06
+## [v4.5.16](https://github.com/growilabs/growi/compare/v4.5.15...v4.5.16) - 2022-04-06
 
 ### 💎 Features
 
@@ -2255,7 +2281,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: Domain whitelist is not respected (fix #5408) (#5488) @yuto-oweseek
 - fix: Add tags to pages restricted by specified groups on View mode (for v4.5.x) (#5487) @yuto-oweseek
 
-## [v5.0.0](https://github.com/weseek/growi/compare/v4.5.15...v5.0.0) - 2022-04-01
+## [v5.0.0](https://github.com/growilabs/growi/compare/v4.5.15...v5.0.0) - 2022-04-01
 
 ### 💎 Features
 
@@ -2305,7 +2331,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - support: update nanoid yarn.lock v3.1.30 to v3.2.0 (#5216) @LuqmanHakim-Grune
 - support: update validator version (#5562) @LuqmanHakim-Grune
 
-## [v4.5.15](https://github.com/weseek/growi/compare/v4.5.14...v4.5.15) - 2022-02-17
+## [v4.5.15](https://github.com/growilabs/growi/compare/v4.5.14...v4.5.15) - 2022-02-17
 
 ### 🚀 Improvement
 
@@ -2320,19 +2346,19 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - support:  modify docker-compose indent (#5322) @yuto-oweseek
 
-## [v4.5.14](https://github.com/weseek/growi/compare/v4.5.13...v4.5.14) - 2022-02-10
+## [v4.5.14](https://github.com/growilabs/growi/compare/v4.5.13...v4.5.14) - 2022-02-10
 
 ### 💎 Features
 
 - feat: OGP in public wiki (#5304) @yuto-oweseek
 
-## [v4.5.13](https://github.com/weseek/growi/compare/v4.5.12...v4.5.13) - 2022-02-08
+## [v4.5.13](https://github.com/growilabs/growi/compare/v4.5.12...v4.5.13) - 2022-02-08
 
 ### 🐛 Bug Fixes
 
 - fix: fix: Sidebar collapsing (#5283) @yuki-takei
 
-## [v4.5.12](https://github.com/weseek/growi/compare/v4.5.11...v4.5.12) - 2022-02-01
+## [v4.5.12](https://github.com/growilabs/growi/compare/v4.5.11...v4.5.12) - 2022-02-01
 
 ### 🚀 Improvement
 
@@ -2343,13 +2369,13 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix: /_api/v3/page with pageId param occurs an 500 error (#5212) @yuki-takei
 - fix: Resolving OIDC issure host (#5220) @yuki-takei
 
-## [v4.5.11](https://github.com/weseek/growi/compare/v4.5.10...v4.5.11) - 2022-01-26
+## [v4.5.11](https://github.com/growilabs/growi/compare/v4.5.10...v4.5.11) - 2022-01-26
 
 ### 🐛 Bug Fixes
 
 - fix: Internal server error occured when "Restrict complete deletion of pages" option's value is "Admin and author" (#5175 ) @yuki-takei
 
-## [v4.5.10](https://github.com/weseek/growi/compare/v4.5.9...v4.5.10) - 2022-01-26
+## [v4.5.10](https://github.com/growilabs/growi/compare/v4.5.9...v4.5.10) - 2022-01-26
 
 ### 💎 Features
 
@@ -2367,7 +2393,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - support: VRT with Cypress (#5030) @yuki-takei
 
-## [v4.5.9](https://github.com/weseek/growi/compare/v4.5.8...v4.5.9) - 2022-01-21
+## [v4.5.9](https://github.com/growilabs/growi/compare/v4.5.8...v4.5.9) - 2022-01-21
 
 ### 🚀 Improvement
 
@@ -2386,7 +2412,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - support: Omit node-re2 (#5089) @yuki-takei
 - ci(deps-dev): bump swr from 1.0.1 to 1.1.2 (#5018) @dependabot
 
-## [v4.5.8](https://github.com/weseek/growi/compare/v4.5.7...v4.5.8) - 2022-01-12
+## [v4.5.8](https://github.com/growilabs/growi/compare/v4.5.7...v4.5.8) - 2022-01-12
 
 ### 💎 Features
 
@@ -2402,7 +2428,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - support: Omit prettier-stylelint (#5070) @yuki-takei
 - support: Bump tar to 6.1.11 (#5069) @yuki-takei
 
-## [v4.5.7](https://github.com/weseek/growi/compare/v4.5.6...v4.5.7) - 2022-01-11
+## [v4.5.7](https://github.com/growilabs/growi/compare/v4.5.6...v4.5.7) - 2022-01-11
 
 ### 🐛 Bug Fixes
 
@@ -2413,7 +2439,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - support: Bump re2 to 1.17.2 (#5059) @yuki-takei
 
-## [v4.5.6](https://github.com/weseek/growi/compare/v4.5.5...v4.5.6) - 2022-01-07
+## [v4.5.6](https://github.com/growilabs/growi/compare/v4.5.5...v4.5.6) - 2022-01-07
 
 ### 💎 Features
 
@@ -2428,7 +2454,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - Bug: Error: The specified instance couldn't register because same id has already been registered (#5031) by #5043 @yuki-takei
 
-## [v4.5.5](https://github.com/weseek/growi/compare/v4.5.4...v4.5.5) - 2022-01-05
+## [v4.5.5](https://github.com/growilabs/growi/compare/v4.5.4...v4.5.5) - 2022-01-05
 
 ### 💎 Features
 
@@ -2452,7 +2478,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - ci(deps): bump ua-parser-js from 0.7.17 to 0.7.31 (#4895) @dependabot
 - support: dependabot alert ssri (#4973) @mudana-grune
 
-## [v4.5.4](https://github.com/weseek/growi/compare/v4.5.3...v4.5.4) - 2021-12-23
+## [v4.5.4](https://github.com/growilabs/growi/compare/v4.5.3...v4.5.4) - 2021-12-23
 
 ### 💎 Features
 
@@ -2485,7 +2511,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - ci(deps): bump ws from 7.5.1 to 8.3.0 (#4728) @dependabot
 - support: omit growi-commons (#4938) @yuki-takei
 
-## [v4.5.3](https://github.com/weseek/growi/compare/v4.5.2...v4.5.3) - 2021-12-17
+## [v4.5.3](https://github.com/growilabs/growi/compare/v4.5.2...v4.5.3) - 2021-12-17
 
 ### 💎 Features
 
@@ -2512,19 +2538,19 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - support: dependabot alert set-value (#4864) @LuqmanHakim-Grune
 - ci(deps): bump aws-sdk from 2.179.0 to 2.1044.0 (#4821) @dependabot
 
-## [v4.5.2](https://github.com/weseek/growi/compare/v4.5.1...v4.5.2) - 2021-12-06
+## [v4.5.2](https://github.com/growilabs/growi/compare/v4.5.1...v4.5.2) - 2021-12-06
 
 ### 🐛 Bug Fixes
 
 - fix: Added scope for unfurl (#4811) @hakumizuki
 
-## [v4.5.1](https://github.com/weseek/growi/compare/v4.5.0...v4.5.1) - 2021-12-06
+## [v4.5.1](https://github.com/growilabs/growi/compare/v4.5.0...v4.5.1) - 2021-12-06
 
 ### 🐛 Bug Fixes
 
 - fix: /admin/slack-integration page dump undefined error (#4806) @yuki-takei
 
-## [v4.5.0](https://github.com/weseek/growi/compare/v4.4.13...v4.5.0) - 2021-12-06
+## [v4.5.0](https://github.com/growilabs/growi/compare/v4.4.13...v4.5.0) - 2021-12-06
 
 ### BREAKING CHANGES
 
@@ -2552,7 +2578,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - ci(deps): bump detect-indent from 6.0.0 to 7.0.0 (#4635) @dependabot
 - ci(deps): bump passport-saml from 2.2.0 to 3.2.0 (#4431) @dependabot
 
-## [v4.4.13](https://github.com/weseek/growi/compare/v4.4.12...v4.4.13) - 2021-11-19
+## [v4.4.13](https://github.com/growilabs/growi/compare/v4.4.12...v4.4.13) - 2021-11-19
 
 ### 💎 Features
 
@@ -2562,7 +2588,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - fix(slackbot): Interactions from private channels not working (#4688) @stevenfukase
 
-## [v4.4.12](https://github.com/weseek/growi/compare/v4.4.11...v4.4.12) - 2021-11-15
+## [v4.4.12](https://github.com/growilabs/growi/compare/v4.4.11...v4.4.12) - 2021-11-15
 
 ### 🐛 Bug Fixes
 
@@ -2572,7 +2598,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - ci(deps): Downgrade passport to 0.4.0 (#4669) @mudana-grune
 
-## [v4.4.11](https://github.com/weseek/growi/compare/v4.4.10...v4.4.11) - 2021-11-12
+## [v4.4.11](https://github.com/growilabs/growi/compare/v4.4.10...v4.4.11) - 2021-11-12
 
 ### 🚀 Improvement
 
@@ -2592,7 +2618,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - ci(deps): bump axios from 0.21.1 to 0.24.0 (#4604) @dependabot
 - ci(deps): bump tar from 4.4.13 to 4.4.19 (#4601) @dependabot
 
-## [v4.4.10](https://github.com/weseek/growi/compare/v4.4.9...v4.4.10) - 2021-11-08
+## [v4.4.10](https://github.com/growilabs/growi/compare/v4.4.9...v4.4.10) - 2021-11-08
 
 ### 🚀 Improvement
 
@@ -2617,7 +2643,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - ci(deps-dev): bump jquery-ui from 1.12.1 to 1.13.0 (#4549) @dependabot
 - docs(page): Add docs to /page/info api (#4531) @Mxchaeltrxn
 
-## [v4.4.9](https://github.com/weseek/growi/compare/v4.4.8...v4.4.9) - 2021-10-18
+## [v4.4.9](https://github.com/growilabs/growi/compare/v4.4.8...v4.4.9) - 2021-10-18
 
 ### 💎 Features
 
@@ -2638,7 +2664,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - support: Localize Copy bug report button (#4436) @AbiFirmandhani-Grune
 
-## [v4.4.8](https://github.com/weseek/growi/compare/v4.4.7...v4.4.8) - 2021-10-08
+## [v4.4.8](https://github.com/growilabs/growi/compare/v4.4.7...v4.4.8) - 2021-10-08
 
 ### 🚀 Improvement
 
@@ -2655,7 +2681,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - fix(slackbot): Respond bad gateway error & improved help message (#4470) @hakumizuki
 - fix(slackbot): Stop auto-join to channels with middlewarer (#4424) @yuki-takei
 
-## [v4.4.7](https://github.com/weseek/growi/compare/v4.4.6...v4.4.7) - 2021-09-29
+## [v4.4.7](https://github.com/growilabs/growi/compare/v4.4.6...v4.4.7) - 2021-09-29
 
 ### 🚀 Improvement
 
@@ -2681,7 +2707,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - support: Install Git LFS when provisioning of devcontainer (#4405) @stevenfukase
 - chore: Add .dockerignore (#4396) @yuki-takei
 
-## [v4.4.6](https://github.com/weseek/growi/compare/v4.4.5...v4.4.6) - 2021-09-24
+## [v4.4.6](https://github.com/growilabs/growi/compare/v4.4.5...v4.4.6) - 2021-09-24
 
 ### 🚀 Improvement
 
@@ -2692,7 +2718,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 - support(slackbot-proxy): Bump slackbot proxy version independentry (#4385) @yuki-takei
 
-## [v4.4.5](https://github.com/weseek/growi/compare/v4.4.4...v4.4.5) - 2021-09-23
+## [v4.4.5](https://github.com/growilabs/growi/compare/v4.4.4...v4.4.5) - 2021-09-23
 
 ### 🐛 Bug Fixes
 
@@ -2705,7 +2731,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - support: Upgrade codemirror to 5.63.0 (#4364) @yuki-takei
 - ci(deps-dev): bump codemirror from 5.48.4 to 5.58.2 (#4363) @dependabot
 
-## [v4.4.4](https://github.com/weseek/growi/compare/v4.4.3...v4.4.4) (Discontinued) - 2021-09-22
+## [v4.4.4](https://github.com/growilabs/growi/compare/v4.4.3...v4.4.4) (Discontinued) - 2021-09-22
 
 ### 💎 Features
 
@@ -2732,7 +2758,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - ci(deps): bump path-parse from 1.0.5 to 1.0.7 (#4126) @dependabot
 - ci(deps): bump tmpl from 1.0.4 to 1.0.5 (#4337) @dependabot
 
-## [v4.4.3](https://github.com/weseek/growi/compare/v4.4.2...v4.4.3) - 2021-09-17
+## [v4.4.3](https://github.com/growilabs/growi/compare/v4.4.2...v4.4.3) - 2021-09-17
 
 ### 💎 Features
 
@@ -2755,7 +2781,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 - chore: Refactor for "Slack command permission for each channel" (#4295) @zahmis
 - support: Update APIv3 docs for pages (#4280) @yuki-takei
 
-## [v4.4.2](https://github.com/weseek/growi/compare/v4.4.0...v4.4.2) - 2021-09-07
+## [v4.4.2](https://github.com/growilabs/growi/compare/v4.4.0...v4.4.2) - 2021-09-07
 
 ### Changes
 
@@ -2772,7 +2798,7 @@ See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin
 
 ## v4.4.1 (Missing number)
 
-## [v4.4.0](https://github.com/weseek/growi/compare/v4.3.3...v4.4.0) (Discontinued) - 2021-09-06
+## [v4.4.0](https://github.com/growilabs/growi/compare/v4.3.3...v4.4.0) (Discontinued) - 2021-09-06
 
 ### Changes
 
@@ -2817,7 +2843,7 @@ Upgrading Guide: [https://docs.growi.org/en/admin-guide/upgrading/44x.html](http
 
 - Improvement: Welcome page markdown
 - Fix: Some recursive operation exclude descendant pages that are restricted for groups (Rename / Delete / Delete completely / Put back / Duplicate)
-- Fix: Layout is broken when editing users page ([#4128](https://github.com/weseek/growi/issues/4128))
+- Fix: Layout is broken when editing users page ([#4128](https://github.com/growilabs/growi/issues/4128))
 - Support: Upgrade libs
 
 ## v4.3.2
@@ -2839,7 +2865,7 @@ Upgrading Guide: [https://docs.growi.org/en/admin-guide/upgrading/44x.html](http
 ### BREAKING CHANGES
 
 - GROWI manages dependencies with `lerna`: Use `npx lerna bootstrap` instead of `yarn install`
-- GROWI includes some official plugins in default: Users no longer need to install [growi-plugin-lsx](https://github.com/weseek/growi-plugin-lsx), [growi-plugin-pukiwiki-like-linker](https://github.com/weseek/growi-plugin-pukiwiki-like-linker) and [growi-plugin-attachment-refs](https://github.com/weseek/growi-plugin-attachment-refs) before build client.
+- GROWI includes some official plugins in default: Users no longer need to install [growi-plugin-lsx](https://github.com/growilabs/growi-plugin-lsx), [growi-plugin-pukiwiki-like-linker](https://github.com/growilabs/growi-plugin-pukiwiki-like-linker) and [growi-plugin-attachment-refs](https://github.com/growilabs/growi-plugin-attachment-refs) before build client.
 
 Upgrading Guide: [https://docs.growi.org/en/admin-guide/upgrading/43x.html](https://docs.growi.org/en/admin-guide/upgrading/43x.html)
 
@@ -3373,7 +3399,7 @@ Upgrading Guide: [https://docs.growi.org/en/admin-guide/upgrading/37x.html](http
 ### BREAKING CHANGES
 
 - GROWI v3.6.x no longer support Node.js v8.x
-- The name of database that is storing migrations meta data has been changed. This affects **only when `MONGO_URI` has parameters**. v3.5.x or above has a bug ([#1361](https://github.com/weseek/growi/issues/1361))
+- The name of database that is storing migrations meta data has been changed. This affects **only when `MONGO_URI` has parameters**. v3.5.x or above has a bug ([#1361](https://github.com/growilabs/growi/issues/1361))
 
 Upgrading Guide: [https://docs.growi.org/en/admin-guide/upgrading/36x.html](https://docs.growi.org/en/admin-guide/upgrading/36x.html)
 
@@ -3462,7 +3488,7 @@ Upgrading Guide: [https://docs.growi.org/en/admin-guide/upgrading/36x.html](http
 ## v3.5.13
 
 - Feature: Re-edit comments
-- Support: [growi-plugin-attachment-refs](https://github.com/weseek/growi-plugin-attachment-refs)
+- Support: [growi-plugin-attachment-refs](https://github.com/growilabs/growi-plugin-attachment-refs)
 - Support: Upgrade libs
 
 ## v3.5.12

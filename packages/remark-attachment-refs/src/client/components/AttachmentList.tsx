@@ -1,12 +1,9 @@
-import { type JSX, useCallback } from 'react';
-
 import type { IAttachmentHasId } from '@growi/core';
 import { Attachment, LoadingSpinner } from '@growi/ui/dist/components';
-
+import { type JSX, useCallback } from 'react';
+import styles from './AttachmentList.module.scss';
 import { ExtractedAttachments } from './ExtractedAttachments';
 import type { RefsContext } from './util/refs-context';
-
-import styles from './AttachmentList.module.scss';
 
 const AttachmentLink = Attachment;
 

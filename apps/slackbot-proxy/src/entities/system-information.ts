@@ -1,10 +1,13 @@
 import {
-  Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn,
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 
 @Entity()
 export class SystemInformation {
-
   @PrimaryGeneratedColumn()
   readonly id: number;
 
@@ -20,5 +23,4 @@ export class SystemInformation {
   setVersion(version: string): void {
     this.version = version;
   }
-
 }

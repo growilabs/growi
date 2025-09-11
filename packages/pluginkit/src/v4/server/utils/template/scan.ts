@@ -3,9 +3,9 @@ import path from 'node:path';
 
 import type { GrowiTemplatePluginValidationData } from '../../../../model';
 import {
+  isTemplateStatusValid,
   type TemplateStatus,
   type TemplateSummary,
-  isTemplateStatusValid,
 } from '../../../interfaces';
 
 import { getStatus } from './get-status';

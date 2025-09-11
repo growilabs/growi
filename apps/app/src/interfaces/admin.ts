@@ -1,4 +1,3 @@
-
 export interface updateConfigMethodForAdmin<T> {
-  update: (arg: T) => void
+  update: (arg: T) => void;
 }

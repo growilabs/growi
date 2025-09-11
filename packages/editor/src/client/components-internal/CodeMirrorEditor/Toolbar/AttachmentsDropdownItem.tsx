@@ -29,7 +29,7 @@ export const AttachmentsDropdownItem = (props: Props): JSX.Element => {
     open,
   } = useFileDropzone({
     // close after uploading
-    // https://github.com/weseek/growi/pull/8564
+    // https://github.com/growilabs/growi/pull/8564
     onUpload: (files: File[]) => { onUpload?.(files); onClose?.() },
     acceptedUploadFileType,
     dropzoneOpts: {
@@ -37,7 +37,7 @@ export const AttachmentsDropdownItem = (props: Props): JSX.Element => {
       noDrag: true,
       noKeyboard: true,
       // close after cancelling
-      // https://github.com/weseek/growi/pull/8564
+      // https://github.com/growilabs/growi/pull/8564
       onFileDialogCancel: onClose,
     },
   });

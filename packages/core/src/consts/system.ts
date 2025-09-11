@@ -2,6 +2,7 @@ export const GrowiServiceType = {
   cloud: 'cloud',
   privateCloud: 'private-cloud',
   onPremise: 'on-premise',
+  dev: 'dev',
   others: 'others',
 } as const;
 

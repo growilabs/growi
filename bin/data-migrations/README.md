@@ -5,20 +5,23 @@
 
 ## Usage
 ```
-git clone https://github.com/weseek/growi
+git clone https://github.com/growilabs/growi
 cd growi/bin/data-migrations
 
 NETWORK=growi_devcontainer_default
-MONGO_URI=mongodb://growi_devcontainer_mongo_1/growi
+MONGO_URI=mongodb://growi-devcontainer_mongo-1/growi
 
 docker run --rm \
   --network $NETWORK \
   -v "$(pwd)"/src:/opt \
   -w /opt \
   -e MIGRATION_MODULE=v60x \
-  mongo:6.0 \
+  mongo:8.0 \
   /bin/mongosh $MONGO_URI index.js
 ```
+
+> **Note**
+> This script uses MongoDB 8.0 Docker image, but mongosh has backward compatibility and can connect to any MongoDB server version 4.2 or greater. See [MongoDB Shell documentation](https://www.mongodb.com/docs/mongodb-shell/install/) for details.
 
 ## Variables
 | Variable              | Description                                                                    | Default |
@@ -77,16 +80,16 @@ module.exports = [
 
 By passing `custom` in the environment variable `MIGRATION_MODULE` and executing it, you can apply the `custom.js` to all the latest `revisions`.
 ```
-git clone https://github.com/weseek/growi
+git clone https://github.com/growilabs/growi
 cd growi/bin/data-migrations
 
 NETWORK=growi_devcontainer_default \
-MONGO_URI=mongodb://growi_devcontainer_mongo_1/growi \
+MONGO_URI=mongodb://growi-devcontainer_mongo-1/growi
 docker run --rm \
   --network $NETWORK \
   -v "$(pwd)"/src:/opt \
   -w /opt \
   -e MIGRATION_MODULE=custom \
-  mongo:6.0 \
+  mongo:8.0 \
   /bin/mongosh $MONGO_URI index.js
 ```

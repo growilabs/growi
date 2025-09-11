@@ -172,14 +172,14 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
     // Generate login error elements using <ul>, <li>
 
     const loginErrorElement = (loginErrorList ?? []).length > 0
-    // prioritize loginErrorList because the list should contains new error
+      // prioritize loginErrorList because the list should contains new error
       ? generateSafelySetErrors(loginErrorList)
       : generateSafelySetErrors(props.externalAccountLoginError != null ? [props.externalAccountLoginError] : []);
 
     return (
       <>
         {/* !! - DO NOT DELETE HIDDEN ELEMENT - !! -- 7.12 ryoji-s */}
-        {/* https://github.com/weseek/growi/pull/7873 */}
+        {/* https://github.com/growilabs/growi/pull/7873 */}
         <div className="visually-hidden">
           <LoadingSpinner />
         </div>
@@ -268,7 +268,7 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
     return (
       <>
         <div className="mt-2">
-          { enabledExternalAuthType.map(authType => <ExternalAuthButton authType={authType} />) }
+          {enabledExternalAuthType.map(authType => <ExternalAuthButton authType={authType} />)}
         </div>
       </>
     );
@@ -342,7 +342,7 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
             {t('page_register.notice.restricted_defail')}
           </p>
         )}
-        { (!isMailerSetup && isEmailAuthenticationEnabled) && (
+        {(!isMailerSetup && isEmailAuthenticationEnabled) && (
           <p className="alert alert-danger">
             <span>{t('commons:alert.please_enable_mailer')}</span>
           </p>

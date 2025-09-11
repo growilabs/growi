@@ -16,7 +16,6 @@ const logger = loggerFactory('growi:migrate:add-config-app-installed');
  *     - value will be false if no users exist
  */
 module.exports = {
-
   async up(db) {
     logger.info('Apply migration');
     await mongoose.connect(getMongoUri(), mongoOptions);
@@ -29,7 +28,9 @@ module.exports = {
     });
     // exit if exists
     if (appInstalled != null) {
-      logger.info('\'app:appInstalled\' is already exists. This migration terminates without any changes.');
+      logger.info(
+        "'app:appInstalled' is already exists. This migration terminates without any changes.",
+      );
       return;
     }
 

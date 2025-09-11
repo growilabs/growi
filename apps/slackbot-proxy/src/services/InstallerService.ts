@@ -1,5 +1,7 @@
 import {
-  Installation as SlackInstallation, InstallationQuery, InstallProvider,
+  InstallationQuery,
+  InstallProvider,
+  Installation as SlackInstallation,
 } from '@slack/oauth';
 import { Inject, Service } from '@tsed/di';
 
@@ -8,7 +10,6 @@ import { InstallationRepository } from '~/repositories/installation';
 
 @Service()
 export class InstallerService {
-
   installer: InstallProvider;
 
   @Inject()
@@ -20,10 +21,14 @@ export class InstallerService {
     const stateSecret = process.env.SLACK_INSTALLPROVIDER_STATE_SECRET;
 
     if (clientId === undefined) {
-      throw new Error('The environment variable \'SLACK_CLIENT_ID\' must be defined.');
+      throw new Error(
+        "The environment variable 'SLACK_CLIENT_ID' must be defined.",
+      );
     }
     if (clientSecret === undefined) {
-      throw new Error('The environment variable \'SLACK_CLIENT_SECRET\' must be defined.');
+      throw new Error(
+        "The environment variable 'SLACK_CLIENT_SECRET' must be defined.",
+      );
     }
 
     const { repository } = this;
@@ -35,14 +40,18 @@ export class InstallerService {
       legacyStateVerification: true,
       installationStore: {
         // upsert
-        storeInstallation: async(slackInstallation: SlackInstallation<'v1' | 'v2', boolean>) => {
-          const teamIdOrEnterpriseId = slackInstallation.team?.id || slackInstallation.enterprise?.id;
+        storeInstallation: async (
+          slackInstallation: SlackInstallation<'v1' | 'v2', boolean>,
+        ) => {
+          const teamIdOrEnterpriseId =
+            slackInstallation.team?.id || slackInstallation.enterprise?.id;
 
           if (teamIdOrEnterpriseId == null) {
             throw new Error('teamId or enterpriseId is required.');
           }
 
-          const existedInstallation = await repository.findByTeamIdOrEnterpriseId(teamIdOrEnterpriseId);
+          const existedInstallation =
+            await repository.findByTeamIdOrEnterpriseId(teamIdOrEnterpriseId);
 
           if (existedInstallation != null) {
             existedInstallation.setData(slackInstallation);
@@ -55,7 +64,7 @@ export class InstallerService {
           await repository.save(installation);
           return;
         },
-        fetchInstallation: async(installQuery: InstallationQuery<boolean>) => {
+        fetchInstallation: async (installQuery: InstallationQuery<boolean>) => {
           const id = installQuery.enterpriseId || installQuery.teamId;
 
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -70,5 +79,4 @@ export class InstallerService {
       },
     });
   }
-
 }

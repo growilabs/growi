@@ -2,7 +2,7 @@ import { Document } from 'mongoose';
 
 import type { IAttachment, IUser } from '~/interfaces';
 
-import { type Ref, isPopulated, isRef } from '../../interfaces/common';
+import { isPopulated, isRef, type Ref } from '../../interfaces/common';
 
 import {
   type IUserSerializedSecurely,

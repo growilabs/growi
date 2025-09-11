@@ -5,7 +5,7 @@
  */
 
 import { markdownLineEnding } from 'micromark-util-character';
-import { constants, codes, types } from 'micromark-util-symbol';
+import { codes, constants, types } from 'micromark-util-symbol';
 import { ok as assert } from 'uvu/assert';
 
 // This is a fork of:

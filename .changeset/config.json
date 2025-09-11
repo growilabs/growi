@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "weseek/growi" }],
+  "changelog": ["@changesets/changelog-github", { "repo": "growilabs/growi" }],
   "commit": false,
   "fixed": [],
   "linked": [],

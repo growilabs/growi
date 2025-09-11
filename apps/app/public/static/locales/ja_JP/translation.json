@@ -223,6 +223,9 @@
       "profile_image2": "アップロードできるようにするには、AWS またはローカルアップロードの設定をしてください。"
     }
   },
+  "API Token Settings": "API Token設定",
+  "Current API Token": "現在のAPI Token",
+  "Update API Token": "API Tokenを更新",
   "page_me_apitoken": {
     "api_token": "API Token",
     "notice": {
@@ -231,6 +234,35 @@
       "update_token2": "現在の Token を利用している処理は動かなくなります。"
     },
     "form_help": {}
+  },
+  "Access Token Settings": "Access token 設定",
+  "page_me_access_token": {
+    "access_token": "Access token",
+    "expiredAt": "有効期限",
+    "description": "説明",
+    "scope": "スコープ",
+    "scope_read": "Read",
+    "action": "アクション",
+    "create_token": "トークンを作成",
+    "no_tokens_found": "アクセストークンが見つかりません",
+    "new_token": {
+      "title": "新しいアクセストークン",
+      "copy_to_clipboard": "クリップボードにコピーしました",
+      "message": "このアクセストークンは一度しか表示されません。安全に保存してください"
+    },
+    "modal": {
+      "message": "このアクセストークンを削除しますか？",
+      "alert": "この操作は取り消せません",
+      "delete_token": "トークンを削除"
+    },
+    "form": {
+      "title": "アクセストークンを作成",
+      "expiredAt_desc": "アクセストークンの有効期限を選択します。",
+      "description_desc": "このトークンを後で識別するための説明を入力します。",
+      "description_max_length": "{{length}}文字以内で入力してください。",
+      "scope_desc": "スコープによって、このトークンで行える操作を制限します。"
+    },
+    "copy_to_clipboard": "Copy to clipboard"
   },
   "Password": "パスワード",
   "Password Settings": "パスワード設定",
@@ -262,9 +294,6 @@
   },
   "API Settings": "API設定",
   "Other Settings": "その他の設定",
-  "API Token Settings": "API Token設定",
-  "Current API Token": "現在のAPI Token",
-  "Update API Token": "API Tokenを更新",
   "in_app_notification_settings": {
     "in_app_notification_settings": "アプリ内通知設定",
     "subscribe_settings": "自動でページをサブスクライブする（通知を受け取る）設定",
@@ -512,9 +541,27 @@
       "Search in Editor": "エディター内検索",
       "Move Line": "行の移動",
       "Copy Line": "行のコピー",
-      "Toggle Line": "行の非表示化",
       "Insert Line": "行を挿入",
-      "Post Comment": "(コメント投稿)"
+      "Post Comment": "(コメント投稿)",
+      "Multiple Cursors": "複数カーソル",
+      "Or Alt Click": "もしくは Alt + クリック"
+    },
+    "format": {
+      "title": "書式設定 (エディター)",
+      "Bold": "太字",
+      "Italic": "斜体",
+      "Strikethrough": "取り消し線",
+      "Code Text": "コードテキスト",
+      "Hyperlink": "ハイパーリンク"
+    },
+    "line_settings": {
+      "title": "行の設定 (エディター)",
+      "Bullet List": "箇条書きリスト",
+      "Numbered List": "番号付きリスト",
+      "Quote": "引用",
+      "Code Block": "コードブロック",
+      "Comment Out": "非表示にする",
+      "Comment Out Desc": "(コメントアウト)"
     }
   },
   "modal_resolve_conflict": {
@@ -530,6 +577,8 @@
   },
   "sidebar_ai_assistant": {
     "reference_pages_label": "参照するページ",
+    "recent_chat": "最近のチャット",
+    "no_recent_chat": "チャットがありません",
     "knowledge_assistant_placeholder": "ききたいことを入力してください",
     "editor_assistant_placeholder": "お手伝いできることはありますか？",
     "summary_mode_label": "要約モード",
@@ -584,6 +633,17 @@
       "create_failed": "アシスタントの作成に失敗しました",
       "update_failed": "アシスタントの更新に失敗しました"
     },
+    "select_source_pages": "アシスタントが参照するページを選択します",
+    "search_reference_pages_by_keyword": "アシスタントが参照するページをキーワードで検索",
+    "search_by_keyword": "キーワードで検索",
+    "enter_keywords": "キーワードを入力",
+    "max_items_space_separated_hint": "スペース区切りで最大5つまで入力できます",
+    "select_assistant_reference_pages": "アシスタントが参照するページを選択してください",
+    "reference_pages": "参照するページ",
+    "no_pages_selected": "ページが選択されていません",
+    "can_add_later": "あとからでも追加できます",
+    "next": "次へ",
+    "select_from_page_tree": "ページツリーから選択",
     "edit_page_description": " アシスタントが参照するページを編集します。<br> 参照できるページは配下ページも含めて {{limitLearnablePageCountPerAssistant}} ページまでです。",
     "default_instruction": "あなたはこのWikiの知識アシスタントです。\n\n## 多言語サポート:\nユーザーが入力で使用した言語と同じ言語で応答してください。\n",
     "add_page_button": "ページを追加する",
@@ -635,11 +695,12 @@
   "default_ai_assistant": {
     "not_set": "デフォルトアシスタントが設定されていません"
   },
-  "ai_assistant_tree": {
+  "ai_assistant_substance": {
     "add_assistant": "アシスタントを追加する",
     "my_assistants": "マイアシスタント",
     "team_assistants": "チームアシスタント",
     "thread_does_not_exist": "スレッドが存在しません",
+    "recent_threads": "最近の項目",
     "toaster": {
       "ai_assistant_deleted_success": "アシスタントを削除しました",
       "ai_assistant_deleted_failed": "アシスタントの削除に失敗しました",
@@ -647,6 +708,10 @@
       "thread_deleted_failed": "スレッドの削除に失敗しました",
       "ai_assistant_set_default_success": "デフォルトアシスタントを設定しました",
       "ai_assistant_set_default_failed": "デフォルトアシスタントの設定に失敗しました"
+    },
+    "delete_modal": {
+      "title": "アシスタントを削除する",
+      "confirm_message": "本当にアシスタントを削除しますか？"
     }
   },
   "link_edit": {
@@ -865,7 +930,7 @@
     "Password field is required": "パスワードの欄は必ず入力してください",
     "Username or E-mail has invalid characters": "ユーザー名または、メールアドレスに無効な文字があります",
     "user_not_found": "ユーザーが見つかりません",
-    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>エラー: DuplicatedUsernameException</strong></p><p class='mb-0'> {{ failedProviderForDuplicatedUsernameException }} 認証は成功しましたが、新しいユーザーを作成できませんでした。詳しくは<a href='https://github.com/weseek/growi/issues/193'>こちら: #193</a>.</p>"
+    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>エラー: DuplicatedUsernameException</strong></p><p class='mb-0'> {{ failedProviderForDuplicatedUsernameException }} 認証は成功しましたが、新しいユーザーを作成できませんでした。詳しくは<a href='https://github.com/growilabs/growi/issues/193'>こちら: #193</a>.</p>"
   },
   "grid_edit": {
     "create_bootstrap_4_grid": "Bootstrap 4 グリッドを作成",
@@ -990,23 +1055,6 @@
     "page_tree_not_avaliable": "Page Tree 機能は現在使用できません。",
     "go_to_settings": "設定する"
   },
-  "questionnaire": {
-    "give_us_feedback": "GROWI の改善のために、アンケートにご協力ください",
-    "thank_you_for_answering": "ご回答ありがとうございます",
-    "additional_feedback": "その他ご意見ご要望はユーザーアイコンのドロップダウンからお願い致します。",
-    "dont_show_again": "今後このアンケートを表示しない",
-    "deny": "回答しない",
-    "agree": "そう思う",
-    "disagree": "そう思わない",
-    "answer": "回答する",
-    "no_answer": "わからない",
-    "settings": "アンケート設定",
-    "failed_to_send": "回答送信に失敗しました",
-    "denied": "このアンケートは今後表示されません",
-    "personal_settings_explanation": "GROWI 改善のためのアンケートが表示されるようになります。ご意見ご要望はユーザーアイコンのドロップダウンからお願いいたします。",
-    "enable_questionnaire": "アンケートを有効にする",
-    "disabled_by_admin": "管理者によってアンケートは無効化されています"
-  },
   "tag_edit_modal": {
     "edit_tags": "タグの編集",
     "done": "完了",
@@ -1040,7 +1088,7 @@
     "untitled": "無題のページ"
   },
   "sync-latest-revision-body": {
-    "menuitem": "最新のリビジョンの本文とエディタのテキストを同期",
+    "menuitem": "最新のリビジョンの本文とエディターのテキストを同期",
     "confirm": "エディターに入力中のドラフトデータを削除して最新の本文を同期します。実行しますか？",
     "alert": "最新の本文が同期されていない可能性があります。リロードして再度ご確認ください。",
     "success-toaster": "最新の本文を同期しました",

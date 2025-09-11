@@ -3,5 +3,5 @@
  * @typedef {import('./lib/html.js').HtmlOptions} HtmlOptions
  */
 
-export { directive } from './lib/syntax.js';
 export { directiveHtml } from './lib/html.js';
+export { directive } from './lib/syntax.js';

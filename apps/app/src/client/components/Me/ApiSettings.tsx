@@ -1,89 +1,35 @@
-import React, { useCallback, type JSX } from 'react';
+import React from 'react';
 
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Put } from '~/client/util/apiv3-client';
-import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useSWRxPersonalSettings, usePersonalSettings } from '~/stores/personal-settings';
+import { useCurrentUser } from '~/stores-universal/context';
+
+import { AccessTokenSettings } from './AccessTokenSettings';
+import { ApiTokenSettings } from './ApiTokenSettings';
 
 
 const ApiSettings = React.memo((): JSX.Element => {
 
   const { t } = useTranslation();
-  const { mutate: mutateDatabaseData } = useSWRxPersonalSettings();
-  const { data: personalSettingsData } = usePersonalSettings();
+  const { data: currentUser, isLoading: isLoadingCurrentUserData } = useCurrentUser();
 
-  const submitHandler = useCallback(async() => {
-
-    try {
-      await apiv3Put('/personal-setting/api-token');
-      mutateDatabaseData();
-
-      toastSuccess(t('toaster.update_successed', { target: t('page_me_apitoken.api_token'), ns: 'commons' }));
-    }
-    catch (err) {
-      toastError(err);
-    }
-
-  }, [mutateDatabaseData, t]);
+  const shouldHideAccessTokenSettings = isLoadingCurrentUserData || !currentUser?.readOnly;
 
   return (
     <>
-
-      <h2 className="border-bottom pb-2 my-4 fs-4">{ t('API Token Settings') }</h2>
-
-      <div className="row mb-3">
-        <label htmlFor="apiToken" className="col-md-3 text-md-end col-form-label">{t('Current API Token')}</label>
-        <div className="col-md-6">
-          {personalSettingsData?.apiToken != null
-            ? (
-              <input
-                data-testid="grw-api-settings-input"
-                data-vrt-blackout
-                className="form-control"
-                type="text"
-                name="apiToken"
-                value={personalSettingsData.apiToken}
-                readOnly
-              />
-            )
-            : (
-              <p>
-                { t('page_me_apitoken.notice.apitoken_issued') }
-              </p>
-            )}
-        </div>
+      <div className="mt-4">
+        <h2 className="border-bottom pb-2 my-4 fs-4">{ t('API Token Settings') }</h2>
+        <ApiTokenSettings />
       </div>
 
-
-      <div className="row">
-        <div className="offset-lg-2 col-lg-7">
-
-          <p className="alert alert-warning">
-            { t('page_me_apitoken.notice.update_token1') }<br />
-            { t('page_me_apitoken.notice.update_token2') }
-          </p>
-
+      {shouldHideAccessTokenSettings && (
+        <div className="mt-4">
+          <h2 className="border-bottom pb-2 my-4 fs-4">{ t('Access Token Settings') }</h2>
+          <AccessTokenSettings />
         </div>
-      </div>
-
-      <div className="row my-3">
-        <div className="offset-4 col-5">
-          <button
-            data-testid="grw-api-settings-update-button"
-            type="button"
-            className="btn btn-primary text-nowrap"
-            onClick={submitHandler}
-          >
-            {t('Update API Token')}
-          </button>
-        </div>
-      </div>
-
+      )}
     </>
-
   );
-
 });
 
 ApiSettings.displayName = 'ApiSettings';

@@ -1,14 +1,17 @@
-import path from 'path';
-
 import { GrowiPluginType } from '@growi/core';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import type { TemplateSummary } from '@growi/pluginkit/dist/v4';
-import { scanAllTemplates, getMarkdown } from '@growi/pluginkit/dist/v4/server/index.cjs';
+import {
+  getMarkdown,
+  scanAllTemplates,
+} from '@growi/pluginkit/dist/v4/server/index.cjs';
 import express from 'express';
 import { param, query } from 'express-validator';
-
+import path from 'path';
 import { PLUGIN_STORING_PATH } from '~/features/growi-plugin/server/consts';
 import { GrowiPlugin } from '~/features/growi-plugin/server/models';
 import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
@@ -19,22 +22,17 @@ const logger = loggerFactory('growi:routes:apiv3:templates');
 const router = express.Router();
 
 const validator = {
-  list: [
-    query('includeInvalidTemplates').optional().isBoolean(),
-  ],
-  get: [
-    param('templateId').isString(),
-    param('locale').isString(),
-  ],
+  list: [query('includeInvalidTemplates').optional().isBoolean()],
+  get: [param('templateId').isString(), param('locale').isString()],
 };
-
 
 // cache object
 let presetTemplateSummaries: TemplateSummary[];
 
-
 module.exports = (crowi: Crowi) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(crowi);
+  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
+    crowi,
+  );
 
   /**
    * @swagger
@@ -77,41 +75,52 @@ module.exports = (crowi: Crowi) => {
    *                       title:
    *                         type: string
    */
-  router.get('/', loginRequiredStrictly, validator.list, apiV3FormValidator, async(req, res: ApiV3Response) => {
-    const { includeInvalidTemplates } = req.query;
+  router.get(
+    '/',
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE]),
+    loginRequiredStrictly,
+    validator.list,
+    apiV3FormValidator,
+    async (req, res: ApiV3Response) => {
+      const { includeInvalidTemplates } = req.query;
 
-    // scan preset templates
-    if (presetTemplateSummaries == null) {
-      const presetTemplatesRoot = resolveFromRoot('node_modules/@growi/preset-templates');
+      // scan preset templates
+      if (presetTemplateSummaries == null) {
+        const presetTemplatesRoot = resolveFromRoot(
+          'node_modules/@growi/preset-templates',
+        );
 
+        try {
+          presetTemplateSummaries = await scanAllTemplates(
+            presetTemplatesRoot,
+            {
+              returnsInvalidTemplates: includeInvalidTemplates,
+            },
+          );
+        } catch (err) {
+          logger.error(err);
+          presetTemplateSummaries = [];
+        }
+      }
+
+      // load plugin templates
+      let pluginsTemplateSummaries: TemplateSummary[] = [];
       try {
-        presetTemplateSummaries = await scanAllTemplates(presetTemplatesRoot, {
-          returnsInvalidTemplates: includeInvalidTemplates,
-        });
-      }
-      catch (err) {
+        const plugins = await GrowiPlugin.findEnabledPluginsByType(
+          GrowiPluginType.Template,
+        );
+        pluginsTemplateSummaries = plugins.flatMap(
+          (p) => p.meta.templateSummaries,
+        );
+      } catch (err) {
         logger.error(err);
-        presetTemplateSummaries = [];
       }
-    }
 
-    // load plugin templates
-    let pluginsTemplateSummaries: TemplateSummary[] = [];
-    try {
-      const plugins = await GrowiPlugin.findEnabledPluginsByType(GrowiPluginType.Template);
-      pluginsTemplateSummaries = plugins.flatMap(p => p.meta.templateSummaries);
-    }
-    catch (err) {
-      logger.error(err);
-    }
-
-    return res.apiv3({
-      summaries: [
-        ...presetTemplateSummaries,
-        ...pluginsTemplateSummaries,
-      ],
-    });
-  });
+      return res.apiv3({
+        summaries: [...presetTemplateSummaries, ...pluginsTemplateSummaries],
+      });
+    },
+  );
 
   /**
    * @swagger
@@ -147,21 +156,31 @@ module.exports = (crowi: Crowi) => {
    *                 markdown:
    *                   type: string
    */
-  router.get('/preset-templates/:templateId/:locale', loginRequiredStrictly, validator.get, apiV3FormValidator, async(req, res: ApiV3Response) => {
-    const {
-      templateId, locale,
-    } = req.params;
+  router.get(
+    '/preset-templates/:templateId/:locale',
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE]),
+    loginRequiredStrictly,
+    validator.get,
+    apiV3FormValidator,
+    async (req, res: ApiV3Response) => {
+      const { templateId, locale } = req.params;
 
-    const presetTemplatesRoot = resolveFromRoot('node_modules/@growi/preset-templates');
+      const presetTemplatesRoot = resolveFromRoot(
+        'node_modules/@growi/preset-templates',
+      );
 
-    try {
-      const markdown = await getMarkdown(presetTemplatesRoot, templateId, locale);
-      return res.apiv3({ markdown });
-    }
-    catch (err) {
-      res.apiv3Err(err);
-    }
-  });
+      try {
+        const markdown = await getMarkdown(
+          presetTemplatesRoot,
+          templateId,
+          locale,
+        );
+        return res.apiv3({ markdown });
+      } catch (err) {
+        res.apiv3Err(err);
+      }
+    },
+  );
 
   /**
    * @swagger
@@ -209,23 +228,28 @@ module.exports = (crowi: Crowi) => {
    *                 markdown:
    *                   type: string
    */
-  router.get('/plugin-templates/:organizationId/:reposId/:templateId/:locale', loginRequiredStrictly, validator.get, apiV3FormValidator, async(
-      req, res: ApiV3Response,
-  ) => {
-    const {
-      organizationId, reposId, templateId, locale,
-    } = req.params;
+  router.get(
+    '/plugin-templates/:organizationId/:reposId/:templateId/:locale',
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE]),
+    loginRequiredStrictly,
+    validator.get,
+    apiV3FormValidator,
+    async (req, res: ApiV3Response) => {
+      const { organizationId, reposId, templateId, locale } = req.params;
 
-    const pluginRoot = path.join(PLUGIN_STORING_PATH, `${organizationId}/${reposId}`);
+      const pluginRoot = path.join(
+        PLUGIN_STORING_PATH,
+        `${organizationId}/${reposId}`,
+      );
 
-    try {
-      const markdown = await getMarkdown(pluginRoot, templateId, locale);
-      return res.apiv3({ markdown });
-    }
-    catch (err) {
-      res.apiv3Err(err);
-    }
-  });
+      try {
+        const markdown = await getMarkdown(pluginRoot, templateId, locale);
+        return res.apiv3({ markdown });
+      } catch (err) {
+        res.apiv3Err(err);
+      }
+    },
+  );
 
   return router;
 };

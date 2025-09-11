@@ -1,3 +1,4 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import express from 'express';
@@ -157,7 +158,7 @@ module.exports = (crowi) => {
       query('fileSize').isNumeric().exists({ checkNull: true }).withMessage('fileSize is required'),
     ],
     retrieveAddAttachment: [
-      body('page_id').isString().exists({ checkNull: true }).withMessage('page_id is required'),
+      body('page_id').isMongoId().exists({ checkNull: true }).withMessage('page_id is required'),
     ],
   };
 
@@ -198,45 +199,47 @@ module.exports = (crowi) => {
    *                  type: object
    *                  $ref: '#/components/schemas/AttachmentPaginateResult'
    */
-  router.get('/list', accessTokenParser, loginRequired, validator.retrieveAttachments, apiV3FormValidator, async(req, res) => {
+  router.get('/list',
+    accessTokenParser([SCOPE.READ.FEATURES.ATTACHMENT], { acceptLegacy: true }), loginRequired, validator.retrieveAttachments, apiV3FormValidator,
+    async(req, res) => {
 
-    const limit = req.query.limit || await crowi.configManager.getConfig('customize:showPageLimitationS') || 10;
-    const pageNumber = req.query.pageNumber || 1;
-    const offset = (pageNumber - 1) * limit;
+      const limit = req.query.limit || await crowi.configManager.getConfig('customize:showPageLimitationS') || 10;
+      const pageNumber = req.query.pageNumber || 1;
+      const offset = (pageNumber - 1) * limit;
 
-    try {
-      const pageId = req.query.pageId;
-      // check whether accessible
-      const isAccessible = await Page.isAccessiblePageByViewer(pageId, req.user);
-      if (!isAccessible) {
-        const msg = 'Current user is not accessible to this page.';
-        return res.apiv3Err(new ErrorV3(msg, 'attachment-list-failed'), 403);
-      }
-
-      // directly get paging-size from db. not to delivery from client side.
-
-      const paginateResult = await Attachment.paginate(
-        { page: pageId },
-        {
-          limit,
-          offset,
-          populate: 'creator',
-        },
-      );
-
-      paginateResult.docs.forEach((doc) => {
-        if (doc.creator != null && doc.creator instanceof User) {
-          doc.creator = serializeUserSecurely(doc.creator);
+      try {
+        const pageId = req.query.pageId;
+        // check whether accessible
+        const isAccessible = await Page.isAccessiblePageByViewer(pageId, req.user);
+        if (!isAccessible) {
+          const msg = 'Current user is not accessible to this page.';
+          return res.apiv3Err(new ErrorV3(msg, 'attachment-list-failed'), 403);
         }
-      });
 
-      return res.apiv3({ paginateResult });
-    }
-    catch (err) {
-      logger.error('Attachment not found', err);
-      return res.apiv3Err(err, 500);
-    }
-  });
+        // directly get paging-size from db. not to delivery from client side.
+
+        const paginateResult = await Attachment.paginate(
+          { page: pageId },
+          {
+            limit,
+            offset,
+            populate: 'creator',
+          },
+        );
+
+        paginateResult.docs.forEach((doc) => {
+          if (doc.creator != null && doc.creator instanceof User) {
+            doc.creator = serializeUserSecurely(doc.creator);
+          }
+        });
+
+        return res.apiv3({ paginateResult });
+      }
+      catch (err) {
+        logger.error('Attachment not found', err);
+        return res.apiv3Err(err, 500);
+      }
+    });
 
 
   /**
@@ -271,17 +274,19 @@ module.exports = (crowi) => {
    *          500:
    *            $ref: '#/components/responses/InternalServerError'
    */
-  router.get('/limit', accessTokenParser, loginRequiredStrictly, validator.retrieveFileLimit, apiV3FormValidator, async(req, res) => {
-    const { fileUploadService } = crowi;
-    const fileSize = Number(req.query.fileSize);
-    try {
-      return res.apiv3(await fileUploadService.checkLimit(fileSize));
-    }
-    catch (err) {
-      logger.error('File limit retrieval failed', err);
-      return res.apiv3Err(err, 500);
-    }
-  });
+  router.get('/limit',
+    accessTokenParser([SCOPE.READ.FEATURES.ATTACHMENT], { acceptLegacy: true }), loginRequiredStrictly, validator.retrieveFileLimit, apiV3FormValidator,
+    async(req, res) => {
+      const { fileUploadService } = crowi;
+      const fileSize = Number(req.query.fileSize);
+      try {
+        return res.apiv3(await fileUploadService.checkLimit(fileSize));
+      }
+      catch (err) {
+        logger.error('File limit retrieval failed', err);
+        return res.apiv3Err(err, 500);
+      }
+    });
 
   /**
    * @swagger
@@ -337,8 +342,8 @@ module.exports = (crowi) => {
    *          500:
    *            $ref: '#/components/responses/InternalServerError'
    */
-  router.post('/', accessTokenParser, loginRequiredStrictly, excludeReadOnlyUser, uploads.single('file'),
-    validator.retrieveAddAttachment, apiV3FormValidator, addActivity,
+  router.post('/', uploads.single('file'), accessTokenParser([SCOPE.WRITE.FEATURES.ATTACHMENT], { acceptLegacy: true }),
+    loginRequiredStrictly, excludeReadOnlyUser, validator.retrieveAddAttachment, apiV3FormValidator, addActivity,
     // Removed autoReap middleware to use file data in asynchronous processes. Instead, implemented file deletion after asynchronous processes complete
     async(req, res) => {
 
@@ -351,7 +356,7 @@ module.exports = (crowi) => {
       }
 
       try {
-        const page = await Page.findById(pageId);
+        const page = await Page.findOne({ _id: { $eq: pageId } });
 
         // check the user is accessible
         const isAccessible = await Page.isAccessiblePageByViewer(page.id, req.user);
@@ -402,7 +407,8 @@ module.exports = (crowi) => {
    *            schema:
    *              type: string
    */
-  router.get('/:id', accessTokenParser, certifySharedPageAttachmentMiddleware, loginRequired, validator.retrieveAttachment, apiV3FormValidator,
+  router.get('/:id', accessTokenParser([SCOPE.READ.FEATURES.ATTACHMENT], { acceptLegacy: true }), certifySharedPageAttachmentMiddleware, loginRequired,
+    validator.retrieveAttachment, apiV3FormValidator,
     async(req, res) => {
       try {
         const attachmentId = req.params.id;

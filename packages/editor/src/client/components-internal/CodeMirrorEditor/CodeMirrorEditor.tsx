@@ -27,7 +27,7 @@ const moduleClass = style['codemirror-editor'];
 
 
 // Fix IME cursor position issue by EditContext
-// ref: https://github.com/weseek/growi/pull/9267
+// ref: https://github.com/growilabs/growi/pull/9267
 // ref: https://discuss.codemirror.net/t/issue-with-google-japanese-ime-cursor-position-in-v6/8810/3
 (EditorView as unknown as { EDIT_CONTEXT: boolean }).EDIT_CONTEXT = false;
 
@@ -227,13 +227,13 @@ export const CodeMirrorEditor = (props: Props): JSX.Element => {
         <FileDropzoneOverlay isEnabled={isDragActive} />
         <CodeMirrorEditorContainer ref={containerRef} />
       </div>
-      { !hideToolbar && (
+      {!hideToolbar && (
         <Toolbar
           editorKey={editorKey}
           acceptedUploadFileType={acceptedUploadFileType}
           onUpload={onUpload}
         />
-      ) }
+      )}
     </div>
   );
 };

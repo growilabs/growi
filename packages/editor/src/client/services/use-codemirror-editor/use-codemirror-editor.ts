@@ -14,7 +14,7 @@ import { useFoldDrawio } from './utils/fold-drawio';
 import type { GetDocString } from './utils/get-doc';
 import { useGetDoc, type GetDoc, useGetDocString } from './utils/get-doc';
 import { useInitDoc, type InitDoc } from './utils/init-doc';
-import { useInsertMarkdownElements, type InsertMarkdowElements } from './utils/insert-markdown-elements';
+import { useInsertMarkdownElements, type InsertMarkdownElements } from './utils/insert-markdown-elements';
 import { useInsertPrefix, type InsertPrefix } from './utils/insert-prefix';
 import { useInsertText, type InsertText } from './utils/insert-text';
 import { useReplaceText, type ReplaceText } from './utils/replace-text';
@@ -30,7 +30,7 @@ type UseCodeMirrorEditorUtils = {
   setCaretLine: SetCaretLine,
   insertText: InsertText,
   replaceText: ReplaceText,
-  insertMarkdownElements: InsertMarkdowElements,
+  insertMarkdownElements: InsertMarkdownElements,
   insertPrefix: InsertPrefix,
   foldDrawio: FoldDrawio,
 }

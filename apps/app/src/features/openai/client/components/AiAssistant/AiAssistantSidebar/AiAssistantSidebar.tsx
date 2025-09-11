@@ -136,13 +136,20 @@ const AiAssistantSidebarSubstance: React.FC<AiAssistantSidebarSubstanceProps> = 
 
     if (isEditorAssistant) {
       if (isEditorAssistantFormData(formData)) {
-        const response = await postMessageForEditorAssistant(threadId, formData);
+        const response = await postMessageForEditorAssistant({
+          threadId,
+          formData,
+        });
         return response;
       }
       return;
     }
     if (aiAssistantData?._id != null) {
-      const response = await postMessageForKnowledgeAssistant(aiAssistantData._id, threadId, formData);
+      const response = await postMessageForKnowledgeAssistant({
+        aiAssistantId: aiAssistantData._id,
+        threadId,
+        formData,
+      });
       return response;
     }
   }, [aiAssistantData?._id, isEditorAssistant, postMessageForEditorAssistant, postMessageForKnowledgeAssistant]);
@@ -361,13 +368,10 @@ const AiAssistantSidebarSubstance: React.FC<AiAssistantSidebarSubstanceProps> = 
   }, [headerIconForEditorAssistant, headerIconForKnowledgeAssistant, isEditorAssistant]);
 
   const headerText = useMemo(() => {
-    if (threadData?.title) {
-      return threadData.title;
-    }
     return isEditorAssistant
       ? headerTextForEditorAssistant
       : headerTextForKnowledgeAssistant;
-  }, [threadData?.title, isEditorAssistant, headerTextForEditorAssistant, headerTextForKnowledgeAssistant]);
+  }, [isEditorAssistant, headerTextForEditorAssistant, headerTextForKnowledgeAssistant]);
 
   const placeHolder = useMemo(() => {
     if (form.formState.isSubmitting) {

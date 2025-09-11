@@ -143,7 +143,6 @@
   "edited this page": "à modifié cette page.",
   "List Drafts": "Brouillons",
   "Deleted Pages": "Pages supprimées",
-  "Questionnaire": "Questionnaire",
   "Disassociate": "Dissocier",
   "No bookmarks yet": "Aucuns favoris",
   "add_bookmark": "Ajouter aux favoris",
@@ -223,6 +222,9 @@
       "profile_image2": "Configurer AWS ou activer le stockage local."
     }
   },
+  "API Token Settings": "Jetons d'API",
+  "Current API Token": "Mon jeton d'API",
+  "Update API Token": "Regénérer",
   "page_me_apitoken": {
     "api_token": "Jeton API",
     "notice": {
@@ -231,6 +233,35 @@
       "update_token2": "Modifiez le jeton aux endroits où celui-ci est utilisé."
     },
     "form_help": {}
+  },
+  "Access Token Settings": "Jeton d'accès",
+  "page_me_access_token": {
+    "access_token": "Jeton d'accès",
+    "expiredAt": "Date d'expiration",
+    "description": "Description",
+    "scope": "Portée",
+    "scope_read": "Lecture",
+    "action": "Action",
+    "create_token": "Créer un jeton",
+    "no_tokens_found": "Aucun jeton d'accès trouvé",
+    "new_token": {
+      "title": "Nouveau jeton d'accès",
+      "copy_to_clipboard": "Copier dans le presse-papiers",
+      "message": "Ce jeton ne sera affiché qu'une seule fois. Veuillez le sauvegarder en lieu sûr."
+    },
+    "modal": {
+      "message": "Êtes-vous sûr de vouloir supprimer ce jeton d'accès ?",
+      "alert": "Cette action ne peut pas être annulée.",
+      "delete_token": "Supprimer le jeton"
+    },
+    "form": {
+      "title": "Créer un nouveau jeton d'accès",
+      "expiredAt_desc": "Sélectionnez la date d'expiration de ce jeton d'accès.",
+      "description_desc": "Fournissez une description pour vous aider à identifier ce jeton ultérieurement.",
+      "description_max_length": "Veuillez saisir jusqu'à {{length}} caractères.",
+      "scope_desc": "Sélectionnez la portée du jeton d'accès."
+    },
+    "copy_to_clipboard": "Copier dans le presse-papiers"
   },
   "Password": "Mot de passe",
   "Password Settings": "Sécurité",
@@ -262,9 +293,6 @@
   },
   "API Settings": "API GROWI",
   "Other Settings": "Autres paramètres",
-  "API Token Settings": "Jetons d'API",
-  "Current API Token": "Mon jeton d'API",
-  "Update API Token": "Regénérer",
   "in_app_notification_settings": {
     "in_app_notification_settings": "Notifications",
     "subscribe_settings": "Paramètres d'abonnement automatique aux notifications de pages",
@@ -460,7 +488,7 @@
       "Create Page": "Créer page",
       "Search": "Rechercher",
       "Show Contributors": "Voir contributeurs",
-      "MirrorMode": "Mode mirroir",
+      "MirrorMode": "Mode miroir",
       "Konami Code": "Code Konami",
       "konami_code_url": "https://fr.wikipedia.org/wiki/Code_Konami"
     },
@@ -474,9 +502,27 @@
       "Search in Editor": "Rechercher dans l'éditeur",
       "Move Line": "Déplacer la ligne",
       "Copy Line": "Copier la ligne",
-      "Toggle Line": "Commenter/Décommenter la ligne",
       "Insert Line": "Insérer une ligne",
-      "Post Comment": "(Publier le commentaire)"
+      "Post Comment": "(Publier le commentaire)",
+      "Multiple Cursors": "Curseurs multiples",
+      "Or Alt Click": "ou Alt + Clic"
+    },
+    "format": {
+      "title": "Paramètres de format (Éditeur)",
+      "Bold": "Gras",
+      "Italic": "Italique",
+      "Strikethrough": "Barré",
+      "Code Text": "Texte de code",
+      "Hyperlink": "Lien hypertexte"
+    },
+    "line_settings": {
+      "title": "Paramètres de ligne (Éditeur)",
+      "Bullet List": "Liste à puces",
+      "Numbered List": "Liste numérotée",
+      "Quote": "Citation",
+      "Code Block": "Bloc de code",
+      "Comment Out": "Masquer",
+      "Comment Out Desc": "(Commenter)"
     }
   },
   "modal_resolve_conflict": {
@@ -492,6 +538,8 @@
   },
   "sidebar_ai_assistant": {
     "reference_pages_label": "Pages de référence",
+    "recent_chat": "Chat récent",
+    "no_recent_chat": "Pas de chat récent",
     "knowledge_assistant_placeholder": "Demandez-moi n'importe quoi.",
     "editor_assistant_placeholder": "Puis-je vous aider ?",
     "summary_mode_label": "Mode résumé",
@@ -546,6 +594,17 @@
       "create_failed": "Échec de la création de l'assistant",
       "update_failed": "Échec de la mise à jour de l'assistant"
     },
+    "select_source_pages": "Sélectionnez les pages que l'assistant doit référencer",
+    "search_reference_pages_by_keyword": "Rechercher les pages de référence de l'assistant par mot-clé",
+    "search_by_keyword": "Rechercher par mot-clé",
+    "max_items_space_separated_hint": "Saisissez jusqu'à 5 éléments séparés par des espaces",
+    "select_assistant_reference_pages": "Sélectionnez les pages de référence pour l'assistant",
+    "enter_keywords": "Entrer des mots-clés",
+    "reference_pages": "Pages de référence",
+    "no_pages_selected": "Aucune page sélectionnée",
+    "can_add_later": "Vous pouvez en ajouter plus tard",
+    "next": "Suivant",
+    "select_from_page_tree": "Sélectionner depuis l'arborescence des pages",
     "edit_page_description": "Modifier les pages que l'assistant peut référencer.<br> L'assistant peut référencer jusqu'à {{limitLearnablePageCountPerAssistant}} pages, y compris les pages enfants.",
     "default_instruction": "Vous êtes l'assistant de connaissances pour ce Wiki.\n\n## Support multilingue :\nRépondez dans la même langue que celle utilisée par l'utilisateur dans sa requête.\n",
     "add_page_button": "Ajouter une page",
@@ -597,11 +656,12 @@
   "default_ai_assistant": {
     "not_set": "L'assistant par défaut n'est pas configuré"
   },
-  "ai_assistant_tree": {
+  "ai_assistant_substance": {
     "add_assistant": "Ajouter un assistant",
     "my_assistants": "Mes assistants",
     "team_assistants": "Assistants d'équipe",
     "thread_does_not_exist": "Aucune discussion",
+    "recent_threads": "Éléments récents",
     "toaster": {
       "ai_assistant_deleted_success": "Assistant supprimé",
       "ai_assistant_deleted_failed": "Échec de la suppression de l'assistant",
@@ -609,6 +669,10 @@
       "thread_deleted_failed": "Échec de la suppression de la discussion",
       "ai_assistant_set_default_success": "Assistant par défaut défini avec succès",
       "ai_assistant_set_default_failed": "Échec de la définition de l'assistant par défaut"
+    },
+    "delete_modal": {
+      "title": "Supprimer l'assistant",
+      "confirm_message": "Êtes-vous sûr de vouloir supprimer cet assistant ?"
     }
   },
   "link_edit": {
@@ -827,7 +891,7 @@
     "Password field is required": "Mot de passe requis.",
     "Username or E-mail has invalid characters": "Le nom d'utilisateur ou l'adresse courriel contient des caractères invalides",
     "user_not_found": "Utilisateur introuvable.",
-    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>DuplicatedUsernameException</strong></p><p class='mb-0'> L'authentification est réussie pour {{ failedProviderForDuplicatedUsernameException }} , mais la création d'un utilisateur a échouée. Voir <a href='https://github.com/weseek/growi/issues/193'>#193</a>.</p>"
+    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>DuplicatedUsernameException</strong></p><p class='mb-0'> L'authentification est réussie pour {{ failedProviderForDuplicatedUsernameException }} , mais la création d'un utilisateur a échouée. Voir <a href='https://github.com/growilabs/growi/issues/193'>#193</a>.</p>"
   },
   "grid_edit": {
     "create_bootstrap_4_grid": "Créer grille Bootstrap 4",
@@ -951,23 +1015,6 @@
   "v5_page_migration": {
     "page_tree_not_avaliable": "Cette fonctionnalité n'est pas encore disponible.",
     "go_to_settings": "Activer cette fonctionnalité dans les paramètres"
-  },
-  "questionnaire": {
-    "give_us_feedback": "Faites-nous part de votre avis",
-    "thank_you_for_answering": "Merci pour votre réponse",
-    "additional_feedback": "Envoyez-nous votre avis depuis le menu déroulant sur le menu utilisateur.",
-    "dont_show_again": "Ne plus afficher",
-    "deny": "Ne pas répondre",
-    "agree": "En accord",
-    "disagree": "En désaccord",
-    "answer": "Répondre",
-    "no_answer": "Aucune réponse",
-    "settings": "Sondages anonymes",
-    "failed_to_send": "Échec de l'envoi du sondage",
-    "denied": "Les sondages ne seront plus affichés.",
-    "personal_settings_explanation": "Sondages de satisfaction anonymes.",
-    "enable_questionnaire": "Sondages anonymes",
-    "disabled_by_admin": "Sondages anonymes désactivés par l'administrateur"
   },
   "tag_edit_modal": {
     "edit_tags": "Étiquettes",

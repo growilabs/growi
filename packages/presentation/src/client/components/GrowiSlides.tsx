@@ -1,6 +1,5 @@
-import type { JSX } from 'react';
-
 import Head from 'next/head';
+import type { JSX } from 'react';
 import ReactMarkdown from 'react-markdown';
 
 import type { PresentationOptions } from '../consts';

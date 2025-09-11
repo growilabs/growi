@@ -1,4 +1,4 @@
-import { PageGrant, GroupType, getIdForRef } from '@growi/core';
+import { GroupType, getIdForRef, PageGrant } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { ExternalGroupProviderType } from '../../../src/features/external-user-group/interfaces/external-user-group';
@@ -64,12 +64,27 @@ describe('Page', () => {
 
   // Since updatePageSubOperation is asyncronously called from updatePageSubOperation,
   // mock it inside updatePageSubOperation, and later call it independently to await for it's execution.
-  const updatePage = async(page, newRevisionBody, oldRevisionBody, user, options = {}) => {
-    const mockedUpdatePageSubOperation = jest.spyOn(pageService, 'updatePageSubOperation').mockReturnValue(null);
+  const updatePage = async (
+    page,
+    newRevisionBody,
+    oldRevisionBody,
+    user,
+    options = {},
+  ) => {
+    const mockedUpdatePageSubOperation = jest
+      .spyOn(pageService, 'updatePageSubOperation')
+      .mockReturnValue(null);
 
-    const savedPage = await pageService.updatePage(page, newRevisionBody, oldRevisionBody, user, options);
+    const savedPage = await pageService.updatePage(
+      page,
+      newRevisionBody,
+      oldRevisionBody,
+      user,
+      options,
+    );
 
-    const argsForUpdatePageSubOperation = mockedUpdatePageSubOperation.mock.calls[0];
+    const argsForUpdatePageSubOperation =
+      mockedUpdatePageSubOperation.mock.calls[0];
 
     mockedUpdatePageSubOperation.mockRestore();
 
@@ -78,12 +93,24 @@ describe('Page', () => {
     return savedPage;
   };
 
-  const createDocumentsToTestUpdatePageOverwritingDescendants = async() => {
+  const createDocumentsToTestUpdatePageOverwritingDescendants = async () => {
     // Users
     await User.insertMany([
-      { name: 'upodUserA', username: 'upodUserA', email: 'upoduserA@example.com' },
-      { name: 'upodUserB', username: 'upodUserB', email: 'upoduserB@example.com' },
-      { name: 'upodUserC', username: 'upodUserC', email: 'upodUserC@example.com' },
+      {
+        name: 'upodUserA',
+        username: 'upodUserA',
+        email: 'upoduserA@example.com',
+      },
+      {
+        name: 'upodUserB',
+        username: 'upodUserB',
+        email: 'upoduserB@example.com',
+      },
+      {
+        name: 'upodUserC',
+        username: 'upodUserC',
+        email: 'upodUserC@example.com',
+      },
     ]);
 
     upodUserA = await User.findOne({ username: 'upodUserA' });
@@ -120,7 +147,9 @@ describe('Page', () => {
 
     upodGroupAB = await UserGroup.findOne({ name: 'upodGroupAB' });
     upodGroupA = await UserGroup.findOne({ name: 'upodGroupA' });
-    upodGroupAIsolated = await UserGroup.findOne({ name: 'upodGroupAIsolated' });
+    upodGroupAIsolated = await UserGroup.findOne({
+      name: 'upodGroupAIsolated',
+    });
     upodGroupB = await UserGroup.findOne({ name: 'upodGroupB' });
     upodGroupC = await UserGroup.findOne({ name: 'upodGroupC' });
 
@@ -234,7 +263,10 @@ describe('Page', () => {
         grantedUsers: null,
         grantedGroups: [
           { item: upodUserGroupIdAB, type: GroupType.userGroup },
-          { item: upodExternalUserGroupIdAB, type: GroupType.externalUserGroup },
+          {
+            item: upodExternalUserGroupIdAB,
+            type: GroupType.externalUserGroup,
+          },
         ],
         parent: rootPage._id,
       },
@@ -305,7 +337,10 @@ describe('Page', () => {
         grantedUsers: null,
         grantedGroups: [
           { item: upodUserGroupIdAIsolated, type: GroupType.userGroup },
-          { item: upodExternalUserGroupIdAIsolated, type: GroupType.externalUserGroup },
+          {
+            item: upodExternalUserGroupIdAIsolated,
+            type: GroupType.externalUserGroup,
+          },
         ],
         parent: upodPageIdPublic2,
       },
@@ -339,7 +374,10 @@ describe('Page', () => {
         grantedUsers: null,
         grantedGroups: [
           { item: upodUserGroupIdAB, type: GroupType.userGroup },
-          { item: upodExternalUserGroupIdAB, type: GroupType.externalUserGroup },
+          {
+            item: upodExternalUserGroupIdAB,
+            type: GroupType.externalUserGroup,
+          },
         ],
         parent: upodPageIdPublic3,
       },
@@ -476,7 +514,7 @@ describe('Page', () => {
     });
   };
 
-  beforeAll(async() => {
+  beforeAll(async () => {
     crowi = await getInstance();
     pageGrantService = crowi.pageGrantService;
     pageService = crowi.pageService;
@@ -522,7 +560,6 @@ describe('Page', () => {
     pModelUser1 = await User.findOne({ _id: pModelUserId1 });
     pModelUser2 = await User.findOne({ _id: pModelUserId2 });
     pModelUser3 = await User.findOne({ _id: pModelUserId3 });
-
 
     userGroupIdPModelIsolate = new mongoose.Types.ObjectId();
     userGroupIdPModelA = new mongoose.Types.ObjectId();
@@ -838,7 +875,10 @@ describe('Page', () => {
         grant: Page.GRANT_USER_GROUP,
         grantedGroups: [
           { item: userGroupIdPModelA, type: GroupType.userGroup },
-          { item: externalUserGroupIdPModelA, type: GroupType.externalUserGroup },
+          {
+            item: externalUserGroupIdPModelA,
+            type: GroupType.externalUserGroup,
+          },
         ],
         creator: pModelUserId1,
         lastUpdateUser: pModelUserId1,
@@ -869,7 +909,10 @@ describe('Page', () => {
         grant: Page.GRANT_USER_GROUP,
         grantedGroups: [
           { item: userGroupIdPModelA, type: GroupType.userGroup },
-          { item: externalUserGroupIdPModelA, type: GroupType.externalUserGroup },
+          {
+            item: externalUserGroupIdPModelA,
+            type: GroupType.externalUserGroup,
+          },
         ],
         creator: pModelUserId1,
         lastUpdateUser: pModelUserId1,
@@ -930,7 +973,10 @@ describe('Page', () => {
         grant: Page.GRANT_USER_GROUP,
         grantedGroups: [
           { item: userGroupIdPModelA, type: GroupType.userGroup },
-          { item: externalUserGroupIdPModelA, type: GroupType.externalUserGroup },
+          {
+            item: externalUserGroupIdPModelA,
+            type: GroupType.externalUserGroup,
+          },
         ],
         creator: pModelUserId1,
         lastUpdateUser: pModelUserId1,
@@ -954,7 +1000,10 @@ describe('Page', () => {
         grant: Page.GRANT_USER_GROUP,
         grantedGroups: [
           { item: userGroupIdPModelA, type: GroupType.userGroup },
-          { item: externalUserGroupIdPModelA, type: GroupType.externalUserGroup },
+          {
+            item: externalUserGroupIdPModelA,
+            type: GroupType.externalUserGroup,
+          },
         ],
         creator: pModelUserId1,
         lastUpdateUser: pModelUserId1,
@@ -978,7 +1027,10 @@ describe('Page', () => {
         grant: Page.GRANT_USER_GROUP,
         grantedGroups: [
           { item: userGroupIdPModelC, type: GroupType.userGroup },
-          { item: externalUserGroupIdPModelC, type: GroupType.externalUserGroup },
+          {
+            item: externalUserGroupIdPModelC,
+            type: GroupType.externalUserGroup,
+          },
         ],
         creator: pModelUserId3,
         lastUpdateUser: pModelUserId3,
@@ -1046,45 +1098,78 @@ describe('Page', () => {
 
   describe('updatePage with overwriteScopesOfDescendants false', () => {
     describe('Changing grant from PUBLIC to RESTRICTED of', () => {
-      test('an only-child page will delete its empty parent page', async() => {
+      test('an only-child page will delete its empty parent page', async () => {
         const pathT = '/mup13_top';
         const path1 = '/mup13_top/mup1_emp';
         const path2 = '/mup13_top/mup1_emp/mup2_pub';
         const pageT = await Page.findOne({ path: pathT, descendantCount: 2 });
         const page1 = await Page.findOne({ path: path1, isEmpty: true });
-        const page2 = await Page.findOne({ path: path2, grant: Page.GRANT_PUBLIC });
+        const page2 = await Page.findOne({
+          path: path2,
+          grant: Page.GRANT_PUBLIC,
+        });
         expect(pageT).toBeTruthy();
         expect(page1).toBeTruthy();
         expect(page2).toBeTruthy();
 
-        const options = { grant: Page.GRANT_RESTRICTED, userRelatedGrantUserGroupIds: null };
-        await updatePage(page2, 'newRevisionBody', 'oldRevisionBody', dummyUser1, options);
+        const options = {
+          grant: Page.GRANT_RESTRICTED,
+          userRelatedGrantUserGroupIds: null,
+        };
+        await updatePage(
+          page2,
+          'newRevisionBody',
+          'oldRevisionBody',
+          dummyUser1,
+          options,
+        );
 
         const _pageT = await Page.findOne({ path: pathT });
         const _page1 = await Page.findOne({ path: path1 });
-        const _page2 = await Page.findOne({ path: path2, grant: Page.GRANT_RESTRICTED });
+        const _page2 = await Page.findOne({
+          path: path2,
+          grant: Page.GRANT_RESTRICTED,
+        });
         expect(_pageT).toBeTruthy();
         expect(_page1).toBeNull();
         expect(_page2).toBeTruthy();
         expect(_pageT.descendantCount).toBe(1);
       });
-      test('a page that has children will create an empty page with the same path and it becomes a new parent', async() => {
+      test('a page that has children will create an empty page with the same path and it becomes a new parent', async () => {
         const pathT = '/mup14_top';
         const path1 = '/mup14_top/mup6_pub';
         const path2 = '/mup14_top/mup6_pub/mup7_pub';
         const top = await Page.findOne({ path: pathT, descendantCount: 2 });
-        const page1 = await Page.findOne({ path: path1, grant: Page.GRANT_PUBLIC });
-        const page2 = await Page.findOne({ path: path2, grant: Page.GRANT_PUBLIC });
+        const page1 = await Page.findOne({
+          path: path1,
+          grant: Page.GRANT_PUBLIC,
+        });
+        const page2 = await Page.findOne({
+          path: path2,
+          grant: Page.GRANT_PUBLIC,
+        });
         expect(top).toBeTruthy();
         expect(page1).toBeTruthy();
         expect(page2).toBeTruthy();
 
-        await updatePage(page1, 'newRevisionBody', 'oldRevisionBody', dummyUser1, { grant: Page.GRANT_RESTRICTED });
+        await updatePage(
+          page1,
+          'newRevisionBody',
+          'oldRevisionBody',
+          dummyUser1,
+          { grant: Page.GRANT_RESTRICTED },
+        );
 
         const _top = await Page.findOne({ path: pathT });
-        const _page1 = await Page.findOne({ path: path1, grant: Page.GRANT_RESTRICTED });
+        const _page1 = await Page.findOne({
+          path: path1,
+          grant: Page.GRANT_RESTRICTED,
+        });
         const _page2 = await Page.findOne({ path: path2 });
-        const _pageN = await Page.findOne({ path: path1, grant: Page.GRANT_PUBLIC });
+        const _pageN = await Page.findOne({
+          path: path1,
+          grant: Page.GRANT_PUBLIC,
+        });
         expect(_page1).toBeTruthy();
         expect(_page2).toBeTruthy();
         expect(_pageN).toBeTruthy();
@@ -1096,21 +1181,36 @@ describe('Page', () => {
         expect(_pageN.descendantCount).toBe(1);
         expect(_top.descendantCount).toBe(1);
       });
-      test('of a leaf page will NOT have an empty page with the same path', async() => {
+      test('of a leaf page will NOT have an empty page with the same path', async () => {
         const pathT = '/mup15_top';
         const path1 = '/mup15_top/mup8_pub';
         const pageT = await Page.findOne({ path: pathT, descendantCount: 1 });
-        const page1 = await Page.findOne({ path: path1, grant: Page.GRANT_PUBLIC });
+        const page1 = await Page.findOne({
+          path: path1,
+          grant: Page.GRANT_PUBLIC,
+        });
         const count = await Page.count({ path: path1 });
         expect(pageT).toBeTruthy();
         expect(page1).toBeTruthy();
         expect(count).toBe(1);
 
-        await updatePage(page1, 'newRevisionBody', 'oldRevisionBody', dummyUser1, { grant: Page.GRANT_RESTRICTED });
+        await updatePage(
+          page1,
+          'newRevisionBody',
+          'oldRevisionBody',
+          dummyUser1,
+          { grant: Page.GRANT_RESTRICTED },
+        );
 
         const _pageT = await Page.findOne({ path: pathT });
-        const _page1 = await Page.findOne({ path: path1, grant: Page.GRANT_RESTRICTED });
-        const _pageNotExist = await Page.findOne({ path: path1, isEmpty: true });
+        const _page1 = await Page.findOne({
+          path: path1,
+          grant: Page.GRANT_RESTRICTED,
+        });
+        const _pageNotExist = await Page.findOne({
+          path: path1,
+          isEmpty: true,
+        });
         expect(_pageT).toBeTruthy();
         expect(_page1).toBeTruthy();
         expect(_pageNotExist).toBeNull();
@@ -1119,12 +1219,22 @@ describe('Page', () => {
     });
 
     describe('Changing grant to GRANT_RESTRICTED', () => {
-      test('successfully change to GRANT_RESTRICTED from GRANT_OWNER', async() => {
+      test('successfully change to GRANT_RESTRICTED from GRANT_OWNER', async () => {
         const path = '/mup40';
-        const _page = await Page.findOne({ path, grant: Page.GRANT_OWNER, grantedUsers: [dummyUser1._id] });
+        const _page = await Page.findOne({
+          path,
+          grant: Page.GRANT_OWNER,
+          grantedUsers: [dummyUser1._id],
+        });
         expect(_page).toBeTruthy();
 
-        await updatePage(_page, 'newRevisionBody', 'oldRevisionBody', dummyUser1, { grant: Page.GRANT_RESTRICTED });
+        await updatePage(
+          _page,
+          'newRevisionBody',
+          'oldRevisionBody',
+          dummyUser1,
+          { grant: Page.GRANT_RESTRICTED },
+        );
 
         const page = await Page.findOne({ path });
         expect(page).toBeTruthy();
@@ -1134,7 +1244,7 @@ describe('Page', () => {
     });
 
     describe('Changing grant from RESTRICTED to PUBLIC of', () => {
-      test('a page will create ancestors if they do not exist', async() => {
+      test('a page will create ancestors if they do not exist', async () => {
         const pathT = '/mup16_top';
         const path1 = '/mup16_top/mup9_pub';
         const path2 = '/mup16_top/mup9_pub/mup10_pub';
@@ -1142,18 +1252,30 @@ describe('Page', () => {
         const top = await Page.findOne({ path: pathT });
         const page1 = await Page.findOne({ path: path1 });
         const page2 = await Page.findOne({ path: path2 });
-        const page3 = await Page.findOne({ path: path3, grant: Page.GRANT_RESTRICTED });
+        const page3 = await Page.findOne({
+          path: path3,
+          grant: Page.GRANT_RESTRICTED,
+        });
         expect(top).toBeTruthy();
         expect(page3).toBeTruthy();
         expect(page1).toBeNull();
         expect(page2).toBeNull();
 
-        await updatePage(page3, 'newRevisionBody', 'oldRevisionBody', dummyUser1, { grant: Page.GRANT_PUBLIC });
+        await updatePage(
+          page3,
+          'newRevisionBody',
+          'oldRevisionBody',
+          dummyUser1,
+          { grant: Page.GRANT_PUBLIC },
+        );
 
         const _pageT = await Page.findOne({ path: pathT });
         const _page1 = await Page.findOne({ path: path1, isEmpty: true });
         const _page2 = await Page.findOne({ path: path2, isEmpty: true });
-        const _page3 = await Page.findOne({ path: path3, grant: Page.GRANT_PUBLIC });
+        const _page3 = await Page.findOne({
+          path: path3,
+          grant: Page.GRANT_PUBLIC,
+        });
         expect(_page1).toBeTruthy();
         expect(_page2).toBeTruthy();
         expect(_page3).toBeTruthy();
@@ -1162,24 +1284,37 @@ describe('Page', () => {
         expect(_page3.parent).toStrictEqual(_page2._id);
         expect(_pageT.descendantCount).toBe(1);
       });
-      test('a page will replace an empty page with the same path if any', async() => {
+      test('a page will replace an empty page with the same path if any', async () => {
         const pathT = '/mup17_top';
         const path1 = '/mup17_top/mup12_emp';
         const path2 = '/mup17_top/mup12_emp/mup18_pub';
         const pageT = await Page.findOne({ path: pathT, descendantCount: 1 });
         const page1 = await Page.findOne({ path: path1, isEmpty: true });
-        const page2 = await Page.findOne({ path: path1, grant: Page.GRANT_RESTRICTED, isEmpty: false });
+        const page2 = await Page.findOne({
+          path: path1,
+          grant: Page.GRANT_RESTRICTED,
+          isEmpty: false,
+        });
         const page3 = await Page.findOne({ path: path2 });
         expect(pageT).toBeTruthy();
         expect(page1).toBeTruthy();
         expect(page2).toBeTruthy();
         expect(page3).toBeTruthy();
 
-        await updatePage(page2, 'newRevisionBody', 'oldRevisionBody', dummyUser1, { grant: Page.GRANT_PUBLIC });
+        await updatePage(
+          page2,
+          'newRevisionBody',
+          'oldRevisionBody',
+          dummyUser1,
+          { grant: Page.GRANT_PUBLIC },
+        );
 
         const _pageT = await Page.findOne({ path: pathT });
         const _page1 = await Page.findOne({ path: path1, isEmpty: true }); // should be replaced
-        const _page2 = await Page.findOne({ path: path1, grant: Page.GRANT_PUBLIC });
+        const _page2 = await Page.findOne({
+          path: path1,
+          grant: Page.GRANT_PUBLIC,
+        });
         const _page3 = await Page.findOne({ path: path2 });
         expect(_pageT).toBeTruthy();
         expect(_page1).toBeNull();
@@ -1193,51 +1328,89 @@ describe('Page', () => {
     });
 
     describe('Changing grant to GRANT_OWNER(onlyme)', () => {
-      test('successfully change to GRANT_OWNER from GRANT_PUBLIC', async() => {
+      test('successfully change to GRANT_OWNER from GRANT_PUBLIC', async () => {
         const path = '/mup19';
         const _page = await Page.findOne({ path, grant: Page.GRANT_PUBLIC });
         expect(_page).toBeTruthy();
 
-        await updatePage(_page, 'newRevisionBody', 'oldRevisionBody', dummyUser1, { grant: Page.GRANT_OWNER });
+        await updatePage(
+          _page,
+          'newRevisionBody',
+          'oldRevisionBody',
+          dummyUser1,
+          { grant: Page.GRANT_OWNER },
+        );
 
         const page = await Page.findOne({ path });
         expect(page.grant).toBe(Page.GRANT_OWNER);
         expect(page.grantedUsers).toStrictEqual([dummyUser1._id]);
-
       });
-      test('successfully change to GRANT_OWNER from GRANT_USER_GROUP', async() => {
+      test('successfully change to GRANT_OWNER from GRANT_USER_GROUP', async () => {
         const path = '/mup20';
-        const _page = await Page.findOne({ path, grant: Page.GRANT_USER_GROUP, grantedGroups: { $elemMatch: { item: userGroupIdPModelA } } });
+        const _page = await Page.findOne({
+          path,
+          grant: Page.GRANT_USER_GROUP,
+          grantedGroups: { $elemMatch: { item: userGroupIdPModelA } },
+        });
         expect(_page).toBeTruthy();
 
-        await updatePage(_page, 'newRevisionBody', 'oldRevisionBody', pModelUser1, { grant: Page.GRANT_OWNER });
+        await updatePage(
+          _page,
+          'newRevisionBody',
+          'oldRevisionBody',
+          pModelUser1,
+          { grant: Page.GRANT_OWNER },
+        );
 
         const page = await Page.findOne({ path });
         expect(page.grant).toBe(Page.GRANT_OWNER);
         expect(page.grantedUsers).toStrictEqual([pModelUser1._id]);
         expect(page.grantedGroups.length).toBe(0);
       });
-      test('successfully change to GRANT_OWNER from GRANT_RESTRICTED', async() => {
+      test('successfully change to GRANT_OWNER from GRANT_RESTRICTED', async () => {
         const path = '/mup21';
-        const _page = await Page.findOne({ path, grant: Page.GRANT_RESTRICTED });
+        const _page = await Page.findOne({
+          path,
+          grant: Page.GRANT_RESTRICTED,
+        });
         expect(_page).toBeTruthy();
 
-        await updatePage(_page, 'newRevisionBody', 'oldRevisionBody', dummyUser1, { grant: Page.GRANT_OWNER });
+        await updatePage(
+          _page,
+          'newRevisionBody',
+          'oldRevisionBody',
+          dummyUser1,
+          { grant: Page.GRANT_OWNER },
+        );
 
         const page = await Page.findOne({ path });
         expect(page.grant).toBe(Page.GRANT_OWNER);
         expect(page.grantedUsers).toStrictEqual([dummyUser1._id]);
       });
-      test('Failed to change to GRANT_OWNER if one of the ancestors is GRANT_USER_GROUP page', async() => {
+      test('Failed to change to GRANT_OWNER if one of the ancestors is GRANT_USER_GROUP page', async () => {
         const path1 = '/mup22';
         const path2 = '/mup22/mup23';
-        const _page1 = await Page.findOne({ path: path1, grant: Page.GRANT_PUBLIC });
-        const _page2 = await Page.findOne({ path: path2, grant: Page.GRANT_USER_GROUP, grantedGroups: { $elemMatch: { item: userGroupIdPModelA } } });
+        const _page1 = await Page.findOne({
+          path: path1,
+          grant: Page.GRANT_PUBLIC,
+        });
+        const _page2 = await Page.findOne({
+          path: path2,
+          grant: Page.GRANT_USER_GROUP,
+          grantedGroups: { $elemMatch: { item: userGroupIdPModelA } },
+        });
         expect(_page1).toBeTruthy();
         expect(_page2).toBeTruthy();
 
-        await expect(updatePage(_page1, 'newRevisionBody', 'oldRevisionBody', dummyUser1, { grant: Page.GRANT_OWNER }))
-          .rejects.toThrow(new Error('The selected grant or grantedGroup is not assignable to this page.'));
+        await expect(
+          updatePage(_page1, 'newRevisionBody', 'oldRevisionBody', dummyUser1, {
+            grant: Page.GRANT_OWNER,
+          }),
+        ).rejects.toThrow(
+          new Error(
+            'The selected grant or grantedGroup is not assignable to this page.',
+          ),
+        );
 
         const page1 = await Page.findOne({ path1 });
         expect(page1).toBeTruthy();
@@ -1247,26 +1420,42 @@ describe('Page', () => {
     });
     describe('Changing grant to GRANT_USER_GROUP', () => {
       describe('update grant of a page under a page with GRANT_PUBLIC', () => {
-        test('successfully change to GRANT_USER_GROUP from GRANT_PUBLIC if parent page is GRANT_PUBLIC', async() => {
+        test('successfully change to GRANT_USER_GROUP from GRANT_PUBLIC if parent page is GRANT_PUBLIC', async () => {
           // path
           const path1 = '/mup24_pub';
           const path2 = '/mup24_pub/mup25_pub';
           // page
-          const _page1 = await Page.findOne({ path: path1, grant: Page.GRANT_PUBLIC }); // out of update scope
-          const _page2 = await Page.findOne({ path: path2, grant: Page.GRANT_PUBLIC, parent: _page1._id }); // update target
+          const _page1 = await Page.findOne({
+            path: path1,
+            grant: Page.GRANT_PUBLIC,
+          }); // out of update scope
+          const _page2 = await Page.findOne({
+            path: path2,
+            grant: Page.GRANT_PUBLIC,
+            parent: _page1._id,
+          }); // update target
           expect(_page1).toBeTruthy();
           expect(_page2).toBeTruthy();
 
           const newGrantedGroups = [
             { item: userGroupIdPModelA, type: GroupType.userGroup },
-            { item: externalUserGroupIdPModelA, type: GroupType.externalUserGroup },
+            {
+              item: externalUserGroupIdPModelA,
+              type: GroupType.externalUserGroup,
+            },
           ];
 
           const options = {
             grant: Page.GRANT_USER_GROUP,
             userRelatedGrantUserGroupIds: newGrantedGroups,
           };
-          const updatedPage = await updatePage(_page2, 'new', 'old', pModelUser1, options); // from GRANT_PUBLIC to GRANT_USER_GROUP(userGroupIdPModelA)
+          const updatedPage = await updatePage(
+            _page2,
+            'new',
+            'old',
+            pModelUser1,
+            options,
+          ); // from GRANT_PUBLIC to GRANT_USER_GROUP(userGroupIdPModelA)
 
           const page1 = await Page.findById(_page1._id);
           const page2 = await Page.findById(_page2._id);
@@ -1277,26 +1466,40 @@ describe('Page', () => {
 
           // check page2 grant and group
           expect(page2.grant).toBe(Page.GRANT_USER_GROUP);
-          expect(normalizeGrantedGroups(page2.grantedGroups)).toStrictEqual(newGrantedGroups);
+          expect(normalizeGrantedGroups(page2.grantedGroups)).toStrictEqual(
+            newGrantedGroups,
+          );
         });
 
-        test('successfully change to GRANT_USER_GROUP from GRANT_RESTRICTED if parent page is GRANT_PUBLIC', async() => {
+        test('successfully change to GRANT_USER_GROUP from GRANT_RESTRICTED if parent page is GRANT_PUBLIC', async () => {
           // path
           const _path1 = '/mup26_awl';
           // page
-          const _page1 = await Page.findOne({ path: _path1, grant: Page.GRANT_RESTRICTED });
+          const _page1 = await Page.findOne({
+            path: _path1,
+            grant: Page.GRANT_RESTRICTED,
+          });
           expect(_page1).toBeTruthy();
 
           const newGrantedGroups = [
             { item: userGroupIdPModelA, type: GroupType.userGroup },
-            { item: externalUserGroupIdPModelA, type: GroupType.externalUserGroup },
+            {
+              item: externalUserGroupIdPModelA,
+              type: GroupType.externalUserGroup,
+            },
           ];
 
           const options = {
             grant: Page.GRANT_USER_GROUP,
             userRelatedGrantUserGroupIds: newGrantedGroups,
           };
-          const updatedPage = await updatePage(_page1, 'new', 'old', pModelUser1, options); // from GRANT_RESTRICTED to GRANT_USER_GROUP(userGroupIdPModelA)
+          const updatedPage = await updatePage(
+            _page1,
+            'new',
+            'old',
+            pModelUser1,
+            options,
+          ); // from GRANT_RESTRICTED to GRANT_USER_GROUP(userGroupIdPModelA)
 
           const page1 = await Page.findById(_page1._id);
           expect(page1).toBeTruthy();
@@ -1305,36 +1508,52 @@ describe('Page', () => {
 
           // updated page
           expect(page1.grant).toBe(Page.GRANT_USER_GROUP);
-          expect(normalizeGrantedGroups(page1.grantedGroups)).toStrictEqual(newGrantedGroups);
+          expect(normalizeGrantedGroups(page1.grantedGroups)).toStrictEqual(
+            newGrantedGroups,
+          );
 
           // parent's grant check
           const parent = await Page.findById(page1.parent);
           expect(parent.grant).toBe(Page.GRANT_PUBLIC);
-
         });
 
-        test('successfully change to GRANT_USER_GROUP from GRANT_OWNER if parent page is GRANT_PUBLIC', async() => {
+        test('successfully change to GRANT_USER_GROUP from GRANT_OWNER if parent page is GRANT_PUBLIC', async () => {
           // path
           const path1 = '/mup27_pub';
           const path2 = '/mup27_pub/mup28_owner';
           // page
-          const _page1 = await Page.findOne({ path: path1, grant: Page.GRANT_PUBLIC }); // out of update scope
+          const _page1 = await Page.findOne({
+            path: path1,
+            grant: Page.GRANT_PUBLIC,
+          }); // out of update scope
           const _page2 = await Page.findOne({
-            path: path2, grant: Page.GRANT_OWNER, grantedUsers: [pModelUser1], parent: _page1._id,
+            path: path2,
+            grant: Page.GRANT_OWNER,
+            grantedUsers: [pModelUser1],
+            parent: _page1._id,
           }); // update target
           expect(_page1).toBeTruthy();
           expect(_page2).toBeTruthy();
 
           const newGrantedGroups = [
             { item: userGroupIdPModelA, type: GroupType.userGroup },
-            { item: externalUserGroupIdPModelA, type: GroupType.externalUserGroup },
+            {
+              item: externalUserGroupIdPModelA,
+              type: GroupType.externalUserGroup,
+            },
           ];
 
           const options = {
             grant: Page.GRANT_USER_GROUP,
             userRelatedGrantUserGroupIds: newGrantedGroups,
           };
-          const updatedPage = await updatePage(_page2, 'new', 'old', pModelUser1, options); // from GRANT_OWNER to GRANT_USER_GROUP(userGroupIdPModelA)
+          const updatedPage = await updatePage(
+            _page2,
+            'new',
+            'old',
+            pModelUser1,
+            options,
+          ); // from GRANT_OWNER to GRANT_USER_GROUP(userGroupIdPModelA)
 
           const page1 = await Page.findById(_page1._id);
           const page2 = await Page.findById(_page2._id);
@@ -1345,19 +1564,29 @@ describe('Page', () => {
 
           // grant check
           expect(page2.grant).toBe(Page.GRANT_USER_GROUP);
-          expect(normalizeGrantedGroups(page2.grantedGroups)).toStrictEqual(newGrantedGroups);
+          expect(normalizeGrantedGroups(page2.grantedGroups)).toStrictEqual(
+            newGrantedGroups,
+          );
           expect(page2.grantedUsers.length).toBe(0);
         });
       });
       describe('update grant of a page under a page with GRANT_USER_GROUP', () => {
-        test('successfully change to GRANT_USER_GROUP if the group to set is the child or descendant of the parent page group', async() => {
+        test('successfully change to GRANT_USER_GROUP if the group to set is the child or descendant of the parent page group', async () => {
           // path
           const _path1 = '/mup29_A';
           const _path2 = '/mup29_A/mup30_owner';
           // page
-          const _page1 = await Page.findOne({ path: _path1, grant: Page.GRANT_USER_GROUP, grantedGroups: { $elemMatch: { item: userGroupIdPModelA } } }); // out of update scope
-          const _page2 = await Page.findOne({ // update target
-            path: _path2, grant: Page.GRANT_OWNER, grantedUsers: [pModelUser1], parent: _page1._id,
+          const _page1 = await Page.findOne({
+            path: _path1,
+            grant: Page.GRANT_USER_GROUP,
+            grantedGroups: { $elemMatch: { item: userGroupIdPModelA } },
+          }); // out of update scope
+          const _page2 = await Page.findOne({
+            // update target
+            path: _path2,
+            grant: Page.GRANT_OWNER,
+            grantedUsers: [pModelUser1],
+            parent: _page1._id,
           });
           expect(_page1).toBeTruthy();
           expect(_page2).toBeTruthy();
@@ -1366,13 +1595,22 @@ describe('Page', () => {
           // Group relation(parent -> child): userGroupIdPModelA -> userGroupIdPModelB -> userGroupIdPModelC
           const newGrantedGroups = [
             { item: userGroupIdPModelB, type: GroupType.userGroup },
-            { item: externalUserGroupIdPModelB, type: GroupType.externalUserGroup },
+            {
+              item: externalUserGroupIdPModelB,
+              type: GroupType.externalUserGroup,
+            },
           ];
           const options = {
             grant: Page.GRANT_USER_GROUP,
             userRelatedGrantUserGroupIds: newGrantedGroups,
           };
-          const updatedPage = await updatePage(_page2, 'new', 'old', pModelUser3, options); // from GRANT_OWNER to GRANT_USER_GROUP(userGroupIdPModelB)
+          const updatedPage = await updatePage(
+            _page2,
+            'new',
+            'old',
+            pModelUser3,
+            options,
+          ); // from GRANT_OWNER to GRANT_USER_GROUP(userGroupIdPModelB)
 
           const page1 = await Page.findById(_page1._id);
           const page2 = await Page.findById(_page2._id);
@@ -1382,40 +1620,66 @@ describe('Page', () => {
           expect(updatedPage._id).toStrictEqual(page2._id);
 
           expect(page2.grant).toBe(Page.GRANT_USER_GROUP);
-          expect(normalizeGrantedGroups(page2.grantedGroups)).toStrictEqual(newGrantedGroups);
+          expect(normalizeGrantedGroups(page2.grantedGroups)).toStrictEqual(
+            newGrantedGroups,
+          );
           expect(page2.grantedUsers.length).toBe(0);
 
           // Second round
           // Update group to groupC which is a grandchild from pageA's point of view
           const secondRoundNewGrantedGroups = [
             { item: userGroupIdPModelC, type: GroupType.userGroup },
-            { item: externalUserGroupIdPModelC, type: GroupType.externalUserGroup },
+            {
+              item: externalUserGroupIdPModelC,
+              type: GroupType.externalUserGroup,
+            },
           ];
-          const secondRoundOptions = { grant: Page.GRANT_USER_GROUP, userRelatedGrantUserGroupIds: secondRoundNewGrantedGroups }; // from GRANT_USER_GROUP(userGroupIdPModelB) to GRANT_USER_GROUP(userGroupIdPModelC)
+          const secondRoundOptions = {
+            grant: Page.GRANT_USER_GROUP,
+            userRelatedGrantUserGroupIds: secondRoundNewGrantedGroups,
+          }; // from GRANT_USER_GROUP(userGroupIdPModelB) to GRANT_USER_GROUP(userGroupIdPModelC)
           // undo grantedGroups populate to prevent Page.hydrate error
           _page2.grantedGroups.forEach((group) => {
             group.item = group.item._id;
           });
-          const secondRoundUpdatedPage = await updatePage(_page2, 'new', 'new', pModelUser3, secondRoundOptions);
+          const secondRoundUpdatedPage = await updatePage(
+            _page2,
+            'new',
+            'new',
+            pModelUser3,
+            secondRoundOptions,
+          );
 
           expect(secondRoundUpdatedPage).toBeTruthy();
           expect(secondRoundUpdatedPage.grant).toBe(Page.GRANT_USER_GROUP);
-          expect(normalizeGrantedGroups(secondRoundUpdatedPage.grantedGroups)).toStrictEqual(secondRoundNewGrantedGroups);
+          expect(
+            normalizeGrantedGroups(secondRoundUpdatedPage.grantedGroups),
+          ).toStrictEqual(secondRoundNewGrantedGroups);
         });
-        test('Fail to change to GRANT_USER_GROUP if the group to set is NOT the child or descendant of the parent page group', async() => {
+        test('Fail to change to GRANT_USER_GROUP if the group to set is NOT the child or descendant of the parent page group', async () => {
           // path
           const _path1 = '/mup31_A';
           const _path2 = '/mup31_A/mup32_owner';
           // page
-          const _page1 = await Page.findOne({ path: _path1, grant: Page.GRANT_USER_GROUP, grantedGroups: { $elemMatch: { item: userGroupIdPModelA } } });
-          const _page2 = await Page.findOne({ // update target
-            path: _path2, grant: Page.GRANT_OWNER, grantedUsers: [pModelUser1._id], parent: _page1._id,
+          const _page1 = await Page.findOne({
+            path: _path1,
+            grant: Page.GRANT_USER_GROUP,
+            grantedGroups: { $elemMatch: { item: userGroupIdPModelA } },
+          });
+          const _page2 = await Page.findOne({
+            // update target
+            path: _path2,
+            grant: Page.GRANT_OWNER,
+            grantedUsers: [pModelUser1._id],
+            parent: _page1._id,
           });
           expect(_page1).toBeTruthy();
           expect(_page2).toBeTruthy();
 
           // group
-          const _groupIsolated = await UserGroup.findById(userGroupIdPModelIsolate);
+          const _groupIsolated = await UserGroup.findById(
+            userGroupIdPModelIsolate,
+          );
           expect(_groupIsolated).toBeTruthy();
           // group parent check
           expect(_groupIsolated.parent).toBeUndefined(); // should have no parent
@@ -1424,11 +1688,18 @@ describe('Page', () => {
             grant: Page.GRANT_USER_GROUP,
             userRelatedGrantUserGroupIds: [
               { item: userGroupIdPModelIsolate, type: GroupType.userGroup },
-              { item: externalUserGroupIdPModelIsolate, type: GroupType.externalUserGroup },
+              {
+                item: externalUserGroupIdPModelIsolate,
+                type: GroupType.externalUserGroup,
+              },
             ],
           };
           await expect(updatePage(_page2, 'new', 'old', pModelUser1, options)) // from GRANT_OWNER to GRANT_USER_GROUP(userGroupIdPModelIsolate)
-            .rejects.toThrow(new Error('The selected grant or grantedGroup is not assignable to this page.'));
+            .rejects.toThrow(
+              new Error(
+                'The selected grant or grantedGroup is not assignable to this page.',
+              ),
+            );
 
           const page1 = await Page.findById(_page1._id);
           const page2 = await Page.findById(_page2._id);
@@ -1439,14 +1710,22 @@ describe('Page', () => {
           expect(page2.grantedUsers).toStrictEqual([pModelUser1._id]); // should be the same before the update
           expect(page2.grantedGroups.length).toBe(0); // no group should be set
         });
-        test('Fail to change to GRANT_USER_GROUP if the group to set is an ancestor of the parent page group', async() => {
+        test('Fail to change to GRANT_USER_GROUP if the group to set is an ancestor of the parent page group', async () => {
           // path
           const _path1 = '/mup33_C';
           const _path2 = '/mup33_C/mup34_owner';
           // page
-          const _page1 = await Page.findOne({ path: _path1, grant: Page.GRANT_USER_GROUP, grantedGroups: { $elemMatch: { item: userGroupIdPModelC } } }); // groupC
-          const _page2 = await Page.findOne({ // update target
-            path: _path2, grant: Page.GRANT_OWNER, grantedUsers: [pModelUser3], parent: _page1._id,
+          const _page1 = await Page.findOne({
+            path: _path1,
+            grant: Page.GRANT_USER_GROUP,
+            grantedGroups: { $elemMatch: { item: userGroupIdPModelC } },
+          }); // groupC
+          const _page2 = await Page.findOne({
+            // update target
+            path: _path2,
+            grant: Page.GRANT_OWNER,
+            grantedUsers: [pModelUser3],
+            parent: _page1._id,
           });
           expect(_page1).toBeTruthy();
           expect(_page2).toBeTruthy();
@@ -1455,14 +1734,21 @@ describe('Page', () => {
             grant: Page.GRANT_USER_GROUP,
             userRelatedGrantUserGroupIds: [
               { item: userGroupIdPModelA, type: GroupType.userGroup },
-              { item: externalUserGroupIdPModelA, type: GroupType.externalUserGroup },
+              {
+                item: externalUserGroupIdPModelA,
+                type: GroupType.externalUserGroup,
+              },
             ],
           };
 
           // Group relation(parent -> child): userGroupIdPModelA -> userGroupIdPModelB -> userGroupIdPModelC
           // this should fail because the groupC is a descendant of groupA
           await expect(updatePage(_page2, 'new', 'old', pModelUser3, options)) // from GRANT_OWNER to GRANT_USER_GROUP(userGroupIdPModelA)
-            .rejects.toThrow(new Error('The selected grant or grantedGroup is not assignable to this page.'));
+            .rejects.toThrow(
+              new Error(
+                'The selected grant or grantedGroup is not assignable to this page.',
+              ),
+            );
 
           const page1 = await Page.findById(_page1._id);
           const page2 = await Page.findById(_page2._id);
@@ -1475,21 +1761,38 @@ describe('Page', () => {
         });
       });
       describe('update grant of a page under a page with GRANT_OWNER', () => {
-        test('Fail to change from GRNAT_OWNER', async() => {
+        test('Fail to change from GRNAT_OWNER', async () => {
           // path
           const path1 = '/mup35_owner';
           const path2 = '/mup35_owner/mup36_owner';
           // page
-          const _page1 = await Page.findOne({ path: path1, grant: Page.GRANT_OWNER, grantedUsers: [pModelUser1] });
-          const _page2 = await Page.findOne({ // update target
-            path: path2, grant: Page.GRANT_OWNER, grantedUsers: [pModelUser1], parent: _page1._id,
+          const _page1 = await Page.findOne({
+            path: path1,
+            grant: Page.GRANT_OWNER,
+            grantedUsers: [pModelUser1],
+          });
+          const _page2 = await Page.findOne({
+            // update target
+            path: path2,
+            grant: Page.GRANT_OWNER,
+            grantedUsers: [pModelUser1],
+            parent: _page1._id,
           });
           expect(_page1).toBeTruthy();
           expect(_page2).toBeTruthy();
 
-          const options = { grant: Page.GRANT_USER_GROUP, userRelatedGrantUserGroupIds: [{ item: userGroupIdPModelA, type: GroupType.userGroup }] };
+          const options = {
+            grant: Page.GRANT_USER_GROUP,
+            userRelatedGrantUserGroupIds: [
+              { item: userGroupIdPModelA, type: GroupType.userGroup },
+            ],
+          };
           await expect(updatePage(_page2, 'new', 'old', pModelUser1, options)) // from GRANT_OWNER to GRANT_USER_GROUP(userGroupIdPModelA)
-            .rejects.toThrow(new Error('The selected grant or grantedGroup is not assignable to this page.'));
+            .rejects.toThrow(
+              new Error(
+                'The selected grant or grantedGroup is not assignable to this page.',
+              ),
+            );
 
           const page1 = await Page.findById(_page1.id);
           const page2 = await Page.findById(_page2.id);
@@ -1501,23 +1804,35 @@ describe('Page', () => {
         });
       });
       describe('update grant of a page from GRANT_USER_GROUP to GRANT_USER_GROUP', () => {
-        test('successfully change the granted groups, with the previous groups wich user is not related to remaining', async() => {
+        test('successfully change the granted groups, with the previous groups wich user is not related to remaining', async () => {
           // path
           const path = '/with_multiple_individual_granted_groups';
           // page
-          const _page = await Page.findOne({ path, grant: Page.GRANT_USER_GROUP });
+          const _page = await Page.findOne({
+            path,
+            grant: Page.GRANT_USER_GROUP,
+          });
           expect(_page).toBeTruthy();
 
           const newUserRelatedGrantedGroups = [
             { item: userGroupIdPModelA, type: GroupType.userGroup },
-            { item: externalUserGroupIdPModelA, type: GroupType.externalUserGroup },
+            {
+              item: externalUserGroupIdPModelA,
+              type: GroupType.externalUserGroup,
+            },
           ];
 
           const options = {
             grant: Page.GRANT_USER_GROUP,
             userRelatedGrantUserGroupIds: newUserRelatedGrantedGroups,
           };
-          const updatedPage = await updatePage(_page, 'new', 'old', pModelUser1, options); // from GRANT_PUBLIC to GRANT_USER_GROUP(userGroupIdPModelA)
+          const updatedPage = await updatePage(
+            _page,
+            'new',
+            'old',
+            pModelUser1,
+            options,
+          ); // from GRANT_PUBLIC to GRANT_USER_GROUP(userGroupIdPModelA)
 
           const page = await Page.findById(_page._id);
           expect(page).toBeTruthy();
@@ -1526,25 +1841,30 @@ describe('Page', () => {
 
           // check page grant and group
           expect(page.grant).toBe(Page.GRANT_USER_GROUP);
-          expect(normalizeGrantedGroups(page.grantedGroups)).toEqual(expect.arrayContaining([
-            ...newUserRelatedGrantedGroups,
-            // userB group remains, although options does not include it
-            { item: userGroupIdPModelB, type: GroupType.userGroup },
-          ]));
+          expect(normalizeGrantedGroups(page.grantedGroups)).toEqual(
+            expect.arrayContaining([
+              ...newUserRelatedGrantedGroups,
+              // userB group remains, although options does not include it
+              { item: userGroupIdPModelB, type: GroupType.userGroup },
+            ]),
+          );
           expect(normalizeGrantedGroups(page.grantedGroups).length).toBe(3);
         });
       });
     });
   });
 
-
   // see: https://dev.growi.org/635a314eac6bcd85cbf359fc about the specification
   describe('updatePage with overwriteScopesOfDescendants true', () => {
-    test('(case 1) it should update all granted descendant pages when update grant is GRANT_PUBLIC', async() => {
+    test('(case 1) it should update all granted descendant pages when update grant is GRANT_PUBLIC', async () => {
       const upodPagegAB = await Page.findOne({ path: '/gAB_upod_1' });
       const upodPagegB = await Page.findOne({ path: '/gAB_upod_1/gB_upod_1' });
-      const upodPageonlyB = await Page.findOne({ path: '/gAB_upod_1/onlyB_upod_1' });
-      const upodPagegAgB = await Page.findOne({ path: '/gAB_upod_1/gA_gB_upod_1' });
+      const upodPageonlyB = await Page.findOne({
+        path: '/gAB_upod_1/onlyB_upod_1',
+      });
+      const upodPagegAgB = await Page.findOne({
+        path: '/gAB_upod_1/gA_gB_upod_1',
+      });
 
       expect(upodPagegAB).not.toBeNull();
       expect(upodPagegB).not.toBeNull();
@@ -1561,28 +1881,52 @@ describe('Page', () => {
         grant: PageGrant.GRANT_PUBLIC,
         overwriteScopesOfDescendants: true,
       };
-      const updatedPage = await updatePage(upodPagegAB, 'newRevisionBody', 'oldRevisionBody', upodUserA, options);
+      const updatedPage = await updatePage(
+        upodPagegAB,
+        'newRevisionBody',
+        'oldRevisionBody',
+        upodUserA,
+        options,
+      );
 
-      const upodPagegBUpdated = await Page.findOne({ path: '/gAB_upod_1/gB_upod_1' });
-      const upodPageonlyBUpdated = await Page.findOne({ path: '/gAB_upod_1/onlyB_upod_1' });
-      const upodPagegAgBUpdated = await Page.findOne({ path: '/gAB_upod_1/gA_gB_upod_1' });
+      const upodPagegBUpdated = await Page.findOne({
+        path: '/gAB_upod_1/gB_upod_1',
+      });
+      const upodPageonlyBUpdated = await Page.findOne({
+        path: '/gAB_upod_1/onlyB_upod_1',
+      });
+      const upodPagegAgBUpdated = await Page.findOne({
+        path: '/gAB_upod_1/gA_gB_upod_1',
+      });
 
       // Changed
       const newGrant = PageGrant.GRANT_PUBLIC;
       expect(updatedPage.grant).toBe(newGrant);
       // Not changed
       expect(upodPagegBUpdated.grant).toBe(PageGrant.GRANT_USER_GROUP);
-      expect(upodPagegBUpdated.grantedGroups).toStrictEqual(upodPagegB.grantedGroups);
+      expect(upodPagegBUpdated.grantedGroups).toStrictEqual(
+        upodPagegB.grantedGroups,
+      );
       expect(upodPageonlyBUpdated.grant).toBe(PageGrant.GRANT_OWNER);
-      expect(upodPageonlyBUpdated.grantedUsers).toStrictEqual(upodPageonlyB.grantedUsers);
+      expect(upodPageonlyBUpdated.grantedUsers).toStrictEqual(
+        upodPageonlyB.grantedUsers,
+      );
       expect(upodPagegAgBUpdated.grant).toBe(PageGrant.GRANT_USER_GROUP);
-      expect(upodPagegAgBUpdated.grantedGroups).toStrictEqual(upodPagegAgB.grantedGroups);
+      expect(upodPagegAgBUpdated.grantedGroups).toStrictEqual(
+        upodPagegAgB.grantedGroups,
+      );
     });
-    test('(case 2) it should update all granted descendant pages when all descendant pages are granted to the operator', async() => {
+    test('(case 2) it should update all granted descendant pages when all descendant pages are granted to the operator', async () => {
       const upodPagePublic = await Page.findOne({ path: '/public_upod_2' });
-      const upodPagegA = await Page.findOne({ path: '/public_upod_2/gA_upod_2' });
-      const upodPagegAIsolated = await Page.findOne({ path: '/public_upod_2/gAIsolated_upod_2' });
-      const upodPageonlyA = await Page.findOne({ path: '/public_upod_2/onlyA_upod_2' });
+      const upodPagegA = await Page.findOne({
+        path: '/public_upod_2/gA_upod_2',
+      });
+      const upodPagegAIsolated = await Page.findOne({
+        path: '/public_upod_2/gAIsolated_upod_2',
+      });
+      const upodPageonlyA = await Page.findOne({
+        path: '/public_upod_2/onlyA_upod_2',
+      });
 
       expect(upodPagePublic).not.toBeNull();
       expect(upodPagegA).not.toBeNull();
@@ -1599,11 +1943,23 @@ describe('Page', () => {
         grant: PageGrant.GRANT_OWNER,
         overwriteScopesOfDescendants: true,
       };
-      const updatedPage = await updatePage(upodPagePublic, 'newRevisionBody', 'oldRevisionBody', upodUserA, options);
+      const updatedPage = await updatePage(
+        upodPagePublic,
+        'newRevisionBody',
+        'oldRevisionBody',
+        upodUserA,
+        options,
+      );
 
-      const upodPagegAUpdated = await Page.findOne({ path: '/public_upod_2/gA_upod_2' });
-      const upodPagegAIsolatedUpdated = await Page.findOne({ path: '/public_upod_2/gAIsolated_upod_2' });
-      const upodPageonlyAUpdated = await Page.findOne({ path: '/public_upod_2/onlyA_upod_2' });
+      const upodPagegAUpdated = await Page.findOne({
+        path: '/public_upod_2/gA_upod_2',
+      });
+      const upodPagegAIsolatedUpdated = await Page.findOne({
+        path: '/public_upod_2/gAIsolated_upod_2',
+      });
+      const upodPageonlyAUpdated = await Page.findOne({
+        path: '/public_upod_2/onlyA_upod_2',
+      });
 
       // Changed
       const newGrant = PageGrant.GRANT_OWNER;
@@ -1613,18 +1969,28 @@ describe('Page', () => {
       expect(upodPagegAUpdated.grant).toBe(newGrant);
       expect(upodPagegAUpdated.grantedUsers).toStrictEqual(newGrantedUsers);
       expect(upodPagegAIsolatedUpdated.grant).toBe(newGrant);
-      expect(upodPagegAIsolatedUpdated.grantedUsers).toStrictEqual(newGrantedUsers);
+      expect(upodPagegAIsolatedUpdated.grantedUsers).toStrictEqual(
+        newGrantedUsers,
+      );
       expect(upodPageonlyAUpdated.grant).toBe(newGrant);
       expect(upodPageonlyAUpdated.grantedUsers).toStrictEqual(newGrantedUsers);
     });
     test(`(case 3) it should update all granted descendant pages when update grant is GRANT_USER_GROUP
     , all user groups of descendants are the children or itself of the update user group
-    , and all users of descendants belong to the update user group`, async() => {
+    , and all users of descendants belong to the update user group`, async () => {
       const upodPagePublic = await Page.findOne({ path: '/public_upod_3' });
-      const upodPagegAB = await Page.findOne({ path: '/public_upod_3/gAB_upod_3' });
-      const upodPagegAgB = await Page.findOne({ path: '/public_upod_3/gA_gB_upod_3' });
-      const upodPagegB = await Page.findOne({ path: '/public_upod_3/gB_upod_3' });
-      const upodPageonlyB = await Page.findOne({ path: '/public_upod_3/onlyB_upod_3' });
+      const upodPagegAB = await Page.findOne({
+        path: '/public_upod_3/gAB_upod_3',
+      });
+      const upodPagegAgB = await Page.findOne({
+        path: '/public_upod_3/gA_gB_upod_3',
+      });
+      const upodPagegB = await Page.findOne({
+        path: '/public_upod_3/gB_upod_3',
+      });
+      const upodPageonlyB = await Page.findOne({
+        path: '/public_upod_3/onlyB_upod_3',
+      });
 
       expect(upodPagePublic).not.toBeNull();
       expect(upodPagegAB).not.toBeNull();
@@ -1643,16 +2009,33 @@ describe('Page', () => {
         grant: PageGrant.GRANT_USER_GROUP,
         userRelatedGrantUserGroupIds: [
           { item: upodUserGroupIdAB, type: GroupType.userGroup },
-          { item: upodExternalUserGroupIdAB, type: GroupType.externalUserGroup },
+          {
+            item: upodExternalUserGroupIdAB,
+            type: GroupType.externalUserGroup,
+          },
         ],
         overwriteScopesOfDescendants: true,
       };
-      const updatedPage = await updatePage(upodPagePublic, 'newRevisionBody', 'oldRevisionBody', upodUserA, options);
+      const updatedPage = await updatePage(
+        upodPagePublic,
+        'newRevisionBody',
+        'oldRevisionBody',
+        upodUserA,
+        options,
+      );
 
-      const upodPagegABUpdated = await Page.findOne({ path: '/public_upod_3/gAB_upod_3' });
-      const upodPagegAgBUpdated = await Page.findOne({ path: '/public_upod_3/gA_gB_upod_3' });
-      const upodPagegBUpdated = await Page.findOne({ path: '/public_upod_3/gB_upod_3' });
-      const upodPageonlyBUpdated = await Page.findOne({ path: '/public_upod_3/onlyB_upod_3' });
+      const upodPagegABUpdated = await Page.findOne({
+        path: '/public_upod_3/gAB_upod_3',
+      });
+      const upodPagegAgBUpdated = await Page.findOne({
+        path: '/public_upod_3/gA_gB_upod_3',
+      });
+      const upodPagegBUpdated = await Page.findOne({
+        path: '/public_upod_3/gB_upod_3',
+      });
+      const upodPageonlyBUpdated = await Page.findOne({
+        path: '/public_upod_3/onlyB_upod_3',
+      });
 
       // Changed
       const newGrant = PageGrant.GRANT_USER_GROUP;
@@ -1661,31 +2044,47 @@ describe('Page', () => {
         { item: upodExternalUserGroupIdAB, type: GroupType.externalUserGroup },
       ];
       expect(updatedPage.grant).toBe(newGrant);
-      expect(normalizeGrantedGroups(updatedPage.grantedGroups)).toStrictEqual(newGrantedGroups);
+      expect(normalizeGrantedGroups(updatedPage.grantedGroups)).toStrictEqual(
+        newGrantedGroups,
+      );
       expect(upodPagegABUpdated.grant).toBe(newGrant);
-      expect(normalizeGrantedGroups(upodPagegABUpdated.grantedGroups)).toStrictEqual(newGrantedGroups);
+      expect(
+        normalizeGrantedGroups(upodPagegABUpdated.grantedGroups),
+      ).toStrictEqual(newGrantedGroups);
       expect(upodPagegAgBUpdated.grant).toBe(newGrant);
       // For multi group granted pages, the grant update will only add/remove groups that the user belongs to,
       // and groups that the user doesn't belong to will stay as it was before the update.
-      expect(normalizeGrantedGroups(upodPagegAgBUpdated.grantedGroups)).toEqual(expect.arrayContaining([
-        ...newGrantedGroups,
-        { item: upodUserGroupIdB, type: GroupType.userGroup },
-        { item: upodExternalUserGroupIdB, type: GroupType.externalUserGroup },
-      ]));
-      expect(normalizeGrantedGroups(upodPagegAgBUpdated.grantedGroups).length).toBe(4);
+      expect(normalizeGrantedGroups(upodPagegAgBUpdated.grantedGroups)).toEqual(
+        expect.arrayContaining([
+          ...newGrantedGroups,
+          { item: upodUserGroupIdB, type: GroupType.userGroup },
+          { item: upodExternalUserGroupIdB, type: GroupType.externalUserGroup },
+        ]),
+      );
+      expect(
+        normalizeGrantedGroups(upodPagegAgBUpdated.grantedGroups).length,
+      ).toBe(4);
 
       // Not changed
       expect(upodPagegBUpdated.grant).toBe(PageGrant.GRANT_USER_GROUP);
-      expect(upodPagegBUpdated.grantedGroups).toStrictEqual(upodPagegB.grantedGroups);
+      expect(upodPagegBUpdated.grantedGroups).toStrictEqual(
+        upodPagegB.grantedGroups,
+      );
       expect(upodPageonlyBUpdated.grant).toBe(PageGrant.GRANT_OWNER);
-      expect(upodPageonlyBUpdated.grantedUsers).toStrictEqual(upodPageonlyB.grantedUsers);
+      expect(upodPageonlyBUpdated.grantedUsers).toStrictEqual(
+        upodPageonlyB.grantedUsers,
+      );
     });
     test(`(case 4) it should throw when some of descendants is not granted
     , update grant is GRANT_USER_GROUP
-    , and some of user groups of descendants are not children or itself of the update user group`, async() => {
+    , and some of user groups of descendants are not children or itself of the update user group`, async () => {
       const upodPagePublic = await Page.findOne({ path: '/public_upod_4' });
-      const upodPagegA = await Page.findOne({ path: '/public_upod_4/gA_upod_4' });
-      const upodPagegC = await Page.findOne({ path: '/public_upod_4/gC_upod_4' });
+      const upodPagegA = await Page.findOne({
+        path: '/public_upod_4/gA_upod_4',
+      });
+      const upodPagegC = await Page.findOne({
+        path: '/public_upod_4/gC_upod_4',
+      });
 
       expect(upodPagePublic).not.toBeNull();
       expect(upodPagegA).not.toBeNull();
@@ -1700,20 +2099,33 @@ describe('Page', () => {
         grant: PageGrant.GRANT_USER_GROUP,
         userRelatedGrantUserGroupIds: [
           { item: upodUserGroupIdAB, type: GroupType.userGroup },
-          { item: upodExternalUserGroupIdAB, type: GroupType.externalUserGroup },
+          {
+            item: upodExternalUserGroupIdAB,
+            type: GroupType.externalUserGroup,
+          },
         ],
         overwriteScopesOfDescendants: true,
       };
-      const updatedPagePromise = updatePage(upodPagePublic, 'newRevisionBody', 'oldRevisionBody', upodUserA, options);
+      const updatedPagePromise = updatePage(
+        upodPagePublic,
+        'newRevisionBody',
+        'oldRevisionBody',
+        upodUserA,
+        options,
+      );
 
       await expect(updatedPagePromise).rejects.toThrowError();
     });
     test(`(case 5) it should throw when some of descendants is not granted
     , update grant is GRANT_USER_GROUP
-    , and some of users of descendants does NOT belong to the update user group`, async() => {
+    , and some of users of descendants does NOT belong to the update user group`, async () => {
       const upodPagePublic = await Page.findOne({ path: '/public_upod_5' });
-      const upodPagegA = await Page.findOne({ path: '/public_upod_5/gA_upod_5' });
-      const upodPageonlyC = await Page.findOne({ path: '/public_upod_5/onlyC_upod_5' });
+      const upodPagegA = await Page.findOne({
+        path: '/public_upod_5/gA_upod_5',
+      });
+      const upodPageonlyC = await Page.findOne({
+        path: '/public_upod_5/onlyC_upod_5',
+      });
 
       expect(upodPagePublic).not.toBeNull();
       expect(upodPagegA).not.toBeNull();
@@ -1728,17 +2140,28 @@ describe('Page', () => {
         grant: PageGrant.GRANT_USER_GROUP,
         userRelatedGrantUserGroupIds: [
           { item: upodUserGroupIdAB, type: GroupType.userGroup },
-          { item: upodExternalUserGroupIdAB, type: GroupType.externalUserGroup },
+          {
+            item: upodExternalUserGroupIdAB,
+            type: GroupType.externalUserGroup,
+          },
         ],
         overwriteScopesOfDescendants: true,
       };
-      const updatedPagePromise = updatePage(upodPagePublic, 'newRevisionBody', 'oldRevisionBody', upodUserA, options);
+      const updatedPagePromise = updatePage(
+        upodPagePublic,
+        'newRevisionBody',
+        'oldRevisionBody',
+        upodUserA,
+        options,
+      );
 
       await expect(updatedPagePromise).rejects.toThrowError();
     });
-    test('(case 6) it should throw when some of descendants is not granted and update grant is GRANT_OWNER', async() => {
+    test('(case 6) it should throw when some of descendants is not granted and update grant is GRANT_OWNER', async () => {
       const upodPagePublic = await Page.findOne({ path: '/public_upod_6' });
-      const upodPageonlyC = await Page.findOne({ path: '/public_upod_6/onlyC_upod_6' });
+      const upodPageonlyC = await Page.findOne({
+        path: '/public_upod_6/onlyC_upod_6',
+      });
 
       expect(upodPagePublic).not.toBeNull();
       expect(upodPageonlyC).not.toBeNull();
@@ -1751,11 +2174,20 @@ describe('Page', () => {
         grant: PageGrant.GRANT_USER_GROUP,
         userRelatedGrantUserGroupIds: [
           { item: upodUserGroupIdAB, type: GroupType.userGroup },
-          { item: upodExternalUserGroupIdAB, type: GroupType.externalUserGroup },
+          {
+            item: upodExternalUserGroupIdAB,
+            type: GroupType.externalUserGroup,
+          },
         ],
         overwriteScopesOfDescendants: true,
       };
-      const updatedPagePromise = updatePage(upodPagePublic, 'newRevisionBody', 'oldRevisionBody', upodUserA, options);
+      const updatedPagePromise = updatePage(
+        upodPagePublic,
+        'newRevisionBody',
+        'oldRevisionBody',
+        upodUserA,
+        options,
+      );
 
       await expect(updatedPagePromise).rejects.toThrowError();
     });

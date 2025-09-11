@@ -1,6 +1,8 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 
+import { SCOPE } from '@growi/core/dist/interfaces';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { serializeUserGroupRelationSecurely } from '~/server/models/serializers';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import loggerFactory from '~/utils/logger';
@@ -53,7 +55,7 @@ module.exports = (crowi) => {
    *                          items:
    *                            type: object
    */
-  router.get('/', loginRequiredStrictly, adminRequired, validator.list, async(req, res) => {
+  router.get('/', accessTokenParser([SCOPE.READ.ADMIN.USER_GROUP_MANAGEMENT]), loginRequiredStrictly, adminRequired, validator.list, async(req, res) => {
     const { query } = req;
 
     try {

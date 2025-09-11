@@ -1,0 +1,100 @@
+@use '@growi/core-styles/scss/variables/growi-official-colors';
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+
+.grw-ai-assistant-keyword-search :global {
+  .rbt {
+    .rbt-input-multi {
+      font-size: 1.2rem;
+      border: none;
+      border-bottom: 3px solid bs.$gray-200;
+      border-radius: 0;
+
+      &.focus {
+        border-color: var(--grw-primary-500);
+        box-shadow: none;
+      }
+    }
+
+    .rbt-menu {
+       display: none !important;
+    }
+
+    .rbt-token {
+      align-items: center;
+      justify-content: center;
+      border-radius: bs.$border-radius-xxl;
+
+      .rbt-token-label {
+        display: flex;
+        align-items: center;
+        font-weight: lighter;
+        text-align: center;
+      }
+
+      .rbt-token-remove-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    }
+  }
+
+  .next-button {
+    width: 30%;
+  }
+}
+
+
+// == Colors
+@include bs.color-mode(light) {
+  .grw-ai-assistant-keyword-search :global {
+     .rbt {
+        .rbt-token {
+          background-color: var(--grw-primary-100);
+          .rbt-token-label {
+            color: var(--grw-primary-400);
+          }
+          .rbt-token-remove-button {
+            color: var(--grw-primary-400);
+          }
+        }
+
+        .rbt-token-active {
+          background-color: var(--grw-primary-200);
+          .rbt-token-label {
+            color: var(--grw-primary-500);
+          }
+          .rbt-token-remove-button {
+            color: var(--grw-primary-500);
+          }
+        }
+     }
+  }
+}
+
+@include bs.color-mode(dark) {
+  .grw-ai-assistant-keyword-search :global {
+     .rbt {
+        .rbt-token {
+          background-color: var(--grw-primary-800);
+          .rbt-token-label {
+            color: var(--grw-primary-200);
+          }
+          .rbt-token-remove-button {
+            color: var(--grw-primary-200);
+          }
+        }
+
+        .rbt-token-active {
+          background-color: var(--grw-primary-700);
+          .rbt-token-label {
+            color: var(--grw-primary-100);
+          }
+          .rbt-token-remove-button {
+            color: var(--grw-primary-100);
+          }
+        }
+     }
+  }
+}

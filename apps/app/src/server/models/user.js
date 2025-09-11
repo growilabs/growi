@@ -81,7 +81,6 @@ const factory = (crowi) => {
     admin: { type: Boolean, default: 0, index: true },
     readOnly: { type: Boolean, default: 0 },
     isInvitationEmailSended: { type: Boolean, default: false },
-    isQuestionnaireEnabled: { type: Boolean, default: true },
   }, {
     timestamps: true,
     toObject: {
@@ -120,11 +119,6 @@ const factory = (crowi) => {
     }
   }
 
-  function generateRandomEmail() {
-    const randomstr = generateRandomTempPassword();
-    return `change-it-${randomstr}@example.com`;
-  }
-
   function generateRandomTempPassword() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!=-_';
     let password = '';
@@ -136,6 +130,11 @@ const factory = (crowi) => {
     }
 
     return password;
+  }
+
+  function generateRandomEmail() {
+    const randomstr = generateRandomTempPassword();
+    return `change-it-${randomstr}@example.com`;
   }
 
   function generatePassword(password) {
@@ -761,11 +760,6 @@ const factory = (crowi) => {
     const totalCount = (await this.find(conditions).distinct('username')).length;
 
     return { users, totalCount };
-  };
-
-  userSchema.methods.updateIsQuestionnaireEnabled = async function(value) {
-    this.isQuestionnaireEnabled = value;
-    return this.save();
   };
 
   class UserUpperLimitException {

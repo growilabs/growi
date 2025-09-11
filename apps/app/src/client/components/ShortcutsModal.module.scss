@@ -14,4 +14,8 @@
   }
 
   @include modifier-keys.modifier-key;
+
+  .grw-modal-body-style {
+    max-height: calc(100vh - 200px);
+  }
 }

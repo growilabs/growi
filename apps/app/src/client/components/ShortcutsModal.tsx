@@ -234,9 +234,159 @@ const ShortcutsModal = (): JSX.Element => {
                   </div>
                 </div>
               </li>
-              {/* Toggle Line */}
+              {/* Multiple Cursors */}
               <li className="d-flex align-items-center p-3">
-                <div className="flex-grow-1">{t('modal_shortcuts.editor.Toggle Line')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.editor.Multiple Cursors')}
+                </div>
+                <div className="text-nowrap">
+                  <div className="text-end">
+                    <div>
+                      <span className={`key cmd-key ${additionalClassByOs}`}></span>
+                      <span className="text-secondary mx-2">+</span>
+                      <span className={`key alt-key ${additionalClassByOs}`}></span>
+                      <span className="text-secondary ms-2">+</span>
+                    </div>
+                    <div className="mt-1">
+                      <span className="key material-symbols-outlined fs-5 px-0">arrow_downward</span>
+                      <span className="text-secondary mx-2">or</span>
+                      <span className="key material-symbols-outlined fs-5 px-0">arrow_upward</span>
+                    </div>
+                    <span className="small text-secondary">{t('modal_shortcuts.editor.Or Alt Click')}</span>
+
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Format settings section */}
+        <div className="row mt-4">
+          <div className="col-lg-6">
+            <h6>
+              <strong>{t('modal_shortcuts.format.title')}</strong>
+            </h6>
+            <ul className="list-unstyled m-0">
+              {/* Bold */}
+              <li className="d-flex align-items-center p-3 border-bottom">
+                <div className="flex-grow-1">{t('modal_shortcuts.format.Bold')}</div>
+                <div className="text-nowrap">
+                  <span className={`key cmd-key ${additionalClassByOs}`}></span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">B</span>
+                </div>
+              </li>
+              {/* Italic */}
+              <li className="d-flex align-items-center p-3 border-bottom">
+                <div className="flex-grow-1">{t('modal_shortcuts.format.Italic')}</div>
+                <div className="text-nowrap">
+                  <span className={`key cmd-key ${additionalClassByOs}`}></span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">Shift</span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">I</span>
+                </div>
+              </li>
+              {/* Strikethrough */}
+              <li className="d-flex align-items-center p-3 border-bottom">
+                <div className="flex-grow-1">{t('modal_shortcuts.format.Strikethrough')}</div>
+                <div className="text-nowrap">
+                  <span className={`key cmd-key ${additionalClassByOs}`}></span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">Shift</span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">X</span>
+                </div>
+              </li>
+              {/* Code Text */}
+              <li className="d-flex align-items-center p-3 border-bottom">
+                <div className="flex-grow-1">{t('modal_shortcuts.format.Code Text')}</div>
+                <div className="text-nowrap">
+                  <span className={`key cmd-key ${additionalClassByOs}`}></span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">Shift</span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">C</span>
+                </div>
+              </li>
+              {/* Hyperlink */}
+              <li className="d-flex align-items-center p-3">
+                <div className="flex-grow-1">{t('modal_shortcuts.format.Hyperlink')}</div>
+                <div className="text-nowrap">
+                  <span className={`key cmd-key ${additionalClassByOs}`}></span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">Shift</span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">U</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div className="col-lg-6">
+            <h6>
+              <strong>{t('modal_shortcuts.line_settings.title')}</strong>
+            </h6>
+            <ul className="list-unstyled m-0">
+              {/* Simple List */}
+              <li className="d-flex align-items-center p-3 border-bottom">
+                <div className="flex-grow-1">{t('modal_shortcuts.line_settings.Numbered List')}</div>
+                <div className="text-nowrap">
+                  <span className={`key cmd-key ${additionalClassByOs}`}></span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">Shift</span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">7</span>
+                </div>
+              </li>
+              {/* Numbered List */}
+              <li className="d-flex align-items-center p-3 border-bottom">
+                <div className="flex-grow-1">{t('modal_shortcuts.line_settings.Bullet List')}</div>
+                <div className="text-nowrap">
+                  <span className={`key cmd-key ${additionalClassByOs}`}></span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">Shift</span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">8</span>
+                </div>
+              </li>
+              {/* Quote */}
+              <li className="d-flex align-items-center p-3 border-bottom">
+                <div className="flex-grow-1">{t('modal_shortcuts.line_settings.Quote')}</div>
+                <div className="text-nowrap">
+                  <span className={`key cmd-key ${additionalClassByOs}`}></span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">Shift</span>
+                  <span className="text-secondary mx-2">+</span>
+                  <span className="key">9</span>
+                </div>
+              </li>
+              {/* Code Block */}
+              <li className="d-flex align-items-center p-3 border-bottom">
+                <div className="flex-grow-1">{t('modal_shortcuts.line_settings.Code Block')}</div>
+                <div className="text-nowrap">
+                  <div className="text-start">
+                    <div>
+                      <span className={`key cmd-key ${additionalClassByOs}`}></span>
+                      <span className="text-secondary mx-2">+</span>
+                      <span className={`key alt-key ${additionalClassByOs}`}></span>
+                      <span className="text-secondary ms-2">+</span>
+                    </div>
+                    <div className="mt-1">
+                      <span className="key">Shift</span>
+                      <span className="text-secondary mx-2">+</span>
+                      <span className="key">C</span>
+                    </div>
+                  </div>
+                </div>
+              </li>
+              {/* Hide comments */}
+              <li className="d-flex align-items-center p-3">
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.line_settings.Comment Out')}<br />
+                  <span className="small text-secondary">{t('modal_shortcuts.line_settings.Comment Out Desc')}</span>
+                </div>
                 <div className="text-nowrap">
                   <span className={`key cmd-key ${additionalClassByOs}`}></span>
                   <span className="text-secondary mx-2">+</span>
@@ -245,7 +395,6 @@ const ShortcutsModal = (): JSX.Element => {
               </li>
             </ul>
           </div>
-          {/* TODO: Add docs link button https://redmine.weseek.co.jp/issues/161862 */}
         </div>
       </div>
     );
@@ -258,7 +407,7 @@ const ShortcutsModal = (): JSX.Element => {
           <ModalHeader tag="h4" toggle={close} className="px-4">
             {t('Shortcuts')}
           </ModalHeader>
-          <ModalBody className="p-md-4">
+          <ModalBody className="p-md-4 mb-3 grw-modal-body-style overflow-auto">
             {bodyContent()}
           </ModalBody>
         </Modal>

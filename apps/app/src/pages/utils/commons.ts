@@ -115,6 +115,7 @@ export const langMap: LangMap = {
   [Lang.en_US]: 'en-US',
   [Lang.zh_CN]: 'zh-CN',
   [Lang.fr_FR]: 'fr-FR',
+  [Lang.ko_KR]: 'ko-KR',
 } as const;
 
 // use this function to translate content

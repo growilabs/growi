@@ -1,7 +1,5 @@
 import escapeStringRegexp from 'escape-string-regexp';
 
-import type { IUser } from '~/interfaces';
-
 import { isValidObjectId } from '../objectid-utils';
 import { addTrailingSlash } from '../path-utils';
 
@@ -112,9 +110,9 @@ const restrictedPatternsToCreate: Array<RegExp> = [
   /\s+\/\s+/, // avoid miss in renaming
   /.+\/edit$/,
   /.+\.md$/,
-  /^(\.\.)$/, // see: https://github.com/weseek/growi/issues/3582
-  /(\/\.\.)\/?/, // see: https://github.com/weseek/growi/issues/3582
-  /\\/, // see: https://github.com/weseek/growi/issues/7241
+  /^(\.\.)$/, // see: https://github.com/growilabs/growi/issues/3582
+  /(\/\.\.)\/?/, // see: https://github.com/growilabs/growi/issues/3582
+  /\\/, // see: https://github.com/growilabs/growi/issues/7241
   /^\/(_search|_private-legacy-pages)(\/.*|$)/,
   /^\/(installer|register|login|logout|admin|me|files|trash|paste|comments|tags|share|attachment)(\/.*|$)/,
   /^\/user(?:\/[^/]+)?$/, // https://regex101.com/r/9Eh2S1/1
@@ -184,7 +182,7 @@ export const generateEditorPath = (...paths: string[]): string => {
   try {
     const url = new URL(joinedPath, 'https://dummy');
     return `${url.pathname}#edit`;
-  } catch (err) {
+  } catch {
     throw new Error('Invalid path format');
   }
 };

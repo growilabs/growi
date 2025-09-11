@@ -1,6 +1,7 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 
 import { SupportedAction } from '~/interfaces/activity';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { getImportService } from '~/server/service/import';
 import { generateOverwriteParams } from '~/server/service/import/overwrite-params';
@@ -197,7 +198,7 @@ export default function route(crowi) {
    *                        type: string
    *                        description: the access token of qiita.com
    */
-  router.get('/', accessTokenParser, loginRequired, adminRequired, async(req, res) => {
+  router.get('/', accessTokenParser([SCOPE.READ.ADMIN.IMPORT_DATA], { acceptLegacy: true }), loginRequired, adminRequired, async(req, res) => {
     try {
       const importSettingsParams = {
         esaTeamName: await crowi.configManager.getConfig('importer:esa:team_name'),
@@ -235,7 +236,7 @@ export default function route(crowi) {
    *                  status:
    *                    $ref: '#/components/schemas/ImportStatus'
    */
-  router.get('/status', accessTokenParser, loginRequired, adminRequired, async(req, res) => {
+  router.get('/status', accessTokenParser([SCOPE.READ.ADMIN.IMPORT_DATA], { acceptLegacy: true }), loginRequired, adminRequired, async(req, res) => {
     try {
       const status = await importService.getStatus();
       return res.apiv3(status);
@@ -282,7 +283,7 @@ export default function route(crowi) {
    *        200:
    *          description: Import process has requested
    */
-  router.post('/', accessTokenParser, loginRequired, adminRequired, addActivity, async(req, res) => {
+  router.post('/', accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA], { acceptLegacy: true }), loginRequired, adminRequired, addActivity, async(req, res) => {
     // TODO: add express validator
     const { fileName, collections, options } = req.body;
 
@@ -405,34 +406,36 @@ export default function route(crowi) {
    *              schema:
    *                $ref: '#/components/schemas/FileImportResponse'
    */
-  router.post('/upload', accessTokenParser, loginRequired, adminRequired, uploads.single('file'), addActivity, async(req, res) => {
-    const { file } = req;
-    const zipFile = importService.getFile(file.filename);
-    let data = null;
+  router.post('/upload',
+    accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA], { acceptLegacy: true }), loginRequired, adminRequired, uploads.single('file'), addActivity,
+    async(req, res) => {
+      const { file } = req;
+      const zipFile = importService.getFile(file.filename);
+      let data = null;
 
-    try {
-      data = await growiBridgeService.parseZipFile(zipFile);
-    }
-    catch (err) {
+      try {
+        data = await growiBridgeService.parseZipFile(zipFile);
+      }
+      catch (err) {
       // TODO: use ApiV3Error
-      logger.error(err);
-      return res.status(500).send({ status: 'ERROR' });
-    }
-    try {
+        logger.error(err);
+        return res.status(500).send({ status: 'ERROR' });
+      }
+      try {
       // validate with meta.json
-      importService.validate(data.meta);
+        importService.validate(data.meta);
 
-      const parameters = { action: SupportedAction.ACTION_ADMIN_ARCHIVE_DATA_UPLOAD };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
+        const parameters = { action: SupportedAction.ACTION_ADMIN_ARCHIVE_DATA_UPLOAD };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
 
-      return res.apiv3(data);
-    }
-    catch {
-      const msg = 'The version of this GROWI and the uploaded GROWI data are not the same';
-      const validationErr = 'versions-are-not-met';
-      return res.apiv3Err(new ErrorV3(msg, validationErr), 500);
-    }
-  });
+        return res.apiv3(data);
+      }
+      catch {
+        const msg = 'The version of this GROWI and the uploaded GROWI data are not the same';
+        const validationErr = 'versions-are-not-met';
+        return res.apiv3Err(new ErrorV3(msg, validationErr), 500);
+      }
+    });
 
   /**
    * @swagger
@@ -449,7 +452,7 @@ export default function route(crowi) {
    *        200:
    *          description: all files are deleted
    */
-  router.delete('/all', accessTokenParser, loginRequired, adminRequired, async(req, res) => {
+  router.delete('/all', accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA], { acceptLegacy: true }), loginRequired, adminRequired, async(req, res) => {
     try {
       importService.deleteAllZipFiles();
 

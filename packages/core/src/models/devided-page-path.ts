@@ -43,7 +43,7 @@ export class DevidedPagePath {
       // for non-chrome browsers
       // biome-ignore lint/complexity/useRegexLiterals: ignore
       PATTERN_DEFAULT = new RegExp('^((.*)(?<!<)\\/)?(.+)$'); // https://regex101.com/r/HJNvMW/1
-    } catch (err) {
+    } catch {
       // lookbehind regex is not supported on non-chrome browsers
     }
 

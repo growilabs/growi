@@ -12,7 +12,8 @@ module.exports = {
       variables: {
         server: {
           default: 'https://demo.growi.org',
-          description: 'The base URL for the GROWI API except for the version path (/_api/v3). This can be set to your GROWI instance URL.',
+          description:
+            'The base URL for the GROWI API except for the version path (/_api/v3). This can be set to your GROWI instance URL.',
         },
       },
     },
@@ -98,8 +99,6 @@ module.exports = {
         'MongoDB',
         'NotificationSetting',
         'Plugins',
-        'Questionnaire',
-        'QuestionnaireSetting',
         'SlackIntegration',
         'SlackIntegrationSettings',
         'SlackIntegrationSettings (with proxy)',
@@ -117,16 +116,7 @@ module.exports = {
     },
     {
       name: 'Public API',
-      tags: [
-        'Healthcheck',
-        'Statistics',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-      ],
+      tags: ['Healthcheck', 'Statistics', '', '', '', '', '', ''],
     },
   ],
 };

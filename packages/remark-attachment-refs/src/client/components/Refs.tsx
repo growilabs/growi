@@ -1,4 +1,4 @@
-import React, { useMemo, type JSX } from 'react';
+import React, { type JSX, useMemo } from 'react';
 
 import { useSWRxRefs } from '../stores/refs';
 

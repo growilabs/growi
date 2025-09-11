@@ -1,6 +1,6 @@
 {
   "name": "@growi/slackbot-proxy",
-  "version": "7.2.8-slackbot-proxy.0",
+  "version": "7.3.0-slackbot-proxy.0",
   "license": "MIT",
   "private": "true",
   "scripts": {
@@ -16,7 +16,7 @@
     "start:prod": "cross-env NODE_ENV=production node -r dotenv-flow/config dist/index.js",
     "postbuild": "pnpm run cp:public && pnpm run cp:views && pnpm run cp:bootstrap",
     "predev": "pnpm run cp:bootstrap:dev",
-    "lint:js": "eslint src/**/*.{js,ts}",
+    "lint:js": "biome check",
     "lint:styles": "stylelint --allow-empty-input \"src/**/*.scss\" \"src/**/*.css\"",
     "lint:typecheck": "vue-tsc --noEmit",
     "lint": "run-p lint:*",

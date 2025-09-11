@@ -174,7 +174,8 @@ export const getRouterFactory = (crowi: Crowi): Router => {
 
   // note: retrieveAttachmentFromIdParam requires `req.params.id`
   router.get<{ id: string }>('/:id([0-9a-z]{24})',
-    certifySharedPageAttachmentMiddleware, loginRequired,
+    certifySharedPageAttachmentMiddleware,
+    loginRequired,
     retrieveAttachmentFromIdParam,
 
     (req: GetRequest, res: GetResponse) => {

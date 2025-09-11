@@ -13,8 +13,6 @@ test('admin/app is successfully loaded', async({ page }) => {
   await expect(page.getByTestId('admin-app-settings')).toBeVisible();
   // await expect(page.getByTestId('v5-page-migration')).toBeVisible();
   await expect(page.locator('#cbFileUpload')).toBeChecked();
-  await expect(page.locator('#isQuestionnaireEnabled')).toBeChecked();
-  await expect(page.locator('#isAppSiteUrlHashed')).not.toBeChecked();
 });
 
 test('admin/security is successfully loaded', async({ page }) => {

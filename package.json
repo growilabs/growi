@@ -1,6 +1,6 @@
 {
   "name": "growi",
-  "version": "7.2.8",
+  "version": "7.3.0-RC.0",
   "description": "Team collaboration software using markdown",
   "license": "MIT",
   "private": "true",
@@ -15,10 +15,10 @@
   "homepage": "https://growi.org",
   "repository": {
     "type": "git",
-    "url": "https://github.com/weseek/growi.git"
+    "url": "https://github.com/growilabs/growi.git"
   },
   "bugs": {
-    "url": "https://github.com/weseek/growi/issues"
+    "url": "https://github.com/growilabs/growi/issues"
   },
   "packageManager": "pnpm@10.4.1",
   "scripts": {
@@ -42,7 +42,7 @@
     "vite-plugin-dts": "v4.2.1 causes the unexpected error 'Cannot find package 'vue-tsc''"
   },
   "devDependencies": {
-    "@biomejs/biome": "1.9.4",
+    "@biomejs/biome": "2.0.6",
     "@changesets/changelog-github": "^0.5.0",
     "@changesets/cli": "^2.27.3",
     "@faker-js/faker": "^9.0.1",
@@ -116,6 +116,6 @@
     }
   },
   "engines": {
-    "node": "^18 || ^20"
+    "node": "^20 || ^22"
   }
 }

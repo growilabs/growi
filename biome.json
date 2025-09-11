@@ -1,34 +1,55 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
-    "ignore": [
-      "dist/**",
-      "node_modules/**",
-      "coverage/**",
-      "vite.config.ts.timestamp-*",
-      "vite.server.config.ts.timestamp-*",
-      "vite.client.config.ts.timestamp-*",
-      ".pnpm-store/**",
-      ".turbo/**",
-      ".vscode/**",
-      "turbo.json",
-      "./bin/**",
-      "./tsconfig.base.json",
-      ".devcontainer/**",
-      ".eslintrc.js",
-      ".stylelintrc.json",
-      "package.json",
-      "./apps/**",
-      "./packages/editor/**",
-      "./packages/pdf-converter-client/src/index.ts"
+    "includes": [
+      "**",
+      "!**/dist/**",
+      "!**/node_modules/**",
+      "!**/coverage/**",
+      "!**/vite.config.ts.timestamp-*",
+      "!**/vite.server.config.ts.timestamp-*",
+      "!**/vite.client.config.ts.timestamp-*",
+      "!**/.pnpm-store/**",
+      "!**/.turbo/**",
+      "!**/.vscode/**",
+      "!**/turbo.json",
+      "!**/.next/**",
+      "!bin/**",
+      "!tsconfig.base.json",
+      "!**/.devcontainer/**",
+      "!**/.eslintrc.js",
+      "!**/.stylelintrc.json",
+      "!**/package.json",
+      "!apps/slackbot-proxy/src/public/bootstrap/**",
+      "!packages/editor/**",
+      "!packages/pdf-converter-client/src/index.ts",
+      "!apps/app/playwright/**",
+      "!apps/app/public/**",
+      "!apps/app/src/client/**",
+      "!apps/app/src/components/**",
+      "!apps/app/src/features/growi-plugin/**",
+      "!apps/app/src/features/openai/**",
+      "!apps/app/src/features/rate-limiter/**",
+      "!apps/app/src/models/**",
+      "!apps/app/src/pages/**",
+      "!apps/app/src/server/**",
+      "!apps/app/src/services/**",
+      "!apps/app/src/stores/**",
+      "!apps/app/src/styles/**",
+      "!apps/app/test/integration/service/**",
+      "!apps/app/test-with-vite/**"
     ]
   },
   "formatter": {
     "enabled": true,
     "indentStyle": "space"
   },
-  "organizeImports": {
-    "enabled": true
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
   },
   "linter": {
     "enabled": true,
@@ -39,6 +60,21 @@
   "javascript": {
     "formatter": {
       "quoteStyle": "single"
+    },
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["apps/pdf-converter/**", "./apps/slackbot-proxy/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useImportType": "off"
+          }
+        }
+      }
+    }
+  ]
 }

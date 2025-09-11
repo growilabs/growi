@@ -1,12 +1,16 @@
 import {
-  Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn, ManyToOne,
+  Column,
+  CreateDateColumn,
+  Entity,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 
 import { Installation } from './installation';
 
 @Entity()
 export class Order {
-
   @PrimaryGeneratedColumn()
   readonly id: number;
 
@@ -31,11 +35,10 @@ export class Order {
   @Column()
   tokenPtoG: string;
 
-  isExpired():boolean {
+  isExpired(): boolean {
     const now = Date.now();
     const expiredAt = this.createdAt.getTime() + 600000;
 
     return expiredAt < now;
   }
-
 }

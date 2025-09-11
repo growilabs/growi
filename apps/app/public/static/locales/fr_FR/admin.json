@@ -313,7 +313,7 @@
       "done": "Copié dans le presse-papier!"
     },
     "bug_report": "Informations de diagnostic",
-    "submit_bug_report": "<a href='https://github.com/weseek/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>soummettre ensuite sur GitHub.</a>"
+    "submit_bug_report": "<a href='https://github.com/growilabs/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>soummettre ensuite sur GitHub.</a>"
   },
   "v5_page_migration": {
     "migration_desc": "Des pages sont encore en V4. Pour profiter des nouvelles fonctionnalitées, convertir toutes les pages vers la V5.",
@@ -411,17 +411,7 @@
     "enable": "Activer",
     "disable": "Désactiver",
     "use_env_var_if_empty": "Si la valeur dans la base de données est vide, la valeur de variable d'environnement <code>{{variable}}</code> est utilisé.",
-    "note_for_the_only_env_option": "Les paramètres sont définis par des variables d'environnement.<br>Pour modifier ce paramètre, supprimer la variable d'environnement <code>{{env}}</code> .",
-    "questionnaire_settings": "Sondages anonymes",
-    "questionnaire_settings_explanation": "Paramètres d'activation des données analytiques. L'utilisateur peut choisir ce paramètre individuellement dans \"Autres paramètres\".",
-    "about_data_sent": "À propos",
-    "docs_link": "https://docs.growi.org/en/admin-guide/management-cookbook/app-settings.html#questionnaire-settings",
-    "learn_more": "En savoir plus",
-    "other_info_will_be_sent": "En plus des données analytiques, des données diagnostiques pour améliorer GROWI sont envoyées. Les données personnelles ne sont pas incluses.",
-    "we_will_use_the_data_to_improve_growi": "Les données seront utilisées pour améliorer au mieux GROWI",
-    "anonymize_app_site_url": "Ne pas inclure l'URL du site",
-    "url_anonymization_explanation": "L'URL du site configurée ne sera pas inclue dans les données envoyées.",
-    "enable_questionnaire": "Activer les données analytiques"
+    "note_for_the_only_env_option": "Les paramètres sont définis par des variables d'environnement.<br>Pour modifier ce paramètre, supprimer la variable d'environnement <code>{{env}}</code> ."
   },
   "markdown_settings": {
     "markdown_settings": "Markdown",

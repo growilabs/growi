@@ -10,7 +10,7 @@ import type { LsxApiParams, LsxApiResponseData } from '../../../interfaces/api';
 import { addDepthCondition } from './add-depth-condition';
 import { addNumCondition } from './add-num-condition';
 import { addSortCondition } from './add-sort-condition';
-import { type PageQuery, generateBaseQuery } from './generate-base-query';
+import { generateBaseQuery, type PageQuery } from './generate-base-query';
 import { getToppageViewersCount } from './get-toppage-viewers-count';
 
 const { addTrailingSlash, removeTrailingSlash } = pathUtils;
@@ -18,7 +18,7 @@ const { addTrailingSlash, removeTrailingSlash } = pathUtils;
 /**
  * add filter condition that filter fetched pages
  */
-function addFilterCondition(
+export function addFilterCondition(
   query,
   pagePath,
   optionsFilter,
@@ -38,11 +38,11 @@ function addFilterCondition(
   try {
     if (optionsFilter.charAt(0) === '^') {
       // move '^' to the first of path
-      filterPath = new RegExp(
-        `^${pagePathForRegexp}${optionsFilter.slice(1, optionsFilter.length)}`,
-      );
+      const escapedFilter = escapeStringRegexp(optionsFilter.slice(1));
+      filterPath = new RegExp(`^${pagePathForRegexp}${escapedFilter}`);
     } else {
-      filterPath = new RegExp(`^${pagePathForRegexp}.*${optionsFilter}`);
+      const escapedFilter = escapeStringRegexp(optionsFilter);
+      filterPath = new RegExp(`^${pagePathForRegexp}.*${escapedFilter}`);
     }
   } catch (err) {
     throw createError(400, err);

@@ -4,7 +4,7 @@ import { configManager } from '~/server/service/config-manager';
 
 import { AssistantType } from './assistant-types';
 import { getOrCreateAssistant } from './create-assistant';
-import { instructionsForFileSearch, instructionsForInjectionCountermeasures } from './instructions/commons';
+import { instructionsForFileSearch, instructionsForInjectionCountermeasures, instructionsForSystem } from './instructions/commons';
 
 
 /* eslint-disable max-len */
@@ -75,6 +75,9 @@ export const getOrCreateEditorAssistant = async(): Promise<OpenAI.Beta.Assistant
     instructions: `# Your Role
 You are an Editor Assistant for GROWI, a markdown wiki system.
 Your task is to help users edit their markdown content based on their requests.
+---
+
+${instructionsForSystem}
 ---
 
 ${instructionsForInjectionCountermeasures}

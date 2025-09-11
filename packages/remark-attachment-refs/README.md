@@ -138,4 +138,4 @@ TODO
 
 - [ ] `format` option
 
-[GROWI]: https://github.com/weseek/growi
+[GROWI]: https://github.com/growilabs/growi

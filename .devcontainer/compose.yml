@@ -3,9 +3,7 @@ services:
     image: mcr.microsoft.com/devcontainers/base:ubuntu
     volumes:
       - ..:/workspace/growi:delegated
-      - pnpm-store:/workspace/growi/.pnpm-store
-      - node_modules:/workspace/growi/node_modules
-      - buildcache_app:/workspace/growi/apps/app/.next
+      - pnpm-store:/workspace/.pnpm-store
       - ../../growi-docker-compose:/workspace/growi-docker-compose:delegated
       - ../../share:/workspace/share:delegated
       - page_bulk_export_tmp:/tmp/page-bulk-export
@@ -15,7 +13,7 @@ services:
     - opentelemetry-collector-dev-setup_default
 
   mongo:
-    image: mongo:6.0
+    image: mongo:8.0
     restart: unless-stopped
     ports:
       - 27017
@@ -23,13 +21,13 @@ services:
       - /data/db
 
   # This container requires '../../growi-docker-compose' repository
-  #   cloned from https://github.com/weseek/growi-docker-compose.git
+  #   cloned from https://github.com/growilabs/growi-docker-compose.git
   elasticsearch:
     build:
-      context: ../../growi-docker-compose/elasticsearch/v8
+      context: ../../growi-docker-compose/elasticsearch/v9
       dockerfile: ./Dockerfile
       args:
-        - version=8.7.0
+        - version=9.0.3
     restart: unless-stopped
     ports:
       - 9200
@@ -43,12 +41,10 @@ services:
         hard: -1
     volumes:
       - /usr/share/elasticsearch/data
-      - ../../growi-docker-compose/elasticsearch/v8/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+      - ../../growi-docker-compose/elasticsearch/v9/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
 
 volumes:
   pnpm-store:
-  node_modules:
-  buildcache_app:
   page_bulk_export_tmp:
 
 networks:

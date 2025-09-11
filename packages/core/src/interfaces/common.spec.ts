@@ -3,8 +3,7 @@ import { Types } from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
 import { getIdForRef, isPopulated } from './common';
-import type { IPageHasId } from './page';
-import type { IPage } from './page';
+import type { IPage, IPageHasId } from './page';
 
 describe('isPopulated', () => {
   it('should return true when the argument implements HasObjectId', () => {
