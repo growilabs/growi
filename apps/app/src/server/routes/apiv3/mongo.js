@@ -1,3 +1,6 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
+
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:routes:apiv3:mongo'); // eslint-disable-line no-unused-vars
@@ -35,7 +38,7 @@ module.exports = (crowi) => {
    *                    items:
    *                      type: string
    */
-  router.get('/collections', loginRequiredStrictly, adminRequired, async(req, res) => {
+  router.get('/collections', accessTokenParser([SCOPE.READ.ADMIN.EXPORT_DATA]), loginRequiredStrictly, adminRequired, async(req, res) => {
     const listCollectionsResult = await mongoose.connection.db.listCollections().toArray();
     const collections = listCollectionsResult.map(collectionObj => collectionObj.name);
 

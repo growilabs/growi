@@ -14,8 +14,9 @@ export const omitInsecureAttributes = <U extends IUser>(
   const leanDoc = user instanceof Document ? user.toObject<U>() : user;
 
   const {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // biome-ignore lint/correctness/noUnusedVariables: ignore
     password,
+    // biome-ignore lint/correctness/noUnusedVariables: ignore
     apiToken,
     email,
     ...rest

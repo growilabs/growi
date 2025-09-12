@@ -1,4 +1,5 @@
 import { GroupType } from '@growi/core';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request } from 'express';
 import { Router } from 'express';
@@ -9,6 +10,7 @@ import ExternalUserGroupRelation from '~/features/external-user-group/server/mod
 import { SupportedAction } from '~/interfaces/activity';
 import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
 import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { serializeUserGroupRelationSecurely } from '~/server/models/serializers/user-group-relation-serializer';
@@ -155,6 +157,7 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.get(
     '/',
+    accessTokenParser([SCOPE.READ.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     async (req: AuthorizedRequest, res: ApiV3Response) => {
@@ -221,6 +224,7 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.get(
     '/ancestors',
+    accessTokenParser([SCOPE.READ.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     validators.ancestorGroup,
@@ -284,6 +288,7 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.get(
     '/children',
+    accessTokenParser([SCOPE.READ.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     validators.listChildren,
@@ -337,6 +342,7 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.get(
     '/:id',
+    accessTokenParser([SCOPE.READ.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     validators.detail,
@@ -401,6 +407,7 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.delete(
     '/:id',
+    accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     validators.delete,
@@ -485,6 +492,7 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.put(
     '/:id',
+    accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     validators.update,
@@ -545,9 +553,13 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.get(
     '/:id/external-user-group-relations',
+    accessTokenParser([SCOPE.READ.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
-    async (req, res: ApiV3Response) => {
+    async (
+      req: Request<{ id: string }, Response, undefined>,
+      res: ApiV3Response,
+    ) => {
       const { id } = req.params;
 
       try {
@@ -603,6 +615,7 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.get(
     '/ldap/sync-settings',
+    accessTokenParser([SCOPE.READ.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     (req: AuthorizedRequest, res: ApiV3Response) => {
@@ -673,6 +686,7 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.get(
     '/keycloak/sync-settings',
+    accessTokenParser([SCOPE.READ.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     (req: AuthorizedRequest, res: ApiV3Response) => {
@@ -749,6 +763,7 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.put(
     '/ldap/sync-settings',
+    accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     validators.ldapSyncSettings,
@@ -849,6 +864,7 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.put(
     '/keycloak/sync-settings',
+    accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     validators.keycloakSyncSettings,
@@ -916,6 +932,7 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.put(
     '/ldap/sync',
+    accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     async (req: AuthorizedRequest, res: ApiV3Response) => {
@@ -983,6 +1000,7 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.put(
     '/keycloak/sync',
+    accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     async (req: AuthorizedRequest, res: ApiV3Response) => {
@@ -1080,6 +1098,7 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.get(
     '/ldap/sync-status',
+    accessTokenParser([SCOPE.READ.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     (req: AuthorizedRequest, res: ApiV3Response) => {
@@ -1107,6 +1126,7 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.get(
     '/keycloak/sync-status',
+    accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     (req: AuthorizedRequest, res: ApiV3Response) => {

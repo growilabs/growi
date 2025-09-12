@@ -230,13 +230,46 @@
       "profile_image2": "设置AWS或启用本地上传。"
     }
   },
+  "API Token Settings": "API token 设置",
+  "Current API Token": "当前 API token",
+  "Update API Token": "更新 API token",
   "page_me_apitoken": {
     "api_token": "API Token",
     "notice": {
       "apitoken_issued": "API token 未发布。",
       "update_token1": "您可以更新以生成新的API令牌。",
       "update_token2": "您需要更新任何现有进程中的API令牌。"
-    }
+    },
+    "form_help": {}
+  },
+  "Access Token Settings": "Access token 设置",
+  "page_me_access_token": {
+    "access_token": "访问令牌",
+    "expiredAt": "过期日期",
+    "description": "描述",
+    "scope": "范围",
+    "scope_read": "读取",
+    "action": "操作",
+    "create_token": "创建令牌",
+    "no_tokens_found": "未找到访问令牌",
+    "new_token": {
+      "title": "新访问令牌",
+      "copy_to_clipboard": "复制到剪贴板",
+      "message": "此令牌仅显示一次。请安全保存。"
+    },
+    "modal": {
+      "message": "确定要删除此访问令牌吗？",
+      "alert": "此操作无法撤消。",
+      "delete_token": "删除令牌"
+    },
+    "form": {
+      "title": "创建新访问令牌",
+      "expiredAt_desc": "选择此访问令牌的过期时间。",
+      "description_desc": "提供描述以帮助您稍后识别此令牌。",
+      "description_max_length": "请输入最多 {{length}} 个字符",
+      "scope_desc": "选择访问令牌的范围。"
+    },
+    "copy_to_clipboard": "复制到剪贴板"
   },
   "Password": "密码",
   "Password Settings": "密码设置",
@@ -252,9 +285,6 @@
   },
   "API Settings": "API设置",
   "Other Settings": "其他设置",
-  "API Token Settings": "API token 设置",
-  "Current API Token": "当前 API token",
-  "Update API Token": "更新 API token",
   "in_app_notification_settings": {
     "in_app_notification_settings": "在应用程序通知设置",
     "subscribe_settings": "自动订阅（接收通知）页面的设置",

@@ -5,6 +5,7 @@ import type { ValidationChain } from 'express-validator';
 import { param } from 'express-validator';
 import mongoose from 'mongoose';
 
+import { SCOPE } from '@growi/core/dist/interfaces';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import type { PageModel } from '~/server/models/page';
@@ -34,7 +35,7 @@ export const getYjsDataHandlerFactory: GetYjsDataHandlerFactory = (crowi) => {
   ];
 
   return [
-    accessTokenParser, loginRequiredStrictly,
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }), loginRequiredStrictly,
     validator, apiV3FormValidator,
     async(req: Req, res: ApiV3Response) => {
       const { pageId } = req.params;

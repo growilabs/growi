@@ -1,7 +1,5 @@
 import escapeStringRegexp from 'escape-string-regexp';
 
-import type { IUser } from '~/interfaces';
-
 import { isValidObjectId } from '../objectid-utils';
 import { addTrailingSlash } from '../path-utils';
 
@@ -184,7 +182,7 @@ export const generateEditorPath = (...paths: string[]): string => {
   try {
     const url = new URL(joinedPath, 'https://dummy');
     return `${url.pathname}#edit`;
-  } catch (err) {
+  } catch {
     throw new Error('Invalid path format');
   }
 };

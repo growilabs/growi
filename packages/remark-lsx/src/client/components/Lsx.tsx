@@ -57,7 +57,7 @@ const LsxSubstance = React.memo(
 
     const ErrorMessage = useCallback((): JSX.Element => {
       if (!hasError) {
-        return <></>;
+        return;
       }
 
       return (
@@ -75,10 +75,10 @@ const LsxSubstance = React.memo(
 
     const Loading = useCallback((): JSX.Element => {
       if (hasError) {
-        return <></>;
+        return;
       }
       if (!isLoading) {
-        return <></>;
+        return;
       }
 
       return (
@@ -118,14 +118,14 @@ const LsxSubstance = React.memo(
       const lastResult = data?.at(-1);
 
       if (lastResult == null) {
-        return <></>;
+        return;
       }
 
       const { cursor, total } = lastResult;
       const leftItemsNum = total - cursor;
 
       if (leftItemsNum === 0) {
-        return <></>;
+        return;
       }
 
       return (

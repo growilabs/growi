@@ -13,7 +13,7 @@ services:
     - opentelemetry-collector-dev-setup_default
 
   mongo:
-    image: mongo:6.0
+    image: mongo:8.0
     restart: unless-stopped
     ports:
       - 27017

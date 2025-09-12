@@ -1,4 +1,5 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler, Response } from 'express';
 import type { ValidationChain } from 'express-validator';
@@ -71,7 +72,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
   ];
 
   return [
-    accessTokenParser, loginRequiredStrictly, certifyAiService, validator, apiV3FormValidator,
+    accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT], { acceptLegacy: true }), loginRequiredStrictly, certifyAiService, validator, apiV3FormValidator,
     async(req: Req, res: ApiV3Response) => {
       const { aiAssistantId, threadId } = req.body;
 

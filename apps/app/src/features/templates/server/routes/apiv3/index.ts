@@ -1,4 +1,5 @@
 import { GrowiPluginType } from '@growi/core';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import type { TemplateSummary } from '@growi/pluginkit/dist/v4';
 import {
   getMarkdown,
@@ -10,6 +11,7 @@ import path from 'path';
 import { PLUGIN_STORING_PATH } from '~/features/growi-plugin/server/consts';
 import { GrowiPlugin } from '~/features/growi-plugin/server/models';
 import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
@@ -75,6 +77,7 @@ module.exports = (crowi: Crowi) => {
    */
   router.get(
     '/',
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE]),
     loginRequiredStrictly,
     validator.list,
     apiV3FormValidator,
@@ -155,6 +158,7 @@ module.exports = (crowi: Crowi) => {
    */
   router.get(
     '/preset-templates/:templateId/:locale',
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE]),
     loginRequiredStrictly,
     validator.get,
     apiV3FormValidator,
@@ -226,6 +230,7 @@ module.exports = (crowi: Crowi) => {
    */
   router.get(
     '/plugin-templates/:organizationId/:reposId/:templateId/:locale',
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE]),
     loginRequiredStrictly,
     validator.get,
     apiV3FormValidator,

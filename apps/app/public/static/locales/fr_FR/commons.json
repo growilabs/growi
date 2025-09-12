@@ -122,5 +122,97 @@
     "transfer_key_limit": "Les clés de transfert sont valides durant une heure.",
     "once_transfer_key_used": "Les clés de transfert sont à usage unique.",
     "transfer_to_growi_cloud": "Pour plus de détails, veuillez cliquer <a href='{{documentationUrl}}en/admin-guide/management-cookbook/g2g-transfer.html'>ici.</a>"
+  },
+  "accesstoken_scopes_desc": {
+    "read": {
+      "all": "Accorde la permission de voir tout le contenu.",
+      "admin": {
+        "all": "Accorde la permission de voir les fonctionnalités d'administration.",
+        "top": "Accorde la permission de voir la page principale de gestion du Wiki.",
+        "app": "Accorde la permission de voir les paramètres de l'application.",
+        "security": "Accorde la permission de voir les paramètres de sécurité.",
+        "markdown": "Accorde la permission de voir les paramètres markdown.",
+        "customize": "Accorde la permission de voir les paramètres de personnalisation.",
+        "import_data": "Accorde la permission de voir les paramètres d'importation de données.",
+        "export_data": "Accorde la permission de voir les paramètres d'archivage de données.",
+        "data_transfer": "Accorde la permission de voir les paramètres de transfert de données.",
+        "external_notification": "Accorde la permission de voir les paramètres de notification externe.",
+        "slack_integration": "Accorde la permission de voir les paramètres d'intégration Slack.",
+        "legacy_slack_integration": "Accorde la permission de voir les paramètres d'intégration Slack (ancien).",
+        "user_management": "Accorde la permission de voir la gestion des utilisateurs.",
+        "user_group_management": "Accorde la permission de voir la gestion des groupes d'utilisateurs.",
+        "audit_log": "Accorde la permission de voir les journaux d'audit.",
+        "plugin": "Accorde la permission de voir les paramètres des plugins.",
+        "ai_integration": "Accorde la permission de voir les paramètres d'intégration IA.",
+        "full_text_search": "Accorde la permission de voir la gestion de la recherche en texte intégral."
+      },
+      "user_settings": {
+        "all": "Accorde la permission de voir les paramètres utilisateur.",
+        "info": "Accorde la permission de voir les informations utilisateur.",
+        "external_account": "Accorde la permission de voir les comptes externes.",
+        "password": "Accorde la permission de voir les paramètres de mot de passe.",
+        "api": {
+          "all": "Accorde la permission de voir les paramètres API.",
+          "api_token": "Accorde la permission de voir les paramètres de jeton API.",
+          "access_token": "Accorde la permission de voir les paramètres de jeton d'accès."
+        },
+        "in_app_notification": "Accorde la permission de voir les paramètres de notification dans l'application.",
+        "other": "Accorde la permission de voir les autres paramètres."
+      },
+      "features": {
+        "all": "Accorde la permission de voir les fonctionnalités.",
+        "ai_assistant": "Accorde la permission de voir les fonctionnalités d'assistant IA.",
+        "page": "Accorde la permission de voir les fonctionnalités de page.",
+        "share_link": "Accorde la permission de voir les fonctionnalités de lien de partage.",
+        "bookmark": "Accorde la permission de voir les fonctionnalités de signet.",
+        "attachment": "Accorde la permission de voir les fonctionnalités de pièce jointe.",
+        "page_bulk_export": "Accorde la permission de voir les fonctionnalités d'exportation en masse de pages."
+      }
+    },
+    "write": {
+      "all": "Accorde la permission de modifier tout le contenu.",
+      "admin": {
+        "all": "Accorde la permission de modifier les fonctionnalités d'administration.",
+        "top": "Accorde la permission de modifier la page principale de gestion du Wiki.",
+        "app": "Accorde la permission de modifier les paramètres de l'application.",
+        "security": "Accorde la permission de modifier les paramètres de sécurité.",
+        "markdown": "Accorde la permission de modifier les paramètres markdown.",
+        "customize": "Accorde la permission de modifier les paramètres de personnalisation.",
+        "import_data": "Accorde la permission de modifier les paramètres d'importation de données.",
+        "export_data": "Accorde la permission de modifier les paramètres d'archivage de données.",
+        "data_transfer": "Accorde la permission de modifier les paramètres de transfert de données.",
+        "external_notification": "Accorde la permission de modifier les paramètres de notification externe.",
+        "slack_integration": "Accorde la permission de modifier les paramètres d'intégration Slack.",
+        "legacy_slack_integration": "Accorde la permission de modifier les paramètres d'intégration Slack (ancien).",
+        "user_management": "Accorde la permission de modifier la gestion des utilisateurs.",
+        "user_group_management": "Accorde la permission de modifier la gestion des groupes d'utilisateurs.",
+        "audit_log": "Accorde la permission de modifier les journaux d'audit.",
+        "plugin": "Accorde la permission de modifier les paramètres des plugins.",
+        "ai_integration": "Accorde la permission de modifier les paramètres d'intégration IA.",
+        "full_text_search": "Accorde la permission de modifier la gestion de la recherche en texte intégral."
+      },
+      "user_settings": {
+        "all": "Accorde la permission de modifier les paramètres utilisateur.",
+        "info": "Accorde la permission de modifier les informations utilisateur.",
+        "external_account": "Accorde la permission de modifier les comptes externes.",
+        "password": "Accorde la permission de modifier les paramètres de mot de passe.",
+        "api": {
+          "all": "Accorde la permission de modifier les paramètres API.",
+          "api_token": "Accorde la permission de modifier les paramètres de jeton API.",
+          "access_token": "Accorde la permission de modifier les paramètres de jeton d'accès."
+        },
+        "in_app_notification": "Accorde la permission de modifier les paramètres de notification dans l'application.",
+        "other": "Accorde la permission de modifier les autres paramètres."
+      },
+      "features": {
+        "all": "Accorde la permission de modifier les fonctionnalités.",
+        "ai_assistant": "Accorde la permission de modifier les fonctionnalités d'assistant IA.",
+        "page": "Accorde la permission de modifier les fonctionnalités de page.",
+        "share_link": "Accorde la permission de modifier les fonctionnalités de lien de partage.",
+        "bookmark": "Accorde la permission de modifier les fonctionnalités de signet.",
+        "attachment": "Accorde la permission de modifier les fonctionnalités de pièce jointe.",
+        "page_bulk_export": "Accorde la permission de modifier les fonctionnalités d'exportation en masse de pages."
+      }
+    }
   }
 }

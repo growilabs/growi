@@ -102,7 +102,7 @@ export const LsxPage = React.memo((props: Props): JSX.Element => {
 
   const pageListMetaElement: JSX.Element = useMemo(() => {
     if (pageNode.page == null) {
-      return <></>;
+      return;
     }
 
     const { page } = pageNode;

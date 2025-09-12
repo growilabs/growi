@@ -119,11 +119,6 @@ const factory = (crowi) => {
     }
   }
 
-  function generateRandomEmail() {
-    const randomstr = generateRandomTempPassword();
-    return `change-it-${randomstr}@example.com`;
-  }
-
   function generateRandomTempPassword() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!=-_';
     let password = '';
@@ -135,6 +130,11 @@ const factory = (crowi) => {
     }
 
     return password;
+  }
+
+  function generateRandomEmail() {
+    const randomstr = generateRandomTempPassword();
+    return `change-it-${randomstr}@example.com`;
   }
 
   function generatePassword(password) {

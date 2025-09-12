@@ -1,3 +1,4 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { body } from 'express-validator';
 
@@ -8,11 +9,16 @@ import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loggerFactory from '~/utils/logger';
 
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import EditorSettings from '../../models/editor-settings';
-import ExternalAccount from '../../models/external-account';
-import InAppNotificationSettings from '../../models/in-app-notification-settings';
+import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import EditorSettings from '../../../models/editor-settings';
+import ExternalAccount from '../../../models/external-account';
+import InAppNotificationSettings from '../../../models/in-app-notification-settings';
+
+import { deleteAccessTokenHandlersFactory } from './delete-access-token';
+import { deleteAllAccessTokensHandlersFactory } from './delete-all-access-tokens';
+import { generateAccessTokenHandlerFactory } from './generate-access-token';
+import { getAccessTokenHandlerFactory } from './get-access-tokens';
 
 
 const logger = loggerFactory('growi:routes:apiv3:personal-setting');
@@ -70,7 +76,7 @@ const router = express.Router();
  */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(crowi);
+  const loginRequiredStrictly = require('../../../middlewares/login-required')(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
   const { User } = crowi.models;
@@ -144,7 +150,7 @@ module.exports = (crowi) => {
    *                      type: object
    *                      description: personal params
    */
-  router.get('/', accessTokenParser, loginRequiredStrictly, async(req, res) => {
+  router.get('/', accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }), loginRequiredStrictly, async(req, res) => {
     const { username } = req.user;
     try {
       const user = await User.findUserByUsername(username);
@@ -185,7 +191,7 @@ module.exports = (crowi) => {
    *                      type: number
    *                      description: Minimum password length
    */
-  router.get('/is-password-set', accessTokenParser, loginRequiredStrictly, async(req, res) => {
+  router.get('/is-password-set', accessTokenParser([SCOPE.READ.USER_SETTINGS.PASSWORD], { acceptLegacy: true }), loginRequiredStrictly, async(req, res) => {
     const { username } = req.user;
 
     try {
@@ -226,36 +232,38 @@ module.exports = (crowi) => {
    *                      type: object
    *                      description: personal params
    */
-  router.put('/', accessTokenParser, loginRequiredStrictly, addActivity, validator.personal, apiV3FormValidator, async(req, res) => {
+  router.put('/',
+    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.INFO], { acceptLegacy: true }), loginRequiredStrictly, addActivity, validator.personal, apiV3FormValidator,
+    async(req, res) => {
 
-    try {
-      const user = await User.findOne({ _id: req.user.id });
-      user.name = req.body.name;
-      user.email = req.body.email;
-      user.lang = req.body.lang;
-      user.isEmailPublished = req.body.isEmailPublished;
-      user.slackMemberId = req.body.slackMemberId;
+      try {
+        const user = await User.findOne({ _id: req.user.id });
+        user.name = req.body.name;
+        user.email = req.body.email;
+        user.lang = req.body.lang;
+        user.isEmailPublished = req.body.isEmailPublished;
+        user.slackMemberId = req.body.slackMemberId;
 
-      const isUniqueEmail = await user.isUniqueEmail();
+        const isUniqueEmail = await user.isUniqueEmail();
 
-      if (!isUniqueEmail) {
-        logger.error('email-is-not-unique');
-        return res.apiv3Err(new ErrorV3('The email is already in use', 'email-is-already-in-use'));
+        if (!isUniqueEmail) {
+          logger.error('email-is-not-unique');
+          return res.apiv3Err(new ErrorV3('The email is already in use', 'email-is-already-in-use'));
+        }
+
+        const updatedUser = await user.save();
+
+        const parameters = { action: SupportedAction.ACTION_USER_PERSONAL_SETTINGS_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+
+        return res.apiv3({ updatedUser });
+      }
+      catch (err) {
+        logger.error(err);
+        return res.apiv3Err('update-personal-settings-failed');
       }
 
-      const updatedUser = await user.save();
-
-      const parameters = { action: SupportedAction.ACTION_USER_PERSONAL_SETTINGS_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-
-      return res.apiv3({ updatedUser });
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err('update-personal-settings-failed');
-    }
-
-  });
+    });
 
   /**
    * @swagger
@@ -285,22 +293,24 @@ module.exports = (crowi) => {
    *                      type: object
    *                      description: user data
    */
-  router.put('/image-type', accessTokenParser, loginRequiredStrictly, addActivity, validator.imageType, apiV3FormValidator, async(req, res) => {
-    const { isGravatarEnabled } = req.body;
+  router.put('/image-type', accessTokenParser([SCOPE.WRITE.USER_SETTINGS.INFO], { acceptLegacy: true }), loginRequiredStrictly, addActivity,
+    validator.imageType, apiV3FormValidator,
+    async(req, res) => {
+      const { isGravatarEnabled } = req.body;
 
-    try {
-      const userData = await req.user.updateIsGravatarEnabled(isGravatarEnabled);
+      try {
+        const userData = await req.user.updateIsGravatarEnabled(isGravatarEnabled);
 
-      const parameters = { action: SupportedAction.ACTION_USER_IMAGE_TYPE_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
+        const parameters = { action: SupportedAction.ACTION_USER_IMAGE_TYPE_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
 
-      return res.apiv3({ userData });
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err('update-personal-settings-failed');
-    }
-  });
+        return res.apiv3({ userData });
+      }
+      catch (err) {
+        logger.error(err);
+        return res.apiv3Err('update-personal-settings-failed');
+      }
+    });
 
   /**
    * @swagger
@@ -321,19 +331,20 @@ module.exports = (crowi) => {
    *                      type: object
    *                      description: array of external accounts
    */
-  router.get('/external-accounts', accessTokenParser, loginRequiredStrictly, async(req, res) => {
-    const userData = req.user;
+  router.get('/external-accounts',
+    accessTokenParser([SCOPE.READ.USER_SETTINGS.EXTERNAL_ACCOUNT], { acceptLegacy: true }), loginRequiredStrictly, async(req, res) => {
+      const userData = req.user;
 
-    try {
-      const externalAccounts = await ExternalAccount.find({ user: userData });
-      return res.apiv3({ externalAccounts });
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err('get-external-accounts-failed');
-    }
+      try {
+        const externalAccounts = await ExternalAccount.find({ user: userData });
+        return res.apiv3({ externalAccounts });
+      }
+      catch (err) {
+        logger.error(err);
+        return res.apiv3Err('get-external-accounts-failed');
+      }
 
-  });
+    });
 
   /**
    * @swagger
@@ -365,27 +376,29 @@ module.exports = (crowi) => {
    *                      type: object
    *                      description: user data updated
    */
-  router.put('/password', accessTokenParser, loginRequiredStrictly, addActivity, validator.password, apiV3FormValidator, async(req, res) => {
-    const { body, user } = req;
-    const { oldPassword, newPassword } = body;
+  router.put('/password',
+    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.PASSWORD], { acceptLegacy: true }), loginRequiredStrictly, addActivity, validator.password, apiV3FormValidator,
+    async(req, res) => {
+      const { body, user } = req;
+      const { oldPassword, newPassword } = body;
 
-    if (user.isPasswordSet() && !user.isPasswordValid(oldPassword)) {
-      return res.apiv3Err('wrong-current-password', 400);
-    }
-    try {
-      const userData = await user.updatePassword(newPassword);
+      if (user.isPasswordSet() && !user.isPasswordValid(oldPassword)) {
+        return res.apiv3Err('wrong-current-password', 400);
+      }
+      try {
+        const userData = await user.updatePassword(newPassword);
 
-      const parameters = { action: SupportedAction.ACTION_USER_PASSWORD_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
+        const parameters = { action: SupportedAction.ACTION_USER_PASSWORD_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
 
-      return res.apiv3({ userData });
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err('update-password-failed');
-    }
+        return res.apiv3({ userData });
+      }
+      catch (err) {
+        logger.error(err);
+        return res.apiv3Err('update-password-failed');
+      }
 
-  });
+    });
 
   /**
    * @swagger
@@ -408,7 +421,7 @@ module.exports = (crowi) => {
    *                      type: object
    *                      description: user data
    */
-  router.put('/api-token', loginRequiredStrictly, addActivity, async(req, res) => {
+  router.put('/api-token', accessTokenParser([SCOPE.WRITE.USER_SETTINGS.API.API_TOKEN]), loginRequiredStrictly, addActivity, async(req, res) => {
     const { user } = req;
 
     try {
@@ -425,6 +438,91 @@ module.exports = (crowi) => {
     }
 
   });
+
+  /**
+   * @swagger
+   *   /personal-setting/access-token:
+   *     get:
+   *       tags: [GeneralSetting]
+   *       operationId: getAccessToken
+   *       summary: /personal-setting/access-token
+   *       description: Get access token
+   *       responses:
+   *         200:
+   *           description: succded to get access token
+   *           content:
+   *             application/json:
+   *               schema:
+   *                 properties:
+   *                   accessTokens:
+   *                     type: object
+   *                     description: array of access tokens
+   */
+  router.get('/access-token', accessTokenParser([SCOPE.READ.USER_SETTINGS.API.ACCESS_TOKEN]), getAccessTokenHandlerFactory(crowi));
+
+  /**
+   * @swagger
+   *   /personal-setting/access-token:
+   *     post:
+   *       tags: [GeneralSetting]
+   *       operationId: generateccessToken
+   *       summary: /personal-setting/access-token
+   *       description: Generate access token
+   *       responses:
+   *         200:
+   *           description: succeded to create access token
+   *           content:
+   *             application/json:
+   *               schema:
+   *                 properties:
+   *                   _id:
+   *                     type: string
+   *                     description: id of access token
+   *                   token:
+   *                     type: string
+   *                     description: access token
+   *                   expiredAt:
+   *                     type: string
+   *                     description: expired date
+   *                   description:
+   *                     type: string
+   *                     description: description of access token
+   *                   scope:
+   *                     type: array
+   *                     description: scope of access token
+   *                     items:
+   *                      type: string
+   */
+  router.post('/access-token', accessTokenParser([SCOPE.WRITE.USER_SETTINGS.API.ACCESS_TOKEN]), generateAccessTokenHandlerFactory(crowi));
+
+  /**
+   * @swagger
+   *   /personal-setting/access-token/:
+   *     delete:
+   *       tags: [GeneralSetting]
+   *       operationId: deleteAccessToken
+   *       summary: /personal-setting/access-token
+   *       description: Delete access token
+   *       responses:
+   *         200:
+   *           description: succeded to delete access token
+   *
+   */
+  router.delete('/access-token', accessTokenParser([SCOPE.WRITE.USER_SETTINGS.API.ACCESS_TOKEN]), deleteAccessTokenHandlersFactory(crowi));
+
+  /**
+   * @swagger
+   *   /personal-setting/access-token/all:
+   *     delete:
+   *       tags: [GeneralSetting]
+   *       operationId: deleteAllAccessToken
+   *       summary: /personal-setting/access-token/all
+   *       description: Delete all access tokens
+   *       responses:
+   *         200:
+   *           description: succeded to delete all access tokens
+   */
+  router.delete('/access-token/all', accessTokenParser([SCOPE.WRITE.USER_SETTINGS.API.ACCESS_TOKEN]), deleteAllAccessTokensHandlersFactory(crowi));
 
   /**
    * @swagger
@@ -454,31 +552,33 @@ module.exports = (crowi) => {
    *                      type: object
    *                      description: Ldap account associate to me
    */
-  router.put('/associate-ldap', accessTokenParser, loginRequiredStrictly, addActivity, validator.associateLdap, apiV3FormValidator, async(req, res) => {
-    const { passportService } = crowi;
-    const { user, body } = req;
-    const { username } = body;
+  router.put('/associate-ldap', accessTokenParser([SCOPE.WRITE.USER_SETTINGS.EXTERNAL_ACCOUNT]), loginRequiredStrictly, addActivity,
+    validator.associateLdap, apiV3FormValidator,
+    async(req, res) => {
+      const { passportService } = crowi;
+      const { user, body } = req;
+      const { username } = body;
 
-    if (!passportService.isLdapStrategySetup) {
-      logger.error('LdapStrategy has not been set up');
-      return res.apiv3Err('associate-ldap-account-failed', 405);
-    }
+      if (!passportService.isLdapStrategySetup) {
+        logger.error('LdapStrategy has not been set up');
+        return res.apiv3Err('associate-ldap-account-failed', 405);
+      }
 
-    try {
-      await passport.authenticate('ldapauth');
-      const associateUser = await ExternalAccount.associate('ldap', username, user);
+      try {
+        await passport.authenticate('ldapauth');
+        const associateUser = await ExternalAccount.associate('ldap', username, user);
 
-      const parameters = { action: SupportedAction.ACTION_USER_LDAP_ACCOUNT_ASSOCIATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
+        const parameters = { action: SupportedAction.ACTION_USER_LDAP_ACCOUNT_ASSOCIATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
 
-      return res.apiv3({ associateUser });
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err('associate-ldap-account-failed');
-    }
+        return res.apiv3({ associateUser });
+      }
+      catch (err) {
+        logger.error(err);
+        return res.apiv3Err('associate-ldap-account-failed');
+      }
 
-  });
+    });
 
   /**
    * @swagger
@@ -505,34 +605,35 @@ module.exports = (crowi) => {
    *                      type: object
    *                      description: Ldap account disassociate to me
    */
-  // eslint-disable-next-line max-len
-  router.put('/disassociate-ldap', accessTokenParser, loginRequiredStrictly, addActivity, validator.disassociateLdap, apiV3FormValidator, async(req, res) => {
-    const { user, body } = req;
-    const { providerType, accountId } = body;
+  router.put('/disassociate-ldap',
+    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.EXTERNAL_ACCOUNT]), loginRequiredStrictly, addActivity, validator.disassociateLdap, apiV3FormValidator,
+    async(req, res) => {
+      const { user, body } = req;
+      const { providerType, accountId } = body;
 
-    try {
-      const count = await ExternalAccount.count({ user });
-      // make sure password set or this user has two or more ExternalAccounts
-      if (user.password == null && count <= 1) {
+      try {
+        const count = await ExternalAccount.count({ user });
+        // make sure password set or this user has two or more ExternalAccounts
+        if (user.password == null && count <= 1) {
+          return res.apiv3Err('disassociate-ldap-account-failed');
+        }
+        const disassociateUser = await ExternalAccount.findOneAndRemove({
+          providerType: { $eq: providerType },
+          accountId: { $eq: accountId },
+          user,
+        });
+
+        const parameters = { action: SupportedAction.ACTION_USER_LDAP_ACCOUNT_DISCONNECT };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+
+        return res.apiv3({ disassociateUser });
+      }
+      catch (err) {
+        logger.error(err);
         return res.apiv3Err('disassociate-ldap-account-failed');
       }
-      const disassociateUser = await ExternalAccount.findOneAndRemove({
-        providerType: { $eq: providerType },
-        accountId: { $eq: accountId },
-        user,
-      });
 
-      const parameters = { action: SupportedAction.ACTION_USER_LDAP_ACCOUNT_DISCONNECT };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-
-      return res.apiv3({ disassociateUser });
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err('disassociate-ldap-account-failed');
-    }
-
-  });
+    });
 
   /**
    * @swagger
@@ -565,34 +666,36 @@ module.exports = (crowi) => {
    *                  type: object
    *                  description: editor settings
    */
-  router.put('/editor-settings', accessTokenParser, loginRequiredStrictly, addActivity, validator.editorSettings, apiV3FormValidator, async(req, res) => {
-    const query = { userId: req.user.id };
-    const { body } = req;
+  router.put('/editor-settings', accessTokenParser([SCOPE.WRITE.USER_SETTINGS.OTHER]), loginRequiredStrictly,
+    addActivity, validator.editorSettings, apiV3FormValidator,
+    async(req, res) => {
+      const query = { userId: req.user.id };
+      const { body } = req;
 
-    const {
-      theme, keymapMode, styleActiveLine, autoFormatMarkdownTable,
-    } = body;
+      const {
+        theme, keymapMode, styleActiveLine, autoFormatMarkdownTable,
+      } = body;
 
-    const document = {
-      theme, keymapMode, styleActiveLine, autoFormatMarkdownTable,
-    };
+      const document = {
+        theme, keymapMode, styleActiveLine, autoFormatMarkdownTable,
+      };
 
-    // Insert if document does not exist, and return new values
-    // See: https://mongoosejs.com/docs/api.html#model_Model.findOneAndUpdate
-    const options = { upsert: true, new: true };
-    try {
-      const response = await EditorSettings.findOneAndUpdate(query, { $set: document }, options);
+      // Insert if document does not exist, and return new values
+      // See: https://mongoosejs.com/docs/api.html#model_Model.findOneAndUpdate
+      const options = { upsert: true, new: true };
+      try {
+        const response = await EditorSettings.findOneAndUpdate(query, { $set: document }, options);
 
-      const parameters = { action: SupportedAction.ACTION_USER_EDITOR_SETTINGS_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
+        const parameters = { action: SupportedAction.ACTION_USER_EDITOR_SETTINGS_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
 
-      return res.apiv3(response);
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err('updating-editor-settings-failed');
-    }
-  });
+        return res.apiv3(response);
+      }
+      catch (err) {
+        logger.error(err);
+        return res.apiv3Err('updating-editor-settings-failed');
+      }
+    });
 
 
   /**
@@ -612,7 +715,7 @@ module.exports = (crowi) => {
    *                  type: object
    *                  description: editor settings
    */
-  router.get('/editor-settings', accessTokenParser, loginRequiredStrictly, async(req, res) => {
+  router.get('/editor-settings', accessTokenParser([SCOPE.READ.USER_SETTINGS.OTHER]), loginRequiredStrictly, async(req, res) => {
     try {
       const query = { userId: req.user.id };
       const editorSettings = await EditorSettings.findOne(query) ?? new EditorSettings();
@@ -655,29 +758,30 @@ module.exports = (crowi) => {
    *                schema:
    *                 type: object
    */
-  // eslint-disable-next-line max-len
-  router.put('/in-app-notification-settings', accessTokenParser, loginRequiredStrictly, addActivity, validator.inAppNotificationSettings, apiV3FormValidator, async(req, res) => {
-    const query = { userId: req.user.id };
-    const subscribeRules = req.body.subscribeRules;
+  router.put('/in-app-notification-settings',
+    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.IN_APP_NOTIFICATION]),
+    loginRequiredStrictly, addActivity, validator.inAppNotificationSettings, apiV3FormValidator, async(req, res) => {
+      const query = { userId: req.user.id };
+      const subscribeRules = req.body.subscribeRules;
 
-    if (subscribeRules == null) {
-      return res.apiv3Err('no-rules-found');
-    }
+      if (subscribeRules == null) {
+        return res.apiv3Err('no-rules-found');
+      }
 
-    const options = { upsert: true, new: true, runValidators: true };
-    try {
-      const response = await InAppNotificationSettings.findOneAndUpdate(query, { $set: { subscribeRules } }, options);
+      const options = { upsert: true, new: true, runValidators: true };
+      try {
+        const response = await InAppNotificationSettings.findOneAndUpdate(query, { $set: { subscribeRules } }, options);
 
-      const parameters = { action: SupportedAction.ACTION_USER_IN_APP_NOTIFICATION_SETTINGS_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
+        const parameters = { action: SupportedAction.ACTION_USER_IN_APP_NOTIFICATION_SETTINGS_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
 
-      return res.apiv3(response);
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err('updating-in-app-notification-settings-failed');
-    }
-  });
+        return res.apiv3(response);
+      }
+      catch (err) {
+        logger.error(err);
+        return res.apiv3Err('updating-in-app-notification-settings-failed');
+      }
+    });
 
   /**
    * @swagger
@@ -698,7 +802,7 @@ module.exports = (crowi) => {
    *                      type: object
    *                      description: InAppNotificationSettings
    */
-  router.get('/in-app-notification-settings', accessTokenParser, loginRequiredStrictly, async(req, res) => {
+  router.get('/in-app-notification-settings', accessTokenParser([SCOPE.READ.USER_SETTINGS.IN_APP_NOTIFICATION]), loginRequiredStrictly, async(req, res) => {
     const query = { userId: req.user.id };
     try {
       const response = await InAppNotificationSettings.findOne(query);

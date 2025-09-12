@@ -2,6 +2,7 @@ import { Origin, allOrigin, getIdForRef } from '@growi/core';
 import type {
   IPage, IRevisionHasId, IUserHasId,
 } from '@growi/core';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { isTopPage, isUsersProtectedPages } from '@growi/core/dist/utils/page-path-utils';
@@ -134,7 +135,7 @@ export const updatePageHandlersFactory: UpdatePageHandlersFactory = (crowi) => {
   const addActivity = generateAddActivityMiddleware();
 
   return [
-    accessTokenParser, loginRequiredStrictly, excludeReadOnlyUser, addActivity,
+    accessTokenParser([SCOPE.WRITE.FEATURES.PAGE], { acceptLegacy: true }), loginRequiredStrictly, excludeReadOnlyUser, addActivity,
     validator, apiV3FormValidator,
     async(req: UpdatePageRequest, res: ApiV3Response) => {
       const {

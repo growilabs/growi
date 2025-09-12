@@ -1,8 +1,10 @@
 import fs from 'fs';
 
+import { SCOPE } from '@growi/core/dist/interfaces';
 import express from 'express';
 import { param, body } from 'express-validator';
 import mongoose from 'mongoose';
+import sanitize from 'sanitize-filename';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -191,7 +193,7 @@ module.exports = (crowi) => {
    *                  status:
    *                    $ref: '#/components/schemas/ExportStatus'
    */
-  router.get('/status', accessTokenParser, loginRequired, adminRequired, async(req, res) => {
+  router.get('/status', accessTokenParser([SCOPE.READ.ADMIN.EXPORT_DATA], { acceptLegacy: true }), loginRequired, adminRequired, async(req, res) => {
     const status = await exportService.getStatus();
 
     // TODO: use res.apiv3
@@ -231,27 +233,28 @@ module.exports = (crowi) => {
    *                    type: boolean
    *                    description: whether the request is succeeded
    */
-  router.post('/', accessTokenParser, loginRequired, adminRequired, addActivity, async(req, res) => {
+  router.post('/', accessTokenParser([SCOPE.WRITE.ADMIN.EXPORT_DATA], { acceptLegacy: true }), loginRequired, adminRequired,
+    validator.generateZipFile, apiV3FormValidator, addActivity, async(req, res) => {
     // TODO: add express validator
-    try {
-      const { collections } = req.body;
+      try {
+        const { collections } = req.body;
 
-      exportService.export(collections);
+        exportService.export(collections);
 
-      const parameters = { action: SupportedAction.ACTION_ADMIN_ARCHIVE_DATA_CREATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
+        const parameters = { action: SupportedAction.ACTION_ADMIN_ARCHIVE_DATA_CREATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
 
-      // TODO: use res.apiv3
-      return res.status(200).json({
-        ok: true,
-      });
-    }
-    catch (err) {
+        // TODO: use res.apiv3
+        return res.status(200).json({
+          ok: true,
+        });
+      }
+      catch (err) {
       // TODO: use ApiV3Error
-      logger.error(err);
-      return res.status(500).send({ status: 'ERROR' });
-    }
-  });
+        logger.error(err);
+        return res.status(500).send({ status: 'ERROR' });
+      }
+    });
 
   /**
    * @swagger
@@ -280,25 +283,28 @@ module.exports = (crowi) => {
    *                    type: boolean
    *                    description: whether the request is succeeded
    */
-  router.delete('/:fileName', accessTokenParser, loginRequired, adminRequired, validator.deleteFile, apiV3FormValidator, addActivity, async(req, res) => {
+  router.delete('/:fileName', accessTokenParser([SCOPE.WRITE.ADMIN.EXPORT_DATA], { acceptLegacy: true }), loginRequired, adminRequired,
+    validator.deleteFile, apiV3FormValidator, addActivity,
+    async(req, res) => {
     // TODO: add express validator
-    const { fileName } = req.params;
+      const { fileName } = req.params;
 
-    try {
-      const zipFile = exportService.getFile(fileName);
-      fs.unlinkSync(zipFile);
-      const parameters = { action: SupportedAction.ACTION_ADMIN_ARCHIVE_DATA_DELETE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
+      try {
+        const sanitizedFileName = sanitize(fileName);
+        const zipFile = exportService.getFile(sanitizedFileName);
+        fs.unlinkSync(zipFile);
+        const parameters = { action: SupportedAction.ACTION_ADMIN_ARCHIVE_DATA_DELETE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
 
-      // TODO: use res.apiv3
-      return res.status(200).send({ ok: true });
-    }
-    catch (err) {
+        // TODO: use res.apiv3
+        return res.status(200).send({ ok: true });
+      }
+      catch (err) {
       // TODO: use ApiV3Error
-      logger.error(err);
-      return res.status(500).send({ ok: false });
-    }
-  });
+        logger.error(err);
+        return res.status(500).send({ ok: false });
+      }
+    });
 
   return router;
 };

@@ -326,6 +326,8 @@ export const CONFIG_KEYS = [
   'app:isBulkExportPagesEnabled',
   'env:useOnlyEnvVars:app:isBulkExportPagesEnabled',
 
+  // Access Token Settings
+  'accessToken:deletionCronExpression',
 ] as const;
 
 
@@ -1289,6 +1291,12 @@ export const CONFIG_DEFINITIONS = {
   'env:useOnlyEnvVars:app:isBulkExportPagesEnabled': defineConfig<boolean>({
     envVarName: 'BULK_EXPORT_PAGES_ENABLED_USES_ONLY_ENV_VARS',
     defaultValue: false,
+  }),
+
+  // Access Token Settings
+  'accessToken:deletionCronExpression': defineConfig<string>({
+    envVarName: 'ACCESS_TOKEN_DELETION_CRON_EXPRESSION',
+    defaultValue: '0 15 * * *',
   }),
 } as const;
 
