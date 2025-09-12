@@ -431,9 +431,9 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'FILE_UPLOAD_TOTAL_LIMIT',
     defaultValue: Infinity,
   }),
-  'app:elasticsearchVersion': defineConfig<number>({
+  'app:elasticsearchVersion': defineConfig<7|8|9>({
     envVarName: 'ELASTICSEARCH_VERSION',
-    defaultValue: 8,
+    defaultValue: 9,
   }),
   'app:elasticsearchUri': defineConfig<string | undefined>({
     envVarName: 'ELASTICSEARCH_URI',
