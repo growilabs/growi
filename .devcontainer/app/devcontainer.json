@@ -35,6 +35,7 @@
         "vitest.explorer",
         "ms-playwright.playwright",
         // git/github
+        "codeinklingon.git-worktree-menu",
         "github.vscode-pull-request-github",
         "mhutchie.git-graph",
         "eamodio.gitlens",
