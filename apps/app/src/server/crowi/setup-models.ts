@@ -67,6 +67,5 @@ export const setupIndependentModels = async(): Promise<void> => {
     import('../models/user-group'),
     import('../models/user-registration-order'),
     import('../models/user-ui-settings'),
-    import('../models/access-token'),
   ]);
 };

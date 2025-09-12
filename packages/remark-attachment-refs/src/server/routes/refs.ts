@@ -1,5 +1,4 @@
 import type { IAttachment, IPage, IUser } from '@growi/core';
-import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeAttachmentSecurely } from '@growi/core/dist/models/serializers';
 import { OptionParser } from '@growi/core/dist/remark-plugins';
 import type { Request } from 'express';
@@ -92,7 +91,7 @@ export const routesFactory = (crowi): any => {
    */
   router.get(
     '/ref',
-    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    accessTokenParser,
     loginRequired,
     async (req: RequestWithUser, res) => {
       const user = req.user;
@@ -174,7 +173,7 @@ export const routesFactory = (crowi): any => {
    */
   router.get(
     '/refs',
-    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    accessTokenParser,
     loginRequired,
     async (req: RequestWithUser, res) => {
       const user = req.user;

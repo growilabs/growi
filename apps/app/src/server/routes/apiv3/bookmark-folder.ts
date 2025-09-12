@@ -3,7 +3,6 @@ import { body } from 'express-validator';
 import type { Types } from 'mongoose';
 
 import type { BookmarkFolderItems } from '~/interfaces/bookmark-info';
-import { SCOPE } from '@growi/core/dist/interfaces';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { InvalidParentBookmarkFolderError } from '~/server/models/errors';
@@ -157,28 +156,26 @@ module.exports = (crowi) => {
    *                      type: object
    *                      $ref: '#/components/schemas/BookmarkFolder'
    */
-  router.post('/',
-    accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }),
-    loginRequiredStrictly, validator.bookmarkFolder, apiV3FormValidator, async(req, res) => {
-      const owner = req.user?._id;
-      const { name, parent } = req.body;
-      const params = {
-        name, owner, parent,
-      };
+  router.post('/', accessTokenParser, loginRequiredStrictly, validator.bookmarkFolder, apiV3FormValidator, async(req, res) => {
+    const owner = req.user?._id;
+    const { name, parent } = req.body;
+    const params = {
+      name, owner, parent,
+    };
 
-      try {
-        const bookmarkFolder = await BookmarkFolder.createByParameters(params);
-        logger.debug('bookmark folder created', bookmarkFolder);
-        return res.apiv3({ bookmarkFolder });
+    try {
+      const bookmarkFolder = await BookmarkFolder.createByParameters(params);
+      logger.debug('bookmark folder created', bookmarkFolder);
+      return res.apiv3({ bookmarkFolder });
+    }
+    catch (err) {
+      logger.error(err);
+      if (err instanceof InvalidParentBookmarkFolderError) {
+        return res.apiv3Err(new ErrorV3(err.message, 'failed_to_create_bookmark_folder'));
       }
-      catch (err) {
-        logger.error(err);
-        if (err instanceof InvalidParentBookmarkFolderError) {
-          return res.apiv3Err(new ErrorV3(err.message, 'failed_to_create_bookmark_folder'));
-        }
-        return res.apiv3Err(err, 500);
-      }
-    });
+      return res.apiv3Err(err, 500);
+    }
+  });
 
   /**
    * @swagger
@@ -211,7 +208,7 @@ module.exports = (crowi) => {
    *                        type: object
    *                        $ref: '#/components/schemas/BookmarkFolder'
    */
-  router.get('/list/:userId', accessTokenParser([SCOPE.READ.FEATURES.BOOKMARK], { acceptLegacy: true }), loginRequiredStrictly, async(req, res) => {
+  router.get('/list/:userId', accessTokenParser, loginRequiredStrictly, async(req, res) => {
     const { userId } = req.params;
 
     const getBookmarkFolders = async(
@@ -299,7 +296,7 @@ module.exports = (crowi) => {
    *                      description: Number of deleted folders
    *                      example: 1
    */
-  router.delete('/:id', accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }), loginRequiredStrictly, async(req, res) => {
+  router.delete('/:id', accessTokenParser, loginRequiredStrictly, async(req, res) => {
     const { id } = req.params;
     try {
       const result = await BookmarkFolder.deleteFolderAndChildren(id);
@@ -355,20 +352,19 @@ module.exports = (crowi) => {
    *                      type: object
    *                      $ref: '#/components/schemas/BookmarkFolder'
    */
-  router.put('/',
-    accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }), loginRequiredStrictly, validator.bookmarkFolder, async(req, res) => {
-      const {
-        bookmarkFolderId, name, parent, childFolder,
-      } = req.body;
-      try {
-        const bookmarkFolder = await BookmarkFolder.updateBookmarkFolder(bookmarkFolderId, name, parent, childFolder);
-        return res.apiv3({ bookmarkFolder });
-      }
-      catch (err) {
-        logger.error(err);
-        return res.apiv3Err(err, 500);
-      }
-    });
+  router.put('/', accessTokenParser, loginRequiredStrictly, validator.bookmarkFolder, async(req, res) => {
+    const {
+      bookmarkFolderId, name, parent, childFolder,
+    } = req.body;
+    try {
+      const bookmarkFolder = await BookmarkFolder.updateBookmarkFolder(bookmarkFolderId, name, parent, childFolder);
+      return res.apiv3({ bookmarkFolder });
+    }
+    catch (err) {
+      logger.error(err);
+      return res.apiv3Err(err, 500);
+    }
+  });
 
   /**
    * @swagger
@@ -405,22 +401,20 @@ module.exports = (crowi) => {
    *                      type: object
    *                      $ref: '#/components/schemas/BookmarkFolder'
    */
-  router.post('/add-bookmark-to-folder',
-    accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }), loginRequiredStrictly, validator.bookmarkPage, apiV3FormValidator,
-    async(req, res) => {
-      const userId = req.user?._id;
-      const { pageId, folderId } = req.body;
+  router.post('/add-bookmark-to-folder', accessTokenParser, loginRequiredStrictly, validator.bookmarkPage, apiV3FormValidator, async(req, res) => {
+    const userId = req.user?._id;
+    const { pageId, folderId } = req.body;
 
-      try {
-        const bookmarkFolder = await BookmarkFolder.insertOrUpdateBookmarkedPage(pageId, userId, folderId);
-        logger.debug('bookmark added to folder', bookmarkFolder);
-        return res.apiv3({ bookmarkFolder });
-      }
-      catch (err) {
-        logger.error(err);
-        return res.apiv3Err(err, 500);
-      }
-    });
+    try {
+      const bookmarkFolder = await BookmarkFolder.insertOrUpdateBookmarkedPage(pageId, userId, folderId);
+      logger.debug('bookmark added to folder', bookmarkFolder);
+      return res.apiv3({ bookmarkFolder });
+    }
+    catch (err) {
+      logger.error(err);
+      return res.apiv3Err(err, 500);
+    }
+  });
 
   /**
    * @swagger
@@ -456,18 +450,17 @@ module.exports = (crowi) => {
    *                      type: object
    *                      $ref: '#/components/schemas/BookmarkFolder'
    */
-  router.put('/update-bookmark',
-    accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }), loginRequiredStrictly, validator.bookmark, async(req, res) => {
-      const { pageId, status } = req.body;
-      const userId = req.user?._id;
-      try {
-        const bookmarkFolder = await BookmarkFolder.updateBookmark(pageId, status, userId);
-        return res.apiv3({ bookmarkFolder });
-      }
-      catch (err) {
-        logger.error(err);
-        return res.apiv3Err(err, 500);
-      }
-    });
+  router.put('/update-bookmark', accessTokenParser, loginRequiredStrictly, validator.bookmark, async(req, res) => {
+    const { pageId, status } = req.body;
+    const userId = req.user?._id;
+    try {
+      const bookmarkFolder = await BookmarkFolder.updateBookmark(pageId, status, userId);
+      return res.apiv3({ bookmarkFolder });
+    }
+    catch (err) {
+      logger.error(err);
+      return res.apiv3Err(err, 500);
+    }
+  });
   return router;
 };

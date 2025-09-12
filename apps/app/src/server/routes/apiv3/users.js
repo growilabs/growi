@@ -1,6 +1,5 @@
 import path from 'path';
 
-import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { userHomepagePath } from '@growi/core/dist/utils/page-path-utils';
@@ -282,90 +281,89 @@ module.exports = (crowi) => {
    *                      $ref: '#/components/schemas/PaginateResult'
    */
 
-  router.get('/',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }), loginRequired, validator.statusList, apiV3FormValidator, async(req, res) => {
+  router.get('/', accessTokenParser, loginRequired, validator.statusList, apiV3FormValidator, async(req, res) => {
 
-      const page = parseInt(req.query.page) || 1;
+    const page = parseInt(req.query.page) || 1;
 
-      // status
-      const forceIncludeAttributes = Array.isArray(req.query.forceIncludeAttributes)
-        ? req.query.forceIncludeAttributes
-        : [];
-      const selectedStatusList = Array.isArray(req.query.selectedStatusList)
-        ? req.query.selectedStatusList
-        : ['active'];
+    // status
+    const forceIncludeAttributes = Array.isArray(req.query.forceIncludeAttributes)
+      ? req.query.forceIncludeAttributes
+      : [];
+    const selectedStatusList = Array.isArray(req.query.selectedStatusList)
+      ? req.query.selectedStatusList
+      : ['active'];
 
-      const statusNoList = (selectedStatusList.includes('all')) ? Object.values(statusNo) : selectedStatusList.map(element => statusNo[element]);
+    const statusNoList = (selectedStatusList.includes('all')) ? Object.values(statusNo) : selectedStatusList.map(element => statusNo[element]);
 
-      // Search from input
-      const searchText = req.query.searchText || '';
-      const searchWord = new RegExp(escapeStringRegexp(searchText));
-      // Sort
-      const { sort, sortOrder } = req.query;
-      const sortOutput = {
-        [sort]: (sortOrder === 'desc') ? -1 : 1,
-      };
+    // Search from input
+    const searchText = req.query.searchText || '';
+    const searchWord = new RegExp(escapeStringRegexp(searchText));
+    // Sort
+    const { sort, sortOrder } = req.query;
+    const sortOutput = {
+      [sort]: (sortOrder === 'desc') ? -1 : 1,
+    };
 
-      //  For more information about the external specification of the User API, see here (https://dev.growi.org/5fd7466a31d89500488248e3)
+    //  For more information about the external specification of the User API, see here (https://dev.growi.org/5fd7466a31d89500488248e3)
 
-      const orConditions = [
-        { name: { $in: searchWord } },
-        { username: { $in: searchWord } },
-      ];
+    const orConditions = [
+      { name: { $in: searchWord } },
+      { username: { $in: searchWord } },
+    ];
 
-      const query = {
-        $and: [
-          { status: { $in: statusNoList } },
+    const query = {
+      $and: [
+        { status: { $in: statusNoList } },
+        {
+          $or: orConditions,
+        },
+      ],
+    };
+
+    try {
+      if (req.user != null) {
+        orConditions.push(
           {
-            $or: orConditions,
-          },
-        ],
-      };
-
-      try {
-        if (req.user != null) {
-          orConditions.push(
-            {
-              $and: [
-                { isEmailPublished: true },
-                { email: { $in: searchWord } },
-              ],
-            },
-          );
-        }
-        if (forceIncludeAttributes.includes('email')) {
-          orConditions.push({ email: { $in: searchWord } });
-        }
-
-        const paginateResult = await User.paginate(
-          query,
-          {
-            sort: sortOutput,
-            page,
-            limit: PAGE_ITEMS,
+            $and: [
+              { isEmailPublished: true },
+              { email: { $in: searchWord } },
+            ],
           },
         );
-
-        paginateResult.docs = paginateResult.docs.map((doc) => {
-
-          // return email only when specified by query
-          const { email } = doc;
-          const user = serializeUserSecurely(doc);
-          if (forceIncludeAttributes.includes('email')) {
-            user.email = email;
-          }
-
-          return user;
-        });
-
-        return res.apiv3({ paginateResult });
       }
-      catch (err) {
-        const msg = 'Error occurred in fetching user group list';
-        logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(msg, 'user-group-list-fetch-failed'), 500);
+      if (forceIncludeAttributes.includes('email')) {
+        orConditions.push({ email: { $in: searchWord } });
       }
-    });
+
+      const paginateResult = await User.paginate(
+        query,
+        {
+          sort: sortOutput,
+          page,
+          limit: PAGE_ITEMS,
+        },
+      );
+
+      paginateResult.docs = paginateResult.docs.map((doc) => {
+
+        // return email only when specified by query
+        const { email } = doc;
+        const user = serializeUserSecurely(doc);
+        if (forceIncludeAttributes.includes('email')) {
+          user.email = email;
+        }
+
+        return user;
+      });
+
+      return res.apiv3({ paginateResult });
+    }
+    catch (err) {
+      const msg = 'Error occurred in fetching user group list';
+      logger.error('Error', err);
+      return res.apiv3Err(new ErrorV3(msg, 'user-group-list-fetch-failed'), 500);
+    }
+  });
 
   /**
    * @swagger
@@ -392,43 +390,42 @@ module.exports = (crowi) => {
    *                    paginateResult:
    *                      $ref: '#/components/schemas/PaginateResult'
    */
-  router.get('/:id/recent', accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }), loginRequired,
-    validator.recentCreatedByUser, apiV3FormValidator, async(req, res) => {
-      const { id } = req.params;
+  router.get('/:id/recent', accessTokenParser, loginRequired, validator.recentCreatedByUser, apiV3FormValidator, async(req, res) => {
+    const { id } = req.params;
 
-      let user;
+    let user;
 
-      try {
-        user = await User.findById(id);
-      }
-      catch (err) {
-        const msg = 'Error occurred in find user';
-        logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(msg, 'retrieve-recent-created-pages-failed'), 500);
-      }
+    try {
+      user = await User.findById(id);
+    }
+    catch (err) {
+      const msg = 'Error occurred in find user';
+      logger.error('Error', err);
+      return res.apiv3Err(new ErrorV3(msg, 'retrieve-recent-created-pages-failed'), 500);
+    }
 
-      if (user == null) {
-        return res.apiv3Err(new ErrorV3('find-user-is-not-found'));
-      }
+    if (user == null) {
+      return res.apiv3Err(new ErrorV3('find-user-is-not-found'));
+    }
 
-      const limit = parseInt(req.query.limit) || await configManager.getConfig('customize:showPageLimitationM') || 30;
-      const page = req.query.page;
-      const offset = (page - 1) * limit;
-      const queryOptions = { offset, limit };
+    const limit = parseInt(req.query.limit) || await configManager.getConfig('customize:showPageLimitationM') || 30;
+    const page = req.query.page;
+    const offset = (page - 1) * limit;
+    const queryOptions = { offset, limit };
 
-      try {
-        const result = await Page.findListByCreator(user, req.user, queryOptions);
+    try {
+      const result = await Page.findListByCreator(user, req.user, queryOptions);
 
-        result.pages = result.pages.map(page => serializePageSecurely(page));
+      result.pages = result.pages.map(page => serializePageSecurely(page));
 
-        return res.apiv3(result);
-      }
-      catch (err) {
-        const msg = 'Error occurred in retrieve recent created pages for user';
-        logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(msg, 'retrieve-recent-created-pages-failed'), 500);
-      }
-    });
+      return res.apiv3(result);
+    }
+    catch (err) {
+      const msg = 'Error occurred in retrieve recent created pages for user';
+      logger.error('Error', err);
+      return res.apiv3Err(new ErrorV3(msg, 'retrieve-recent-created-pages-failed'), 500);
+    }
+  });
 
   validator.inviteEmail = [
     // isEmail prevents line breaks, so use isString
@@ -489,37 +486,35 @@ module.exports = (crowi) => {
    *                          type: string
    *                          description: reason for failure
    */
-  router.post('/invite', accessTokenParser([SCOPE.WRITE.ADMIN.USER_MANAGEMENT]), loginRequiredStrictly, adminRequired, addActivity,
-    validator.inviteEmail, apiV3FormValidator,
-    async(req, res) => {
+  router.post('/invite', loginRequiredStrictly, adminRequired, addActivity, validator.inviteEmail, apiV3FormValidator, async(req, res) => {
 
-      // Delete duplicate email addresses
-      const emailList = Array.from(new Set(req.body.shapedEmailList));
-      let failedEmailList = [];
+    // Delete duplicate email addresses
+    const emailList = Array.from(new Set(req.body.shapedEmailList));
+    let failedEmailList = [];
 
-      // Create users
-      const createUser = await User.createUsersByEmailList(emailList);
-      if (createUser.failedToCreateUserEmailList.length > 0) {
-        failedEmailList = failedEmailList.concat(createUser.failedToCreateUserEmailList);
+    // Create users
+    const createUser = await User.createUsersByEmailList(emailList);
+    if (createUser.failedToCreateUserEmailList.length > 0) {
+      failedEmailList = failedEmailList.concat(createUser.failedToCreateUserEmailList);
+    }
+
+    // Send email
+    if (req.body.sendEmail) {
+      const sendEmail = await sendEmailByUserList(createUser.createdUserList);
+      if (sendEmail.failedToSendEmailList.length > 0) {
+        failedEmailList = failedEmailList.concat(sendEmail.failedToSendEmailList);
       }
+    }
 
-      // Send email
-      if (req.body.sendEmail) {
-        const sendEmail = await sendEmailByUserList(createUser.createdUserList);
-        if (sendEmail.failedToSendEmailList.length > 0) {
-          failedEmailList = failedEmailList.concat(sendEmail.failedToSendEmailList);
-        }
-      }
+    const parameters = { action: SupportedAction.ACTION_ADMIN_USERS_INVITE };
+    activityEvent.emit('update', res.locals.activity._id, parameters);
 
-      const parameters = { action: SupportedAction.ACTION_ADMIN_USERS_INVITE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-
-      return res.apiv3({
-        createdUserList: createUser.createdUserList,
-        existingEmailList: createUser.existingEmailList,
-        failedEmailList,
-      }, 201);
-    });
+    return res.apiv3({
+      createdUserList: createUser.createdUserList,
+      existingEmailList: createUser.existingEmailList,
+      failedEmailList,
+    }, 201);
+  });
 
   /**
    * @swagger
@@ -550,7 +545,7 @@ module.exports = (crowi) => {
    *                      $ref: '#/components/schemas/User'
    *                      description: data of admin user
    */
-  router.put('/:id/grant-admin', accessTokenParser([SCOPE.WRITE.ADMIN.USER_MANAGEMENT]), loginRequiredStrictly, adminRequired, addActivity, async(req, res) => {
+  router.put('/:id/grant-admin', loginRequiredStrictly, adminRequired, addActivity, async(req, res) => {
     const { id } = req.params;
 
     try {
@@ -598,26 +593,24 @@ module.exports = (crowi) => {
    *                      type: object
    *                      description: data of revoked admin user
    */
-  router.put('/:id/revoke-admin', accessTokenParser([SCOPE.WRITE.ADMIN.USER_MANAGEMENT]),
-    loginRequiredStrictly, adminRequired, certifyUserOperationOtherThenYourOwn, addActivity,
-    async(req, res) => {
-      const { id } = req.params;
+  router.put('/:id/revoke-admin', loginRequiredStrictly, adminRequired, certifyUserOperationOtherThenYourOwn, addActivity, async(req, res) => {
+    const { id } = req.params;
 
-      try {
-        const userData = await User.findById(id);
-        await userData.revokeAdmin();
+    try {
+      const userData = await User.findById(id);
+      await userData.revokeAdmin();
 
-        const serializedUserData = serializeUserSecurely(userData);
+      const serializedUserData = serializeUserSecurely(userData);
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_USERS_REVOKE_ADMIN });
+      activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_USERS_REVOKE_ADMIN });
 
-        return res.apiv3({ userData: serializedUserData });
-      }
-      catch (err) {
-        logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(err));
-      }
-    });
+      return res.apiv3({ userData: serializedUserData });
+    }
+    catch (err) {
+      logger.error('Error', err);
+      return res.apiv3Err(new ErrorV3(err));
+    }
+  });
 
   /**
    * @swagger
@@ -648,30 +641,29 @@ module.exports = (crowi) => {
    *                      $ref: '#/components/schemas/User'
    *                      description: data of grant read only
    */
-  router.put('/:id/grant-read-only', accessTokenParser([SCOPE.WRITE.ADMIN.USER_MANAGEMENT]), loginRequiredStrictly, adminRequired, addActivity,
-    async(req, res) => {
-      const { id } = req.params;
+  router.put('/:id/grant-read-only', loginRequiredStrictly, adminRequired, addActivity, async(req, res) => {
+    const { id } = req.params;
 
-      try {
-        const userData = await User.findById(id);
+    try {
+      const userData = await User.findById(id);
 
-        if (userData == null) {
-          return res.apiv3Err(new ErrorV3('User not found'), 404);
-        }
-
-        await userData.grantReadOnly();
-
-        const serializedUserData = serializeUserSecurely(userData);
-
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_USERS_GRANT_READ_ONLY });
-
-        return res.apiv3({ userData: serializedUserData });
+      if (userData == null) {
+        return res.apiv3Err(new ErrorV3('User not found'), 404);
       }
-      catch (err) {
-        logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(err));
-      }
-    });
+
+      await userData.grantReadOnly();
+
+      const serializedUserData = serializeUserSecurely(userData);
+
+      activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_USERS_GRANT_READ_ONLY });
+
+      return res.apiv3({ userData: serializedUserData });
+    }
+    catch (err) {
+      logger.error('Error', err);
+      return res.apiv3Err(new ErrorV3(err));
+    }
+  });
 
   /**
    * @swagger
@@ -702,30 +694,29 @@ module.exports = (crowi) => {
    *                      $ref: '#/components/schemas/User'
    *                      description: data of revoke read only
    */
-  router.put('/:id/revoke-read-only', accessTokenParser([SCOPE.WRITE.ADMIN.USER_MANAGEMENT]), loginRequiredStrictly, adminRequired, addActivity,
-    async(req, res) => {
-      const { id } = req.params;
+  router.put('/:id/revoke-read-only', loginRequiredStrictly, adminRequired, addActivity, async(req, res) => {
+    const { id } = req.params;
 
-      try {
-        const userData = await User.findById(id);
+    try {
+      const userData = await User.findById(id);
 
-        if (userData == null) {
-          return res.apiv3Err(new ErrorV3('User not found'), 404);
-        }
-
-        await userData.revokeReadOnly();
-
-        const serializedUserData = serializeUserSecurely(userData);
-
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_USERS_REVOKE_READ_ONLY });
-
-        return res.apiv3({ userData: serializedUserData });
+      if (userData == null) {
+        return res.apiv3Err(new ErrorV3('User not found'), 404);
       }
-      catch (err) {
-        logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(err));
-      }
-    });
+
+      await userData.revokeReadOnly();
+
+      const serializedUserData = serializeUserSecurely(userData);
+
+      activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_USERS_REVOKE_READ_ONLY });
+
+      return res.apiv3({ userData: serializedUserData });
+    }
+    catch (err) {
+      logger.error('Error', err);
+      return res.apiv3Err(new ErrorV3(err));
+    }
+  });
 
   /**
    * @swagger
@@ -756,7 +747,7 @@ module.exports = (crowi) => {
    *                      $ref: '#/components/schemas/User'
    *                      description: data of activate user
    */
-  router.put('/:id/activate', accessTokenParser([SCOPE.WRITE.ADMIN.USER_MANAGEMENT]), loginRequiredStrictly, adminRequired, addActivity, async(req, res) => {
+  router.put('/:id/activate', loginRequiredStrictly, adminRequired, addActivity, async(req, res) => {
     // check user upper limit
     const isUserCountExceedsUpperLimit = await User.isUserCountExceedsUpperLimit();
     if (isUserCountExceedsUpperLimit) {
@@ -811,26 +802,24 @@ module.exports = (crowi) => {
    *                      $ref: '#/components/schemas/User'
    *                      description: data of deactivate user
    */
-  router.put('/:id/deactivate', accessTokenParser([SCOPE.WRITE.ADMIN.USER_MANAGEMENT]),
-    loginRequiredStrictly, adminRequired, certifyUserOperationOtherThenYourOwn, addActivity,
-    async(req, res) => {
-      const { id } = req.params;
+  router.put('/:id/deactivate', loginRequiredStrictly, adminRequired, certifyUserOperationOtherThenYourOwn, addActivity, async(req, res) => {
+    const { id } = req.params;
 
-      try {
-        const userData = await User.findById(id);
-        await userData.statusSuspend();
+    try {
+      const userData = await User.findById(id);
+      await userData.statusSuspend();
 
-        const serializedUserData = serializeUserSecurely(userData);
+      const serializedUserData = serializeUserSecurely(userData);
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_USERS_DEACTIVATE });
+      activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_USERS_DEACTIVATE });
 
-        return res.apiv3({ userData: serializedUserData });
-      }
-      catch (err) {
-        logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(err));
-      }
-    });
+      return res.apiv3({ userData: serializedUserData });
+    }
+    catch (err) {
+      logger.error('Error', err);
+      return res.apiv3Err(new ErrorV3(err));
+    }
+  });
 
   /**
    * @swagger
@@ -861,41 +850,39 @@ module.exports = (crowi) => {
    *                      $ref: '#/components/schemas/User'
    *                      description: data of deleted user
    */
-  router.delete('/:id/remove', accessTokenParser([SCOPE.WRITE.ADMIN.USER_MANAGEMENT]),
-    loginRequiredStrictly, adminRequired, certifyUserOperationOtherThenYourOwn, addActivity,
-    async(req, res) => {
-      const { id } = req.params;
-      const isUsersHomepageDeletionEnabled = configManager.getConfig('security:user-homepage-deletion:isEnabled');
-      const isForceDeleteUserHomepageOnUserDeletion = configManager.getConfig('security:user-homepage-deletion:isForceDeleteUserHomepageOnUserDeletion');
+  router.delete('/:id/remove', loginRequiredStrictly, adminRequired, certifyUserOperationOtherThenYourOwn, addActivity, async(req, res) => {
+    const { id } = req.params;
+    const isUsersHomepageDeletionEnabled = configManager.getConfig('security:user-homepage-deletion:isEnabled');
+    const isForceDeleteUserHomepageOnUserDeletion = configManager.getConfig('security:user-homepage-deletion:isForceDeleteUserHomepageOnUserDeletion');
 
-      try {
-        const user = await User.findById(id);
-        // !! DO NOT MOVE homepagePath FROM THIS POSITION !! -- 05.31.2023
-        // catch username before delete user because username will be change to deleted_at_*
-        const homepagePath = userHomepagePath(user);
+    try {
+      const user = await User.findById(id);
+      // !! DO NOT MOVE homepagePath FROM THIS POSITION !! -- 05.31.2023
+      // catch username before delete user because username will be change to deleted_at_*
+      const homepagePath = userHomepagePath(user);
 
-        await UserGroupRelation.remove({ relatedUser: user });
-        await ExternalUserGroupRelation.remove({ relatedUser: user });
-        await user.statusDelete();
-        await ExternalAccount.remove({ user });
+      await UserGroupRelation.remove({ relatedUser: user });
+      await ExternalUserGroupRelation.remove({ relatedUser: user });
+      await user.statusDelete();
+      await ExternalAccount.remove({ user });
 
-        deleteUserAiAssistant(user);
+      deleteUserAiAssistant(user);
 
-        const serializedUser = serializeUserSecurely(user);
+      const serializedUser = serializeUserSecurely(user);
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_USERS_REMOVE });
+      activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_USERS_REMOVE });
 
-        if (isUsersHomepageDeletionEnabled && isForceDeleteUserHomepageOnUserDeletion) {
-          deleteCompletelyUserHomeBySystem(homepagePath, crowi.pageService);
-        }
-
-        return res.apiv3({ user: serializedUser });
+      if (isUsersHomepageDeletionEnabled && isForceDeleteUserHomepageOnUserDeletion) {
+        deleteCompletelyUserHomeBySystem(homepagePath, crowi.pageService);
       }
-      catch (err) {
-        logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(err));
-      }
-    });
+
+      return res.apiv3({ user: serializedUser });
+    }
+    catch (err) {
+      logger.error('Error', err);
+      return res.apiv3Err(new ErrorV3(err));
+    }
+  });
 
   /**
    * @swagger
@@ -924,7 +911,7 @@ module.exports = (crowi) => {
    *                    paginateResult:
    *                      $ref: '#/components/schemas/PaginateResult'
    */
-  router.get('/external-accounts/', accessTokenParser([SCOPE.READ.USER_SETTINGS.EXTERNAL_ACCOUNT]), loginRequiredStrictly, adminRequired, async(req, res) => {
+  router.get('/external-accounts/', loginRequiredStrictly, adminRequired, async(req, res) => {
     const page = parseInt(req.query.page) || 1;
     try {
       const paginateResult = await ExternalAccount.findAllWithPagination({ page });
@@ -966,22 +953,20 @@ module.exports = (crowi) => {
    *                      type: object
    *                      description: A result of `ExtenralAccount.findByIdAndRemove`
    */
-  router.delete('/external-accounts/:id/remove', accessTokenParser([SCOPE.WRITE.USER_SETTINGS.EXTERNAL_ACCOUNT]),
-    loginRequiredStrictly, adminRequired, apiV3FormValidator,
-    async(req, res) => {
-      const { id } = req.params;
+  router.delete('/external-accounts/:id/remove', loginRequiredStrictly, adminRequired, apiV3FormValidator, async(req, res) => {
+    const { id } = req.params;
 
-      try {
-        const externalAccount = await ExternalAccount.findByIdAndRemove(id);
+    try {
+      const externalAccount = await ExternalAccount.findByIdAndRemove(id);
 
-        return res.apiv3({ externalAccount });
-      }
-      catch (err) {
-        const msg = 'Error occurred in deleting a external account  ';
-        logger.error(msg, err);
-        return res.apiv3Err(new ErrorV3(msg + err.message, 'extenral-account-delete-failed'));
-      }
-    });
+      return res.apiv3({ externalAccount });
+    }
+    catch (err) {
+      const msg = 'Error occurred in deleting a external account  ';
+      logger.error(msg, err);
+      return res.apiv3Err(new ErrorV3(msg + err.message, 'extenral-account-delete-failed'));
+    }
+  });
 
   /**
    * @swagger
@@ -1013,7 +998,7 @@ module.exports = (crowi) => {
    *                  type: object
    *                  description: success creating imageUrlCached
    */
-  router.put('/update.imageUrlCache', accessTokenParser([SCOPE.WRITE.ADMIN.USER_MANAGEMENT]), loginRequiredStrictly, adminRequired, async(req, res) => {
+  router.put('/update.imageUrlCache', loginRequiredStrictly, adminRequired, async(req, res) => {
     try {
       const userIds = req.body.userIds;
       const users = await User.find({ _id: { $in: userIds }, imageUrlCached: null });
@@ -1070,7 +1055,7 @@ module.exports = (crowi) => {
    *                  user:
    *                    $ref: '#/components/schemas/User'
    */
-  router.put('/reset-password', accessTokenParser([SCOPE.WRITE.ADMIN.USER_MANAGEMENT]), loginRequiredStrictly, adminRequired, addActivity, async(req, res) => {
+  router.put('/reset-password', loginRequiredStrictly, adminRequired, addActivity, async(req, res) => {
     const { id } = req.body;
 
     try {
@@ -1112,29 +1097,28 @@ module.exports = (crowi) => {
    *          200:
    *            description: success send new password email
    */
-  router.put('/reset-password-email', accessTokenParser([SCOPE.WRITE.ADMIN.USER_MANAGEMENT]), loginRequiredStrictly, adminRequired, addActivity,
-    async(req, res) => {
-      const { id } = req.body;
+  router.put('/reset-password-email', loginRequiredStrictly, adminRequired, addActivity, async(req, res) => {
+    const { id } = req.body;
 
-      try {
-        const user = await User.findById(id);
-        if (user == null) {
-          throw new Error('User not found');
-        }
-        const userInfo = {
-          email: user.email,
-          password: req.body.newPassword,
-        };
+    try {
+      const user = await User.findById(id);
+      if (user == null) {
+        throw new Error('User not found');
+      }
+      const userInfo = {
+        email: user.email,
+        password: req.body.newPassword,
+      };
 
-        await sendEmailByUser(userInfo);
-        return res.apiv3();
-      }
-      catch (err) {
-        const msg = err.message;
-        logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(msg));
-      }
-    });
+      await sendEmailByUser(userInfo);
+      return res.apiv3();
+    }
+    catch (err) {
+      const msg = err.message;
+      logger.error('Error', err);
+      return res.apiv3Err(new ErrorV3(msg));
+    }
+  });
 
   /**
    * @swagger
@@ -1171,30 +1155,29 @@ module.exports = (crowi) => {
    *                        reason:
    *                          type: string
    */
-  router.put('/send-invitation-email', accessTokenParser([SCOPE.WRITE.ADMIN.USER_MANAGEMENT]), loginRequiredStrictly, adminRequired, addActivity,
-    async(req, res) => {
-      const { id } = req.body;
+  router.put('/send-invitation-email', loginRequiredStrictly, adminRequired, addActivity, async(req, res) => {
+    const { id } = req.body;
 
-      try {
-        const user = await User.findById(id);
-        const newPassword = await User.resetPasswordByRandomString(id);
-        const userList = [{
-          email: user.email,
-          password: newPassword,
-          user: { id },
-        }];
-        const sendEmail = await sendEmailByUserList(userList);
-        // return null if absent
+    try {
+      const user = await User.findById(id);
+      const newPassword = await User.resetPasswordByRandomString(id);
+      const userList = [{
+        email: user.email,
+        password: newPassword,
+        user: { id },
+      }];
+      const sendEmail = await sendEmailByUserList(userList);
+      // return null if absent
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_USERS_SEND_INVITATION_EMAIL });
+      activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_USERS_SEND_INVITATION_EMAIL });
 
-        return res.apiv3({ failedToSendEmail: sendEmail.failedToSendEmailList[0] });
-      }
-      catch (err) {
-        logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(err));
-      }
-    });
+      return res.apiv3({ failedToSendEmail: sendEmail.failedToSendEmailList[0] });
+    }
+    catch (err) {
+      logger.error('Error', err);
+      return res.apiv3Err(new ErrorV3(err));
+    }
+  });
 
   /**
    * @swagger
@@ -1229,7 +1212,7 @@ module.exports = (crowi) => {
    *            500:
    *              $ref: '#/components/responses/InternalServerError'
    */
-  router.get('/list', accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }), loginRequired, async(req, res) => {
+  router.get('/list', accessTokenParser, loginRequired, async(req, res) => {
     const userIds = req.query.userIds ?? null;
 
     let userFetcher;
@@ -1332,49 +1315,48 @@ module.exports = (crowi) => {
     *                        items:
     *                          type: string
     */
-  router.get('/usernames',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }), loginRequired, validator.usernames, apiV3FormValidator, async(req, res) => {
-      const q = req.query.q;
-      const offset = +req.query.offset || 0;
-      const limit = +req.query.limit || 10;
+  router.get('/usernames', accessTokenParser, loginRequired, validator.usernames, apiV3FormValidator, async(req, res) => {
+    const q = req.query.q;
+    const offset = +req.query.offset || 0;
+    const limit = +req.query.limit || 10;
 
-      try {
-        const options = JSON.parse(req.query.options || '{}');
-        const data = {};
+    try {
+      const options = JSON.parse(req.query.options || '{}');
+      const data = {};
 
-        if (options.isIncludeActiveUser == null || options.isIncludeActiveUser) {
-          const activeUserData = await User.findUserByUsernameRegexWithTotalCount(q, [User.STATUS_ACTIVE], { offset, limit });
-          const activeUsernames = activeUserData.users.map(user => user.username);
-          Object.assign(data, { activeUser: { usernames: activeUsernames, totalCount: activeUserData.totalCount } });
-        }
-
-        if (options.isIncludeInactiveUser) {
-          const inactiveUserStates = [User.STATUS_REGISTERED, User.STATUS_SUSPENDED, User.STATUS_INVITED];
-          const inactiveUserData = await User.findUserByUsernameRegexWithTotalCount(q, inactiveUserStates, { offset, limit });
-          const inactiveUsernames = inactiveUserData.users.map(user => user.username);
-          Object.assign(data, { inactiveUser: { usernames: inactiveUsernames, totalCount: inactiveUserData.totalCount } });
-        }
-
-        if (options.isIncludeActivitySnapshotUser && req.user.admin) {
-          const activitySnapshotUserData = await Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount(q, { offset, limit });
-          Object.assign(data, { activitySnapshotUser: activitySnapshotUserData });
-        }
-
-        // eslint-disable-next-line max-len
-        const canIncludeMixedUsernames = (options.isIncludeMixedUsernames && req.user.admin) || (options.isIncludeMixedUsernames && !options.isIncludeActivitySnapshotUser);
-        if (canIncludeMixedUsernames) {
-          const allUsernames = [...data.activeUser?.usernames || [], ...data.inactiveUser?.usernames || [], ...data?.activitySnapshotUser?.usernames || []];
-          const distinctUsernames = Array.from(new Set(allUsernames));
-          Object.assign(data, { mixedUsernames: distinctUsernames });
-        }
-
-        return res.apiv3(data);
+      if (options.isIncludeActiveUser == null || options.isIncludeActiveUser) {
+        const activeUserData = await User.findUserByUsernameRegexWithTotalCount(q, [User.STATUS_ACTIVE], { offset, limit });
+        const activeUsernames = activeUserData.users.map(user => user.username);
+        Object.assign(data, { activeUser: { usernames: activeUsernames, totalCount: activeUserData.totalCount } });
       }
-      catch (err) {
-        logger.error('Failed to get usernames', err);
-        return res.apiv3Err(err);
+
+      if (options.isIncludeInactiveUser) {
+        const inactiveUserStates = [User.STATUS_REGISTERED, User.STATUS_SUSPENDED, User.STATUS_INVITED];
+        const inactiveUserData = await User.findUserByUsernameRegexWithTotalCount(q, inactiveUserStates, { offset, limit });
+        const inactiveUsernames = inactiveUserData.users.map(user => user.username);
+        Object.assign(data, { inactiveUser: { usernames: inactiveUsernames, totalCount: inactiveUserData.totalCount } });
       }
-    });
+
+      if (options.isIncludeActivitySnapshotUser && req.user.admin) {
+        const activitySnapshotUserData = await Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount(q, { offset, limit });
+        Object.assign(data, { activitySnapshotUser: activitySnapshotUserData });
+      }
+
+      // eslint-disable-next-line max-len
+      const canIncludeMixedUsernames = (options.isIncludeMixedUsernames && req.user.admin) || (options.isIncludeMixedUsernames && !options.isIncludeActivitySnapshotUser);
+      if (canIncludeMixedUsernames) {
+        const allUsernames = [...data.activeUser?.usernames || [], ...data.inactiveUser?.usernames || [], ...data?.activitySnapshotUser?.usernames || []];
+        const distinctUsernames = Array.from(new Set(allUsernames));
+        Object.assign(data, { mixedUsernames: distinctUsernames });
+      }
+
+      return res.apiv3(data);
+    }
+    catch (err) {
+      logger.error('Failed to get usernames', err);
+      return res.apiv3Err(err);
+    }
+  });
 
   return router;
 };

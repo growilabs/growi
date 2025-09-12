@@ -1,10 +1,8 @@
-import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, Router } from 'express';
 import type { IExternalUserGroupRelationHasId } from '~/features/external-user-group/interfaces/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { serializeUserGroupRelationSecurely } from '~/server/models/serializers/user-group-relation-serializer';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
@@ -73,7 +71,6 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.get(
     '/',
-    accessTokenParser([SCOPE.READ.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
     validators.list,

@@ -13,7 +13,6 @@ export * from './locale';
 export * from './page';
 export * from './primitive/string';
 export * from './revision';
-export * from './scope';
 export * from './subscription';
 export * from './tag';
 export * from './user';

@@ -222,9 +222,6 @@
       "profile_image2": "Configurer AWS ou activer le stockage local."
     }
   },
-  "API Token Settings": "Jetons d'API",
-  "Current API Token": "Mon jeton d'API",
-  "Update API Token": "Regénérer",
   "page_me_apitoken": {
     "api_token": "Jeton API",
     "notice": {
@@ -233,35 +230,6 @@
       "update_token2": "Modifiez le jeton aux endroits où celui-ci est utilisé."
     },
     "form_help": {}
-  },
-  "Access Token Settings": "Jeton d'accès",
-  "page_me_access_token": {
-    "access_token": "Jeton d'accès",
-    "expiredAt": "Date d'expiration",
-    "description": "Description",
-    "scope": "Portée",
-    "scope_read": "Lecture",
-    "action": "Action",
-    "create_token": "Créer un jeton",
-    "no_tokens_found": "Aucun jeton d'accès trouvé",
-    "new_token": {
-      "title": "Nouveau jeton d'accès",
-      "copy_to_clipboard": "Copier dans le presse-papiers",
-      "message": "Ce jeton ne sera affiché qu'une seule fois. Veuillez le sauvegarder en lieu sûr."
-    },
-    "modal": {
-      "message": "Êtes-vous sûr de vouloir supprimer ce jeton d'accès ?",
-      "alert": "Cette action ne peut pas être annulée.",
-      "delete_token": "Supprimer le jeton"
-    },
-    "form": {
-      "title": "Créer un nouveau jeton d'accès",
-      "expiredAt_desc": "Sélectionnez la date d'expiration de ce jeton d'accès.",
-      "description_desc": "Fournissez une description pour vous aider à identifier ce jeton ultérieurement.",
-      "description_max_length": "Veuillez saisir jusqu'à {{length}} caractères.",
-      "scope_desc": "Sélectionnez la portée du jeton d'accès."
-    },
-    "copy_to_clipboard": "Copier dans le presse-papiers"
   },
   "Password": "Mot de passe",
   "Password Settings": "Sécurité",
@@ -293,6 +261,9 @@
   },
   "API Settings": "API GROWI",
   "Other Settings": "Autres paramètres",
+  "API Token Settings": "Jetons d'API",
+  "Current API Token": "Mon jeton d'API",
+  "Update API Token": "Regénérer",
   "in_app_notification_settings": {
     "in_app_notification_settings": "Notifications",
     "subscribe_settings": "Paramètres d'abonnement automatique aux notifications de pages",

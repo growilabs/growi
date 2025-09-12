@@ -223,9 +223,6 @@
       "profile_image2": "アップロードできるようにするには、AWS またはローカルアップロードの設定をしてください。"
     }
   },
-  "API Token Settings": "API Token設定",
-  "Current API Token": "現在のAPI Token",
-  "Update API Token": "API Tokenを更新",
   "page_me_apitoken": {
     "api_token": "API Token",
     "notice": {
@@ -234,35 +231,6 @@
       "update_token2": "現在の Token を利用している処理は動かなくなります。"
     },
     "form_help": {}
-  },
-  "Access Token Settings": "Access token 設定",
-  "page_me_access_token": {
-    "access_token": "Access token",
-    "expiredAt": "有効期限",
-    "description": "説明",
-    "scope": "スコープ",
-    "scope_read": "Read",
-    "action": "アクション",
-    "create_token": "トークンを作成",
-    "no_tokens_found": "アクセストークンが見つかりません",
-    "new_token": {
-      "title": "新しいアクセストークン",
-      "copy_to_clipboard": "クリップボードにコピーしました",
-      "message": "このアクセストークンは一度しか表示されません。安全に保存してください"
-    },
-    "modal": {
-      "message": "このアクセストークンを削除しますか？",
-      "alert": "この操作は取り消せません",
-      "delete_token": "トークンを削除"
-    },
-    "form": {
-      "title": "アクセストークンを作成",
-      "expiredAt_desc": "アクセストークンの有効期限を選択します。",
-      "description_desc": "このトークンを後で識別するための説明を入力します。",
-      "description_max_length": "{{length}}文字以内で入力してください。",
-      "scope_desc": "スコープによって、このトークンで行える操作を制限します。"
-    },
-    "copy_to_clipboard": "Copy to clipboard"
   },
   "Password": "パスワード",
   "Password Settings": "パスワード設定",
@@ -294,6 +262,9 @@
   },
   "API Settings": "API設定",
   "Other Settings": "その他の設定",
+  "API Token Settings": "API Token設定",
+  "Current API Token": "現在のAPI Token",
+  "Update API Token": "API Tokenを更新",
   "in_app_notification_settings": {
     "in_app_notification_settings": "アプリ内通知設定",
     "subscribe_settings": "自動でページをサブスクライブする（通知を受け取る）設定",

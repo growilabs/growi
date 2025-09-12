@@ -6,7 +6,6 @@ import type { ValidationChain } from 'express-validator';
 import { query } from 'express-validator';
 import mongoose from 'mongoose';
 
-import { SCOPE } from '@growi/core/dist/interfaces';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
@@ -40,7 +39,7 @@ export const checkPageExistenceHandlersFactory: CreatePageHandlersFactory = (cro
   ];
 
   return [
-    accessTokenParser([SCOPE.WRITE.FEATURES.PAGE], { acceptLegacy: true }), loginRequired,
+    accessTokenParser, loginRequired,
     validator, apiV3FormValidator,
     async(req: Req, res: ApiV3Response) => {
       const { path } = req.query;

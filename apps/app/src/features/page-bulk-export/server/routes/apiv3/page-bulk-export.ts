@@ -1,4 +1,3 @@
-import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request } from 'express';
 import { Router } from 'express';
@@ -22,7 +21,6 @@ interface AuthorizedRequest extends Request {
 }
 
 module.exports = (crowi: Crowi): Router => {
-  const accessTokenParser = crowi.accessTokenParser;
   const loginRequiredStrictly = require('~/server/middlewares/login-required')(
     crowi,
   );
@@ -37,7 +35,6 @@ module.exports = (crowi: Crowi): Router => {
 
   router.post(
     '/',
-    accessTokenParser([SCOPE.WRITE.FEATURES.PAGE_BULK_EXPORT]),
     loginRequiredStrictly,
     validators.pageBulkExport,
     async (req: AuthorizedRequest, res: ApiV3Response) => {

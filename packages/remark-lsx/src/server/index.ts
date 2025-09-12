@@ -1,8 +1,9 @@
-import { SCOPE } from '@growi/core/dist/interfaces';
 import type { NextFunction, Request, Response } from 'express';
 import { query, validationResult } from 'express-validator';
 import { FilterXSS } from 'xss';
+
 import type { LsxApiOptions } from '../interfaces/api';
+
 import { listPages } from './routes/list-pages';
 
 const loginRequiredFallback = (req: Request, res: Response) => {
@@ -26,7 +27,7 @@ const lsxValidator = [
         }
 
         return jsonData;
-      } catch {
+      } catch (err) {
         throw new Error('Invalid JSON format in options');
       }
     }),
@@ -58,7 +59,7 @@ const middleware = (crowi: any, app: any): void => {
 
   app.get(
     '/_api/lsx',
-    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    accessTokenParser,
     loginRequired,
     lsxValidator,
     paramValidator,
