@@ -6,7 +6,7 @@
   </a>
 </p>
 <p align="center">
-  <a href="https://github.com/weseek/growi/releases/latest"><img src="https://img.shields.io/github/release/weseek/growi.svg" alt="Latest version"></a>
+  <a href="https://github.com/growilabs/growi/releases/latest"><img src="https://img.shields.io/github/release/growilabs/growi.svg" alt="Latest version"></a>
   <a href="https://communityinviter.com/apps/wsgrowi/invite/"><img src="https://img.shields.io/badge/Slack-Join%20Us-4A154B?style=flat&logo=slack&logoColor=white" alt="Slack - Join US"></a>
 </p>
 
@@ -17,9 +17,9 @@
 # GROWI
 
 [![docker pulls](https://img.shields.io/docker/pulls/weseek/growi.svg)](https://hub.docker.com/r/weseek/growi/)
-[![CodeQL](https://github.com/weseek/growi/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/weseek/growi/actions/workflows/codeql-analysis.yml)
-[![Node CI for app development](https://github.com/weseek/growi/actions/workflows/ci-app.yml/badge.svg)](https://github.com/weseek/growi/actions/workflows/ci-app.yml)
-[![Node CI for app production](https://github.com/weseek/growi/actions/workflows/ci-app-prod.yml/badge.svg)](https://github.com/weseek/growi/actions/workflows/ci-app-prod.yml)
+[![CodeQL](https://github.com/growilabs/growi/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/growilabs/growi/actions/workflows/codeql-analysis.yml)
+[![Node CI for app development](https://github.com/growilabs/growi/actions/workflows/ci-app.yml/badge.svg)](https://github.com/growilabs/growi/actions/workflows/ci-app.yml)
+[![Node CI for app production](https://github.com/growilabs/growi/actions/workflows/ci-app-prod.yml/badge.svg)](https://github.com/growilabs/growi/actions/workflows/ci-app-prod.yml)
 
 ## デモ
 <video src="https://private-user-images.githubusercontent.com/34241526/333079216-cec7f7d8-c3cc-4ee7-bc94-167b056d4ce2.mp4?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTY0NDk0MDQsIm5iZiI6MTcxNjQ0OTEwNCwicGF0aCI6Ii8zNDI0MTUyNi8zMzMwNzkyMTYtY2VjN2Y3ZDgtYzNjYy00ZWU3LWJjOTQtMTY3YjA1NmQ0Y2UyLm1wND9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNDA1MjMlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjQwNTIzVDA3MjUwNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWQ2M2IwZjc0ZGNhOWQxNWE4MGIyZTZlMzQ0ZDQ4MGZlNjEzMWE3MTQ1YmMwYzg3MmY1NWMyZWI2NzQ3NGIwMTkmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JmFjdG9yX2lkPTAma2V5X2lkPTAmcmVwb19pZD0wIn0.qLfu5120JrkdfpghXlLG8wCn0p4JNZ7W8AD3zUJTIYY"></video>
@@ -137,11 +137,11 @@ Issue と Pull requests の作成は英語・日本語どちらでも受け付�
 # ライセンス
 
 - The MIT License (MIT)
-- [ライセンス](https://github.com/weseek/growi/blob/master/LICENSE) と [THIRD-PARTY-NOTICES.md](https://github.com/weseek/growi/blob/master/THIRD-PARTY-NOTICES.md) をご覧ください。
+- [ライセンス](https://github.com/growilabs/growi/blob/master/LICENSE) と [THIRD-PARTY-NOTICES.md](https://github.com/growilabs/growi/blob/master/THIRD-PARTY-NOTICES.md) をご覧ください。
 
   [crowi]: https://github.com/crowi/crowi
-  [growi]: https://github.com/weseek/growi
-  [issues]: https://github.com/weseek/growi/issues
-  [pulls]: https://github.com/weseek/growi/pulls
+  [growi]: https://github.com/growilabs/growi
+  [issues]: https://github.com/growilabs/growi/issues
+  [pulls]: https://github.com/growilabs/growi/pulls
   [dockerhub]: https://hub.docker.com/r/weseek/growi
-  [docker-compose]: https://github.com/weseek/growi-docker-compose
+  [docker-compose]: https://github.com/growilabs/growi-docker-compose

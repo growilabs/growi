@@ -313,7 +313,7 @@
       "done": "Copié dans le presse-papier!"
     },
     "bug_report": "Informations de diagnostic",
-    "submit_bug_report": "<a href='https://github.com/weseek/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>soummettre ensuite sur GitHub.</a>"
+    "submit_bug_report": "<a href='https://github.com/growilabs/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>soummettre ensuite sur GitHub.</a>"
   },
   "v5_page_migration": {
     "migration_desc": "Des pages sont encore en V4. Pour profiter des nouvelles fonctionnalitées, convertir toutes les pages vers la V5.",

@@ -33,7 +33,7 @@ const TableOfContents = ({ tagsElementHeight }: Props): JSX.Element => {
     const containerElem = document.querySelector('#revision-toc');
 
     // rendererOptions for redo calcViewHeight()
-    // see: https://github.com/weseek/growi/pull/6791
+    // see: https://github.com/growilabs/growi/pull/6791
     if (parentElem == null || containerElem == null || rendererOptions == null || tagsElementHeight == null) {
       return 0;
     }
@@ -64,7 +64,7 @@ const TableOfContents = ({ tagsElementHeight }: Props): JSX.Element => {
           data-testid="revision-toc-content"
           className="revision-toc-content mb-3"
         >
-          {/* parse blank to show toc (https://github.com/weseek/growi/pull/6277) */}
+          {/* parse blank to show toc (https://github.com/growilabs/growi/pull/6277) */}
           <ReactMarkdown {...rendererOptions}>{' '}</ReactMarkdown>
         </div>
       </StickyStretchableScroller>

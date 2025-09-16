@@ -18,7 +18,7 @@ Environment
 |Using Docker|yes/no|
 |Using [growi-docker-compose][growi-docker-compose]|yes/no|
 
-[growi-docker-compose]: https://github.com/weseek/growi-docker-compose
+[growi-docker-compose]: https://github.com/growilabs/growi-docker-compose
 
 *(Accessing https://{GROWI_HOST}/admin helps you to fill in above versions)*
 

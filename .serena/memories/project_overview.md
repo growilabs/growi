@@ -8,7 +8,7 @@ GROWIは、マークダウンを使用したチームコラボレーションソ
 - **バージョン**: 7.3.0-RC.0
 - **ライセンス**: MIT
 - **作者**: Yuki Takei <yuki@weseek.co.jp>
-- **リポジトリ**: https://github.com/weseek/growi.git
+- **リポジトリ**: https://github.com/growilabs/growi.git
 - **公式サイト**: https://growi.org
 
 ## 主な特徴

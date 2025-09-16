@@ -52,7 +52,7 @@ function extractChildrenToIgnoreReactNode(children: ReactNode): ReactNode {
 function CodeBlockSubstance({ lang, children }: { lang: string, children: ReactNode }): JSX.Element {
   // return alternative element
   //   in order to fix "CodeBlock string is be [object Object] if searched"
-  // see: https://github.com/weseek/growi/pull/7484
+  // see: https://github.com/growilabs/growi/pull/7484
   //
   // Note: You can also remove this code if the user requests to see the code highlighted in Prism as-is.
 

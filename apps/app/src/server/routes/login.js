@@ -130,7 +130,7 @@ module.exports = function(crowi, app) {
       let redirectTo;
       if (userData.password == null) {
         // userData.password can't be empty but, prepare redirect because password property in User Model is optional
-        // https://github.com/weseek/growi/pull/6670
+        // https://github.com/growilabs/growi/pull/6670
         redirectTo = '/me#password_settings';
       }
       else if (req.session.redirectTo != null) {
