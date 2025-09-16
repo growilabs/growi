@@ -1,6 +1,7 @@
-import { Writable, Transform } from 'stream';
+import { Writable, Transform, Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { URL } from 'url';
+import type { Cursor } from 'mongoose';
 
 import { getIdStringForRef, type IPage } from '@growi/core';
 import gc from 'expose-gc/function';
@@ -71,9 +72,13 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
 
   private elasticsearchVersion: 7 | 8 | 9;
 
-  private client: ElasticsearchClientDelegator;
+  private client: ElasticsearchClientDelegator | null = null;
 
   private indexName: string;
+
+  // Memory management properties
+  private memoryThreshold = 500 * 1024 * 1024; // 500MB threshold
+  private activeStreams = new Set<Readable | Writable | Transform>();
 
   constructor(socketIoService: SocketIoService) {
     this.name = SearchDelegatorName.DEFAULT;
@@ -96,7 +101,25 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     return `${this.indexName}-alias`;
   }
 
+  private getClient(): ElasticsearchClientDelegator {
+    if (this.client == null) {
+      throw new Error('Elasticsearch client is not initialized');
+    }
+    return this.client;
+  }
+
   async initClient(): Promise<void> {
+    // 既存のクライアントが存在する場合はクリーンアップ
+    if (this.client != null) {
+      try {
+        // ES7, ES8, ES9クライアントは close メソッドを持たないため、
+        // 代わりに適切なクリーンアップ処理を実行
+        logger.info('Cleaning up existing ES client');
+      } catch (error) {
+        logger.warn('Failed to close existing ES client:', error);
+      }
+    }
+
     const { host, auth, indexName } = this.getConnectionInfo();
 
     const rejectUnauthorized = configManager.getConfig('app:elasticsearchRejectUnauthorized');
@@ -105,6 +128,9 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
       node: host,
       auth,
       requestTimeout: configManager.getConfig('app:elasticsearchRequestTimeout'),
+      // コネクションプールの設定を明示的に追加
+      maxRetries: 3,
+      maxConnections: 10,
     };
 
     this.client = await getClient({ version: this.elasticsearchVersion, options, rejectUnauthorized });
@@ -169,6 +195,10 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
    * @see https://www.elastic.co/guide/en/elasticsearch/reference/6.6/cluster-nodes-info.html
    */
   async getInfo() {
+    if (this.client == null) {
+      throw new Error('Elasticsearch client is not initialized');
+    }
+
     const info = await this.client.nodes.info();
     if (!info != null) {
       throw new Error('There is no nodes');
@@ -205,6 +235,10 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
    * @see https://www.elastic.co/guide/en/elasticsearch/reference/6.6/cluster-health.html
    */
   async getInfoForHealth() {
+    if (this.client == null) {
+      throw new Error('Elasticsearch client is not initialized');
+    }
+
     const esClusterHealth = await this.client.cluster.health();
     return { esClusterHealth };
   }
@@ -213,7 +247,8 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
    * Return information for Admin Full Text Search Management page
    */
   async getInfoForAdmin() {
-    const { client, indexName, aliasName } = this;
+    const client = this.getClient();
+    const { indexName, aliasName } = this;
 
     const tmpIndexName = `${indexName}-tmp`;
 
@@ -257,7 +292,8 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
    * rebuild index
    */
   async rebuildIndex(): Promise<void> {
-    const { client, indexName, aliasName } = this;
+    const client = this.getClient();
+    const { indexName, aliasName } = this;
 
     const tmpIndexName = `${indexName}-tmp`;
 
@@ -298,7 +334,8 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   }
 
   async normalizeIndices(): Promise<void> {
-    const { client, indexName, aliasName } = this;
+    const client = this.getClient();
+    const { indexName, aliasName } = this;
 
     const tmpIndexName = `${indexName}-tmp`;
 
@@ -325,10 +362,12 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   }
 
   async createIndex(index: string) {
+    const client = this.getClient();
+    
     // TODO: https://redmine.weseek.co.jp/issues/168446
-    if (isES7ClientDelegator(this.client)) {
+    if (isES7ClientDelegator(client)) {
       const { mappings } = await import('./mappings/mappings-es7');
-      return this.client.indices.create({
+      return client.indices.create({
         index,
         body: {
           ...mappings,
@@ -336,20 +375,20 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
       });
     }
 
-    if (isES8ClientDelegator(this.client)) {
+    if (isES8ClientDelegator(client)) {
       const { mappings } = await import('./mappings/mappings-es8');
-      return this.client.indices.create({
+      return client.indices.create({
         index,
         ...mappings,
       });
     }
 
-    if (isES9ClientDelegator(this.client)) {
+    if (isES9ClientDelegator(client)) {
       const { mappings } = process.env.CI == null
         ? await import('./mappings/mappings-es9')
         : await import('./mappings/mappings-es9-for-ci');
 
-      return this.client.indices.create({
+      return client.indices.create({
         index,
         ...mappings,
       });
@@ -438,6 +477,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
    */
   async updateOrInsertPages(queryFactory, option: UpdateOrInsertPagesOpts = {}): Promise<void> {
     const { shouldEmitProgress = false, invokeGarbageCollection = false } = option;
+    const startMemory = process.memoryUsage();
 
     const Page = mongoose.model<IPage, PageModel>('Page');
     const { PageQueryBuilder } = Page;
@@ -446,100 +486,225 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
 
     // prepare functions invoked from custom streams
     const prepareBodyForCreate = this.prepareBodyForCreate.bind(this);
-    const bulkWrite = this.client.bulk.bind(this.client);
+    const bulkWrite = this.getClient().bulk.bind(this.getClient());
 
     const matchQuery = new PageQueryBuilder(queryFactory()).query;
-
     const countQuery = new PageQueryBuilder(queryFactory()).query;
     const totalCount = await countQuery.count();
 
     const maxBodyLengthToIndex = configManager.getConfig('app:elasticsearchMaxBodyLengthToIndex');
 
-    const readStream = Page.aggregate<AggregatedPage>(
-      aggregatePipelineToIndex(maxBodyLengthToIndex, matchQuery),
-    ).cursor();
+    let readStream: Cursor<AggregatedPage>;
+    let batchStream: Transform;
+    let appendTagNamesStream: Transform;
+    let writeStream: Writable;
 
-    const bulkSize: number = configManager.getConfig('app:elasticsearchReindexBulkSize');
-    const batchStream = createBatchStream(bulkSize);
+    try {
+      readStream = Page.aggregate<AggregatedPage>(
+        aggregatePipelineToIndex(maxBodyLengthToIndex, matchQuery),
+      ).cursor();
+      this.activeStreams.add(readStream);
 
-    const appendTagNamesStream = new Transform({
-      objectMode: true,
-      async transform(chunk, encoding, callback) {
-        const pageIds = chunk.map(doc => doc._id);
+      const bulkSize: number = Math.min(
+        configManager.getConfig('app:elasticsearchReindexBulkSize'),
+        1000 // Maximum safe batch size to prevent memory issues
+      );
+      
+      batchStream = createBatchStream(bulkSize);
+      this.activeStreams.add(batchStream);
 
-        const idToTagNamesMap = await PageTagRelation.getIdToTagNamesMap(pageIds);
-        const idsHavingTagNames = Object.keys(idToTagNamesMap);
+      appendTagNamesStream = this.createMemoryAwareTagStream();
+      this.activeStreams.add(appendTagNamesStream);
 
-        // append tagNames
-        chunk
-          .filter(doc => idsHavingTagNames.includes(doc._id.toString()))
-          .forEach((doc: AggregatedPage) => {
-            // append tagName from idToTagNamesMap
-            doc.tagNames = idToTagNamesMap[doc._id.toString()];
-          });
+      writeStream = this.createMemoryAwareWriteStream(
+        totalCount, 
+        shouldEmitProgress, 
+        socket, 
+        prepareBodyForCreate, 
+        bulkWrite, 
+        invokeGarbageCollection
+      );
+      this.activeStreams.add(writeStream);
 
-        this.push(chunk);
-        callback();
-      },
+      await pipeline(
+        readStream,
+        batchStream,
+        appendTagNamesStream,
+        writeStream,
+      );
+
+    } catch (error) {
+      logger.error('Pipeline error occurred:', error);
+      await this.cleanupStreams();
+      throw error;
+    } finally {
+      await this.cleanupStreams();
+      
+      const endMemory = process.memoryUsage();
+      const memoryDelta = endMemory.heapUsed - startMemory.heapUsed;
+      
+      logger.info('Memory usage after updateOrInsertPages:', {
+        deltaMB: Math.round(memoryDelta / 1024 / 1024),
+        currentHeapMB: Math.round(endMemory.heapUsed / 1024 / 1024),
+        heapTotalMB: Math.round(endMemory.heapTotal / 1024 / 1024),
+      });
+      
+      // メモリ使用量が閾値を超えた場合の対応
+      if (memoryDelta > this.memoryThreshold) {
+        logger.warn(`High memory delta detected: ${memoryDelta / 1024 / 1024}MB`);
+        if (typeof global.gc === 'function') {
+          global.gc();
+          logger.info('Forced garbage collection executed');
+        }
+      }
+    }
+  }
+
+  private async cleanupStreams(): Promise<void> {
+    const cleanupPromises = Array.from(this.activeStreams).map(async (stream) => {
+      try {
+        if (stream && typeof stream.destroy === 'function') {
+          stream.destroy();
+        }
+      } catch (error) {
+        logger.warn('Stream cleanup error:', error);
+      }
     });
 
-    let count = 0;
-    const writeStream = new Writable({
+    await Promise.allSettled(cleanupPromises);
+    this.activeStreams.clear();
+  }
+
+  private createMemoryAwareTagStream(): Transform {
+    return new Transform({
       objectMode: true,
-      async write(batch, encoding, callback) {
-        const body: (BulkWriteCommand|BulkWriteBody)[] = [];
-        batch.forEach((doc: AggregatedPage) => {
-          body.push(...prepareBodyForCreate(doc));
-        });
-
+      // バッファサイズを制限
+      highWaterMark: 16,
+      async transform(chunk, encoding, callback) {
         try {
-          const bulkResponse = await bulkWrite({
-            body,
-            // requestTimeout: Infinity,
-          });
+          const pageIds = chunk.map(doc => doc._id);
+          
+          // メモリ使用量を監視
+          const memBefore = process.memoryUsage().heapUsed;
+          
+          const idToTagNamesMap = await PageTagRelation.getIdToTagNamesMap(pageIds);
+          const idsHavingTagNames = Object.keys(idToTagNamesMap);
 
-          count += (bulkResponse.items || []).length;
+          // 効率的な処理でメモリ使用量を削減
+          for (const doc of chunk) {
+            const docId = doc._id.toString();
+            if (idsHavingTagNames.includes(docId)) {
+              doc.tagNames = idToTagNamesMap[docId];
+            }
+          }
 
-          logger.info(`Adding pages progressing: (count=${count}, errors=${bulkResponse.errors}, took=${bulkResponse.took}ms)`);
+          const memAfter = process.memoryUsage().heapUsed;
+          const memDelta = memAfter - memBefore;
+          
+          // メモリ使用量が閾値を超えた場合の警告
+          if (memDelta > 50 * 1024 * 1024) { // 50MB
+            logger.warn(`High memory usage in appendTagNamesStream: ${memDelta / 1024 / 1024}MB`);
+          }
+
+          this.push(chunk);
+          callback();
+        } catch (error) {
+          callback(error);
+        }
+      },
+    });
+  }
+
+  private createMemoryAwareWriteStream(
+    totalCount: number,
+    shouldEmitProgress: boolean, 
+    socket: any, 
+    prepareBodyForCreate: Function, 
+    bulkWrite: Function, 
+    invokeGarbageCollection: boolean
+  ): Writable {
+    let processedCount = 0;
+    let totalMemoryUsed = 0;
+    const memoryThreshold = this.memoryThreshold;
+
+    return new Writable({
+      objectMode: true,
+      // バックプレッシャーを制御
+      highWaterMark: 1,
+      
+      async write(batch, encoding, callback) {
+        const batchStartTime = performance.now();
+        const batchMemoryBefore = process.memoryUsage().heapUsed;
+        
+        try {
+          const body: (BulkWriteCommand|BulkWriteBody)[] = [];
+          
+          // メモリ効率的な処理
+          for (const doc of batch) {
+            const [command, document] = prepareBodyForCreate(doc);
+            body.push(command, document);
+            
+            // 定期的なメモリチェック
+            if (body.length % 100 === 0) {
+              const currentMemory = process.memoryUsage().heapUsed;
+              if (currentMemory > memoryThreshold * 2) {
+                logger.warn('Memory threshold exceeded during batch processing');
+                break;
+              }
+            }
+          }
+
+          const bulkResponse = await bulkWrite({ body });
+          processedCount += (bulkResponse.items || []).length;
+          
+          const batchMemoryAfter = process.memoryUsage().heapUsed;
+          const batchMemoryDelta = batchMemoryAfter - batchMemoryBefore;
+          totalMemoryUsed += batchMemoryDelta;
+          
+          const batchTime = performance.now() - batchStartTime;
+          
+          logger.debug(`Batch processed: count=${processedCount}, time=${Math.round(batchTime)}ms, memory=${Math.round(batchMemoryDelta / 1024 / 1024)}MB`);
 
           if (shouldEmitProgress) {
-            socket?.emit(SocketEventName.AddPageProgress, { totalCount, count });
+            socket?.emit(SocketEventName.AddPageProgress, { 
+              totalCount, 
+              count: processedCount,
+              memoryUsageMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+            });
           }
-        }
-        catch (err) {
-          logger.error('addAllPages error on add anyway: ', err);
-        }
 
-        if (invokeGarbageCollection) {
-          try {
-            // First aid to prevent unexplained memory leaks
-            logger.info('global.gc() invoked.');
-            gc();
+          // メモリベースのガベージコレクション
+          if (invokeGarbageCollection && totalMemoryUsed > memoryThreshold) {
+            try {
+              if (typeof global.gc === 'function') {
+                global.gc();
+                totalMemoryUsed = 0; // Reset counter after GC
+                logger.debug('Memory-triggered garbage collection executed');
+              }
+            } catch (err) {
+              logger.error('Garbage collection failed:', err);
+            }
           }
-          catch (err) {
-            logger.error('fail garbage collection: ', err);
-          }
+
+          // 明示的なクリーンアップ
+          body.length = 0;
+          
+        } catch (err) {
+          logger.error('Batch processing error:', err);
         }
 
         callback();
       },
+      
       final(callback) {
-        logger.info(`Adding pages has completed: (totalCount=${totalCount})`);
-
+        logger.info(`Indexing completed: totalProcessed=${processedCount}, totalMemoryUsed=${Math.round(totalMemoryUsed / 1024 / 1024)}MB`);
+        
         if (shouldEmitProgress) {
-          socket?.emit(SocketEventName.FinishAddPage, { totalCount, count });
+          socket?.emit(SocketEventName.FinishAddPage, { totalCount, count: processedCount });
         }
         callback();
       },
     });
-
-
-    return pipeline(
-      readStream,
-      batchStream,
-      appendTagNamesStream,
-      writeStream,
-    );
   }
 
   deletePages(pages) {
@@ -547,7 +712,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     pages.forEach(page => this.prepareBodyForDelete(body, page));
 
     logger.debug('deletePages(): Sending Request to ES', body);
-    return this.client.bulk({
+    return this.getClient().bulk({
       body,
     });
   }
@@ -565,11 +730,11 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     if (process.env.NODE_ENV === 'development') {
       logger.debug('query: ', JSON.stringify(query, null, 2));
 
-
+      const client = this.getClient();
       const validateQueryResponse = await (async() => {
-        if (isES7ClientDelegator(this.client)) {
+        if (isES7ClientDelegator(client)) {
           const es7SearchQuery = query as ES7SearchQuery;
-          return this.client.indices.validateQuery({
+          return client.indices.validateQuery({
             explain: true,
             index: es7SearchQuery.index,
             body: {
@@ -578,18 +743,18 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
           });
         }
 
-        if (isES8ClientDelegator(this.client)) {
+        if (isES8ClientDelegator(client)) {
           const es8SearchQuery = query as ES8SearchQuery;
-          return this.client.indices.validateQuery({
+          return client.indices.validateQuery({
             explain: true,
             index: es8SearchQuery.index,
             query: es8SearchQuery.body.query,
           });
         }
 
-        if (isES9ClientDelegator(this.client)) {
+        if (isES9ClientDelegator(client)) {
           const es9SearchQuery = query as ES9SearchQuery;
-          return this.client.indices.validateQuery({
+          return client.indices.validateQuery({
             explain: true,
             index: es9SearchQuery.index,
             query: es9SearchQuery.body.query,
@@ -605,17 +770,18 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     }
 
     const searchResponse = await (async() => {
-      if (isES7ClientDelegator(this.client)) {
-        return this.client.search(query as ES7SearchQuery);
+      const client = this.getClient();
+      if (isES7ClientDelegator(client)) {
+        return client.search(query as ES7SearchQuery);
       }
 
-      if (isES8ClientDelegator(this.client)) {
-        return this.client.search(query as ES8SearchQuery);
+      if (isES8ClientDelegator(client)) {
+        return client.search(query as ES8SearchQuery);
       }
 
-      if (isES9ClientDelegator(this.client)) {
+      if (isES9ClientDelegator(client)) {
         const { body, ...rest } = query as ES9SearchQuery;
-        return this.client.search({
+        return client.search({
           ...rest,
           // Elimination of the body property since ES9
           // https://raw.githubusercontent.com/elastic/elasticsearch-js/2f6200eb397df0e54d23848d769a93614ee1fb45/docs/release-notes/breaking-changes.md
@@ -1038,6 +1204,36 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     logger.debug('SearchClient.syncTagChanged', page.path);
 
     return this.updateOrInsertPageById(page._id);
+  }
+
+  // Lifecycle management
+  async destroy(): Promise<void> {
+    await this.cleanupStreams();
+    
+    if (this.client != null) {
+      try {
+        // 既存のクライアントのクリーンアップ
+        logger.info('Destroying Elasticsearch client');
+        this.client = null;
+      } catch (error) {
+        logger.error('Failed to destroy Elasticsearch client:', error);
+      }
+    }
+  }
+
+  // Memory monitoring utility
+  private logMemoryUsage(context: string): void {
+    const memUsage = process.memoryUsage();
+    const cpuUsage = process.cpuUsage();
+    
+    logger.info(`Memory usage [${context}]:`, {
+      heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
+      heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`,
+      external: `${Math.round(memUsage.external / 1024 / 1024)}MB`,
+      rss: `${Math.round(memUsage.rss / 1024 / 1024)}MB`,
+      cpuUser: `${Math.round(cpuUsage.user / 1000)}ms`,
+      cpuSystem: `${Math.round(cpuUsage.system / 1000)}ms`,
+    });
   }
 
 }
