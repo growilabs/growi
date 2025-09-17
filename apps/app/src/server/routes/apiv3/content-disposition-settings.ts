@@ -42,7 +42,7 @@ module.exports = (crowi) => {
  *                   properties:
  *                     type: array
  *                     description: The list of MIME types set to inline.
- *                       items:
+ *                     items:
  *                       type: string
  *
  */
@@ -102,7 +102,7 @@ module.exports = (crowi) => {
  *                   properties:
  *                     type: array
  *                     description: The list of MIME types set to inline.
- *                       items:
+ *                     items:
  *                       type: string
  *
  */
