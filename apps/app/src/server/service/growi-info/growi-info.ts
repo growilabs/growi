@@ -17,9 +17,6 @@ import createPageModel from '~/server/models/page';
 import { aclService } from '~/server/service/acl';
 import { configManager } from '~/server/service/config-manager';
 import { getGrowiVersion } from '~/utils/growi-version';
-import loggerFactory from '~/utils/logger';
-
-const logger = loggerFactory('growi:passwordReset');
 
 // Local preset for full additional info
 const FULL_ADDITIONAL_INFO_OPTIONS = {
@@ -172,7 +169,6 @@ export class GrowiInfoService {
 
     if (options.includePageCountInfo) {
       const currentPagesCount = await Page.countDocuments();
-      logger.info('カレントページカウント', currentPagesCount);
       partialResult.currentPagesCount = currentPagesCount;
     }
 
