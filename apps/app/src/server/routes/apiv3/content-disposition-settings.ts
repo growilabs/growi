@@ -40,10 +40,11 @@ module.exports = (crowi) => {
  *                 currentDispositionSettings:
  *                   type: object
  *                   properties:
- *                     type: array
- *                     description: The list of MIME types set to inline.
- *                     items:
- *                       type: string
+ *                     inlineMimeTypes:
+ *                       type: array
+ *                       description: The list of MIME types set to inline.
+ *                       items:
+ *                         type: string
  *
  */
   router.put(
@@ -100,10 +101,11 @@ module.exports = (crowi) => {
  *                 currentDispositionSettings:
  *                   type: object
  *                   properties:
- *                     type: array
- *                     description: The list of MIME types set to inline.
- *                     items:
- *                       type: string
+ *                     inlineMimeTypes:
+ *                       type: array
+ *                       description: The list of MIME types set to inline.
+ *                       items:
+ *                         type: string
  *
  */
   router.get('/', loginRequiredStrictly, adminRequired, async(req, res) => {
