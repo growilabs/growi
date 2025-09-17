@@ -27,7 +27,6 @@
       "!apps/app/public/**",
       "!apps/app/src/client/**",
       "!apps/app/src/components/**",
-      "!apps/app/src/features/growi-plugin/**",
       "!apps/app/src/features/openai/**",
       "!apps/app/src/features/rate-limiter/**",
       "!apps/app/src/models/**",
