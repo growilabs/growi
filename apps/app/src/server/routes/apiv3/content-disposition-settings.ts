@@ -3,7 +3,6 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import { SupportedAction } from '~/interfaces/activity';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { configManager } from '~/server/service/config-manager';
-import { strictMimeTypeSettings, laxMimeTypeSettings } from '~/server/service/file-uploader/utils/security';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:routes:apiv3:content-disposition-settings');
@@ -16,6 +15,10 @@ module.exports = (crowi) => {
   const adminRequired = require('~/server/middlewares/admin-required')(crowi);
   const addActivity = generateAddActivityMiddleware();
   const activityEvent = crowi.event('activity');
+
+  interface UpdateMimeTypesPayload {
+  newInlineMimeTypes: string[];
+  }
 
   /**
  * @swagger
@@ -34,11 +37,11 @@ module.exports = (crowi) => {
  *             schema:
  *               type: object
  *               properties:
- *                 contentDispositionSettings:
+ *                 currentDispositionSettings:
  *                   type: object
  *                   additionalProperties:
- *                     type: string
- *                     description: inline or attachment
+ *                     type: string[]
+ *                     description: inline MIME types.
  *
  */
   router.put(
@@ -49,26 +52,21 @@ module.exports = (crowi) => {
     async(req, res) => {
 
       try {
-        const { newInlineMimeTypes } = req.body;
-
-        const currentSettings = await configManager.getConfig('attachments:contentDisposition:mimeTypeOverrides');
-        const currentInlineMimeTypes = currentSettings.inlineMimeTypes || [];
-
-        const updatedInlineMimeTypes = Array.from(new Set([
-          ...currentInlineMimeTypes,
-          ...newInlineMimeTypes,
-        ]));
-
-        await configManager.updateConfigs({ 'attachments:contentDisposition:mimeTypeOverrides': { inlineMimeTypes: updatedInlineMimeTypes } });
+        const { newInlineMimeTypes } = req.body as UpdateMimeTypesPayload;
+        const inlineMimeTypes = Array.from(new Set(newInlineMimeTypes));
+        await configManager.updateConfigs({ 'attachments:contentDisposition:inlineMimeTypes': { inlineMimeTypes } });
 
         const parameters = {
           action: SupportedAction.ACTION_ADMIN_ATTACHMENT_DISPOSITION_UPDATE,
-          contentDispositionSettings: strictMimeTypeSettings,
-          currentMode: 'strict',
+          currentDispositionSettings: inlineMimeTypes,
         };
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
-        return res.apiv3({ currentMode: 'custom', contentDispositionSettings: strictMimeTypeSettings });
+        return res.apiv3({
+          currentDispositionSettings: {
+            inlineMimeTypes,
+          },
+        });
       }
       catch (err) {
         const msg = 'Error occurred in updating content disposition for MIME types';
@@ -106,10 +104,9 @@ module.exports = (crowi) => {
  */
   router.get('/', loginRequiredStrictly, adminRequired, async(req, res) => {
     try {
-      const currentDispositionSettings = configManager.getConfig('attachments:contentDisposition:mimeTypeOverrides');
-      const contentDispositionSettings: Record<string, 'inline' | 'attachment'> = currentDispositionSettings;
+      const currentDispositionSettings = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
 
-      return res.apiv3({ contentDispositionSettings });
+      return res.apiv3({ currentDispositionSettings });
     }
     catch (err) {
       logger.error('Error retrieving content disposition settings:', err);
