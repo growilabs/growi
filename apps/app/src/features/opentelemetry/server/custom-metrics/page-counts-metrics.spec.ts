@@ -1,5 +1,5 @@
 import { type Meter, metrics, type ObservableGauge } from '@opentelemetry/api';
-import { mock } from 'vitest-mock-extended'; //なんだこれ
+import { mock } from 'vitest-mock-extended';
 
 import { addPageCountsMetrics } from './page-counts-metrics';
 
