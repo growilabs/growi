@@ -5,7 +5,7 @@ import type {
   GrowiInfoOptions,
   IGrowiAdditionalInfoResult,
 } from '@growi/core';
-import type { IUser, IPage } from '@growi/core/dist/interfaces';
+import type { IUser } from '@growi/core/dist/interfaces';
 import { GrowiWikiType } from '@growi/core/dist/interfaces';
 import { pathUtils } from '@growi/core/dist/utils';
 import type { Model } from 'mongoose';
