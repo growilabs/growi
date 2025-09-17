@@ -208,14 +208,15 @@ module.exports = (crowi: Crowi): Router => {
    *             schema:
    *               $ref: '#/components/schemas/ActivityResponse'
    */
-  router.get('/',
-    accessTokenParser([SCOPE.READ.ADMIN.AUDIT_LOG], { acceptLegacy: true }),
-    loginRequiredStrictly, validator.list, apiV3FormValidator, async(req: Request, res: ApiV3Response) => {
-     
+  router.get('/users/:userId/activities',
+
+      // FIX: Need middleware for getting current users userId
+      loginRequiredStrictly, validator.list, apiV3FormValidator, async(req: Request, res: ApiV3Response) => {
 
       const limit = req.query.limit || configManager.getConfig('customize:showPageLimitationS');
       const offset = req.query.offset || 1;
 
+      // FIX: Needs change to have userId in query
       const query = {};
 
       try {
@@ -266,6 +267,7 @@ module.exports = (crowi: Crowi): Router => {
       }
 
       try {
+        // FIX: Needs change to use aggreagation pipeline
         const paginateResult = await Activity.paginate(
           query,
           {
