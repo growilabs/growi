@@ -41,7 +41,7 @@ module.exports = (crowi) => {
  *                   type: object
  *                   additionalProperties:
  *                     type: string[]
- *                     description: inline MIME types.
+ *                     description: inline MIME types
  *
  */
   router.put(
@@ -95,11 +95,11 @@ module.exports = (crowi) => {
  *             schema:
  *               type: object
  *               properties:
- *                 contentDispositionSettings:
+ *                 currentDispositionSettings:
  *                   type: object
  *                   additionalProperties:
  *                     type: string
- *                     description: inline or attachment
+ *                     description: inline MIME types
  *
  */
   router.get('/', loginRequiredStrictly, adminRequired, async(req, res) => {
