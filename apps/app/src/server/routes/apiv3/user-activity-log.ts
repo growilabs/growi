@@ -1,12 +1,9 @@
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
-import { parseISO, addMinutes, isValid } from 'date-fns';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
 
-import type { IActivity, ISearchFilter } from '~/interfaces/activity';
-import { SCOPE } from '@growi/core/dist/interfaces';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import type { IActivity } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
@@ -210,75 +207,17 @@ module.exports = (crowi: Crowi): Router => {
    */
   router.get('/users/:userId/activities',
 
-      // FIX: Need middleware for getting current users userId
-      loginRequiredStrictly, validator.list, apiV3FormValidator, async(req: Request, res: ApiV3Response) => {
+    // FIX: Need middleware for getting current users userId
+    loginRequiredStrictly, validator.list, apiV3FormValidator, async(req: Request, res: ApiV3Response) => {
 
       const limit = req.query.limit || configManager.getConfig('customize:showPageLimitationS');
       const offset = req.query.offset || 1;
-
-      // FIX: Needs change to have userId in query
-      const query = {};
-
-      try {
-        const parsedSearchFilter = JSON.parse(req.query.searchFilter as string) as ISearchFilter;
-
-        // add username to query
-        const canContainUsernameFilterToQuery = (
-          parsedSearchFilter.usernames != null
-        && parsedSearchFilter.usernames.length > 0
-        && parsedSearchFilter.usernames.every(u => typeof u === 'string')
-        );
-        if (canContainUsernameFilterToQuery) {
-          Object.assign(query, { 'snapshot.username': parsedSearchFilter.usernames });
-        }
-
-        // add action to query
-        if (parsedSearchFilter.actions != null) {
-          const availableActions = crowi.activityService.getAvailableActions(false);
-          const searchableActions = parsedSearchFilter.actions.filter(action => availableActions.includes(action));
-          Object.assign(query, { action: searchableActions });
-        }
-
-        // add date to query
-        const startDate = parseISO(parsedSearchFilter?.dates?.startDate || '');
-        const endDate = parseISO(parsedSearchFilter?.dates?.endDate || '');
-        if (isValid(startDate) && isValid(endDate)) {
-          Object.assign(query, {
-            createdAt: {
-              $gte: startDate,
-              // + 23 hours 59 minutes
-              $lt: addMinutes(endDate, 1439),
-            },
-          });
-        }
-        else if (isValid(startDate) && !isValid(endDate)) {
-          Object.assign(query, {
-            createdAt: {
-              $gte: startDate,
-              // + 23 hours 59 minutes
-              $lt: addMinutes(startDate, 1439),
-            },
-          });
-        }
-      }
-      catch (err) {
-        logger.error('Invalid value', err);
-        return res.apiv3Err(err, 400);
-      }
+      const { userId } = req.params;
+      const query = { user: userId };
 
       try {
-        // FIX: Needs change to use aggreagation pipeline
-        const paginateResult = await Activity.paginate(
-          query,
-          {
-            lean: true,
-            limit,
-            offset,
-            sort: { createdAt: -1 },
-            populate: 'user',
-          },
-        );
 
+        // Create paginateResult in MongoDB Aggregation Pipeline.
         const serializedDocs = paginateResult.docs.map((doc: IActivity) => {
           const { user, ...rest } = doc;
           return {
