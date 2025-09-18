@@ -35,13 +35,22 @@ export class ContentHeaders implements IContentHeaders {
 
     let finalDispositionValue: string;
 
-    const currentInlineMimeTypes = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
-    const test = currentInlineMimeTypes.inlineMimeTypes;
+    const currentConfig = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
+    const adminInlineMimeTypes = currentConfig.inlineMimeTypes;
 
-    if (test.includes(mimeType)) {
+    const currentAttachmentMimeTypes = configManager.getConfig('attachments:contentDisposition:attachmentMimeTypes');
+    const adminAttachmentMimeTypes = currentAttachmentMimeTypes.attachmentMimeTypes;
+
+
+    // 1. Check for explicit admin override to 'inline'
+    if (adminInlineMimeTypes.includes(mimeType)) {
       finalDispositionValue = 'inline';
     }
-
+    // 2. Check for explicit admin override to 'attachment'
+    else if (adminAttachmentMimeTypes.includes(mimeType)) {
+      finalDispositionValue = 'attachment';
+    }
+    // 3. If no override, fall back to the default setting
     else {
       const defaultSetting = defaultContentDispositionSettings[mimeType];
 
@@ -51,7 +60,6 @@ export class ContentHeaders implements IContentHeaders {
       else {
         finalDispositionValue = 'attachment';
       }
-    }
 
 
     this.contentDisposition = {

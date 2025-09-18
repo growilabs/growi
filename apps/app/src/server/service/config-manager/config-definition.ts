@@ -80,6 +80,8 @@ export const CONFIG_KEYS = [
 
   // Content-Disposition settings for MIME types
   'attachments:contentDisposition:inlineMimeTypes',
+  'attachments:contentDisposition:attachmentMimeTypes',
+
 
   // Security Settings
   'security:wikiMode',
@@ -548,6 +550,11 @@ export const CONFIG_DEFINITIONS = {
     },
   }),
 
+  'attachments:contentDisposition:attachmentMimeTypes': defineConfig<{ attachmentMimeTypes: string[]; }>({
+    defaultValue: {
+      attachmentMimeTypes: [],
+    },
+  }),
 
   // Security Settings
   'security:wikiMode': defineConfig<string | undefined>({
