@@ -111,8 +111,7 @@ const respondForRedirectMode = async(res: Response, fileUploadService: FileUploa
 const respondForRelayMode = async(res: Response, fileUploadService: FileUploader,
     attachment: IAttachmentDocument, opts?: RespondOptions): Promise<void> => {
   // apply content-* headers before response
-  const isDownload = opts?.download ?? false;
-  const contentHeaders = new ContentHeaders(attachment, { inline: !isDownload });
+  const contentHeaders = new ContentHeaders(attachment);
   applyHeaders(res, contentHeaders.toExpressHttpHeaders());
 
   try {

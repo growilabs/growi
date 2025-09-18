@@ -22,9 +22,6 @@ export class ContentHeaders implements IContentHeaders {
 
   constructor(
       attachment: IAttachmentDocument,
-      opts?: {
-        inline?: boolean,
-    },
   ) {
     const attachmentContentType = attachment.fileFormat;
     const filename = attachment.originalName;
@@ -38,18 +35,17 @@ export class ContentHeaders implements IContentHeaders {
 
     let finalDispositionValue: string;
 
-    const requestedInline = opts?.inline ?? false;
-    const mimeTypeOverrides = configManager.getConfig('attachments:contentDisposition:mimeTypeOverrides');
-    const overrideSetting = mimeTypeOverrides[mimeType];
+    const currentInlineMimeTypes = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
+    const test = currentInlineMimeTypes.inlineMimeTypes;
 
-    if (overrideSetting) {
-      finalDispositionValue = overrideSetting;
+    if (test.includes(mimeType)) {
+      finalDispositionValue = 'inline';
     }
 
     else {
       const defaultSetting = defaultContentDispositionSettings[mimeType];
 
-      if (defaultSetting === 'inline' && requestedInline) {
+      if (defaultSetting === 'inline') {
         finalDispositionValue = 'inline';
       }
       else {
