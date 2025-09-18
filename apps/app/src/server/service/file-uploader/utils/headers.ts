@@ -35,8 +35,8 @@ export class ContentHeaders implements IContentHeaders {
 
     let finalDispositionValue: string;
 
-    const currentConfig = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
-    const adminInlineMimeTypes = currentConfig.inlineMimeTypes;
+    const currentInlineMimeTypes = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
+    const adminInlineMimeTypes = currentInlineMimeTypes.inlineMimeTypes;
 
     const currentAttachmentMimeTypes = configManager.getConfig('attachments:contentDisposition:attachmentMimeTypes');
     const adminAttachmentMimeTypes = currentAttachmentMimeTypes.attachmentMimeTypes;
