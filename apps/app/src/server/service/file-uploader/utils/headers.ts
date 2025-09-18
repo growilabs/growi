@@ -60,6 +60,7 @@ export class ContentHeaders implements IContentHeaders {
       else {
         finalDispositionValue = 'attachment';
       }
+    }
 
 
     this.contentDisposition = {
