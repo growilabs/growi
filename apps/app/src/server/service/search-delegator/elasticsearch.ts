@@ -23,7 +23,9 @@ import { configManager } from '../config-manager';
 import type { UpdateOrInsertPagesOpts } from '../interfaces/search';
 
 import { aggregatePipelineToIndex } from './aggregate-to-index';
-import type { AggregatedPage, BulkWriteBody, BulkWriteCommand } from './bulk-write';
+import type {
+  AggregatedPage, BulkWriteBody, BulkWriteCommand, BulkWriteBodyRestriction,
+} from './bulk-write';
 import {
   getClient,
   isES7ClientDelegator,
@@ -359,7 +361,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   /**
    * generate object that is related to page.grant*
    */
-  generateDocContentsRelatedToRestriction(page: AggregatedPage) {
+  generateDocContentsRelatedToRestriction(page: AggregatedPage): BulkWriteBodyRestriction {
     const grantedUserIds = page.grantedUsers.map(user => getIdStringForRef(user));
     const grantedGroupIds = page.grantedGroups.map(group => getIdStringForRef(group.item));
 
