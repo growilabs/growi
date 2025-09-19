@@ -8,7 +8,7 @@
 
   "features": {
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "22.17.0"
+      "version": "20.18.3"
     }
   },
 
@@ -35,6 +35,7 @@
         "vitest.explorer",
         "ms-playwright.playwright",
         // git/github
+        "codeinklingon.git-worktree-menu",
         "github.vscode-pull-request-github",
         "mhutchie.git-graph",
         "eamodio.gitlens",

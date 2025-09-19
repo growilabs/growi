@@ -14,7 +14,7 @@ const TextElement: FC<TextElemProps> = (props: TextElemProps) => (
         dangerouslySetInnerHTML={{ __html: props.children?.toString() || '' }}
       />
     ) : (
-      <>{props.children}</>
+      props.children
     )}
   </>
 );
@@ -48,6 +48,7 @@ export const PagePathLabel: FC<Props> = (props: Props) => {
     );
   } else if (isFormerOnly) {
     textElem = dPagePath.isFormerRoot ? (
+      // biome-ignore lint/complexity/noUselessFragments: ignore
       <>/</>
     ) : (
       <TextElement isHTML={isPathIncludedHtml}>{dPagePath.former}</TextElement>

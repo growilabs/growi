@@ -30,7 +30,7 @@ export const GrowiSlides = (props: Props): JSX.Element => {
     rendererOptions.remarkPlugins == null ||
     rendererOptions.components == null
   ) {
-    return <></>;
+    return;
   }
 
   rendererOptions.remarkPlugins.push([

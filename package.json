@@ -1,6 +1,6 @@
 {
   "name": "growi",
-  "version": "7.3.0",
+  "version": "7.3.1-RC.0",
   "description": "Team collaboration software using markdown",
   "license": "MIT",
   "private": "true",
@@ -96,7 +96,7 @@
     "turbo": "^2.1.3",
     "typescript": "~5.0.0",
     "typescript-transform-paths": "^3.4.7",
-    "vite": "^5.4.19",
+    "vite": "^5.4.20",
     "vite-plugin-dts": "^3.9.1",
     "vite-tsconfig-paths": "^5.0.1",
     "vitest": "^2.1.1",
@@ -116,6 +116,6 @@
     }
   },
   "engines": {
-    "node": "^20 || ^22"
+    "node": "^18 || ^20"
   }
 }

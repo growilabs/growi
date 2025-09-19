@@ -181,6 +181,7 @@ export const UserPicture = memo((userProps: Props): JSX.Element => {
     .filter(Boolean)
     .join(' ');
 
+  // biome-ignore lint/performance/noImgElement: ignore
   const imgElement = <img src={src} alt={displayName} className={className} />;
   const baseProps = { displayName, size, children: imgElement };
 

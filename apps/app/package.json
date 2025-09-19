@@ -1,6 +1,6 @@
 {
   "name": "@growi/app",
-  "version": "7.3.0",
+  "version": "7.3.1-RC.0",
   "license": "MIT",
   "private": "true",
   "scripts": {
@@ -296,6 +296,7 @@
     "@types/unzip-stream": "^0.3.4",
     "@types/url-join": "^4.0.2",
     "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.1",
     "babel-loader": "^8.2.5",
     "bootstrap": "=5.3.2",
     "commander": "^14.0.0",

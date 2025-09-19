@@ -11,7 +11,7 @@ pnpm install
 ## 開発サーバー
 ```bash
 # メインアプリケーション開発モード
-cd apps/app && pnpm run dev
+cd /workspace/growi/apps/app && pnpm run dev
 
 # ルートから起動（本番用ビルド後）
 pnpm start
@@ -31,20 +31,26 @@ turbo run build
 
 ## Lint・フォーマット
 ```bash
+# 全てのLint実行
+pnpm run lint
+```
+
+## apps/app の Lint・フォーマット
+```bash
 # 【推奨】Biome実行（lint + format）
-pnpm run lint:biome
+cd /workspace/growi/apps/app pnpm run lint:biome
 
 # 【過渡期】ESLint実行（廃止予定）
-pnpm run lint:eslint
+cd /workspace/growi/apps/app pnpm run lint:eslint
 
 # Stylelint実行
-pnpm run lint:styles
+cd /workspace/growi/apps/app pnpm run lint:styles
 
-# 全てのLint実行（過渡期対応）
-pnpm run lint
+# 全てのLint実行
+cd /workspace/growi/apps/app pnpm run lint
 
 # TypeScript型チェック
-pnpm run lint:typecheck
+cd /workspace/growi/apps/app pnpm run lint:typecheck
 ```
 
 ## テスト
