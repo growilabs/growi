@@ -22,8 +22,8 @@ function fileSearchSubstance({ prompt, instruction, vectorStoreId }: FileSearchP
   const openai = getOpenaiProvider();
   const model = configManager.getConfig('openai:assistantModel:chat');
   return {
-    model: openai(model),
     prompt,
+    model: openai(model),
     tools: {
       file_search: openai.tools.fileSearch({
         vectorStoreIds: [vectorStoreId],
@@ -40,7 +40,7 @@ function fileSearchSubstance({ prompt, instruction, vectorStoreId }: FileSearchP
       },
     },
     // Force file search tool:
-    toolChoice: { type: 'tool', toolName: 'file_search' } as const,
+    toolChoice: { type: 'tool', toolName: 'file_search' },
   };
 }
 
