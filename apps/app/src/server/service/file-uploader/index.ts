@@ -10,7 +10,12 @@ export type { FileUploader } from './file-uploader';
 
 const logger = loggerFactory('growi:service:FileUploaderServise');
 
-export const getUploader = (crowi: Crowi): FileUploader => {
+// Extended FileUploader type with cleanup function
+export interface FileUploaderWithCleanup extends FileUploader {
+  cleanup?: () => Promise<void>;
+}
+
+export const getUploader = (crowi: Crowi): FileUploaderWithCleanup => {
   const method = EnvToModuleMappings[configManager.getConfig('app:fileUploadType')];
   const modulePath = `./${method}`;
   const uploader = require(modulePath)(crowi);

@@ -85,23 +85,50 @@ const getS3Bucket = (): NonBlankString | undefined => {
   return toNonBlankStringOrUndefined(configManager.getConfig('aws:s3Bucket')); // Blank strings may remain in the DB, so convert with toNonBlankStringOrUndefined for safety
 };
 
-const S3Factory = (): S3Client => {
-  const accessKeyId = configManager.getConfig('aws:s3AccessKeyId');
-  const secretAccessKey = configManager.getConfig('aws:s3SecretAccessKey');
-  const s3Region = toNonBlankStringOrUndefined(configManager.getConfig('aws:s3Region')); // Blank strings may remain in the DB, so convert with toNonBlankStringOrUndefined for safety
-  const s3CustomEndpoint = toNonBlankStringOrUndefined(configManager.getConfig('aws:s3CustomEndpoint'));
+// Singleton S3Client to prevent memory leaks from multiple client instances
+let s3ClientInstance: S3Client | null = null;
 
-  return new S3Client({
-    credentials: accessKeyId != null && secretAccessKey != null
-      ? {
-        accessKeyId,
-        secretAccessKey,
-      }
-      : undefined,
-    region: s3Region,
-    endpoint: s3CustomEndpoint,
-    forcePathStyle: s3CustomEndpoint != null, // s3ForcePathStyle renamed to forcePathStyle in v3
-  });
+const getS3Client = (): S3Client => {
+  if (s3ClientInstance == null) {
+    const accessKeyId = configManager.getConfig('aws:s3AccessKeyId');
+    const secretAccessKey = configManager.getConfig('aws:s3SecretAccessKey');
+    const s3Region = toNonBlankStringOrUndefined(configManager.getConfig('aws:s3Region')); // Blank strings may remain in the DB, so convert with toNonBlankStringOrUndefined for safety
+    const s3CustomEndpoint = toNonBlankStringOrUndefined(configManager.getConfig('aws:s3CustomEndpoint'));
+
+    s3ClientInstance = new S3Client({
+      credentials: accessKeyId != null && secretAccessKey != null
+        ? {
+          accessKeyId,
+          secretAccessKey,
+        }
+        : undefined,
+      region: s3Region,
+      endpoint: s3CustomEndpoint,
+      forcePathStyle: s3CustomEndpoint != null, // s3ForcePathStyle renamed to forcePathStyle in v3
+    });
+  }
+  return s3ClientInstance;
+};
+
+// Cleanup function for application shutdown
+const cleanupS3Client = async (): Promise<void> => {
+  if (s3ClientInstance != null) {
+    try {
+      await s3ClientInstance.destroy();
+    }
+    catch (err) {
+      logger.warn('Error during S3Client cleanup:', err);
+    }
+    finally {
+      s3ClientInstance = null;
+    }
+  }
+};
+
+// Deprecated: Use getS3Client() instead
+const S3Factory = (): S3Client => {
+  logger.warn('S3Factory is deprecated. Use getS3Client() instead.');
+  return getS3Client();
 };
 
 const getFilePathOnStorage = (attachment: IAttachmentDocument) => {
@@ -174,7 +201,7 @@ class AwsFileUploader extends AbstractFileUploader {
 
     logger.debug(`File uploading: fileName=${attachment.fileName}`);
 
-    const s3 = S3Factory();
+    const s3 = getS3Client(); // Use singleton S3Client
 
     const filePath = getFilePathOnStorage(attachment);
     const contentHeaders = new ContentHeaders(attachment);
@@ -205,7 +232,7 @@ class AwsFileUploader extends AbstractFileUploader {
       throw new Error('AWS is not configured.');
     }
 
-    const s3 = S3Factory();
+    const s3 = getS3Client(); // Use singleton S3Client
     const filePath = getFilePathOnStorage(attachment);
 
     const params = {
@@ -220,16 +247,33 @@ class AwsFileUploader extends AbstractFileUploader {
     }
 
     try {
-      const body = (await s3.send(new GetObjectCommand(params))).Body;
+      const response = await s3.send(new GetObjectCommand(params));
+      const body = response.Body;
 
       if (body == null) {
         throw new Error(`S3 returned null for the Attachment (${filePath})`);
       }
 
       // eslint-disable-next-line no-nested-ternary
-      return 'stream' in body
+      const stream = 'stream' in body
         ? body.stream() as unknown as NodeJS.ReadableStream // get stream from Blob and cast force
         : body as unknown as NodeJS.ReadableStream; // cast force
+
+      // Add error handling for stream to prevent memory leaks
+      stream.on('error', (err) => {
+        logger.error('Stream error for attachment:', attachment._id.toString(), err);
+        try {
+          // Check if stream has destroy method (Node.js streams)
+          if ('destroy' in stream && typeof stream.destroy === 'function') {
+            stream.destroy();
+          }
+        }
+        catch (destroyErr) {
+          logger.warn('Error destroying stream:', destroyErr);
+        }
+      });
+
+      return stream;
     }
     catch (err) {
       logger.error(err);
@@ -245,7 +289,7 @@ class AwsFileUploader extends AbstractFileUploader {
       throw new Error('AWS is not configured.');
     }
 
-    const s3 = S3Factory();
+    const s3 = getS3Client(); // Use singleton S3Client
     const filePath = getFilePathOnStorage(attachment);
     const lifetimeSecForTemporaryUrl = configManager.getConfig('aws:lifetimeSecForTemporaryUrl');
 
@@ -271,13 +315,14 @@ class AwsFileUploader extends AbstractFileUploader {
   }
 
   override createMultipartUploader(uploadKey: string, maxPartSize: number) {
-    const s3 = S3Factory();
+    const s3 = getS3Client(); // Use singleton S3Client
     return new AwsMultipartUploader(s3, getS3Bucket(), uploadKey, maxPartSize);
   }
 
   override async abortPreviousMultipartUpload(uploadKey: string, uploadId: string) {
+    const s3 = getS3Client(); // Use singleton S3Client
     try {
-      await S3Factory().send(new AbortMultipartUploadCommand({
+      await s3.send(new AbortMultipartUploadCommand({
         Bucket: getS3Bucket(),
         Key: uploadKey,
         UploadId: uploadId,
@@ -315,7 +360,7 @@ module.exports = (crowi: Crowi) => {
     if (!lib.getIsUploadable()) {
       throw new Error('AWS is not configured.');
     }
-    const s3 = S3Factory();
+    const s3 = getS3Client(); // Use singleton S3Client
 
     const filePaths = attachments.map((attachment) => {
       return { Key: getFilePathOnStorage(attachment) };
@@ -332,7 +377,7 @@ module.exports = (crowi: Crowi) => {
     if (!lib.getIsUploadable()) {
       throw new Error('AWS is not configured.');
     }
-    const s3 = S3Factory();
+    const s3 = getS3Client(); // Use singleton S3Client
 
     const params = {
       Bucket: getS3Bucket(),
@@ -350,7 +395,7 @@ module.exports = (crowi: Crowi) => {
   };
 
   lib.saveFile = async function({ filePath, contentType, data }) {
-    const s3 = S3Factory();
+    const s3 = getS3Client(); // Use singleton S3Client
 
     return s3.send(new PutObjectCommand({
       Bucket: getS3Bucket(),
@@ -368,46 +413,88 @@ module.exports = (crowi: Crowi) => {
   };
 
   /**
-   * List files in storage
+   * List files in storage with memory-efficient pagination
+   * Returns an async generator to prevent memory leaks with large file lists
    */
-  (lib as any).listFiles = async function() {
+  (lib as any).listFiles = async function* () {
     if (!lib.getIsReadable()) {
       throw new Error('AWS is not configured.');
     }
 
-    const files: FileMeta[] = [];
-    const s3 = S3Factory();
-    const params = {
-      Bucket: getS3Bucket(),
-    };
-    let shouldContinue = true;
+    const s3 = getS3Client(); // Use singleton S3Client
+    const BATCH_SIZE = 1000; // Limit batch size to prevent memory issues
     let nextMarker: string | undefined;
+    let shouldContinue = true;
+    let totalProcessed = 0;
+    const MAX_TOTAL_FILES = 100000; // Safety limit to prevent runaway processes
 
-    // handle pagination
-    while (shouldContinue) {
-      // eslint-disable-next-line no-await-in-loop
-      const { Contents = [], IsTruncated, NextMarker } = await s3.send(new ListObjectsCommand({
-        ...params,
-        Marker: nextMarker,
-      }));
-      files.push(...(
-        Contents.map(({ Key, Size }) => ({
+    // handle pagination with memory efficiency
+    while (shouldContinue && totalProcessed < MAX_TOTAL_FILES) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const { Contents = [], IsTruncated, NextMarker } = await s3.send(new ListObjectsCommand({
+          Bucket: getS3Bucket(),
+          Marker: nextMarker,
+          MaxKeys: BATCH_SIZE, // Limit each S3 request
+        }));
+
+        // Process files in batches to reduce memory usage
+        const batchFiles = Contents.map(({ Key, Size }) => ({
           name: Key as string,
           size: Size as number,
-        }))
-      ));
+        }));
 
-      if (!IsTruncated) {
-        shouldContinue = false;
-        nextMarker = undefined;
+        // Yield batch instead of accumulating all files
+        yield batchFiles;
+        
+        totalProcessed += batchFiles.length;
+
+        if (!IsTruncated) {
+          shouldContinue = false;
+          nextMarker = undefined;
+        }
+        else {
+          nextMarker = NextMarker;
+        }
+
+        // Log progress for large operations
+        if (totalProcessed % 10000 === 0) {
+          logger.debug(`Processed ${totalProcessed} files, continuing...`);
+        }
       }
-      else {
-        nextMarker = NextMarker;
+      catch (error) {
+        logger.error('Error during file listing:', error);
+        throw error;
       }
     }
 
-    return files;
+    if (totalProcessed >= MAX_TOTAL_FILES) {
+      logger.warn(`File listing stopped at ${MAX_TOTAL_FILES} files to prevent memory issues`);
+    }
+
+    logger.debug(`File listing completed. Total processed: ${totalProcessed} files`);
   };
+
+  // Backward compatibility: Convert generator to array for existing code
+  (lib as any).listFilesLegacy = async function() {
+    const allFiles: FileMeta[] = [];
+    
+    // Use the generator but accumulate results for backward compatibility
+    for await (const batch of (lib as any).listFiles()) {
+      allFiles.push(...batch);
+      
+      // Safety check to prevent excessive memory usage
+      if (allFiles.length > 50000) {
+        logger.warn(`Legacy listFiles stopped at ${allFiles.length} files to prevent memory issues. Use listFiles() generator for large datasets.`);
+        break;
+      }
+    }
+    
+    return allFiles;
+  };
+
+  // Add cleanup method for application shutdown
+  (lib as any).cleanup = cleanupS3Client;
 
   return lib;
 };

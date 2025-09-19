@@ -548,6 +548,19 @@ Crowi.prototype.setupTerminus = function(server) {
     onSignal: async() => {
       logger.info('Server is starting cleanup');
 
+      // Cleanup file uploaders to prevent memory leaks
+      try {
+        if (this.fileUploadService && typeof this.fileUploadService.cleanup === 'function') {
+          logger.info('Cleaning up file upload service...');
+          await this.fileUploadService.cleanup();
+          logger.info('File upload service cleanup completed');
+        }
+      }
+      catch (err) {
+        logger.warn('Error during file upload service cleanup:', err);
+      }
+
+      // Cleanup database connection
       await mongoose.disconnect();
       return;
     },
