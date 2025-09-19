@@ -50,6 +50,7 @@ export const CONFIG_KEYS = [
   'app:aiEnabled',
   'app:publishOpenAPI',
   'app:maxFileSize',
+  'app:fileUploadTimeout',
   'app:fileUploadTotalLimit',
   'app:fileUploadDisabled',
   'app:elasticsearchVersion',
@@ -428,6 +429,10 @@ export const CONFIG_DEFINITIONS = {
   'app:maxFileSize': defineConfig<number>({
     envVarName: 'MAX_FILE_SIZE',
     defaultValue: Infinity,
+  }),
+  'app:fileUploadTimeout': defineConfig<number>({
+    envVarName: 'FILE_UPLOAD_TIMEOUT',
+    defaultValue: 10 * 60 * 1000, // 10 minutes
   }),
   'app:fileUploadTotalLimit': defineConfig<number>({
     envVarName: 'FILE_UPLOAD_TOTAL_LIMIT',

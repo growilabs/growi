@@ -75,6 +75,10 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
 
   private indexName: string;
 
+  private pageModel?: PageModel;
+
+  private userModel?: typeof mongoose.Model;
+
   constructor(socketIoService: SocketIoService) {
     this.name = SearchDelegatorName.DEFAULT;
     this.socketIoService = socketIoService;
@@ -90,6 +94,26 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     this.elasticsearchVersion = elasticsearchVersion;
 
     this.isElasticsearchReindexOnBoot = configManager.getConfig('app:elasticsearchReindexOnBoot');
+  }
+
+  /**
+   * Get Page model with proper typing
+   */
+  private getPageModel(): PageModel {
+    if (!this.pageModel) {
+      this.pageModel = mongoose.model<IPage, PageModel>('Page');
+    }
+    return this.pageModel;
+  }
+
+  /**
+   * Get User model with proper typing
+   */
+  private getUserModel() {
+    if (!this.userModel) {
+      this.userModel = mongoose.model('User');
+    }
+    return this.userModel;
   }
 
   get aliasName(): string {
@@ -416,17 +440,17 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   }
 
   addAllPages() {
-    const Page = mongoose.model('Page');
+    const Page = this.getPageModel();
     return this.updateOrInsertPages(() => Page.find(), { shouldEmitProgress: true, invokeGarbageCollection: true });
   }
 
   updateOrInsertPageById(pageId) {
-    const Page = mongoose.model('Page');
+    const Page = this.getPageModel();
     return this.updateOrInsertPages(() => Page.findById(pageId));
   }
 
   updateOrInsertDescendantsPagesById(page, user) {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = this.getPageModel();
     const { PageQueryBuilder } = Page;
     const builder = new PageQueryBuilder(Page.find());
     builder.addConditionToListWithDescendants(page.path);
@@ -439,7 +463,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   async updateOrInsertPages(queryFactory, option: UpdateOrInsertPagesOpts = {}): Promise<void> {
     const { shouldEmitProgress = false, invokeGarbageCollection = false } = option;
 
-    const Page = mongoose.model<IPage, PageModel>('Page');
+    const Page = this.getPageModel();
     const { PageQueryBuilder } = Page;
 
     const socket = shouldEmitProgress ? this.socketIoService.getAdminSocket() : null;
@@ -827,7 +851,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
       throw new Error('query.body.query.bool is not initialized');
     }
 
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = this.getPageModel();
     const {
       GRANT_PUBLIC, GRANT_SPECIFIED, GRANT_OWNER, GRANT_USER_GROUP,
     } = Page;
@@ -886,7 +910,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   }
 
   async appendFunctionScore(query, queryString): Promise<void> {
-    const User = mongoose.model('User');
+    const User = this.getUserModel();
     const count = await User.count({}) || 1;
 
     const minScore = queryString.length * 0.1 - 1; // increase with length
