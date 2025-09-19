@@ -14,7 +14,7 @@ const logger = loggerFactory(
  */
 export const verifyGrowiToSlackRequest = (
   req: RequestFromGrowi,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ): void => {
   const str = req.headers['x-growi-gtop-tokens'];

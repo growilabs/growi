@@ -1,5 +1,4 @@
 import type {
-  Action,
   ActionsBlock,
   ActionsBlockElement,
   Button,
@@ -10,7 +9,6 @@ import type {
   InputBlock,
   MultiSelect,
   Option,
-  Overflow,
   PlainTextInput,
   RadioButtons,
   SectionBlock,

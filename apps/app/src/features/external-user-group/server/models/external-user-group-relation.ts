@@ -15,6 +15,7 @@ export interface ExternalUserGroupRelationDocument
 
 export interface ExternalUserGroupRelationModel
   extends Model<ExternalUserGroupRelationDocument> {
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
   [x: string]: any; // for old methods
 
   PAGE_ITEMS: 50;

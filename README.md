@@ -16,7 +16,7 @@
 
 # GROWI
 
-[![docker pulls](https://img.shields.io/docker/pulls/weseek/growi.svg)](https://hub.docker.com/r/weseek/growi/)
+[![docker pulls](https://img.shields.io/docker/pulls/growilabs/growi.svg)](https://hub.docker.com/r/growilabs/growi/)
 [![CodeQL](https://github.com/growilabs/growi/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/growilabs/growi/actions/workflows/codeql-analysis.yml)
 [![Node CI for app development](https://github.com/growilabs/growi/actions/workflows/ci-app.yml/badge.svg)](https://github.com/growilabs/growi/actions/workflows/ci-app.yml)
 [![Node CI for app production](https://github.com/growilabs/growi/actions/workflows/ci-app-prod.yml/badge.svg)](https://github.com/growilabs/growi/actions/workflows/ci-app-prod.yml)
@@ -81,9 +81,9 @@ See [GROWI Docs: Environment Variables](https://docs.growi.org/en/admin-guide/ad
 
 ## Dependencies
 
-- Node.js v20.x or v22.x
-- npm 10.x
-- pnpm 10.x
+- Node.js v18.x or v20.x
+- npm 6.x
+- pnpm 9.x
 - [Turborepo](https://turbo.build/repo)
 - MongoDB v6.x or v8.x
 
@@ -144,5 +144,5 @@ If you have questions or suggestions, you can [join our Slack team](https://comm
 [growi]: https://github.com/growilabs/growi
 [issues]: https://github.com/growilabs/growi/issues
 [pulls]: https://github.com/growilabs/growi/pulls
-[dockerhub]: https://hub.docker.com/r/weseek/growi
+[dockerhub]: https://hub.docker.com/r/growilabs/growi
 [docker-compose]: https://github.com/growilabs/growi-docker-compose

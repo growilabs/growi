@@ -2,7 +2,7 @@
 GROWI Official docker image
 ========================
 
-[![Actions Status](https://github.com/growilabs/growi/workflows/Release/badge.svg)](https://github.com/growilabs/growi/actions) [![docker-pulls](https://img.shields.io/docker/pulls/weseek/growi.svg)](https://hub.docker.com/r/weseek/growi/) [![](https://images.microbadger.com/badges/image/weseek/growi.svg)](https://microbadger.com/images/weseek/growi)
+[![Actions Status](https://github.com/growilabs/growi/workflows/Release/badge.svg)](https://github.com/growilabs/growi/actions) [![docker-pulls](https://img.shields.io/docker/pulls/growilabs/growi.svg)](https://hub.docker.com/r/growilabs/growi/) 
 
 ![GROWI-x-docker](https://github.com/user-attachments/assets/1a82236d-5a85-4a2e-842a-971b4c1625e6)
 
@@ -18,7 +18,7 @@ Supported tags and respective Dockerfile links
 What is GROWI?
 -------------
 
-GROWI is a team collaboration software and it forked from [crowi](https://github.com/weseek/crowi/crowi)
+GROWI is a team collaboration software and it forked from [crowi](https://github.com/crowi/crowi)
 
 see: [growilabs/growi](https://github.com/growilabs/growi)
 
@@ -41,7 +41,7 @@ Usage
 ```bash
 docker run -d \
     -e MONGO_URI=mongodb://MONGODB_HOST:MONGODB_PORT/growi \
-    weseek/growi
+    growilabs/growi
 ```
 
 and go to `http://localhost:3000/` .
@@ -52,7 +52,7 @@ If you use ElasticSearch, type this:
 docker run -d \
     -e MONGO_URI=mongodb://MONGODB_HOST:MONGODB_PORT/growi \
     -e ELASTICSEARCH_URI=http://ELASTICSEARCH_HOST:ELASTICSEARCH_PORT/growi \
-    weseek/growi
+    growilabs/growi
 ```
 
 
@@ -60,7 +60,7 @@ docker run -d \
 
 Using docker-compose is the fastest and the most convenient way to boot GROWI.
 
-see: [weseek/growi-docker-compose](https://github.com/growilabs/growi-docker-compose)
+see: [growilabs/growi-docker-compose](https://github.com/growilabs/growi-docker-compose)
 
 
 Configuration
