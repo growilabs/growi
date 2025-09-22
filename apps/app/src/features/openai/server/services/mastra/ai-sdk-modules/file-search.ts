@@ -44,10 +44,13 @@ function fileSearchSubstance({ prompt, instruction, vectorStoreId }: FileSearchP
   };
 }
 
+
+// for Agent tool
 export const fileSearch = ({ prompt, instruction, vectorStoreId }: FileSearchParameters): GenerateTextResult => {
   return generateText(fileSearchSubstance({ prompt, instruction, vectorStoreId }));
 };
 
+// for Workflow step
 export const fileSearchWithStream = ({ prompt, instruction, vectorStoreId }: FileSearchParameters): StreamTextResult => {
   return streamText(fileSearchSubstance({ prompt, instruction, vectorStoreId }));
 };
