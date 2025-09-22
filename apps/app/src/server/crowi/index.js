@@ -18,9 +18,9 @@ import instanciatePageBulkExportJobCleanUpCronService, {
 } from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
 import { startCron as startAccessTokenCron } from '~/server/service/access-token';
+import { projectRoot } from '~/server/util/project-dir-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
-import { projectRoot } from '~/utils/project-dir-utils';
 
 import UserEvent from '../events/user';
 import { accessTokenParser } from '../middlewares/access-token-parser';
