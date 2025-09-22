@@ -55,7 +55,10 @@ class NodeMemoryConsumptionChecker {
   }
 
   // Helper method to get pressure status and icon
-  private getPressureInfo(percentage: number): { status: string; icon: string } {
+  private getPressureInfo(percentage: number): {
+    status: string;
+    icon: string;
+  } {
     if (percentage > 90) return { status: 'HIGH PRESSURE', icon: '🔴' };
     if (percentage > 70) return { status: 'MODERATE PRESSURE', icon: '🟡' };
     return { status: 'LOW PRESSURE', icon: '🟢' };
@@ -71,9 +74,13 @@ class NodeMemoryConsumptionChecker {
     return new Promise((resolve, reject) => {
       get(url, (res) => {
         let data = '';
-        res.on('data', (chunk) => { data += chunk; });
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
         res.on('end', () => resolve(data));
-      }).on('error', (err) => reject(this.createError(`Cannot connect to ${url}: ${err.message}`)));
+      }).on('error', (err) =>
+        reject(this.createError(`Cannot connect to ${url}: ${err.message}`)),
+      );
     });
   }
 
@@ -218,9 +225,20 @@ class NodeMemoryConsumptionChecker {
       return;
     }
 
-    const [heapUsedMB, heapTotalMB, heapLimitMB, rssMB, externalMB, arrayBuffersMB] = [
-      this.toMB(info.heapUsed), this.toMB(info.heapTotal), this.toMB(info.heapLimit || 0),
-      this.toMB(info.rss), this.toMB(info.external), this.toMB(info.arrayBuffers)
+    const [
+      heapUsedMB,
+      heapTotalMB,
+      heapLimitMB,
+      rssMB,
+      externalMB,
+      arrayBuffersMB,
+    ] = [
+      this.toMB(info.heapUsed),
+      this.toMB(info.heapTotal),
+      this.toMB(info.heapLimit || 0),
+      this.toMB(info.rss),
+      this.toMB(info.external),
+      this.toMB(info.arrayBuffers),
     ];
 
     console.log('\n📊 Node.js Memory Information');
@@ -237,20 +255,35 @@ class NodeMemoryConsumptionChecker {
     // Heap Limits
     console.log('\n🔸 Heap Limits:');
     if (info.heapLimit) {
-      const limitType = info.heapLimitSource === 'explicit' ? 'Explicit Limit' : 'Default Limit';
-      const limitSource = info.heapLimitSource === 'explicit' ? '(from --max-old-space-size)' : '(system default)';
-      console.log(`  ${limitType}: ${heapLimitMB.toFixed(2)} MB ${limitSource}`);
-      console.log(`  Global Usage:   ${((heapUsedMB / heapLimitMB) * 100).toFixed(2)}% of maximum`);
+      const limitType =
+        info.heapLimitSource === 'explicit'
+          ? 'Explicit Limit'
+          : 'Default Limit';
+      const limitSource =
+        info.heapLimitSource === 'explicit'
+          ? '(from --max-old-space-size)'
+          : '(system default)';
+      console.log(
+        `  ${limitType}: ${heapLimitMB.toFixed(2)} MB ${limitSource}`,
+      );
+      console.log(
+        `  Global Usage:   ${((heapUsedMB / heapLimitMB) * 100).toFixed(2)}% of maximum`,
+      );
     }
 
     // Heap Pressure Analysis
     const heapPressure = (info.heapUsed / info.heapTotal) * 100;
-    const { status: pressureStatus, icon: pressureIcon } = this.getPressureInfo(heapPressure);
+    const { status: pressureStatus, icon: pressureIcon } =
+      this.getPressureInfo(heapPressure);
     console.log('\n� Memory Pressure Analysis:');
-    console.log(`  Current Pool:   ${pressureIcon} ${pressureStatus} (${heapPressure.toFixed(1)}% of allocated heap)`);
+    console.log(
+      `  Current Pool:   ${pressureIcon} ${pressureStatus} (${heapPressure.toFixed(1)}% of allocated heap)`,
+    );
 
     if (heapPressure > 90) {
-      console.log('  📝 Note: High pressure is normal - Node.js will allocate more heap as needed');
+      console.log(
+        '  📝 Note: High pressure is normal - Node.js will allocate more heap as needed',
+      );
     }
 
     // System Information
@@ -271,10 +304,13 @@ class NodeMemoryConsumptionChecker {
     console.log('\n📋 Summary:');
     if (info.heapLimit) {
       const heapUsagePercent = (heapUsedMB / heapLimitMB) * 100;
-      console.log(`Heap Memory: ${heapUsedMB.toFixed(2)} MB / ${heapLimitMB.toFixed(2)} MB (${heapUsagePercent.toFixed(2)}%)`);
-      console.log(heapUsagePercent > 80
-        ? '⚠️  Consider increasing heap limit with --max-old-space-size if needed'
-        : '✅ Memory usage is within healthy limits'
+      console.log(
+        `Heap Memory: ${heapUsedMB.toFixed(2)} MB / ${heapLimitMB.toFixed(2)} MB (${heapUsagePercent.toFixed(2)}%)`,
+      );
+      console.log(
+        heapUsagePercent > 80
+          ? '⚠️  Consider increasing heap limit with --max-old-space-size if needed'
+          : '✅ Memory usage is within healthy limits',
       );
     }
 

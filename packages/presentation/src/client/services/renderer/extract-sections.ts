@@ -61,7 +61,7 @@ export const remarkPlugin: Plugin<[ExtractSectionsPluginParams]> = (
 
   return (tree) => {
     // wrap with <section>
-    visit(tree, startCondition, (node, index, parent: Parent) => {
+    visit(tree, startCondition, (node, _index, parent: Parent) => {
       if (parent == null || parent.type !== 'root' || node.type === 'yaml') {
         return;
       }

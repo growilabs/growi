@@ -12,6 +12,7 @@ export interface ExternalUserGroupDocument
 
 export interface ExternalUserGroupModel
   extends Model<ExternalUserGroupDocument> {
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
   [x: string]: any; // for old methods
 
   PAGE_ITEMS: 10;

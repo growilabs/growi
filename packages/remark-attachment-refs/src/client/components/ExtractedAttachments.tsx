@@ -107,7 +107,7 @@ export const ExtractedAttachments = React.memo(
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const renderExtractedImage = useCallback(
-      (attachment: IAttachmentHasId, index: number) => {
+      (attachment: IAttachmentHasId, _index: number) => {
         const { options } = refsContext;
 
         // determine alt

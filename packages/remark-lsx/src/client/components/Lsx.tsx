@@ -93,7 +93,7 @@ const LsxSubstance = React.memo(
 
     const contents = useMemo(() => {
       if (data == null) {
-        return <></>;
+        return;
       }
 
       const depthRange = lsxContext.getOptDepth();

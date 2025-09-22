@@ -22,8 +22,6 @@ import { stringifyEntitiesLight } from 'stringify-entities';
 
 const own = {}.hasOwnProperty;
 
-const shortcut = /^[^\t\n\r "#'.<=>`}]+$/;
-
 export const DirectiveType = Object.freeze({
   Text: 'textGrowiPluginDirective',
   Leaf: 'leafGrowiPluginDirective',
@@ -223,12 +221,6 @@ function attributes(node, state) {
   const attrs = node.attributes || {};
   /** @type {Array.<string>} */
   const values = [];
-  /** @type {string|undefined} */
-  let classesFull;
-  /** @type {string|undefined} */
-  let classes;
-  /** @type {string|undefined} */
-  let id;
   /** @type {string} */
   let key;
 

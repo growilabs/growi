@@ -162,7 +162,7 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
     }
 
     const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
+      for (const _entry of entries) {
         // setElementWidth(entry.contentRect.width);
         onRenderingStart?.();
         renderDrawioWithDebounce();
