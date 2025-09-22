@@ -209,8 +209,7 @@ class AzureFileUploader extends AbstractFileUploader {
       const expiresOn = new Date(now + lifetimeSecForTemporaryUrl * 1000);
       const userDelegationKey = await blobServiceClient.getUserDelegationKey(startsOn, expiresOn);
 
-      const isDownload = opts?.download ?? false;
-      const contentHeaders = new ContentHeaders(attachment, { inline: !isDownload });
+      const contentHeaders = new ContentHeaders(attachment);
 
       // https://github.com/Azure/azure-sdk-for-js/blob/d4d55f73/sdk/storage/storage-blob/src/ContainerSASPermissions.ts#L24
       // r:read, a:add, c:create, w:write, d:delete, l:list
