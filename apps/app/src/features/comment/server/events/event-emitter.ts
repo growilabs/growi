@@ -1,3 +1,2 @@
-import { EventEmitter } from 'events';
-
+import { EventEmitter } from 'node:events';
 export const commentEvent = new EventEmitter();
