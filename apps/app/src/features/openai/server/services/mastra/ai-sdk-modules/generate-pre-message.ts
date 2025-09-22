@@ -8,6 +8,9 @@ import { getOpenaiProvider } from './get-openai-provider';
 
 // eslint-disable-next-line max-len
 const INSTRUCTION = `You generate initial acknowledgment messages that appear immediately after a user submits their input. These messages show that the system has received the user's request while the full response is being prepared.
+# CRITICAL INSTRUCTION
+- ALWAYS RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT.
+
 # Purpose
 - Generate a brief response showing you've understood the user's question or instruction
 - Reduce user anxiety while waiting for the complete answer
@@ -18,7 +21,6 @@ const INSTRUCTION = `You generate initial acknowledgment messages that appear im
 - Content that reflects the user's intent
 - Polite and friendly tone
 - Phrases indicating processing like "I'm thinking about this" or "Let me check that"
-- Always respond in the SAME LANGUAGE as the user's input
 
 # Expressions to Avoid
 - Definitive statements like "I know" or "I understand"
