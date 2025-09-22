@@ -128,7 +128,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
           for await (const chunk of stream) {
             if (chunk.type === 'workflow-step-output') {
               const payloadType = chunk?.payload?.output?.type;
-              if (payloadType === StreamEventName.FILE_SEARCH_STEP_EVENT || payloadType === StreamEventName.FILE_SEARCH_STEP_EVENT) {
+              if (payloadType === StreamEventName.GENERATE_PRE_MESSAGE_STEP_EVENT || payloadType === StreamEventName.FILE_SEARCH_STEP_EVENT) {
                 const text = chunk?.payload?.output?.text;
                 // Output chunk text
                 console.log(text);
