@@ -1,6 +1,7 @@
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 
+import { StreamEventName } from '../../../../interfaces/mastra';
 import { fileSearchWithStream } from '../ai-sdk-modules/file-search';
 
 export const fileSearchStep = createStep({
@@ -18,7 +19,7 @@ export const fileSearchStep = createStep({
     const fileSearchResult = fileSearchWithStream({ ...inputData });
     for await (const text of fileSearchResult.textStream) {
       await writer.write({
-        type: 'file-search-step-event',
+        type: StreamEventName.FILE_SEARCH_STEP_EVENT,
         text,
       });
     }

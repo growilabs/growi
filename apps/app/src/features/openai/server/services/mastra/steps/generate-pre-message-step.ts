@@ -2,6 +2,7 @@
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 
+import { StreamEventName } from '../../../../interfaces/mastra';
 import { generatePreMessage } from '../ai-sdk-modules/generate-pre-message';
 
 export const generatePreMessageStep = createStep({
@@ -19,7 +20,7 @@ export const generatePreMessageStep = createStep({
     const result = await generatePreMessage({ prompt });
     for await (const text of result.textStream) {
       await writer.write({
-        type: 'pre-message-step-event',
+        type: StreamEventName.GENERATE_PRE_MESSAGE_STEP_EVENT,
         text,
       });
     }
