@@ -27,15 +27,15 @@ module.exports = (crowi) => {
   /**
  * @swagger
  *
- * /content-disposition-settings/strict:
+ * /content-disposition-settings/:
  *   put:
  *     tags: [Content-Disposition Settings]
- *     summary: Set content disposition settings for configurable MIME types to strict.
+ *     summary: Replace content disposition settings for configurable MIME types with recieved lists.
  *     security:
  *       - cookieAuth: []
  *     responses:
  *       200:
- *         description: Successfully set strict content disposition settings.
+ *         description: Successfully set content disposition settings.
  *         content:
  *           application/json:
  *             schema:
@@ -44,6 +44,12 @@ module.exports = (crowi) => {
  *                 currentDispositionSettings:
  *                   type: object
  *                   properties:
+ *                   inlineMimeTypes:
+ *                     attachmentMimeTypes:
+ *                       type: array
+ *                       description: The list of MIME types set to attachment.
+ *                       items:
+ *                         type: string
  *                     inlineMimeTypes:
  *                       type: array
  *                       description: The list of MIME types set to inline.
@@ -52,7 +58,7 @@ module.exports = (crowi) => {
  *
  */
   router.put(
-    '/update',
+    '/',
     loginRequiredStrictly,
     adminRequired,
     addActivity,
