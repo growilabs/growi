@@ -115,7 +115,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
         const run = await fileSearchWorkflow.createRunAsync();
 
         try {
-          //  Will return using toUIMessageStreamResponse() in the future
+          // Will return using toUIMessageStreamResponse() in the future
           // See: https://github.com/mastra-ai/mastra/pull/7829
           const stream = run.streamVNext({
             inputData: {
