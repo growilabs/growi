@@ -15,16 +15,13 @@ export const fileSearchStep = createStep({
   }),
   execute: async({ inputData, writer }) => {
     const { prompt } = inputData;
-
     const fileSearchResult = fileSearchWithStream({ ...inputData });
-
     for await (const text of fileSearchResult.textStream) {
       await writer.write({
         type: 'file-search-step-event',
         text,
       });
     }
-
     return {
       value: prompt,
     };

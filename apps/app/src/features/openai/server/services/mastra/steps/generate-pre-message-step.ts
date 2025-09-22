@@ -23,7 +23,6 @@ export const generatePreMessageStep = createStep({
         text,
       });
     }
-
     return {
       value: prompt,
     };
