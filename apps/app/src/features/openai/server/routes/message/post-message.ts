@@ -1,5 +1,5 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
-import { SCOPE } from '@growi/core/dist/interfaces';
+import { isPopulated, SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler, Response } from 'express';
 import type { ValidationChain } from 'express-validator';
@@ -15,11 +15,13 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import { StreamEventName } from '../../../interfaces/mastra';
 import { MessageErrorCode, type StreamErrorCode } from '../../../interfaces/message-error';
 import AiAssistantModel from '../../models/ai-assistant';
 import ThreadRelationModel from '../../models/thread-relation';
 import { openaiClient } from '../../services/client';
 import { getStreamErrorCode } from '../../services/getStreamErrorCode';
+import { mastra } from '../../services/mastra';
 import { getOpenaiService } from '../../services/openai';
 import { replaceAnnotationWithPageLink } from '../../services/replace-annotation-with-page-link';
 import { certifyAiService } from '../middlewares/certify-ai-service';
@@ -103,6 +105,42 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
       let stream: AssistantStream;
       const useSummaryMode = req.body.summaryMode ?? false;
       const useExtendedThinkingMode = req.body.extendedThinkingMode ?? false;
+
+      const aiAssistantWithPopulatedVectorStore = await aiAssistant.populate('vectorStore');
+      if (isPopulated(aiAssistantWithPopulatedVectorStore.vectorStore)) {
+        const vectorStoreId = aiAssistantWithPopulatedVectorStore.vectorStore.vectorStoreId;
+        const additionalInstruction = instructionForAssistantInstruction(aiAssistant.additionalInstruction);
+
+        const fileSearchWorkflow = mastra.getWorkflow('fileSearchWorkflow');
+        const run = await fileSearchWorkflow.createRunAsync();
+
+        try {
+          //  Will return using toUIMessageStreamResponse() in the future
+          // See: https://github.com/mastra-ai/mastra/pull/7829
+          const stream = run.streamVNext({
+            inputData: {
+              prompt: req.body.userMessage,
+              instruction: additionalInstruction,
+              vectorStoreId,
+            },
+          });
+
+          for await (const chunk of stream) {
+            if (chunk.type === 'workflow-step-output') {
+              const payloadType = chunk?.payload?.output?.type;
+              if (payloadType === StreamEventName.FILE_SEARCH_STEP_EVENT || payloadType === StreamEventName.FILE_SEARCH_STEP_EVENT) {
+                const text = chunk?.payload?.output?.text;
+                // Output chunk text
+                console.log(text);
+              }
+            }
+          }
+        }
+
+        catch (error) {
+          logger.error(error);
+        }
+      }
 
       try {
         await threadRelation.updateThreadExpiration();
