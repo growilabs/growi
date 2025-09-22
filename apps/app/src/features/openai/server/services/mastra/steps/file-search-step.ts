@@ -12,10 +12,9 @@ export const fileSearchStep = createStep({
     vectorStoreId: z.string(),
   }),
   outputSchema: z.object({
-    value: z.string(),
+    value: z.null(),
   }),
   execute: async({ inputData, writer }) => {
-    const { prompt } = inputData;
     const fileSearchResult = fileSearchWithStream({ ...inputData });
     for await (const text of fileSearchResult.textStream) {
       await writer.write({
@@ -24,7 +23,8 @@ export const fileSearchStep = createStep({
       });
     }
     return {
-      value: prompt,
+      // Return value is not necessary since the response is being sent through workflow streaming
+      value: null,
     };
   },
 });

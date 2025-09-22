@@ -13,7 +13,7 @@ export const generatePreMessageStep = createStep({
     vectorStoreId: z.string(),
   }),
   outputSchema: z.object({
-    value: z.string(),
+    value: z.null(),
   }),
   execute: async({ inputData, writer }) => {
     const { prompt } = inputData;
@@ -25,7 +25,8 @@ export const generatePreMessageStep = createStep({
       });
     }
     return {
-      value: prompt,
+      // Return value is not necessary since the response is being sent through workflow streaming
+      value: null,
     };
   },
 });
