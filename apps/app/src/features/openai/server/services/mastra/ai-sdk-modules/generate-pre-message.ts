@@ -1,8 +1,10 @@
 import { streamText } from 'ai';
 
-import { getOpenaiProvider } from './get-openai-provider';
+import type {
+  StreamTextResult,
+} from '../../../../interfaces/ai-sdk';
 
-type StreamTextResult = ReturnType<typeof streamText>;
+import { getOpenaiProvider } from './get-openai-provider';
 
 export const generatePreMessage = async({ prompt }: { prompt: string }): Promise<StreamTextResult> => {
   const openai = getOpenaiProvider();

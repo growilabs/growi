@@ -2,19 +2,18 @@ import { streamText, generateText } from 'ai';
 
 import { configManager } from '~/server/service/config-manager';
 
+import type {
+  GenerateTextConfig, StreamTextConfig, GenerateTextResult, StreamTextResult,
+} from '../../../../interfaces/ai-sdk';
+
 import { getOpenaiProvider } from './get-openai-provider';
+
 
 type FileSearchParameters = {
   prompt: string,
   instruction: string,
   vectorStoreId: string,
 }
-
-// Extracted types from ai-sdk
-type GenerateTextConfig = Parameters<typeof generateText>[0];
-type StreamTextConfig = Parameters<typeof streamText>[0];
-type GenerateTextResult = ReturnType<typeof generateText>;
-type StreamTextResult = ReturnType<typeof streamText>;
 
 function fileSearchSubstance(params: FileSearchParameters): GenerateTextConfig;
 function fileSearchSubstance(params: FileSearchParameters): StreamTextConfig;
