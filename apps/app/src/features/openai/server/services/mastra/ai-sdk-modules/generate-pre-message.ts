@@ -38,24 +38,14 @@ const INSTRUCTION = `You generate initial acknowledgment messages that appear im
 
 Please generate only a concise initial message following these guidelines based on the user's input.`;
 
-
 export const generatePreMessage = async({ prompt }: { prompt: string }): Promise<StreamTextResult> => {
   const openai = getOpenaiProvider();
   return streamText({
+    prompt,
     model: openai('gpt-4.1-nano'),
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: prompt,
-          },
-        ],
-      },
-    ],
     providerOptions: {
       openai: {
+        store: false,
         instructions: INSTRUCTION,
       },
     },
