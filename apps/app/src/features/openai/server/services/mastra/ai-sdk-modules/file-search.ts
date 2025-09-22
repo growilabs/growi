@@ -38,7 +38,8 @@ function fileSearchSubstance({ prompt, instruction, vectorStoreId }: FileSearchP
         instructions: instruction,
       },
     },
-    // Force file search tool:
+    // Force file search tool
+    // see: https://ai-sdk.dev/providers/ai-sdk-providers/openai#file-search-tool
     toolChoice: { type: 'tool', toolName: 'file_search' },
   };
 }
