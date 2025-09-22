@@ -17,6 +17,8 @@ export const getOpenaiProvider = (): OpenAIProvider => {
     throw new Error('GROWI AI is not enabled');
   }
 
+  // Not using import { openai } from '@ai-sdk/openai' since we want to explicitly set the API key, we'll use createOpenAI instead
+  // See: https://ai-sdk.dev/providers/ai-sdk-providers/openai#provider-instance
   instance = createOpenAI({
     apiKey: openaiApiKey,
   });
