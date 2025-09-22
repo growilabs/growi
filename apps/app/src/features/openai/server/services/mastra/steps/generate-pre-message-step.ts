@@ -1,9 +1,8 @@
 
 import { createStep } from '@mastra/core/workflows';
-import { streamText } from 'ai';
 import { z } from 'zod';
 
-import { getOpenaiProvider } from '../ai-sdk-modules/get-openai-provider';
+import { generatePreMessage } from '../ai-sdk-modules/generate-pre-message';
 
 export const generatePreMessageStep = createStep({
   id: 'generate-pre-message-step',
@@ -17,25 +16,7 @@ export const generatePreMessageStep = createStep({
   }),
   execute: async({ inputData, writer }) => {
     const { prompt } = inputData;
-    const openai = getOpenaiProvider();
-    const result = streamText({
-      model: openai('gpt-4.1-nano'),
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-          ],
-        },
-        {
-          role: 'assistant',
-          content: [
-            { type: 'text', text: 'Generate a brief confirmation message based on the user\'s message' },
-          ],
-        },
-      ],
-    });
-
+    const result = await generatePreMessage({ prompt });
     for await (const text of result.textStream) {
       await writer.write({
         type: 'pre-message-step-event',
