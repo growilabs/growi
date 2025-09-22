@@ -5,11 +5,10 @@ import { configManager } from '~/server/service/config-manager';
 import { isAiEnabled } from '../../is-ai-enabled';
 
 
-let instance: OpenAIProvider;
-
+let openAIProvider: OpenAIProvider | undefined;
 export const getOpenaiProvider = (): OpenAIProvider => {
-  if (instance != null) {
-    return instance;
+  if (openAIProvider != null) {
+    return openAIProvider;
   }
 
   const openaiApiKey = configManager.getConfig('openai:apiKey');
@@ -19,9 +18,9 @@ export const getOpenaiProvider = (): OpenAIProvider => {
 
   // Not using import { openai } from '@ai-sdk/openai' since we want to explicitly set the API key, we'll use createOpenAI instead
   // See: https://ai-sdk.dev/providers/ai-sdk-providers/openai#provider-instance
-  instance = createOpenAI({
+  openAIProvider = createOpenAI({
     apiKey: openaiApiKey,
   });
 
-  return instance;
+  return openAIProvider;
 };
