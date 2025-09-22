@@ -39,6 +39,21 @@ concurrency:
 
 jobs:
 
+  test-prod-node18:
+    uses: weseek/growi/.github/workflows/reusable-app-prod.yml@master
+    if: |
+      ( github.event_name == 'push'
+        || github.base_ref == 'master'
+        || github.base_ref == 'dev/7.*.x'
+        || startsWith( github.base_ref, 'release/' )
+        || startsWith( github.head_ref, 'mergify/merge-queue/' ))
+    with:
+      node-version: 18.x
+      skip-e2e-test: true
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+
   test-prod-node20:
     uses: growilabs/growi/.github/workflows/reusable-app-prod.yml@master
     if: |
@@ -49,21 +64,6 @@ jobs:
         || startsWith( github.head_ref, 'mergify/merge-queue/' ))
     with:
       node-version: 20.x
-      skip-e2e-test: true
-    secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-
-  test-prod-node22:
-    uses: growilabs/growi/.github/workflows/reusable-app-prod.yml@master
-    if: |
-      ( github.event_name == 'push'
-        || github.base_ref == 'master'
-        || github.base_ref == 'dev/7.*.x'
-        || startsWith( github.base_ref, 'release/' )
-        || startsWith( github.head_ref, 'mergify/merge-queue/' ))
-    with:
-      node-version: 22.x
       skip-e2e-test: ${{ contains( github.event.pull_request.labels.*.name, 'dependencies' ) }}
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

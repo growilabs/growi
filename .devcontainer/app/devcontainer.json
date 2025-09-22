@@ -8,7 +8,7 @@
 
   "features": {
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "22.17.0"
+      "version": "20.18.3"
     }
   },
 
