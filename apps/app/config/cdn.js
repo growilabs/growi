@@ -1,4 +1,4 @@
-import path from 'path';
+import path from 'node:path';
 
 import { projectRoot } from '~/utils/project-dir-utils';
 
