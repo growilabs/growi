@@ -122,7 +122,7 @@ export class LlmResponseStreamProcessor {
             if (!validDiff.success) {
               // Phase 2B: Enhanced error logging for diff validation failures
               logger.warn('Diff validation failed', {
-                errors: validDiff.error.errors,
+                errors: validDiff.error,
                 item: JSON.stringify(item).substring(0, 200),
                 hasStartLine: 'startLine' in item,
                 hasSearch: 'search' in item,
