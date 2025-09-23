@@ -1,19 +1,20 @@
 import { createReadStream } from 'fs';
 import path from 'path';
 
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { NextFunction, Request, Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 import multer from 'multer';
 
-import { SCOPE } from '@growi/core/dist/interfaces';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { isG2GTransferError } from '~/server/models/vo/g2g-transfer-error';
 import { configManager } from '~/server/service/config-manager';
 import { exportService } from '~/server/service/export';
 import type { IDataGROWIInfo } from '~/server/service/g2g-transfer';
 import { X_GROWI_TRANSFER_KEY_HEADER_NAME } from '~/server/service/g2g-transfer';
+import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
 import loggerFactory from '~/utils/logger';
 import { TransferKey } from '~/utils/vo/transfer-key';
@@ -313,7 +314,7 @@ module.exports = (crowi: Crowi): Router => {
     /*
      * generate maps of ImportSettings to import
      */
-    let importSettingsMap;
+    let importSettingsMap: Map<string, ImportSettings>;
     try {
       importSettingsMap = g2gTransferReceiverService.getImportSettingMap(innerFileStats, optionsMap, operatorUserId);
     }

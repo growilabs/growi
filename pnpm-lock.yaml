@@ -509,8 +509,8 @@ importers:
         specifier: ^6.13.6
         version: 6.13.8(@aws-sdk/client-sso-oidc@3.600.0)
       mongoose-gridfs:
-        specifier: ^1.2.42
-        version: 1.2.42(mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0))
+        specifier: ^1.3.0
+        version: 1.3.0(@aws-sdk/client-sso-oidc@3.600.0)(mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0))
       mongoose-paginate-v2:
         specifier: ^1.3.9
         version: 1.8.2
@@ -3400,22 +3400,25 @@ packages:
   '@lezer/yaml@1.0.3':
     resolution: {integrity: sha512-GuBLekbw9jDBDhGur82nuwkxKQ+a3W5H0GfaAthDXcAu+XdpS43VlnxA9E9hllkpSP5ellRDKjLLj7Lu9Wr6xA==}
 
-  '@lykmapipo/common@0.34.3':
-    resolution: {integrity: sha512-rdLJkeatlCWEZFXC142V/fLAuKHREJcfPSC7OAjpn4DEvANfmvCgwLl+gwLLwFsn8lwnBDGo+7Y6pwirw86FpA==}
+  '@lykmapipo/common@0.44.5':
+    resolution: {integrity: sha512-xkG/1aaOPMdyMKwJ4reNTlwN/s2drXmgfF7Siwwz/SHjKFOnonALmKURLyKuZ8FmSByP5ohaMjPCnzfO4YMM1A==}
     engines: {node: '>=8.11.1', npm: '>=5.6.0'}
 
-  '@lykmapipo/env@0.17.8':
-    resolution: {integrity: sha512-wtwBhTACxMZ342j1CSUUXtiNQOH+yl+8vyptBXcQtZCz5QCHMO7sInCgtKUezEduaY9evs/aNINwrcTVA485dQ==}
+  '@lykmapipo/env@0.17.39':
+    resolution: {integrity: sha512-0V2x4+Lao/7SzxQcO4LCYLjtrrUS06fNJXVLcyUBAN8JnuM3kbo0GR1mujaiV72Q9/1bIdZDxfJW2OnNyKJGdQ==}
     engines: {node: '>=8.11.1', npm: '>=5.6.0'}
 
-  '@lykmapipo/mongoose-common@0.35.0':
-    resolution: {integrity: sha512-XvbiTSkhI8bhfHw4slXpWxbRsDe27XhM0946JMySGcgG7T1Ohe+I+C8nTKzsORU5EcBdyyYgHgTIpdc55oXlcg==}
-    peerDependencies:
-      mongoose: '>=5.9.17'
-
-  '@lykmapipo/phone@0.6.5':
-    resolution: {integrity: sha512-b3x17Rn7E/20hf7RFbd2szwa05C/SIRCnjgcFoOi3YYLkIlKIWU/IB596EHmx8nYiX9XYb+RIdvvcx2WhgR/8A==}
+  '@lykmapipo/mongoose-common@0.40.0':
+    resolution: {integrity: sha512-dU32a3iq0nSSWkPTqr4LA+gcC2NfpyGZr1pd9YFn1jfpw9M2Y0qfGhugzaQJ3rP8w3zGJHt8k3+6WLOLLaDylQ==}
     engines: {node: '>=8.11.1', npm: '>=5.6.0'}
+
+  '@lykmapipo/mongoose-connection@0.5.2':
+    resolution: {integrity: sha512-9ykz/IoraBBZmF3IndHM/QJO6VSb5GRO8jg3F+ZEzr0qoYYQpLRUgl4HzCYkgKXWES2ccjx4XWoruD2zWDCAbg==}
+    engines: {node: '>=8.11.1', npm: '>=5.6.0'}
+
+  '@lykmapipo/phone@0.7.16':
+    resolution: {integrity: sha512-YkHyZav72pgXpa0oBqVxud8Mdw/T9LmopMMECzTUTQ6UqXeehd9UuDcQauBY3vC9+MjHL0I9Cd2yF9+24/AZQQ==}
+    engines: {node: '>=14.5.0', npm: '>=6.14.5'}
 
   '@manypkg/find-root@1.1.0':
     resolution: {integrity: sha512-mki5uBvhHzO8kYYix/WRy2WX8S3B5wdVSc9D6KcU5lQNglP2yt58/VfLuAK49glRXChosY8ap2oJ1qgma3GUVA==}
@@ -6625,8 +6628,8 @@ packages:
   browser-bunyan@1.8.0:
     resolution: {integrity: sha512-Et1TaRUm8m2oy4OTi69g0qAM8wqpofACUgkdBnj1Kq2aC8Wpl8w+lNevebPG6zKH2w0Aq+BHiAXWwjm0/QbkaQ==}
 
-  browser-or-node@1.2.1:
-    resolution: {integrity: sha512-sVIA0cysIED0nbmNOm7sZzKfgN1rpFmrqvLZaFWspaBAftfQcezlC81G6j6U2RJf4Lh66zFxrCeOsvkUXIcPWg==}
+  browser-or-node@3.0.0:
+    resolution: {integrity: sha512-iczIdVJzGEYhP5DqQxYM9Hh7Ztpqqi+CXZpSmX8ALFs9ecXkQIeqRyM6TfxEfMVpwhl3dSuDvxdzzo9sUOIVBQ==}
 
   browser-sync-client@3.0.4:
     resolution: {integrity: sha512-+ew5ubXzGRKVjquBL3u6najS40TG7GxCdyBll0qSRc/n+JRV9gb/yDdRL1IAgRHqjnJTdqeBKKIQabjvjRSYRQ==}
@@ -9300,8 +9303,8 @@ packages:
     resolution: {integrity: sha512-5Rk7iLNDFhFeBYc3s8l1CqzbEBcdhwR193RlD4vSNFajIcINKI8W8P0JLmBpwymHqqWbX34pJDQu39cSy/6RsA==}
     engines: {node: '>=10'}
 
-  google-libphonenumber@3.2.10:
-    resolution: {integrity: sha512-TsckE9O8QgqaIeaOXPjcJa4/kX3BzFdO1oCbMfmUpRZckml4xJhjJVxaT9Mdt/VrZZkT9lX44eHAEWfJK1tHtw==}
+  google-libphonenumber@3.2.42:
+    resolution: {integrity: sha512-60jm6Lu72WmlUJXUBJmmuZlHG2vDJ2gQ9pL5gcFsSe1Q4eigsm0Z1ayNHjMgqGUl0zey8JqKtO4QCHPV+5LCNQ==}
     engines: {node: '>=0.10'}
 
   google-p12-pem@3.1.4:
@@ -9700,9 +9703,9 @@ packages:
   infer-owner@1.0.4:
     resolution: {integrity: sha512-IClj+Xz94+d7irH5qRyfJonOdfTzuDaifE6ZPWfx0N0+/ATZCbuTPq2prFl526urkQd90WyUKIh1DfBQ2hMz9A==}
 
-  inflection@1.12.0:
-    resolution: {integrity: sha512-lRy4DxuIFWXlJU7ed8UiTJOSTqStqYdEb4CEbtXfNbkdj3nH1L+reUWiE10VWcJS2yR7tge8Z74pJjtBjNwj0w==}
-    engines: {'0': node >= 0.4.0}
+  inflection@3.0.2:
+    resolution: {integrity: sha512-+Bg3+kg+J6JUWn8J6bzFmOWkTQ6L/NHfDRSYU+EVvuKHDxUDHAXgqixHfVlzuBQaPOTac8hn43aPhMNk6rMe3g==}
+    engines: {node: '>=18.0.0'}
 
   inflight@1.0.6:
     resolution: {integrity: sha512-k92I/b08q4wvFscXCLvqfsHCrjrF7yiXsQuIVvVE7N82W3+aqpzuUdBbfhWcy/FZR3/4IgflMgKLOsvPDrGCJA==}
@@ -11335,30 +11338,26 @@ packages:
       socks:
         optional: true
 
-  mongoose-gridfs@1.2.42:
-    resolution: {integrity: sha512-n0yGLrWHeEW5PpR1xvB7bSSqcOnXdWSuwkQyEW8+u98eHfffD2kKT7Re2bxMvIBzOK76Q32uyYkOTzH+Y6MwZQ==}
-    engines: {node: '>=8.6.0', npm: '>=5.3.0'}
+  mongoose-gridfs@1.3.0:
+    resolution: {integrity: sha512-5Rrgb00LN5mRC1s+ddeQ032nGVyRUM6bbX5nqDgWsAJPcpYCjaarnKIlOf+rDxSSAhbn7GzZ3fUvddG+6OX88Q==}
+    engines: {node: '>=8.11.1', npm: '>=5.6.0'}
     peerDependencies:
-      mongoose: '>=5.9.15'
+      mongoose: '>=6.0.7'
 
   mongoose-paginate-v2@1.8.2:
     resolution: {integrity: sha512-T/Z3qKyKnPUa6UkH1IjHxdYnYApCAKk9zb2C0GF5hg3QETcI62AUAUQGCBE2tIw7fF4feUaDARMajj/bersyvg==}
     engines: {node: '>=4.0.0'}
-
-  mongoose-schema-jsonschema@2.0.1:
-    resolution: {integrity: sha512-OHXK/tSziSSuNXKxsjvDyYwnGVB+/c5Dn7p2sI6Vri0vTJm13Nime68YwK8m1j9jgkqh2ZXiO5TyVXTQHtxG8Q==}
-    peerDependencies:
-      mongoose: ^5.0.0 || ^6.0.0
 
   mongoose-unique-validator@2.0.3:
     resolution: {integrity: sha512-3/8pmvAC1acBZS6eWKAWQUiZBlARE1wyWtjga4iQ2wDJeOfRlIKmAvTNHSZXKaAf7RCRUd7wh7as6yWAOrjpQg==}
     peerDependencies:
       mongoose: ^5.2.1
 
-  mongoose-valid8@1.6.18:
-    resolution: {integrity: sha512-0MgK1sD9HXAK7I2lyFRlwNMfZ8+Ahx7rH0Hg6sJyXiXMCazK6Mw4lNcdX0ISjuKkI7joORz2T5Eyw6cJ3q5vQQ==}
+  mongoose-valid8@1.7.1:
+    resolution: {integrity: sha512-65Zf+md73TkMNMUQ3tJzOtEm3MxJW15bpy+lBomqep7FNtiMjNoMzbN0P3/1FCpbqIkXDpeWH7WtyE2+D0tmhg==}
+    engines: {node: '>=8.11.1', npm: '>=5.6.0'}
     peerDependencies:
-      mongoose: '>=5.9.15'
+      mongoose: '>=6.0.7'
 
   mongoose@6.13.8:
     resolution: {integrity: sha512-JHKco/533CyVrqCbyQsnqMpLn8ZCiKrPDTd2mvo2W7ygIvhygWjX2wj+RPjn6upZZgw0jC6U51RD7kUsyK8NBg==}
@@ -11983,10 +11982,6 @@ packages:
     resolution: {integrity: sha512-ybiGyvspI+fAoRQbIPRddCcSTV9/LsJbf0e/S85VLowVGzRmokfneg2kwVW/KU5rOXrPSbF1qAKPMgNTqqROQQ==}
     engines: {node: '>=18'}
 
-  parse-ms@2.1.0:
-    resolution: {integrity: sha512-kHt7kzLoS9VBZfUsiKjv43mr91ea+U05EyKkEtqp7vNbHxmaVuEqN7XxeEVnGrMtYOAxGrDElSi96K7EgO1zCA==}
-    engines: {node: '>=6'}
-
   parse5-htmlparser2-tree-adapter@6.0.1:
     resolution: {integrity: sha512-qPuWvbLgvDGilKc5BoicRovlT4MtYT6JfJyBOMDsKoiT+GiuP5qyrPCnR9HcPECIJJmZh5jRndyNThnhhb/vlA==}
 
@@ -12502,8 +12497,8 @@ packages:
   randombytes@2.1.0:
     resolution: {integrity: sha512-vYl3iOX+4CKUWuxGi9Ukhie6fsqXqS9FE2Zaic4tNFD2N2QQaXOMFbuKK4QmDHC0JO6B1Zp41J0LpT0oR68amQ==}
 
-  randomcolor@0.5.4:
-    resolution: {integrity: sha512-nYd4nmTuuwMFzHL6W+UWR5fNERGZeVauho8mrJDUSXdNDbao4rbrUwhuLgKC/j8VCS5+34Ria8CsTDuBjrIrQA==}
+  randomcolor@0.6.2:
+    resolution: {integrity: sha512-Mn6TbyYpFgwFuQ8KJKqf3bqqY9O1y37/0jgSK/61PUxV4QfIMv0+K2ioq8DfOjkBslcjwSzRfIDEXfzA9aCx7A==}
 
   range-parser@1.2.1:
     resolution: {integrity: sha512-Hrgsx+orqoygnmhFbKaHE6c296J+HTAQXoxEF6gNupROmmGJRoyzfG3ccAveqCBrwr/2yxQ5BVd/GTl5agOwSg==}
@@ -17795,48 +17790,62 @@ snapshots:
       '@lezer/highlight': 1.2.1
       '@lezer/lr': 1.4.2
 
-  '@lykmapipo/common@0.34.3':
+  '@lykmapipo/common@0.44.5':
     dependencies:
       auto-parse: 1.8.0
-      browser-or-node: 1.2.1
+      browser-or-node: 3.0.0
       flat: 5.0.2
-      inflection: 1.12.0
+      inflection: 3.0.2
       lodash: 4.17.21
       mime: 3.0.0
       moment: 2.30.1
       object-hash: 2.2.0
-      parse-json: 5.2.0
-      parse-ms: 2.1.0
-      randomcolor: 0.5.4
+      randomcolor: 0.6.2
       statuses: 2.0.1
       string-template: 1.0.0
       striptags: 3.2.0
       uuid: 11.1.0
 
-  '@lykmapipo/env@0.17.8':
+  '@lykmapipo/env@0.17.39':
     dependencies:
-      '@lykmapipo/common': 0.34.3
+      '@lykmapipo/common': 0.44.5
       dotenv: 16.4.5
       dotenv-expand: 5.1.0
       lodash: 4.17.21
       rc: 1.2.8
       semver: 7.6.3
 
-  '@lykmapipo/mongoose-common@0.35.0(mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0))':
+  '@lykmapipo/mongoose-common@0.40.0(@aws-sdk/client-sso-oidc@3.600.0)':
     dependencies:
-      '@lykmapipo/common': 0.34.3
-      '@lykmapipo/env': 0.17.8
+      '@lykmapipo/common': 0.44.5
+      '@lykmapipo/env': 0.17.39
+      '@lykmapipo/mongoose-connection': 0.5.2(@aws-sdk/client-sso-oidc@3.600.0)
       async: 3.2.4
       lodash: 4.17.21
       mongoose: 6.13.8(@aws-sdk/client-sso-oidc@3.600.0)
-      mongoose-schema-jsonschema: 2.0.1(mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0))
-      mongoose-valid8: 1.6.18(mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0))
+      mongoose-valid8: 1.7.1(mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0))
+    transitivePeerDependencies:
+      - '@aws-sdk/client-sso-oidc'
+      - aws-crt
+      - supports-color
 
-  '@lykmapipo/phone@0.6.5':
+  '@lykmapipo/mongoose-connection@0.5.2(@aws-sdk/client-sso-oidc@3.600.0)':
     dependencies:
-      '@lykmapipo/common': 0.34.3
-      '@lykmapipo/env': 0.17.8
-      google-libphonenumber: 3.2.10
+      '@lykmapipo/common': 0.44.5
+      '@lykmapipo/env': 0.17.39
+      async: 3.2.4
+      lodash: 4.17.21
+      mongoose: 6.13.8(@aws-sdk/client-sso-oidc@3.600.0)
+    transitivePeerDependencies:
+      - '@aws-sdk/client-sso-oidc'
+      - aws-crt
+      - supports-color
+
+  '@lykmapipo/phone@0.7.16':
+    dependencies:
+      '@lykmapipo/common': 0.44.5
+      '@lykmapipo/env': 0.17.39
+      google-libphonenumber: 3.2.42
       lodash: 4.17.21
 
   '@manypkg/find-root@1.1.0':
@@ -22307,7 +22316,7 @@ snapshots:
       '@browser-bunyan/console-raw-stream': 1.8.0
       '@browser-bunyan/levels': 1.8.0
 
-  browser-or-node@1.2.1: {}
+  browser-or-node@3.0.0: {}
 
   browser-sync-client@3.0.4:
     dependencies:
@@ -25162,7 +25171,7 @@ snapshots:
       - encoding
       - supports-color
 
-  google-libphonenumber@3.2.10: {}
+  google-libphonenumber@3.2.42: {}
 
   google-p12-pem@3.1.4:
     dependencies:
@@ -25686,7 +25695,7 @@ snapshots:
 
   infer-owner@1.0.4: {}
 
-  inflection@1.12.0: {}
+  inflection@3.0.2: {}
 
   inflight@1.0.6:
     dependencies:
@@ -27750,19 +27759,18 @@ snapshots:
       '@aws-sdk/credential-providers': 3.600.0(@aws-sdk/client-sso-oidc@3.600.0)
       socks: 2.8.3
 
-  mongoose-gridfs@1.2.42(mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0)):
+  mongoose-gridfs@1.3.0(@aws-sdk/client-sso-oidc@3.600.0)(mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0)):
     dependencies:
-      '@lykmapipo/mongoose-common': 0.35.0(mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0))
+      '@lykmapipo/mongoose-common': 0.40.0(@aws-sdk/client-sso-oidc@3.600.0)
       lodash: 4.17.21
       mongoose: 6.13.8(@aws-sdk/client-sso-oidc@3.600.0)
       stream-read: 1.1.2
+    transitivePeerDependencies:
+      - '@aws-sdk/client-sso-oidc'
+      - aws-crt
+      - supports-color
 
   mongoose-paginate-v2@1.8.2: {}
-
-  mongoose-schema-jsonschema@2.0.1(mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0)):
-    dependencies:
-      mongoose: 6.13.8(@aws-sdk/client-sso-oidc@3.600.0)
-      pluralize: 8.0.0
 
   mongoose-unique-validator@2.0.3(mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0)):
     dependencies:
@@ -27770,10 +27778,10 @@ snapshots:
       lodash.get: 4.4.2
       mongoose: 6.13.8(@aws-sdk/client-sso-oidc@3.600.0)
 
-  mongoose-valid8@1.6.18(mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0)):
+  mongoose-valid8@1.7.1(mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0)):
     dependencies:
-      '@lykmapipo/env': 0.17.8
-      '@lykmapipo/phone': 0.6.5
+      '@lykmapipo/env': 0.17.39
+      '@lykmapipo/phone': 0.7.16
       lodash: 4.17.21
       mongoose: 6.13.8(@aws-sdk/client-sso-oidc@3.600.0)
       validator: 13.12.0
@@ -28573,8 +28581,6 @@ snapshots:
       index-to-position: 1.1.0
       type-fest: 4.41.0
 
-  parse-ms@2.1.0: {}
-
   parse5-htmlparser2-tree-adapter@6.0.1:
     dependencies:
       parse5: 6.0.1
@@ -29060,7 +29066,7 @@ snapshots:
     dependencies:
       safe-buffer: 5.2.1
 
-  randomcolor@0.5.4: {}
+  randomcolor@0.6.2: {}
 
   range-parser@1.2.1: {}
 
