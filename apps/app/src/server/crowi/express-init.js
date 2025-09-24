@@ -3,8 +3,8 @@ import csrf from 'csurf';
 import qs from 'qs';
 
 import { PLUGIN_EXPRESS_STATIC_DIR, PLUGIN_STORING_PATH } from '~/features/growi-plugin/server/consts';
+import { resolveFromRoot } from '~/server/util/project-dir-utils';
 import loggerFactory from '~/utils/logger';
-import { resolveFromRoot } from '~/utils/project-dir-utils';
 
 import registerSafeRedirectFactory from '../middlewares/safe-redirect';
 

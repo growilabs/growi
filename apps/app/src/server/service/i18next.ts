@@ -7,7 +7,7 @@ import resourcesToBackend from 'i18next-resources-to-backend';
 
 import * as i18nextConfig from '^/config/i18next.config';
 
-import { resolveFromRoot } from '~/utils/project-dir-utils';
+import { resolveFromRoot } from '~/server/util/project-dir-utils';
 
 import { configManager } from './config-manager';
 

@@ -18,9 +18,9 @@ import instanciatePageBulkExportJobCleanUpCronService, {
 } from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
 import { startCron as startAccessTokenCron } from '~/server/service/access-token';
+import { projectRoot } from '~/server/util/project-dir-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
-import { projectRoot } from '~/utils/project-dir-utils';
 
 import UserEvent from '../events/user';
 import { accessTokenParser } from '../middlewares/access-token-parser';
@@ -32,7 +32,7 @@ import instanciateExportService from '../service/export';
 import instanciateExternalAccountService from '../service/external-account';
 import { FileUploader, getUploader } from '../service/file-uploader'; // eslint-disable-line no-unused-vars
 import { G2GTransferPusherService, G2GTransferReceiverService } from '../service/g2g-transfer';
-import GrowiBridgeService from '../service/growi-bridge';
+import { GrowiBridgeService } from '../service/growi-bridge';
 import { initializeImportService } from '../service/import';
 import { InstallerService } from '../service/installer';
 import { normalizeData } from '../service/normalize-data';
@@ -81,6 +81,9 @@ class Crowi {
 
   /** @type {import('../service/growi-info').GrowiInfoService} */
   growiInfoService;
+
+  /** @type {import('../service/growi-bridge').GrowiBridgeService} */
+  growiBridgeService;
 
   /** @type {import('../service/page').IPageService} */
   pageService;
@@ -134,7 +137,6 @@ class Crowi {
     this.aclService = null;
     this.appService = null;
     this.fileUploadService = null;
-    this.growiBridgeService = null;
     this.pluginService = null;
     this.searchService = null;
     this.socketIoService = null;

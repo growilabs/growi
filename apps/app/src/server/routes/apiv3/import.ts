@@ -1,13 +1,17 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 
 import { SupportedAction } from '~/interfaces/activity';
-import { SCOPE } from '@growi/core/dist/interfaces';
+import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
+import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
 import { generateOverwriteParams } from '~/server/service/import/overwrite-params';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
+
 
 const logger = loggerFactory('growi:routes:apiv3:import'); // eslint-disable-line no-unused-vars
 
@@ -122,14 +126,13 @@ const router = express.Router();
  *                  type: integer
  *                  nullable: true
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-export default function route(crowi) {
+export default function route(crowi: Crowi): void {
   const { growiBridgeService, socketIoService } = crowi;
-  const importService = getImportService(crowi);
+  const importService = getImportService();
 
   const loginRequired = require('../../middlewares/login-required')(crowi);
   const adminRequired = require('../../middlewares/admin-required')(crowi);
-  const addActivity = generateAddActivityMiddleware(crowi);
+  const addActivity = generateAddActivityMiddleware();
 
   const adminEvent = crowi.event('admin');
   const activityEvent = crowi.event('activity');
@@ -312,18 +315,22 @@ export default function route(crowi) {
     /*
      * unzip, parse
      */
-    let meta = null;
-    let fileStatsToImport = null;
+    let meta;
+    let fileStatsToImport;
     try {
       // unzip
       await importService.unzip(zipFile);
 
       // eslint-disable-next-line no-unused-vars
-      const { meta: parsedMeta, fileStats, innerFileStats } = await growiBridgeService.parseZipFile(zipFile);
-      meta = parsedMeta;
+      const parseZipResult = await growiBridgeService.parseZipFile(zipFile);
+      if (parseZipResult == null) {
+        throw new Error('parseZipFile returns null');
+      }
+
+      meta = parseZipResult.meta;
 
       // filter innerFileStats
-      fileStatsToImport = innerFileStats.filter(({ fileName, collectionName, size }) => {
+      fileStatsToImport = parseZipResult.innerFileStats.filter(({ collectionName }) => {
         return collections.includes(collectionName);
       });
     }
@@ -346,21 +353,20 @@ export default function route(crowi) {
     }
 
     // generate maps of ImportSettings to import
-    const importSettingsMap = {};
+    // Use the Map for a potential fix for the code scanning alert no. 895: Prototype-polluting assignment
+    const importSettingsMap = new Map<string, ImportSettings>();
     fileStatsToImport.forEach(({ fileName, collectionName }) => {
       // instanciate GrowiArchiveImportOption
-      /** @type {import('~/models/admin/growi-archive-import-option').GrowiArchiveImportOption} */
-      const option = options.find(opt => opt.collectionName === collectionName);
+      const option: GrowiArchiveImportOption = options.find(opt => opt.collectionName === collectionName);
 
       // generate options
-      /** @type {import('~/server/service/import').ImportSettings} */
       const importSettings = {
         mode: option.mode,
         jsonFileName: fileName,
         overwriteParams: generateOverwriteParams(collectionName, req.user._id, option),
-      };
+      } satisfies ImportSettings;
 
-      importSettingsMap[collectionName] = importSettings;
+      importSettingsMap.set(collectionName, importSettings);
     });
 
     /*
@@ -411,7 +417,7 @@ export default function route(crowi) {
     async(req, res) => {
       const { file } = req;
       const zipFile = importService.getFile(file.filename);
-      let data = null;
+      let data;
 
       try {
         data = await growiBridgeService.parseZipFile(zipFile);

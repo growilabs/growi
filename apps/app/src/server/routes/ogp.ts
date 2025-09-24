@@ -13,8 +13,8 @@ import { param, validationResult } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
+import { projectRoot } from '~/server/util/project-dir-utils';
 import loggerFactory from '~/utils/logger';
-import { projectRoot } from '~/utils/project-dir-utils';
 
 import type Crowi from '../crowi';
 import { Attachment } from '../models/attachment';
