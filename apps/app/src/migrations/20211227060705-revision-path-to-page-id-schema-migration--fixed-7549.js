@@ -1,6 +1,6 @@
+import { Writable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import mongoose from 'mongoose';
-import { Writable } from 'stream';
-import { pipeline } from 'stream/promises';
 
 import getPageModel from '~/server/models/page';
 import { Revision } from '~/server/models/revision';

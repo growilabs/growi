@@ -14,7 +14,7 @@ import RebuildIndexControls from './RebuildIndexControls';
 import ReconnectControls from './ReconnectControls';
 import StatusTable from './StatusTable';
 
-const ElasticsearchManagement = () => {
+const ElasticsearchManagement = (): JSX.Element => {
   const { t } = useTranslation('admin');
   const { data: isSearchServiceReachable } = useIsSearchServiceReachable();
   const { data: socket } = useAdminSocket();
@@ -43,6 +43,8 @@ const ElasticsearchManagement = () => {
       setIndicesData(info.indices);
       setAliasesData(info.aliases);
       setIsNormalized(info.isNormalized);
+
+      return info.isNormalized;
     }
     catch (errors: unknown) {
       setIsConnected(false);
@@ -60,6 +62,7 @@ const ElasticsearchManagement = () => {
         toastError(errors as Error);
       }
 
+      return false;
     }
     finally {
       setIsInitialized(true);
@@ -67,12 +70,8 @@ const ElasticsearchManagement = () => {
   }, []);
 
   useEffect(() => {
-    const fetchIndicesStatusData = async() => {
-      await retrieveIndicesStatus();
-    };
-    fetchIndicesStatusData();
+    retrieveIndicesStatus();
   }, [retrieveIndicesStatus]);
-
 
   useEffect(() => {
     if (socket == null) {
@@ -83,7 +82,19 @@ const ElasticsearchManagement = () => {
     });
 
     socket.on(SocketEventName.FinishAddPage, async(data) => {
-      await retrieveIndicesStatus();
+      let retryCount = 0;
+      const maxRetries = 5;
+      const retryDelay = 500;
+
+      const retrieveIndicesStatusWithRetry = async() => {
+        const isNormalizedResult = await retrieveIndicesStatus();
+        if (!isNormalizedResult && retryCount < maxRetries) {
+          retryCount++;
+          setTimeout(retrieveIndicesStatusWithRetry, retryDelay);
+        }
+      };
+
+      await retrieveIndicesStatusWithRetry();
       setIsRebuildingProcessing(false);
       setIsRebuildingCompleted(true);
     });
@@ -98,7 +109,6 @@ const ElasticsearchManagement = () => {
       socket.off(SocketEventName.RebuildingFailed);
     };
   }, [retrieveIndicesStatus, socket]);
-
 
   const reconnect = async() => {
     setIsReconnectingProcessing(true);

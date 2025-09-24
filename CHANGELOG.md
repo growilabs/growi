@@ -1,8 +1,16 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.3.0...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.3.1...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.3.1](https://github.com/growilabs/compare/v7.3.0...v7.3.1) - 2025-09-22
+
+### 🧰 Maintenance
+
+* support: Revert Node.js runtime version to v18/20 for memory consumption
+* ci(deps-dev): bump vite from 5.4.19 to 5.4.20 (#10294) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump next from 14.2.30 to 14.2.32 (#10312) @[dependabot[bot]](https://github.com/apps/dependabot)
 
 ## [v7.3.0](https://github.com/growilabs/compare/v7.2.10...v7.3.0) - 2025-09-11
 

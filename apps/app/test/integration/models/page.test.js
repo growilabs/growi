@@ -9,7 +9,7 @@ let testGroup0;
 let parentPage;
 
 describe('Page', () => {
-  // eslint-disable-next-line no-unused-vars
+  // biome-ignore lint/correctness/noUnusedVariables: ignore
   let crowi;
   let Page;
   let PageQueryBuilder;
