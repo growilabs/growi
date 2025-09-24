@@ -23,9 +23,7 @@ import { configManager } from '../config-manager';
 import type { UpdateOrInsertPagesOpts } from '../interfaces/search';
 
 import { aggregatePipelineToIndex } from './aggregate-to-index';
-import type {
-  AggregatedPage, BulkWriteBody, BulkWriteCommand, BulkWriteBodyRestriction,
-} from './bulk-write';
+import type { AggregatedPage, BulkWriteBody, BulkWriteCommand } from './bulk-write';
 import {
   getClient,
   isES7ClientDelegator,
@@ -77,10 +75,6 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
 
   private indexName: string;
 
-  private pageModel?: PageModel;
-
-  private userModel?: typeof mongoose.Model;
-
   constructor(socketIoService: SocketIoService) {
     this.name = SearchDelegatorName.DEFAULT;
     this.socketIoService = socketIoService;
@@ -96,26 +90,6 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     this.elasticsearchVersion = elasticsearchVersion;
 
     this.isElasticsearchReindexOnBoot = configManager.getConfig('app:elasticsearchReindexOnBoot');
-  }
-
-  /**
-   * Get Page model with proper typing
-   */
-  private getPageModel(): PageModel {
-    if (!this.pageModel) {
-      this.pageModel = mongoose.model<IPage, PageModel>('Page');
-    }
-    return this.pageModel;
-  }
-
-  /**
-   * Get User model with proper typing
-   */
-  private getUserModel() {
-    if (!this.userModel) {
-      this.userModel = mongoose.model('User');
-    }
-    return this.userModel;
   }
 
   get aliasName(): string {
@@ -385,7 +359,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   /**
    * generate object that is related to page.grant*
    */
-  generateDocContentsRelatedToRestriction(page: AggregatedPage): BulkWriteBodyRestriction {
+  generateDocContentsRelatedToRestriction(page: AggregatedPage) {
     const grantedUserIds = page.grantedUsers.map(user => getIdStringForRef(user));
     const grantedGroupIds = page.grantedGroups.map(group => getIdStringForRef(group.item));
 
@@ -442,17 +416,17 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   }
 
   addAllPages() {
-    const Page = this.getPageModel();
+    const Page = mongoose.model('Page');
     return this.updateOrInsertPages(() => Page.find(), { shouldEmitProgress: true, invokeGarbageCollection: true });
   }
 
   updateOrInsertPageById(pageId) {
-    const Page = this.getPageModel();
+    const Page = mongoose.model('Page');
     return this.updateOrInsertPages(() => Page.findById(pageId));
   }
 
   updateOrInsertDescendantsPagesById(page, user) {
-    const Page = this.getPageModel();
+    const Page = mongoose.model('Page') as unknown as PageModel;
     const { PageQueryBuilder } = Page;
     const builder = new PageQueryBuilder(Page.find());
     builder.addConditionToListWithDescendants(page.path);
@@ -465,7 +439,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   async updateOrInsertPages(queryFactory, option: UpdateOrInsertPagesOpts = {}): Promise<void> {
     const { shouldEmitProgress = false, invokeGarbageCollection = false } = option;
 
-    const Page = this.getPageModel();
+    const Page = mongoose.model<IPage, PageModel>('Page');
     const { PageQueryBuilder } = Page;
 
     const socket = shouldEmitProgress ? this.socketIoService.getAdminSocket() : null;
@@ -853,7 +827,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
       throw new Error('query.body.query.bool is not initialized');
     }
 
-    const Page = this.getPageModel();
+    const Page = mongoose.model('Page') as unknown as PageModel;
     const {
       GRANT_PUBLIC, GRANT_SPECIFIED, GRANT_OWNER, GRANT_USER_GROUP,
     } = Page;
@@ -912,7 +886,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   }
 
   async appendFunctionScore(query, queryString): Promise<void> {
-    const User = this.getUserModel();
+    const User = mongoose.model('User');
     const count = await User.count({}) || 1;
 
     const minScore = queryString.length * 0.1 - 1; // increase with length

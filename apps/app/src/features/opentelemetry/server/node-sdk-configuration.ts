@@ -76,7 +76,7 @@ export const generateNodeSDKConfiguration = (opts?: Option): Configuration => {
  * This function should be called after database is available
  */
 export const generateAdditionalResourceAttributes = async (
-  _opts?: Option,
+  opts?: Option,
 ): Promise<Resource> => {
   if (resource == null) {
     throw new Error(

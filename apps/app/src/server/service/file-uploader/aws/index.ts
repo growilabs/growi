@@ -28,7 +28,7 @@ import { configManager } from '../../config-manager';
 import {
   AbstractFileUploader, type TemporaryUrl, type SaveFileParam,
 } from '../file-uploader';
-import { createContentHeaders, getContentHeaderValue } from '../utils';
+import { ContentHeaders } from '../utils';
 
 import { AwsMultipartUploader } from './multipart-uploader';
 
@@ -44,8 +44,6 @@ interface FileMeta {
   size: number;
 }
 
-// Cache holder to avoid repeated instantiation of S3 client
-let cachedS3Client: { configKey: string, client: S3Client } | null = null;
 const isFileExists = async(s3: S3Client, params: HeadObjectCommandInput) => {
   try {
     await s3.send(new HeadObjectCommand(params));
@@ -88,21 +86,12 @@ const getS3Bucket = (): NonBlankString | undefined => {
 };
 
 const S3Factory = (): S3Client => {
-  // Cache key based on configuration values to detect changes
   const accessKeyId = configManager.getConfig('aws:s3AccessKeyId');
   const secretAccessKey = configManager.getConfig('aws:s3SecretAccessKey');
   const s3Region = toNonBlankStringOrUndefined(configManager.getConfig('aws:s3Region')); // Blank strings may remain in the DB, so convert with toNonBlankStringOrUndefined for safety
   const s3CustomEndpoint = toNonBlankStringOrUndefined(configManager.getConfig('aws:s3CustomEndpoint'));
 
-  const configKey = `${accessKeyId ?? ''}|${secretAccessKey ?? ''}|${s3Region ?? ''}|${s3CustomEndpoint ?? ''}`;
-
-  // Return cached client if configuration hasn't changed
-  if (cachedS3Client != null && cachedS3Client.configKey === configKey) {
-    return cachedS3Client.client;
-  }
-
-  // Create new client instance with connection pooling optimizations
-  const client = new S3Client({
+  return new S3Client({
     credentials: accessKeyId != null && secretAccessKey != null
       ? {
         accessKeyId,
@@ -113,10 +102,6 @@ const S3Factory = (): S3Client => {
     endpoint: s3CustomEndpoint,
     forcePathStyle: s3CustomEndpoint != null, // s3ForcePathStyle renamed to forcePathStyle in v3
   });
-
-  // Cache the new client
-  cachedS3Client = { configKey, client };
-  return client;
 };
 
 const getFilePathOnStorage = (attachment: IAttachmentDocument) => {
@@ -192,38 +177,17 @@ class AwsFileUploader extends AbstractFileUploader {
     const s3 = S3Factory();
 
     const filePath = getFilePathOnStorage(attachment);
-    const contentHeaders = createContentHeaders(attachment);
+    const contentHeaders = new ContentHeaders(attachment);
 
-    try {
-      const uploadTimeout = configManager.getConfig('app:fileUploadTimeout');
-
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: getS3Bucket(),
-          Key: filePath,
-          Body: readable,
-          ACL: getS3PutObjectCannedAcl(),
-          // put type and the file name for reference information when uploading
-          ContentType: getContentHeaderValue(contentHeaders, 'Content-Type'),
-          ContentDisposition: getContentHeaderValue(contentHeaders, 'Content-Disposition'),
-        }),
-        { abortSignal: AbortSignal.timeout(uploadTimeout) },
-      );
-
-      logger.debug(`File upload completed successfully: fileName=${attachment.fileName}`);
-    }
-    catch (error) {
-      // Handle timeout error specifically
-      if (error.name === 'AbortError') {
-        logger.warn(`Upload timeout: fileName=${attachment.fileName}`, error);
-      }
-      else {
-        logger.error(`File upload failed: fileName=${attachment.fileName}`, error);
-      }
-      // Re-throw the error to be handled by the caller.
-      // The pipeline automatically handles stream cleanup on error.
-      throw error;
-    }
+    await s3.send(new PutObjectCommand({
+      Bucket: getS3Bucket(),
+      Key: filePath,
+      Body: readable,
+      ACL: getS3PutObjectCannedAcl(),
+      // put type and the file name for reference information when uploading
+      ContentType: contentHeaders.contentType?.value.toString(),
+      ContentDisposition: contentHeaders.contentDisposition?.value.toString(),
+    }));
   }
 
   /**
@@ -241,7 +205,7 @@ class AwsFileUploader extends AbstractFileUploader {
       throw new Error('AWS is not configured.');
     }
 
-    const s3 = S3Factory(); // Use singleton client
+    const s3 = S3Factory();
     const filePath = getFilePathOnStorage(attachment);
 
     const params = {
@@ -256,20 +220,20 @@ class AwsFileUploader extends AbstractFileUploader {
     }
 
     try {
-      const response = await s3.send(new GetObjectCommand(params));
-      const body = response.Body;
+      const body = (await s3.send(new GetObjectCommand(params))).Body;
 
       if (body == null) {
         throw new Error(`S3 returned null for the Attachment (${filePath})`);
       }
 
+      // eslint-disable-next-line no-nested-ternary
       return 'stream' in body
         ? body.stream() as unknown as NodeJS.ReadableStream // get stream from Blob and cast force
         : body as unknown as NodeJS.ReadableStream; // cast force
     }
     catch (err) {
-      logger.error(`Failed to get file from AWS S3 for attachment ${attachment._id.toString()}:`, err);
-      throw new Error(`Couldn't get file from AWS for the Attachment (${attachment._id.toString()})`);
+      logger.error(err);
+      throw new Error(`Coudn't get file from AWS for the Attachment (${attachment._id.toString()})`);
     }
   }
 
@@ -288,12 +252,12 @@ class AwsFileUploader extends AbstractFileUploader {
     // issue signed url (default: expires 120 seconds)
     // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#getSignedUrl-property
     const isDownload = opts?.download ?? false;
-    const contentHeaders = createContentHeaders(attachment, { inline: !isDownload });
+    const contentHeaders = new ContentHeaders(attachment, { inline: !isDownload });
     const params: GetObjectCommandInput = {
       Bucket: getS3Bucket(),
       Key: filePath,
-      ResponseContentType: getContentHeaderValue(contentHeaders, 'Content-Type'),
-      ResponseContentDisposition: getContentHeaderValue(contentHeaders, 'Content-Disposition'),
+      ResponseContentType: contentHeaders.contentType?.value.toString(),
+      ResponseContentDisposition: contentHeaders.contentDisposition?.value.toString(),
     };
     const signedUrl = await getSignedUrl(s3, new GetObjectCommand(params), {
       expiresIn: lifetimeSecForTemporaryUrl,
@@ -318,15 +282,12 @@ class AwsFileUploader extends AbstractFileUploader {
         Key: uploadKey,
         UploadId: uploadId,
       }));
-      logger.debug(`Successfully aborted multipart upload: uploadKey=${uploadKey}, uploadId=${uploadId}`);
     }
     catch (e) {
       // allow duplicate abort requests to ensure abortion
       if (e.response?.status !== 404) {
-        logger.error(`Failed to abort multipart upload: uploadKey=${uploadKey}, uploadId=${uploadId}`, e);
         throw e;
       }
-      logger.debug(`Multipart upload already aborted: uploadKey=${uploadKey}, uploadId=${uploadId}`);
     }
   }
 

@@ -17,7 +17,7 @@ import { configManager } from '../../config-manager';
 import {
   AbstractFileUploader, type TemporaryUrl, type SaveFileParam,
 } from '../file-uploader';
-import { createContentHeaders, getContentHeaderValue } from '../utils';
+import { ContentHeaders } from '../utils';
 
 import { GcsMultipartUploader } from './multipart-uploader';
 
@@ -131,38 +131,14 @@ class GcsFileUploader extends AbstractFileUploader {
     const gcs = getGcsInstance();
     const myBucket = gcs.bucket(getGcsBucket());
     const filePath = getFilePathOnStorage(attachment);
-    const contentHeaders = createContentHeaders(attachment);
+    const contentHeaders = new ContentHeaders(attachment);
 
     const file = myBucket.file(filePath);
-    const writeStream = file.createWriteStream({
+
+    await pipeline(readable, file.createWriteStream({
       // put type and the file name for reference information when uploading
-      contentType: getContentHeaderValue(contentHeaders, 'Content-Type'),
-    });
-
-    try {
-      const uploadTimeout = configManager.getConfig('app:fileUploadTimeout');
-
-      // Use AbortSignal.timeout() for robust timeout handling (Node.js 16+)
-      await pipeline(
-        readable,
-        writeStream,
-        { signal: AbortSignal.timeout(uploadTimeout) },
-      );
-
-      logger.debug(`File upload completed successfully: fileName=${attachment.fileName}`);
-    }
-    catch (error) {
-      // Handle timeout error specifically
-      if (error.name === 'AbortError') {
-        logger.warn(`Upload timeout: fileName=${attachment.fileName}`, error);
-      }
-      else {
-        logger.error(`File upload failed: fileName=${attachment.fileName}`, error);
-      }
-      // Re-throw the error to be handled by the caller.
-      // The pipeline automatically handles stream cleanup on error.
-      throw error;
-    }
+      contentType: contentHeaders.contentType?.value.toString(),
+    }));
   }
 
   /**
@@ -196,7 +172,7 @@ class GcsFileUploader extends AbstractFileUploader {
     }
     catch (err) {
       logger.error(err);
-      throw new Error(`Coudn't get file from GCS for the Attachment (${attachment._id.toString()})`);
+      throw new Error(`Coudn't get file from AWS for the Attachment (${attachment._id.toString()})`);
     }
   }
 
@@ -217,12 +193,12 @@ class GcsFileUploader extends AbstractFileUploader {
     // issue signed url (default: expires 120 seconds)
     // https://cloud.google.com/storage/docs/access-control/signed-urls
     const isDownload = opts?.download ?? false;
-    const contentHeaders = createContentHeaders(attachment, { inline: !isDownload });
+    const contentHeaders = new ContentHeaders(attachment, { inline: !isDownload });
     const [signedUrl] = await file.getSignedUrl({
       action: 'read',
       expires: Date.now() + lifetimeSecForTemporaryUrl * 1000,
-      responseType: getContentHeaderValue(contentHeaders, 'Content-Type'),
-      responseDisposition: getContentHeaderValue(contentHeaders, 'Content-Disposition'),
+      responseType: contentHeaders.contentType?.value.toString(),
+      responseDisposition: contentHeaders.contentDisposition?.value.toString(),
     });
 
     return {

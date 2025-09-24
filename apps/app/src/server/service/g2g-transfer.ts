@@ -189,7 +189,7 @@ interface Receiver {
     innerFileStats: any[],
     optionsMap: { [key: string]: GrowiArchiveImportOption; },
     operatorUserId: string,
-  ): Map<string, ImportSettings>
+  ): { [key: string]: ImportSettings; }
   /**
    * Import collections
    * @param {string} collections Array of collection name
@@ -198,7 +198,7 @@ interface Receiver {
    */
   importCollections(
     collections: string[],
-    importSettingsMap: Map<string, ImportSettings>,
+    importSettingsMap: { [key: string]: ImportSettings; },
     sourceGROWIUploadConfigs: FileUploadConfigs,
   ): Promise<void>
   /**
@@ -618,8 +618,8 @@ export class G2GTransferReceiverService implements Receiver {
       innerFileStats: any[],
       optionsMap: { [key: string]: GrowiArchiveImportOption; },
       operatorUserId: string,
-  ): Map<string, ImportSettings> {
-    const importSettingsMap = new Map<string, ImportSettings>();
+  ): { [key: string]: ImportSettings; } {
+    const importSettingsMap = {};
     innerFileStats.forEach(({ fileName, collectionName }) => {
       const options = new GrowiArchiveImportOption(collectionName, undefined, optionsMap[collectionName]);
 
@@ -641,7 +641,7 @@ export class G2GTransferReceiverService implements Receiver {
         jsonFileName: fileName,
         overwriteParams: generateOverwriteParams(collectionName, operatorUserId, options),
       };
-      importSettingsMap.set(collectionName, importSettings);
+      importSettingsMap[collectionName] = importSettings;
     });
 
     return importSettingsMap;
@@ -649,7 +649,7 @@ export class G2GTransferReceiverService implements Receiver {
 
   public async importCollections(
       collections: string[],
-      importSettingsMap: Map<string, ImportSettings>,
+      importSettingsMap: { [key: string]: ImportSettings; },
       sourceGROWIUploadConfigs: FileUploadConfigs,
   ): Promise<void> {
     const { appService } = this.crowi;

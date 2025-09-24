@@ -50,7 +50,7 @@ const PageBulkExportSelectModal = (): JSX.Element => {
           restartJob: true,
         });
         toastSuccess(t('page_export.bulk_export_started'));
-      } catch (_e) {
+      } catch (e) {
         toastError(t('page_export.failed_to_export'));
       }
       setIsRestartModalOpened(false);

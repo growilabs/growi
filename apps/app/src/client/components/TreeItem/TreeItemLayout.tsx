@@ -9,8 +9,6 @@ import React, {
   type JSX,
 } from 'react';
 
-import { addTrailingSlash } from '@growi/core/dist/utils/path-utils';
-
 import { useSWRxPageChildren } from '~/stores/page-listing';
 import { usePageTreeDescCountMap } from '~/stores/ui';
 
@@ -90,10 +88,9 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
     setIsOpen(!isOpen);
   }, [isOpen]);
 
+  // didMount
   useEffect(() => {
-    const isPathToTarget = page.path != null
-      && targetPath.startsWith(addTrailingSlash(page.path))
-      && targetPath !== page.path; // Target Page does not need to be opened
+    const isPathToTarget = page.path != null && targetPath.startsWith(page.path) && targetPath !== page.path; // Target Page does not need to be opened
     if (isPathToTarget) setIsOpen(true);
   }, [targetPath, page.path]);
 

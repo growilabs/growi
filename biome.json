@@ -14,7 +14,6 @@
       "!**/.vscode/**",
       "!**/turbo.json",
       "!**/.next/**",
-      "!**/.terraform/**",
       "!bin/**",
       "!tsconfig.base.json",
       "!**/.devcontainer/**",
@@ -38,8 +37,7 @@
       "!apps/app/src/stores/**",
       "!apps/app/src/styles/**",
       "!apps/app/test/integration/service/**",
-      "!apps/app/test-with-vite/**",
-      "!apps/app/tmp/**"
+      "!apps/app/test-with-vite/**"
     ]
   },
   "formatter": {
@@ -69,10 +67,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "apps/pdf-converter/**",
-        "./apps/slackbot-proxy/**"
-      ],
+      "includes": ["apps/pdf-converter/**", "./apps/slackbot-proxy/**"],
       "linter": {
         "rules": {
           "style": {

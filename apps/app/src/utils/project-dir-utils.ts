@@ -1,8 +1,9 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import process from 'node:process';
+/* eslint-disable import/prefer-default-export */
 
 import { isServer } from '@growi/core/dist/utils/browser-utils';
+import fs from 'fs';
+import path from 'path';
+import process from 'process';
 
 const isCurrentDirRoot = isServer() && fs.existsSync('./next.config.js');
 

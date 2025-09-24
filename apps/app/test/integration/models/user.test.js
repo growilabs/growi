@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const { getInstance } = require('../setup-crowi');
 
 describe('User', () => {
-  // biome-ignore lint/correctness/noUnusedVariables: ignore
+  // eslint-disable-next-line no-unused-vars
   let crowi;
   let User;
 

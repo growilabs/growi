@@ -1,9 +1,7 @@
 import React from 'react';
 
 import PropTypes from 'prop-types';
-import {
-  Progress, UncontrolledDropdown, DropdownToggle, DropdownMenu, DropdownItem,
-} from 'reactstrap';
+import { Progress } from 'reactstrap';
 
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 
@@ -50,8 +48,6 @@ export default class ImportCollectionItem extends React.Component {
 
     onOptionChange(collectionName, { mode });
   }
-
-  // No toggle state needed when using UncontrolledDropdown
 
   configButtonClickedHandler() {
     const { collectionName, onConfigButtonClicked } = this.props;
@@ -107,28 +103,40 @@ export default class ImportCollectionItem extends React.Component {
     const {
       collectionName, option, isImporting,
     } = this.props;
-    const currentMode = option?.mode || 'insert';
-    const attrMap = MODE_ATTR_MAP[currentMode];
+
+    const attrMap = MODE_ATTR_MAP[option.mode];
+    const btnColor = `btn-${attrMap.color}`;
+
     const modes = MODE_RESTRICTED_COLLECTION[collectionName] || Object.keys(MODE_ATTR_MAP);
 
     return (
       <span className="d-inline-flex align-items-center">
         Mode:&nbsp;
-        <UncontrolledDropdown size="sm" className="d-inline-block">
-          <DropdownToggle color={attrMap.color} caret disabled={isImporting} id={`ddmMode-${collectionName}`}>
-            {this.renderModeLabel(currentMode)}
-          </DropdownToggle>
-          <DropdownMenu>
-            {modes.map(mode => (
-              <DropdownItem
-                key={`buttonMode_${mode}`}
-                onClick={() => this.modeSelectedHandler(mode)}
-              >
-                {this.renderModeLabel(mode, true)}
-              </DropdownItem>
-            ))}
-          </DropdownMenu>
-        </UncontrolledDropdown>
+        <div className="dropdown d-inline-block">
+          <button
+            className={`btn ${btnColor} btn-sm dropdown-toggle`}
+            type="button"
+            id="ddmMode"
+            disabled={isImporting}
+            data-bs-toggle="dropdown"
+            aria-haspopup="true"
+            aria-expanded="true"
+          >
+            {this.renderModeLabel(option.mode)}
+            <span className="caret ms-2"></span>
+          </button>
+          <ul className="dropdown-menu" aria-labelledby="ddmMode">
+            { modes.map((mode) => {
+              return (
+                <li key={`buttonMode_${mode}`}>
+                  <button type="button" className="dropdown-item" role="button" onClick={() => this.modeSelectedHandler(mode)}>
+                    {this.renderModeLabel(mode, true)}
+                  </button>
+                </li>
+              );
+            }) }
+          </ul>
+        </div>
       </span>
     );
   }
@@ -182,6 +190,7 @@ export default class ImportCollectionItem extends React.Component {
         }
       </div>
     );
+
   }
 
   render() {

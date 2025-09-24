@@ -1,4 +1,4 @@
-import type { IncomingMessage } from 'node:http';
+import type { IncomingMessage } from 'http';
 
 /**
  * Interface for anonymization modules
