@@ -109,6 +109,7 @@ describe('GrowiInfoService', () => {
           currentActiveUsersCount: 1,
           attachmentType: 'aws',
           activeExternalAccountTypes: ['saml', 'github'],
+          currentPagesCount: 0,
         },
       });
     });
@@ -158,6 +159,7 @@ describe('GrowiInfoService', () => {
       const growiInfo = await growiInfoService.getGrowiInfo({
         includeAttachmentInfo: true,
         includeUserCountInfo: true,
+        includePageCountInfo: true,
       });
 
       // assert
@@ -167,6 +169,7 @@ describe('GrowiInfoService', () => {
         activeExternalAccountTypes: ['saml', 'github'],
         currentUsersCount: 1,
         currentActiveUsersCount: 1,
+        currentPagesCount: 0,
       });
     });
 
@@ -176,6 +179,7 @@ describe('GrowiInfoService', () => {
         includeAttachmentInfo: true,
         includeInstalledInfo: true,
         includeUserCountInfo: true,
+        includePageCountInfo: true,
       });
 
       // assert
@@ -187,6 +191,7 @@ describe('GrowiInfoService', () => {
         installedAtByOldestUser: new Date('2000-01-01'),
         currentUsersCount: 1,
         currentActiveUsersCount: 1,
+        currentPagesCount: 0,
       });
     });
 
