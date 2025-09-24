@@ -1,6 +1,7 @@
 const isDev = process.env.NODE_ENV === 'development';
 
-const path = require('node:path');
+// biome-ignore lint/style/useNodejsImportProtocol: ignore
+const path = require('path');
 
 const { AllLang } = require('@growi/core');
 const { isServer } = require('@growi/core/dist/utils');

@@ -1,4 +1,5 @@
 import { useSWRStatic } from '@growi/core/dist/swr';
+// biome-ignore lint/style/useNodejsImportProtocol: ignore
 import assert from 'assert';
 import type { Key, SWRConfiguration, SWRResponse } from 'swr';
 
