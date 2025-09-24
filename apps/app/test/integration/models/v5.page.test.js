@@ -10,14 +10,14 @@ import { getInstance } from '../setup-crowi';
 
 describe('Page', () => {
   let crowi;
-  let _pageGrantService;
+  let pageGrantService;
   let pageService;
 
   let Page;
-  let _Revision;
+  let Revision;
   let User;
-  let _Bookmark;
-  let _Comment;
+  let Bookmark;
+  let Comment;
   let ShareLink;
   let PageRedirect;
   let xssSpy;
@@ -516,7 +516,7 @@ describe('Page', () => {
 
   beforeAll(async () => {
     crowi = await getInstance();
-    _pageGrantService = crowi.pageGrantService;
+    pageGrantService = crowi.pageGrantService;
     pageService = crowi.pageService;
 
     await crowi.configManager.updateConfig('app:isV5Compatible', true);
@@ -524,9 +524,9 @@ describe('Page', () => {
     jest.restoreAllMocks();
     User = mongoose.model('User');
     Page = mongoose.model('Page');
-    _Revision = mongoose.model('Revision');
-    _Bookmark = mongoose.model('Bookmark');
-    _Comment = mongoose.model('Comment');
+    Revision = mongoose.model('Revision');
+    Bookmark = mongoose.model('Bookmark');
+    Comment = mongoose.model('Comment');
     ShareLink = mongoose.model('ShareLink');
     PageRedirect = mongoose.model('PageRedirect');
 

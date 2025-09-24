@@ -6,7 +6,7 @@
  */
 const isProduction = process.env.NODE_ENV === 'production';
 
-const { URL } = require('node:url');
+const { URL } = require('url');
 
 const { getMongoUri, mongoOptions } = isProduction
   ? // eslint-disable-next-line import/extensions, import/no-unresolved

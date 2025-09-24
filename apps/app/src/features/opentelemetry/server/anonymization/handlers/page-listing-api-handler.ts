@@ -1,5 +1,5 @@
 import { diag } from '@opentelemetry/api';
-import type { IncomingMessage } from 'node:http';
+import type { IncomingMessage } from 'http';
 
 import { ATTR_HTTP_TARGET } from '../../semconv';
 import type { AnonymizationModule } from '../interfaces/anonymization-module';
@@ -28,7 +28,7 @@ export const pageListingApiModule: AnonymizationModule = {
   /**
    * Handle anonymization for page-listing API endpoints
    */
-  handle(_request: IncomingMessage, url: string): Record<string, string> | null {
+  handle(request: IncomingMessage, url: string): Record<string, string> | null {
     const attributes: Record<string, string> = {};
     let hasAnonymization = false;
 
