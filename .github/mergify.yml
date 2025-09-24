@@ -13,7 +13,7 @@ queue_rules:
       - check-success ~= ci-app-test
       - check-success ~= ci-app-launch-dev
       - check-success = test-prod-node20 / build-prod
-      - check-success = test-prod-node20 / launch-prod
+      - check-success ~= test-prod-node20 / launch-prod
       - check-success ~= test-prod-node20 / run-playwright
       - -check-failure ~= ci-app-
       - -check-failure ~= ci-slackbot-

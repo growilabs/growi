@@ -964,7 +964,7 @@ module.exports = (crowi: Crowi): Router => {
           req.user.name,
           req.body.password,
         );
-      } catch (e) {
+      } catch (_e) {
         return res.apiv3Err(
           new ErrorV3(
             'LDAP group sync failed',

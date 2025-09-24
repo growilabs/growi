@@ -23,7 +23,7 @@ export const setResource = (sdk: NodeSDK, resource: Resource): void => {
   // Verify that we can access the _resource property
   try {
     getResource(sdk);
-  } catch (e) {
+  } catch (_e) {
     throw new Error('Failed to access SDK resource');
   }
 

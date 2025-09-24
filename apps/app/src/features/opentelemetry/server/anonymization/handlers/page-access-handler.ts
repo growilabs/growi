@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import type { IncomingMessage } from 'node:http';
 import {
   getUsernameByPath,
   isCreatablePage,
@@ -7,8 +9,6 @@ import {
   isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import { diag } from '@opentelemetry/api';
-import { createHash } from 'crypto';
-import type { IncomingMessage } from 'http';
 
 import { ATTR_HTTP_TARGET } from '../../semconv';
 import type { AnonymizationModule } from '../interfaces/anonymization-module';
@@ -132,7 +132,10 @@ export const pageAccessModule: AnonymizationModule = {
   /**
    * Handle anonymization for page access requests
    */
-  handle(request: IncomingMessage, url: string): Record<string, string> | null {
+  handle(
+    _request: IncomingMessage,
+    url: string,
+  ): Record<string, string> | null {
     try {
       const parsedUrl = new URL(url, 'http://localhost');
       const originalPath = parsedUrl.pathname;
