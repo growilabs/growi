@@ -9,11 +9,12 @@
       "!**/vite.config.ts.timestamp-*",
       "!**/vite.server.config.ts.timestamp-*",
       "!**/vite.client.config.ts.timestamp-*",
-      "!**/.pnpm-store/**",
       "!**/.turbo/**",
       "!**/.vscode/**",
       "!**/turbo.json",
+      "!**/.claude/**",
       "!**/.next/**",
+      "!**/.terraform/**",
       "!bin/**",
       "!tsconfig.base.json",
       "!**/.devcontainer/**",
@@ -37,7 +38,8 @@
       "!apps/app/src/stores/**",
       "!apps/app/src/styles/**",
       "!apps/app/test/integration/service/**",
-      "!apps/app/test-with-vite/**"
+      "!apps/app/test-with-vite/**",
+      "!apps/app/tmp/**"
     ]
   },
   "formatter": {
@@ -67,7 +69,10 @@
   },
   "overrides": [
     {
-      "includes": ["apps/pdf-converter/**", "./apps/slackbot-proxy/**"],
+      "includes": [
+        "apps/pdf-converter/**",
+        "./apps/slackbot-proxy/**"
+      ],
       "linter": {
         "rules": {
           "style": {

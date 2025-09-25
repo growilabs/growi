@@ -14,7 +14,7 @@
         "--context",
         "ide-assistant",
         "--project",
-        "/workspace/growi"
+        "."
       ],
       "env": {}
     }

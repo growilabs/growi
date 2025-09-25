@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { GrowiPluginType } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import type { TemplateSummary } from '@growi/pluginkit/dist/v4';
@@ -7,15 +8,14 @@ import {
 } from '@growi/pluginkit/dist/v4/server/index.cjs';
 import express from 'express';
 import { param, query } from 'express-validator';
-import path from 'path';
 import { PLUGIN_STORING_PATH } from '~/features/growi-plugin/server/consts';
 import { GrowiPlugin } from '~/features/growi-plugin/server/models';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import { resolveFromRoot } from '~/server/util/project-dir-utils';
 import loggerFactory from '~/utils/logger';
-import { resolveFromRoot } from '~/utils/project-dir-utils';
 
 const logger = loggerFactory('growi:routes:apiv3:templates');
 

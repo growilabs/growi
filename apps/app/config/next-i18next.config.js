@@ -1,5 +1,6 @@
 const isDev = process.env.NODE_ENV === 'development';
 
+// biome-ignore lint/style/useNodejsImportProtocol: ignore
 const path = require('path');
 
 const { AllLang } = require('@growi/core');

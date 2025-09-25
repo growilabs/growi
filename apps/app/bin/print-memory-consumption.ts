@@ -11,7 +11,7 @@
  *        print-memory-consumption.ts [--port=9229] [--host=localhost] [--json]
  */
 
-import { get } from 'http';
+import { get } from 'node:http';
 
 import WebSocket from 'ws';
 

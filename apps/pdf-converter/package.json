@@ -48,7 +48,7 @@
     "@types/connect": "^3.4.38",
     "@types/express": "^4.17.21",
     "@types/multer": "^1.4.12",
-    "@types/node": "^22.5.4",
+    "@types/node": "^20.18.3",
     "@types/supertest": "^6.0.3",
     "supertest": "^7.1.1",
     "unplugin-swc": "^1.5.3"

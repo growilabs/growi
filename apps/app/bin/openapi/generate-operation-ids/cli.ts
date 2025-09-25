@@ -1,5 +1,5 @@
+import { writeFileSync } from 'node:fs';
 import { Command } from 'commander';
-import { writeFileSync } from 'fs';
 
 import { generateOperationIds } from './generate-operation-ids';
 

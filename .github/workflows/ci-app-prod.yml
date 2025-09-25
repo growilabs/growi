@@ -40,7 +40,7 @@ concurrency:
 jobs:
 
   test-prod-node18:
-    uses: weseek/growi/.github/workflows/reusable-app-prod.yml@master
+    uses: growilabs/growi/.github/workflows/reusable-app-prod.yml@master
     if: |
       ( github.event_name == 'push'
         || github.base_ref == 'master'
