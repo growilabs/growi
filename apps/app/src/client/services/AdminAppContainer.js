@@ -76,9 +76,6 @@ export default class AdminAppContainer extends Container {
       isEnabledPlugins: true,
 
       isMaintenanceMode: false,
-
-      // TODO: remove this property when bulk export can be relased for cloud (https://redmine.weseek.co.jp/issues/163220)
-      isBulkExportDisabledForCloud: false,
     };
 
   }
@@ -152,9 +149,6 @@ export default class AdminAppContainer extends Container {
 
       isEnabledPlugins: appSettingsParams.isEnabledPlugins,
       isMaintenanceMode: appSettingsParams.isMaintenanceMode,
-
-      // TODO: remove this property when bulk export can be relased for cloud (https://redmine.weseek.co.jp/issues/163220)
-      isBulkExportDisabledForCloud: appSettingsParams.isBulkExportDisabledForCloud,
     });
 
     // if useOnlyEnvVarForFileUploadType is true, get fileUploadType from only env var and make the forms fixed.

@@ -599,8 +599,7 @@ function injectServerConfigurations(context: GetServerSidePropsContext, props: P
   props.disableLinkSharing = configManager.getConfig('security:disableLinkSharing');
   props.isUploadAllFileAllowed = fileUploadService.getFileUploadEnabled();
   props.isUploadEnabled = fileUploadService.getIsUploadable();
-  // TODO: remove growiCloudUri condition when bulk export can be relased for GROWI.cloud (https://redmine.weseek.co.jp/issues/163220)
-  props.isBulkExportPagesEnabled = configManager.getConfig('app:isBulkExportPagesEnabled') && configManager.getConfig('app:growiCloudUri') == null;
+  props.isBulkExportPagesEnabled = configManager.getConfig('app:isBulkExportPagesEnabled');
   props.isPdfBulkExportEnabled = configManager.getConfig('app:pageBulkExportPdfConverterUri') != null;
 
   props.isLocalAccountRegistrationEnabled = passportService.isLocalStrategySetup
