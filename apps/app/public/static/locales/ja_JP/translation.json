@@ -244,7 +244,7 @@
     "scope_read": "Read",
     "action": "アクション",
     "create_token": "トークンを作成",
-    "no_tokens_found":"アクセストークンが見つかりません",
+    "no_tokens_found": "アクセストークンが見つかりません",
     "new_token": {
       "title": "新しいアクセストークン",
       "copy_to_clipboard": "クリップボードにコピーしました",
@@ -708,7 +708,7 @@
       "thread_deleted_failed": "スレッドの削除に失敗しました",
       "ai_assistant_set_default_success": "デフォルトアシスタントを設定しました",
       "ai_assistant_set_default_failed": "デフォルトアシスタントの設定に失敗しました"
-      },
+    },
     "delete_modal": {
       "title": "アシスタントを削除する",
       "confirm_message": "本当にアシスタントを削除しますか？"
@@ -930,7 +930,7 @@
     "Password field is required": "パスワードの欄は必ず入力してください",
     "Username or E-mail has invalid characters": "ユーザー名または、メールアドレスに無効な文字があります",
     "user_not_found": "ユーザーが見つかりません",
-    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>エラー: DuplicatedUsernameException</strong></p><p class='mb-0'> {{ failedProviderForDuplicatedUsernameException }} 認証は成功しましたが、新しいユーザーを作成できませんでした。詳しくは<a href='https://github.com/weseek/growi/issues/193'>こちら: #193</a>.</p>"
+    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>エラー: DuplicatedUsernameException</strong></p><p class='mb-0'> {{ failedProviderForDuplicatedUsernameException }} 認証は成功しましたが、新しいユーザーを作成できませんでした。詳しくは<a href='https://github.com/growilabs/growi/issues/193'>こちら: #193</a>.</p>"
   },
   "grid_edit": {
     "create_bootstrap_4_grid": "Bootstrap 4 グリッドを作成",

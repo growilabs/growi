@@ -3,7 +3,7 @@
 ##
 ## base
 ##
-FROM node:22-slim AS base
+FROM node:20-slim AS base
 
 ENV optDir="/opt"
 
@@ -52,7 +52,7 @@ RUN tar -zcf packages.tar.gz \
 ##
 ## release
 ##
-FROM node:22-slim
+FROM node:20-slim
 LABEL maintainer="Yuki Takei <yuki@weseek.co.jp>"
 
 ENV NODE_ENV="production"

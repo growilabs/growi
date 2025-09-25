@@ -96,6 +96,7 @@
     {
       "text": "Always write commit messages in English."
     }
-  ]
+  ],
+  "git-worktree-menu.worktreeDir": "/workspace"
 
 }

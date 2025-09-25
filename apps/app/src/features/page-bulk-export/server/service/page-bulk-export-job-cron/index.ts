@@ -1,9 +1,9 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import type { Readable } from 'node:stream';
 import type { IUser } from '@growi/core';
 import { getIdForRef, isPopulated } from '@growi/core';
-import fs from 'fs';
 import mongoose from 'mongoose';
-import path from 'path';
-import type { Readable } from 'stream';
 
 import type { SupportedActionType } from '~/interfaces/activity';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';

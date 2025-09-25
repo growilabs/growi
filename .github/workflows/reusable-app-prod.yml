@@ -1,4 +1,4 @@
-name: Reusable build app workflow for production
+name: Reusable build and test app for production
 
 on:
   workflow_call:
@@ -16,7 +16,7 @@ on:
       node-version:
         required: true
         type: string
-        default: 20.x
+        default: 22.x
       skip-e2e-test:
         type: boolean
         default: false

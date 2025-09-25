@@ -116,7 +116,7 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
     setShowPreview(showPreview);
   }, []);
 
-  // DO NOT dependent on slackChannelsData directly: https://github.com/weseek/growi/pull/7332
+  // DO NOT dependent on slackChannelsData directly: https://github.com/growilabs/growi/pull/7332
   const slackChannelsDataString = slackChannelsData?.toString();
   const initializeSlackEnabled = useCallback(() => {
     setSlackChannels(slackChannelsDataString ?? '');
@@ -186,7 +186,7 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
       const errorMessage = err.message || 'An unknown error occured when posting comment';
       setError(errorMessage);
     }
-  // eslint-disable-next-line max-len
+    // eslint-disable-next-line max-len
   }, [currentCommentId, initializeEditor, onCommented, codeMirrorEditor, updateComment, revisionId, replyTo, isSlackEnabled, slackChannels, postComment]);
 
   // the upload event handler

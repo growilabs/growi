@@ -1,5 +1,5 @@
+import type { IncomingMessage } from 'node:http';
 import { diag } from '@opentelemetry/api';
-import type { IncomingMessage } from 'http';
 
 import { ATTR_HTTP_TARGET } from '../../semconv';
 import type { AnonymizationModule } from '../interfaces/anonymization-module';

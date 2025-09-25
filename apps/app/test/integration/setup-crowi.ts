@@ -1,4 +1,4 @@
-import { Server } from 'http';
+import { Server } from 'node:http';
 
 import Crowi from '../../src/server/crowi';
 import { setupModelsDependentOnCrowi } from '../../src/server/crowi/setup-models';

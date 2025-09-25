@@ -11,7 +11,7 @@ import type { CrowiProperties, CrowiRequest } from '~/interfaces/crowi-request';
 import { ResponseMode, type ExpressHttpHeader, type RespondOptions } from '~/server/interfaces/attachment';
 import {
   type FileUploader,
-  toExpressHttpHeaders, ContentHeaders, applyHeaders,
+  toExpressHttpHeaders, applyHeaders, createContentHeaders,
 } from '~/server/service/file-uploader';
 import loggerFactory from '~/utils/logger';
 
@@ -110,8 +110,8 @@ const respondForRedirectMode = async(res: Response, fileUploadService: FileUploa
 const respondForRelayMode = async(res: Response, fileUploadService: FileUploader, attachment: IAttachmentDocument, opts?: RespondOptions): Promise<void> => {
   // apply content-* headers before response
   const isDownload = opts?.download ?? false;
-  const contentHeaders = new ContentHeaders(attachment, { inline: !isDownload });
-  applyHeaders(res, contentHeaders.toExpressHttpHeaders());
+  const contentHeaders = createContentHeaders(attachment, { inline: !isDownload });
+  applyHeaders(res, contentHeaders);
 
   try {
     const readable = await fileUploadService.findDeliveryFile(attachment);

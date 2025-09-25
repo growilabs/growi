@@ -2,13 +2,13 @@
 GROWI Slackbot Proxy Server Official docker image
 ==============================================
 
-[![Node CI for slackbot-proxy](https://github.com/weseek/growi/actions/workflows/ci-slackbot-proxy.yml/badge.svg)](https://github.com/weseek/growi/actions/workflows/ci-slackbot-proxy.yml) [![docker-pulls](https://img.shields.io/docker/pulls/weseek/growi-slackbot-proxy.svg)](https://hub.docker.com/r/weseek/growi-slackbot-proxy/)
+[![Node CI for slackbot-proxy](https://github.com/growilabs/growi/actions/workflows/ci-slackbot-proxy.yml/badge.svg)](https://github.com/growilabs/growi/actions/workflows/ci-slackbot-proxy.yml) [![docker-pulls](https://img.shields.io/docker/pulls/weseek/growi-slackbot-proxy.svg)](https://hub.docker.com/r/weseek/growi-slackbot-proxy/)
 
 
 Supported tags and respective Dockerfile links
 ------------------------------------------------
 
-* [`1.0.0`, `latest` (Dockerfile)](https://github.com/weseek/growi/blob/master/apps/slackbot-proxy/docker/Dockerfile)
+* [`1.0.0`, `latest` (Dockerfile)](https://github.com/growilabs/growi/blob/master/apps/slackbot-proxy/docker/Dockerfile)
 
 
 What is GROWI Slackbot Proxy Server?

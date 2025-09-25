@@ -36,7 +36,7 @@ export function isValidResponseUrl(
     }
 
     return false;
-  } catch (error) {
+  } catch {
     // Invalid URL format
     return false;
   }

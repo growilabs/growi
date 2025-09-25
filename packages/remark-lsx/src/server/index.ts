@@ -5,7 +5,7 @@ import { FilterXSS } from 'xss';
 import type { LsxApiOptions } from '../interfaces/api';
 import { listPages } from './routes/list-pages';
 
-const loginRequiredFallback = (req: Request, res: Response) => {
+const loginRequiredFallback = (_req: Request, res: Response) => {
   return res.status(403).send('login required');
 };
 

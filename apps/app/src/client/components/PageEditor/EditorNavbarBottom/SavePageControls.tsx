@@ -38,7 +38,7 @@ declare global {
 const logger = loggerFactory('growi:SavePageControls');
 
 
-const SavePageButton = (props: {slackChannels: string, isSlackEnabled?: boolean, isDeviceLargerThanMd?: boolean}) => {
+const SavePageButton = (props: { slackChannels: string, isSlackEnabled?: boolean, isDeviceLargerThanMd?: boolean }) => {
 
   const { t } = useTranslation();
   const { data: _isWaitingSaveProcessing } = useWaitingSaveProcessing();
@@ -159,7 +159,7 @@ export const SavePageControls = (): JSX.Element | null => {
   const [slackChannels, setSlackChannels] = useState<string>('');
   const [isSavePageControlsModalShown, setIsSavePageControlsModalShown] = useState<boolean>(false);
 
-  // DO NOT dependent on slackChannelsData directly: https://github.com/weseek/growi/pull/7332
+  // DO NOT dependent on slackChannelsData directly: https://github.com/growilabs/growi/pull/7332
   const slackChannelsDataString = slackChannelsData?.toString();
   useEffect(() => {
     if (editorMode === 'editor') {

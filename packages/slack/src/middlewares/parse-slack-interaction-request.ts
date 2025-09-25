@@ -5,7 +5,7 @@ import { InteractionPayloadAccessor } from '../utils/interaction-payload-accesso
 
 export const parseSlackInteractionRequest = (
   req: RequestFromSlack,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ): void => {
   // There is no payload in the request from slack

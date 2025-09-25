@@ -1,4 +1,4 @@
-// see: https://github.com/weseek/growi/issues/8337
+// see: https://github.com/growilabs/growi/issues/8337
 
 import { type IPageHasId } from '@growi/core';
 import mongoose from 'mongoose';

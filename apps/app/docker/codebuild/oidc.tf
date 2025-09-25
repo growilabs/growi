@@ -7,7 +7,7 @@ module "oidc_github" {
   }
 
   github_repositories = [
-    "weseek/growi",
+    "growilabs/growi",
   ]
 }
 

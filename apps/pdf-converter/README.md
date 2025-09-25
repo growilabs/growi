@@ -13,7 +13,7 @@ This app (PDF-Converter) is necessary to convert markdown pages to PDF during th
 1. Create `.devcontainer/compose.extend.yml` with the same contents as `.devcontainer/compose.extend.template.yml`
 1. Open command palette (Windows: Ctrl + Shift + P, Mac: Cmd + Shift + P)
 1. Choose `Dev Containers: Open folder in Container...`
-1. Choose the root growi directory you have cloned from https://github.com/weseek/growi
+1. Choose the root growi directory you have cloned from https://github.com/growilabs/growi
     - **Not the PDF-Converter directory (growi/apps/pdf-converter)**
 1. Choose `GROWI-PDF-Converter` as the container to open
 1. Execute `cd apps/pdf-converter && turbo dev:pdf-converter` to start the pdf-converter app

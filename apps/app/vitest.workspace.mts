@@ -38,6 +38,7 @@ export default defineWorkspace([
       name: 'app-components',
       environment: 'happy-dom',
       include: ['**/*.spec.{tsx,jsx}'],
+      setupFiles: ['./test-with-vite/setup/jest-dom.ts'],
     },
   }),
 ]);

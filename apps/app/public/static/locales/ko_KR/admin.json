@@ -313,7 +313,7 @@
       "done": "클립보드에 복사되었습니다!"
     },
     "bug_report": "버그 보고서 제출",
-    "submit_bug_report": "<a href='https://github.com/weseek/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>그런 다음 GitHub에 문제를 제출하십시오.</a>"
+    "submit_bug_report": "<a href='https://github.com/growilabs/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>그런 다음 GitHub에 문제를 제출하십시오.</a>"
   },
   "v5_page_migration": {
     "migration_desc": "일부 페이지는 이전 v4 호환성을 가지고 있습니다. 페이지 트리 및 쉬운 이름 변경과 같은 새로운 기능을 활용하려면 모든 페이지를 v5 호환성으로 변환하십시오.",

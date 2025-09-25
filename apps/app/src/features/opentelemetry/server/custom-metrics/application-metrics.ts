@@ -1,5 +1,5 @@
+import crypto from 'node:crypto';
 import { diag, metrics } from '@opentelemetry/api';
-import crypto from 'crypto';
 
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';

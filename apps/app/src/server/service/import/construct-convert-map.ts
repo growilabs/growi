@@ -11,9 +11,28 @@ export type ConvertMap = {
 }
 
 /**
+ * Special conversion functions for problematic fields
+ * Add entries here for fields that require custom handling during import
+ */
+const SPECIAL_CONVERT_FUNCTIONS: Record<string, Record<string, OverwriteFunction>> = {
+  activities: {
+    snapshot: (value: unknown) => value, // Skip SubdocumentPath casting to avoid Mongoose errors
+  },
+  // Add more collections and fields as needed:
+  // otherCollection: {
+  //   problematicField: (value: unknown) => customProcessing(value),
+  // },
+};
+
+/**
+ * Get special conversion function for a specific collection.field combination
+ */
+const getSpecialConvertFunction = (collectionName: string, propertyName: string): OverwriteFunction | null => {
+  return SPECIAL_CONVERT_FUNCTIONS[collectionName]?.[propertyName] ?? null;
+};
+
+/**
  * Initialize convert map. set keepOriginal as default
- *
- * @param {Crowi} crowi Crowi instance
  */
 export const constructConvertMap = (): ConvertMap => {
   const convertMap: ConvertMap = {};
@@ -30,7 +49,8 @@ export const constructConvertMap = (): ConvertMap => {
     convertMap[collectionName] = {};
 
     for (const key of Object.keys(model.schema.paths)) {
-      convertMap[collectionName][key] = keepOriginal;
+      const specialHandler = getSpecialConvertFunction(collectionName, key);
+      convertMap[collectionName][key] = specialHandler ?? keepOriginal;
     }
   });
 

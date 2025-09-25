@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: User request or Suggestions
-    url: https://github.com/weseek/growi/discussions
+    url: https://github.com/growilabs/growi/discussions
     about: If you have feature requests or suggestions, you can create a new discussion and consider it with the community.
   - name: Questions
     url: https://communityinviter.com/apps/wsgrowi/invite/

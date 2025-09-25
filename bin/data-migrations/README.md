@@ -5,7 +5,7 @@
 
 ## Usage
 ```
-git clone https://github.com/weseek/growi
+git clone https://github.com/growilabs/growi
 cd growi/bin/data-migrations
 
 NETWORK=growi_devcontainer_default
@@ -80,7 +80,7 @@ module.exports = [
 
 By passing `custom` in the environment variable `MIGRATION_MODULE` and executing it, you can apply the `custom.js` to all the latest `revisions`.
 ```
-git clone https://github.com/weseek/growi
+git clone https://github.com/growilabs/growi
 cd growi/bin/data-migrations
 
 NETWORK=growi_devcontainer_default \

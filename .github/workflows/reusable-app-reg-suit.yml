@@ -32,7 +32,7 @@ jobs:
 
   run-reg-suit:
     # use secrets for "VRT" environment
-    # https://github.com/weseek/growi/settings/environments/376165508/edit
+    # https://github.com/growilabs/growi/settings/environments/376165508/edit
     environment: VRT
 
     if: ${{ !inputs.skip-reg-suit }}

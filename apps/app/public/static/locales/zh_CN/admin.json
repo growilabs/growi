@@ -322,7 +322,7 @@
       "done": "复制到剪贴板!"
     },
     "bug_report": "提交一个错误报告",
-    "submit_bug_report": "<a href='https://github.com/weseek/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>然后提交你的问题到GitHub。</a>"
+    "submit_bug_report": "<a href='https://github.com/growilabs/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>然后提交你的问题到GitHub。</a>"
   },
   "v5_page_migration": {
     "migration_desc": "有一些页面具有旧的v4兼容性。为了利用新的功能，如页面树和容易重命名，请将您的所有页面转换为v5兼容性。",

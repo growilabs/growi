@@ -189,7 +189,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
         ...(opts ?? {}),
       });
 
-      // to sync revision id with page tree: https://github.com/weseek/growi/pull/7227
+      // to sync revision id with page tree: https://github.com/growilabs/growi/pull/7227
       mutatePageTree();
 
       mutateRecentlyUpdated();

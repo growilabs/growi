@@ -3,7 +3,7 @@
 services:
   pdf-converter:
     # enabling devcontainer 'features' was not working for secondary devcontainer (https://github.com/devcontainers/features/issues/1175)
-    image: mcr.microsoft.com/vscode/devcontainers/javascript-node:1-22
+    image: mcr.microsoft.com/vscode/devcontainers/javascript-node:1-20
     volumes:
       - ..:/workspace/growi:delegated
       - pnpm-store:/workspace/.pnpm-store
