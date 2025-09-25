@@ -1,13 +1,12 @@
 import { streamText } from 'ai';
 
-import type {
-  StreamTextResult,
-} from '../../../../interfaces/ai-sdk';
+import type { StreamTextResult } from '../../../../openai/interfaces/ai-sdk';
 
 import { getOpenaiProvider } from './get-openai-provider';
 
 // eslint-disable-next-line max-len
-const INSTRUCTION = `You generate initial acknowledgment messages that appear immediately after a user submits their input. These messages show that the system has received the user's request while the full response is being prepared.
+const INSTRUCTION =
+  `You generate initial acknowledgment messages that appear immediately after a user submits their input. These messages show that the system has received the user's request while the full response is being prepared.
 # CRITICAL INSTRUCTION
 - ALWAYS RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT.
 
@@ -38,7 +37,11 @@ const INSTRUCTION = `You generate initial acknowledgment messages that appear im
 
 Please generate only a concise initial message following these guidelines based on the user's input.` as const;
 
-export const generatePreMessage = async({ prompt }: { prompt: string }): Promise<StreamTextResult> => {
+export const generatePreMessage = async ({
+  prompt,
+}: {
+  prompt: string;
+}): Promise<StreamTextResult> => {
   const openai = getOpenaiProvider();
   return streamText({
     prompt,

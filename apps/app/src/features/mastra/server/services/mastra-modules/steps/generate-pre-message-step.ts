@@ -1,9 +1,8 @@
-
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 
-import { StreamEventName } from '../../../../interfaces/mastra';
-import { generatePreMessage } from '../ai-sdk-modules/generate-pre-message';
+import { StreamEventName } from '../../../../interfaces/stream-event-name';
+import { generatePreMessage } from '../../ai-sdk-modules/generate-pre-message';
 
 export const generatePreMessageStep = createStep({
   id: 'generate-pre-message-step',

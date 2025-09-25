@@ -1,8 +1,8 @@
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 
-import { StreamEventName } from '../../../../interfaces/mastra';
-import { fileSearchWithStream } from '../ai-sdk-modules/file-search';
+import { StreamEventName } from '../../../../interfaces/stream-event-name';
+import { fileSearchWithStream } from '../../ai-sdk-modules/file-search';
 
 export const fileSearchStep = createStep({
   id: 'file-search-step-step',

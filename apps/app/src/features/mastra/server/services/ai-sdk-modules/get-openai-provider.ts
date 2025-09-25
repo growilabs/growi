@@ -2,8 +2,7 @@ import { createOpenAI, type OpenAIProvider } from '@ai-sdk/openai';
 
 import { configManager } from '~/server/service/config-manager';
 
-import { isAiEnabled } from '../../is-ai-enabled';
-
+import { isAiEnabled } from '../../../../openai/server/services/is-ai-enabled';
 
 let openAIProvider: OpenAIProvider | undefined;
 export const getOpenaiProvider = (): OpenAIProvider => {
