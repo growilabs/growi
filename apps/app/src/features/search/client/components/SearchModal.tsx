@@ -3,7 +3,7 @@ import Downshift, {
   type StateChangeOptions,
 } from 'downshift';
 import { useRouter } from 'next/router';
-import React, { type JSX, useCallback, useEffect, useState } from 'react';
+import { type JSX, useCallback, useEffect, useState } from 'react';
 import { Modal, ModalBody } from 'reactstrap';
 
 import { isIncludeAiMenthion, removeAiMenthion } from '../../utils/ai';

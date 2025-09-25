@@ -1,5 +1,5 @@
+import type { IncomingMessage } from 'node:http';
 import { diag } from '@opentelemetry/api';
-import type { IncomingMessage } from 'http';
 
 import { ATTR_HTTP_TARGET } from '../../semconv';
 import type { AnonymizationModule } from '../interfaces/anonymization-module';
@@ -29,7 +29,10 @@ export const searchApiModule: AnonymizationModule = {
   /**
    * Handle anonymization for search API endpoints
    */
-  handle(request: IncomingMessage, url: string): Record<string, string> | null {
+  handle(
+    _request: IncomingMessage,
+    url: string,
+  ): Record<string, string> | null {
     // Check if this is a search request that needs anonymization
     // Look for q parameter anywhere in the query string
     if (url.includes('?q=') || url.includes('&q=')) {

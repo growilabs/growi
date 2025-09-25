@@ -39,7 +39,7 @@ export const LdapGroupManagement: FC = () => {
     [isUserBind],
   );
 
-  const AdditionalForm = (): JSX.Element => {
+  const AdditionalForm = (): JSX.Element | null => {
     return isUserBind ? (
       <div className="row form-group">
         <label
@@ -60,9 +60,7 @@ export const LdapGroupManagement: FC = () => {
           </p>
         </div>
       </div>
-    ) : (
-      <></>
-    );
+    ) : null;
   };
 
   return (

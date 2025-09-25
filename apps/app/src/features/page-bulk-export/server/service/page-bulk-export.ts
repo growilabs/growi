@@ -15,7 +15,7 @@ import {
 import type { PageBulkExportJobDocument } from '../models/page-bulk-export-job';
 import PageBulkExportJob from '../models/page-bulk-export-job';
 
-const logger = loggerFactory('growi:services:PageBulkExportService');
+const _logger = loggerFactory('growi:services:PageBulkExportService');
 
 export class DuplicateBulkExportJobError extends Error {
   duplicateJob: HydratedDocument<PageBulkExportJobDocument>;

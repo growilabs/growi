@@ -1,8 +1,8 @@
+import { createHash } from 'node:crypto';
+import { pipeline, Writable } from 'node:stream';
 import type { IPage } from '@growi/core';
 import { getIdForRef, getIdStringForRef } from '@growi/core';
-import { createHash } from 'crypto';
 import mongoose from 'mongoose';
-import { pipeline, Writable } from 'stream';
 
 import { PageBulkExportJobStatus } from '~/features/page-bulk-export/interfaces/page-bulk-export';
 import { SupportedAction } from '~/interfaces/activity';
@@ -69,7 +69,7 @@ export async function createPageSnapshotsAsync(
   // create a Writable that creates a snapshot for each page
   const pageSnapshotsWritable = new Writable({
     objectMode: true,
-    write: async (page: PageDocument, encoding, callback) => {
+    write: async (page: PageDocument, _encoding, callback) => {
       try {
         if (page.revision != null) {
           revisionListHash.update(getIdStringForRef(page.revision));

@@ -36,8 +36,7 @@ describe('addPageCountsMetrics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(metrics.getMeter).mockReturnValue(mockMeter);
-    mockMeter.createObservableGauge
-      .mockReturnValueOnce(mockPageCountGauge)
+    mockMeter.createObservableGauge.mockReturnValueOnce(mockPageCountGauge);
   });
 
   afterEach(() => {

@@ -41,11 +41,11 @@ type CalloutViewerProps = {
 };
 
 export const CalloutViewer = React.memo(
-  (props: CalloutViewerProps): JSX.Element => {
+  (props: CalloutViewerProps): JSX.Element | null => {
     const { node, type, label, children } = props;
 
     if (node == null) {
-      return <></>;
+      return null;
     }
 
     return (

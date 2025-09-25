@@ -1,5 +1,5 @@
 import { PagePathLabel, UserPicture } from '@growi/ui/dist/components';
-import React, { type JSX, useCallback } from 'react';
+import { type JSX, useCallback } from 'react';
 import { useDebounce } from 'usehooks-ts';
 
 import { useSWRxSearch } from '~/stores/search';
@@ -13,7 +13,7 @@ type Props = {
   searchKeyword: string;
   getItemProps: GetItemProps;
 };
-export const SearchResultMenuItem = (props: Props): JSX.Element => {
+export const SearchResultMenuItem = (props: Props): JSX.Element | null => {
   const { activeIndex, searchKeyword, getItemProps } = props;
 
   const debouncedKeyword = useDebounce(searchKeyword, 500);
@@ -52,7 +52,7 @@ export const SearchResultMenuItem = (props: Props): JSX.Element => {
     searchResult == null ||
     searchResult.data.length === 0
   ) {
-    return <></>;
+    return null;
   }
 
   return (

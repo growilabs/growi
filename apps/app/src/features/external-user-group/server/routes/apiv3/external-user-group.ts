@@ -618,7 +618,7 @@ module.exports = (crowi: Crowi): Router => {
     accessTokenParser([SCOPE.READ.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
-    (req: AuthorizedRequest, res: ApiV3Response) => {
+    (_req: AuthorizedRequest, res: ApiV3Response) => {
       const settings = {
         ldapGroupSearchBase: configManager.getConfig(
           'external-user-group:ldap:groupSearchBase',
@@ -689,7 +689,7 @@ module.exports = (crowi: Crowi): Router => {
     accessTokenParser([SCOPE.READ.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
-    (req: AuthorizedRequest, res: ApiV3Response) => {
+    (_req: AuthorizedRequest, res: ApiV3Response) => {
       const settings = {
         keycloakHost: configManager.getConfig(
           'external-user-group:keycloak:host',
@@ -964,7 +964,7 @@ module.exports = (crowi: Crowi): Router => {
           req.user.name,
           req.body.password,
         );
-      } catch (e) {
+      } catch (_e) {
         return res.apiv3Err(
           new ErrorV3(
             'LDAP group sync failed',
@@ -1003,7 +1003,7 @@ module.exports = (crowi: Crowi): Router => {
     accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
-    async (req: AuthorizedRequest, res: ApiV3Response) => {
+    async (_req: AuthorizedRequest, res: ApiV3Response) => {
       if (isExecutingSync()) {
         return res.apiv3Err(
           new ErrorV3(
@@ -1101,7 +1101,7 @@ module.exports = (crowi: Crowi): Router => {
     accessTokenParser([SCOPE.READ.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
-    (req: AuthorizedRequest, res: ApiV3Response) => {
+    (_req: AuthorizedRequest, res: ApiV3Response) => {
       const syncStatus = crowi.ldapUserGroupSyncService?.syncStatus;
       return res.apiv3({ ...syncStatus });
     },
@@ -1129,7 +1129,7 @@ module.exports = (crowi: Crowi): Router => {
     accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
-    (req: AuthorizedRequest, res: ApiV3Response) => {
+    (_req: AuthorizedRequest, res: ApiV3Response) => {
       const syncStatus = crowi.keycloakUserGroupSyncService?.syncStatus;
       return res.apiv3({ ...syncStatus });
     },
