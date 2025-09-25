@@ -217,13 +217,12 @@ module.exports = (crowi: Crowi): Router => {
 
       try {
 
-
         const userActivityPipeline = [
           {
             $match: {
               $and: [
                 {
-                  userId,
+                  user: userId,
                 },
                 {
                   action: { $in: Object.values(ActivityLogActions) },
@@ -244,12 +243,16 @@ module.exports = (crowi: Crowi): Router => {
         const simpleTestPipeline = [
           {
             $match: {
-              action: 'UNSETTLED',
+              action: { $in: Object.values(ActivityLogActions) },
             },
           },
         ];
         const pipeLineResults = await Activity.aggregate(simpleTestPipeline);
         const test: string[] = [];
+
+        pipeLineResults.forEach((doc) => {
+          test.push(doc._id.toString());
+        });
 
         return res.apiv3({ test });
 
