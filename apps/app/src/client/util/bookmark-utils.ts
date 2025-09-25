@@ -16,7 +16,7 @@ export const addNewFolder = async(name: string, parent: string | null): Promise<
 
 // Put bookmark to a folder
 export const addBookmarkToFolder = async(pageId: string, folderId: string | null): Promise<void> => {
-  await apiv3Post('/bookmark-folder/add-boookmark-to-folder', { pageId, folderId });
+  await apiv3Post('/bookmark-folder/add-bookmark-to-folder', { pageId, folderId });
 };
 
 // Delete bookmark folder

@@ -4,11 +4,9 @@ import userModelFactory from '~/server/models/user';
 import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
-
 const logger = loggerFactory('growi:migrate:make-email-unique');
 
 module.exports = {
-
   async up(db, next) {
     logger.info('Start migration');
     await mongoose.connect(getMongoUri(), mongoOptions);
@@ -44,5 +42,4 @@ module.exports = {
     // do not rollback
     next();
   },
-
 };

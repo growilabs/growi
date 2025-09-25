@@ -1,4 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, {
+  useState, useCallback, useEffect, type JSX,
+} from 'react';
 
 import type { IPageHasId } from '@growi/core';
 

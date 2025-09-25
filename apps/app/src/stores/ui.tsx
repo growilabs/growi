@@ -52,8 +52,8 @@ export const useCurrentPageTocNode = (): SWRResponse<HtmlElementNode, any> => {
  *                      for switching UI
  *********************************************************** */
 
-export const useSidebarScrollerRef = (initialData?: RefObject<HTMLDivElement>): SWRResponse<RefObject<HTMLDivElement>, Error> => {
-  return useSWRStatic<RefObject<HTMLDivElement>, Error>('sidebarScrollerRef', initialData);
+export const useSidebarScrollerRef = (initialData?: RefObject<HTMLDivElement | null>): SWRResponse<RefObject<HTMLDivElement | null>, Error> => {
+  return useSWRStatic<RefObject<HTMLDivElement | null>, Error>('sidebarScrollerRef', initialData);
 };
 
 //

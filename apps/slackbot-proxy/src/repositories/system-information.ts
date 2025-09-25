@@ -1,13 +1,13 @@
-import {
-  Repository, EntityRepository,
-} from 'typeorm';
+import { EntityRepository, Repository } from 'typeorm';
 
 import { SystemInformation } from '~/entities/system-information';
 
 @EntityRepository(SystemInformation)
 export class SystemInformationRepository extends Repository<SystemInformation> {
-
-  async createOrUpdateUniqueRecordWithVersion(systemInfo: SystemInformation | undefined, proxyVersion: string): Promise<void> {
+  async createOrUpdateUniqueRecordWithVersion(
+    systemInfo: SystemInformation | undefined,
+    proxyVersion: string,
+  ): Promise<void> {
     // update the version if it exists
     if (systemInfo != null) {
       systemInfo.setVersion(proxyVersion);
@@ -19,5 +19,4 @@ export class SystemInformationRepository extends Repository<SystemInformation> {
     newSystemInfo.setVersion(proxyVersion);
     await this.save(newSystemInfo);
   }
-
 }

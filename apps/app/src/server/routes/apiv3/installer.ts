@@ -8,6 +8,7 @@ import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
+import * as applicationNotInstalled from '../../middlewares/application-not-installed';
 import { registerRules, registerValidation } from '../../middlewares/register-form-validator';
 import { InstallerService, FailedToCreateAdminUserError } from '../../service/installer';
 
@@ -21,20 +22,63 @@ const logger = loggerFactory('growi:routes:apiv3:installer');
 type FormRequest = Request & { form: any, logIn: any };
 
 module.exports = (crowi: Crowi): Router => {
-  const addActivity = generateAddActivityMiddleware(crowi);
+  const addActivity = generateAddActivityMiddleware();
 
   const activityEvent = crowi.event('activity');
 
   const router = express.Router();
 
-  const minPasswordLength = configManager.getConfig('crowi', 'app:minPasswordLength');
+  // check application is not installed yet
+  router.use(
+    applicationNotInstalled.generateCheckerMiddleware(crowi),
+    applicationNotInstalled.handleAsApiError,
+  );
 
+  const minPasswordLength = configManager.getConfig('app:minPasswordLength');
+
+  /**
+   * @swagger
+   *
+   *  /installer:
+   *    post:
+   *      tags: [Install]
+   *      security: []
+   *      summary: /installer
+   *      description: Install GROWI
+   *      requestBody:
+   *        required: true
+   *        content:
+   *          application/json:
+   *            schema:
+   *              type: object
+   *              properties:
+   *                registerForm:
+   *                  type: object
+   *                  properties:
+   *                    name:
+   *                      type: string
+   *                    username:
+   *                      type: string
+   *                    email:
+   *                      type: string
+   *                    password:
+   *                      type: string
+   *                    app:globalLang:
+   *                      type: string
+   *                      default: en_US
+   *      responses:
+   *        200:
+   *          description: import settings params
+   *          content:
+   *            application/json:
+   *              schema:
+   *                properties:
+   *                  message:
+   *                    type: string
+   *                    example: Installation completed (Logged in as an admin user)
+   */
   // eslint-disable-next-line max-len
   router.post('/', registerRules(minPasswordLength), registerValidation, addActivity, async(req: FormRequest, res: ApiV3Response) => {
-    const appService = crowi.appService;
-    if (appService == null) {
-      return res.apiv3Err(new ErrorV3('GROWI cannot be installed due to an internal error', 'app_service_not_setup'), 500);
-    }
 
     if (!req.form.isValid) {
       const errors = req.form.errors;
@@ -67,7 +111,7 @@ module.exports = (crowi: Crowi): Router => {
       return res.apiv3Err(new ErrorV3(err, 'failed_to_install'));
     }
 
-    await appService.setupAfterInstall();
+    await crowi.appService.setupAfterInstall();
 
     const parameters = { action: SupportedAction.ACTION_USER_REGISTRATION_SUCCESS };
     activityEvent.emit('update', res.locals.activity._id, parameters);

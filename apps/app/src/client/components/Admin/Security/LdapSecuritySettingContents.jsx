@@ -92,7 +92,7 @@ class LdapSecuritySettingContents extends React.Component {
                   className="form-control"
                   type="text"
                   name="serverUrl"
-                  defaultValue={adminLdapSecurityContainer.state.serverUrl || ''}
+                  value={adminLdapSecurityContainer.state.serverUrl || ''}
                   onChange={e => adminLdapSecurityContainer.changeServerUrl(e.target.value)}
                 />
                 <small>
@@ -145,7 +145,7 @@ class LdapSecuritySettingContents extends React.Component {
                   className="form-control"
                   type="text"
                   name="bindDN"
-                  defaultValue={adminLdapSecurityContainer.state.ldapBindDN || ''}
+                  value={adminLdapSecurityContainer.state.ldapBindDN || ''}
                   onChange={e => adminLdapSecurityContainer.changeBindDN(e.target.value)}
                 />
                 {(adminLdapSecurityContainer.state.isUserBind === true) ? (
@@ -194,7 +194,7 @@ class LdapSecuritySettingContents extends React.Component {
                         className="form-control passport-ldap-managerbind"
                         type="password"
                         name="bindDNPassword"
-                        defaultValue={adminLdapSecurityContainer.state.ldapBindDNPassword || ''}
+                        value={adminLdapSecurityContainer.state.ldapBindDNPassword || ''}
                         onChange={e => adminLdapSecurityContainer.changeBindDNPassword(e.target.value)}
                       />
                     </>
@@ -211,7 +211,7 @@ class LdapSecuritySettingContents extends React.Component {
                   className="form-control"
                   type="text"
                   name="searchFilter"
-                  defaultValue={adminLdapSecurityContainer.state.ldapSearchFilter || ''}
+                  value={adminLdapSecurityContainer.state.ldapSearchFilter || ''}
                   onChange={e => adminLdapSecurityContainer.changeSearchFilter(e.target.value)}
                 />
                 <p className="form-text text-muted">
@@ -248,7 +248,7 @@ class LdapSecuritySettingContents extends React.Component {
                   type="text"
                   placeholder="Default: uid"
                   name="attrMapUsername"
-                  defaultValue={adminLdapSecurityContainer.state.ldapAttrMapUsername || ''}
+                  value={adminLdapSecurityContainer.state.ldapAttrMapUsername || ''}
                   onChange={e => adminLdapSecurityContainer.changeAttrMapUsername(e.target.value)}
                 />
                 <p className="form-text text-muted">
@@ -292,7 +292,7 @@ class LdapSecuritySettingContents extends React.Component {
                   type="text"
                   placeholder="Default: mail"
                   name="attrMapMail"
-                  defaultValue={adminLdapSecurityContainer.state.ldapAttrMapMail || ''}
+                  value={adminLdapSecurityContainer.state.ldapAttrMapMail || ''}
                   onChange={e => adminLdapSecurityContainer.changeAttrMapMail(e.target.value)}
                 />
                 <p className="form-text text-muted">
@@ -312,7 +312,7 @@ class LdapSecuritySettingContents extends React.Component {
                   className="form-control"
                   type="text"
                   name="attrMapName"
-                  defaultValue={adminLdapSecurityContainer.state.ldapAttrMapName || ''}
+                  value={adminLdapSecurityContainer.state.ldapAttrMapName || ''}
                   onChange={e => adminLdapSecurityContainer.changeAttrMapName(e.target.value)}
                 />
                 <p className="form-text text-muted">
@@ -337,7 +337,7 @@ class LdapSecuritySettingContents extends React.Component {
                   className="form-control"
                   type="text"
                   name="groupSearchBase"
-                  defaultValue={adminLdapSecurityContainer.state.ldapGroupSearchBase || ''}
+                  value={adminLdapSecurityContainer.state.ldapGroupSearchBase || ''}
                   onChange={e => adminLdapSecurityContainer.changeGroupSearchBase(e.target.value)}
                 />
                 <p className="form-text text-muted">
@@ -359,7 +359,7 @@ class LdapSecuritySettingContents extends React.Component {
                   className="form-control"
                   type="text"
                   name="groupSearchFilter"
-                  defaultValue={adminLdapSecurityContainer.state.ldapGroupSearchFilter || ''}
+                  value={adminLdapSecurityContainer.state.ldapGroupSearchFilter || ''}
                   onChange={e => adminLdapSecurityContainer.changeGroupSearchFilter(e.target.value)}
                 />
                 <p className="form-text text-muted">
@@ -391,7 +391,7 @@ class LdapSecuritySettingContents extends React.Component {
                   type="text"
                   placeholder="Default: uid"
                   name="groupDnProperty"
-                  defaultValue={adminLdapSecurityContainer.state.ldapGroupDnProperty || ''}
+                  value={adminLdapSecurityContainer.state.ldapGroupDnProperty || ''}
                   onChange={e => adminLdapSecurityContainer.changeGroupDnProperty(e.target.value)}
                 />
                 <p className="form-text text-muted">

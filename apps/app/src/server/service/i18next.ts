@@ -7,7 +7,7 @@ import resourcesToBackend from 'i18next-resources-to-backend';
 
 import * as i18nextConfig from '^/config/i18next.config';
 
-import { resolveFromRoot } from '~/utils/project-dir-utils';
+import { resolveFromRoot } from '~/server/util/project-dir-utils';
 
 import { configManager } from './config-manager';
 
@@ -42,7 +42,7 @@ type Opts = {
 }
 
 export async function getTranslation(opts?: Opts): Promise<Translation> {
-  const globalLang = configManager.getConfig('crowi', 'app:globalLang') as Lang;
+  const globalLang = configManager.getConfig('app:globalLang');
   const fixedLang = opts?.lang ?? globalLang;
 
   const initOptions: InitOptions = {

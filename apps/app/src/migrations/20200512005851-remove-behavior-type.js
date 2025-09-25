@@ -23,7 +23,6 @@ module.exports = {
     await mongoose.connect(getMongoUri(), mongoOptions);
 
     const insertConfig = new Config({
-      ns: 'crowi',
       key: 'customize:behavior',
       value: JSON.stringify('growi'),
     });

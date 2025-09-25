@@ -33,7 +33,7 @@ class LdapService {
    * @param {string} userBindPassword Necessary when bind type is user bind
    */
   initClient(userBindUsername?: string, userBindPassword?: string): void {
-    const serverUrl = configManager?.getConfig('crowi', 'security:passport-ldap:serverUrl');
+    const serverUrl = configManager.getConfig('security:passport-ldap:serverUrl');
 
     // parse serverUrl
     // see: https://regex101.com/r/0tuYBB/1
@@ -58,11 +58,11 @@ class LdapService {
    * @param {string} userBindUsername Necessary when bind type is user bind
    * @param {string} userBindPassword Necessary when bind type is user bind
    */
-  bind(userBindUsername?: string, userBindPassword?: string): Promise<void> {
+  bind(userBindUsername = '', userBindPassword = ''): Promise<void> {
     const client = this.client;
     if (client == null) throw new Error('LDAP client is not initialized');
 
-    const isLdapEnabled = configManager?.getConfig('crowi', 'security:passport-ldap:isEnabled');
+    const isLdapEnabled = configManager.getConfig('security:passport-ldap:isEnabled');
     if (!isLdapEnabled) {
       const notEnabledMessage = 'LDAP is not enabled';
       logger.error(notEnabledMessage);
@@ -70,9 +70,9 @@ class LdapService {
     }
 
     // get configurations
-    const isUserBind = configManager?.getConfig('crowi', 'security:passport-ldap:isUserBind');
-    const bindDN = configManager?.getConfig('crowi', 'security:passport-ldap:bindDN');
-    const bindCredentials = configManager?.getConfig('crowi', 'security:passport-ldap:bindDNPassword');
+    const isUserBind = configManager.getConfig('security:passport-ldap:isUserBind');
+    const bindDN = configManager.getConfig('security:passport-ldap:bindDN') ?? '';
+    const bindCredentials = configManager.getConfig('security:passport-ldap:bindDNPassword') ?? '';
 
     // user bind
     const fixedBindDN = (isUserBind)
@@ -146,12 +146,12 @@ class LdapService {
     return this.search(undefined, this.getGroupSearchBase());
   }
 
-  getArrayValFromSearchResultEntry(entry: SearchResultEntry, attributeType: string): string[] {
+  getArrayValFromSearchResultEntry(entry: SearchResultEntry, attributeType: string | undefined): string[] {
     const values: string | string[] = entry.attributes.find(attribute => attribute.type === attributeType)?.values || [];
     return typeof values === 'string' ? [values] : values;
   }
 
-  getStringValFromSearchResultEntry(entry: SearchResultEntry, attributeType: string): string | undefined {
+  getStringValFromSearchResultEntry(entry: SearchResultEntry, attributeType: string | undefined): string | undefined {
     const values: string | string[] | undefined = entry.attributes.find(attribute => attribute.type === attributeType)?.values;
     if (typeof values === 'string' || values == null) {
       return values;
@@ -163,8 +163,9 @@ class LdapService {
   }
 
   getGroupSearchBase(): string {
-    return configManager?.getConfig('crowi', 'external-user-group:ldap:groupSearchBase')
-    || configManager?.getConfig('crowi', 'security:passport-ldap:groupSearchBase');
+    return configManager.getConfig('external-user-group:ldap:groupSearchBase')
+      ?? configManager.getConfig('security:passport-ldap:groupSearchBase')
+      ?? '';
   }
 
 }

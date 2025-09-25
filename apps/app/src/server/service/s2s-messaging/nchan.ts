@@ -5,6 +5,7 @@ import axios from 'axios';
 import ReconnectingWebSocket from 'reconnecting-websocket';
 import WebSocket from 'ws';
 
+import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
 import S2sMessage from '../../models/vo/s2s-message';
@@ -175,10 +176,10 @@ class NchanDelegator extends AbstractS2sMessagingService {
 
 }
 
-module.exports = function(crowi) {
+module.exports = function(crowi: Crowi) {
   const { configManager } = crowi;
 
-  const uri = configManager.getConfig('crowi', 'app:nchanUri');
+  const uri = configManager.getConfig('app:nchanUri');
 
   // when nachan server URI is not set
   if (uri == null) {
@@ -186,9 +187,9 @@ module.exports = function(crowi) {
     return;
   }
 
-  const publishPath = configManager.getConfig('crowi', 's2sMessagingPubsub:nchan:publishPath');
-  const subscribePath = configManager.getConfig('crowi', 's2sMessagingPubsub:nchan:subscribePath');
-  const channelId = configManager.getConfig('crowi', 's2sMessagingPubsub:nchan:channelId');
+  const publishPath = configManager.getConfig('s2sMessagingPubsub:nchan:publishPath');
+  const subscribePath = configManager.getConfig('s2sMessagingPubsub:nchan:subscribePath');
+  const channelId = configManager.getConfig('s2sMessagingPubsub:nchan:channelId');
 
   return new NchanDelegator(uri, publishPath, subscribePath, channelId);
 };

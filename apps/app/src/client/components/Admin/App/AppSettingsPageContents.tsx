@@ -15,7 +15,6 @@ import FileUploadSetting from './FileUploadSetting';
 import MailSetting from './MailSetting';
 import { MaintenanceMode } from './MaintenanceMode';
 import PageBulkExportSettings from './PageBulkExportSettings';
-import QuestionnaireSettings from './QuestionnaireSettings';
 import SiteUrlSetting from './SiteUrlSetting';
 import V5PageMigration from './V5PageMigration';
 
@@ -109,19 +108,15 @@ const AppSettingsPageContents = (props: Props) => {
         </div>
       </div>
 
-      <div className="row mt-5">
-        <div className="col-lg-12">
-          <h2 className="admin-setting-header">{t('admin:app_setting.page_bulk_export_settings')}</h2>
-          <PageBulkExportSettings />
+      {/* TODO: Enable configuring bulk export for GROWI.cloud when it can be relased for cloud (https://redmine.weseek.co.jp/issues/163220) */}
+      {!adminAppContainer.state.isBulkExportDisabledForCloud && (
+        <div className="row mt-5">
+          <div className="col-lg-12">
+            <h2 className="admin-setting-header">{t('admin:app_setting.page_bulk_export_settings')}</h2>
+            <PageBulkExportSettings />
+          </div>
         </div>
-      </div>
-
-      <div className="row mt-5">
-        <div className="col-lg-12">
-          <h2 className="admin-setting-header">{t('admin:app_setting.questionnaire_settings')}</h2>
-          <QuestionnaireSettings />
-        </div>
-      </div>
+      )}
 
       <div className="row">
         <div className="col-lg-12">

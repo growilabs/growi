@@ -9,7 +9,7 @@ let testGroup0;
 let parentPage;
 
 describe('Page', () => {
-  // eslint-disable-next-line no-unused-vars
+  // biome-ignore lint/correctness/noUnusedVariables: ignore
   let crowi;
   let Page;
   let PageQueryBuilder;
@@ -17,7 +17,7 @@ describe('Page', () => {
   let UserGroup;
   let UserGroupRelation;
 
-  beforeAll(async() => {
+  beforeAll(async () => {
     crowi = await getInstance();
 
     User = mongoose.model('User');
@@ -26,11 +26,22 @@ describe('Page', () => {
     Page = mongoose.model('Page');
     PageQueryBuilder = Page.PageQueryBuilder;
 
-
     await User.insertMany([
-      { name: 'Anon 0', username: 'anonymous0', email: 'anonymous0@example.com' },
-      { name: 'Anon 1', username: 'anonymous1', email: 'anonymous1@example.com' },
-      { name: 'Anon 2', username: 'anonymous2', email: 'anonymous2@example.com' },
+      {
+        name: 'Anon 0',
+        username: 'anonymous0',
+        email: 'anonymous0@example.com',
+      },
+      {
+        name: 'Anon 1',
+        username: 'anonymous1',
+        email: 'anonymous1@example.com',
+      },
+      {
+        name: 'Anon 2',
+        username: 'anonymous2',
+        email: 'anonymous2@example.com',
+      },
     ]);
 
     await UserGroup.insertMany([
@@ -126,7 +137,7 @@ describe('Page', () => {
 
   describe('.isPublic', () => {
     describe('with a public page', () => {
-      test('should return true', async() => {
+      test('should return true', async () => {
         const page = await Page.findOne({ path: '/grant/public' });
         expect(page.isPublic()).toEqual(true);
       });
@@ -134,7 +145,7 @@ describe('Page', () => {
 
     ['restricted', 'specified', 'owner'].forEach((grant) => {
       describe(`with a ${grant} page`, () => {
-        test('should return false', async() => {
+        test('should return false', async () => {
           const page = await Page.findOne({ path: `/grant/${grant}` });
           expect(page.isPublic()).toEqual(false);
         });
@@ -152,20 +163,22 @@ describe('Page', () => {
     test('should return reverted trash page name', () => {
       expect(Page.getRevertDeletedPageName('/hoge')).toEqual('/hoge');
       expect(Page.getRevertDeletedPageName('/trash/hoge')).toEqual('/hoge');
-      expect(Page.getRevertDeletedPageName('/trash/hoge/trash')).toEqual('/hoge/trash');
+      expect(Page.getRevertDeletedPageName('/trash/hoge/trash')).toEqual(
+        '/hoge/trash',
+      );
     });
   });
 
   describe('.isAccessiblePageByViewer', () => {
     describe('with a granted page', () => {
-      test('should return true with granted user', async() => {
+      test('should return true with granted user', async () => {
         const user = await User.findOne({ email: 'anonymous0@example.com' });
         const page = await Page.findOne({ path: '/user/anonymous0/memo' });
 
         const bool = await Page.isAccessiblePageByViewer(page.id, user);
         expect(bool).toEqual(true);
       });
-      test('should return false without user', async() => {
+      test('should return false without user', async () => {
         const user = null;
         const page = await Page.findOne({ path: '/user/anonymous0/memo' });
 
@@ -175,14 +188,14 @@ describe('Page', () => {
     });
 
     describe('with a public page', () => {
-      test('should return true with user', async() => {
+      test('should return true with user', async () => {
         const user = await User.findOne({ email: 'anonymous1@example.com' });
         const page = await Page.findOne({ path: '/grant/public' });
 
         const bool = await Page.isAccessiblePageByViewer(page.id, user);
         expect(bool).toEqual(true);
       });
-      test('should return true with out', async() => {
+      test('should return true with out', async () => {
         const user = null;
         const page = await Page.findOne({ path: '/grant/public' });
 
@@ -192,14 +205,14 @@ describe('Page', () => {
     });
 
     describe('with a restricted page', () => {
-      test('should return false with user who has no grant', async() => {
+      test('should return false with user who has no grant', async () => {
         const user = await User.findOne({ email: 'anonymous1@example.com' });
         const page = await Page.findOne({ path: '/grant/owner' });
 
         const bool = await Page.isAccessiblePageByViewer(page.id, user);
         expect(bool).toEqual(false);
       });
-      test('should return false without user', async() => {
+      test('should return false without user', async () => {
         const user = null;
         const page = await Page.findOne({ path: '/grant/owner' });
 
@@ -211,28 +224,28 @@ describe('Page', () => {
 
   describe('.findPage', () => {
     describe('findByIdAndViewer', () => {
-      test('should find page (public)', async() => {
+      test('should find page (public)', async () => {
         const expectedPage = await Page.findOne({ path: '/grant/public' });
         const page = await Page.findByIdAndViewer(expectedPage.id, testUser0);
         expect(page).not.toBeNull();
         expect(page.path).toEqual(expectedPage.path);
       });
 
-      test('should find page (anyone knows link)', async() => {
+      test('should find page (anyone knows link)', async () => {
         const expectedPage = await Page.findOne({ path: '/grant/restricted' });
         const page = await Page.findByIdAndViewer(expectedPage.id, testUser1);
         expect(page).not.toBeNull();
         expect(page.path).toEqual(expectedPage.path);
       });
 
-      test('should find page (only me)', async() => {
+      test('should find page (only me)', async () => {
         const expectedPage = await Page.findOne({ path: '/grant/owner' });
         const page = await Page.findByIdAndViewer(expectedPage.id, testUser0);
         expect(page).not.toBeNull();
         expect(page.path).toEqual(expectedPage.path);
       });
 
-      test('should not be found by grant (only me)', async() => {
+      test('should not be found by grant (only me)', async () => {
         const expectedPage = await Page.findOne({ path: '/grant/owner' });
         const page = await Page.findByIdAndViewer(expectedPage.id, testUser1);
         expect(page).toBeNull();
@@ -240,14 +253,14 @@ describe('Page', () => {
     });
 
     describe('findByIdAndViewer granted userGroup', () => {
-      test('should find page', async() => {
+      test('should find page', async () => {
         const expectedPage = await Page.findOne({ path: '/grant/groupacl' });
         const page = await Page.findByIdAndViewer(expectedPage.id, testUser0);
         expect(page).not.toBeNull();
         expect(page.path).toEqual(expectedPage.path);
       });
 
-      test('should not be found by grant', async() => {
+      test('should not be found by grant', async () => {
         const expectedPage = await Page.findOne({ path: '/grant/groupacl' });
         const page = await Page.findByIdAndViewer(expectedPage.id, testUser2);
         expect(page).toBeNull();
@@ -256,7 +269,7 @@ describe('Page', () => {
   });
 
   describe('PageQueryBuilder.addConditionToListWithDescendants', () => {
-    test('can retrieve descendants of /page', async() => {
+    test('can retrieve descendants of /page', async () => {
       const builder = new PageQueryBuilder(Page.find());
       builder.addConditionToListWithDescendants('/page');
 
@@ -265,11 +278,13 @@ describe('Page', () => {
       // assert totalCount
       expect(result.length).toEqual(1);
       // assert paths
-      const pagePaths = result.map((page) => { return page.path });
+      const pagePaths = result.map((page) => {
+        return page.path;
+      });
       expect(pagePaths).toContainEqual('/page/child/without/parents');
     });
 
-    test('can retrieve descendants of /page1', async() => {
+    test('can retrieve descendants of /page1', async () => {
       const builder = new PageQueryBuilder(Page.find());
       builder.addConditionToListWithDescendants('/page1/');
 
@@ -278,14 +293,16 @@ describe('Page', () => {
       // assert totalCount
       expect(result.length).toEqual(2);
       // assert paths
-      const pagePaths = result.map((page) => { return page.path });
+      const pagePaths = result.map((page) => {
+        return page.path;
+      });
       expect(pagePaths).toContainEqual('/page1');
       expect(pagePaths).toContainEqual('/page1/child1');
     });
   });
 
   describe('PageQueryBuilder.addConditionToListOnlyDescendants', () => {
-    test('can retrieve only descendants of /page', async() => {
+    test('can retrieve only descendants of /page', async () => {
       const builder = new PageQueryBuilder(Page.find());
       builder.addConditionToListOnlyDescendants('/page');
 
@@ -294,11 +311,13 @@ describe('Page', () => {
       // assert totalCount
       expect(result.length).toEqual(1);
       // assert paths
-      const pagePaths = result.map((page) => { return page.path });
+      const pagePaths = result.map((page) => {
+        return page.path;
+      });
       expect(pagePaths).toContainEqual('/page/child/without/parents');
     });
 
-    test('can retrieve only descendants of /page1', async() => {
+    test('can retrieve only descendants of /page1', async () => {
       const builder = new PageQueryBuilder(Page.find());
       builder.addConditionToListOnlyDescendants('/page1');
 
@@ -307,13 +326,15 @@ describe('Page', () => {
       // assert totalCount
       expect(result.length).toEqual(1);
       // assert paths
-      const pagePaths = result.map((page) => { return page.path });
+      const pagePaths = result.map((page) => {
+        return page.path;
+      });
       expect(pagePaths).toContainEqual('/page1/child1');
     });
   });
 
   describe('PageQueryBuilder.addConditionToListByStartWith', () => {
-    test('can retrieve pages which starts with /page', async() => {
+    test('can retrieve pages which starts with /page', async () => {
       const builder = new PageQueryBuilder(Page.find());
       builder.addConditionToListByStartWith('/page');
 
@@ -322,7 +343,9 @@ describe('Page', () => {
       // assert totalCount
       expect(result.length).toEqual(4);
       // assert paths
-      const pagePaths = result.map((page) => { return page.path });
+      const pagePaths = result.map((page) => {
+        return page.path;
+      });
       expect(pagePaths).toContainEqual('/page/child/without/parents');
       expect(pagePaths).toContainEqual('/page1');
       expect(pagePaths).toContainEqual('/page1/child1');
@@ -331,7 +354,7 @@ describe('Page', () => {
   });
 
   describe('.findListWithDescendants', () => {
-    test('can retrieve all pages with testUser0', async() => {
+    test('can retrieve all pages with testUser0', async () => {
       const result = await Page.findListWithDescendants('/grant', testUser0);
       const { pages } = result;
 
@@ -339,7 +362,9 @@ describe('Page', () => {
       expect(pages.length).toEqual(5);
 
       // assert paths
-      const pagePaths = await pages.map((page) => { return page.path });
+      const pagePaths = await pages.map((page) => {
+        return page.path;
+      });
       expect(pagePaths).toContainEqual('/grant/groupacl');
       expect(pagePaths).toContainEqual('/grant/specified');
       expect(pagePaths).toContainEqual('/grant/owner');
@@ -347,7 +372,7 @@ describe('Page', () => {
       expect(pagePaths).toContainEqual('/grant');
     });
 
-    test('can retrieve all pages with testUser1', async() => {
+    test('can retrieve all pages with testUser1', async () => {
       const result = await Page.findListWithDescendants('/grant', testUser1);
       const { pages } = result;
 
@@ -355,7 +380,9 @@ describe('Page', () => {
       expect(pages.length).toEqual(5);
 
       // assert paths
-      const pagePaths = await pages.map((page) => { return page.path });
+      const pagePaths = await pages.map((page) => {
+        return page.path;
+      });
       expect(pagePaths).toContainEqual('/grant/groupacl');
       expect(pagePaths).toContainEqual('/grant/specified');
       expect(pagePaths).toContainEqual('/grant/owner');
@@ -363,7 +390,7 @@ describe('Page', () => {
       expect(pagePaths).toContainEqual('/grant');
     });
 
-    test('can retrieve all pages with testUser2', async() => {
+    test('can retrieve all pages with testUser2', async () => {
       const result = await Page.findListWithDescendants('/grant', testUser2);
       const { pages } = result;
 
@@ -371,7 +398,9 @@ describe('Page', () => {
       expect(pages.length).toEqual(5);
 
       // assert paths
-      const pagePaths = await pages.map((page) => { return page.path });
+      const pagePaths = await pages.map((page) => {
+        return page.path;
+      });
       expect(pagePaths).toContainEqual('/grant/groupacl');
       expect(pagePaths).toContainEqual('/grant/specified');
       expect(pagePaths).toContainEqual('/grant/owner');
@@ -379,7 +408,7 @@ describe('Page', () => {
       expect(pagePaths).toContainEqual('/grant');
     });
 
-    test('can retrieve all pages without user', async() => {
+    test('can retrieve all pages without user', async () => {
       const result = await Page.findListWithDescendants('/grant', null);
       const { pages } = result;
 
@@ -387,7 +416,9 @@ describe('Page', () => {
       expect(pages.length).toEqual(5);
 
       // assert paths
-      const pagePaths = await pages.map((page) => { return page.path });
+      const pagePaths = await pages.map((page) => {
+        return page.path;
+      });
       expect(pagePaths).toContainEqual('/grant/groupacl');
       expect(pagePaths).toContainEqual('/grant/specified');
       expect(pagePaths).toContainEqual('/grant/owner');
@@ -397,14 +428,19 @@ describe('Page', () => {
   });
 
   describe('.findManageableListWithDescendants', () => {
-    test('can retrieve all pages with testUser0', async() => {
-      const pages = await Page.findManageableListWithDescendants(parentPage, testUser0);
+    test('can retrieve all pages with testUser0', async () => {
+      const pages = await Page.findManageableListWithDescendants(
+        parentPage,
+        testUser0,
+      );
 
       // assert totalCount
       expect(pages.length).toEqual(5);
 
       // assert paths
-      const pagePaths = await pages.map((page) => { return page.path });
+      const pagePaths = await pages.map((page) => {
+        return page.path;
+      });
       expect(pagePaths).toContainEqual('/grant/groupacl');
       expect(pagePaths).toContainEqual('/grant/specified');
       expect(pagePaths).toContainEqual('/grant/owner');
@@ -412,37 +448,49 @@ describe('Page', () => {
       expect(pagePaths).toContainEqual('/grant');
     });
 
-    test('can retrieve group page and public page which starts with testUser1', async() => {
-      const pages = await Page.findManageableListWithDescendants(parentPage, testUser1);
+    test('can retrieve group page and public page which starts with testUser1', async () => {
+      const pages = await Page.findManageableListWithDescendants(
+        parentPage,
+        testUser1,
+      );
 
       // assert totalCount
       expect(pages.length).toEqual(3);
 
       // assert paths
-      const pagePaths = await pages.map((page) => { return page.path });
+      const pagePaths = await pages.map((page) => {
+        return page.path;
+      });
       expect(pagePaths).toContainEqual('/grant/groupacl');
       expect(pagePaths).toContainEqual('/grant/public');
       expect(pagePaths).toContainEqual('/grant');
     });
 
-    test('can retrieve only public page which starts with testUser2', async() => {
-      const pages = await Page.findManageableListWithDescendants(parentPage, testUser2);
+    test('can retrieve only public page which starts with testUser2', async () => {
+      const pages = await Page.findManageableListWithDescendants(
+        parentPage,
+        testUser2,
+      );
 
       // assert totalCount
       expect(pages.length).toEqual(2);
 
       // assert paths
-      const pagePaths = await pages.map((page) => { return page.path });
+      const pagePaths = await pages.map((page) => {
+        return page.path;
+      });
       expect(pagePaths).toContainEqual('/grant/public');
       expect(pagePaths).toContainEqual('/grant');
     });
 
-    test('can retrieve only public page which starts without user', async() => {
-      const pages = await Page.findManageableListWithDescendants(parentPage, null);
+    test('can retrieve only public page which starts without user', async () => {
+      const pages = await Page.findManageableListWithDescendants(
+        parentPage,
+        null,
+      );
 
       // assert totalCount
       expect(pages).toBeNull();
     });
   });
-
 });

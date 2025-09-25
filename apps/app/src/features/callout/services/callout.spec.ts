@@ -3,7 +3,7 @@ import remarkDirective from 'remark-directive';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { visit } from 'unist-util-visit';
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import * as callout from './callout';
 
@@ -23,7 +23,7 @@ This is an info callout.
     const tree = processor.parse(markdown);
     processor.runSync(tree);
 
-    let calloutNode;
+    let calloutNode: ContainerDirective | undefined;
     visit(tree, 'containerDirective', (node) => {
       calloutNode = node;
     });
@@ -41,7 +41,9 @@ This is an info callout.
     assert('value' in calloutNode.children[0].children[0]);
 
     expect(calloutNode.children.length).toBe(1);
-    expect(calloutNode.children[0].children[0].value).toBe('This is an info callout.');
+    expect(calloutNode.children[0].children[0].value).toBe(
+      'This is an info callout.',
+    );
   });
 
   it('should transform containerDirective to callout with custom label', () => {
@@ -77,7 +79,9 @@ This is an info callout.
     assert('value' in calloutNode.children[0].children[0]);
 
     expect(calloutNode.children.length).toBe(1);
-    expect(calloutNode.children[0].children[0].value).toBe('This is an info callout.');
+    expect(calloutNode.children[0].children[0].value).toBe(
+      'This is an info callout.',
+    );
   });
 
   it('should transform containerDirective to callout with empty label', () => {
@@ -113,6 +117,8 @@ This is an info callout.
     assert('value' in calloutNode.children[0].children[0]);
 
     expect(calloutNode.children.length).toBe(1);
-    expect(calloutNode.children[0].children[0].value).toBe('This is an info callout.');
+    expect(calloutNode.children[0].children[0].value).toBe(
+      'This is an info callout.',
+    );
   });
 });

@@ -18,6 +18,47 @@ module.exports = (crowi: Crowi): Router => {
   const applicationInstalled = require('../../middlewares/application-installed')(crowi);
   const router = express.Router();
 
+  /**
+   * @swagger
+   *
+   *  /invited:
+   *    post:
+   *      tags: [Users]
+   *      security:
+   *        - cookieAuth: []
+   *      summary: /invited
+   *      description: Activate invited user
+   *      requestBody:
+   *        required: true
+   *        content:
+   *          application/json:
+   *            schema:
+   *              type: object
+   *              properties:
+   *                invitedForm:
+   *                  type: object
+   *                  properties:
+   *                    username:
+   *                      type: string
+   *                      description: The username of the invited user.
+   *                    name:
+   *                      type: string
+   *                      description: The name of the invited user.
+   *                    password:
+   *                      type: string
+   *                      description: The password for the invited user.
+   *      responses:
+   *        200:
+   *          description: User activated successfully
+   *          content:
+   *            application/json:
+   *              schema:
+   *                type: object
+   *                properties:
+   *                  redirectTo:
+   *                    type: string
+   *                    description: URL to redirect after successful activation.
+   */
   router.post('/', applicationInstalled, invitedRules(), invitedValidation, async(req: InvitedFormRequest, res: ApiV3Response) => {
     if (!req.user) {
       return res.apiv3({ redirectTo: '/login' });

@@ -43,6 +43,7 @@ export const TagsInput: FC<Props> = (props: Props) => {
       event.preventDefault();
 
       // fix: https://redmine.weseek.co.jp/issues/140689
+      // "event.isComposing" is not supported
       const isComposing = event.nativeEvent.isComposing;
       if (isComposing) {
         return;

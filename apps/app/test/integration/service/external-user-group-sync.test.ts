@@ -182,7 +182,7 @@ describe('ExternalUserGroupSyncService.syncExternalUserGroups', () => {
 
   beforeAll(async() => {
     crowi = await getInstance();
-    await configManager.updateConfigsInTheSameNamespace('crowi', { 'app:isV5Compatible': true });
+    await configManager.updateConfig('app:isV5Compatible', true);
     const passportService = new PassportService(crowi);
     instanciateExternalAccountService(passportService);
   });
@@ -218,7 +218,7 @@ describe('ExternalUserGroupSyncService.syncExternalUserGroups', () => {
     };
 
     beforeAll(async() => {
-      await configManager.updateConfigsInTheSameNamespace('crowi', configParams);
+      await configManager.updateConfigs(configParams);
     });
 
     // eslint-disable-next-line jest/expect-expect
@@ -235,7 +235,7 @@ describe('ExternalUserGroupSyncService.syncExternalUserGroups', () => {
     };
 
     beforeAll(async() => {
-      await configManager.updateConfigsInTheSameNamespace('crowi', configParams);
+      await configManager.updateConfigs(configParams);
     });
 
     // eslint-disable-next-line jest/expect-expect
@@ -252,7 +252,7 @@ describe('ExternalUserGroupSyncService.syncExternalUserGroups', () => {
     };
 
     beforeAll(async() => {
-      await configManager.updateConfigsInTheSameNamespace('crowi', configParams);
+      await configManager.updateConfigs(configParams);
 
       const groupId = new Types.ObjectId();
       const userId = new Types.ObjectId();

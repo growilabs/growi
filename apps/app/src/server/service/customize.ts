@@ -8,10 +8,11 @@ import uglifycss from 'uglifycss';
 import { growiPluginService } from '~/features/growi-plugin/server/services';
 import loggerFactory from '~/utils/logger';
 
+import type Crowi from '../crowi';
 import S2sMessage from '../models/vo/s2s-message';
 
 
-import type { ConfigManager } from './config-manager';
+import { configManager } from './config-manager';
 import type { S2sMessageHandlable } from './s2s-messaging/handlable';
 
 
@@ -22,8 +23,6 @@ const logger = loggerFactory('growi:service:CustomizeService');
  * the service class of CustomizeService
  */
 class CustomizeService implements S2sMessageHandlable {
-
-  configManager: ConfigManager;
 
   s2sMessagingService: any;
 
@@ -41,8 +40,7 @@ class CustomizeService implements S2sMessageHandlable {
 
   forcedColorScheme?: ColorScheme;
 
-  constructor(crowi) {
-    this.configManager = crowi.configManager;
+  constructor(crowi: Crowi) {
     this.s2sMessagingService = crowi.s2sMessagingService;
     this.appService = crowi.appService;
   }
@@ -63,8 +61,6 @@ class CustomizeService implements S2sMessageHandlable {
    * @inheritdoc
    */
   async handleS2sMessage(s2sMessage) {
-    const { configManager } = this;
-
     logger.info('Reset customized value by pubsub notification');
     await configManager.loadConfigs();
     this.initCustomCss();
@@ -91,7 +87,7 @@ class CustomizeService implements S2sMessageHandlable {
    * initialize custom css strings
    */
   initCustomCss() {
-    const rawCss = this.configManager.getConfig('crowi', 'customize:css') || '';
+    const rawCss = configManager.getConfig('customize:css') || '';
 
     // uglify and store
     this.customCss = uglifycss.processString(rawCss);
@@ -104,15 +100,15 @@ class CustomizeService implements S2sMessageHandlable {
   }
 
   getCustomScript() {
-    return this.configManager.getConfig('crowi', 'customize:script');
+    return configManager.getConfig('customize:script');
   }
 
   getCustomNoscript() {
-    return this.configManager.getConfig('crowi', 'customize:noscript');
+    return configManager.getConfig('customize:noscript');
   }
 
   initCustomTitle() {
-    let configValue = this.configManager.getConfig('crowi', 'customize:title');
+    let configValue = configManager.getConfig('customize:title');
 
     if (configValue == null || configValue.trim().length === 0) {
       configValue = '{{pagename}} - {{sitename}}';
@@ -124,7 +120,7 @@ class CustomizeService implements S2sMessageHandlable {
   }
 
   async initGrowiTheme(): Promise<void> {
-    const theme = this.configManager.getConfig('crowi', 'customize:theme');
+    const theme = configManager.getConfig('customize:theme');
 
     this.theme = theme;
 

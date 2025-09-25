@@ -1,4 +1,4 @@
-import { SWRResponse } from 'swr';
+import type { SWRResponse } from 'swr';
 
 import { useStaticSWR } from './use-static-swr';
 

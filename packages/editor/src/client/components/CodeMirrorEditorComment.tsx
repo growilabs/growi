@@ -1,4 +1,4 @@
-import { memo, useEffect } from 'react';
+import { memo, useEffect, type JSX } from 'react';
 
 import type { Extension } from '@codemirror/state';
 import { keymap } from '@codemirror/view';

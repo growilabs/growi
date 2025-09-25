@@ -1,8 +1,10 @@
+import type { Model, Document, Types } from 'mongoose';
 import {
-  Schema, Model, Document, Types,
+  Schema,
 } from 'mongoose';
 
-import { IInAppNotificationSettings, subscribeRuleNames } from '~/interfaces/in-app-notification';
+import type { IInAppNotificationSettings } from '~/interfaces/in-app-notification';
+import { subscribeRuleNames } from '~/interfaces/in-app-notification';
 
 import { getOrCreateModel } from '../util/mongoose-utils';
 

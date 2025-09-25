@@ -17,11 +17,15 @@ function getAxios(team, token) {
 
 class RestQiitaAPIService {
 
+  /** @type {import('~/server/crowi').default} Crowi instance */
+  crowi;
+
+  /** @param {import('~/server/crowi').default} crowi Crowi instance */
   constructor(crowi) {
     this.crowi = crowi;
     this.configManager = crowi.configManager;
-    this.team = this.configManager.getConfig('crowi', 'importer:qiita:team_name');
-    this.token = this.configManager.getConfig('crowi', 'importer:qiita:access_token');
+    this.team = this.configManager.getConfig('importer:qiita:team_name');
+    this.token = this.configManager.getConfig('importer:qiita:access_token');
     this.axios = getAxios(this.team, this.token);
   }
 
@@ -31,8 +35,8 @@ class RestQiitaAPIService {
    * @param {string} token
    */
   async reset() {
-    this.team = this.configManager.getConfig('crowi', 'importer:qiita:team_name');
-    this.token = this.configManager.getConfig('crowi', 'importer:qiita:access_token');
+    this.team = this.configManager.getConfig('importer:qiita:team_name');
+    this.token = this.configManager.getConfig('importer:qiita:access_token');
     this.axios = getAxios(this.team, this.token);
   }
 

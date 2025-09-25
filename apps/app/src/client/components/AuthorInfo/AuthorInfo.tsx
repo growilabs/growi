@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import type { IUserHasId } from '@growi/core';
 import { isPopulated, type IUser, type Ref } from '@growi/core';
@@ -28,20 +28,20 @@ type AuthorInfoProps = {
   date: Date,
   user?: IUserHasId | Ref<IUser>,
   mode: 'create' | 'update',
-  locate: 'subnav' | 'footer',
+  locate: 'pageSide' | 'footer',
 }
 
 export const AuthorInfo = (props: AuthorInfoProps): JSX.Element => {
   const { t } = useTranslation();
   const {
-    date, user, mode = 'create', locate = 'subnav',
+    date, user, mode = 'create', locate = 'pageSide',
   } = props;
 
   const formatType = 'yyyy/MM/dd HH:mm';
 
-  const infoLabelForSubNav = mode === 'create'
-    ? 'Created by'
-    : 'Updated by';
+  const infoLabelForPageSide = mode === 'create'
+    ? t('author_info.created_by')
+    : t('author_info.updated_by');
   const nullinfoLabelForFooter = mode === 'create'
     ? 'Created by'
     : 'Updated by';
@@ -76,13 +76,13 @@ export const AuthorInfo = (props: AuthorInfoProps): JSX.Element => {
   };
 
   return (
-    <div className={`grw-author-info ${styles['grw-author-info']} d-flex align-items-center`}>
-      <div className="me-2">
+    <div className={`grw-author-info ${styles['grw-author-info']} d-flex align-items-center mb-2`}>
+      <div className="me-2 d-none d-lg-block">
         <UserPicture user={user} size="sm" />
       </div>
       <div>
-        <div>{infoLabelForSubNav} {userLabel}</div>
-        <div className="text-muted text-date" data-vrt-blackout-datetime>
+        <div className="text-secondary mb-1">{infoLabelForPageSide} <br className="d-lg-none" />{userLabel}</div>
+        <div className="text-secondary text-date" data-vrt-blackout-datetime>
           {renderParsedDate()}
         </div>
       </div>

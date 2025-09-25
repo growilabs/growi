@@ -1,4 +1,4 @@
-import { IPageForItem } from '../../../interfaces/page';
+import type { IPageForItem } from '../../../interfaces/page';
 
 export class ItemNode {
 

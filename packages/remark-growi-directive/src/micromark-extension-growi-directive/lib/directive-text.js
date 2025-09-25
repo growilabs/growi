@@ -25,8 +25,8 @@ const attributes = { tokenize: tokenizeAttributes, partial: true };
 function previous(code) {
   // If there is a previous code, there will always be a tail.
   return (
-    code !== codes.dollarSign
-    || this.events[this.events.length - 1][1].type === types.characterEscape
+    code !== codes.dollarSign ||
+    this.events[this.events.length - 1][1].type === types.characterEscape
   );
 }
 
@@ -45,7 +45,13 @@ function tokenizeDirectiveText(effects, ok, nok) {
     effects.enter('directiveGrowiTextMarker');
     effects.consume(code);
     effects.exit('directiveGrowiTextMarker');
-    return factoryName.call(self, effects, afterName, nok, 'directiveGrowiTextName');
+    return factoryName.call(
+      self,
+      effects,
+      afterName,
+      nok,
+      'directiveGrowiTextName',
+    );
   }
 
   /** @type {State} */

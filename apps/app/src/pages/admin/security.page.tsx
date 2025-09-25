@@ -92,9 +92,9 @@ const AdminSecuritySettingsPage: NextPage<Props> = (props) => {
 const injectServerConfigurations = async(context: GetServerSidePropsContext, props: Props): Promise<void> => {
   const req: CrowiRequest = context.req as CrowiRequest;
   const { crowi } = req;
-  const { appService, mailService } = crowi;
+  const { growiInfoService, mailService } = crowi;
 
-  props.siteUrl = appService.getSiteUrl();
+  props.siteUrl = growiInfoService.getSiteUrl();
   props.isMailerSetup = mailService.isMailerSetup;
 };
 

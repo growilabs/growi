@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, type JSX } from 'react';
 
 import { MarkdownTable } from '@growi/editor';
 import { useHandsontableModalForEditor } from '@growi/editor/dist/client/stores/use-handsontable';
@@ -491,9 +491,16 @@ export const HandsontableModal = (): JSX.Element => {
             </div>
           </Collapse>
         </div>
-        <div ref={c => setHotTableContainer(c)} className="hot-table-container px-3">
+        <div
+          ref={(c) => {
+            setHotTableContainer(c);
+          }}
+          className="hot-table-container px-3"
+        >
           <HotTable
-            ref={c => setHotTable(c)}
+            ref={(c) => {
+              setHotTable(c);
+            }}
             data={markdownTable.table}
             settings={handsontableSettings as Handsontable.DefaultSettings}
             height={handsontableHeight}

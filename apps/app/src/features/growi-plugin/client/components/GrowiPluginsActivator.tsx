@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import React, { useEffect, type JSX } from 'react';
 
 import { initializeGrowiFacade, registerGrowiFacade } from '../utils/growi-facade-utils';
 
@@ -24,6 +24,7 @@ async function activateAll(): Promise<void> {
         generatePreviewOptions,
       },
     },
+    react: React,
   });
 
   if (!('pluginActivators' in window)) {

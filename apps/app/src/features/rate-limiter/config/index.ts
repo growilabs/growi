@@ -56,11 +56,6 @@ export const defaultConfig: IApiRateLimitEndpointMap = {
     method: 'GET',
     maxRequests: MAX_REQUESTS_TIER_3,
   },
-  '/_api/v3/openai/rebuild-vector-store': {
-    method: 'POST',
-    maxRequests: 1,
-    usersPerIpProspection: 1,
-  },
 };
 
 const isDev = process.env.NODE_ENV === 'development';

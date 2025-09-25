@@ -1,5 +1,5 @@
 import React, {
-  useCallback, useMemo, useRef, useState, useEffect,
+  useCallback, useMemo, useRef, useState, useEffect, type JSX,
 } from 'react';
 
 import { useGlobalSocket } from '@growi/core/dist/swr';

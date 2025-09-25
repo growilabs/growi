@@ -3,13 +3,18 @@ import mongoose from 'mongoose';
 // eslint-disable-next-line import/no-named-as-default
 import PageRedirectModel from '~/server/models/page-redirect';
 import { createBatchStream } from '~/server/util/batch-stream';
-import { getModelSafely, getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
+import {
+  getModelSafely,
+  getMongoUri,
+  mongoOptions,
+} from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
-const logger = loggerFactory('growi:migrate:convert-redirect-to-pages-to-page-redirect-documents');
+const logger = loggerFactory(
+  'growi:migrate:convert-redirect-to-pages-to-page-redirect-documents',
+);
 
 const BATCH_SIZE = 100;
-
 
 module.exports = {
   async up(db, client) {
@@ -17,7 +22,12 @@ module.exports = {
     const pageCollection = await db.collection('pages');
     const PageRedirect = getModelSafely('PageRedirect') || PageRedirectModel;
 
-    const cursor = pageCollection.find({ redirectTo: { $exists: true, $ne: null } }, { path: 1, redirectTo: 1, _id: 0 }).stream();
+    const cursor = pageCollection
+      .find(
+        { redirectTo: { $exists: true, $ne: null } },
+        { path: 1, redirectTo: 1, _id: 0 },
+      )
+      .stream();
     const batchStream = createBatchStream(BATCH_SIZE);
 
     // redirectTo => PageRedirect
@@ -35,8 +45,7 @@ module.exports = {
 
       try {
         await PageRedirect.bulkWrite(insertPageRedirectOperations);
-      }
-      catch (err) {
+      } catch (err) {
         if (err.code !== 11000) {
           throw Error(`Failed to migrate: ${err}`);
         }
@@ -71,8 +80,7 @@ module.exports = {
 
       try {
         await pageCollection.bulkWrite(insertPageOperations);
-      }
-      catch (err) {
+      } catch (err) {
         if (err.code !== 11000) {
           throw Error(`Failed to migrate: ${err}`);
         }

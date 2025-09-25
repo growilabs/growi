@@ -7,9 +7,9 @@ import {
   Modal, ModalBody, ModalFooter, ModalHeader,
 } from 'reactstrap';
 
+import { FolderIcon } from '~/client/components/Icons/FolderIcon';
 import { deleteBookmarkFolder } from '~/client/util/bookmark-utils';
 import { toastError } from '~/client/util/toastr';
-import { FolderIcon } from '~/client/components/Icons/FolderIcon';
 import { useBookmarkFolderDeleteModal } from '~/stores/modal';
 
 

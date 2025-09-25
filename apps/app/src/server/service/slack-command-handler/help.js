@@ -5,13 +5,16 @@
 
 import { markdownSectionBlock } from '@growi/slack/dist/utils/block-kit-builder';
 
+import { growiInfoService } from '../growi-info';
+
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
   const BaseSlackCommandHandler = require('./slack-command-handler');
   const handler = new BaseSlackCommandHandler();
 
   handler.handleCommand = async(growiCommand, client, body, respondUtil) => {
     const appTitle = crowi.appService.getAppTitle();
-    const appSiteUrl = crowi.appService.getSiteUrl();
+    const appSiteUrl = growiInfoService.getSiteUrl();
     // adjust spacing
     let message = `*Help* (*${appTitle}* at ${appSiteUrl})\n\n`;
     message += 'Usage:     `/growi [command] [args]`\n\n';

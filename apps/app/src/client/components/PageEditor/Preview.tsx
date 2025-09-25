@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, JSX } from 'react';
 
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 

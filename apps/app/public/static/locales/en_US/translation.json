@@ -117,7 +117,7 @@
   "Create under": "Create page under below:",
   "V5 Page Migration": "Convert To V5 Compatibility",
   "GROWI.5.0_new_schema": "GROWI.5.0 new schema",
-  "See_more_detail_on_new_schema": "See more detail on <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html#about-the-new-v5-compatible-format' target='_blank'>{{title}}</a> <span className='growi-custom-icons'>external_link</span> ",
+  "See_more_detail_on_new_schema": "See more detail on <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html#about-the-new-v5-compatible-format' target='_blank'>{{title}}</a> <span class='growi-custom-icons'>external_link</span> ",
   "external_account_management": "External Account Management",
   "UserGroup": "UserGroup",
   "Basic Settings": "Basic Settings",
@@ -142,7 +142,6 @@
   "edited this page": "edited this page.",
   "List Drafts": "Drafts",
   "Deleted Pages": "Deleted Pages",
-  "Questionnaire": "Questionnaire",
   "Disassociate": "Disassociate",
   "No bookmarks yet": "No bookmarks yet",
   "add_bookmark": "Add to Bookmarks",
@@ -152,12 +151,15 @@
   "Page Tree": "Page Tree",
   "Bookmarks": "Bookmarks",
   "In-App Notification": "Notifications",
+  "AI Assistant": "AI Assistant",
+  "Knowledge Assistant": "Knowledge Assistant (Beta)",
+  "Editor Assistant": "Editor Assistant (Beta)",
   "original_path": "Original path",
   "new_path": "New path",
   "duplicated_path": "Duplicated path",
   "Link sharing is disabled": "Link sharing is disabled",
   "successfully_saved_the_page": "Successfully saved the page",
-  "you_can_not_create_page_with_this_name": "You can not create page with this name",
+  "you_can_not_create_page_with_this_name_or_hierarchy": "You can not create page with this name or page hierarchy",
   "not_allowed_to_see_this_page": "You cannot see this page",
   "Confirm": "Confirm",
   "Successfully requested": "Successfully requested.",
@@ -184,7 +186,9 @@
   },
   "author_info": {
     "created_at": "Created at",
-    "last_revision_posted_at": "Last revision posted at"
+    "created_by": "Created by",
+    "last_revision_posted_at": "Last revision posted at",
+    "updated_by": "Updated by"
   },
   "installer": {
     "tab": "Create account",
@@ -217,6 +221,9 @@
       "profile_image2": "Set up AWS or enable local uploads."
     }
   },
+  "API Token Settings": "API token settings",
+  "Current API Token": "Current API token",
+  "Update API Token": "Update API token",
   "page_me_apitoken": {
     "api_token": "API Token",
     "notice": {
@@ -225,6 +232,35 @@
       "update_token2": "You will need to update the API token in any existing processes."
     },
     "form_help": {}
+  },
+  "Access Token Settings": "Access token settings",
+  "page_me_access_token": {
+    "access_token": "Access token",
+    "expiredAt": "Expiration date",
+    "description": "Description",
+    "scope": "Scope",
+    "scope_read": "Read",
+    "action": "Action",
+    "create_token": "Create Token",
+    "no_tokens_found": "No access tokens found",
+    "new_token": {
+      "title": "New access token",
+      "copy_to_clipboard": "Copy to clipboard",
+      "message": "This token will only be displayed once. Please save it securely."
+    },
+    "modal": {
+      "message": "Are you sure you want to delete this access token?",
+      "alert": "This action cannot be undone.",
+      "delete_token": "Delete Token"
+    },
+    "form": {
+      "title": "Create New Access Token",
+      "expiredAt_desc": "Select when this access token should expire.",
+      "description_desc": "Provide a description to help you identify this token later",
+      "description_max_length": "Description must be less than {{length}} characters",
+      "scope_desc": "Select the scope of the access token."
+    },
+    "copy_to_clipboard": "Copy to clipboard"
   },
   "Password": "Password",
   "Password Settings": "Password settings",
@@ -256,9 +292,6 @@
   },
   "API Settings": "API settings",
   "Other Settings": "Other Settings",
-  "API Token Settings": "API token settings",
-  "Current API Token": "Current API token",
-  "Update API Token": "Update API token",
   "in_app_notification_settings": {
     "in_app_notification_settings": "In-App Notification Settings",
     "subscribe_settings": "Settings to automatically subscribe (Receive notifications) to pages",
@@ -340,6 +373,7 @@
       "file": "File only"
     },
     "editor_config": "Editor Config",
+    "editor_assistant": "Editor Assistant",
     "Show active line": "Show active line",
     "auto_format_table": "Auto format table",
     "overwrite_scopes": "{{operation}} and Overwrite scopes of all descendants",
@@ -454,7 +488,7 @@
   "modal_shortcuts": {
     "global": {
       "title": "Global shortcuts",
-      "Open/Close shortcut help": "Open/Close<br>shortcut help",
+      "Open/Close shortcut help": "Open/Close Shortcut Help",
       "Edit Page": "Edit Page",
       "Create Page": "Create Page",
       "Search": "Search",
@@ -468,11 +502,32 @@
       "Indent": "Indent",
       "Outdent": "Outdent",
       "Save Page": "Save Page",
-      "Delete Line": "Delete Line"
+      "Only Editor": "(Editor Only)",
+      "Delete Line": "Delete Line",
+      "Search in Editor": "Search in Editor",
+      "Move Line": "Move Line",
+      "Copy Line": "Copy Line",
+      "Insert Line": "Insert Line",
+      "Post Comment": "(Post Comment)",
+      "Multiple Cursors": "Multiple Cursors",
+      "Or Alt Click": "or Alt + Click"
     },
-    "commentform": {
-      "title": "Comment Form shortcuts",
-      "Post": "Post"
+    "format": {
+      "title": "Format Settings (Editor)",
+      "Bold": "Bold",
+      "Italic": "Italic",
+      "Strikethrough": "Strikethrough",
+      "Code Text": "Code Text",
+      "Hyperlink": "Hyperlink"
+    },
+    "line_settings": {
+      "title": "Line Settings (Editor)",
+      "Bullet List": "Bullet List",
+      "Numbered List": "Numbered List",
+      "Quote": "Quote",
+      "Code Block": "Code Block",
+      "Comment Out": "Comment Out",
+      "Comment Out Desc": "(Hide)"
     }
   },
   "modal_resolve_conflict": {
@@ -486,20 +541,145 @@
     "latest_revision": "theirs",
     "selected_editable_revision": "Selected Page Body (Editable)"
   },
-  "modal_aichat": {
-    "title": "Knowledge Assistant",
-    "title_beta_label": "(Beta)",
+  "sidebar_ai_assistant": {
+    "reference_pages_label": "Reference pages",
+    "recent_chat": "Recent chat",
+    "no_recent_chat": "No recent chat",
     "placeholder": "Ask me anything.",
+    "knowledge_assistant_placeholder": "Ask me anything.",
+    "editor_assistant_placeholder": "Can I help you with anything?",
     "summary_mode_label": "Summary mode",
     "summary_mode_help": "Concise answer within 2-3 sentences",
+    "extended_thinking_mode_label": "Extended Thinking Mode",
+    "extended_thinking_mode_help": "When enabled, the AI will take more time to think and provide a more comprehensive answer.",
     "caution_against_hallucination": "Please verify the information and check the sources.",
     "progress_label": "Generating answers",
     "failed_to_create_or_retrieve_thread": "Failed to create or retrieve thread",
     "budget_exceeded": "You have reached your usage limit for OpenAI's API. To use the Knowledge Assistant again, please add credits from the OpenAI billing page.",
     "budget_exceeded_for_growi_cloud": "You have reached your OpenAI API usage limit. To use the Knowledge Assistant again, please add credits from the GROWI.cloud admin page for Hosted users or from the OpenAI billing page for Owned users.",
     "error_message": "An error has occurred",
-    "show_error_detail": "Show error details"
-
+    "show_error_detail": "Show error details",
+    "editor_assistant_long_context_warn_with_unit_line": "The text is too long, so the Editor Assistant will reference approximately lines {{startPosition}} to {{endPosition}} for its response.",
+    "editor_assistant_long_context_warn_with_unit_char": "The text is too long, so the Editor Assistant will reference characters {{startPosition}} to {{endPosition}} for its response.",
+    "discard": "Discard",
+    "accept": "Accept",
+    "use_assistant": "Use Assistant",
+    "remove_assistant": "Deselect the selected assistant",
+    "text_generation_by_editor_assistant_label": "Editor Assistant is generating text",
+    "preset_menu": {
+      "summarize": {
+        "title": "Summarize this article",
+        "prompt": "Please summarize the markdown content"
+      },
+      "correct": {
+        "title": "Correct errors in the text",
+        "prompt": "Please correct the errors in the markdown text"
+      }
+    }
+  },
+  "modal_ai_assistant": {
+    "header": {
+      "update_assistant": "Update Assistant",
+      "add_new_assistant": "Add New Assistant"
+    },
+    "assistant_name_placeholder": "Enter assistant name",
+    "page_count": "{{count}} pages",
+    "memo": {
+      "title": "Assistant memo",
+      "optional": "Optional",
+      "placeholder": "You can display notes about content and usage",
+      "description": "The contents of the memo do not affect the assistant's processing."
+    },
+    "submit_button": {
+      "update_assistant": "Update Assistant",
+      "create_assistant": "Create Assistant"
+    },
+    "toaster": {
+      "create_success": "Assistant has been created",
+      "update_success": "Assistant has been updated",
+      "create_failed": "Failed to create assistant",
+      "update_failed": "Failed to update assistant"
+    },
+    "select_source_pages": "Select pages for the assistant to reference",
+    "search_reference_pages_by_keyword": "Search for pages the assistant will reference by keyword",
+    "search_by_keyword": "Search by keyword",
+    "enter_keywords": "Enter keywords",
+    "max_items_space_separated_hint": "Enter up to 5 items separated by spaces",
+    "select_assistant_reference_pages": "Select pages for the assistant to reference",
+    "reference_pages": "Reference pages",
+    "no_pages_selected": "No pages selected",
+    "can_add_later": "You can add more later",
+    "next": "Next",
+    "select_from_page_tree": "Select from page tree",
+    "edit_page_description": "Edit pages that the assistant can reference.<br> The assistant can reference up to {{limitLearnablePageCountPerAssistant}} pages including child pages.",
+    "default_instruction": "You are the knowledge assistant for this Wiki.\n\n## Multilingual Support:\nRespond in the same language the user uses in their input.\n",
+    "add_page_button": "Add page",
+    "page_mode_title": {
+      "share": "Assistant Sharing",
+      "pages": "Reference Pages",
+      "instruction": "Assistant Instructions"
+    },
+    "share_assistant": "Share assistant",
+    "page_access_permission": "Page access permission",
+    "access_scope": {
+      "owner": "All pages accessible by {{username}}",
+      "groups": "Specify groups",
+      "publicOnly": "Public pages only"
+    },
+    "share_scope": {
+      "title": "Assistant sharing scope",
+      "owner": {
+        "label": "{{username}} only"
+      },
+      "publicOnly": {
+        "label": "Public",
+        "desc": "Shared with all users"
+      },
+      "groups": {
+        "label": "Specify groups",
+        "desc": "Shared only with members of selected groups"
+      },
+      "sameAsAccessScope": {
+        "label": "Same as page access scope",
+        "desc": "Shared with the same scope as page access"
+      }
+    },
+    "instructions": {
+      "description": "You can set instructions that determine how the assistant behaves.<br>The assistant will answer and analyze based on these instructions.",
+      "reset_to_default": "Reset to default"
+    }
+  },
+  "share_scope_warning_modal": {
+    "header_title": "Confirm Sharing Scope",
+    "warning_message": "This assistant includes pages with limited access.<br>With the current settings, information from these pages may be shared beyond their original access permissions through the assistant.",
+    "selected_pages_label": "Selected page paths",
+    "confirmation_message": "Please confirm that you understand the content of these pages may be shared within the assistant's public scope if you proceed.",
+    "button": {
+      "review": "Review settings",
+      "proceed": "Understand and proceed"
+    }
+  },
+  "default_ai_assistant": {
+    "not_set": "Default assistant is not set"
+  },
+  "ai_assistant_substance": {
+    "add_assistant": "Add Assistant",
+    "my_assistants": "My Assistants",
+    "team_assistants": "Team Assistants",
+    "thread_does_not_exist": "No threads exist",
+    "recent_threads": "Recent Items",
+    "toaster": {
+      "ai_assistant_deleted_success": "Assistant deleted",
+      "ai_assistant_deleted_failed": "Failed to delete assistant",
+      "thread_deleted_success": "Thread deleted",
+      "thread_deleted_failed": "Failed to delete thread",
+      "ai_assistant_set_default_success": "Default assistant set successfully",
+      "ai_assistant_set_default_failed": "Failed to set default assistant"
+    },
+    "delete_modal": {
+      "title": "Delete Assistant",
+      "confirm_message": "Are you sure you want to delete this assistant?"
+    }
   },
   "link_edit": {
     "edit_link": "Edit Link",
@@ -615,7 +795,7 @@
     "alert_desc1": "On this page, you can select pages with the checkbox and batch convert to the new v5 compatible format from the \"Bulk operation\" button at the top of the screen.",
     "nopages_title": "Congratulations. Ready to use GROWI v5!",
     "nopages_desc1": "Now all the pages you can manage seem to be in v5 compatible format.",
-    "detail_info": "See the detail information from <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html' target='_blank' class='alert-link'>Upgrading GROWI to v5.0.x <span className='growi-custom-icons'>external_link</span></a>.",
+    "detail_info": "See the detail information from <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html' target='_blank' class='alert-link'>Upgrading GROWI to v5.0.x <span class='growi-custom-icons'>external_link</span></a>.",
     "modal": {
       "title": "Convert to new v5 compatible format",
       "converting_pages": "Converting pages",
@@ -660,7 +840,9 @@
     "export_page_markdown": "Export page as Markdown",
     "export_page_pdf": "Export page as PDF",
     "bulk_export": "Export page and all child pages",
-    "bulk_export_notice": "Once a download link is ready, a notification will be sent. If the number of pages is large, it may take a while for preparation.",
+    "bulk_export_download_explanation": "A notification will be sent when the export is complete. To download the exported file, click the notification.",
+    "bulk_export_exec_time_warning": "If the number of pages is large, it may take a while to export",
+    "large_bulk_export_warning": "To conserve system resources, please refrain from exporting a large number of pages consecutively",
     "markdown": "Markdown",
     "choose_export_format": "Select export format",
     "bulk_export_started": "Please wait a moment...",
@@ -671,7 +853,8 @@
     "export_cancel_warning": "The following export in progress will be canceled",
     "restart": "Restart",
     "format": "Format",
-    "started_on": "Started on"
+    "started_on": "Started on",
+    "file_upload_not_configured": "File upload settings are not configured"
   },
   "message": {
     "successfully_connected": "Successfully Connected!",
@@ -714,7 +897,7 @@
     "Password field is required": "Password field is required.",
     "Username or E-mail has invalid characters": "Username or E-mail has invalid characters.",
     "user_not_found": "User not found.",
-    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>DuplicatedUsernameException occured</strong></p><p class='mb-0'> Your {{ failedProviderForDuplicatedUsernameException }} authentication was succeeded, but a new user could not be created. See the issue <a href='https://github.com/weseek/growi/issues/193'>#193</a>.</p>"
+    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>DuplicatedUsernameException occured</strong></p><p class='mb-0'> Your {{ failedProviderForDuplicatedUsernameException }} authentication was succeeded, but a new user could not be created. See the issue <a href='https://github.com/growilabs/growi/issues/193'>#193</a>.</p>"
   },
   "grid_edit": {
     "create_bootstrap_4_grid": "Create Bootstrap 4 Grid",
@@ -756,7 +939,8 @@
   "pagetree": {
     "cannot_rename_a_title_that_contains_slash": "Cannot rename a title that contains '/'",
     "you_cannot_move_this_page_now": "You cannot move this page now",
-    "something_went_wrong_with_moving_page": "Something went wrong with moving page"
+    "something_went_wrong_with_moving_page": "Something went wrong with moving page",
+    "error_retrieving_the_pagetree": "Error occurred while retrieving the PageTree"
   },
   "duplicated_page_alert": {
     "same_page_name_exists": "Same page name exits as「{{pageName}}」",
@@ -838,23 +1022,6 @@
     "page_tree_not_avaliable": "Page tree feature is not available yet.",
     "go_to_settings": "Go to settings to enable the feature"
   },
-  "questionnaire": {
-    "give_us_feedback": "Give us feedback for improvements",
-    "thank_you_for_answering": "Thank you for answering",
-    "additional_feedback": "Send us additional feedback from the user icon dropdown.",
-    "dont_show_again": "Don`t show again",
-    "deny": "Don't answer",
-    "agree": "Agree",
-    "disagree": "Disagree",
-    "answer": "Answer",
-    "no_answer": "No answer",
-    "settings": "Questionnaire settings",
-    "failed_to_send": "Failed to send feedback",
-    "denied": "The questionnaire won't be shown again",
-    "personal_settings_explanation": "Questionnaires for improving GROWI will be shown. If you have other feedbacks, you can send them from the user icon dropdown.",
-    "enable_questionnaire": "Enable questionnaire",
-    "disabled_by_admin": "Questionnaire is disabled by admin"
-  },
   "tag_edit_modal": {
     "edit_tags": "Edit Tags",
     "done": "Done",
@@ -882,8 +1049,7 @@
   },
   "sidebar_header": {
     "show_wip_page": "Show WIP",
-    "size_s": "Size: S",
-    "size_l": "Size: L"
+    "compact_view": "Compact View"
   },
   "create_page": {
     "untitled": "Untitled"

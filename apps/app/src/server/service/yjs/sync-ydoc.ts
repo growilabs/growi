@@ -1,4 +1,5 @@
 import { Origin, YDocStatus } from '@growi/core';
+import { type Delta } from '@growi/editor';
 import type { Document } from 'y-socket.io/dist/server';
 
 import loggerFactory from '~/utils/logger';
@@ -10,9 +11,6 @@ import type { MongodbPersistence } from './extended/mongodb-persistence';
 
 const logger = loggerFactory('growi:service:yjs:sync-ydoc');
 
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Delta = Array<{insert?:Array<any>|string, delete?:number, retain?:number}>;
 
 type Context = {
   ydocStatus: YDocStatus,

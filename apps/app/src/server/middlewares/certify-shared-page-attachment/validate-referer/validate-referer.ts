@@ -2,7 +2,7 @@ import { objectIdUtils } from '@growi/core/dist/utils';
 
 import loggerFactory from '~/utils/logger';
 
-import { ValidReferer } from '../interfaces';
+import type { ValidReferer } from '../interfaces';
 
 import { retrieveSiteUrl } from './retrieve-site-url';
 

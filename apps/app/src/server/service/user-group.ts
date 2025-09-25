@@ -1,16 +1,17 @@
 import type { IUser, IGrantedGroup } from '@growi/core';
 import type { DeleteResult } from 'mongodb';
-import type { Model } from 'mongoose';
+import mongoose, { type Model } from 'mongoose';
 
+import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { UserGroupDocument, UserGroupModel } from '~/server/models/user-group';
 import UserGroup from '~/server/models/user-group';
 import { excludeTestIdsFromTargetIds, includesObjectIds } from '~/server/util/compare-objectId';
 import loggerFactory from '~/utils/logger';
 
+import type Crowi from '../crowi';
 import type { UserGroupRelationDocument, UserGroupRelationModel } from '../models/user-group-relation';
 import UserGroupRelation from '../models/user-group-relation';
-import { PageActionOnGroupDelete } from '~/interfaces/user-group';
 
 
 const logger = loggerFactory('growi:service:UserGroupService'); // eslint-disable-line no-unused-vars
@@ -27,9 +28,9 @@ export interface IUserGroupService {
  */
 class UserGroupService implements IUserGroupService {
 
-  crowi: any;
+  crowi: Crowi;
 
-  constructor(crowi) {
+  constructor(crowi: Crowi) {
     this.crowi = crowi;
   }
 
@@ -147,7 +148,7 @@ class UserGroupService implements IUserGroupService {
   }
 
   async removeUserByUsername(userGroupId: ObjectIdLike, username: string): Promise<{user: IUser, deletedGroupsCount: number}> {
-    const User = this.crowi.model('User');
+    const User = mongoose.model<IUser, { findUserByUsername }>('User');
 
     const [userGroup, user] = await Promise.all([
       UserGroup.findById(userGroupId),

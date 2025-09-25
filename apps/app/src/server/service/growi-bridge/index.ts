@@ -5,6 +5,7 @@ import { finished } from 'stream/promises';
 
 import unzipStream, { type Entry } from 'unzip-stream';
 
+import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
 import type { ZipFileStat } from '../interfaces/export';
@@ -18,9 +19,9 @@ const logger = loggerFactory('growi:services:GrowiBridgeService'); // eslint-dis
  * the service class for bridging GROWIs (export and import)
  * common properties and methods between export service and import service are defined in this service
  */
-class GrowiBridgeService {
+export class GrowiBridgeService {
 
-  crowi: any;
+  crowi: Crowi;
 
   encoding: BufferEncoding = 'utf-8';
 
@@ -28,7 +29,7 @@ class GrowiBridgeService {
 
   baseDir: string | undefined;
 
-  constructor(crowi) {
+  constructor(crowi: Crowi) {
     this.crowi = crowi;
   }
 
@@ -122,5 +123,3 @@ class GrowiBridgeService {
   }
 
 }
-
-export default GrowiBridgeService;

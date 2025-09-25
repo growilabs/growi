@@ -1,5 +1,5 @@
 import React, {
-  useState, useEffect, useCallback, useMemo,
+  useState, useEffect, useCallback, useMemo, type JSX,
 } from 'react';
 
 import { isIPageInfoForEntity } from '@growi/core';

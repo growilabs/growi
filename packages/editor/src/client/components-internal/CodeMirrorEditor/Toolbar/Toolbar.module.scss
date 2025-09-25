@@ -1,3 +1,9 @@
 .codemirror-editor-toolbar :global {
-  @import './scss/toolbar-button.scss';
+  @import './scss/toolbar-button';
+
+  // center the toolbar vertically
+  .simplebar-offset {
+    display: flex;
+    align-items: center;
+  }
 }

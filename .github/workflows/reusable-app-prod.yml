@@ -1,4 +1,4 @@
-name: Reusable build app workflow for production
+name: Reusable build and test app for production
 
 on:
   workflow_call:
@@ -16,7 +16,7 @@ on:
       node-version:
         required: true
         type: string
-        default: 20.x
+        default: 22.x
       skip-e2e-test:
         type: boolean
         default: false
@@ -49,18 +49,6 @@ jobs:
     - name: Install dependencies
       run: |
         pnpm install --frozen-lockfile
-
-    - name: Cache/Restore dist
-      uses: actions/cache@v4
-      with:
-        path: |
-          **/.turbo
-          **/dist
-          **/node_modules/.cache/turbo
-          ${{ github.workspace }}/apps/app/.next
-        key: dist-app-prod-${{ runner.OS }}-node${{ inputs.node-version }}-${{ github.sha }}
-        restore-keys: |
-          dist-app-prod-${{ runner.OS }}-node${{ inputs.node-version }}-
 
     - name: Build
       working-directory: ./apps/app
@@ -119,13 +107,17 @@ jobs:
     needs: [build-prod]
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        mongodb-version: ['6.0', '8.0']
+
     services:
       mongodb:
-        image: mongo:6.0
+        image: mongo:${{ matrix.mongodb-version }}
         ports:
         - 27017/tcp
       elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:7.17.1
+        image: docker.elastic.co/elasticsearch/elasticsearch:9.0.1
         ports:
         - 9200/tcp
         env:
@@ -140,6 +132,12 @@ jobs:
       with:
         node-version: ${{ inputs.node-version }}
         cache: 'pnpm'
+
+    # avoid setup-node cache failure; see: https://github.com/actions/setup-node/issues/1137
+    - name: Verify PNPM Cache Directory
+      run: |
+        PNPM_STORE_PATH="$( pnpm store path --silent )"
+        [ -d "$PNPM_STORE_PATH" ] || mkdir -vp "$PNPM_STORE_PATH"
 
     - name: Download production files artifact
       uses: actions/download-artifact@v4
@@ -181,21 +179,22 @@ jobs:
     container:
       # Match the Playwright version
       # https://github.com/microsoft/playwright/issues/20010
-      image: mcr.microsoft.com/playwright:v1.46.0-jammy
+      image: mcr.microsoft.com/playwright:v1.49.1-jammy
 
     strategy:
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
         shard: [1/2, 2/2]
+        mongodb-version: ['6.0', '8.0']
 
     services:
       mongodb:
-        image: mongo:6.0
+        image: mongo:${{ matrix.mongodb-version }}
         ports:
         - 27017/tcp
       elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:7.17.1
+        image: docker.elastic.co/elasticsearch/elasticsearch:9.0.1
         ports:
         - 9200/tcp
         env:
@@ -274,12 +273,19 @@ jobs:
         MONGO_URI: mongodb://mongodb:27017/growi-playwright-guest-mode
         ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
 
-    - name: Upload test results
+    - name: Generate shard ID
+      id: shard-id
       if: always()
+      run: |
+        SHARD_ID=$(echo "${{ matrix.shard }}" | tr '/' '-')
+        echo "shard_id=${SHARD_ID}" >> $GITHUB_OUTPUT
+
+    - name: Upload test results
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: blob-report-${{ matrix.shard }}
-        path: blob-report
+        name: blob-report-${{ matrix.browser }}-mongo${{ matrix.mongodb-version }}-${{ steps.shard-id.outputs.shard_id }}
+        path: ./apps/app/blob-report
         retention-days: 30
 
     - name: Slack Notification
@@ -287,7 +293,7 @@ jobs:
       if: failure()
       with:
         type: ${{ job.status }}
-        job_name: '*Node CI for growi - run-playwright*'
+        job_name: '*Node CI for growi - run-playwright (${{ matrix.browser }}, MongoDB ${{ matrix.mongodb-version }})*'
         channel: '#ci'
         isCompactMode: true
         url: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -314,8 +320,21 @@ jobs:
       run: |
         pnpm install --frozen-lockfile
 
+    - name: Download blob reports
+      uses: actions/download-artifact@v4
+      with:
+        pattern: blob-report-*
+        path: all-blob-reports
+        merge-multiple: true
+
     - name: Merge into HTML Report
-      run: pnpm playwright merge-reports --reporter html ./all-blob-reports
+      run: |
+        mkdir -p playwright-report
+        if [ -z "$(ls all-blob-reports/*.zip all-blob-reports/*.blob 2>/dev/null || true)" ]; then
+          echo "<html><body><h1>No test results available</h1><p>This could be because tests were skipped or all artifacts were not available.</p></body></html>" > playwright-report/index.html
+        else
+          pnpm playwright merge-reports --reporter html all-blob-reports
+        fi
 
     - name: Upload HTML report
       uses: actions/upload-artifact@v4

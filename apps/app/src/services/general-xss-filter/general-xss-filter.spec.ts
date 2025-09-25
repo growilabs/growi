@@ -18,7 +18,7 @@ describe('generalXssFilter', () => {
     expect(result).toBe('alert("XSS")');
   });
 
-  // for https://github.com/weseek/growi/issues/221
+  // for https://github.com/growilabs/growi/issues/221
   test('should not be sanitize blockquote', () => {
     // Act
     const result = generalXssFilter.process('> foo\n> bar');
@@ -27,7 +27,7 @@ describe('generalXssFilter', () => {
     expect(result).toBe('> foo\n> bar');
   });
 
-  // https://github.com/weseek/growi/pull/505
+  // https://github.com/growilabs/growi/pull/505
   test('should not be sanitize next closing-tag', () => {
     // Act
     const result = generalXssFilter.process('<evil /><span>text</span>');

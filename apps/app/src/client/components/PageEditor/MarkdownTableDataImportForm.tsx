@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, type JSX } from 'react';
 
 import { MarkdownTable } from '@growi/editor';
 import { useTranslation } from 'next-i18next';

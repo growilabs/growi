@@ -1,6 +1,6 @@
 /* eslint-disable camelcase */
-import { SearchDelegatorName } from '~/interfaces/named-query';
-import { ISearchResult } from '~/interfaces/search';
+import type { SearchDelegatorName } from '~/interfaces/named-query';
+import type { ISearchResult } from '~/interfaces/search';
 
 
 export type QueryTerms = {

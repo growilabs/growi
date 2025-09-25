@@ -1,5 +1,5 @@
 import type { IUserHasId } from '@growi/core';
-import { NextFunction, Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
@@ -12,7 +12,7 @@ interface AuthorizedRequest extends Request {
   user?: IUserHasId
 }
 
-export const generateAddActivityMiddleware = crowi => async(req: AuthorizedRequest, res: Response, next: NextFunction): Promise<void> => {
+export const generateAddActivityMiddleware = () => async(req: AuthorizedRequest, res: Response, next: NextFunction): Promise<void> => {
   if (req.method === 'GET') {
     logger.warn('This middleware is not available for GET requests');
     return next();

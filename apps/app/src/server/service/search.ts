@@ -9,6 +9,7 @@ import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { IFormattedSearchResult, IPageWithSearchMeta, ISearchResult } from '~/interfaces/search';
 import loggerFactory from '~/utils/logger';
 
+import type Crowi from '../crowi';
 import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 import type {
   SearchDelegator, SearchQueryParser, SearchResolver, ParsedQuery, SearchableData, QueryTerms,
@@ -77,7 +78,7 @@ const findPageListByIds = async(pageIds: ObjectIdLike[], crowi: any) => {
 
 class SearchService implements SearchQueryParser, SearchResolver {
 
-  crowi!: any;
+  crowi: Crowi;
 
   isErrorOccuredOnHealthcheck: boolean | null;
 
@@ -87,7 +88,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
   nqDelegators: {[key in SearchDelegatorName]: SearchDelegator};
 
-  constructor(crowi) {
+  constructor(crowi: Crowi) {
     this.crowi = crowi;
 
     this.isErrorOccuredOnHealthcheck = null;
@@ -117,7 +118,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   get isElasticsearchEnabled() {
-    const uri = configManager.getConfig('crowi', 'app:elasticsearchUri');
+    const uri = configManager.getConfig('app:elasticsearchUri');
     return uri != null && uri.length > 0;
   }
 

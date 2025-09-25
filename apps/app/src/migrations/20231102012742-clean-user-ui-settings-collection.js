@@ -3,7 +3,6 @@ import UserUISettings from '~/server/models/user-ui-settings';
 import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
-
 const logger = loggerFactory('growi:migrate:clean-user-ui-settings-collection');
 
 const mongoose = require('mongoose');

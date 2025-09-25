@@ -49,9 +49,9 @@ const AdminSlackIntegrationPage: NextPage<Props> = (props) => {
 const injectServerConfigurations = async(context: GetServerSidePropsContext, props: Props): Promise<void> => {
   const req: CrowiRequest = context.req as CrowiRequest;
   const { crowi } = req;
-  const { appService } = crowi;
+  const { growiInfoService } = crowi;
 
-  props.siteUrl = appService.getSiteUrl();
+  props.siteUrl = growiInfoService.getSiteUrl();
 };
 
 

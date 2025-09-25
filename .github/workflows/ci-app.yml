@@ -6,6 +6,8 @@ on:
       - release/**
       - rc/**
       - changeset-release/**
+      - mergify/merge-queue/**
+      - tmp-mergify/merge-queue/**
     paths:
       - .github/mergify.yml
       - .github/workflows/ci-app.yml
@@ -72,7 +74,7 @@ jobs:
 
       - name: Lint
         run: |
-          turbo run lint --filter=!@growi/slackbot-proxy
+          turbo run lint --filter=@growi/app --filter=./packages/*
 
       - name: Slack Notification
         uses: weseek/ghaction-slack-notification@master
@@ -91,10 +93,11 @@ jobs:
     strategy:
       matrix:
         node-version: [20.x]
+        mongodb-version: ['6.0', '8.0']
 
     services:
       mongodb:
-        image: mongo:6.0
+        image: mongo:${{ matrix.mongodb-version }}
         ports:
           - 27017/tcp
 
@@ -126,14 +129,14 @@ jobs:
 
       - name: Test
         run: |
-          turbo run test --filter=!@growi/slackbot-proxy --env-mode=loose
+          turbo run test --filter=@growi/app --filter=./packages/* --env-mode=loose
         env:
           MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi_test
 
       - name: Upload coverage report as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Coverage Report
+          name: coverage-mongo${{ matrix.mongodb-version }}
           path: |
             apps/app/coverage
             packages/remark-growi-directive/coverage
@@ -155,10 +158,11 @@ jobs:
     strategy:
       matrix:
         node-version: [20.x]
+        mongodb-version: ['6.0', '8.0']
 
     services:
       mongodb:
-        image: mongo:6.0
+        image: mongo:${{ matrix.mongodb-version }}
         ports:
           - 27017/tcp
 

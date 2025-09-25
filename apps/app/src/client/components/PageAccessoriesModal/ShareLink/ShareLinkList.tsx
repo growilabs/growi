@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import { format as dateFnsFormat } from 'date-fns/format';
 import { useTranslation } from 'next-i18next';
@@ -30,7 +30,7 @@ const ShareLinkTr = (props: ShareLinkTrProps): JSX.Element => {
         { isRelatedPageExists && (
           <CopyDropdown
             pagePath={relatedPage.path}
-            dropdownToggleId={`copydropdown-${shareLinkId}`}
+            dropdownToggleId={`copydropdown-for-share-link-list-${shareLinkId}`}
             pageId={shareLinkId}
             isShareLinkMode
           >

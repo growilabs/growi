@@ -10,7 +10,7 @@ export const BookmarkFolderMenuItem: React.FC<{
   isSelected,
 }) => {
   return (
-    <div className="d-flex justify-content-start grw-bookmark-folder-menu-item-title">
+    <div className="d-flex align-items-center grw-bookmark-folder-menu-item-title">
       <input
         type="radio"
         checked={isSelected}

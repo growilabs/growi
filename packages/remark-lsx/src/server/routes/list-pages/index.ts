@@ -1,4 +1,3 @@
-
 import type { IUser } from '@growi/core';
 import { OptionParser } from '@growi/core/dist/remark-plugins';
 import { pathUtils } from '@growi/core/dist/utils';
@@ -14,31 +13,38 @@ import { addSortCondition } from './add-sort-condition';
 import { generateBaseQuery, type PageQuery } from './generate-base-query';
 import { getToppageViewersCount } from './get-toppage-viewers-count';
 
-
 const { addTrailingSlash, removeTrailingSlash } = pathUtils;
 
 /**
  * add filter condition that filter fetched pages
  */
-function addFilterCondition(query, pagePath, optionsFilter, isExceptFilter = false): PageQuery {
+export function addFilterCondition(
+  query,
+  pagePath,
+  optionsFilter,
+  isExceptFilter = false,
+): PageQuery {
   // when option strings is 'filter=', the option value is true
   if (optionsFilter == null || optionsFilter === true) {
-    throw createError(400, 'filter option require value in regular expression.');
+    throw createError(
+      400,
+      'filter option require value in regular expression.',
+    );
   }
 
   const pagePathForRegexp = escapeStringRegexp(addTrailingSlash(pagePath));
 
-  let filterPath;
+  let filterPath: RegExp;
   try {
     if (optionsFilter.charAt(0) === '^') {
       // move '^' to the first of path
-      filterPath = new RegExp(`^${pagePathForRegexp}${optionsFilter.slice(1, optionsFilter.length)}`);
+      const escapedFilter = escapeStringRegexp(optionsFilter.slice(1));
+      filterPath = new RegExp(`^${pagePathForRegexp}${escapedFilter}`);
+    } else {
+      const escapedFilter = escapeStringRegexp(optionsFilter);
+      filterPath = new RegExp(`^${pagePathForRegexp}.*${escapedFilter}`);
     }
-    else {
-      filterPath = new RegExp(`^${pagePathForRegexp}.*${optionsFilter}`);
-    }
-  }
-  catch (err) {
+  } catch (err) {
     throw createError(400, err);
   }
 
@@ -56,12 +62,15 @@ function addExceptCondition(query, pagePath, optionsFilter): PageQuery {
   return addFilterCondition(query, pagePath, optionsFilter, true);
 }
 
-interface IListPagesRequest extends Request<undefined, undefined, undefined, LsxApiParams> {
-  user: IUser,
+interface IListPagesRequest
+  extends Request<undefined, undefined, undefined, LsxApiParams> {
+  user: IUser;
 }
 
-
-export const listPages = async(req: IListPagesRequest, res: Response): Promise<Response> => {
+export const listPages = async (
+  req: IListPagesRequest,
+  res: Response,
+): Promise<Response> => {
   const user = req.user;
 
   if (req.query.pagePath == null) {
@@ -75,25 +84,27 @@ export const listPages = async(req: IListPagesRequest, res: Response): Promise<R
     options: req.query?.options ?? {},
   };
 
-  const {
-    pagePath, offset, limit, options,
-  } = params;
+  const { pagePath, offset, limit, options } = params;
   const builder = await generateBaseQuery(params.pagePath, user);
 
   // count viewers of `/`
-  let toppageViewersCount;
+  let toppageViewersCount: number;
   try {
     toppageViewersCount = await getToppageViewersCount();
-  }
-  catch (error) {
-    return res.status(500).send(error);
+  } catch (error) {
+    console.error('Error occurred in getToppageViewersCount:', error);
+    return res.status(500).send('An internal server error occurred.');
   }
 
   let query = builder.query;
   try {
     // depth
     if (options?.depth != null) {
-      query = addDepthCondition(query, params.pagePath, OptionParser.parseRange(options.depth));
+      query = addDepthCondition(
+        query,
+        params.pagePath,
+        OptionParser.parseRange(options.depth),
+      );
     }
     // filter
     if (options?.filter != null) {
@@ -115,15 +126,17 @@ export const listPages = async(req: IListPagesRequest, res: Response): Promise<R
     const cursor = (offset ?? 0) + pages.length;
 
     const responseData: LsxApiResponseData = {
-      pages, cursor, total, toppageViewersCount,
+      pages,
+      cursor,
+      total,
+      toppageViewersCount,
     };
     return res.status(200).send(responseData);
-  }
-  catch (error) {
+  } catch (error) {
+    console.error('Error occurred while processing listPages request:', error);
     if (isHttpError(error)) {
       return res.status(error.status).send(error.message);
     }
-    return res.status(500).send(error.message);
+    return res.status(500).send('An internal server error occurred.');
   }
-
 };

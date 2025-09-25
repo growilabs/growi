@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, type JSX } from 'react';
 
 import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
 import { useHandsontableModalForEditor } from '../../../stores/use-handsontable';

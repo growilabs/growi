@@ -1,3 +1,5 @@
+import type { JSX } from 'react';
+
 import nodePath from 'path';
 
 import { useTranslation } from 'next-i18next';
@@ -7,6 +9,7 @@ import type { IPageForItem } from '~/interfaces/page';
 import { shouldRecoverPagePaths } from '~/utils/page-operation';
 
 import styles from './SimpleItemContent.module.scss';
+
 
 const moduleClass = styles['simple-item-content'] ?? '';
 

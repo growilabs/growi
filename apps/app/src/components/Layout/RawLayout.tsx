@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, JSX } from 'react';
 import React, { useState } from 'react';
 
 import type { ColorScheme } from '@growi/core';

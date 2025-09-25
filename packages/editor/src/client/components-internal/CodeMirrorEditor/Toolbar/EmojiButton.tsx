@@ -1,6 +1,6 @@
 import {
   useState, useCallback,
-  type CSSProperties,
+  type CSSProperties, type JSX,
 } from 'react';
 
 import emojiData from '@emoji-mart/data';

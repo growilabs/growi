@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import RevisionRenderer from '~/components/PageView/RevisionRenderer';
 import { useSWRxPageByPath } from '~/stores/page';

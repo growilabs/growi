@@ -12,4 +12,4 @@ export const YDocStatus = {
   OUTDATED: 'outdated',
   ISOLATED: 'isolated',
 } as const;
-export type YDocStatus = typeof YDocStatus[keyof typeof YDocStatus]
+export type YDocStatus = (typeof YDocStatus)[keyof typeof YDocStatus];

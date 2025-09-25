@@ -1,0 +1,31 @@
+{
+  "name": "GROWI-PDF-Converter",
+  "dockerComposeFile": ["../compose.yml", "../compose.extend.yml"],
+  "service": "pdf-converter",
+  "workspaceFolder": "/workspace/growi",
+
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  // "forwardPorts": [],
+
+  "initializeCommand": "/bin/bash .devcontainer/pdf-converter/initializeCommand.sh",
+  // Use 'postCreateCommand' to run commands after the container is created.
+  "postCreateCommand": "/bin/bash ./.devcontainer/pdf-converter/postCreateCommand.sh",
+
+  // Configure tool-specific properties.
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "biomejs.biome",
+        "mhutchie.git-graph",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  }
+
+  // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+  // "remoteUser": "root"
+}

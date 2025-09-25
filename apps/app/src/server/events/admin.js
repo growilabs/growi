@@ -1,6 +1,7 @@
-const util = require('util');
 const events = require('events');
+const util = require('util');
 
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 function AdminEvent(crowi) {
   this.crowi = crowi;
 

@@ -1,27 +1,22 @@
-import React, { useMemo } from 'react';
-
 import { pathUtils } from '@growi/core/dist/utils';
 import { PageListMeta, PagePathLabel } from '@growi/ui/dist/components';
 import Link from 'next/link';
+import React, { type JSX, useMemo } from 'react';
 
 import type { PageNode } from '../../../interfaces/page-node';
 import type { LsxContext } from '../lsx-context';
 
-
 import styles from './LsxPage.module.scss';
 
-
 type Props = {
-  pageNode: PageNode,
-  lsxContext: LsxContext,
-  depth: number,
-  basisViewersCount?: number,
+  pageNode: PageNode;
+  lsxContext: LsxContext;
+  depth: number;
+  basisViewersCount?: number;
 };
 
 export const LsxPage = React.memo((props: Props): JSX.Element => {
-  const {
-    pageNode, lsxContext, depth, basisViewersCount,
-  } = props;
+  const { pageNode, lsxContext, depth, basisViewersCount } = props;
 
   const pageId = pageNode.page?._id;
   const pagePath = pageNode.pagePath;
@@ -64,9 +59,15 @@ export const LsxPage = React.memo((props: Props): JSX.Element => {
 
   const iconElement: JSX.Element = useMemo(() => {
     const isExists = pageId != null;
-    return (isExists)
-      ? <span className="material-symbols-outlined fs-5 me-1" aria-hidden="true">description</span>
-      : <span className="material-symbols-outlined fs-5 me-1" aria-hidden="true">draft</span>;
+    return isExists ? (
+      <span className="material-symbols-outlined fs-5 me-1" aria-hidden="true">
+        description
+      </span>
+    ) : (
+      <span className="material-symbols-outlined fs-5 me-1" aria-hidden="true">
+        draft
+      </span>
+    );
   }, [pageId]);
 
   const pagePathElement: JSX.Element = useMemo(() => {
@@ -78,7 +79,13 @@ export const LsxPage = React.memo((props: Props): JSX.Element => {
     }
 
     // create PagePath element
-    let pagePathNode = <PagePathLabel path={pagePath} isLatterOnly additionalClassNames={classNames} />;
+    let pagePathNode = (
+      <PagePathLabel
+        path={pagePath}
+        isLatterOnly
+        additionalClassNames={classNames}
+      />
+    );
     if (isLinkable) {
       const href = isExists
         ? `/${pageId}`
@@ -95,7 +102,7 @@ export const LsxPage = React.memo((props: Props): JSX.Element => {
 
   const pageListMetaElement: JSX.Element = useMemo(() => {
     if (pageNode.page == null) {
-      return <></>;
+      return;
     }
 
     const { page } = pageNode;
@@ -118,6 +125,5 @@ export const LsxPage = React.memo((props: Props): JSX.Element => {
       {childrenElements}
     </li>
   );
-
 });
 LsxPage.displayName = 'LsxPage';

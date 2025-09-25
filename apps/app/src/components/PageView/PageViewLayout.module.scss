@@ -29,6 +29,10 @@ $page-view-layout-margin-top: 32px;
       margin-left: 30px;
     }
 
+    @include bs.media-breakpoint-up(md) {
+      max-width: 170px;
+    }
+
     @include bs.media-breakpoint-down(sm) {
       position: fixed;
       right: 1rem;

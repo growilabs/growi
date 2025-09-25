@@ -31,7 +31,6 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 const logger = loggerFactory('slackbot-proxy:server');
 
-
 const connectionOptions: ConnectionOptions = {
   // The 'name' property must be set. Otherwise, the 'name' will be '0' and won't work well. -- 2021.04.05 Yuki Takei
   // see: https://github.com/TypedProject/tsed/blob/7630cda20a1f6fa3a692ecc3e6cd51d37bc3c45f/packages/typeorm/src/utils/createConnection.ts#L10
@@ -45,25 +44,29 @@ const connectionOptions: ConnectionOptions = {
   synchronize: true,
 } as ConnectionOptions;
 
-const swaggerSettings = isProduction ? swaggerSettingsForProd : swaggerSettingsForDev;
-const helmetOptions = isProduction ? {
-  contentSecurityPolicy: false,
-  expectCt: false,
-  referrerPolicy: false,
-  permittedCrossDomainPolicies: false,
-} : {
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ['\'self\''],
-      styleSrc: ['\'self\'', '\'unsafe-inline\''],
-      imgSrc: ['\'self\'', 'data:', 'https:'],
-      scriptSrc: ['\'self\'', 'https: \'unsafe-inline\''],
-    },
-  },
-  expectCt: false,
-  referrerPolicy: false,
-  permittedCrossDomainPolicies: false,
-};
+const swaggerSettings = isProduction
+  ? swaggerSettingsForProd
+  : swaggerSettingsForDev;
+const helmetOptions = isProduction
+  ? {
+      contentSecurityPolicy: false,
+      expectCt: false,
+      referrerPolicy: false,
+      permittedCrossDomainPolicies: false,
+    }
+  : {
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          scriptSrc: ["'self'", "https: 'unsafe-inline'"],
+        },
+      },
+      expectCt: false,
+      referrerPolicy: false,
+      permittedCrossDomainPolicies: false,
+    };
 
 @Configuration({
   rootDir,
@@ -73,35 +76,20 @@ const helmetOptions = isProduction ? {
   // disable RequestLogger of @tsed/logger
   logger: { logRequest: false },
   mount: {
-    '/': [
-      `${rootDir}/controllers/*.ts`,
-      `${rootDir}/middlewares/*.ts`,
-    ],
+    '/': [`${rootDir}/controllers/*.ts`, `${rootDir}/middlewares/*.ts`],
   },
-  middlewares: [
-    helmet(helmetOptions),
-  ],
-  componentsScan: [
-    `${rootDir}/services/*.ts`,
-  ],
+  middlewares: [helmet(helmetOptions)],
+  componentsScan: [`${rootDir}/services/*.ts`],
   typeorm: [
     {
       ...connectionOptions,
-      entities: [
-        `${rootDir}/entities/*{.ts,.js}`,
-      ],
-      migrations: [
-        `${rootDir}/migrations/*{.ts,.js}`,
-      ],
-      subscribers: [
-        `${rootDir}/subscribers/*{.ts,.js}`,
-      ],
+      entities: [`${rootDir}/entities/*{.ts,.js}`],
+      migrations: [`${rootDir}/migrations/*{.ts,.js}`],
+      subscribers: [`${rootDir}/subscribers/*{.ts,.js}`],
     } as ConnectionOptions,
   ],
   swagger: swaggerSettings,
-  exclude: [
-    '**/*.spec.ts',
-  ],
+  exclude: ['**/*.spec.ts'],
   viewsDir: `${rootDir}/views`,
   views: {
     root: `${rootDir}/views`,
@@ -118,9 +106,7 @@ const helmetOptions = isProduction ? {
     ],
   },
 })
-
 export class Server {
-
   @Inject()
   app: PlatformApplication<Express>;
 
@@ -130,24 +116,25 @@ export class Server {
   @Inject()
   injector: InjectorService;
 
-  $beforeInit(): Promise<any> | void {
+  $beforeInit(): void {
     const serverUri = process.env.SERVER_URI;
 
     if (serverUri === undefined) {
-      throw new Error('The environment variable \'SERVER_URI\' must be defined.');
+      throw new Error("The environment variable 'SERVER_URI' must be defined.");
     }
   }
 
   $beforeRoutesInit(): void {
-
     this.app
       .use(cookieParser())
       .use(compress({}))
       .use(methodOverride())
       .use(bodyParser.json())
-      .use(bodyParser.urlencoded({
-        extended: true,
-      }));
+      .use(
+        bodyParser.urlencoded({
+          extended: true,
+        }),
+      );
 
     this.setupLogger();
   }
@@ -161,13 +148,13 @@ export class Server {
 
     // init terminus
     createTerminus(server, {
-      onSignal: async() => {
+      onSignal: async () => {
         logger.info('server is starting cleanup');
         const connectionManager = getConnectionManager();
         const defaultConnection = connectionManager.get('default');
         await defaultConnection.close();
       },
-      onShutdown: async() => {
+      onShutdown: async () => {
         logger.info('cleanup finished, server is shutting down');
       },
     });
@@ -181,10 +168,12 @@ export class Server {
     if (isProduction) {
       const logger = loggerFactory('express');
 
-      this.app.use(expressBunyanLogger({
-        logger,
-        excludes: ['*'],
-      }));
+      this.app.use(
+        expressBunyanLogger({
+          logger,
+          excludes: ['*'],
+        }),
+      );
     }
     // use morgan
     else {
@@ -193,5 +182,4 @@ export class Server {
       this.app.use(morgan('dev'));
     }
   }
-
 }

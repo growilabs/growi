@@ -1,9 +1,12 @@
+import type { JSX } from 'react';
+
 import { useCommentPreviewOptions } from '~/stores/renderer';
 
 import RevisionRenderer from '../../../components/PageView/RevisionRenderer';
 
 
 import styles from './CommentPreview.module.scss';
+
 
 const moduleClass = styles['grw-comment-preview'] ?? '';
 

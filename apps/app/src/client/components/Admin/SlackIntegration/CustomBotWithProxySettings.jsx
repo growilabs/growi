@@ -111,7 +111,7 @@ const CustomBotWithProxySettings = (props) => {
                 className="form-control"
                 type="text"
                 name="settingForm[proxyUrl]"
-                defaultValue={newProxyServerUri}
+                value={newProxyServerUri}
                 onChange={(e) => { setNewProxyServerUri(e.target.value) }}
               />
             </div>

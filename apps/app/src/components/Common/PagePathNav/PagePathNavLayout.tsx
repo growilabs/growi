@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, JSX } from 'react';
 
 import dynamic from 'next/dynamic';
 
@@ -9,8 +9,9 @@ import styles from './PagePathNav.module.scss';
 const moduleClass = styles['grw-page-path-nav-layout'] ?? '';
 
 export type PagePathNavLayoutProps = {
-  className?: string,
   pagePath: string,
+  inline?: boolean,
+  className?: string,
   pageId?: string | null,
   isWipPage?: boolean,
   maxWidth?: number,
@@ -28,6 +29,7 @@ const CopyDropdown = dynamic(() => import('~/client/components/Common/CopyDropdo
 export const PagePathNavLayout = (props: Props): JSX.Element => {
   const {
     className = '',
+    inline = false,
     pageId, pagePath, isWipPage,
     formerLink,
     formerLinkClassName = '',
@@ -38,29 +40,41 @@ export const PagePathNavLayout = (props: Props): JSX.Element => {
 
   const { data: isNotFound } = useIsNotFound();
 
-  const copyDropdownId = `copydropdown-${pageId}`;
+  const copyDropdownId = `copydropdown-in-pagepathnavlayout-${pageId}`;
+
+  const containerLayoutClass = inline ? '' : 'd-flex align-items-center';
 
   return (
     <div
       className={`${className} ${moduleClass}`}
       style={{ maxWidth }}
     >
-      <span className={`${formerLinkClassName ?? ''} ${styles['grw-former-link']}`}>{formerLink}</span>
-      <div className="d-flex align-items-center">
-        <h1 className={`m-0 ${latterLinkClassName}`}>
+      {formerLink && (
+        <span className={`${formerLinkClassName ?? ''} ${styles['grw-former-link']} mb-2 d-block`}>
+          {formerLink}
+        </span>
+      )}
+      <div className={containerLayoutClass}>
+        <h1 className={`m-0 d-inline align-bottom ${latterLinkClassName}`}>
           {latterLink}
         </h1>
         { pageId != null && !isNotFound && (
-          <div className="d-flex align-items-center ms-2">
+          <span className="d-inline-flex align-items-center align-bottom ms-2 gap-2">
             { isWipPage && (
-              <span className="badge text-bg-secondary ms-1 me-1">WIP</span>
+              <span className="badge text-bg-secondary">WIP</span>
             )}
-            <span className=" grw-page-path-nav-copydropdown">
-              <CopyDropdown pageId={pageId} pagePath={pagePath} dropdownToggleId={copyDropdownId} dropdownToggleClassName="p-2">
+            <span className="grw-page-path-nav-copydropdown">
+              <CopyDropdown
+                pageId={pageId}
+                pagePath={pagePath}
+                dropdownToggleId={copyDropdownId}
+                dropdownToggleClassName="p-2"
+                dropdownMenuContainer="body"
+              >
                 <span className="material-symbols-outlined">content_paste</span>
               </CopyDropdown>
             </span>
-          </div>
+          </span>
         ) }
       </div>
     </div>

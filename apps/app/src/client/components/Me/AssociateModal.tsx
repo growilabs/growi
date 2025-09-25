@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, type JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
 import {
@@ -80,12 +80,6 @@ const AssociateModal = (props: Props): JSX.Element => {
             >
               <span className="growi-custom-icons">google</span> (TBD) Google OAuth
             </NavLink>
-            {/* <NavLink
-              className={`${activeTab === 4 ? 'active' : ''} d-flex gap-1 align-items-center`}
-              onClick={() => setActiveTab(4)}
-            >
-              <span className="growi-custom-icons">facebook</span> (TBD) Facebook
-            </NavLink> */}
           </Nav>
           <TabContent activeTab={activeTab}>
             <TabPane tabId={1}>

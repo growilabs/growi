@@ -1,33 +1,35 @@
 <%- include('commons/head'); %>
 
-<body class="pt-3">
-  <div class="container border p-5">
-    <div class="text-center">
-      <h1>GROWI Bot</h1>
-      <h4>GROWI is a wiki that can be written in Markdown and easy to share information with everyone.</h4>
+  <body class="pt-3">
+    <div class="container border p-5">
+      <div class="text-center">
+        <h1>GROWI Bot</h1>
+        <h4>GROWI is a wiki that can be written in Markdown and easy to share information with everyone.</h4>
 
-      <div>
-        <img height="300" width="300" alt="GROWi Bot" src="/images/growi-bot.png" />
+        <div>
+          <img height="300" width="300" alt="GROWi Bot" src="/images/growi-bot.png" />
+        </div>
+        <div class="m-3">
+          <a href=<%- url %>>
+            <img alt="Add to Slack" height="40" width="139" src="/images/add-to-slack.png" />
+          </a>
+        </div>
+        <a class="btn btn-outline-success"
+          href="https://docs.growi.org/en/admin-guide/management-cookbook/slack-integration/official-bot-settings.html">Getting
+          started</a>
+        <div class="d-flex justify-content-evenly my-3">
+          <% if (isOfficialMode) { %>
+            <a href="/privacy">
+              Privacy Policy
+            </a>
+            <a href="/term">
+              Term of Service
+            </a>
+            <% } %>
+        </div>
       </div>
       <div class="m-3">
-        <a href=<%- url %>>
-          <img alt="Add to Slack" height="40" width="139" src="/images/add-to-slack.png"/>
-        </a>
-      </div>
-      <a class="btn btn-outline-success" href="https://docs.growi.org/en/admin-guide/management-cookbook/slack-integration/official-bot-settings.html">Getting started</a>
-      <div class="d-flex justify-content-evenly my-3">
-        <% if (isOfficialMode) { %>
-          <a href="/privacy">
-            Privacy Policy
-          </a>
-          <a href="/term">
-            Term of Service
-          </a>
-        <% } %>
-      </div>
-    </div>
-    <div class="m-3">
-      <div class="d-flex flex-column align-items-center justify-content-center">
+        <div class="d-flex flex-column align-items-center justify-content-center">
           <ul>
             With GROWI for Slack, you can:
             <ul>
@@ -36,12 +38,14 @@
             </ul>
             </li>
           </ul>
-        <div class="mt-3">
-          GROWI is open-source software developed by WESEEK, Inc and we are looking for contributors who can work with us.<br>
-          Please <a href="https://communityinviter.com/apps/wsgrowi/invite/">join</a> Slack and feel free to talk to WESEEK members!
+          <div class="mt-3">
+            GROWI is open-source software developed by GROWI, Inc. and we are looking for contributors who can work with
+            us.<br>
+            Please <a href="https://communityinviter.com/apps/wsgrowi/invite/">join</a> Slack and feel free to talk to
+            GROWI, Inc. members!
+          </div>
         </div>
       </div>
+      <%- include('commons/footer'); %>
     </div>
-    <%- include('commons/footer'); %>
-  </div>
-</body>
+  </body>

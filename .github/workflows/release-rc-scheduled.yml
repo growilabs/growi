@@ -23,11 +23,11 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Retrieve information from package.json
-      uses: myrotvorets/info-from-package-json-action@2.0.1
+      uses: myrotvorets/info-from-package-json-action@v2.0.2
       id: package-json
 
     - name: Docker meta for docker.io
-      uses: docker/metadata-action@v4
+      uses: docker/metadata-action@v5
       id: meta
       with:
         images: docker.io/weseek/growi
@@ -36,7 +36,7 @@ jobs:
           type=raw,value=${{ steps.package-json.outputs.packageVersion }}.{{sha}}
 
     - name: Docker meta for ghcr.io
-      uses: docker/metadata-action@v4
+      uses: docker/metadata-action@v5
       id: meta-ghcr
       with:
         images: ghcr.io/weseek/growi
@@ -46,9 +46,9 @@ jobs:
 
 
   build-image-rc:
-    uses: weseek/growi/.github/workflows/reusable-app-build-image.yml@master
+    uses: growilabs/growi/.github/workflows/reusable-app-build-image.yml@master
     with:
-      image-name: weseek/growi
+      image-name: growilabs/growi
       tag-temporary: latest-rc
     secrets:
       AWS_ROLE_TO_ASSUME_FOR_OIDC: ${{ secrets.AWS_ROLE_TO_ASSUME_FOR_OIDC }}
@@ -57,11 +57,12 @@ jobs:
   publish-image-rc:
     needs: [determine-tags, build-image-rc]
 
-    uses: weseek/growi/.github/workflows/reusable-app-create-manifests.yml@master
+    uses: growilabs/growi/.github/workflows/reusable-app-create-manifests.yml@master
     with:
       tags: ${{ needs.determine-tags.outputs.TAGS }}
       registry: docker.io
       image-name: weseek/growi
+      docker-registry-username: wsmoogle
       tag-temporary: latest-rc
     secrets:
       DOCKER_REGISTRY_PASSWORD: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}

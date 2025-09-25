@@ -3,6 +3,7 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:middleware:certify-shared-page');
 
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
 
   return async(req, res, next) => {

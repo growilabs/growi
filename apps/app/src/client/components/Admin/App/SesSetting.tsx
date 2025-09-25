@@ -24,7 +24,7 @@ const SmtpSetting = (props: Props) => {
             <input
               className="form-control"
               type="text"
-              defaultValue={adminAppContainer.state.sesAccessKeyId || ''}
+              value={adminAppContainer.state.sesAccessKeyId || ''}
               onChange={(e) => {
                 adminAppContainer.changeSesAccessKeyId(e.target.value);
               }}
@@ -40,7 +40,7 @@ const SmtpSetting = (props: Props) => {
             <input
               className="form-control"
               type="text"
-              defaultValue={adminAppContainer.state.sesSecretAccessKey || ''}
+              value={adminAppContainer.state.sesSecretAccessKey || ''}
               onChange={(e) => {
                 adminAppContainer.changeSesSecretAccessKey(e.target.value);
               }}

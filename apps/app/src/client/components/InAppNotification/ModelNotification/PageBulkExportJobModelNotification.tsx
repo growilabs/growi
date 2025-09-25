@@ -33,7 +33,7 @@ export const usePageBulkExportJobModelNotification = (notification: IInAppNotifi
 
   notification.parsedSnapshot = pageBulkExportJobSerializers.parseSnapshot(notification.snapshot);
 
-  const getSubMsg = (): React.ReactElement => {
+  const getSubMsg = (): JSX.Element => {
     if (notification.action === SupportedAction.ACTION_PAGE_BULK_EXPORT_COMPLETED && notification.target == null) {
       return <div className="text-danger"><small>{t('page_export.bulk_export_download_expired')}</small></div>;
     }

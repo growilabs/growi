@@ -28,6 +28,7 @@ export const GlobalNotificationSettingType = {
   SLACK: 'slack',
 };
 
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 const factory = function(crowi) {
   GlobalNotificationSettingClass.crowi = crowi;
   GlobalNotificationSettingSchema.loadClass(GlobalNotificationSettingClass);

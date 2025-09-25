@@ -1,4 +1,5 @@
-import React, { ReactNode, useState } from 'react';
+import type { ReactNode } from 'react';
+import React, { useState, type JSX } from 'react';
 
 import CustomNav, { CustomNavTab, CustomNavDropdown } from './CustomNav';
 import CustomTabContent from './CustomTabContent';

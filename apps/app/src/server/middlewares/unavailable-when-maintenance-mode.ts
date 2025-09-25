@@ -1,38 +1,41 @@
-import { NextFunction, Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 
 import loggerFactory from '~/utils/logger';
 
-const logger = loggerFactory('growi:middlewares:unavailable-when-maintenance-mode');
+import type Crowi from '../crowi';
 
-type Crowi = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  nextApp: any,
-}
+const logger = loggerFactory('growi:middlewares:unavailable-when-maintenance-mode');
 
 type CrowiReq = Request & {
   crowi: Crowi,
 }
 
-export const generateUnavailableWhenMaintenanceModeMiddleware = crowi => async(req: CrowiReq, res: Response, next: NextFunction): Promise<void> => {
-  const isMaintenanceMode = crowi.appService.isMaintenanceMode();
+type IMiddleware = (req: CrowiReq, res: Response, next: NextFunction) => Promise<void>;
 
-  if (!isMaintenanceMode) {
-    next();
-    return;
-  }
+export const generateUnavailableWhenMaintenanceModeMiddleware = (crowi: Crowi): IMiddleware => {
+  return async(req, res, next) => {
+    const isMaintenanceMode = crowi.appService.isMaintenanceMode();
 
-  const { nextApp } = crowi;
-  req.crowi = crowi;
-  nextApp.render(req, res, '/maintenance');
+    if (!isMaintenanceMode) {
+      next();
+      return;
+    }
+
+    const { nextApp } = crowi;
+    req.crowi = crowi;
+    nextApp.render(req, res, '/maintenance');
+  };
 };
 
-export const generateUnavailableWhenMaintenanceModeMiddlewareForApi = crowi => async(req: Request, res: Response, next: NextFunction): Promise<void> => {
-  const isMaintenanceMode = crowi.appService.isMaintenanceMode();
+export const generateUnavailableWhenMaintenanceModeMiddlewareForApi = (crowi: Crowi): IMiddleware => {
+  return async(req, res, next) => {
+    const isMaintenanceMode = crowi.appService.isMaintenanceMode();
 
-  if (!isMaintenanceMode) {
-    next();
-    return;
-  }
+    if (!isMaintenanceMode) {
+      next();
+      return;
+    }
 
-  res.status(503).json({ error: 'GROWI is under maintenance.' });
+    res.status(503).json({ error: 'GROWI is under maintenance.' });
+  };
 };

@@ -1,6 +1,6 @@
 {
   "name": "@growi/slackbot-proxy",
-  "version": "7.1.6-slackbot-proxy.0",
+  "version": "7.3.2-slackbot-proxy.0",
   "license": "MIT",
   "private": "true",
   "scripts": {
@@ -16,7 +16,7 @@
     "start:prod": "cross-env NODE_ENV=production node -r dotenv-flow/config dist/index.js",
     "postbuild": "pnpm run cp:public && pnpm run cp:views && pnpm run cp:bootstrap",
     "predev": "pnpm run cp:bootstrap:dev",
-    "lint:js": "eslint src/**/*.{js,ts}",
+    "lint:js": "biome check",
     "lint:styles": "stylelint --allow-empty-input \"src/**/*.scss\" \"src/**/*.css\"",
     "lint:typecheck": "vue-tsc --noEmit",
     "lint": "run-p lint:*",
@@ -29,16 +29,18 @@
   },
   "// comments for dependencies": {
     "@tsed/*": "v6.133.1 causes 'TypeError: Cannot read properties of undefined (reading 'prototype')' with `@Middleware()`",
+    "@tsed/common,di,logger,schema": "force package to local node_modules in tsconfig.json since pnpm reads wrong hoisted tsed version (https://github.com/pnpm/pnpm/issues/7158)",
     "read-pkg-up": "v8 doesn't support CommonJS anymore. https://github.com/sindresorhus/read-pkg-up/issues/17",
     "typeorm": "Upgrading to v0.3.x requires significant changes. https://github.com/tsedio/tsed/blob/production/docs/tutorials/typeorm.md"
   },
   "dependencies": {
     "@godaddy/terminus": "^4.9.0",
     "@growi/slack": "workspace:^",
-    "@slack/oauth": "^2.0.1",
+    "@slack/oauth": "^3.0.3",
     "@slack/web-api": "^6.2.4",
     "@tsed/common": "=6.43.0",
     "@tsed/di": "=6.43.0",
+    "@tsed/logger": "=6.7.8",
     "@tsed/platform-express": "=6.43.0",
     "@tsed/schema": "=6.43.0",
     "@tsed/swagger": "=6.43.0",
@@ -66,6 +68,7 @@
   },
   "// comments for devDependencies": {
     "@tsed/*": "v6.133.1 causes 'TypeError: Cannot read properties of undefined (reading 'prototype')' with `@Middleware()`",
+    "@tsed/core,exceptions": "force package to local node_modules in tsconfig.json since pnpm reads wrong hoisted tsed version (https://github.com/pnpm/pnpm/issues/7158)",
     "bootstrap": "v5.3.3 has a bug. refs: https://github.com/twbs/bootstrap/issues/39798"
   },
   "devDependencies": {

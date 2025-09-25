@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import { useTranslation } from 'react-i18next';
 import { DropdownMenu, DropdownItem } from 'reactstrap';

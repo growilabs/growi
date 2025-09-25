@@ -6,9 +6,9 @@ import { GlobalCodeMirrorEditorKey } from '@growi/editor';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
 import { useTranslation } from 'react-i18next';
 
+import type { Save, SaveOptions } from '~/client/components/PageEditor/PageEditor';
 import { useUpdateStateAfterSave } from '~/client/services/page-operation';
 import { toastSuccess } from '~/client/util/toastr';
-import type { Save, SaveOptions } from '~/client/components/PageEditor/PageEditor';
 import { SocketEventName } from '~/interfaces/websocket';
 import { EditorMode, useEditorMode } from '~/stores-universal/ui';
 import { usePageStatusAlert } from '~/stores/alert';
@@ -97,7 +97,7 @@ export const useConflictEffect = (): void => {
         closePageStatusAlert();
       };
 
-      const markdown = codeMirrorEditor?.getDoc();
+      const markdown = codeMirrorEditor?.getDocString();
       openConflictDiffModal(markdown ?? '', resolveConflictHandler);
     };
 

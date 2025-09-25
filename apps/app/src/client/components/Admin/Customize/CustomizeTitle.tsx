@@ -16,7 +16,7 @@ export const CustomizeTitle: FC = () => {
 
   const { data: customizeTitle } = useCustomizeTitle();
 
-  const [currentCustomizeTitle, setCrrentCustomizeTitle] = useState(customizeTitle);
+  const [currentCustomizeTitle, setCrrentCustomizeTitle] = useState(customizeTitle ?? '');
 
   const onClickSubmit = async() => {
     try {
@@ -67,7 +67,7 @@ export const CustomizeTitle: FC = () => {
         <div className="col-12">
           <input
             className="form-control"
-            defaultValue={currentCustomizeTitle}
+            value={currentCustomizeTitle}
             onChange={(e) => { setCrrentCustomizeTitle(e.target.value) }}
           />
         </div>

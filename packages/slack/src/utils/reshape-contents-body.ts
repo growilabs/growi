@@ -40,7 +40,8 @@ const devideLinesBeforeAfterFirstHeader = (lines: string[]) => {
 // Reshape linesAfterFirstHeader
 export const reshapeContentsBody = (str: string): string => {
   const splitted = str.split('\n');
-  const { linesBeforeFirstHeader, linesAfterFirstHeader } = devideLinesBeforeAfterFirstHeader(splitted);
+  const { linesBeforeFirstHeader, linesAfterFirstHeader } =
+    devideLinesBeforeAfterFirstHeader(splitted);
   if (linesAfterFirstHeader.length === 0) {
     return linesBeforeFirstHeader.join('\n');
   }
@@ -64,7 +65,10 @@ export const reshapeContentsBody = (str: string): string => {
       }
       // ##*username*  HH:mm AM
       copyline = '\n## **'.concat(copyline);
-      copyline = copyline.replace(regexpTime, '**<span class="grw-keep-time">'.concat(time, '</span>\n'));
+      copyline = copyline.replace(
+        regexpTime,
+        '**<span class="grw-keep-time">'.concat(time, '</span>\n'),
+      );
     }
     // Check 3: Is this line a short time(HH:mm)?
     else if (regexpShortTime.test(copyline)) {
@@ -80,12 +84,12 @@ export const reshapeContentsBody = (str: string): string => {
     return copyline;
   });
   // remove all blanks
-  const blanksRemoved = reshapedArray.filter(line => line !== '');
+  const blanksRemoved = reshapedArray.filter((line) => line !== '');
   // add <div> to the first line & add </div> to the last line
   blanksRemoved[0] = '\n<div class="grw-keep">\n'.concat(blanksRemoved[0]);
   blanksRemoved.push('</div>');
   // Add 2 spaces and 1 enter to all lines
-  const completedArray = blanksRemoved.map(line => line.concat('  \n'));
+  const completedArray = blanksRemoved.map((line) => line.concat('  \n'));
   // join all
   const contentsBeforeFirstHeader = linesBeforeFirstHeader.join('');
   const contentsAfterFirstHeader = completedArray.join('');

@@ -1,9 +1,6 @@
 {
   "$schema": "http://json.schemastore.org/tsconfig",
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-  },
-  "include": [
-    "src"
-  ]
+  "compilerOptions": {},
+  "include": ["src"]
 }

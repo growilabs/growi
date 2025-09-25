@@ -32,13 +32,12 @@
     "clean": "shx rm -rf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
-    "lint:js": "eslint **/*.{js,ts}",
+    "lint:js": "biome check",
     "lint:styles": "stylelint \"./scss/**/*\"",
     "lint:typecheck": "vue-tsc --noEmit",
     "lint": "npm-run-all -p lint:*"
   },
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "@growi/core": "workspace:^",
     "@growi/core-styles": "workspace:^",

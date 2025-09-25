@@ -15,7 +15,7 @@ interface SlackLegacyUtil {
 export const slackLegacyUtilFactory = (configManager: any): SlackLegacyUtil => {
 
   const postWithIwh = async(messageObj: IncomingWebhookSendArguments) => {
-    const webhook = new IncomingWebhook(configManager.getConfig('notification', 'slack:incomingWebhookUrl'));
+    const webhook = new IncomingWebhook(configManager.getConfig('slack:incomingWebhookUrl'));
     try {
       await webhook.send(messageObj);
     }
@@ -27,7 +27,7 @@ export const slackLegacyUtilFactory = (configManager: any): SlackLegacyUtil => {
   };
 
   const postWithWebApi = async(messageObj?: ChatPostMessageArguments) => {
-    const client = new WebClient(configManager.getConfig('notification', 'slack:token'));
+    const client = new WebClient(configManager.getConfig('slack:token'));
     try {
       await client.chat.postMessage(messageObj);
     }
@@ -41,23 +41,23 @@ export const slackLegacyUtilFactory = (configManager: any): SlackLegacyUtil => {
   return {
     postMessage: async(messageObj) => {
       // when incoming Webhooks is prioritized
-      if (configManager.getConfig('notification', 'slack:isIncomingWebhookPrioritized')) {
-        if (configManager.getConfig('notification', 'slack:incomingWebhookUrl')) {
+      if (configManager.getConfig('slack:isIncomingWebhookPrioritized')) {
+        if (configManager.getConfig('slack:incomingWebhookUrl')) {
           logger.debug('posting message with IncomingWebhook');
           return postWithIwh(messageObj as IncomingWebhookSendArguments);
         }
-        if (configManager.getConfig('notification', 'slack:token')) {
+        if (configManager.getConfig('slack:token')) {
           logger.debug('posting message with Web API');
           return postWithWebApi(messageObj as ChatPostMessageArguments);
         }
       }
       // else
       else {
-        if (configManager.getConfig('notification', 'slack:token')) {
+        if (configManager.getConfig('slack:token')) {
           logger.debug('posting message with Web API');
           return postWithWebApi(messageObj as ChatPostMessageArguments);
         }
-        if (configManager.getConfig('notification', 'slack:incomingWebhookUrl')) {
+        if (configManager.getConfig('slack:incomingWebhookUrl')) {
           logger.debug('posting message with IncomingWebhook');
           return postWithIwh(messageObj as IncomingWebhookSendArguments);
         }

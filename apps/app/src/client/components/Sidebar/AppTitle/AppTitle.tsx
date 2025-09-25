@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, type JSX } from 'react';
 
 import Link from 'next/link';
 import { UncontrolledTooltip } from 'reactstrap';
@@ -12,28 +12,29 @@ import styles from './AppTitle.module.scss';
 
 type Props = {
   className?: string,
+  hideAppTitle?: boolean;
 }
 
-const AppTitleSubstance = memo((props: Props): JSX.Element => {
-
-  const { className } = props;
+const AppTitleSubstance = memo(({ className = '', hideAppTitle = false }: Props): JSX.Element => {
 
   const { data: isDefaultLogo } = useIsDefaultLogo();
   const { data: appTitle } = useAppTitle();
   const { data: confidential } = useConfidential();
 
   return (
-    <div className={`${styles['grw-app-title']} ${className} d-flex d-edit-none`}>
+    <div className={`${styles['grw-app-title']} ${className} d-flex`}>
       {/* Brand Logo  */}
       <Link href="/" className="grw-logo d-block">
         <SidebarBrandLogo isDefaultLogo={isDefaultLogo} />
       </Link>
       <div className="flex-grow-1 d-flex align-items-center justify-content-between gap-3 overflow-hidden">
-        <div id="grw-site-name" className="grw-site-name text-truncate">
-          <Link href="/" className="fs-4">
-            {appTitle}
-          </Link>
-        </div>
+        {!hideAppTitle && (
+          <div id="grw-site-name" className="grw-site-name text-truncate">
+            <Link href="/" className="fs-4">
+              {appTitle}
+            </Link>
+          </div>
+        )}
       </div>
       {!(confidential == null || confidential === '')
       && (
@@ -56,6 +57,21 @@ export const AppTitleOnSubnavigation = memo((): JSX.Element => {
   return <AppTitleSubstance className={`position-absolute ${styles['on-subnavigation']}`} />;
 });
 
-export const AppTitleOnSidebarHead = memo((): JSX.Element => {
-  return <AppTitleSubstance className={`position-absolute z-1 ${styles['on-sidebar-head']}`} />;
+export const AppTitleOnSidebarHead = memo(({ hideAppTitle }: Props): JSX.Element => {
+  return (
+    <AppTitleSubstance
+      className={`position-absolute z-1 ${styles['on-sidebar-head']}`}
+      hideAppTitle={hideAppTitle}
+    />
+  );
+});
+
+export const AppTitleOnEditorSidebarHead = memo((): JSX.Element => {
+  return (
+    <div className={`${styles['on-editor-sidebar-head']}`}>
+      <AppTitleSubstance
+        className={`${styles['on-sidebar-head']}`}
+      />
+    </div>
+  );
 });

@@ -1,3 +1,5 @@
+import type { JSX } from 'react';
+
 import dynamic from 'next/dynamic';
 
 import { useIsNotFound } from '~/stores/page';
@@ -6,6 +8,7 @@ import { OldRevisionAlert } from './OldRevisionAlert';
 import { PageGrantAlert } from './PageGrantAlert';
 import { PageStaleAlert } from './PageStaleAlert';
 import { WipPageAlert } from './WipPageAlert';
+
 
 const FullTextSearchNotCoverAlert = dynamic(() => import('./FullTextSearchNotCoverAlert').then(mod => mod.FullTextSearchNotCoverAlert), { ssr: false });
 const PageRedirectedAlert = dynamic(() => import('./PageRedirectedAlert').then(mod => mod.PageRedirectedAlert), { ssr: false });

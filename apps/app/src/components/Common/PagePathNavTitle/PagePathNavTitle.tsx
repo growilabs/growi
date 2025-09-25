@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type JSX } from 'react';
 
 import withLoadingProps from 'next-dynamic-loading-props';
 import dynamic from 'next/dynamic';

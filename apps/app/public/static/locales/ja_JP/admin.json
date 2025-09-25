@@ -13,22 +13,21 @@
   "Execute": "実行",
   "last_login": "最終ログイン",
   "wiki_management_homepage": "Wiki管理トップ",
-  "public": "公開",
-  "anyone_with_the_link": "リンクを知っている人のみ",
+  "public": "「公開」のページ",
+  "anyone_with_the_link": "「リンクを知っている人のみ」のページ",
   "specified_users": "特定ユーザーのみ",
-  "only_me": "自分のみ",
-  "only_inside_the_group": "特定グループのみ",
+  "only_me": "「自分のみ」のページ",
+  "only_inside_the_group": "「特定グループのみ」のページ",
   "optional": "オプション",
   "days": "日",
   "security_settings": {
     "security_settings": "セキュリティ設定",
     "scope_of_page_disclosure": "ページの公開範囲",
     "set_point": "設定値",
-    "Guest Users Access":"ゲストユーザーのアクセス",
+    "Guest Users Access": "ゲストユーザーのアクセス",
     "readonly_users_access": "閲覧のみユーザーのアクセス",
-    "always_hidden": "非表示 (固定)",
-    "always_displayed": "表示 (固定)",
-    "displayed_or_hidden": "非表示 / 表示",
+    "always_hidden": "表示しない",
+    "always_displayed": "表示する",
     "Fixed by env var": "環境変数 <code>{{forcewikimode}}={{wikimode}}</code> により固定されています。",
     "register_limitation": "登録の制限",
     "register_limitation_desc": "新しいユーザーを登録する方法を制限します。",
@@ -73,7 +72,7 @@
     "forced_update_desc": "設定が強制変更されました。前回の設定: ",
     "page_delete_rights_caution": "「（子孫ページを含む）ゴミ箱に入れる操作 / 完全に削除する」の権限は、「ゴミ箱に入れる操作 / 完全に削除する」よりも強い権限になるように強制されます。 <br><br> 管理者のみ可能 > 管理者とページ作者が可能 > 誰でも可能",
     "Authentication mechanism settings": "認証機構設定",
-    "setup_is_not_yet_complete":"セットアップはまだ完了してません",
+    "setup_is_not_yet_complete": "セットアップはまだ完了してません",
     "xss_prevent_setting": "XSS(Cross Site Scripting)対策設定",
     "xss_prevent_setting_link": "マークダウン設定ページに移動",
     "callback_URL": "コールバックURL",
@@ -107,9 +106,9 @@
       "closed": "非公開 (登録には管理者による招待が必要)"
     },
     "share_link_management": "共有リンク管理",
-    "No_share_links":"共有リンクが存在しません",
-    "share_link_notice":"共有リンクを全て削除します",
-    "delete_all_share_links":"全ての共有リンクを削除します",
+    "No_share_links": "共有リンクが存在しません",
+    "share_link_notice": "共有リンクを全て削除します",
+    "delete_all_share_links": "全ての共有リンクを削除します",
     "share_link_rights": "シェアリンクの権限",
     "enable_link_sharing": "リンクのシェアを許可",
     "all_share_links": "全てのシェアリンク",
@@ -194,9 +193,6 @@
         "register_5": "上記フォームにクライアントIDとクライアントシークレットを入力",
         "updated_google": "Google OAuth を更新しました"
       },
-      "Facebook": {
-        "name": "Facebook OAuth"
-      },
       "GitHub": {
         "enable_github": "GitHub OAuth を有効にする",
         "name": "GitHub OAuth",
@@ -212,7 +208,7 @@
         "name_detail": "新規ユーザー名(<code>name</code>)に関連付ける属性",
         "mapping_detail": "新規ユーザーの{{target}}に関連付ける属性",
         "register_1": "OIDC IdP Administrator へ接続します。",
-        "register_2": "OIDCアプリの認証コールバックURLを<code>%s</code>として登録します。",
+        "register_2": "OIDCアプリの認証コールバックURLを<code>{{url}}</code>として登録します。",
         "register_3": "上記のClientIDとClient Secretをコピー＆ペーストしてください。",
         "updated_oidc": "OpenID Connect を更新しました",
         "Use discovered URL if empty": "データベース側の値が空の場合、\"Issuer Host\"から検出した値を利用します。"
@@ -326,7 +322,7 @@
       "done": "クリップボードにコピーしました！"
     },
     "bug_report": "バグを報告する",
-    "submit_bug_report": "<a href='https://github.com/weseek/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>次に GitHub で Issue を投稿してください。</a>"
+    "submit_bug_report": "<a href='https://github.com/growilabs/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>次に GitHub で Issue を投稿してください。</a>"
   },
   "v5_page_migration": {
     "migration_desc": "公開されているページに 古い v4 互換形式のものが存在します。ページツリーや簡単なリネームなどの新機能を利用するには、全てのページを v5 互換形式に変換してください。",
@@ -424,17 +420,7 @@
     "enable": "有効",
     "disable": "無効",
     "use_env_var_if_empty": "データベース側の値が空の場合、環境変数 <code>{{variable}}</code> の値を利用します",
-    "note_for_the_only_env_option": "現在GCS設定は環境変数の値によって制限されています<br>この設定を変更する場合は環境変数 <code>{{env}}</code> の値をfalseに変更もしくは削除してください",
-    "questionnaire_settings": "アンケート設定",
-    "questionnaire_settings_explanation": "システム全体でアンケート機能を有効/無効にします。有効の場合、各ユーザーはユーザー設定ページの「その他の設定」から個別にアンケート機能を有効/無効にできます。",
-    "about_data_sent": "送信される情報について",
-    "docs_link": "https://docs.growi.org/ja/admin-guide/management-cookbook/app-settings.html#%E3%82%A2%E3%83%B3%E3%82%B1%E3%83%BC%E3%83%88%E8%A8%AD%E5%AE%9A",
-    "learn_more": "詳細",
-    "other_info_will_be_sent": "アンケートの回答と合わせて、GROWI の改善に必要な情報を送信します。送信されるデータにユーザーの個人情報は含まれません。",
-    "we_will_use_the_data_to_improve_growi": "私たちはそれらを活用し、最大限ユーザーの体験を向上させるよう努めます。",
-    "anonymize_app_site_url": "サイト URL を匿名化して送信する",
-    "url_anonymization_explanation": "アンケート回答データに含まれるサイト URL が匿名化されます。この設定を有効にすることで、アンケート回答データの送信元である GROWI アプリケーションが特定されなくなります。",
-    "enable_questionnaire": "アンケートを有効にする"
+    "note_for_the_only_env_option": "現在GCS設定は環境変数の値によって制限されています<br>この設定を変更する場合は環境変数 <code>{{env}}</code> の値をfalseに変更もしくは削除してください"
   },
   "markdown_settings": {
     "markdown_settings": "マークダウン設定",
@@ -511,16 +497,17 @@
       "show_all_reply_comments": "返信コメントを全て表示する",
       "show_all_reply_comments_desc": "OFFの場合、最新2件のコメント以外が省略されます。",
       "select_search_scope_children_as_default": "検索範囲のデフォルト設定を「この階層下の子ページ」にする",
-      "select_search_scope_children_as_default_desc": "OFFの場合、検索範囲のデフォルト設定は「全てのページ」になります。"
-
+      "select_search_scope_children_as_default_desc": "OFFの場合、検索範囲のデフォルト設定は「全てのページ」になります。",
+      "show_page_side_authors": "作成者・更新者を目次上部に常時表示する",
+      "show_page_side_authors_desc": "ページサイドバーの目次上部に作成者と最終更新者の情報を表示します。"
     },
-    "presentation":"プレゼンテーション",
-    "presentation_options":{
+    "presentation": "プレゼンテーション",
+    "presentation_options": {
       "enable_marp": "Marp を有効化する",
       "enable_marp_desc": "プレゼンテーション表示に Marp を利用できるようになります。ただし、XSS に対して脆弱になる恐れがあります。",
       "marp_official_site": "参考：Marp 公式サイト",
       "marp_official_site_link": "https://marp.app",
-      "marp_in_growi" : "参考：GROWI Docs - Marp でスライドを作成する",
+      "marp_in_growi": "参考：GROWI Docs - Marp でスライドを作成する",
       "marp_in_growi_link": "https://docs.growi.org/ja/guide/features/marp.html"
     },
     "custom_title": "カスタム Title",
@@ -534,7 +521,7 @@
     "write_css": " システム全体に適用されるCSSを記述できます。",
     "ctrl_space": "Ctrl+Space でコード補完",
     "custom_script": "カスタムスクリプト",
-    "custom_presentation":"プレゼンテーション",
+    "custom_presentation": "プレゼンテーション",
     "write_java": "システム全体に適用されるJavaScriptを記述できます。",
     "reflect_change": "変更の反映はページの更新が必要です。",
     "custom_logo": "カスタムロゴ",
@@ -543,7 +530,7 @@
     "current_logo": "現在のロゴ",
     "upload_new_logo": "新しいロゴをアップロードする",
     "delete_logo": "ロゴを削除"
-   },
+  },
   "importer_management": {
     "import_data": "データインポート",
     "article": "記事",
@@ -683,7 +670,7 @@
     "delete": "削除",
     "integration_procedure": "連携手順",
     "custom_bot_without_proxy_settings": "Custom Bot without proxy 設定",
-    "integration_failed":"連携に失敗しました",
+    "integration_failed": "連携に失敗しました",
     "reset": "リセット",
     "reset_all_settings": "全ての設定をリセット",
     "delete_slackbot_settings": "Slack Bot 設定を削除する",
@@ -730,7 +717,7 @@
       "allow_specified_long": "特定のチャンネルを許可 (テキストボックスに入力されたチャンネルのみ許可されます)",
       "test_connection": "連携状況のテストをする",
       "test_connection_by_pressing_button": "以下のテストボタンを押して、Slack連携が完了しているかの確認をしましょう",
-      "test_connection_only_public_channel":"連携テストは public チャンネルで確認してください",
+      "test_connection_only_public_channel": "連携テストは public チャンネルで確認してください",
       "error_check_logs_below": "エラーが発生しました。下記のログを確認してください。",
       "send_message_to_slack_work_space": "Slack ワークスペースに送信しました",
       "add_slack_workspace": "Slackワークスペースを追加"
@@ -754,7 +741,7 @@
     }
   },
   "slack_integration_legacy": {
-    "slack_integration_legacy":  "Slack連携 (レガシー)",
+    "slack_integration_legacy": "Slack連携 (レガシー)",
     "alert_disabled": "<a href='/admin/slack-integration'>新しい設定</a>が有効になっているため、この 'Slack連携 (レガシー)' は現在無効になっています。",
     "alert_deplicated": "この 'Slack連携 (レガシー)' は将来廃止されます。代わりに<a href='/admin/slack-integration'>新しいSlack連携機能</a>を利用してください。"
   },
@@ -991,7 +978,7 @@
     "ADMIN_SITE_URL_UPDATE": "サイトURL設定の更新",
     "ADMIN_MAIL_SMTP_UPDATE": "メール設定（SMTP）の更新",
     "ADMIN_MAIL_SES_UPDATE": "メール設定（SES）の更新",
-    "ADMIN_MAIL_TEST_SUBMIT" : "テストメールの送信",
+    "ADMIN_MAIL_TEST_SUBMIT": "テストメールの送信",
     "ADMIN_FILE_UPLOAD_CONFIG_UPDATE": "ファイルアップロード設定の更新",
     "ADMIN_PLUGIN_UPDATE": "プラグイン設定の更新",
     "ADMIN_MAINTENANCEMODE_ENABLED": "メンテナンスモードの開始",
@@ -1159,12 +1146,6 @@
   "ai_integration": {
     "ai_integration": "AI 連携",
     "disable_mode_explanation": "現在、AI 連携は無効になっています。有効にする場合は環境変数 <code>AI_ENABLED</code> の他、必要な環境変数を設定してください。<br><br>詳細は<a target='blank' rel='noopener noreferrer' href={{documentationUrl}}ja/guide/features/ai-knowledge-assistant.html>ドキュメント</a>を参照してください。",
-    "ai_search_management": "AI 検索管理",
-    "rebuild_vector_store": "Vector Store のリビルド",
-    "rebuild_vector_store_label": "リビルド",
-    "rebuild_vector_store_explanation1": "既存の Vector Store を削除し、公開ページの Vector Store を再作成します。",
-    "rebuild_vector_store_explanation2": "この作業には数分かかる可能性があります。",
-    "rebuild_vector_store_requested": "Vector Store のリビルドを受け付けました",
-    "rebuild_vector_store_failed": "Vector Store のリビルドに失敗しました"
+    "ai_search_management": "AI 検索管理"
   }
 }

@@ -1,7 +1,9 @@
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, JSX } from 'react';
 import {
   useState, useCallback, memo,
 } from 'react';
+
+import nodePath from 'path';
 
 import type { IPagePopulatedToShowRevision } from '@growi/core';
 import { DevidedPagePath } from '@growi/core/dist/models';
@@ -11,13 +13,13 @@ import { debounce } from 'throttle-debounce';
 
 import type { InputValidationResult } from '~/client/util/use-input-validator';
 import { ValidationTarget, useInputValidator } from '~/client/util/use-input-validator';
+import type { IPageForItem } from '~/interfaces/page';
 import LinkedPagePath from '~/models/linked-page-path';
 import { usePageSelectModal } from '~/stores/modal';
 
 import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink';
 import { AutosizeSubmittableInput, getAdjustedMaxWidthForAutosizeInput } from '../Common/SubmittableInput';
 import { usePagePathRenameHandler } from '../PageEditor/page-path-rename-utils';
-import { PageSelectModal } from '../PageSelectModal/PageSelectModal';
 
 import styles from './PagePathHeader.module.scss';
 
@@ -45,8 +47,7 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
   const [isRenameInputShown, setRenameInputShown] = useState(false);
   const [isHover, setHover] = useState(false);
 
-  const { data: PageSelectModalData, open: openPageSelectModal } = usePageSelectModal();
-  const isOpened = PageSelectModalData?.isOpened ?? false;
+  const { open: openPageSelectModal } = usePageSelectModal();
 
   const [validationResult, setValidationResult] = useState<InputValidationResult>();
 
@@ -61,6 +62,20 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
 
   const pagePathRenameHandler = usePagePathRenameHandler(currentPage);
 
+  const onClickOpenPageSelectModalButton = useCallback(() => {
+    const onSelected = (page: IPageForItem): void => {
+      if (page == null || page.path == null) {
+        return;
+      }
+
+      const currentPageTitle = nodePath.basename(currentPage?.path ?? '') || '/';
+      const newPagePath = nodePath.resolve(page.path, currentPageTitle);
+
+      pagePathRenameHandler(newPagePath);
+    };
+
+    openPageSelectModal({ onSelected });
+  }, [currentPage?.path, openPageSelectModal, pagePathRenameHandler]);
 
   const rename = useCallback((inputText) => {
     const pathToRename = normalizePath(`${inputText}/${dPagePath.latter}`);
@@ -93,6 +108,9 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
 
   const isInvalid = validationResult != null;
 
+  const fixedMaxWidth = maxWidth != null
+    ? maxWidth - 60 // 60px is the width of the buttons
+    : undefined;
   const inputMaxWidth = maxWidth != null
     ? getAdjustedMaxWidthForAutosizeInput(maxWidth, 'sm', validationResult != null ? false : undefined) - 16
     : undefined;
@@ -106,6 +124,7 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
     >
       <div
         className="page-path-header-input d-inline-block"
+        style={{ maxWidth: fixedMaxWidth }}
       >
         { isRenameInputShown && (
           <div className="position-relative">
@@ -144,13 +163,11 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
         <button
           type="button"
           className="btn btn-outline-neutral-secondary d-flex align-items-center justify-content-center"
-          onClick={openPageSelectModal}
+          onClick={onClickOpenPageSelectModalButton}
         >
           <span className="material-symbols-outlined fs-6">account_tree</span>
         </button>
       </div>
-
-      {isOpened && <PageSelectModal />}
     </div>
   );
 });

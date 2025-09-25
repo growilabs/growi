@@ -1,9 +1,9 @@
 // eslint-disable-next-line no-restricted-imports
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { debounce } from 'throttle-debounce';
 
 import { apiv3Put } from '~/client/util/apiv3-client';
-import { IUserUISettings } from '~/interfaces/user-ui-settings';
+import type { IUserUISettings } from '~/interfaces/user-ui-settings';
 
 let settingsForBulk: Partial<IUserUISettings> = {};
 const _putUserUISettingsInBulk = (): Promise<AxiosResponse<IUserUISettings>> => {

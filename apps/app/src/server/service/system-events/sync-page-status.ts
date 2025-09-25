@@ -1,3 +1,4 @@
+import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
 import { S2cMessagePageUpdated } from '../../models/vo/s2c-message';
@@ -23,7 +24,7 @@ const logger = loggerFactory('growi:service:system-events:SyncPageStatusService'
  */
 class SyncPageStatusService implements S2sMessageHandlable {
 
-  crowi!: any;
+  crowi: Crowi;
 
   s2sMessagingService!: S2sMessagingService;
 
@@ -31,7 +32,7 @@ class SyncPageStatusService implements S2sMessageHandlable {
 
   emitter!: any;
 
-  constructor(crowi, s2sMessagingService, socketIoService) {
+  constructor(crowi: Crowi, s2sMessagingService, socketIoService) {
     this.crowi = crowi;
     this.s2sMessagingService = s2sMessagingService;
     this.socketIoService = socketIoService;

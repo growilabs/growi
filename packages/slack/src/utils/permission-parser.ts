@@ -1,8 +1,9 @@
 import type { IChannelOptionalId } from '../interfaces/channel';
 
-
-export const permissionParser = (permissionForCommand: boolean | string[], channel: IChannelOptionalId): boolean => {
-
+export const permissionParser = (
+  permissionForCommand: boolean | string[],
+  channel: IChannelOptionalId,
+): boolean => {
   if (permissionForCommand == null) {
     return false;
   }

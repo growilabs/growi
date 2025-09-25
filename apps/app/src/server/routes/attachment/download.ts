@@ -8,9 +8,8 @@ import loggerFactory from '~/utils/logger';
 import type Crowi from '../../crowi';
 import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
 
-import {
-  GetRequest, GetResponse, getActionFactory, retrieveAttachmentFromIdParam,
-} from './get';
+import type { GetRequest, GetResponse } from './get';
+import { getActionFactory, retrieveAttachmentFromIdParam } from './get';
 
 
 const logger = loggerFactory('growi:routes:attachment:download');

@@ -5,6 +5,7 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:events:page');
 
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 function PageEvent(crowi) {
   this.crowi = crowi;
 

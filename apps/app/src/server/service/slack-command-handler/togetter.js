@@ -11,7 +11,7 @@ import loggerFactory from '~/utils/logger';
 // eslint-disable-next-line no-unused-vars
 const logger = loggerFactory('growi:service:SlackBotService:togetter');
 
-
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
   const CreatePageService = require('./create-page-service');
   const createPageService = new CreatePageService(crowi);

@@ -6,7 +6,6 @@ import { TabContent, TabPane } from 'reactstrap';
 
 import CustomNav from '../../CustomNavigation/CustomNav';
 
-// import FacebookSecuritySetting from './FacebookSecuritySetting';
 import GitHubSecuritySetting from './GitHubSecuritySetting';
 import GoogleSecuritySetting from './GoogleSecuritySetting';
 import LdapSecuritySetting from './LdapSecuritySetting';
@@ -53,10 +52,6 @@ const SecurityManagementContents = () => {
         Icon: () => <span className="growi-custom-icons align-bottom">github</span>,
         i18n: 'GitHub',
       },
-      // passport_facebook: {
-      //   Icon: () => <span className="growi-custom-icons align-bottom">facebook</span>,
-      //   i18n: '(TBD) Facebook',
-      // },
     };
   }, []);
 
@@ -114,9 +109,6 @@ const SecurityManagementContents = () => {
           <TabPane tabId="passport_github">
             {activeComponents.has('passport_github') && <GitHubSecuritySetting />}
           </TabPane>
-          {/* <TabPane tabId="passport_facebook">
-            {activeComponents.has('passport_facebook') && <FacebookSecuritySetting />}
-          </TabPane> */}
         </TabContent>
       </div>
     </div>

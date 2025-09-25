@@ -1,0 +1,13 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use '@growi/core-styles/scss/variables/growi-official-colors';
+@use '@growi/ui/scss/atoms/btn-muted';
+@use '~/client/components/PageControls/button-styles';
+
+.btn-open-default-ai-assistant :global {
+  @extend %btn-basis;
+}
+
+// == Colors
+.btn-open-default-ai-assistant {
+  @include btn-muted.colorize(bs.$purple);
+}

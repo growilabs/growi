@@ -1,20 +1,18 @@
 // based on https://gist.github.com/morajabi/523d7a642d8c0a2f71fcfa0d8b3d2846?permalink_comment_id=4688158#gistcomment-4688158
 
 import type { RefObject } from 'react';
-import {
-  useState, useEffect, useCallback,
-} from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 type MutableRefObject<T> = {
-  current: T
-}
+  current: T;
+};
 
-type EventType = 'resize' | 'scroll'
+type EventType = 'resize' | 'scroll';
 
 const useEffectInEvent = (
-    event: EventType,
-    useCapture?: boolean,
-    set?: () => void,
+  event: EventType,
+  useCapture?: boolean,
+  set?: () => void,
 ) => {
   useEffect(() => {
     if (set) {

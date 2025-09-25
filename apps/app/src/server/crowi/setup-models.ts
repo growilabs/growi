@@ -44,10 +44,6 @@ export const setupIndependentModels = async(): Promise<void> => {
     import('~/features/external-user-group/server/models/external-user-group-relation'),
     import('~/features/external-user-group/server/models/external-user-group'),
     import('~/features/growi-plugin/server/models'),
-    import('~/features/questionnaire/server/models/proactive-questionnaire-answer'),
-    import('~/features/questionnaire/server/models/questionnaire-answer-status'),
-    import('~/features/questionnaire/server/models/questionnaire-answer'),
-    import('~/features/questionnaire/server/models/questionnaire-order'),
     import('../models/activity'),
     import('../models/attachment'),
     import('../models/bookmark-folder'),
@@ -71,5 +67,6 @@ export const setupIndependentModels = async(): Promise<void> => {
     import('../models/user-group'),
     import('../models/user-registration-order'),
     import('../models/user-ui-settings'),
+    import('../models/access-token'),
   ]);
 };

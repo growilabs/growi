@@ -28,7 +28,7 @@ describe('LdapUserGroupSyncService.generateExternalUserGroupTrees', () => {
 
   beforeAll(async() => {
     crowi = await getInstance();
-    await configManager.updateConfigsInTheSameNamespace('crowi', configParams, true);
+    await configManager.updateConfigs(configParams, { skipPubsub: true });
 
     mockBind.mockImplementation(() => {
       return Promise.resolve();

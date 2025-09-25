@@ -71,7 +71,7 @@ describe('PageService', () => {
 
   beforeAll(async() => {
     crowi = await getInstance();
-    await crowi.configManager.updateConfigsInTheSameNamespace('crowi', { 'app:isV5Compatible': null });
+    await crowi.configManager.updateConfig('app:isV5Compatible', null);
 
     User = mongoose.model('User');
     Page = mongoose.model('Page');
@@ -766,7 +766,7 @@ describe('PageService', () => {
             'security:pageCompleteDeletionAuthority': PageSingleDeleteCompConfigValue.Anyone,
             'security:pageRecursiveCompleteDeletionAuthority': PageRecursiveDeleteCompConfigValue.Anyone,
           };
-          await crowi.configManager.updateConfigsInTheSameNamespace('crowi', config);
+          await crowi.configManager.updateConfigs(config);
         });
 
         test('is not deletable', async() => {
@@ -787,7 +787,7 @@ describe('PageService', () => {
             'security:pageCompleteDeletionAuthority': PageSingleDeleteCompConfigValue.Anyone,
             'security:pageRecursiveCompleteDeletionAuthority': PageRecursiveDeleteCompConfigValue.Anyone,
           };
-          await crowi.configManager.updateConfigsInTheSameNamespace('crowi', config);
+          await crowi.configManager.updateConfigs(config);
         });
 
         test('is not deletable', async() => {
@@ -808,7 +808,7 @@ describe('PageService', () => {
             'security:pageCompleteDeletionAuthority': PageSingleDeleteCompConfigValue.Anyone,
             'security:pageRecursiveCompleteDeletionAuthority': PageRecursiveDeleteCompConfigValue.Anyone,
           };
-          await crowi.configManager.updateConfigsInTheSameNamespace('crowi', config);
+          await crowi.configManager.updateConfigs(config);
         });
 
         test('is deletable', async() => {
@@ -829,7 +829,7 @@ describe('PageService', () => {
             'security:pageCompleteDeletionAuthority': PageSingleDeleteCompConfigValue.Anyone,
             'security:pageRecursiveCompleteDeletionAuthority': PageRecursiveDeleteCompConfigValue.Anyone,
           };
-          await crowi.configManager.updateConfigsInTheSameNamespace('crowi', config);
+          await crowi.configManager.updateConfigs(config);
         });
 
         test('is deletable', async() => {

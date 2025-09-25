@@ -1,13 +1,17 @@
 import path from 'path';
 
+import type { IUser } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { format, subSeconds } from 'date-fns';
 import { body, validationResult } from 'express-validator';
+import mongoose from 'mongoose';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { RegistrationMode } from '~/interfaces/registration-mode';
+import type Crowi from '~/server/crowi';
 import UserRegistrationOrder from '~/server/models/user-registration-order';
 import { configManager } from '~/server/service/config-manager';
+import { growiInfoService } from '~/server/service/growi-info';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
@@ -66,8 +70,47 @@ async function sendEmailToAllAdmins(userData, admins, appTitle, mailService, tem
   });
 }
 
-export const completeRegistrationAction = (crowi) => {
-  const User = crowi.model('User');
+/**
+ * @swagger
+ *
+ * /complete-registration:
+ *   post:
+ *     summary: /complete-registration
+ *     tags: [Users]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               registerForm:
+ *                 type: object
+ *                 properties:
+ *                   username:
+ *                     type: string
+ *                   name:
+ *                     type: string
+ *                   password:
+ *                     type: string
+ *                   token:
+ *                     type: string
+ *                   email:
+ *                     type: string
+ *     responses:
+ *       200:
+ *         description: User activation successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 redirectTo:
+ *                   type: string
+ */
+export const completeRegistrationAction = (crowi: Crowi) => {
+  const User = mongoose.model<IUser, { isEmailValid, isRegisterable, createUserByEmailAndPassword, findAdmins }>('User');
   const activityEvent = crowi.event('activity');
   const {
     aclService,
@@ -83,12 +126,12 @@ export const completeRegistrationAction = (crowi) => {
     }
 
     // error when registration is not allowed
-    if (configManager.getConfig('crowi', 'security:registrationMode') === aclService.labels.SECURITY_REGISTRATION_MODE_CLOSED) {
+    if (configManager.getConfig('security:registrationMode') === aclService.labels.SECURITY_REGISTRATION_MODE_CLOSED) {
       return res.apiv3Err(new ErrorV3('Registration closed', 'registration-failed'), 403);
     }
 
     // error when email authentication is disabled
-    if (configManager.getConfig('crowi', 'security:passport-local:isEmailAuthenticationEnabled') !== true) {
+    if (configManager.getConfig('security:passport-local:isEmailAuthenticationEnabled') !== true) {
       return res.apiv3Err(new ErrorV3('Email authentication configuration is disabled', 'registration-failed'), 403);
     }
 
@@ -138,15 +181,15 @@ export const completeRegistrationAction = (crowi) => {
 
         userRegistrationOrder.revokeOneTimeToken();
 
-        if (configManager.getConfig('crowi', 'security:registrationMode') === aclService.labels.SECURITY_REGISTRATION_MODE_RESTRICTED) {
+        if (configManager.getConfig('security:registrationMode') === aclService.labels.SECURITY_REGISTRATION_MODE_RESTRICTED) {
           const isMailerSetup = mailService.isMailerSetup ?? false;
 
           if (isMailerSetup) {
             const admins = await User.findAdmins();
             const appTitle = appService.getAppTitle();
-            const locale = configManager.getConfig('crowi', 'app:globalLang');
+            const locale = configManager.getConfig('app:globalLang');
             const template = path.join(crowi.localeDir, `${locale}/admin/userWaitingActivation.ejs`);
-            const url = appService.getSiteUrl();
+            const url = growiInfoService.getSiteUrl();
 
             sendEmailToAllAdmins(userData, admins, appTitle, mailService, template, url);
           }
@@ -173,7 +216,7 @@ export const completeRegistrationAction = (crowi) => {
           }
 
           // userData.password can't be empty but, prepare redirect because password property in User Model is optional
-          // https://github.com/weseek/growi/pull/6670
+          // https://github.com/growilabs/growi/pull/6670
           const redirectTo = userData.password != null ? '/' : '/me#password_settings';
           return res.apiv3({ redirectTo });
         });
@@ -206,7 +249,7 @@ export const validateRegisterForm = (req, res, next) => {
   return res.apiv3Err(extractedErrors, 400);
 };
 
-async function makeRegistrationEmailToken(email, crowi) {
+async function makeRegistrationEmailToken(email, crowi: Crowi) {
   const {
     mailService,
     localeDir,
@@ -218,8 +261,8 @@ async function makeRegistrationEmailToken(email, crowi) {
     throw Error('mailService is not setup');
   }
 
-  const locale = configManager.getConfig('crowi', 'app:globalLang');
-  const appUrl = appService.getSiteUrl();
+  const locale = configManager.getConfig('app:globalLang');
+  const appUrl = growiInfoService.getSiteUrl();
 
   const userRegistrationOrder = await UserRegistrationOrder.createUserRegistrationOrder(email);
   const grwTzoffsetSec = crowi.appService.getTzoffset() * 60;
@@ -241,14 +284,14 @@ async function makeRegistrationEmailToken(email, crowi) {
   });
 }
 
-export const registerAction = (crowi) => {
-  const User = crowi.model('User');
+export const registerAction = (crowi: Crowi) => {
+  const User = mongoose.model<IUser, { isRegisterableEmail, isEmailValid }>('User');
 
   return async function(req, res) {
     const registerForm = req.body.registerForm || {};
     const email = registerForm.email;
     const isRegisterableEmail = await User.isRegisterableEmail(email);
-    const registrationMode = configManager.getConfig('crowi', 'security:registrationMode') as RegistrationMode;
+    const registrationMode = configManager.getConfig('security:registrationMode');
     const isEmailValid = await User.isEmailValid(email);
 
     if (registrationMode === RegistrationMode.CLOSED) {

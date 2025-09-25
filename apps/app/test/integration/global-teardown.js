@@ -5,5 +5,4 @@
  * are NOT available in setup scripts
  *********************************************************** */
 
-module.exports = async() => {
-};
+module.exports = async () => {};

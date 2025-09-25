@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import { USER_STATUS, type IUserHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';

@@ -1,4 +1,4 @@
-import React, { type ComponentPropsWithoutRef } from 'react';
+import React, { type ComponentPropsWithoutRef, type JSX } from 'react';
 
 import { LoadingSpinner } from '@growi/ui/dist/components';
 

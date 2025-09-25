@@ -1,11 +1,13 @@
-import { pathUtils } from '@growi/core/dist/utils';
+import { ConfigSource } from '@growi/core/dist/interfaces';
 
 import loggerFactory from '~/utils/logger';
 
+import type Crowi from '../crowi';
 import S2sMessage from '../models/vo/s2s-message';
 
-import { S2sMessagingService } from './s2s-messaging/base';
-import { S2sMessageHandlable } from './s2s-messaging/handlable';
+import { configManager } from './config-manager';
+import type { S2sMessagingService } from './s2s-messaging/base';
+import type { S2sMessageHandlable } from './s2s-messaging/handlable';
 
 const logger = loggerFactory('growi:service:AppService');
 /**
@@ -13,15 +15,12 @@ const logger = loggerFactory('growi:service:AppService');
  */
 export default class AppService implements S2sMessageHandlable {
 
-  crowi!: any;
-
-  configManager: any;
+  crowi: Crowi;
 
   s2sMessagingService: S2sMessagingService;
 
-  constructor(crowi) {
+  constructor(crowi: Crowi) {
     this.crowi = crowi;
-    this.configManager = crowi.configManager;
     this.s2sMessagingService = crowi.s2sMessagingService;
   }
 
@@ -34,7 +33,7 @@ export default class AppService implements S2sMessageHandlable {
       return false;
     }
 
-    const isInstalled = this.crowi.configManager.getConfig('crowi', 'app:installed');
+    const isInstalled = configManager.getConfig('app:installed');
 
     return !isInstalled;
   }
@@ -74,44 +73,23 @@ export default class AppService implements S2sMessageHandlable {
   }
 
   getAppTitle() {
-    return this.configManager.getConfig('crowi', 'app:title') || 'GROWI';
+    return configManager.getConfig('app:title') ?? 'GROWI';
   }
-
-  /**
-   * get the site url
-   *
-   * If the config for the site url is not set, this returns a message "[The site URL is not set. Please set it!]".
-   *
-   * With version 3.2.3 and below, there is no config for the site URL, so the system always uses auto-generated site URL.
-   * With version 3.2.4 to 3.3.4, the system uses the auto-generated site URL only if the config is not set.
-   * With version 3.3.5 and above, the system use only a value from the config.
-   */
-  /* eslint-disable no-else-return */
-  getSiteUrl() {
-    const siteUrl = this.configManager.getConfig('crowi', 'app:siteUrl');
-    if (siteUrl != null) {
-      return pathUtils.removeTrailingSlash(siteUrl);
-    }
-    else {
-      return '[The site URL is not set. Please set it!]';
-    }
-  }
-  /* eslint-enable no-else-return */
 
   getTzoffset() {
-    return -(this.configManager.getConfig('crowi', 'app:timezone') || 9) * 60;
+    return -(configManager.getConfig('app:timezone') || 9) * 60;
   }
 
   getAppConfidential() {
-    return this.configManager.getConfig('crowi', 'app:confidential');
+    return configManager.getConfig('app:confidential');
   }
 
   async isDBInitialized(forceReload) {
     if (forceReload) {
       // load configs
-      await this.configManager.loadConfigs();
+      await configManager.loadConfigs();
     }
-    return this.configManager.getConfigFromDB('crowi', 'app:installed');
+    return configManager.getConfig('app:installed', ConfigSource.db);
   }
 
   async setupAfterInstall(): Promise<void> {
@@ -120,15 +98,15 @@ export default class AppService implements S2sMessageHandlable {
   }
 
   isMaintenanceMode(): boolean {
-    return this.configManager.getConfig('crowi', 'app:isMaintenanceMode');
+    return configManager.getConfig('app:isMaintenanceMode');
   }
 
   async startMaintenanceMode(): Promise<void> {
-    await this.configManager.updateConfigsInTheSameNamespace('crowi', { 'app:isMaintenanceMode': true });
+    await configManager.updateConfig('app:isMaintenanceMode', true);
   }
 
   async endMaintenanceMode(): Promise<void> {
-    await this.configManager.updateConfigsInTheSameNamespace('crowi', { 'app:isMaintenanceMode': false });
+    await configManager.updateConfig('app:isMaintenanceMode', false);
   }
 
 }

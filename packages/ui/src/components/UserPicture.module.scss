@@ -1,0 +1,50 @@
+.user-picture {
+  width: 24px;
+  height: 24px;
+
+  &:global {
+    // size list
+    &.user-picture-lg {
+      width: 48px;
+      height: 48px;
+    }
+
+    &.user-picture-md {
+      width: 24px;
+      height: 24px;
+    }
+
+    &.user-picture-sm {
+      width: 18px;
+      height: 18px;
+    }
+
+    &.user-picture-xs {
+      width: 14px;
+      height: 14px;
+    }
+  }
+}
+
+.user-picture-tooltip {
+  --bs-tooltip-margin: 12px 0 0 0;
+
+  &:global {
+    // size list
+    &.user-picture-tooltip-lg {
+      --bs-tooltip-margin: 24px 0 0 0;
+    }
+
+    &.user-picture-tooltip-md {
+      --bs-tooltip-margin: 12px 0 0 0;
+    }
+
+    &.user-picture-tooltip-sm {
+      --bs-tooltip-margin: 9px 0 0 0;
+    }
+
+    &.user-picture-tooltip-xs {
+      --bs-tooltip-margin: 7px 0 0 0;
+    }
+  }
+}

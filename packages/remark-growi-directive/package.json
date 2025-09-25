@@ -24,8 +24,8 @@
     "test": "cross-env NODE_ENV=test npm run test-coverage",
     "test-api": "vitest run --coverage",
     "test-coverage": "c8 --check-coverage --branches 100 --functions 100 --lines 100 --statements 100 --reporter lcov npm run test-api",
-    "lint": "eslint \"**/*.{cjs, js,jsx,ts,tsx}\"",
-    "lint:fix": "eslint \"**/*.{cjs, js,jsx,ts,tsx}\" --fix"
+    "lint": "biome check",
+    "lint:fix": "biome check --write"
   },
   "dependencies": {
     "@types/mdast": "^4.0.4",

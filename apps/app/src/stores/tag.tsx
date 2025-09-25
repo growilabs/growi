@@ -1,7 +1,8 @@
-import useSWR, { SWRResponse } from 'swr';
+import type { SWRResponse } from 'swr';
+import useSWR from 'swr';
 
 import { apiGet } from '~/client/util/apiv1-client';
-import { IResTagsListApiv1, IResTagsSearchApiv1 } from '~/interfaces/tag';
+import type { IResTagsListApiv1, IResTagsSearchApiv1 } from '~/interfaces/tag';
 
 export const useSWRxTagsList = (limit?: number, offset?: number): SWRResponse<IResTagsListApiv1, Error> => {
   return useSWR(

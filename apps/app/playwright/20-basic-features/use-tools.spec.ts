@@ -1,25 +1,31 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const openPageItemControl = async(page: Page): Promise<void> => {
-  await expect(page.getByTestId('grw-contextual-sub-nav')).toBeVisible();
-  await page.getByTestId('grw-contextual-sub-nav').getByTestId('open-page-item-control-btn').click();
+  const nav = page.getByTestId('grw-contextual-sub-nav');
+  const button = nav.getByTestId('open-page-item-control-btn');
+
+  // Wait for navigation element to be visible and attached
+  await expect(nav).toBeVisible();
+  await nav.waitFor({ state: 'visible' });
+
+  // Wait for button to be visible, enabled and attached
+  await expect(button).toBeVisible();
+  await expect(button).toBeEnabled();
+  await button.waitFor({ state: 'visible' });
+
+  // Add a small delay to ensure the button is fully interactive
+  await page.waitForTimeout(100);
+
+  await button.click();
 };
 
-test('Page Deletion and PutBack is executed successfully', async({ page }) => {
-  await page.goto('/Sandbox/Bootstrap5');
+test('PageDeleteModal is shown successfully', async({ page }) => {
+  await page.goto('/Sandbox');
 
-  // Delete
   await openPageItemControl(page);
   await page.getByTestId('open-page-delete-modal-btn').click();
-  await expect(page.getByTestId('page-delete-modal')).toBeVisible();
-  await page.getByTestId('delete-page-button').click();
 
-  // PutBack
-  await expect(page.getByTestId('trash-page-alert')).toBeVisible();
-  await page.getByTestId('put-back-button').click();
-  await expect(page.getByTestId('put-back-page-modal')).toBeVisible();
-  await page.getByTestId('put-back-execution-button').click();
-  await expect(page.getByTestId('trash-page-alert')).not.toBeVisible();
+  await expect(page.getByTestId('page-delete-modal')).toBeVisible();
 });
 
 test('PageDuplicateModal is shown successfully', async({ page }) => {

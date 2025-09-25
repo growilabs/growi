@@ -12,7 +12,7 @@ export const SidebarBrandLogo = memo((props: SidebarBrandLogoProps) => {
   return isDefaultLogo
     ? <GrowiLogo />
     // eslint-disable-next-line @next/next/no-img-element
-    : (<div><img src="/attachment/brand-logo" alt="custom logo" className="picture picture-lg p-2" id="settingBrandLogo" /></div>);
+    : (<div><img src="/attachment/brand-logo" alt="custom logo" width="48" className="p-1" id="settingBrandLogo" /></div>);
 });
 
 SidebarBrandLogo.displayName = 'SidebarBrandLogo';

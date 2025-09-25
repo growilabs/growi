@@ -1,7 +1,5 @@
 import {
-  type FC,
-  memo, useCallback, useEffect, useState,
-  useRef,
+  type FC, memo, useCallback, useEffect, useState, useRef, type JSX,
 } from 'react';
 
 import withLoadingProps from 'next-dynamic-loading-props';
@@ -11,6 +9,7 @@ import { useIsomorphicLayoutEffect } from 'usehooks-ts';
 
 import { SidebarMode } from '~/interfaces/ui';
 import { useIsSearchPage } from '~/stores-universal/context';
+import { EditorMode, useEditorMode } from '~/stores-universal/ui';
 import {
   useDrawerOpened,
   useCollapsedContentsOpened,
@@ -18,11 +17,13 @@ import {
   usePreferCollapsedMode,
   useSidebarMode,
   useSidebarScrollerRef,
+  useIsDeviceLargerThanMd,
+  useIsDeviceLargerThanXl,
 } from '~/stores/ui';
 
 import { DrawerToggler } from '../Common/DrawerToggler';
 
-import { AppTitleOnSidebarHead, AppTitleOnSubnavigation } from './AppTitle/AppTitle';
+import { AppTitleOnSidebarHead, AppTitleOnEditorSidebarHead, AppTitleOnSubnavigation } from './AppTitle/AppTitle';
 import { ResizableAreaFallback } from './ResizableArea/ResizableAreaFallback';
 import type { ResizableAreaProps } from './ResizableArea/props';
 import { SidebarHead } from './SidebarHead';
@@ -230,6 +231,14 @@ export const Sidebar = (): JSX.Element => {
   } = useSidebarMode();
 
   const { data: isSearchPage } = useIsSearchPage();
+  const { data: editorMode } = useEditorMode();
+  const { data: isMdSize } = useIsDeviceLargerThanMd();
+  const { data: isXlSize } = useIsDeviceLargerThanXl();
+
+  const isEditorMode = editorMode === EditorMode.Editor;
+  const shouldHideSiteName = isEditorMode && isXlSize;
+  const shouldHideSubnavAppTitle = isEditorMode && isMdSize && (isDrawerMode() || isCollapsedMode());
+  const shouldShowEditorSidebarHead = isEditorMode && isXlSize;
 
   // css styles
   const grwSidebarClass = styles['grw-sidebar'];
@@ -253,12 +262,16 @@ export const Sidebar = (): JSX.Element => {
         <DrawerToggler className="position-fixed d-none d-md-block">
           <span className="material-symbols-outlined">reorder</span>
         </DrawerToggler>
-      ) }
-      { sidebarMode != null && !isDockMode() && !isSearchPage && <AppTitleOnSubnavigation /> }
+      )}
+      { sidebarMode != null && !isDockMode() && !isSearchPage && !shouldHideSubnavAppTitle && (
+        <AppTitleOnSubnavigation />
+      )}
       <DrawableContainer className={`${grwSidebarClass} ${modeClass} border-end flex-expand-vh-100`} divProps={{ 'data-testid': 'grw-sidebar' }}>
         <ResizableContainer>
-          { sidebarMode != null && !isCollapsedMode() && <AppTitleOnSidebarHead /> }
-          <SidebarHead />
+          { sidebarMode != null && !isCollapsedMode() && (
+            <AppTitleOnSidebarHead hideAppTitle={shouldHideSiteName} />
+          )}
+          {shouldShowEditorSidebarHead ? <AppTitleOnEditorSidebarHead /> : <SidebarHead />}
           <CollapsibleContainer Nav={SidebarNav} className="border-top">
             <SidebarContents />
           </CollapsibleContainer>

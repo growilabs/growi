@@ -21,7 +21,7 @@ export const PresetThemes = {
   WOOD: 'wood',
   CLASSIC: 'classic',
 } as const;
-export type PresetThemes = typeof PresetThemes[keyof typeof PresetThemes];
+export type PresetThemes = (typeof PresetThemes)[keyof typeof PresetThemes];
 
 /* eslint-disable no-multi-spaces, */
 
@@ -74,7 +74,8 @@ export const PresetThemesMetadatas: GrowiThemeMetadata[] = [
     lightIcon: '#94351E',
     darkIcon: '#EE775B',
     createBtn: '#EA5532',
-  }, {
+  },
+  {
     name: PresetThemes.JADE_GREEN,
     schemeType: BOTH,
     lightBg: '#FFFFFF',
@@ -84,7 +85,8 @@ export const PresetThemesMetadatas: GrowiThemeMetadata[] = [
     lightIcon: '#3A8F6F',
     darkIcon: '#5FC2A2',
     createBtn: '#49B38A',
-  }, {
+  },
+  {
     name: PresetThemes.CLASSIC,
     schemeType: BOTH,
     lightBg: '#FFFFFF',
@@ -94,7 +96,8 @@ export const PresetThemesMetadatas: GrowiThemeMetadata[] = [
     lightIcon: '#53687E',
     darkIcon: '#869BB1',
     createBtn: '#3491CB',
-  }, {
+  },
+  {
     name: PresetThemes.CHRISTMAS,
     schemeType: BOTH,
     lightBg: '#FFFFFF',
@@ -116,7 +119,8 @@ export const PresetThemesMetadatas: GrowiThemeMetadata[] = [
     lightIcon: '#3F8421',
     darkIcon: '#1F4210',
     createBtn: '#4FA529',
-  }, {
+  },
+  {
     name: PresetThemes.WOOD,
     schemeType: LIGHT,
     lightBg: '#FFFFF5',
@@ -126,7 +130,8 @@ export const PresetThemesMetadatas: GrowiThemeMetadata[] = [
     lightIcon: '#86651A',
     darkIcon: '#43320D',
     createBtn: '#A77E21',
-  }, {
+  },
+  {
     name: PresetThemes.ISLAND,
     schemeType: LIGHT,
     lightBg: '#FFFFFF',
@@ -136,7 +141,8 @@ export const PresetThemesMetadatas: GrowiThemeMetadata[] = [
     lightIcon: '#51C2D3',
     darkIcon: '#204D54',
     createBtn: '#51C2D3',
-  }, {
+  },
+  {
     name: PresetThemes.ANTARCTIC,
     schemeType: LIGHT,
     lightBg: '#FAFEFF',
@@ -146,7 +152,8 @@ export const PresetThemesMetadatas: GrowiThemeMetadata[] = [
     lightIcon: '#2631AF',
     darkIcon: '#131857',
     createBtn: '#303DDB',
-  }, {
+  },
+  {
     name: PresetThemes.SPRING,
     schemeType: LIGHT,
     lightBg: '#FFFFFF',
@@ -156,7 +163,8 @@ export const PresetThemesMetadatas: GrowiThemeMetadata[] = [
     lightIcon: '#D76F7D',
     darkIcon: '#8A423F',
     createBtn: '#6ABA55',
-  }, {
+  },
+  {
     name: PresetThemes.KIBELA,
     schemeType: LIGHT,
     lightBg: '#FFFFFF',
@@ -178,7 +186,8 @@ export const PresetThemesMetadatas: GrowiThemeMetadata[] = [
     lightIcon: '#3F999B',
     darkIcon: '#99E5E6',
     createBtn: '#03A2A8',
-  }, {
+  },
+  {
     name: PresetThemes.HALLOWEEN,
     schemeType: DARK,
     lightBg: '#240E3E',
@@ -188,7 +197,8 @@ export const PresetThemesMetadatas: GrowiThemeMetadata[] = [
     lightIcon: '#8C3C03',
     darkIcon: '#DDB69B',
     createBtn: '#AA4A04',
-  }, {
+  },
+  {
     name: PresetThemes.BLACKBOARD,
     schemeType: DARK,
     lightBg: '#223323',

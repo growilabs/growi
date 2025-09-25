@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {
+  useState, useEffect, useCallback, type JSX,
+} from 'react';
 
 import { SlackbotType } from '@growi/slack';
 import { LoadingSpinner } from '@growi/ui/dist/components';

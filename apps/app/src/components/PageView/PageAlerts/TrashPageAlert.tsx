@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, type JSX } from 'react';
 
 import { UserPicture } from '@growi/ui/dist/components';
 import { format } from 'date-fns/format';

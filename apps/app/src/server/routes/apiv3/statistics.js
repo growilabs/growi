@@ -16,7 +16,49 @@ const USER_STATUS_MASTER = {
   5: 'invited',
 };
 
+/**
+ * @swagger
+ *   components:
+ *     schemas:
+ *       StatisticsUserResponse:
+ *         type: object
+ *         properties:
+ *           data:
+*             type: object
+*             properties:
+*               total:
+*                 type: integer
+*                 example: 1
+*               active:
+*                 type: object
+*                 properties:
+*                   total:
+*                     type: integer
+*                     example: 1
+*                   admin:
+*                     type: integer
+*                     example: 1
+*               inactive:
+*                 type: object
+*                 properties:
+*                   total:
+*                     type: integer
+*                     example: 0
+*                   registered:
+*                     type: integer
+*                     example: 0
+*                   suspended:
+*                     type: integer
+*                     example: 0
+*                   deleted:
+*                     type: integer
+*                     example: 0
+*                   invited:
+*                     type: integer
+*                     example: 0
+*/
 
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
 
   const models = crowi.models;
@@ -78,7 +120,7 @@ module.exports = (crowi) => {
    *  /statistics/user:
    *    get:
    *      tags: [Statistics]
-   *      operationId: getStatisticsUser
+   *      security: []
    *      summary: /statistics/user
    *      description: Get statistics for user
    *      responses:
@@ -87,10 +129,8 @@ module.exports = (crowi) => {
    *          content:
    *            application/json:
    *              schema:
-   *                properties:
-   *                  data:
-   *                    type: object
-   *                    description: Statistics for all user
+   *                description: Statistics for all user
+   *                $ref: '#/components/schemas/StatisticsUserResponse'
    */
   router.get('/user', noCache(), async(req, res) => {
     const data = req.user == null ? await getUserStatisticsForNotLoggedIn() : await getUserStatistics();

@@ -1,12 +1,14 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 
 import { LoginErrorCode } from '~/interfaces/errors/login-error';
+import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 import loggerFactory from '~/utils/logger';
 
 import { NullUsernameToBeRegisteredError } from '../models/errors';
-import ExternalAccount, { ExternalAccountDocument } from '../models/external-account';
+import type { ExternalAccountDocument } from '../models/external-account';
+import ExternalAccount from '../models/external-account';
 
-import PassportService from './passport';
+import type PassportService from './passport';
 
 const logger = loggerFactory('growi:service:external-account-service');
 
@@ -21,11 +23,13 @@ class ExternalAccountService {
 
   async getOrCreateUser(
       userInfo: {id: string, username: string, name?: string, email?: string},
-      providerId: string,
+      providerId: IExternalAuthProviderType,
   ): Promise<ExternalAccountDocument | undefined> {
     // get option
     const isSameUsernameTreatedAsIdenticalUser = this.passportService.isSameUsernameTreatedAsIdenticalUser(providerId);
-    const isSameEmailTreatedAsIdenticalUser = this.passportService.isSameEmailTreatedAsIdenticalUser(providerId);
+    const isSameEmailTreatedAsIdenticalUser = providerId === 'ldap'
+      ? false
+      : this.passportService.isSameEmailTreatedAsIdenticalUser(providerId);
 
     try {
       // find or register(create) user

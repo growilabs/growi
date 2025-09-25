@@ -64,7 +64,13 @@ function tokenizeDirectiveLeaf(effects, ok, nok) {
     assert(code === codes.dollarSign, 'expected `$`');
     effects.enter('directiveGrowiLeaf');
     effects.consume(code);
-    return factoryName.call(self, effects, afterName, nok, 'directiveGrowiLeafName');
+    return factoryName.call(
+      self,
+      effects,
+      afterName,
+      nok,
+      'directiveGrowiLeafName',
+    );
   }
 
   /** @type {State} */

@@ -25,12 +25,12 @@ const ForbiddenPage = dynamic(() => import('~/client/components/Admin/ForbiddenP
 
 
 type Props = CommonProps & {
-  growiCloudUri: string,
-  growiAppIdForGrowiCloud: number,
+  growiCloudUri?: string,
+  growiAppIdForGrowiCloud?: number,
 };
 
 
-const AdminHomepage: NextPage<Props> = (props) => {
+const AdminHomepage: NextPage<Props> = (props: Props) => {
   useCurrentUser(props.currentUser ?? null);
   useGrowiCloudUri(props.growiCloudUri);
   useGrowiAppIdForGrowiCloud(props.growiAppIdForGrowiCloud);
@@ -71,8 +71,8 @@ const injectServerConfigurations = async(context: GetServerSidePropsContext, pro
   const req: CrowiRequest = context.req as CrowiRequest;
   const { crowi } = req;
 
-  props.growiCloudUri = await crowi.configManager.getConfig('crowi', 'app:growiCloudUri');
-  props.growiAppIdForGrowiCloud = await crowi.configManager.getConfig('crowi', 'app:growiAppIdForCloud');
+  props.growiCloudUri = crowi.configManager.getConfig('app:growiCloudUri');
+  props.growiAppIdForGrowiCloud = crowi.configManager.getConfig('app:growiAppIdForCloud');
 };
 
 

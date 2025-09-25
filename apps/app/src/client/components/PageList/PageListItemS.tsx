@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import type { IPageHasId } from '@growi/core';
 import { UserPicture, PageListMeta, PagePathLabel } from '@growi/ui/dist/components';

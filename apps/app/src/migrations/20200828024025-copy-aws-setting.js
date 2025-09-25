@@ -25,7 +25,6 @@ module.exports = {
           insertOne: {
             document: {
               key: 'mail:sesAccessKeyId',
-              ns: 'crowi',
               value: accessKeyId.value,
             },
           },
@@ -39,7 +38,6 @@ module.exports = {
           insertOne: {
             document: {
               key: 'mail:sesSecretAccessKey',
-              ns: 'crowi',
               value: secretAccessKey.value,
             },
           },
@@ -58,7 +56,9 @@ module.exports = {
     logger.info('Rollback migration');
     await mongoose.connect(getMongoUri(), mongoOptions);
 
-    await Config.deleteMany({ key: { $in: ['mail:sesAccessKeyId', 'mail:sesSecretAccessKey'] } });
+    await Config.deleteMany({
+      key: { $in: ['mail:sesAccessKeyId', 'mail:sesSecretAccessKey'] },
+    });
 
     logger.info('Migration has been successfully rollbacked');
   },

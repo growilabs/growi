@@ -5,8 +5,10 @@ import nodemailer from 'nodemailer';
 
 import loggerFactory from '~/utils/logger';
 
+import type Crowi from '../crowi';
 import S2sMessage from '../models/vo/s2s-message';
 
+import type { IConfigManagerForApp } from './config-manager';
 import type { S2sMessageHandlable } from './s2s-messaging/handlable';
 
 const logger = loggerFactory('growi:service:mail');
@@ -23,7 +25,7 @@ class MailService implements S2sMessageHandlable {
 
   appService!: any;
 
-  configManager!: any;
+  configManager: IConfigManagerForApp;
 
   s2sMessagingService!: any;
 
@@ -38,7 +40,7 @@ class MailService implements S2sMessageHandlable {
    */
   isMailerSetup = false;
 
-  constructor(crowi) {
+  constructor(crowi: Crowi) {
     this.appService = crowi.appService;
     this.configManager = crowi.configManager;
     this.s2sMessagingService = crowi.s2sMessagingService;
@@ -90,12 +92,12 @@ class MailService implements S2sMessageHandlable {
 
     this.isMailerSetup = false;
 
-    if (!configManager.getConfig('crowi', 'mail:from')) {
+    if (!configManager.getConfig('mail:from')) {
       this.mailer = null;
       return;
     }
 
-    const transmissionMethod = configManager.getConfig('crowi', 'mail:transmissionMethod');
+    const transmissionMethod = configManager.getConfig('mail:transmissionMethod');
 
     if (transmissionMethod === 'smtp') {
       this.mailer = this.createSMTPClient();
@@ -111,7 +113,7 @@ class MailService implements S2sMessageHandlable {
       this.isMailerSetup = true;
     }
 
-    this.mailConfig.from = configManager.getConfig('crowi', 'mail:from');
+    this.mailConfig.from = configManager.getConfig('mail:from');
     this.mailConfig.subject = `${appService.getAppTitle()}からのメール`;
 
     logger.debug('mailer initialized');
@@ -122,8 +124,8 @@ class MailService implements S2sMessageHandlable {
 
     logger.debug('createSMTPClient option', option);
     if (!option) {
-      const host = configManager.getConfig('crowi', 'mail:smtpHost');
-      const port = configManager.getConfig('crowi', 'mail:smtpPort');
+      const host = configManager.getConfig('mail:smtpHost');
+      const port = configManager.getConfig('mail:smtpPort');
 
       if (host == null || port == null) {
         return null;
@@ -133,10 +135,10 @@ class MailService implements S2sMessageHandlable {
         port,
       };
 
-      if (configManager.getConfig('crowi', 'mail:smtpUser') && configManager.getConfig('crowi', 'mail:smtpPassword')) {
+      if (configManager.getConfig('mail:smtpPassword')) {
         option.auth = {
-          user: configManager.getConfig('crowi', 'mail:smtpUser'),
-          pass: configManager.getConfig('crowi', 'mail:smtpPassword'),
+          user: configManager.getConfig('mail:smtpUser'),
+          pass: configManager.getConfig('mail:smtpPassword'),
         };
       }
       if (option.port === 465) {
@@ -156,8 +158,8 @@ class MailService implements S2sMessageHandlable {
     const { configManager } = this;
 
     if (!option) {
-      const accessKeyId = configManager.getConfig('crowi', 'mail:sesAccessKeyId');
-      const secretAccessKey = configManager.getConfig('crowi', 'mail:sesSecretAccessKey');
+      const accessKeyId = configManager.getConfig('mail:sesAccessKeyId');
+      const secretAccessKey = configManager.getConfig('mail:sesSecretAccessKey');
       if (accessKeyId == null || secretAccessKey == null) {
         return null;
       }

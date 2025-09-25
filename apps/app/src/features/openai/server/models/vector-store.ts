@@ -2,35 +2,19 @@ import { type Model, type Document, Schema } from 'mongoose';
 
 import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
-export const VectorStoreScopeType = {
-  PUBLIC: 'public',
-} as const;
+import type { IVectorStore } from '../../interfaces/vector-store';
 
-export type VectorStoreScopeType = typeof VectorStoreScopeType[keyof typeof VectorStoreScopeType];
-
-const VectorStoreScopeTypes = Object.values(VectorStoreScopeType);
-interface VectorStore {
-  vectorStoreId: string
-  scopeType: VectorStoreScopeType
-  isDeleted: boolean
-}
-
-export interface VectorStoreDocument extends VectorStore, Document {
+export interface VectorStoreDocument extends IVectorStore, Document {
   markAsDeleted(): Promise<void>
 }
 
-type VectorStoreModel = Model<VectorStore>
+type VectorStoreModel = Model<VectorStoreDocument>;
 
 const schema = new Schema<VectorStoreDocument, VectorStoreModel>({
   vectorStoreId: {
     type: String,
     required: true,
     unique: true,
-  },
-  scopeType: {
-    enum: VectorStoreScopeTypes,
-    type: String,
-    required: true,
   },
   isDeleted: {
     type: Boolean,

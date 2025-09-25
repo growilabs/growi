@@ -12,8 +12,7 @@ const logger = loggerFactory('growi:crowi:dev');
 class CrowiDev {
 
   /**
-   * Creates an instance of CrowiDev.
-   * @param {Crowi} crowi
+   * @param {import('~/server/crowi').default} crowi Crowi instance
    *
    * @memberOf CrowiDev
    */

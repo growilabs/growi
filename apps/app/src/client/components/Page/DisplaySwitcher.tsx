@@ -1,3 +1,5 @@
+import type { JSX } from 'react';
+
 import dynamic from 'next/dynamic';
 
 import { useHashChangedEffect } from '~/client/services/side-effects/hash-changed';
@@ -7,6 +9,7 @@ import { useReservedNextCaretLine } from '~/stores/editor';
 import { useIsLatestRevision } from '~/stores/page';
 
 import { LazyRenderer } from '../Common/LazyRenderer';
+
 
 const PageEditor = dynamic(() => import('../PageEditor'), { ssr: false });
 const PageEditorReadOnly = dynamic(() => import('../PageEditor/PageEditorReadOnly').then(mod => mod.PageEditorReadOnly), { ssr: false });

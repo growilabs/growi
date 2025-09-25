@@ -6,12 +6,12 @@ import type {
 import {
   type SWRResponseWithUtils, withUtils,
 } from '@growi/core/dist/swr';
-import { Util } from 'reactstrap';
+import type { Util } from 'reactstrap';
 import useSWR, { useSWRConfig } from 'swr';
 
 import { apiPost } from '~/client/util/apiv1-client';
 import { apiv3Get } from '~/client/util/apiv3-client';
-import { IResAttachmentList } from '~/interfaces/attachment';
+import type { IResAttachmentList } from '~/interfaces/attachment';
 
 type Util = {
   remove(body: { attachment_id: string }): Promise<void>

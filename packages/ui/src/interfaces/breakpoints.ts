@@ -6,4 +6,4 @@ export const Breakpoint = {
   XL: 'xl',
   XXL: 'xxl',
 } as const;
-export type Breakpoint = typeof Breakpoint[keyof typeof Breakpoint];
+export type Breakpoint = (typeof Breakpoint)[keyof typeof Breakpoint];

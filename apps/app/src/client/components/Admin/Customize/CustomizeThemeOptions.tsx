@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, type JSX } from 'react';
 
 import { type GrowiThemeMetadata, GrowiThemeSchemeType } from '@growi/core';
 import { useTranslation } from 'next-i18next';

@@ -1,0 +1,1 @@
+export { remarkPlugin } from './plantuml';

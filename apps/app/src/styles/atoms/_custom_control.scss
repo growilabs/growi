@@ -30,7 +30,7 @@ label.form-check-label {
     }
 
     &::after {
-      top: add(($font-size-base * $line-height-base - $form-check-indicator-size) / 2, $form-check-indicator-border-width * 2);
+      top: add(($font-size-base * $line-height-base - $form-check-indicator-size) * 0.5, $form-check-indicator-border-width * 2);
       left: add(-($form-switch-width-sm + $form-check-gutter-sm), $form-check-indicator-border-width * 2);
       width: $form-switch-indicator-size-sm;
       height: $form-switch-indicator-size-sm;
@@ -56,19 +56,19 @@ label.form-check-label {
   line-height: $form-check-indicator-size-lg;
   .form-check-label {
     &::before {
-      top: ($font-size-base * $line-height-base - $form-check-indicator-size-lg) / 2;
+      top: ($font-size-base * $line-height-base - $form-check-indicator-size-lg) * 0.5;
       left: -($form-switch-width-lg + $form-check-gutter-lg);
       width: $form-switch-width-lg;
       height: $form-check-indicator-size-lg;
-      border-radius: $form-check-indicator-size-lg / 2;
+      border-radius: $form-check-indicator-size-lg * 0.5;
     }
 
     &::after {
-      top: add(($font-size-base * $line-height-base - $form-check-indicator-size-lg) / 2, $form-check-indicator-border-width * 2);
+      top: add(($font-size-base * $line-height-base - $form-check-indicator-size-lg) * 0.5, $form-check-indicator-border-width * 2);
       left: add(-($form-switch-width-lg + $form-check-gutter-lg), $form-check-indicator-border-width * 2);
       width: $form-switch-indicator-size-lg;
       height: $form-switch-indicator-size-lg;
-      border-radius: $form-check-indicator-size-lg / 2;
+      border-radius: $form-check-indicator-size-lg * 0.5;
     }
   }
 

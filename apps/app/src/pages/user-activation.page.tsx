@@ -81,8 +81,8 @@ export const getServerSideProps: GetServerSideProps = async(context: GetServerSi
   if (typeof context.query.errorCode === 'string') {
     props.errorCode = context.query.errorCode as UserActivationErrorCode;
   }
-  props.registrationMode = req.crowi.configManager.getConfig('crowi', 'security:registrationMode');
-  props.isEmailAuthenticationEnabled = req.crowi.configManager.getConfig('crowi', 'security:passport-local:isEmailAuthenticationEnabled');
+  props.registrationMode = req.crowi.configManager.getConfig('security:registrationMode');
+  props.isEmailAuthenticationEnabled = req.crowi.configManager.getConfig('security:passport-local:isEmailAuthenticationEnabled');
 
   await injectNextI18NextConfigurations(context, props, ['translation']);
 

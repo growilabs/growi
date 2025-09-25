@@ -60,7 +60,7 @@ const injectServerConfigurations = async(context: GetServerSidePropsContext, pro
   const req: CrowiRequest = context.req as CrowiRequest;
   const { crowi } = req;
 
-  props.growiCloudUri = await crowi.configManager.getConfig('crowi', 'app:growiCloudUri');
+  props.growiCloudUri = await crowi.configManager.getConfig('app:growiCloudUri');
 };
 
 export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {

@@ -99,7 +99,7 @@ export const useNewPageInput = (): UseNewPageInput => {
       const isCreatable = pagePathUtils.isCreatablePage(newPagePath);
 
       if (!isCreatable) {
-        toastWarning(t('you_can_not_create_page_with_this_name'));
+        toastWarning(t('you_can_not_create_page_with_this_name_or_hierarchy'));
         return;
       }
 

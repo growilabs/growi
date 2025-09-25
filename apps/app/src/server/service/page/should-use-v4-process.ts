@@ -2,7 +2,7 @@ import type { IPage } from '@growi/core';
 import { isTopPage } from '@growi/core/dist/utils/page-path-utils';
 import mongoose from 'mongoose';
 
-import { PageModel } from '~/server/models/page';
+import type { PageModel } from '~/server/models/page';
 import { configManager } from '~/server/service/config-manager';
 
 export const shouldUseV4Process = (page: IPage): boolean => {
@@ -10,7 +10,7 @@ export const shouldUseV4Process = (page: IPage): boolean => {
 
   const isTrashPage = page.status === Page.STATUS_DELETED;
   const isPageMigrated = page.parent != null;
-  const isV5Compatible = configManager.getConfig('crowi', 'app:isV5Compatible');
+  const isV5Compatible = configManager.getConfig('app:isV5Compatible');
   const isRoot = isTopPage(page.path);
   const isPageRestricted = page.grant === Page.GRANT_RESTRICTED;
 

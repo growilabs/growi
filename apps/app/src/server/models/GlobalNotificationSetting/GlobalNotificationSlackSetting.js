@@ -7,6 +7,7 @@ const GlobalNotificationSetting = require('./index');
 const GlobalNotificationSettingClass = GlobalNotificationSetting.class;
 const GlobalNotificationSettingSchema = GlobalNotificationSetting.schema;
 
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 const factory = (crowi) => {
   GlobalNotificationSettingClass.crowi = crowi;
   GlobalNotificationSettingSchema.loadClass(GlobalNotificationSettingClass);

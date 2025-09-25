@@ -5,14 +5,15 @@
 
 import { htmlVoidElements } from 'html-void-elements';
 import { micromark } from 'micromark';
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { DirectiveType } from '../src/mdast-util-growi-directive/lib/index.js';
-import { directive as syntax, directiveHtml as html } from '../src/micromark-extension-growi-directive/index.js';
-
+import {
+  directiveHtml as html,
+  directive as syntax,
+} from '../src/micromark-extension-growi-directive/index.js';
 
 const own = {}.hasOwnProperty;
-
 
 describe('micromark-extension-directive (syntax)', () => {
   describe('text', () => {
@@ -73,7 +74,9 @@ describe('micromark-extension-directive (syntax)', () => {
     });
 
     it('should not interfere w/ emphasis (`_`)', () => {
-      expect(micromark('_$directive_', options())).toBe('<p><em>$directive</em></p>');
+      expect(micromark('_$directive_', options())).toBe(
+        '<p><em>$directive</em></p>',
+      );
     });
 
     it('should support a name followed by an unclosed `[`', () => {
@@ -120,27 +123,19 @@ describe('micromark-extension-directive (syntax)', () => {
     // );
 
     it('should support a directive in an label', () => {
-      expect(
-        micromark('a $b[c :d[e] f] g', options()),
-      ).toBe('<p>a  g</p>');
+      expect(micromark('a $b[c :d[e] f] g', options())).toBe('<p>a  g</p>');
     });
 
     it('should support content after a label', () => {
-      expect(
-        micromark('$a[]asd', options()),
-      ).toBe('<p>asd</p>');
+      expect(micromark('$a[]asd', options())).toBe('<p>asd</p>');
     });
 
     it('should support empty attributes', () => {
-      expect(
-        micromark('a $a()', options()),
-      ).toBe('<p>a </p>');
+      expect(micromark('a $a()', options())).toBe('<p>a </p>');
     });
 
     it('should support whitespace only attributes', () => {
-      expect(
-        micromark('a $a( \t)', options()),
-      ).toBe('<p>a </p>');
+      expect(micromark('a $a( \t)', options())).toBe('<p>a </p>');
     });
 
     it('should support an eol in attributes', () => {
@@ -172,7 +167,9 @@ describe('micromark-extension-directive (syntax)', () => {
     });
 
     it('should support attributes w/ shortcuts combined w/ other attributes', () => {
-      expect(micromark('a $a(#a.b.c#d e f=g #h.i.j)', options())).toBe('<p>a </p>');
+      expect(micromark('a $a(#a.b.c#d e f=g #h.i.j)', options())).toBe(
+        '<p>a </p>',
+      );
     });
 
     it('should support attrs which starts w/ continuous dots', () => {
@@ -192,51 +189,37 @@ describe('micromark-extension-directive (syntax)', () => {
     });
 
     it('should support with the attr `(.a"b)`', () => {
-      expect(
-        micromark('a $a(.a"b)', options()),
-      ).toBe('<p>a </p>');
+      expect(micromark('a $a(.a"b)', options())).toBe('<p>a </p>');
     });
 
     it('should support with the attr `(.a<b)`', () => {
-      expect(
-        micromark('a $a(.a<b)', options()),
-      ).toBe('<p>a </p>');
+      expect(micromark('a $a(.a<b)', options())).toBe('<p>a </p>');
     });
 
     it('should support most characters in shortcuts', () => {
-      expect(
-        micromark('a $a(.a💚b)', options()),
-      ).toBe('<p>a </p>');
+      expect(micromark('a $a(.a💚b)', options())).toBe('<p>a </p>');
     });
 
     it('should support an underscore in attribute names', () => {
-      expect(
-        micromark('a $a(_)', options()),
-      ).toBe('<p>a </p>');
+      expect(micromark('a $a(_)', options())).toBe('<p>a </p>');
     });
 
     it('should support a colon in attribute names', () => {
-      expect(
-        micromark('a $a(xml:lang)', options()),
-      ).toBe('<p>a </p>');
+      expect(micromark('a $a(xml:lang)', options())).toBe('<p>a </p>');
     });
 
     it('should support double quoted attributes', () => {
-      expect(
-        micromark('a $a(a="b" c="d e f")', options()),
-      ).toBe('<p>a </p>');
+      expect(micromark('a $a(a="b" c="d e f")', options())).toBe('<p>a </p>');
     });
 
     it('should support single quoted attributes', () => {
-      expect(
-        micromark("a $a(a='b' c='d e f')", options()),
-      ).toBe('<p>a </p>');
+      expect(micromark("a $a(a='b' c='d e f')", options())).toBe('<p>a </p>');
     });
 
     it('should support whitespace around initializers', () => {
-      expect(
-        micromark('a $a(a = b c\t=\t\'d\' f  =\r"g")', options()),
-      ).toBe('<p>a </p>');
+      expect(micromark('a $a(a = b c\t=\t\'d\' f  =\r"g")', options())).toBe(
+        '<p>a </p>',
+      );
     });
 
     it('should not support `=` to start an unquoted attribute value', () => {
@@ -256,49 +239,31 @@ describe('micromark-extension-directive (syntax)', () => {
     });
 
     it('should support most other characters in attribute keys', () => {
-      expect(
-        micromark('a $a(b💚=a💚b)', options()),
-      ).toBe('<p>a </p>');
+      expect(micromark('a $a(b💚=a💚b)', options())).toBe('<p>a </p>');
     });
 
     it('should support most other characters in unquoted attribute values', () => {
-      expect(
-        micromark('a $a(b=a💚b)', options()),
-      ).toBe('<p>a </p>');
+      expect(micromark('a $a(b=a💚b)', options())).toBe('<p>a </p>');
     });
 
     it('should not support an EOF in a quoted attribute value', () => {
-      expect(
-        micromark('$a(b="c', options()),
-      ).toBe('<p>(b=&quot;c</p>');
+      expect(micromark('$a(b="c', options())).toBe('<p>(b=&quot;c</p>');
     });
 
     it('should support most other characters in quoted attribute values', () => {
-      expect(
-        micromark('a $a(b="a💚b")', options()),
-      ).toBe('<p>a </p>');
+      expect(micromark('a $a(b="a💚b")', options())).toBe('<p>a </p>');
     });
 
     it('should support EOLs in quoted attribute values', () => {
-      expect(
-        micromark('$a(b="\nc\r  d")', options()),
-      ).toBe(
-        '<p></p>',
-      );
+      expect(micromark('$a(b="\nc\r  d")', options())).toBe('<p></p>');
     });
 
     it('should not support an EOF after a quoted attribute value', () => {
-      expect(
-        micromark('$a(b="c"', options()),
-      ).toBe(
-        '<p>(b=&quot;c&quot;</p>',
-      );
+      expect(micromark('$a(b="c"', options())).toBe('<p>(b=&quot;c&quot;</p>');
     });
-
   });
 
   describe('leaf', () => {
-
     it('should support a directive', () => {
       expect(micromark('$b', options())).toBe('');
     });
@@ -461,15 +426,21 @@ describe('micromark-extension-directive (syntax)', () => {
     });
 
     it('should support a block quote after a leaf', () => {
-      expect(micromark('$a(b=c)\n>a', options())).toBe('<blockquote>\n<p>a</p>\n</blockquote>');
+      expect(micromark('$a(b=c)\n>a', options())).toBe(
+        '<blockquote>\n<p>a</p>\n</blockquote>',
+      );
     });
 
     it('should support code (fenced) after a leaf', () => {
-      expect(micromark('$a(b=c)\n```js\na', options())).toBe('<pre><code class="language-js">a\n</code></pre>\n');
+      expect(micromark('$a(b=c)\n```js\na', options())).toBe(
+        '<pre><code class="language-js">a\n</code></pre>\n',
+      );
     });
 
     it('should support code (indented) after a leaf', () => {
-      expect(micromark('$a(b=c)\n    a', options())).toBe('<pre><code>a\n</code></pre>');
+      expect(micromark('$a(b=c)\n    a', options())).toBe(
+        '<pre><code>a\n</code></pre>',
+      );
     });
 
     it('should support a definition after a leaf', () => {
@@ -489,7 +460,9 @@ describe('micromark-extension-directive (syntax)', () => {
     });
 
     it('should support a list after a leaf', () => {
-      expect(micromark('$a(b=c)\n* a', options())).toBe('<ul>\n<li>a</li>\n</ul>');
+      expect(micromark('$a(b=c)\n* a', options())).toBe(
+        '<ul>\n<li>a</li>\n</ul>',
+      );
     });
 
     it('should support a paragraph after a leaf', () => {
@@ -501,15 +474,21 @@ describe('micromark-extension-directive (syntax)', () => {
     });
 
     it('should support a block quote before a leaf', () => {
-      expect(micromark('>a\n$a(b=c)', options())).toBe('<blockquote>\n<p>a</p>\n</blockquote>\n');
+      expect(micromark('>a\n$a(b=c)', options())).toBe(
+        '<blockquote>\n<p>a</p>\n</blockquote>\n',
+      );
     });
 
     it('should support code (fenced) before a leaf', () => {
-      expect(micromark('```js\na\n```\n$a(b=c)', options())).toBe('<pre><code class="language-js">a\n</code></pre>\n');
+      expect(micromark('```js\na\n```\n$a(b=c)', options())).toBe(
+        '<pre><code class="language-js">a\n</code></pre>\n',
+      );
     });
 
     it('should support code (indented) before a leaf', () => {
-      expect(micromark('    a\n$a(b=c)', options())).toBe('<pre><code>a\n</code></pre>\n');
+      expect(micromark('    a\n$a(b=c)', options())).toBe(
+        '<pre><code>a\n</code></pre>\n',
+      );
     });
 
     it('should support a definition before a leaf', () => {
@@ -529,7 +508,9 @@ describe('micromark-extension-directive (syntax)', () => {
     });
 
     it('should support a list before a leaf', () => {
-      expect(micromark('* a\n$a(b=c)', options())).toBe('<ul>\n<li>a</li>\n</ul>\n');
+      expect(micromark('* a\n$a(b=c)', options())).toBe(
+        '<ul>\n<li>a</li>\n</ul>\n',
+      );
     });
 
     it('should support a paragraph before a leaf', () => {
@@ -541,19 +522,20 @@ describe('micromark-extension-directive (syntax)', () => {
     });
 
     it('should not support lazyness (1)', () => {
-      expect(micromark('> $a\nb', options({ '*': h }))).toBe('<blockquote><a></a>\n</blockquote>\n<p>b</p>');
+      expect(micromark('> $a\nb', options({ '*': h }))).toBe(
+        '<blockquote><a></a>\n</blockquote>\n<p>b</p>',
+      );
     });
 
     it('should not support lazyness (2)', () => {
-      expect(micromark('> a\n$b', options({ '*': h }))).toBe('<blockquote>\n<p>a</p>\n</blockquote>\n<b></b>');
+      expect(micromark('> a\n$b', options({ '*': h }))).toBe(
+        '<blockquote>\n<p>a</p>\n</blockquote>\n<b></b>',
+      );
     });
-
   });
-
 });
 
 describe('micromark-extension-directive (compile)', () => {
-
   it('should support a directives (abbr)', () => {
     expect(
       micromark(
@@ -653,7 +635,10 @@ describe('micromark-extension-directive (compile)', () => {
 
   it('should support fall through directives (`*`)', () => {
     expect(
-      micromark('a $youtube[Cat in a box]\n$br a', options({ youtube, '*': h })),
+      micromark(
+        'a $youtube[Cat in a box]\n$br a',
+        options({ youtube, '*': h }),
+      ),
     ).toBe('<p>a <youtube>Cat in a box</youtube>\n<br> a</p>');
   });
 
@@ -662,55 +647,65 @@ describe('micromark-extension-directive (compile)', () => {
       micromark('a $a[$img(src="x" alt=y)](href="z")', options({ '*': h })),
     ).toBe('<p>a <a href="z"><img src="x" alt="y"></a></p>');
   });
-
 });
 
 describe('content', () => {
-
   it('should support character escapes and character references in label', () => {
-    expect(micromark('a $abbr[x\\&y&amp;z]', options({ abbr })))
-      .toBe('<p>a <abbr>x&amp;y&amp;z</abbr></p>');
+    expect(micromark('a $abbr[x\\&y&amp;z]', options({ abbr }))).toBe(
+      '<p>a <abbr>x&amp;y&amp;z</abbr></p>',
+    );
   });
 
   it('should support escaped brackets in a label', () => {
-    expect(micromark('a $abbr[x\\[y\\]z]', options({ abbr })))
-      .toBe('<p>a <abbr>x[y]z</abbr></p>');
+    expect(micromark('a $abbr[x\\[y\\]z]', options({ abbr }))).toBe(
+      '<p>a <abbr>x[y]z</abbr></p>',
+    );
   });
 
   it('should support balanced brackets in a label', () => {
-    expect(micromark('a $abbr[x[y]z]', options({ abbr })))
-      .toBe('<p>a <abbr>x[y]z</abbr></p>');
+    expect(micromark('a $abbr[x[y]z]', options({ abbr }))).toBe(
+      '<p>a <abbr>x[y]z</abbr></p>',
+    );
   });
 
   it('should support balanced brackets in a label, 32 levels deep', () => {
-    expect(micromark(
-      'a $abbr[1[2[3[4[5[6[7[8[9[10[11[12[13[14[15[16[17[18[19[20[21[22[23[24[25[26[27[28[29[30[31[32[x]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]',
-      options({ abbr }),
-    )).toBe('<p>a <abbr>1[2[3[4[5[6[7[8[9[10[11[12[13[14[15[16[17[18[19[20[21[22[23[24[25[26[27[28[29[30[31[32[x]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]</abbr></p>');
+    expect(
+      micromark(
+        'a $abbr[1[2[3[4[5[6[7[8[9[10[11[12[13[14[15[16[17[18[19[20[21[22[23[24[25[26[27[28[29[30[31[32[x]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]',
+        options({ abbr }),
+      ),
+    ).toBe(
+      '<p>a <abbr>1[2[3[4[5[6[7[8[9[10[11[12[13[14[15[16[17[18[19[20[21[22[23[24[25[26[27[28[29[30[31[32[x]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]</abbr></p>',
+    );
   });
 
   it('should *not* support balanced brackets in a label, 33 levels deep', () => {
-    expect(micromark(
-      '$abbr[1[2[3[4[5[6[7[8[9[10[11[12[13[14[15[16[17[18[19[20[21[22[23[24[25[26[27[28[29[30[31[32[33[x]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]',
-      options({ abbr }),
-    )).toBe(
+    expect(
+      micromark(
+        '$abbr[1[2[3[4[5[6[7[8[9[10[11[12[13[14[15[16[17[18[19[20[21[22[23[24[25[26[27[28[29[30[31[32[33[x]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]',
+        options({ abbr }),
+      ),
+    ).toBe(
       '<p><abbr></abbr>[1[2[3[4[5[6[7[8[9[10[11[12[13[14[15[16[17[18[19[20[21[22[23[24[25[26[27[28[29[30[31[32[33[x]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]</p>',
     );
   });
 
   it('should support EOLs in a label', () => {
-    expect(micromark('$abbr[a\nb\rc]', options({ abbr })))
-      .toBe('<p><abbr>a\nb\rc</abbr></p>');
+    expect(micromark('$abbr[a\nb\rc]', options({ abbr }))).toBe(
+      '<p><abbr>a\nb\rc</abbr></p>',
+    );
   });
 
   it('should support EOLs at the edges of a label (1)', () => {
-    expect(micromark('$abbr[\na\r]', options({ abbr })))
-      .toBe('<p><abbr>\na\r</abbr></p>');
+    expect(micromark('$abbr[\na\r]', options({ abbr }))).toBe(
+      '<p><abbr>\na\r</abbr></p>',
+    );
   });
 
   it('should support EOLs at the edges of a label (2)', () => {
-    expect(micromark('$abbr[\n]', options({ abbr })))
-      .toBe('<p><abbr>\n</abbr></p>');
+    expect(micromark('$abbr[\n]', options({ abbr }))).toBe(
+      '<p><abbr>\n</abbr></p>',
+    );
   });
 
   // == does not work but I don't know why.. -- 2022.08.12 Yuki Takei
@@ -720,122 +715,142 @@ describe('content', () => {
   // });
 
   it('should support EOLs inside nested directives (1)', () => {
-    expect(micromark('$abbr[$abbr[\n]]', options({ abbr })))
-      .toBe('<p><abbr><abbr>\n</abbr></abbr></p>');
+    expect(micromark('$abbr[$abbr[\n]]', options({ abbr }))).toBe(
+      '<p><abbr><abbr>\n</abbr></abbr></p>',
+    );
   });
 
   it('should support EOLs inside nested directives (2)', () => {
-    expect(micromark('$abbr[$abbr[a\nb]]', options({ abbr })))
-      .toBe('<p><abbr><abbr>a\nb</abbr></abbr></p>');
+    expect(micromark('$abbr[$abbr[a\nb]]', options({ abbr }))).toBe(
+      '<p><abbr><abbr>a\nb</abbr></abbr></p>',
+    );
   });
 
   it('should support EOLs inside nested directives (3)', () => {
-    expect(micromark('$abbr[$abbr[\nb\n]]', options({ abbr })))
-      .toBe('<p><abbr><abbr>\nb\n</abbr></abbr></p>');
+    expect(micromark('$abbr[$abbr[\nb\n]]', options({ abbr }))).toBe(
+      '<p><abbr><abbr>\nb\n</abbr></abbr></p>',
+    );
   });
 
   it('should support EOLs inside nested directives (4)', () => {
-    expect(micromark('$abbr[$abbr[\\\n]]', options({ abbr })))
-      .toBe('<p><abbr><abbr><br />\n</abbr></abbr></p>');
+    expect(micromark('$abbr[$abbr[\\\n]]', options({ abbr }))).toBe(
+      '<p><abbr><abbr><br />\n</abbr></abbr></p>',
+    );
   });
 
   it('should support markdown in a label', () => {
-    expect(micromark('a $abbr[a *b* **c** d]', options({ abbr })))
-      .toBe('<p>a <abbr>a <em>b</em> <strong>c</strong> d</abbr></p>');
+    expect(micromark('a $abbr[a *b* **c** d]', options({ abbr }))).toBe(
+      '<p>a <abbr>a <em>b</em> <strong>c</strong> d</abbr></p>',
+    );
   });
 
   it('should support character references in unquoted attribute values', () => {
-    expect(micromark('a $abbr(title=a&apos;b)', options({ abbr })))
-      .toBe('<p>a <abbr title="a\'b"></abbr></p>');
+    expect(micromark('a $abbr(title=a&apos;b)', options({ abbr }))).toBe(
+      '<p>a <abbr title="a\'b"></abbr></p>',
+    );
   });
 
   it('should support character references in double attribute values', () => {
-    expect(micromark('a $abbr(title="a&apos;b")', options({ abbr })))
-      .toBe('<p>a <abbr title="a\'b"></abbr></p>');
+    expect(micromark('a $abbr(title="a&apos;b")', options({ abbr }))).toBe(
+      '<p>a <abbr title="a\'b"></abbr></p>',
+    );
   });
 
   it('should support character references in single attribute values', () => {
-    expect(micromark("a $abbr(title='a&apos;b')", options({ abbr })))
-      .toBe('<p>a <abbr title="a\'b"></abbr></p>');
+    expect(micromark("a $abbr(title='a&apos;b')", options({ abbr }))).toBe(
+      '<p>a <abbr title="a\'b"></abbr></p>',
+    );
   });
 
   it('should support unknown character references in attribute values', () => {
-    expect(micromark('a $abbr(title="a&somethingelse;b")', options({ abbr })))
-      .toBe('<p>a <abbr title="a&amp;somethingelse;b"></abbr></p>');
+    expect(
+      micromark('a $abbr(title="a&somethingelse;b")', options({ abbr })),
+    ).toBe('<p>a <abbr title="a&amp;somethingelse;b"></abbr></p>');
   });
 
   it('should support EOLs between attributes', () => {
-    expect(micromark('$span(a\nb)', options({ '*': h })))
-      .toBe('<p><span a="" b=""></span></p>');
+    expect(micromark('$span(a\nb)', options({ '*': h }))).toBe(
+      '<p><span a="" b=""></span></p>',
+    );
   });
 
   it('should support EOLs at the edges of attributes', () => {
-    expect(micromark('$span(\na\n)', options({ '*': h })))
-      .toBe('<p><span a=""></span></p>');
+    expect(micromark('$span(\na\n)', options({ '*': h }))).toBe(
+      '<p><span a=""></span></p>',
+    );
   });
 
   it('should support EOLs before initializer', () => {
-    expect(micromark('$span(a\r= b)', options({ '*': h })))
-      .toBe('<p><span a="b"></span></p>');
+    expect(micromark('$span(a\r= b)', options({ '*': h }))).toBe(
+      '<p><span a="b"></span></p>',
+    );
   });
 
   it('should support EOLs after initializer', () => {
-    expect(micromark('$span(a=\r\nb)', options({ '*': h })))
-      .toBe('<p><span a="b"></span></p>');
+    expect(micromark('$span(a=\r\nb)', options({ '*': h }))).toBe(
+      '<p><span a="b"></span></p>',
+    );
   });
 
   it('should support EOLs between an unquoted attribute value and a next attribute name', () => {
-    expect(micromark('$span(a=b\nc)', options({ '*': h })))
-      .toBe('<p><span a="b" c=""></span></p>');
+    expect(micromark('$span(a=b\nc)', options({ '*': h }))).toBe(
+      '<p><span a="b" c=""></span></p>',
+    );
   });
 
   it('should support EOLs in a double quoted attribute value', () => {
-    expect(micromark('$span(a="b\nc")', options({ '*': h })))
-      .toBe('<p><span a="b\nc"></span></p>');
+    expect(micromark('$span(a="b\nc")', options({ '*': h }))).toBe(
+      '<p><span a="b\nc"></span></p>',
+    );
   });
 
   it('should support EOLs in a single quoted attribute value', () => {
-    expect(micromark("$span(a='b\nc')", options({ '*': h })))
-      .toBe('<p><span a="b\nc"></span></p>');
+    expect(micromark("$span(a='b\nc')", options({ '*': h }))).toBe(
+      '<p><span a="b\nc"></span></p>',
+    );
   });
 
   it('should support attrs which contains `#` (1)', () => {
-    expect(micromark('a $span(#a#b)', options({ '*': h })))
-      .toBe('<p>a <span #a#b=""></span></p>');
+    expect(micromark('a $span(#a#b)', options({ '*': h }))).toBe(
+      '<p>a <span #a#b=""></span></p>',
+    );
   });
 
   it('should support attrs which contains `#` (2)', () => {
-    expect(micromark('a $span(id=a id="b" #c#d)', options({ '*': h })))
-      .toBe('<p>a <span id="b" #c#d=""></span></p>');
+    expect(micromark('a $span(id=a id="b" #c#d)', options({ '*': h }))).toBe(
+      '<p>a <span id="b" #c#d=""></span></p>',
+    );
   });
 
   it('should support attrs with dot notation', () => {
-    expect(micromark('a $span(.a.b)', options({ '*': h })))
-      .toBe('<p>a <span .a.b=""></span></p>');
+    expect(micromark('a $span(.a.b)', options({ '*': h }))).toBe(
+      '<p>a <span .a.b=""></span></p>',
+    );
   });
 
   describe('spec for growi plugin', () => {
     it('should support name with slash', () => {
-      expect(micromark('a $lsx(/Sandbox)', options()))
-        .toBe('<p>a </p>');
+      expect(micromark('a $lsx(/Sandbox)', options())).toBe('<p>a </p>');
     });
 
     it('should support name=value and an attribute w/o value', () => {
-      expect(micromark('a $lsx(key=value, reverse)', options()))
-        .toBe('<p>a </p>');
+      expect(micromark('a $lsx(key=value, reverse)', options())).toBe(
+        '<p>a </p>',
+      );
     });
 
     it('should support consecutive attributes w/o value', () => {
-      expect(micromark('a $lsx(key=value, reverse, reverse2)', options()))
-        .toBe('<p>a </p>');
+      expect(micromark('a $lsx(key=value, reverse, reverse2)', options())).toBe(
+        '<p>a </p>',
+      );
     });
 
     it('should support name=value after an empty value attribute', () => {
-      expect(micromark('a $lsx(/Sandbox, key=value, reverse)', options()))
-        .toBe('<p>a </p>');
+      expect(micromark('a $lsx(/Sandbox, key=value, reverse)', options())).toBe(
+        '<p>a </p>',
+      );
     });
   });
-
 });
 
 /** @type {Handle} */
@@ -899,8 +914,7 @@ function lsx(d) {
   for (const key in attrs) {
     if (attrs[key].length === 0) {
       props.push(`prefix="${key}"`);
-    }
-    else {
+    } else {
       props.push(`${key}="${attrs[key]}"`);
     }
   }

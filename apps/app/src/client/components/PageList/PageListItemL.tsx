@@ -1,4 +1,4 @@
-import type { ForwardRefRenderFunction } from 'react';
+import type { ForwardRefRenderFunction, JSX } from 'react';
 import React, {
   forwardRef, useState, memo, useCallback, useImperativeHandle, useRef, useEffect,
 } from 'react';
@@ -280,7 +280,7 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (pr
               <Clamp lines={2}>
                 {elasticSearchResult != null && elasticSearchResult.snippet != null && (
                   // eslint-disable-next-line react/no-danger
-                  <div dangerouslySetInnerHTML={{ __html: elasticSearchResult.snippet }}></div>
+                  (<div dangerouslySetInnerHTML={{ __html: elasticSearchResult.snippet }}></div>)
                 )}
                 {revisionShortBody != null && (
                   <div data-testid="revision-short-body-in-page-list-item-L">{revisionShortBody}</div>

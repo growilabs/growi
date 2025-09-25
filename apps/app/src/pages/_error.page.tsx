@@ -1,6 +1,9 @@
+import type { JSX } from 'react';
+
 import type { NextPageContext } from 'next';
 import type { ErrorProps } from 'next/error';
 import Error from 'next/error';
+
 
 export default function ErrorPage(props: ErrorProps): JSX.Element {
   return <Error {...props} />;

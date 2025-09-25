@@ -1,4 +1,4 @@
-import assert from 'assert';
+import assert from 'node:assert';
 
 import type { IChannel } from '../interfaces/channel';
 import type { IInteractionPayloadAccessor } from '../interfaces/request-from-slack';
@@ -7,16 +7,16 @@ import loggerFactory from './logger';
 
 const logger = loggerFactory('@growi/slack:utils:interaction-payload-accessor');
 
-
 export class InteractionPayloadAccessor implements IInteractionPayloadAccessor {
-
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
   private payload: any;
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
   constructor(payload: any) {
     this.payload = payload;
   }
 
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
   firstAction(): any | null {
     const actions = this.payload.actions;
 
@@ -40,6 +40,7 @@ export class InteractionPayloadAccessor implements IInteractionPayloadAccessor {
     return responseUrls[0].response_url;
   }
 
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
   getStateValues(): any | null {
     const state = this.payload.state;
     if (state != null && state.values != null) {
@@ -54,17 +55,18 @@ export class InteractionPayloadAccessor implements IInteractionPayloadAccessor {
     return null;
   }
 
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
   getViewPrivateMetaData(): any | null {
     const view = this.payload.view;
 
-    if (view != null && view.private_metadata) {
+    if (view?.private_metadata) {
       return JSON.parse(view.private_metadata);
     }
 
     return null;
   }
 
-  getActionIdAndCallbackIdFromPayLoad(): {[key: string]: string} {
+  getActionIdAndCallbackIdFromPayLoad(): { [key: string]: string } {
     const actionId = this.firstAction()?.action_id || '';
     const callbackId = this.payload.view?.callback_id || '';
 
@@ -75,7 +77,9 @@ export class InteractionPayloadAccessor implements IInteractionPayloadAccessor {
     // private_metadata should have the channelName parameter when view_submission
     const privateMetadata = this.getViewPrivateMetaData();
     if (privateMetadata != null && privateMetadata.channelName != null) {
-      throw new Error('PrivateMetaDatas are not implemented after removal of modal from slash commands. Use payload instead.');
+      throw new Error(
+        'PrivateMetaDatas are not implemented after removal of modal from slash commands. Use payload instead.',
+      );
     }
     const channel = this.payload.channel;
     if (channel != null) {
@@ -85,6 +89,7 @@ export class InteractionPayloadAccessor implements IInteractionPayloadAccessor {
     return null;
   }
 
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
   getOriginalData(): any | null {
     const value = this.firstAction()?.value;
     if (value == null) return null;
@@ -92,16 +97,15 @@ export class InteractionPayloadAccessor implements IInteractionPayloadAccessor {
     const { originalData } = JSON.parse(value);
     if (originalData == null) return JSON.parse(value);
 
+    // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
     let parsedOriginalData;
     try {
       parsedOriginalData = JSON.parse(originalData);
-    }
-    catch (err) {
+    } catch (err) {
       logger.error('Failed to parse original data:\n', err);
       return null;
     }
 
     return parsedOriginalData;
   }
-
 }

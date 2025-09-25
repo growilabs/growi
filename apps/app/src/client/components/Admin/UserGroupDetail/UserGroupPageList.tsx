@@ -1,4 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, {
+  useEffect, useState, useCallback, type JSX,
+} from 'react';
 
 import type { IPageHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';

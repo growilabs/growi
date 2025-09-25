@@ -147,7 +147,7 @@ const PermissionSettingForEachPermissionTypeComponent = ({
             className="form-control"
             type="textarea"
             name={keyName}
-            defaultValue={textareaDefaultValue}
+            value={textareaDefaultValue}
             onChange={onUpdateChannels}
           />
           <p className="form-text text-muted small">

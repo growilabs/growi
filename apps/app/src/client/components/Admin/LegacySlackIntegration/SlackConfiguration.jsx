@@ -70,7 +70,7 @@ class SlackConfiguration extends React.Component {
                 <input
                   className="form-control"
                   type="text"
-                  defaultValue={adminSlackIntegrationLegacyContainer.state.webhookUrl || ''}
+                  value={adminSlackIntegrationLegacyContainer.state.webhookUrl || ''}
                   onChange={e => adminSlackIntegrationLegacyContainer.changeWebhookUrl(e.target.value)}
                 />
               </div>
@@ -122,7 +122,7 @@ class SlackConfiguration extends React.Component {
                   <input
                     className="form-control"
                     type="text"
-                    defaultValue={adminSlackIntegrationLegacyContainer.state.slackToken || ''}
+                    value={adminSlackIntegrationLegacyContainer.state.slackToken || ''}
                     onChange={e => adminSlackIntegrationLegacyContainer.changeSlackToken(e.target.value)}
                   />
                 </div>

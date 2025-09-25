@@ -29,7 +29,6 @@ module.exports = {
   'growi-plugin:*': 'debug',
   'growi:service:search-delegator:elasticsearch': 'debug',
   'growi:service:g2g-transfer': 'debug',
-  'growi:service:questionnaire': 'debug',
 
   'growi:migration:add-installed-date-to-config': 'debug',
 
@@ -44,4 +43,5 @@ module.exports = {
   // 'growi:cli:ItemsTree': 'debug',
   'growi:searchResultList': 'debug',
   'growi:service:openai': 'debug',
+  'growi:middleware:access-token-parser:access-token': 'debug',
 };

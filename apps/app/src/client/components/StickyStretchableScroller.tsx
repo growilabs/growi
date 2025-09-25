@@ -1,5 +1,6 @@
+import type { RefObject } from 'react';
 import React, {
-  useEffect, useCallback, useRef, useState, useMemo, RefObject,
+  useEffect, useCallback, useRef, useState, useMemo, type JSX,
 } from 'react';
 
 import SimpleBar from 'simplebar-react';
@@ -13,7 +14,7 @@ const logger = loggerFactory('growi:cli:StickyStretchableScroller');
 
 export type StickyStretchableScrollerProps = {
   stickyElemSelector: string,
-  simplebarRef?: (ref: RefObject<SimpleBar>) => void,
+  simplebarRef?: (ref: RefObject<SimpleBar | null>) => void,
   calcViewHeight?: (scrollElement: HTMLElement) => number,
   children?: JSX.Element,
 }

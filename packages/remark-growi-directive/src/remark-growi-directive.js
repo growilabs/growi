@@ -3,32 +3,35 @@
  * @typedef {import('unified').Processor<Root>} Processor
  */
 
-import { directiveFromMarkdown, directiveToMarkdown } from './mdast-util-growi-directive/index.js';
+import {
+  directiveFromMarkdown,
+  directiveToMarkdown,
+} from './mdast-util-growi-directive/index.js';
 import { directive } from './micromark-extension-growi-directive/index.js';
 
 /**
-    * Plugin to support GROWI plugin (`$lsx(/path, depth=2)`).
-    *
-    * Add support for generic directives.
-    *
-    * ###### Notes
-    *
-    * Doesn’t handle the directives: create your own plugin to do that.
-    *
-    * @returns {undefined}
-    *   Nothing.
-    */
+ * Plugin to support GROWI plugin (`$lsx(/path, depth=2)`).
+ *
+ * Add support for generic directives.
+ *
+ * ###### Notes
+ *
+ * Doesn’t handle the directives: create your own plugin to do that.
+ *
+ * @returns {undefined}
+ *   Nothing.
+ */
 export function remarkGrowiDirectivePlugin() {
   // @ts-expect-error: TS is wrong about `this`.
-  // eslint-disable-next-line @typescript-eslint/no-this-alias
+  // biome-ignore lint/complexity/noUselessThisAlias: ignore
   const self = /** @type {Processor} */ (this);
   const data = self.data();
 
-  const micromarkExtensions = data.micromarkExtensions || (data.micromarkExtensions = []);
-  const fromMarkdownExtensions = data.fromMarkdownExtensions || (data.fromMarkdownExtensions = []);
-  const toMarkdownExtensions = data.toMarkdownExtensions || (data.toMarkdownExtensions = []);
+  if (!data.micromarkExtensions) data.micromarkExtensions = [];
+  if (!data.fromMarkdownExtensions) data.fromMarkdownExtensions = [];
+  if (!data.toMarkdownExtensions) data.toMarkdownExtensions = [];
 
-  micromarkExtensions.push(directive());
-  fromMarkdownExtensions.push(directiveFromMarkdown());
-  toMarkdownExtensions.push(directiveToMarkdown());
+  data.micromarkExtensions.push(directive());
+  data.fromMarkdownExtensions.push(directiveFromMarkdown());
+  data.toMarkdownExtensions.push(directiveToMarkdown());
 }

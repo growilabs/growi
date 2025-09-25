@@ -11,7 +11,6 @@ import mongoose from 'mongoose';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
-import { generateConfigsForInstalling } from '../models/config';
 
 import { configManager } from './config-manager';
 
@@ -112,14 +111,16 @@ export class InstallerService {
    * Execute only once for installing application
    */
   private async initDB(globalLang: Lang, options?: AutoInstallOptions): Promise<void> {
-    const initialConfig = generateConfigsForInstalling();
-    initialConfig['app:globalLang'] = globalLang;
+    await configManager.updateConfigs({
+      'app:installed': true,
+      'app:fileUpload': true,
+      'app:isV5Compatible': true,
+      'app:globalLang': globalLang,
+    }, { skipPubsub: true });
 
     if (options?.allowGuestMode) {
-      initialConfig['security:restrictGuestMode'] = 'Readonly';
+      await configManager.updateConfig('security:restrictGuestMode', 'Readonly', { skipPubsub: true });
     }
-
-    return configManager.updateConfigsInTheSameNamespace('crowi', initialConfig, true);
   }
 
   async install(firstAdminUserToSave: Pick<IUser, 'name' | 'username' | 'email' | 'password'>, globalLang: Lang, options?: AutoInstallOptions): Promise<IUser> {

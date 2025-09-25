@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, {
+  useEffect, useMemo, useState, type JSX,
+} from 'react';
 
 import { isPopulated, type IUser } from '@growi/core';
 import * as pathUtils from '@growi/core/dist/utils/path-utils';
@@ -149,7 +151,7 @@ export const Comment = (props: CommentProps): JSX.Element => {
         <div id={commentId} className={rootClassName}>
           <div className="page-comment-main bg-comment rounded mb-2">
             <div className="d-flex align-items-center">
-              <UserPicture user={creator} additionalClassName="me-2" />
+              <UserPicture user={creator} className="me-2" />
               <div className="small fw-bold me-3">
                 <Username user={creator} />
               </div>

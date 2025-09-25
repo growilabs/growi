@@ -46,7 +46,7 @@ const revisionSchema = new Schema<IRevisionDocument, IRevisionModel>({
     required: true,
     get: (data) => {
     // replace CR/CRLF to LF above v3.1.5
-    // see https://github.com/weseek/growi/issues/463
+    // see https://github.com/growilabs/growi/issues/463
       return data ? data.replace(/\r\n?/g, '\n') : '';
     },
   },

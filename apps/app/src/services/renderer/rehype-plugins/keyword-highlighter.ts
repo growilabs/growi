@@ -1,6 +1,6 @@
-import { Root, Element, Text } from 'hast';
+import type { Root, Element, Text } from 'hast';
 import rehypeRewrite from 'rehype-rewrite';
-import { Plugin } from 'unified';
+import type { Plugin } from 'unified';
 
 
 /**

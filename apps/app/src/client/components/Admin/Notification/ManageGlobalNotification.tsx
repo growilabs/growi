@@ -1,5 +1,5 @@
 import React, {
-  useCallback, useMemo, useEffect, useState,
+  useCallback, useMemo, useEffect, useState, type JSX,
 } from 'react';
 
 import { useTranslation } from 'next-i18next';

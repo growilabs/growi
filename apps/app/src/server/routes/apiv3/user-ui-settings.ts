@@ -12,7 +12,7 @@ const logger = loggerFactory('growi:routes:apiv3:user-ui-settings');
 
 const router = express.Router();
 
-module.exports = (crowi) => {
+module.exports = () => {
 
   const validatorForPut = [
     body('settings').exists().withMessage('The body param \'settings\' is required'),
@@ -21,6 +21,51 @@ module.exports = (crowi) => {
     body('settings.preferCollapsedModeByUser').optional().isBoolean(),
   ];
 
+  /**
+   * @swagger
+   *
+   * /user-ui-settings:
+   *   put:
+   *     tags: [UserUISettings]
+   *     security:
+   *       - cookieAuth: []
+   *     summary: /user-ui-settings
+   *     description: Update the user's UI settings
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               settings:
+   *                 type: object
+   *                 properties:
+   *                   currentSidebarContents:
+   *                     type: string
+   *                   currentProductNavWidth:
+   *                     type: number
+   *                   preferCollapsedModeByUser:
+   *                     type: boolean
+   *     responses:
+   *       200:
+   *         description: The user's UI settings
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 _id:
+   *                   type: string
+   *                 user:
+   *                   type: string
+   *                 __v:
+   *                   type: number
+   *                 currentSidebarContents:
+   *                   type: string
+   *                 preferCollapsedModeByUser:
+   *                   type: boolean
+   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   router.put('/', validatorForPut, apiV3FormValidator, async(req: any, res: any) => {
     const { user } = req;

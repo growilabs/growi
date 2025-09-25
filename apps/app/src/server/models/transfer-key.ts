@@ -1,6 +1,7 @@
-import { Model, Schema, HydratedDocument } from 'mongoose';
+import type { Model, HydratedDocument } from 'mongoose';
+import { Schema } from 'mongoose';
 
-import { ITransferKey } from '~/interfaces/transfer-key';
+import type { ITransferKey } from '~/interfaces/transfer-key';
 
 import { getOrCreateModel } from '../util/mongoose-utils';
 

@@ -1,4 +1,5 @@
-import useSWR, { SWRConfiguration, SWRResponse } from 'swr';
+import type { SWRConfiguration, SWRResponse } from 'swr';
+import useSWR from 'swr';
 
 
 import { SupportedTargetModel } from '~/interfaces/activity';

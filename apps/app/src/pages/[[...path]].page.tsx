@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, JSX } from 'react';
 import React, { useEffect } from 'react';
 
 import EventEmitter from 'events';
@@ -41,12 +41,13 @@ import {
   useIsAclEnabled, useIsSearchPage, useIsEnabledAttachTitleHeader,
   useCsrfToken, useIsSearchScopeChildrenAsDefault, useIsEnabledMarp, useCurrentPathname,
   useIsSlackConfigured, useRendererConfig, useGrowiCloudUri,
-  useIsAllReplyShown, useIsContainerFluid, useIsNotCreatable,
+  useIsAllReplyShown, useShowPageSideAuthors, useIsContainerFluid, useIsNotCreatable,
   useIsUploadAllFileAllowed, useIsUploadEnabled, useIsBulkExportPagesEnabled,
   useElasticsearchMaxBodyLengthToIndex,
   useIsLocalAccountRegistrationEnabled,
   useIsRomUserAllowedToComment,
-  useIsAiEnabled,
+  useIsPdfBulkExportEnabled,
+  useIsAiEnabled, useLimitLearnablePageCountPerAssistant, useIsUsersHomepageDeletionEnabled,
 } from '~/stores-universal/context';
 import { useEditingMarkdown } from '~/stores/editor';
 import {
@@ -90,7 +91,6 @@ const TemplateModal = dynamic(() => import('~/client/components/TemplateModal').
 const LinkEditModal = dynamic(() => import('~/client/components/PageEditor/LinkEditModal').then(mod => mod.LinkEditModal), { ssr: false });
 const TagEditModal = dynamic(() => import('~/client/components/PageTags/TagEditModal').then(mod => mod.TagEditModal), { ssr: false });
 const ConflictDiffModal = dynamic(() => import('~/client/components/PageEditor/ConflictDiffModal').then(mod => mod.ConflictDiffModal), { ssr: false });
-const QuestionnaireModalManager = dynamic(() => import('~/features/questionnaire/client/components/QuestionnaireModalManager'), { ssr: false });
 
 const EditablePageEffects = dynamic(() => import('~/client/components/Page/EditablePageEffects').then(mod => mod.EditablePageEffects), { ssr: false });
 
@@ -175,13 +175,14 @@ type Props = CommonProps & {
   isAclEnabled: boolean,
   // hasSlackConfig: boolean,
   drawioUri: string | null,
-  noCdn: string,
   // highlightJsStyle: string,
   isAllReplyShown: boolean,
+  showPageSideAuthors: boolean,
   isContainerFluid: boolean,
   isUploadEnabled: boolean,
   isUploadAllFileAllowed: boolean,
   isBulkExportPagesEnabled: boolean,
+  isPdfBulkExportEnabled: boolean,
   isEnabledStaleNotification: boolean,
   isEnabledAttachTitleHeader: boolean,
   // isEnabledLinebreaks: boolean,
@@ -197,6 +198,8 @@ type Props = CommonProps & {
   rendererConfig: RendererConfig,
 
   aiEnabled: boolean,
+  limitLearnablePageCountPerAssistant: number,
+  isUsersHomepageDeletionEnabled: boolean,
 };
 
 const Page: NextPageWithLayout<Props> = (props: Props) => {
@@ -234,7 +237,6 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
   // useIsMailerSetup(props.isMailerSetup);
   useIsAclEnabled(props.isAclEnabled);
   // useHasSlackConfig(props.hasSlackConfig);
-  // useNoCdn(props.noCdn);
   useDefaultIndentSize(props.adminPreferredIndentSize);
   useIsIndentSizeForced(props.isIndentSizeForced);
   useDisableLinkSharing(props.disableLinkSharing);
@@ -243,15 +245,21 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
   // useRendererSettings(props.rendererSettingsStr != null ? JSON.parse(props.rendererSettingsStr) : undefined);
   // useGrowiRendererConfig(props.growiRendererConfigStr != null ? JSON.parse(props.growiRendererConfigStr) : undefined);
   useIsAllReplyShown(props.isAllReplyShown);
+  useShowPageSideAuthors(props.showPageSideAuthors);
 
   useIsUploadAllFileAllowed(props.isUploadAllFileAllowed);
   useIsUploadEnabled(props.isUploadEnabled);
   useIsBulkExportPagesEnabled(props.isBulkExportPagesEnabled);
+  useIsPdfBulkExportEnabled(props.isPdfBulkExportEnabled);
 
   useIsLocalAccountRegistrationEnabled(props.isLocalAccountRegistrationEnabled);
   useIsRomUserAllowedToComment(props.isRomUserAllowedToComment);
 
   useIsAiEnabled(props.aiEnabled);
+  useLimitLearnablePageCountPerAssistant(props.limitLearnablePageCountPerAssistant);
+
+  useIsUsersHomepageDeletionEnabled(props.isUsersHomepageDeletionEnabled);
+
 
   const { pageWithMeta } = props;
 
@@ -417,7 +425,6 @@ Page.getLayout = function getLayout(page: React.ReactElement<Props>) {
       <DescendantsPageListModal />
       <DrawioModal />
       <HandsontableModal />
-      <QuestionnaireModalManager />
       <TemplateModal />
       <LinkEditModal />
       <TagEditModal />
@@ -478,24 +485,29 @@ async function injectPageData(context: GetServerSidePropsContext, props: Props):
     }
   }
 
-  const pageWithMeta: IPageToShowRevisionWithMeta | null = await pageService.findPageAndMetaDataByViewer(pageId, currentPathname, user, true); // includeEmpty = true, isSharedPage = false
-  const page = pageWithMeta?.data as unknown as PageDocument;
+  const pageWithMeta = await pageService.findPageAndMetaDataByViewer(pageId, currentPathname, user, true); // includeEmpty = true, isSharedPage = false
+  const { data: page, meta } = pageWithMeta ?? {};
 
   // add user to seen users
   if (page != null && user != null) {
     await page.seen(user);
   }
 
+  props.pageWithMeta = null;
+
   // populate & check if the revision is latest
   if (page != null) {
     page.initLatestRevisionField(revisionId);
     props.isLatestRevision = page.isLatestRevision();
-    const ssrMaxRevisionBodyLength = configManager.getConfig('crowi', 'app:ssrMaxRevisionBodyLength');
+    const ssrMaxRevisionBodyLength = configManager.getConfig('app:ssrMaxRevisionBodyLength');
     props.skipSSR = await skipSSR(page, ssrMaxRevisionBodyLength);
-    await page.populateDataToShowRevision(props.skipSSR); // shouldExcludeBody = skipSSR
-  }
+    const populatedPage = await page.populateDataToShowRevision(props.skipSSR); // shouldExcludeBody = skipSSR
 
-  props.pageWithMeta = pageWithMeta;
+    props.pageWithMeta = {
+      data: populatedPage,
+      meta,
+    };
+  }
 }
 
 async function injectRoutingInformation(context: GetServerSidePropsContext, props: Props): Promise<void> {
@@ -560,65 +572,71 @@ function injectServerConfigurations(context: GetServerSidePropsContext, props: P
   const req: CrowiRequest = context.req as CrowiRequest;
   const { crowi } = req;
   const {
-    searchService, configManager, aclService,
+    configManager, searchService, aclService, fileUploadService,
+    slackIntegrationService, passportService,
   } = crowi;
 
-  props.aiEnabled = configManager.getConfig('crowi', 'app:aiEnabled');
-
+  props.aiEnabled = configManager.getConfig('app:aiEnabled');
+  props.limitLearnablePageCountPerAssistant = configManager.getConfig('openai:limitLearnablePageCountPerAssistant');
+  props.isUsersHomepageDeletionEnabled = configManager.getConfig('security:user-homepage-deletion:isEnabled');
   props.isSearchServiceConfigured = searchService.isConfigured;
   props.isSearchServiceReachable = searchService.isReachable;
-  props.isSearchScopeChildrenAsDefault = configManager.getConfig('crowi', 'customize:isSearchScopeChildrenAsDefault');
-  props.elasticsearchMaxBodyLengthToIndex = configManager.getConfig('crowi', 'app:elasticsearchMaxBodyLengthToIndex');
+  props.isSearchScopeChildrenAsDefault = configManager.getConfig('customize:isSearchScopeChildrenAsDefault');
+  props.elasticsearchMaxBodyLengthToIndex = configManager.getConfig('app:elasticsearchMaxBodyLengthToIndex');
 
-  props.isRomUserAllowedToComment = configManager.getConfig('crowi', 'security:isRomUserAllowedToComment');
+  props.isRomUserAllowedToComment = configManager.getConfig('security:isRomUserAllowedToComment');
 
-  props.isSlackConfigured = crowi.slackIntegrationService.isSlackConfigured;
+  props.isSlackConfigured = slackIntegrationService.isSlackConfigured;
   // props.isMailerSetup = mailService.isMailerSetup;
   props.isAclEnabled = aclService.isAclEnabled();
   // props.hasSlackConfig = slackNotificationService.hasSlackConfig();
-  props.drawioUri = configManager.getConfig('crowi', 'app:drawioUri');
-  props.noCdn = configManager.getConfig('crowi', 'app:noCdn');
-  // props.highlightJsStyle = configManager.getConfig('crowi', 'customize:highlightJsStyle');
-  props.isAllReplyShown = configManager.getConfig('crowi', 'customize:isAllReplyShown');
-  props.isContainerFluid = configManager.getConfig('crowi', 'customize:isContainerFluid');
-  props.isEnabledStaleNotification = configManager.getConfig('crowi', 'customize:isEnabledStaleNotification');
-  props.disableLinkSharing = configManager.getConfig('crowi', 'security:disableLinkSharing');
-  props.isUploadAllFileAllowed = crowi.fileUploadService.getFileUploadEnabled();
-  props.isUploadEnabled = crowi.fileUploadService.getIsUploadable();
-  props.isBulkExportPagesEnabled = configManager.getConfig('crowi', 'app:isBulkExportPagesEnabled');
+  props.drawioUri = configManager.getConfig('app:drawioUri');
+  // props.highlightJsStyle = configManager.getConfig('customize:highlightJsStyle');
+  props.isAllReplyShown = configManager.getConfig('customize:isAllReplyShown');
+  props.showPageSideAuthors = configManager.getConfig('customize:showPageSideAuthors');
+  props.isContainerFluid = configManager.getConfig('customize:isContainerFluid');
+  props.isEnabledStaleNotification = configManager.getConfig('customize:isEnabledStaleNotification');
+  props.disableLinkSharing = configManager.getConfig('security:disableLinkSharing');
+  props.isUploadAllFileAllowed = fileUploadService.getFileUploadEnabled();
+  props.isUploadEnabled = fileUploadService.getIsUploadable();
+  // TODO: remove growiCloudUri condition when bulk export can be relased for GROWI.cloud (https://redmine.weseek.co.jp/issues/163220)
+  props.isBulkExportPagesEnabled = configManager.getConfig('app:isBulkExportPagesEnabled') && configManager.getConfig('app:growiCloudUri') == null;
+  props.isPdfBulkExportEnabled = configManager.getConfig('app:pageBulkExportPdfConverterUri') != null;
 
-  props.isLocalAccountRegistrationEnabled = crowi.passportService.isLocalStrategySetup
-  && configManager.getConfig('crowi', 'security:registrationMode') !== RegistrationMode.CLOSED;
+  props.isLocalAccountRegistrationEnabled = passportService.isLocalStrategySetup
+  && configManager.getConfig('security:registrationMode') !== RegistrationMode.CLOSED;
 
-  props.adminPreferredIndentSize = configManager.getConfig('markdown', 'markdown:adminPreferredIndentSize');
-  props.isIndentSizeForced = configManager.getConfig('markdown', 'markdown:isIndentSizeForced');
+  props.adminPreferredIndentSize = configManager.getConfig('markdown:adminPreferredIndentSize');
+  props.isIndentSizeForced = configManager.getConfig('markdown:isIndentSizeForced');
 
-  props.isEnabledAttachTitleHeader = configManager.getConfig('crowi', 'customize:isEnabledAttachTitleHeader');
+  props.isEnabledAttachTitleHeader = configManager.getConfig('customize:isEnabledAttachTitleHeader');
 
   props.sidebarConfig = {
-    isSidebarCollapsedMode: configManager.getConfig('crowi', 'customize:isSidebarCollapsedMode'),
-    isSidebarClosedAtDockMode: configManager.getConfig('crowi', 'customize:isSidebarClosedAtDockMode'),
+    isSidebarCollapsedMode: configManager.getConfig('customize:isSidebarCollapsedMode'),
+    isSidebarClosedAtDockMode: configManager.getConfig('customize:isSidebarClosedAtDockMode'),
   };
 
   props.rendererConfig = {
-    isEnabledLinebreaks: configManager.getConfig('markdown', 'markdown:isEnabledLinebreaks'),
-    isEnabledLinebreaksInComments: configManager.getConfig('markdown', 'markdown:isEnabledLinebreaksInComments'),
-    isEnabledMarp: configManager.getConfig('crowi', 'customize:isEnabledMarp'),
-    adminPreferredIndentSize: configManager.getConfig('markdown', 'markdown:adminPreferredIndentSize'),
-    isIndentSizeForced: configManager.getConfig('markdown', 'markdown:isIndentSizeForced'),
+    isEnabledLinebreaks: configManager.getConfig('markdown:isEnabledLinebreaks'),
+    isEnabledLinebreaksInComments: configManager.getConfig('markdown:isEnabledLinebreaksInComments'),
+    isEnabledMarp: configManager.getConfig('customize:isEnabledMarp'),
+    adminPreferredIndentSize: configManager.getConfig('markdown:adminPreferredIndentSize'),
+    isIndentSizeForced: configManager.getConfig('markdown:isIndentSizeForced'),
 
-    drawioUri: configManager.getConfig('crowi', 'app:drawioUri'),
-    plantumlUri: configManager.getConfig('crowi', 'app:plantumlUri'),
+    drawioUri: configManager.getConfig('app:drawioUri'),
+    plantumlUri: configManager.getConfig('app:plantumlUri'),
 
     // XSS Options
-    isEnabledXssPrevention: configManager.getConfig('markdown', 'markdown:rehypeSanitize:isEnabledPrevention'),
-    sanitizeType: configManager.getConfig('markdown', 'markdown:rehypeSanitize:option'),
-    customAttrWhitelist: JSON.parse(crowi.configManager.getConfig('markdown', 'markdown:rehypeSanitize:attributes')),
-    customTagWhitelist: crowi.configManager.getConfig('markdown', 'markdown:rehypeSanitize:tagNames'),
-    highlightJsStyleBorder: crowi.configManager.getConfig('crowi', 'customize:highlightJsStyleBorder'),
+    isEnabledXssPrevention: configManager.getConfig('markdown:rehypeSanitize:isEnabledPrevention'),
+    sanitizeType: configManager.getConfig('markdown:rehypeSanitize:option'),
+    customTagWhitelist: configManager.getConfig('markdown:rehypeSanitize:tagNames'),
+    customAttrWhitelist: configManager.getConfig('markdown:rehypeSanitize:attributes') != null
+      ? JSON.parse(configManager.getConfig('markdown:rehypeSanitize:attributes'))
+      : undefined,
+    highlightJsStyleBorder: configManager.getConfig('customize:highlightJsStyleBorder'),
   };
 
-  props.ssrMaxRevisionBodyLength = configManager.getConfig('crowi', 'app:ssrMaxRevisionBodyLength');
+  props.ssrMaxRevisionBodyLength = configManager.getConfig('app:ssrMaxRevisionBodyLength');
 }
 
 /**

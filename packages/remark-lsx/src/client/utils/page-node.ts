@@ -1,15 +1,15 @@
-import * as url from 'url';
-
 import type { IPageHasId } from '@growi/core';
 import type { ParseRangeResult } from '@growi/core/dist/remark-plugins';
-import { removeTrailingSlash } from '@growi/core/dist/utils/path-utils';
+import {
+  getParentPath as getParentPathCore,
+  removeTrailingSlash,
+} from '@growi/core/dist/utils/path-utils';
 
 import type { PageNode } from '../../interfaces/page-node';
 import { getDepthOfPath } from '../../utils/depth-utils';
 
-
 function getParentPath(path: string) {
-  return removeTrailingSlash(decodeURIComponent(url.resolve(path, './')));
+  return removeTrailingSlash(decodeURIComponent(getParentPathCore(path)));
 }
 
 /**
@@ -22,15 +22,18 @@ function getParentPath(path: string) {
  * @memberof Lsx
  */
 function generatePageNode(
-    pathToNodeMap: Record<string, PageNode>, rootPagePath: string, pagePath: string, depthRange?: ParseRangeResult | null,
+  pathToNodeMap: Record<string, PageNode>,
+  rootPagePath: string,
+  pagePath: string,
+  depthRange?: ParseRangeResult | null,
 ): PageNode | null {
-
   // exclude rootPagePath itself
   if (pagePath === rootPagePath) {
     return null;
   }
 
-  const depthStartToProcess = getDepthOfPath(rootPagePath) + (depthRange?.start ?? 0); // at least 1
+  const depthStartToProcess =
+    getDepthOfPath(rootPagePath) + (depthRange?.start ?? 0); // at least 1
   const currentPageDepth = getDepthOfPath(pagePath);
 
   // return by the depth restriction
@@ -49,11 +52,16 @@ function generatePageNode(
   pathToNodeMap[pagePath] = node;
 
   /*
-    * process recursively for ancestors
-    */
+   * process recursively for ancestors
+   */
   // get or create parent node
   const parentPath = getParentPath(pagePath);
-  const parentNode = generatePageNode(pathToNodeMap, rootPagePath, parentPath, depthRange);
+  const parentNode = generatePageNode(
+    pathToNodeMap,
+    rootPagePath,
+    parentPath,
+    depthRange,
+  );
   // associate to patent
   if (parentNode != null) {
     parentNode.children.push(node);
@@ -62,30 +70,39 @@ function generatePageNode(
   return node;
 }
 
-export function generatePageNodeTree(rootPagePath: string, pages: IPageHasId[], depthRange?: ParseRangeResult | null): PageNode[] {
+export function generatePageNodeTree(
+  rootPagePath: string,
+  pages: IPageHasId[],
+  depthRange?: ParseRangeResult | null,
+): PageNode[] {
   const pathToNodeMap: Record<string, PageNode> = {};
 
-  pages.forEach((page) => {
-    const node = generatePageNode(pathToNodeMap, rootPagePath, page.path, depthRange); // this will not be null
+  for (const page of pages) {
+    const node = generatePageNode(
+      pathToNodeMap,
+      rootPagePath,
+      page.path,
+      depthRange,
+    ); // this will not be null
 
     // exclude rootPagePath itself
     if (node == null) {
-      return;
+      continue;
     }
 
     // set the Page substance
     node.page = page;
-  });
+  }
 
   // return root objects
   const rootNodes: PageNode[] = [];
-  Object.keys(pathToNodeMap).forEach((pagePath) => {
+  for (const pagePath in pathToNodeMap) {
     const parentPath = getParentPath(pagePath);
 
     // pick up what parent doesn't exist
-    if ((parentPath === '/') || !(parentPath in pathToNodeMap)) {
+    if (parentPath === '/' || !(parentPath in pathToNodeMap)) {
       rootNodes.push(pathToNodeMap[pagePath]);
     }
-  });
+  }
   return rootNodes;
 }

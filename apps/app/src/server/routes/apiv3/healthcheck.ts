@@ -28,23 +28,56 @@ const router = express.Router();
  *            example: 'OK'
  *          searchInfo:
  *            type: object
- *            example: {
- *              "esVersion":"6.6.1",
- *              "esNodeInfos":{
- *                "6pnILIqFT_Cjbs4mwQfcmA": {
- *                  "name":"6pnILIq",
- *                  "version":"6.6.1",
- *                  "plugins":[
- *                    {"name":"analysis-icu","version":"6.6.1"},
- *                    {"name":"analysis-kuromoji","version":"6.6.1"},
- *                    {"name":"ingest-geoip","version":"6.6.1"},
- *                    {"name":"ingest-user-agent","version":"6.6.1"}
- *                  ]
- *                }
- *              }
- *            }
+ *            properties:
+ *              cluster_name:
+ *                type: string
+ *                example: elasticsearch
+ *              status:
+ *                type: string
+ *                enum: [green, yellow, red]
+ *                example: yellow
+ *              timed_out:
+ *                type: boolean
+ *                example: false
+ *              number_of_nodes:
+ *                type: integer
+ *                example: 1
+ *              number_of_data_nodes:
+ *                type: integer
+ *                example: 1
+ *              active_primary_shards:
+ *                type: integer
+ *                example: 2
+ *              active_shards:
+ *                type: integer
+ *                example: 2
+ *              relocating_shards:
+ *                type: integer
+ *                example: 0
+ *              initializing_shards:
+ *                type: integer
+ *                example: 0
+ *              unassigned_shards:
+ *                type: integer
+ *                example: 1
+ *              delayed_unassigned_shards:
+ *                type: integer
+ *                example: 0
+ *              number_of_pending_tasks:
+ *                type: integer
+ *                example: 0
+ *              number_of_in_flight_fetch:
+ *                type: integer
+ *                example: 0
+ *              task_max_waiting_in_queue_millis:
+ *                type: integer
+ *                example: 0
+ *              active_shards_percent_as_number:
+ *                type: number
+ *                format: float
+ *                example: 66.66666666666666
  */
-
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
 
   async function checkMongo(errors, info) {
@@ -77,7 +110,7 @@ module.exports = (crowi) => {
    *  /healthcheck:
    *    get:
    *      tags: [Healthcheck]
-   *      operationId: getHealthcheck
+   *      security: []
    *      summary: /healthcheck
    *      description: Check whether the server is healthy or not
    *      parameters:
@@ -102,11 +135,19 @@ module.exports = (crowi) => {
    *          content:
    *            application/json:
    *              schema:
-   *                properties:
-   *                  info:
-   *                    $ref: '#/components/schemas/HealthcheckInfo'
+   *                oneOf:
+   *                  - type: object
+   *                    description: "Don't select checkServices"
+   *                    properties:
+   *                      status:
+   *                        type: string
+   *                  - type: object
+   *                    description: "Select checkServices"
+   *                    properties:
+   *                      info:
+   *                        $ref: '#/components/schemas/HealthcheckInfo'
    *        503:
-   *          description: Unhealthy
+   *          description: "errors occurs when using checkServicesStrictly"
    *          content:
    *            application/json:
    *              schema:
@@ -115,7 +156,12 @@ module.exports = (crowi) => {
    *                    type: array
    *                    description: Errors
    *                    items:
-   *                      $ref: '#/components/schemas/ErrorV3'
+   *                      type: object
+   *                      properties:
+   *                        message:
+   *                          type: string
+   *                        code:
+   *                          type: string
    *                  info:
    *                    $ref: '#/components/schemas/HealthcheckInfo'
    */

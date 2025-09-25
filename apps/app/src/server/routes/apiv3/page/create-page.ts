@@ -16,6 +16,7 @@ import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IApiv3PageCreateParams } from '~/interfaces/apiv3';
 import { subscribeRuleNames } from '~/interfaces/in-app-notification';
 import type { IOptionsForCreate } from '~/interfaces/page';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
@@ -135,7 +136,7 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
     let tags: string[] = _tags ?? [];
 
     if (_body == null) {
-      const isEnabledAttachTitleHeader = await configManager.getConfig('crowi', 'customize:isEnabledAttachTitleHeader');
+      const isEnabledAttachTitleHeader = await configManager.getConfig('customize:isEnabledAttachTitleHeader');
       if (isEnabledAttachTitleHeader) {
         body += `${attachTitleHeader(path)}\n`;
       }
@@ -206,7 +207,7 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
       const { getOpenaiService } = await import('~/features/openai/server/services/openai');
       try {
         const openaiService = getOpenaiService();
-        await openaiService?.rebuildVectorStore(createdPage);
+        await openaiService?.createVectorStoreFileOnPageCreate([createdPage]);
       }
       catch (err) {
         logger.error('Rebuild vector store failed', err);
@@ -214,10 +215,10 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
     }
   }
 
-  const addActivity = generateAddActivityMiddleware(crowi);
+  const addActivity = generateAddActivityMiddleware();
 
   return [
-    accessTokenParser, loginRequiredStrictly, excludeReadOnlyUser, addActivity,
+    accessTokenParser([SCOPE.WRITE.FEATURES.PAGE], { acceptLegacy: true }), loginRequiredStrictly, excludeReadOnlyUser, addActivity,
     validator, apiV3FormValidator,
     async(req: CreatePageRequest, res: ApiV3Response) => {
       const {

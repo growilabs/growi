@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import { UserPicture } from '@growi/ui/dist/components';
 import { format as dateFnsFormat } from 'date-fns/format';
@@ -43,8 +43,8 @@ export const UserGroupUserTable = (props: Props): JSX.Element => {
                 <strong>{relatedUser.username}</strong>
               </td>
               <td>{relatedUser.name}</td>
-              <td>{relatedUser.createdAt ? dateFnsFormat(new Date(relatedUser.createdAt), 'yyyy-MM-dd') : ''}</td>
-              <td>{relatedUser.lastLoginAt ? dateFnsFormat(new Date(relatedUser.lastLoginAt), 'yyyy-MM-dd HH:mm:ss') : ''}</td>
+              <td>{relatedUser.createdAt ? dateFnsFormat(relatedUser.createdAt, 'yyyy-MM-dd') : ''}</td>
+              <td>{relatedUser.lastLoginAt ? dateFnsFormat(relatedUser.lastLoginAt, 'yyyy-MM-dd HH:mm:ss') : ''}</td>
               {!props.isExternalGroup && (
                 <td>
                   <div className="btn-group admin-user-menu">

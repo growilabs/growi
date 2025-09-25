@@ -1,13 +1,14 @@
 import path from 'node:path';
 
-import { scanAllTemplates, validateTemplatePluginGrowiDirective, validateAllTemplateLocales } from '@growi/pluginkit/dist/v4/server';
-
+import {
+  scanAllTemplates,
+  validateAllTemplateLocales,
+  validateTemplatePluginGrowiDirective,
+} from '@growi/pluginkit/dist/v4/server';
 
 const projectDirRoot = path.resolve(__dirname, '../');
 
-
 it('Validation for package.json should be passed', () => {
-
   // when
   const caller = () => validateTemplatePluginGrowiDirective(projectDirRoot);
 
@@ -16,7 +17,6 @@ it('Validation for package.json should be passed', () => {
 });
 
 it('Validation for package.json should be return data', () => {
-
   // when
   const data = validateTemplatePluginGrowiDirective(projectDirRoot);
 
@@ -24,7 +24,7 @@ it('Validation for package.json should be return data', () => {
   expect(data).not.toBeNull();
 });
 
-it('Scanning the templates ends up with no errors', async() => {
+it('Scanning the templates ends up with no errors', async () => {
   // when
   const results = await scanAllTemplates(projectDirRoot);
 
@@ -32,8 +32,7 @@ it('Scanning the templates ends up with no errors', async() => {
   expect(results).not.toBeNull();
 });
 
-it('Scanning the templates ends up with no errors with opts.data', async() => {
-
+it('Scanning the templates ends up with no errors with opts.data', async () => {
   // setup
   const data = validateTemplatePluginGrowiDirective(projectDirRoot);
 

@@ -1,5 +1,5 @@
 import React, {
-  useCallback, useEffect, useState,
+  useCallback, useEffect, useState, type JSX,
 } from 'react';
 
 import assert from 'assert';

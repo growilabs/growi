@@ -22,9 +22,6 @@ import { stringifyEntitiesLight } from 'stringify-entities';
 
 const own = {}.hasOwnProperty;
 
-const shortcut = /^[^\t\n\r "#'.<=>`}]+$/;
-
-
 export const DirectiveType = Object.freeze({
   Text: 'textGrowiPluginDirective',
   Leaf: 'leafGrowiPluginDirective',
@@ -102,9 +99,15 @@ function enterText(token) {
  * @param {Token} token
  */
 function enter(type, token) {
-  this.enter({
-    type, name: '', attributes: {}, children: [],
-  }, token);
+  this.enter(
+    {
+      type,
+      name: '',
+      attributes: {},
+      children: [],
+    },
+    token,
+  );
 }
 
 /**
@@ -179,7 +182,7 @@ function handleDirective(node, _, context, safeOptions) {
   /** @type {Directive|Paragraph|undefined} */
   const label = node;
 
-  if (label && label.children && label.children.length > 0) {
+  if (label?.children && label.children.length > 0) {
     const exit = context.enter('label');
     const subexit = context.enter(`${node.type}Label`);
     value += tracker.move('[');
@@ -213,25 +216,20 @@ function peekDirective() {
  */
 function attributes(node, state) {
   const quote = state.options.quote || '"';
-  const subset = node.type === DirectiveType.Text ? [quote] : [quote, '\n', '\r'];
+  const subset =
+    node.type === DirectiveType.Text ? [quote] : [quote, '\n', '\r'];
   const attrs = node.attributes || {};
   /** @type {Array.<string>} */
   const values = [];
-  /** @type {string|undefined} */
-  let classesFull;
-  /** @type {string|undefined} */
-  let classes;
-  /** @type {string|undefined} */
-  let id;
   /** @type {string} */
   let key;
 
   // eslint-disable-next-line no-restricted-syntax
   for (key in attrs) {
     if (
-      own.call(attrs, key)
-      && attrs[key] !== undefined
-      && attrs[key] !== null
+      own.call(attrs, key) &&
+      attrs[key] !== undefined &&
+      attrs[key] !== null
     ) {
       const value = String(attrs[key]);
 
@@ -248,8 +246,8 @@ function attributes(node, state) {
    */
   function quoted(key, value) {
     return (
-      key
-      + (value
+      key +
+      (value
         ? `=${quote}${stringifyEntitiesLight(value, { subset })}${quote}`
         : '')
     );
@@ -265,11 +263,9 @@ function fence(node) {
 
   if (node.type === DirectiveType.Leaf) {
     size = 1;
-  }
-  else {
+  } else {
     size = 1;
   }
 
   return '$'.repeat(size);
-
 }

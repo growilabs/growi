@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import { useGrowiVersion } from '~/stores-universal/context';
 import { useShortcutsModal } from '~/stores/modal';

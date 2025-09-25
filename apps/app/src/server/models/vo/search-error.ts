@@ -1,6 +1,6 @@
 import ExtensibleCustomError from 'extensible-custom-error';
 
-import { AllTermsKey } from '~/server/interfaces/search';
+import type { AllTermsKey } from '~/server/interfaces/search';
 
 export class SearchError extends ExtensibleCustomError {
 

@@ -2,19 +2,17 @@ import type { IUser } from '@growi/core';
 import type { Request } from 'express';
 import type { HydratedDocument } from 'mongoose';
 
+import type Crowi from '~/server/crowi';
 
 export interface CrowiProperties {
+  user?: HydratedDocument<IUser>;
 
-  user?: HydratedDocument<IUser>,
+  crowi: Crowi;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  crowi: any,
-
-  session: any,
+  session: any;
 
   // provided by csurf
-  csrfToken: () => string,
-
+  csrfToken: () => string;
 }
 
 export interface CrowiRequest extends CrowiProperties, Request {}

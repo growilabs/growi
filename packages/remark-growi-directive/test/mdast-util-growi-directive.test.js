@@ -1,12 +1,14 @@
 import { fromMarkdown } from 'mdast-util-from-markdown';
 import { toMarkdown } from 'mdast-util-to-markdown';
 import { removePosition } from 'unist-util-remove-position';
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { directiveFromMarkdown, directiveToMarkdown } from '../src/mdast-util-growi-directive/index.js';
+import {
+  directiveFromMarkdown,
+  directiveToMarkdown,
+} from '../src/mdast-util-growi-directive/index.js';
 import { DirectiveType } from '../src/mdast-util-growi-directive/lib/index.js';
 import { directive } from '../src/micromark-extension-growi-directive/index.js';
-
 
 describe('markdown -> mdast', () => {
   it('should support directives (text)', () => {
@@ -88,7 +90,6 @@ describe('markdown -> mdast', () => {
     });
   });
 
-
   it('should support content in a label', () => {
     const tree = fromMarkdown('x $a[b *c*\nd]', {
       extensions: [directive()],
@@ -97,31 +98,28 @@ describe('markdown -> mdast', () => {
 
     removePosition(tree, { force: true });
 
-    expect(tree).toEqual(
-      {
-        type: 'root',
-        children: [
-          {
-            type: 'paragraph',
-            children: [
-              { type: 'text', value: 'x ' },
-              {
-                type: DirectiveType.Text,
-                name: 'a',
-                attributes: {},
-                children: [
-                  { type: 'text', value: 'b ' },
-                  { type: 'emphasis', children: [{ type: 'text', value: 'c' }] },
-                  { type: 'text', value: '\nd' },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-    );
+    expect(tree).toEqual({
+      type: 'root',
+      children: [
+        {
+          type: 'paragraph',
+          children: [
+            { type: 'text', value: 'x ' },
+            {
+              type: DirectiveType.Text,
+              name: 'a',
+              attributes: {},
+              children: [
+                { type: 'text', value: 'b ' },
+                { type: 'emphasis', children: [{ type: 'text', value: 'c' }] },
+                { type: 'text', value: '\nd' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
   });
-
 
   it('should support attributes', () => {
     const tree = fromMarkdown('x $a(#b.c.d e=f g="h&amp;i&unknown;j")', {
@@ -142,7 +140,9 @@ describe('markdown -> mdast', () => {
               type: DirectiveType.Text,
               name: 'a',
               attributes: {
-                '#b.c.d': '', e: 'f', g: 'h&i&unknown;j',
+                '#b.c.d': '',
+                e: 'f',
+                g: 'h&i&unknown;j',
               },
               children: [],
             },
@@ -151,7 +151,6 @@ describe('markdown -> mdast', () => {
       ],
     });
   });
-
 
   it('should support EOLs in attributes', () => {
     const tree = fromMarkdown('$a(b\nc="d\ne")', {
@@ -287,7 +286,12 @@ describe('mdast -> markdown', () => {
               name: 'b',
               // @ts-expect-error: should contain only `string`s
               attributes: {
-                c: 'd', e: 'f', g: '', h: null, i: undefined, j: 2,
+                c: 'd',
+                e: 'f',
+                g: '',
+                h: null,
+                i: undefined,
+                j: 2,
               },
               children: [],
             },
@@ -383,7 +387,7 @@ describe('mdast -> markdown', () => {
     ).toBe('a $b(c.d e<f) g.\n');
   });
 
-  it('should not use the `class` shortcut if impossible characters exist (but should use it for classes that don\'t)', () => {
+  it("should not use the `class` shortcut if impossible characters exist (but should use it for classes that don't)", () => {
     expect(
       toMarkdown(
         {
@@ -394,7 +398,10 @@ describe('mdast -> markdown', () => {
               type: DirectiveType.Text,
               name: 'b',
               attributes: {
-                'c.d': '', e: '', 'f<g': '', hij: '',
+                'c.d': '',
+                e: '',
+                'f<g': '',
+                hij: '',
               },
               children: [],
             },
@@ -480,19 +487,25 @@ describe('mdast -> markdown', () => {
 
   it('should not escape a `:` in phrasing when followed by a non-alpha', () => {
     expect(
-      toMarkdown({
-        type: 'paragraph',
-        children: [{ type: 'text', value: 'a$9' }],
-      }, { extensions: [directiveToMarkdown()] }),
+      toMarkdown(
+        {
+          type: 'paragraph',
+          children: [{ type: 'text', value: 'a$9' }],
+        },
+        { extensions: [directiveToMarkdown()] },
+      ),
     ).toBe('a$9\n');
   });
 
   it('should not escape a `:` in phrasing when preceded by a colon', () => {
     expect(
-      toMarkdown({
-        type: 'paragraph',
-        children: [{ type: 'text', value: 'a$c' }],
-      }, { extensions: [directiveToMarkdown()] }),
+      toMarkdown(
+        {
+          type: 'paragraph',
+          children: [{ type: 'text', value: 'a$c' }],
+        },
+        { extensions: [directiveToMarkdown()] },
+      ),
     ).toBe('a\\$c\n');
   });
 
@@ -522,23 +535,28 @@ describe('mdast -> markdown', () => {
 
   it('should escape a `:` at a break when followed by a colon', () => {
     expect(
-      toMarkdown({
-        type: 'paragraph',
-        children: [{ type: 'text', value: '$\na' }],
-      }, { extensions: [directiveToMarkdown()] }),
+      toMarkdown(
+        {
+          type: 'paragraph',
+          children: [{ type: 'text', value: '$\na' }],
+        },
+        { extensions: [directiveToMarkdown()] },
+      ),
     ).toBe('$\na\n');
   });
 
   it('should escape a `:` after a text directive', () => {
     expect(
-      toMarkdown({
-        type: 'paragraph',
-        children: [
-          { type: DirectiveType.Text, name: 'red', children: [] },
-          { type: 'text', value: '$' },
-        ],
-      }, { extensions: [directiveToMarkdown()] }),
+      toMarkdown(
+        {
+          type: 'paragraph',
+          children: [
+            { type: DirectiveType.Text, name: 'red', children: [] },
+            { type: 'text', value: '$' },
+          ],
+        },
+        { extensions: [directiveToMarkdown()] },
+      ),
     ).toBe('$red$\n');
   });
-
 });

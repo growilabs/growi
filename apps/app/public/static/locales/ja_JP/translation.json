@@ -116,7 +116,7 @@
   "Create under": "ページを以下に作成",
   "V5 Page Migration": "V5 互換形式 への変換",
   "GROWI.5.0_new_schema": "GROWI.5.0における新スキーマについて",
-  "See_more_detail_on_new_schema": "詳しくは<a href='https://docs.growi.org/ja/admin-guide/upgrading/50x.html#新しい-v5-互換形式について' target='_blank'>{{title}}</a><span className='growi-custom-icons'>external_link</span>を参照ください。",
+  "See_more_detail_on_new_schema": "詳しくは<a href='https://docs.growi.org/ja/admin-guide/upgrading/50x.html#新しい-v5-互換形式について' target='_blank'>{{title}}</a><span class='growi-custom-icons'>external_link</span>を参照ください。",
   "external_account_management": "外部アカウント管理",
   "UserGroup": "グループ",
   "Basic Settings": "基本設定",
@@ -153,12 +153,15 @@
   "Page Tree": "ページツリー",
   "Bookmarks": "ブックマーク",
   "In-App Notification": "通知",
+  "AI Assistant": "AI アシスタント",
+  "Knowledge Assistant": "ナレッジアシスタント (ベータ版)",
+  "Editor Assistant": "エディターアシスタント (ベータ版)",
   "original_path": "元のパス",
   "new_path": "新しいパス",
   "duplicated_path": "重複したパス",
   "Link sharing is disabled": "リンクのシェアは無効化されています",
   "successfully_saved_the_page": "ページが正常に保存されました",
-  "you_can_not_create_page_with_this_name": "この名前でページを作成することはできません",
+  "you_can_not_create_page_with_this_name_or_hierarchy": "この名前、または階層でページを作成することはできません",
   "not_allowed_to_see_this_page": "このページは閲覧できません",
   "Confirm": "確認",
   "Successfully requested": "正常に処理を受け付けました",
@@ -185,7 +188,9 @@
   },
   "author_info": {
     "created_at": "作成日",
-    "last_revision_posted_at": "最終更新日"
+    "created_by": "作成者:",
+    "last_revision_posted_at": "最終更新日",
+    "updated_by": "最終更新者:"
   },
   "installer": {
     "tab": "アカウント作成",
@@ -218,6 +223,9 @@
       "profile_image2": "アップロードできるようにするには、AWS またはローカルアップロードの設定をしてください。"
     }
   },
+  "API Token Settings": "API Token設定",
+  "Current API Token": "現在のAPI Token",
+  "Update API Token": "API Tokenを更新",
   "page_me_apitoken": {
     "api_token": "API Token",
     "notice": {
@@ -226,6 +234,35 @@
       "update_token2": "現在の Token を利用している処理は動かなくなります。"
     },
     "form_help": {}
+  },
+  "Access Token Settings": "Access token 設定",
+  "page_me_access_token": {
+    "access_token": "Access token",
+    "expiredAt": "有効期限",
+    "description": "説明",
+    "scope": "スコープ",
+    "scope_read": "Read",
+    "action": "アクション",
+    "create_token": "トークンを作成",
+    "no_tokens_found": "アクセストークンが見つかりません",
+    "new_token": {
+      "title": "新しいアクセストークン",
+      "copy_to_clipboard": "クリップボードにコピーしました",
+      "message": "このアクセストークンは一度しか表示されません。安全に保存してください"
+    },
+    "modal": {
+      "message": "このアクセストークンを削除しますか？",
+      "alert": "この操作は取り消せません",
+      "delete_token": "トークンを削除"
+    },
+    "form": {
+      "title": "アクセストークンを作成",
+      "expiredAt_desc": "アクセストークンの有効期限を選択します。",
+      "description_desc": "このトークンを後で識別するための説明を入力します。",
+      "description_max_length": "{{length}}文字以内で入力してください。",
+      "scope_desc": "スコープによって、このトークンで行える操作を制限します。"
+    },
+    "copy_to_clipboard": "Copy to clipboard"
   },
   "Password": "パスワード",
   "Password Settings": "パスワード設定",
@@ -257,9 +294,6 @@
   },
   "API Settings": "API設定",
   "Other Settings": "その他の設定",
-  "API Token Settings": "API Token設定",
-  "Current API Token": "現在のAPI Token",
-  "Update API Token": "API Tokenを更新",
   "in_app_notification_settings": {
     "in_app_notification_settings": "アプリ内通知設定",
     "subscribe_settings": "自動でページをサブスクライブする（通知を受け取る）設定",
@@ -372,7 +406,8 @@
       "text": "テキストのみ",
       "file": "ファイルのみ"
     },
-    "editor_config": "エディタ設定",
+    "editor_config": "エディター設定",
+    "editor_assistant": "エディターアシスタント",
     "Show active line": "アクティブ行をハイライト",
     "auto_format_table": "表の自動整形",
     "overwrite_scopes": "{{operation}}と同時に全ての配下ページのスコープを上書き",
@@ -487,7 +522,7 @@
   "modal_shortcuts": {
     "global": {
       "title": "グローバルショートカット",
-      "Open/Close shortcut help": "ショートカットヘルプ<br>の表示/非表示",
+      "Open/Close shortcut help": "ショートカットヘルプの<br>表示/非表示",
       "Edit Page": "ページ編集",
       "Create Page": "ページ作成",
       "Search": "検索",
@@ -501,11 +536,32 @@
       "Indent": "インデント",
       "Outdent": "左インデント",
       "Save Page": "保存",
-      "Delete Line": "行削除"
+      "Only Editor": "(エディターのみ)",
+      "Delete Line": "行削除",
+      "Search in Editor": "エディター内検索",
+      "Move Line": "行の移動",
+      "Copy Line": "行のコピー",
+      "Insert Line": "行を挿入",
+      "Post Comment": "(コメント投稿)",
+      "Multiple Cursors": "複数カーソル",
+      "Or Alt Click": "もしくは Alt + クリック"
     },
-    "commentform": {
-      "title": "コメントフォームショートカット",
-      "Post": "投稿"
+    "format": {
+      "title": "書式設定 (エディター)",
+      "Bold": "太字",
+      "Italic": "斜体",
+      "Strikethrough": "取り消し線",
+      "Code Text": "コードテキスト",
+      "Hyperlink": "ハイパーリンク"
+    },
+    "line_settings": {
+      "title": "行の設定 (エディター)",
+      "Bullet List": "箇条書きリスト",
+      "Numbered List": "番号付きリスト",
+      "Quote": "引用",
+      "Code Block": "コードブロック",
+      "Comment Out": "非表示にする",
+      "Comment Out Desc": "(コメントアウト)"
     }
   },
   "modal_resolve_conflict": {
@@ -519,19 +575,144 @@
     "latest_revision": "最新の本文",
     "selected_editable_revision": "保存するページ本文(編集可能)"
   },
-  "modal_aichat": {
-    "title": "ナレッジアシスタント",
-    "title_beta_label": "(ベータ)",
-    "placeholder": "ききたいことを入力してください",
+  "sidebar_ai_assistant": {
+    "reference_pages_label": "参照するページ",
+    "recent_chat": "最近のチャット",
+    "no_recent_chat": "チャットがありません",
+    "knowledge_assistant_placeholder": "ききたいことを入力してください",
+    "editor_assistant_placeholder": "お手伝いできることはありますか？",
     "summary_mode_label": "要約モード",
     "summary_mode_help": "2～3文以内の簡潔な回答",
+    "extended_thinking_mode_label": "拡張思考モード",
+    "extended_thinking_mode_help": "有効にすると、AIはより時間をかけて考え、より包括的な回答を提供します。",
     "caution_against_hallucination": "情報が正しいか出典を確認しましょう",
     "progress_label": "回答を生成しています",
     "failed_to_create_or_retrieve_thread": "スレッドの作成または取得に失敗しました",
     "budget_exceeded": "OpenAI の API の利用上限に達しました。ナレッジアシスタントを再度利用するには OpenAI の請求ページからクレジットを追加してください。",
     "budget_exceeded_for_growi_cloud": "OpenAI の API の利用上限に達しました。ナレッジアシスタントを再度利用するには Hosted の場合は GROWI.cloud の管理画面から Owned の場合は OpenAI の請求ページからクレジットを追加してください。",
     "error_message": "エラーが発生しました",
-    "show_error_detail": "詳細を表示"
+    "show_error_detail": "詳細を表示",
+    "editor_assistant_long_context_warn_with_unit_line": "本文が長すぎるため、エディターアシスタントは {{startPosition}}行から{{endPosition}}行付近までを参照して回答します",
+    "editor_assistant_long_context_warn_with_unit_char": "本文が長すぎるため、エディターアシスタントは {{startPosition}}文字目から{{endPosition}}文字目までを参照して回答します",
+    "discard": "破棄",
+    "accept": "採用",
+    "use_assistant": "アシスタントを使用する",
+    "remove_assistant": "選択されているアシスタントの解除",
+    "text_generation_by_editor_assistant_label": "エディターアシスタントが文章を生成中",
+    "preset_menu": {
+      "summarize": {
+        "title": "この記事の要約をつくる",
+        "prompt": "マークダウンの内容を要約してください"
+      },
+      "correct": {
+        "title": "文章の誤りを修正する",
+        "prompt": "マークダウンの内の文章の誤りを修正してください"
+      }
+    }
+  },
+  "modal_ai_assistant": {
+    "header": {
+      "update_assistant": "アシスタントの更新",
+      "add_new_assistant": "新規アシスタントの追加"
+    },
+    "assistant_name_placeholder": "アシスタント名を入力",
+    "page_count": "{{count}} ページ",
+    "memo": {
+      "title": "アシスタントのメモ",
+      "optional": "任意",
+      "placeholder": "内容や用途のメモを表示させることができます",
+      "description": "メモの内容はアシスタントの処理に影響しません。"
+    },
+    "submit_button": {
+      "update_assistant": "アシスタントを更新する",
+      "create_assistant": "アシスタントを作成する"
+    },
+    "toaster": {
+      "create_success": "アシスタントが作成されました",
+      "update_success": "アシスタントが更新されました",
+      "create_failed": "アシスタントの作成に失敗しました",
+      "update_failed": "アシスタントの更新に失敗しました"
+    },
+    "select_source_pages": "アシスタントが参照するページを選択します",
+    "search_reference_pages_by_keyword": "アシスタントが参照するページをキーワードで検索",
+    "search_by_keyword": "キーワードで検索",
+    "enter_keywords": "キーワードを入力",
+    "max_items_space_separated_hint": "スペース区切りで最大5つまで入力できます",
+    "select_assistant_reference_pages": "アシスタントが参照するページを選択してください",
+    "reference_pages": "参照するページ",
+    "no_pages_selected": "ページが選択されていません",
+    "can_add_later": "あとからでも追加できます",
+    "next": "次へ",
+    "select_from_page_tree": "ページツリーから選択",
+    "edit_page_description": " アシスタントが参照するページを編集します。<br> 参照できるページは配下ページも含めて {{limitLearnablePageCountPerAssistant}} ページまでです。",
+    "default_instruction": "あなたはこのWikiの知識アシスタントです。\n\n## 多言語サポート:\nユーザーが入力で使用した言語と同じ言語で応答してください。\n",
+    "add_page_button": "ページを追加する",
+    "page_mode_title": {
+      "share": "アシスタントの共有",
+      "pages": "参照ページ",
+      "instruction": "アシスタントへの指示"
+    },
+    "share_assistant": "アシスタントを共有する",
+    "page_access_permission": "ページのアクセス権限",
+    "access_scope": {
+      "owner": "{{username}} がアクセス可能な全てのページ",
+      "groups": "グループを指定",
+      "publicOnly": "公開ページのみ"
+    },
+    "share_scope": {
+      "title": "アシスタントの共有範囲",
+      "owner": {
+        "label": "{{username}} のみ"
+      },
+      "publicOnly": {
+        "label": "全体公開",
+        "desc": "すべてのユーザーに共有されます"
+      },
+      "groups": {
+        "label": "グループを指定",
+        "desc": "選択したグループのメンバーにのみ共有されます"
+      },
+      "sameAsAccessScope": {
+        "label": "ページのアクセス権限と同じ範囲",
+        "desc": "ページのアクセス権限と同じ範囲で共有されます"
+      }
+    },
+    "instructions": {
+      "description": "アシスタントの振る舞いを決める指示文を設定できます。<br>この指示に従ってにアシスタントの回答や分析を行います。",
+      "reset_to_default": "デフォルトに戻す"
+    }
+  },
+  "share_scope_warning_modal": {
+    "header_title": "共有範囲の確認",
+    "warning_message": "このアシスタントには限定公開されているページが含まれています。<br />現在の設定では、アシスタントを通じてこれらのページの情報が、本来のアクセス権限を超えて共有される可能性があります。",
+    "selected_pages_label": "選択されているページパス",
+    "confirmation_message": "続行する場合、これらのページの内容がアシスタントの公開範囲内で共有される可能性があることを確認してください。",
+    "button": {
+      "review": "設定を見直す",
+      "proceed": "理解して続行する"
+    }
+  },
+  "default_ai_assistant": {
+    "not_set": "デフォルトアシスタントが設定されていません"
+  },
+  "ai_assistant_substance": {
+    "add_assistant": "アシスタントを追加する",
+    "my_assistants": "マイアシスタント",
+    "team_assistants": "チームアシスタント",
+    "thread_does_not_exist": "スレッドが存在しません",
+    "recent_threads": "最近の項目",
+    "toaster": {
+      "ai_assistant_deleted_success": "アシスタントを削除しました",
+      "ai_assistant_deleted_failed": "アシスタントの削除に失敗しました",
+      "thread_deleted_success": "スレッドを削除しました",
+      "thread_deleted_failed": "スレッドの削除に失敗しました",
+      "ai_assistant_set_default_success": "デフォルトアシスタントを設定しました",
+      "ai_assistant_set_default_failed": "デフォルトアシスタントの設定に失敗しました"
+    },
+    "delete_modal": {
+      "title": "アシスタントを削除する",
+      "confirm_message": "本当にアシスタントを削除しますか？"
+    }
   },
   "link_edit": {
     "edit_link": "リンク編集",
@@ -647,7 +828,7 @@
     "alert_desc1": "このページでは、チェックボックスでページを選択し、画面上部の「一括操作」ボタンから新しい v5 互換形式に一括変換できます。",
     "nopages_title": "おめでとうございます。GROWI v5 を使う準備が完了しました！",
     "nopages_desc1": "今あなたが管理可能なページはすべて v5 互換形式になっているようです。",
-    "detail_info": "詳しくは <a href='https://docs.growi.org/ja/admin-guide/upgrading/50x.html' target='_blank' class='alert-link'>GROWI v5.0.x へのアップグレード <span className='growi-custom-icons'>external_link</span></a> を参照ください。",
+    "detail_info": "詳しくは <a href='https://docs.growi.org/ja/admin-guide/upgrading/50x.html' target='_blank' class='alert-link'>GROWI v5.0.x へのアップグレード <span class='growi-custom-icons'>external_link</span></a> を参照ください。",
     "modal": {
       "title": "新しい v5 互換形式への変換",
       "converting_pages": "以下のページを変換します",
@@ -692,7 +873,9 @@
     "export_page_markdown": "マークダウン形式でページをエクスポート",
     "export_page_pdf": "PDF形式でページをエクスポート",
     "bulk_export": "ページとその配下のページを全てエクスポート",
-    "bulk_export_notice": "ダウンロードの準備が完了すると、通知が届きます。ページ数が多いと、準備に時間がかかる場合があります。",
+    "bulk_export_download_explanation": "エクスポート完了後に通知が届きます。通知をクリックし、ファイルをダウンロードしてください。",
+    "bulk_export_exec_time_warning": "ページ数が多いと、エクスポートに時間がかかる場合があります",
+    "large_bulk_export_warning": "システムリソースの維持のため、ページ数の多いエクスポートを連続して実行することはご遠慮ください",
     "markdown": "マークダウン",
     "choose_export_format": "エクスポート形式を選択してください",
     "bulk_export_started": "ただいま準備中です...",
@@ -703,7 +886,8 @@
     "export_cancel_warning": "進行中の以下のエクスポートはキャンセルされます",
     "restart": "やり直す",
     "format": "形式",
-    "started_on": "開始日時"
+    "started_on": "開始日時",
+    "file_upload_not_configured": "ファイルアップロード設定が完了していません"
   },
   "message": {
     "successfully_connected": "接続に成功しました!",
@@ -746,7 +930,7 @@
     "Password field is required": "パスワードの欄は必ず入力してください",
     "Username or E-mail has invalid characters": "ユーザー名または、メールアドレスに無効な文字があります",
     "user_not_found": "ユーザーが見つかりません",
-    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>エラー: DuplicatedUsernameException</strong></p><p class='mb-0'> {{ failedProviderForDuplicatedUsernameException }} 認証は成功しましたが、新しいユーザーを作成できませんでした。詳しくは<a href='https://github.com/weseek/growi/issues/193'>こちら: #193</a>.</p>"
+    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>エラー: DuplicatedUsernameException</strong></p><p class='mb-0'> {{ failedProviderForDuplicatedUsernameException }} 認証は成功しましたが、新しいユーザーを作成できませんでした。詳しくは<a href='https://github.com/growilabs/growi/issues/193'>こちら: #193</a>.</p>"
   },
   "grid_edit": {
     "create_bootstrap_4_grid": "Bootstrap 4 グリッドを作成",
@@ -788,7 +972,8 @@
   "pagetree": {
     "cannot_rename_a_title_that_contains_slash": "`/` が含まれているタイトルにリネームできません",
     "you_cannot_move_this_page_now": "現在、このページを移動することはできません",
-    "something_went_wrong_with_moving_page": "ページの移動に問題が発生しました"
+    "something_went_wrong_with_moving_page": "ページの移動に問題が発生しました",
+    "error_retrieving_the_pagetree": "ページツリーの取得中にエラーが発生しました"
   },
   "duplicated_page_alert": {
     "same_page_name_exists": "ページ名 「{{pageName}}」が重複しています",
@@ -870,23 +1055,6 @@
     "page_tree_not_avaliable": "Page Tree 機能は現在使用できません。",
     "go_to_settings": "設定する"
   },
-  "questionnaire": {
-    "give_us_feedback": "GROWI の改善のために、アンケートにご協力ください",
-    "thank_you_for_answering": "ご回答ありがとうございます",
-    "additional_feedback": "その他ご意見ご要望はユーザーアイコンのドロップダウンからお願い致します。",
-    "dont_show_again": "今後このアンケートを表示しない",
-    "deny": "回答しない",
-    "agree": "そう思う",
-    "disagree": "そう思わない",
-    "answer": "回答する",
-    "no_answer": "わからない",
-    "settings": "アンケート設定",
-    "failed_to_send": "回答送信に失敗しました",
-    "denied": "このアンケートは今後表示されません",
-    "personal_settings_explanation": "GROWI 改善のためのアンケートが表示されるようになります。ご意見ご要望はユーザーアイコンのドロップダウンからお願いいたします。",
-    "enable_questionnaire": "アンケートを有効にする",
-    "disabled_by_admin": "管理者によってアンケートは無効化されています"
-  },
   "tag_edit_modal": {
     "edit_tags": "タグの編集",
     "done": "完了",
@@ -914,14 +1082,13 @@
   },
   "sidebar_header": {
     "show_wip_page": "WIP を表示",
-    "size_s": "サイズ: S",
-    "size_l": "サイズ: L"
+    "compact_view": "コンパクト表示"
   },
   "create_page": {
     "untitled": "無題のページ"
   },
   "sync-latest-revision-body": {
-    "menuitem": "最新のリビジョンの本文とエディタのテキストを同期",
+    "menuitem": "最新のリビジョンの本文とエディターのテキストを同期",
     "confirm": "エディターに入力中のドラフトデータを削除して最新の本文を同期します。実行しますか？",
     "alert": "最新の本文が同期されていない可能性があります。リロードして再度ご確認ください。",
     "success-toaster": "最新の本文を同期しました",

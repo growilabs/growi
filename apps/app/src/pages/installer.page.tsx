@@ -79,7 +79,7 @@ async function injectServerConfigurations(context: GetServerSidePropsContext, pr
   const { crowi } = req;
   const { configManager } = crowi;
 
-  props.minPasswordLength = configManager.getConfig('crowi', 'app:minPasswordLength');
+  props.minPasswordLength = configManager.getConfig('app:minPasswordLength');
 }
 
 export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {

@@ -1,4 +1,4 @@
-import type { DetailedHTMLProps } from 'react';
+import type { DetailedHTMLProps, JSX } from 'react';
 import {
   forwardRef, useMemo, useRef, useEffect,
 } from 'react';
@@ -22,6 +22,15 @@ import { Toolbar } from './Toolbar';
 
 
 import style from './CodeMirrorEditor.module.scss';
+
+const moduleClass = style['codemirror-editor'];
+
+
+// Fix IME cursor position issue by EditContext
+// ref: https://github.com/growilabs/growi/pull/9267
+// ref: https://discuss.codemirror.net/t/issue-with-google-japanese-ime-cursor-position-in-v6/8810/3
+(EditorView as unknown as { EDIT_CONTEXT: boolean }).EDIT_CONTEXT = false;
+
 
 const CodeMirrorEditorContainer = forwardRef<HTMLDivElement, DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>>(
   (props, ref) => {
@@ -47,12 +56,14 @@ export type CodeMirrorEditorProps = {
 
 type Props = CodeMirrorEditorProps & {
   editorKey: string | GlobalCodeMirrorEditorKey,
+  className?: string,
   hideToolbar?: boolean,
 }
 
 export const CodeMirrorEditor = (props: Props): JSX.Element => {
   const {
     editorKey,
+    className,
     hideToolbar,
 
     cmProps,
@@ -210,19 +221,19 @@ export const CodeMirrorEditor = (props: Props): JSX.Element => {
   }, [isUploading, isDragAccept, isDragReject, acceptedUploadFileType]);
 
   return (
-    <div className={`${style['codemirror-editor']} flex-expand-vert overflow-y-hidden`}>
+    <div className={`${className} ${moduleClass} flex-expand-vert overflow-y-hidden`}>
       <div {...getRootProps()} className={`dropzone  ${fileUploadState} flex-expand-vert`}>
         <input {...getInputProps()} />
         <FileDropzoneOverlay isEnabled={isDragActive} />
         <CodeMirrorEditorContainer ref={containerRef} />
       </div>
-      { !hideToolbar && (
+      {!hideToolbar && (
         <Toolbar
           editorKey={editorKey}
           acceptedUploadFileType={acceptedUploadFileType}
           onUpload={onUpload}
         />
-      ) }
+      )}
     </div>
   );
 };

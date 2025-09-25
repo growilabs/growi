@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, DetailedHTMLProps } from 'react';
+import type { ButtonHTMLAttributes, DetailedHTMLProps, JSX } from 'react';
 import { memo } from 'react';
 
 import { useTranslation } from 'next-i18next';

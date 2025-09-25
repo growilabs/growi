@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, JSX } from 'react';
 
 import styles from './PageViewLayout.module.scss';
 
@@ -51,7 +51,7 @@ export const PageViewLayout = (props: Props): JSX.Element => {
       </div>
 
       { footerContents != null && (
-        <footer className={`footer d-edit-none wide-gutter-x-lg ${fluidLayoutClass}`}>
+        <footer className={`footer d-edit-none container-lg wide-gutter-x-lg ${fluidLayoutClass}`}>
           {footerContents}
         </footer>
       ) }

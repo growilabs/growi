@@ -32,13 +32,14 @@ export default class AdminGeneralSecurityContainer extends Container {
       currentPageRecursiveDeletionAuthority: PageRecursiveDeleteConfigValue.Inherit,
       currentPageCompleteDeletionAuthority: PageSingleDeleteCompConfigValue.AdminOnly,
       currentPageRecursiveCompleteDeletionAuthority: PageRecursiveDeleteCompConfigValue.Inherit,
+      currentGroupRestrictionDisplayMode: 'Hidden',
+      currentOwnerRestrictionDisplayMode: 'Hidden',
       isAllGroupMembershipRequiredForPageCompleteDeletion: true,
       previousPageRecursiveDeletionAuthority: null,
       previousPageRecursiveCompleteDeletionAuthority: null,
       expandOtherOptionsForDeletion: false,
       expandOtherOptionsForCompleteDeletion: false,
       isShowRestrictedByOwner: false,
-      isShowRestrictedByGroup: false,
       isUsersHomepageDeletionEnabled: false,
       isForceDeleteUserHomepageOnUserDeletion: false,
       isRomUserAllowedToComment: false,
@@ -56,6 +57,8 @@ export default class AdminGeneralSecurityContainer extends Container {
       shareLinksActivePage: 1,
     };
 
+    this.changeOwnerRestrictionDisplayMode = this.changeOwnerRestrictionDisplayMode.bind(this);
+    this.changeGroupRestrictionDisplayMode = this.changeGroupRestrictionDisplayMode.bind(this);
     this.changePageDeletionAuthority = this.changePageDeletionAuthority.bind(this);
     this.changePageCompleteDeletionAuthority = this.changePageCompleteDeletionAuthority.bind(this);
     this.changePageRecursiveDeletionAuthority = this.changePageRecursiveDeletionAuthority.bind(this);
@@ -76,8 +79,9 @@ export default class AdminGeneralSecurityContainer extends Container {
       currentPageRecursiveDeletionAuthority: generalSetting.pageRecursiveDeletionAuthority,
       currentPageRecursiveCompleteDeletionAuthority: generalSetting.pageRecursiveCompleteDeletionAuthority,
       isAllGroupMembershipRequiredForPageCompleteDeletion: generalSetting.isAllGroupMembershipRequiredForPageCompleteDeletion,
-      isShowRestrictedByOwner: !generalSetting.hideRestrictedByOwner,
-      isShowRestrictedByGroup: !generalSetting.hideRestrictedByGroup,
+      // Set display to 'Hidden' if hideRestrictedByOwner is anything but false.
+      currentOwnerRestrictionDisplayMode: generalSetting.hideRestrictedByOwner === false ? 'Displayed' : 'Hidden',
+      currentGroupRestrictionDisplayMode: generalSetting.hideRestrictedByGroup === false ? 'Displayed' : 'Hidden',
       isUsersHomepageDeletionEnabled: generalSetting.isUsersHomepageDeletionEnabled,
       isForceDeleteUserHomepageOnUserDeletion: generalSetting.isForceDeleteUserHomepageOnUserDeletion,
       isRomUserAllowedToComment: generalSetting.isRomUserAllowedToComment,
@@ -121,6 +125,20 @@ export default class AdminGeneralSecurityContainer extends Container {
    */
   setDisableLinkSharing(disableLinkSharing) {
     this.setState({ disableLinkSharing });
+  }
+
+  /**
+   * Change ownerRestrictionDisplayMode
+   */
+  changeOwnerRestrictionDisplayMode(mode) {
+    this.setState({ currentOwnerRestrictionDisplayMode: mode });
+  }
+
+  /**
+   * Change groupRestrictionDisplayMode
+   */
+  changeGroupRestrictionDisplayMode(mode) {
+    this.setState({ currentGroupRestrictionDisplayMode: mode });
   }
 
   /**
@@ -195,20 +213,6 @@ export default class AdminGeneralSecurityContainer extends Container {
   }
 
   /**
-   * Switch showRestrictedByOwner
-   */
-  switchIsShowRestrictedByOwner() {
-    this.setState({ isShowRestrictedByOwner:  !this.state.isShowRestrictedByOwner });
-  }
-
-  /**
-   * Switch showRestrictedByGroup
-   */
-  switchIsShowRestrictedByGroup() {
-    this.setState({ isShowRestrictedByGroup:  !this.state.isShowRestrictedByGroup });
-  }
-
-  /**
    * Switch isUsersHomepageDeletionEnabled
    */
   switchIsUsersHomepageDeletionEnabled() {
@@ -245,8 +249,8 @@ export default class AdminGeneralSecurityContainer extends Container {
       pageRecursiveDeletionAuthority: this.state.currentPageRecursiveDeletionAuthority,
       pageRecursiveCompleteDeletionAuthority: this.state.currentPageRecursiveCompleteDeletionAuthority,
       isAllGroupMembershipRequiredForPageCompleteDeletion: this.state.isAllGroupMembershipRequiredForPageCompleteDeletion,
-      hideRestrictedByGroup: !this.state.isShowRestrictedByGroup,
-      hideRestrictedByOwner: !this.state.isShowRestrictedByOwner,
+      hideRestrictedByGroup: this.state.currentGroupRestrictionDisplayMode === 'Hidden',
+      hideRestrictedByOwner: this.state.currentOwnerRestrictionDisplayMode === 'Hidden',
       isUsersHomepageDeletionEnabled: this.state.isUsersHomepageDeletionEnabled,
       isForceDeleteUserHomepageOnUserDeletion: this.state.isForceDeleteUserHomepageOnUserDeletion,
       isRomUserAllowedToComment: this.state.isRomUserAllowedToComment,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, type JSX } from 'react';
 
 import { type Extension } from '@codemirror/state';
 import { keymap, scrollPastEnd } from '@codemirror/view';
@@ -7,8 +7,9 @@ import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
 import deepmerge from 'ts-deepmerge';
 
 import { GlobalCodeMirrorEditorKey } from '../../consts';
+import type { EditingClient } from '../../interfaces';
 import { CodeMirrorEditor, type CodeMirrorEditorProps } from '../components-internal/CodeMirrorEditor';
-import { setDataLine } from '../services-internal';
+import { setDataLine, useUnifiedMergeView, codemirrorEditorClassForUnifiedMergeView } from '../services-internal';
 import { useCodeMirrorEditorIsolated } from '../stores/codemirror-editor';
 import { useCollaborativeEditorMode } from '../stores/use-collaborative-editor-mode';
 
@@ -24,19 +25,29 @@ type Props = CodeMirrorEditorProps & {
   user?: IUserHasId,
   pageId?: string,
   initialValue?: string,
-  isEditorMode: boolean,
-  onEditorsUpdated?: (userList: IUserHasId[]) => void,
+  enableCollaboration?: boolean,
+  enableUnifiedMergeView?: boolean,
+  onEditorsUpdated?: (clientList: EditingClient[]) => void,
 }
 
 export const CodeMirrorEditorMain = (props: Props): JSX.Element => {
   const {
-    user, pageId, initialValue, isEditorMode, cmProps,
+    user, pageId,
+    enableCollaboration = false, enableUnifiedMergeView = false,
+    cmProps,
     onSave, onEditorsUpdated, ...otherProps
   } = props;
 
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.MAIN);
 
-  useCollaborativeEditorMode(isEditorMode, user, pageId, initialValue, onEditorsUpdated, codeMirrorEditor);
+  useCollaborativeEditorMode(enableCollaboration, codeMirrorEditor, {
+    user,
+    pageId,
+    onEditorsUpdated,
+    reviewMode: enableUnifiedMergeView,
+  });
+
+  useUnifiedMergeView(enableUnifiedMergeView, codeMirrorEditor, { pageId });
 
   // setup additional extensions
   useEffect(() => {
@@ -81,6 +92,7 @@ export const CodeMirrorEditorMain = (props: Props): JSX.Element => {
   return (
     <CodeMirrorEditor
       editorKey={GlobalCodeMirrorEditorKey.MAIN}
+      className={codemirrorEditorClassForUnifiedMergeView}
       onSave={onSave}
       cmProps={cmPropsOverride}
       {...otherProps}

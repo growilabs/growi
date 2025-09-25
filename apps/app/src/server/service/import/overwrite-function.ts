@@ -5,6 +5,10 @@ import {
   Types, type Document,
 } from 'mongoose';
 
+import loggerFactory from '~/utils/logger';
+
+const logger = loggerFactory('growi:service:import:overwrite-function');
+
 
 const { ObjectId } = Types;
 
@@ -21,6 +25,10 @@ export type OverwriteFunction = (value: unknown, ctx: { document: Document, prop
  * @see https://mongoosejs.com/docs/api/schematype.html#schematype_SchemaType-cast
  */
 export const keepOriginal: OverwriteFunction = (value, { document, schema, propertyName }) => {
+  if (value == null) {
+    return value;
+  }
+
   // Model
   if (schema != null && schema.path(propertyName) != null) {
     const schemaType = schema.path(propertyName);
@@ -30,7 +38,14 @@ export const keepOriginal: OverwriteFunction = (value, { document, schema, prope
     // ref: https://github.com/Automattic/mongoose/blob/6.11.4/lib/schema/array.js#L334
     document.schema = schema;
 
-    return schemaType.cast(value, document, true);
+    try {
+      return schemaType.cast(value, document, true);
+    }
+    catch (e) {
+      logger.warn(`Failed to cast value for ${propertyName}`, e);
+      // return original value
+      return value;
+    }
   }
 
   // _id

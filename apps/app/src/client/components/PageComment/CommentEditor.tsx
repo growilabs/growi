@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, JSX } from 'react';
 import React, {
-  useCallback, useState, useEffect,
+  useCallback, useState, useEffect, useLayoutEffect,
   useMemo,
 } from 'react';
 
@@ -116,7 +116,7 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
     setShowPreview(showPreview);
   }, []);
 
-  // DO NOT dependent on slackChannelsData directly: https://github.com/weseek/growi/pull/7332
+  // DO NOT dependent on slackChannelsData directly: https://github.com/growilabs/growi/pull/7332
   const slackChannelsDataString = slackChannelsData?.toString();
   const initializeSlackEnabled = useCallback(() => {
     setSlackChannels(slackChannelsDataString ?? '');
@@ -152,7 +152,7 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
   }, [onCanceled, initializeEditor]);
 
   const postCommentHandler = useCallback(async() => {
-    const commentBodyToPost = codeMirrorEditor?.getDoc() ?? '';
+    const commentBodyToPost = codeMirrorEditor?.getDocString() ?? '';
 
     try {
       if (currentCommentId != null) {
@@ -186,7 +186,7 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
       const errorMessage = err.message || 'An unknown error occured when posting comment';
       setError(errorMessage);
     }
-  // eslint-disable-next-line max-len
+    // eslint-disable-next-line max-len
   }, [currentCommentId, initializeEditor, onCommented, codeMirrorEditor, updateComment, revisionId, replyTo, isSlackEnabled, slackChannels, postComment]);
 
   // the upload event handler
@@ -224,6 +224,11 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
     codeMirrorEditor?.initDoc(commentBody);
   }, [codeMirrorEditor, commentBody]);
 
+  // set handler to focus
+  useLayoutEffect(() => {
+    if (showPreview) return;
+    codeMirrorEditor?.focus();
+  }, [codeMirrorEditor, showPreview]);
 
   const errorMessage = useMemo(() => <span className="text-danger text-end me-2">{error}</span>, [error]);
   const cancelButton = useMemo(() => (
@@ -271,7 +276,7 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
           </TabPane>
           <TabPane tabId="comment_preview">
             <div className="comment-preview-container">
-              <CommentPreview markdown={codeMirrorEditor?.getDoc() ?? ''} />
+              <CommentPreview markdown={codeMirrorEditor?.getDocString() ?? ''} />
             </div>
           </TabPane>
         </TabContent>
@@ -336,7 +341,7 @@ export const CommentEditorPre = (props: CommentEditorProps): JSX.Element => {
               onClick={() => setIsReadyToUse(true)}
               data-testid="open-comment-editor-button"
             >
-              <UserPicture user={currentUser} noLink noTooltip additionalClassName="me-3" />
+              <UserPicture user={currentUser} noLink noTooltip className="me-3" />
               <span className="material-symbols-outlined me-1 fs-5">add_comment</span>
               <small>{t('page_comment.add_a_comment')}...</small>
             </button>

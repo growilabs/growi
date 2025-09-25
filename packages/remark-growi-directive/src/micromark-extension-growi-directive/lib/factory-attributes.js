@@ -14,7 +14,10 @@ import {
 import { codes, types } from 'micromark-util-symbol';
 import { ok as assert } from 'uvu/assert';
 
-import { markdownLineEndingOrSpaceOrComma, factoryAttributesDevider } from '../../micromark-factory-attributes-devider/index.js';
+import {
+  factoryAttributesDevider,
+  markdownLineEndingOrSpaceOrComma,
+} from '../../micromark-factory-attributes-devider/index.js';
 
 /**
  * @param {Effects} effects
@@ -33,22 +36,20 @@ import { markdownLineEndingOrSpaceOrComma, factoryAttributesDevider } from '../.
  */
 /* eslint-disable-next-line max-params */
 export function factoryAttributes(
-    effects,
-    ok,
-    nok,
-    attributesType,
-    attributesMarkerType,
-    attributeType,
-    attributeNameType,
-    attributeInitializerType,
-    attributeValueLiteralType,
-    attributeValueType,
-    attributeValueMarker,
-    attributeValueData,
-    disallowEol,
+  effects,
+  ok,
+  nok,
+  attributesType,
+  attributesMarkerType,
+  attributeType,
+  attributeNameType,
+  attributeInitializerType,
+  attributeValueLiteralType,
+  attributeValueType,
+  attributeValueMarker,
+  attributeValueData,
+  disallowEol,
 ) {
-  /** @type {string} */
-  let type;
   /** @type {Code|undefined} */
   let marker;
 
@@ -79,12 +80,13 @@ export function factoryAttributes(
       return factoryAttributesDevider(effects, between)(code);
     }
 
-    if (code !== codes.rightParenthesis
-      && code !== codes.eof
-      && code !== codes.carriageReturn
-      && code !== codes.lineFeed
-      && code !== codes.carriageReturnLineFeed
-      && code !== codes.ampersand
+    if (
+      code !== codes.rightParenthesis &&
+      code !== codes.eof &&
+      code !== codes.carriageReturn &&
+      code !== codes.lineFeed &&
+      code !== codes.carriageReturnLineFeed &&
+      code !== codes.ampersand
     ) {
       effects.enter(attributeType);
       effects.enter(attributeNameType);
@@ -98,19 +100,19 @@ export function factoryAttributes(
   /** @type {State} */
   function name(code) {
     if (
-      code !== codes.eof
-        && code !== codes.carriageReturn
-        && code !== codes.lineFeed
-        && code !== codes.carriageReturnLineFeed
-        && code !== codes.quotationMark
-        && code !== codes.apostrophe
-        && code !== codes.lessThan
-        && code !== codes.equalsTo
-        && code !== codes.greaterThan
-        && code !== codes.graveAccent
-        && code !== codes.rightParenthesis
-        && code !== codes.space
-        && code !== codes.comma
+      code !== codes.eof &&
+      code !== codes.carriageReturn &&
+      code !== codes.lineFeed &&
+      code !== codes.carriageReturnLineFeed &&
+      code !== codes.quotationMark &&
+      code !== codes.apostrophe &&
+      code !== codes.lessThan &&
+      code !== codes.equalsTo &&
+      code !== codes.greaterThan &&
+      code !== codes.graveAccent &&
+      code !== codes.rightParenthesis &&
+      code !== codes.space &&
+      code !== codes.comma
     ) {
       effects.consume(code);
       return name;
@@ -146,13 +148,13 @@ export function factoryAttributes(
   /** @type {State} */
   function valueBefore(code) {
     if (
-      code === codes.eof
-      || code === codes.lessThan
-      || code === codes.equalsTo
-      || code === codes.greaterThan
-      || code === codes.graveAccent
-      || code === codes.rightParenthesis
-      || (disallowEol && markdownLineEnding(code))
+      code === codes.eof ||
+      code === codes.lessThan ||
+      code === codes.equalsTo ||
+      code === codes.greaterThan ||
+      code === codes.graveAccent ||
+      code === codes.rightParenthesis ||
+      (disallowEol && markdownLineEnding(code))
     ) {
       return nok(code);
     }
@@ -184,18 +186,21 @@ export function factoryAttributes(
   /** @type {State} */
   function valueUnquoted(code) {
     if (
-      code === codes.eof
-      || code === codes.quotationMark
-      || code === codes.apostrophe
-      || code === codes.lessThan
-      || code === codes.equalsTo
-      || code === codes.greaterThan
-      || code === codes.graveAccent
+      code === codes.eof ||
+      code === codes.quotationMark ||
+      code === codes.apostrophe ||
+      code === codes.lessThan ||
+      code === codes.equalsTo ||
+      code === codes.greaterThan ||
+      code === codes.graveAccent
     ) {
       return nok(code);
     }
 
-    if (code === codes.rightParenthesis || markdownLineEndingOrSpaceOrComma(code)) {
+    if (
+      code === codes.rightParenthesis ||
+      markdownLineEndingOrSpaceOrComma(code)
+    ) {
       effects.exit(attributeValueData);
       effects.exit(attributeValueType);
       effects.exit(attributeType);
@@ -257,7 +262,8 @@ export function factoryAttributes(
 
   /** @type {State} */
   function valueQuotedAfter(code) {
-    return code === codes.rightParenthesis || markdownLineEndingOrSpaceOrComma(code)
+    return code === codes.rightParenthesis ||
+      markdownLineEndingOrSpaceOrComma(code)
       ? between(code)
       : end(code);
   }

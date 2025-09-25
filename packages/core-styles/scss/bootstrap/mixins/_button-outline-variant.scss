@@ -1,5 +1,9 @@
 @use 'sass:color';
 
+// Uncomment if you want to include this mixin with @use
+// $prefix: 'bs-' !default;
+// $btn-active-box-shadow: 0 !default;
+
 @mixin button-outline-variant-light(
   $color,
   $background: color.mix(#fff, $color, 90%),

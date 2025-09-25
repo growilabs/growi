@@ -148,6 +148,11 @@ const SearchTypeahead: ForwardRefRenderFunction<IFocusable, Props> = (props: Pro
 
   const keyDownHandler = useCallback((event: KeyboardEvent) => {
     if (event.key === 'Enter') {
+      // do nothing while composing
+      // "event.isComposing" is not supported
+      if (event.nativeEvent.isComposing) {
+        return;
+      }
       if (onSubmit != null && input != null && input.length > 0) {
         // schedule to submit with 100ms delay
         timeoutIdRef.current = setTimeout(() => onSubmit(input), DELAY_FOR_SUBMISSION);

@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, type JSX } from 'react';
 
 export const EditorSettings = memo((): JSX.Element => {
   // const { t } = useTranslation();

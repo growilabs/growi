@@ -1,5 +1,5 @@
 import React, {
-  useEffect, useRef, useState,
+  useEffect, useRef, useState, type JSX,
 } from 'react';
 
 import type { IRevisionHasId } from '@growi/core';

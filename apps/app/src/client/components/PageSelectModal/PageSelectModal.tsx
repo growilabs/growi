@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import type { FC, JSX } from 'react';
 import {
   Suspense, useState, useCallback,
 } from 'react';
@@ -13,78 +13,68 @@ import {
 import SimpleBar from 'simplebar-react';
 
 import type { IPageForItem } from '~/interfaces/page';
-import { useTargetAndAncestors, useIsGuestUser, useIsReadOnlyUser } from '~/stores-universal/context';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/stores-universal/context';
 import { usePageSelectModal } from '~/stores/modal';
 import { useSWRxCurrentPage } from '~/stores/page';
 
 import { ItemsTree } from '../ItemsTree';
 import ItemsTreeContentSkeleton from '../ItemsTree/ItemsTreeContentSkeleton';
-import { usePagePathRenameHandler } from '../PageEditor/page-path-rename-utils';
 
 import { TreeItemForModal } from './TreeItemForModal';
 
-
-export const PageSelectModal: FC = () => {
+const PageSelectModalSubstance: FC = () => {
   const {
     data: PageSelectModalData,
     close: closeModal,
   } = usePageSelectModal();
 
-  const isOpened = PageSelectModalData?.isOpened ?? false;
-
-  const [clickedParentPagePath, setClickedParentPagePath] = useState<string | null>(null);
+  const [clickedParentPage, setClickedParentPage] = useState<IPageForItem | null>(null);
+  const [isIncludeSubPage, setIsIncludeSubPage] = useState(true);
 
   const { t } = useTranslation();
 
   const { data: isGuestUser } = useIsGuestUser();
   const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { data: targetAndAncestorsData } = useTargetAndAncestors();
   const { data: currentPage } = useSWRxCurrentPage();
+  const { data: pageSelectModalData } = usePageSelectModal();
 
-  const pagePathRenameHandler = usePagePathRenameHandler(currentPage);
+  const isHierarchicalSelectionMode = pageSelectModalData?.opts?.isHierarchicalSelectionMode ?? false;
 
   const onClickTreeItem = useCallback((page: IPageForItem) => {
     const parentPagePath = page.path;
 
     if (parentPagePath == null) {
-      return <></>;
+      return;
     }
 
-    setClickedParentPagePath(parentPagePath);
+    setClickedParentPage(page);
   }, []);
 
   const onClickCancel = useCallback(() => {
-    setClickedParentPagePath(null);
+    setClickedParentPage(null);
     closeModal();
   }, [closeModal]);
 
   const onClickDone = useCallback(() => {
-    if (clickedParentPagePath != null) {
-      const currentPageTitle = nodePath.basename(currentPage?.path ?? '') || '/';
-      const newPagePath = nodePath.resolve(clickedParentPagePath, currentPageTitle);
-
-      pagePathRenameHandler(newPagePath);
+    if (clickedParentPage != null) {
+      PageSelectModalData?.opts?.onSelected?.(clickedParentPage, isIncludeSubPage);
     }
 
     closeModal();
-  }, [clickedParentPagePath, closeModal, currentPage?.path, pagePathRenameHandler]);
+  }, [PageSelectModalData?.opts, clickedParentPage, closeModal, isIncludeSubPage]);
 
   const parentPagePath = pathUtils.addTrailingSlash(nodePath.dirname(currentPage?.path ?? ''));
 
-  const targetPathOrId = clickedParentPagePath || parentPagePath;
+  const targetPathOrId = clickedParentPage?.path || parentPagePath;
 
-  const targetPath = clickedParentPagePath || parentPagePath;
+  const targetPath = clickedParentPage?.path || parentPagePath;
 
   if (isGuestUser == null) {
     return <></>;
   }
 
   return (
-    <Modal
-      isOpen={isOpened}
-      toggle={closeModal}
-      centered
-    >
+    <>
       <ModalHeader toggle={closeModal}>{t('page_select_modal.select_page_location')}</ModalHeader>
       <ModalBody className="p-0">
         <Suspense fallback={<ItemsTreeContentSkeleton />}>
@@ -96,17 +86,51 @@ export const PageSelectModal: FC = () => {
                 isReadOnlyUser={!!isReadOnlyUser}
                 targetPath={targetPath}
                 targetPathOrId={targetPathOrId}
-                targetAndAncestorsData={targetAndAncestorsData}
                 onClickTreeItem={onClickTreeItem}
               />
             </div>
           </SimpleBar>
         </Suspense>
       </ModalBody>
-      <ModalFooter>
-        <Button color="secondary" onClick={onClickCancel}>{t('Cancel')}</Button>
-        <Button color="primary" onClick={onClickDone}>{t('Done')}</Button>
+      <ModalFooter className="border-top d-flex flex-column">
+        { isHierarchicalSelectionMode && (
+          <div className="form-check form-check-info align-self-start ms-4">
+            <input
+              type="checkbox"
+              id="includeSubPages"
+              className="form-check-input"
+              name="fileUpload"
+              checked={isIncludeSubPage}
+              onChange={() => setIsIncludeSubPage(!isIncludeSubPage)}
+            />
+            <label
+              className="form-label form-check-label"
+              htmlFor="includeSubPages"
+            >
+              {t('Include Subordinated Page')}
+            </label>
+          </div>
+        )}
+        <div className="d-flex gap-2 align-self-end">
+          <Button color="secondary" onClick={onClickCancel}>{t('Cancel')}</Button>
+          <Button color="primary" onClick={onClickDone}>{t('Done')}</Button>
+        </div>
       </ModalFooter>
+    </>
+  );
+};
+
+export const PageSelectModal = (): JSX.Element => {
+  const { data: pageSelectModalData, close: closePageSelectModal } = usePageSelectModal();
+  const isOpen = pageSelectModalData?.isOpened ?? false;
+
+  if (!isOpen) {
+    return <></>;
+  }
+
+  return (
+    <Modal isOpen={isOpen} toggle={closePageSelectModal} centered>
+      <PageSelectModalSubstance />
     </Modal>
   );
 };

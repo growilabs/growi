@@ -43,13 +43,13 @@
     "clean": "shx rm -rf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
-    "lint:js": "eslint **/*.{js,ts}",
+    "lint:js": "biome check",
     "lint:typecheck": "vue-tsc --noEmit",
     "lint": "npm-run-all -p lint:*",
     "test": "vitest run --coverage"
   },
   "dependencies": {
-    "@slack/oauth": "^2.0.1",
+    "@slack/oauth": "^3.0.3",
     "@slack/web-api": "^6.2.4",
     "@types/bunyan": "^1.8.10",
     "@types/http-errors": "^2.0.3",

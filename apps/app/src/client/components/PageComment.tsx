@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import type { FC, JSX } from 'react';
 import React, {
   useState, useMemo, memo, useCallback,
 } from 'react';
@@ -190,7 +190,7 @@ export const PageComment: FC<PageCommentProps> = memo((props: PageCommentProps):
                           className="btn btn-secondary btn-comment-reply text-start w-100 ms-5"
                           onClick={() => onReplyButtonClickHandler(comment._id)}
                         >
-                          <UserPicture user={currentUser} noLink noTooltip additionalClassName="me-2" />
+                          <UserPicture user={currentUser} noLink noTooltip className="me-2" />
                           <span className="material-symbols-outlined me-1 fs-5 pb-1">reply</span><small>{t('page_comment.reply')}...</small>
                         </button>
                       </NotAvailableIfReadOnlyUserNotAllowedToComment>

@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, memo } from 'react';
+import React, {
+  useCallback, useEffect, memo, type JSX,
+} from 'react';
 
 import { useTranslation } from 'next-i18next';
 import { useRouter } from 'next/router';

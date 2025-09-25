@@ -32,7 +32,7 @@ class AclServiceImpl implements AclService {
    * @returns Whether Access Control is enabled or not
    */
   isAclEnabled() {
-    const wikiMode = configManager.getConfig('crowi', 'security:wikiMode');
+    const wikiMode = configManager.getConfig('security:wikiMode');
     return wikiMode !== 'public';
   }
 
@@ -40,7 +40,7 @@ class AclServiceImpl implements AclService {
    * @returns Whether wiki mode is set
    */
   isWikiModeForced() {
-    const wikiMode = configManager.getConfig('crowi', 'security:wikiMode');
+    const wikiMode = configManager.getConfig('security:wikiMode');
     const isPrivateOrPublic = wikiMode === 'private' || wikiMode === 'public';
 
     return isPrivateOrPublic;
@@ -50,7 +50,7 @@ class AclServiceImpl implements AclService {
    * @returns Whether guest users are allowed to read public pages
    */
   isGuestAllowedToRead() {
-    const wikiMode = configManager.getConfig('crowi', 'security:wikiMode');
+    const wikiMode = configManager.getConfig('security:wikiMode');
 
     // return false if private wiki mode
     if (wikiMode === 'private') {
@@ -61,7 +61,7 @@ class AclServiceImpl implements AclService {
       return true;
     }
 
-    const guestMode = configManager.getConfig('crowi', 'security:restrictGuestMode');
+    const guestMode = configManager.getConfig('security:restrictGuestMode');
 
     // 'Readonly' => returns true (allow access to guests)
     // 'Deny', null, undefined, '', ... everything else => returns false (requires login)

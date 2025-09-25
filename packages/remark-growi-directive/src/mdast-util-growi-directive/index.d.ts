@@ -1,8 +1,4 @@
-import type {
-  Data,
-  Parent,
-  PhrasingContent,
-} from 'mdast';
+import type { Data, Parent, PhrasingContent } from 'mdast';
 
 import { DirectiveType as DirectiveTypeObject } from './lib/index.js';
 
@@ -18,12 +14,12 @@ interface DirectiveFields {
   /**
    * Directive name.
    */
-  name: string
+  name: string;
 
   /**
    * Directive attributes.
    */
-  attributes?: Record<string, string | null | undefined> | null | undefined
+  attributes?: Record<string, string | null | undefined> | null | undefined;
 }
 
 /**
@@ -33,25 +29,25 @@ export interface LeafGrowiPluginDirective extends Parent, DirectiveFields {
   /**
    * Node type of leaf directive.
    */
-  type: DirectiveType['Leaf']
+  type: DirectiveType['Leaf'];
 
   /**
    * Children of leaf directive.
    */
-  children: PhrasingContent[]
+  children: PhrasingContent[];
 
   /**
    * Data associated with the mdast leaf directive.
    */
-  data?: LeafGrowiPluginDirectiveData | undefined
+  data?: LeafGrowiPluginDirectiveData | undefined;
 }
 
 /**
  * Info associated with mdast leaf directive nodes by the ecosystem.
  */
 export interface LeafGrowiPluginDirectiveData extends Data {
-  hName?: string,
-  hProperties?: Record<string, string>
+  hName?: string;
+  hProperties?: Record<string, string>;
 }
 
 /**
@@ -61,34 +57,33 @@ export interface TextGrowiPluginDirective extends Parent, DirectiveFields {
   /**
    * Node type of text directive.
    */
-  type: DirectiveType['Text']
+  type: DirectiveType['Text'];
 
   /**
    * Children of text directive.
    */
-  children: PhrasingContent[]
+  children: PhrasingContent[];
 
   /**
    * Data associated with the text leaf directive.
    */
-  data?: TextGrowiPluginDirectiveData | undefined
+  data?: TextGrowiPluginDirectiveData | undefined;
 }
 
 /**
  * Info associated with mdast text directive nodes by the ecosystem.
  */
 export interface TextGrowiPluginDirectiveData extends Data {
-  hName?: string,
-  hProperties?: Record<string, string>
+  hName?: string;
+  hProperties?: Record<string, string>;
 }
-
 
 /**
  * Union of registered mdast directive nodes.
  *
  * It is not possible to register custom mdast directive node types.
  */
-export type Directives = LeafGrowiPluginDirective | TextGrowiPluginDirective
+export type Directives = LeafGrowiPluginDirective | TextGrowiPluginDirective;
 
 // Add custom data tracked to turn markdown into a tree.
 declare module 'mdast-util-from-markdown' {
@@ -96,7 +91,7 @@ declare module 'mdast-util-from-markdown' {
     /**
      * Attributes for current directive.
      */
-    directiveAttributes?: Array<[string, string]> | undefined
+    directiveAttributes?: Array<[string, string]> | undefined;
   }
 }
 
@@ -111,7 +106,7 @@ declare module 'mdast-util-to-markdown' {
      *     ^^^
      * ```
      */
-    leafGrowiPluginDirective: 'leafGrowiPluginDirective'
+    leafGrowiPluginDirective: 'leafGrowiPluginDirective';
 
     /**
      * Label of a leaf directive.
@@ -121,7 +116,7 @@ declare module 'mdast-util-to-markdown' {
      *        ^^^
      * ```
      */
-    leafGrowiPluginDirectiveLabel: 'leafGrowiPluginDirectiveLabel'
+    leafGrowiPluginDirectiveLabel: 'leafGrowiPluginDirectiveLabel';
 
     /**
      * Whole text directive.
@@ -131,7 +126,7 @@ declare module 'mdast-util-to-markdown' {
      *     ^^
      * ```
      */
-    textGrowiPluginDirective: 'textGrowiPluginDirective'
+    textGrowiPluginDirective: 'textGrowiPluginDirective';
 
     /**
      * Label of a text directive.
@@ -141,7 +136,7 @@ declare module 'mdast-util-to-markdown' {
      *       ^^^
      * ```
      */
-    textGrowiPluginDirectiveLabel: 'textGrowiPluginDirectiveLabel'
+    textGrowiPluginDirectiveLabel: 'textGrowiPluginDirectiveLabel';
   }
 }
 
@@ -152,14 +147,14 @@ declare module 'mdast' {
      * Directive in flow content (such as in the root document, or block
      * quotes), which contains nothing.
      */
-    leafGrowiPluginDirective: LeafGrowiPluginDirective
+    leafGrowiPluginDirective: LeafGrowiPluginDirective;
   }
 
   interface PhrasingContentMap {
     /**
      * Directive in phrasing content (such as in paragraphs, headings).
      */
-    textGrowiPluginDirective: TextGrowiPluginDirective
+    textGrowiPluginDirective: TextGrowiPluginDirective;
   }
 
   interface RootContentMap {
@@ -167,11 +162,11 @@ declare module 'mdast' {
      * Directive in flow content (such as in the root document, or block
      * quotes), which contains nothing.
      */
-    leafGrowiPluginDirective: LeafGrowiPluginDirective
+    leafGrowiPluginDirective: LeafGrowiPluginDirective;
 
     /**
      * Directive in phrasing content (such as in paragraphs, headings).
      */
-    textGrowiPluginDirective: TextGrowiPluginDirective
+    textGrowiPluginDirective: TextGrowiPluginDirective;
   }
 }

@@ -7,7 +7,6 @@ import type {
 import useSWR, {
   mutate, type SWRConfiguration, type SWRResponse, type Arguments,
 } from 'swr';
-import { cache } from 'swr/_internal';
 import useSWRImmutable from 'swr/immutable';
 import type { SWRInfiniteResponse } from 'swr/infinite';
 import useSWRInfinite, { unstable_serialize } from 'swr/infinite'; // eslint-disable-line camelcase
@@ -16,7 +15,7 @@ import type { IPagingResult } from '~/interfaces/paging-result';
 
 import { apiv3Get } from '../client/util/apiv3-client';
 import type {
-  AncestorsChildrenResult, ChildrenResult, V5MigrationStatus, RootPageResult,
+  ChildrenResult, V5MigrationStatus, RootPageResult,
 } from '../interfaces/page-listing-results';
 
 
@@ -28,7 +27,6 @@ export const useSWRxPagesByPath = (path?: Nullable<string>): SWRResponse<IPageHa
     ([endpoint, path, findAll, includeEmpty]) => apiv3Get(endpoint, { path, findAll, includeEmpty }).then(result => result.data.pages),
   );
 };
-
 
 type RecentApiResult = {
   pages: IPageHasId[],
@@ -185,32 +183,6 @@ export const mutatePageTree = async(): Promise<undefined[]> => {
   return mutate(keyMatcherForPageTree);
 };
 
-export const useSWRxPageAncestorsChildren = (
-    path: string | null,
-    config?: SWRConfiguration,
-): SWRResponse<AncestorsChildrenResult, Error> => {
-  const key = path ? [MUTATION_ID_FOR_PAGETREE, '/page-listing/ancestors-children', path] : null;
-
-  // take care of the degration
-  // see: https://github.com/weseek/growi/pull/7038
-
-  if (key != null) {
-    assert(keyMatcherForPageTree(key));
-  }
-
-  return useSWRImmutable(
-    key,
-    ([, endpoint, path]) => apiv3Get(endpoint, { path }).then((response) => {
-      return {
-        ancestorsChildren: response.data.ancestorsChildren,
-      };
-    }),
-    {
-      ...config,
-      keepPreviousData: true,
-    },
-  );
-};
 
 export const useSWRxPageChildren = (
     id?: string | null,

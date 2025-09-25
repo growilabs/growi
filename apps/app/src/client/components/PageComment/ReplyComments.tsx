@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, type JSX } from 'react';
 
 import type { IUser } from '@growi/core';
 import { Collapse } from 'reactstrap';

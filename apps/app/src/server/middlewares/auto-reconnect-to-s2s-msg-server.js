@@ -1,3 +1,4 @@
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
   const { s2sMessagingService } = crowi;
 

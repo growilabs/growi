@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, type JSX } from 'react';
 
 import styles from './MaskedInput.module.scss';
 
 type Props = {
   name: string
   readOnly: boolean
-  defaultValue: string
+  value: string
   onChange?: (e: any) => void
   tabIndex?: number | undefined
 };
@@ -17,7 +17,7 @@ export default function MaskedInput(props: Props): JSX.Element {
   };
 
   const {
-    name, readOnly, defaultValue, onChange, tabIndex,
+    name, readOnly, value, onChange, tabIndex,
   } = props;
 
   return (
@@ -27,7 +27,7 @@ export default function MaskedInput(props: Props): JSX.Element {
         type={passwordShown ? 'text' : 'password'}
         name={name}
         readOnly={readOnly}
-        defaultValue={defaultValue}
+        value={value}
         onChange={onChange}
         tabIndex={tabIndex}
       />

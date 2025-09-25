@@ -1,5 +1,5 @@
 import React, {
-  memo, useCallback, useEffect, useMemo, useRef,
+  memo, useCallback, useEffect, useMemo, useRef, type JSX,
 } from 'react';
 
 import type {
@@ -8,6 +8,7 @@ import type {
 import {
   isIPageInfoForEntity, isIPageInfoForOperation,
 } from '@growi/core';
+import { pagePathUtils } from '@growi/core/dist/utils';
 import { useRect } from '@growi/ui/dist/utils';
 import { useTranslation } from 'next-i18next';
 import { DropdownItem } from 'reactstrap';
@@ -16,8 +17,10 @@ import {
   toggleLike, toggleSubscribe,
 } from '~/client/services/page-operation';
 import { toastError } from '~/client/util/toastr';
-import RagSearchButton from '~/features/openai/client/components/RagSearchButton';
-import { useIsGuestUser, useIsReadOnlyUser, useIsSearchPage } from '~/stores-universal/context';
+import OpenDefaultAiAssistantButton from '~/features/openai/client/components/AiAssistant/OpenDefaultAiAssistantButton';
+import {
+  useIsGuestUser, useIsReadOnlyUser, useIsSearchPage, useIsUsersHomepageDeletionEnabled,
+} from '~/stores-universal/context';
 import {
   EditorMode, useEditorMode,
 } from '~/stores-universal/ui';
@@ -27,7 +30,7 @@ import {
 } from '~/stores/ui';
 import loggerFactory from '~/utils/logger';
 
-import { useSWRxPageInfo, useSWRxTagsInfo } from '../../../stores/page';
+import { useSWRxPageInfo, useSWRxTagsInfo, useCurrentPagePath } from '../../../stores/page';
 import { useSWRxUsersList } from '../../../stores/user';
 import type { AdditionalMenuItemsRendererProps, ForceHideMenuItems } from '../Common/Dropdown/PageItemControl';
 import {
@@ -134,6 +137,10 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
   const { data: editorMode } = useEditorMode();
   const { data: isDeviceLargerThanMd } = useIsDeviceLargerThanMd();
   const { data: isSearchPage } = useIsSearchPage();
+  const { data: isUsersHomepageDeletionEnabled } = useIsUsersHomepageDeletionEnabled();
+  const { data: currentPagePath } = useCurrentPagePath();
+
+  const isUsersHomepage = currentPagePath == null ? false : pagePathUtils.isUsersHomepage(currentPagePath);
 
   const { mutate: mutatePageInfo } = useSWRxPageInfo(pageId, shareLinkId);
 
@@ -249,6 +256,22 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
     }
   }, [expandContentWidth, isGuestUser, isReadOnlyUser, onClickSwitchContentWidth, pageId, pageInfo]);
 
+  const isEnableActions = useMemo(() => {
+    if (isGuestUser) {
+      return false;
+    }
+
+    if (currentPagePath == null) {
+      return false;
+    }
+
+    if (isUsersHomepage && !isUsersHomepageDeletionEnabled) {
+      return false;
+    }
+
+    return true;
+  }, [isGuestUser, isUsersHomepage, isUsersHomepageDeletionEnabled]);
+
   const additionalMenuItemOnTopRenderer = useMemo(() => {
     if (!isIPageInfoForEntity(pageInfo)) {
       return undefined;
@@ -285,7 +308,7 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
       { isViewMode && isDeviceLargerThanMd && !isSearchPage && !isSearchPage && (
         <>
           <SearchButton />
-          <RagSearchButton />
+          <OpenDefaultAiAssistantButton />
         </>
       )}
 
@@ -332,7 +355,7 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
         <PageItemControl
           pageId={pageId}
           pageInfo={pageInfo}
-          isEnableActions={!isGuestUser}
+          isEnableActions={isEnableActions}
           isReadOnlyUser={!!isReadOnlyUser}
           forceHideMenuItems={forceHideMenuItemsWithAdditions}
           additionalMenuItemOnTopRenderer={!isReadOnlyUser ? additionalMenuItemOnTopRenderer : undefined}

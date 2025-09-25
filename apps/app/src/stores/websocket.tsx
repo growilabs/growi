@@ -1,13 +1,13 @@
 import { useEffect } from 'react';
 
-import { useGlobalSocket, GLOBAL_SOCKET_KEY, GLOBAL_SOCKET_NS } from '@growi/core/dist/swr';
+import {
+  useGlobalSocket, GLOBAL_SOCKET_KEY, GLOBAL_SOCKET_NS, useSWRStatic,
+} from '@growi/core/dist/swr';
 import type { Socket } from 'socket.io-client';
 import type { SWRResponse } from 'swr';
 
 import { SocketEventName } from '~/interfaces/websocket';
 import loggerFactory from '~/utils/logger';
-
-import { useStaticSWR } from './use-static-swr';
 
 const logger = loggerFactory('growi:stores:ui');
 
@@ -19,10 +19,14 @@ export const GLOBAL_ADMIN_SOCKET_KEY = 'globalAdminSocket';
  */
 export const useSetupGlobalSocket = (): void => {
 
-  const { mutate } = useStaticSWR(GLOBAL_SOCKET_KEY);
+  const { data, mutate } = useSWRStatic(GLOBAL_SOCKET_KEY);
 
   useEffect(() => {
-    const setUpSocket = async() => {
+    if (data != null) {
+      return;
+    }
+
+    mutate(async() => {
       const { io } = await import('socket.io-client');
       const socket = io(GLOBAL_SOCKET_NS, {
         transports: ['websocket'],
@@ -31,15 +35,12 @@ export const useSetupGlobalSocket = (): void => {
       socket.on('error', (err) => { logger.error(err) });
       socket.on('connect_error', (err) => { logger.error('Failed to connect with websocket.', err) });
 
-      mutate(socket);
-    };
-
-    setUpSocket();
-
-  }, [mutate]);
+      return socket;
+    });
+  }, [data, mutate]);
 };
 
-// comment out for porduction build error: https://github.com/weseek/growi/pull/7131
+// comment out for porduction build error: https://github.com/growilabs/growi/pull/7131
 /*
  * Global Admin Socket
  */
@@ -59,7 +60,7 @@ export const useSetupGlobalSocket = (): void => {
 // };
 
 export const useGlobalAdminSocket = (): SWRResponse<Socket, Error> => {
-  return useStaticSWR(GLOBAL_ADMIN_SOCKET_KEY);
+  return useSWRStatic(GLOBAL_ADMIN_SOCKET_KEY);
 };
 
 export const useSetupGlobalSocketForPage = (pageId: string | undefined): void => {

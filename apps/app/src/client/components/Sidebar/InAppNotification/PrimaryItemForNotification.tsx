@@ -8,7 +8,6 @@ import { PrimaryItem, type PrimaryItemProps } from '../SidebarNav/PrimaryItem';
 
 type PrimaryItemForNotificationProps = Omit<PrimaryItemProps, 'onClick' | 'label' | 'iconName' | 'contents' | 'badgeContents' >
 
-// TODO(after v7 release): https://redmine.weseek.co.jp/issues/138463
 export const PrimaryItemForNotification = memo((props: PrimaryItemForNotificationProps) => {
   const { sidebarMode, onHover } = props;
 

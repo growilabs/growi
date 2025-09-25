@@ -56,7 +56,7 @@ const MailSetting = (props: Props) => {
             className="form-control"
             type="text"
             placeholder={`${t('eg')} mail@growi.org`}
-            defaultValue={adminAppContainer.state.fromAddress || ''}
+            value={adminAppContainer.state.fromAddress || ''}
             onChange={(e) => { adminAppContainer.changeFromAddress(e.target.value) }}
           />
         </div>

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, type JSX } from 'react';
 
 
 import { isPopulated } from '@growi/core';
@@ -10,7 +10,6 @@ import { apiv3Put } from '~/client/util/apiv3-client';
 import { toastSuccess, toastError } from '~/client/util/toastr';
 import { useCurrentUser } from '~/stores-universal/context';
 import { generateGravatarSrc, GRAVATAR_DEFAULT } from '~/utils/gravatar';
-
 
 const DEFAULT_IMAGE = '/images/icons/user.svg';
 
@@ -113,7 +112,7 @@ const ProfileImageSettings = (): JSX.Element => {
               </a>
             </div>
           </h5>
-          <img src={generateGravatarSrc(currentUser.email)} className="rounded-pill" width="64" data-vrt-blackout-profile />
+          <img src={generateGravatarSrc(currentUser.email)} className="rounded-pill" width="64" height="64" data-vrt-blackout-profile />
         </div>
 
         <div className="col-md-7 mt-5 mt-md-0">
@@ -138,7 +137,9 @@ const ProfileImageSettings = (): JSX.Element => {
               { t('Current Image') }
             </label>
             <div className="col-md-6 col-lg-8">
-              <p className="mb-0"><img src={uploadedPictureSrc ?? DEFAULT_IMAGE} className="picture picture-lg rounded-circle" id="settingUserPicture" /></p>
+              <p className="mb-0">
+                <img src={uploadedPictureSrc ?? DEFAULT_IMAGE} width="64" height="64" className="rounded-circle" id="settingUserPicture" />
+              </p>
               {uploadedPictureSrc && <button type="button" className="btn btn-danger mt-2" onClick={deleteImageHandler}>{ t('Delete Image') }</button>}
             </div>
           </div>
@@ -147,7 +148,12 @@ const ProfileImageSettings = (): JSX.Element => {
               {t('Upload new image')}
             </label>
             <div className="col-md-6 col-lg-8">
-              <input type="file" onChange={selectFileHandler} name="profileImage" accept="image/*" />
+              <input
+                type="file"
+                onChange={selectFileHandler}
+                name="profileImage"
+                accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/avif,image/heic,image/heif,image/tiff,image/svg+xml"
+              />
             </div>
           </div>
         </div>

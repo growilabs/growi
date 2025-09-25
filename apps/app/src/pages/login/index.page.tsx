@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { IExternalAuthProviderType } from '@growi/core';
+import { pagePathUtils } from '@growi/core/dist/utils';
 import type {
   NextPage, GetServerSideProps, GetServerSidePropsContext,
 } from 'next';
@@ -13,6 +13,7 @@ import { NoLoginLayout } from '~/components/Layout/NoLoginLayout';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type { IExternalAccountLoginError } from '~/interfaces/errors/external-account-login-error';
 import { isExternalAccountLoginError } from '~/interfaces/errors/external-account-login-error';
+import { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 import type { RegistrationMode } from '~/interfaces/registration-mode';
 import type { CommonProps } from '~/pages/utils/commons';
 import { getServerSideCommonProps, generateCustomTitle, getNextI18NextConfig } from '~/pages/utils/commons';
@@ -23,6 +24,8 @@ import {
 
 import styles from './index.module.scss';
 
+
+const { isPermalink, isUserPage, isUsersTopPage } = pagePathUtils;
 
 const LoginForm = dynamic(() => import('~/client/components/LoginForm').then(mod => mod.LoginForm), { ssr: false });
 
@@ -95,11 +98,10 @@ function injectEnabledStrategies(context: GetServerSidePropsContext, props: Prop
   } = crowi;
 
   props.enabledExternalAuthType = [
-    configManager.getConfig('crowi', 'security:passport-google:isEnabled') === true ? IExternalAuthProviderType.google : undefined,
-    configManager.getConfig('crowi', 'security:passport-github:isEnabled') === true ? IExternalAuthProviderType.github : undefined,
-    // configManager.getConfig('crowi', 'security:passport-facebook:isEnabled') ?? IExternalAuthProviderType.facebook : undefined,
-    configManager.getConfig('crowi', 'security:passport-saml:isEnabled') === true ? IExternalAuthProviderType.saml : undefined,
-    configManager.getConfig('crowi', 'security:passport-oidc:isEnabled') === true ? IExternalAuthProviderType.oidc : undefined,
+    configManager.getConfig('security:passport-google:isEnabled') === true ? IExternalAuthProviderType.google : undefined,
+    configManager.getConfig('security:passport-github:isEnabled') === true ? IExternalAuthProviderType.github : undefined,
+    configManager.getConfig('security:passport-saml:isEnabled') === true ? IExternalAuthProviderType.saml : undefined,
+    configManager.getConfig('security:passport-oidc:isEnabled') === true ? IExternalAuthProviderType.oidc : undefined,
 
   ]
     .filter((authType): authType is Exclude<typeof authType, undefined> => authType != null);
@@ -114,19 +116,28 @@ async function injectServerConfigurations(context: GetServerSidePropsContext, pr
     passportService,
   } = crowi;
 
-  props.isPasswordResetEnabled = crowi.configManager.getConfig('crowi', 'security:passport-local:isPasswordResetEnabled');
+  props.isPasswordResetEnabled = configManager.getConfig('security:passport-local:isPasswordResetEnabled');
   props.isMailerSetup = mailService.isMailerSetup;
   props.isLocalStrategySetup = passportService.isLocalStrategySetup;
   props.isLdapStrategySetup = passportService.isLdapStrategySetup;
-  props.isLdapSetupFailed = configManager.getConfig('crowi', 'security:passport-ldap:isEnabled') && !props.isLdapStrategySetup;
-  props.registrationWhitelist = configManager.getConfig('crowi', 'security:registrationWhitelist');
-  props.isEmailAuthenticationEnabled = configManager.getConfig('crowi', 'security:passport-local:isEmailAuthenticationEnabled');
-  props.registrationMode = configManager.getConfig('crowi', 'security:registrationMode');
-  props.minPasswordLength = configManager.getConfig('crowi', 'app:minPasswordLength');
+  props.isLdapSetupFailed = configManager.getConfig('security:passport-ldap:isEnabled') && !props.isLdapStrategySetup;
+  props.registrationWhitelist = configManager.getConfig('security:registrationWhitelist');
+  props.isEmailAuthenticationEnabled = configManager.getConfig('security:passport-local:isEmailAuthenticationEnabled');
+  props.registrationMode = configManager.getConfig('security:registrationMode');
+  props.minPasswordLength = configManager.getConfig('app:minPasswordLength');
 }
 
 export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {
   const result = await getServerSideCommonProps(context);
+
+
+  // redirect to the page the user was on before moving to the Login Page
+  if (context.req.headers.referer != null) {
+    const urlBeforeLogin = new URL(context.req.headers.referer);
+    if (isPermalink(urlBeforeLogin.pathname) || isUserPage(urlBeforeLogin.pathname) || isUsersTopPage(urlBeforeLogin.pathname)) {
+      (context.req as CrowiRequest).session.redirectTo = urlBeforeLogin.href;
+    }
+  }
 
   // check for presence
   // see: https://github.com/vercel/next.js/issues/19271#issuecomment-730006862

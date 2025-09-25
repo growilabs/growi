@@ -1,5 +1,5 @@
 import React, {
-  useCallback, useMemo, useRef, useState,
+  useCallback, useMemo, useRef, useState, type JSX,
 } from 'react';
 
 import { useTranslation } from 'next-i18next';
@@ -56,7 +56,7 @@ const SearchResultListHead = React.memo((props: SearchResultListHeadProps): JSX.
         <span className="ms-3 fw-bold">{total} {t('search_result.hit_number_unit', 'hit')}</span>
         { took != null && (
           // blackout 70px rectangle in VRT
-          <span data-vrt-blackout className="ms-3 text-muted d-inline-block" style={{ minWidth: '70px' }}>({took}ms)</span>
+          (<span data-vrt-blackout className="ms-3 text-muted d-inline-block" style={{ minWidth: '70px' }}>({took}ms)</span>)
         ) }
       </div>
       {/* TODO: infinite scroll for search result */}

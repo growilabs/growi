@@ -1,7 +1,5 @@
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
+  useCallback, useEffect, useMemo, type JSX,
 } from 'react';
 
 import { Lang } from '@growi/core';

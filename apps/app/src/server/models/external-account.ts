@@ -1,12 +1,12 @@
 // disable no-return-await for model functions
 /* eslint-disable no-return-await */
-import type { IUser } from '@growi/core/dist/interfaces';
-import { type IExternalAccount, type IExternalAccountHasId, type IUserHasId } from '@growi/core/dist/interfaces';
+import type { IUser, IUserHasId, IExternalAccount } from '@growi/core/dist/interfaces';
 import type { Model, Document, HydratedDocument } from 'mongoose';
 import mongoose, { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
+import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 import { NullUsernameToBeRegisteredError } from '~/server/models/errors';
 import loggerFactory from '~/utils/logger';
 
@@ -14,8 +14,7 @@ import { getOrCreateModel } from '../util/mongoose-utils';
 
 const logger = loggerFactory('growi:models:external-account');
 
-
-export interface ExternalAccountDocument extends IExternalAccount, Document {}
+export interface ExternalAccountDocument extends IExternalAccount<IExternalAuthProviderType>, Document {}
 
 export interface ExternalAccountModel extends Model<ExternalAccountDocument> {
   [x:string]: any, // for old methods
@@ -71,7 +70,7 @@ schema.statics.findOrRegister = function(
     usernameToBeRegistered?: string,
     nameToBeRegistered?: string,
     mailToBeRegistered?: string,
-): Promise<IExternalAccountHasId> {
+): Promise<HydratedDocument<IExternalAccount<IExternalAuthProviderType>>> {
   return this.findOne({ providerType, accountId })
     .then((account) => {
     // ExternalAccount is found

@@ -14,7 +14,7 @@ type ErrorHandler = {
   notFoundError?: () => Promise<void>;
 }
 
-export const oepnaiApiErrorHandler = async(error: unknown, handler: ErrorHandler): Promise<void> => {
+export const openaiApiErrorHandler = async(error: unknown, handler: ErrorHandler): Promise<void> => {
   if (!(error instanceof OpenAI.APIError)) {
     return;
   }

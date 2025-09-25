@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type JSX } from 'react';
 
 import type { Ref, IRevision, IRevisionHasId } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';

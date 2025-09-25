@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, JSX } from 'react';
 import React, {
   useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
 } from 'react';
@@ -27,7 +27,7 @@ import {
   useDefaultIndentSize, useCurrentUser,
   useCurrentPathname, useIsEnabledAttachTitleHeader,
   useIsEditable, useIsIndentSizeForced,
-  useAcceptedUploadFileType,
+  useAcceptedUploadFileType, useIsEnableUnifiedMergeView,
 } from '~/stores-universal/context';
 import { EditorMode, useEditorMode } from '~/stores-universal/ui';
 import { useNextThemes } from '~/stores-universal/use-next-themes';
@@ -44,11 +44,11 @@ import {
 import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
 import { usePreviewOptions } from '~/stores/renderer';
 import { useIsUntitledPage, useSelectedGrant } from '~/stores/ui';
-import { useEditingUsers } from '~/stores/use-editing-users';
+import { useEditingClients } from '~/stores/use-editing-clients';
 import loggerFactory from '~/utils/logger';
 
 import { EditorNavbar } from './EditorNavbar';
-import EditorNavbarBottom from './EditorNavbarBottom';
+import { EditorNavbarBottom } from './EditorNavbarBottom';
 import Preview from './Preview';
 import { useScrollSync } from './ScrollSyncHelper';
 import { useConflictResolver, useConflictEffect, type ConflictHandler } from './conflict';
@@ -81,7 +81,7 @@ type Props = {
   visibility?: boolean,
 }
 
-export const PageEditor = React.memo((props: Props): JSX.Element => {
+export const PageEditorSubstance = (props: Props): JSX.Element => {
 
   const { t } = useTranslation();
 
@@ -108,9 +108,10 @@ export const PageEditor = React.memo((props: Props): JSX.Element => {
   const { data: editorSettings } = useEditorSettings();
   const { mutate: mutateIsGrantNormalized } = useSWRxCurrentGrantData(currentPage?._id);
   const { data: user } = useCurrentUser();
-  const { onEditorsUpdated } = useEditingUsers();
+  const { mutate: mutateEditingUsers } = useEditingClients();
   const onConflict = useConflictResolver();
   const { data: reservedNextCaretLine, mutate: mutateReservedNextCaretLine } = useReservedNextCaretLine();
+  const { data: isEnableUnifiedMergeView } = useIsEnableUnifiedMergeView();
 
   const { data: rendererOptions } = usePreviewOptions();
 
@@ -155,7 +156,7 @@ export const PageEditor = React.memo((props: Props): JSX.Element => {
 
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.MAIN);
 
-  const [markdownToPreview, setMarkdownToPreview] = useState<string>(codeMirrorEditor?.getDoc() ?? '');
+  const [markdownToPreview, setMarkdownToPreview] = useState<string>(codeMirrorEditor?.getDocString() ?? '');
   const setMarkdownPreviewWithDebounce = useMemo(() => debounce(100, throttle(150, (value: string) => {
     setMarkdownToPreview(value);
   })), []);
@@ -188,7 +189,7 @@ export const PageEditor = React.memo((props: Props): JSX.Element => {
         ...(opts ?? {}),
       });
 
-      // to sync revision id with page tree: https://github.com/weseek/growi/pull/7227
+      // to sync revision id with page tree: https://github.com/growilabs/growi/pull/7227
       mutatePageTree();
 
       mutateRecentlyUpdated();
@@ -216,7 +217,7 @@ export const PageEditor = React.memo((props: Props): JSX.Element => {
   }, [pageId, selectedGrant, mutateWaitingSaveProcessing, updatePage, mutateIsGrantNormalized, t]);
 
   const saveAndReturnToViewHandler = useCallback(async(opts: SaveOptions) => {
-    const markdown = codeMirrorEditor?.getDoc();
+    const markdown = codeMirrorEditor?.getDocString();
     const revisionId = isRevisionIdRequiredForPageUpdate ? currentRevisionId : undefined;
     const page = await save(revisionId, markdown, opts, onConflict);
     if (page == null) {
@@ -228,7 +229,7 @@ export const PageEditor = React.memo((props: Props): JSX.Element => {
   }, [codeMirrorEditor, currentRevisionId, isRevisionIdRequiredForPageUpdate, mutateEditorMode, onConflict, save, updateStateAfterSave]);
 
   const saveWithShortcut = useCallback(async() => {
-    const markdown = codeMirrorEditor?.getDoc();
+    const markdown = codeMirrorEditor?.getDocString();
     const revisionId = isRevisionIdRequiredForPageUpdate ? currentRevisionId : undefined;
     const page = await save(revisionId, markdown, undefined, onConflict);
     if (page == null) {
@@ -362,41 +363,47 @@ export const PageEditor = React.memo((props: Props): JSX.Element => {
   }
 
   return (
+    <div className={`flex-expand-horiz ${props.visibility ? '' : 'd-none'}`}>
+      <div className="page-editor-editor-container flex-expand-vert border-end">
+        <CodeMirrorEditorMain
+          enableUnifiedMergeView={isEnableUnifiedMergeView}
+          enableCollaboration={editorMode === EditorMode.Editor}
+          onSave={saveWithShortcut}
+          onUpload={uploadHandler}
+          acceptedUploadFileType={acceptedUploadFileType}
+          onScroll={scrollEditorHandlerThrottle}
+          indentSize={currentIndentSize ?? defaultIndentSize}
+          user={user ?? undefined}
+          pageId={pageId ?? undefined}
+          editorSettings={editorSettings}
+          onEditorsUpdated={mutateEditingUsers}
+          cmProps={cmProps}
+        />
+      </div>
+      <div
+        ref={previewRef}
+        onScroll={scrollPreviewHandlerThrottle}
+        className="page-editor-preview-container flex-expand-vert overflow-y-auto d-none d-lg-flex"
+      >
+        <Preview
+          rendererOptions={rendererOptions}
+          markdown={markdownToPreview}
+          pagePath={currentPagePath}
+          expandContentWidth={shouldExpandContent}
+          style={pastEndStyle}
+        />
+      </div>
+    </div>
+  );
+};
+
+export const PageEditor = React.memo((props: Props): JSX.Element => {
+  return (
     <div data-testid="page-editor" id="page-editor" className={`flex-expand-vert ${props.visibility ? '' : 'd-none'}`}>
 
       <EditorNavbar />
 
-      <div className={`flex-expand-horiz ${props.visibility ? '' : 'd-none'}`}>
-        <div className="page-editor-editor-container flex-expand-vert border-end">
-          <CodeMirrorEditorMain
-            isEditorMode={editorMode === EditorMode.Editor}
-            onSave={saveWithShortcut}
-            onUpload={uploadHandler}
-            acceptedUploadFileType={acceptedUploadFileType}
-            onScroll={scrollEditorHandlerThrottle}
-            indentSize={currentIndentSize ?? defaultIndentSize}
-            user={user ?? undefined}
-            pageId={pageId ?? undefined}
-            initialValue={initialValue}
-            editorSettings={editorSettings}
-            onEditorsUpdated={onEditorsUpdated}
-            cmProps={cmProps}
-          />
-        </div>
-        <div
-          ref={previewRef}
-          onScroll={scrollPreviewHandlerThrottle}
-          className="page-editor-preview-container flex-expand-vert overflow-y-auto d-none d-lg-flex"
-        >
-          <Preview
-            rendererOptions={rendererOptions}
-            markdown={markdownToPreview}
-            pagePath={currentPagePath}
-            expandContentWidth={shouldExpandContent}
-            style={pastEndStyle}
-          />
-        </div>
-      </div>
+      <PageEditorSubstance visibility={props.visibility} />
 
       <EditorNavbarBottom />
 

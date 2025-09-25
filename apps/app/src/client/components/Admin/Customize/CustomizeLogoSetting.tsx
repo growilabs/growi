@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, type JSX } from 'react';
 
 import { useTranslation } from 'react-i18next';
 
@@ -125,7 +125,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
                     {isCustomizedLogoUploaded && (
                       <>
                         <p>
-                          <img src={CUSTOMIZED_LOGO} className="picture picture-lg " id="settingBrandLogo" width="64" />
+                          <img src={CUSTOMIZED_LOGO} id="settingBrandLogo" width="64" />
                         </p>
                         <button type="button" className="btn btn-danger" onClick={onClickDeleteBtn}>
                           { t('admin:customize_settings.delete_logo') }

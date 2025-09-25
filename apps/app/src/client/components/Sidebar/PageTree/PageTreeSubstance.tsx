@@ -5,10 +5,10 @@ import React, {
 import { useTranslation } from 'next-i18next';
 import { debounce } from 'throttle-debounce';
 
-import { useTargetAndAncestors, useIsGuestUser, useIsReadOnlyUser } from '~/stores-universal/context';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/stores-universal/context';
 import { useCurrentPagePath, useCurrentPageId } from '~/stores/page';
 import {
-  mutatePageTree, mutateRecentlyUpdated, useSWRxPageAncestorsChildren, useSWRxRootPage, useSWRxV5MigrationStatus,
+  mutatePageTree, mutateRecentlyUpdated, useSWRxRootPage, useSWRxV5MigrationStatus,
 } from '~/stores/page-listing';
 import { useSidebarScrollerRef } from '~/stores/ui';
 import loggerFactory from '~/utils/logger';
@@ -99,14 +99,12 @@ export const PageTreeContent = memo(({ isWipPageShown }: PageTreeContentProps) =
   const { data: isReadOnlyUser } = useIsReadOnlyUser();
   const { data: currentPath } = useCurrentPagePath();
   const { data: targetId } = useCurrentPageId();
-  const { data: targetAndAncestorsData } = useTargetAndAncestors();
 
   const { data: migrationStatus } = useSWRxV5MigrationStatus({ suspense: true });
 
   const targetPathOrId = targetId || currentPath;
   const path = currentPath || '/';
 
-  const { data: ancestorsChildrenResult } = useSWRxPageAncestorsChildren(path, { suspense: true });
   const { data: rootPageResult } = useSWRxRootPage({ suspense: true });
   const { data: sidebarScrollerRef } = useSidebarScrollerRef();
   const [isInitialScrollCompleted, setIsInitialScrollCompleted] = useState(false);
@@ -144,7 +142,7 @@ export const PageTreeContent = memo(({ isWipPageShown }: PageTreeContentProps) =
   const scrollOnInitDebounced = useMemo(() => debounce(500, scrollOnInit), [scrollOnInit]);
 
   useEffect(() => {
-    if (isInitialScrollCompleted || ancestorsChildrenResult == null || rootPageResult == null) {
+    if (isInitialScrollCompleted || rootPageResult == null) {
       return;
     }
 
@@ -166,7 +164,7 @@ export const PageTreeContent = memo(({ isWipPageShown }: PageTreeContentProps) =
     return () => {
       observer.disconnect();
     };
-  }, [isInitialScrollCompleted, scrollOnInitDebounced, ancestorsChildrenResult, rootPageResult]);
+  }, [isInitialScrollCompleted, scrollOnInitDebounced, rootPageResult]);
   // *******************************  end  *******************************
 
 
@@ -189,7 +187,6 @@ export const PageTreeContent = memo(({ isWipPageShown }: PageTreeContentProps) =
         isWipPageShown={isWipPageShown}
         targetPath={path}
         targetPathOrId={targetPathOrId}
-        targetAndAncestorsData={targetAndAncestorsData}
         CustomTreeItem={PageTreeItem}
       />
 

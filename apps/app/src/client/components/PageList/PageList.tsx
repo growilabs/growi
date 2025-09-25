@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import type { IPageInfoForEntity, IPageWithMeta } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';

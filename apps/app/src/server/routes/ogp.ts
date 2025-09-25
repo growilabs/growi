@@ -13,9 +13,10 @@ import { param, validationResult } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
+import { projectRoot } from '~/server/util/project-dir-utils';
 import loggerFactory from '~/utils/logger';
-import { projectRoot } from '~/utils/project-dir-utils';
 
+import type Crowi from '../crowi';
 import { Attachment } from '../models/attachment';
 import type { PageDocument, PageModel } from '../models/page';
 import { configManager } from '../service/config-manager';
@@ -33,19 +34,24 @@ fs.readFile(path.join(projectRoot, DEFAULT_USER_IMAGE_PATH), (err, buffer) => {
 });
 
 
-module.exports = function(crowi) {
+module.exports = function(crowi: Crowi) {
 
   const isUserImageAttachment = (userImageUrlCached: string): boolean => {
     return /^\/attachment\/.+/.test(userImageUrlCached);
   };
 
-  const getBufferedUserImage = async(userImageUrlCached: string): Promise<Buffer> => {
+  const getBufferedUserImage = async(userImageUrlCached: string): Promise<Buffer | null> => {
 
     let bufferedUserImage: Buffer;
 
     if (isUserImageAttachment(userImageUrlCached)) {
       const { fileUploadService } = crowi;
       const attachment = await Attachment.findById(userImageUrlCached);
+
+      if (attachment == null) {
+        return null;
+      }
+
       const fileStream = await fileUploadService.findDeliveryFile(attachment);
       bufferedUserImage = await convertStreamToBuffer(fileStream);
       return bufferedUserImage;
@@ -61,8 +67,12 @@ module.exports = function(crowi) {
 
   const renderOgp = async(req: Request, res: Response) => {
 
-    const User = mongoose.model<IUser>('User');
-    const ogpUri = configManager.getConfig('crowi', 'app:ogpUri');
+    const ogpUri = configManager.getConfig('app:ogpUri');
+
+    if (ogpUri == null) {
+      return res.status(501).send('OGP_URI for growi-unique-ogp has not been setup');
+    }
+
     const page: PageDocument = req.body.page; // asserted by ogpValidator
 
     const title = (new DevidedPagePath(page.path)).latter;
@@ -73,13 +83,14 @@ module.exports = function(crowi) {
 
     try {
       if (page.creator != null) {
+        const User = mongoose.model<IUser>('User');
         user = await User.findById(getIdStringForRef(page.creator));
 
         if (user != null) {
           userName = user.username;
           userImage = user.imageUrlCached !== DEFAULT_USER_IMAGE_URL
             ? bufferedDefaultUserImageCache
-            : await getBufferedUserImage(user.imageUrlCached);
+            : await getBufferedUserImage(user.imageUrlCached) ?? bufferedDefaultUserImageCache;
         }
       }
     }
@@ -119,7 +130,7 @@ module.exports = function(crowi) {
   const ogpValidator = async(req:Request, res:Response, next:NextFunction) => {
     const { aclService, fileUploadService, configManager } = crowi;
 
-    const ogpUri = configManager.getConfig('crowi', 'app:ogpUri');
+    const ogpUri = configManager.getConfig('app:ogpUri');
 
     if (ogpUri == null) return res.status(400).send('OGP URI for GROWI has not been setup');
     if (!fileUploadService.getIsUploadable()) return res.status(501).send('This GROWI can not upload file');

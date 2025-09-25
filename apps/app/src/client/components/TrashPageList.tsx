@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, type JSX } from 'react';
 
 import type { IPageHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';

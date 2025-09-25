@@ -28,13 +28,12 @@ import { DirectiveType } from '../../mdast-util-growi-directive/lib/index.js';
 const own = {}.hasOwnProperty;
 
 /**
-  * @param {HtmlOptions} [options]
-  * @returns {HtmlExtension}
-  */
+ * @param {HtmlOptions} [options]
+ * @returns {HtmlExtension}
+ */
 export function directiveHtml(options = {}) {
   return {
     enter: {
-
       directiveGrowiLeaf() {
         return enter.call(this, DirectiveType.Leaf);
       },
@@ -65,13 +64,16 @@ export function directiveHtml(options = {}) {
   };
 
   /**
-    * @this {CompileContext}
-    * @param {DirectiveType} type
-    */
+   * @this {CompileContext}
+   * @param {DirectiveType} type
+   */
   function enter(type) {
     /** @type {Directive[]} */
     let stack = this.getData('directiveStack');
-    if (!stack) this.setData('directiveStack', (stack = []));
+    if (!stack) {
+      stack = [];
+      this.setData('directiveStack', stack);
+    }
     stack.push({ type, name: '' });
   }
 

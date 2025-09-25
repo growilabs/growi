@@ -65,7 +65,7 @@ const CustomBotWithoutProxySecretTokenSection = (props) => {
           <input
             className="form-control"
             type="text"
-            defaultValue={slackSigningSecretEnv}
+            value={slackSigningSecretEnv}
             readOnly
           />
           <p className="form-text text-muted">
@@ -94,7 +94,7 @@ const CustomBotWithoutProxySecretTokenSection = (props) => {
           <input
             className="form-control"
             type="text"
-            defaultValue={slackBotTokenEnv}
+            value={slackBotTokenEnv}
             readOnly
           />
           <p className="form-text text-muted">

@@ -1,7 +1,7 @@
 import { type SWRResponseWithUtils, withUtils } from '@growi/core/dist/swr';
 import useSWRImmutable from 'swr/immutable';
 
-import { IGlobalNotification } from '~/client/interfaces/global-notification';
+import type { IGlobalNotification } from '~/client/interfaces/global-notification';
 
 import { apiv3Get, apiv3Put } from '../client/util/apiv3-client';
 

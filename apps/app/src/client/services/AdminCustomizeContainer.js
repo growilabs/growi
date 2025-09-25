@@ -40,11 +40,13 @@ export default class AdminCustomizeContainer extends Container {
       currentCustomizeNoscript: '',
       currentCustomizeCss: '',
       currentCustomizeScript: '',
+      showPageSideAuthors: false,
     };
     this.switchPageListLimitationS = this.switchPageListLimitationS.bind(this);
     this.switchPageListLimitationM = this.switchPageListLimitationM.bind(this);
     this.switchPageListLimitationL = this.switchPageListLimitationL.bind(this);
     this.switchPageListLimitationXL = this.switchPageListLimitationXL.bind(this);
+    this.switchShowPageSideAuthors = this.switchShowPageSideAuthors.bind(this);
 
   }
 
@@ -78,6 +80,7 @@ export default class AdminCustomizeContainer extends Container {
         currentCustomizeNoscript: customizeParams.customizeNoscript,
         currentCustomizeCss: customizeParams.customizeCss,
         currentCustomizeScript: customizeParams.customizeScript,
+        showPageSideAuthors: customizeParams.showPageSideAuthors,
       });
     }
     catch (err) {
@@ -187,6 +190,12 @@ export default class AdminCustomizeContainer extends Container {
     this.setState({ currentCustomizeScript: inpuValue });
   }
 
+  /**
+   * Switch showPageSideAuthors
+   */
+  switchShowPageSideAuthors() {
+    this.setState({ showPageSideAuthors: !this.state.showPageSideAuthors });
+  }
 
   /**
    * Update function
@@ -204,6 +213,7 @@ export default class AdminCustomizeContainer extends Container {
         isEnabledStaleNotification: this.state.isEnabledStaleNotification,
         isAllReplyShown: this.state.isAllReplyShown,
         isSearchScopeChildrenAsDefault: this.state.isSearchScopeChildrenAsDefault,
+        showPageSideAuthors: this.state.showPageSideAuthors,
       });
       const { customizedParams } = response.data;
       this.setState({
@@ -216,6 +226,7 @@ export default class AdminCustomizeContainer extends Container {
         isEnabledStaleNotification: customizedParams.isEnabledStaleNotification,
         isAllReplyShown: customizedParams.isAllReplyShown,
         isSearchScopeChildrenAsDefault: customizedParams.isSearchScopeChildrenAsDefault,
+        showPageSideAuthors: customizedParams.showPageSideAuthors,
       });
     }
     catch (err) {

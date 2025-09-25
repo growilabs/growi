@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import type { IRevisionHasId } from '@growi/core';
 import { returnPathForURL } from '@growi/core/dist/utils/path-utils';

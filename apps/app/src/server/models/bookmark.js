@@ -10,6 +10,7 @@ const logger = loggerFactory('growi:models:bookmark');
 
 const ObjectId = mongoose.Schema.Types.ObjectId;
 
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 const factory = (crowi) => {
   const bookmarkEvent = crowi.event('bookmark');
 

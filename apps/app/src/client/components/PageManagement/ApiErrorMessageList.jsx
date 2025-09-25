@@ -1,8 +1,10 @@
 import React from 'react';
+
 import PropTypes from 'prop-types';
 
-import ApiErrorMessage from './ApiErrorMessage';
 import { toArrayIfNot } from '~/utils/array-utils';
+
+import ApiErrorMessage from './ApiErrorMessage';
 
 function ApiErrorMessageList(props) {
   const errs = toArrayIfNot(props.errs);

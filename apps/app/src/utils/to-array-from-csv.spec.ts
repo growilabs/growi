@@ -1,7 +1,6 @@
 import { toArrayFromCsv } from './to-array-from-csv';
 
 describe('To array from csv', () => {
-
   test('case 1', () => {
     const result = toArrayFromCsv('dev,general');
     expect(result).toStrictEqual(['dev', 'general']);
@@ -26,5 +25,4 @@ describe('To array from csv', () => {
     const result = toArrayFromCsv(',dev,general');
     expect(result).toStrictEqual(['dev', 'general']);
   });
-
 });

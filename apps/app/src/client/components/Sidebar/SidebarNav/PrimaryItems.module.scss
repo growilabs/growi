@@ -36,7 +36,7 @@
         height: $btn-active-indicator-height;
         content: '';
         background-color: var(--bs-primary);
-        transform: translateY(#{($btn-height - $btn-active-indicator-height) / 2});
+        transform: translateY(#{($btn-height - $btn-active-indicator-height) * 0.5});
       }
     }
   }

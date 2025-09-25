@@ -37,10 +37,10 @@ export class ThreadDeletionCronService {
     }
 
     this.openaiService = openaiService;
-    this.threadDeletionCronExpression = configManager.getConfig('crowi', 'openai:threadDeletionCronExpression');
-    this.threadDeletionCronMaxMinutesUntilRequest = configManager.getConfig('crowi', 'app:openaiThreadDeletionCronMaxMinutesUntilRequest');
-    this.threadDeletionBarchSize = configManager.getConfig('crowi', 'openai:threadDeletionBarchSize');
-    this.threadDeletionApiCallInterval = configManager.getConfig('crowi', 'openai:threadDeletionApiCallInterval');
+    this.threadDeletionCronExpression = configManager.getConfig('openai:threadDeletionCronExpression');
+    this.threadDeletionCronMaxMinutesUntilRequest = configManager.getConfig('app:openaiThreadDeletionCronMaxMinutesUntilRequest');
+    this.threadDeletionBarchSize = configManager.getConfig('openai:threadDeletionBarchSize');
+    this.threadDeletionApiCallInterval = configManager.getConfig('openai:threadDeletionApiCallInterval');
 
     this.cronJob?.stop();
     this.cronJob = this.generateCronJob();

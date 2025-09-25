@@ -13,8 +13,8 @@
     }
 
     // user icon
-    .picture {
-      @extend %picture;
+    .user-picture {
+      @extend %user-picture;
     }
 
   }
@@ -23,6 +23,12 @@
 
 // adjust height
 .comment-editor-styles :global {
+  // Set `display: flex` instead of `display: block` to make it work with `flex: 1` of the children
+  // This helps users focus on the editor by clicking on the broader area
+  .tab-pane.active {
+    display: flex;
+  }
+
   .cm-editor {
     min-height: comment-inheritance.$codemirror-default-height !important;
     max-height: #{2 * comment-inheritance.$codemirror-default-height};
@@ -40,5 +46,12 @@
 .comment-editor-styles :global {
   .cm-editor, .cm-scroller {
     border-radius: var(--bs-border-radius);
+  }
+}
+
+// remove outline
+.comment-editor-styles :global {
+  .cm-editor {
+    outline: none;
   }
 }

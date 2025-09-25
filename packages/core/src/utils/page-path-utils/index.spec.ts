@@ -1,5 +1,11 @@
 import {
-  isMovablePage, isTopPage, isUsersProtectedPages, convertToNewAffiliationPath, isCreatablePage, omitDuplicateAreaPathFromPaths, getUsernameByPath,
+  convertToNewAffiliationPath,
+  getUsernameByPath,
+  isCreatablePage,
+  isMovablePage,
+  isTopPage,
+  isUsersProtectedPages,
+  omitDuplicateAreaPathFromPaths,
 } from './index';
 
 describe.concurrent('isMovablePage test', () => {
@@ -33,19 +39,34 @@ describe.concurrent('isUsersProtectedPages test', () => {
 
 describe.concurrent('convertToNewAffiliationPath test', () => {
   test.concurrent('Child path is not converted normally', () => {
-    const result = convertToNewAffiliationPath('parent/', 'parent2/', 'parent/child');
+    const result = convertToNewAffiliationPath(
+      'parent/',
+      'parent2/',
+      'parent/child',
+    );
     expect(result).toBe('parent2/child');
   });
 
   test.concurrent('Parent path is not converted normally', () => {
-    const result = convertToNewAffiliationPath('parent/', 'parent3/', 'parent/child');
+    const result = convertToNewAffiliationPath(
+      'parent/',
+      'parent3/',
+      'parent/child',
+    );
     expect(result === 'parent/child').toBe(false);
   });
 
-  test.concurrent('Parent and Child path names are switched unexpectedly', () => {
-    const result = convertToNewAffiliationPath('parent/', 'parent4/', 'parent/child');
-    expect(result === 'child/parent4').toBe(false);
-  });
+  test.concurrent(
+    'Parent and Child path names are switched unexpectedly',
+    () => {
+      const result = convertToNewAffiliationPath(
+        'parent/',
+        'parent4/',
+        'parent/child',
+      );
+      expect(result === 'child/parent4').toBe(false);
+    },
+  );
 });
 
 describe.concurrent('isCreatablePage test', () => {
@@ -99,8 +120,17 @@ describe.concurrent('isCreatablePage test', () => {
 
     expect(isCreatablePage('/ the / path / with / space')).toBeFalsy();
 
-    const forbidden = ['installer', 'register', 'login', 'logout',
-                       'admin', 'files', 'trash', 'paste', 'comments'];
+    const forbidden = [
+      'installer',
+      'register',
+      'login',
+      'logout',
+      'admin',
+      'files',
+      'trash',
+      'paste',
+      'comments',
+    ];
     for (let i = 0; i < forbidden.length; i++) {
       const pn = forbidden[i];
       expect(isCreatablePage(`/${pn}`)).toBeFalsy();
@@ -114,31 +144,47 @@ describe.concurrent('isCreatablePage test', () => {
       const paths = ['/A', '/B/A', '/C/B/A', '/D'];
       const expectedPaths = paths;
 
-      expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(expectedPaths);
+      expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(
+        expectedPaths,
+      );
     });
 
-    test.concurrent('Should omit when some paths are at duplicated area', () => {
-      const paths = ['/A', '/A/A', '/A/B/A', '/B', '/B/A', '/AA'];
-      const expectedPaths = ['/A', '/B', '/AA'];
+    test.concurrent(
+      'Should omit when some paths are at duplicated area',
+      () => {
+        const paths = ['/A', '/A/A', '/A/B/A', '/B', '/B/A', '/AA'];
+        const expectedPaths = ['/A', '/B', '/AA'];
 
-      expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(expectedPaths);
-    });
+        expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(
+          expectedPaths,
+        );
+      },
+    );
 
-    test.concurrent('Should omit when some long paths are at duplicated area', () => {
-      const paths = ['/A/B/C', '/A/B/C/D', '/A/B/C/D/E'];
-      const expectedPaths = ['/A/B/C'];
+    test.concurrent(
+      'Should omit when some long paths are at duplicated area',
+      () => {
+        const paths = ['/A/B/C', '/A/B/C/D', '/A/B/C/D/E'];
+        const expectedPaths = ['/A/B/C'];
 
-      expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(expectedPaths);
-    });
+        expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(
+          expectedPaths,
+        );
+      },
+    );
 
-    test.concurrent('Should omit when some long paths are at duplicated area [case insensitivity]', () => {
-      const paths = ['/a/B/C', '/A/b/C/D', '/A/B/c/D/E'];
-      const expectedPaths = ['/a/B/C'];
+    test.concurrent(
+      'Should omit when some long paths are at duplicated area [case insensitivity]',
+      () => {
+        const paths = ['/a/B/C', '/A/b/C/D', '/A/B/c/D/E'];
+        const expectedPaths = ['/a/B/C'];
 
-      expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(expectedPaths);
-    });
+        expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(
+          expectedPaths,
+        );
+      },
+    );
   });
-
 
   describe.concurrent('Test getUsernameByPath', () => {
     test.concurrent('found', () => {
@@ -152,9 +198,10 @@ describe.concurrent('isCreatablePage test', () => {
     });
 
     test.concurrent('not found', () => {
-      const username = getUsernameByPath('/the/page/is/not/related/to/user/page');
+      const username = getUsernameByPath(
+        '/the/page/is/not/related/to/user/page',
+      );
       expect(username).toBeNull();
     });
   });
-
 });

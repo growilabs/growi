@@ -1,6 +1,10 @@
-.system-version {
+@use '@growi/core-styles/scss/helpers/modifier-keys';
+
+.system-version :global {
   position: fixed;
   right: 0.5em;
   bottom: 0;
   opacity: 0.6;
+
+  @include modifier-keys.modifier-key;
 }

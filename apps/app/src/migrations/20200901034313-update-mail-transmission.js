@@ -13,24 +13,27 @@ module.exports = {
     await mongoose.connect(getMongoUri(), mongoOptions);
 
     const sesAccessKeyId = await Config.findOne({
-      ns: 'crowi',
       key: 'mail:sesAccessKeyId',
     });
     const transmissionMethod = await Config.findOne({
-      ns: 'crowi',
       key: 'mail:transmissionMethod',
     });
 
     if (sesAccessKeyId == null) {
-      return logger.info('The key \'mail:sesAccessKeyId\' does not exist, value of transmission method will be set smtp automatically.');
+      return logger.info(
+        "The key 'mail:sesAccessKeyId' does not exist, value of transmission method will be set smtp automatically.",
+      );
     }
     if (transmissionMethod != null) {
-      return logger.info('The key \'mail:transmissionMethod\' already exists, there is no need to migrate.');
+      return logger.info(
+        "The key 'mail:transmissionMethod' already exists, there is no need to migrate.",
+      );
     }
 
-    const value = sesAccessKeyId.value != null
-      ? JSON.stringify('ses')
-      : JSON.stringify('smtp');
+    const value =
+      sesAccessKeyId.value != null
+        ? JSON.stringify('ses')
+        : JSON.stringify('smtp');
 
     await Config.create({
       ns: 'crowi',
@@ -38,7 +41,6 @@ module.exports = {
       value,
     });
     logger.info('Migration has successfully applied');
-
   },
 
   async down(db, client) {
@@ -47,7 +49,6 @@ module.exports = {
 
     // remote 'mail:transmissionMethod'
     await Config.findOneAndDelete({
-      ns: 'crowi',
       key: 'mail:transmissionMethod',
     });
 

@@ -1,4 +1,7 @@
-import ConfigLoader from '../../service/config-loader';
+import { SCOPE } from '@growi/core/dist/interfaces';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { configManager } from '~/server/service/config-manager';
+import { getGrowiVersion } from '~/utils/growi-version';
 
 const express = require('express');
 
@@ -40,7 +43,6 @@ const router = express.Router();
  *              "ELASTICSEARCH_REQUEST_TIMEOUT": 15000
  *              "ELASTICSEARCH_REJECT_UNAUTHORIZED": true
  *              "OGP_URI": "http://ogp:8088"
- *              "QUESTIONNAIRE_SERVER_ORIGIN": "http://host.docker.internal:3003"
  *          isV5Compatible:
  *            type: boolean
  *            description: This value is true if this GROWI is compatible v5.
@@ -56,7 +58,7 @@ const router = express.Router();
  *            type: object
  *            description: installed plugins
  */
-
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
   const loginRequiredStrictly = require('../../middlewares/login-required')(crowi);
   const adminRequired = require('../../middlewares/admin-required')(crowi);
@@ -67,7 +69,6 @@ module.exports = (crowi) => {
    *    /admin-home/:
    *      get:
    *        tags: [AdminHome]
-   *        operationId: getAdminHome
    *        summary: /admin-home
    *        security:
    *          - cookieAuth: []
@@ -82,18 +83,18 @@ module.exports = (crowi) => {
    *                    adminHomeParams:
    *                      $ref: "#/components/schemas/SystemInformationParams"
    */
-  router.get('/', loginRequiredStrictly, adminRequired, async(req, res) => {
+  router.get('/', accessTokenParser([SCOPE.READ.ADMIN.TOP]), loginRequiredStrictly, adminRequired, async(req, res) => {
     const { getRuntimeVersions } = await import('~/server/util/runtime-versions');
     const runtimeVersions = await getRuntimeVersions();
 
     const adminHomeParams = {
-      growiVersion: crowi.version,
+      growiVersion: getGrowiVersion(),
       nodeVersion: runtimeVersions.node ?? '-',
       npmVersion: runtimeVersions.npm ?? '-',
       pnpmVersion: runtimeVersions.pnpm ?? '-',
-      envVars: await ConfigLoader.getEnvVarsForDisplay(true),
-      isV5Compatible: crowi.configManager.getConfig('crowi', 'app:isV5Compatible'),
-      isMaintenanceMode: crowi.configManager.getConfig('crowi', 'app:isMaintenanceMode'),
+      envVars: configManager.getManagedEnvVars(),
+      isV5Compatible: configManager.getConfig('app:isV5Compatible'),
+      isMaintenanceMode: configManager.getConfig('app:isMaintenanceMode'),
     };
 
     return res.apiv3({ adminHomeParams });

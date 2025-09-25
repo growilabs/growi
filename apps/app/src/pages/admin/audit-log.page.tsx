@@ -57,8 +57,8 @@ const injectServerConfigurations = async(context: GetServerSidePropsContext, pro
   const { crowi } = req;
   const { activityService } = crowi;
 
-  props.auditLogEnabled = crowi.configManager.getConfig('crowi', 'app:auditLogEnabled');
-  props.activityExpirationSeconds = crowi.configManager.getConfig('crowi', 'app:activityExpirationSeconds');
+  props.auditLogEnabled = crowi.configManager.getConfig('app:auditLogEnabled');
+  props.activityExpirationSeconds = crowi.configManager.getConfig('app:activityExpirationSeconds');
   props.auditLogAvailableActions = activityService.getAvailableActions(false);
 };
 

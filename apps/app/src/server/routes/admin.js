@@ -7,6 +7,7 @@ import { exportService } from '../service/export';
 const logger = loggerFactory('growi:routes:admin');
 
 /* eslint-disable no-use-before-define */
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = function(crowi, app) {
   const ApiResponse = require('../util/apiResponse');
   const importer = require('../util/importer')(crowi);
@@ -89,6 +90,28 @@ module.exports = function(crowi, app) {
   actions.api = {};
 
   /**
+   * Reject request if unexpected keys are present in form.
+   * Logs the keys and returns error response.
+   *
+   * @param {Object} form
+   * @param {Array<string>} allowedKeys
+   * @param {Object} res
+   * @returns {boolean}
+   */
+  function isValidFormKeys(form, allowedKeys, res) {
+    const receivedKeys = Object.keys(form);
+    const unexpectedKeys = receivedKeys.filter(key => !allowedKeys.includes(key));
+
+    if (unexpectedKeys.length > 0) {
+      logger.warn('Unexpected keys were found in request body.', { unexpectedKeys });
+      res.json(ApiResponse.error('Invalid config keys provided.'));
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * save esa settings, update config cache, and response json
    *
    * @param {*} req
@@ -103,7 +126,10 @@ module.exports = function(crowi, app) {
       return res.json(ApiResponse.error('esa.io form is blank'));
     }
 
-    await configManager.updateConfigsInTheSameNamespace('crowi', form);
+    const ALLOWED_KEYS = ['importer:esa:team_name', 'importer:esa:access_token'];
+    if (!isValidFormKeys(form, ALLOWED_KEYS, res)) return;
+
+    await configManager.updateConfigs(form);
     importer.initializeEsaClient(); // let it run in the back aftert res
     const parameters = { action: SupportedAction.ACTION_ADMIN_ESA_DATA_UPDATED };
     activityEvent.emit('update', res.locals.activity._id, parameters);
@@ -125,7 +151,10 @@ module.exports = function(crowi, app) {
       return res.json(ApiResponse.error('Qiita form is blank'));
     }
 
-    await configManager.updateConfigsInTheSameNamespace('crowi', form);
+    const ALLOWED_KEYS = ['importer:qiita:team_name', 'importer:qiita:access_token'];
+    if (!isValidFormKeys(form, ALLOWED_KEYS, res)) return;
+
+    await configManager.updateConfigs(form);
     importer.initializeQiitaClient(); // let it run in the back aftert res
     const parameters = { action: SupportedAction.ACTION_ADMIN_QIITA_DATA_UPDATED };
     activityEvent.emit('update', res.locals.activity._id, parameters);

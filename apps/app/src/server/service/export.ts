@@ -5,14 +5,16 @@ import { Readable, Transform } from 'stream';
 import archiver from 'archiver';
 
 import { toArrayIfNot } from '~/utils/array-utils';
+import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
 
 import type CollectionProgress from '../models/vo/collection-progress';
 import CollectionProgressingStatus from '../models/vo/collection-progressing-status';
 
 import type AppService from './app';
-import ConfigLoader from './config-loader';
-import type GrowiBridgeService from './growi-bridge';
+import { configManager } from './config-manager';
+import type { GrowiBridgeService } from './growi-bridge';
+import { growiInfoService } from './growi-info';
 import type { ZipFileStat } from './interfaces/export';
 
 
@@ -117,11 +119,11 @@ class ExportService {
     const passwordSeed = this.crowi.env.PASSWORD_SEED || null;
 
     const metaData = {
-      version: this.crowi.version,
-      url: this.appService.getSiteUrl(),
+      version: getGrowiVersion(),
+      url: growiInfoService.getSiteUrl(),
       passwordSeed,
       exportedAt: new Date(),
-      envVars: await ConfigLoader.getEnvVarsForDisplay(),
+      envVars: configManager.getManagedEnvVars(),
     };
 
     writeStream.write(JSON.stringify(metaData));

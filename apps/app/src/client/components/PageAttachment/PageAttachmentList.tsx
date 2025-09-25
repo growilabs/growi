@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import type { IAttachmentHasId } from '@growi/core';
 import { Attachment } from '@growi/ui/dist/components';

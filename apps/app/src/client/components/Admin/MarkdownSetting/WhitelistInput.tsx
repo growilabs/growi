@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, type JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
 
@@ -52,7 +52,7 @@ export const WhitelistInput = (props: Props): JSX.Element => {
           name="recommendedTags"
           rows={6}
           cols={40}
-          defaultValue={adminMarkDownContainer.state.tagWhitelist}
+          value={adminMarkDownContainer.state.tagWhitelist}
           onChange={(e) => { adminMarkDownContainer.setState({ tagWhitelist: e.target.value }) }}
         />
       </div>
@@ -69,7 +69,7 @@ export const WhitelistInput = (props: Props): JSX.Element => {
           name="recommendedAttrs"
           rows={6}
           cols={40}
-          defaultValue={adminMarkDownContainer.state.attrWhitelist}
+          value={adminMarkDownContainer.state.attrWhitelist}
           onChange={(e) => { adminMarkDownContainer.setState({ attrWhitelist: e.target.value }) }}
         />
       </div>

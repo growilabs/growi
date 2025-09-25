@@ -1,6 +1,0 @@
-/dist/**
-/transpiled/**
-/public/**
-/src/linter-checker/**
-/tmp/**
-/next-env.d.ts

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, type JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
@@ -22,6 +22,7 @@ export type PrimaryItemProps = {
   label: string,
   iconName: string,
   sidebarMode: SidebarMode,
+  isCustomIcon?: boolean,
   badgeContents?: number,
   onHover?: (contents: SidebarContentsType) => void,
   onClick?: () => void,
@@ -29,7 +30,7 @@ export type PrimaryItemProps = {
 
 export const PrimaryItem = (props: PrimaryItemProps): JSX.Element => {
   const {
-    contents, label, iconName, sidebarMode, badgeContents,
+    contents, label, iconName, sidebarMode, badgeContents, isCustomIcon,
     onClick, onHover,
   } = props;
 
@@ -80,7 +81,10 @@ export const PrimaryItem = (props: PrimaryItemProps): JSX.Element => {
           { badgeContents != null && (
             <span className="position-absolute badge rounded-pill bg-primary">{badgeContents}</span>
           )}
-          <span className="material-symbols-outlined">{iconName}</span>
+          { isCustomIcon
+            ? (<span className="growi-custom-icons fs-4 align-middle">{iconName}</span>)
+            : (<span className="material-symbols-outlined">{iconName}</span>)
+          }
         </div>
       </button>
       {

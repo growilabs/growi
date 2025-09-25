@@ -21,7 +21,7 @@
     "watch": "run-p watch:*",
     "watch:libs": "pnpm run dev:libs -w --emptyOutDir=false",
     "watch:themes": "pnpm run dev:themes -w --emptyOutDir=false",
-    "lint:eslint": "eslint \"**/*.{js,jsx,ts,tsx}\"",
+    "lint:biome": "biome check",
     "lint:styles": "stylelint \"src/**/*.scss\"",
     "lint:typecheck": "vue-tsc --noEmit",
     "lint": "run-p lint:*",

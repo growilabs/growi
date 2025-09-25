@@ -10,6 +10,7 @@ import { externalAccountService } from '../service/external-account';
 
 /* eslint-disable no-use-before-define */
 
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = function(crowi, app) {
   const logger = loggerFactory('growi:routes:login-passport');
   const passport = require('passport');
@@ -344,7 +345,7 @@ module.exports = function(crowi, app) {
   };
 
   const loginPassportGoogleCallback = async(req, res, next) => {
-    const globalLang = crowi.configManager.getConfig('crowi', 'app:globalLang');
+    const globalLang = crowi.configManager.getConfig('app:globalLang');
 
     const providerId = 'google';
     const strategyName = 'google';
@@ -457,10 +458,10 @@ module.exports = function(crowi, app) {
   const loginPassportOidcCallback = async(req, res, next) => {
     const providerId = 'oidc';
     const strategyName = 'oidc';
-    const attrMapId = crowi.configManager.getConfig('crowi', 'security:passport-oidc:attrMapId');
-    const attrMapUserName = crowi.configManager.getConfig('crowi', 'security:passport-oidc:attrMapUserName');
-    const attrMapName = crowi.configManager.getConfig('crowi', 'security:passport-oidc:attrMapName');
-    const attrMapMail = crowi.configManager.getConfig('crowi', 'security:passport-oidc:attrMapMail');
+    const attrMapId = crowi.configManager.getConfig('security:passport-oidc:attrMapId');
+    const attrMapUserName = crowi.configManager.getConfig('security:passport-oidc:attrMapUserName');
+    const attrMapName = crowi.configManager.getConfig('security:passport-oidc:attrMapName');
+    const attrMapMail = crowi.configManager.getConfig('security:passport-oidc:attrMapMail');
 
     let response;
     try {
@@ -506,11 +507,11 @@ module.exports = function(crowi, app) {
   const loginPassportSamlCallback = async(req, res, next) => {
     const providerId = 'saml';
     const strategyName = 'saml';
-    const attrMapId = crowi.configManager.getConfig('crowi', 'security:passport-saml:attrMapId');
-    const attrMapUsername = crowi.configManager.getConfig('crowi', 'security:passport-saml:attrMapUsername');
-    const attrMapMail = crowi.configManager.getConfig('crowi', 'security:passport-saml:attrMapMail');
-    const attrMapFirstName = crowi.configManager.getConfig('crowi', 'security:passport-saml:attrMapFirstName') || 'firstName';
-    const attrMapLastName = crowi.configManager.getConfig('crowi', 'security:passport-saml:attrMapLastName') || 'lastName';
+    const attrMapId = crowi.configManager.getConfig('security:passport-saml:attrMapId');
+    const attrMapUsername = crowi.configManager.getConfig('security:passport-saml:attrMapUsername');
+    const attrMapMail = crowi.configManager.getConfig('security:passport-saml:attrMapMail');
+    const attrMapFirstName = crowi.configManager.getConfig('security:passport-saml:attrMapFirstName') || 'firstName';
+    const attrMapLastName = crowi.configManager.getConfig('security:passport-saml:attrMapLastName') || 'lastName';
 
     let response;
     try {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import type { IUserHasId } from '@growi/core';
 import { isPopulated, type IUser, type Ref } from '@growi/core';

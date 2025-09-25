@@ -1,3 +1,6 @@
+/**
+ * @type {import('eslint').Linter.Config}
+ */
 module.exports = {
   root: true, // https://eslint.org/docs/user-guide/configuring/configuration-files#cascading-and-hierarchy
   extends: [
@@ -6,6 +9,9 @@ module.exports = {
   ],
   plugins: [
     'regex',
+  ],
+  ignorePatterns: [
+    'node_modules/**',
   ],
   rules: {
     'import/prefer-default-export': 'off',
@@ -73,7 +79,7 @@ module.exports = {
   overrides: [
     {
       // enable the rule specifically for TypeScript files
-      files: ['*.ts', '*.tsx'],
+      files: ['*.ts', '*.mts', '*.tsx'],
       rules: {
         '@typescript-eslint/explicit-module-boundary-types': ['error'],
       },

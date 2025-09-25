@@ -8,16 +8,13 @@ module.exports = {
 
     const pageCollection = await db.collection('pages');
 
-    await pageCollection.updateMany(
-      { grantedGroups: { $eq: null } },
-      [
-        {
-          $set: {
-            grantedGroups: [],
-          },
+    await pageCollection.updateMany({ grantedGroups: { $eq: null } }, [
+      {
+        $set: {
+          grantedGroups: [],
         },
-      ],
-    );
+      },
+    ]);
 
     logger.info('Migration has successfully applied');
   },

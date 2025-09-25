@@ -1,0 +1,25 @@
+@mixin modifier-key {
+  .cmd-key.mac {
+    &::after {
+      content: '⌘';
+    }
+  }
+
+  .cmd-key.win {
+    &::after {
+      content: 'Ctrl';
+    }
+  }
+
+  .alt-key.mac {
+    &::after {
+      content: '⌥';
+    }
+  }
+
+  .alt-key.win {
+    &::after {
+      content: 'Alt';
+    }
+  }
+}

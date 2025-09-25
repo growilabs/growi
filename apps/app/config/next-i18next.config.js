@@ -1,5 +1,6 @@
 const isDev = process.env.NODE_ENV === 'development';
 
+// biome-ignore lint/style/useNodejsImportProtocol: ignore
 const path = require('path');
 
 const { AllLang } = require('@growi/core');
@@ -26,17 +27,17 @@ module.exports = {
     ? isServer()
       ? [new HMRPlugin({ webpack: { server: true } })]
       : [
-        require('i18next-chained-backend').default,
-        new HMRPlugin({ webpack: { client: true } }),
-      ]
+          require('i18next-chained-backend').default,
+          new HMRPlugin({ webpack: { client: true } }),
+        ]
     : [],
   backend: {
     backends: isServer()
       ? []
       : [
-        require('i18next-localstorage-backend').default,
-        require('i18next-http-backend').default,
-      ],
+          require('i18next-localstorage-backend').default,
+          require('i18next-http-backend').default,
+        ],
     backendOptions: [
       // options for i18next-localstorage-backend
       { expirationTime: isDev ? 0 : 24 * 60 * 60 * 1000 }, // 1 day in production
@@ -44,5 +45,4 @@ module.exports = {
       { loadPath: '/static/locales/{{lng}}/{{ns}}.json' },
     ],
   },
-
 };

@@ -2,8 +2,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 
 import { toArrayIfNot } from '~/utils/array-utils';
 
-
-const addCustomFunctionToResponse = (express, crowi) => {
+const addCustomFunctionToResponse = (express) => {
 
   express.response.apiv3 = function(obj = {}, status = 200) { // not arrow function
     // obj must be object

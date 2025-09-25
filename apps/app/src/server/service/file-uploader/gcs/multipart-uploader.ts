@@ -22,8 +22,8 @@ export class GcsMultipartUploader extends MultipartUploader implements IGcsMulti
   constructor(bucket: Bucket, uploadKey: string, maxPartSize: number) {
     super(uploadKey, maxPartSize);
 
-    const namespace = configManager.getConfig('crowi', 'gcs:uploadNamespace');
-    this.file = bucket.file(urljoin(namespace || '', uploadKey));
+    const namespace = configManager.getConfig('gcs:uploadNamespace');
+    this.file = bucket.file(urljoin(namespace, uploadKey));
   }
 
   async initUpload(): Promise<void> {

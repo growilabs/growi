@@ -1,4 +1,5 @@
 import { isHttpError } from 'http-errors';
+
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:middleware:htto-error-handler');

@@ -297,7 +297,7 @@ class SecuritySetting extends React.Component {
                     onClick={() => this.setExpantOtherDeleteOptionsState(deletionType, !expantDeleteOptionsState)}
                   >
                     <span className={`material-symbols-outlined me-1 ${expantDeleteOptionsState ? 'rotate-90' : ''}`}>navigate_next</span>
-                    { t('security_settings.other_options') }
+                    {t('security_settings.other_options')}
                   </button>
                   <Collapse isOpen={expantDeleteOptionsState}>
                     <div className="pb-4">
@@ -308,7 +308,7 @@ class SecuritySetting extends React.Component {
                           <span dangerouslySetInnerHTML={{ __html: t('security_settings.page_delete_rights_caution') }} />
                         </span>
                       </p>
-                      { this.previousPageRecursiveAuthorityState(deletionType) !== null && (
+                      {this.previousPageRecursiveAuthorityState(deletionType) !== null && (
                         <div className="mb-3">
                           <strong>
                             {t('security_settings.forced_update_desc')}
@@ -356,60 +356,102 @@ class SecuritySetting extends React.Component {
           </div>
         )}
 
-        <h4 className="mt-4">{ t('security_settings.page_list_and_search_results') }</h4>
-        <div className="row justify-content-md-center">
-          <table className="table table-bordered col-lg-9 mb-5">
-            <thead>
-              <tr>
-                <th scope="col">{ t('security_settings.scope_of_page_disclosure') }</th>
-                <th scope="col">{ t('security_settings.set_point') }</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th scope="row">{ t('public') }</th>
-                <td><span className="material-symbols-outlined text-success me-1">check_circle</span>{ t('security_settings.always_displayed') }</td>
-              </tr>
-              <tr>
-                <th scope="row">{ t('anyone_with_the_link') }</th>
-                <td><span className="material-symbols-outlined text-danger me-1">cancel</span>{ t('security_settings.always_hidden') }</td>
-              </tr>
-              <tr>
-                <th scope="row">{ t('only_me') }</th>
-                <td>
-                  <div className="form-check form-switch form-check-success">
-                    <input
-                      type="checkbox"
-                      className="form-check-input"
+        <h4 className="alert-anchor border-bottom mt-4">{t('security_settings.page_list_and_search_results')}</h4>
+        <div className="row mb-4">
+          <div className="col-md-10">
+            <div className="row">
+
+              {/* Left Column: Labels */}
+              <div className="col-5 d-flex flex-column align-items-end p-4">
+                <div className="fw-bold mb-4">{t('public')}</div>
+                <div className="fw-bold mb-4">{t('anyone_with_the_link')}</div>
+                <div className="fw-bold mb-4">{t('only_me')}</div>
+                <div className="fw-bold">{t('only_inside_the_group')}</div>
+              </div>
+
+              {/* Right Column: Content */}
+              <div className="col-7 d-flex flex-column align-items-start pt-4 pb-4">
+                <div className="mb-4 d-flex align-items-center">
+                  <span className="material-symbols-outlined text-success me-1"></span>
+                  {t('security_settings.always_displayed')}
+                </div>
+                <div className="mb-3 d-flex align-items-center">
+                  <span className="material-symbols-outlined text-danger me-1"></span>
+                  {t('security_settings.always_hidden')}
+                </div>
+
+                {/* Owner Restriction Dropdown */}
+                <div className="mb-3">
+                  <div className="dropdown">
+                    <button
+                      className="btn btn-outline-secondary dropdown-toggle text-end col-12 col-md-auto"
+                      type="button"
                       id="isShowRestrictedByOwner"
-                      checked={!adminGeneralSecurityContainer.state.isShowRestrictedByOwner}
-                      onChange={() => { adminGeneralSecurityContainer.switchIsShowRestrictedByOwner() }}
-                    />
-                    <label className="form-label form-check-label" htmlFor="isShowRestrictedByOwner">
-                      {t('security_settings.displayed_or_hidden')}
-                    </label>
+                      data-bs-toggle="dropdown"
+                      aria-haspopup="true"
+                      aria-expanded="true"
+                    >
+                      <span className="float-start">
+                        {adminGeneralSecurityContainer.state.currentOwnerRestrictionDisplayMode === 'Displayed' && t('security_settings.always_displayed')}
+                        {adminGeneralSecurityContainer.state.currentOwnerRestrictionDisplayMode === 'Hidden' && t('security_settings.always_hidden')}
+                      </span>
+                    </button>
+                    <div className="dropdown-menu" aria-labelledby="isShowRestrictedByOwner">
+                      <button
+                        className="dropdown-item"
+                        type="button"
+                        onClick={() => { adminGeneralSecurityContainer.changeOwnerRestrictionDisplayMode('Displayed') }}
+                      >
+                        {t('security_settings.always_displayed')}
+                      </button>
+                      <button
+                        className="dropdown-item"
+                        type="button"
+                        onClick={() => { adminGeneralSecurityContainer.changeOwnerRestrictionDisplayMode('Hidden') }}
+                      >
+                        {t('security_settings.always_hidden')}
+                      </button>
+                    </div>
                   </div>
-                </td>
-              </tr>
-              <tr>
-                <th scope="row">{ t('only_inside_the_group') }</th>
-                <td>
-                  <div className="form-check form-switch form-check-success">
-                    <input
-                      type="checkbox"
-                      className="form-check-input"
+                </div>
+
+                {/* Group Restriction Dropdown */}
+                <div className="">
+                  <div className="dropdown">
+                    <button
+                      className="btn btn-outline-secondary dropdown-toggle text-end col-12 col-md-auto"
+                      type="button"
                       id="isShowRestrictedByGroup"
-                      checked={!adminGeneralSecurityContainer.state.isShowRestrictedByGroup}
-                      onChange={() => { adminGeneralSecurityContainer.switchIsShowRestrictedByGroup() }}
-                    />
-                    <label className="form-label form-check-label" htmlFor="isShowRestrictedByGroup">
-                      {t('security_settings.displayed_or_hidden')}
-                    </label>
+                      data-bs-toggle="dropdown"
+                      aria-haspopup="true"
+                      aria-expanded="true"
+                    >
+                      <span className="float-start">
+                        {adminGeneralSecurityContainer.state.currentGroupRestrictionDisplayMode === 'Displayed' && t('security_settings.always_displayed')}
+                        {adminGeneralSecurityContainer.state.currentGroupRestrictionDisplayMode === 'Hidden' && t('security_settings.always_hidden')}
+                      </span>
+                    </button>
+                    <div className="dropdown-menu" aria-labelledby="isShowRestrictedByGroup">
+                      <button
+                        className="dropdown-item"
+                        type="button"
+                        onClick={() => { adminGeneralSecurityContainer.changeGroupRestrictionDisplayMode('Displayed') }}
+                      >
+                        {t('security_settings.always_displayed')}
+                      </button>
+                      <button
+                        className="dropdown-item"
+                        type="button"
+                        onClick={() => { adminGeneralSecurityContainer.changeGroupRestrictionDisplayMode('Hidden') }}
+                      >
+                        {t('security_settings.always_hidden')}
+                      </button>
+                    </div>
                   </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <h4 className="mb-3">{t('security_settings.page_access_rights')}</h4>
@@ -549,7 +591,7 @@ class SecuritySetting extends React.Component {
             <input
               className="form-control col-md-4"
               type="text"
-              defaultValue={adminGeneralSecurityContainer.state.sessionMaxAge || ''}
+              value={adminGeneralSecurityContainer.state.sessionMaxAge || ''}
               onChange={(e) => {
                 adminGeneralSecurityContainer.setSessionMaxAge(e.target.value);
               }}

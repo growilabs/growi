@@ -1,8 +1,5 @@
 import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+  useEffect, useMemo, useRef, useState, type JSX,
 } from 'react';
 
 import { DevidedPagePath } from '@growi/core/dist/models';
@@ -87,22 +84,30 @@ export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element =>
     <div ref={pagePathNavRef}>
       <Sticky className={`${moduleClass} mb-4`} innerClass="pe-none" innerActiveClass="active mt-1">
         {({ status }) => {
-          const isCollapseParents = status === Sticky.STATUS_FIXED;
-          return (
+          const isParentsCollapsed = status === Sticky.STATUS_FIXED;
+
           // Controlling pointer-events
           //  2. enable pointer-events with 'pe-auto' only against the children
           //      which width is minimized by 'd-inline-block'
           //
-            <div className="d-inline-block pe-auto">
-              { !isCollapseParents && <PagePathNav {...props} /> }
-              { isCollapseParents && (
+          if (isParentsCollapsed) {
+            return (
+              <div className="d-inline-block pe-auto">
                 <PagePathNavLayout
                   {...props}
                   latterLink={latterLink}
                   latterLinkClassName="fs-3 text-truncate"
-                  maxWidth={isCollapseParents ? navMaxWidth : undefined}
+                  maxWidth={navMaxWidth}
                 />
-              ) }
+              </div>
+            );
+          }
+
+          return (
+            // Use 'd-block' to make the children take the full width
+            // This is to improve UX when opening/closing CopyDropdown
+            <div className="d-block pe-auto">
+              <PagePathNav {...props} inline />
             </div>
           );
         }}

@@ -4,7 +4,7 @@
 
 .grw-page-path-nav-layout :global {
   .grw-page-path-nav-copydropdown {
-    display: none;
+    visibility: hidden;
     @include bs.media-breakpoint-down(md) {
       display: block;
     }
@@ -15,7 +15,7 @@
   &:global {
     &:hover {
       .grw-page-path-nav-copydropdown {
-        display: block;
+        visibility: visible;
       }
     }
   }

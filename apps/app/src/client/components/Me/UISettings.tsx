@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, type JSX } from 'react';
 
 import { useTranslation } from 'react-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
@@ -101,7 +101,7 @@ export const UISettings = (): JSX.Element => {
 
       <div className="row my-3">
         <div className="offset-4 col-5">
-          <button data-testid="" type="button" className="btn btn-primary" onClick={updateButtonHandler}>
+          <button data-testid="grw-ui-settings-update-btn" type="button" className="btn btn-primary" onClick={updateButtonHandler}>
             {t('Update')}
           </button>
         </div>

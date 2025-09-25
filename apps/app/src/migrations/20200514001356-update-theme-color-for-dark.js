@@ -13,8 +13,14 @@ module.exports = {
     await mongoose.connect(getMongoUri(), mongoOptions);
 
     await Promise.all([
-      await Config.findOneAndUpdate({ key: 'customize:theme', value: JSON.stringify('default-dark') }, { value: JSON.stringify('default') }), // update default-dark
-      await Config.findOneAndUpdate({ key: 'customize:theme', value: JSON.stringify('blue-night') }, { value: JSON.stringify('mono-blue') }), // update blue-night
+      await Config.findOneAndUpdate(
+        { key: 'customize:theme', value: JSON.stringify('default-dark') },
+        { value: JSON.stringify('default') },
+      ), // update default-dark
+      await Config.findOneAndUpdate(
+        { key: 'customize:theme', value: JSON.stringify('blue-night') },
+        { value: JSON.stringify('mono-blue') },
+      ), // update blue-night
     ]);
 
     logger.info('Migration has successfully applied');

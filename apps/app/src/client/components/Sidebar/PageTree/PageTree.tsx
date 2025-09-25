@@ -1,4 +1,4 @@
-import { Suspense, useState } from 'react';
+import { Suspense, useState, type JSX } from 'react';
 
 import dynamic from 'next/dynamic';
 import { DndProvider } from 'react-dnd';

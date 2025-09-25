@@ -1,4 +1,6 @@
-import { memo, useCallback, useRef } from 'react';
+import {
+  memo, useCallback, useRef, type JSX,
+} from 'react';
 
 import type { ResizableAreaProps } from './props';
 

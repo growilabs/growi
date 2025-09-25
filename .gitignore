@@ -44,3 +44,5 @@ yarn-error.log*
 
 # pnpm deploy target dir
 out
+
+.devcontainer/compose.extend.yml

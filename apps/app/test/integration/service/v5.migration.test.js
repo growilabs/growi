@@ -67,7 +67,7 @@ describe('V5 page migration', () => {
     UserGroup = mongoose.model('UserGroup');
     UserGroupRelation = mongoose.model('UserGroupRelation');
 
-    await crowi.configManager.updateConfigsInTheSameNamespace('crowi', { 'app:isV5Compatible': true });
+    await crowi.configManager.updateConfig('app:isV5Compatible', true);
 
     await User.insertMany([
       { name: 'rootUser', username: 'rootUser', email: 'rootUser@example.com' },

@@ -5,6 +5,7 @@ import { SubscriptionStatusType } from '@growi/core';
 import urljoin from 'url-join';
 
 import type { SyncLatestRevisionBody } from '~/interfaces/yjs';
+import { useIsGuestUser } from '~/stores-universal/context';
 import { useEditingMarkdown, usePageTagsForEditors } from '~/stores/editor';
 import {
   useCurrentPageId, useSWRMUTxCurrentPage, useSWRxApplicableGrant, useSWRxTagsInfo,
@@ -103,14 +104,15 @@ export const useUpdateStateAfterSave = (pageId: string|undefined|null, opts?: Up
   const { mutate: mutateTagsInfo } = useSWRxTagsInfo(pageId);
   const { sync: syncTagsInfoForEditor } = usePageTagsForEditors(pageId);
   const { mutate: mutateEditingMarkdown } = useEditingMarkdown();
-  const { mutate: mutateCurrentGrantData } = useSWRxCurrentGrantData(pageId);
-  const { mutate: mutateApplicableGrant } = useSWRxApplicableGrant(pageId);
+  const { data: isGuestUser } = useIsGuestUser();
+  const { mutate: mutateCurrentGrantData } = useSWRxCurrentGrantData(isGuestUser ? null : pageId);
+  const { mutate: mutateApplicableGrant } = useSWRxApplicableGrant(isGuestUser ? null : pageId);
 
   // update swr 'currentPageId', 'currentPage', remote states
   return useCallback(async() => {
     if (pageId == null) { return }
 
-    // update tag before page: https://github.com/weseek/growi/pull/7158
+    // update tag before page: https://github.com/growilabs/growi/pull/7158
     // !! DO NOT CHANGE THE ORDERS OF THE MUTATIONS !! -- 12.26 yuken-t
     await mutateTagsInfo(); // get from DB
     syncTagsInfoForEditor(); // sync global state for client
@@ -121,7 +123,7 @@ export const useUpdateStateAfterSave = (pageId: string|undefined|null, opts?: Up
     if (updatedPage == null || updatedPage.revision == null) { return }
 
     // supress to mutate only when updated from built-in editor
-    // and see: https://github.com/weseek/growi/pull/7118
+    // and see: https://github.com/growilabs/growi/pull/7118
     const supressEditingMarkdownMutation = opts?.supressEditingMarkdownMutation ?? false;
     if (!supressEditingMarkdownMutation) {
       mutateEditingMarkdown(updatedPage.revision.body);

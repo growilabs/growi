@@ -1,4 +1,6 @@
-import React, { type ReactNode, useCallback, useMemo } from 'react';
+import React, {
+  type ReactNode, useCallback, useMemo, type JSX,
+} from 'react';
 
 import { Origin } from '@growi/core';
 import { getParentPath } from '@growi/core/dist/utils/path-utils';

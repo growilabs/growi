@@ -73,10 +73,10 @@ class ActivityService {
   }
 
   getAvailableActions = function(isIncludeEssentialActions = true): SupportedActionType[] {
-    const auditLogEnabled = this.crowi.configManager.getConfig('crowi', 'app:auditLogEnabled') || false;
-    const auditLogActionGroupSize = this.crowi.configManager.getConfig('crowi', 'app:auditLogActionGroupSize') || ActionGroupSize.Small;
-    const auditLogAdditionalActions = this.crowi.configManager.getConfig('crowi', 'app:auditLogAdditionalActions');
-    const auditLogExcludeActions = this.crowi.configManager.getConfig('crowi', 'app:auditLogExcludeActions');
+    const auditLogEnabled = this.crowi.configManager.getConfig('app:auditLogEnabled') || false;
+    const auditLogActionGroupSize = this.crowi.configManager.getConfig('app:auditLogActionGroupSize') || ActionGroupSize.Small;
+    const auditLogAdditionalActions = this.crowi.configManager.getConfig('app:auditLogAdditionalActions');
+    const auditLogExcludeActions = this.crowi.configManager.getConfig('app:auditLogExcludeActions');
 
     if (!auditLogEnabled) {
       return AllEssentialActions;
@@ -135,7 +135,7 @@ class ActivityService {
 
   createTtlIndex = async function() {
     const configManager = this.crowi.configManager;
-    const activityExpirationSeconds = configManager != null ? configManager.getConfig('crowi', 'app:activityExpirationSeconds') : 2592000;
+    const activityExpirationSeconds = configManager != null ? configManager.getConfig('app:activityExpirationSeconds') : 2592000;
 
     try {
       // create the collection with indexes at first

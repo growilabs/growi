@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, JSX } from 'react';
 import React, { useCallback } from 'react';
 
 import { useTranslation } from 'next-i18next';

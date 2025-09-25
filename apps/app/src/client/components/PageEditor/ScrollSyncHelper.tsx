@@ -171,7 +171,7 @@ const scrollPreview = (editorRootElement: HTMLElement, previewRootElement: HTMLE
 };
 
 // eslint-disable-next-line max-len
-export const useScrollSync = (codeMirrorKey: GlobalCodeMirrorEditorKey, previewRef: RefObject<HTMLDivElement>): { scrollEditorHandler: () => void; scrollPreviewHandler: () => void } => {
+export const useScrollSync = (codeMirrorKey: GlobalCodeMirrorEditorKey, previewRef: RefObject<HTMLDivElement | null>): { scrollEditorHandler: () => void; scrollPreviewHandler: () => void } => {
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(codeMirrorKey);
 
   const isOriginOfScrollSyncEditor = useRef(false);

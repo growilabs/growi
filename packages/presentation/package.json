@@ -33,16 +33,15 @@
     "clean": "shx rm -rf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
-    "lint:js": "eslint **/*.{js,jsx,ts,tsx}",
+    "lint:js": "biome check",
     "lint:styles": "stylelint --allow-empty-input \"src/**/*.scss\" \"src/**/*.css\"",
     "lint:typecheck": "vue-tsc --noEmit",
     "lint": "run-p lint:*"
   },
   "dependencies": {
-    "@growi/core": "workspace:^"
   },
   "devDependencies": {
-    "@marp-team/marp-core": "^3.9.0",
+    "@marp-team/marp-core": "^3.9.1",
     "@marp-team/marpit": "^2.6.1",
     "@types/mdast": "^4.0.4",
     "@types/reveal.js": "^4.4.1",

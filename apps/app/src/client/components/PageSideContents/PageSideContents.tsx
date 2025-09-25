@@ -1,4 +1,6 @@
-import React, { Suspense, useCallback, useRef } from 'react';
+import React, {
+  Suspense, useCallback, useRef, type JSX,
+} from 'react';
 
 import type { IPagePopulatedToShowRevision, IPageInfoForOperation } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
@@ -6,7 +8,7 @@ import { useTranslation } from 'next-i18next';
 import dynamic from 'next/dynamic';
 import { scroller } from 'react-scroll';
 
-import { useIsGuestUser, useIsReadOnlyUser } from '~/stores-universal/context';
+import { useIsGuestUser, useIsReadOnlyUser, useShowPageSideAuthors } from '~/stores-universal/context';
 import { useDescendantsPageListModal, useTagEditModal } from '~/stores/modal';
 import { useSWRxPageInfo, useSWRxTagsInfo } from '~/stores/page';
 import { useIsAbleToShowTagLabel } from '~/stores/ui';
@@ -28,6 +30,7 @@ const PageTags = dynamic(() => import('../PageTags').then(mod => mod.PageTags), 
   loading: PageTagsSkeleton,
 });
 
+const AuthorInfo = dynamic(() => import('~/client/components/AuthorInfo').then(mod => mod.AuthorInfo), { ssr: false });
 
 type TagsProps = {
   pageId: string,
@@ -84,6 +87,11 @@ export const PageSideContents = (props: PageSideContentsProps): JSX.Element => {
   const tagsRef = useRef<HTMLDivElement>(null);
 
   const { data: pageInfo } = useSWRxPageInfo(page._id);
+  const { data: showPageSideAuthors } = useShowPageSideAuthors();
+
+  const {
+    creator, lastUpdateUser, createdAt, updatedAt,
+  } = page;
 
   const pagePath = page.path;
   const isTopPagePath = isTopPage(pagePath);
@@ -92,14 +100,22 @@ export const PageSideContents = (props: PageSideContentsProps): JSX.Element => {
 
   return (
     <>
+      {/* AuthorInfo */}
+      {showPageSideAuthors && (
+        <div className="d-none d-md-block page-meta border-bottom pb-2 ms-lg-3 mb-3">
+          <AuthorInfo user={creator} date={createdAt} mode="create" locate="pageSide" />
+          <AuthorInfo user={lastUpdateUser} date={updatedAt} mode="update" locate="pageSide" />
+        </div>
+      )}
+
       {/* Tags */}
-      { page.revision != null && (
+      {page.revision != null && (
         <div ref={tagsRef}>
           <Suspense fallback={<PageTagsSkeleton />}>
             <Tags pageId={page._id} revisionId={page.revision._id} />
           </Suspense>
         </div>
-      ) }
+      )}
 
       <div className={`${styles['grw-page-accessories-controls']} d-flex flex-column gap-2`}>
         {/* Page list */}
@@ -108,7 +124,7 @@ export const PageSideContents = (props: PageSideContentsProps): JSX.Element => {
             <PageAccessoriesControl
               icon={<span className="material-symbols-outlined">subject</span>}
               label={t('page_list')}
-              // Do not display CountBadge if '/trash/*': https://github.com/weseek/growi/pull/7600
+              // Do not display CountBadge if '/trash/*': https://github.com/growilabs/growi/pull/7600
               count={!isTrash && pageInfo != null ? (pageInfo as IPageInfoForOperation).descendantCount : undefined}
               offset={1}
               onClick={() => openDescendantPageListModal(pagePath)}

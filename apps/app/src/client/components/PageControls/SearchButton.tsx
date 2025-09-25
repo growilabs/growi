@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, type JSX } from 'react';
 
 import { useSearchModal } from '../../../features/search/client/stores/search';
 

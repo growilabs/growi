@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import {
+  useCallback, useEffect, useState, type JSX,
+} from 'react';
 
 import type EventEmitter from 'events';
 

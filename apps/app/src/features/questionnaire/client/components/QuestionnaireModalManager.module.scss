@@ -1,9 +1,0 @@
-@use '@growi/core-styles/scss/bootstrap/init' as bs;
-
-.grw-questionnaire-toasts :global {
-  position: fixed;
-  right: 20px;
-  bottom: 52px;
-  z-index: bs.$zindex-fixed + 1;
-  width: 230px;
-}

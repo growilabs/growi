@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import { Disable } from 'react-disable';
 import type { UncontrolledTooltipProps } from 'reactstrap';

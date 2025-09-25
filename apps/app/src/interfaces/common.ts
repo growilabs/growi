@@ -2,8 +2,8 @@
  * Common types and interfaces
  */
 
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 export type HasChildren<T = ReactNode> = {
-  children?: T
-}
+  children?: T;
+};

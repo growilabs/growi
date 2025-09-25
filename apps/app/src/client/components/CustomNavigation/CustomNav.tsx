@@ -1,5 +1,5 @@
 import React, {
-  useEffect, useState, useRef, useMemo, useCallback,
+  useEffect, useState, useRef, useMemo, useCallback, type JSX,
 } from 'react';
 
 import type { Breakpoint } from '@growi/ui/dist/interfaces';

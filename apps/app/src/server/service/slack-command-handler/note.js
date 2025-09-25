@@ -7,6 +7,7 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:service:SlackCommandHandler:note');
 
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
   const CreatePageService = require('./create-page-service');
   const createPageService = new CreatePageService(crowi);

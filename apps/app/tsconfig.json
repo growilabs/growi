@@ -4,14 +4,12 @@
   "compilerOptions": {
     "jsx": "preserve",
     "resolveJsonModule": true,
-    "types": [
-      "vitest/globals"
-    ],
+    "types": ["vitest/globals", "@testing-library/jest-dom/vitest"],
 
     "baseUrl": ".",
     "paths": {
       "~/*": ["./src/*"],
-      "^/*": ["./*"],
+      "^/*": ["./*"]
     },
 
     /* TODO: remove below flags for strict checking */
@@ -29,11 +27,7 @@
       { "transform": "typescript-transform-paths", "afterDeclarations": true }
     ]
   },
-  "include": [
-    "next-env.d.ts",
-    "config",
-    "src"
-  ],
+  "include": ["next-env.d.ts", "config", "src"],
   "ts-node": {
     "transpileOnly": true,
     "swc": true,

@@ -3,7 +3,6 @@ import { InvalidGrowiCommandError } from '../models/errors';
 import { parseSlashCommand } from './slash-command-parser';
 
 describe('parseSlashCommand', () => {
-
   describe('without growiCommandType', () => {
     test('throws InvalidGrowiCommandError', () => {
       // setup

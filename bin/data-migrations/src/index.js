@@ -5,13 +5,14 @@
 /**
  * @typedef {import('./types').MigrationModule} MigrationModule
  * @typedef {import('./types').ReplaceLatestRevisions} ReplaceLatestRevisions
+ * @typedef {import('./types').Operatioins } Operations
  */
 
 var pagesCollection = db.getCollection('pages');
 var revisionsCollection = db.getCollection('revisions');
 
-var batchSize = process.env.BATCH_SIZE ?? 100; // default 100 revisions in 1 bulkwrite
-var batchSizeInterval = process.env.BATCH_INTERVAL ?? 3000; // default 3 sec
+var batchSize = Number(process.env.BATCH_SIZE ?? 100); // default 100 revisions in 1 bulkwrite
+var batchSizeInterval = Number(process.env.BATCH_INTERVAL ?? 3000); // default 3 sec
 
 var migrationModule = process.env.MIGRATION_MODULE;
 
@@ -24,37 +25,81 @@ if (migrationModules.length === 0) {
 
 /** @type {ReplaceLatestRevisions} */
 function replaceLatestRevisions(body, migrationModules) {
-  var replacedBody = body;
-  migrationModules.forEach((migrationModule) => {
-    replacedBody = migrationModule(replacedBody);
-  });
-  return replacedBody;
+  return migrationModules.reduce((replacedBody, module) => module(replacedBody), body);
 }
 
-var operations = [];
-pagesCollection.find({}).forEach((doc) => {
-  if (doc.revision) {
-    var revision = revisionsCollection.findOne({ _id: doc.revision });
-    var replacedBody = replaceLatestRevisions(revision.body, [...migrationModules]);
-    var operation = {
-      updateOne: {
-        filter: { _id: revision._id },
-        update: {
-          $set: { body: replacedBody },
-        },
-      },
-    };
-    operations.push(operation);
+var pipeline = [
+  // Join pages with revisions
+  {
+    $lookup: {
+      from: 'revisions',
+      localField: 'revision',
+      foreignField: '_id',
+      as: 'revisionDoc',
+    },
+  },
+  // Unwind the revision array
+  {
+    $unwind: '$revisionDoc',
+  },
+  // Project only needed fields
+  {
+    $project: {
+      _id: '$revisionDoc._id',
+      body: '$revisionDoc.body',
+    },
+  },
+];
 
-    // bulkWrite per 100 revisions
-    if (operations.length > (batchSize - 1)) {
-      revisionsCollection.bulkWrite(operations);
-      // sleep time can be set from env var
-      sleep(batchSizeInterval);
-      operations = [];
+
+try {
+  /** @type {Operations} */
+  var operations = [];
+  var processedCount = 0;
+
+  var cursor = pagesCollection.aggregate(pipeline, {
+    allowDiskUse: true,
+    cursor: { batchSize },
+  });
+
+  while (cursor.hasNext()) {
+    var doc = cursor.next();
+
+    if (doc == null || doc.body == null) {
+      continue;
+    }
+
+    try {
+      var replacedBody = replaceLatestRevisions(doc.body, [...migrationModules]);
+
+      operations.push({
+        updateOne: {
+          filter: { _id: doc._id },
+          update: {
+            $set: { body: replacedBody },
+          },
+        },
+      });
+
+      processedCount++;
+
+      if (operations.length >= batchSize || !cursor.hasNext()) {
+        revisionsCollection.bulkWrite(operations);
+        if (batchSizeInterval > 0) {
+          sleep(batchSizeInterval);
+        }
+
+        operations = [];
+      }
+    }
+    catch (err) {
+      print(`Error processing document ${doc?._id}: ${err}`);
     }
   }
-});
-revisionsCollection.bulkWrite(operations);
 
-print('migration complete!');
+  print('Migration complete!');
+}
+catch (err) {
+  print(`Fatal error during migration: ${err}`);
+  throw err;
+}

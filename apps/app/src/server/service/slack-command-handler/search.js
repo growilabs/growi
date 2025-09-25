@@ -5,12 +5,15 @@ import { generateLastUpdateMrkdwn } from '@growi/slack/dist/utils/generate-last-
 
 import loggerFactory from '~/utils/logger';
 
+import { growiInfoService } from '../growi-info';
+
 
 const logger = loggerFactory('growi:service:SlackCommandHandler:search');
 
 const PAGINGLIMIT = 7;
 
 
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
   const BaseSlackCommandHandler = require('./slack-command-handler');
   const handler = new BaseSlackCommandHandler(crowi);
@@ -56,7 +59,7 @@ module.exports = (crowi) => {
   }
 
   function buildRespondBodyForSearchResult(searchResult, growiCommandArgs) {
-    const appUrl = crowi.appService.getSiteUrl();
+    const appUrl = growiInfoService.getSiteUrl();
     const appTitle = crowi.appService.getAppTitle();
 
     const {
@@ -237,7 +240,7 @@ module.exports = (crowi) => {
   handler.shareSinglePageResult = async function(client, payload, interactionPayloadAccessor, respondUtil) {
     const { user } = payload;
 
-    const appUrl = crowi.appService.getSiteUrl();
+    const appUrl = growiInfoService.getSiteUrl();
     const appTitle = crowi.appService.getAppTitle();
 
     const value = interactionPayloadAccessor.firstAction()?.value; // shareSinglePage action must have button action

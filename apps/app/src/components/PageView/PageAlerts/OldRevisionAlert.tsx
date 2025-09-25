@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, type JSX } from 'react';
 
 import { returnPathForURL } from '@growi/core/dist/utils/path-utils';
 import { useRouter } from 'next/router';

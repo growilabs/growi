@@ -1,12 +1,12 @@
-import { useCallback } from 'react';
+import { useCallback, type JSX } from 'react';
 
-import { IExternalAuthProviderType } from '@growi/core';
 import { useTranslation } from 'next-i18next';
+
+import { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 
 const authIcon = {
   [IExternalAuthProviderType.google]: <span className="growi-custom-icons align-bottom">google</span>,
   [IExternalAuthProviderType.github]: <span className="growi-custom-icons align-bottom">github</span>,
-  [IExternalAuthProviderType.facebook]: <span className="growi-custom-icons align-bottom">facebook</span>,
   [IExternalAuthProviderType.oidc]: <span className="growi-custom-icons align-bottom">openid</span>,
   [IExternalAuthProviderType.saml]: <span className="material-symbols-outlined align-bottom">key</span>,
 };
@@ -14,7 +14,6 @@ const authIcon = {
 const authLabel = {
   [IExternalAuthProviderType.google]: 'Google',
   [IExternalAuthProviderType.github]: 'GitHub',
-  [IExternalAuthProviderType.facebook]: 'Facebook',
   [IExternalAuthProviderType.oidc]: 'OIDC',
   [IExternalAuthProviderType.saml]: 'SAML',
 };

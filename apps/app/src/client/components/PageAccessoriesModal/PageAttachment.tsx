@@ -1,5 +1,5 @@
 import React, {
-  useCallback, useMemo, useState,
+  useCallback, useMemo, useState, type JSX,
 } from 'react';
 
 import type { IAttachmentHasId } from '@growi/core';

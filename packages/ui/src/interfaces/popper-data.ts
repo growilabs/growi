@@ -1,8 +1,8 @@
 interface Rect {
-  top: number
-  left: number
-  width: number
-  height: number
+  top: number;
+  left: number;
+  width: number;
+  height: number;
 }
 
 export interface PopperData {

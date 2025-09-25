@@ -82,12 +82,6 @@
       --bs-btn-active-bg: #{rgba(#403D3E, 0.7)};
     }
 
-    .btn-auth-facebook {
-      --bs-btn-bg: #{rgba(#29487d, 0.4)};
-      --bs-btn-hover-bg: #{rgba(#29487d, 0.9)};
-      --bs-btn-active-bg: #{rgba(#29487d, 0.9)};
-    }
-
     .btn-auth-oidc {
       --bs-btn-bg: #{rgba(#835B1A, 0.4)};
       --bs-btn-hover-bg: #{rgba(#835B1A, 0.8)};

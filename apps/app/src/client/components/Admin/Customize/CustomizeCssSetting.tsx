@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, type JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
 import { Card, CardBody } from 'reactstrap';
@@ -46,7 +46,7 @@ const CustomizeCssSetting = (props: Props): JSX.Element => {
               className="form-control"
               name="customizeCss"
               rows={8}
-              defaultValue={adminCustomizeContainer.state.currentCustomizeCss || ''}
+              value={adminCustomizeContainer.state.currentCustomizeCss || ''}
               onChange={(e) => { adminCustomizeContainer.changeCustomizeCss(e.target.value) }}
             />
           </div>

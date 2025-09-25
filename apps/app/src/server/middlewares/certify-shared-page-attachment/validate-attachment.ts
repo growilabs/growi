@@ -1,6 +1,6 @@
 import { getIdForRef, type IAttachment } from '@growi/core';
 
-import { ShareLinkDocument } from '~/server/models/share-link';
+import type { ShareLinkDocument } from '~/server/models/share-link';
 import { getModelSafely } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 

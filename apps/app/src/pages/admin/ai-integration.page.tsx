@@ -50,7 +50,7 @@ const injectServerConfigurations = async(context: GetServerSidePropsContext, pro
   const { crowi } = req;
   const { configManager } = crowi;
 
-  props.aiEnabled = configManager.getConfig('crowi', 'app:aiEnabled');
+  props.aiEnabled = configManager.getConfig('app:aiEnabled');
 };
 
 export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {

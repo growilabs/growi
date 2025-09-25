@@ -17,7 +17,9 @@ import {
   type BlockBlobUploadResponse,
   type BlockBlobParallelUploadOptions,
 } from '@azure/storage-blob';
+import { toNonBlankStringOrUndefined } from '@growi/core/dist/interfaces';
 
+import type Crowi from '~/server/crowi';
 import { FilePathOnStoragePrefix, ResponseMode, type RespondOptions } from '~/server/interfaces/attachment';
 import type { IAttachmentDocument } from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
@@ -27,7 +29,7 @@ import { configManager } from '../config-manager';
 import {
   AbstractFileUploader, type TemporaryUrl, type SaveFileParam,
 } from './file-uploader';
-import { ContentHeaders } from './utils';
+import { createContentHeaders, getContentHeaderValue } from './utils';
 
 const urljoin = require('url-join');
 
@@ -43,25 +45,82 @@ type AzureConfig = {
   containerName: string,
 }
 
+// Cache holders to avoid repeated instantiation of credential and clients
+let cachedCredential: { key: string, credential: TokenCredential } | null = null;
+let cachedBlobServiceClient: { key: string, client: BlobServiceClient } | null = null;
+let cachedContainerClient: { key: string, client: ContainerClient } | null = null;
+
 
 function getAzureConfig(): AzureConfig {
+  const accountName = configManager.getConfig('azure:storageAccountName');
+  const containerName = configManager.getConfig('azure:storageContainerName');
+
+  if (accountName == null || containerName == null) {
+    throw new Error('Azure Blob Storage is not configured.');
+  }
+
   return {
-    accountName: configManager.getConfig('crowi', 'azure:storageAccountName'),
-    containerName: configManager.getConfig('crowi', 'azure:storageContainerName'),
+    accountName,
+    containerName,
   };
 }
 
 function getCredential(): TokenCredential {
-  const tenantId = configManager.getConfig('crowi', 'azure:tenantId');
-  const clientId = configManager.getConfig('crowi', 'azure:clientId');
-  const clientSecret = configManager.getConfig('crowi', 'azure:clientSecret');
-  return new ClientSecretCredential(tenantId, clientId, clientSecret);
+  // Build cache key from credential-related configs
+  const tenantId = toNonBlankStringOrUndefined(configManager.getConfig('azure:tenantId'));
+  const clientId = toNonBlankStringOrUndefined(configManager.getConfig('azure:clientId'));
+  const clientSecret = toNonBlankStringOrUndefined(configManager.getConfig('azure:clientSecret'));
+
+  if (tenantId == null || clientId == null || clientSecret == null) {
+    throw new Error(`Azure Blob Storage missing required configuration: tenantId=${tenantId}, clientId=${clientId}, clientSecret=${clientSecret}`);
+  }
+
+  const key = `${tenantId}|${clientId}|${clientSecret}`;
+
+  // Reuse cached credential when config has not changed
+  if (cachedCredential != null && cachedCredential.key === key) {
+    return cachedCredential.credential;
+  }
+
+  const credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+  cachedCredential = { key, credential };
+  return credential;
+}
+
+function getBlobServiceClient(): BlobServiceClient {
+  const { accountName } = getAzureConfig();
+  // Include credential cache key to ensure we re-create if cred changed
+  const credential = getCredential();
+  const credentialKey = (cachedCredential?.key) ?? 'unknown-cred';
+  const key = `${accountName}|${credentialKey}`;
+
+  if (cachedBlobServiceClient != null && cachedBlobServiceClient.key === key) {
+    return cachedBlobServiceClient.client;
+  }
+
+  // Use keep-alive to minimize socket churn; reuse client across calls
+  const client = new BlobServiceClient(
+    `https://${accountName}.blob.core.windows.net`,
+    credential,
+    { keepAliveOptions: { enable: true } },
+  );
+  cachedBlobServiceClient = { key, client };
+  return client;
 }
 
 async function getContainerClient(): Promise<ContainerClient> {
   const { accountName, containerName } = getAzureConfig();
-  const blobServiceClient = new BlobServiceClient(`https://${accountName}.blob.core.windows.net`, getCredential());
-  return blobServiceClient.getContainerClient(containerName);
+  const credentialKey = (cachedCredential?.key) ?? 'unknown-cred';
+  const key = `${accountName}|${containerName}|${credentialKey}`;
+
+  if (cachedContainerClient != null && cachedContainerClient.key === key) {
+    return cachedContainerClient.client;
+  }
+
+  const blobServiceClient = getBlobServiceClient();
+  const client = blobServiceClient.getContainerClient(containerName);
+  cachedContainerClient = { key, client };
+  return client;
 }
 
 function getFilePathOnStorage(attachment: IAttachmentDocument) {
@@ -75,7 +134,14 @@ class AzureFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override isValidUploadSettings(): boolean {
-    throw new Error('Method not implemented.');
+    try {
+      getAzureConfig();
+      return true;
+    }
+    catch (e) {
+      logger.error(e);
+      return false;
+    }
   }
 
   /**
@@ -111,22 +177,41 @@ class AzureFileUploader extends AbstractFileUploader {
     const filePath = getFilePathOnStorage(attachment);
     const containerClient = await getContainerClient();
     const blockBlobClient: BlockBlobClient = containerClient.getBlockBlobClient(filePath);
-    const contentHeaders = new ContentHeaders(attachment);
+    const contentHeaders = createContentHeaders(attachment);
 
-    await blockBlobClient.uploadStream(readable, undefined, undefined, {
-      blobHTTPHeaders: {
-        // put type and the file name for reference information when uploading
-        blobContentType: contentHeaders.contentType?.value.toString(),
-        blobContentDisposition: contentHeaders.contentDisposition?.value.toString(),
-      },
-    });
+    try {
+      const uploadTimeout = configManager.getConfig('app:fileUploadTimeout');
+
+      await blockBlobClient.uploadStream(readable, undefined, undefined, {
+        blobHTTPHeaders: {
+          // put type and the file name for reference information when uploading
+          blobContentType: getContentHeaderValue(contentHeaders, 'Content-Type'),
+          blobContentDisposition: getContentHeaderValue(contentHeaders, 'Content-Disposition'),
+        },
+        abortSignal: AbortSignal.timeout(uploadTimeout),
+      });
+
+      logger.debug(`File upload completed successfully: fileName=${attachment.fileName}`);
+    }
+    catch (error) {
+      // Handle timeout error specifically
+      if (error.name === 'AbortError') {
+        logger.warn(`Upload timeout: fileName=${attachment.fileName}`, error);
+      }
+      else {
+        logger.error(`File upload failed: fileName=${attachment.fileName}`, error);
+      }
+      // Re-throw the error to be handled by the caller.
+      // The pipeline automatically handles stream cleanup on error.
+      throw error;
+    }
   }
 
   /**
    * @inheritdoc
    */
   override determineResponseMode() {
-    return configManager.getConfig('crowi', 'azure:referenceFileWithRelayMode')
+    return configManager.getConfig('azure:referenceFileWithRelayMode')
       ? ResponseMode.RELAY
       : ResponseMode.REDIRECT;
   }
@@ -170,7 +255,7 @@ class AzureFileUploader extends AbstractFileUploader {
       throw new Error('Azure Blob is not configured.');
     }
 
-    const lifetimeSecForTemporaryUrl = configManager.getConfig('crowi', 'azure:lifetimeSecForTemporaryUrl');
+    const lifetimeSecForTemporaryUrl = configManager.getConfig('azure:lifetimeSecForTemporaryUrl');
 
     const url = await (async() => {
       const containerClient = await getContainerClient();
@@ -181,7 +266,8 @@ class AzureFileUploader extends AbstractFileUploader {
 
     const sasToken = await (async() => {
       const { accountName, containerName } = getAzureConfig();
-      const blobServiceClient = new BlobServiceClient(`https://${accountName}.blob.core.windows.net`, getCredential());
+      // Reuse the same BlobServiceClient (singleton)
+      const blobServiceClient = getBlobServiceClient();
 
       const now = Date.now();
       const startsOn = new Date(now - 30 * 1000);
@@ -189,7 +275,7 @@ class AzureFileUploader extends AbstractFileUploader {
       const userDelegationKey = await blobServiceClient.getUserDelegationKey(startsOn, expiresOn);
 
       const isDownload = opts?.download ?? false;
-      const contentHeaders = new ContentHeaders(attachment, { inline: !isDownload });
+      const contentHeaders = createContentHeaders(attachment, { inline: !isDownload });
 
       // https://github.com/Azure/azure-sdk-for-js/blob/d4d55f73/sdk/storage/storage-blob/src/ContainerSASPermissions.ts#L24
       // r:read, a:add, c:create, w:write, d:delete, l:list
@@ -200,8 +286,8 @@ class AzureFileUploader extends AbstractFileUploader {
         protocol: SASProtocol.HttpsAndHttp,
         startsOn,
         expiresOn,
-        contentType: contentHeaders.contentType?.value.toString(),
-        contentDisposition: contentHeaders.contentDisposition?.value.toString(),
+        contentType: getContentHeaderValue(contentHeaders, 'Content-Type'),
+        contentDisposition: getContentHeaderValue(contentHeaders, 'Content-Disposition'),
       };
 
       return generateBlobSASQueryParameters(sasOptions, userDelegationKey, accountName).toString();
@@ -218,12 +304,12 @@ class AzureFileUploader extends AbstractFileUploader {
 
 }
 
-module.exports = (crowi) => {
+module.exports = (crowi: Crowi) => {
   const lib = new AzureFileUploader(crowi);
 
   lib.isValidUploadSettings = function() {
-    return configManager.getConfig('crowi', 'azure:storageAccountName') != null
-      && configManager.getConfig('crowi', 'azure:storageContainerName') != null;
+    return configManager.getConfig('azure:storageAccountName') != null
+      && configManager.getConfig('azure:storageContainerName') != null;
   };
 
   (lib as any).deleteFile = async function(attachment) {
@@ -260,8 +346,8 @@ module.exports = (crowi) => {
   };
 
   (lib as any).checkLimit = async function(uploadFileSize) {
-    const maxFileSize = configManager.getConfig('crowi', 'app:maxFileSize');
-    const gcsTotalLimit = configManager.getConfig('crowi', 'app:fileUploadTotalLimit');
+    const maxFileSize = configManager.getConfig('app:maxFileSize');
+    const gcsTotalLimit = configManager.getConfig('app:fileUploadTotalLimit');
     return lib.doCheckLimit(uploadFileSize, maxFileSize, gcsTotalLimit);
   };
 

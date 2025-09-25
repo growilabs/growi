@@ -1,49 +1,60 @@
 import type {
-  HasObjectId, Ref,
+  HasObjectId,
   IPageHasId,
-  IUserGroup, IUserGroupHasId, IUserGroupRelationHasId, IUserHasId,
+  IUserGroup,
+  IUserGroupHasId,
+  IUserGroupRelationHasId,
+  IUserHasId,
+  Ref,
 } from '@growi/core';
 
-
 export type UserGroupResult = {
-  userGroup: IUserGroupHasId,
-}
-
-export type UserGroupListResult<TUSERGROUP extends IUserGroupHasId = IUserGroupHasId> = {
-  userGroups: TUSERGROUP[],
+  userGroup: IUserGroupHasId;
 };
 
-export type ChildUserGroupListResult<TUSERGROUP extends IUserGroupHasId = IUserGroupHasId> = {
-  childUserGroups: TUSERGROUP[],
-  grandChildUserGroups: TUSERGROUP[],
+export type UserGroupListResult<
+  TUSERGROUP extends IUserGroupHasId = IUserGroupHasId,
+> = {
+  userGroups: TUSERGROUP[];
 };
 
-export type UserGroupRelationListResult<TUSERGROUPRELATION extends IUserGroupRelationHasId = IUserGroupRelationHasId> = {
-  userGroupRelations: TUSERGROUPRELATION[],
+export type ChildUserGroupListResult<
+  TUSERGROUP extends IUserGroupHasId = IUserGroupHasId,
+> = {
+  childUserGroups: TUSERGROUP[];
+  grandChildUserGroups: TUSERGROUP[];
 };
 
-export type IUserGroupRelationHasIdPopulatedUser<TUSERGROUP extends IUserGroup = IUserGroup> = {
-  relatedGroup: Ref<TUSERGROUP>,
-  relatedUser: IUserHasId,
-  createdAt: Date,
+export type UserGroupRelationListResult<
+  TUSERGROUPRELATION extends IUserGroupRelationHasId = IUserGroupRelationHasId,
+> = {
+  userGroupRelations: TUSERGROUPRELATION[];
+};
+
+export type IUserGroupRelationHasIdPopulatedUser<
+  TUSERGROUP extends IUserGroup = IUserGroup,
+> = {
+  relatedGroup: Ref<TUSERGROUP>;
+  relatedUser: IUserHasId;
+  createdAt: Date;
 } & HasObjectId;
 
 export type UserGroupRelationsResult = {
-  userGroupRelations: IUserGroupRelationHasIdPopulatedUser[],
+  userGroupRelations: IUserGroupRelationHasIdPopulatedUser[];
 };
 
 export type UserGroupPagesResult = {
-  pages: IPageHasId[],
-}
+  pages: IPageHasId[];
+};
 
 export type SelectableParentUserGroupsResult = {
-  selectableParentGroups: IUserGroupHasId[],
-}
+  selectableParentGroups: IUserGroupHasId[];
+};
 
 export type SelectableUserChildGroupsResult = {
-  selectableChildGroups: IUserGroupHasId[],
-}
+  selectableChildGroups: IUserGroupHasId[];
+};
 
 export type AncestorUserGroupsResult = {
-  ancestorUserGroups: IUserGroupHasId[],
-}
+  ancestorUserGroups: IUserGroupHasId[];
+};

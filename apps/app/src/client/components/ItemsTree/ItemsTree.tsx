@@ -1,17 +1,14 @@
-import React, {
-  useEffect, useMemo, useCallback,
-} from 'react';
+import React, { useEffect, useCallback, type JSX } from 'react';
 
 import path from 'path';
 
-import type { Nullable, IPageHasId, IPageToDeleteWithMeta } from '@growi/core';
+import type { IPageToDeleteWithMeta } from '@growi/core';
 import { useGlobalSocket } from '@growi/core/dist/swr';
 import { useTranslation } from 'next-i18next';
 import { useRouter } from 'next/router';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import type { IPageForItem } from '~/interfaces/page';
-import type { AncestorsChildrenResult, RootPageResult, TargetAndAncestors } from '~/interfaces/page-listing-results';
 import type { OnDuplicatedFunction, OnDeletedFunction } from '~/interfaces/ui';
 import type { UpdateDescCountData, UpdateDescCountRawData } from '~/interfaces/websocket';
 import { SocketEventName } from '~/interfaces/websocket';
@@ -19,7 +16,7 @@ import type { IPageForPageDuplicateModal } from '~/stores/modal';
 import { usePageDuplicateModal, usePageDeleteModal } from '~/stores/modal';
 import { mutateAllPageInfo, useCurrentPagePath, useSWRMUTxCurrentPage } from '~/stores/page';
 import {
-  useSWRxPageAncestorsChildren, useSWRxRootPage, mutatePageTree, mutatePageList,
+  useSWRxRootPage, mutatePageTree, mutatePageList,
 } from '~/stores/page-listing';
 import { mutateSearching } from '~/stores/search';
 import { usePageTreeDescCountMap } from '~/stores/ui';
@@ -35,66 +32,12 @@ const moduleClass = styles['items-tree'] ?? '';
 
 const logger = loggerFactory('growi:cli:ItemsTree');
 
-/*
- * Utility to generate initial node
- */
-const generateInitialNodeBeforeResponse = (targetAndAncestors: Partial<IPageHasId>[]): ItemNode => {
-  const nodes = targetAndAncestors.map((page): ItemNode => {
-    return new ItemNode(page, []);
-  });
-
-  // update children for each node
-  const rootNode = nodes.reduce((child, parent) => {
-    parent.children = [child];
-    return parent;
-  });
-
-  return rootNode;
-};
-
-const generateInitialNodeAfterResponse = (ancestorsChildren: Record<string, Partial<IPageHasId>[]>, rootNode: ItemNode): ItemNode => {
-  const paths = Object.keys(ancestorsChildren);
-
-  let currentNode = rootNode;
-  paths.every((path) => {
-    // stop rendering when non-migrated pages found
-    if (currentNode == null) {
-      return false;
-    }
-
-    const childPages = ancestorsChildren[path];
-    currentNode.children = ItemNode.generateNodesFromPages(childPages);
-    const nextNode = currentNode.children.filter((node) => {
-      return paths.includes(node.page.path as string);
-    })[0];
-    currentNode = nextNode;
-    return true;
-  });
-
-  return rootNode;
-};
-
-// user defined typeguard to assert the arg is not null
-type RenderingCondition = {
-  ancestorsChildrenResult: AncestorsChildrenResult | undefined,
-  rootPageResult: RootPageResult | undefined,
-}
-type SecondStageRenderingCondition = {
-  ancestorsChildrenResult: AncestorsChildrenResult,
-  rootPageResult: RootPageResult,
-}
-const isSecondStageRenderingCondition = (condition: RenderingCondition|SecondStageRenderingCondition): condition is SecondStageRenderingCondition => {
-  return condition.ancestorsChildrenResult != null && condition.rootPageResult != null;
-};
-
-
 type ItemsTreeProps = {
   isEnableActions: boolean
   isReadOnlyUser: boolean
   isWipPageShown?: boolean
   targetPath: string
-  targetPathOrId?: Nullable<string>
-  targetAndAncestorsData?: TargetAndAncestors
+  targetPathOrId?: string,
   CustomTreeItem: React.FunctionComponent<TreeItemProps>
   onClickTreeItem?: (page: IPageForItem) => void;
 }
@@ -104,14 +47,13 @@ type ItemsTreeProps = {
  */
 export const ItemsTree = (props: ItemsTreeProps): JSX.Element => {
   const {
-    targetPath, targetPathOrId, targetAndAncestorsData, isEnableActions, isReadOnlyUser, isWipPageShown, CustomTreeItem, onClickTreeItem,
+    targetPath, targetPathOrId, isEnableActions, isReadOnlyUser, isWipPageShown, CustomTreeItem, onClickTreeItem,
   } = props;
 
   const { t } = useTranslation();
   const router = useRouter();
 
-  const { data: ancestorsChildrenResult, error: error1 } = useSWRxPageAncestorsChildren(targetPath, { suspense: true });
-  const { data: rootPageResult, error: error2 } = useSWRxRootPage({ suspense: true });
+  const { data: rootPageResult, error } = useSWRxRootPage({ suspense: true });
   const { data: currentPagePath } = useCurrentPagePath();
   const { open: openDuplicateModal } = usePageDuplicateModal();
   const { open: openDeleteModal } = usePageDeleteModal();
@@ -121,14 +63,6 @@ export const ItemsTree = (props: ItemsTreeProps): JSX.Element => {
 
   // for mutation
   const { trigger: mutateCurrentPage } = useSWRMUTxCurrentPage();
-
-
-  const renderingCondition = useMemo(() => {
-    return {
-      ancestorsChildrenResult,
-      rootPageResult,
-    };
-  }, [ancestorsChildrenResult, rootPageResult]);
 
   useEffect(() => {
     if (socket == null) {
@@ -197,34 +131,18 @@ export const ItemsTree = (props: ItemsTreeProps): JSX.Element => {
   }, [currentPagePath, mutateCurrentPage, openDeleteModal, router, t]);
 
 
-  if (error1 != null || error2 != null) {
-    // TODO: improve message
-    toastError('Error occurred while fetching pages to render PageTree');
+  if (error != null) {
+    toastError(t('pagetree.error_retrieving_the_pagetree'));
     return <></>;
   }
 
-  let initialItemNode;
-  /*
-   * Render second stage
-   */
-  if (isSecondStageRenderingCondition(renderingCondition)) {
-    initialItemNode = generateInitialNodeAfterResponse(
-      renderingCondition.ancestorsChildrenResult.ancestorsChildren,
-      new ItemNode(renderingCondition.rootPageResult.rootPage),
-    );
-  }
-  /*
-   * Before swr response comes back
-   */
-  else if (targetAndAncestorsData != null) {
-    initialItemNode = generateInitialNodeBeforeResponse(targetAndAncestorsData.targetAndAncestors);
-  }
-
+  const initialItemNode = rootPageResult ? new ItemNode(rootPageResult.rootPage) : null;
   if (initialItemNode != null) {
     return (
       <ul className={`${moduleClass} list-group`}>
         <CustomTreeItem
           key={initialItemNode.page.path}
+          targetPath={targetPath}
           targetPathOrId={targetPathOrId}
           itemNode={initialItemNode}
           isOpen

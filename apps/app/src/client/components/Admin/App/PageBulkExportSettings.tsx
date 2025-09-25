@@ -1,5 +1,5 @@
 import {
-  useState, useCallback, useEffect,
+  useState, useCallback, useEffect, type JSX,
 } from 'react';
 
 import { LoadingSpinner } from '@growi/ui/dist/components';
@@ -30,7 +30,7 @@ const PageBulkExportSettings = (): JSX.Element => {
         isBulkExportPagesEnabled,
         bulkExportDownloadExpirationSeconds,
       });
-      toastSuccess(t('commons:toaster.update_successed', { target: t('app_setting.questionnaire_settings') }));
+      toastSuccess(t('commons:toaster.update_successed', { target: t('app_setting.page_bulk_export_settings') }));
     }
     catch (err) {
       toastError(err);

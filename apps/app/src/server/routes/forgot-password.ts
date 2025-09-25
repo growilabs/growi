@@ -15,7 +15,7 @@ const logger = loggerFactory('growi:routes:forgot-password');
 export const checkForgotPasswordEnabledMiddlewareFactory = (crowi: any, forApi = false) => {
 
   return (req: Request, res: Response, next: NextFunction): void => {
-    const isPasswordResetEnabled = crowi.configManager.getConfig('crowi', 'security:passport-local:isPasswordResetEnabled') as boolean | null;
+    const isPasswordResetEnabled = crowi.configManager.getConfig('security:passport-local:isPasswordResetEnabled');
     const isLocalStrategySetup = crowi.passportService.isLocalStrategySetup as boolean ?? false;
 
     const isEnabled = isLocalStrategySetup && isPasswordResetEnabled;

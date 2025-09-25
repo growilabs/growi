@@ -1,4 +1,6 @@
-import { memo, useCallback, useMemo } from 'react';
+import {
+  memo, useCallback, useMemo, type JSX,
+} from 'react';
 
 import {
   useCollapsedContentsOpened, usePreferCollapsedMode, useDrawerOpened, useSidebarMode,

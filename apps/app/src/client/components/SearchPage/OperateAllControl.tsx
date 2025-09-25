@@ -1,4 +1,4 @@
-import type { ChangeEvent, ForwardRefRenderFunction } from 'react';
+import type { ChangeEvent, ForwardRefRenderFunction, JSX } from 'react';
 import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 
 import { Input } from 'reactstrap';

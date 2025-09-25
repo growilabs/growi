@@ -12,6 +12,27 @@ type CrowiReq = ReqWithUserRegistrationOrder & {
   crowi: Crowi,
 }
 
+/**
+ * @swagger
+ *
+ * /user-activation/{token}:
+ *   get:
+ *     summary: /user-activation/{token}
+ *     tags: [Users]
+ *     parameters:
+ *       - name: token
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User activation successful
+ *         content:
+ *           text/html:
+ *             schema:
+ *               type: string
+ */
 export const renderUserActivationPage = (crowi: Crowi) => {
   return (req: CrowiReq, res: Response): void => {
     const { userRegistrationOrder } = req;

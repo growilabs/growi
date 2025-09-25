@@ -27,7 +27,7 @@ const SmtpSetting = (props: Props) => {
             <input
               className="form-control"
               type="text"
-              defaultValue={adminAppContainer.state.smtpHost || ''}
+              value={adminAppContainer.state.smtpHost || ''}
               onChange={(e) => { adminAppContainer.changeSmtpHost(e.target.value) }}
             />
           </div>
@@ -40,7 +40,7 @@ const SmtpSetting = (props: Props) => {
           <div className="col-md-6">
             <input
               className="form-control"
-              defaultValue={adminAppContainer.state.smtpPort || ''}
+              value={adminAppContainer.state.smtpPort || ''}
               onChange={(e) => { adminAppContainer.changeSmtpPort(e.target.value) }}
             />
           </div>
@@ -54,7 +54,7 @@ const SmtpSetting = (props: Props) => {
             <input
               className="form-control"
               type="text"
-              defaultValue={adminAppContainer.state.smtpUser || ''}
+              value={adminAppContainer.state.smtpUser || ''}
               onChange={(e) => { adminAppContainer.changeSmtpUser(e.target.value) }}
             />
           </div>
@@ -68,7 +68,7 @@ const SmtpSetting = (props: Props) => {
             <input
               className="form-control"
               type="password"
-              defaultValue={adminAppContainer.state.smtpPassword || ''}
+              value={adminAppContainer.state.smtpPassword || ''}
               onChange={(e) => { adminAppContainer.changeSmtpPassword(e.target.value) }}
             />
           </div>

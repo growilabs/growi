@@ -18,6 +18,7 @@ import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
 
 import { apiGet } from '~/client/util/apiv1-client';
 import { apiv3Get } from '~/client/util/apiv3-client';
+import type { IPagePathWithDescendantCount } from '~/interfaces/page';
 import type { IRecordApplicableGrant, IResCurrentGrantData } from '~/interfaces/page-grant';
 import {
   useCurrentPathname, useShareLinkId, useIsGuestUser, useIsReadOnlyUser,
@@ -54,14 +55,14 @@ export const useTemplateBodyData = (initialData?: string): SWRResponse<string, E
 };
 
 /** "useSWRxCurrentPage" is intended for initial data retrieval only. Use "useSWRMUTxCurrentPage" for revalidation */
-export const useSWRxCurrentPage = (initialData?: IPagePopulatedToShowRevision|null): SWRResponse<IPagePopulatedToShowRevision|null> => {
+export const useSWRxCurrentPage = (initialData?: IPagePopulatedToShowRevision | null): SWRResponse<IPagePopulatedToShowRevision | null> => {
   const key = 'currentPage';
 
   const { data: isLatestRevision } = useIsLatestRevision();
 
   const { cache } = useSWRConfig();
 
-  // Problem 1: https://github.com/weseek/growi/pull/7772/files#diff-4c1708c4f959974166c15435c6b35950ba01bbf35e7e4b8e99efeb125a8000a7
+  // Problem 1: https://github.com/growilabs/growi/pull/7772/files#diff-4c1708c4f959974166c15435c6b35950ba01bbf35e7e4b8e99efeb125a8000a7
   // Problem 2: https://redmine.weseek.co.jp/issues/141027
   // Problem 3: https://redmine.weseek.co.jp/issues/153618
   // Problem 4: https://redmine.weseek.co.jp/issues/153759
@@ -75,7 +76,7 @@ export const useSWRxCurrentPage = (initialData?: IPagePopulatedToShowRevision|nu
       return true;
     }
 
-    const cachedData = cache.get(key)?.data as IPagePopulatedToShowRevision|null;
+    const cachedData = cache.get(key)?.data as IPagePopulatedToShowRevision | null;
     if (initialData._id !== cachedData?._id) {
       return true;
     }
@@ -87,8 +88,8 @@ export const useSWRxCurrentPage = (initialData?: IPagePopulatedToShowRevision|nu
 
     // mutate when opening a previous revision.
     if (!isLatestRevision
-        && cachedData.revision?._id != null && initialData.revision?._id != null
-        && cachedData.revision._id !== initialData.revision._id
+      && cachedData.revision?._id != null && initialData.revision?._id != null
+      && cachedData.revision._id !== initialData.revision._id
     ) {
       return true;
     }
@@ -122,14 +123,14 @@ const getPageApiErrorHandler = (errs: AxiosResponse[]) => {
   throw Error('failed to get page');
 };
 
-export const useSWRMUTxCurrentPage = (): SWRMutationResponse<IPagePopulatedToShowRevision|null> => {
+export const useSWRMUTxCurrentPage = (): SWRMutationResponse<IPagePopulatedToShowRevision | null> => {
   const key = 'currentPage';
 
   const { data: currentPageId } = useCurrentPageId();
   const { data: shareLinkId } = useShareLinkId();
 
   // Get URL parameter for specific revisionId
-  let revisionId: string|undefined;
+  let revisionId: string | undefined;
   if (isClient()) {
     const urlParams = new URLSearchParams(window.location.search);
     const requestRevisionId = urlParams.get('revisionId');
@@ -155,7 +156,7 @@ export const useSWRMUTxCurrentPage = (): SWRMutationResponse<IPagePopulatedToSho
   );
 };
 
-export const useSWRxPageByPath = (path?: string, config?: SWRConfiguration): SWRResponse<IPagePopulatedToShowRevision|null, Error> => {
+export const useSWRxPageByPath = (path?: string, config?: SWRConfiguration): SWRResponse<IPagePopulatedToShowRevision | null, Error> => {
   return useSWR(
     path != null ? ['/page', path] : null,
     ([endpoint, path]) => apiv3Get<{ page: IPagePopulatedToShowRevision }>(endpoint, { path })
@@ -212,7 +213,7 @@ export const useSWRxPageInfo = (
 
   const swrResult = useSWRImmutable(
     key,
-    ([endpoint, pageId, shareLinkId]: [string, string, string|null]) => apiv3Get(endpoint, { pageId, shareLinkId }).then(response => response.data),
+    ([endpoint, pageId, shareLinkId]: [string, string, string | null]) => apiv3Get(endpoint, { pageId, shareLinkId }).then(response => response.data),
     { fallbackData: initialData },
   );
 
@@ -246,7 +247,7 @@ export const useSWRMUTxPageInfo = (
 
   return useSWRMutation(
     key,
-    ([endpoint, pageId, shareLinkId]: [string, string, string|null]) => apiv3Get(endpoint, { pageId, shareLinkId }).then(response => response.data),
+    ([endpoint, pageId, shareLinkId]: [string, string, string | null]) => apiv3Get(endpoint, { pageId, shareLinkId }).then(response => response.data),
   );
 };
 
@@ -360,5 +361,19 @@ export const useIsRevisionOutdated = (): SWRResponse<boolean, Error> => {
   return useSWRImmutable(
     currentRevisionId != null && remoteRevisionId != null ? ['useIsRevisionOutdated', currentRevisionId, remoteRevisionId] : null,
     ([, remoteRevisionId, currentRevisionId]) => { return remoteRevisionId !== currentRevisionId },
+  );
+};
+
+
+export const useSWRxPagePathsWithDescendantCount = (
+    paths?: string[], userGroups?: string[], isIncludeEmpty?: boolean, includeAnyoneWithTheLink?: boolean,
+): SWRResponse<IPagePathWithDescendantCount[], Error> => {
+  return useSWR(
+    (paths != null && paths.length !== 0) ? ['/page/page-paths-with-descendant-count', paths, userGroups, isIncludeEmpty, includeAnyoneWithTheLink] : null,
+    ([endpoint, paths, userGroups, isIncludeEmpty, includeAnyoneWithTheLink]) => apiv3Get(
+      endpoint, {
+        paths, userGroups, isIncludeEmpty, includeAnyoneWithTheLink,
+      },
+    ).then(result => result.data.pagePathsWithDescendantCount),
   );
 };

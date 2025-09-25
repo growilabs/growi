@@ -1,8 +1,11 @@
 import { markdownSectionBlock } from '@growi/slack/dist/utils/block-kit-builder';
 import { reshapeContentsBody } from '@growi/slack/dist/utils/reshape-contents-body';
 
+import Crowi from '~/server/crowi';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
+
+import { growiInfoService } from '../growi-info';
 
 // eslint-disable-next-line no-unused-vars
 const logger = loggerFactory('growi:service:CreatePageService');
@@ -12,6 +15,10 @@ const mongoose = require('mongoose');
 
 class CreatePageService {
 
+  /** @type {import('~/server/crowi').default} Crowi instance */
+  crowi;
+
+  /** @param {import('~/server/crowi').default} crowi Crowi instance */
   constructor(crowi) {
     this.crowi = crowi;
   }
@@ -29,7 +36,7 @@ class CreatePageService {
     const page = await this.crowi.pageService.create(normalizedPath, reshapedContentsBody, userOrDummyUser, {});
 
     // Send a message when page creation is complete
-    const growiUri = this.crowi.appService.getSiteUrl();
+    const growiUri = growiInfoService.getSiteUrl();
     await respondUtil.respond({
       text: 'Page has been created',
       blocks: [

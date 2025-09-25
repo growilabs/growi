@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, DetailedHTMLProps } from 'react';
+import type { ButtonHTMLAttributes, DetailedHTMLProps, JSX } from 'react';
 
 import { Hexagon } from './Hexagon';
 

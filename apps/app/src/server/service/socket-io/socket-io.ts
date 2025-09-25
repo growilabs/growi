@@ -177,7 +177,7 @@ export class SocketIoService {
 
       logger.debug('Current count of clients for \'/admin\':', clientsCount);
 
-      const limit = configManager.getConfig('crowi', 's2cMessagingPubsub:connectionsLimitForAdmin');
+      const limit = configManager.getConfig('s2cMessagingPubsub:connectionsLimitForAdmin');
       if (limit <= clientsCount) {
         const msg = `The connection was refused because the current count of clients for '/admin' is ${clientsCount} and exceeds the limit`;
         logger.warn(msg);
@@ -196,7 +196,7 @@ export class SocketIoService {
 
       logger.debug('Current count of clients for guests:', clientsCount);
 
-      const limit = configManager.getConfig('crowi', 's2cMessagingPubsub:connectionsLimitForGuest');
+      const limit = configManager.getConfig('s2cMessagingPubsub:connectionsLimitForGuest');
       if (limit <= clientsCount) {
         const msg = `The connection was refused because the current count of clients for guests is ${clientsCount} and exceeds the limit`;
         logger.warn(msg);
@@ -223,7 +223,7 @@ export class SocketIoService {
 
     logger.debug('Current count of clients for \'/\':', clientsCount);
 
-    const limit = configManager.getConfig('crowi', 's2cMessagingPubsub:connectionsLimit');
+    const limit = configManager.getConfig('s2cMessagingPubsub:connectionsLimit');
     if (limit <= clientsCount) {
       const msg = `The connection was refused because the current count of clients for '/' is ${clientsCount} and exceeds the limit`;
       logger.warn(msg);

@@ -7,7 +7,7 @@ module "codebuild" {
   artifact_type       = "NO_ARTIFACTS"
 
   source_type         = "GITHUB"
-  source_location     = "https://github.com/weseek/growi.git"
+  source_location     = "https://github.com/growilabs/growi.git"
   source_version      = "refs/heads/master"
   git_clone_depth     = 1
 

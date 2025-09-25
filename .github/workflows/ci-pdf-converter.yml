@@ -1,0 +1,168 @@
+name: Node CI for pdf-converter
+
+on:
+  push:
+    branches-ignore:
+      - release/**
+      - rc/**
+      - support/prepare-v**
+    paths:
+      - .github/mergify.yml
+      - .github/workflows/ci-pdf-converter.yml
+      - .eslint*
+      - tsconfig.base.json
+      - turbo.json
+      - pnpm-lock.yaml
+      - package.json
+      - apps/pdf-converter/**
+      - '!apps/pdf-converter/docker/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
+jobs:
+
+  ci-pdf-converter-lint:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: pnpm/action-setup@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: |
+        pnpm add turbo --global
+        pnpm install --frozen-lockfile
+
+    - name: Lint
+      run: |
+        turbo run lint --filter=@growi/pdf-converter
+
+    - name: Slack Notification
+      uses: weseek/ghaction-slack-notification@master
+      if: failure()
+      with:
+        type: ${{ job.status }}
+        job_name: '*Node CI for growi-pdf-converter - test (${{ matrix.node-version }})*'
+        channel: '#ci'
+        isCompactMode: true
+        url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  ci-pdf-converter-launch-dev:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: pnpm/action-setup@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: |
+        pnpm add turbo --global
+        pnpm install --frozen-lockfile
+
+    - name: turbo run dev:pdf-converter:ci
+      working-directory: ./apps/pdf-converter
+      run: turbo run dev:pdf-converter:ci
+
+    - name: Slack Notification
+      uses: weseek/ghaction-slack-notification@master
+      if: failure()
+      with:
+        type: ${{ job.status }}
+        job_name: '*Node CI for growi-pdf-converter - launch-dev (${{ matrix.node-version }})*'
+        channel: '#ci'
+        isCompactMode: true
+        url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  ci-pdf-converter-launch-prod:
+
+    if: startsWith(github.head_ref, 'mergify/merge-queue/')
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: pnpm/action-setup@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'pnpm'
+
+    - name: Install turbo
+      run: |
+        pnpm add turbo --global
+
+    - name: Install dependencies
+      run: |
+        pnpm install --frozen-lockfile
+
+    - name: Restore dist
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          **/.turbo
+          **/dist
+        key: dist-pdf-converter-prod-${{ runner.OS }}-node${{ matrix.node-version }}-${{ github.sha }}
+        restore-keys: |
+          dist-pdf-converter-prod-${{ runner.OS }}-node${{ matrix.node-version }}-
+
+    - name: Build
+      working-directory: ./apps/pdf-converter
+      run: |
+        turbo run build
+
+    - name: Assembling all dependencies
+      run: |
+        rm -rf out
+        pnpm deploy out --prod --filter @growi/pdf-converter
+        rm -rf apps/pdf-converter/node_modules && mv out/node_modules apps/pdf-converter/node_modules
+
+    - name: pnpm run start:prod:ci
+      working-directory: ./apps/pdf-converter
+      run: pnpm run start:prod:ci
+
+    - name: Slack Notification
+      uses: weseek/ghaction-slack-notification@master
+      if: failure()
+      with:
+        type: ${{ job.status }}
+        job_name: '*Node CI for growi-pdf-converter - launch-prod (${{ matrix.node-version }})*'
+        channel: '#ci'
+        isCompactMode: true
+        url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: Cache dist
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          **/.turbo
+          **/dist
+        key: dist-pdf-converter-prod-${{ runner.OS }}-node${{ matrix.node-version }}-${{ github.sha }}

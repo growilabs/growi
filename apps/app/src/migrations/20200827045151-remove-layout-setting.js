@@ -42,10 +42,9 @@ module.exports = {
     await mongoose.connect(getMongoUri(), mongoOptions);
 
     const theme = await Config.findOne({ key: 'customize:theme' });
-    const insertLayoutType = (theme.value === '"kibela"') ? 'kibela' : 'growi';
+    const insertLayoutType = theme.value === '"kibela"' ? 'kibela' : 'growi';
 
     const insertConfig = new Config({
-      ns: 'crowi',
       key: 'customize:layout',
       value: JSON.stringify(insertLayoutType),
     });

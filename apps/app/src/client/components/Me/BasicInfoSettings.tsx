@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import { useTranslation, i18n } from 'next-i18next';
 

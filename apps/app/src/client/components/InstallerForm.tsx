@@ -1,4 +1,4 @@
-import type { FormEventHandler } from 'react';
+import type { FormEventHandler, JSX } from 'react';
 import { memo, useCallback, useState } from 'react';
 
 import { Lang, AllLang } from '@growi/core';

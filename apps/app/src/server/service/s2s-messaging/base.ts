@@ -1,8 +1,9 @@
+import crypto from 'crypto';
+
+import type S2sMessage from '~/server/models/vo/s2s-message';
 import loggerFactory from '~/utils/logger';
 
-import S2sMessage from '~/server/models/vo/s2s-message';
-
-import { S2sMessageHandlable } from './handlable';
+import type { S2sMessageHandlable } from './handlable';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const logger = loggerFactory('growi:service:s2s-messaging:base');
@@ -48,7 +49,7 @@ export abstract class AbstractS2sMessagingService implements S2sMessagingService
   handlableList: S2sMessageHandlable[];
 
   constructor(uri: string) {
-    this.uid = Math.floor(Math.random() * 100000);
+    this.uid = crypto.randomInt(100000);
     this.uri = uri;
 
     if (uri == null) {

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, type JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
 import { PrismAsyncLight } from 'react-syntax-highlighter';
@@ -50,7 +50,7 @@ const CustomizeNoscriptSetting = (props: Props): JSX.Element => {
               className="form-control mb-2"
               name="customizeNoscript"
               rows={8}
-              defaultValue={adminCustomizeContainer.state.currentCustomizeNoscript || ''}
+              value={adminCustomizeContainer.state.currentCustomizeNoscript || ''}
               onChange={(e) => { adminCustomizeContainer.changeCustomizeNoscript(e.target.value) }}
             />
           </div>

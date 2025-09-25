@@ -4,4 +4,4 @@ export const SlackbotType = {
   CUSTOM_WITH_PROXY: 'customBotWithProxy',
 } as const;
 
-export type SlackbotType = typeof SlackbotType[keyof typeof SlackbotType]
+export type SlackbotType = (typeof SlackbotType)[keyof typeof SlackbotType];

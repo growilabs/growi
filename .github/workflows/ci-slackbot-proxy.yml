@@ -59,7 +59,7 @@ jobs:
 
     - name: Lint
       run: |
-        turbo run lint --filter=@growi/slackbot-proxy
+        turbo run lint --filter=@growi/slackbot-proxy --filter=@growi/slack
 
     - name: Slack Notification
       uses: weseek/ghaction-slack-notification@master

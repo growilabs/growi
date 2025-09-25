@@ -1,5 +1,6 @@
-import type { IExternalAuthProviderType } from '@growi/core';
 import mongoose from 'mongoose';
+
+import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 
 interface AggregateResult {
   count: number;

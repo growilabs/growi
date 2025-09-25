@@ -1,5 +1,4 @@
 import type { IPageToDeleteWithMeta } from '@growi/core';
-import type { Nullable } from 'vitest';
 
 import type { IPageForItem } from '~/interfaces/page';
 import type { IPageForPageDuplicateModal } from '~/stores/modal';
@@ -23,7 +22,8 @@ export type TreeItemToolProps = TreeItemBaseProps & {
 };
 
 export type TreeItemProps = TreeItemBaseProps & {
-  targetPathOrId?: Nullable<string>,
+  targetPath: string,
+  targetPathOrId?:string,
   isOpen?: boolean,
   isWipPageShown?: boolean,
   itemClass?: React.FunctionComponent<TreeItemProps>,

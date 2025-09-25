@@ -8,20 +8,19 @@ import lsxRoutes from '@growi/remark-lsx/dist/server/index.cjs';
 import mongoose from 'mongoose';
 import next from 'next';
 
-import pkg from '^/package.json';
-
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron';
+import { initializeOpenaiService } from '~/features/openai/server/services/openai';
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
 import instanciatePageBulkExportJobCleanUpCronService, {
   pageBulkExportJobCleanUpCronService,
 } from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
-import QuestionnaireService from '~/features/questionnaire/server/service/questionnaire';
-import questionnaireCronService from '~/features/questionnaire/server/service/questionnaire-cron';
+import { startCron as startAccessTokenCron } from '~/server/service/access-token';
+import { projectRoot } from '~/server/util/project-dir-utils';
+import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
-import { projectRoot } from '~/utils/project-dir-utils';
 
 import UserEvent from '../events/user';
 import { accessTokenParser } from '../middlewares/access-token-parser';
@@ -33,7 +32,7 @@ import instanciateExportService from '../service/export';
 import instanciateExternalAccountService from '../service/external-account';
 import { FileUploader, getUploader } from '../service/file-uploader'; // eslint-disable-line no-unused-vars
 import { G2GTransferPusherService, G2GTransferReceiverService } from '../service/g2g-transfer';
-import GrowiBridgeService from '../service/growi-bridge';
+import { GrowiBridgeService } from '../service/growi-bridge';
 import { initializeImportService } from '../service/import';
 import { InstallerService } from '../service/installer';
 import { normalizeData } from '../service/normalize-data';
@@ -61,27 +60,60 @@ class Crowi {
 
   /**
    * For retrieving other packages
-   * @type {(req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => Promise<void>}
+   * @type {import('~/server/middlewares/access-token-parser').AccessTokenParser}
    */
   accessTokenParser;
+
+  /** @type {ReturnType<typeof next>} */
+  nextApp;
+
+  /** @type {import('../service/config-manager').IConfigManagerForApp} */
+  configManager;
+
+  /** @type {import('../service/acl').AclService} */
+  aclService;
 
   /** @type {AppService} */
   appService;
 
+  /** @type {FileUploader} */
+  fileUploadService;
+
+  /** @type {import('../service/growi-info').GrowiInfoService} */
+  growiInfoService;
+
+  /** @type {import('../service/growi-bridge').GrowiBridgeService} */
+  growiBridgeService;
+
   /** @type {import('../service/page').IPageService} */
   pageService;
 
-  /** @type UserNotificationService */
-  userNotificationService;
+  /** @type {import('../service/page-grant').default} */
+  pageGrantService;
 
-  /** @type {FileUploader} */
-  fileUploadService;
+  /** @type {import('../service/page-operation').default} */
+  pageOperationService;
+
+  /** @type {PassportService} */
+  passportService;
+
+  /** @type {import('../service/rest-qiita-API')} */
+  restQiitaAPIService;
+
+  /** @type {SearchService} */
+  searchService;
+
+  /** @type {SlackIntegrationService} */
+  slackIntegrationService;
 
   /** @type {SocketIoService} */
   socketIoService;
 
+  /** @type UserNotificationService */
+  userNotificationService;
+
   constructor() {
-    this.version = pkg.version;
+    this.version = getGrowiVersion();
 
     this.publicDir = path.join(projectRoot, 'public') + sep;
     this.resourceDir = path.join(projectRoot, 'resource') + sep;
@@ -105,8 +137,6 @@ class Crowi {
     this.aclService = null;
     this.appService = null;
     this.fileUploadService = null;
-    this.restQiitaAPIService = null;
-    this.growiBridgeService = null;
     this.pluginService = null;
     this.searchService = null;
     this.socketIoService = null;
@@ -115,7 +145,6 @@ class Crowi {
     this.inAppNotificationService = null;
     this.activityService = null;
     this.commentService = null;
-    this.questionnaireService = null;
     this.openaiThreadDeletionCronService = null;
     this.openaiVectorStoreFileDeletionCronService = null;
 
@@ -146,7 +175,6 @@ Crowi.prototype.init = async function() {
   this.models = await setupModelsDependentOnCrowi(this);
   await this.setupConfigManager();
   await this.setupSessionConfig();
-  this.setupCron();
 
   // setup messaging services
   await this.setupS2sMessagingService();
@@ -161,6 +189,7 @@ Crowi.prototype.init = async function() {
   ]);
 
   await Promise.all([
+    this.setupGrowiInfoService(),
     this.setupPassport(),
     this.setupSearcher(),
     this.setupMailer(),
@@ -180,7 +209,6 @@ Crowi.prototype.init = async function() {
     this.setupActivityService(),
     this.setupCommentService(),
     this.setupSyncPageStatusService(),
-    this.setupQuestionnaireService(),
     this.setUpCustomize(), // depends on pluginService
   ]);
 
@@ -191,7 +219,12 @@ Crowi.prototype.init = async function() {
     // depends on passport service
     this.setupExternalAccountService(),
     this.setupExternalUserGroupSyncService(),
+
+    // depends on AttachmentService
+    this.setupOpenaiService(),
   ]);
+
+  this.setupCron();
 
   await normalizeData();
 };
@@ -259,7 +292,7 @@ Crowi.prototype.setupDatabase = function() {
 
 Crowi.prototype.setupSessionConfig = async function() {
   const session = require('express-session');
-  const sessionMaxAge = this.configManager.getConfig('crowi', 'security:sessionMaxAge') || 2592000000; // default: 30days
+  const sessionMaxAge = this.configManager.getConfig('security:sessionMaxAge') || 2592000000; // default: 30days
   const redisUrl = this.env.REDISTOGO_URL || this.env.REDIS_URI || this.env.REDIS_URL || null;
   const uid = require('uid-safe').sync;
 
@@ -325,8 +358,6 @@ Crowi.prototype.setupSocketIoService = async function() {
 };
 
 Crowi.prototype.setupCron = function() {
-  questionnaireCronService.startCron();
-
   instanciatePageBulkExportJobCronService(this);
   checkPageBulkExportJobInProgressCronService.startCron();
 
@@ -334,10 +365,7 @@ Crowi.prototype.setupCron = function() {
   pageBulkExportJobCleanUpCronService.startCron();
 
   startOpenaiCronIfEnabled();
-};
-
-Crowi.prototype.setupQuestionnaireService = function() {
-  this.questionnaireService = new QuestionnaireService(this);
+  startAccessTokenCron();
 };
 
 Crowi.prototype.getSlack = function() {
@@ -354,10 +382,6 @@ Crowi.prototype.getGlobalNotificationService = function() {
 
 Crowi.prototype.getUserNotificationService = function() {
   return this.userNotificationService;
-};
-
-Crowi.prototype.getRestQiitaAPIService = function() {
-  return this.restQiitaAPIService;
 };
 
 Crowi.prototype.setupPassport = async function() {
@@ -404,8 +428,8 @@ Crowi.prototype.setupMailer = async function() {
 };
 
 Crowi.prototype.autoInstall = async function() {
-  const isInstalled = this.configManager.getConfig('crowi', 'app:installed');
-  const username = this.configManager.getConfig('crowi', 'autoInstall:adminUsername');
+  const isInstalled = this.configManager.getConfig('app:installed');
+  const username = this.configManager.getConfig('autoInstall:adminUsername');
 
   if (isInstalled || username == null) {
     return;
@@ -415,14 +439,14 @@ Crowi.prototype.autoInstall = async function() {
 
   const firstAdminUserToSave = {
     username,
-    name: this.configManager.getConfig('crowi', 'autoInstall:adminName'),
-    email: this.configManager.getConfig('crowi', 'autoInstall:adminEmail'),
-    password: this.configManager.getConfig('crowi', 'autoInstall:adminPassword'),
+    name: this.configManager.getConfig('autoInstall:adminName'),
+    email: this.configManager.getConfig('autoInstall:adminEmail'),
+    password: this.configManager.getConfig('autoInstall:adminPassword'),
     admin: true,
   };
-  const globalLang = this.configManager.getConfig('crowi', 'autoInstall:globalLang');
-  const allowGuestMode = this.configManager.getConfig('crowi', 'autoInstall:allowGuestMode');
-  const serverDate = this.configManager.getConfig('crowi', 'autoInstall:serverDate');
+  const globalLang = this.configManager.getConfig('autoInstall:globalLang');
+  const allowGuestMode = this.configManager.getConfig('autoInstall:allowGuestMode');
+  const serverDate = this.configManager.getConfig('autoInstall:serverDate');
 
   const installerService = new InstallerService(this);
 
@@ -620,7 +644,7 @@ Crowi.prototype.setUpApp = async function() {
     this.appService = new AppService(this);
 
     // add as a message handler
-    const isInstalled = this.configManager.getConfig('crowi', 'app:installed');
+    const isInstalled = this.configManager.getConfig('app:installed');
     if (this.s2sMessagingService != null && !isInstalled) {
       this.s2sMessagingService.addMessageHandler(this.appService);
     }
@@ -646,6 +670,11 @@ Crowi.prototype.setUpFileUploaderSwitchService = async function() {
   if (this.s2sMessagingService != null) {
     this.s2sMessagingService.addMessageHandler(this.fileUploaderSwitchService);
   }
+};
+
+Crowi.prototype.setupGrowiInfoService = async function() {
+  const { growiInfoService } = await import('../service/growi-info');
+  this.growiInfoService = growiInfoService;
 };
 
 /**
@@ -774,6 +803,10 @@ Crowi.prototype.setupExternalAccountService = function() {
 Crowi.prototype.setupExternalUserGroupSyncService = function() {
   this.ldapUserGroupSyncService = new LdapUserGroupSyncService(this.passportService, this.s2sMessagingService, this.socketIoService);
   this.keycloakUserGroupSyncService = new KeycloakUserGroupSyncService(this.s2sMessagingService, this.socketIoService);
+};
+
+Crowi.prototype.setupOpenaiService = function() {
+  initializeOpenaiService(this);
 };
 
 export default Crowi;

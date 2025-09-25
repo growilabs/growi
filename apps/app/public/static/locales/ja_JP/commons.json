@@ -32,7 +32,6 @@
   "headers": {
     "app_settings": "アプリ設定"
   },
-
   "header_search_box": {
     "label": {
       "All pages": "全てのページ",
@@ -43,20 +42,17 @@
       "This tree": "この階層下の子ページのみ"
     }
   },
-
   "search_method_menu_item": {
     "search_in_all": "全てのページ",
     "only_children_of_this_tree": "この階層下の子ページのみ",
     "exact_mutch": "キーワードに完全一致した文字を含むページのみ"
   },
-
   "share_links": {
     "Share Link": "共有用リンク",
     "Page Path": "ページパス",
     "expire": "有効期限",
     "description": "概要"
   },
-
   "in_app_notification": {
     "notification_list": "アプリ内通知一覧",
     "see_all": "通知一覧を見る",
@@ -67,7 +63,6 @@
     "no_unread_messages": "未読はありません",
     "only_unread": "未読のみ"
   },
-
   "personal_dropdown": {
     "home": "ホーム",
     "settings": "設定",
@@ -77,7 +72,6 @@
     "use_os_settings": "OS設定を利用する",
     "feedback": "ご意見・ご要望"
   },
-
   "create_page_dropdown": {
     "new_page": "新規ページ作成",
     "open_page_create_modal": "新規ページ作成モーダルを表示",
@@ -91,7 +85,6 @@
       "descendants": "下位層テンプレート"
     }
   },
-
   "copy_to_clipboard": {
     "Copy to clipboard": "クリップボードにコピー",
     "Page path": "ページ名",
@@ -101,14 +94,12 @@
     "Markdown link": "マークダウン形式のリンク",
     "Append params": "パラメータの追加"
   },
-
   "crop_image_modal": {
     "image_crop": "画像の切り抜き",
     "crop": "トリミング",
     "save": "保存",
     "cancel": "キャンセル"
   },
-
   "handsontable_modal": {
     "title": "テーブル編集",
     "data_import": "データインポート",
@@ -124,35 +115,9 @@
       "import": "インポート"
     }
   },
-
-  "questionnaire_modal": {
-    "required": "必須",
-    "submit": "送信",
-    "close": "閉じる",
-    "title": "GROWI サービス改善のためのアンケート",
-    "more_satisfied_services": "GROWI をご利用の皆さまに更にご満足いただけるよう",
-    "strive_to_improve_services": "皆さまからのご意見を参考にサービス改善に努めてまいります。",
-    "length_of_experience": {
-      "more_than_two_years": "2年以上",
-      "one_to_two_years": "1年以上2年未満",
-      "six_months_to_one_year": "6ヶ月以上1年未満",
-      "three_months_to_six_months": "3ヶ月以上6ヶ月未満",
-      "one_month_to_three_months": "1ヶ月以上3ヶ月未満",
-      "less_than_one_month": "1ヶ月未満"
-    },
-    "satisfaction_with_growi": "GROWI の満足度",
-    "history_of_growi_usage": "GROWI の利用歴",
-    "occupation": "職種",
-    "position": "役職",
-    "comment_on_growi": "GROWI へのコメント",
-    "successfully_submitted": "アンケートの送信が完了しました。",
-    "thanks_for_answering": "アンケートのご回答誠にありがとうございました。"
-  },
-
   "not_found_page": {
     "page_not_exist": "このページは存在しません。"
   },
-
   "g2g_data_transfer": {
     "tab": "データ移行",
     "data_transfer": "データ移行",
@@ -161,5 +126,98 @@
     "transfer_key_limit": "※ 移行キーの有効期限は発行から1時間となります。",
     "once_transfer_key_used": "※ 移行キーは一度移行に利用するとそれ以降はご利用いただけなくなります。",
     "transfer_to_growi_cloud": "※ 詳しくは <a href='{{documentationUrl}}ja/admin-guide/management-cookbook/g2g-transfer.html'> GROWI お引越し機能</a>をご確認ください。"
+  },
+
+  "accesstoken_scopes_desc": {
+    "read": {
+      "all": "全ての閲覧権限を付与できます。",
+      "admin": {
+        "all": "管理者機能の閲覧権限を付与できます。",
+        "top": "Wiki管理トップの閲覧権限を付与できます。",
+        "app": "アプリ設定の閲覧権限を付与できます。",
+        "security": "セキュリティ設定の閲覧権限を付与できます。",
+        "markdown": "マークダウン設定の閲覧権限を付与できます。",
+        "customize": "カスタマイズの閲覧権限を付与できます。",
+        "import_data": "データインポートの閲覧権限を付与できます。",
+        "export_data": "データアーカイブの閲覧権限を付与できます。",
+        "data_transfer": "データ移行の閲覧権限を付与できます。",
+        "external_notification": "外部ツールへの通知の閲覧権限を付与できます。",
+        "slack_integration": "Slack連携の閲覧権限を付与できます。",
+        "legacy_slack_integration": "Slack連携(レガシー)の閲覧権限を付与できます。",
+        "user_management": "ユーザー管理の閲覧権限を付与できます。",
+        "user_group_management": "ユーザーグループ管理の閲覧権限を付与できます。",
+        "audit_log": "監査ログの閲覧権限を付与できます。",
+        "plugin": "プラグインの閲覧権限を付与できます。",
+        "ai_integration": "AI連携設定の閲覧権限を付与できます。",
+        "full_text_search": "全文検索管理の閲覧権限を付与できます。"
+      },
+      "user_settings": {
+        "all": "ユーザー設定の閲覧権限を付与できます。",
+        "info": "ユーザー情報の閲覧権限を付与できます。",
+        "external_account": "外部アカウントの閲覧権限を付与できます。",
+        "password": "パスワード設定の閲覧権限を付与できます。",
+        "api": {
+          "all": "API 設定の閲覧権限を付与できます。",
+          "api_token": "API トークン設定の閲覧権限を付与できます。",
+          "access_token": "アクセストークン設定の閲覧権限を付与できます。"
+        },
+        "in_app_notification": "アプリ内通知設定の閲覧権限を付与できます。",
+        "other": "その他設定の閲覧権限を付与できます。"
+      },
+      "features": {
+        "all": "機能の閲覧権限を付与できます。",
+        "ai_assistant": "AIアシスタント機能の閲覧権限を付与できます。",
+        "page": "ページ機能の閲覧権限を付与できます。",
+        "share_link": "共有リンク機能の閲覧権限を付与できます。",
+        "bookmark": "ブックマーク機能の閲覧権限を付与できます。",
+        "attachment": "添付ファイル機能の閲覧権限を付与できます。",
+        "page_bulk_export": "ページの一括エクスポート機能の閲覧権限を付与できます。"
+      }
+    },
+    "write": {
+      "all": "全ての編集権限を付与できます。",
+      "admin": {
+        "all": "管理者機能の編集権限を付与できます。",
+        "top": "Wiki管理トップの編集権限を付与できます。",
+        "app": "アプリ設定の編集権限を付与できます。",
+        "security": "セキュリティ設定の編集権限を付与できます。",
+        "markdown": "マークダウン設定の編集権限を付与できます。",
+        "customize": "カスタマイズの編集権限を付与できます。",
+        "import_data": "データインポートの編集権限を付与できます。",
+        "export_data": "データアーカイブの編集権限を付与できます。",
+        "data_transfer": "データ移行の編集権限を付与できます。",
+        "external_notification": "外部ツールへの通知の編集権限を付与できます。",
+        "slack_integration": "Slack連携の編集権限を付与できます。",
+        "legacy_slack_integration": "Slack連携(レガシー)の編集権限を付与できます。",
+        "user_management": "ユーザー管理の編集権限を付与できます。",
+        "user_group_management": "ユーザーグループ管理の編集権限を付与できます。",
+        "audit_log": "監査ログの編集権限を付与できます。",
+        "plugin": "プラグインの編集権限を付与できます。",
+        "ai_integration": "AI連携設定の編集権限を付与できます。",
+        "full_text_search": "全文検索管理の編集権限を付与できます。"
+      },
+      "user_settings": {
+        "all": "ユーザー設定の編集権限を付与できます。",
+        "info": "ユーザー情報の編集権限を付与できます。",
+        "external_account": "外部アカウントの編集権限を付与できます。",
+        "password": "パスワード設定の編集権限を付与できます。",
+        "api": {
+          "all": "API 設定の編集権限を付与できます。",
+          "api_token": "API トークン設定の編集権限を付与できます。",
+          "access_token": "アクセストークン設定の編集権限を付与できます。"
+        },
+        "in_app_notification": "アプリ内通知設定の編集権限を付与できます。",
+        "other": "その他設定の編集権限を付与できます。"
+      },
+      "features": {
+        "all": "機能の編集権限を付与できます。",
+        "ai_assistant": "AIアシスタント機能の編集権限を付与できます。",
+        "page": "ページ機能の編集権限を付与できます。",
+        "share_link": "共有リンク機能の編集権限を付与できます。",
+        "bookmark": "ブックマーク機能の編集権限を付与できます。",
+        "attachment": "添付ファイル機能の編集権限を付与できます。",
+        "page_bulk_export": "ページの一括エクスポート機能の編集権限を付与できます。"
+      }
+    }
   }
 }

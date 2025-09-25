@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, {
+  useState, useEffect, useRef, type JSX,
+} from 'react';
 
 import { useTranslation } from 'next-i18next';
 import { useRipple } from 'react-use-ripple';

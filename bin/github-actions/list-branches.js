@@ -25,7 +25,7 @@ const LEGAL_PATTERNS = [
   // https://regex101.com/r/p9xswM/4
   /^(dev|feat|imprv|support|fix|rc|release|tmp)\/.+$/,
 ];
-const GITHUB_REPOS_URI = 'https://github.com/weseek/growi/';
+const GITHUB_REPOS_URI = 'https://github.com/growilabs/growi/';
 
 class BranchSummary {
 

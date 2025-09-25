@@ -1,6 +1,9 @@
 
+import type { JSX } from 'react';
+
 import { useTranslation } from 'next-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
+
 
 const ProxyCircle = () => (
   <div className="grw-bridge-proxy-circle position-relative">

@@ -5,4 +5,5 @@ export const V5ConversionErrCode = {
   FORBIDDEN: 'Forbidden',
 } as const;
 
-export type V5ConversionErrCode = typeof V5ConversionErrCode[keyof typeof V5ConversionErrCode];
+export type V5ConversionErrCode =
+  (typeof V5ConversionErrCode)[keyof typeof V5ConversionErrCode];

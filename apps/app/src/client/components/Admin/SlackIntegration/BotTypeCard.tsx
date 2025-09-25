@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import { SlackbotType } from '@growi/slack';
 import { useTranslation } from 'next-i18next';

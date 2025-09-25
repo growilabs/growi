@@ -2,6 +2,7 @@ import nodePath from 'path';
 
 import { GlobalNotificationSettingEvent, GlobalNotificationSettingType } from '~/server/models/GlobalNotificationSetting';
 import { configManager } from '~/server/service/config-manager';
+import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:service:GlobalNotificationMailService'); // eslint-disable-line no-unused-vars
@@ -11,6 +12,10 @@ const logger = loggerFactory('growi:service:GlobalNotificationMailService'); // 
  */
 class GlobalNotificationMailService {
 
+  /** @type {import('~/server/crowi').default} Crowi instance */
+  crowi;
+
+  /** @param {import('~/server/crowi').default} crowi Crowi instance */
   constructor(crowi) {
     this.crowi = crowi;
   }
@@ -51,7 +56,7 @@ class GlobalNotificationMailService {
    * @return  {{ subject: string, template: string, vars: object }}
    */
   generateOption(event, page, triggeredBy, { comment, oldPath }) {
-    const locale = configManager.getConfig('crowi', 'app:globalLang');
+    const locale = configManager.getConfig('app:globalLang');
     // validate for all events
     if (event == null || page == null || triggeredBy == null) {
       throw new Error(`invalid vars supplied to GlobalNotificationMailService.generateOption for event ${event}`);
@@ -61,7 +66,7 @@ class GlobalNotificationMailService {
 
     const path = page.path;
     const appTitle = this.crowi.appService.getAppTitle();
-    const siteUrl = this.crowi.appService.getSiteUrl();
+    const siteUrl = growiInfoService.getSiteUrl();
     const pageUrl = new URL(page._id, siteUrl);
 
     let subject;

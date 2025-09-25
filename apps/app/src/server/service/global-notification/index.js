@@ -1,14 +1,18 @@
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:service:GlobalNotificationService');
-const GloabalNotificationSlack = require('./global-notification-slack');
 const GloabalNotificationMail = require('./global-notification-mail');
+const GloabalNotificationSlack = require('./global-notification-slack');
 
 /**
  * service class of GlobalNotificationSetting
  */
 class GlobalNotificationService {
 
+  /** @type {import('~/server/crowi').default} Crowi instance */
+  crowi;
+
+  /** @param {import('~/server/crowi').default} crowi Crowi instance */
   constructor(crowi) {
     this.crowi = crowi;
     this.defaultLang = 'en_US'; // TODO: get defaultLang from app global config
@@ -67,9 +71,9 @@ class GlobalNotificationService {
       case this.Page.GRANT_SPECIFIED:
         return false;
       case this.Page.GRANT_OWNER:
-        return (this.crowi.configManager.getConfig('notification', 'notification:owner-page:isEnabled') || false);
+        return (this.crowi.configManager.getConfig('notification:owner-page:isEnabled'));
       case this.Page.GRANT_USER_GROUP:
-        return (this.crowi.configManager.getConfig('notification', 'notification:group-page:isEnabled') || false);
+        return (this.crowi.configManager.getConfig('notification:group-page:isEnabled'));
     }
   }
 

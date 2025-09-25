@@ -8,8 +8,11 @@ import multer from 'multer';
 
 import { GrowiPlugin } from '~/features/growi-plugin/server/models';
 import { SupportedAction } from '~/interfaces/activity';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { AttachmentType } from '~/server/interfaces/attachment';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { Attachment } from '~/server/models/attachment';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
@@ -190,6 +193,7 @@ const router = express.Router();
  *            type: boolean
  *            description: The flag whether the logo is default or not.
  */
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
   const loginRequiredStrictly = require('../../middlewares/login-required')(crowi);
   const adminRequired = require('../../middlewares/admin-required')(crowi);
@@ -220,6 +224,7 @@ module.exports = (crowi) => {
       body('isEnabledStaleNotification').isBoolean(),
       body('isAllReplyShown').isBoolean(),
       body('isSearchScopeChildrenAsDefault').isBoolean(),
+      body('showPageSideAuthors').isBoolean(),
     ],
     CustomizePresentation: [
       body('isEnabledMarp').isBoolean(),
@@ -256,7 +261,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *          - cookieAuth: []
-   *        operationId: getCustomizeSetting
    *        summary: /customize-setting
    *        description: Get customize parameters
    *        responses:
@@ -271,24 +275,25 @@ module.exports = (crowi) => {
    *                      description: customize params
    *                      $ref: '#/components/schemas/CustomizeSetting'
    */
-  router.get('/', loginRequiredStrictly, adminRequired, async(req, res) => {
+  router.get('/', accessTokenParser([SCOPE.READ.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired, async(req, res) => {
     const customizeParams = {
-      isEnabledTimeline: await crowi.configManager.getConfig('crowi', 'customize:isEnabledTimeline'),
-      isEnabledAttachTitleHeader: await crowi.configManager.getConfig('crowi', 'customize:isEnabledAttachTitleHeader'),
-      pageLimitationS: await crowi.configManager.getConfig('crowi', 'customize:showPageLimitationS'),
-      pageLimitationM: await crowi.configManager.getConfig('crowi', 'customize:showPageLimitationM'),
-      pageLimitationL: await crowi.configManager.getConfig('crowi', 'customize:showPageLimitationL'),
-      pageLimitationXL: await crowi.configManager.getConfig('crowi', 'customize:showPageLimitationXL'),
-      isEnabledStaleNotification: await crowi.configManager.getConfig('crowi', 'customize:isEnabledStaleNotification'),
-      isAllReplyShown: await crowi.configManager.getConfig('crowi', 'customize:isAllReplyShown'),
-      isSearchScopeChildrenAsDefault: await crowi.configManager.getConfig('crowi', 'customize:isSearchScopeChildrenAsDefault'),
-      isEnabledMarp: await crowi.configManager.getConfig('crowi', 'customize:isEnabledMarp'),
-      styleName: await crowi.configManager.getConfig('crowi', 'customize:highlightJsStyle'),
-      styleBorder: await crowi.configManager.getConfig('crowi', 'customize:highlightJsStyleBorder'),
-      customizeTitle: await crowi.configManager.getConfig('crowi', 'customize:title'),
-      customizeScript: await crowi.configManager.getConfig('crowi', 'customize:script'),
-      customizeCss: await crowi.configManager.getConfig('crowi', 'customize:css'),
-      customizeNoscript: await crowi.configManager.getConfig('crowi', 'customize:noscript'),
+      isEnabledTimeline: await configManager.getConfig('customize:isEnabledTimeline'),
+      isEnabledAttachTitleHeader: await configManager.getConfig('customize:isEnabledAttachTitleHeader'),
+      pageLimitationS: await configManager.getConfig('customize:showPageLimitationS'),
+      pageLimitationM: await configManager.getConfig('customize:showPageLimitationM'),
+      pageLimitationL: await configManager.getConfig('customize:showPageLimitationL'),
+      pageLimitationXL: await configManager.getConfig('customize:showPageLimitationXL'),
+      isEnabledStaleNotification: await configManager.getConfig('customize:isEnabledStaleNotification'),
+      isAllReplyShown: await configManager.getConfig('customize:isAllReplyShown'),
+      showPageSideAuthors: await configManager.getConfig('customize:showPageSideAuthors'),
+      isSearchScopeChildrenAsDefault: await configManager.getConfig('customize:isSearchScopeChildrenAsDefault'),
+      isEnabledMarp: await configManager.getConfig('customize:isEnabledMarp'),
+      styleName: await configManager.getConfig('customize:highlightJsStyle'),
+      styleBorder: await configManager.getConfig('customize:highlightJsStyleBorder'),
+      customizeTitle: await configManager.getConfig('customize:title'),
+      customizeScript: await configManager.getConfig('customize:script'),
+      customizeCss: await configManager.getConfig('customize:css'),
+      customizeNoscript: await configManager.getConfig('customize:noscript'),
     };
 
     return res.apiv3({ customizeParams });
@@ -302,7 +307,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *          - cookieAuth: []
-   *        operationId: getLayoutCustomizeSetting
    *        summary: /customize-setting/layout
    *        description: Get layout
    *        responses:
@@ -313,9 +317,9 @@ module.exports = (crowi) => {
    *                schema:
    *                  $ref: '#/components/schemas/CustomizeLayout'
    */
-  router.get('/layout', loginRequiredStrictly, adminRequired, async(req, res) => {
+  router.get('/layout', accessTokenParser([SCOPE.READ.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired, async(req, res) => {
     try {
-      const isContainerFluid = await crowi.configManager.getConfig('crowi', 'customize:isContainerFluid');
+      const isContainerFluid = await configManager.getConfig('customize:isContainerFluid');
       return res.apiv3({ isContainerFluid });
     }
     catch (err) {
@@ -331,7 +335,6 @@ module.exports = (crowi) => {
    *    /customize-setting/layout:
    *      put:
    *        tags: [CustomizeSetting]
-   *        operationId: updateLayoutCustomizeSetting
    *        summary: /customize-setting/layout
    *        description: Update layout
    *        requestBody:
@@ -353,28 +356,30 @@ module.exports = (crowi) => {
    *                      description: customized params
    *                      $ref: '#/components/schemas/CustomizeLayout'
    */
-  router.put('/layout', loginRequiredStrictly, adminRequired, addActivity, validator.layout, apiV3FormValidator, async(req, res) => {
-    const requestParams = {
-      'customize:isContainerFluid': req.body.isContainerFluid,
-    };
-
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestParams);
-      const customizedParams = {
-        isContainerFluid: await crowi.configManager.getConfig('crowi', 'customize:isContainerFluid'),
+  router.put('/layout', accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired, addActivity,
+    validator.layout, apiV3FormValidator,
+    async(req, res) => {
+      const requestParams = {
+        'customize:isContainerFluid': req.body.isContainerFluid,
       };
 
-      const parameters = { action: SupportedAction.ACTION_ADMIN_LAYOUT_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
+      try {
+        await configManager.updateConfigs(requestParams);
+        const customizedParams = {
+          isContainerFluid: await configManager.getConfig('customize:isContainerFluid'),
+        };
 
-      return res.apiv3({ customizedParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating layout';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-layout-failed'));
-    }
-  });
+        const parameters = { action: SupportedAction.ACTION_ADMIN_LAYOUT_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+
+        return res.apiv3({ customizedParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating layout';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-layout-failed'));
+      }
+    });
 
   /**
    * @swagger
@@ -384,7 +389,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *          - cookieAuth: []
-   *        operationId: getThemeCustomizeSetting
    *        summary: /customize-setting/theme
    *        description: Get theme
    *        responses:
@@ -404,10 +408,10 @@ module.exports = (crowi) => {
    *                      items:
    *                        $ref: '#/components/schemas/ThemesMetadata'
    */
-  router.get('/theme', loginRequiredStrictly, async(req, res) => {
+  router.get('/theme', accessTokenParser([SCOPE.READ.ADMIN.CUSTOMIZE]), loginRequiredStrictly, async(req, res) => {
 
     try {
-      const currentTheme = await crowi.configManager.getConfig('crowi', 'customize:theme');
+      const currentTheme = await configManager.getConfig('customize:theme');
 
       // retrieve plugin manifests
       const themePlugins = await GrowiPlugin.findEnabledPluginsByType(GrowiPluginType.Theme);
@@ -433,7 +437,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *          - cookieAuth: []
-   *        operationId: updateThemeCustomizeSetting
    *        summary: /customize-setting/theme
    *        description: Update theme
    *        requestBody:
@@ -453,27 +456,28 @@ module.exports = (crowi) => {
    *                    customizedParams:
    *                      $ref: '#/components/schemas/CustomizeTheme'
    */
-  router.put('/theme', loginRequiredStrictly, adminRequired, addActivity, validator.theme, apiV3FormValidator, async(req, res) => {
-    const requestParams = {
-      'customize:theme': req.body.theme,
-    };
-
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestParams);
-      const customizedParams = {
-        theme: await crowi.configManager.getConfig('crowi', 'customize:theme'),
+  router.put('/theme', accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired, addActivity, validator.theme, apiV3FormValidator,
+    async(req, res) => {
+      const requestParams = {
+        'customize:theme': req.body.theme,
       };
-      customizeService.initGrowiTheme();
-      const parameters = { action: SupportedAction.ACTION_ADMIN_THEME_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-      return res.apiv3({ customizedParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating theme';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-theme-failed'));
-    }
-  });
+
+      try {
+        await configManager.updateConfigs(requestParams);
+        const customizedParams = {
+          theme: await configManager.getConfig('customize:theme'),
+        };
+        customizeService.initGrowiTheme();
+        const parameters = { action: SupportedAction.ACTION_ADMIN_THEME_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+        return res.apiv3({ customizedParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating theme';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-theme-failed'));
+      }
+    });
 
   /**
    * @swagger
@@ -483,7 +487,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *          - cookieAuth: []
-   *        operationId: getCustomeSettingSidebar
    *        summary: /customize-setting/sidebar
    *        description: Get sidebar
    *        responses:
@@ -494,11 +497,11 @@ module.exports = (crowi) => {
    *                schema:
    *                  $ref: '#/components/schemas/CustomizeSidebar'
    */
-  router.get('/sidebar', loginRequiredStrictly, adminRequired, async(req, res) => {
+  router.get('/sidebar', accessTokenParser([SCOPE.READ.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired, async(req, res) => {
 
     try {
-      const isSidebarCollapsedMode = await crowi.configManager.getConfig('crowi', 'customize:isSidebarCollapsedMode');
-      const isSidebarClosedAtDockMode = await crowi.configManager.getConfig('crowi', 'customize:isSidebarClosedAtDockMode');
+      const isSidebarCollapsedMode = await configManager.getConfig('customize:isSidebarCollapsedMode');
+      const isSidebarClosedAtDockMode = await configManager.getConfig('customize:isSidebarClosedAtDockMode');
       return res.apiv3({ isSidebarCollapsedMode, isSidebarClosedAtDockMode });
     }
     catch (err) {
@@ -516,7 +519,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *          - cookieAuth: []
-   *        operationId: updateCustomizeSettingSidebar
    *        summary: /customize-setting/sidebar
    *        description: Update sidebar
    *        requestBody:
@@ -536,29 +538,31 @@ module.exports = (crowi) => {
    *                    customizedParams:
    *                      $ref: '#/components/schemas/CustomizeSidebar'
    */
-  router.put('/sidebar', loginRequiredStrictly, adminRequired, validator.sidebar, apiV3FormValidator, addActivity, async(req, res) => {
-    const requestParams = {
-      'customize:isSidebarCollapsedMode': req.body.isSidebarCollapsedMode,
-      'customize:isSidebarClosedAtDockMode': req.body.isSidebarClosedAtDockMode,
-    };
-
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestParams);
-      const customizedParams = {
-        isSidebarCollapsedMode: await crowi.configManager.getConfig('crowi', 'customize:isSidebarCollapsedMode'),
-        isSidebarClosedAtDockMode: await crowi.configManager.getConfig('crowi', 'customize:isSidebarClosedAtDockMode'),
+  router.put('/sidebar', accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired,
+    validator.sidebar, apiV3FormValidator, addActivity,
+    async(req, res) => {
+      const requestParams = {
+        'customize:isSidebarCollapsedMode': req.body.isSidebarCollapsedMode,
+        'customize:isSidebarClosedAtDockMode': req.body.isSidebarClosedAtDockMode,
       };
 
-      activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SIDEBAR_UPDATE });
+      try {
+        await configManager.updateConfigs(requestParams);
+        const customizedParams = {
+          isSidebarCollapsedMode: await configManager.getConfig('customize:isSidebarCollapsedMode'),
+          isSidebarClosedAtDockMode: await configManager.getConfig('customize:isSidebarClosedAtDockMode'),
+        };
 
-      return res.apiv3({ customizedParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating sidebar';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-sidebar-failed'));
-    }
-  });
+        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SIDEBAR_UPDATE });
+
+        return res.apiv3({ customizedParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating sidebar';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-sidebar-failed'));
+      }
+    });
 
   /**
    * @swagger
@@ -568,7 +572,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *         - cookieAuth: []
-   *        operationId: updateFunctionCustomizeSetting
    *        summary: /customize-setting/function
    *        description: Update function
    *        requestBody:
@@ -588,42 +591,46 @@ module.exports = (crowi) => {
    *                    customizedParams:
    *                      $ref: '#/components/schemas/CustomizeFunction'
    */
-  router.put('/function', loginRequiredStrictly, adminRequired, addActivity, validator.function, apiV3FormValidator, async(req, res) => {
-    const requestParams = {
-      'customize:isEnabledTimeline': req.body.isEnabledTimeline,
-      'customize:isEnabledAttachTitleHeader': req.body.isEnabledAttachTitleHeader,
-      'customize:showPageLimitationS': req.body.pageLimitationS,
-      'customize:showPageLimitationM': req.body.pageLimitationM,
-      'customize:showPageLimitationL': req.body.pageLimitationL,
-      'customize:showPageLimitationXL': req.body.pageLimitationXL,
-      'customize:isEnabledStaleNotification': req.body.isEnabledStaleNotification,
-      'customize:isAllReplyShown': req.body.isAllReplyShown,
-      'customize:isSearchScopeChildrenAsDefault': req.body.isSearchScopeChildrenAsDefault,
-    };
-
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestParams);
-      const customizedParams = {
-        isEnabledTimeline: await crowi.configManager.getConfig('crowi', 'customize:isEnabledTimeline'),
-        isEnabledAttachTitleHeader: await crowi.configManager.getConfig('crowi', 'customize:isEnabledAttachTitleHeader'),
-        pageLimitationS: await crowi.configManager.getConfig('crowi', 'customize:showPageLimitationS'),
-        pageLimitationM: await crowi.configManager.getConfig('crowi', 'customize:showPageLimitationM'),
-        pageLimitationL: await crowi.configManager.getConfig('crowi', 'customize:showPageLimitationL'),
-        pageLimitationXL: await crowi.configManager.getConfig('crowi', 'customize:showPageLimitationXL'),
-        isEnabledStaleNotification: await crowi.configManager.getConfig('crowi', 'customize:isEnabledStaleNotification'),
-        isAllReplyShown: await crowi.configManager.getConfig('crowi', 'customize:isAllReplyShown'),
-        isSearchScopeChildrenAsDefault: await crowi.configManager.getConfig('crowi', 'customize:isSearchScopeChildrenAsDefault'),
+  router.put('/function', accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired, addActivity,
+    validator.function, apiV3FormValidator,
+    async(req, res) => {
+      const requestParams = {
+        'customize:isEnabledTimeline': req.body.isEnabledTimeline,
+        'customize:isEnabledAttachTitleHeader': req.body.isEnabledAttachTitleHeader,
+        'customize:showPageLimitationS': req.body.pageLimitationS,
+        'customize:showPageLimitationM': req.body.pageLimitationM,
+        'customize:showPageLimitationL': req.body.pageLimitationL,
+        'customize:showPageLimitationXL': req.body.pageLimitationXL,
+        'customize:isEnabledStaleNotification': req.body.isEnabledStaleNotification,
+        'customize:isAllReplyShown': req.body.isAllReplyShown,
+        'customize:isSearchScopeChildrenAsDefault': req.body.isSearchScopeChildrenAsDefault,
+        'customize:showPageSideAuthors': req.body.showPageSideAuthors,
       };
-      const parameters = { action: SupportedAction.ACTION_ADMIN_FUNCTION_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-      return res.apiv3({ customizedParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating function';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-function-failed'));
-    }
-  });
+
+      try {
+        await configManager.updateConfigs(requestParams);
+        const customizedParams = {
+          isEnabledTimeline: await configManager.getConfig('customize:isEnabledTimeline'),
+          isEnabledAttachTitleHeader: await configManager.getConfig('customize:isEnabledAttachTitleHeader'),
+          pageLimitationS: await configManager.getConfig('customize:showPageLimitationS'),
+          pageLimitationM: await configManager.getConfig('customize:showPageLimitationM'),
+          pageLimitationL: await configManager.getConfig('customize:showPageLimitationL'),
+          pageLimitationXL: await configManager.getConfig('customize:showPageLimitationXL'),
+          isEnabledStaleNotification: await configManager.getConfig('customize:isEnabledStaleNotification'),
+          isAllReplyShown: await configManager.getConfig('customize:isAllReplyShown'),
+          isSearchScopeChildrenAsDefault: await configManager.getConfig('customize:isSearchScopeChildrenAsDefault'),
+          showPageSideAuthors: await configManager.getConfig('customize:showPageSideAuthors'),
+        };
+        const parameters = { action: SupportedAction.ACTION_ADMIN_FUNCTION_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+        return res.apiv3({ customizedParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating function';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-function-failed'));
+      }
+    });
 
 
   /**
@@ -634,7 +641,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *         - cookieAuth: []
-   *        operationId: updatePresentationCustomizeSetting
    *        summary: /customize-setting/presentation
    *        description: Update presentation
    *        requestBody:
@@ -654,26 +660,28 @@ module.exports = (crowi) => {
    *                    customizedParams:
    *                      $ref: '#/components/schemas/CustomizePresentation'
    */
-  router.put('/presentation', loginRequiredStrictly, adminRequired, addActivity, validator.CustomizePresentation, apiV3FormValidator, async(req, res) => {
-    const requestParams = {
-      'customize:isEnabledMarp': req.body.isEnabledMarp,
-    };
-
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestParams);
-      const customizedParams = {
-        isEnabledMarp: await crowi.configManager.getConfig('crowi', 'customize:isEnabledMarp'),
+  router.put('/presentation', accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired, addActivity,
+    validator.CustomizePresentation, apiV3FormValidator,
+    async(req, res) => {
+      const requestParams = {
+        'customize:isEnabledMarp': req.body.isEnabledMarp,
       };
-      const parameters = { action: SupportedAction.ACTION_ADMIN_FUNCTION_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-      return res.apiv3({ customizedParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating presentaion';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-presentation-failed'));
-    }
-  });
+
+      try {
+        await configManager.updateConfigs(requestParams);
+        const customizedParams = {
+          isEnabledMarp: await configManager.getConfig('customize:isEnabledMarp'),
+        };
+        const parameters = { action: SupportedAction.ACTION_ADMIN_FUNCTION_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+        return res.apiv3({ customizedParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating presentaion';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-presentation-failed'));
+      }
+    });
 
   /**
    * @swagger
@@ -683,7 +691,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *          - cookieAuth: []
-   *        operationId: updateHighlightCustomizeSetting
    *        summary: /customize-setting/highlight
    *        description: Update highlight
    *        requestBody:
@@ -703,28 +710,30 @@ module.exports = (crowi) => {
    *                    customizedParams:
    *                      $ref: '#/components/schemas/CustomizeHighlightResponse'
    */
-  router.put('/highlight', loginRequiredStrictly, adminRequired, addActivity, validator.highlight, apiV3FormValidator, async(req, res) => {
-    const requestParams = {
-      'customize:highlightJsStyle': req.body.highlightJsStyle,
-      'customize:highlightJsStyleBorder': req.body.highlightJsStyleBorder,
-    };
-
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestParams);
-      const customizedParams = {
-        styleName: await crowi.configManager.getConfig('crowi', 'customize:highlightJsStyle'),
-        styleBorder: await crowi.configManager.getConfig('crowi', 'customize:highlightJsStyleBorder'),
+  router.put('/highlight', accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired, addActivity,
+    validator.highlight, apiV3FormValidator,
+    async(req, res) => {
+      const requestParams = {
+        'customize:highlightJsStyle': req.body.highlightJsStyle,
+        'customize:highlightJsStyleBorder': req.body.highlightJsStyleBorder,
       };
-      const parameters = { action: SupportedAction.ACTION_ADMIN_CODE_HIGHLIGHT_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-      return res.apiv3({ customizedParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating highlight';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-highlight-failed'));
-    }
-  });
+
+      try {
+        await configManager.updateConfigs(requestParams);
+        const customizedParams = {
+          styleName: await configManager.getConfig('customize:highlightJsStyle'),
+          styleBorder: await configManager.getConfig('customize:highlightJsStyleBorder'),
+        };
+        const parameters = { action: SupportedAction.ACTION_ADMIN_CODE_HIGHLIGHT_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+        return res.apiv3({ customizedParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating highlight';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-highlight-failed'));
+      }
+    });
 
   /**
    * @swagger
@@ -734,7 +743,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *          - cookieAuth: []
-   *        operationId: updateCustomizeTitleCustomizeSetting
    *        summary: /customize-setting/customizeTitle
    *        description: Update title
    *        requestBody:
@@ -754,29 +762,31 @@ module.exports = (crowi) => {
    *                    customizedParams:
    *                      $ref: '#/components/schemas/CustomizeTitle'
    */
-  router.put('/customize-title', loginRequiredStrictly, adminRequired, addActivity, validator.customizeTitle, apiV3FormValidator, async(req, res) => {
-    const requestParams = {
-      'customize:title': req.body.customizeTitle,
-    };
-
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestParams, true);
-      crowi.customizeService.publishUpdatedMessage();
-
-      const customizedParams = {
-        customizeTitle: await crowi.configManager.getConfig('crowi', 'customize:title'),
+  router.put('/customize-title', accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired, addActivity,
+    validator.customizeTitle, apiV3FormValidator,
+    async(req, res) => {
+      const requestParams = {
+        'customize:title': req.body.customizeTitle,
       };
-      customizeService.initCustomTitle();
-      const parameters = { action: SupportedAction.ACTION_ADMIN_CUSTOM_TITLE_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-      return res.apiv3({ customizedParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating customizeTitle';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-customizeTitle-failed'));
-    }
-  });
+
+      try {
+        await configManager.updateConfigs(requestParams, { skipPubsub: true });
+        crowi.customizeService.publishUpdatedMessage();
+
+        const customizedParams = {
+          customizeTitle: await configManager.getConfig('customize:title'),
+        };
+        customizeService.initCustomTitle();
+        const parameters = { action: SupportedAction.ACTION_ADMIN_CUSTOM_TITLE_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+        return res.apiv3({ customizedParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating customizeTitle';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-customizeTitle-failed'));
+      }
+    });
 
   /**
    * @swagger
@@ -786,7 +796,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *          - cookieAuth: []
-   *        operationId: updateCustomizeNoscriptCustomizeSetting
    *        summary: /customize-setting/customize-noscript
    *        description: Update noscript
    *        requestBody:
@@ -806,25 +815,27 @@ module.exports = (crowi) => {
    *                    customizedParams:
    *                      $ref: '#/components/schemas/CustomizeNoscript'
    */
-  router.put('/customize-noscript', loginRequiredStrictly, adminRequired, addActivity, validator.customizeNoscript, apiV3FormValidator, async(req, res) => {
-    const requestParams = {
-      'customize:noscript': req.body.customizeNoscript,
-    };
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestParams);
-      const customizedParams = {
-        customizeNoscript: await crowi.configManager.getConfig('crowi', 'customize:noscript'),
+  router.put('/customize-noscript', accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired, addActivity,
+    validator.customizeNoscript, apiV3FormValidator,
+    async(req, res) => {
+      const requestParams = {
+        'customize:noscript': req.body.customizeNoscript,
       };
-      const parameters = { action: SupportedAction.ACTION_ADMIN_CUSTOM_NOSCRIPT_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-      return res.apiv3({ customizedParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating customizeNoscript';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-customizeNoscript-failed'));
-    }
-  });
+      try {
+        await configManager.updateConfigs(requestParams);
+        const customizedParams = {
+          customizeNoscript: await configManager.getConfig('customize:noscript'),
+        };
+        const parameters = { action: SupportedAction.ACTION_ADMIN_CUSTOM_NOSCRIPT_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+        return res.apiv3({ customizedParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating customizeNoscript';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-customizeNoscript-failed'));
+      }
+    });
 
   /**
    * @swagger
@@ -834,7 +845,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *          - cookieAuth: []
-   *        operationId: updateCustomizeCssCustomizeSetting
    *        summary: /customize-setting/customize-css
    *        description: Update customize css
    *        requestBody:
@@ -854,28 +864,30 @@ module.exports = (crowi) => {
    *                    customizedParams:
    *                      $ref: '#/components/schemas/CustomizeCss'
    */
-  router.put('/customize-css', loginRequiredStrictly, adminRequired, addActivity, validator.customizeCss, apiV3FormValidator, async(req, res) => {
-    const requestParams = {
-      'customize:css': req.body.customizeCss,
-    };
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestParams, true);
-      crowi.customizeService.publishUpdatedMessage();
-
-      const customizedParams = {
-        customizeCss: await crowi.configManager.getConfig('crowi', 'customize:css'),
+  router.put('/customize-css', accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired, addActivity,
+    validator.customizeCss, apiV3FormValidator,
+    async(req, res) => {
+      const requestParams = {
+        'customize:css': req.body.customizeCss,
       };
-      customizeService.initCustomCss();
-      const parameters = { action: SupportedAction.ACTION_ADMIN_CUSTOM_CSS_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-      return res.apiv3({ customizedParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating customizeCss';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-customizeCss-failed'));
-    }
-  });
+      try {
+        await configManager.updateConfigs(requestParams, { skipPubsub: true });
+        crowi.customizeService.publishUpdatedMessage();
+
+        const customizedParams = {
+          customizeCss: await configManager.getConfig('customize:css'),
+        };
+        customizeService.initCustomCss();
+        const parameters = { action: SupportedAction.ACTION_ADMIN_CUSTOM_CSS_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+        return res.apiv3({ customizedParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating customizeCss';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-customizeCss-failed'));
+      }
+    });
 
   /**
    * @swagger
@@ -885,7 +897,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *          - cookieAuth: []
-   *        operationId: updateCustomizeScriptCustomizeSetting
    *        summary: /customize-setting/customize-script
    *        description: Update customize script
    *        requestBody:
@@ -905,25 +916,27 @@ module.exports = (crowi) => {
    *                    customizedParams:
    *                      $ref: '#/components/schemas/CustomizeScript'
    */
-  router.put('/customize-script', loginRequiredStrictly, adminRequired, addActivity, validator.customizeScript, apiV3FormValidator, async(req, res) => {
-    const requestParams = {
-      'customize:script': req.body.customizeScript,
-    };
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestParams);
-      const customizedParams = {
-        customizeScript: await crowi.configManager.getConfig('crowi', 'customize:script'),
+  router.put('/customize-script', accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired, addActivity,
+    validator.customizeScript, apiV3FormValidator,
+    async(req, res) => {
+      const requestParams = {
+        'customize:script': req.body.customizeScript,
       };
-      const parameters = { action: SupportedAction.ACTION_ADMIN_CUSTOM_SCRIPT_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-      return res.apiv3({ customizedParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating customizeScript';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-customizeScript-failed'));
-    }
-  });
+      try {
+        await configManager.updateConfigs(requestParams);
+        const customizedParams = {
+          customizeScript: await configManager.getConfig('customize:script'),
+        };
+        const parameters = { action: SupportedAction.ACTION_ADMIN_CUSTOM_SCRIPT_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+        return res.apiv3({ customizedParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating customizeScript';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-customizeScript-failed'));
+      }
+    });
 
   /**
    * @swagger
@@ -933,7 +946,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *          - cookieAuth: []
-   *        operationId: updateCustomizeLogoCustomizeSetting
    *        summary: /customize-setting/customize-logo
    *        description: Update customize logo
    *        requestBody:
@@ -953,28 +965,29 @@ module.exports = (crowi) => {
    *                    customizedParams:
    *                      $ref: '#/components/schemas/CustomizeLogo'
    */
-  router.put('/customize-logo', loginRequiredStrictly, adminRequired, validator.logo, apiV3FormValidator, async(req, res) => {
+  router.put('/customize-logo', accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired,
+    validator.logo, apiV3FormValidator,
+    async(req, res) => {
+      const {
+        isDefaultLogo,
+      } = req.body;
 
-    const {
-      isDefaultLogo,
-    } = req.body;
-
-    const requestParams = {
-      'customize:isDefaultLogo': isDefaultLogo,
-    };
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestParams);
-      const customizedParams = {
-        isDefaultLogo: await crowi.configManager.getConfig('crowi', 'customize:isDefaultLogo'),
+      const requestParams = {
+        'customize:isDefaultLogo': isDefaultLogo,
       };
-      return res.apiv3({ customizedParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating customizeLogo';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-customizeLogo-failed'));
-    }
-  });
+      try {
+        await configManager.updateConfigs(requestParams);
+        const customizedParams = {
+          isDefaultLogo: await configManager.getConfig('customize:isDefaultLogo'),
+        };
+        return res.apiv3({ customizedParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating customizeLogo';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-customizeLogo-failed'));
+      }
+    });
 
   /**
    * @swagger
@@ -984,7 +997,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *          - cookieAuth: []
-   *        operationId: uploadBrandLogoCustomizeSetting
    *        summary: /customize-setting/upload-brand-logo
    *        description: Upload brand logo
    *        requestBody:
@@ -995,6 +1007,7 @@ module.exports = (crowi) => {
    *               type: object
    *               properties:
    *                 file:
+   *                   type: string
    *                   format: binary
    *        responses:
    *          200:
@@ -1015,8 +1028,9 @@ module.exports = (crowi) => {
    *                            temporaryUrlExpiredAt: {}
    *                            temporaryUrlCached: {}
    */
-  router.post('/upload-brand-logo', uploads.single('file'), loginRequiredStrictly,
-    adminRequired, validator.logo, apiV3FormValidator, async(req, res) => {
+  router.post('/upload-brand-logo',
+    uploads.single('file'), accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]), loginRequiredStrictly, uploads.single('file'), validator.logo, apiV3FormValidator,
+    async(req, res) => {
 
       if (req.file == null) {
         return res.apiv3Err(new ErrorV3('File error.', 'upload-brand-logo-failed'));
@@ -1060,7 +1074,6 @@ module.exports = (crowi) => {
    *        tags: [CustomizeSetting]
    *        security:
    *          - cookieAuth: []
-   *        operationId: deleteBrandLogoCustomizeSetting
    *        summary: /customize-setting/delete-brand-logo
    *        description: Delete brand logo
    *        responses:
@@ -1071,7 +1084,7 @@ module.exports = (crowi) => {
    *                schema:
    *                  additionalProperties: false
    */
-  router.delete('/delete-brand-logo', loginRequiredStrictly, adminRequired, async(req, res) => {
+  router.delete('/delete-brand-logo', accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]), loginRequiredStrictly, adminRequired, async(req, res) => {
 
     const attachments = await Attachment.find({ attachmentType: AttachmentType.BRAND_LOGO });
 

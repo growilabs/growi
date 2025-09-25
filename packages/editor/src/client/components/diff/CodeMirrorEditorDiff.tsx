@@ -1,4 +1,6 @@
-import { useEffect, useRef, useMemo } from 'react';
+import {
+  useEffect, useRef, useMemo, type JSX,
+} from 'react';
 
 import type { Extension } from '@codemirror/state';
 import { placeholder, scrollPastEnd } from '@codemirror/view';

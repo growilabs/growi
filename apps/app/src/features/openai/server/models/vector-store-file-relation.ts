@@ -7,6 +7,7 @@ import { getOrCreateModel } from '~/server/util/mongoose-utils';
 export interface VectorStoreFileRelation {
   vectorStoreRelationId: mongoose.Types.ObjectId;
   page: mongoose.Types.ObjectId;
+  attachment?: mongoose.Types.ObjectId;
   fileIds: string[];
   isAttachedToVectorStore: boolean;
 }
@@ -19,10 +20,21 @@ interface VectorStoreFileRelationModel extends Model<VectorStoreFileRelation> {
 }
 
 export const prepareVectorStoreFileRelations = (
-    vectorStoreRelationId: Types.ObjectId, page: Types.ObjectId, fileId: string, relationsMap: Map<string, VectorStoreFileRelation>,
+    vectorStoreRelationId: Types.ObjectId,
+    page: Types.ObjectId,
+    fileId: string,
+    relationsMap: Map<string, VectorStoreFileRelation>,
+    attachment?: Types.ObjectId,
 ): Map<string, VectorStoreFileRelation> => {
-  const pageIdStr = page.toHexString();
-  const existingData = relationsMap.get(pageIdStr);
+
+  const key = (() => {
+    if (attachment == null) {
+      return page.toHexString();
+    }
+    return page.toHexString() + attachment.toHexString();
+  })();
+
+  const existingData = relationsMap.get(key);
 
   // If the data exists, add the fileId to the fileIds array
   if (existingData != null) {
@@ -30,11 +42,12 @@ export const prepareVectorStoreFileRelations = (
   }
   // If the data doesn't exist, create a new one and add it to the map
   else {
-    relationsMap.set(pageIdStr, {
+    relationsMap.set(key, {
       vectorStoreRelationId,
       page,
       fileIds: [fileId],
       isAttachedToVectorStore: false,
+      attachment,
     });
   }
 
@@ -52,6 +65,10 @@ const schema = new Schema<VectorStoreFileRelationDocument, VectorStoreFileRelati
     ref: 'Page',
     required: true,
   },
+  attachment: {
+    type: Schema.Types.ObjectId,
+    ref: 'Attachment',
+  },
   fileIds: [{
     type: String,
     required: true,
@@ -64,22 +81,43 @@ const schema = new Schema<VectorStoreFileRelationDocument, VectorStoreFileRelati
 });
 
 // define unique compound index
-schema.index({ vectorStoreRelationId: 1, page: 1 }, { unique: true });
+schema.index({ vectorStoreRelationId: 1, page: 1, attachment: 1 }, { unique: true });
 
 schema.statics.upsertVectorStoreFileRelations = async function(vectorStoreFileRelations: VectorStoreFileRelation[]): Promise<void> {
-  await this.bulkWrite(
-    vectorStoreFileRelations.map((data) => {
-      return {
-        updateOne: {
-          filter: { page: data.page, vectorStoreRelationId: data.vectorStoreRelationId },
-          update: {
-            $addToSet: { fileIds: { $each: data.fileIds } },
-          },
-          upsert: true,
+  const upsertOps = vectorStoreFileRelations
+    .filter(data => data.attachment == null)
+    .map(data => ({
+      updateOne: {
+        filter: {
+          page: data.page,
+          vectorStoreRelationId: data.vectorStoreRelationId,
+          attachment: { $exists: false },
         },
-      };
-    }),
-  );
+        update: {
+          $addToSet: { fileIds: { $each: data.fileIds } },
+        },
+        upsert: true,
+      },
+    }));
+
+  const insertOps = vectorStoreFileRelations
+    .filter(data => data.attachment != null)
+    .map(data => ({
+      insertOne: {
+        document: {
+          vectorStoreRelationId: data.vectorStoreRelationId,
+          page: data.page,
+          attachment: data.attachment,
+          fileIds: data.fileIds,
+          isAttachedToVectorStore: data.isAttachedToVectorStore,
+        },
+      },
+    }));
+
+  const bulkOps = [...upsertOps, ...insertOps];
+  if (bulkOps.length > 0) {
+    await this.bulkWrite(bulkOps);
+  }
 };
 
 // Used when attached to VectorStore

@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, JSX } from 'react';
 import { useCallback, useRef, useState } from 'react';
 
 import { useRect } from '@growi/ui/dist/utils';

@@ -1,6 +1,5 @@
 import React, {
-  useCallback, useState,
-  type FC,
+  useCallback, useState, type JSX,
 } from 'react';
 
 import nodePath from 'path';
@@ -34,7 +33,7 @@ const moduleClass = styles['page-tree-item'] ?? '';
 
 const logger = loggerFactory('growi:cli:Item');
 
-export const PageTreeItem: FC<TreeItemProps> = (props) => {
+export const PageTreeItem = (props:TreeItemProps): JSX.Element => {
   const router = useRouter();
 
   const getNewPathAfterMoved = (droppedPagePath: string, newParentPagePath: string): string => {
@@ -186,6 +185,7 @@ export const PageTreeItem: FC<TreeItemProps> = (props) => {
   return (
     <TreeItemLayout
       className={moduleClass}
+      targetPath={props.targetPath}
       targetPathOrId={props.targetPathOrId}
       itemLevel={props.itemLevel}
       itemNode={props.itemNode}

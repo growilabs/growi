@@ -72,8 +72,16 @@ export class GrowiPluginService implements IGrowiPluginService {
 
       // if not exists repository in file system, download latest plugin repository
       for await (const growiPlugin of growiPlugins) {
-        const pluginPath = path.join(PLUGIN_STORING_PATH, growiPlugin.installedPath);
-        const organizationName = path.join(PLUGIN_STORING_PATH, growiPlugin.organizationName);
+        let pluginPath :fs.PathLike|undefined;
+        let organizationName :fs.PathLike|undefined;
+        try {
+          pluginPath = this.joinAndValidatePath(PLUGIN_STORING_PATH, growiPlugin.installedPath);
+          organizationName = this.joinAndValidatePath(PLUGIN_STORING_PATH, growiPlugin.organizationName);
+        }
+        catch (err) {
+          logger.error(err);
+          continue;
+        }
         if (fs.existsSync(pluginPath)) {
           continue;
         }
@@ -301,15 +309,6 @@ export class GrowiPluginService implements IGrowiPluginService {
     }
 
     try {
-      const growiPluginsPath = path.join(PLUGIN_STORING_PATH, growiPlugins.installedPath);
-      await deleteFolder(growiPluginsPath);
-    }
-    catch (err) {
-      logger.error(err);
-      throw new Error('Failed to delete plugin repository.');
-    }
-
-    try {
       await GrowiPlugin.deleteOne({ _id: pluginId });
     }
     catch (err) {
@@ -317,6 +316,27 @@ export class GrowiPluginService implements IGrowiPluginService {
       throw new Error('Failed to delete plugin from GrowiPlugin documents.');
     }
 
+    let growiPluginsPath: fs.PathLike | undefined;
+    try {
+      growiPluginsPath = this.joinAndValidatePath(PLUGIN_STORING_PATH, growiPlugins.installedPath);
+    }
+    catch (err) {
+      logger.error(err);
+      throw new Error('The installedPath for the plugin is invalid, and the plugin has already been removed.');
+    }
+
+    if (growiPluginsPath && fs.existsSync(growiPluginsPath)) {
+      try {
+        await deleteFolder(growiPluginsPath);
+      }
+      catch (err) {
+        logger.error(err);
+        throw new Error('Failed to delete plugin repository.');
+      }
+    }
+    else {
+      logger.warn(`Plugin path does not exist : ${growiPluginsPath}`);
+    }
     return growiPlugins.meta.name;
   }
 
@@ -400,6 +420,17 @@ export class GrowiPluginService implements IGrowiPluginService {
     }
 
     return entries;
+  }
+
+  private joinAndValidatePath(baseDir: string, ...paths: string[]):fs.PathLike {
+    const joinedPath = path.join(baseDir, ...paths);
+    if (!joinedPath.startsWith(baseDir)) {
+      throw new Error(
+        'Invalid plugin path detected! Access outside of the allowed directory is not permitted.'
+        + `\nAttempted Path: ${joinedPath}`,
+      );
+    }
+    return joinedPath;
   }
 
 }

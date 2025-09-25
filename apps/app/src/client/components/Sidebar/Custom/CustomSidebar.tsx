@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, type JSX } from 'react';
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';

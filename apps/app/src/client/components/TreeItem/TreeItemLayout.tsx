@@ -1,7 +1,15 @@
 import React, {
-  useCallback, useState, useEffect, useMemo,
-  type FC, type RefObject, type RefCallback, type MouseEvent,
+  useCallback,
+  useState,
+  useEffect,
+  useMemo,
+  type RefObject,
+  type RefCallback,
+  type MouseEvent,
+  type JSX,
 } from 'react';
+
+import { addTrailingSlash } from '@growi/core/dist/utils/path-utils';
 
 import { useSWRxPageChildren } from '~/stores/page-listing';
 import { usePageTreeDescCountMap } from '~/stores/ui';
@@ -22,21 +30,21 @@ type TreeItemLayoutProps = TreeItemProps & {
   indentSize?: number,
 }
 
-export const TreeItemLayout: FC<TreeItemLayoutProps> = (props) => {
+export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
   const {
     className, itemClassName,
     indentSize = 10,
     itemLevel: baseItemLevel = 1,
-    itemNode, targetPathOrId, isOpen: _isOpen = false,
+    itemNode, targetPath, targetPathOrId, isOpen: _isOpen = false,
     onRenamed, onClick, onClickDuplicateMenuItem, onClickDeleteMenuItem, onWheelClick,
     isEnableActions, isReadOnlyUser, isWipPageShown = true,
     itemRef, itemClass,
     showAlternativeContent,
   } = props;
 
-  const { page, children } = itemNode;
+  const { page } = itemNode;
 
-  const [currentChildren, setCurrentChildren] = useState<ItemNode[]>(children);
+  const [currentChildren, setCurrentChildren] = useState<ItemNode[]>([]);
   const [isOpen, setIsOpen] = useState(_isOpen);
 
   const { data } = useSWRxPageChildren(isOpen ? page._id : null);
@@ -82,10 +90,12 @@ export const TreeItemLayout: FC<TreeItemLayoutProps> = (props) => {
     setIsOpen(!isOpen);
   }, [isOpen]);
 
-  // didMount
   useEffect(() => {
-    if (hasChildren()) setIsOpen(true);
-  }, [hasChildren]);
+    const isPathToTarget = page.path != null
+      && targetPath.startsWith(addTrailingSlash(page.path))
+      && targetPath !== page.path; // Target Page does not need to be opened
+    if (isPathToTarget) setIsOpen(true);
+  }, [targetPath, page.path]);
 
   /*
    * When swr fetch succeeded
@@ -108,6 +118,7 @@ export const TreeItemLayout: FC<TreeItemLayoutProps> = (props) => {
     isReadOnlyUser,
     isOpen: false,
     isWipPageShown,
+    targetPath,
     targetPathOrId,
     onRenamed,
     onClickDuplicateMenuItem,
@@ -168,7 +179,7 @@ export const TreeItemLayout: FC<TreeItemLayoutProps> = (props) => {
           ? (
             AlternativeComponents.map((AlternativeContent, index) => (
               // eslint-disable-next-line react/no-array-index-key
-              <AlternativeContent key={index} {...toolProps} />
+              (<AlternativeContent key={index} {...toolProps} />)
             ))
           )
           : (
@@ -177,13 +188,13 @@ export const TreeItemLayout: FC<TreeItemLayoutProps> = (props) => {
               <div className="d-hover-none">
                 {EndComponents?.map((EndComponent, index) => (
                   // eslint-disable-next-line react/no-array-index-key
-                  <EndComponent key={index} {...toolProps} />
+                  (<EndComponent key={index} {...toolProps} />)
                 ))}
               </div>
               <div className="d-none d-hover-flex">
                 {HoveredEndComponents?.map((HoveredEndContent, index) => (
                   // eslint-disable-next-line react/no-array-index-key
-                  <HoveredEndContent key={index} {...toolProps} />
+                  (<HoveredEndContent key={index} {...toolProps} />)
                 ))}
               </div>
             </>
@@ -191,13 +202,12 @@ export const TreeItemLayout: FC<TreeItemLayoutProps> = (props) => {
         }
 
       </li>
-
       { isOpen && (
         <div className={`tree-item-layout-children level-${baseItemLevel + 1}`}>
 
           {HeadObChildrenComponents?.map((HeadObChildrenContents, index) => (
             // eslint-disable-next-line react/no-array-index-key
-            <HeadObChildrenContents key={index} {...toolProps} itemLevel={baseItemLevel + 1} />
+            (<HeadObChildrenContents key={index} {...toolProps} itemLevel={baseItemLevel + 1} />)
           ))}
 
           { hasChildren() && currentChildren.map((node) => {

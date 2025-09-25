@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, type JSX } from 'react';
 
 import type { IGraphViewerGlobal } from '@growi/remark-drawio';
 import Head from 'next/head';
@@ -19,7 +19,7 @@ export const DrawioViewerScript = ({ drawioUri }: Props): JSX.Element => {
 
   const loadedHandler = useCallback(() => {
     // disable useResizeSensor and checkVisibleState
-    //   for preventing resize event by viewer.min.js
+    //   for preventing resize event by viewer-static.min.js
     GraphViewer.useResizeSensor = false;
     GraphViewer.prototype.checkVisibleState = false;
 

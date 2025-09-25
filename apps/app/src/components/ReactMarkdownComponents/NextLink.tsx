@@ -1,3 +1,5 @@
+import type { JSX } from 'react';
+
 import { pagePathUtils } from '@growi/core/dist/utils';
 import type { LinkProps } from 'next/link';
 import Link from 'next/link';

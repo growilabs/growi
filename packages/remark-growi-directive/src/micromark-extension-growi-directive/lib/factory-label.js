@@ -24,13 +24,13 @@ import { ok as assert } from 'uvu/assert';
  */
 // eslint-disable-next-line max-params
 export function factoryLabel(
-    effects,
-    ok,
-    nok,
-    type,
-    markerType,
-    stringType,
-    disallowEol,
+  effects,
+  ok,
+  nok,
+  type,
+  markerType,
+  stringType,
+  disallowEol,
 ) {
   let size = 0;
   let balance = 0;
@@ -85,8 +85,8 @@ export function factoryLabel(
     }
 
     if (
-      code === codes.leftSquareBracket
-      && ++balance > constants.linkResourceDestinationBalanceMax
+      code === codes.leftSquareBracket &&
+      ++balance > constants.linkResourceDestinationBalanceMax
     ) {
       return nok(code);
     }
@@ -113,9 +113,9 @@ export function factoryLabel(
   /** @type {State} */
   function dataEscape(code) {
     if (
-      code === codes.leftSquareBracket
-      || code === codes.backslash
-      || code === codes.rightSquareBracket
+      code === codes.leftSquareBracket ||
+      code === codes.backslash ||
+      code === codes.rightSquareBracket
     ) {
       effects.consume(code);
       size++;

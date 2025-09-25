@@ -6,7 +6,7 @@ const logger = loggerFactory('growi:middlewares:certify-shared-page-attachment:v
 
 
 export const retrieveSiteUrl = (): URL | null => {
-  const siteUrlString = configManager.getConfig('crowi', 'app:siteUrl');
+  const siteUrlString = configManager.getConfig('app:siteUrl');
   if (siteUrlString == null) {
     logger.warn("Verification referer does not work because 'Site URL' is NOT set. All of attachments in share link page is invisible.");
     return null;

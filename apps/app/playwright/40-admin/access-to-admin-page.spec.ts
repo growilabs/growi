@@ -13,16 +13,14 @@ test('admin/app is successfully loaded', async({ page }) => {
   await expect(page.getByTestId('admin-app-settings')).toBeVisible();
   // await expect(page.getByTestId('v5-page-migration')).toBeVisible();
   await expect(page.locator('#cbFileUpload')).toBeChecked();
-  await expect(page.locator('#isQuestionnaireEnabled')).toBeChecked();
-  await expect(page.locator('#isAppSiteUrlHashed')).not.toBeChecked();
 });
 
 test('admin/security is successfully loaded', async({ page }) => {
   await page.goto('/admin/security');
 
   await expect(page.getByTestId('admin-security')).toBeVisible();
-  await expect(page.locator('#isShowRestrictedByOwner')).not.toBeChecked();
-  await expect(page.locator('#isShowRestrictedByGroup')).not.toBeChecked();
+  await expect(page.locator('#isShowRestrictedByOwner')).toHaveText('Always displayed');
+  await expect(page.locator('#isShowRestrictedByGroup')).toHaveText('Always displayed');
 });
 
 test('admin/markdown is successfully loaded', async({ page }) => {

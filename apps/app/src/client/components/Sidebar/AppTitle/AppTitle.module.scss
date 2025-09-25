@@ -2,6 +2,7 @@
 @use '@growi/core-styles/scss/variables/growi-official-colors';
 @use '~/styles/variables' as var;
 @use '../button-styles';
+@use '~/styles/mixins';
 
 // GROWI Logo
 .grw-app-title :global {
@@ -16,12 +17,28 @@
     svg {
       width: $width;
       height: $height;
-      padding: (($height - $logomark-height) / 2) (($width - $logomark-width) / 2);
+      padding: (($height - $logomark-height) * 0.5) (($width - $logomark-width) * 0.5);
     }
   }
 
   .confidential-tooltip {
     max-width: 180px;
+  }
+}
+
+// == GROWI Logo when Editor mode
+@include mixins.at-editing() {
+  @include bs.media-breakpoint-up(xl) {
+    .grw-app-title :global {
+      .grw-logo {
+          opacity: 0.5;
+          transition: opacity 0.8s ease;
+
+          &:hover {
+            opacity: 1;
+          }
+      }
+    }
   }
 }
 
@@ -64,6 +81,30 @@
   width: calc(100% - $toggle-collapse-button-width);
 }
 
+// ==Sidebar Head when Editor mode
+@include bs.color-mode(light) {
+  .on-editor-sidebar-head {
+    background-color: var(
+      --on-editor-sidebar-head-bg,
+      var(
+        --grw-sidebar-nav-bg,
+        var(--grw-highlight-100)
+      )
+    );
+  }
+}
+
+@include bs.color-mode(dark) {
+  .on-editor-sidebar-head {
+    background-color: var(
+      --on-editor-sidebar-head-bg,
+      var(
+        --grw-sidebar-nav-bg,
+        var(--grw-highlight-800)
+      )
+    );
+  }
+}
 
 // == Interaction
 @keyframes bounce-to-right {

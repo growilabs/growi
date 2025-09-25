@@ -1,4 +1,4 @@
-import react, { useMemo, useRef } from 'react';
+import react, { useMemo, useRef, type JSX } from 'react';
 
 import { GlobalCodeMirrorEditorKey } from '@growi/editor';
 import { CodeMirrorEditorReadOnly } from '@growi/editor/dist/client/components/CodeMirrorEditorReadOnly';

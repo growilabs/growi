@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, type JSX } from 'react';
 
 import type { IAdminExternalAccount } from '@growi/core';
 import { format as dateFnsFormat } from 'date-fns/format';
@@ -6,6 +6,7 @@ import { useTranslation } from 'next-i18next';
 
 import AdminExternalAccountsContainer from '~/client/services/AdminExternalAccountsContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
+import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -76,7 +77,7 @@ const ExternalAccountTable = (props: ExternalAccountTableProps): JSX.Element => 
           </tr>
         </thead>
         <tbody>
-          { adminExternalAccountsContainer.state.externalAccounts.map((ea: IAdminExternalAccount) => {
+          { adminExternalAccountsContainer.state.externalAccounts.map((ea: IAdminExternalAccount<IExternalAuthProviderType>) => {
             return (
               <tr key={ea._id}>
                 <td><span>{ea.providerType}</span></td>
@@ -88,7 +89,7 @@ const ExternalAccountTable = (props: ExternalAccountTableProps): JSX.Element => 
                     : (<span className="badge bg-warning text-dark">{t('user_management.unset')}</span>)
                   }
                 </td>
-                <td>{dateFnsFormat(new Date(ea.createdAt), 'yyyy-MM-dd')}</td>
+                <td>{dateFnsFormat(ea.createdAt, 'yyyy-MM-dd')}</td>
                 <td>
                   <div className="btn-group admin-user-menu">
                     <button type="button" className="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">

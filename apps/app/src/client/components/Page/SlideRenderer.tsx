@@ -1,8 +1,11 @@
+import type { JSX } from 'react';
+
 import type { Options as ReactMarkdownOptions } from 'react-markdown';
 
 import { usePresentationViewOptions } from '~/stores/renderer';
 
 import { Slides } from '../Presentation/Slides';
+
 
 type SlideRendererProps = {
   markdown: string,

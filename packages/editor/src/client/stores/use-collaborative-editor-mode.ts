@@ -2,136 +2,144 @@ import { useEffect, useState } from 'react';
 
 import { keymap } from '@codemirror/view';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
-import { useGlobalSocket } from '@growi/core/dist/swr';
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next';
 import { SocketIOProvider } from 'y-socket.io';
 import * as Y from 'yjs';
 
 import { userColor } from '../../consts';
+import type { EditingClient } from '../../interfaces';
 import type { UseCodeMirrorEditor } from '../services';
 
-type UserLocalState = {
-  name: string;
-  user?: IUserHasId;
-  color: string;
-  colorLight: string;
+import { useSecondaryYdocs } from './use-secondary-ydocs';
+
+
+type Configuration = {
+  user?: IUserHasId,
+  pageId?: string,
+  reviewMode?: boolean,
+  onEditorsUpdated?: (clientList: EditingClient[]) => void,
 }
 
 export const useCollaborativeEditorMode = (
     isEnabled: boolean,
-    user?: IUserHasId,
-    pageId?: string,
-    initialValue?: string,
-    onEditorsUpdated?: (userList: IUserHasId[]) => void,
     codeMirrorEditor?: UseCodeMirrorEditor,
+    configuration?: Configuration,
 ): void => {
-  const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
-  const [provider, setProvider] = useState<SocketIOProvider | null>(null);
-  const [cPageId, setCPageId] = useState(pageId);
+  const {
+    user, pageId, onEditorsUpdated, reviewMode,
+  } = configuration ?? {};
 
-  const { data: socket } = useGlobalSocket();
+  const { primaryDoc, activeDoc } = useSecondaryYdocs(isEnabled, {
+    pageId,
+    useSecondary: reviewMode,
+  }) ?? {};
 
-  // Cleanup Ydoc
+  const [provider, setProvider] = useState<SocketIOProvider>();
+
+
+  // reset editors
   useEffect(() => {
-    if (cPageId === pageId && isEnabled) {
-      return;
-    }
-
-    ydoc?.destroy();
-    setYdoc(null);
-
-    // NOTICE: Destroying the provider leaves awareness in the other user's connection,
-    // so only awareness is destroyed here
-    provider?.awareness.destroy();
-
-    setCPageId(pageId);
-
-    // reset editors
+    if (!isEnabled) return;
     onEditorsUpdated?.([]);
-  }, [cPageId, isEnabled, onEditorsUpdated, pageId, provider?.awareness, socket, ydoc]);
-
-  // Setup Ydoc
-  useEffect(() => {
-    if (ydoc != null || !isEnabled) {
-      return;
-    }
-
-    // NOTICE: Old provider destroy at the time of ydoc setup,
-    // because the awareness destroying is not sync to other clients
-    provider?.destroy();
-    setProvider(null);
-
-    const _ydoc = new Y.Doc();
-    setYdoc(_ydoc);
-  }, [isEnabled, provider, ydoc]);
+  }, [isEnabled, onEditorsUpdated]);
 
   // Setup provider
   useEffect(() => {
-    if (provider != null || pageId == null || ydoc == null || socket == null || onEditorsUpdated == null) {
-      return;
-    }
 
-    const socketIOProvider = new SocketIOProvider(
-      '/',
-      pageId,
-      ydoc,
-      {
-        autoConnect: true,
-        resyncInterval: 3000,
-      },
-    );
+    let _provider: SocketIOProvider | undefined;
+    let providerSyncHandler: (isSync: boolean) => void;
+    let updateAwarenessHandler: (update: { added: number[]; updated: number[]; removed: number[]; }) => void;
 
-    const userLocalState: UserLocalState = {
-      name: user?.name ? `${user.name}` : `Guest User ${Math.floor(Math.random() * 100)}`,
-      user,
-      color: userColor.color,
-      colorLight: userColor.light,
+    setProvider(() => {
+      if (!isEnabled || pageId == null || primaryDoc == null) {
+        return undefined;
+      }
+
+      _provider = new SocketIOProvider(
+        '/',
+        pageId,
+        primaryDoc,
+        {
+          autoConnect: true,
+          resyncInterval: 3000,
+        },
+      );
+
+      const userLocalState: EditingClient = {
+        clientId: primaryDoc.clientID,
+        name: user?.name ?? `Guest User ${Math.floor(Math.random() * 100)}`,
+        userId: user?._id,
+        username: user?.username,
+        imageUrlCached: user?.imageUrlCached,
+        color: userColor.color,
+        colorLight: userColor.light,
+      };
+
+      const { awareness } = _provider;
+      awareness.setLocalStateField('editors', userLocalState);
+
+      providerSyncHandler = (isSync: boolean) => {
+        if (isSync && onEditorsUpdated != null) {
+          const clientList: EditingClient[] = Array.from(awareness.getStates().values(), value => value.editors);
+          if (Array.isArray(clientList)) {
+            onEditorsUpdated(clientList);
+          }
+        }
+      };
+
+      _provider.on('sync', providerSyncHandler);
+
+      // update args type see: SocketIOProvider.Awareness.awarenessUpdate
+      updateAwarenessHandler = (update: { added: number[]; updated: number[]; removed: number[]; }) => {
+        // remove the states of disconnected clients
+        update.removed.forEach(clientId => awareness.states.delete(clientId));
+
+        // update editor list
+        if (onEditorsUpdated != null) {
+          const clientList: EditingClient[] = Array.from(awareness.states.values(), value => value.editors);
+          if (Array.isArray(clientList)) {
+            onEditorsUpdated(clientList);
+          }
+        }
+      };
+
+      awareness.on('update', updateAwarenessHandler);
+
+      return _provider;
+    });
+
+    return () => {
+      _provider?.awareness.setLocalState(null);
+      _provider?.awareness.off('update', updateAwarenessHandler);
+      _provider?.off('sync', providerSyncHandler);
+      _provider?.disconnect();
+      _provider?.destroy();
     };
-
-    socketIOProvider.awareness.setLocalStateField('user', userLocalState);
-
-    socketIOProvider.on('sync', (isSync: boolean) => {
-      if (isSync) {
-        const userList: IUserHasId[] = Array.from(socketIOProvider.awareness.states.values(), value => value.user.user && value.user.user);
-        onEditorsUpdated(userList);
-      }
-    });
-
-    // update args type see: SocketIOProvider.Awareness.awarenessUpdate
-    socketIOProvider.awareness.on('update', (update: { added: unknown[]; removed: unknown[]; }) => {
-      const { added, removed } = update;
-      if (added.length > 0 || removed.length > 0) {
-        const userList: IUserHasId[] = Array.from(socketIOProvider.awareness.states.values(), value => value.user.user && value.user.user);
-        onEditorsUpdated(userList);
-      }
-    });
-
-    setProvider(socketIOProvider);
-  }, [initialValue, onEditorsUpdated, pageId, provider, socket, user, ydoc]);
+  }, [isEnabled, primaryDoc, onEditorsUpdated, pageId, user]);
 
   // Setup Ydoc Extensions
   useEffect(() => {
-    if (ydoc == null || provider == null || codeMirrorEditor == null) {
+    if (!isEnabled || !primaryDoc || !activeDoc || !provider || !codeMirrorEditor) {
       return;
     }
 
-    const ytext = ydoc.getText('codemirror');
-    const undoManager = new Y.UndoManager(ytext);
+    const activeText = activeDoc.getText('codemirror');
 
-    codeMirrorEditor.initDoc(ytext.toString());
+    const undoManager = new Y.UndoManager(activeText);
 
-    const cleanupYUndoManagerKeymap = codeMirrorEditor.appendExtensions([
+    // initialize document with activeDoc text
+    codeMirrorEditor.initDoc(activeText.toString());
+
+    const extensions = [
       keymap.of(yUndoManagerKeymap),
-    ]);
-    const cleanupYCollab = codeMirrorEditor.appendExtensions([
-      yCollab(ytext, provider.awareness, { undoManager }),
-    ]);
+      yCollab(activeText, provider.awareness, { undoManager }),
+    ];
+
+    const cleanupFunctions = extensions.map(ext => codeMirrorEditor.appendExtensions([ext]));
 
     return () => {
-      cleanupYUndoManagerKeymap?.();
-      cleanupYCollab?.();
-      // clean up editor
+      cleanupFunctions.forEach(cleanup => cleanup?.());
       codeMirrorEditor.initDoc('');
     };
-  }, [codeMirrorEditor, provider, ydoc]);
+  }, [isEnabled, codeMirrorEditor, provider, primaryDoc, activeDoc, reviewMode]);
 };

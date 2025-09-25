@@ -7,6 +7,7 @@ import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity
 import injectResetOrderByTokenMiddleware from '~/server/middlewares/inject-reset-order-by-token-middleware';
 import PasswordResetOrder from '~/server/models/password-reset-order';
 import { configManager } from '~/server/service/config-manager';
+import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
@@ -40,6 +41,7 @@ const { body } = require('express-validator');
 
 const router = express.Router();
 
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
   const { appService, mailService } = crowi;
   const User = crowi.model('User');
@@ -49,7 +51,7 @@ module.exports = (crowi) => {
 
   const activityEvent = crowi.event('activity');
 
-  const minPasswordLength = configManager.getConfig('crowi', 'app:minPasswordLength');
+  const minPasswordLength = configManager.getConfig('app:minPasswordLength');
 
   const validator = {
     password: [
@@ -96,7 +98,7 @@ module.exports = (crowi) => {
    *      summary: Request password reset
    *      tags: [Users]
    *      security:
-   *        -
+   *        - cookieAuth: []
    *      requestBody:
    *        required: true
    *        content:
@@ -118,8 +120,8 @@ module.exports = (crowi) => {
    */
   router.post('/', checkPassportStrategyMiddleware, validator.email, apiV3FormValidator, addActivity, async(req, res) => {
     const { email } = req.body;
-    const locale = configManager.getConfig('crowi', 'app:globalLang');
-    const appUrl = appService.getSiteUrl();
+    const locale = configManager.getConfig('app:globalLang');
+    const appUrl = growiInfoService.getSiteUrl();
 
     try {
       const user = await User.findOne({ email });
@@ -158,7 +160,7 @@ module.exports = (crowi) => {
    *      summary: Reset password
    *      tags: [Users]
    *      security:
-   *        -
+   *        - cookieAuth: []
    *      requestBody:
    *        required: true
    *        content:
@@ -185,7 +187,7 @@ module.exports = (crowi) => {
   router.put('/', checkPassportStrategyMiddleware, injectResetOrderByTokenMiddleware, validator.password, apiV3FormValidator, addActivity, async(req, res) => {
     const { passwordResetOrder } = req;
     const { email } = passwordResetOrder;
-    const grobalLang = configManager.getConfig('crowi', 'app:globalLang');
+    const grobalLang = configManager.getConfig('app:globalLang');
     const i18n = grobalLang || req.language;
     const { newPassword } = req.body;
 

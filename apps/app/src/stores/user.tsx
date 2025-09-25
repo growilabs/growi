@@ -4,6 +4,7 @@ import useSWR from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
+import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 import { checkAndUpdateImageUrlCached } from '~/stores/middlewares/user';
 
 export const useSWRxUsersList = (userIds: string[]): SWRResponse<IUserHasId[], Error> => {
@@ -47,5 +48,16 @@ export const useSWRxUsernames = (q: string, offset?: number, limit?: number, opt
     ([endpoint, q, offset, limit, options]) => apiv3Get(endpoint, {
       q, offset, limit, options,
     }).then(result => result.data),
+  );
+};
+
+type RelatedGroupsResponse = {
+  relatedGroups: PopulatedGrantedGroup[]
+}
+
+export const useSWRxUserRelatedGroups = (): SWRResponse<RelatedGroupsResponse, Error> => {
+  return useSWRImmutable<RelatedGroupsResponse>(
+    ['/user/related-groups'],
+    ([endpoint]) => apiv3Get(endpoint).then(response => response.data),
   );
 };

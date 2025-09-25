@@ -1,4 +1,4 @@
-import type { DetailedHTMLProps } from 'react';
+import type { DetailedHTMLProps, JSX } from 'react';
 
 import styles from './GroundGlassBar.module.scss';
 

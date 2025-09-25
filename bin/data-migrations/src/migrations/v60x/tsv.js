@@ -7,7 +7,7 @@ module.exports = [
    * @type {MigrationModule}
    */
   (body) => {
-    const oldTsvTableRegExp = /::: tsv(-h)?\n([\s\S]*?)\n:::/g; // TSV old format
+    const oldTsvTableRegExp = /:::\s?tsv(-h)?\n([\s\S]*?)\n:::/g; // TSV old format
     return body.replace(oldTsvTableRegExp, '``` tsv$1\n$2\n```');
   },
 ];

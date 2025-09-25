@@ -2,6 +2,7 @@ import ExternalUserGroupRelation from '~/features/external-user-group/server/mod
 import { SupportedAction } from '~/interfaces/activity';
 import loggerFactory from '~/utils/logger';
 
+import type Crowi from '../crowi';
 import UserGroupRelation from '../models/user-group-relation';
 import { isSearchError } from '../models/vo/search-error';
 
@@ -13,28 +14,30 @@ const logger = loggerFactory('growi:routes:search');
  *
  *   components:
  *     schemas:
+ *       ElasticsearchResultMeta:
+ *         type: object
+ *         properties:
+ *           took:
+ *             type: number
+ *             description: Time Elasticsearch took to execute a search(milliseconds)
+ *             example: 34
+ *           total:
+ *             type: number
+ *             description: Number of documents matching search criteria
+ *             example: 2
+ *           results:
+ *             type: number
+ *             description: Actual array length of search results
+ *             example: 2
+ *
  *       ElasticsearchResult:
  *         description: Elasticsearch result v1
  *         type: object
  *         properties:
  *           meta:
- *             type: object
- *             properties:
- *               took:
- *                 type: number
- *                 description: Time Elasticsearch took to execute a search(milliseconds)
- *                 example: 34
- *               total:
- *                 type: number
- *                 description: Number of documents matching search criteria
- *                 example: 2
- *               results:
- *                 type: number
- *                 description: Actual array length of search results
- *                 example: 2
- *
+ *             $ref: '#/components/schemas/ElasticsearchResultMeta'
  */
-module.exports = function(crowi, app) {
+module.exports = function(crowi: Crowi, app) {
   const ApiResponse = require('../util/apiResponse');
   const ApiPaginate = require('../util/apiPaginate');
 
@@ -61,39 +64,41 @@ module.exports = function(crowi, app) {
    *         - in: query
    *           name: path
    *           schema:
-   *             $ref: '#/components/schemas/Page/properties/path'
+   *             $ref: '#/components/schemas/PagePath'
    *         - in: query
    *           name: offset
    *           schema:
-   *             $ref: '#/components/schemas/V1PaginateResult/properties/meta/properties/offset'
+   *             $ref: '#/components/schemas/Offset'
    *         - in: query
    *           name: limit
    *           schema:
-   *             $ref: '#/components/schemas/V1PaginateResult/properties/meta/properties/limit'
+   *             $ref: '#/components/schemas/Limit'
    *       responses:
    *         200:
    *           description: Succeeded to get list of pages.
    *           content:
    *             application/json:
    *               schema:
-   *                 properties:
-   *                   ok:
-   *                     $ref: '#/components/schemas/V1Response/properties/ok'
-   *                   meta:
-   *                     $ref: '#/components/schemas/ElasticsearchResult/properties/meta'
-   *                   totalCount:
-   *                     type: integer
-   *                     description: total count of pages
-   *                     example: 35
-   *                   data:
-   *                     type: array
-   *                     items:
-   *                       $ref: '#/components/schemas/Page'
-   *                     description: page list
+   *                 allOf:
+   *                   - $ref: '#/components/schemas/ApiResponseSuccess'
+   *                   - type: object
+   *                     properties:
+   *                       meta:
+   *                         $ref: '#/components/schemas/ElasticsearchResultMeta'
+   *                         description: Elasticsearch metadata
+   *                       totalCount:
+   *                         type: integer
+   *                         description: total count of pages
+   *                         example: 35
+   *                       data:
+   *                         type: array
+   *                         items:
+   *                           $ref: '#/components/schemas/Page'
+   *                         description: page list
    *         403:
-   *           $ref: '#/components/responses/403'
+   *           $ref: '#/components/responses/Forbidden'
    *         500:
-   *           $ref: '#/components/responses/500'
+   *           $ref: '#/components/responses/InternalServerError'
    */
   /**
    * @api {get} /search search page

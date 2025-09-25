@@ -1,7 +1,10 @@
+import type { JSX } from 'react';
+
 import type { IPage, IPagePopulatedToShowRevision } from '@growi/core';
 import dynamic from 'next/dynamic';
 
 import styles from './PageContentFooter.module.scss';
+
 
 const AuthorInfo = dynamic(() => import('~/client/components/AuthorInfo').then(mod => mod.AuthorInfo), { ssr: false });
 
@@ -22,12 +25,10 @@ export const PageContentFooter = (props: PageContentFooterProps): JSX.Element =>
   }
 
   return (
-    <div className={`${styles['page-content-footer']} page-content-footer py-4 d-edit-none d-print-none}`}>
-      <div className="container-lg grw-container-convertible">
-        <div className="page-meta">
-          <AuthorInfo user={creator} date={createdAt} mode="create" locate="footer" />
-          <AuthorInfo user={lastUpdateUser} date={updatedAt} mode="update" locate="footer" />
-        </div>
+    <div className={`${styles['page-content-footer']} my-4 pt-4 d-edit-none d-print-none}`}>
+      <div className="page-meta">
+        <AuthorInfo user={creator} date={createdAt} mode="create" locate="footer" />
+        <AuthorInfo user={lastUpdateUser} date={updatedAt} mode="update" locate="footer" />
       </div>
     </div>
   );

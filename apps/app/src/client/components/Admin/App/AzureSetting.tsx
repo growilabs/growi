@@ -1,6 +1,9 @@
+import type { JSX } from 'react';
+
 import { useTranslation } from 'next-i18next';
 
 import MaskedInput from './MaskedInput';
+
 
 export type AzureSettingMoleculeProps = {
   azureReferenceFileWithRelayMode
@@ -115,12 +118,12 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
               <MaskedInput
                 name="azureTenantId"
                 readOnly={azureUseOnlyEnvVars}
-                defaultValue={azureTenantId}
+                value={azureTenantId}
                 onChange={e => props?.onChangeAzureTenantId(e.target.value)}
               />
             </td>
             <td>
-              <MaskedInput name="envAzureTenantId" defaultValue={envAzureTenantId || ''} readOnly tabIndex={-1} />
+              <MaskedInput name="envAzureTenantId" value={envAzureTenantId || ''} readOnly tabIndex={-1} />
               <p className="form-text text-muted">
                 {/* eslint-disable-next-line react/no-danger */}
                 <small dangerouslySetInnerHTML={{ __html: t('admin:app_setting.use_env_var_if_empty', { variable: 'AZURE_TENANT_ID' }) }} />
@@ -133,12 +136,12 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
               <MaskedInput
                 name="azureClientId"
                 readOnly={azureUseOnlyEnvVars}
-                defaultValue={azureClientId}
+                value={azureClientId}
                 onChange={e => props?.onChangeAzureClientId(e.target.value)}
               />
             </td>
             <td>
-              <MaskedInput name="envAzureClientId" defaultValue={envAzureClientId || ''} readOnly tabIndex={-1} />
+              <MaskedInput name="envAzureClientId" value={envAzureClientId || ''} readOnly tabIndex={-1} />
               <p className="form-text text-muted">
                 {/* eslint-disable-next-line react/no-danger */}
                 <small dangerouslySetInnerHTML={{ __html: t('admin:app_setting.use_env_var_if_empty', { variable: 'AZURE_CLIENT_ID' }) }} />
@@ -151,12 +154,12 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
               <MaskedInput
                 name="azureClientSecret"
                 readOnly={azureUseOnlyEnvVars}
-                defaultValue={azureClientSecret}
+                value={azureClientSecret}
                 onChange={e => props?.onChangeAzureClientSecret(e.target.value)}
               />
             </td>
             <td>
-              <MaskedInput name="envAzureClientSecret" defaultValue={envAzureClientSecret || ''} readOnly tabIndex={-1} />
+              <MaskedInput name="envAzureClientSecret" value={envAzureClientSecret || ''} readOnly tabIndex={-1} />
               <p className="form-text text-muted">
                 {/* eslint-disable-next-line react/no-danger */}
                 <small dangerouslySetInnerHTML={{ __html: t('admin:app_setting.use_env_var_if_empty', { variable: 'AZURE_CLIENT_SECRET' }) }} />
@@ -171,7 +174,7 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
                 type="text"
                 name="azureStorageAccountName"
                 readOnly={azureUseOnlyEnvVars}
-                defaultValue={azureStorageAccountName}
+                value={azureStorageAccountName}
                 onChange={e => props?.onChangeAzureStorageAccountName(e.target.value)}
               />
             </td>
@@ -191,7 +194,7 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
                 type="text"
                 name="azureStorageContainerName"
                 readOnly={azureUseOnlyEnvVars}
-                defaultValue={azureStorageContainerName}
+                value={azureStorageContainerName}
                 onChange={e => props?.onChangeAzureStorageContainerName(e.target.value)}
               />
             </td>

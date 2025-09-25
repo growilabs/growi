@@ -1,3 +1,6 @@
+import {
+  ConfigSource, toNonBlankString, toNonBlankStringOrUndefined, SCOPE,
+} from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { body } from 'express-validator';
 
@@ -5,6 +8,7 @@ import { i18n } from '^/config/next-i18next.config';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
@@ -102,9 +106,6 @@ const router = express.Router();
  *          isMaintenanceMode:
  *            type: boolean
  *            example: false
- *          isQuestionnaireEnabled:
- *            type: boolean
- *            example: true
  *          isV5Compatible:
  *            type: boolean
  *            example: true
@@ -313,19 +314,8 @@ const router = express.Router();
  *          azureReferenceFileWithRelayMode:
  *            type: boolean
  *            description: is enable internal stream system for azure file request
- *      QuestionnaireSettingParams:
- *        description: QuestionnaireSettingParams
- *        type: object
- *        properties:
- *          isQuestionnaireEnabled:
- *            type: boolean
- *            description: is questionnaire enabled, or not
- *            example: true
- *          isAppSiteUrlHashed:
- *            type: boolean
- *            description: is app site url hashed, or not
  */
-
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
   const loginRequiredStrictly = require('../../middlewares/login-required')(crowi);
   const adminRequired = require('../../middlewares/admin-required')(crowi);
@@ -365,6 +355,7 @@ module.exports = (crowi) => {
       body('gcsBucket').trim(),
       body('gcsUploadNamespace').trim(),
       body('gcsReferenceFileWithRelayMode').if(value => value != null).isBoolean(),
+      body('s3Bucket').trim(),
       body('s3Region')
         .trim()
         .if(value => value !== '')
@@ -385,7 +376,6 @@ module.exports = (crowi) => {
           }
           return true;
         }),
-      body('s3Bucket').trim(),
       body('s3AccessKeyId').trim().if(value => value !== '').matches(/^[\da-zA-Z]+$/),
       body('s3SecretAccessKey').trim(),
       body('s3ReferenceFileWithRelayMode').if(value => value != null).isBoolean(),
@@ -396,10 +386,6 @@ module.exports = (crowi) => {
       body('azureStorageStorageName').trim(),
       body('azureReferenceFileWithRelayMode').if(value => value != null).isBoolean(),
 
-    ],
-    questionnaireSettings: [
-      body('isQuestionnaireEnabled').isBoolean(),
-      body('isAppSiteUrlHashed').isBoolean(),
     ],
     pageBulkExportSettings: [
       body('isBulkExportPagesEnabled').isBoolean(),
@@ -416,9 +402,9 @@ module.exports = (crowi) => {
    *    /app-settings:
    *      get:
    *        tags: [AppSettings]
-   *        operationId: getAppSettings
    *        security:
-   *          - api_key: []
+   *          - bearer: []
+   *          - accessTokenInQuery: []
    *        summary: /app-settings
    *        description: get app setting params
    *        responses:
@@ -432,73 +418,72 @@ module.exports = (crowi) => {
    *                      type: object
    *                      $ref: '#/components/schemas/AppSettingParams'
    */
-  router.get('/', accessTokenParser, loginRequiredStrictly, adminRequired, async(req, res) => {
+  router.get('/', accessTokenParser([SCOPE.READ.ADMIN.APP], { acceptLegacy: true }), loginRequiredStrictly, adminRequired, async(req, res) => {
     const appSettingsParams = {
-      title: crowi.configManager.getConfig('crowi', 'app:title'),
-      confidential: crowi.configManager.getConfig('crowi', 'app:confidential'),
-      globalLang: crowi.configManager.getConfig('crowi', 'app:globalLang'),
-      isEmailPublishedForNewUser: crowi.configManager.getConfig('crowi', 'customize:isEmailPublishedForNewUser'),
-      fileUpload: crowi.configManager.getConfig('crowi', 'app:fileUpload'),
-      useOnlyEnvVarsForIsBulkExportPagesEnabled: crowi.configManager.getConfig('crowi', 'env:useOnlyEnvVars:app:isBulkExportPagesEnabled'),
-      isV5Compatible: crowi.configManager.getConfig('crowi', 'app:isV5Compatible'),
-      siteUrl: crowi.configManager.getConfig('crowi', 'app:siteUrl'),
-      siteUrlUseOnlyEnvVars: crowi.configManager.getConfig('crowi', 'app:siteUrl:useOnlyEnvVars'),
-      envSiteUrl: crowi.configManager.getConfigFromEnvVars('crowi', 'app:siteUrl'),
+      title: configManager.getConfig('app:title'),
+      confidential: configManager.getConfig('app:confidential'),
+      globalLang: configManager.getConfig('app:globalLang'),
+      isEmailPublishedForNewUser: configManager.getConfig('customize:isEmailPublishedForNewUser'),
+      fileUpload: configManager.getConfig('app:fileUpload'),
+      useOnlyEnvVarsForIsBulkExportPagesEnabled: configManager.getConfig('env:useOnlyEnvVars:app:isBulkExportPagesEnabled'),
+      isV5Compatible: configManager.getConfig('app:isV5Compatible'),
+      siteUrl: configManager.getConfig('app:siteUrl'),
+      siteUrlUseOnlyEnvVars: configManager.getConfig('env:useOnlyEnvVars:app:siteUrl'),
+      envSiteUrl: configManager.getConfig('app:siteUrl', ConfigSource.env),
       isMailerSetup: crowi.mailService.isMailerSetup,
-      fromAddress: crowi.configManager.getConfig('crowi', 'mail:from'),
+      fromAddress: configManager.getConfig('mail:from'),
 
-      transmissionMethod: crowi.configManager.getConfig('crowi', 'mail:transmissionMethod'),
-      smtpHost: crowi.configManager.getConfig('crowi', 'mail:smtpHost'),
-      smtpPort: crowi.configManager.getConfig('crowi', 'mail:smtpPort'),
-      smtpUser: crowi.configManager.getConfig('crowi', 'mail:smtpUser'),
-      smtpPassword: crowi.configManager.getConfig('crowi', 'mail:smtpPassword'),
-      sesAccessKeyId: crowi.configManager.getConfig('crowi', 'mail:sesAccessKeyId'),
-      sesSecretAccessKey: crowi.configManager.getConfig('crowi', 'mail:sesSecretAccessKey'),
+      transmissionMethod: configManager.getConfig('mail:transmissionMethod'),
+      smtpHost: configManager.getConfig('mail:smtpHost'),
+      smtpPort: configManager.getConfig('mail:smtpPort'),
+      smtpUser: configManager.getConfig('mail:smtpUser'),
+      smtpPassword: configManager.getConfig('mail:smtpPassword'),
+      sesAccessKeyId: configManager.getConfig('mail:sesAccessKeyId'),
+      sesSecretAccessKey: configManager.getConfig('mail:sesSecretAccessKey'),
 
-      fileUploadType: crowi.configManager.getConfig('crowi', 'app:fileUploadType'),
-      envFileUploadType: crowi.configManager.getConfigFromEnvVars('crowi', 'app:fileUploadType'),
-      useOnlyEnvVarForFileUploadType: crowi.configManager.getConfig('crowi', 'app:useOnlyEnvVarForFileUploadType'),
+      fileUploadType: configManager.getConfig('app:fileUploadType'),
+      envFileUploadType: configManager.getConfig('app:fileUploadType', ConfigSource.env),
+      useOnlyEnvVarForFileUploadType: configManager.getConfig('env:useOnlyEnvVars:app:fileUploadType'),
 
-      s3Region: crowi.configManager.getConfig('crowi', 'aws:s3Region'),
-      s3CustomEndpoint: crowi.configManager.getConfig('crowi', 'aws:s3CustomEndpoint'),
-      s3Bucket: crowi.configManager.getConfig('crowi', 'aws:s3Bucket'),
-      s3AccessKeyId: crowi.configManager.getConfig('crowi', 'aws:s3AccessKeyId'),
-      s3ReferenceFileWithRelayMode: crowi.configManager.getConfig('crowi', 'aws:referenceFileWithRelayMode'),
+      s3Region: configManager.getConfig('aws:s3Region'),
+      s3CustomEndpoint: configManager.getConfig('aws:s3CustomEndpoint'),
+      s3Bucket: configManager.getConfig('aws:s3Bucket'),
+      s3AccessKeyId: configManager.getConfig('aws:s3AccessKeyId'),
+      s3ReferenceFileWithRelayMode: configManager.getConfig('aws:referenceFileWithRelayMode'),
 
-      gcsUseOnlyEnvVars: crowi.configManager.getConfig('crowi', 'gcs:useOnlyEnvVarsForSomeOptions'),
-      gcsApiKeyJsonPath: crowi.configManager.getConfig('crowi', 'gcs:apiKeyJsonPath'),
-      gcsBucket: crowi.configManager.getConfig('crowi', 'gcs:bucket'),
-      gcsUploadNamespace: crowi.configManager.getConfig('crowi', 'gcs:uploadNamespace'),
-      gcsReferenceFileWithRelayMode: crowi.configManager.getConfig('crowi', 'gcs:referenceFileWithRelayMode'),
+      gcsUseOnlyEnvVars: configManager.getConfig('env:useOnlyEnvVars:gcs'),
+      gcsApiKeyJsonPath: configManager.getConfig('gcs:apiKeyJsonPath'),
+      gcsBucket: configManager.getConfig('gcs:bucket'),
+      gcsUploadNamespace: configManager.getConfig('gcs:uploadNamespace'),
+      gcsReferenceFileWithRelayMode: configManager.getConfig('gcs:referenceFileWithRelayMode'),
 
-      envGcsApiKeyJsonPath: crowi.configManager.getConfigFromEnvVars('crowi', 'gcs:apiKeyJsonPath'),
-      envGcsBucket: crowi.configManager.getConfigFromEnvVars('crowi', 'gcs:bucket'),
-      envGcsUploadNamespace: crowi.configManager.getConfigFromEnvVars('crowi', 'gcs:uploadNamespace'),
+      envGcsApiKeyJsonPath: configManager.getConfig('gcs:apiKeyJsonPath', ConfigSource.env),
+      envGcsBucket: configManager.getConfig('gcs:bucket', ConfigSource.env),
+      envGcsUploadNamespace: configManager.getConfig('gcs:uploadNamespace', ConfigSource.env),
 
-      azureUseOnlyEnvVars: crowi.configManager.getConfig('crowi', 'azure:useOnlyEnvVarsForSomeOptions'),
-      azureTenantId: crowi.configManager.getConfigFromDB('crowi', 'azure:tenantId'),
-      azureClientId: crowi.configManager.getConfigFromDB('crowi', 'azure:clientId'),
-      azureClientSecret: crowi.configManager.getConfigFromDB('crowi', 'azure:clientSecret'),
-      azureStorageAccountName: crowi.configManager.getConfigFromDB('crowi', 'azure:storageAccountName'),
-      azureStorageContainerName: crowi.configManager.getConfigFromDB('crowi', 'azure:storageContainerName'),
-      azureReferenceFileWithRelayMode: crowi.configManager.getConfig('crowi', 'azure:referenceFileWithRelayMode'),
+      azureUseOnlyEnvVars: configManager.getConfig('env:useOnlyEnvVars:azure'),
+      azureTenantId: configManager.getConfig('azure:tenantId', ConfigSource.db),
+      azureClientId: configManager.getConfig('azure:clientId', ConfigSource.db),
+      azureClientSecret: configManager.getConfig('azure:clientSecret', ConfigSource.db),
+      azureStorageAccountName: configManager.getConfig('azure:storageAccountName', ConfigSource.db),
+      azureStorageContainerName: configManager.getConfig('azure:storageContainerName', ConfigSource.db),
+      azureReferenceFileWithRelayMode: configManager.getConfig('azure:referenceFileWithRelayMode'),
 
-      envAzureTenantId: crowi.configManager.getConfigFromEnvVars('crowi', 'azure:tenantId'),
-      envAzureClientId: crowi.configManager.getConfigFromEnvVars('crowi', 'azure:clientId'),
-      envAzureClientSecret: crowi.configManager.getConfigFromEnvVars('crowi', 'azure:clientSecret'),
-      envAzureStorageAccountName: crowi.configManager.getConfigFromEnvVars('crowi', 'azure:storageAccountName'),
-      envAzureStorageContainerName: crowi.configManager.getConfigFromEnvVars('crowi', 'azure:storageContainerName'),
+      envAzureTenantId: configManager.getConfig('azure:tenantId', ConfigSource.env),
+      envAzureClientId: configManager.getConfig('azure:clientId', ConfigSource.env),
+      envAzureClientSecret: configManager.getConfig('azure:clientSecret', ConfigSource.env),
+      envAzureStorageAccountName: configManager.getConfig('azure:storageAccountName', ConfigSource.env),
+      envAzureStorageContainerName: configManager.getConfig('azure:storageContainerName', ConfigSource.env),
 
-      isEnabledPlugins: crowi.configManager.getConfig('crowi', 'plugin:isEnabledPlugins'),
+      isEnabledPlugins: configManager.getConfig('plugin:isEnabledPlugins'),
 
-      isQuestionnaireEnabled: crowi.configManager.getConfig('crowi', 'questionnaire:isQuestionnaireEnabled'),
-      isAppSiteUrlHashed: crowi.configManager.getConfig('crowi', 'questionnaire:isAppSiteUrlHashed'),
+      isMaintenanceMode: configManager.getConfig('app:isMaintenanceMode'),
 
-      isMaintenanceMode: crowi.configManager.getConfig('crowi', 'app:isMaintenanceMode'),
-
-      isBulkExportPagesEnabled: crowi.configManager.getConfig('crowi', 'app:isBulkExportPagesEnabled'),
-      envIsBulkExportPagesEnabled: crowi.configManager.getConfigFromEnvVars('crowi', 'app:isBulkExportPagesEnabled'),
-      bulkExportDownloadExpirationSeconds: crowi.configManager.getConfig('crowi', 'app:bulkExportDownloadExpirationSeconds'),
+      isBulkExportPagesEnabled: configManager.getConfig('app:isBulkExportPagesEnabled'),
+      envIsBulkExportPagesEnabled: configManager.getConfig('app:isBulkExportPagesEnabled'),
+      bulkExportDownloadExpirationSeconds: configManager.getConfig('app:bulkExportDownloadExpirationSeconds'),
+      // TODO: remove this property when bulk export can be relased for cloud (https://redmine.weseek.co.jp/issues/163220)
+      isBulkExportDisabledForCloud: configManager.getConfig('app:growiCloudUri') != null,
     };
     return res.apiv3({ appSettingsParams });
 
@@ -510,7 +495,6 @@ module.exports = (crowi) => {
    *    /app-settings/app-setting:
    *      put:
    *        tags: [AppSettings]
-   *        operationId: updateAppSettings
    *        security:
    *          - cookieAuth: []
    *        summary: /app-settings/app-setting
@@ -533,37 +517,39 @@ module.exports = (crowi) => {
    *                      type: object
    *                      $ref: '#/components/schemas/AppSettingPutParams'
    */
-  router.put('/app-setting', loginRequiredStrictly, adminRequired, addActivity, validator.appSetting, apiV3FormValidator, async(req, res) => {
-    const requestAppSettingParams = {
-      'app:title': req.body.title,
-      'app:confidential': req.body.confidential,
-      'app:globalLang': req.body.globalLang,
-      'customize:isEmailPublishedForNewUser': req.body.isEmailPublishedForNewUser,
-      'app:fileUpload': req.body.fileUpload,
-    };
-
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestAppSettingParams);
-      const appSettingParams = {
-        title: crowi.configManager.getConfig('crowi', 'app:title'),
-        confidential: crowi.configManager.getConfig('crowi', 'app:confidential'),
-        globalLang: crowi.configManager.getConfig('crowi', 'app:globalLang'),
-        isEmailPublishedForNewUser: crowi.configManager.getConfig('crowi', 'customize:isEmailPublishedForNewUser'),
-        fileUpload: crowi.configManager.getConfig('crowi', 'app:fileUpload'),
+  router.put('/app-setting', accessTokenParser([SCOPE.WRITE.ADMIN.APP]), loginRequiredStrictly, adminRequired, addActivity,
+    validator.appSetting, apiV3FormValidator,
+    async(req, res) => {
+      const requestAppSettingParams = {
+        'app:title': req.body.title,
+        'app:confidential': req.body.confidential,
+        'app:globalLang': req.body.globalLang,
+        'customize:isEmailPublishedForNewUser': req.body.isEmailPublishedForNewUser,
+        'app:fileUpload': req.body.fileUpload,
       };
 
-      const parameters = { action: SupportedAction.ACTION_ADMIN_APP_SETTINGS_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
+      try {
+        await configManager.updateConfigs(requestAppSettingParams);
+        const appSettingParams = {
+          title: configManager.getConfig('app:title'),
+          confidential: configManager.getConfig('app:confidential'),
+          globalLang: configManager.getConfig('app:globalLang'),
+          isEmailPublishedForNewUser: configManager.getConfig('customize:isEmailPublishedForNewUser'),
+          fileUpload: configManager.getConfig('app:fileUpload'),
+        };
 
-      return res.apiv3({ appSettingParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating app setting';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-appSetting-failed'));
-    }
+        const parameters = { action: SupportedAction.ACTION_ADMIN_APP_SETTINGS_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
 
-  });
+        return res.apiv3({ appSettingParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating app setting';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-appSetting-failed'));
+      }
+
+    });
 
   /**
    * @swagger
@@ -571,7 +557,6 @@ module.exports = (crowi) => {
    *    /app-settings/site-url-setting:
    *      put:
    *        tags: [AppSettings]
-   *        operationId: updateAppSettingSiteUrlSetting
    *        security:
    *          - cookieAuth: []
    *        summary: /app-settings/site-url-setting
@@ -598,36 +583,37 @@ module.exports = (crowi) => {
    *                          description: Site URL. e.g. https://example.com, https://example.com:3000
    *                          example: 'http://localhost:3000'
    */
-  router.put('/site-url-setting', loginRequiredStrictly, adminRequired, addActivity, validator.siteUrlSetting, apiV3FormValidator, async(req, res) => {
+  router.put('/site-url-setting', accessTokenParser([SCOPE.WRITE.ADMIN.APP]), loginRequiredStrictly, adminRequired, addActivity,
+    validator.siteUrlSetting, apiV3FormValidator,
+    async(req, res) => {
+      const useOnlyEnvVars = configManager.getConfig('env:useOnlyEnvVars:app:siteUrl');
 
-    const useOnlyEnvVars = crowi.configManager.getConfig('crowi', 'app:siteUrl:useOnlyEnvVars');
+      if (useOnlyEnvVars) {
+        const msg = 'Updating the Site URL is prohibited on this system.';
+        return res.apiv3Err(new ErrorV3(msg, 'update-siteUrlSetting-prohibited'));
+      }
 
-    if (useOnlyEnvVars) {
-      const msg = 'Updating the Site URL is prohibited on this system.';
-      return res.apiv3Err(new ErrorV3(msg, 'update-siteUrlSetting-prohibited'));
-    }
-
-    const requestSiteUrlSettingParams = {
-      'app:siteUrl': pathUtils.removeTrailingSlash(req.body.siteUrl),
-    };
-
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestSiteUrlSettingParams);
-      const siteUrlSettingParams = {
-        siteUrl: crowi.configManager.getConfig('crowi', 'app:siteUrl'),
+      const requestSiteUrlSettingParams = {
+        'app:siteUrl': pathUtils.removeTrailingSlash(req.body.siteUrl),
       };
 
-      const parameters = { action: SupportedAction.ACTION_ADMIN_SITE_URL_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-      return res.apiv3({ siteUrlSettingParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating site url setting';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-siteUrlSetting-failed'));
-    }
+      try {
+        await configManager.updateConfigs(requestSiteUrlSettingParams);
+        const siteUrlSettingParams = {
+          siteUrl: configManager.getConfig('app:siteUrl'),
+        };
 
-  });
+        const parameters = { action: SupportedAction.ACTION_ADMIN_SITE_URL_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+        return res.apiv3({ siteUrlSettingParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating site url setting';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-siteUrlSetting-failed'));
+      }
+
+    });
 
   /**
    * send mail (Promise wrapper)
@@ -650,21 +636,21 @@ module.exports = (crowi) => {
    */
   async function sendTestEmail(destinationAddress) {
 
-    const { configManager, mailService } = crowi;
+    const { mailService } = crowi;
 
     if (!mailService.isMailerSetup) {
       throw Error('mailService is not setup');
     }
 
-    const fromAddress = configManager.getConfig('crowi', 'mail:from');
+    const fromAddress = configManager.getConfig('mail:from');
     if (fromAddress == null) {
       throw Error('fromAddress is not setup');
     }
 
-    const smtpHost = configManager.getConfig('crowi', 'mail:smtpHost');
-    const smtpPort = configManager.getConfig('crowi', 'mail:smtpPort');
-    const smtpUser = configManager.getConfig('crowi', 'mail:smtpUser');
-    const smtpPassword = configManager.getConfig('crowi', 'mail:smtpPassword');
+    const smtpHost = configManager.getConfig('mail:smtpHost');
+    const smtpPort = configManager.getConfig('mail:smtpPort');
+    const smtpUser = configManager.getConfig('mail:smtpUser');
+    const smtpPassword = configManager.getConfig('mail:smtpPassword');
 
     const option = {
       host: smtpHost,
@@ -695,25 +681,24 @@ module.exports = (crowi) => {
 
   const updateMailSettinConfig = async function(requestMailSettingParams) {
     const {
-      configManager,
       mailService,
     } = crowi;
 
     // update config without publishing S2sMessage
-    await configManager.updateConfigsInTheSameNamespace('crowi', requestMailSettingParams, true);
+    await configManager.updateConfigs(requestMailSettingParams, { skipPubsub: true });
 
     await mailService.initialize();
     mailService.publishUpdatedMessage();
 
     return {
       isMailerSetup: mailService.isMailerSetup,
-      fromAddress: configManager.getConfig('crowi', 'mail:from'),
-      smtpHost: configManager.getConfig('crowi', 'mail:smtpHost'),
-      smtpPort: configManager.getConfig('crowi', 'mail:smtpPort'),
-      smtpUser: configManager.getConfig('crowi', 'mail:smtpUser'),
-      smtpPassword: configManager.getConfig('crowi', 'mail:smtpPassword'),
-      sesAccessKeyId: configManager.getConfig('crowi', 'mail:sesAccessKeyId'),
-      sesSecretAccessKey: configManager.getConfig('crowi', 'mail:sesSecretAccessKey'),
+      fromAddress: configManager.getConfig('mail:from'),
+      smtpHost: configManager.getConfig('mail:smtpHost'),
+      smtpPort: configManager.getConfig('mail:smtpPort'),
+      smtpUser: configManager.getConfig('mail:smtpUser'),
+      smtpPassword: configManager.getConfig('mail:smtpPassword'),
+      sesAccessKeyId: configManager.getConfig('mail:sesAccessKeyId'),
+      sesSecretAccessKey: configManager.getConfig('mail:sesSecretAccessKey'),
     };
   };
 
@@ -723,7 +708,6 @@ module.exports = (crowi) => {
    *    /app-settings/smtp-setting:
    *      put:
    *        tags: [AppSettings]
-   *        operationId: updateAppSettingSmtpSetting
    *        security:
    *          - cookieAuth: []
    *        summary: /app-settings/smtp-setting
@@ -746,28 +730,30 @@ module.exports = (crowi) => {
    *                      type: object
    *                      $ref: '#/components/schemas/SmtpSettingResponseParams'
    */
-  router.put('/smtp-setting', loginRequiredStrictly, adminRequired, addActivity, validator.smtpSetting, apiV3FormValidator, async(req, res) => {
-    const requestMailSettingParams = {
-      'mail:from': req.body.fromAddress,
-      'mail:transmissionMethod': req.body.transmissionMethod,
-      'mail:smtpHost': req.body.smtpHost,
-      'mail:smtpPort': req.body.smtpPort,
-      'mail:smtpUser': req.body.smtpUser,
-      'mail:smtpPassword': req.body.smtpPassword,
-    };
+  router.put('/smtp-setting', accessTokenParser([SCOPE.WRITE.ADMIN.APP]), loginRequiredStrictly, adminRequired, addActivity,
+    validator.smtpSetting, apiV3FormValidator,
+    async(req, res) => {
+      const requestMailSettingParams = {
+        'mail:from': req.body.fromAddress,
+        'mail:transmissionMethod': req.body.transmissionMethod,
+        'mail:smtpHost': req.body.smtpHost,
+        'mail:smtpPort': req.body.smtpPort,
+        'mail:smtpUser': req.body.smtpUser,
+        'mail:smtpPassword': req.body.smtpPassword,
+      };
 
-    try {
-      const mailSettingParams = await updateMailSettinConfig(requestMailSettingParams);
-      const parameters = { action: SupportedAction.ACTION_ADMIN_MAIL_SMTP_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-      return res.apiv3({ mailSettingParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating smtp setting';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-smtpSetting-failed'));
-    }
-  });
+      try {
+        const mailSettingParams = await updateMailSettinConfig(requestMailSettingParams);
+        const parameters = { action: SupportedAction.ACTION_ADMIN_MAIL_SMTP_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+        return res.apiv3({ mailSettingParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating smtp setting';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-smtpSetting-failed'));
+      }
+    });
 
   /**
    * @swagger
@@ -775,7 +761,6 @@ module.exports = (crowi) => {
    *    /app-settings/smtp-test:
    *      post:
    *        tags: [AppSettings]
-   *        operationId: postSmtpTest
    *        security:
    *          - cookieAuth: []
    *        summary: /app-settings/smtp-setting
@@ -789,7 +774,7 @@ module.exports = (crowi) => {
    *                  type: object
    *                  description: Empty object
    */
-  router.post('/smtp-test', loginRequiredStrictly, adminRequired, addActivity, async(req, res) => {
+  router.post('/smtp-test', accessTokenParser([SCOPE.WRITE.ADMIN.APP]), loginRequiredStrictly, adminRequired, addActivity, async(req, res) => {
     const { t } = await getTranslation({ lang: req.user.lang });
 
     try {
@@ -812,7 +797,6 @@ module.exports = (crowi) => {
    *    /app-settings/ses-setting:
    *      put:
    *        tags: [AppSettings]
-   *        operationId: updateAppSettingSesSetting
    *        security:
    *          - cookieAuth: []
    *        summary: /app-settings/ses-setting
@@ -831,32 +815,34 @@ module.exports = (crowi) => {
    *                schema:
    *                  $ref: '#/components/schemas/SesSettingResponseParams'
    */
-  router.put('/ses-setting', loginRequiredStrictly, adminRequired, addActivity, validator.sesSetting, apiV3FormValidator, async(req, res) => {
-    const { mailService } = crowi;
+  router.put('/ses-setting', accessTokenParser([SCOPE.WRITE.ADMIN.APP]), loginRequiredStrictly, adminRequired, addActivity,
+    validator.sesSetting, apiV3FormValidator,
+    async(req, res) => {
+      const { mailService } = crowi;
 
-    const requestSesSettingParams = {
-      'mail:from': req.body.fromAddress,
-      'mail:transmissionMethod': req.body.transmissionMethod,
-      'mail:sesAccessKeyId': req.body.sesAccessKeyId,
-      'mail:sesSecretAccessKey': req.body.sesSecretAccessKey,
-    };
+      const requestSesSettingParams = {
+        'mail:from': req.body.fromAddress,
+        'mail:transmissionMethod': req.body.transmissionMethod,
+        'mail:sesAccessKeyId': req.body.sesAccessKeyId,
+        'mail:sesSecretAccessKey': req.body.sesSecretAccessKey,
+      };
 
-    let mailSettingParams;
-    try {
-      mailSettingParams = await updateMailSettinConfig(requestSesSettingParams);
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating ses setting';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-ses-setting-failed'));
-    }
+      let mailSettingParams;
+      try {
+        mailSettingParams = await updateMailSettinConfig(requestSesSettingParams);
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating ses setting';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-ses-setting-failed'));
+      }
 
-    await mailService.initialize();
-    mailService.publishUpdatedMessage();
-    const parameters = { action: SupportedAction.ACTION_ADMIN_MAIL_SES_UPDATE };
-    activityEvent.emit('update', res.locals.activity._id, parameters);
-    return res.apiv3({ mailSettingParams });
-  });
+      await mailService.initialize();
+      mailService.publishUpdatedMessage();
+      const parameters = { action: SupportedAction.ACTION_ADMIN_MAIL_SES_UPDATE };
+      activityEvent.emit('update', res.locals.activity._id, parameters);
+      return res.apiv3({ mailSettingParams });
+    });
 
   /**
    * @swagger
@@ -864,7 +850,6 @@ module.exports = (crowi) => {
    *    /app-settings/file-upload-settings:
    *      put:
    *        tags: [AppSettings]
-   *        operationId: updateAppSettingFileUploadSetting
    *        security:
    *          - cookieAuth: []
    *        summary: /app-settings/file-upload-setting
@@ -888,146 +873,150 @@ module.exports = (crowi) => {
    *                      $ref: '#/components/schemas/FileUploadSettingParams'
    */
   //  eslint-disable-next-line max-len
-  router.put('/file-upload-setting', loginRequiredStrictly, adminRequired, addActivity, validator.fileUploadSetting, apiV3FormValidator, async(req, res) => {
-    const { fileUploadType } = req.body;
+  router.put('/file-upload-setting', accessTokenParser([SCOPE.WRITE.ADMIN.APP]),
+    loginRequiredStrictly, adminRequired, addActivity, validator.fileUploadSetting, apiV3FormValidator, async(req, res) => {
+      const { fileUploadType } = req.body;
 
-    const requestParams = {
-      'app:fileUploadType': fileUploadType,
-    };
-
-    if (fileUploadType === 'gcs') {
-      requestParams['gcs:apiKeyJsonPath'] = req.body.gcsApiKeyJsonPath;
-      requestParams['gcs:bucket'] = req.body.gcsBucket;
-      requestParams['gcs:uploadNamespace'] = req.body.gcsUploadNamespace;
-      requestParams['gcs:referenceFileWithRelayMode'] = req.body.gcsReferenceFileWithRelayMode;
-    }
-
-    if (fileUploadType === 'aws') {
-      requestParams['aws:s3Region'] = req.body.s3Region;
-      requestParams['aws:s3CustomEndpoint'] = req.body.s3CustomEndpoint;
-      requestParams['aws:s3Bucket'] = req.body.s3Bucket;
-      requestParams['aws:s3AccessKeyId'] = req.body.s3AccessKeyId;
-      requestParams['aws:referenceFileWithRelayMode'] = req.body.s3ReferenceFileWithRelayMode;
-    }
-
-    if (fileUploadType === 'azure') {
-      requestParams['azure:tenantId'] = req.body.azureTenantId;
-      requestParams['azure:clientId'] = req.body.azureClientId;
-      requestParams['azure:clientSecret'] = req.body.azureClientSecret;
-      requestParams['azure:storageAccountName'] = req.body.azureStorageAccountName;
-      requestParams['azure:storageContainerName'] = req.body.azureStorageContainerName;
-      requestParams['azure:referenceFileWithRelayMode'] = req.body.azureReferenceFileWithRelayMode;
-    }
-
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestParams, true);
-
-      const s3SecretAccessKey = req.body.s3SecretAccessKey;
-      if (fileUploadType === 'aws' && s3SecretAccessKey != null && s3SecretAccessKey.trim() !== '') {
-        await crowi.configManager.updateConfigsInTheSameNamespace('crowi', { 'aws:s3SecretAccessKey': s3SecretAccessKey }, true);
-      }
-
-      await crowi.setUpFileUpload(true);
-      crowi.fileUploaderSwitchService.publishUpdatedMessage();
-
-      const responseParams = {
-        fileUploadType: crowi.configManager.getConfig('crowi', 'app:fileUploadType'),
-      };
-
-      if (fileUploadType === 'gcs') {
-        responseParams.gcsApiKeyJsonPath = crowi.configManager.getConfig('crowi', 'gcs:apiKeyJsonPath');
-        responseParams.gcsBucket = crowi.configManager.getConfig('crowi', 'gcs:bucket');
-        responseParams.gcsUploadNamespace = crowi.configManager.getConfig('crowi', 'gcs:uploadNamespace');
-        responseParams.gcsReferenceFileWithRelayMode = crowi.configManager.getConfig('crowi', 'gcs:referenceFileWithRelayMode ');
+      if (fileUploadType === 'local' || fileUploadType === 'gridfs') {
+        try {
+          await configManager.updateConfigs({
+            'app:fileUploadType': fileUploadType,
+          }, { skipPubsub: true });
+        }
+        catch (err) {
+          const msg = `Error occurred in updating ${fileUploadType} settings: ${err.message}`;
+          logger.error('Error', err);
+          return res.apiv3Err(new ErrorV3(msg, 'update-fileUploadType-failed'));
+        }
       }
 
       if (fileUploadType === 'aws') {
-        responseParams.s3Region = crowi.configManager.getConfig('crowi', 'aws:s3Region');
-        responseParams.s3CustomEndpoint = crowi.configManager.getConfig('crowi', 'aws:s3CustomEndpoint');
-        responseParams.s3Bucket = crowi.configManager.getConfig('crowi', 'aws:s3Bucket');
-        responseParams.s3AccessKeyId = crowi.configManager.getConfig('crowi', 'aws:s3AccessKeyId');
-        responseParams.s3ReferenceFileWithRelayMode = crowi.configManager.getConfig('crowi', 'aws:referenceFileWithRelayMode');
+        try {
+          try {
+            toNonBlankString(req.body.s3Bucket);
+          }
+          catch (err) {
+            throw new Error('S3 Bucket name is required');
+          }
+          try {
+            toNonBlankString(req.body.s3Region);
+          }
+          catch (err) {
+            throw new Error('S3 Region is required');
+          }
+          await configManager.updateConfigs({
+            'app:fileUploadType': fileUploadType,
+            'aws:s3Region': toNonBlankString(req.body.s3Region),
+            'aws:s3Bucket': toNonBlankString(req.body.s3Bucket),
+            'aws:referenceFileWithRelayMode': req.body.s3ReferenceFileWithRelayMode,
+          },
+          { skipPubsub: true });
+          await configManager.updateConfigs({
+            'aws:s3CustomEndpoint': toNonBlankStringOrUndefined(req.body.s3CustomEndpoint),
+            'aws:s3AccessKeyId': toNonBlankStringOrUndefined(req.body.s3AccessKeyId),
+            'aws:s3SecretAccessKey': toNonBlankStringOrUndefined(req.body.s3SecretAccessKey),
+          },
+          {
+            skipPubsub: true,
+            removeIfUndefined: true,
+          });
+        }
+        catch (err) {
+          const msg = `Error occurred in updating AWS S3 settings: ${err.message}`;
+          logger.error('Error', err);
+          return res.apiv3Err(new ErrorV3(msg, 'update-fileUploadType-failed'));
+        }
+      }
+
+      if (fileUploadType === 'gcs') {
+        try {
+          await configManager.updateConfigs({
+            'app:fileUploadType': fileUploadType,
+            'gcs:referenceFileWithRelayMode': req.body.gcsReferenceFileWithRelayMode,
+          },
+          { skipPubsub: true });
+          await configManager.updateConfigs({
+            'gcs:apiKeyJsonPath': toNonBlankStringOrUndefined(req.body.gcsApiKeyJsonPath),
+            'gcs:bucket': toNonBlankStringOrUndefined(req.body.gcsBucket),
+            'gcs:uploadNamespace': toNonBlankStringOrUndefined(req.body.gcsUploadNamespace),
+          },
+          { skipPubsub: true, removeIfUndefined: true });
+        }
+        catch (err) {
+          const msg = `Error occurred in updating GCS settings: ${err.message}`;
+          logger.error('Error', err);
+          return res.apiv3Err(new ErrorV3(msg, 'update-fileUploadType-failed'));
+        }
       }
 
       if (fileUploadType === 'azure') {
-        responseParams.azureTenantId = crowi.configManager.getConfig('crowi', 'azure:tenantId');
-        responseParams.azureClientId = crowi.configManager.getConfig('crowi', 'azure:clientId');
-        responseParams.azureClientSecret = crowi.configManager.getConfig('crowi', 'azure:clientSecret');
-        responseParams.azureStorageAccountName = crowi.configManager.getConfig('crowi', 'azure:storageAccountName');
-        responseParams.azureStorageContainerName = crowi.configManager.getConfig('crowi', 'azure:storageContainerName');
-        responseParams.azureReferenceFileWithRelayMode = crowi.configManager.getConfig('crowi', 'azure:referenceFileWithRelayMode');
+        try {
+          await configManager.updateConfigs({
+            'app:fileUploadType': fileUploadType,
+            'azure:referenceFileWithRelayMode': req.body.azureReferenceFileWithRelayMode,
+          },
+          { skipPubsub: true });
+          await configManager.updateConfigs({
+            'azure:tenantId': toNonBlankStringOrUndefined(req.body.azureTenantId),
+            'azure:clientId': toNonBlankStringOrUndefined(req.body.azureClientId),
+            'azure:clientSecret': toNonBlankStringOrUndefined(req.body.azureClientSecret),
+            'azure:storageAccountName': toNonBlankStringOrUndefined(req.body.azureStorageAccountName),
+            'azure:storageContainerName': toNonBlankStringOrUndefined(req.body.azureStorageContainerName),
+          }, { skipPubsub: true, removeIfUndefined: true });
+        }
+        catch (err) {
+          const msg = `Error occurred in updating Azure settings: ${err.message}`;
+          logger.error('Error', err);
+          return res.apiv3Err(new ErrorV3(msg, 'update-fileUploadType-failed'));
+        }
       }
-      const parameters = { action: SupportedAction.ACTION_ADMIN_FILE_UPLOAD_CONFIG_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-      return res.apiv3({ responseParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating fileUploadType';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-fileUploadType-failed'));
-    }
 
-  });
+      try {
+        await crowi.setUpFileUpload(true);
+        crowi.fileUploaderSwitchService.publishUpdatedMessage();
 
-  /**
-   * @swagger
-   *
-   *    /app-settings/questionnaire-settings:
-   *      put:
-   *        tags: [AppSettings]
-   *        operationId: updateAppSettingQuestionnaireSettings
-   *        security:
-   *          - cookieAuth: []
-   *        summary: /app-settings/questionnaire-settings
-   *        description: Update QuestionnaireSetting
-   *        requestBody:
-   *          required: true
-   *          content:
-   *            application/json:
-   *              schema:
-   *                $ref: '#/components/schemas/QuestionnaireSettingParams'
-   *        responses:
-   *          200:
-   *            description: Succeeded to update QuestionnaireSetting
-   *            content:
-   *              application/json:
-   *                schema:
-   *                  type: object
-   *                  properties:
-   *                    responseParams:
-   *                      type: object
-   *                      $ref: '#/components/schemas/QuestionnaireSettingParams'
-   */
-  // eslint-disable-next-line max-len
-  router.put('/questionnaire-settings', loginRequiredStrictly, adminRequired, addActivity, validator.questionnaireSettings, apiV3FormValidator, async(req, res) => {
-    const { isQuestionnaireEnabled, isAppSiteUrlHashed } = req.body;
+        const responseParams = {
+          fileUploadType: configManager.getConfig('app:fileUploadType'),
+        };
 
-    const requestParams = {
-      'questionnaire:isQuestionnaireEnabled': isQuestionnaireEnabled,
-      'questionnaire:isAppSiteUrlHashed': isAppSiteUrlHashed,
-    };
+        if (fileUploadType === 'gcs') {
+          responseParams.gcsApiKeyJsonPath = configManager.getConfig('gcs:apiKeyJsonPath');
+          responseParams.gcsBucket = configManager.getConfig('gcs:bucket');
+          responseParams.gcsUploadNamespace = configManager.getConfig('gcs:uploadNamespace');
+          responseParams.gcsReferenceFileWithRelayMode = configManager.getConfig('gcs:referenceFileWithRelayMode ');
+        }
 
-    try {
-      await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestParams, true);
+        if (fileUploadType === 'aws') {
+          responseParams.s3Region = configManager.getConfig('aws:s3Region');
+          responseParams.s3CustomEndpoint = configManager.getConfig('aws:s3CustomEndpoint');
+          responseParams.s3Bucket = configManager.getConfig('aws:s3Bucket');
+          responseParams.s3AccessKeyId = configManager.getConfig('aws:s3AccessKeyId');
+          responseParams.s3ReferenceFileWithRelayMode = configManager.getConfig('aws:referenceFileWithRelayMode');
+        }
 
-      const responseParams = {
-        isQuestionnaireEnabled: crowi.configManager.getConfig('crowi', 'questionnaire:isQuestionnaireEnabled'),
-        isAppSiteUrlHashed: crowi.configManager.getConfig('crowi', 'questionnaire:isAppSiteUrlHashed'),
-      };
+        if (fileUploadType === 'azure') {
+          responseParams.azureTenantId = configManager.getConfig('azure:tenantId');
+          responseParams.azureClientId = configManager.getConfig('azure:clientId');
+          responseParams.azureClientSecret = configManager.getConfig('azure:clientSecret');
+          responseParams.azureStorageAccountName = configManager.getConfig('azure:storageAccountName');
+          responseParams.azureStorageContainerName = configManager.getConfig('azure:storageContainerName');
+          responseParams.azureReferenceFileWithRelayMode = configManager.getConfig('azure:referenceFileWithRelayMode');
+        }
+        const parameters = { action: SupportedAction.ACTION_ADMIN_FILE_UPLOAD_CONFIG_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+        return res.apiv3({ responseParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in retrieving file upload configurations';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-fileUploadType-failed'));
+      }
 
-      const parameters = { action: SupportedAction.ACTION_ADMIN_QUESTIONNAIRE_SETTINGS_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-      return res.apiv3({ responseParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating questionnaire settings';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-questionnaire-settings-failed'));
-    }
+    });
 
-  });
 
-  router.put('/page-bulk-export-settings', loginRequiredStrictly, adminRequired, addActivity, validator.pageBulkExportSettings, apiV3FormValidator,
+  router.put('/page-bulk-export-settings',
+    accessTokenParser([SCOPE.WRITE.ADMIN.APP]), loginRequiredStrictly, adminRequired, addActivity, validator.pageBulkExportSettings, apiV3FormValidator,
     async(req, res) => {
       const requestParams = {
         'app:isBulkExportPagesEnabled': req.body.isBulkExportPagesEnabled,
@@ -1035,10 +1024,10 @@ module.exports = (crowi) => {
       };
 
       try {
-        await crowi.configManager.updateConfigsInTheSameNamespace('crowi', requestParams, true);
+        await configManager.updateConfigs(requestParams, { skipPubsub: true });
         const responseParams = {
-          isBulkExportPagesEnabled: crowi.configManager.getConfig('crowi', 'app:isBulkExportPagesEnabled'),
-          bulkExportDownloadExpirationSeconds: crowi.configManager.getConfig('crowi', 'app:bulkExportDownloadExpirationSeconds'),
+          isBulkExportPagesEnabled: configManager.getConfig('app:isBulkExportPagesEnabled'),
+          bulkExportDownloadExpirationSeconds: configManager.getConfig('app:bulkExportDownloadExpirationSeconds'),
         };
 
         const parameters = { action: SupportedAction.ACTION_ADMIN_APP_SETTINGS_UPDATE };
@@ -1060,9 +1049,9 @@ module.exports = (crowi) => {
    *    /app-settings/v5-schema-migration:
    *      post:
    *        tags: [AppSettings]
-   *        operationId: updateAppSettingV5SchemaMigration
    *        security:
-   *          - api_key: []
+   *          - bearer: []
+   *          - accessTokenInQuery: []
    *        summary: AccessToken supported.
    *        description: Update V5SchemaMigration
    *        responses:
@@ -1078,26 +1067,27 @@ module.exports = (crowi) => {
    *                      description: is V5 compatible, or not
    *                      example: true
    */
-  router.post('/v5-schema-migration', accessTokenParser, loginRequiredStrictly, adminRequired, async(req, res) => {
-    const isMaintenanceMode = crowi.appService.isMaintenanceMode();
-    if (!isMaintenanceMode) {
-      return res.apiv3Err(new ErrorV3('GROWI is not maintenance mode. To import data, please activate the maintenance mode first.', 'not_maintenance_mode'));
-    }
-
-    const isV5Compatible = crowi.configManager.getConfig('crowi', 'app:isV5Compatible');
-
-    try {
-      if (!isV5Compatible) {
-        // This method throws and emit socketIo event when error occurs
-        crowi.pageService.normalizeAllPublicPages();
+  router.post('/v5-schema-migration',
+    accessTokenParser([SCOPE.WRITE.ADMIN.APP], { acceptLegacy: true }), loginRequiredStrictly, adminRequired, async(req, res) => {
+      const isMaintenanceMode = crowi.appService.isMaintenanceMode();
+      if (!isMaintenanceMode) {
+        return res.apiv3Err(new ErrorV3('GROWI is not maintenance mode. To import data, please activate the maintenance mode first.', 'not_maintenance_mode'));
       }
-    }
-    catch (err) {
-      return res.apiv3Err(new ErrorV3(`Failed to migrate pages: ${err.message}`), 500);
-    }
 
-    return res.apiv3({ isV5Compatible });
-  });
+      const isV5Compatible = configManager.getConfig('app:isV5Compatible');
+
+      try {
+        if (!isV5Compatible) {
+        // This method throws and emit socketIo event when error occurs
+          crowi.pageService.normalizeAllPublicPages();
+        }
+      }
+      catch (err) {
+        return res.apiv3Err(new ErrorV3(`Failed to migrate pages: ${err.message}`), 500);
+      }
+
+      return res.apiv3({ isV5Compatible });
+    });
 
   /**
    * @swagger
@@ -1105,9 +1095,9 @@ module.exports = (crowi) => {
    *    /app-settings/maintenance-mode:
    *      post:
    *        tags: [AppSettings]
-   *        operationId: updateAppSettingMaintenanceMode
    *        security:
-   *          - api_key: []
+   *          - bearer: []
+   *          - accessTokenInQuery: []
    *        summary: AccessToken supported.
    *        description: Update MaintenanceMode
    *        requestBody:
@@ -1132,36 +1122,37 @@ module.exports = (crowi) => {
    *                      description: true if maintenance mode is enabled
    *                      example: true
    */
-  // eslint-disable-next-line max-len
-  router.post('/maintenance-mode', accessTokenParser, loginRequiredStrictly, adminRequired, addActivity, validator.maintenanceMode, apiV3FormValidator, async(req, res) => {
-    const { flag } = req.body;
-    const parameters = {};
-    try {
-      if (flag) {
-        await crowi.appService.startMaintenanceMode();
-        Object.assign(parameters, { action: SupportedAction.ACTION_ADMIN_MAINTENANCEMODE_ENABLED });
+  router.post('/maintenance-mode',
+    accessTokenParser([SCOPE.WRITE.ADMIN.APP], { acceptLegacy: true }),
+    loginRequiredStrictly, adminRequired, addActivity, validator.maintenanceMode, apiV3FormValidator, async(req, res) => {
+      const { flag } = req.body;
+      const parameters = {};
+      try {
+        if (flag) {
+          await crowi.appService.startMaintenanceMode();
+          Object.assign(parameters, { action: SupportedAction.ACTION_ADMIN_MAINTENANCEMODE_ENABLED });
+        }
+        else {
+          await crowi.appService.endMaintenanceMode();
+          Object.assign(parameters, { action: SupportedAction.ACTION_ADMIN_MAINTENANCEMODE_DISABLED });
+        }
       }
-      else {
-        await crowi.appService.endMaintenanceMode();
-        Object.assign(parameters, { action: SupportedAction.ACTION_ADMIN_MAINTENANCEMODE_DISABLED });
+      catch (err) {
+        logger.error(err);
+        if (flag) {
+          res.apiv3Err(new ErrorV3('Failed to start maintenance mode', 'failed_to_start_maintenance_mode'), 500);
+        }
+        else {
+          res.apiv3Err(new ErrorV3('Failed to end maintenance mode', 'failed_to_end_maintenance_mode'), 500);
+        }
       }
-    }
-    catch (err) {
-      logger.error(err);
-      if (flag) {
-        res.apiv3Err(new ErrorV3('Failed to start maintenance mode', 'failed_to_start_maintenance_mode'), 500);
-      }
-      else {
-        res.apiv3Err(new ErrorV3('Failed to end maintenance mode', 'failed_to_end_maintenance_mode'), 500);
-      }
-    }
 
-    if ('action' in parameters) {
-      activityEvent.emit('update', res.locals.activity._id, parameters);
-    }
+      if ('action' in parameters) {
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+      }
 
-    res.apiv3({ flag });
-  });
+      res.apiv3({ flag });
+    });
 
   return router;
 };

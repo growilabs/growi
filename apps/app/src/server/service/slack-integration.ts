@@ -2,22 +2,24 @@ import {
   SlackbotType, type GrowiCommand, type GrowiBotEvent,
 } from '@growi/slack';
 import { markdownSectionBlock } from '@growi/slack/dist/utils/block-kit-builder';
-import { InteractionPayloadAccessor } from '@growi/slack/dist/utils/interaction-payload-accessor';
+import type { InteractionPayloadAccessor } from '@growi/slack/dist/utils/interaction-payload-accessor';
 import type { RespondUtil } from '@growi/slack/dist/utils/respond-util-factory';
 import { generateWebClient } from '@growi/slack/dist/utils/webclient-factory';
-import { type ChatPostMessageArguments, WebClient } from '@slack/web-api';
+import type { WebClient } from '@slack/web-api';
+import { type ChatPostMessageArguments } from '@slack/web-api';
 import type { IncomingWebhookSendArguments } from '@slack/webhook';
 import mongoose from 'mongoose';
 
 
 import loggerFactory from '~/utils/logger';
 
+import type Crowi from '../crowi';
 import type { EventActionsPermission } from '../interfaces/slack-integration/events';
 import S2sMessage from '../models/vo/s2s-message';
 import { SlackCommandHandlerError } from '../models/vo/slack-command-handler-error';
 import { slackLegacyUtilFactory } from '../util/slack-legacy';
 
-import type { ConfigManager } from './config-manager';
+import { configManager } from './config-manager';
 import type { S2sMessagingService } from './s2s-messaging/base';
 import type { S2sMessageHandlable } from './s2s-messaging/handlable';
 import { LinkSharedEventHandler } from './slack-event-handler/link-shared';
@@ -30,9 +32,7 @@ type S2sMessageForSlackIntegration = S2sMessage & { updatedAt: Date };
 
 export class SlackIntegrationService implements S2sMessageHandlable {
 
-  crowi!: any;
-
-  configManager!: ConfigManager;
+  crowi: Crowi;
 
   s2sMessagingService!: S2sMessagingService;
 
@@ -40,9 +40,8 @@ export class SlackIntegrationService implements S2sMessageHandlable {
 
   linkSharedHandler!: LinkSharedEventHandler;
 
-  constructor(crowi) {
+  constructor(crowi: Crowi) {
     this.crowi = crowi;
-    this.configManager = crowi.configManager;
     this.s2sMessagingService = crowi.s2sMessagingService;
     this.linkSharedHandler = new LinkSharedEventHandler(crowi);
 
@@ -97,20 +96,20 @@ export class SlackIntegrationService implements S2sMessageHandlable {
   }
 
   get isSlackbotConfigured(): boolean {
-    const hasSlackbotType = !!this.configManager.getConfig('crowi', 'slackbot:currentBotType');
+    const hasSlackbotType = !!configManager.getConfig('slackbot:currentBotType');
     return hasSlackbotType;
   }
 
   get isSlackLegacyConfigured(): boolean {
     // for legacy util
-    const hasSlackToken = !!this.configManager.getConfig('notification', 'slack:token');
-    const hasSlackIwhUrl = !!this.configManager.getConfig('notification', 'slack:incomingWebhookUrl');
+    const hasSlackToken = !!configManager.getConfig('slack:token');
+    const hasSlackIwhUrl = !!configManager.getConfig('slack:incomingWebhookUrl');
 
     return hasSlackToken || hasSlackIwhUrl;
   }
 
   private isCheckTypeValid(): boolean {
-    const currentBotType = this.configManager.getConfig('crowi', 'slackbot:currentBotType');
+    const currentBotType = configManager.getConfig('slackbot:currentBotType');
     if (currentBotType == null) {
       throw new Error('The config \'SLACKBOT_TYPE\'(ns: \'crowi\', key: \'slackbot:currentBotType\') must be set.');
     }
@@ -118,19 +117,19 @@ export class SlackIntegrationService implements S2sMessageHandlable {
     return true;
   }
 
-  get proxyUriForCurrentType(): string {
-    const currentBotType = this.configManager.getConfig('crowi', 'slackbot:currentBotType');
+  get proxyUriForCurrentType(): string | undefined {
+    const currentBotType = configManager.getConfig('slackbot:currentBotType');
 
     // TODO assert currentBotType is not null and CUSTOM_WITHOUT_PROXY
 
-    let proxyUri: string;
+    let proxyUri: string | undefined;
 
     switch (currentBotType) {
       case SlackbotType.OFFICIAL:
         proxyUri = OFFICIAL_SLACKBOT_PROXY_URI;
         break;
       default:
-        proxyUri = this.configManager.getConfig('crowi', 'slackbot:proxyUri');
+        proxyUri = configManager.getConfig('slackbot:proxyUri');
         break;
     }
 
@@ -143,7 +142,7 @@ export class SlackIntegrationService implements S2sMessageHandlable {
   async generateClientForCustomBotWithoutProxy(): Promise<WebClient> {
     this.isCheckTypeValid();
 
-    const token = this.configManager.getConfig('crowi', 'slackbot:withoutProxy:botToken');
+    const token = configManager.getConfig('slackbot:withoutProxy:botToken');
 
     if (token == null) {
       throw new Error('The config \'SLACK_BOT_TOKEN\'(ns: \'crowi\', key: \'slackbot:withoutProxy:botToken\') must be set.');
@@ -177,7 +176,7 @@ export class SlackIntegrationService implements S2sMessageHandlable {
   async generateClientForPrimaryWorkspace(): Promise<WebClient> {
     this.isCheckTypeValid();
 
-    const currentBotType = this.configManager.getConfig('crowi', 'slackbot:currentBotType');
+    const currentBotType = configManager.getConfig('slackbot:currentBotType');
 
     if (currentBotType === SlackbotType.CUSTOM_WITHOUT_PROXY) {
       return this.generateClientForCustomBotWithoutProxy();
@@ -231,7 +230,7 @@ export class SlackIntegrationService implements S2sMessageHandlable {
   }
 
   private async postMessageWithLegacyUtil(messageArgs: ChatPostMessageArguments | IncomingWebhookSendArguments): Promise<void> {
-    const slackLegacyUtil = slackLegacyUtilFactory(this.configManager);
+    const slackLegacyUtil = slackLegacyUtilFactory(configManager);
 
     try {
       await slackLegacyUtil.postMessage(messageArgs);

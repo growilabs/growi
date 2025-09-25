@@ -3,7 +3,7 @@
     "display_name": "Français"
   },
   "Help": "Aide",
-  "view": "Voir",
+  "View": "Voir",
   "Edit": "Modifier",
   "Delete": "Supprimer",
   "delete_all": "Tout supprimer",
@@ -60,7 +60,7 @@
   "Timeline View": "Chronologie",
   "History": "Historique",
   "attachment_data": "Pièces jointes",
-  "No_attachments_yet": "Aucunes pièces jointes.",
+  "No_attachments_yet": "Aucune pièce jointe.",
   "Presentation Mode": "Mode présentation",
   "Not available for guest": "Indisponible pour les invités",
   "Not available in this version": "Indisponible dans cette version",
@@ -90,24 +90,25 @@
   "No diff": "Aucune différences",
   "Latest": "Dernière version",
   "User ID": "Identifiant utilisateur",
-  "User Information": "Informations utilisateur",
+  "User Settings": "Paramètres utilisateur",
+  "User Information": "Mon compte",
   "User Activation": "Activation utilisateur",
-  "Basic Info": "Informations de base",
+  "Basic Info": "Informations du compte",
   "Name": "Nom",
   "Email": "Adresse courriel",
   "Language": "Langue",
   "English": "Anglais",
   "Japanese": "Japonais",
-  "Set Profile Image": "Sélectionner image de profil",
-  "Upload Image": "Téléverser image",
-  "Current Image": "Image actuelle",
-  "Delete Image": "Supprimer image",
-  "Delete this image?": "Supprimer cette image?",
+  "Set Profile Image": "Photo de profil",
+  "Upload Image": "Photo personalisée",
+  "Current Image": "Photo actuelle",
+  "Delete Image": "Supprimer photo",
+  "Delete this image?": "Supprimer cette photo?",
   "Updated": "Modifié",
-  "Upload new image": "Téléverser nouvelle image",
+  "Upload new image": "Téléverser une photo",
   "Connected": "Connecté",
   "Loading": "Chargement...",
-  "Disclose E-mail": "Afficher adresse courriel",
+  "Disclose E-mail": "Divulguer adresse courriel",
   "page exists": "cette page est déjà existante",
   "Error occurred": "Une erreur est survenue",
   "Input page name": "Nom de la page",
@@ -117,47 +118,49 @@
   "Create under": "Créer la page sous:",
   "V5 Page Migration": "Convertir vers la V5",
   "GROWI.5.0_new_schema": "Nouveau schéma GROWI.5.0",
-  "See_more_detail_on_new_schema": "Plus de détails sur <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html#about-the-new-v5-compatible-format' target='_blank'>{{title}}</a> <i class='icon-share-alt'></i> ",
+  "See_more_detail_on_new_schema": "Plus de détails sur <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html#about-the-new-v5-compatible-format' target='_blank'>{{title}}</a><span class='growi-custom-icons'>external_link</span> ",
   "external_account_management": "Gestion des comptes externes",
   "UserGroup": "Groupe utilisateur",
   "Basic Settings": "Paramètres de base",
   "The contents entered here will be shown in the header etc": "Le contenu entré ici sera visible dans l'en-tête",
-  "Public": "Public",
+  "Public": "Tout le monde",
   "Anyone with the link": "Tous les utilisateurs disposant du lien",
   "Specified users only": "Utilisateurs spécifiés",
   "Only me": "Seulement moi",
   "Only inside the group": "Utilisateurs du groupe",
-  "page_list": "Liste de pages",
+  "page_list": "Pages enfants",
   "comments": "Commentaires",
   "Reselect the group": "Resélectionner ce groupe",
   "Shareable link": "Lien partageable",
   "The whitelist of registration permission E-mail address": "Les adresses courriel permises lors de l'inscription",
   "Add tags for this page": "Ajouter des étiquettes",
   "tag_list": "Étiquettes",
-  "popular_tags": "Étiquettes populaires",
-  "Check All tags": "voir toutes les étiquettes",
-  "You have no tag, You can set tags on pages": "Vous n'avez aucunes étiquettes, vous pouvez assigner des étiquettes aux pages",
+  "popular_tags": "Étiquettes fréquentes",
+  "Check All tags": "Toutes les étiquettes",
+  "You have no tag, You can set tags on pages": "Aucune étiquette existante.",
   "Show latest": "Voir le plus récent",
   "Load latest": "Charger le plus récent",
   "edited this page": "à modifié cette page.",
   "List Drafts": "Brouillons",
   "Deleted Pages": "Pages supprimées",
-  "Questionnaire": "Questionnaire",
   "Disassociate": "Dissocier",
   "No bookmarks yet": "Aucuns favoris",
   "add_bookmark": "Ajouter aux favoris",
   "remove_bookmark": "Retirer des favoris",
-  "wide_view": "Vue élargie",
+  "wide_view": "Affichage large",
   "Recent Changes": "Modifications récentes",
-  "Page Tree": "Arbre",
+  "Page Tree": "Arborescence",
   "Bookmarks": "Favoris",
   "In-App Notification": "Notifications",
+  "AI Assistant": "Assistant IA",
+  "Knowledge Assistant": "Assistant de Connaissances (Bêta)",
+  "Editor Assistant": "Assistante de rédaction (Bêta)",
   "original_path": "Chemin originel",
   "new_path": "Nouveau chemin",
   "duplicated_path": "Chemin dupliqué",
   "Link sharing is disabled": "Le partage est désactivé",
   "successfully_saved_the_page": "Page sauvegardée",
-  "you_can_not_create_page_with_this_name": "Vous ne pouvez pas créer cette page",
+  "you_can_not_create_page_with_this_name_or_hierarchy": "Vous ne pouvez pas créer de page avec ce nom ou cette hiérarchie de pages",
   "not_allowed_to_see_this_page": "Vous ne pouvez pas voir cette page",
   "Confirm": "Confirmer",
   "Successfully requested": "Demande envoyée.",
@@ -184,7 +187,9 @@
   },
   "author_info": {
     "created_at": "Crée le",
-    "last_revision_posted_at": "Dernière révision le"
+    "created_by": "Créé par",
+    "last_revision_posted_at": "Dernière révision le",
+    "updated_by": "Mis à jour par"
   },
   "installer": {
     "tab": "Créer compte",
@@ -217,6 +222,9 @@
       "profile_image2": "Configurer AWS ou activer le stockage local."
     }
   },
+  "API Token Settings": "Jetons d'API",
+  "Current API Token": "Mon jeton d'API",
+  "Update API Token": "Regénérer",
   "page_me_apitoken": {
     "api_token": "Jeton API",
     "notice": {
@@ -226,8 +234,37 @@
     },
     "form_help": {}
   },
+  "Access Token Settings": "Jeton d'accès",
+  "page_me_access_token": {
+    "access_token": "Jeton d'accès",
+    "expiredAt": "Date d'expiration",
+    "description": "Description",
+    "scope": "Portée",
+    "scope_read": "Lecture",
+    "action": "Action",
+    "create_token": "Créer un jeton",
+    "no_tokens_found": "Aucun jeton d'accès trouvé",
+    "new_token": {
+      "title": "Nouveau jeton d'accès",
+      "copy_to_clipboard": "Copier dans le presse-papiers",
+      "message": "Ce jeton ne sera affiché qu'une seule fois. Veuillez le sauvegarder en lieu sûr."
+    },
+    "modal": {
+      "message": "Êtes-vous sûr de vouloir supprimer ce jeton d'accès ?",
+      "alert": "Cette action ne peut pas être annulée.",
+      "delete_token": "Supprimer le jeton"
+    },
+    "form": {
+      "title": "Créer un nouveau jeton d'accès",
+      "expiredAt_desc": "Sélectionnez la date d'expiration de ce jeton d'accès.",
+      "description_desc": "Fournissez une description pour vous aider à identifier ce jeton ultérieurement.",
+      "description_max_length": "Veuillez saisir jusqu'à {{length}} caractères.",
+      "scope_desc": "Sélectionnez la portée du jeton d'accès."
+    },
+    "copy_to_clipboard": "Copier dans le presse-papiers"
+  },
   "Password": "Mot de passe",
-  "Password Settings": "Paramètres de mot passe",
+  "Password Settings": "Sécurité",
   "personal_settings": {
     "disassociate_external_account": "Dissocier compte externe",
     "disassociate_external_account_desc": "Dissocier le compte externe <strong>{{providerType}}</strong> <strong>{{accountId}}</strong>?",
@@ -241,7 +278,7 @@
   "share_links": {
     "Shere this page link to public": "Partager cette page publiquement",
     "share_link_list": "Liens de partage",
-    "share_link_management": "Gestion des liens de partage",
+    "share_link_management": "Liens de partage",
     "delete_all_share_links": "Supprimer tout les liens de partage",
     "expire": "Expiration",
     "Days": "Jour",
@@ -254,23 +291,20 @@
     "Invalid_Number_of_Date": "Valeurs invalides",
     "link_sharing_is_disabled": "Le partage est désactivé"
   },
-  "API Settings": "Configuration API",
+  "API Settings": "API GROWI",
   "Other Settings": "Autres paramètres",
-  "API Token Settings": "Paramètres de jetons",
-  "Current API Token": "Jeton d'API actuel",
-  "Update API Token": "Modifier jeton",
   "in_app_notification_settings": {
-    "in_app_notification_settings": "Paramètres de notifications",
+    "in_app_notification_settings": "Notifications",
     "subscribe_settings": "Paramètres d'abonnement automatique aux notifications de pages",
     "default_subscribe_rules": {
-      "page_create": "S'abonner à la page lors de sa création."
+      "page_create": "S'abonner aux modifications d'une page lors de sa création."
     }
   },
   "ui_settings": {
-    "ui_settings": "Paramètres UI",
+    "ui_settings": "Interface",
     "side_bar_mode": {
       "settings": "Paramètres navigation latérale",
-      "side_bar_mode_setting": "Activer la navigation latérale",
+      "side_bar_mode_setting": "Épingler la navigation latérale",
       "description": "Activer pour toujours afficher la barre de navigation latérale lorsque l'écran est large. Si la largeur d'écran est faible, le cas inverse est applicable."
     }
   },
@@ -278,7 +312,7 @@
     "light": "Clair",
     "dark": "Sombre",
     "system": "Système",
-    "settings": "Paramètres de thème",
+    "settings": "Thème",
     "description": "Affichage en mode clair, sombre ou selon les paramètres système.<br>Seuls les thèmes supportés seront modifiés."
   },
   "editor_settings": {
@@ -331,17 +365,18 @@
   "page_edit": {
     "input_channels": "Canal Slack...",
     "theme": "Thème",
-    "keymap": "Touches",
+    "keymap": "Raccourcis",
     "indent": "Indentation",
     "paste": {
       "title": "Comportement du collage",
-      "both": "Les deux",
+      "both": "Texte et fichier",
       "text": "Texte seulement",
       "file": "Fichier seulement"
     },
-    "editor_config": "Configuration de l'éditeur",
-    "Show active line": "Montrer la ligne active",
-    "auto_format_table": "Formattage les tables",
+    "editor_config": "Préférences de l'éditeur",
+    "editor_assistant": "Assistant d'édition",
+    "Show active line": "Surligner la ligne active",
+    "auto_format_table": "Formatter les tableaux",
     "overwrite_scopes": "{{operation}} et écraser les scopes des pages enfants",
     "notice": {
       "conflict": "Sauvegarde impossible, la page est en cours de modification par un autre utilisateur. Recharger la page."
@@ -370,28 +405,28 @@
   },
   "page_history": {
     "revision_list": "Historique des modifications",
-    "revision": "version",
+    "revision": "Révision",
     "comparing_source": "Source",
-    "comparing_target": "Destination",
+    "comparing_target": "Cible",
     "comparing_revisions": "Comparer les modifications",
     "compare_latest": "Comparer avec la version la plus récente",
-    "compare_previous": "Compare avec une version précédente"
+    "compare_previous": "Comparer avec la version précédente"
   },
   "modal_rename": {
     "label": {
       "Move/Rename page": "Déplacer/renommer page",
-      "New page name": "Nom de la page",
+      "New page name": "Nouveau chemin",
       "Failed to get subordinated pages": "échec de récupération des pages subordinnées",
       "Failed to get exist path": "échec de la récupération du chemin",
-      "Current page name": "Nom de la page courante",
+      "Current page name": "Chemin actuel",
       "Rename this page only": "Renommer cette page",
       "Force rename all child pages": "Forcer le renommage des pages",
       "Other options": "Autres options",
       "Do not update metadata": "Ne pas modifier les métadonnées",
-      "Redirect": "Rediriger"
+      "Redirect": "Redirection automatique"
     },
     "help": {
-      "redirect": "Rediriger vers la nouvelle page",
+      "redirect": "Redirige automatiquement vers le nouveau chemin de la page.",
       "metadata": "Conserve les métadonnées d'édition de la page",
       "recursive": "Déplacer/renommer les pages enfants récursivement"
     }
@@ -453,20 +488,41 @@
       "Create Page": "Créer page",
       "Search": "Rechercher",
       "Show Contributors": "Voir contributeurs",
-      "MirrorMode": "Mode mirroir",
+      "MirrorMode": "Mode miroir",
       "Konami Code": "Code Konami",
-      "konami_code_url": "https://en.wikipedia.org/wiki/Konami_Code"
+      "konami_code_url": "https://fr.wikipedia.org/wiki/Code_Konami"
     },
     "editor": {
       "title": "Raccourcis d'édition",
       "Indent": "Indentation",
       "Outdent": "Retrait",
       "Save Page": "Sauvegarder la page",
-      "Delete Line": "Supprimer la ligne"
+      "Only Editor": "(Éditeur uniquement)",
+      "Delete Line": "Supprimer la ligne",
+      "Search in Editor": "Rechercher dans l'éditeur",
+      "Move Line": "Déplacer la ligne",
+      "Copy Line": "Copier la ligne",
+      "Insert Line": "Insérer une ligne",
+      "Post Comment": "(Publier le commentaire)",
+      "Multiple Cursors": "Curseurs multiples",
+      "Or Alt Click": "ou Alt + Clic"
     },
-    "commentform": {
-      "title": "Raccourcis de commentaires",
-      "Post": "Poster"
+    "format": {
+      "title": "Paramètres de format (Éditeur)",
+      "Bold": "Gras",
+      "Italic": "Italique",
+      "Strikethrough": "Barré",
+      "Code Text": "Texte de code",
+      "Hyperlink": "Lien hypertexte"
+    },
+    "line_settings": {
+      "title": "Paramètres de ligne (Éditeur)",
+      "Bullet List": "Liste à puces",
+      "Numbered List": "Liste numérotée",
+      "Quote": "Citation",
+      "Code Block": "Bloc de code",
+      "Comment Out": "Masquer",
+      "Comment Out Desc": "(Commenter)"
     }
   },
   "modal_resolve_conflict": {
@@ -480,19 +536,144 @@
     "latest_revision": "les autres",
     "selected_editable_revision": "Corps de page sélectionné (Modifiable)"
   },
-  "modal_aichat": {
-    "title": "Assistant de Connaissance",
-    "title_beta_label": "(Bêta)",
-    "placeholder": "Demandez-moi n'importe quoi.",
+  "sidebar_ai_assistant": {
+    "reference_pages_label": "Pages de référence",
+    "recent_chat": "Chat récent",
+    "no_recent_chat": "Pas de chat récent",
+    "knowledge_assistant_placeholder": "Demandez-moi n'importe quoi.",
+    "editor_assistant_placeholder": "Puis-je vous aider ?",
     "summary_mode_label": "Mode résumé",
     "summary_mode_help": "Réponse concise en 2-3 phrases",
+    "extended_thinking_mode_label": "Mode réflexion approfondie",
+    "extended_thinking_mode_help": "Lorsqu'activé, l'IA prendra plus de temps pour réfléchir et fournir une réponse plus complète.",
     "caution_against_hallucination": "Veuillez vérifier les informations et consulter les sources.",
     "progress_label": "Génération des réponses",
     "failed_to_create_or_retrieve_thread": "Échec de la création ou de la récupération du fil de discussion",
     "budget_exceeded": "Vous avez atteint votre limite d'utilisation de l'API de l'OpenAI. Pour utiliser à nouveau l'assistant de connaissance, veuillez ajouter des crédits à partir de la page de facturation d'OpenAI.",
     "budget_exceeded_for_growi_cloud": "Vous avez atteint votre limite d'utilisation de l'API de l'OpenAI. Pour utiliser à nouveau l'assistant de connaissance, veuillez ajouter des crédits à partir de la page d'administration de GROWI.cloud pour les utilisateurs hébergés ou à partir de la page de facturation de l'OpenAI pour les utilisateurs propriétaires.",
     "error_message": "Erreur",
-    "show_error_detail": "Détails de l'exposition"
+    "show_error_detail": "Détails de l'exposition",
+    "editor_assistant_long_context_warn_with_unit_line": "Le texte est trop long, l'Assistant de rédaction se référera approximativement aux lignes {{startPosition}} à {{endPosition}} pour sa réponse.",
+    "editor_assistant_long_context_warn_with_unit_char": "Le texte est trop long, l'Assistant de rédaction se référera aux caractères {{startPosition}} à {{endPosition}} pour sa réponse.",
+    "discard": "Annuler",
+    "accept": "Accepter",
+    "use_assistant": "Utiliser l'assistant",
+    "remove_assistant": "Désélectionner l'assistant sélectionné",
+    "text_generation_by_editor_assistant_label": "L'assistant de rédaction génère du texte",
+    "preset_menu": {
+      "summarize": {
+        "title": "Résumer cet article'",
+        "prompt": "Veuillez résumer le contenu markdown"
+      },
+      "correct": {
+        "title": "Corriger les erreurs du texte",
+        "prompt": "Veuillez corriger les erreurs dans le texte markdown"
+      }
+    }
+  },
+  "modal_ai_assistant": {
+    "header": {
+      "update_assistant": "Mettre à jour l'assistant",
+      "add_new_assistant": "Ajouter un nouvel assistant"
+    },
+    "assistant_name_placeholder": "Entrer le nom de l'assistant",
+    "page_count": "{{count}} pages",
+    "memo": {
+      "title": "Note sur l'assistant",
+      "optional": "Optionnel",
+      "placeholder": "Vous pouvez afficher des notes sur le contenu et l'utilisation",
+      "description": "Le contenu de la note n'affecte pas le traitement de l'assistant."
+    },
+    "submit_button": {
+      "update_assistant": "Mettre à jour l'assistant",
+      "create_assistant": "Créer l'assistant"
+    },
+    "toaster": {
+      "create_success": "L'assistant a été créé",
+      "update_success": "L'assistant a été mis à jour",
+      "create_failed": "Échec de la création de l'assistant",
+      "update_failed": "Échec de la mise à jour de l'assistant"
+    },
+    "select_source_pages": "Sélectionnez les pages que l'assistant doit référencer",
+    "search_reference_pages_by_keyword": "Rechercher les pages de référence de l'assistant par mot-clé",
+    "search_by_keyword": "Rechercher par mot-clé",
+    "max_items_space_separated_hint": "Saisissez jusqu'à 5 éléments séparés par des espaces",
+    "select_assistant_reference_pages": "Sélectionnez les pages de référence pour l'assistant",
+    "enter_keywords": "Entrer des mots-clés",
+    "reference_pages": "Pages de référence",
+    "no_pages_selected": "Aucune page sélectionnée",
+    "can_add_later": "Vous pouvez en ajouter plus tard",
+    "next": "Suivant",
+    "select_from_page_tree": "Sélectionner depuis l'arborescence des pages",
+    "edit_page_description": "Modifier les pages que l'assistant peut référencer.<br> L'assistant peut référencer jusqu'à {{limitLearnablePageCountPerAssistant}} pages, y compris les pages enfants.",
+    "default_instruction": "Vous êtes l'assistant de connaissances pour ce Wiki.\n\n## Support multilingue :\nRépondez dans la même langue que celle utilisée par l'utilisateur dans sa requête.\n",
+    "add_page_button": "Ajouter une page",
+    "page_mode_title": {
+      "share": "Partage de l'assistant",
+      "pages": "Pages de référence",
+      "instruction": "Instructions de l'assistant"
+    },
+    "share_assistant": "Partager l'assistant",
+    "page_access_permission": "Autorisation d'accès à la page",
+    "access_scope": {
+      "owner": "Toutes les pages accessibles par {{username}}",
+      "groups": "Spécifier les groupes",
+      "publicOnly": "Pages publiques uniquement"
+    },
+    "share_scope": {
+      "title": "Portée de partage de l'assistant",
+      "owner": {
+        "label": "Seulement {{username}}"
+      },
+      "publicOnly": {
+        "label": "Public",
+        "desc": "Partagé avec tous les utilisateurs"
+      },
+      "groups": {
+        "label": "Spécifier les groupes",
+        "desc": "Partagé uniquement avec les membres des groupes sélectionnés"
+      },
+      "sameAsAccessScope": {
+        "label": "Même portée que l'accès à la page",
+        "desc": "Partagé avec la même portée que l'accès à la page"
+      }
+    },
+    "instructions": {
+      "description": "Vous pouvez définir des instructions qui déterminent le comportement de l'assistant.<br>L'assistant répondra et analysera en fonction de ces instructions.",
+      "reset_to_default": "Réinitialiser par défaut"
+    }
+  },
+  "share_scope_warning_modal": {
+    "header_title": "Confirmation de la portée de partage",
+    "warning_message": "Cet assistant comprend des pages à accès limité.<br>Avec les paramètres actuels, les informations de ces pages peuvent être partagées au-delà de leurs autorisations d'accès d'origine via l'assistant.",
+    "selected_pages_label": "Chemins de pages sélectionnés",
+    "confirmation_message": "Veuillez confirmer que vous comprenez que le contenu de ces pages peut être partagé dans la portée publique de l'assistant si vous continuez.",
+    "button": {
+      "review": "Réviser les paramètres",
+      "proceed": "Comprendre et continuer"
+    }
+  },
+  "default_ai_assistant": {
+    "not_set": "L'assistant par défaut n'est pas configuré"
+  },
+  "ai_assistant_substance": {
+    "add_assistant": "Ajouter un assistant",
+    "my_assistants": "Mes assistants",
+    "team_assistants": "Assistants d'équipe",
+    "thread_does_not_exist": "Aucune discussion",
+    "recent_threads": "Éléments récents",
+    "toaster": {
+      "ai_assistant_deleted_success": "Assistant supprimé",
+      "ai_assistant_deleted_failed": "Échec de la suppression de l'assistant",
+      "thread_deleted_success": "Discussion supprimée",
+      "thread_deleted_failed": "Échec de la suppression de la discussion",
+      "ai_assistant_set_default_success": "Assistant par défaut défini avec succès",
+      "ai_assistant_set_default_failed": "Échec de la définition de l'assistant par défaut"
+    },
+    "delete_modal": {
+      "title": "Supprimer l'assistant",
+      "confirm_message": "Êtes-vous sûr de vouloir supprimer cet assistant ?"
+    }
   },
   "link_edit": {
     "edit_link": "Modifier lien",
@@ -515,7 +696,7 @@
     "initialize_successed": "Initialisation de {{target}} réussie",
     "remove_share_link_success": "Suppression de {{shareLinkId}} réussie",
     "issue_share_link": "Lien de partage ajouté",
-    "remove_share_link": "{{count}} liens de partage supprimés",
+    "remove_share_link": "{{count}} liens supprimés",
     "switch_disable_link_sharing_success": "Paramètres des liens de partage modifiés",
     "failed_to_reset_password": "Échec de la réinitialisation du mot de passe",
     "save_succeeded": "Sauvegarde réussie"
@@ -608,7 +789,7 @@
     "alert_desc1": "Sélectionner les pages à convertir vers le format V5 avec le bouton \"Opération de masse\".",
     "nopages_title": "GROWI V5 est maintenant utilisable!",
     "nopages_desc1": "Toutes les pages ont été converties au format V5.",
-    "detail_info": "Pour plus de détails, voir <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html' target='_blank' class='alert-link'>Convertir vers GROWI v5.0.x <span className='growi-custom-icons'>external_link</span></a>.",
+    "detail_info": "Pour plus de détails, voir <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html' target='_blank' class='alert-link'>Convertir vers GROWI v5.0.x <span class='growi-custom-icons'>external_link</span></a>.",
     "modal": {
       "title": "Convertir au format V5",
       "converting_pages": "Conversion des pages",
@@ -653,7 +834,9 @@
     "export_page_markdown": "Exporter la page en Markdown",
     "export_page_pdf": "Exporter la page en PDF",
     "bulk_export": "Exporter la page et toutes les pages enfants",
-    "bulk_export_notice": "Une fois qu'un lien de téléchargement est prêt, une notification sera envoyée. Si le nombre de pages est important, la préparation peut prendre un certain temps.",
+    "bulk_export_download_explanation": "Une notification sera envoyée lorsque l’exportation sera terminée. Pour télécharger le fichier exporté, cliquez sur la notification.",
+    "bulk_export_exec_time_warning": "Si le nombre de pages est important, l'exportation peut prendre un certain temps.",
+    "large_bulk_export_warning": "Pour préserver les ressources du système, veuillez éviter d'exporter un grand nombre de pages consécutivement",
     "markdown": "Markdown",
     "choose_export_format": "Sélectionnez le format d'exportation",
     "bulk_export_started": "Patientez s'il-vous-plait...",
@@ -664,7 +847,8 @@
     "export_cancel_warning": "Les exportations suivantes en cours seront annulées",
     "restart": "Redémarrage",
     "format": "Format",
-    "started_on": "Commencé le"
+    "started_on": "Commencé le",
+    "file_upload_not_configured": "Les paramètres de téléchargement de fichiers ne sont pas configurés"
   },
   "message": {
     "successfully_connected": "Connecté!",
@@ -707,7 +891,7 @@
     "Password field is required": "Mot de passe requis.",
     "Username or E-mail has invalid characters": "Le nom d'utilisateur ou l'adresse courriel contient des caractères invalides",
     "user_not_found": "Utilisateur introuvable.",
-    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>DuplicatedUsernameException</strong></p><p class='mb-0'> L'authentification est réussie pour {{ failedProviderForDuplicatedUsernameException }} , mais la création d'un utilisateur a échouée. Voir <a href='https://github.com/weseek/growi/issues/193'>#193</a>.</p>"
+    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>DuplicatedUsernameException</strong></p><p class='mb-0'> L'authentification est réussie pour {{ failedProviderForDuplicatedUsernameException }} , mais la création d'un utilisateur a échouée. Voir <a href='https://github.com/growilabs/growi/issues/193'>#193</a>.</p>"
   },
   "grid_edit": {
     "create_bootstrap_4_grid": "Créer grille Bootstrap 4",
@@ -749,7 +933,8 @@
   "pagetree": {
     "cannot_rename_a_title_that_contains_slash": "Renommage impossible lorsque le titre contient '/'",
     "you_cannot_move_this_page_now": "Déplacement de la page impossible",
-    "something_went_wrong_with_moving_page": "Échec de déplacement de la page"
+    "something_went_wrong_with_moving_page": "Échec de déplacement de la page",
+    "error_retrieving_the_pagetree": "Une erreur s'est produite lors de la récupération de l'arbre des pages"
   },
   "duplicated_page_alert": {
     "same_page_name_exists": "Une page avec ce nom 「{{pageName}}」 existe déjà",
@@ -757,9 +942,9 @@
     "select_page_to_see": "Sélectionner une page"
   },
   "user_group": {
-    "select_group": "Sélectionner groupe",
-    "belonging_to_no_group": "Appartenance au groupe introuvable.",
-    "manage_user_groups": "Gestion des groupes utilisateurs"
+    "select_group": "Groupes autorisés",
+    "belonging_to_no_group": "Vous n'appartenez à aucun groupe.",
+    "manage_user_groups": "Gestion des groupes"
   },
   "fix_page_grant": {
     "modal": {
@@ -790,11 +975,11 @@
   "tooltip": {
     "like": "Like!",
     "cancel_like": "Annuler",
-    "bookmark": "Favori",
-    "cancel_bookmark": "Annuler favori",
-    "receive_notifications": "Recevoir les notifications",
-    "stop_notification": "Stopper les notifications",
-    "footprints": "Visiteurs",
+    "bookmark": "Ajouter aux favoris",
+    "cancel_bookmark": "Retirer des favoris",
+    "receive_notifications": "S'abonner",
+    "stop_notification": "Se désabonner",
+    "footprints": "Lecteurs",
     "login_required": "Connexion requise",
     "operation": {
       "attention": {
@@ -808,7 +993,7 @@
   },
   "user_home_page": {
     "bookmarks": "Favoris",
-    "recently_created": "Crée récemment"
+    "recently_created": "Page récentes"
   },
   "bookmark_folder": {
     "bookmark_folder": "dossier de favoris",
@@ -831,28 +1016,11 @@
     "page_tree_not_avaliable": "Cette fonctionnalité n'est pas encore disponible.",
     "go_to_settings": "Activer cette fonctionnalité dans les paramètres"
   },
-  "questionnaire": {
-    "give_us_feedback": "Faites-nous part de votre avis",
-    "thank_you_for_answering": "Merci pour votre réponse",
-    "additional_feedback": "Envoyez-nous votre avis depuis le menu déroulant sur le menu utilisateur.",
-    "dont_show_again": "Ne plus afficher",
-    "deny": "Ne pas répondre",
-    "agree": "En accord",
-    "disagree": "En désaccord",
-    "answer": "Répondre",
-    "no_answer": "Aucune réponse",
-    "settings": "Configuration du questionnaire",
-    "failed_to_send": "Échec de l'envoi du questionnaire",
-    "denied": "Le questionnaire ne sera plus montré",
-    "personal_settings_explanation": "Les questionnaires de satisfaction seront actifs.",
-    "enable_questionnaire": "Activer questionnaire",
-    "disabled_by_admin": "Questionnaire désactivé par l'administrateur"
-  },
   "tag_edit_modal": {
-    "edit_tags": "Modifier étiquettes",
-    "done": "Terminer",
+    "edit_tags": "Étiquettes",
+    "done": "Mettre à jour",
     "tags_input": {
-      "tag_name": "nom de l'étiquette"
+      "tag_name": "Choisir ou créer une étiquette"
     }
   },
   "delete_attachment_modal": {
@@ -875,15 +1043,14 @@
   },
   "sidebar_header": {
     "show_wip_page": "Voir brouillon",
-    "size_s": "Taille: P",
-    "size_l": "Taille: G"
+    "compact_view": "Vue compacte"
   },
   "sync-latest-revision-body": {
-    "menuitem": "Synchroniser le texte de l'éditeur avec le corps de la dernière révision",
-    "confirm": "Delete the draft data being entered into the editor and synchronize the latest text. Are you sure you want to run it?",
+    "menuitem": "Synchroniser avec la dernière révision",
+    "confirm": "Supprime les données en brouillon et synchronise avec la dernière révision. Synchroniser?",
     "alert": "Il se peut que le texte le plus récent n'ait pas été synchronisé. Veuillez recharger et vérifier à nouveau.",
     "success-toaster": "Dernier texte synchronisé",
-    "skipped-toaster": "Synchronisation ignorée car l'éditeur n'est pas activé. Ouvrir l'éditeur et réessayer.",
-    "error-toaster": "La synchronisation du dernier texte a échoué"
+    "skipped-toaster": "L'éditeur n'est pas actif. Synchronisation annulée.",
+    "error-toaster": "Synchronisation échouée"
   }
 }

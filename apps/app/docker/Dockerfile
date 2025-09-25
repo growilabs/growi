@@ -1,25 +1,31 @@
-# syntax = docker/dockerfile:1
+# syntax = docker/dockerfile:1.4
 
+ARG OPT_DIR="/opt"
+ARG PNPM_HOME="/root/.local/share/pnpm"
 
 ##
 ## base
 ##
 FROM node:20-slim AS base
 
-ENV optDir=/opt
+ARG OPT_DIR
+ARG PNPM_HOME
 
-WORKDIR ${optDir}
+WORKDIR $OPT_DIR
 
 # install tools
-RUN apt-get update && apt-get install -y ca-certificates wget curl --no-install-recommends
+RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  apt-get update && apt-get install -y ca-certificates wget curl --no-install-recommends
 
 # install pnpm
-RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" sh -
-ENV PNPM_HOME="/root/.local/share/pnpm"
+RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" PNPM_VERSION="10.4.1" sh -
+ENV PNPM_HOME=$PNPM_HOME
 ENV PATH="$PNPM_HOME:$PATH"
 
 # install turbo
-RUN pnpm add turbo --global
+RUN --mount=type=cache,target=$PNPM_HOME/store,sharing=locked \
+  pnpm add turbo --global
 
 
 
@@ -28,14 +34,17 @@ RUN pnpm add turbo --global
 ##
 FROM base AS builder
 
-ENV optDir=/opt
+ENV PNPM_HOME=$PNPM_HOME
+ENV PATH="$PNPM_HOME:$PATH"
 
-WORKDIR ${optDir}
+WORKDIR $OPT_DIR
 
 COPY . .
 
-RUN pnpm add node-gyp --global
-RUN pnpm install ---frozen-lockfile
+RUN --mount=type=cache,target=$PNPM_HOME/store,sharing=locked \
+  pnpm add node-gyp --global
+RUN --mount=type=cache,target=$PNPM_HOME/store,sharing=locked \
+  pnpm install ---frozen-lockfile
 
 # build
 RUN turbo run clean
@@ -45,7 +54,7 @@ RUN turbo run build --filter @growi/app
 RUN pnpm deploy out --prod --filter @growi/app
 RUN rm -rf apps/app/node_modules && mv out/node_modules apps/app/node_modules
 RUN rm -rf apps/app/.next/cache
-RUN tar -zcf packages.tar.gz \
+RUN tar -zcf /tmp/packages.tar.gz \
   package.json \
   apps/app/.next \
   apps/app/config \
@@ -66,27 +75,28 @@ RUN tar -zcf packages.tar.gz \
 FROM node:20-slim
 LABEL maintainer="Yuki Takei <yuki@weseek.co.jp>"
 
+ARG OPT_DIR
+
 ENV NODE_ENV="production"
 
-ENV optDir=/opt
-ENV appDir=${optDir}/growi
+ENV appDir="$OPT_DIR/growi"
 
 # Add gosu
 # see: https://github.com/tianon/gosu/blob/1.13/INSTALL.md
-RUN set -eux; \
+RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  set -eux; \
 	apt-get update; \
 	apt-get install -y gosu; \
 	rm -rf /var/lib/apt/lists/*; \
 # verify that the binary works
 	gosu nobody true
 
-COPY --from=builder --chown=node:node \
-  ${optDir}/packages.tar.gz ${appDir}/
-
 # extract artifacts as 'node' user
 USER node
 WORKDIR ${appDir}
-RUN tar -zxf packages.tar.gz && rm packages.tar.gz
+RUN --mount=type=bind,from=builder,source=/tmp/packages.tar.gz,target=/tmp/packages.tar.gz \
+  tar -zxf /tmp/packages.tar.gz -C ${appDir}/
 
 COPY --chown=node:node --chmod=700 apps/app/docker/docker-entrypoint.sh /
 

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, type JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
 

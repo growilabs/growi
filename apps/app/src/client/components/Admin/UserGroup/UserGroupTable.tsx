@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import type { FC, JSX } from 'react';
 import React, { useState, useEffect } from 'react';
 
 import type { IUserGroupHasId, IUserGroupRelation, IUserHasId } from '@growi/core';
@@ -218,7 +218,7 @@ export const UserGroupTable: FC<Props> = ({
                     })}
                   </ul>
                 </td>
-                <td>{dateFnsFormat(new Date(group.createdAt), 'yyyy-MM-dd')}</td>
+                <td>{dateFnsFormat(group.createdAt, 'yyyy-MM-dd')}</td>
                 {isAclEnabled
                   ? (
                     <td>

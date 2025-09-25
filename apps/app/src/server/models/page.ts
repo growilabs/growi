@@ -7,7 +7,7 @@ import {
   type IPage,
   GroupType, type HasObjectId,
 } from '@growi/core';
-import type { IPagePopulatedToShowRevision } from '@growi/core/dist/interfaces';
+import type { IPagePopulatedToShowRevision, IUserHasId } from '@growi/core/dist/interfaces';
 import { getIdForRef, isPopulated } from '@growi/core/dist/interfaces';
 import { isTopPage, hasSlash } from '@growi/core/dist/utils/page-path-utils';
 import { addTrailingSlash, normalizePath } from '@growi/core/dist/utils/path-utils';
@@ -23,10 +23,11 @@ import uniqueValidator from 'mongoose-unique-validator';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import type { IOptionsForCreate } from '~/interfaces/page';
+import type { IOptionsForCreate, IPagePathWithDescendantCount } from '~/interfaces/page';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 
 import loggerFactory from '../../utils/logger';
+import type Crowi from '../crowi';
 import { collectAncestorPaths } from '../util/collect-ancestor-paths';
 import { getOrCreateModel } from '../util/mongoose-utils';
 
@@ -51,7 +52,7 @@ export interface PageDocument extends IPage, Document<Types.ObjectId> {
   [x:string]: any // for obsolete methods
   getLatestRevisionBodyLength(): Promise<number | null | undefined>
   calculateAndUpdateLatestRevisionBodyLength(this: PageDocument): Promise<void>
-  populateDataToShowRevision(shouldExcludeBody?: boolean): Promise<IPagePopulatedToShowRevision>
+  populateDataToShowRevision(shouldExcludeBody?: boolean): Promise<IPagePopulatedToShowRevision & PageDocument>
 }
 
 type TargetAndAncestorsResult = {
@@ -90,7 +91,9 @@ export interface PageModel extends Model<PageDocument> {
   findByPath(path: string, includeEmpty?: boolean): Promise<HydratedDocument<PageDocument> | null>
   findByPathAndViewer(path: string | null, user, userGroups?, useFindOne?: true, includeEmpty?: boolean): Promise<HydratedDocument<PageDocument> | null>
   findByPathAndViewer(path: string | null, user, userGroups?, useFindOne?: false, includeEmpty?: boolean): Promise<HydratedDocument<PageDocument>[]>
-  countByPathAndViewer(path: string | null, user, userGroups?, includeEmpty?:boolean): Promise<number>
+  descendantCountByPaths(
+    paths: string[], user: IUserHasId, userGroups?, includeEmpty?: boolean, includeAnyoneWithTheLink?: boolean
+  ): Promise<IPagePathWithDescendantCount[]>
   findParentByPath(path: string | null): Promise<HydratedDocument<PageDocument> | null>
   findTargetAndAncestorsByPathOrId(pathOrId: string): Promise<TargetAndAncestorsResult>
   findRecentUpdatedPages(path: string, user, option: FindRecentUpdatedPagesOption, includeEmpty?: boolean): Promise<PaginatedPages>
@@ -669,6 +672,54 @@ schema.statics.findByPathAndViewer = async function(
   return queryBuilder.query.exec();
 };
 
+schema.statics.descendantCountByPaths = async function(
+    paths: string[],
+    user: IUserHasId,
+    userGroups = null,
+    includeEmpty = false,
+    includeAnyoneWithTheLink = false,
+): Promise<IPagePathWithDescendantCount[]> {
+  if (paths.length === 0) {
+    throw new Error('paths are required');
+  }
+
+  const baseQuery = this.find({ path: { $in: paths } });
+  const queryBuilder = new PageQueryBuilder(baseQuery, includeEmpty);
+
+  await queryBuilder.addViewerCondition(user, userGroups, includeAnyoneWithTheLink);
+
+  const conditions = queryBuilder.query._conditions;
+
+  const aggregationPipeline = [
+    {
+      $match: conditions,
+    },
+    {
+      $project: {
+        _id: 0,
+        path: 1,
+        descendantCount: 1,
+      },
+    },
+    {
+      $group: {
+        _id: '$path',
+        descendantCount: { $first: '$descendantCount' },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        path: '$_id',
+        descendantCount: 1,
+      },
+    },
+  ];
+
+  const pages = await this.aggregate<IPagePathWithDescendantCount>(aggregationPipeline);
+  return pages;
+};
+
 schema.statics.countByPathAndViewer = async function(path: string | null, user, userGroups = null, includeEmpty = false): Promise<number> {
   if (path == null) {
     throw new Error('path is required.');
@@ -1154,7 +1205,8 @@ schema.methods.makeWip = function(disableTtl: boolean) {
 /*
  * Merge obsolete page model methods and define new methods which depend on crowi instance
  */
-export default function PageModel(crowi): any {
+
+export default function PageModel(crowi: Crowi | null): any {
   // add old page schema methods
   const pageSchema = getPageSchema(crowi);
   schema.methods = { ...pageSchema.methods, ...schema.methods };

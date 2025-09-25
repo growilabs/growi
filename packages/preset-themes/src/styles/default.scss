@@ -47,7 +47,7 @@
   $body-secondary-bg-dark: $gray-800;
   $body-tertiary-color-dark: rgba($body-color-dark, .5);
   $body-tertiary-bg-dark: color.mix($gray-800, $gray-900, 50%);
-  $border-color-dark: var(--grw-highlight-200);
+  $border-color-dark: var(--grw-highlight-800);
   $link-color-dark: $gray-500;
 
   @import 'bootstrap/scss/variables';

@@ -1,6 +1,6 @@
 /* eslint-disable max-len */
 
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
 import { PrismAsyncLight } from 'react-syntax-highlighter';

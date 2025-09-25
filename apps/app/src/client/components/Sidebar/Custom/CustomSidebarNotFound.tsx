@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, type JSX } from 'react';
 
 import { Origin } from '@growi/core';
 import { useTranslation } from 'react-i18next';

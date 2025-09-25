@@ -1,4 +1,4 @@
-import type { Ref } from 'react';
+import type { Ref, JSX } from 'react';
 import React, { useEffect, useState } from 'react';
 
 import { LoadingSpinner } from '@growi/ui/dist/components';
@@ -30,7 +30,7 @@ const useIntersection = <E extends HTMLElement>(): [boolean, Ref<E>] => {
   return [intersecting, (el) => { if (el != null) setElement(el); }];
 };
 
-const LoadingIndicator = (): React.ReactElement => {
+const LoadingIndicator = (): JSX.Element => {
   return (
     <div className="text-muted text-center">
       <LoadingSpinner className="me-1 fs-3" />

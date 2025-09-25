@@ -9,7 +9,7 @@ please bring it to our attention through any of the ways detailed here :
 The attached notices are provided for information only.
 
 For any licenses that require disclosure of source, sources are available at  
-https://github.com/weseek/growi.
+https://github.com/growilabs/growi.
 
 
 1. Apache License, Version 2.0 Derivative Works

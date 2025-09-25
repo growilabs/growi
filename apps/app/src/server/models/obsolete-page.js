@@ -8,6 +8,8 @@ import ExternalUserGroup from '~/features/external-user-group/server/models/exte
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import loggerFactory from '~/utils/logger';
 
+import { configManager } from '../service/config-manager';
+
 import UserGroup from './user-group';
 import UserGroupRelation from './user-group-relation';
 
@@ -84,7 +86,7 @@ export const populateDataToShowRevision = (page, userPublicFields, shouldExclude
 };
 /* eslint-enable object-curly-newline, object-property-newline */
 
-
+/** @param {import('~/server/crowi').default | null} crowi Crowi instance */
 export const getPageSchema = (crowi) => {
   let pageEvent;
 
@@ -513,8 +515,8 @@ export const getPageSchema = (crowi) => {
     validateCrowi();
 
     // determine User condition
-    const hidePagesRestrictedByOwner = crowi.configManager.getConfig('crowi', 'security:list-policy:hideRestrictedByOwner');
-    const hidePagesRestrictedByGroup = crowi.configManager.getConfig('crowi', 'security:list-policy:hideRestrictedByGroup');
+    const hidePagesRestrictedByOwner = configManager.getConfig('security:list-policy:hideRestrictedByOwner');
+    const hidePagesRestrictedByGroup = configManager.getConfig('security:list-policy:hideRestrictedByGroup');
 
     // determine UserGroup condition
     const userGroups = user != null ? [

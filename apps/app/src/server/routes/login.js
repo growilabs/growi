@@ -2,9 +2,12 @@ import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
+import { growiInfoService } from '../service/growi-info';
+
 // disable all of linting
 // because this file is a deprecated legacy of Crowi
 
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = function(crowi, app) {
   const logger = loggerFactory('growi:routes:login');
   const path = require('path');
@@ -20,7 +23,7 @@ module.exports = function(crowi, app) {
     // send mails to all admin users (derived from crowi) -- 2020.06.18 Yuki Takei
     const admins = await User.findAdmins();
     const appTitle = appService.getAppTitle();
-    const locale = configManager.getConfig('crowi', 'app:globalLang');
+    const locale = configManager.getConfig('app:globalLang');
 
     const promises = admins.map((admin) => {
       return mailService.send({
@@ -30,7 +33,7 @@ module.exports = function(crowi, app) {
         vars: {
           adminUser: admin,
           createdUser: userData,
-          url: appService.getSiteUrl(),
+          url: growiInfoService.getSiteUrl(),
           appTitle,
         },
       });
@@ -79,6 +82,38 @@ module.exports = function(crowi, app) {
       return res.apiv3({});
     }
 
+    /**
+     * @swagger
+     *
+     * /login:
+     *   post:
+     *     summary: /login
+     *     tags: [Users]
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               loginForm:
+     *                 type: object
+     *                 properties:
+     *                   username:
+     *                     type: string
+     *                   password:
+     *                     type: string
+     *     responses:
+     *       200:
+     *         description: Login successful
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 redirectTo:
+     *                   type: string
+     */
     req.login(userData, (err) => {
       if (err) {
         logger.debug(err);
@@ -95,7 +130,7 @@ module.exports = function(crowi, app) {
       let redirectTo;
       if (userData.password == null) {
         // userData.password can't be empty but, prepare redirect because password property in User Model is optional
-        // https://github.com/weseek/growi/pull/6670
+        // https://github.com/growilabs/growi/pull/6670
         redirectTo = '/me#password_settings';
       }
       else if (req.session.redirectTo != null) {
@@ -128,13 +163,49 @@ module.exports = function(crowi, app) {
     next();
   };
 
+  /**
+   * @swagger
+   *
+   * /register:
+   *   post:
+   *     summary: /register
+   *     tags: [Users]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               registerForm:
+   *                 type: object
+   *                 properties:
+   *                   name:
+   *                     type: string
+   *                   username:
+   *                     type: string
+   *                   email:
+   *                     type: string
+   *                   password:
+   *                     type: string
+   *     responses:
+   *       200:
+   *         description: Register successful
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 redirectTo:
+   *                   type: string
+   */
   actions.register = function(req, res) {
     if (req.user != null) {
       return res.apiv3Err('message.user_already_logged_in', 403);
     }
 
     // config で closed ならさよなら
-    if (configManager.getConfig('crowi', 'security:registrationMode') === aclService.labels.SECURITY_REGISTRATION_MODE_CLOSED) {
+    if (configManager.getConfig('security:registrationMode') === aclService.labels.SECURITY_REGISTRATION_MODE_CLOSED) {
       return res.apiv3Err('message.registration_closed', 403);
     }
 
@@ -169,7 +240,7 @@ module.exports = function(crowi, app) {
         return res.apiv3Err(errors, 400);
       }
 
-      const registrationMode = configManager.getConfig('crowi', 'security:registrationMode');
+      const registrationMode = configManager.getConfig('security:registrationMode');
 
       User.createUserByEmailAndPassword(name, username, email, password, undefined, async(err, userData) => {
         if (err) {

@@ -1,11 +1,12 @@
 import Head from 'next/head';
+import type { JSX } from 'react';
 
 import { presentationMarpit, slideMarpit } from '../services/growi-marpit';
 
 type Props = {
-  children?: string,
-  presentation?: boolean,
-}
+  children?: string;
+  presentation?: boolean;
+};
 
 export const MarpSlides = (props: Props): JSX.Element => {
   const { children, presentation } = props;
@@ -18,7 +19,7 @@ export const MarpSlides = (props: Props): JSX.Element => {
         <style>{css}</style>
       </Head>
       <div
-        // eslint-disable-next-line react/no-danger
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: ignore
         dangerouslySetInnerHTML={{
           // DOMpurify.sanitize delete elements in <svg> so sanitize is not used here.
           __html: html,

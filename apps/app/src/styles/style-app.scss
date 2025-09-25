@@ -56,44 +56,6 @@
   flex-basis: 0;
 }
 
-.picture {
-  width: 24px;
-  height: 24px;
-
-  // size list
-  &.picture-lg {
-    width: 48px;
-    height: 48px;
-  }
-
-  &.picture-md {
-    width: 24px;
-    height: 24px;
-  }
-
-  &.picture-sm {
-    width: 18px;
-    height: 18px;
-  }
-
-  &.picture-xs {
-    width: 14px;
-    height: 14px;
-  }
-}
-
-.cmd-key.mac {
-  &::after {
-    content: '⌘';
-  }
-}
-
-.cmd-key.win {
-  &::after {
-    content: 'Ctrl';
-  }
-}
-
 .grw-page-control-dropdown-item {
   display: flex !important;
   align-items: center;

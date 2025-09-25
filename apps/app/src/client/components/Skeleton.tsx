@@ -1,4 +1,7 @@
+import type { JSX } from 'react';
+
 import styles from './Skeleton.module.scss';
+
 
 const moduleClass = styles['grw-skeleton'] ?? '';
 

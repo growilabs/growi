@@ -1,5 +1,5 @@
 import React, {
-  useState, useEffect, useCallback, useMemo,
+  useState, useEffect, useCallback, useMemo, type JSX,
 } from 'react';
 
 import type { IUser } from '@growi/core';
@@ -60,7 +60,7 @@ const ConflictDiffModalCore = (props: ConflictDiffModalCoreProps): JSX.Element =
   }, [isRevisionselected]);
 
   const resolveConflictHandler = useCallback(async() => {
-    const newBody = codeMirrorEditor?.getDoc();
+    const newBody = codeMirrorEditor?.getDocString();
     if (newBody == null) {
       return;
     }

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, type JSX } from 'react';
 
 import { useDrawioModalForEditor } from '../../../stores/use-drawio';
 

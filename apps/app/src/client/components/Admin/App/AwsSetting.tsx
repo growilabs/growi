@@ -1,4 +1,7 @@
+import type { JSX } from 'react';
+
 import { useTranslation } from 'next-i18next';
+
 
 export type AwsSettingMoleculeProps = {
   s3ReferenceFileWithRelayMode
@@ -73,7 +76,7 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
           <input
             className="form-control"
             placeholder={`${t('eg')} ap-northeast-1`}
-            defaultValue={props.s3Region || ''}
+            value={props.s3Region || ''}
             onChange={(e) => {
               props?.onChangeS3Region(e.target.value);
             }}
@@ -90,7 +93,7 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
             className="form-control"
             type="text"
             placeholder={`${t('eg')} http://localhost:9000`}
-            defaultValue={props.s3CustomEndpoint || ''}
+            value={props.s3CustomEndpoint || ''}
             onChange={(e) => {
               props?.onChangeS3CustomEndpoint(e.target.value);
             }}
@@ -108,7 +111,7 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
             className="form-control"
             type="text"
             placeholder={`${t('eg')} crowi`}
-            defaultValue={props.s3Bucket || ''}
+            value={props.s3Bucket || ''}
             onChange={(e) => {
               props.onChangeS3Bucket(e.target.value);
             }}
@@ -124,7 +127,7 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
           <input
             className="form-control"
             type="text"
-            defaultValue={props.s3AccessKeyId || ''}
+            value={props.s3AccessKeyId || ''}
             onChange={(e) => {
               props?.onChangeS3AccessKeyId(e.target.value);
             }}

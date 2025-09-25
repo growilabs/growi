@@ -1,4 +1,6 @@
-import { memo, useCallback, useRef } from 'react';
+import {
+  memo, useCallback, useRef, type JSX,
+} from 'react';
 
 import type { AcceptedUploadFileType } from '@growi/core';
 import SimpleBar from 'simplebar-react';
@@ -32,7 +34,7 @@ export const Toolbar = memo((props: Props): JSX.Element => {
 
   return (
     <>
-      <div className={`d-flex gap-2 py-1 px-2 px-md-3 border-top ${styles['codemirror-editor-toolbar']}`}>
+      <div className={`d-flex gap-2 py-1 px-2 px-md-3 border-top ${styles['codemirror-editor-toolbar']} align-items-center`}>
         <AttachmentsDropup editorKey={editorKey} onUpload={onUpload} acceptedUploadFileType={acceptedUploadFileType} />
         <div className="flex-grow-1">
           <SimpleBar ref={simpleBarRef} autoHide style={{ overflowY: 'hidden' }}>

@@ -1,4 +1,4 @@
 export type ConnectionStatus = {
-  error?: Error,
-  workspaceName?: string,
-}
+  error?: Error;
+  workspaceName?: string;
+};

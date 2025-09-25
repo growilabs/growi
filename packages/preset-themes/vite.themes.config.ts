@@ -28,9 +28,7 @@ export default defineConfig(({ mode }) => {
           '/src/styles/classic.scss',
         ],
         output: {
-          assetFileNames: isProd
-            ? undefined
-            : 'assets/[name].[ext]', // not attach hash
+          assetFileNames: isProd ? undefined : 'assets/[name].[ext]', // not attach hash
         },
       },
     },

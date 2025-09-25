@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type JSX } from 'react';
 
 import { isPopulated } from '@growi/core';
 import { UserPicture } from '@growi/ui/dist/components';

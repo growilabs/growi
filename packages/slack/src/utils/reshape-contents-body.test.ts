@@ -1,7 +1,6 @@
 import { reshapeContentsBody } from './reshape-contents-body';
 
 describe('reshapeContentsBody', () => {
-
   describe('Markdown only', () => {
     test('Return the same input', () => {
       const input = `
@@ -110,5 +109,4 @@ some messages...\u0020\u0020
       expect(reshapeContentsBody(input)).toBe(output);
     });
   });
-
 });

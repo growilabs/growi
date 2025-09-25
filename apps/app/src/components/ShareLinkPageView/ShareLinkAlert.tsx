@@ -42,7 +42,7 @@ const ShareLinkAlert: FC<Props> = (props: Props) => {
   return (
     <p className={`alert alert-${alertColor} px-4 d-edit-none`}>
       <span className="material-symbols-outlined me-1">link</span>
-      {(expiredAt === null ? <span>{t('page_page.notice.no_deadline')}</span>
+      {(expiredAt == null ? <span>{t('page_page.notice.no_deadline')}</span>
       // eslint-disable-next-line react/no-danger
         : <span dangerouslySetInnerHTML={{ __html: t('page_page.notice.expiration', { expiredAt }) }} />
       )}

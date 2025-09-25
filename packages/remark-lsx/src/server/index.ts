@@ -1,12 +1,11 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
 import type { NextFunction, Request, Response } from 'express';
 import { query, validationResult } from 'express-validator';
 import { FilterXSS } from 'xss';
-
 import type { LsxApiOptions } from '../interfaces/api';
-
 import { listPages } from './routes/list-pages';
 
-const loginRequiredFallback = (req: Request, res: Response) => {
+const loginRequiredFallback = (_req: Request, res: Response) => {
   return res.status(403).send('login required');
 };
 
@@ -14,21 +13,20 @@ const filterXSS = new FilterXSS();
 
 const lsxValidator = [
   query('pagePath').notEmpty().isString(),
-  query('offset').optional().isInt(),
-  query('limit').optional().isInt(),
+  query('offset').optional().isInt().toInt(),
+  query('limit').optional().isInt().toInt(),
   query('options')
     .optional()
     .customSanitizer((options) => {
       try {
         const jsonData: LsxApiOptions = JSON.parse(options);
 
-        Object.keys(jsonData).forEach((key) => {
+        for (const key in jsonData) {
           jsonData[key] = filterXSS.process(jsonData[key]);
-        });
+        }
 
         return jsonData;
-      }
-      catch (err) {
+      } catch {
         throw new Error('Invalid JSON format in options');
       }
     }),
@@ -46,15 +44,26 @@ const paramValidator = (req: Request, res: Response, next: NextFunction) => {
     return new Error(`Invalid lsx parameter: ${err.param}: ${err.msg}`);
   });
 
-  res.status(400).json({ errors: errs.map(err => err.message) });
+  res.status(400).json({ errors: errs.map((err) => err.message) });
 };
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: ignore
 const middleware = (crowi: any, app: any): void => {
-  const loginRequired = crowi.require('../middlewares/login-required')(crowi, true, loginRequiredFallback);
+  const loginRequired = crowi.require('../middlewares/login-required')(
+    crowi,
+    true,
+    loginRequiredFallback,
+  );
   const accessTokenParser = crowi.accessTokenParser;
 
-  app.get('/_api/lsx', accessTokenParser, loginRequired, lsxValidator, paramValidator, listPages);
+  app.get(
+    '/_api/lsx',
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    loginRequired,
+    lsxValidator,
+    paramValidator,
+    listPages,
+  );
 };
 
 export default middleware;

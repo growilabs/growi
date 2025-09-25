@@ -1,6 +1,7 @@
 
 import type { IPageHasId } from '@growi/core';
-import useSWRInfinite, { SWRInfiniteResponse } from 'swr/infinite';
+import type { SWRInfiniteResponse } from 'swr/infinite';
+import useSWRInfinite from 'swr/infinite';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
 

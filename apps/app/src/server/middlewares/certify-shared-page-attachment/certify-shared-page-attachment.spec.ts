@@ -1,10 +1,10 @@
 import type { Response } from 'express';
 import { mock } from 'vitest-mock-extended';
 
-import { ShareLinkDocument } from '~/server/models/share-link';
+import type { ShareLinkDocument } from '~/server/models/share-link';
 
 import { certifySharedPageAttachmentMiddleware, type RequestToAllowShareLink } from './certify-shared-page-attachment';
-import { ValidReferer } from './interfaces';
+import type { ValidReferer } from './interfaces';
 
 const mocks = vi.hoisted(() => {
   return {

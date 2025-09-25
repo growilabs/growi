@@ -1,4 +1,4 @@
-import type { DetailedHTMLProps, ImgHTMLAttributes } from 'react';
+import type { DetailedHTMLProps, ImgHTMLAttributes, JSX } from 'react';
 import React, { useMemo, useState } from 'react';
 
 import FsLightbox from 'fslightbox-react';
