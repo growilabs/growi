@@ -81,6 +81,8 @@ module.exports = (crowi, app) => {
     return [router, routerForAdmin, routerForAuth];
   }
 
+  router.use('/user-activities', require('./user-activities')(crowi));
+
   router.use('/in-app-notification', require('./in-app-notification')(crowi));
 
   router.use('/personal-setting', require('./personal-setting')(crowi));
