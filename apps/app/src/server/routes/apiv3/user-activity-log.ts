@@ -4,6 +4,7 @@ import express from 'express';
 import { query } from 'express-validator';
 
 import type { IActivity } from '~/interfaces/activity';
+import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
@@ -12,7 +13,6 @@ import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 
 import type { ApiV3Response } from './interfaces/apiv3-response';
-
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
 
