@@ -1,4 +1,3 @@
-
 import sanitize from 'sanitize-filename';
 
 // https://regex101.com/r/fK2rV3/1
@@ -11,7 +10,6 @@ const sanitizeSymbolsChars = new RegExp(/[^a-zA-Z0-9_.]+/g);
 const sanitizeVersionChars = new RegExp(/^v[\d]/gi);
 
 export class GitHubUrl {
-
   private _organizationName: string;
 
   private _reposName: string;
@@ -39,19 +37,26 @@ export class GitHubUrl {
   get archiveUrl(): string {
     const encodedBranchName = encodeURIComponent(this.branchName);
     const encodedTagName = encodeURIComponent(this.tagName);
-    const zipUrl = encodedTagName !== '' ? `tags/${encodedTagName}` : `heads/${encodedBranchName}`;
-    const ghUrl = new URL(`/${this.organizationName}/${this.reposName}/archive/refs/${zipUrl}.zip`, 'https://github.com');
+    const zipUrl =
+      encodedTagName !== ''
+        ? `tags/${encodedTagName}`
+        : `heads/${encodedBranchName}`;
+    const ghUrl = new URL(
+      `/${this.organizationName}/${this.reposName}/archive/refs/${zipUrl}.zip`,
+      'https://github.com',
+    );
     return ghUrl.toString();
   }
 
   get extractedArchiveDirName(): string {
     const name = this._tagName !== '' ? this._tagName : this._branchName;
-    return name.replace(sanitizeVersionChars, m => m.substring(1)).replaceAll(sanitizeSymbolsChars, '-');
+    return name
+      .replace(sanitizeVersionChars, (m) => m.substring(1))
+      .replaceAll(sanitizeSymbolsChars, '-');
   }
 
   constructor(url: string, branchName = 'main', tagName = '') {
-
-    let matched;
+    let matched: RegExpMatchArray | null;
     try {
       const ghUrl = new URL(url);
 
@@ -60,8 +65,7 @@ export class GitHubUrl {
       if (ghUrl.hostname !== 'github.com' || matched == null) {
         throw new Error();
       }
-    }
-    catch (err) {
+    } catch (err) {
       throw new Error(`The specified URL is invalid. : url='${url}'`);
     }
 
@@ -71,5 +75,4 @@ export class GitHubUrl {
     this._organizationName = sanitize(matched[1]);
     this._reposName = sanitize(matched[2]);
   }
-
 }
