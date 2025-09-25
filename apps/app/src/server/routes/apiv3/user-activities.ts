@@ -205,7 +205,7 @@ module.exports = (crowi: Crowi): Router => {
    *             schema:
    *               $ref: '#/components/schemas/ActivityResponse'
    */
-  router.get('/users/:userId/activities',
+  router.get('/:userId',
 
     // FIX: Need middleware for getting current users userId
     loginRequiredStrictly, validator.list, apiV3FormValidator, async(req: Request, res: ApiV3Response) => {
@@ -216,6 +216,43 @@ module.exports = (crowi: Crowi): Router => {
       const query = { user: userId };
 
       try {
+
+
+        const userActivityPipeline = [
+          {
+            $match: {
+              $and: [
+                {
+                  userId,
+                },
+                {
+                  action: { $in: Object.values(ActivityLogActions) },
+                },
+              ],
+            },
+          },
+          {
+            $sort: {
+              createdAt: -1 as const,
+            },
+          },
+          {
+            $limit: 20,
+          },
+        ];
+
+        const simpleTestPipeline = [
+          {
+            $match: {
+              action: 'UNSETTLED',
+            },
+          },
+        ];
+        const pipeLineResults = await Activity.aggregate(simpleTestPipeline);
+        const test: string[] = [];
+
+        return res.apiv3({ test });
+
 
         // Create paginateResult in MongoDB Aggregation Pipeline.
         const serializedDocs = paginateResult.docs.map((doc: IActivity) => {
