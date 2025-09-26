@@ -1,4 +1,4 @@
-import crypto from 'node:crypto';
+import crypto from 'crypto';
 import { type Meter, metrics, type ObservableGauge } from '@opentelemetry/api';
 import { mock } from 'vitest-mock-extended';
 

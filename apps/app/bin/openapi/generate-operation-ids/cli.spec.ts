@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs';
+import { writeFileSync } from 'fs';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
