@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import { diag, metrics } from '@opentelemetry/api';
 
 import { configManager } from '~/server/service/config-manager';

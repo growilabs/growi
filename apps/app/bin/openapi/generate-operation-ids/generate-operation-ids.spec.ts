@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import type { OpenAPI3 } from 'openapi-typescript';
-import { tmpdir } from 'os';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
 
