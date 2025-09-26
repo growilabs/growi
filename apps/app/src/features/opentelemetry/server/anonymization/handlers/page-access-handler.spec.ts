@@ -1,4 +1,4 @@
-import type { IncomingMessage } from 'node:http';
+import type { IncomingMessage } from 'http';
 
 import { describe, expect, it } from 'vitest';
 

@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-import type { IncomingMessage } from 'node:http';
 import {
   getUsernameByPath,
   isCreatablePage,
@@ -9,6 +7,8 @@ import {
   isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import { diag } from '@opentelemetry/api';
+import { createHash } from 'crypto';
+import type { IncomingMessage } from 'http';
 
 import { ATTR_HTTP_TARGET } from '../../semconv';
 import type { AnonymizationModule } from '../interfaces/anonymization-module';
