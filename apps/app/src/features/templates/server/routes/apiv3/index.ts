@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { GrowiPluginType } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import type { TemplateSummary } from '@growi/pluginkit/dist/v4';
@@ -8,6 +7,7 @@ import {
 } from '@growi/pluginkit/dist/v4/server/index.cjs';
 import express from 'express';
 import { param, query } from 'express-validator';
+import path from 'path';
 import { PLUGIN_STORING_PATH } from '~/features/growi-plugin/server/consts';
 import { GrowiPlugin } from '~/features/growi-plugin/server/models';
 import type Crowi from '~/server/crowi';

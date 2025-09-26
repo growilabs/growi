@@ -1,6 +1,6 @@
 const isDev = process.env.NODE_ENV === 'development';
 
-const path = require('node:path');
+const path = require('path');
 
 const { AllLang } = require('@growi/core');
 const { isServer } = require('@growi/core/dist/utils');

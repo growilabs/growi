@@ -1,5 +1,5 @@
-import assert from 'node:assert';
 import { useSWRStatic } from '@growi/core/dist/swr';
+import assert from 'assert';
 import type { Key, SWRConfiguration, SWRResponse } from 'swr';
 
 export function useContextSWR<Data, Error>(key: Key): SWRResponse<Data, Error>;
