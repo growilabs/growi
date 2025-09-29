@@ -1,7 +1,7 @@
 // workaround by https://github.com/martpie/next-transpile-modules/issues/143#issuecomment-817467144
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const nodeModulesPaths = [
   path.resolve(__dirname, '../../node_modules'),
