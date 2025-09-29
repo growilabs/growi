@@ -41,16 +41,16 @@
     "lint:styles": "stylelint \"src/**/*.scss\" \"src/**/*.css\"",
     "lint:typecheck": "vue-tsc --noEmit",
     "lint": "run-p lint:*",
-    "test": ""
+    "test": "vitest run --coverage"
   },
   "dependencies": {
     "@growi/core": "workspace:^",
     "@growi/remark-growi-directive": "workspace:^",
     "@growi/ui": "workspace:^",
-    "axios": "^0.24.0",
+    "axios": "^1.11.0",
     "bunyan": "^1.8.15",
-    "hast-util-select": "^6.0.2",
     "express": "^4.20.0",
+    "hast-util-select": "^6.0.2",
     "mongoose": "^6.13.6",
     "swr": "^2.3.2",
     "universal-bunyan": "^0.9.2",
@@ -59,10 +59,15 @@
   "devDependencies": {
     "@types/bunyan": "^1.8.11",
     "@types/hast": "^3.0.4",
+    "@types/react": "^18.2.14",
+    "@types/react-dom": "^18.2.6",
+    "@types/supertest": "^6.0.2",
     "csstype": "^3.0.2",
+    "happy-dom": "^15.7.4",
     "hast-util-sanitize": "^5.0.1",
     "hast-util-select": "^6.0.2",
     "npm-run-all": "^4.1.5",
+    "supertest": "^7.0.0",
     "unified": "^11.0.0",
     "unist-util-visit": "^5.0.0"
   },
