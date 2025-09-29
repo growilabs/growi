@@ -2,14 +2,13 @@ import { generateText, streamText } from 'ai';
 
 import { configManager } from '~/server/service/config-manager';
 
-import type {
-  GenerateTextConfig,
-  GenerateTextResult,
-  StreamTextConfig,
-  StreamTextResult,
-} from '../../../../openai/interfaces/ai-sdk';
-
 import { getOpenaiProvider } from './get-openai-provider';
+
+type GenerateTextConfig = Parameters<typeof generateText>[0];
+type StreamTextConfig = Parameters<typeof streamText>[0];
+type GenerateTextResult = ReturnType<typeof generateText>;
+type StreamTextResult = ReturnType<typeof streamText>;
+
 
 type FileSearchParameters = {
   prompt: string;
