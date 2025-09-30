@@ -16,6 +16,9 @@ import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/opena
 import { initializeOpenaiService } from '~/features/openai/server/services/openai';
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
 import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
+import instanciateAuditLogBulkExportJobCleanUpCronService, {
+  auditLogBulkExportJobCleanUpCronService,
+} from '~/features/audit-log-export/server/service/audit-log-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCleanUpCronService, {
   pageBulkExportJobCleanUpCronService,
 } from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
@@ -364,6 +367,9 @@ Crowi.prototype.setupCron = function() {
 
   instanciateAuditLogBulkExportJobCronService(this);
   checkAuditLogExportJobInProgressCronService.startCron();
+
+  instanciateAuditLogBulkExportJobCleanUpCronService(this);
+  auditLogBulkExportJobCleanUpCronService.startCron();
 
   instanciatePageBulkExportJobCleanUpCronService(this);
   pageBulkExportJobCleanUpCronService.startCron();

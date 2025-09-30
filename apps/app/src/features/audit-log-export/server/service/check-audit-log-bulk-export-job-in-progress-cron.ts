@@ -24,7 +24,6 @@ class CheckAuditLogExportJobInProgressCronService extends CronService {
   }
 
   override async executeJob(): Promise<void> {
-    console.log('CheckAuditLogExportJobInProgressCron 起動');
     const isAuditLogEnabled = configManager.getConfig('app:auditLogEnabled');
     if (!isAuditLogEnabled) return;
 
@@ -39,7 +38,6 @@ class CheckAuditLogExportJobInProgressCronService extends CronService {
       auditLogExportInProgressExists &&
       !auditLogExportJobCronService?.isJobRunning()
     ) {
-      console.log('export cron召喚');
       auditLogExportJobCronService?.startCron();
     } else if (!auditLogExportInProgressExists) {
       auditLogExportJobCronService?.stopCron();

@@ -124,7 +124,6 @@ class AuditLogExportJobCronService
   }
 
   async proceedBulkExportJob(auditLogExportJob: AuditLogExportJobDocument) {
-    console.log('cron定期実行中...');
     try {
       if (auditLogExportJob.restartFlag) {
         //restart処理を実行
@@ -138,19 +137,15 @@ class AuditLogExportJobCronService
         throw new Error(`User not found for audit log export job: ${auditLogExportJob._id}`);
       }
 
-      // if (auditLogExportJob.status === AuditLogExportJobStatus.initializing) {
-      // }
       if (
         auditLogExportJob.status === AuditLogExportJobStatus.exporting
       ) {
         loggerFactory('exporting');
-        console.log('exportingだ');
         exportAuditLogsToFsAsync.bind(this)(auditLogExportJob);
       }
       else if (
         auditLogExportJob.status === AuditLogExportJobStatus.uploading
       ) {
-        console.log('uploadingだ');
         await compressAndUpload.bind(this)(user, auditLogExportJob);
       }
     }
@@ -272,9 +267,7 @@ export default function instanciate(crowi: Crowi): void {
   try {
     auditLogExportJobCronService = new AuditLogExportJobCronService(crowi);
     const schedule = auditLogExportJobCronService.getCronSchedule();
-    console.log('AuditLogExportJobCronService created with schedule:', schedule);
     auditLogExportJobCronService.startCron();
-    console.log('AuditLogExportJobCronService cron started');
   } catch (error) {
     console.error('Failed to start AuditLogExportJobCronService:', error);
   }

@@ -54,6 +54,6 @@ auditLogExportJobSchema.index({ status: 1, updatedAt: 1 });
 auditLogExportJobSchema.index({ lastExportedAt: 1, lastExportedId: 1 });
 
 export default getOrCreateModel<AuditLogExportJobDocument, AuditLogExportJobModel>(
-  'AuditLogBulkExportJob',
+  'AuditLogExportJob',
   auditLogExportJobSchema,
 );
