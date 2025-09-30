@@ -17,6 +17,7 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+// import type { GrowiAgentRuntimeContext } from '../services/mastra-modules';
 import { mastra } from '../services/mastra-modules';
 
 const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
@@ -33,6 +34,7 @@ type Req = Request<undefined, Response, ReqBody> & {
 
 type PostMessageHandlersFactory = (crowi: Crowi) => RequestHandler[];
 
+const runtimeContext = new RuntimeContext<{ vectorStoreId: string }>();
 
 const reasoningSchema = z.object({
   thoughtProcess: z.array(z.object({
@@ -82,11 +84,11 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
       }
 
       const vectorStoreId = aiAssistantWithPopulatedVectorStore.vectorStore.vectorStoreId;
+      runtimeContext.set('vectorStoreId', vectorStoreId);
+
       const growiAgent = mastra.getAgent('growiAgent');
 
       try {
-        const runtimeContext = new RuntimeContext<{ vectorStoreId: string }>();
-        runtimeContext.set('vectorStoreId', vectorStoreId);
 
         const stream = await growiAgent.streamVNext(
           userMessage, {
