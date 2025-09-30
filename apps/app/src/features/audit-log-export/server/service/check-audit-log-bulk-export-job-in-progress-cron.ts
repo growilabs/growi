@@ -6,7 +6,6 @@ import { AuditLogExportJobInProgressStatus } from '../../interfaces/audit-log-bu
 import AuditLogExportJob from '../models/audit-log-bulk-export-job';
 
 import { auditLogExportJobCronService } from './audit-log-bulk-export-job-cron';
-import { LightBox } from '~/client/components/ReactMarkdownComponents/LightBox';
 
 const logger = loggerFactory(
   'growi:service:check-audit-log-bulk-export-job-in-progress-cron',
@@ -20,7 +19,7 @@ class CheckAuditLogExportJobInProgressCronService extends CronService {
   override getCronSchedule(): string {
     return configManager.getConfig(
       'app:checkAuditLogExportJobInProgressCronSchedule',
-    ) || '*/3 * * * *'; // default: every 3 minutes
+    );
   }
 
   override async executeJob(): Promise<void> {

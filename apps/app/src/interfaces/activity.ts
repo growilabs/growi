@@ -5,7 +5,7 @@ const MODEL_PAGE = 'Page';
 const MODEL_USER = 'User';
 const MODEL_COMMENT = 'Comment';
 const MODEL_PAGE_BULK_EXPORT_JOB = 'PageBulkExportJob';
-const MODEL_AUDIT_LOG_EXPORT_JOB = 'AuditLogBulkExportJob';
+const MODEL_AUDIT_LOG_EXPORT_JOB = 'AuditLogExportJob';
 
 // Action
 const ACTION_UNSETTLED = 'UNSETTLED';

@@ -9,7 +9,7 @@ import CronService from '~/server/service/cron';
 import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
 import type { ActivityDocument } from '~/server/models/activity';
-import auditLogBulkExportJob from '../../models/audit-log-bulk-export-job';
+import AuditLogExportJob from '../../models/audit-log-bulk-export-job';
 import type { AuditLogExportJobDocument } from '../../models/audit-log-bulk-export-job';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { Readable } from 'stream';
@@ -64,7 +64,6 @@ class AuditLogExportJobCronService
   tmpOutputRootDir = '/tmp/audit-log-bulk-export';
 
 
-  // TODO: stream 管理や parallelExecLimit の設定などはあとで追加する
   private streamInExecutionMemo: { [key: string]: Readable } = {};
 
   private parallelExecLimit: number;
@@ -82,7 +81,7 @@ class AuditLogExportJobCronService
 
   override async executeJob(): Promise<void> {
     logger.debug('executeJob() called - not implemented yet');
-    const auditLogBulkExportJobInProgress = await auditLogBulkExportJob.find({
+    const auditLogBulkExportJobInProgress = await AuditLogExportJob.find({
       $or: Object.values(AuditLogExportJobInProgressStatus).map((status) => ({
         status,
       })),
@@ -126,10 +125,16 @@ class AuditLogExportJobCronService
   async proceedBulkExportJob(auditLogExportJob: AuditLogExportJobDocument) {
     try {
       if (auditLogExportJob.restartFlag) {
-        //restart処理を実行
+        await this.cleanUpExportJobResources(auditLogExportJob);
+        auditLogExportJob.restartFlag = false;
+        auditLogExportJob.status = AuditLogExportJobStatus.exporting;
+        auditLogExportJob.statusOnPreviousCronExec = undefined;
+        auditLogExportJob.lastExportedAt = undefined;
+        auditLogExportJob.lastExportedId = undefined;
+        auditLogExportJob.totalExportedCount = 0;
+        await auditLogExportJob.save();
       }
 
-      // Get user for the job
       const User = mongoose.model<IUser>('User');
       const user = await User.findById(getIdForRef(auditLogExportJob.user));
 
@@ -162,21 +167,21 @@ class AuditLogExportJobCronService
 
     if (err instanceof AuditLogExportJobExpiredError) {
       logger.error(err);
-      // await this.notifyExportResultAndCleanUp(
-      //   SupportedAction.ACTION_AUDIT_LOG_EXPORT_JOB_EXPIRED,
-      //   auditLogExportJob,
-      // );
+      await this.notifyExportResultAndCleanUp(
+        SupportedAction.ACTION_AUDIT_LOG_EXPORT_JOB_EXPIRED,
+        auditLogExportJob,
+      );
     }
     else if (err instanceof AuditLogExportJobRestartedError) {
       logger.info(err.message);
-      // await this.cleanUpExportJobResources(auditLogExportJob);
+      await this.cleanUpExportJobResources(auditLogExportJob);
     }
     else {
       logger.error(err);
-      // await this.notifyExportResultAndCleanUp(
-      //   SupportedAction.ACTION_AUDIT_LOG_EXPORT_FAILED,
-      //   auditLogExportJob,
-      // );
+      await this.notifyExportResultAndCleanUp(
+        SupportedAction.ACTION_AUDIT_LOG_EXPORT_FAILED,
+        auditLogExportJob,
+      );
     }
   }
 
@@ -235,6 +240,8 @@ class AuditLogExportJobCronService
     auditLogExportJob: AuditLogExportJobDocument,
     action: SupportedActionType,
   ) {
+    logger.debug('Creating activity with targetModel:', SupportedTargetModel.MODEL_AUDIT_LOG_EXPORT_JOB);
+    logger.debug('Job model name:', auditLogExportJob.constructor.modelName);
     const activity = await this.crowi.activityService.createActivity({
       action,
       targetModel: SupportedTargetModel.MODEL_AUDIT_LOG_EXPORT_JOB,
@@ -261,7 +268,7 @@ class AuditLogExportJobCronService
 // eslint-disable-next-line import/no-mutable-exports
 export let auditLogExportJobCronService:
   | AuditLogExportJobCronService
-  | undefined; // singleton instance
+  | undefined;
 
 export default function instanciate(crowi: Crowi): void {
   try {

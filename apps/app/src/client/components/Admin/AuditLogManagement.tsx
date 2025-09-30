@@ -168,14 +168,7 @@ export const AuditLogManagement: FC = () => {
             <button type="button" className="btn btn-sm grw-btn-reload me-2" onClick={reloadButtonPushedHandler}>
               <span className="material-symbols-outlined">refresh</span>
             </button>
-            <AuditLogExportButton
-              filters={{
-                users: selectedUsernames,
-                actions: selectedActionList,
-                dateFrom: startDate,
-                dateTo: endDate,
-              }}
-            />
+            <AuditLogExportButton />
           </div>
         )}
       </h2>
