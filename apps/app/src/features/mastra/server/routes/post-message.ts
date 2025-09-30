@@ -17,7 +17,6 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
-// import type { GrowiAgentRuntimeContext } from '../services/mastra-modules';
 import { mastra } from '../services/mastra-modules';
 
 const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
