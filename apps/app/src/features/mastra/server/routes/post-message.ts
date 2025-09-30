@@ -88,7 +88,6 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
       const growiAgent = mastra.getAgent('growiAgent');
 
       try {
-
         const stream = await growiAgent.streamVNext(
           userMessage, {
             format: 'aisdk',
@@ -97,9 +96,10 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
           },
         );
 
-        for await (const chunk of stream.fullStream) {
-          console.log(chunk);
-        }
+        // debug: log all chunks from the full stream
+        // for await (const chunk of stream.fullStream) {
+        //   console.log(chunk);
+        // }
 
         // Use pipeUIMessageStreamToResponse for Express servers
         // Express requires piping to ServerResponse object, not returning Web API Response
