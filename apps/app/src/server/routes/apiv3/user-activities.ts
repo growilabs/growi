@@ -2,6 +2,7 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
+import { Types } from 'mongoose';
 
 import type { IActivity } from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
@@ -208,7 +209,7 @@ module.exports = (crowi: Crowi): Router => {
   router.get('/:userId',
 
     // FIX: Need middleware for getting current users userId
-    loginRequiredStrictly, validator.list, apiV3FormValidator, async(req: Request, res: ApiV3Response) => {
+    loginRequiredStrictly, async(req: Request, res: ApiV3Response) => {
 
       const limit = req.query.limit || configManager.getConfig('customize:showPageLimitationS');
       const offset = req.query.offset || 1;
@@ -217,17 +218,13 @@ module.exports = (crowi: Crowi): Router => {
 
       try {
 
+        const userObjectId = new Types.ObjectId(userId);
+
         const userActivityPipeline = [
           {
             $match: {
-              $and: [
-                {
-                  user: userId,
-                },
-                {
-                  action: { $in: Object.values(ActivityLogActions) },
-                },
-              ],
+              user: userObjectId,
+              action: { $in: Object.values(ActivityLogActions) },
             },
           },
           {
@@ -236,22 +233,43 @@ module.exports = (crowi: Crowi): Router => {
             },
           },
           {
-            $limit: 20,
+            $limit: 10,
           },
-        ];
-
-        const simpleTestPipeline = [
           {
-            $match: {
-              action: { $in: Object.values(ActivityLogActions) },
+            $lookup: {
+              from: 'users',
+              localField: 'user',
+              foreignField: '_id',
+              as: 'user',
+            },
+          },
+          {
+            $unwind: {
+              path: '$user',
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+          {
+            $project: {
+              _id: 1,
+              ip: 1,
+              endpoint: 1,
+              action: 1,
+              createdAt: 1,
+              target: 1,
+              targetModel: 1,
+              'user.username': 1,
+              'user.name': 1,
+              'user.imageUrlCached': 1,
             },
           },
         ];
-        const pipeLineResults = await Activity.aggregate(simpleTestPipeline);
+
+        const pipeLineResults = await Activity.aggregate(userActivityPipeline);
         const test: string[] = [];
 
         pipeLineResults.forEach((doc) => {
-          test.push(doc._id.toString());
+          test.push(doc);
         });
 
         return res.apiv3({ test });
