@@ -1,13 +1,8 @@
-import { generateText, streamText } from 'ai';
+import { generateText } from 'ai';
 
 import { configManager } from '~/server/service/config-manager';
 
 import { getOpenaiProvider } from './get-openai-provider';
-
-type GenerateTextConfig = Parameters<typeof generateText>[0];
-type StreamTextConfig = Parameters<typeof streamText>[0];
-type GenerateTextResult = ReturnType<typeof generateText>;
-type StreamTextResult = ReturnType<typeof streamText>;
 
 
 type FileSearchParameters = {
@@ -16,16 +11,11 @@ type FileSearchParameters = {
   vectorStoreId: string;
 };
 
-function fileSearchSubstance(params: FileSearchParameters): GenerateTextConfig;
-function fileSearchSubstance(params: FileSearchParameters): StreamTextConfig;
-function fileSearchSubstance({
-  prompt,
-  instruction,
-  vectorStoreId,
-}: FileSearchParameters): GenerateTextConfig | StreamTextConfig {
+export const fileSearch = async({ prompt, instruction, vectorStoreId }: FileSearchParameters) => {
   const openai = getOpenaiProvider();
   const model = configManager.getConfig('openai:assistantModel:chat');
-  return {
+
+  return generateText({
     prompt,
     system: instruction,
     model: openai(model),
@@ -46,27 +36,5 @@ function fileSearchSubstance({
     // Force file search tool
     // see: https://ai-sdk.dev/providers/ai-sdk-providers/openai#file-search-tool
     toolChoice: { type: 'tool', toolName: 'file_search' },
-  };
-}
-
-// for Agent tool
-export const fileSearch = ({
-  prompt,
-  instruction,
-  vectorStoreId,
-}: FileSearchParameters): GenerateTextResult => {
-  return generateText(
-    fileSearchSubstance({ prompt, instruction, vectorStoreId }),
-  );
-};
-
-// for Workflow step
-export const fileSearchWithStream = ({
-  prompt,
-  instruction,
-  vectorStoreId,
-}: FileSearchParameters): StreamTextResult => {
-  return streamText(
-    fileSearchSubstance({ prompt, instruction, vectorStoreId }),
-  );
+  });
 };
