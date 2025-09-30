@@ -222,14 +222,10 @@ module.exports = (crowi: Crowi): Router => {
       const defaultLimit = String(configManager.getConfig('customize:showPageLimitationS'));
       const limit: number = parseInt(req.query.limit as string || defaultLimit, 10) || 10;
       const offset: number = parseInt(req.query.offset as string || '0', 10) || 0;
+
       const user = req.user;
 
-      if (!user) {
-        logger.error('Authentication failure: req.user is missing after loginRequiredStrictly.');
-        return res.apiv3Err('Internal server error due to missing user data.', 500);
-      }
-
-      if (!user._id) {
+      if (!user || !user._id) {
         logger.error('Authentication failure: req.user is missing after loginRequiredStrictly.');
         return res.apiv3Err('Internal server error due to missing user data.', 500);
       }
