@@ -5,6 +5,7 @@ import type { HasObjectId } from '@growi/core';
 import type { IInAppNotification } from '~/interfaces/in-app-notification';
 
 
+import { useAuditLogExportJobModelNotification } from './AuditLogExportJobModelNotification';
 import { usePageBulkExportJobModelNotification } from './PageBulkExportJobModelNotification';
 import { usePageModelNotification } from './PageModelNotification';
 import { useUserModelNotification } from './UserModelNotification';
@@ -23,8 +24,9 @@ export const useModelNotification = (notification: IInAppNotification & HasObjec
   const pageModelNotificationUtils = usePageModelNotification(notification);
   const userModelNotificationUtils = useUserModelNotification(notification);
   const pageBulkExportResultModelNotificationUtils = usePageBulkExportJobModelNotification(notification);
+  const auditLogExportResultModelNotificationUtils = useAuditLogExportJobModelNotification(notification);
 
-  const modelNotificationUtils = pageModelNotificationUtils ?? userModelNotificationUtils ?? pageBulkExportResultModelNotificationUtils;
+  const modelNotificationUtils = pageModelNotificationUtils ?? userModelNotificationUtils ?? pageBulkExportResultModelNotificationUtils ?? auditLogExportResultModelNotificationUtils;
 
 
   return modelNotificationUtils;

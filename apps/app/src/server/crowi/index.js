@@ -8,11 +8,14 @@ import lsxRoutes from '@growi/remark-lsx/dist/server/index.cjs';
 import mongoose from 'mongoose';
 import next from 'next';
 
+import instanciateAuditLogBulkExportJobCronService from '~/features/audit-log-export/server/service/audit-log-bulk-export-job-cron';
+import '~/features/audit-log-export/server/models/audit-log-bulk-export-job';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron';
 import { initializeOpenaiService } from '~/features/openai/server/services/openai';
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
+import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
 import instanciatePageBulkExportJobCleanUpCronService, {
   pageBulkExportJobCleanUpCronService,
 } from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
@@ -358,6 +361,9 @@ Crowi.prototype.setupSocketIoService = async function() {
 Crowi.prototype.setupCron = function() {
   instanciatePageBulkExportJobCronService(this);
   checkPageBulkExportJobInProgressCronService.startCron();
+
+  instanciateAuditLogBulkExportJobCronService(this);
+  checkAuditLogExportJobInProgressCronService.startCron();
 
   instanciatePageBulkExportJobCleanUpCronService(this);
   pageBulkExportJobCleanUpCronService.startCron();
