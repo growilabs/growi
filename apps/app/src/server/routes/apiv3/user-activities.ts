@@ -2,7 +2,7 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
-import { Types } from 'mongoose';
+import { Types, PipelineStage } from 'mongoose';
 
 import type { IActivity } from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
@@ -211,16 +211,17 @@ module.exports = (crowi: Crowi): Router => {
     // FIX: Need middleware for getting current users userId
     loginRequiredStrictly, async(req: Request, res: ApiV3Response) => {
 
-      const limit = req.query.limit || configManager.getConfig('customize:showPageLimitationS');
-      const offset = req.query.offset || 1;
+      const defaultLimit = String(configManager.getConfig('customize:showPageLimitationS'));
+
+      const limit: number = parseInt(req.query.limit as string || defaultLimit, 10) || 10;
+      const offset: number = parseInt(req.query.offset as string || '0', 10) || 0;
       const { userId } = req.params;
-      const query = { user: userId };
 
       try {
 
         const userObjectId = new Types.ObjectId(userId);
 
-        const userActivityPipeline = [
+        const userActivityPipeline: PipelineStage[] = [
           {
             $match: {
               user: userObjectId,
@@ -228,51 +229,51 @@ module.exports = (crowi: Crowi): Router => {
             },
           },
           {
-            $sort: {
-              createdAt: -1 as const,
-            },
-          },
-          {
-            $limit: 10,
-          },
-          {
-            $lookup: {
-              from: 'users',
-              localField: 'user',
-              foreignField: '_id',
-              as: 'user',
-            },
-          },
-          {
-            $unwind: {
-              path: '$user',
-              preserveNullAndEmptyArrays: true,
-            },
-          },
-          {
-            $project: {
-              _id: 1,
-              ip: 1,
-              endpoint: 1,
-              action: 1,
-              createdAt: 1,
-              target: 1,
-              targetModel: 1,
-              'user.username': 1,
-              'user.name': 1,
-              'user.imageUrlCached': 1,
+            $facet: {
+              totalCount: [
+                { $count: 'count' },
+              ],
+              docs: [
+                { $sort: { createdAt: -1 } },
+                { $skip: offset },
+                { $limit: limit },
+
+                {
+                  $lookup: {
+                    from: 'users',
+                    localField: 'user',
+                    foreignField: '_id',
+                    as: 'user',
+                  },
+                },
+                {
+                  $unwind: {
+                    path: '$user',
+                    preserveNullAndEmptyArrays: true,
+                  },
+                },
+                {
+                  $project: {
+                    _id: 1,
+                    'user.username': 1,
+                    'user.name': 1,
+                    'user.imageUrlCached': 1,
+                    action: 1,
+                    createdAt: 1,
+                    target: 1,
+                    targetModel: 1,
+                  },
+                },
+              ],
             },
           },
         ];
 
-        const pipeLineResults = await Activity.aggregate(userActivityPipeline);
-        const test: string[] = [];
+        const [result] = await Activity.aggregate(userActivityPipeline);
 
-        pipeLineResults.forEach((doc) => {
-          test.push(doc);
-        });
 
-        return res.apiv3({ test });
+
+        return res.apiv3({ result });
 
 
         // Create paginateResult in MongoDB Aggregation Pipeline.
