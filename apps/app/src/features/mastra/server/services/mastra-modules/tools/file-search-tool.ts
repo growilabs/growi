@@ -19,7 +19,6 @@ export const fileSearchTool = createTool({
     const vectorStoreId = runtimeContext.get('vectorStoreId');
     const result = await fileSearch({ ...context, vectorStoreId });
 
-    // Return the result in the expected output property
     return { output: result.text };
   },
 });
