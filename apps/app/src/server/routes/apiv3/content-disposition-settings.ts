@@ -1,7 +1,9 @@
 import { ErrorV3 } from '@growi/core/dist/models';
+import { body } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
@@ -16,13 +18,34 @@ module.exports = (crowi) => {
   const addActivity = generateAddActivityMiddleware();
   const activityEvent = crowi.event('activity');
 
-  interface UpdateInlineMimeTypesPayload {
-  newInlineMimeTypes: string[];
+  const validateUpdateMimeTypes = [
+    body('newInlineMimeTypes').exists().withMessage('Inline mime types field is required.').bail(),
+    body('newInlineMimeTypes').isArray().withMessage('Inline mime types must be an array.'),
+
+    body('newAttachmentMimeTypes').exists().withMessage('Attachment mime types field is required.').bail(),
+    body('newAttachmentMimeTypes').isArray().withMessage('Attachment mime types must be an array.'),
+
+    body('*').trim(),
+  ];
+
+  type InlineMimeTypesConfig = { inlineMimeTypes: string[] };
+  type AttachmentMimeTypesConfig = { attachmentMimeTypes: string[] };
+  interface UpdateMimeTypesPayload {
+    newInlineMimeTypes: string[];
+    newAttachmentMimeTypes: string[];
   }
 
-  interface UpdateAttachmentMimeTypesPayload {
-  newAttachmentMimeTypes: string[];
-  }
+  const isArrayOfStrings = (arr: unknown): arr is string[] => {
+    if (!Array.isArray(arr)) {
+      return false;
+    }
+    return arr.every(item => typeof item === 'string');
+  };
+
+  const isUpdateMimeTypesPayload = (data: any): data is UpdateMimeTypesPayload => {
+    return isArrayOfStrings(data.newInlineMimeTypes)
+      && isArrayOfStrings(data.newAttachmentMimeTypes);
+  };
 
   /**
  * @swagger
@@ -60,30 +83,36 @@ module.exports = (crowi) => {
     '/',
     loginRequiredStrictly,
     adminRequired,
+    validateUpdateMimeTypes,
+    apiV3FormValidator,
     addActivity,
     async(req, res) => {
 
+      if (!isUpdateMimeTypesPayload(req.body)) {
+        return res.apiv3Err(new ErrorV3('Internal Type Error', 'internal-error'));
+      }
+
+      const { newInlineMimeTypes } = req.body;
+      const { newAttachmentMimeTypes } = req.body;
+
+      // Ensure no MIME type is in both lists.
+      const inlineSet = new Set(newInlineMimeTypes);
+      const attachmentSet = new Set(newAttachmentMimeTypes);
+      const intersection = [...inlineSet].filter(mimeType => attachmentSet.has(mimeType));
+
+      if (intersection.length > 0) {
+        const msg = `MIME types cannot be in both inline and attachment lists: ${intersection.join(', ')}`;
+        return res.apiv3Err(new ErrorV3(msg, 'invalid-payload'));
+      }
+
       try {
-        const { newInlineMimeTypes } = req.body as UpdateInlineMimeTypesPayload;
-        const { newAttachmentMimeTypes } = req.body as UpdateAttachmentMimeTypesPayload;
-
-        // Ensure no MIME type is in both lists.
-        const inlineSet = new Set(newInlineMimeTypes);
-        const attachmentSet = new Set(newAttachmentMimeTypes);
-        const intersection = [...inlineSet].filter(mimeType => attachmentSet.has(mimeType));
-
-        if (intersection.length > 0) {
-          const msg = `MIME types cannot be in both inline and attachment lists: ${intersection.join(', ')}`;
-          return res.apiv3Err(new ErrorV3(msg, 'invalid-payload'));
-        }
-
         await configManager.updateConfigs({
           'attachments:contentDisposition:inlineMimeTypes': {
             inlineMimeTypes: Array.from(inlineSet),
-          },
+          } as InlineMimeTypesConfig,
           'attachments:contentDisposition:attachmentMimeTypes': {
             attachmentMimeTypes: Array.from(attachmentSet),
-          },
+          } as AttachmentMimeTypesConfig,
         });
 
         const parameters = {
