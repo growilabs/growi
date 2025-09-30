@@ -1,6 +1,6 @@
 {
   "name": "growi",
-  "version": "7.3.2-RC.0",
+  "version": "7.3.3-RC.0",
   "description": "Team collaboration software using markdown",
   "license": "MIT",
   "private": "true",
@@ -47,6 +47,9 @@
     "@changesets/cli": "^2.27.3",
     "@faker-js/faker": "^9.0.1",
     "@playwright/test": "^1.49.1",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/react": "^16.0.1",
+    "@testing-library/react-hooks": "^8.0.1",
     "@swc-node/register": "^1.10.9",
     "@swc/core": "^1.5.25",
     "@swc/helpers": "^0.5.11",

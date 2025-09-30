@@ -12,7 +12,7 @@
     "build": "pnpm gen:client-code && tsc -p tsconfig.json"
   },
   "dependencies": {
-    "axios": "^0.24.0",
+    "axios": "^1.11.0",
     "tslib": "^2.8.0"
   },
   "devDependencies": {

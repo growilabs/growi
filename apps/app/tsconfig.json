@@ -4,7 +4,7 @@
   "compilerOptions": {
     "jsx": "preserve",
     "resolveJsonModule": true,
-    "types": ["vitest/globals"],
+    "types": ["vitest/globals", "@testing-library/jest-dom/vitest"],
 
     "baseUrl": ".",
     "paths": {

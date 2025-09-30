@@ -1,8 +1,24 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.3.1...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.3.2...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.3.2](https://github.com/growilabs/compare/v7.3.1...v7.3.2) - 2025-09-29
+
+### 🚀 Improvement
+
+* imprv: Elasticsearch management retrieving status (#10330) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Ensure login errors display regardless of password login configuration (#10347) @yuki-takei
+* fix: TreeItem opening logic (#10331) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Improve memory leak (#10329) @yuki-takei
+* support: Fix biome errors (#10338) @yuki-takei
 
 ## [v7.3.1](https://github.com/growilabs/compare/v7.3.0...v7.3.1) - 2025-09-22
 
