@@ -100,6 +100,10 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
           console.log(chunk);
         }
 
+        // Use pipeUIMessageStreamToResponse for Express servers
+        // Express requires piping to ServerResponse object, not returning Web API Response
+        // See: https://ai-sdk.dev/cookbook/api-servers/express#ui-message-stream
+        // Example: https://github.com/vercel/ai/blob/c5e2a7c22eb8d9392705d1e87458b1d4af9c6ec9/examples/express/src/server.ts
         return pipeUIMessageStreamToResponse({
           response: res,
           stream: stream.toUIMessageStream(),
