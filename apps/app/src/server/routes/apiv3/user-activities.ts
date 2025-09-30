@@ -1,8 +1,10 @@
+import type { IUserHasId } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
-import { Types, PipelineStage } from 'mongoose';
+import type { PipelineStage } from 'mongoose';
+import { Types } from 'mongoose';
 
 import type { IActivity } from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
@@ -25,6 +27,12 @@ const validator = {
     query('searchFilter').optional().isString().withMessage('query must be a string'),
   ],
 };
+
+interface AuthorizedRequest extends Request {
+   user?: IUserHasId; // Ensures TypeScript knows 'user' exists
+}
+
+// FIX: Update swagger comment
 
 /**
  * @swagger
@@ -172,6 +180,8 @@ module.exports = (crowi: Crowi): Router => {
 
   const router = express.Router();
 
+  // FIX: Update swagger comment
+
   /**
    * @swagger
    *
@@ -206,19 +216,27 @@ module.exports = (crowi: Crowi): Router => {
    *             schema:
    *               $ref: '#/components/schemas/ActivityResponse'
    */
-  router.get('/:userId',
-
-    // FIX: Need middleware for getting current users userId
-    loginRequiredStrictly, async(req: Request, res: ApiV3Response) => {
+  router.get('/',
+    loginRequiredStrictly, validator.list, apiV3FormValidator, async(req: AuthorizedRequest, res: ApiV3Response) => {
 
       const defaultLimit = String(configManager.getConfig('customize:showPageLimitationS'));
-
       const limit: number = parseInt(req.query.limit as string || defaultLimit, 10) || 10;
       const offset: number = parseInt(req.query.offset as string || '0', 10) || 0;
-      const { userId } = req.params;
+      const user = req.user;
+
+      if (!user) {
+        logger.error('Authentication failure: req.user is missing after loginRequiredStrictly.');
+        return res.apiv3Err('Internal server error due to missing user data.', 500);
+      }
+
+      if (!user._id) {
+        logger.error('Authentication failure: req.user is missing after loginRequiredStrictly.');
+        return res.apiv3Err('Internal server error due to missing user data.', 500);
+      }
+
+      const userId = user._id;
 
       try {
-
         const userObjectId = new Types.ObjectId(userId);
 
         const userActivityPipeline: PipelineStage[] = [
@@ -255,6 +273,7 @@ module.exports = (crowi: Crowi): Router => {
                 {
                   $project: {
                     _id: 1,
+                    'user._id': 1,
                     'user.username': 1,
                     'user.name': 1,
                     'user.imageUrlCached': 1,
@@ -269,15 +288,9 @@ module.exports = (crowi: Crowi): Router => {
           },
         ];
 
-        const [result] = await Activity.aggregate(userActivityPipeline);
+        const [activityResults] = await Activity.aggregate(userActivityPipeline);
 
-
-
-        return res.apiv3({ result });
-
-
-        // Create paginateResult in MongoDB Aggregation Pipeline.
-        const serializedDocs = paginateResult.docs.map((doc: IActivity) => {
+        const serializedResults = activityResults.docs.map((doc: IActivity) => {
           const { user, ...rest } = doc;
           return {
             user: serializeUserSecurely(user),
@@ -285,9 +298,19 @@ module.exports = (crowi: Crowi): Router => {
           };
         });
 
+        const totalDocs = activityResults.totalCount.length > 0 ? activityResults.totalCount[0].count : 0;
+        const totalPages = Math.ceil(totalDocs / limit);
+        const page = Math.floor(offset / limit) + 1;
+
         const serializedPaginationResult = {
-          ...paginateResult,
-          docs: serializedDocs,
+          docs: serializedResults,
+          totalDocs,
+          limit,
+          offset,
+          page,
+          totalPages,
+          hasPrevPage: page > 1,
+          hasNextPage: page < totalPages,
         };
 
         return res.apiv3({ serializedPaginationResult });
