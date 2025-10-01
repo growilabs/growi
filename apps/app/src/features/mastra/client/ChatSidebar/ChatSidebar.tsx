@@ -45,9 +45,9 @@ const ChatSidebarSubstance = (): JSX.Element => {
 
 
 export const ChatSidebar = (): JSX.Element => {
-  const isAiEnable = true;
+  const isOpened = true;
 
-  if (!isAiEnable) {
+  if (!isOpened) {
     return <></>;
   }
 
