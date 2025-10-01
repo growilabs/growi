@@ -29,10 +29,8 @@ const validator = {
 };
 
 interface AuthorizedRequest extends Request {
-   user?: IUserHasId; // Ensures TypeScript knows 'user' exists
+   user?: IUserHasId;
 }
-
-// FIX: Update swagger comment
 
 /**
  * @swagger
@@ -53,15 +51,6 @@ interface AuthorizedRequest extends Request {
  *                   _id:
  *                     type: string
  *                     example: "67e33da5d97e8d3b53e99f95"
- *                   id:
- *                     type: string
- *                     example: "67e33da5d97e8d3b53e99f95"
- *                   ip:
- *                     type: string
- *                     example: "::ffff:172.18.0.1"
- *                   endpoint:
- *                     type: string
- *                     example: "/_api/pages.remove"
  *                   targetModel:
  *                     type: string
  *                     example: "Page"
@@ -70,77 +59,26 @@ interface AuthorizedRequest extends Request {
  *                     example: "675547e97f208f8050a361d4"
  *                   action:
  *                     type: string
- *                     example: "PAGE_DELETE_COMPLETELY"
- *                   snapshot:
- *                     type: object
- *                     properties:
- *                       username:
- *                         type: string
- *                         example: "growi"
- *                       _id:
- *                         type: string
- *                         example: "67e33da5d97e8d3b53e99f96"
+ *                     example: "PAGE_UPDATE"
  *                   createdAt:
  *                     type: string
  *                     format: date-time
  *                     example: "2025-03-25T23:35:01.584Z"
- *                   __v:
- *                     type: integer
- *                     example: 0
  *                   user:
  *                     type: object
  *                     properties:
  *                       _id:
  *                         type: string
  *                         example: "669a5aa48d45e62b521d00e4"
- *                       isGravatarEnabled:
- *                         type: boolean
- *                         example: false
- *                       isEmailPublished:
- *                         type: boolean
- *                         example: true
- *                       lang:
- *                         type: string
- *                         example: "ja_JP"
- *                       status:
- *                         type: integer
- *                         example: 2
- *                       admin:
- *                         type: boolean
- *                         example: true
- *                       readOnly:
- *                         type: boolean
- *                         example: false
- *                       isInvitationEmailSended:
- *                         type: boolean
- *                         example: false
  *                       name:
  *                         type: string
  *                         example: "Taro"
  *                       username:
  *                         type: string
- *                         example: "grow"
- *                       createdAt:
- *                         type: string
- *                         format: date-time
- *                         example: "2024-07-19T12:23:00.806Z"
- *                       updatedAt:
- *                         type: string
- *                         format: date-time
- *                         example: "2025-03-25T23:34:04.362Z"
- *                       __v:
- *                         type: integer
- *                         example: 0
+ *                         example: "growi"
  *                       imageUrlCached:
  *                         type: string
  *                         example: "/images/icons/user.svg"
- *                       lastLoginAt:
- *                         type: string
- *                         format: date-time
- *                         example: "2025-03-25T23:34:04.355Z"
- *                       email:
- *                         type: string
- *                         example: "test@example.com"
  *             totalDocs:
  *               type: integer
  *               example: 3
@@ -180,8 +118,6 @@ module.exports = (crowi: Crowi): Router => {
 
   const router = express.Router();
 
-  // FIX: Update swagger comment
-
   /**
    * @swagger
    *
@@ -190,6 +126,7 @@ module.exports = (crowi: Crowi): Router => {
    *     summary: /activity
    *     tags: [Activity]
    *     security:
+   *       - cookieAuth: []
    *       - bearer: []
    *       - accessTokenInQuery: []
    *     parameters:
