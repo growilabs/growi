@@ -1,6 +1,4 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
-@use '@growi/core-styles/scss/variables/growi-official-colors';
-@use '@growi/ui/scss/atoms/btn-muted';
 
 .grw-chat-sidebar :global {
   z-index: bs.$zindex-fixed + 2;
