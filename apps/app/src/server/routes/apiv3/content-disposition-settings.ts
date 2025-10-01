@@ -30,6 +30,7 @@ module.exports = (crowi) => {
 
   type InlineMimeTypesConfig = { inlineMimeTypes: string[] };
   type AttachmentMimeTypesConfig = { attachmentMimeTypes: string[] };
+
   interface UpdateMimeTypesPayload {
     newInlineMimeTypes: string[];
     newAttachmentMimeTypes: string[];
@@ -175,7 +176,13 @@ module.exports = (crowi) => {
  */
   router.get('/', loginRequiredStrictly, adminRequired, async(req, res) => {
     try {
-      const currentDispositionSettings = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
+      const currentInlineDispositionSettings = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
+      const currentAttachmentDispositionSettings = configManager.getConfig('attachments:contentDisposition:attachmentMimeTypes');
+
+      const currentDispositionSettings = {
+        currentInlineDispositionSettings,
+        currentAttachmentDispositionSettings,
+      };
 
       return res.apiv3({ currentDispositionSettings });
     }
