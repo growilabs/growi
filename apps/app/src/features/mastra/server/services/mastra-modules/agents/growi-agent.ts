@@ -1,8 +1,11 @@
 import { Agent } from '@mastra/core/agent';
 
+import { configManager } from '~/server/service/config-manager';
+
 import { getOpenaiProvider } from '../../ai-sdk-modules/get-openai-provider';
 import { fileSearchTool } from '../tools/file-search-tool';
 
+const model = configManager.getConfig('openai:assistantModel:chat');
 
 export const growiAgent = new Agent({
   name: 'GROWI Agent',
@@ -20,6 +23,6 @@ export const growiAgent = new Agent({
   Always use the structured output format to organize your reasoning.
   `,
 
-  model: getOpenaiProvider()('gpt-4o-mini'),
+  model: getOpenaiProvider()(model),
   tools: { fileSearchTool },
 });
