@@ -1,4 +1,4 @@
-import { ErrorV3 } from '^/../../packages/core/dist/models';
+import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 
 import { isAiEnabled } from '~/features/openai/server/services';
