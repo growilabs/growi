@@ -24,8 +24,6 @@ module.exports = (crowi) => {
 
     body('newAttachmentMimeTypes').exists().withMessage('Attachment mime types field is required.').bail(),
     body('newAttachmentMimeTypes').isArray().withMessage('Attachment mime types must be an array.'),
-
-    body('*').trim(),
   ];
 
   type InlineMimeTypesConfig = { inlineMimeTypes: string[] };
@@ -176,15 +174,10 @@ module.exports = (crowi) => {
  */
   router.get('/', loginRequiredStrictly, adminRequired, async(req, res) => {
     try {
-      const currentInlineDispositionSettings = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
-      const currentAttachmentDispositionSettings = configManager.getConfig('attachments:contentDisposition:attachmentMimeTypes');
+      const inlineDispositionSettings = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
+      const attachmentDispositionSettings = configManager.getConfig('attachments:contentDisposition:attachmentMimeTypes');
 
-      const currentDispositionSettings = {
-        currentInlineDispositionSettings,
-        currentAttachmentDispositionSettings,
-      };
-
-      return res.apiv3({ currentDispositionSettings });
+      return res.apiv3({ inlineDispositionSettings, attachmentDispositionSettings });
     }
     catch (err) {
       logger.error('Error retrieving content disposition settings:', err);
