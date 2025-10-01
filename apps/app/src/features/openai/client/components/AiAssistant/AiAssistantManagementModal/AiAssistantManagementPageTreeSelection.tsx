@@ -145,7 +145,7 @@ export const AiAssistantManagementPageTreeSelection = (props: Props): JSX.Elemen
           <SimpleBar className="page-list-container" style={{ maxHeight: '300px' }}>
             <SelectablePageList
               method="remove"
-              methodButtonPosition="right"
+              methodButtonPosition="left"
               pages={selectedPagesArray}
               onClickMethodButton={removePage}
             />
