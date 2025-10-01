@@ -1,5 +1,6 @@
 
 import { PageGrant } from '@growi/core';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { isCreatablePage, isTrashPage, isUserPage } from '@growi/core/dist/utils/page-path-utils';
@@ -9,7 +10,6 @@ import { body, query } from 'express-validator';
 
 import { SupportedTargetModel, SupportedAction } from '~/interfaces/activity';
 import { subscribeRuleNames } from '~/interfaces/in-app-notification';
-import { SCOPE } from '@growi/core/dist/interfaces';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import PageTagRelation from '~/server/models/page-tag-relation';
@@ -53,7 +53,6 @@ module.exports = (crowi) => {
     ],
     renamePage: [
       body('pageId').isMongoId().withMessage('pageId is required'),
-      body('revisionId').optional({ nullable: true }).isMongoId().withMessage('revisionId is required'), // required when v4
       body('newPagePath').isLength({ min: 1 }).withMessage('newPagePath is required'),
       body('isRecursively').if(value => value != null).isBoolean().withMessage('isRecursively must be boolean'),
       body('isRenameRedirect').if(value => value != null).isBoolean().withMessage('isRenameRedirect must be boolean'),
@@ -210,10 +209,6 @@ module.exports = (crowi) => {
    *                    $ref: '#/components/schemas/ObjectId'
    *                  path:
    *                    $ref: '#/components/schemas/PagePath'
-   *                  revisionId:
-   *                    type: string
-   *                    description: revision ID
-   *                    example: 5e07345972560e001761fa63
    *                  newPagePath:
    *                    type: string
    *                    description: new path

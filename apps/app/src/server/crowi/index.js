@@ -38,7 +38,7 @@ import { InstallerService } from '../service/installer';
 import { normalizeData } from '../service/normalize-data';
 import PageService from '../service/page';
 import PageGrantService from '../service/page-grant';
-import PageOperationService from '../service/page-operation';
+import instanciatePageOperationService from '../service/page-operation';
 import PassportService from '../service/passport';
 import SearchService from '../service/search';
 import { SlackIntegrationService } from '../service/slack-integration';
@@ -91,7 +91,7 @@ class Crowi {
   /** @type {import('../service/page-grant').default} */
   pageGrantService;
 
-  /** @type {import('../service/page-operation').default} */
+  /** @type {import('../service/page-operation').IPageOperationService} */
   pageOperationService;
 
   /** @type {PassportService} */
@@ -734,10 +734,7 @@ Crowi.prototype.setupPageService = async function() {
     this.pageService = new PageService(this);
     await this.pageService.createTtlIndex();
   }
-  if (this.pageOperationService == null) {
-    this.pageOperationService = new PageOperationService(this);
-    await this.pageOperationService.init();
-  }
+  this.pageOperationService = instanciatePageOperationService(this);
 };
 
 Crowi.prototype.setupInAppNotificationService = async function() {
