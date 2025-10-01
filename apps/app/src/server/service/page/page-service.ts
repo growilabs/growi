@@ -31,10 +31,6 @@ export interface IPageService {
   findPageAndMetaDataByViewer(
       pageId: string | null, path: string, user?: HydratedDocument<IUser>, includeEmpty?: boolean, isSharedPage?: boolean,
   ): Promise<IDataWithMeta<HydratedDocument<PageDocument>, IPageInfoAll>|null>
-  findAncestorsChildrenByPathAndViewer(path: string, user, userGroups?): Promise<Record<string, PageDocument[]>>,
-  findChildrenByParentPathOrIdAndViewer(
-    parentPathOrId: string, user, userGroups?, showPagesRestrictedByOwner?: boolean, showPagesRestrictedByGroup?: boolean,
-  ): Promise<PageDocument[]>,
   resumeRenameSubOperation(renamedPage: PageDocument, pageOp: PageOperationDocument, activity?): Promise<void>
   handlePrivatePagesForGroupsToDelete(
     groupsToDelete: UserGroupDocument[] | ExternalUserGroupDocument[],
