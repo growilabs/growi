@@ -1,29 +1,24 @@
 import type { FC } from 'react';
-import React, { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
-import { Modal, ModalHeader, ModalBody, ModalFooter } from 'reactstrap';
 import { useTranslation } from 'react-i18next';
+import {
+  Modal, ModalHeader, ModalBody, ModalFooter,
+} from 'reactstrap';
 
+import { DateRangePicker } from '~/client/components/Admin/AuditLog/DateRangePicker';
+import { SearchUsernameTypeahead } from '~/client/components/Admin/AuditLog/SearchUsernameTypeahead';
+import { SelectActionDropdown } from '~/client/components/Admin/AuditLog/SelectActionDropdown';
 import type { IClearable } from '~/client/interfaces/clearable';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import type { SupportedActionType } from '~/interfaces/activity';
 import { useAuditLogAvailableActions } from '~/stores-universal/context';
 
-import { DateRangePicker } from '~/client/components/Admin/AuditLog/DateRangePicker';
-import { SearchUsernameTypeahead } from '~/client/components/Admin/AuditLog/SearchUsernameTypeahead';
-import { SelectActionDropdown } from '~/client/components/Admin/AuditLog/SelectActionDropdown';
-
-const formatDate = (date: Date | null) => {
-  if (date == null) {
-    return '';
-  }
-  return date.toISOString().split('T')[0]; // YYYY-MM-DD format
-};
 
 export const AuditLogExportButton: FC = () => {
   const { t } = useTranslation('admin');
   const typeaheadRef = useRef<IClearable>(null);
-  
+
   const { data: auditLogAvailableActionsData } = useAuditLogAvailableActions();
 
   // Modal state
@@ -36,7 +31,7 @@ export const AuditLogExportButton: FC = () => {
   const [selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
   const [actionMap, setActionMap] = useState(
     new Map<SupportedActionType, boolean>(
-      auditLogAvailableActionsData != null ? auditLogAvailableActionsData.map(action => [action, true]) : []
+      auditLogAvailableActionsData != null ? auditLogAvailableActionsData.map(action => [action, true]) : [],
     ),
   );
 
@@ -49,12 +44,12 @@ export const AuditLogExportButton: FC = () => {
   const actionCheckboxChangedHandler = useCallback((action: SupportedActionType) => {
     actionMap.set(action, !actionMap.get(action));
     setActionMap(new Map(actionMap.entries()));
-  }, [actionMap, setActionMap]);
+  }, [actionMap]);
 
   const multipleActionCheckboxChangedHandler = useCallback((actions: SupportedActionType[], isChecked: boolean) => {
     actions.forEach(action => actionMap.set(action, isChecked));
     setActionMap(new Map(actionMap.entries()));
-  }, [actionMap, setActionMap]);
+  }, [actionMap]);
 
   const setUsernamesHandler = useCallback((usernames: string[]) => {
     setSelectedUsernames(usernames);
@@ -81,12 +76,12 @@ export const AuditLogExportButton: FC = () => {
   }, []);
 
   // Export logic
-  const startAuditLogExport = async () => {
+  const startAuditLogExport = async() => {
     setIsExporting(true);
-    
+
     try {
       const selectedActionList = Array.from(actionMap.entries()).filter(v => v[1]).map(v => v[0]);
-      
+
       const res = await fetch('/_api/v3/audit-log-bulk-export', {
         method: 'POST',
         headers: {
@@ -111,15 +106,15 @@ export const AuditLogExportButton: FC = () => {
       else if (res.status === 409) {
         const data = await res.json();
         toastError(
-          t('audit_log_export.duplicate_job_error', { 
-            createdAt: data.error?.duplicateJob?.createdAt 
-          })
+          t('audit_log_export.duplicate_job_error', {
+            createdAt: data.error?.duplicateJob?.createdAt,
+          }),
         );
       }
       else {
         const data = await res.json();
-        toastError(t('audit_log_export.export_failed', { 
-          message: data.error?.message ?? '' 
+        toastError(t('audit_log_export.export_failed', {
+          message: data.error?.message ?? '',
         }));
       }
     }
@@ -154,7 +149,7 @@ export const AuditLogExportButton: FC = () => {
 
           <div className="row g-3 mb-4">
             <div className="col-12">
-              <label className="form-label">{t('audit_log_management.user')}</label>
+              <div className="form-label">{t('audit_log_management.user')}</div>
               <SearchUsernameTypeahead
                 ref={typeaheadRef}
                 onChange={setUsernamesHandler}
@@ -162,7 +157,7 @@ export const AuditLogExportButton: FC = () => {
             </div>
 
             <div className="col-12">
-              <label className="form-label">{t('audit_log_management.date')}</label>
+              <div className="form-label">{t('audit_log_management.date')}</div>
               <DateRangePicker
                 startDate={startDate}
                 endDate={endDate}
@@ -171,7 +166,7 @@ export const AuditLogExportButton: FC = () => {
             </div>
 
             <div className="col-12">
-              <label className="form-label">{t('audit_log_management.action')}</label>
+              <div className="form-label">{t('audit_log_management.action')}</div>
               <SelectActionDropdown
                 actionMap={actionMap}
                 availableActions={auditLogAvailableActionsData || []}
@@ -213,7 +208,7 @@ export const AuditLogExportButton: FC = () => {
           >
             {isExporting ? (
               <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                <output className="spinner-border spinner-border-sm me-2" aria-hidden="true"></output>
                 {t('audit_log_export.exporting')}
               </>
             ) : (

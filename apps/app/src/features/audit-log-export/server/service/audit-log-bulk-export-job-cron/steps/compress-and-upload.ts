@@ -1,3 +1,4 @@
+import type { IUser } from '@growi/core';
 import type { Archiver } from 'archiver';
 import archiver from 'archiver';
 
@@ -8,8 +9,10 @@ import type { IAttachmentDocument } from '~/server/models/attachment';
 import { Attachment } from '~/server/models/attachment';
 import type { FileUploader } from '~/server/service/file-uploader';
 import loggerFactory from '~/utils/logger';
-import type { AuditLogExportJobDocument } from '../../../models/audit-log-bulk-export-job';
+
+
 import type { IAuditLogExportJobCronService } from '..';
+import type { AuditLogExportJobDocument } from '../../../models/audit-log-bulk-export-job';
 
 const logger = loggerFactory(
   'growi:service:audit-log-export-job-cron:compress-and-upload-async',
@@ -30,10 +33,10 @@ function setUpAuditLogArchiver(): Archiver {
 }
 
 async function postProcess(
-  this: IAuditLogExportJobCronService,
-  auditLogExportJob: AuditLogExportJobDocument,
-  attachment: IAttachmentDocument,
-  fileSize: number,
+    this: IAuditLogExportJobCronService,
+    auditLogExportJob: AuditLogExportJobDocument,
+    attachment: IAttachmentDocument,
+    fileSize: number,
 ): Promise<void> {
   attachment.fileSize = fileSize;
   await attachment.save();
@@ -54,14 +57,13 @@ async function postProcess(
  * Execute a pipeline that reads the audit log files from the temporal fs directory, compresses them into a zip file, and uploads to the cloud storage
  */
 export async function compressAndUpload(
-  this: IAuditLogExportJobCronService,
-  user,
-  auditLogExportJob: AuditLogExportJobDocument,
+    this: IAuditLogExportJobCronService,
+    user: IUser,
+    auditLogExportJob: AuditLogExportJobDocument,
 ): Promise<void> {
   const auditLogArchiver = setUpAuditLogArchiver();
 
-  if (auditLogExportJob.filterHash == null)
-    throw new Error('filterHash is not set');
+  if (auditLogExportJob.filterHash == null) throw new Error('filterHash is not set');
 
   const originalName = `audit-logs-${auditLogExportJob.filterHash}.zip`;
   const attachment = Attachment.createWithoutSave(
@@ -81,7 +83,8 @@ export async function compressAndUpload(
 
   try {
     await fileUploadService.uploadAttachment(auditLogArchiver, attachment);
-  } catch (e) {
+  }
+  catch (e) {
     logger.error(e);
     this.handleError(e, auditLogExportJob);
   }

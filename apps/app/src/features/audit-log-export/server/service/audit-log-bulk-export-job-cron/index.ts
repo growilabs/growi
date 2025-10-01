@@ -1,29 +1,34 @@
+import fs from 'fs';
+import path from 'path';
+import type { Readable } from 'stream';
+
 import type { IUser } from '@growi/core';
 import { getIdForRef, isPopulated } from '@growi/core';
-import fs from 'fs';
 import mongoose from 'mongoose';
+
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
+import type { SupportedActionType } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
-import path from 'path';
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
+import type { ActivityDocument } from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
 import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
-import type { ActivityDocument } from '~/server/models/activity';
+
+import { AuditLogExportJobStatus, AuditLogExportJobInProgressStatus } from '../../../interfaces/audit-log-bulk-export';
 import AuditLogExportJob from '../../models/audit-log-bulk-export-job';
 import type { AuditLogExportJobDocument } from '../../models/audit-log-bulk-export-job';
-import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
-import type { Readable } from 'stream';
+
+
 import {
   AuditLogExportJobExpiredError,
   AuditLogExportJobRestartedError,
 } from './errors';
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
-import type { SupportedActionType } from '~/interfaces/activity';
-import { exportAuditLogsToFsAsync } from './steps/exportAuditLogsToFsAsync';
 import { compressAndUpload } from './steps/compress-and-upload';
+import { exportAuditLogsToFsAsync } from './steps/exportAuditLogsToFsAsync';
 
 // あとで作る予定のものを import だけ定義しておく
-import { AuditLogExportJobStatus, AuditLogExportJobInProgressStatus } from '../../../interfaces/audit-log-bulk-export';
 // import { createAuditLogSnapshotsAsync } from './steps/create-audit-log-snapshots-async';
 // import { exportAuditLogsToFsAsync } from './steps/export-audit-logs-to-fs-async';
 // import { compressAndUpload } from './steps/compress-and-upload';
@@ -52,7 +57,7 @@ class AuditLogExportJobCronService
 
   crowi: Crowi;
 
-  activityEvent: any;
+  activityEvent: NodeJS.EventEmitter;
 
   // multipart upload max part size
   maxPartSize = 5 * 1024 * 1024; // 5MB
@@ -82,7 +87,7 @@ class AuditLogExportJobCronService
   override async executeJob(): Promise<void> {
     logger.debug('executeJob() called - not implemented yet');
     const auditLogBulkExportJobInProgress = await AuditLogExportJob.find({
-      $or: Object.values(AuditLogExportJobInProgressStatus).map((status) => ({
+      $or: Object.values(AuditLogExportJobInProgressStatus).map(status => ({
         status,
       })),
     })
@@ -186,18 +191,18 @@ class AuditLogExportJobCronService
   }
 
   async notifyExportResultAndCleanUp(
-    action: SupportedActionType,
-    auditLogExportJob: AuditLogExportJobDocument,
+      action: SupportedActionType,
+      auditLogExportJob: AuditLogExportJobDocument,
   ): Promise<void> {
-    auditLogExportJob.status =
-      action === SupportedAction.ACTION_AUDIT_LOG_EXPORT_COMPLETED
-        ? AuditLogExportJobStatus.completed
-        : AuditLogExportJobStatus.failed;
+    auditLogExportJob.status = action === SupportedAction.ACTION_AUDIT_LOG_EXPORT_COMPLETED
+      ? AuditLogExportJobStatus.completed
+      : AuditLogExportJobStatus.failed;
 
     try {
       await auditLogExportJob.save();
       await this.notifyExportResult(auditLogExportJob, action);
-    } catch (err) {
+    }
+    catch (err) {
       logger.error(err);
     }
     // execute independently of notif process resolve/reject
@@ -210,14 +215,15 @@ class AuditLogExportJobCronService
    * - destroy any stream in execution
    */
   async cleanUpExportJobResources(
-    auditLogExportJob: AuditLogExportJobDocument,
-    restarted = false,
+      auditLogExportJob: AuditLogExportJobDocument,
+      restarted = false,
   ) {
     const streamInExecution = this.getStreamInExecution(auditLogExportJob._id);
     if (streamInExecution != null) {
       if (restarted) {
         streamInExecution.destroy(new AuditLogExportJobRestartedError());
-      } else {
+      }
+      else {
         streamInExecution.destroy(new AuditLogExportJobExpiredError());
       }
       this.removeStreamInExecution(auditLogExportJob._id);
@@ -237,11 +243,10 @@ class AuditLogExportJobCronService
   }
 
   private async notifyExportResult(
-    auditLogExportJob: AuditLogExportJobDocument,
-    action: SupportedActionType,
+      auditLogExportJob: AuditLogExportJobDocument,
+      action: SupportedActionType,
   ) {
     logger.debug('Creating activity with targetModel:', SupportedTargetModel.MODEL_AUDIT_LOG_EXPORT_JOB);
-    logger.debug('Job model name:', auditLogExportJob.constructor.modelName);
     const activity = await this.crowi.activityService.createActivity({
       action,
       targetModel: SupportedTargetModel.MODEL_AUDIT_LOG_EXPORT_JOB,
@@ -253,7 +258,7 @@ class AuditLogExportJobCronService
           : '',
       },
     });
-    const getAdditionalTargetUsers = async (activity: ActivityDocument) => [
+    const getAdditionalTargetUsers = async(activity: ActivityDocument) => [
       activity.user,
     ];
     const preNotify = preNotifyService.generatePreNotify(
@@ -273,9 +278,10 @@ export let auditLogExportJobCronService:
 export default function instanciate(crowi: Crowi): void {
   try {
     auditLogExportJobCronService = new AuditLogExportJobCronService(crowi);
-    const schedule = auditLogExportJobCronService.getCronSchedule();
     auditLogExportJobCronService.startCron();
-  } catch (error) {
+  }
+  catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Failed to start AuditLogExportJobCronService:', error);
   }
 }

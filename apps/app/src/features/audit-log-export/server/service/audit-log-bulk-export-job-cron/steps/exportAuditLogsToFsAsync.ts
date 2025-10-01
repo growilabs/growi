@@ -2,18 +2,18 @@ import fs from 'fs';
 import path from 'path';
 import { pipeline, Writable } from 'stream';
 
+import type { IUser } from '@growi/core';
+import mongoose, { type FilterQuery } from 'mongoose';
+
 import {
   AuditLogExportJobStatus,
 } from '~/features/audit-log-export/interfaces/audit-log-bulk-export';
-import type { AuditLogExportJobDocument } from '../../../models/audit-log-bulk-export-job';
-
-import mongoose from 'mongoose';
-import type { IUser } from '@growi/core';
-
+import Activity, { type ActivityDocument } from '~/server/models/activity';
 import loggerFactory from '~/utils/logger';
 
 import type { IAuditLogExportJobCronService } from '..';
-import Activity, { type ActivityDocument } from '~/server/models/activity';
+import type { AuditLogExportJobDocument } from '../../../models/audit-log-bulk-export-job';
+
 
 const MAX_LOGS_PER_FILE = 10; // 1ファイルあたりの件数上限
 
@@ -27,7 +27,7 @@ function getAuditLogWritable(
     job: AuditLogExportJobDocument,
 ): Writable {
   const outputDir = this.getTmpOutputDir(job);
-  let buffer: any[] = [];
+  let buffer: ActivityDocument[] = [];
   let fileIndex = 0;
 
   return new Writable({
@@ -47,10 +47,10 @@ function getAuditLogWritable(
           );
           await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
           await fs.promises.writeFile(filePath, JSON.stringify(buffer, null, 2));
-          
+
           // Save progress after each file
           await job.save();
-          
+
           buffer = [];
           fileIndex++;
         }
@@ -92,7 +92,7 @@ export async function exportAuditLogsToFsAsync(
     job: AuditLogExportJobDocument,
 ): Promise<void> {
   const filters = job.filters ?? {};
-  const query: any = {};
+  const query: FilterQuery<ActivityDocument> = {};
 
   if (filters.actions && filters.actions.length > 0) {
     query.action = { $in: filters.actions };
@@ -114,14 +114,14 @@ export async function exportAuditLogsToFsAsync(
     logger.debug('Converting usernames to ObjectIds:', filters.users);
     const User = mongoose.model<IUser>('User');
     const userIds = await User.find({ username: { $in: filters.users } }).distinct('_id');
-    
+
     logger.debug('Found user IDs:', userIds);
-    
+
     if (userIds.length === 0) {
       // No users found with the specified usernames - this would result in no matching activities
       throw new Error(`No users found with usernames: ${filters.users.join(', ')}`);
     }
-    
+
     query.user = { $in: userIds };
   }
 

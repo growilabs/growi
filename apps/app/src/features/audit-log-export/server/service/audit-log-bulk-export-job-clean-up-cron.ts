@@ -22,6 +22,7 @@ const logger = loggerFactory(
  * Manages cronjob which deletes unnecessary audit log bulk export jobs
  */
 class AuditLogBulkExportJobCleanUpCronService extends CronService {
+
   crowi: Crowi;
 
   constructor(crowi: Crowi) {
@@ -51,11 +52,11 @@ class AuditLogBulkExportJobCleanUpCronService extends CronService {
     const exportJobExpirationSeconds = configManager.getConfig(
       'app:bulkExportJobExpirationSeconds',
     );
-    
+
     const thresholdDate = new Date(Date.now() - exportJobExpirationSeconds * 1000);
-    
+
     const expiredExportJobs = await AuditLogExportJob.find({
-      $or: Object.values(AuditLogExportJobInProgressStatus).map((status) => ({
+      $or: Object.values(AuditLogExportJobInProgressStatus).map(status => ({
         status,
       })),
       createdAt: {
@@ -85,7 +86,7 @@ class AuditLogBulkExportJobCleanUpCronService extends CronService {
     const thresholdDate = new Date(
       Date.now() - downloadExpirationSeconds * 1000,
     );
-    
+
     const downloadExpiredExportJobs = await AuditLogExportJob.find({
       status: AuditLogExportJobStatus.completed,
       completedAt: { $lt: thresholdDate },
@@ -93,15 +94,14 @@ class AuditLogBulkExportJobCleanUpCronService extends CronService {
 
     logger.debug(`Found ${downloadExpiredExportJobs.length} download-expired audit log export jobs`);
 
-    const cleanUp = async (job: AuditLogExportJobDocument) => {
+    const cleanUp = async(job: AuditLogExportJobDocument) => {
       await auditLogExportJobCronService?.cleanUpExportJobResources(job);
 
-      const hasSameAttachmentAndDownloadNotExpired =
-        await AuditLogExportJob.findOne({
-          attachment: job.attachment,
-          _id: { $ne: job._id },
-          completedAt: { $gte: thresholdDate },
-        });
+      const hasSameAttachmentAndDownloadNotExpired = await AuditLogExportJob.findOne({
+        attachment: job.attachment,
+        _id: { $ne: job._id },
+        completedAt: { $gte: thresholdDate },
+      });
       if (hasSameAttachmentAndDownloadNotExpired == null) {
         // delete attachment if no other export job (which download has not expired) has re-used it
         await this.crowi.attachmentService?.removeAttachment(job.attachment);
@@ -135,11 +135,11 @@ class AuditLogBulkExportJobCleanUpCronService extends CronService {
   }
 
   async cleanUpAndDeleteBulkExportJobs(
-    auditLogBulkExportJobs: HydratedDocument<AuditLogExportJobDocument>[],
-    cleanUp: (job: AuditLogExportJobDocument) => Promise<void>,
+      auditLogBulkExportJobs: HydratedDocument<AuditLogExportJobDocument>[],
+      cleanUp: (job: AuditLogExportJobDocument) => Promise<void>,
   ): Promise<void> {
     const results = await Promise.allSettled(
-      auditLogBulkExportJobs.map((job) => cleanUp(job)),
+      auditLogBulkExportJobs.map(job => cleanUp(job)),
     );
     results.forEach((result) => {
       if (result.status === 'rejected') logger.error(result.reason);
@@ -151,11 +151,12 @@ class AuditLogBulkExportJobCleanUpCronService extends CronService {
       (_, index) => results[index].status === 'fulfilled',
     );
     if (cleanedUpJobs.length > 0) {
-      const cleanedUpJobIds = cleanedUpJobs.map((job) => job._id);
+      const cleanedUpJobIds = cleanedUpJobs.map(job => job._id);
       await AuditLogExportJob.deleteMany({ _id: { $in: cleanedUpJobIds } });
       logger.debug(`Successfully deleted ${cleanedUpJobs.length} audit log export jobs`);
     }
   }
+
 }
 
 // eslint-disable-next-line import/no-mutable-exports

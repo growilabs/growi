@@ -1,7 +1,6 @@
 // server/routes/apiv3/audit-log-bulk-export.ts
 import type { IUser, IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
-import type { Scope } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request } from 'express';
 import { Router } from 'express';
