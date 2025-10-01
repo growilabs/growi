@@ -2,9 +2,7 @@ import type { IUserHasId } from '@growi/core';
 import { SCOPE, isPopulated } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { RuntimeContext } from '@mastra/core/runtime-context';
-import {
-  pipeUIMessageStreamToResponse,
-} from 'ai';
+import { pipeUIMessageStreamToResponse, validateUIMessages, type UIMessage } from 'ai';
 import type { Request, RequestHandler } from 'express';
 import { body, type ValidationChain } from 'express-validator';
 import { z } from 'zod';
@@ -24,7 +22,7 @@ const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
 
 type ReqBody = {
   aiAssistantId: string,
-  userMessage: string,
+  messages: UIMessage[],
 }
 
 type Req = Request<undefined, Response, ReqBody> & {
@@ -52,15 +50,16 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
       .isMongoId()
       .withMessage('aiAssistantId must be string'),
 
-    body('userMessage')
-      .isString()
-      .withMessage('userMessage must be string'),
+    body('messages')
+      .custom(async(data) => {
+        await validateUIMessages({ messages: data });
+      }),
   ];
 
   return [
     accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT], { acceptLegacy: true }),
     loginRequiredStrictly, ...validator, apiV3FormValidator, async(req: Req, res: ApiV3Response) => {
-      const { aiAssistantId, userMessage } = req.body;
+      const { aiAssistantId, messages } = req.body;
 
       const openaiService = getOpenaiService();
       if (openaiService == null) {
@@ -89,7 +88,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
 
       try {
         const stream = await growiAgent.streamVNext(
-          userMessage, {
+          messages, {
             format: 'aisdk',
             output: reasoningSchema,
             runtimeContext,
