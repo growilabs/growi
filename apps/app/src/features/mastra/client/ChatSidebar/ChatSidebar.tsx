@@ -12,17 +12,15 @@ const ChatSidebarSubstance = (): JSX.Element => {
     transport: new DefaultChatTransport({ api: '/_api/v3/mastra/message' }),
   });
 
-
   return (
     <div
       className={`position-fixed top-0 end-0 h-100 border-start bg-body shadow-sm overflow-hidden ${moduleClass}`}
     >
-      <SimpleBar
-        className="h-100"
-        autoHide
-      >
+      <SimpleBar className="h-100" autoHide>
 
-        {/* 後で消す */}
+        {/* ============================================ */}
+        {/*   TODO: REMOVE THIS TEMPORARY DEBUG BUTTON   */}
+        {/* ============================================ */}
         <button
           type="button"
           className="btn btn-primary"
@@ -35,14 +33,12 @@ const ChatSidebarSubstance = (): JSX.Element => {
         >
           Send Message
         </button>
-        {/* ここまで */}
-
+        {/* ============================================ */}
 
       </SimpleBar>
     </div>
   );
 };
-
 
 export const ChatSidebar = (): JSX.Element => {
   const isOpened = true;
