@@ -107,13 +107,17 @@ jobs:
     needs: [build-prod]
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        mongodb-version: ['6.0', '8.0']
+
     services:
       mongodb:
-        image: mongo:6.0
+        image: mongo:${{ matrix.mongodb-version }}
         ports:
         - 27017/tcp
       elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:7.17.1
+        image: docker.elastic.co/elasticsearch/elasticsearch:9.0.1
         ports:
         - 9200/tcp
         env:
@@ -128,6 +132,12 @@ jobs:
       with:
         node-version: ${{ inputs.node-version }}
         cache: 'pnpm'
+
+    # avoid setup-node cache failure; see: https://github.com/actions/setup-node/issues/1137
+    - name: Verify PNPM Cache Directory
+      run: |
+        PNPM_STORE_PATH="$( pnpm store path --silent )"
+        [ -d "$PNPM_STORE_PATH" ] || mkdir -vp "$PNPM_STORE_PATH"
 
     - name: Download production files artifact
       uses: actions/download-artifact@v4
@@ -176,14 +186,15 @@ jobs:
       matrix:
         browser: [chromium, firefox, webkit]
         shard: [1/2, 2/2]
+        mongodb-version: ['6.0', '8.0']
 
     services:
       mongodb:
-        image: mongo:6.0
+        image: mongo:${{ matrix.mongodb-version }}
         ports:
         - 27017/tcp
       elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:7.17.1
+        image: docker.elastic.co/elasticsearch/elasticsearch:9.0.1
         ports:
         - 9200/tcp
         env:
@@ -273,7 +284,7 @@ jobs:
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: blob-report-${{ matrix.browser }}-${{ steps.shard-id.outputs.shard_id }}
+        name: blob-report-${{ matrix.browser }}-mongo${{ matrix.mongodb-version }}-${{ steps.shard-id.outputs.shard_id }}
         path: ./apps/app/blob-report
         retention-days: 30
 
@@ -282,7 +293,7 @@ jobs:
       if: failure()
       with:
         type: ${{ job.status }}
-        job_name: '*Node CI for growi - run-playwright*'
+        job_name: '*Node CI for growi - run-playwright (${{ matrix.browser }}, MongoDB ${{ matrix.mongodb-version }})*'
         channel: '#ci'
         isCompactMode: true
         url: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -1,20 +1,21 @@
 import type { Schema as SanitizeOption } from 'hast-util-sanitize';
 import type { Plugin } from 'unified';
-import type { Parent, Node } from 'unist';
+import type { Node, Parent } from 'unist';
 import { findAfter } from 'unist-util-find-after';
 import { visit } from 'unist-util-visit';
 
-
-function wrapWithSection(parentNode: Parent, startElem: Node, endElem?: Node | null, isDarkMode?: boolean): void {
+function wrapWithSection(
+  parentNode: Parent,
+  startElem: Node,
+  endElem?: Node | null,
+  isDarkMode?: boolean,
+): void {
   const siblings = parentNode.children;
 
   const startIndex = siblings.indexOf(startElem);
   const endIndex = endElem != null ? siblings.indexOf(endElem) : undefined;
 
-  const between = siblings.slice(
-    startIndex,
-    endIndex,
-  );
+  const between = siblings.slice(startIndex, endIndex);
 
   const section = {
     type: 'section',
@@ -36,11 +37,13 @@ function removeElement(parentNode: Parent, elem: Node): void {
 }
 
 export type ExtractSectionsPluginParams = {
-  isDarkMode?: boolean,
-  disableSeparationByHeader?: boolean,
-}
+  isDarkMode?: boolean;
+  disableSeparationByHeader?: boolean;
+};
 
-export const remarkPlugin: Plugin<[ExtractSectionsPluginParams]> = (options) => {
+export const remarkPlugin: Plugin<[ExtractSectionsPluginParams]> = (
+  options,
+) => {
   const { isDarkMode, disableSeparationByHeader } = options;
 
   const startCondition = (node: Node) => {
@@ -58,29 +61,23 @@ export const remarkPlugin: Plugin<[ExtractSectionsPluginParams]> = (options) => 
 
   return (tree) => {
     // wrap with <section>
-    visit(
-      tree,
-      startCondition,
-      (node, index, parent: Parent) => {
-        if (parent == null || parent.type !== 'root' || node.type === 'yaml') {
-          return;
-        }
+    visit(tree, startCondition, (node, index, parent: Parent) => {
+      if (parent == null || parent.type !== 'root' || node.type === 'yaml') {
+        return;
+      }
 
-        const startElem = node;
-        const endElem = findAfter(parent, startElem, endCondition);
+      const startElem = node;
+      const endElem = findAfter(parent, startElem, endCondition);
 
-        wrapWithSection(parent, startElem, endElem, isDarkMode);
+      wrapWithSection(parent, startElem, endElem, isDarkMode);
 
-        // remove <hr>
-        if (endElem != null && endElem.type === 'thematicBreak') {
-          removeElement(parent, endElem);
-        }
-      },
-    );
+      // remove <hr>
+      if (endElem != null && endElem.type === 'thematicBreak') {
+        removeElement(parent, endElem);
+      }
+    });
   };
-
 };
-
 
 export const sanitizeOption: SanitizeOption = {
   tagNames: ['section'],

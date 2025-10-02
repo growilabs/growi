@@ -6,7 +6,7 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "lint": "pnpm eslint **/*.{js,ts}",
+    "lint": "biome check",
     "gen:client-code": "orval",
     "dev": "pnpm gen:client-code && tsc -p tsconfig.json",
     "build": "pnpm gen:client-code && tsc -p tsconfig.json"

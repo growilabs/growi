@@ -3,11 +3,15 @@ import mongoose from 'mongoose';
 import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
-const logger = loggerFactory('growi:migrate:drop-wrong-index-of-page-tag-relation');
+const logger = loggerFactory(
+  'growi:migrate:drop-wrong-index-of-page-tag-relation',
+);
 
 async function dropIndexIfExists(db, collectionName, indexName) {
   // check existence of the collection
-  const items = await db.listCollections({ name: collectionName }, { nameOnly: true }).toArray();
+  const items = await db
+    .listCollections({ name: collectionName }, { nameOnly: true })
+    .toArray();
   if (items.length === 0) {
     return;
   }

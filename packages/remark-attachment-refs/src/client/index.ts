@@ -1,2 +1,2 @@
-export * from './services/renderer/refs';
 export * from './components';
+export * from './services/renderer/refs';

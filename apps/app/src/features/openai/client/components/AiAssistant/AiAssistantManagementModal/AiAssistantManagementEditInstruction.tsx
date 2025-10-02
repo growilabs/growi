@@ -18,7 +18,7 @@ export const AiAssistantManagementEditInstruction = (props: Props): JSX.Element 
 
   return (
     <>
-      <AiAssistantManagementHeader />
+      <AiAssistantManagementHeader labelTranslationKey="modal_ai_assistant.page_mode_title.instruction" />
 
       <ModalBody className="px-4">
         <p className="text-secondary py-1">

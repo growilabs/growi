@@ -1,30 +1,32 @@
 import React, {
-  useCallback, useState, useMemo, type JSX,
+  useCallback, useState, useMemo, useRef, useEffect, type JSX,
 } from 'react';
 
 import { useTranslation } from 'react-i18next';
 import {
-  ModalHeader, ModalBody, ModalFooter, Input,
+  ModalBody, ModalFooter, Input,
 } from 'reactstrap';
 
 import { AiAssistantShareScope, AiAssistantAccessScope } from '~/features/openai/interfaces/ai-assistant';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 import { useCurrentUser, useLimitLearnablePageCountPerAssistant } from '~/stores-universal/context';
 
-import type { SelectedPage } from '../../../../interfaces/selected-page';
+import type { SelectablePage } from '../../../../interfaces/selectable-page';
 import { determineShareScope } from '../../../../utils/determine-share-scope';
 import { useAiAssistantManagementModal, AiAssistantManagementModalPageMode } from '../../../stores/ai-assistant';
 
+import { AiAssistantManagementHeader } from './AiAssistantManagementHeader';
 import { ShareScopeWarningModal } from './ShareScopeWarningModal';
 
 type Props = {
+  isActivePane: boolean;
   shouldEdit: boolean;
   name: string;
   description: string;
   instruction: string;
   shareScope: AiAssistantShareScope,
   accessScope: AiAssistantAccessScope,
-  selectedPages: SelectedPage[];
+  selectedPages: SelectablePage[];
   selectedUserGroupsForAccessScope: PopulatedGrantedGroup[],
   selectedUserGroupsForShareScope: PopulatedGrantedGroup[],
   onNameChange: (value: string) => void;
@@ -34,6 +36,7 @@ type Props = {
 
 export const AiAssistantManagementHome = (props: Props): JSX.Element => {
   const {
+    isActivePane,
     shouldEdit,
     name,
     description,
@@ -55,11 +58,11 @@ export const AiAssistantManagementHome = (props: Props): JSX.Element => {
 
   const [isShareScopeWarningModalOpen, setIsShareScopeWarningModalOpen] = useState(false);
 
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const totalSelectedPageCount = useMemo(() => {
     return selectedPages.reduce((total, selectedPage) => {
-      const descendantCount = selectedPage.isIncludeSubPage
-        ? selectedPage.page.descendantCount ?? 0
-        : 0;
+      const descendantCount = selectedPage.descendantCount ?? 0;
       const pageCountWithDescendants = descendantCount + 1;
       return total + pageCountWithDescendants;
     }, 0);
@@ -114,12 +117,20 @@ export const AiAssistantManagementHome = (props: Props): JSX.Element => {
     await onUpsertAiAssistant();
   }, [accessScope, onUpsertAiAssistant, selectedUserGroupsForAccessScope, selectedUserGroupsForShareScope, shareScope]);
 
+  // Autofocus
+  useEffect(() => {
+    // Only when creating a new assistant
+    if (isActivePane && !shouldEdit) {
+      inputRef.current?.focus();
+    }
+  }, [isActivePane, shouldEdit]);
+
   return (
     <>
-      <ModalHeader tag="h4" toggle={closeAiAssistantManagementModal} className="pe-4">
-        <span className="growi-custom-icons growi-ai-assistant-icon me-3 fs-4">growi_ai</span>
-        <span className="fw-bold">{t(shouldEdit ? 'modal_ai_assistant.header.update_assistant' : 'modal_ai_assistant.header.add_new_assistant')}</span>
-      </ModalHeader>
+      <AiAssistantManagementHeader
+        hideBackButton
+        labelTranslationKey={shouldEdit ? 'modal_ai_assistant.header.update_assistant' : 'modal_ai_assistant.header.add_new_assistant'}
+      />
 
       <div className="px-4">
         <ModalBody>
@@ -131,6 +142,7 @@ export const AiAssistantManagementHome = (props: Props): JSX.Element => {
               className="border-0 border-bottom border-2 px-0 rounded-0"
               value={name}
               onChange={e => onNameChange(e.target.value)}
+              innerRef={inputRef}
             />
           </div>
 

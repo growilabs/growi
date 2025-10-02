@@ -18,9 +18,13 @@ module.exports = {
 
     // create operations
     const operations = slackAppIntegrations.map((doc) => {
-      const permissionsForSingleUseCommands = doc._doc.permissionsForSingleUseCommands;
+      const permissionsForSingleUseCommands =
+        doc._doc.permissionsForSingleUseCommands;
       const createValue = permissionsForSingleUseCommands.get('create', false);
-      const togetterValue = permissionsForSingleUseCommands.get('togetter', false);
+      const togetterValue = permissionsForSingleUseCommands.get(
+        'togetter',
+        false,
+      );
 
       const newPermissionsForSingleUseCommands = {
         note: createValue,
@@ -32,7 +36,8 @@ module.exports = {
           filter: { _id: doc._id },
           update: {
             $set: {
-              permissionsForSingleUseCommands: newPermissionsForSingleUseCommands,
+              permissionsForSingleUseCommands:
+                newPermissionsForSingleUseCommands,
             },
           },
         },
@@ -55,7 +60,8 @@ module.exports = {
 
     // create operations
     const operations = slackAppIntegrations.map((doc) => {
-      const permissionsForSingleUseCommands = doc._doc.permissionsForSingleUseCommands;
+      const permissionsForSingleUseCommands =
+        doc._doc.permissionsForSingleUseCommands;
       const noteValue = permissionsForSingleUseCommands.get('note', false);
       const keepValue = permissionsForSingleUseCommands.get('keep', false);
 
@@ -69,7 +75,8 @@ module.exports = {
           filter: { _id: doc._id },
           update: {
             $set: {
-              permissionsForSingleUseCommands: newPermissionsForSingleUseCommands,
+              permissionsForSingleUseCommands:
+                newPermissionsForSingleUseCommands,
             },
           },
         },

@@ -4,7 +4,7 @@ import { Readable, Transform, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 
 import type {
-  IUser, Ref, Lang, IPage,
+  IUser, Ref, Lang, IPage, Nullable,
 } from '@growi/core';
 import {
   PageGrant, getIdForRef, getIdStringForRef, isPopulated, type IUserHasId,
@@ -15,6 +15,7 @@ import escapeStringRegexp from 'escape-string-regexp';
 import createError from 'http-errors';
 import mongoose, { type HydratedDocument, type Types } from 'mongoose';
 import { type OpenAI, toFile } from 'openai';
+import { type ChatCompletionChunk } from 'openai/resources/chat/completions';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import ThreadRelationModel, { type ThreadRelationDocument } from '~/features/openai/server/models/thread-relation';
@@ -45,7 +46,7 @@ import { convertMarkdownToHtml } from '../utils/convert-markdown-to-html';
 import { generateGlobPatterns } from '../utils/generate-glob-patterns';
 import { isVectorStoreCompatible } from '../utils/is-vector-store-compatible';
 
-import { getClient } from './client-delegator';
+import { getClient, isStreamResponse } from './client-delegator';
 import { openaiApiErrorHandler } from './openai-api-error-handler';
 import { replaceAnnotationWithPageLink } from './replace-annotation-with-page-link';
 
@@ -72,6 +73,7 @@ const convertPathPatternsToRegExp = (pagePathPatterns: string[]): Array<string |
 };
 
 export interface IOpenaiService {
+  generateAndProcessPreMessage(message: string, chunkProcessor: (chunk: ChatCompletionChunk) => void): Promise<void>
   createThread(userId: string, type: ThreadType, aiAssistantId?: string, initialUserMessage?: string): Promise<ThreadRelationDocument>;
   getThreadsByAiAssistantId(aiAssistantId: string): Promise<ThreadRelationDocument[]>
   deleteThread(threadRelationId: string): Promise<ThreadRelationDocument>;
@@ -108,7 +110,37 @@ class OpenaiService implements IOpenaiService {
     return getClient({ openaiServiceType });
   }
 
-  private async generateThreadTitle(message: string): Promise<string | null> {
+  async generateAndProcessPreMessage(message: string, chunkProcessor: (delta: ChatCompletionChunk) => void): Promise<void> {
+    const systemMessage = [
+      "Generate a message briefly confirming the user's question.",
+      'Please generate up to 20 characters',
+    ].join('');
+
+    const preMessageCompletion = await this.client.chatCompletion({
+      stream: true,
+      model: 'gpt-4.1-nano',
+      messages: [
+        {
+          role: 'system',
+          content: systemMessage,
+        },
+        {
+          role: 'user',
+          content: message,
+        },
+      ],
+    });
+
+    if (!isStreamResponse(preMessageCompletion)) {
+      return;
+    }
+
+    for await (const chunk of preMessageCompletion) {
+      chunkProcessor(chunk);
+    }
+  }
+
+  private async generateThreadTitle(message: string): Promise<Nullable<string>> {
     const systemMessage = [
       'Create a brief title (max 5 words) from your message.',
       'Respond in the same language the user uses in their input.',
@@ -129,8 +161,10 @@ class OpenaiService implements IOpenaiService {
       ],
     });
 
-    const threadTitle = threadTitleCompletion.choices[0].message.content;
-    return threadTitle;
+    if (!isStreamResponse(threadTitleCompletion)) {
+      const threadTitle = threadTitleCompletion.choices[0].message.content;
+      return threadTitle;
+    }
   }
 
   async createThread(userId: string, type: ThreadType, aiAssistantId?: string, initialUserMessage?: string): Promise<ThreadRelationDocument> {
@@ -183,7 +217,9 @@ class OpenaiService implements IOpenaiService {
   }
 
   async getThreadsByAiAssistantId(aiAssistantId: string, type: ThreadType = ThreadType.KNOWLEDGE): Promise<ThreadRelationDocument[]> {
-    const threadRelations = await ThreadRelationModel.find({ aiAssistant: aiAssistantId, type });
+    const threadRelations = await ThreadRelationModel
+      .find({ aiAssistant: aiAssistantId, type })
+      .sort({ updatedAt: -1 });
     return threadRelations;
   }
 

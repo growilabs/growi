@@ -1,11 +1,9 @@
+import type { IUser } from '@growi/core';
+import { getIdForRef, isPopulated } from '@growi/core';
 import fs from 'fs';
+import mongoose from 'mongoose';
 import path from 'path';
 import type { Readable } from 'stream';
-
-import type { IUser } from '@growi/core';
-import { isPopulated, getIdForRef } from '@growi/core';
-import mongoose from 'mongoose';
-
 
 import type { SupportedActionType } from '~/interfaces/activity';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
@@ -17,18 +15,23 @@ import CronService from '~/server/service/cron';
 import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
 
-import { PageBulkExportFormat, PageBulkExportJobInProgressStatus, PageBulkExportJobStatus } from '../../../interfaces/page-bulk-export';
+import {
+  PageBulkExportFormat,
+  PageBulkExportJobInProgressStatus,
+  PageBulkExportJobStatus,
+} from '../../../interfaces/page-bulk-export';
 import type { PageBulkExportJobDocument } from '../../models/page-bulk-export-job';
 import PageBulkExportJob from '../../models/page-bulk-export-job';
 import PageBulkExportPageSnapshot from '../../models/page-bulk-export-page-snapshot';
 
-
-import { BulkExportJobExpiredError, BulkExportJobRestartedError } from './errors';
+import {
+  BulkExportJobExpiredError,
+  BulkExportJobRestartedError,
+} from './errors';
 import { requestPdfConverter } from './request-pdf-converter';
 import { compressAndUpload } from './steps/compress-and-upload';
 import { createPageSnapshotsAsync } from './steps/create-page-snapshots-async';
 import { exportPagesToFsAsync } from './steps/export-pages-to-fs-async';
-
 
 const logger = loggerFactory('growi:service:page-bulk-export-job-cron');
 
@@ -39,17 +42,28 @@ export interface IPageBulkExportJobCronService {
   compressExtension: string;
   setStreamInExecution(jobId: ObjectIdLike, stream: Readable): void;
   removeStreamInExecution(jobId: ObjectIdLike): void;
-  handleError(err: Error | null, pageBulkExportJob: PageBulkExportJobDocument): void;
-  notifyExportResultAndCleanUp(action: SupportedActionType, pageBulkExportJob: PageBulkExportJobDocument): Promise<void>;
-  getTmpOutputDir(pageBulkExportJob: PageBulkExportJobDocument, isHtmlPath?: boolean): string;
+  handleError(
+    err: Error | null,
+    pageBulkExportJob: PageBulkExportJobDocument,
+  ): void;
+  notifyExportResultAndCleanUp(
+    action: SupportedActionType,
+    pageBulkExportJob: PageBulkExportJobDocument,
+  ): Promise<void>;
+  getTmpOutputDir(
+    pageBulkExportJob: PageBulkExportJobDocument,
+    isHtmlPath?: boolean,
+  ): string;
 }
 
 /**
  * Manages cronjob which proceeds PageBulkExportJobs in progress.
  * If PageBulkExportJob finishes the current step, the next step will be started on the next cron execution.
  */
-class PageBulkExportJobCronService extends CronService implements IPageBulkExportJobCronService {
-
+class PageBulkExportJobCronService
+  extends CronService
+  implements IPageBulkExportJobCronService
+{
   crowi: Crowi;
 
   activityEvent: any;
@@ -76,7 +90,9 @@ class PageBulkExportJobCronService extends CronService implements IPageBulkExpor
     super();
     this.crowi = crowi;
     this.activityEvent = crowi.event('activity');
-    this.parallelExecLimit = configManager.getConfig('app:pageBulkExportParallelExecLimit');
+    this.parallelExecLimit = configManager.getConfig(
+      'app:pageBulkExportParallelExecLimit',
+    );
   }
 
   override getCronSchedule(): string {
@@ -85,8 +101,12 @@ class PageBulkExportJobCronService extends CronService implements IPageBulkExpor
 
   override async executeJob(): Promise<void> {
     const pageBulkExportJobsInProgress = await PageBulkExportJob.find({
-      $or: Object.values(PageBulkExportJobInProgressStatus).map(status => ({ status })),
-    }).sort({ createdAt: 1 }).limit(this.parallelExecLimit);
+      $or: Object.values(PageBulkExportJobInProgressStatus).map((status) => ({
+        status,
+      })),
+    })
+      .sort({ createdAt: 1 })
+      .limit(this.parallelExecLimit);
 
     pageBulkExportJobsInProgress.forEach((pageBulkExportJob) => {
       this.proceedBulkExportJob(pageBulkExportJob);
@@ -102,19 +122,14 @@ class PageBulkExportJobCronService extends CronService implements IPageBulkExpor
    * @param pageBulkExportJob page bulk export job in execution
    * @param isHtmlPath whether the tmp output path is for html files
    */
-  getTmpOutputDir(pageBulkExportJob: PageBulkExportJobDocument, isHtmlPath = false): string {
-    const isGrowiCloud = configManager.getConfig('app:growiCloudUri') != null;
-    const appId = configManager.getConfig('app:growiAppIdForCloud')?.toString();
+  getTmpOutputDir(
+    pageBulkExportJob: PageBulkExportJobDocument,
+    isHtmlPath = false,
+  ): string {
     const jobId = pageBulkExportJob._id.toString();
-
-    if (isGrowiCloud) {
-      if (appId == null) {
-        throw new Error('appId is required for bulk export on GROWI.cloud');
-      }
-    }
-
-    const basePath = isHtmlPath ? path.join(this.tmpOutputRootDir, 'html') : this.tmpOutputRootDir;
-    return path.join(basePath, appId ?? '', jobId);
+    return isHtmlPath
+      ? path.join(this.tmpOutputRootDir, 'html', jobId)
+      : path.join(this.tmpOutputRootDir, jobId);
   }
 
   /**
@@ -153,12 +168,17 @@ class PageBulkExportJobCronService extends CronService implements IPageBulkExpor
         await pageBulkExportJob.save();
       }
 
-      if (pageBulkExportJob.status === PageBulkExportJobStatus.exporting && pageBulkExportJob.format === PageBulkExportFormat.pdf) {
+      if (
+        pageBulkExportJob.status === PageBulkExportJobStatus.exporting &&
+        pageBulkExportJob.format === PageBulkExportFormat.pdf
+      ) {
         await requestPdfConverter(pageBulkExportJob);
       }
 
       // return if job is still the same status as the previous cron exec
-      if (pageBulkExportJob.status === pageBulkExportJob.statusOnPreviousCronExec) {
+      if (
+        pageBulkExportJob.status === pageBulkExportJob.statusOnPreviousCronExec
+      ) {
         return;
       }
 
@@ -171,17 +191,21 @@ class PageBulkExportJobCronService extends CronService implements IPageBulkExpor
 
       if (pageBulkExportJob.status === PageBulkExportJobStatus.initializing) {
         await createPageSnapshotsAsync.bind(this)(user, pageBulkExportJob);
-      }
-      else if (pageBulkExportJob.status === PageBulkExportJobStatus.exporting) {
+      } else if (
+        pageBulkExportJob.status === PageBulkExportJobStatus.exporting
+      ) {
         await exportPagesToFsAsync.bind(this)(pageBulkExportJob);
-      }
-      else if (pageBulkExportJob.status === PageBulkExportJobStatus.uploading) {
+      } else if (
+        pageBulkExportJob.status === PageBulkExportJobStatus.uploading
+      ) {
         compressAndUpload.bind(this)(user, pageBulkExportJob);
       }
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
-      await this.notifyExportResultAndCleanUp(SupportedAction.ACTION_PAGE_BULK_EXPORT_FAILED, pageBulkExportJob);
+      await this.notifyExportResultAndCleanUp(
+        SupportedAction.ACTION_PAGE_BULK_EXPORT_FAILED,
+        pageBulkExportJob,
+      );
     }
   }
 
@@ -190,20 +214,27 @@ class PageBulkExportJobCronService extends CronService implements IPageBulkExpor
    * @param err error
    * @param pageBulkExportJob PageBulkExportJob executed in the pipeline
    */
-  async handleError(err: Error | null, pageBulkExportJob: PageBulkExportJobDocument) {
+  async handleError(
+    err: Error | null,
+    pageBulkExportJob: PageBulkExportJobDocument,
+  ) {
     if (err == null) return;
 
     if (err instanceof BulkExportJobExpiredError) {
       logger.error(err);
-      await this.notifyExportResultAndCleanUp(SupportedAction.ACTION_PAGE_BULK_EXPORT_JOB_EXPIRED, pageBulkExportJob);
-    }
-    else if (err instanceof BulkExportJobRestartedError) {
+      await this.notifyExportResultAndCleanUp(
+        SupportedAction.ACTION_PAGE_BULK_EXPORT_JOB_EXPIRED,
+        pageBulkExportJob,
+      );
+    } else if (err instanceof BulkExportJobRestartedError) {
       logger.info(err.message);
       await this.cleanUpExportJobResources(pageBulkExportJob);
-    }
-    else {
+    } else {
       logger.error(err);
-      await this.notifyExportResultAndCleanUp(SupportedAction.ACTION_PAGE_BULK_EXPORT_FAILED, pageBulkExportJob);
+      await this.notifyExportResultAndCleanUp(
+        SupportedAction.ACTION_PAGE_BULK_EXPORT_FAILED,
+        pageBulkExportJob,
+      );
     }
   }
 
@@ -213,17 +244,18 @@ class PageBulkExportJobCronService extends CronService implements IPageBulkExpor
    * @param pageBulkExportJob the page bulk export job
    */
   async notifyExportResultAndCleanUp(
-      action: SupportedActionType,
-      pageBulkExportJob: PageBulkExportJobDocument,
+    action: SupportedActionType,
+    pageBulkExportJob: PageBulkExportJobDocument,
   ): Promise<void> {
-    pageBulkExportJob.status = action === SupportedAction.ACTION_PAGE_BULK_EXPORT_COMPLETED
-      ? PageBulkExportJobStatus.completed : PageBulkExportJobStatus.failed;
+    pageBulkExportJob.status =
+      action === SupportedAction.ACTION_PAGE_BULK_EXPORT_COMPLETED
+        ? PageBulkExportJobStatus.completed
+        : PageBulkExportJobStatus.failed;
 
     try {
       await pageBulkExportJob.save();
       await this.notifyExportResult(pageBulkExportJob, action);
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
     }
     // execute independently of notif process resolve/reject
@@ -235,13 +267,15 @@ class PageBulkExportJobCronService extends CronService implements IPageBulkExpor
    * - delete page snapshots
    * - remove the temporal output directory
    */
-  async cleanUpExportJobResources(pageBulkExportJob: PageBulkExportJobDocument, restarted = false) {
+  async cleanUpExportJobResources(
+    pageBulkExportJob: PageBulkExportJobDocument,
+    restarted = false,
+  ) {
     const streamInExecution = this.getStreamInExecution(pageBulkExportJob._id);
     if (streamInExecution != null) {
       if (restarted) {
         streamInExecution.destroy(new BulkExportJobRestartedError());
-      }
-      else {
+      } else {
         streamInExecution.destroy(new BulkExportJobExpiredError());
       }
       this.removeStreamInExecution(pageBulkExportJob._id);
@@ -249,13 +283,19 @@ class PageBulkExportJobCronService extends CronService implements IPageBulkExpor
 
     const promises = [
       PageBulkExportPageSnapshot.deleteMany({ pageBulkExportJob }),
-      fs.promises.rm(this.getTmpOutputDir(pageBulkExportJob), { recursive: true, force: true }),
+      fs.promises.rm(this.getTmpOutputDir(pageBulkExportJob), {
+        recursive: true,
+        force: true,
+      }),
     ];
 
     // clean up html files exported for PDF conversion
     if (pageBulkExportJob.format === PageBulkExportFormat.pdf) {
       promises.push(
-        fs.promises.rm(this.getTmpOutputDir(pageBulkExportJob, true), { recursive: true, force: true }),
+        fs.promises.rm(this.getTmpOutputDir(pageBulkExportJob, true), {
+          recursive: true,
+          force: true,
+        }),
       );
     }
 
@@ -266,7 +306,8 @@ class PageBulkExportJobCronService extends CronService implements IPageBulkExpor
   }
 
   private async notifyExportResult(
-      pageBulkExportJob: PageBulkExportJobDocument, action: SupportedActionType,
+    pageBulkExportJob: PageBulkExportJobDocument,
+    action: SupportedActionType,
   ) {
     const activity = await this.crowi.activityService.createActivity({
       action,
@@ -274,18 +315,26 @@ class PageBulkExportJobCronService extends CronService implements IPageBulkExpor
       target: pageBulkExportJob,
       user: pageBulkExportJob.user,
       snapshot: {
-        username: isPopulated(pageBulkExportJob.user) ? pageBulkExportJob.user.username : '',
+        username: isPopulated(pageBulkExportJob.user)
+          ? pageBulkExportJob.user.username
+          : '',
       },
     });
-    const getAdditionalTargetUsers = async(activity: ActivityDocument) => [activity.user];
-    const preNotify = preNotifyService.generatePreNotify(activity, getAdditionalTargetUsers);
+    const getAdditionalTargetUsers = async (activity: ActivityDocument) => [
+      activity.user,
+    ];
+    const preNotify = preNotifyService.generatePreNotify(
+      activity,
+      getAdditionalTargetUsers,
+    );
     this.activityEvent.emit('updated', activity, pageBulkExportJob, preNotify);
   }
-
 }
 
 // eslint-disable-next-line import/no-mutable-exports
-export let pageBulkExportJobCronService: PageBulkExportJobCronService | undefined; // singleton instance
+export let pageBulkExportJobCronService:
+  | PageBulkExportJobCronService
+  | undefined; // singleton instance
 export default function instanciate(crowi: Crowi): void {
   pageBulkExportJobCronService = new PageBulkExportJobCronService(crowi);
 }

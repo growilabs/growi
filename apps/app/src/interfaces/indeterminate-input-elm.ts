@@ -1,3 +1,3 @@
 export interface IndeterminateInputElement extends HTMLInputElement {
-  indeterminate:boolean
+  indeterminate: boolean;
 }

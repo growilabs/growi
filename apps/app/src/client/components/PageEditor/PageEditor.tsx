@@ -156,7 +156,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
 
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.MAIN);
 
-  const [markdownToPreview, setMarkdownToPreview] = useState<string>(codeMirrorEditor?.getDoc() ?? '');
+  const [markdownToPreview, setMarkdownToPreview] = useState<string>(codeMirrorEditor?.getDocString() ?? '');
   const setMarkdownPreviewWithDebounce = useMemo(() => debounce(100, throttle(150, (value: string) => {
     setMarkdownToPreview(value);
   })), []);
@@ -217,7 +217,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   }, [pageId, selectedGrant, mutateWaitingSaveProcessing, updatePage, mutateIsGrantNormalized, t]);
 
   const saveAndReturnToViewHandler = useCallback(async(opts: SaveOptions) => {
-    const markdown = codeMirrorEditor?.getDoc();
+    const markdown = codeMirrorEditor?.getDocString();
     const revisionId = isRevisionIdRequiredForPageUpdate ? currentRevisionId : undefined;
     const page = await save(revisionId, markdown, opts, onConflict);
     if (page == null) {
@@ -229,7 +229,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   }, [codeMirrorEditor, currentRevisionId, isRevisionIdRequiredForPageUpdate, mutateEditorMode, onConflict, save, updateStateAfterSave]);
 
   const saveWithShortcut = useCallback(async() => {
-    const markdown = codeMirrorEditor?.getDoc();
+    const markdown = codeMirrorEditor?.getDocString();
     const revisionId = isRevisionIdRequiredForPageUpdate ? currentRevisionId : undefined;
     const page = await save(revisionId, markdown, undefined, onConflict);
     if (page == null) {

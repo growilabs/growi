@@ -2,26 +2,55 @@ import { useCallback } from 'react';
 
 import type { EditorView } from '@codemirror/view';
 
-export type InsertMarkdowElements = (
+
+export type InsertMarkdownElements = (
   prefix: string,
   suffix: string,
 ) => void;
 
-export const useInsertMarkdownElements = (view?: EditorView): InsertMarkdowElements => {
+const removeSymbol = (text: string, prefix: string, suffix: string): string => {
+  let result = text;
+
+  if (result.startsWith(prefix)) {
+    result = result.slice(prefix.length);
+  }
+
+  if (result.endsWith(suffix)) {
+    result = result.slice(0, -suffix.length);
+  }
+
+  return result;
+};
+
+export const useInsertMarkdownElements = (view?: EditorView): InsertMarkdownElements => {
 
   return useCallback((prefix, suffix) => {
-    const selection = view?.state.sliceDoc(
-      view?.state.selection.main.from,
-      view?.state.selection.main.to,
-    );
-    const cursorPos = view?.state.selection.main.head;
-    const insertText = view?.state.replaceSelection(prefix + selection + suffix);
+    if (view == null) return;
 
-    if (insertText == null || cursorPos == null) {
+    const from = view?.state.selection.main.from;
+    const to = view?.state.selection.main.to;
+
+    const selectedText = view?.state.sliceDoc(from, to);
+    const cursorPos = view?.state.selection.main.head;
+
+    let insertText: string;
+
+    if (selectedText?.startsWith(prefix) && selectedText?.endsWith(suffix)) {
+      insertText = removeSymbol(selectedText, prefix, suffix);
+    }
+    else {
+      insertText = prefix + selectedText + suffix;
+    }
+
+    const selection = (from === to) ? { anchor: from + prefix.length } : { anchor: from, head: from + insertText.length };
+
+    const transaction = view?.state.replaceSelection(insertText);
+
+    if (transaction == null || cursorPos == null) {
       return;
     }
-    view?.dispatch(insertText);
-    view?.dispatch({ selection: { anchor: cursorPos + prefix.length } });
+    view?.dispatch(transaction);
+    view?.dispatch({ selection });
     view?.focus();
   }, [view]);
 };

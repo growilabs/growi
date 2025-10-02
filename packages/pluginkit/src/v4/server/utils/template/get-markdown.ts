@@ -1,10 +1,13 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 import { getStatus } from './get-status';
 
-
-export const getMarkdown = async(projectDirRoot: string, templateId: string, locale: string): Promise<string> => {
+export const getMarkdown = async (
+  projectDirRoot: string,
+  templateId: string,
+  locale: string,
+): Promise<string> => {
   const tplDir = path.resolve(projectDirRoot, 'dist', templateId, locale);
 
   const { isTemplateExists } = await getStatus(tplDir);

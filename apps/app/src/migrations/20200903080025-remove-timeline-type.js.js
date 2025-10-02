@@ -3,7 +3,6 @@ import { Config } from '~/server/models/config';
 import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
-
 const logger = loggerFactory('growi:migrate:remove-timeline-type');
 
 const mongoose = require('mongoose');

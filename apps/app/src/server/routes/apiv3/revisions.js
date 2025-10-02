@@ -3,6 +3,7 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import express from 'express';
 import { connection } from 'mongoose';
 
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { Revision } from '~/server/models/revision';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
@@ -134,74 +135,76 @@ module.exports = (crowi) => {
    *                    type: number
    *                    description: offset of the revisions
    */
-  router.get('/list', certifySharedPage, accessTokenParser, loginRequired, validator.retrieveRevisions, apiV3FormValidator, async(req, res) => {
-    const pageId = req.query.pageId;
-    const limit = req.query.limit || await crowi.configManager.getConfig('customize:showPageLimitationS') || 10;
-    const { isSharedPage } = req;
-    const offset = req.query.offset || 0;
+  router.get('/list',
+    certifySharedPage, accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }), loginRequired, validator.retrieveRevisions, apiV3FormValidator,
+    async(req, res) => {
+      const pageId = req.query.pageId;
+      const limit = req.query.limit || await crowi.configManager.getConfig('customize:showPageLimitationS') || 10;
+      const { isSharedPage } = req;
+      const offset = req.query.offset || 0;
 
-    // check whether accessible
-    if (!isSharedPage && !(await Page.isAccessiblePageByViewer(pageId, req.user))) {
-      return res.apiv3Err(new ErrorV3('Current user is not accessible to this page.', 'forbidden-page'), 403);
-    }
-
-    // Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js'
-    try {
-      await normalizeLatestRevisionIfBroken(pageId);
-    }
-    catch (err) {
-      logger.error('Error occurred in normalizing the latest revision');
-    }
-
-    try {
-      const page = await Page.findOne({ _id: pageId });
-
-      const appliedAt = await getAppliedAtOfTheMigrationFile();
-
-      const queryOpts = {
-        offset,
-        sort: { createdAt: -1 },
-        populate: 'author',
-        pagination: false,
-      };
-
-      if (limit > 0) {
-        queryOpts.limit = limit;
-        queryOpts.pagination = true;
+      // check whether accessible
+      if (!isSharedPage && !(await Page.isAccessiblePageByViewer(pageId, req.user))) {
+        return res.apiv3Err(new ErrorV3('Current user is not accessible to this page.', 'forbidden-page'), 403);
       }
 
-      const queryCondition = {
-        pageId: page._id,
-        createdAt: { $gt: appliedAt },
-      };
+      // Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js'
+      try {
+        await normalizeLatestRevisionIfBroken(pageId);
+      }
+      catch (err) {
+        logger.error('Error occurred in normalizing the latest revision');
+      }
 
-      // https://redmine.weseek.co.jp/issues/151652
-      const paginateResult = await Revision.paginate(
-        queryCondition,
-        queryOpts,
-      );
+      try {
+        const page = await Page.findOne({ _id: pageId });
 
-      paginateResult.docs.forEach((doc) => {
-        if (doc.author != null && doc.author instanceof User) {
-          doc.author = serializeUserSecurely(doc.author);
+        const appliedAt = await getAppliedAtOfTheMigrationFile();
+
+        const queryOpts = {
+          offset,
+          sort: { createdAt: -1 },
+          populate: 'author',
+          pagination: false,
+        };
+
+        if (limit > 0) {
+          queryOpts.limit = limit;
+          queryOpts.pagination = true;
         }
-      });
 
-      const result = {
-        revisions: paginateResult.docs,
-        totalCount: paginateResult.totalDocs,
-        offset: paginateResult.offset,
-      };
+        const queryCondition = {
+          pageId: page._id,
+          createdAt: { $gt: appliedAt },
+        };
 
-      return res.apiv3(result);
-    }
-    catch (err) {
-      const msg = 'Error occurred in getting revisions by poge id';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'faild-to-find-revisions'), 500);
-    }
+        // https://redmine.weseek.co.jp/issues/151652
+        const paginateResult = await Revision.paginate(
+          queryCondition,
+          queryOpts,
+        );
 
-  });
+        paginateResult.docs.forEach((doc) => {
+          if (doc.author != null && doc.author instanceof User) {
+            doc.author = serializeUserSecurely(doc.author);
+          }
+        });
+
+        const result = {
+          revisions: paginateResult.docs,
+          totalCount: paginateResult.totalDocs,
+          offset: paginateResult.offset,
+        };
+
+        return res.apiv3(result);
+      }
+      catch (err) {
+        const msg = 'Error occurred in getting revisions by poge id';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'faild-to-find-revisions'), 500);
+      }
+
+    });
 
   /**
    * @swagger
@@ -233,32 +236,34 @@ module.exports = (crowi) => {
    *                    revision:
    *                      $ref: '#/components/schemas/Revision'
    */
-  router.get('/:id', certifySharedPage, accessTokenParser, loginRequired, validator.retrieveRevisionById, apiV3FormValidator, async(req, res) => {
-    const revisionId = req.params.id;
-    const pageId = req.query.pageId;
-    const { isSharedPage } = req;
+  router.get('/:id',
+    certifySharedPage, accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }), loginRequired, validator.retrieveRevisionById, apiV3FormValidator,
+    async(req, res) => {
+      const revisionId = req.params.id;
+      const pageId = req.query.pageId;
+      const { isSharedPage } = req;
 
-    // check whether accessible
-    if (!isSharedPage && !(await Page.isAccessiblePageByViewer(pageId, req.user))) {
-      return res.apiv3Err(new ErrorV3('Current user is not accessible to this page.', 'forbidden-page'), 403);
-    }
-
-    try {
-      const revision = await Revision.findById(revisionId).populate('author');
-
-      if (revision.author != null && revision.author instanceof User) {
-        revision.author = serializeUserSecurely(revision.author);
+      // check whether accessible
+      if (!isSharedPage && !(await Page.isAccessiblePageByViewer(pageId, req.user))) {
+        return res.apiv3Err(new ErrorV3('Current user is not accessible to this page.', 'forbidden-page'), 403);
       }
 
-      return res.apiv3({ revision });
-    }
-    catch (err) {
-      const msg = 'Error occurred in getting revision data by id';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'faild-to-find-revision'), 500);
-    }
+      try {
+        const revision = await Revision.findById(revisionId).populate('author');
 
-  });
+        if (revision.author != null && revision.author instanceof User) {
+          revision.author = serializeUserSecurely(revision.author);
+        }
+
+        return res.apiv3({ revision });
+      }
+      catch (err) {
+        const msg = 'Error occurred in getting revision data by id';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'faild-to-find-revision'), 500);
+      }
+
+    });
 
   return router;
 };

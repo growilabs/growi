@@ -1,4 +1,3 @@
-
 import { SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
 import loggerFactory from '~/utils/logger';
@@ -220,15 +219,17 @@ export const routesFactory = (crowi) => {
    *            content:
    *              application/json:
    *                schema:
-   *                  properties:
-   *                    ok:
-   *                      $ref: '#/components/schemas/V1ResponseOK'
-   *                    attachment:
-   *                      $ref: '#/components/schemas/AttachmentProfile'
+   *                  allOf:
+   *                    - $ref: '#/components/schemas/ApiResponseSuccess'
+   *                    - type: object
+   *                      properties:
+   *                        attachment:
+   *                          $ref: '#/components/schemas/AttachmentProfile'
+   *                          description: The uploaded profile image attachment
    *          403:
-   *            $ref: '#/components/responses/403'
+   *            $ref: '#/components/responses/Forbidden'
    *          500:
-   *            $ref: '#/components/responses/500'
+   *            $ref: '#/components/responses/InternalServerError'
    */
   /**
    * @api {post} /attachments.uploadProfileImage Add attachment for profile image
@@ -298,13 +299,11 @@ export const routesFactory = (crowi) => {
    *            content:
    *              application/json:
    *                schema:
-   *                  properties:
-   *                    ok:
-   *                      $ref: '#/components/schemas/V1ResponseOK'
+   *                  $ref: '#/components/schemas/ApiResponseSuccess'
    *          403:
-   *            $ref: '#/components/responses/403'
+   *            $ref: '#/components/responses/Forbidden'
    *          500:
-   *            $ref: '#/components/responses/500'
+   *            $ref: '#/components/responses/InternalServerError'
    */
   /**
    * @api {post} /attachments.remove Remove attachments
@@ -363,13 +362,11 @@ export const routesFactory = (crowi) => {
    *            content:
    *              application/json:
    *                schema:
-   *                  properties:
-   *                    ok:
-   *                      $ref: '#/components/schemas/V1ResponseOK'
+   *                  $ref: '#/components/schemas/ApiResponseSuccess'
    *          403:
-   *            $ref: '#/components/responses/403'
+   *            $ref: '#/components/responses/Forbidden'
    *          500:
-   *            $ref: '#/components/responses/500'
+   *            $ref: '#/components/responses/InternalServerError'
    */
   /**
    * @api {post} /attachments.removeProfileImage Remove profile image attachments

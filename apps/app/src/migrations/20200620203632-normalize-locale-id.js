@@ -27,15 +27,9 @@ module.exports = {
       ),
 
       // update en-US -> en_US
-      User.updateMany(
-        { lang: 'en-US' },
-        { lang: 'en_US' },
-      ),
+      User.updateMany({ lang: 'en-US' }, { lang: 'en_US' }),
       // update ja -> ja_JP
-      User.updateMany(
-        { lang: 'ja' },
-        { lang: 'ja_JP' },
-      ),
+      User.updateMany({ lang: 'ja' }, { lang: 'ja_JP' }),
     ]);
 
     logger.info('Migration has successfully applied');

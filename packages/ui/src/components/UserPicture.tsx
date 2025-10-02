@@ -1,16 +1,15 @@
-import {
-  type JSX,
-  type ReactNode,
-  forwardRef,
-  memo,
-  useCallback,
-  useRef,
-} from 'react';
-
 import type { IUser, Ref } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
+import {
+  forwardRef,
+  type JSX,
+  memo,
+  type ReactNode,
+  useCallback,
+  useRef,
+} from 'react';
 import type { UncontrolledTooltipProps } from 'reactstrap';
 
 import styles from './UserPicture.module.scss';
@@ -68,12 +67,15 @@ const UserPictureRootWithLink = forwardRef<
   // Nested anchor tags causes a warning.
   // https://stackoverflow.com/questions/13052598/creating-anchor-tag-inside-anchor-taga
   return (
+    // biome-ignore lint/a11y/useSemanticElements: ignore
     <span
       ref={ref}
       className={props.className}
       onClick={clickHandler}
-      onKeyDown={() => {}}
+      onKeyDown={clickHandler}
       style={{ cursor: 'pointer' }}
+      role="link"
+      tabIndex={0}
     >
       {props.children}
     </span>

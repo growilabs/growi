@@ -91,7 +91,6 @@ const TemplateModal = dynamic(() => import('~/client/components/TemplateModal').
 const LinkEditModal = dynamic(() => import('~/client/components/PageEditor/LinkEditModal').then(mod => mod.LinkEditModal), { ssr: false });
 const TagEditModal = dynamic(() => import('~/client/components/PageTags/TagEditModal').then(mod => mod.TagEditModal), { ssr: false });
 const ConflictDiffModal = dynamic(() => import('~/client/components/PageEditor/ConflictDiffModal').then(mod => mod.ConflictDiffModal), { ssr: false });
-const QuestionnaireModalManager = dynamic(() => import('~/features/questionnaire/client/components/QuestionnaireModalManager'), { ssr: false });
 
 const EditablePageEffects = dynamic(() => import('~/client/components/Page/EditablePageEffects').then(mod => mod.EditablePageEffects), { ssr: false });
 
@@ -426,7 +425,6 @@ Page.getLayout = function getLayout(page: React.ReactElement<Props>) {
       <DescendantsPageListModal />
       <DrawioModal />
       <HandsontableModal />
-      <QuestionnaireModalManager />
       <TemplateModal />
       <LinkEditModal />
       <TagEditModal />

@@ -13,13 +13,14 @@ export const AttachmentMethodType = {
   local: 'local',
   none: 'none',
 } as const;
-export type AttachmentMethodType = typeof AttachmentMethodType[keyof typeof AttachmentMethodType]
+export type AttachmentMethodType =
+  (typeof AttachmentMethodType)[keyof typeof AttachmentMethodType];
 
 export type IResAttachmentList = {
-  paginateResult: PaginateResult<IAttachmentHasId>
+  paginateResult: PaginateResult<IAttachmentHasId>;
 };
 
 export type ICheckLimitResult = {
-  isUploadable: boolean,
-  errorMessage?: string,
-}
+  isUploadable: boolean;
+  errorMessage?: string;
+};

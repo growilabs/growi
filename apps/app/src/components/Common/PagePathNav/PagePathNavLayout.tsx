@@ -49,7 +49,11 @@ export const PagePathNavLayout = (props: Props): JSX.Element => {
       className={`${className} ${moduleClass}`}
       style={{ maxWidth }}
     >
-      <span className={`${formerLinkClassName ?? ''} ${styles['grw-former-link']}`}>{formerLink}</span>
+      {formerLink && (
+        <span className={`${formerLinkClassName ?? ''} ${styles['grw-former-link']} mb-2 d-block`}>
+          {formerLink}
+        </span>
+      )}
       <div className={containerLayoutClass}>
         <h1 className={`m-0 d-inline align-bottom ${latterLinkClassName}`}>
           {latterLink}
@@ -60,7 +64,13 @@ export const PagePathNavLayout = (props: Props): JSX.Element => {
               <span className="badge text-bg-secondary">WIP</span>
             )}
             <span className="grw-page-path-nav-copydropdown">
-              <CopyDropdown pageId={pageId} pagePath={pagePath} dropdownToggleId={copyDropdownId} dropdownToggleClassName="p-2">
+              <CopyDropdown
+                pageId={pageId}
+                pagePath={pagePath}
+                dropdownToggleId={copyDropdownId}
+                dropdownToggleClassName="p-2"
+                dropdownMenuContainer="body"
+              >
                 <span className="material-symbols-outlined">content_paste</span>
               </CopyDropdown>
             </span>

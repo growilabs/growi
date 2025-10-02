@@ -1,25 +1,25 @@
-import type { Ref, IPageHasId, IUser } from '@growi/core';
+import type { IPageHasId, IUser, Ref } from '@growi/core';
 
 export interface IBookmarkInfo {
-  sumOfBookmarks: number,
-  isBookmarked: boolean,
-  bookmarkedUsers: IUser[],
-  pageId: string,
+  sumOfBookmarks: number;
+  isBookmarked: boolean;
+  bookmarkedUsers: IUser[];
+  pageId: string;
 }
 
 export interface BookmarkedPage {
-  _id: string,
-  page: IPageHasId | null,
-  user: Ref<IUser>,
-  createdAt: Date,
+  _id: string;
+  page: IPageHasId | null;
+  user: Ref<IUser>;
+  createdAt: Date;
 }
 
-export type MyBookmarkList = BookmarkedPage[]
+export type MyBookmarkList = BookmarkedPage[];
 
 export interface IBookmarkFolder {
-  name: string
-  owner: Ref<IUser>
-  parent?: Ref<this>
+  name: string;
+  owner: Ref<IUser>;
+  parent?: Ref<this>;
 }
 
 export interface BookmarkFolderItems extends IBookmarkFolder {
@@ -34,13 +34,13 @@ export const DRAG_ITEM_TYPE = {
 } as const;
 
 interface BookmarkDragItem {
-  bookmarkFolder: BookmarkFolderItems
-  level: number
-  root: string
+  bookmarkFolder: BookmarkFolderItems;
+  level: number;
+  root: string;
 }
 
 export interface DragItemDataType extends BookmarkDragItem, IPageHasId {
-  parentFolder: BookmarkFolderItems | null
+  parentFolder: BookmarkFolderItems | null;
 }
 
-export type DragItemType = typeof DRAG_ITEM_TYPE[keyof typeof DRAG_ITEM_TYPE];
+export type DragItemType = (typeof DRAG_ITEM_TYPE)[keyof typeof DRAG_ITEM_TYPE];

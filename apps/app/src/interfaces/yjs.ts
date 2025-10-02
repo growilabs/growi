@@ -1,9 +1,9 @@
 export type CurrentPageYjsData = {
-  hasYdocsNewerThanLatestRevision?: boolean,
-  awarenessStateSize?: number,
-}
+  hasYdocsNewerThanLatestRevision?: boolean;
+  awarenessStateSize?: number;
+};
 
 export type SyncLatestRevisionBody = {
-  synced: boolean,
-  isYjsDataBroken?: boolean,
-}
+  synced: boolean;
+  isYjsDataBroken?: boolean;
+};

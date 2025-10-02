@@ -8,7 +8,7 @@
 
   "features": {
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "20.18.3"
+      "version": "22.17.0"
     }
   },
 
@@ -23,21 +23,28 @@
   "customizations": {
     "vscode": {
       "extensions": [
+        // AI
+        "anthropic.claude-code",
+        // linter
         "dbaeumer.vscode-eslint",
         "biomejs.biome",
-        "mhutchie.git-graph",
-        "eamodio.gitlens",
-        "github.vscode-pull-request-github",
-        "cschleiden.vscode-github-actions",
-        "cweijan.vscode-database-client2",
-        "mongodb.mongodb-vscode",
-        "msjsdiag.debugger-for-chrome",
-        "firefox-devtools.vscode-firefox-debug",
         "editorconfig.editorconfig",
         "shinnn.stylelint",
         "stylelint.vscode-stylelint",
+        // Test
         "vitest.explorer",
-        "ms-playwright.playwright"
+        "ms-playwright.playwright",
+        // git/github
+        "github.vscode-pull-request-github",
+        "mhutchie.git-graph",
+        "eamodio.gitlens",
+        "cschleiden.vscode-github-actions",
+        // DB
+        "cweijan.vscode-database-client2",
+        "mongodb.mongodb-vscode",
+        // Debug
+        "msjsdiag.debugger-for-chrome",
+        "firefox-devtools.vscode-firefox-debug"
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "bash"

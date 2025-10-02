@@ -14,7 +14,7 @@
       "@tsed/exceptions": ["./node_modules/@tsed/exceptions"],
       "@tsed/common": ["./node_modules/@tsed/common"],
       "@tsed/di": ["./node_modules/@tsed/di"],
-      "@tsed/logger": ["./node_modules/@tsed/logger"],
+      "@tsed/logger": ["./node_modules/@tsed/logger"]
     },
 
     /* TODO: remove below flags for strict checking */
@@ -32,9 +32,7 @@
       { "transform": "typescript-transform-paths", "afterDeclarations": true }
     ]
   },
-  "include": [
-    "src"
-  ],
+  "include": ["src"],
   "exclude": [
     "node_modules",
     "config",

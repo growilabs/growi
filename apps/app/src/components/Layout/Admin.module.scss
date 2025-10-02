@@ -230,14 +230,22 @@ $slack-work-space-name-card-border: #efc1f6;
     }
     .date-range-picker {
       width: 188px;
+      height: auto;
     }
     .jump-page-input {
       width: 50px;
     }
+
+    .table-bordered {
+      table-layout: fixed;
+    }
+
   }
 
+
+
+
   .settings-table {
-    table-layout: fixed;
 
     .item-name {
       width: 150px;
@@ -251,6 +259,10 @@ $slack-work-space-name-card-border: #efc1f6;
       background-color: rgba($info, 0.1);
     }
   }
+
+
+
+
 
 }
 

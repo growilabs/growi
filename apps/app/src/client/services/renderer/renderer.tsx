@@ -22,14 +22,14 @@ import { RichAttachment } from '~/client/components/ReactMarkdownComponents/Rich
 import { TableWithEditButton } from '~/client/components/ReactMarkdownComponents/TableWithEditButton';
 import * as callout from '~/features/callout';
 import * as mermaid from '~/features/mermaid';
+import * as plantuml from '~/features/plantuml';
 import type { RendererOptions } from '~/interfaces/renderer-options';
-import type { RendererConfig } from '~/interfaces/services/renderer';
+import { type RendererConfigExt } from '~/interfaces/services/renderer';
 import * as addLineNumberAttribute from '~/services/renderer/rehype-plugins/add-line-number-attribute';
 import * as keywordHighlighter from '~/services/renderer/rehype-plugins/keyword-highlighter';
 import * as relocateToc from '~/services/renderer/rehype-plugins/relocate-toc';
 import * as attachment from '~/services/renderer/remark-plugins/attachment';
 import * as codeBlock from '~/services/renderer/remark-plugins/codeblock';
-import * as plantuml from '~/services/renderer/remark-plugins/plantuml';
 import * as xsvToTable from '~/services/renderer/remark-plugins/xsv-to-table';
 import {
   getCommonSanitizeOption, generateCommonOptions, verifySanitizePlugin,
@@ -51,7 +51,7 @@ assert(isClient(), 'This module must be loaded only from client modules.');
 
 export const generateViewOptions = (
     pagePath: string,
-    config: RendererConfig,
+    config: RendererConfigExt,
     storeTocNode: (toc: HtmlElementNode) => void,
 ): RendererOptions => {
 
@@ -62,7 +62,7 @@ export const generateViewOptions = (
   // add remark plugins
   remarkPlugins.push(
     math,
-    [plantuml.remarkPlugin, { plantumlUri: config.plantumlUri }],
+    [plantuml.remarkPlugin, { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode }],
     drawio.remarkPlugin,
     mermaid.remarkPlugin,
     xsvToTable.remarkPlugin,
@@ -128,7 +128,7 @@ export const generateViewOptions = (
   return options;
 };
 
-export const generateTocOptions = (config: RendererConfig, tocNode: HtmlElementNode | undefined): RendererOptions => {
+export const generateTocOptions = (config: RendererConfigExt, tocNode: HtmlElementNode | undefined): RendererOptions => {
 
   const options = generateCommonOptions(undefined);
 
@@ -158,7 +158,7 @@ export const generateTocOptions = (config: RendererConfig, tocNode: HtmlElementN
 };
 
 export const generateSimpleViewOptions = (
-    config: RendererConfig,
+    config: RendererConfigExt,
     pagePath: string,
     highlightKeywords?: string | string[],
     overrideIsEnabledLinebreaks?: boolean,
@@ -170,7 +170,7 @@ export const generateSimpleViewOptions = (
   // add remark plugins
   remarkPlugins.push(
     math,
-    [plantuml.remarkPlugin, { plantumlUri: config.plantumlUri }],
+    [plantuml.remarkPlugin, { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode }],
     drawio.remarkPlugin,
     mermaid.remarkPlugin,
     xsvToTable.remarkPlugin,
@@ -232,7 +232,7 @@ export const generateSimpleViewOptions = (
 };
 
 export const generatePresentationViewOptions = (
-    config: RendererConfig,
+    config: RendererConfigExt,
     pagePath: string,
 ): RendererOptions => {
   // based on simple view options
@@ -259,7 +259,7 @@ export const generatePresentationViewOptions = (
   return options;
 };
 
-export const generatePreviewOptions = (config: RendererConfig, pagePath: string): RendererOptions => {
+export const generatePreviewOptions = (config: RendererConfigExt, pagePath: string): RendererOptions => {
   const options = generateCommonOptions(pagePath);
 
   const { remarkPlugins, rehypePlugins, components } = options;
@@ -267,7 +267,7 @@ export const generatePreviewOptions = (config: RendererConfig, pagePath: string)
   // add remark plugins
   remarkPlugins.push(
     math,
-    [plantuml.remarkPlugin, { plantumlUri: config.plantumlUri }],
+    [plantuml.remarkPlugin, { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode }],
     drawio.remarkPlugin,
     mermaid.remarkPlugin,
     xsvToTable.remarkPlugin,

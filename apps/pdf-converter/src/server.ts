@@ -32,10 +32,8 @@ const PORT = Number(process.env.PORT || 3010);
   },
 })
 class Server {
-
   @Inject()
-    app: PlatformApplication | undefined;
-
+  app: PlatformApplication | undefined;
 }
 
 export default Server;

@@ -1,15 +1,15 @@
 import { Installation as SlackInstallation } from '@slack/oauth';
+import { Required } from '@tsed/schema';
 import {
-  Required,
-} from '@tsed/schema';
-import {
-  Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn,
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
-
 
 @Entity()
 export class Installation {
-
   @PrimaryGeneratedColumn()
   readonly id: number;
 
@@ -39,5 +39,4 @@ export class Installation {
     this.teamId = slackInstallation.team?.id;
     this.enterpriseId = slackInstallation.enterprise?.id;
   }
-
 }

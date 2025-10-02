@@ -5,7 +5,7 @@ export const ConfigSource = {
   env: 'env',
   db: 'db',
 } as const;
-export type ConfigSource = typeof ConfigSource[keyof typeof ConfigSource];
+export type ConfigSource = (typeof ConfigSource)[keyof typeof ConfigSource];
 
 /**
  * Metadata for a configuration value
@@ -19,12 +19,14 @@ export interface ConfigDefinition<T> {
 /**
  * Helper function for defining configurations with type safety
  */
-export const defineConfig = <T>(config: ConfigDefinition<T>): ConfigDefinition<T> => config;
+export const defineConfig = <T>(
+  config: ConfigDefinition<T>,
+): ConfigDefinition<T> => config;
 
 /**
  * Interface for loading configuration values
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: ignore
 export interface IConfigLoader<K extends string, V extends Record<K, any>> {
   /**
    * Load configurations from environment variables
@@ -37,11 +39,14 @@ export interface IConfigLoader<K extends string, V extends Record<K, any>> {
   loadFromDB(): Promise<RawConfigData<K, V>>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type RawConfigData<K extends string, V extends Record<K, any>> = Record<K, {
-  value: V[K];
-  definition?: ConfigDefinition<V[K]>;
-}>;
+// biome-ignore lint/suspicious/noExplicitAny: ignore
+export type RawConfigData<K extends string, V extends Record<K, any>> = Record<
+  K,
+  {
+    value: V[K];
+    definition?: ConfigDefinition<V[K]>;
+  }
+>;
 
 export type UpdateConfigOptions = {
   skipPubsub?: boolean;
@@ -51,7 +56,7 @@ export type UpdateConfigOptions = {
 /**
  * Interface for managing configuration values
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: ignore
 export interface IConfigManager<K extends string, V extends Record<K, any>> {
   /**
    * Load configurations
@@ -67,12 +72,19 @@ export interface IConfigManager<K extends string, V extends Record<K, any>> {
   /**
    * Update a configuration value
    */
-  updateConfig<T extends K>(key: T, value: V[T], options?: UpdateConfigOptions): Promise<void>;
+  updateConfig<T extends K>(
+    key: T,
+    value: V[T],
+    options?: UpdateConfigOptions,
+  ): Promise<void>;
 
   /**
    * Update multiple configuration values
    */
-  updateConfigs(updates: Partial<{ [T in K]: V[T] }>, options?: UpdateConfigOptions): Promise<void>;
+  updateConfigs(
+    updates: Partial<{ [T in K]: V[T] }>,
+    options?: UpdateConfigOptions,
+  ): Promise<void>;
 
   /**
    * Remove multiple configuration values
@@ -83,5 +95,4 @@ export interface IConfigManager<K extends string, V extends Record<K, any>> {
    * Get environment variables managed with ConfigDefinitions
    */
   getManagedEnvVars(showSecretValues: boolean): Record<string, string>;
-
 }

@@ -26,7 +26,7 @@ jobs:
 
     - uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
         cache: 'pnpm'
 
     - name: Install dependencies
@@ -137,7 +137,7 @@ jobs:
         ref: v${{ needs.create-github-release.outputs.RELEASED_VERSION }}
 
     - name: Update Docker Hub Description
-      uses: peter-evans/dockerhub-description@v3
+      uses: peter-evans/dockerhub-description@v4
       with:
         username: wsmoogle
         password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
@@ -165,7 +165,7 @@ jobs:
 
     - uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
         cache: 'pnpm'
 
     - name: Install dependencies

@@ -1,6 +1,6 @@
 {
   "name": "@growi/core",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "GROWI Core Libraries",
   "license": "MIT",
   "keywords": [
@@ -60,7 +60,7 @@
     "clean": "shx rm -rf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
-    "lint:js": "eslint **/*.{js,ts}",
+    "lint:js": "biome check",
     "lint:typecheck": "vue-tsc --noEmit",
     "lint": "npm-run-all -p lint:*",
     "test": "vitest run --coverage"
