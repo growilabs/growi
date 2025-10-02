@@ -10,8 +10,8 @@ export interface GrowiInfoOptions {
   includeAttachmentInfo?: boolean;
   includeInstalledInfo?: boolean;
   includeUserCountInfo?: boolean;
+  includePageCountInfo?: boolean;
   // Future extensions can be added here
-  // includePageCount?: boolean;
 }
 
 interface IGrowiOSInfo {
@@ -36,9 +36,14 @@ interface IAdditionalUserCountInfo {
   currentActiveUsersCount: number;
 }
 
+interface IAdditionalPageCountInfo {
+  currentPagesCount: number;
+}
+
 export interface IGrowiAdditionalInfo
   extends IAdditionalInstalledAtInfo,
     IAdditionalUserCountInfo,
+    IAdditionalPageCountInfo,
     IAdditionalAttachmentInfo {}
 
 // Type mapping for flexible options
@@ -51,6 +56,9 @@ export type IGrowiAdditionalInfoByOptions<T extends GrowiInfoOptions> =
       : Record<string, never>) &
     (T['includeUserCountInfo'] extends true
       ? IAdditionalUserCountInfo
+      : Record<string, never>) &
+    (T['includePageCountInfo'] extends true
+      ? IAdditionalPageCountInfo
       : Record<string, never>);
 
 // Helper type to check if any option is enabled
@@ -61,7 +69,9 @@ export type HasAnyOption<T extends GrowiInfoOptions> =
       ? true
       : T['includeUserCountInfo'] extends true
         ? true
-        : false;
+        : T['includePageCountInfo'] extends true
+          ? true
+          : false;
 
 // Final result type based on options
 export type IGrowiAdditionalInfoResult<T extends GrowiInfoOptions> =
