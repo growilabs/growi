@@ -8,15 +8,11 @@ import type { IPageHasId } from '@growi/core';
 import { pagePathUtils, pathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
 import { useRouter } from 'next/router';
-import { useDrag, useDrop } from 'react-dnd';
 
-import { apiv3Put } from '~/client/util/apiv3-client';
-import { toastWarning, toastError } from '~/client/util/toastr';
 import type { IPageForItem } from '~/interfaces/page';
-import { mutatePageTree, useSWRxPageChildren } from '~/stores/page-listing';
+import { useSWRxPageChildren } from '~/stores/page-listing';
 import loggerFactory from '~/utils/logger';
 
-import type { ItemNode } from '../../TreeItem';
 import {
   TreeItemLayout, useNewPageInput, type TreeItemProps,
 } from '../../TreeItem';
@@ -89,96 +85,95 @@ export const PageTreeItem = (props:TreeItemProps): JSX.Element => {
     window.open(url, '_blank');
   }, []);
 
-  const [, drag] = useDrag({
-    type: 'PAGE_TREE',
-    item: { page },
-    canDrag: () => {
-      if (page.path == null) {
-        return false;
-      }
-      return !pagePathUtils.isUsersProtectedPages(page.path);
-    },
-    end: (item, monitor) => {
-      // in order to set d-none to dropped Item
-      const dropResult = monitor.getDropResult();
-    },
-    collect: monitor => ({
-      isDragging: monitor.isDragging(),
-      canDrag: monitor.canDrag(),
-    }),
-  });
+  // const [, drag] = useDrag({
+  //   type: 'PAGE_TREE',
+  //   item: { page },
+  //   canDrag: () => {
+  //     if (page.path == null) {
+  //       return false;
+  //     }
+  //     return !pagePathUtils.isUsersProtectedPages(page.path);
+  //   },
+  //   end: (item, monitor) => {
+  //     // in order to set d-none to dropped Item
+  //     const dropResult = monitor.getDropResult();
+  //   },
+  //   collect: monitor => ({
+  //     isDragging: monitor.isDragging(),
+  //     canDrag: monitor.canDrag(),
+  //   }),
+  // });
 
-  const pageItemDropHandler = async(item: ItemNode) => {
-    const { page: droppedPage } = item;
-    if (!isDroppable(droppedPage, page, true)) {
-      return;
-    }
-    if (droppedPage.path == null || page.path == null) {
-      return;
-    }
-    const newPagePath = getNewPathAfterMoved(droppedPage.path, page.path);
-    try {
-      await apiv3Put('/pages/rename', {
-        pageId: droppedPage._id,
-        revisionId: droppedPage.revision,
-        newPagePath,
-        isRenameRedirect: false,
-        updateMetadata: true,
-      });
-      await mutatePageTree();
-      await mutateChildren();
-      if (onRenamed != null) {
-        onRenamed(page.path, newPagePath);
-      }
-      // force open
-      setIsOpen(true);
-    }
-    catch (err) {
-      if (err.code === 'operation__blocked') {
-        toastWarning(t('pagetree.you_cannot_move_this_page_now'));
-      }
-      else {
-        toastError(t('pagetree.something_went_wrong_with_moving_page'));
-      }
-    }
-  };
+  // const pageItemDropHandler = async(item: ItemNode) => {
+  //   const { page: droppedPage } = item;
+  //   if (!isDroppable(droppedPage, page, true)) {
+  //     return;
+  //   }
+  //   if (droppedPage.path == null || page.path == null) {
+  //     return;
+  //   }
+  //   const newPagePath = getNewPathAfterMoved(droppedPage.path, page.path);
+  //   try {
+  //     await apiv3Put('/pages/rename', {
+  //       pageId: droppedPage._id,
+  //       newPagePath,
+  //       isRenameRedirect: false,
+  //       updateMetadata: true,
+  //     });
+  //     await mutatePageTree();
+  //     await mutateChildren();
+  //     if (onRenamed != null) {
+  //       onRenamed(page.path, newPagePath);
+  //     }
+  //     // force open
+  //     setIsOpen(true);
+  //   }
+  //   catch (err) {
+  //     if (err.code === 'operation__blocked') {
+  //       toastWarning(t('pagetree.you_cannot_move_this_page_now'));
+  //     }
+  //     else {
+  //       toastError(t('pagetree.something_went_wrong_with_moving_page'));
+  //     }
+  //   }
+  // };
 
-  const [{ isOver }, drop] = useDrop<ItemNode, Promise<void>, { isOver: boolean }>(
-    () => ({
-      accept: 'PAGE_TREE',
-      drop: pageItemDropHandler,
-      hover: (item, monitor) => {
-        // when a drag item is overlapped more than 1 sec, the drop target item will be opened.
-        if (monitor.isOver()) {
-          setTimeout(() => {
-            if (monitor.isOver()) {
-              setIsOpen(true);
-            }
-          }, 600);
-        }
-      },
-      canDrop: (item) => {
-        const { page: droppedPage } = item;
-        return isDroppable(droppedPage, page);
-      },
-      collect: monitor => ({
-        isOver: monitor.isOver(),
-      }),
-    }),
-    [page],
-  );
+  // const [{ isOver }, drop] = useDrop<ItemNode, Promise<void>, { isOver: boolean }>(
+  //   () => ({
+  //     accept: 'PAGE_TREE',
+  //     drop: pageItemDropHandler,
+  //     hover: (item, monitor) => {
+  //       // when a drag item is overlapped more than 1 sec, the drop target item will be opened.
+  //       if (monitor.isOver()) {
+  //         setTimeout(() => {
+  //           if (monitor.isOver()) {
+  //             setIsOpen(true);
+  //           }
+  //         }, 600);
+  //       }
+  //     },
+  //     canDrop: (item) => {
+  //       const { page: droppedPage } = item;
+  //       return isDroppable(droppedPage, page);
+  //     },
+  //     collect: monitor => ({
+  //       isOver: monitor.isOver(),
+  //     }),
+  //   }),
+  //   [page],
+  // );
 
-  const itemRef = (c) => {
-    // do not apply when RenameInput is shown
-    if (showRenameInput) return;
+  // const itemRef = (c) => {
+  //   // do not apply when RenameInput is shown
+  //   if (showRenameInput) return;
 
-    drag(c);
-    drop(c);
-  };
+  //   drag(c);
+  //   drop(c);
+  // };
 
   const isSelected = page._id === targetPathOrId || page.path === targetPathOrId;
   const itemClassNames = [
-    isOver ? 'drag-over' : '',
+    // isOver ? 'drag-over' : '',
     page.path !== '/' && isSelected ? 'active' : '', // set 'active' except the root page
   ];
 
@@ -198,7 +193,7 @@ export const PageTreeItem = (props:TreeItemProps): JSX.Element => {
       onClickDeleteMenuItem={props.onClickDeleteMenuItem}
       onWheelClick={itemSelectedByWheelClickHandler}
       onRenamed={props.onRenamed}
-      itemRef={itemRef}
+      // itemRef={itemRef}
       itemClass={PageTreeItem}
       itemClassName={itemClassNames.join(' ')}
       customEndComponents={[CountBadgeForPageTreeItem]}

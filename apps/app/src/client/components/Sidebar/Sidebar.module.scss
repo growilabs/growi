@@ -44,9 +44,6 @@
         min-height: 50vh;
         max-height: calc(100vh - var.$grw-sidebar-nav-width * 2);
         border-radius: 0 4px 4px 0 ;
-        .simple-scrollbar {
-          max-height: inherit;
-        }
       }
     }
   }

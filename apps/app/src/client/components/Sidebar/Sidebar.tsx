@@ -16,7 +16,6 @@ import {
   useCurrentProductNavWidth,
   usePreferCollapsedMode,
   useSidebarMode,
-  useSidebarScrollerRef,
   useIsDeviceLargerThanMd,
   useIsDeviceLargerThanXl,
 } from '~/stores/ui';
@@ -143,11 +142,6 @@ const CollapsibleContainer = memo((props: CollapsibleContainerProps): JSX.Elemen
   const { data: currentProductNavWidth } = useCurrentProductNavWidth();
   const { data: isCollapsedContentsOpened, mutate: mutateCollapsedContentsOpened } = useCollapsedContentsOpened();
 
-  const sidebarScrollerRef = useRef<HTMLDivElement>(null);
-  const { mutate: mutateSidebarScroller } = useSidebarScrollerRef();
-  mutateSidebarScroller(sidebarScrollerRef);
-
-
   // open menu when collapsed mode
   const primaryItemHoverHandler = useCallback(() => {
     // reject other than collapsed mode
@@ -178,14 +172,9 @@ const CollapsibleContainer = memo((props: CollapsibleContainerProps): JSX.Elemen
       <div
         className={`sidebar-contents-container flex-grow-1 overflow-hidden ${closedClass} ${openedClass}`}
       >
-        <SimpleBar
-          scrollableNodeProps={{ ref: sidebarScrollerRef }}
-          className="simple-scrollbar h-100"
-          style={{ width: collapsibleContentsWidth }}
-          autoHide
-        >
+        <div className="h-100" style={{ width: collapsibleContentsWidth }}>
           {children}
-        </SimpleBar>
+        </div>
       </div>
     </div>
   );

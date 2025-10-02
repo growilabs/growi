@@ -1,16 +1,12 @@
-import React, {
-  memo, useCallback, useEffect, useMemo, useRef, useState,
-} from 'react';
+import React, { memo, useCallback } from 'react';
 
 import { useTranslation } from 'next-i18next';
-import { debounce } from 'throttle-debounce';
 
 import { useIsGuestUser, useIsReadOnlyUser } from '~/stores-universal/context';
 import { useCurrentPagePath, useCurrentPageId } from '~/stores/page';
 import {
   mutatePageTree, mutateRecentlyUpdated, useSWRxRootPage, useSWRxV5MigrationStatus,
 } from '~/stores/page-listing';
-import { useSidebarScrollerRef } from '~/stores/ui';
 import loggerFactory from '~/utils/logger';
 
 import { ItemsTree } from '../../ItemsTree/ItemsTree';
@@ -106,67 +102,6 @@ export const PageTreeContent = memo(({ isWipPageShown }: PageTreeContentProps) =
   const path = currentPath || '/';
 
   const { data: rootPageResult } = useSWRxRootPage({ suspense: true });
-  const { data: sidebarScrollerRef } = useSidebarScrollerRef();
-  const [isInitialScrollCompleted, setIsInitialScrollCompleted] = useState(false);
-
-  const rootElemRef = useRef<HTMLDivElement>(null);
-
-  // ***************************  Scroll on init ***************************
-  const scrollOnInit = useCallback(() => {
-    const rootElement = rootElemRef.current;
-    const scrollElement = sidebarScrollerRef?.current;
-
-    if (rootElement == null || scrollElement == null) {
-      return;
-    }
-
-    const scrollTargetElement = rootElement.querySelector<HTMLElement>('[aria-current]');
-
-    if (scrollTargetElement == null) {
-      return;
-    }
-
-    logger.debug('scrollOnInit has invoked');
-
-
-    // NOTE: could not use scrollIntoView
-    //  https://stackoverflow.com/questions/11039885/scrollintoview-causing-the-whole-page-to-move
-
-    // calculate the center point
-    const scrollTop = scrollTargetElement.offsetTop - scrollElement.getBoundingClientRect().height / 2;
-    scrollElement.scrollTo({ top: scrollTop });
-
-    setIsInitialScrollCompleted(true);
-  }, [sidebarScrollerRef]);
-
-  const scrollOnInitDebounced = useMemo(() => debounce(500, scrollOnInit), [scrollOnInit]);
-
-  useEffect(() => {
-    if (isInitialScrollCompleted || rootPageResult == null) {
-      return;
-    }
-
-    const rootElement = rootElemRef.current as HTMLElement | null;
-    if (rootElement == null) {
-      return;
-    }
-
-    const observerCallback = (mutationRecords: MutationRecord[]) => {
-      mutationRecords.forEach(() => scrollOnInitDebounced());
-    };
-
-    const observer = new MutationObserver(observerCallback);
-    observer.observe(rootElement, { childList: true, subtree: true });
-
-    // first call for the situation that all rendering is complete at this point
-    scrollOnInitDebounced();
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [isInitialScrollCompleted, scrollOnInitDebounced, rootPageResult]);
-  // *******************************  end  *******************************
-
 
   if (!migrationStatus?.isV5Compatible) {
     return <PageTreeUnavailable />;
@@ -180,7 +115,7 @@ export const PageTreeContent = memo(({ isWipPageShown }: PageTreeContentProps) =
   }
 
   return (
-    <div ref={rootElemRef} className="pt-4">
+    <div className="pt-4">
       <ItemsTree
         isEnableActions={!isGuestUser}
         isReadOnlyUser={!!isReadOnlyUser}

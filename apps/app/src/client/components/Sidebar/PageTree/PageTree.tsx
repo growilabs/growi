@@ -1,8 +1,6 @@
 import { Suspense, useState, type JSX } from 'react';
 
 import dynamic from 'next/dynamic';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useTranslation } from 'react-i18next';
 
 import ItemsTreeContentSkeleton from '../../ItemsTree/ItemsTreeContentSkeleton';
@@ -33,9 +31,7 @@ export const PageTree = (): JSX.Element => {
       </div>
 
       <Suspense fallback={<ItemsTreeContentSkeleton />}>
-        <DndProvider backend={HTML5Backend}>
-          <PageTreeContent isWipPageShown={isWipPageShown} />
-        </DndProvider>
+        <PageTreeContent isWipPageShown={isWipPageShown} />
       </Suspense>
     </div>
   );
