@@ -79,7 +79,9 @@ export const CONFIG_KEYS = [
   'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest',
 
   // Content-Disposition settings for MIME types
-  'attachments:contentDisposition:mimeTypeOverrides',
+  'attachments:contentDisposition:inlineMimeTypes',
+  'attachments:contentDisposition:attachmentMimeTypes',
+
 
   // Security Settings
   'security:wikiMode',
@@ -542,17 +544,17 @@ export const CONFIG_DEFINITIONS = {
   }),
 
   // Attachment Content-Disposition settings
-  'attachments:contentDisposition:mimeTypeOverrides': defineConfig<Record<string, 'inline' | 'attachment'>>({
+  'attachments:contentDisposition:inlineMimeTypes': defineConfig<{ inlineMimeTypes: string[]; }>({
     defaultValue: {
-      'text/html': 'attachment',
-      'image/svg+xml': 'attachment',
-      'application/pdf': 'attachment',
-      'application/json': 'attachment',
-      'text/csv': 'attachment',
-      'font/*': 'attachment',
+      inlineMimeTypes: [],
     },
   }),
 
+  'attachments:contentDisposition:attachmentMimeTypes': defineConfig<{ attachmentMimeTypes: string[]; }>({
+    defaultValue: {
+      attachmentMimeTypes: [],
+    },
+  }),
 
   // Security Settings
   'security:wikiMode': defineConfig<string | undefined>({

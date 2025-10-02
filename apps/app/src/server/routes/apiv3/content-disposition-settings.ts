@@ -1,5 +1,5 @@
 import { ErrorV3 } from '@growi/core/dist/models';
-import { body, param } from 'express-validator';
+import { body } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
@@ -12,39 +12,133 @@ const express = require('express');
 
 const router = express.Router();
 
-const validator = {
-  updateContentDisposition: [
-    param('mimeType')
-      .exists()
-      .notEmpty()
-      .withMessage('MIME type is required')
-      .bail()
-      .matches(/^.+\/.+$/)
-      .custom((value) => {
-        const mimeTypeDefaults = configManager.getConfig('attachments:contentDisposition:mimeTypeOverrides');
-        return Object.keys(mimeTypeDefaults).includes(value);
-      })
-      .withMessage('Invalid or unconfigurable MIME type specified.'),
-
-    body('disposition')
-      .isIn(['inline', 'attachment']) // Validate that it's one of these two strings
-      .withMessage('`disposition` must be either "inline" or "attachment".'),
-  ],
-};
-
-/*
- * @swagger
- *
- *  components:
- *    schemas:
- *    parameters:
- *      - $ref: '#/components/parameters/MimeTypePathParam'
-  */
 module.exports = (crowi) => {
   const loginRequiredStrictly = require('~/server/middlewares/login-required')(crowi);
   const adminRequired = require('~/server/middlewares/admin-required')(crowi);
   const addActivity = generateAddActivityMiddleware();
   const activityEvent = crowi.event('activity');
+
+  const validateUpdateMimeTypes = [
+    body('newInlineMimeTypes').exists().withMessage('Inline mime types field is required.').bail(),
+    body('newInlineMimeTypes').isArray().withMessage('Inline mime types must be an array.'),
+
+    body('newAttachmentMimeTypes').exists().withMessage('Attachment mime types field is required.').bail(),
+    body('newAttachmentMimeTypes').isArray().withMessage('Attachment mime types must be an array.'),
+  ];
+
+  type InlineMimeTypesConfig = { inlineMimeTypes: string[] };
+  type AttachmentMimeTypesConfig = { attachmentMimeTypes: string[] };
+
+  interface UpdateMimeTypesPayload {
+    newInlineMimeTypes: string[];
+    newAttachmentMimeTypes: string[];
+  }
+
+  const isArrayOfStrings = (arr: unknown): arr is string[] => {
+    if (!Array.isArray(arr)) {
+      return false;
+    }
+    return arr.every(item => typeof item === 'string');
+  };
+
+  const isUpdateMimeTypesPayload = (data: any): data is UpdateMimeTypesPayload => {
+    return isArrayOfStrings(data.newInlineMimeTypes)
+      && isArrayOfStrings(data.newAttachmentMimeTypes);
+  };
+
+  /**
+ * @swagger
+ *
+ * /content-disposition-settings/:
+ *   put:
+ *     tags: [Content-Disposition Settings]
+ *     summary: Replace content disposition settings for configurable MIME types with recieved lists.
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully set content disposition settings.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 currentDispositionSettings:
+ *                   type: object
+ *                   properties:
+ *                     inlineMimeTypes:
+ *                     type: array
+ *                     description: The list of MIME types set to inline.
+ *                     items:
+ *                       type: string
+ *                     attachmentMimeTypes:
+ *                     type: array
+ *                     description: The list of MIME types set to attachment.
+ *                     items:
+ *                       type: string
+ *
+ */
+  router.put(
+    '/',
+    loginRequiredStrictly,
+    adminRequired,
+    validateUpdateMimeTypes,
+    apiV3FormValidator,
+    addActivity,
+    async(req, res) => {
+
+      if (!isUpdateMimeTypesPayload(req.body)) {
+        return res.apiv3Err(new ErrorV3('Internal Type Error', 'internal-error'));
+      }
+
+      const { newInlineMimeTypes } = req.body;
+      const { newAttachmentMimeTypes } = req.body;
+
+      // Ensure no MIME type is in both lists.
+      const inlineSet = new Set(newInlineMimeTypes);
+      const attachmentSet = new Set(newAttachmentMimeTypes);
+      const intersection = [...inlineSet].filter(mimeType => attachmentSet.has(mimeType));
+
+      if (intersection.length > 0) {
+        const msg = `MIME types cannot be in both inline and attachment lists: ${intersection.join(', ')}`;
+        return res.apiv3Err(new ErrorV3(msg, 'invalid-payload'));
+      }
+
+      try {
+        await configManager.updateConfigs({
+          'attachments:contentDisposition:inlineMimeTypes': {
+            inlineMimeTypes: Array.from(inlineSet),
+          } as InlineMimeTypesConfig,
+          'attachments:contentDisposition:attachmentMimeTypes': {
+            attachmentMimeTypes: Array.from(attachmentSet),
+          } as AttachmentMimeTypesConfig,
+        });
+
+        const parameters = {
+          action: SupportedAction.ACTION_ADMIN_ATTACHMENT_DISPOSITION_UPDATE,
+          currentDispositionSettings: {
+            inlineMimeTypes: Array.from(inlineSet),
+            attachmentMimeTypes: Array.from(attachmentSet),
+          },
+        };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
+
+        return res.apiv3({
+          currentDispositionSettings: {
+            inlineMimeTypes: Array.from(inlineSet),
+            attachmentMimeTypes: Array.from(attachmentSet),
+          },
+        });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating content disposition for MIME types';
+        logger.error(msg, err);
+        return res.apiv3Err(
+          new ErrorV3(msg, 'update-content-disposition-failed'),
+        );
+      }
+    },
+  );
 
   /**
  * @swagger
@@ -63,108 +157,33 @@ module.exports = (crowi) => {
  *             schema:
  *               type: object
  *               properties:
- *                 contentDispositionSettings:
+ *                 currentDispositionSettings:
  *                   type: object
- *                   additionalProperties:
- *                     type: string
- *                     description: inline or attachment
+ *                   properties:
+ *                     inlineMimeTypes:
+ *                       type: array
+ *                       description: The list of MIME types set to inline.
+ *                       items:
+ *                         type: string
+ *                     attachmentMimeTypes:
+ *                       type: array
+ *                       description: The list of MIME types set to attachment.
+ *                       items:
+ *                         type: string
  *
  */
   router.get('/', loginRequiredStrictly, adminRequired, async(req, res) => {
     try {
+      const inlineDispositionSettings = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
+      const attachmentDispositionSettings = configManager.getConfig('attachments:contentDisposition:attachmentMimeTypes');
 
-      const mimeTypeDefaults = configManager.getConfig('attachments:contentDisposition:mimeTypeOverrides');
-      const contentDispositionSettings: Record<string, 'inline' | 'attachment'> = mimeTypeDefaults;
-
-      return res.apiv3({ contentDispositionSettings });
+      return res.apiv3({ inlineDispositionSettings, attachmentDispositionSettings });
     }
     catch (err) {
       logger.error('Error retrieving content disposition settings:', err);
       return res.apiv3Err(new ErrorV3('Failed to retrieve content disposition settings', 'get-content-disposition-failed'));
     }
   });
-
-  /**
- * @swagger
- *
- * paths:
- *    /content-disposition-settings/{mimeType}:
- *      put:
- *        tags: [Content Disposition Settings]
- *        summary: Update content disposition setting for a specific MIME type
- *        security:
- *          - cookieAuth: []
- *        parameters:
- *          - $ref: '#/components/parameters/MimeTypePathParam'
- *        requestBody:
- *          required: true
- *          content:
- *            application/json:
- *              schema:
- *                type: object
- *                required:
- *                  - disposition
- *                properties:
- *                  disposition:
- *                     type: string
- *        responses:
- *          200:
- *            description: Successfully updated content disposition setting
- *            content:
- *              application/json:
- *                schema:
- *                  type: object
- *                  properties:
- *                    setting:
- *                       type: object
- *                       properties:
- *                         mimeType:
- *                           type: string
- *                         disposition:
- *                           type: string
- */
-  router.put(
-    '/:mimeType(*)',
-    loginRequiredStrictly,
-    adminRequired,
-    addActivity,
-    validator.updateContentDisposition,
-    apiV3FormValidator,
-    async(req, res) => {
-      const { mimeType } = req.params;
-      const { disposition } = req.body;
-
-      try {
-        const currentMimeTypeDefaults = configManager.getConfig('attachments:contentDisposition:mimeTypeOverrides');
-
-        const newDisposition: 'inline' | 'attachment' = disposition;
-
-        const updatedMimeTypeDefaults = {
-          ...currentMimeTypeDefaults,
-          [mimeType]: newDisposition,
-        };
-
-        await configManager.updateConfigs({ 'attachments:contentDisposition:mimeTypeOverrides': updatedMimeTypeDefaults });
-        const updatedDispositionFromDb = configManager.getConfig('attachments:contentDisposition:mimeTypeOverrides')[mimeType];
-
-        const parameters = {
-          action: SupportedAction.ACTION_ADMIN_ATTACHMENT_DISPOSITION_UPDATE,
-          mimeType,
-          disposition: updatedDispositionFromDb,
-        };
-        activityEvent.emit('update', res.locals.activity._id, parameters);
-
-        return res.apiv3({ mimeType, disposition: updatedDispositionFromDb });
-      }
-      catch (err) {
-        const msg = `Error occurred in updating content disposition for MIME type: ${mimeType}`;
-        logger.error(msg, err);
-        return res.apiv3Err(
-          new ErrorV3(msg, 'update-content-disposition-failed'),
-        );
-      }
-    },
-  );
 
   return router;
 };

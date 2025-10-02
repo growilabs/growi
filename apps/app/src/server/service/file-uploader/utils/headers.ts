@@ -22,9 +22,6 @@ export class ContentHeaders implements IContentHeaders {
 
   constructor(
       attachment: IAttachmentDocument,
-      opts?: {
-        inline?: boolean,
-    },
   ) {
     const attachmentContentType = attachment.fileFormat;
     const filename = attachment.originalName;
@@ -38,18 +35,26 @@ export class ContentHeaders implements IContentHeaders {
 
     let finalDispositionValue: string;
 
-    const requestedInline = opts?.inline ?? false;
-    const mimeTypeOverrides = configManager.getConfig('attachments:contentDisposition:mimeTypeOverrides');
-    const overrideSetting = mimeTypeOverrides[mimeType];
+    const currentInlineMimeTypes = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
+    const adminInlineMimeTypes = currentInlineMimeTypes.inlineMimeTypes;
 
-    if (overrideSetting) {
-      finalDispositionValue = overrideSetting;
+    const currentAttachmentMimeTypes = configManager.getConfig('attachments:contentDisposition:attachmentMimeTypes');
+    const adminAttachmentMimeTypes = currentAttachmentMimeTypes.attachmentMimeTypes;
+
+
+    // 1. Check for explicit admin override to 'inline'
+    if (adminInlineMimeTypes.includes(mimeType)) {
+      finalDispositionValue = 'inline';
     }
-
+    // 2. Check for explicit admin override to 'attachment'
+    else if (adminAttachmentMimeTypes.includes(mimeType)) {
+      finalDispositionValue = 'attachment';
+    }
+    // 3. If no override, fall back to the default setting
     else {
       const defaultSetting = defaultContentDispositionSettings[mimeType];
 
-      if (defaultSetting === 'inline' && requestedInline) {
+      if (defaultSetting === 'inline') {
         finalDispositionValue = 'inline';
       }
       else {
