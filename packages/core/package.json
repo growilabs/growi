@@ -73,7 +73,7 @@
     "escape-string-regexp": "^4.0.0"
   },
   "devDependencies": {
-    "mongoose": "^6.13.6",
+    "mongoose": "^8.19.0",
     "socket.io-client": "^4.7.5",
     "swr": "^2.2.2"
   }
