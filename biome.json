@@ -5,6 +5,7 @@
       "**",
       "!**/dist/**",
       "!**/node_modules/**",
+      "!**/.pnpm-store/**",
       "!**/coverage/**",
       "!**/vite.config.ts.timestamp-*",
       "!**/vite.server.config.ts.timestamp-*",
@@ -24,11 +25,11 @@
       "!apps/slackbot-proxy/src/public/bootstrap/**",
       "!packages/editor/**",
       "!packages/pdf-converter-client/src/index.ts",
+      "!packages/pdf-converter-client/specs/**",
       "!apps/app/playwright/**",
       "!apps/app/public/**",
       "!apps/app/src/client/**",
       "!apps/app/src/components/**",
-      "!apps/app/src/features/growi-plugin/**",
       "!apps/app/src/features/openai/**",
       "!apps/app/src/features/rate-limiter/**",
       "!apps/app/src/models/**",
@@ -68,10 +69,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "apps/pdf-converter/**",
-        "./apps/slackbot-proxy/**"
-      ],
+      "includes": ["apps/pdf-converter/**", "./apps/slackbot-proxy/**"],
       "linter": {
         "rules": {
           "style": {
