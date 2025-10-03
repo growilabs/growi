@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState, useRef, useEffect } from 'react';
 
 import { useTranslation } from 'react-i18next';
 
@@ -21,6 +21,9 @@ export const SelectActionDropdown: FC<Props> = (props: Props) => {
   const {
     actionMap, availableActions, onChangeAction, onChangeMultipleAction,
   } = props;
+
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const dropdownItems = useMemo<Array<{actionCategory: SupportedActionCategoryType, actions: SupportedActionType[]}>>(() => {
     return (
@@ -77,15 +80,40 @@ export const SelectActionDropdown: FC<Props> = (props: Props) => {
     }
   }, [onChangeMultipleAction]);
 
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
+
+  const toggleDropdown = useCallback(() => {
+    setIsDropdownOpen(!isDropdownOpen);
+  }, [isDropdownOpen]);
+
   return (
-    <div className="btn-group me-2 admin-audit-log">
-      <button className="btn btn-outline-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown">
+    <div className="btn-group me-2 admin-audit-log" ref={dropdownRef}>
+      <button 
+        className="btn btn-outline-secondary dropdown-toggle" 
+        type="button" 
+        onClick={toggleDropdown}
+      >
         <span className="material-symbols-outlined me-1">bolt</span>{t('admin:audit_log_management.action')}
       </button>
-      <ul className="dropdown-menu select-action-dropdown" aria-labelledby="dropdownMenuButton">
+      <ul className={`dropdown-menu select-action-dropdown ${isDropdownOpen ? 'show' : ''}`} onClick={(e) => e.stopPropagation()}>
         {dropdownItems.map(item => (
           <div key={item.actionCategory}>
-            <div className="dropdown-item">
+            <div className="dropdown-item" onClick={(e) => e.stopPropagation()}>
               <div className="px-2 m-0">
                 <input
                   type="checkbox"
@@ -98,7 +126,7 @@ export const SelectActionDropdown: FC<Props> = (props: Props) => {
             </div>
             {
               item.actions.map(action => (
-                <div className="dropdown-item" key={action}>
+                <div className="dropdown-item" key={action} onClick={(e) => e.stopPropagation()}>
                   <div className="px-4 m-0">
                     <input
                       type="checkbox"

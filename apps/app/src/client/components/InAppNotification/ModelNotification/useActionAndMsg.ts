@@ -79,6 +79,15 @@ export const useActionMsgAndIconForModelNotification = (notification: IInAppNoti
       actionMsg = 'export failed for';
       actionIcon = 'error';
       break;
+    case SupportedAction.ACTION_AUDIT_LOG_EXPORT_COMPLETED:
+      actionMsg = 'audit log export completed for';
+      actionIcon = 'download';
+      break;
+    case SupportedAction.ACTION_AUDIT_LOG_EXPORT_FAILED:
+    case SupportedAction.ACTION_AUDIT_LOG_EXPORT_JOB_EXPIRED:
+      actionMsg = 'audit log export failed for';
+      actionIcon = 'error';
+      break;
     default:
       actionMsg = '';
       actionIcon = '';
