@@ -43,12 +43,17 @@ const SelectablePageTree = memo((props: { onClickAddPageButton: (page: Selectabl
   const PageTreeItem = (props: TreeItemProps) => {
     const { itemNode } = props;
     const { page } = itemNode;
+    const itemLevel = (props as any).itemLevel || 1;
+
 
     const SelectPageButton = () => {
+      const marginLeft = itemLevel > 1 ? -(10 * (itemLevel - 1)) : 0;
+
       return (
         <button
           type="button"
           className="border-0 rounded btn p-0"
+          style={{ marginLeft: `${marginLeft}px` }}
           onClick={(e) => {
             e.stopPropagation();
             pageTreeItemClickHandler(page);
@@ -64,7 +69,7 @@ const SelectablePageTree = memo((props: { onClickAddPageButton: (page: Selectabl
         {...props}
         itemClass={PageTreeItem}
         className="text-muted"
-        customHoveredEndComponents={[SelectPageButton]}
+        customStartComponents={[SelectPageButton]}
       />
     );
   };

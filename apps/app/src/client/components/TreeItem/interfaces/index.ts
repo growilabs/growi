@@ -28,6 +28,7 @@ export type TreeItemProps = TreeItemBaseProps & {
   isWipPageShown?: boolean,
   itemClass?: React.FunctionComponent<TreeItemProps>,
   itemClassName?: string,
+  customStartComponents?: Array<React.FunctionComponent<TreeItemToolProps>>,
   customEndComponents?: Array<React.FunctionComponent<TreeItemToolProps>>,
   customHoveredEndComponents?: Array<React.FunctionComponent<TreeItemToolProps>>,
   customHeadOfChildrenComponents?: Array<React.FunctionComponent<TreeItemToolProps>>,

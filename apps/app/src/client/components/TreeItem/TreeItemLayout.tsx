@@ -134,6 +134,7 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
     },
   };
 
+  const StartComponents = props.customStartComponents;
   const EndComponents = props.customEndComponents;
   const HoveredEndComponents = props.customHoveredEndComponents;
   const HeadObChildrenComponents = props.customHeadOfChildrenComponents;
@@ -160,6 +161,11 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
         onMouseUp={itemMouseupHandler}
         aria-current={isSelected ? true : undefined}
       >
+
+        {StartComponents?.map((StartComponent, index) => (
+          // eslint-disable-next-line react/no-array-index-key
+          (<StartComponent key={index} {...toolProps} />)
+        ))}
 
         <div className="btn-triangle-container d-flex justify-content-center">
           {hasDescendants && (
