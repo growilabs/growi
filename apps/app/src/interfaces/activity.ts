@@ -579,7 +579,6 @@ export const ActivityLogActions = {
   ACTION_ATTACHMENT_ADD,
 } as const;
 
-
 /*
  * Array
  */
