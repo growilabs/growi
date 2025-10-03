@@ -46,7 +46,7 @@ export async function apiPost<T>(path: string, params: unknown = {}): Promise<T>
 }
 
 export async function apiPostForm<T>(path: string, formData: FormData): Promise<T> {
-  return apiPost<T>(path, formData);
+  return apiRequest<T>('postForm', path, formData);
 }
 
 export async function apiDelete<T>(path: string, params: unknown = {}): Promise<T> {

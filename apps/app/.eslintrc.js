@@ -25,6 +25,7 @@ module.exports = {
     'test/integration/middlewares/**',
     'test/integration/migrations/**',
     'test/integration/models/**',
+    'test/integration/service/**',
     'test/integration/setup.js',
     'bin/**',
     'config/**',

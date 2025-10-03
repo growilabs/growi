@@ -1,3 +1,5 @@
+import type { IPage } from '^/../../packages/core/dist';
+import mongoose from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
 import pkg from '^/package.json';
@@ -7,6 +9,8 @@ import { Config } from '~/server/models/config';
 import { configManager } from '~/server/service/config-manager';
 
 import type Crowi from '../../crowi';
+import type { PageModel } from '../../models/page';
+import pageModel from '../../models/page';
 
 import { growiInfoService } from './growi-info';
 
@@ -14,11 +18,16 @@ describe('GrowiInfoService', () => {
   const appVersion = pkg.version;
 
   let User;
+  let Page;
 
   beforeAll(async() => {
     process.env.APP_SITE_URL = 'http://growi.test.jp';
     process.env.DEPLOYMENT_TYPE = 'growi-docker-compose';
     process.env.SAML_ENABLED = 'true';
+
+    // setup page model before loading configs
+    pageModel(null);
+    Page = mongoose.model<IPage, PageModel>('Page');
 
     await configManager.loadConfigs();
     await configManager.updateConfigs({
@@ -47,6 +56,12 @@ describe('GrowiInfoService', () => {
     User = userModelFactory(crowiMock);
 
     await User.deleteMany({}); // clear users
+    await Page.deleteMany({}); // clear pages
+
+    await Page.create({
+      path: '/',
+      descendantCount: 0,
+    });
   });
 
   describe('getGrowiInfo', () => {
@@ -109,6 +124,7 @@ describe('GrowiInfoService', () => {
           currentActiveUsersCount: 1,
           attachmentType: 'aws',
           activeExternalAccountTypes: ['saml', 'github'],
+          currentPagesCount: 1,
         },
       });
     });
@@ -158,6 +174,7 @@ describe('GrowiInfoService', () => {
       const growiInfo = await growiInfoService.getGrowiInfo({
         includeAttachmentInfo: true,
         includeUserCountInfo: true,
+        includePageCountInfo: true,
       });
 
       // assert
@@ -167,6 +184,7 @@ describe('GrowiInfoService', () => {
         activeExternalAccountTypes: ['saml', 'github'],
         currentUsersCount: 1,
         currentActiveUsersCount: 1,
+        currentPagesCount: 1,
       });
     });
 
@@ -176,6 +194,7 @@ describe('GrowiInfoService', () => {
         includeAttachmentInfo: true,
         includeInstalledInfo: true,
         includeUserCountInfo: true,
+        includePageCountInfo: true,
       });
 
       // assert
@@ -187,6 +206,7 @@ describe('GrowiInfoService', () => {
         installedAtByOldestUser: new Date('2000-01-01'),
         currentUsersCount: 1,
         currentActiveUsersCount: 1,
+        currentPagesCount: 1,
       });
     });
 

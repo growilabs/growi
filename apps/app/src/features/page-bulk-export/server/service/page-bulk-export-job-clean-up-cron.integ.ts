@@ -31,6 +31,7 @@ vi.mock('./page-bulk-export-job-cron', () => {
   return {
     pageBulkExportJobCronService: {
       cleanUpExportJobResources: vi.fn(() => Promise.resolve()),
+      notifyExportResultAndCleanUp: vi.fn(() => Promise.resolve()),
     },
   };
 });

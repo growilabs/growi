@@ -7,6 +7,7 @@
     "paths": {
       "~/*": ["./src/*"]
     },
+    "types": ["vitest/globals"],
 
     /* TODO: remove below flags for strict checking */
     "strict": false,

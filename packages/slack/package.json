@@ -54,7 +54,7 @@
     "@types/bunyan": "^1.8.10",
     "@types/http-errors": "^2.0.3",
     "@types/url-join": "^4.0.2",
-    "axios": "^0.24.0",
+    "axios": "^1.11.0",
     "browser-bunyan": "^1.6.3",
     "bunyan": "^1.8.15",
     "crypto": "^1.0.1",
