@@ -84,6 +84,7 @@ module.exports = (crowi, app) => {
   router.use('/in-app-notification', require('./in-app-notification')(crowi));
 
   router.use('/personal-setting', require('./personal-setting')(crowi));
+  router.use('/user-activities', require('./user-activities')(crowi));
 
   router.use('/user-group-relations', require('./user-group-relation')(crowi));
   router.use('/external-user-group-relations', require('~/features/external-user-group/server/routes/apiv3/external-user-group-relation')(crowi));
