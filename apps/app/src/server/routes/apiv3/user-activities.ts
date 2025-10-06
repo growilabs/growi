@@ -164,7 +164,7 @@ module.exports = (crowi: Crowi): Router => {
 
       if (!user || !user._id) {
         logger.error('Authentication failure: req.user is missing after loginRequiredStrictly.');
-        return res.apiv3Err('Internal server error due to missing user data.', 500);
+        return res.apiv3Err('Authentication failed.', 401);
       }
 
       const userId = user._id;
