@@ -11,6 +11,7 @@ import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export
 import PageBulkExportJob from '../../../models/page-bulk-export-job';
 import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-snapshot';
 import type { IPageBulkExportJobCronService } from '..';
+import { BulkExportJobStreamDestroyedByCleanupError } from '../errors';
 
 async function reuseDuplicateExportIfExists(
   this: IPageBulkExportJobCronService,
@@ -100,9 +101,16 @@ export async function createPageSnapshotsAsync(
     },
   });
 
-  this.setStreamInExecution(pageBulkExportJob._id, pagesReadable);
+  this.setStreamsInExecution(
+    pageBulkExportJob._id,
+    pagesReadable,
+    pageSnapshotsWritable,
+  );
 
   pipeline(pagesReadable, pageSnapshotsWritable, (err) => {
-    this.handleError(err, pageBulkExportJob);
+    // prevent overlapping cleanup
+    if (!(err instanceof BulkExportJobStreamDestroyedByCleanupError)) {
+      this.handleError(err, pageBulkExportJob);
+    }
   });
 }

@@ -1,7 +1,6 @@
 import { GitHubUrl } from './github-url';
 
 describe('GitHubUrl Constructor throws an error when the url string is', () => {
-
   it.concurrent.each`
     url
     ${'//example.com/org/repos'}
@@ -14,11 +13,9 @@ describe('GitHubUrl Constructor throws an error when the url string is', () => {
     // then
     expect(caller).toThrowError(`The specified URL is invalid. : url='${url}'`);
   });
-
 });
 
 describe('The constructor is successfully processed', () => {
-
   it('with http schemed url', () => {
     // when
     const githubUrl = new GitHubUrl('http://github.com/org/repos');
@@ -51,7 +48,6 @@ describe('The constructor is successfully processed', () => {
     expect(githubUrl.reposName).toEqual('repos');
     expect(githubUrl.branchName).toEqual('fix/bug');
   });
-
 });
 
 describe('archiveUrl()', () => {
@@ -63,12 +59,13 @@ describe('archiveUrl()', () => {
     const { archiveUrl } = githubUrl;
 
     // then
-    expect(archiveUrl).toEqual('https://github.com/org/repos/archive/refs/heads/fix%2Fbug.zip');
+    expect(archiveUrl).toEqual(
+      'https://github.com/org/repos/archive/refs/heads/fix%2Fbug.zip',
+    );
   });
 });
 
 describe('extractedArchiveDirName()', () => {
-
   describe('certain characters in the branch name are converted to slashes, and if they are consecutive, they become a single hyphen', () => {
     it.concurrent.each`
       branchName
@@ -76,7 +73,10 @@ describe('extractedArchiveDirName()', () => {
       ${'a---b'}
     `("'$branchName'", ({ branchName }) => {
       // setup
-      const githubUrl = new GitHubUrl('https://github.com/org/repos', branchName);
+      const githubUrl = new GitHubUrl(
+        'https://github.com/org/repos',
+        branchName,
+      );
 
       // when
       const { extractedArchiveDirName } = githubUrl;
@@ -93,7 +93,10 @@ describe('extractedArchiveDirName()', () => {
       ${'a_b'}
     `("'$branchName'", ({ branchName }) => {
       // setup
-      const githubUrl = new GitHubUrl('https://github.com/org/repos', branchName);
+      const githubUrl = new GitHubUrl(
+        'https://github.com/org/repos',
+        branchName,
+      );
 
       // when
       const { extractedArchiveDirName } = githubUrl;
@@ -102,5 +105,4 @@ describe('extractedArchiveDirName()', () => {
       expect(extractedArchiveDirName).toEqual(branchName);
     });
   });
-
 });

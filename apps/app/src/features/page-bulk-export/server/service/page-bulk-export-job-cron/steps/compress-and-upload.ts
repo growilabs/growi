@@ -76,7 +76,7 @@ export async function compressAndUpload(
 
   pageArchiver.directory(this.getTmpOutputDir(pageBulkExportJob), false);
   pageArchiver.finalize();
-  this.setStreamInExecution(pageBulkExportJob._id, pageArchiver);
+  this.setStreamsInExecution(pageBulkExportJob._id, pageArchiver);
 
   try {
     await fileUploadService.uploadAttachment(pageArchiver, attachment);
