@@ -33,12 +33,10 @@ function rewriteNode(node: Node, lang: Lang) {
   }
 }
 
-export const remarkPlugin: Plugin = function() {
-  return (tree) => {
-    visit(tree, 'code', (node: Code) => {
-      if (isXsv(node.lang)) {
-        rewriteNode(node, node.lang);
-      }
-    });
-  };
+export const remarkPlugin: Plugin = () => (tree) => {
+  visit(tree, 'code', (node: Code) => {
+    if (isXsv(node.lang)) {
+      rewriteNode(node, node.lang);
+    }
+  });
 };

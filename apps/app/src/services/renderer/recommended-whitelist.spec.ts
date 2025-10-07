@@ -1,9 +1,8 @@
 import { notDeepEqual } from 'assert';
 
-import { tagNames, attributes } from './recommended-whitelist';
+import { attributes, tagNames } from './recommended-whitelist';
 
 describe('recommended-whitelist', () => {
-
   test('.tagNames should return iframe tag', () => {
     expect(tagNames).not.toBeNull();
     expect(tagNames).includes('iframe');
@@ -52,7 +51,10 @@ describe('recommended-whitelist', () => {
     assert(attributes != null);
 
     expect(Object.keys(attributes)).includes('a');
-    expect(attributes.a).not.toContainEqual(['className', 'data-footnote-backref']);
+    expect(attributes.a).not.toContainEqual([
+      'className',
+      'data-footnote-backref',
+    ]);
   });
 
   test('.attributes.ul should allow class and className by excluding partial className specification', () => {
@@ -61,7 +63,10 @@ describe('recommended-whitelist', () => {
     assert(attributes != null);
 
     expect(Object.keys(attributes)).includes('a');
-    expect(attributes.a).not.toContainEqual(['className', 'data-footnote-backref']);
+    expect(attributes.a).not.toContainEqual([
+      'className',
+      'data-footnote-backref',
+    ]);
   });
 
   test('.attributes.li should allow class and className by excluding partial className specification', () => {
@@ -70,7 +75,9 @@ describe('recommended-whitelist', () => {
     assert(attributes != null);
 
     expect(Object.keys(attributes)).includes('a');
-    expect(attributes.a).not.toContainEqual(['className', 'data-footnote-backref']);
+    expect(attributes.a).not.toContainEqual([
+      'className',
+      'data-footnote-backref',
+    ]);
   });
-
 });
