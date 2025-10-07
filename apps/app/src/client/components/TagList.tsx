@@ -3,8 +3,8 @@ import React, { useCallback } from 'react';
 
 import { useTranslation } from 'next-i18next';
 
-import { useKeywordManager } from '~/client/services/search-operation';
 import type { IDataTagCount } from '~/interfaces/tag';
+import { useSetSearchKeyword } from '~/states/search';
 
 import PaginationWrapper from './PaginationWrapper';
 
@@ -33,7 +33,7 @@ const TagList: FC<TagListProps> = (props:(TagListProps & typeof defaultProps)) =
   const isTagExist: boolean = tagData.length > 0;
   const { t } = useTranslation('');
 
-  const { pushState } = useKeywordManager();
+  const setSearchKeyword = useSetSearchKeyword();
 
   const generateTagList = useCallback((tagData) => {
     return tagData.map((tag:IDataTagCount) => {
@@ -42,14 +42,14 @@ const TagList: FC<TagListProps> = (props:(TagListProps & typeof defaultProps)) =
           key={tag._id}
           type="button"
           className="list-group-item list-group-item-action d-flex justify-content-between rounded-1"
-          onClick={() => pushState(`tag:${tag.name}`)}
+          onClick={() => setSearchKeyword(`tag:${tag.name}`)}
         >
           <div className="text-truncate grw-tag badge">{tag.name}</div>
           <div className="grw-tag-count badge">{tag.count}</div>
         </button>
       );
     });
-  }, [pushState]);
+  }, [setSearchKeyword]);
 
   if (!isTagExist) {
     return <h6>{ t('You have no tag, You can set tags on pages') }</h6>;

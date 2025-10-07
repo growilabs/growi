@@ -19,7 +19,7 @@ import type { MessageLog, MessageWithCustomMetaData } from '../../interfaces/mes
 import type { IThreadRelationHasId } from '../../interfaces/thread-relation';
 import { ThreadType } from '../../interfaces/thread-relation';
 import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
-import { useAiAssistantSidebar } from '../stores/ai-assistant';
+import { useAiAssistantSidebarStatus } from '../states';
 import { useSWRMUTxMessages } from '../stores/message';
 import { useSWRMUTxThreads, useSWRINFxRecentThreads } from '../stores/thread';
 
@@ -72,7 +72,7 @@ type UseKnowledgeAssistant = () => {
 
 export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
   // Hooks
-  const { data: aiAssistantSidebarData } = useAiAssistantSidebar();
+  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
   const { aiAssistantData, threadData } = aiAssistantSidebarData ?? {};
   const { mutate: mutateRecentThreads } = useSWRINFxRecentThreads();
   const { trigger: mutateThreadData } = useSWRMUTxThreads(aiAssistantData?._id);
@@ -284,7 +284,7 @@ export const useFetchAndSetMessageDataEffect = (
     setMessageLogs: Dispatch<SetStateAction<MessageLog[]>>,
     threadId?: string,
 ): void => {
-  const { data: aiAssistantSidebarData } = useAiAssistantSidebar();
+  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
   const { trigger: mutateMessageData } = useSWRMUTxMessages(
     aiAssistantSidebarData?.aiAssistantData?._id,
     threadId,

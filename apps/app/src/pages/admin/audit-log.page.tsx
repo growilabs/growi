@@ -1,72 +1,61 @@
-import type {
-  NextPage, GetServerSideProps, GetServerSidePropsContext,
-} from 'next';
-import { useTranslation } from 'next-i18next';
+import { useHydrateAtoms } from 'jotai/utils';
+import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
-import Head from 'next/head';
 
 import type { SupportedActionType } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { CommonProps } from '~/pages/utils/commons';
-import { generateCustomTitle } from '~/pages/utils/commons';
-import {
-  useCurrentUser, useAuditLogEnabled, useAuditLogAvailableActions, useActivityExpirationSeconds,
-} from '~/stores-universal/context';
+import { activityExpirationSecondsAtom, auditLogAvailableActionsAtom, auditLogEnabledAtom } from '~/states/server-configurations';
 
-import { retrieveServerSideProps } from '../../utils/admin-page-util';
+import type { NextPageWithLayout } from '../_app.page';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
 
-const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), { ssr: false });
+import type { AdminCommonProps } from './_shared';
+import { createAdminPageLayout, getServerSideAdminCommonProps } from './_shared';
+
 const AuditLogManagement = dynamic(() => import('~/client/components/Admin/AuditLogManagement').then(mod => mod.AuditLogManagement), { ssr: false });
-const ForbiddenPage = dynamic(() => import('~/client/components/Admin/ForbiddenPage').then(mod => mod.ForbiddenPage), { ssr: false });
 
-
-type Props = CommonProps & {
+type PageProps = {
   auditLogEnabled: boolean,
   activityExpirationSeconds: number,
   auditLogAvailableActions: SupportedActionType[],
 };
 
+type Props = AdminCommonProps & PageProps;
 
-const AdminAuditLogPage: NextPage<Props> = (props) => {
-  const { t } = useTranslation('admin');
-  useAuditLogEnabled(props.auditLogEnabled);
-  useActivityExpirationSeconds(props.activityExpirationSeconds);
-  useAuditLogAvailableActions(props.auditLogAvailableActions);
-  useCurrentUser(props.currentUser ?? null);
+const AdminAuditLogPage: NextPageWithLayout<Props> = (props: Props) => {
+  // hydrate
+  useHydrateAtoms([
+    [auditLogEnabledAtom, props.auditLogEnabled],
+    [activityExpirationSecondsAtom, props.activityExpirationSeconds],
+    [auditLogAvailableActionsAtom, props.auditLogAvailableActions],
+  ], { dangerouslyForceHydrate: true });
 
-  const title = t('audit_log_management.audit_log');
-  const headTitle = generateCustomTitle(props, title);
-
-  if (props.isAccessDeniedForNonAdminUser) {
-    return <ForbiddenPage />;
-  }
-
-  return (
-    <AdminLayout componentTitle={title}>
-      <Head>
-        <title>{headTitle}</title>
-      </Head>
-      <AuditLogManagement />
-    </AdminLayout>
-  );
-
+  return <AuditLogManagement />;
 };
 
-const injectServerConfigurations = async(context: GetServerSidePropsContext, props: Props): Promise<void> => {
+// No extra containers required presently; values injected directly via props + existing universal stores inside component children
+AdminAuditLogPage.getLayout = createAdminPageLayout<Props>({
+  title: (_p, t) => t('audit_log_management.audit_log'),
+});
+
+// Extend common SSR to inject audit log specific server configs
+export const getServerSideProps: GetServerSideProps<Props> = async(context: GetServerSidePropsContext) => {
+  const baseResult = await getServerSideAdminCommonProps(context);
+
   const req: CrowiRequest = context.req as CrowiRequest;
   const { crowi } = req;
-  const { activityService } = crowi;
+  const { configManager, activityService } = crowi;
 
-  props.auditLogEnabled = crowi.configManager.getConfig('app:auditLogEnabled');
-  props.activityExpirationSeconds = crowi.configManager.getConfig('app:activityExpirationSeconds');
-  props.auditLogAvailableActions = activityService.getAvailableActions(false);
+  // Build audit-log specific result fragment
+  const auditLogPropsFragment = {
+    props: {
+      auditLogEnabled: configManager.getConfig('app:auditLogEnabled'),
+      activityExpirationSeconds: configManager.getConfig('app:activityExpirationSeconds'),
+      auditLogAvailableActions: activityService.getAvailableActions(false),
+    },
+  } satisfies { props: PageProps };
+
+  return mergeGetServerSidePropsResults(baseResult, auditLogPropsFragment);
 };
-
-
-export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {
-  const props = await retrieveServerSideProps(context, injectServerConfigurations);
-  return props;
-};
-
 
 export default AdminAuditLogPage;

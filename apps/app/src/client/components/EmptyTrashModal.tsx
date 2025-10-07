@@ -1,7 +1,5 @@
 import type { FC } from 'react';
-import React, {
-  useState,
-} from 'react';
+import React, { useState, useCallback } from 'react';
 
 import { useTranslation } from 'next-i18next';
 import {
@@ -9,29 +7,28 @@ import {
 } from 'reactstrap';
 
 import { apiv3Delete } from '~/client/util/apiv3-client';
-import { useEmptyTrashModal } from '~/stores/modal';
+import { useEmptyTrashModalStatus, useEmptyTrashModalActions } from '~/states/ui/modal/empty-trash';
 
 import ApiErrorMessageList from './PageManagement/ApiErrorMessageList';
 
 const EmptyTrashModal: FC = () => {
   const { t } = useTranslation();
 
-  const { data: emptyTrashModalData, close: closeEmptyTrashModal } = useEmptyTrashModal();
+  const { isOpened, pages, opts } = useEmptyTrashModalStatus();
+  const { close: closeEmptyTrashModal } = useEmptyTrashModalActions();
 
-  const isOpened = emptyTrashModalData?.isOpened ?? false;
-
-  const canDeleteAllpages = emptyTrashModalData?.opts?.canDeleteAllPages ?? false;
+  const canDeleteAllpages = opts?.canDeleteAllPages ?? false;
 
   const [errs, setErrs] = useState<Error[] | null>(null);
 
-  async function emptyTrash() {
-    if (emptyTrashModalData == null || emptyTrashModalData.pages == null) {
+  const emptyTrash = useCallback(async() => {
+    if (pages == null) {
       return;
     }
 
     try {
       await apiv3Delete('/pages/empty-trash');
-      const onEmptiedTrash = emptyTrashModalData.opts?.onEmptiedTrash;
+      const onEmptiedTrash = opts?.onEmptiedTrash;
       if (onEmptiedTrash != null) {
         onEmptiedTrash();
       }
@@ -40,15 +37,13 @@ const EmptyTrashModal: FC = () => {
     catch (err) {
       setErrs([err]);
     }
-  }
+  }, [pages, opts?.onEmptiedTrash, closeEmptyTrashModal]);
 
-  async function emptyTrashButtonHandler() {
+  const emptyTrashButtonHandler = useCallback(async() => {
     await emptyTrash();
-  }
+  }, [emptyTrash]);
 
-  const renderPagePaths = () => {
-    const pages = emptyTrashModalData?.pages;
-
+  const renderPagePaths = useCallback(() => {
     if (pages != null) {
       return pages.map(page => (
         <p key={page.data._id} className="mb-1">
@@ -57,7 +52,7 @@ const EmptyTrashModal: FC = () => {
       ));
     }
     return <></>;
-  };
+  }, [pages]);
 
   return (
     <Modal size="lg" isOpen={isOpened} toggle={closeEmptyTrashModal} data-testid="page-delete-modal">

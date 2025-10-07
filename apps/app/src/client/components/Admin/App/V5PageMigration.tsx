@@ -4,13 +4,13 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useAdminSocket } from '~/features/admin/states/socket-io';
 import type {
   PMStartedData, PMMigratingData, PMErrorCountData, PMEndedData,
 } from '~/interfaces/websocket';
 import {
   SocketEventName,
 } from '~/interfaces/websocket';
-import { useGlobalAdminSocket } from '~/stores/websocket';
 
 import AdminAppContainer from '../../../services/AdminAppContainer';
 import { withUnstatedContainers } from '../../UnstatedUtils';
@@ -33,7 +33,7 @@ const V5PageMigration: FC<Props> = (props: Props) => {
   const [current, setCurrent] = useState<number>(0);
   const [isSucceeded, setSucceeded] = useState<boolean | undefined>(undefined);
 
-  const { data: adminSocket } = useGlobalAdminSocket();
+  const adminSocket = useAdminSocket();
   const { t } = useTranslation();
 
   const { adminAppContainer } = props;

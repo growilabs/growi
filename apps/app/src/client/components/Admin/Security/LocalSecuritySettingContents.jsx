@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import Link from 'next/link';
 import PropTypes from 'prop-types';
@@ -7,7 +8,7 @@ import PropTypes from 'prop-types';
 import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 import AdminLocalSecurityContainer from '~/client/services/AdminLocalSecurityContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useIsMailerSetup } from '~/stores-universal/context';
+import { isMailerSetupAtom } from '~/states/server-configurations';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -248,7 +249,7 @@ LocalSecuritySettingContents.propTypes = {
 
 const LocalSecuritySettingContentsWrapperFC = (props) => {
   const { t } = useTranslation('admin');
-  const { data: isMailerSetup } = useIsMailerSetup();
+  const isMailerSetup = useAtomValue(isMailerSetupAtom);
   return <LocalSecuritySettingContents t={t} {...props} isMailerSetup={isMailerSetup ?? false} />;
 };
 

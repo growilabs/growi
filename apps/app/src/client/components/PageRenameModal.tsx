@@ -4,6 +4,7 @@ import React, {
 
 import { isIPageInfoForEntity } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import {
   Collapse, Modal, ModalHeader, ModalBody, ModalFooter,
@@ -12,8 +13,9 @@ import { debounce } from 'throttle-debounce';
 
 import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
 import { toastError } from '~/client/util/toastr';
-import { useSiteUrl, useIsSearchServiceReachable } from '~/stores-universal/context';
-import { usePageRenameModal } from '~/stores/modal';
+import { useSiteUrl } from '~/states/global';
+import { isSearchServiceReachableAtom } from '~/states/server-configurations';
+import { usePageRenameModalStatus, usePageRenameModalActions } from '~/states/ui/modal/page-rename';
 import { useSWRxPageInfo } from '~/stores/page';
 
 import DuplicatedPathsTable from './DuplicatedPathsTable';
@@ -29,12 +31,10 @@ const PageRenameModal = (): JSX.Element => {
   const { t } = useTranslation();
 
   const { isUsersHomepage } = pagePathUtils;
-  const { data: siteUrl } = useSiteUrl();
-  const { data: renameModalData, close: closeRenameModal } = usePageRenameModal();
-  const { data: isReachable } = useIsSearchServiceReachable();
-
-  const isOpened = renameModalData?.isOpened ?? false;
-  const page = renameModalData?.page;
+  const siteUrl = useSiteUrl();
+  const { isOpened, page, opts } = usePageRenameModalStatus();
+  const { close: closeRenameModal } = usePageRenameModalActions();
+  const isReachable = useAtomValue(isSearchServiceReachableAtom);
 
   const shouldFetch = isOpened && page != null && !isIPageInfoForEntity(page.meta);
   const { data: pageInfo } = useSWRxPageInfo(shouldFetch ? page?.data._id : null);
@@ -116,7 +116,7 @@ const PageRenameModal = (): JSX.Element => {
         url.searchParams.append('withRedirect', 'true');
       }
 
-      const onRenamed = renameModalData?.opts?.onRenamed;
+      const onRenamed = opts?.onRenamed;
       if (onRenamed != null) {
         onRenamed(path);
       }
@@ -125,7 +125,7 @@ const PageRenameModal = (): JSX.Element => {
     catch (err) {
       setErrs(err);
     }
-  }, [closeRenameModal, canRename, isRemainMetadata, isRenameRecursively, isRenameRedirect, page, pageNameInput, renameModalData?.opts?.onRenamed]);
+  }, [closeRenameModal, canRename, isRemainMetadata, isRenameRecursively, isRenameRedirect, page, pageNameInput, opts?.onRenamed]);
 
   const checkExistPaths = useCallback(async(fromPath, toPath) => {
     if (page == null) {

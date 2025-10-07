@@ -4,18 +4,20 @@ import type {
   NextPage, GetServerSideProps, GetServerSidePropsContext,
 } from 'next';
 import { useTranslation } from 'next-i18next';
-import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import { useRouter } from 'next/router';
 
 import { NoLoginLayout } from '~/components/Layout/NoLoginLayout';
-import type { CommonProps } from '~/pages/utils/commons';
-import { getServerSideCommonProps, getNextI18NextConfig } from '~/pages/utils/commons';
+import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props';
+import {
+  getServerSideCommonEachProps, getServerSideCommonInitialProps, getServerSideI18nProps,
+} from '~/pages/common-props';
+import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props';
 
 
-type Props = CommonProps;
+type Props = CommonInitialProps & CommonEachProps;
 const classNames: string[] = ['login-page'];
 
-const LoginPage: NextPage<CommonProps> = () => {
+const LoginErrorPage: NextPage<Props> = () => {
 
   const { t } = useTranslation();
   const router = useRouter();
@@ -99,34 +101,19 @@ const LoginPage: NextPage<CommonProps> = () => {
   );
 };
 
-/**
- * for Server Side Translations
- * @param context
- * @param props
- * @param namespacesRequired
- */
-async function injectNextI18NextConfigurations(context: GetServerSidePropsContext, props: Props, namespacesRequired?: string[] | undefined): Promise<void> {
-  const nextI18NextConfig = await getNextI18NextConfig(serverSideTranslations, context, namespacesRequired);
-  props._nextI18Next = nextI18NextConfig._nextI18Next;
-}
-
-
 export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {
-  const result = await getServerSideCommonProps(context);
+  const [
+    commonInitialResult,
+    commonEachResult,
+    i18nPropsResult,
+  ] = await Promise.all([
+    getServerSideCommonInitialProps(context),
+    getServerSideCommonEachProps(context),
+    getServerSideI18nProps(context, ['translation']),
+  ]);
 
-  // check for presence
-  // see: https://github.com/vercel/next.js/issues/19271#issuecomment-730006862
-  if (!('props' in result)) {
-    throw new Error('invalid getSSP result');
-  }
-
-  const props: Props = result.props as Props;
-
-  await injectNextI18NextConfigurations(context, props, ['translation']);
-
-  return {
-    props,
-  };
+  return mergeGetServerSidePropsResults(commonInitialResult,
+    mergeGetServerSidePropsResults(commonEachResult, i18nPropsResult));
 };
 
-export default LoginPage;
+export default LoginErrorPage;

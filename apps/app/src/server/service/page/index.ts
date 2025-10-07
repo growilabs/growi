@@ -7,11 +7,11 @@ import {
   PageStatus, YDocStatus, getIdForRef,
   getIdStringForRef,
 } from '@growi/core';
-import { PageGrant } from '@growi/core/dist/interfaces';
+import { PageGrant, isIPageInfoForEntity } from '@growi/core/dist/interfaces';
 import type {
   Ref, HasObjectId, IUserHasId, IUser,
-  IPage, IPageInfo, IPageInfoAll, IPageInfoForEntity, IGrantedGroup, IRevisionHasId,
-  IDataWithMeta,
+  IPage, IGrantedGroup, IRevisionHasId,
+  IDataWithMeta, IPageNotFoundInfo, IPageInfoExt, IPageInfo, IPageInfoForEntity, IPageInfoForOperation,
 } from '@growi/core/dist/interfaces';
 import {
   pagePathUtils, pathUtils,
@@ -402,8 +402,15 @@ class PageService implements IPageService {
 
   // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   async findPageAndMetaDataByViewer(
-      pageId: string | null, path: string, user?: HydratedDocument<IUser>, includeEmpty = false, isSharedPage = false,
-  ): Promise<IDataWithMeta<HydratedDocument<PageDocument>, IPageInfoAll>|null> {
+      pageId: string | null,
+      path: string,
+      user?: HydratedDocument<IUser>,
+      includeEmpty = false,
+      isSharedPage = false,
+  ): Promise<
+    IDataWithMeta<HydratedDocument<PageDocument>, IPageInfoExt> |
+    IDataWithMeta<null, IPageNotFoundInfo>
+  > {
 
     const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>('Page');
 
@@ -416,45 +423,49 @@ class PageService implements IPageService {
     }
 
     if (page == null) {
-      return null;
+      const count = pageId != null ? await Page.count({ _id: pageId }) : await Page.count({ path });
+      const isForbidden = count > 0;
+      return {
+        data: null,
+        meta: {
+          isNotFound: true,
+          isForbidden,
+        },
+      };
     }
 
     if (isSharedPage) {
       return {
         data: page,
         meta: {
+          isNotFound: page.isEmpty,
           isV5Compatible: isTopPage(page.path) || page.parent != null,
           isEmpty: page.isEmpty,
           isMovable: false,
           isDeletable: false,
           isAbleToDeleteCompletely: false,
           isRevertible: false,
+          bookmarkCount: 0,
         },
       };
     }
 
     const isGuestUser = user == null;
-    const pageInfo = this.constructBasicPageInfo(page, isGuestUser);
 
-    const Bookmark = mongoose.model<BookmarkedPage, { countByPageId, findByPageIdAndUserId }>('Bookmark');
-    const bookmarkCount = await Bookmark.countByPageId(pageId);
+    const Bookmark = mongoose.model<BookmarkedPage, { countDocuments, findByPageIdAndUserId }>('Bookmark');
+    const bookmarkCount: number = await Bookmark.countDocuments({ page: pageId });
 
-    const metadataForGuest = {
-      ...pageInfo,
+    const pageInfo = {
+      ...this.constructBasicPageInfo(page, isGuestUser),
       bookmarkCount,
-    };
+    } satisfies IPageInfo | IPageInfoForEntity;
 
     if (isGuestUser) {
       return {
         data: page,
-        meta: metadataForGuest,
+        meta: pageInfo,
       };
     }
-
-    const isBookmarked: boolean = (await Bookmark.findByPageIdAndUserId(pageId, user._id)) != null;
-    const isLiked: boolean = page.isLiked(user);
-
-    const subscription = await Subscription.findByUserIdAndTargetId(user._id, page._id);
 
     const creatorId = await this.getCreatorIdForCanDelete(page);
 
@@ -463,17 +474,36 @@ class PageService implements IPageService {
     const isDeletable = this.canDelete(page, creatorId, user, false);
     const isAbleToDeleteCompletely = this.canDeleteCompletely(page, creatorId, user, false, userRelatedGroups); // use normal delete config
 
+    if (!isIPageInfoForEntity(pageInfo)) {
+      return {
+        data: page,
+        meta: {
+          ...pageInfo,
+          isDeletable,
+          isAbleToDeleteCompletely,
+        } satisfies IPageInfo,
+      };
+    }
+
+    const isBookmarked: boolean = isGuestUser
+      ? false
+      : (await Bookmark.findByPageIdAndUserId(pageId, user._id)) != null;
+
+    const isLiked: boolean = page.isLiked(user);
+    const subscription = await Subscription.findByUserIdAndTargetId(user._id, page._id);
+
     return {
       data: page,
       meta: {
-        ...metadataForGuest,
+        ...pageInfo,
         isDeletable,
         isAbleToDeleteCompletely,
         isBookmarked,
         isLiked,
         subscriptionStatus: subscription?.status,
-      },
+      } satisfies IPageInfoForOperation,
     };
+
   }
 
   private shouldUseV4ProcessForRevert(page): boolean {
@@ -2536,12 +2566,13 @@ class PageService implements IPageService {
     });
   }
 
-  constructBasicPageInfo(page: PageDocument, isGuestUser?: boolean): IPageInfo | Omit<IPageInfoForEntity, 'bookmarkCount'> {
+  constructBasicPageInfo(page: PageDocument, isGuestUser?: boolean): | Omit<IPageInfo | IPageInfoForEntity, 'bookmarkCount'> {
     const isMovable = isGuestUser ? false : isMovablePage(page.path);
     const isDeletable = !(isGuestUser || isTopPage(page.path) || isUsersTopPage(page.path));
 
     if (page.isEmpty) {
       return {
+        isNotFound: true,
         isV5Compatible: true,
         isEmpty: true,
         isMovable,
@@ -2555,6 +2586,7 @@ class PageService implements IPageService {
     const seenUsers = page.seenUsers.slice(0, 15) as Ref<IUserHasId>[];
 
     const infoForEntity: Omit<IPageInfoForEntity, 'bookmarkCount'> = {
+      isNotFound: false,
       isV5Compatible: isTopPage(page.path) || page.parent != null,
       isEmpty: false,
       sumOfLikers: page.liker.length,

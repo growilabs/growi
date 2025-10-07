@@ -13,7 +13,7 @@ import {
 } from 'reactstrap';
 
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { usePersonalSettings, useSWRxPersonalExternalAccounts } from '~/stores/personal-settings';
+import { useAssociateLdapAccount, useSWRxPersonalExternalAccounts } from '~/stores/personal-settings';
 
 import { LdapAuthTest } from '../Admin/Security/LdapAuthTest';
 
@@ -25,7 +25,7 @@ type Props = {
 const AssociateModal = (props: Props): JSX.Element => {
   const { t } = useTranslation();
   const { mutate: mutatePersonalExternalAccounts } = useSWRxPersonalExternalAccounts();
-  const { associateLdapAccount } = usePersonalSettings();
+  const { trigger: associateLdapAccount, isMutating } = useAssociateLdapAccount();
   const [activeTab, setActiveTab] = useState(1);
   const { isOpen, onClose } = props;
 

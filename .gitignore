@@ -36,6 +36,7 @@ yarn-error.log*
 
 # IDE, dev #
 .idea
+.claude
 *.orig
 *.code-workspace
 

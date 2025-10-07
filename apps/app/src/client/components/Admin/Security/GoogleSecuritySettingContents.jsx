@@ -8,7 +8,7 @@ import urljoin from 'url-join';
 import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 import AdminGoogleSecurityContainer from '~/client/services/AdminGoogleSecurityContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useSiteUrl } from '~/stores-universal/context';
+import { useSiteUrlWithEmptyValueWarn } from '~/states/global';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -200,7 +200,7 @@ class GoogleSecurityManagementContents extends React.Component {
 
 const GoogleSecurityManagementContentsFc = (props) => {
   const { t } = useTranslation('admin');
-  const { data: siteUrl } = useSiteUrl();
+  const siteUrl = useSiteUrlWithEmptyValueWarn();
   return <GoogleSecurityManagementContents t={t} siteUrl={siteUrl} {...props} />;
 };
 

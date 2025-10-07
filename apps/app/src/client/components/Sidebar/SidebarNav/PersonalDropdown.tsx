@@ -10,7 +10,7 @@ import {
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError } from '~/client/util/toastr';
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 
 import { SkeletonItem } from './SkeletonItem';
 
@@ -18,7 +18,7 @@ import styles from './PersonalDropdown.module.scss';
 
 export const PersonalDropdown = (): JSX.Element => {
   const { t } = useTranslation('commons');
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser();
 
   if (currentUser == null) {
     return <SkeletonItem />;

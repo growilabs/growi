@@ -9,7 +9,7 @@ import urljoin from 'url-join';
 import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 import AdminOidcSecurityContainer from '~/client/services/AdminOidcSecurityContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useSiteUrl } from '~/stores-universal/context';
+import { useSiteUrlWithEmptyValueWarn } from '~/states/global';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -476,7 +476,7 @@ OidcSecurityManagementContents.propTypes = {
 
 const OidcSecurityManagementContentsWrapperFC = (props) => {
   const { t } = useTranslation('admin');
-  const { data: siteUrl } = useSiteUrl();
+  const siteUrl = useSiteUrlWithEmptyValueWarn();
   return <OidcSecurityManagementContents t={t} {...props} siteUrl={siteUrl} />;
 };
 

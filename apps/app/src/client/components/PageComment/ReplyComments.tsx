@@ -2,11 +2,12 @@
 import React, { useState, type JSX } from 'react';
 
 import type { IUser } from '@growi/core';
+import { useAtomValue } from 'jotai';
 import { Collapse } from 'reactstrap';
 
 import type { ICommentHasId, ICommentHasIdList } from '~/interfaces/comment';
 import type { RendererOptions } from '~/interfaces/renderer-options';
-import { useIsAllReplyShown } from '~/stores-universal/context';
+import { isAllReplyShownAtom } from '~/states/server-configurations';
 
 
 import { Comment } from './Comment';
@@ -34,7 +35,7 @@ export const ReplyComments = (props: ReplycommentsProps): JSX.Element => {
     pageId, pagePath, deleteBtnClicked, onComment,
   } = props;
 
-  const { data: isAllReplyShown } = useIsAllReplyShown();
+  const isAllReplyShown = useAtomValue(isAllReplyShownAtom);
 
   const [isOlderRepliesShown, setIsOlderRepliesShown] = useState(false);
 

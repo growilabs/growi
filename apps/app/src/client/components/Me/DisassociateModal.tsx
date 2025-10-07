@@ -11,7 +11,7 @@ import {
 
 import { toastSuccess, toastError } from '~/client/util/toastr';
 import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
-import { usePersonalSettings, useSWRxPersonalExternalAccounts } from '~/stores/personal-settings';
+import { useDisassociateLdapAccount, useSWRxPersonalExternalAccounts } from '~/stores/personal-settings';
 
 type Props = {
   isOpen: boolean,
@@ -24,7 +24,7 @@ const DisassociateModal = (props: Props): JSX.Element => {
 
   const { t } = useTranslation();
   const { mutate: mutatePersonalExternalAccounts } = useSWRxPersonalExternalAccounts();
-  const { disassociateLdapAccount } = usePersonalSettings();
+  const { trigger: disassociateLdapAccount } = useDisassociateLdapAccount();
 
   const { providerType, accountId } = props.accountForDisassociate;
 

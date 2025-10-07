@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { DescendantsPageListModal } from './DescendantsPageListModal';
 
 const mockClose = vi.hoisted(() => vi.fn());
-const useIsDeviceLargerThanLg = vi.hoisted(() => vi.fn().mockReturnValue({ data: true }));
+const useDeviceLargerThanLg = vi.hoisted(() => vi.fn().mockReturnValue([true]));
 
 vi.mock('next/router', () => ({
   useRouter: () => ({
@@ -21,8 +21,8 @@ vi.mock('~/stores/modal', () => ({
   }),
 }));
 
-vi.mock('~/stores/ui', () => ({
-  useIsDeviceLargerThanLg,
+vi.mock('~/states/ui/device', () => ({
+  useDeviceLargerThanLg,
 }));
 
 describe('DescendantsPageListModal.tsx', () => {
@@ -54,7 +54,7 @@ describe('DescendantsPageListModal.tsx', () => {
 
   describe('when device is smaller than lg', () => {
     beforeEach(() => {
-      useIsDeviceLargerThanLg.mockReturnValue({ data: false });
+      useDeviceLargerThanLg.mockReturnValue([false]);
     });
 
     it('should render CustomNavDropdown on devices smaller than lg', () => {

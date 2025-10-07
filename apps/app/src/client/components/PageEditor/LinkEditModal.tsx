@@ -5,7 +5,7 @@ import React, {
 import path from 'path';
 
 import { Linker } from '@growi/editor';
-import { useLinkEditModal } from '@growi/editor/dist/client/stores/use-link-edit-modal';
+import { useLinkEditModalStatus, useLinkEditModalActions } from '@growi/editor/dist/states/modal/link-edit';
 import { useTranslation } from 'next-i18next';
 import {
   Modal,
@@ -18,7 +18,7 @@ import {
 import validator from 'validator';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
-import { useCurrentPagePath } from '~/stores/page';
+import { useCurrentPagePath } from '~/states/page';
 import { usePreviewOptions } from '~/stores/renderer';
 import loggerFactory from '~/utils/logger';
 
@@ -34,9 +34,10 @@ const logger = loggerFactory('growi:components:LinkEditModal');
 
 export const LinkEditModal = (): JSX.Element => {
   const { t } = useTranslation();
-  const { data: currentPath } = useCurrentPagePath();
+  const currentPath = useCurrentPagePath();
   const { data: rendererOptions } = usePreviewOptions();
-  const { data: linkEditModalStatus, close } = useLinkEditModal();
+  const linkEditModalStatus = useLinkEditModalStatus();
+  const { close } = useLinkEditModalActions();
 
   const [isUseRelativePath, setIsUseRelativePath] = useState<boolean>(false);
   const [isUsePermanentLink, setIsUsePermanentLink] = useState<boolean>(false);

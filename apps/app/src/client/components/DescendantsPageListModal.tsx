@@ -10,9 +10,9 @@ import {
   Modal, ModalHeader, ModalBody,
 } from 'reactstrap';
 
-import { useIsSharedUser } from '~/stores-universal/context';
-import { useDescendantsPageListModal } from '~/stores/modal';
-import { useIsDeviceLargerThanLg } from '~/stores/ui';
+import { useIsSharedUser } from '~/states/context';
+import { useDeviceLargerThanLg } from '~/states/ui/device';
+import { useDescendantsPageListModalActions, useDescendantsPageListModalStatus } from '~/states/ui/modal/descendants-page-list';
 
 import { CustomNavDropdown, CustomNavTab } from './CustomNavigation/CustomNav';
 import CustomTabContent from './CustomNavigation/CustomTabContent';
@@ -31,13 +31,14 @@ export const DescendantsPageListModal = (): JSX.Element => {
   const [activeTab, setActiveTab] = useState('pagelist');
   const [isWindowExpanded, setIsWindowExpanded] = useState(false);
 
-  const { data: isSharedUser } = useIsSharedUser();
+  const isSharedUser = useIsSharedUser();
 
-  const { data: status, close } = useDescendantsPageListModal();
+  const status = useDescendantsPageListModalStatus();
+  const { close } = useDescendantsPageListModalActions();
 
   const { events } = useRouter();
 
-  const { data: isDeviceLargerThanLg } = useIsDeviceLargerThanLg();
+  const [isDeviceLargerThanLg] = useDeviceLargerThanLg();
 
   useEffect(() => {
     events.on('routeChangeStart', close);

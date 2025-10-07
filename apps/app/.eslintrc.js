@@ -36,6 +36,7 @@ module.exports = {
     'src/migrations/**',
     'src/models/**',
     'src/features/callout/**',
+    'src/features/collaborative-editor/**',
     'src/features/comment/**',
     'src/features/templates/**',
     'src/features/mermaid/**',
@@ -49,6 +50,7 @@ module.exports = {
     'src/stores-universal/**',
     'src/interfaces/**',
     'src/utils/**',
+    'src/states/**',
   ],
   settings: {
     // resolve path aliases by eslint-import-resolver-typescript
@@ -57,6 +59,7 @@ module.exports = {
     },
   },
   rules: {
+    'space-before-function-paren': 'off',
     'no-restricted-imports': ['error', {
       name: 'axios',
       message: 'Please use src/utils/axios instead.',

@@ -39,8 +39,8 @@ const GrantedGroupsInheritanceSelectModal = dynamic(() => import('~/client/compo
 const DeleteBookmarkFolderModal = dynamic(
   () => import('~/client/components/DeleteBookmarkFolderModal').then(mod => mod.DeleteBookmarkFolderModal), { ssr: false },
 );
-const SearchModal = dynamic(() => import('../../features/search/client/components/SearchModal'), { ssr: false });
-const PageBulkExportSelectModal = dynamic(() => import('../../features/page-bulk-export/client/components/PageBulkExportSelectModal'), { ssr: false });
+const SearchModal = dynamic(() => import('~/features/search/client/components/SearchModal'), { ssr: false });
+const PageBulkExportSelectModal = dynamic(() => import('~/features/page-bulk-export/client/components/PageBulkExportSelectModal'), { ssr: false });
 
 const AiAssistantManagementModal = dynamic(
   () => import('~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementModal')
@@ -71,6 +71,7 @@ export const BasicLayout = ({ children, className }: Props): JSX.Element => {
       </div>
 
       <GrowiNavbarBottom />
+      <SearchModal />
 
       <PageCreateModal />
       <PageDuplicateModal />
@@ -81,7 +82,6 @@ export const BasicLayout = ({ children, className }: Props): JSX.Element => {
       <DeleteBookmarkFolderModal />
       <PutbackPageModal />
       <PageSelectModal />
-      <SearchModal />
       <AiAssistantManagementModal />
 
       <PagePresentationModal />

@@ -2,6 +2,7 @@ import React, {
   useState, useEffect, useCallback, useMemo, type JSX,
 } from 'react';
 
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import {
   Modal, ModalHeader, ModalBody, ModalFooter,
@@ -10,8 +11,9 @@ import { debounce } from 'throttle-debounce';
 
 import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
 import { toastError } from '~/client/util/toastr';
-import { useIsSearchServiceReachable, useSiteUrl } from '~/stores-universal/context';
-import { usePageDuplicateModal } from '~/stores/modal';
+import { useSiteUrl } from '~/states/global';
+import { isSearchServiceReachableAtom } from '~/states/server-configurations';
+import { usePageDuplicateModalStatus, usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate';
 
 import DuplicatePathsTable from './DuplicatedPathsTable';
 import ApiErrorMessageList from './PageManagement/ApiErrorMessageList';
@@ -21,13 +23,11 @@ import PagePathAutoComplete from './PagePathAutoComplete';
 const PageDuplicateModal = (): JSX.Element => {
   const { t } = useTranslation();
 
-  const { data: siteUrl } = useSiteUrl();
-  const { data: isReachable } = useIsSearchServiceReachable();
+  const siteUrl = useSiteUrl();
+  const isReachable = useAtomValue(isSearchServiceReachableAtom);
 
-  const { data: duplicateModalData, close: closeDuplicateModal } = usePageDuplicateModal();
-
-  const isOpened = duplicateModalData?.isOpened ?? false;
-  const page = duplicateModalData?.page;
+  const { isOpened, page, opts } = usePageDuplicateModalStatus();
+  const { close: closeDuplicateModal } = usePageDuplicateModalActions();
 
   const [pageNameInput, setPageNameInput] = useState('');
 
@@ -118,7 +118,7 @@ const PageDuplicateModal = (): JSX.Element => {
       const { data } = await apiv3Post('/pages/duplicate', {
         pageId, pageNameInput, isRecursively: isDuplicateRecursively, onlyDuplicateUserRelatedResources,
       });
-      const onDuplicated = duplicateModalData?.opts?.onDuplicated;
+      const onDuplicated = opts?.onDuplicated;
       const fromPath = path;
       const toPath = data.page.path;
 
@@ -130,7 +130,7 @@ const PageDuplicateModal = (): JSX.Element => {
     catch (err) {
       setErrs(err);
     }
-  }, [closeDuplicateModal, duplicateModalData?.opts?.onDuplicated, isDuplicateRecursively, page, pageNameInput, onlyDuplicateUserRelatedResources]);
+  }, [closeDuplicateModal, opts?.onDuplicated, isDuplicateRecursively, page, pageNameInput, onlyDuplicateUserRelatedResources]);
 
   useEffect(() => {
     if (isOpened) {

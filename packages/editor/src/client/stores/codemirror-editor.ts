@@ -1,9 +1,9 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
-import { useSWRStatic } from '@growi/core/dist/swr';
 import { deepEquals } from '@growi/core/dist/utils';
 import type { ReactCodeMirrorProps, UseCodeMirror } from '@uiw/react-codemirror';
-import type { SWRResponse } from 'swr';
+import { atom, useAtom } from 'jotai';
+import { atomFamily } from 'jotai/utils';
 import deepmerge from 'ts-deepmerge';
 
 import { type UseCodeMirrorEditor, useCodeMirrorEditor } from '../services';
@@ -14,14 +14,33 @@ const isValid = (u: UseCodeMirrorEditor) => {
   return u.state != null && u.view != null;
 };
 
+/**
+ * Atom family to store CodeMirror editor instances by key
+ */
+const codeMirrorEditorAtomFamily = atomFamily((_key: string) => atom<UseCodeMirrorEditor | null>(null));
+
+/**
+ * Result type for useCodeMirrorEditorIsolated hook
+ * Compatible with the previous SWRResponse interface for the data field
+ */
+export type CodeMirrorEditorResult = {
+  data: UseCodeMirrorEditor | undefined;
+};
+
+/**
+ * Hook to manage isolated CodeMirror editor instances using Jotai
+ */
 export const useCodeMirrorEditorIsolated = (
     key: string | null, container?: HTMLDivElement | null, props?: ReactCodeMirrorProps,
-): SWRResponse<UseCodeMirrorEditor> => {
+): CodeMirrorEditorResult => {
 
   const ref = useRef<UseCodeMirrorEditor | null>(null);
   const currentData = ref.current;
 
-  const swrKey = key != null ? `codeMirrorEditor_${key}` : null;
+  // Use a default key if null is provided
+  const atomKey = key ?? 'default';
+  const [storedData, setStoredData] = useAtom(codeMirrorEditorAtomFamily(atomKey));
+
   const mergedProps = useMemo<UseCodeMirror>(() => deepmerge(
     { container },
     props ?? {},
@@ -29,14 +48,20 @@ export const useCodeMirrorEditorIsolated = (
 
   const newData = useCodeMirrorEditor(mergedProps);
 
-  const shouldUpdate = swrKey != null && container != null && (
+  const shouldUpdate = key != null && container != null && (
     currentData == null
     || (isValid(newData) && !isDeepEquals(currentData, newData))
   );
 
-  if (shouldUpdate) {
-    ref.current = newData;
-  }
+  // Update atom when data changes
+  useEffect(() => {
+    if (shouldUpdate) {
+      ref.current = newData;
+      setStoredData(newData);
+    }
+  }, [shouldUpdate, newData, setStoredData]);
 
-  return useSWRStatic(swrKey, shouldUpdate ? newData : undefined);
+  return {
+    data: key != null ? storedData ?? undefined : undefined,
+  };
 };

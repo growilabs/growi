@@ -6,7 +6,7 @@ import {
 } from 'reactstrap';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
-import { usePrivateLegacyPagesMigrationModal } from '~/stores/modal';
+import { usePrivateLegacyPagesMigrationModalActions, usePrivateLegacyPagesMigrationModalStatus } from '~/states/ui/modal/private-legacy-pages-migration';
 
 import ApiErrorMessageList from './PageManagement/ApiErrorMessageList';
 
@@ -14,7 +14,8 @@ import ApiErrorMessageList from './PageManagement/ApiErrorMessageList';
 export const PrivateLegacyPagesMigrationModal = (): JSX.Element => {
   const { t } = useTranslation();
 
-  const { data: status, close } = usePrivateLegacyPagesMigrationModal();
+  const status = usePrivateLegacyPagesMigrationModalStatus();
+  const { close } = usePrivateLegacyPagesMigrationModalActions();
 
   const isOpened = status?.isOpened ?? false;
 
@@ -28,7 +29,7 @@ export const PrivateLegacyPagesMigrationModal = (): JSX.Element => {
       return;
     }
 
-    const { pages, onSubmited } = status;
+    const { pages, onSubmit } = status;
     const pageIds = pages.map(page => page.pageId);
     try {
       await apiv3Post<void>('/pages/legacy-pages-migration', {
@@ -36,8 +37,8 @@ export const PrivateLegacyPagesMigrationModal = (): JSX.Element => {
         isRecursively: isRecursively ? true : undefined,
       });
 
-      if (onSubmited != null) {
-        onSubmited(pages, isRecursively);
+      if (onSubmit != null) {
+        onSubmit(pages, isRecursively);
       }
     }
     catch (err) {

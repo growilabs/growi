@@ -11,7 +11,7 @@ import urljoin from 'url-join';
 import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 import AdminSamlSecurityContainer from '~/client/services/AdminSamlSecurityContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useSiteUrl } from '~/stores-universal/context';
+import { useSiteUrlWithEmptyValueWarn } from '~/states/global';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -546,12 +546,12 @@ SamlSecurityManagementContents.propTypes = {
   t: PropTypes.func.isRequired, // i18next
   adminGeneralSecurityContainer: PropTypes.instanceOf(AdminGeneralSecurityContainer).isRequired,
   adminSamlSecurityContainer: PropTypes.instanceOf(AdminSamlSecurityContainer).isRequired,
-  siteUrl: PropTypes.string,
+  siteUrl: PropTypes.string.isRequired,
 };
 
 const SamlSecurityManagementContentsWrapperFC = (props) => {
   const { t } = useTranslation('admin');
-  const { data: siteUrl } = useSiteUrl();
+  const siteUrl = useSiteUrlWithEmptyValueWarn();
   return <SamlSecurityManagementContents t={t} siteUrl={siteUrl} {...props} />;
 };
 

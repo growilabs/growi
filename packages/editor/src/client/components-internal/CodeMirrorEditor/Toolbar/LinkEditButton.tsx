@@ -3,9 +3,9 @@ import { useCallback, type JSX } from 'react';
 import { DropdownItem } from 'reactstrap';
 
 import type { GlobalCodeMirrorEditorKey } from '../../../../consts';
+import { useLinkEditModalActions } from '../../../../states/modal/link-edit';
 import { getMarkdownLink, replaceFocusedMarkdownLinkWithEditor } from '../../../services-internal';
 import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
-import { useLinkEditModal } from '../../../stores/use-link-edit-modal';
 
 
 type Props = {
@@ -14,7 +14,7 @@ type Props = {
 
 export const LinkEditButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
-  const { open: openLinkEditModal } = useLinkEditModal();
+  const { open: openLinkEditModal } = useLinkEditModalActions();
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(editorKey);
 
   const onClickOpenLinkEditModal = useCallback(() => {

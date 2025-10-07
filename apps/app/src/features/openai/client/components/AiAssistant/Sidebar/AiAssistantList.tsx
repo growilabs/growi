@@ -6,13 +6,14 @@ import { useTranslation } from 'react-i18next';
 import { Collapse } from 'reactstrap';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 import loggerFactory from '~/utils/logger';
 
 import { AiAssistantShareScope, type AiAssistantHasId } from '../../../../interfaces/ai-assistant';
 import { determineShareScope } from '../../../../utils/determine-share-scope';
 import { deleteAiAssistant, setDefaultAiAssistant } from '../../../services/ai-assistant';
-import { useAiAssistantSidebar, useAiAssistantManagementModal } from '../../../stores/ai-assistant';
+import { useAiAssistantSidebarActions } from '../../../states';
+import { useAiAssistantManagementModalActions } from '../../../states/modal/ai-assistant-management';
 import { getShareScopeIcon } from '../../../utils/get-share-scope-Icon';
 
 import { DeleteAiAssistantModal } from './DeleteAiAssistantModal';
@@ -144,9 +145,9 @@ export const AiAssistantList: React.FC<AiAssistantListProps> = ({
   isTeamAssistant, aiAssistants, onUpdated, onDeleted, onCollapsed,
 }) => {
   const { t } = useTranslation();
-  const { openChat } = useAiAssistantSidebar();
-  const { data: currentUser } = useCurrentUser();
-  const { open: openAiAssistantManagementModal } = useAiAssistantManagementModal();
+  const { openChat } = useAiAssistantSidebarActions();
+  const currentUser = useCurrentUser();
+  const { open: openAiAssistantManagementModal } = useAiAssistantManagementModalActions();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
 

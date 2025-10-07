@@ -3,7 +3,6 @@ import {
 } from 'react';
 
 import { AcceptedUploadFileType } from '@growi/core';
-import { GLOBAL_SOCKET_KEY, GLOBAL_SOCKET_NS, useSWRStatic } from '@growi/core/dist/swr';
 import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
 import { toast } from 'react-toastify';
 
@@ -16,6 +15,7 @@ import { useCodeMirrorEditorIsolated } from '../../stores/codemirror-editor';
 
 import { PlaygroundController } from './PlaygroundController';
 import { Preview } from './Preview';
+import { useSetupPlaygroundSocket } from './states/socket';
 
 export const Playground = (): JSX.Element => {
 
@@ -28,7 +28,8 @@ export const Playground = (): JSX.Element => {
 
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.MAIN);
 
-  const { mutate } = useSWRStatic(GLOBAL_SOCKET_KEY);
+  // Initialize playground socket
+  useSetupPlaygroundSocket();
 
   // initial caret line
   useEffect(() => {
@@ -44,26 +45,6 @@ export const Playground = (): JSX.Element => {
       pasteMode: editorPaste,
     });
   }, [setEditorSettings, editorKeymap, editorTheme, editorPaste]);
-
-  // initialize global socket
-  useEffect(() => {
-    const setUpSocket = async() => {
-      const { io } = await import('socket.io-client');
-      const socket = io(GLOBAL_SOCKET_NS, {
-        transports: ['websocket'],
-      });
-
-      // eslint-disable-next-line no-console
-      socket.on('error', (err) => { console.error(err) });
-      // eslint-disable-next-line no-console
-      socket.on('connect_error', (err) => { console.error('Failed to connect with websocket.', err) });
-
-      mutate(socket);
-    };
-
-    setUpSocket();
-
-  }, [mutate]);
 
   // set handler to save with shortcut key
   const saveHandler = useCallback(() => {

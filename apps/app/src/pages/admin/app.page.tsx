@@ -1,64 +1,30 @@
-import { useEffect, useMemo } from 'react';
-
-import type {
-  NextPage, GetServerSideProps, GetServerSidePropsContext,
-} from 'next';
-import { useTranslation } from 'next-i18next';
+import type { GetServerSideProps } from 'next';
 import dynamic from 'next/dynamic';
-import Head from 'next/head';
-import type { Container } from 'unstated';
-import { Provider } from 'unstated';
 
-import type { CommonProps } from '~/pages/utils/commons';
-import { generateCustomTitle } from '~/pages/utils/commons';
-import { useCurrentUser } from '~/stores-universal/context';
-import { useIsMaintenanceMode } from '~/stores/maintenanceMode';
+import type { NextPageWithLayout } from '../_app.page';
 
-import { retrieveServerSideProps } from '../../utils/admin-page-util';
+import type { AdminCommonProps } from './_shared';
+import { createAdminPageLayout, getServerSideAdminCommonProps } from './_shared';
 
 
-const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), { ssr: false });
 const AppSettingsPageContents = dynamic(() => import('~/client/components/Admin/App/AppSettingsPageContents'), { ssr: false });
-const ForbiddenPage = dynamic(() => import('~/client/components/Admin/ForbiddenPage').then(mod => mod.ForbiddenPage), { ssr: false });
 
+type Props = AdminCommonProps;
 
-const AdminAppPage: NextPage<CommonProps> = (props) => {
-  const { t } = useTranslation('commons');
-  useIsMaintenanceMode(props.isMaintenanceMode);
-  useCurrentUser(props.currentUser ?? null);
+const AdminAppPage: NextPageWithLayout<Props> = () => <AppSettingsPageContents />;
 
-  const injectableContainers: Container<any>[] = useMemo(() => [], []);
-
-  useEffect(() => {
-    (async() => {
+AdminAppPage.getLayout = createAdminPageLayout<Props>({
+  title: (_p, t) => t('headers.app_settings', { ns: 'commons' }),
+  containerFactories: [
+    async() => {
       const AdminAppContainer = (await import('~/client/services/AdminAppContainer')).default;
-      const adminAppContainer = new AdminAppContainer();
-      injectableContainers.push(adminAppContainer);
-    })();
-  }, [injectableContainers]);
+      return new AdminAppContainer();
+    },
+  ],
+});
 
-  const title = generateCustomTitle(props, t('headers.app_settings'));
-
-  if (props.isAccessDeniedForNonAdminUser) {
-    return <ForbiddenPage />;
-  }
-
-  return (
-    <Provider inject={[...injectableContainers]}>
-      <AdminLayout componentTitle={title}>
-        <Head>
-          <title>{title}</title>
-        </Head>
-        <AppSettingsPageContents />
-      </AdminLayout>
-    </Provider>
-  );
+export const getServerSideProps: GetServerSideProps = async(context) => {
+  return getServerSideAdminCommonProps(context, { preloadAllLang: true });
 };
-
-export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {
-  const props = await retrieveServerSideProps(context);
-  return props;
-};
-
 
 export default AdminAppPage;

@@ -2,7 +2,7 @@ import React from 'react';
 
 import { useTranslation } from 'react-i18next';
 
-import { useAiAssistantManagementModal, AiAssistantManagementModalPageMode } from '../../../stores/ai-assistant';
+import { useAiAssistantManagementModalActions, AiAssistantManagementModalPageMode } from '../../../states/modal/ai-assistant-management';
 
 import styles from './PageSelectionMethodButtons.module.scss';
 
@@ -30,7 +30,7 @@ const SelectionButton = (props: { icon: string, label: string, onClick: () => vo
 
 export const PageSelectionMethodButtons = (): JSX.Element => {
   const { t } = useTranslation();
-  const { changePageMode } = useAiAssistantManagementModal();
+  const { changePageMode } = useAiAssistantManagementModalActions();
 
   return (
     <div className={moduleClass}>

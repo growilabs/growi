@@ -1,9 +1,8 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 import { PLUGIN_STORING_PATH } from '../../consts';
 import { GrowiPlugin } from '../../models';
-
 import { growiPluginService } from './growi-plugin';
 
 describe('Installing a GROWI template plugin', () => {

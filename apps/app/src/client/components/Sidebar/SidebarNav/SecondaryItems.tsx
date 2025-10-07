@@ -4,7 +4,8 @@ import { memo } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
-import { useIsGuestUser, useGrowiCloudUri, useIsAdmin } from '~/stores-universal/context';
+import { useIsAdmin, useIsGuestUser } from '~/states/context';
+import { useGrowiCloudUri } from '~/states/global';
 
 import { SkeletonItem } from './SkeletonItem';
 
@@ -41,9 +42,9 @@ const SecondaryItem: FC<SecondaryItemProps> = (props: SecondaryItemProps) => {
 
 export const SecondaryItems: FC = memo(() => {
 
-  const { data: isAdmin } = useIsAdmin();
-  const { data: growiCloudUri } = useGrowiCloudUri();
-  const { data: isGuestUser } = useIsGuestUser();
+  const isAdmin = useIsAdmin();
+  const growiCloudUri = useGrowiCloudUri();
+  const isGuestUser = useIsGuestUser();
 
   return (
     <div className={styles['grw-secondary-items']}>

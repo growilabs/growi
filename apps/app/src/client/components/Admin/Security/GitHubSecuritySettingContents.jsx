@@ -10,7 +10,7 @@ import urljoin from 'url-join';
 import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 import AdminGitHubSecurityContainer from '~/client/services/AdminGitHubSecurityContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useSiteUrl } from '~/stores-universal/context';
+import { useSiteUrlWithEmptyValueWarn } from '~/states/global';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -194,7 +194,7 @@ class GitHubSecurityManagementContents extends React.Component {
 
 const GitHubSecurityManagementContentsFC = (props) => {
   const { t } = useTranslation('admin');
-  const { data: siteUrl } = useSiteUrl();
+  const siteUrl = useSiteUrlWithEmptyValueWarn();
   return <GitHubSecurityManagementContents t={t} siteUrl={siteUrl} {...props} />;
 };
 
@@ -210,6 +210,7 @@ GitHubSecurityManagementContents.propTypes = {
   t: PropTypes.func.isRequired, // i18next
   adminGeneralSecurityContainer: PropTypes.instanceOf(AdminGeneralSecurityContainer).isRequired,
   adminGitHubSecurityContainer: PropTypes.instanceOf(AdminGitHubSecurityContainer).isRequired,
+  siteUrl: PropTypes.string.isRequired,
 };
 
 export default GitHubSecurityManagementContentsWrapper;

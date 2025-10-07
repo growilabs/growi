@@ -4,13 +4,13 @@ import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
 
 import ItemsTreeContentSkeleton from '~/client/components/ItemsTree/ItemsTreeContentSkeleton';
-import { useIsGuestUser } from '~/stores-universal/context';
+import { useIsGuestUser } from '~/states/context';
 
 const AiAssistantContent = dynamic(() => import('./AiAssistantSubstance').then(mod => mod.AiAssistantContent), { ssr: false });
 
 export const AiAssistant = (): JSX.Element => {
   const { t } = useTranslation();
-  const { data: isGuestUser } = useIsGuestUser();
+  const isGuestUser = useIsGuestUser();
 
   return (
     <div className="px-3">

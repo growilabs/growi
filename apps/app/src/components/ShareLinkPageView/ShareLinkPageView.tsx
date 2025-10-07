@@ -1,6 +1,5 @@
-import { useMemo, type JSX } from 'react';
+import { useMemo, memo, type JSX } from 'react';
 
-import type { IPagePopulatedToShowRevision } from '@growi/core';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 import dynamic from 'next/dynamic';
 
@@ -9,7 +8,7 @@ import type { RendererConfig } from '~/interfaces/services/renderer';
 import type { IShareLinkHasId } from '~/interfaces/share-link';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
 import { generateSSRViewOptions } from '~/services/renderer/renderer';
-import { useIsNotFound } from '~/stores/page';
+import { useCurrentPageData, usePageNotFound } from '~/states/page';
 import { useViewOptions } from '~/stores/renderer';
 import loggerFactory from '~/utils/logger';
 
@@ -20,7 +19,7 @@ import RevisionRenderer from '../PageView/RevisionRenderer';
 import ShareLinkAlert from './ShareLinkAlert';
 
 
-const logger = loggerFactory('growi:Page');
+const logger = loggerFactory('growi:components:ShareLinkPageView');
 
 
 const PageSideContents = dynamic(() => import('~/client/components/PageSideContents').then(mod => mod.PageSideContents), { ssr: false });
@@ -30,20 +29,21 @@ const SlideRenderer = dynamic(() => import('~/client/components/Page/SlideRender
 type Props = {
   pagePath: string,
   rendererConfig: RendererConfig,
-  page?: IPagePopulatedToShowRevision,
   shareLink?: IShareLinkHasId,
-  isExpired: boolean,
+  isExpired?: boolean,
   disableLinkSharing: boolean,
 }
 
-export const ShareLinkPageView = (props: Props): JSX.Element => {
+export const ShareLinkPageView = memo((props: Props): JSX.Element => {
   const {
     pagePath, rendererConfig,
-    page, shareLink,
+    shareLink,
     isExpired, disableLinkSharing,
   } = props;
 
-  const { data: isNotFoundMeta } = useIsNotFound();
+  const isNotFoundMeta = usePageNotFound();
+
+  const page = useCurrentPageData();
 
   const { data: viewOptions } = useViewOptions();
 
@@ -128,4 +128,5 @@ export const ShareLinkPageView = (props: Props): JSX.Element => {
       ) }
     </PageViewLayout>
   );
-};
+});
+ShareLinkPageView.displayName = 'ShareLinkPageView';

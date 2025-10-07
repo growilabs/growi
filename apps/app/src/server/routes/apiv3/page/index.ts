@@ -2,8 +2,11 @@ import path from 'path';
 import { type Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 
-import type { IPage, IRevision } from '@growi/core';
+import type {
+  IDataWithMeta, IPage, IPageInfoExt, IPageNotFoundInfo, IRevision,
+} from '@growi/core';
 import {
+  isIPageNotFoundInfo,
   AllSubscriptionStatusType, PageGrant, SCOPE, SubscriptionStatusType,
   getIdForRef,
 } from '@growi/core';
@@ -183,21 +186,21 @@ module.exports = (crowi) => {
         return res.apiv3Err(new Error('Either parameter of (pageId or path) or (pageId and shareLinkId) is required.'), 400);
       }
 
-      let page;
+      let pageWithMeta: IDataWithMeta<HydratedDocument<PageDocument>, IPageInfoExt> | IDataWithMeta<null, IPageNotFoundInfo> = {
+        data: null,
+      };
       let pages;
       try {
         if (isSharedPage) {
           const shareLink = await ShareLink.findOne({ _id: { $eq: shareLinkId } });
           if (shareLink == null) {
-            throw new Error('ShareLink is not found');
+            return res.apiv3Err('ShareLink is not found', 404);
           }
-          page = await Page.findOne({ _id: getIdForRef(shareLink.relatedPage) });
-        }
-        else if (pageId != null) { // prioritized
-          page = await Page.findByIdAndViewer(pageId, user);
+          // page = await Page.findOne({ _id: getIdForRef(shareLink.relatedPage) });
+          pageWithMeta = await pageService.findPageAndMetaDataByShareLink(getIdForRef(shareLink.relatedPage), path, user, false, true);
         }
         else if (!findAll) {
-          page = await Page.findByPathAndViewer(path, user, null, true, false);
+          pageWithMeta = await pageService.findPageAndMetaDataByViewer(pageId, path, user, false);
         }
         else {
           pages = await Page.findByPathAndViewer(path, user, null, false, includeEmpty);
@@ -208,8 +211,15 @@ module.exports = (crowi) => {
         return res.apiv3Err(err, 500);
       }
 
+      let { data: page } = pageWithMeta;
+      const { meta } = pageWithMeta;
+
+      // not found or forbidden
       if (page == null && (pages == null || pages.length === 0)) {
-        return res.apiv3Err('Page is not found', 404);
+        if (isIPageNotFoundInfo(meta) && meta.isForbidden) {
+          return res.apiv3Err(new ErrorV3('Page is forbidden', 'page-not-found', undefined, meta), 403);
+        }
+        return res.apiv3Err(new ErrorV3('Page is not found', 'page-not-found', undefined, meta), 404);
       }
 
       if (page != null) {
@@ -221,11 +231,11 @@ module.exports = (crowi) => {
         }
         catch (err) {
           logger.error('populate-page-failed', err);
-          return res.apiv3Err(err, 500);
+          return res.apiv3Err(new ErrorV3('Failed to populate page', 'populate-page-failed', undefined, { err, meta }), 500);
         }
       }
 
-      return res.apiv3({ page, pages });
+      return res.apiv3({ page, pages, meta });
     });
 
   router.get('/page-paths-with-descendant-count', getPagePathsWithDescendantCountFactory(crowi));

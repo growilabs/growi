@@ -13,8 +13,8 @@ import { useTranslation } from 'react-i18next';
 import { type Text as YText } from 'yjs';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
-import { useIsEnableUnifiedMergeView } from '~/stores-universal/context';
-import { useCurrentPageId } from '~/stores/page';
+import { useCurrentPageId } from '~/states/page';
+
 
 import type { AiAssistantHasId } from '../../../interfaces/ai-assistant';
 import {
@@ -32,7 +32,7 @@ import { ThreadType } from '../../../interfaces/thread-relation';
 import { handleIfSuccessfullyParsed } from '../../../utils/handle-if-successfully-parsed';
 import { AiAssistantDropdown } from '../../components/AiAssistant/AiAssistantSidebar/AiAssistantDropdown';
 import { QuickMenuList } from '../../components/AiAssistant/AiAssistantSidebar/QuickMenuList';
-import { useAiAssistantSidebar } from '../../stores/ai-assistant';
+import { useIsEnableUnifiedMergeView, useUnifiedMergeViewActions, useAiAssistantSidebarStatus } from '../../states';
 import { useClientEngineIntegration, shouldUseClientProcessing } from '../client-engine-integration';
 
 import { getPageBodyForContext } from './get-page-body-for-context';
@@ -139,11 +139,12 @@ export const useEditorAssistant: UseEditorAssistant = () => {
 
   // Hooks
   const { t } = useTranslation();
-  const { data: currentPageId } = useCurrentPageId();
-  const { data: isEnableUnifiedMergeView, mutate: mutateIsEnableUnifiedMergeView } = useIsEnableUnifiedMergeView();
+  const currentPageId = useCurrentPageId();
+  const isEnableUnifiedMergeView = useIsEnableUnifiedMergeView();
+  const { disable: disableUnifiedMergeView, enable: enableUnifiedMergeView } = useUnifiedMergeViewActions();
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.MAIN);
   const yDocs = useSecondaryYdocs(isEnableUnifiedMergeView ?? false, { pageId: currentPageId ?? undefined, useSecondary: isEnableUnifiedMergeView ?? false });
-  const { data: aiAssistantSidebarData } = useAiAssistantSidebar();
+  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
   const clientEngine = useClientEngineIntegration({
     enableClientProcessing: shouldUseClientProcessing(),
     enableServerFallback: true,
@@ -161,7 +162,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
     form.reset({ input: '' });
   }, [form]);
 
-  const createThread: CreateThread = useCallback(async() => {
+  const createThread: CreateThread = useCallback(async () => {
     const response = await apiv3Post<IThreadRelationHasId>('/openai/thread', {
       type: ThreadType.EDITOR,
       aiAssistantId: selectedAiAssistant?._id,
@@ -169,12 +170,12 @@ export const useEditorAssistant: UseEditorAssistant = () => {
     return response.data;
   }, [selectedAiAssistant?._id]);
 
-  const postMessage: PostMessage = useCallback(async({ threadId, formData }) => {
+  const postMessage: PostMessage = useCallback(async ({ threadId, formData }) => {
     // Clear partial content info on new request
     setPartialContentInfo(null);
 
     // Disable UnifiedMergeView when a Form is submitted with UnifiedMergeView enabled
-    mutateIsEnableUnifiedMergeView(false);
+    disableUnifiedMergeView();
 
     const pageBodyContext = getPageBodyForContext(codeMirrorEditor, 2000, 8000);
 
@@ -212,18 +213,18 @@ export const useEditorAssistant: UseEditorAssistant = () => {
     });
 
     return response;
-  }, [codeMirrorEditor, mutateIsEnableUnifiedMergeView, selectedAiAssistant?._id, selectedText, selectedTextIndex]);
+  }, [codeMirrorEditor, disableUnifiedMergeView, selectedAiAssistant?._id, selectedText, selectedTextIndex]);
 
 
   // Enhanced processMessage with client engine support (保持)
-  const processMessage = useCallback(async(data: unknown, handler: {
+  const processMessage = useCallback(async (data: unknown, handler: {
     onMessage: (data: SseMessage) => void;
     onDetectedDiff: (data: SseDetectedDiff) => void;
     onFinalized: (data: SseFinalized) => void;
   }) => {
     // Reset timer whenever data is received
     const handleDataReceived = () => {
-    // Clear existing timer
+      // Clear existing timer
       if (timerRef.current != null) {
         clearTimeout(timerRef.current);
       }
@@ -244,9 +245,9 @@ export const useEditorAssistant: UseEditorAssistant = () => {
       handler.onMessage(data);
     });
 
-    handleIfSuccessfullyParsed(data, SseDetectedDiffSchema, async(diffData: SseDetectedDiff) => {
+    handleIfSuccessfullyParsed(data, SseDetectedDiffSchema, async (diffData: SseDetectedDiff) => {
       handleDataReceived();
-      mutateIsEnableUnifiedMergeView(true);
+      enableUnifiedMergeView();
 
       // Check if client engine processing is enabled
       if (clientEngine.isClientProcessingEnabled && yDocs?.secondaryDoc != null) {
@@ -259,7 +260,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
           const result = await clientEngine.processHybrid(
             currentContent,
             [diffData],
-            async() => {
+            async () => {
               // Fallback to original server-side processing
               setDetectedDiff((prev) => {
                 const newData = { data: diffData, applied: false, id: crypto.randomUUID() };
@@ -299,7 +300,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
     handleIfSuccessfullyParsed(data, SseFinalizedSchema, (data: SseFinalized) => {
       handler.onFinalized(data);
     });
-  }, [isGeneratingEditorText, mutateIsEnableUnifiedMergeView, clientEngine, yDocs]);
+  }, [isGeneratingEditorText, enableUnifiedMergeView, clientEngine, yDocs]);
 
   const selectTextHandler = useCallback(({ selectedText, selectedTextIndex, selectedTextFirstLineNumber }) => {
     setSelectedText(selectedText);
@@ -384,7 +385,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
       setSelectedAiAssistant(aiAssistant);
     };
 
-    const clickQuickMenuHandler = async(quickMenu: string) => {
+    const clickQuickMenuHandler = async (quickMenu: string) => {
       await onSubmit({ input: quickMenu, markdownType: 'full' });
     };
 
@@ -434,11 +435,11 @@ export const useEditorAssistant: UseEditorAssistant = () => {
       }
 
       acceptAllChunks(codeMirrorEditor.view);
-      mutateIsEnableUnifiedMergeView(false);
+      disableUnifiedMergeView();
     };
 
     const reject = () => {
-      mutateIsEnableUnifiedMergeView(false);
+      disableUnifiedMergeView();
     };
 
     if (!isActionButtonShown) {
@@ -463,7 +464,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
         </button>
       </div>
     );
-  }, [aiAssistantSidebarData?.isEditorAssistant, codeMirrorEditor?.view, isEnableUnifiedMergeView, mutateIsEnableUnifiedMergeView, t]);
+  }, [aiAssistantSidebarData?.isEditorAssistant, codeMirrorEditor?.view, isEnableUnifiedMergeView, disableUnifiedMergeView, t]);
 
   const generatingEditorTextLabel = useMemo(() => {
     return (

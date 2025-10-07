@@ -9,7 +9,7 @@ import { useSWRMUTxThreads, useSWRINFxRecentThreads } from '~/features/openai/cl
 import loggerFactory from '~/utils/logger';
 
 import { deleteThread } from '../../../services/thread';
-import { useAiAssistantSidebar } from '../../../stores/ai-assistant';
+import { useAiAssistantSidebarStatus, useAiAssistantSidebarActions } from '../../../states';
 
 const logger = loggerFactory('growi:openai:client:components:ThreadList');
 
@@ -17,7 +17,8 @@ export const ThreadList: React.FC = () => {
   const swrInifiniteThreads = useSWRINFxRecentThreads();
   const { t } = useTranslation();
   const { data, mutate: mutateRecentThreads } = swrInifiniteThreads;
-  const { openChat, data: aiAssistantSidebarData, close: closeAiAssistantSidebar } = useAiAssistantSidebar();
+  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
+  const { openChat, close: closeAiAssistantSidebar } = useAiAssistantSidebarActions();
   const { trigger: mutateAssistantThreadData } = useSWRMUTxThreads(aiAssistantSidebarData?.aiAssistantData?._id);
 
   const isEmpty = data?.[0]?.paginateResult.totalDocs === 0;

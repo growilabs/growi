@@ -10,10 +10,10 @@ import {
   Modal, ModalBody,
 } from 'reactstrap';
 
-import { useIsEnabledMarp } from '~/stores-universal/context';
+import { useCurrentPageData } from '~/states/page';
+import { useRendererConfig } from '~/states/server-configurations';
+import { usePresentationModalActions, usePresentationModalStatus } from '~/states/ui/modal/page-presentation';
 import { useNextThemes } from '~/stores-universal/use-next-themes';
-import { usePagePresentationModal } from '~/stores/modal';
-import { useSWRxCurrentPage } from '~/stores/page';
 import { usePresentationViewOptions } from '~/stores/renderer';
 
 import { RendererErrorMessage } from './Common/RendererErrorMessage';
@@ -33,15 +33,16 @@ const Presentation = dynamic<PresentationProps>(() => import('./Presentation/Pre
 
 const PagePresentationModal = (): JSX.Element => {
 
-  const { data: presentationModalData, close: closePresentationModal } = usePagePresentationModal();
+  const presentationModalData = usePresentationModalStatus();
+  const { close: closePresentationModal } = usePresentationModalActions();
 
   const { isDarkMode } = useNextThemes();
   const fullscreen = useFullScreen();
 
-  const { data: currentPage } = useSWRxCurrentPage();
+  const currentPage = useCurrentPageData();
   const { data: rendererOptions, isLoading } = usePresentationViewOptions();
 
-  const { data: isEnabledMarp } = useIsEnabledMarp();
+  const { isEnabledMarp } = useRendererConfig();
 
   const markdown = currentPage?.revision?.body;
 

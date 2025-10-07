@@ -5,12 +5,14 @@ import { format } from 'date-fns/format';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'react-i18next';
 
-import { usePageDeleteModal, usePutBackPageModal } from '~/stores/modal';
 import {
-  useCurrentPagePath, useSWRxPageInfo, useSWRxCurrentPage, useIsTrashPage, useSWRMUTxCurrentPage,
-} from '~/stores/page';
+  useCurrentPageData, useCurrentPagePath, useIsTrashPage, useFetchCurrentPage,
+} from '~/states/page';
+import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
+import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page';
+import { useIsAbleToShowTrashPageManagementButtons } from '~/states/ui/page-abilities';
+import { useSWRxPageInfo } from '~/stores/page';
 import { mutateRecentlyUpdated } from '~/stores/page-listing';
-import { useIsAbleToShowTrashPageManagementButtons } from '~/stores/ui';
 
 
 const onDeletedHandler = (pathOrPathsToDelete) => {
@@ -25,18 +27,18 @@ export const TrashPageAlert = (): JSX.Element => {
   const { t } = useTranslation();
   const router = useRouter();
 
-  const { data: isAbleToShowTrashPageManagementButtons } = useIsAbleToShowTrashPageManagementButtons();
-  const { data: pageData } = useSWRxCurrentPage();
-  const { data: isTrashPage } = useIsTrashPage();
+  const isAbleToShowTrashPageManagementButtons = useIsAbleToShowTrashPageManagementButtons();
+  const pageData = useCurrentPageData();
+  const isTrashPage = useIsTrashPage();
   const pageId = pageData?._id;
   const pagePath = pageData?.path;
   const { data: pageInfo } = useSWRxPageInfo(pageId ?? null);
 
-  const { open: openDeleteModal } = usePageDeleteModal();
-  const { open: openPutBackPageModal } = usePutBackPageModal();
-  const { data: currentPagePath } = useCurrentPagePath();
+  const { open: openDeleteModal } = usePageDeleteModalActions();
+  const { open: openPutBackPageModal } = usePutBackPageModalActions();
+  const currentPagePath = useCurrentPagePath();
 
-  const { trigger: mutateCurrentPage } = useSWRMUTxCurrentPage();
+  const { fetchCurrentPage } = useFetchCurrentPage();
 
   const deleteUser = pageData?.deleteUser;
   const deletedAt = pageData?.deletedAt ? format(new Date(pageData?.deletedAt), 'yyyy/MM/dd HH:mm') : '';
@@ -48,7 +50,7 @@ export const TrashPageAlert = (): JSX.Element => {
     if (isEmptyPage) {
       return;
     }
-    const putBackedHandler = async() => {
+    const putBackedHandler = async () => {
       if (currentPagePath == null) {
         return;
       }
@@ -57,7 +59,7 @@ export const TrashPageAlert = (): JSX.Element => {
         unlink(currentPagePath);
 
         router.push(`/${pageId}`);
-        mutateCurrentPage();
+        fetchCurrentPage();
         mutateRecentlyUpdated();
       }
       catch (err) {
@@ -66,7 +68,7 @@ export const TrashPageAlert = (): JSX.Element => {
       }
     };
     openPutBackPageModal({ pageId, path: pagePath }, { onPutBacked: putBackedHandler });
-  }, [currentPagePath, mutateCurrentPage, openPutBackPageModal, pageId, pagePath, router, isEmptyPage]);
+  }, [isEmptyPage, openPutBackPageModal, pageId, pagePath, currentPagePath, router, fetchCurrentPage]);
 
   const openPageDeleteModalHandler = useCallback(() => {
     // User cannot operate empty page.

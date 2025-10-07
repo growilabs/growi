@@ -1,62 +1,26 @@
-import { useEffect, useMemo } from 'react';
-
-import type {
-  NextPage, GetServerSideProps, GetServerSidePropsContext,
-} from 'next';
-import { useTranslation } from 'next-i18next';
+import type { GetServerSideProps } from 'next';
 import dynamic from 'next/dynamic';
-import Head from 'next/head';
-import type { Container } from 'unstated';
-import { Provider } from 'unstated';
 
-import type { CommonProps } from '~/pages/utils/commons';
-import { useCurrentUser } from '~/stores-universal/context';
+import type { NextPageWithLayout } from '../../_app.page';
+import type { AdminCommonProps } from '../_shared';
+import { createAdminPageLayout, getServerSideAdminCommonProps } from '../_shared';
 
-import { retrieveServerSideProps } from '../../../utils/admin-page-util';
-
-const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), { ssr: false });
 const ManageGlobalNotification = dynamic(() => import('~/client/components/Admin/Notification/ManageGlobalNotification'), { ssr: false });
-const ForbiddenPage = dynamic(() => import('~/client/components/Admin/ForbiddenPage').then(mod => mod.ForbiddenPage), { ssr: false });
 
+type Props = AdminCommonProps;
 
-const AdminGlobalNotificationNewPage: NextPage<CommonProps> = (props) => {
-  const { t } = useTranslation('admin');
-  useCurrentUser(props.currentUser ?? null);
+const AdminGlobalNotificationNewPage: NextPageWithLayout<Props> = () => <ManageGlobalNotification />;
 
-  const title = t('external_notification.external_notification');
-
-  const injectableContainers: Container<any>[] = useMemo(() => [], []);
-
-  useEffect(() => {
-    (async() => {
+AdminGlobalNotificationNewPage.getLayout = createAdminPageLayout<Props>({
+  title: (_p, t) => t('external_notification.external_notification'),
+  containerFactories: [
+    async() => {
       const AdminNotificationContainer = (await import('~/client/services/AdminNotificationContainer')).default;
-      const adminNotificationContainer = new AdminNotificationContainer();
-      injectableContainers.push(adminNotificationContainer);
-    })();
-  }, [injectableContainers]);
+      return new AdminNotificationContainer();
+    },
+  ],
+});
 
-  if (props.isAccessDeniedForNonAdminUser) {
-    <ForbiddenPage />;
-  }
-
-  return (
-    <Provider inject={[...injectableContainers]}>
-      <AdminLayout componentTitle={title}>
-        <Head>
-          <title>{title}</title>
-        </Head>
-        <ManageGlobalNotification />
-      </AdminLayout>
-    </Provider>
-  );
-
-};
-
-
-export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {
-  const props = await retrieveServerSideProps(context);
-  return props;
-};
-
+export const getServerSideProps: GetServerSideProps<Props> = getServerSideAdminCommonProps;
 
 export default AdminGlobalNotificationNewPage;

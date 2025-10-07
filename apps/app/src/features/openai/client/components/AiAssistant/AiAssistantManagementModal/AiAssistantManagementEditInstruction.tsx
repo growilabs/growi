@@ -10,7 +10,7 @@ import {
   DropdownItem,
 } from 'reactstrap';
 
-import { useAiAssistantManagementModal, AiAssistantManagementModalPageMode } from '../../../stores/ai-assistant';
+import { useAiAssistantManagementModalActions, AiAssistantManagementModalPageMode } from '../../../states/modal/ai-assistant-management';
 
 import { AiAssistantManagementHeader } from './AiAssistantManagementHeader';
 
@@ -24,7 +24,7 @@ type Props = {
 export const AiAssistantManagementEditInstruction = (props: Props): JSX.Element => {
   const { instruction, onChange, onReset } = props;
   const { t } = useTranslation();
-  const { changePageMode } = useAiAssistantManagementModal();
+  const { changePageMode } = useAiAssistantManagementModalActions();
 
   const handleComplete = () => {
     changePageMode(AiAssistantManagementModalPageMode.HOME);

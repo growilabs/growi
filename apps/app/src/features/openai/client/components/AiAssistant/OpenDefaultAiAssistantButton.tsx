@@ -1,19 +1,21 @@
 import React, { useCallback, useMemo, type JSX } from 'react';
 
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
 import { NotAvailable } from '~/client/components/NotAvailable';
 import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest';
-import { useIsAiEnabled } from '~/stores-universal/context';
+import { aiEnabledAtom } from '~/states/server-configurations';
 
-import { useAiAssistantSidebar, useSWRxAiAssistants } from '../../stores/ai-assistant';
+import { useAiAssistantSidebarActions } from '../../states';
+import { useSWRxAiAssistants } from '../../stores/ai-assistant';
 
 import styles from './OpenDefaultAiAssistantButton.module.scss';
 
 const OpenDefaultAiAssistantButtonSubstance = (): JSX.Element => {
   const { t } = useTranslation();
   const { data: aiAssistantData } = useSWRxAiAssistants();
-  const { openChat } = useAiAssistantSidebar();
+  const { openChat } = useAiAssistantSidebarActions();
 
   const defaultAiAssistant = useMemo(() => {
     if (aiAssistantData == null) {
@@ -48,7 +50,7 @@ const OpenDefaultAiAssistantButtonSubstance = (): JSX.Element => {
 };
 
 const OpenDefaultAiAssistantButton = (): JSX.Element => {
-  const { data: isAiEnabled } = useIsAiEnabled();
+  const isAiEnabled = useAtomValue(aiEnabledAtom);
 
   if (!isAiEnabled) {
     return <></>;

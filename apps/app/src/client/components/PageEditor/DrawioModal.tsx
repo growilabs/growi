@@ -4,7 +4,6 @@ import React, {
 
 import { Lang } from '@growi/core';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
-import { useDrawioModalForEditor } from '@growi/editor/dist/client/stores/use-drawio';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import {
   Modal,
@@ -12,9 +11,10 @@ import {
 } from 'reactstrap';
 
 import { replaceFocusedDrawioWithEditor, getMarkdownDrawioMxfile } from '~/client/components/PageEditor/markdown-drawio-util-for-editor';
-import { useRendererConfig } from '~/stores-universal/context';
-import { useDrawioModal } from '~/stores/modal';
-import { usePersonalSettings } from '~/stores/personal-settings';
+import { useRendererConfig } from '~/states/server-configurations';
+import { useDrawioModalActions, useDrawioModalStatus } from '~/states/ui/modal/drawio';
+import { useDrawioModalForEditorStatus, useDrawioModalForEditorActions } from '~/states/ui/modal/drawio-for-editor';
+import { useSWRxPersonalSettings } from '~/stores/personal-settings';
 import loggerFactory from '~/utils/logger';
 
 
@@ -54,31 +54,35 @@ const drawioConfig: DrawioConfig = {
 };
 
 
-export const DrawioModal = (): JSX.Element => {
-  const { data: rendererConfig } = useRendererConfig();
-  const { data: personalSettingsInfo } = usePersonalSettings({
+const DrawioModalSubstance = (): JSX.Element => {
+  const { drawioUri } = useRendererConfig();
+  const { data: personalSettingsInfo } = useSWRxPersonalSettings({
     // make immutable
     revalidateIfStale: false,
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
   });
 
-  const { data: drawioModalData, close: closeDrawioModal } = useDrawioModal();
-  const { data: drawioModalDataInEditor, close: closeDrawioModalInEditor } = useDrawioModalForEditor();
+  const drawioModalData = useDrawioModalStatus();
+  const { close: closeDrawioModal } = useDrawioModalActions();
+  const drawioModalDataInEditor = useDrawioModalForEditorStatus();
+  const { close: closeDrawioModalInEditor } = useDrawioModalForEditorActions();
   const editorKey = drawioModalDataInEditor?.editorKey ?? null;
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(editorKey);
   const editor = codeMirrorEditor?.view;
   const isOpenedInEditor = (drawioModalDataInEditor?.isOpened ?? false) && (editor != null);
   const isOpened = drawioModalData?.isOpened ?? false;
 
+  // Memoize URI with parameters calculation
+
   const drawioUriWithParams = useMemo(() => {
-    if (rendererConfig == null) {
+    if (drawioUri === '') {
       return undefined;
     }
 
     let url;
     try {
-      url = new URL(rendererConfig.drawioUri);
+      url = new URL(drawioUri);
     }
     catch (err) {
       logger.debug(err);
@@ -93,32 +97,45 @@ export const DrawioModal = (): JSX.Element => {
     url.searchParams.append('configure', '1');
 
     return url;
-  }, [rendererConfig, personalSettingsInfo?.lang]);
+  }, [drawioUri, personalSettingsInfo?.lang]);
 
+  // Memoize communication helper with inline handlers to avoid dependency issues
   const drawioCommunicationHelper = useMemo(() => {
-    if (rendererConfig == null) {
+    if (drawioUri === '') {
       return undefined;
     }
 
-    const save = editor != null ? (drawioMxFile: string) => {
-      replaceFocusedDrawioWithEditor(editor, drawioMxFile);
-    } : drawioModalData?.onSave;
+    const saveHandler = editor != null
+      ? (drawioMxFile: string) => replaceFocusedDrawioWithEditor(editor, drawioMxFile)
+      : drawioModalData?.onSave;
+
+    const closeHandler = isOpened ? closeDrawioModal : closeDrawioModalInEditor;
 
     return new DrawioCommunicationHelper(
-      rendererConfig.drawioUri,
+      drawioUri,
       drawioConfig,
-      { onClose: isOpened ? closeDrawioModal : closeDrawioModalInEditor, onSave: save },
+      { onClose: closeHandler, onSave: saveHandler },
     );
-  }, [closeDrawioModal, closeDrawioModalInEditor, drawioModalData?.onSave, editor, isOpened, rendererConfig]);
+  }, [drawioUri, editor, drawioModalData?.onSave, isOpened, closeDrawioModal, closeDrawioModalInEditor]);
 
   const receiveMessageHandler = useCallback((event: MessageEvent) => {
-    if (drawioModalData == null) {
+    if (drawioModalData == null || drawioCommunicationHelper == null) {
       return;
     }
 
     const drawioMxFile = editor != null ? getMarkdownDrawioMxfile(editor) : drawioModalData.drawioMxFile;
-    drawioCommunicationHelper?.onReceiveMessage(event, drawioMxFile);
+    drawioCommunicationHelper.onReceiveMessage(event, drawioMxFile ?? null);
   }, [drawioCommunicationHelper, drawioModalData, editor]);
+
+  // Memoize toggle handler
+  const toggleHandler = useCallback(() => {
+    if (isOpened) {
+      closeDrawioModal();
+    }
+    else {
+      closeDrawioModalInEditor();
+    }
+  }, [isOpened, closeDrawioModal, closeDrawioModalInEditor]);
 
   useEffect(() => {
     if (isOpened || isOpenedInEditor) {
@@ -137,7 +154,7 @@ export const DrawioModal = (): JSX.Element => {
   return (
     <Modal
       isOpen={isOpened || isOpenedInEditor}
-      toggle={() => (isOpened ? closeDrawioModal() : closeDrawioModalInEditor())}
+      toggle={toggleHandler}
       backdrop="static"
       className="drawio-modal grw-body-only-modal-expanded"
       size="xl"
@@ -165,4 +182,18 @@ export const DrawioModal = (): JSX.Element => {
       </ModalBody>
     </Modal>
   );
+};
+
+export const DrawioModal = (): JSX.Element => {
+  const drawioModalData = useDrawioModalStatus();
+  const drawioModalDataInEditor = useDrawioModalForEditorStatus();
+
+  const isOpened = drawioModalData?.isOpened ?? false;
+  const isOpenedInEditor = drawioModalDataInEditor?.isOpened ?? false;
+
+  if (!isOpened && !isOpenedInEditor) {
+    return <></>;
+  }
+
+  return <DrawioModalSubstance />;
 };

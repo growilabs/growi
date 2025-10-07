@@ -6,7 +6,7 @@ import {
   Modal, ModalHeader, ModalBody, ModalFooter,
 } from 'reactstrap';
 
-import { useUpdateUserGroupConfirmModal } from '~/stores/modal';
+import { useUpdateUserGroupConfirmModalStatus, useUpdateUserGroupConfirmModalActions } from '~/states/ui/modal/update-user-group-confirm';
 
 
 export const UpdateParentConfirmModal: FC = () => {
@@ -14,7 +14,8 @@ export const UpdateParentConfirmModal: FC = () => {
 
   const [isForceUpdate, setForceUpdate] = useState(false);
 
-  const { data: modalStatus, close: closeModal } = useUpdateUserGroupConfirmModal();
+  const modalStatus = useUpdateUserGroupConfirmModalStatus();
+  const { close: closeModal } = useUpdateUserGroupConfirmModalActions();
 
   if (modalStatus == null) {
     closeModal();

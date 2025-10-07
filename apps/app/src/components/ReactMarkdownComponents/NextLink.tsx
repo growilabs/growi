@@ -4,7 +4,7 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 import type { LinkProps } from 'next/link';
 import Link from 'next/link';
 
-import { useSiteUrl } from '~/stores-universal/context';
+import { useSiteUrl } from '~/states/global';
 import loggerFactory from '~/utils/logger';
 
 
@@ -50,7 +50,7 @@ export const NextLink = (props: Props): JSX.Element => {
     id, href, children, className, onClick, ...rest
   } = props;
 
-  const { data: siteUrl } = useSiteUrl();
+  const siteUrl = useSiteUrl();
 
   if (href == null) {
     return <a className={className}>{children}</a>;

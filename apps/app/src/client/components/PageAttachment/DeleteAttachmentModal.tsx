@@ -9,7 +9,7 @@ import {
 } from 'reactstrap';
 
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useDeleteAttachmentModal } from '~/stores/modal';
+import { useDeleteAttachmentModalStatus, useDeleteAttachmentModalActions } from '~/states/ui/modal/delete-attachment';
 import loggerFactory from '~/utils/logger';
 
 import { Username } from '../../../components/User/Username';
@@ -27,7 +27,8 @@ export const DeleteAttachmentModal: React.FC = () => {
   const [deleteError, setDeleteError] = useState<string>('');
 
   const { t } = useTranslation();
-  const { data: deleteAttachmentModal, close: closeDeleteAttachmentModal } = useDeleteAttachmentModal();
+  const deleteAttachmentModal = useDeleteAttachmentModalStatus();
+  const { close: closeDeleteAttachmentModal } = useDeleteAttachmentModalActions();
   const isOpen = deleteAttachmentModal?.isOpened;
   const attachment = deleteAttachmentModal?.attachment;
   const remove = deleteAttachmentModal?.remove;

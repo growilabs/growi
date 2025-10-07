@@ -1,7 +1,8 @@
-import React, { useState, type JSX } from 'react';
+import React, {
+  useState, useCallback, useMemo, type JSX,
+} from 'react';
 
-import { MarkdownTable } from '@growi/editor';
-import { useHandsontableModalForEditor } from '@growi/editor/dist/client/stores/use-handsontable';
+import { MarkdownTable, useHandsontableModalForEditorStatus } from '@growi/editor';
 import { HotTable } from '@handsontable/react';
 import type Handsontable from 'handsontable';
 import { useTranslation } from 'next-i18next';
@@ -13,7 +14,7 @@ import { debounce } from 'throttle-debounce';
 
 
 import { replaceFocusedMarkdownTableWithEditor, getMarkdownTable } from '~/client/components/PageEditor/markdown-table-util-for-editor';
-import { useHandsontableModal } from '~/stores/modal';
+import { useHandsontableModalActions, useHandsontableModalStatus } from '~/states/ui/modal/handsontable';
 
 import ExpandOrContractButton from '../ExpandOrContractButton';
 
@@ -30,11 +31,12 @@ const MARKDOWNTABLE_TO_HANDSONTABLE_ALIGNMENT_SYMBOL_MAPPING = {
   '': '',
 };
 
-export const HandsontableModal = (): JSX.Element => {
+export const HandsontableModalSubstance = (): JSX.Element => {
 
   const { t } = useTranslation('commons');
-  const { data: handsontableModalData, close: closeHandsontableModal } = useHandsontableModal();
-  const { data: handsontableModalForEditorData } = useHandsontableModalForEditor();
+  const handsontableModalData = useHandsontableModalStatus();
+  const { close: closeHandsontableModal } = useHandsontableModalActions();
+  const handsontableModalForEditorData = useHandsontableModalForEditorStatus();
 
   const isOpened = handsontableModalData?.isOpened ?? false;
   const isOpendInEditor = handsontableModalForEditorData?.isOpened ?? false;
@@ -43,7 +45,8 @@ export const HandsontableModal = (): JSX.Element => {
   const editor = handsontableModalForEditorData?.editor;
   const onSave = handsontableModalData?.onSave;
 
-  const defaultMarkdownTable = () => {
+  // Memoize default table creation
+  const defaultMarkdownTable = useMemo(() => {
     return new MarkdownTable(
       [
         ['col1', 'col2', 'col3'],
@@ -54,7 +57,7 @@ export const HandsontableModal = (): JSX.Element => {
         align: ['', '', ''],
       },
     );
-  };
+  }, []);
 
   const defaultHandsontableSetting = () => {
     return {
@@ -94,36 +97,42 @@ export const HandsontableModal = (): JSX.Element => {
   const [handsontableHeight, setHandsontableHeight] = useState<number>(DEFAULT_HOT_HEIGHT);
   const [handsontableWidth, setHandsontableWidth] = useState<number>(0);
 
-  const handleWindowExpandedChange = () => {
+  // Memoize window resize handler
+  const handleWindowExpandedChange = useCallback(() => {
     if (hotTableContainer != null) {
       // Get the width and height of hotTableContainer
       const { width, height } = hotTableContainer.getBoundingClientRect();
       setHandsontableWidth(width);
       setHandsontableHeight(height);
     }
-  };
+  }, [hotTableContainer]);
 
-  const debouncedHandleWindowExpandedChange = debounce(100, handleWindowExpandedChange);
+  // Memoize debounced handler
+  const debouncedHandleWindowExpandedChange = useMemo(() => (
+    debounce(100, handleWindowExpandedChange)
+  ), [handleWindowExpandedChange]);
 
-  const handleModalOpen = () => {
+  // Memoize modal open handler
+  const handleModalOpen = useCallback(() => {
     const markdownTableState = table == null && editor != null ? getMarkdownTable(editor) : table;
     const initTableInstance = markdownTableState == null ? defaultMarkdownTable : markdownTableState.clone();
     setMarkdownTable(markdownTableState ?? defaultMarkdownTable);
     setMarkdownTableOnInit(initTableInstance);
     debouncedHandleWindowExpandedChange();
-  };
+  }, [table, editor, defaultMarkdownTable, debouncedHandleWindowExpandedChange]);
 
-  const expandWindow = () => {
+  // Memoize expand/contract handlers
+  const expandWindow = useCallback(() => {
     setIsWindowExpanded(true);
     debouncedHandleWindowExpandedChange();
-  };
+  }, [debouncedHandleWindowExpandedChange]);
 
-  const contractWindow = () => {
+  const contractWindow = useCallback(() => {
     setIsWindowExpanded(false);
     // Set the height to the default value
     setHandsontableHeight(DEFAULT_HOT_HEIGHT);
     debouncedHandleWindowExpandedChange();
-  };
+  }, [debouncedHandleWindowExpandedChange]);
 
   const markdownTableOption = {
     get latest() {
@@ -523,4 +532,15 @@ export const HandsontableModal = (): JSX.Element => {
       </ModalFooter>
     </Modal>
   );
+};
+
+export const HandsontableModal = (): JSX.Element => {
+  const handsontableModalData = useHandsontableModalStatus();
+  const isOpened = handsontableModalData?.isOpened ?? false;
+
+  if (!isOpened) {
+    return <></>;
+  }
+
+  return <HandsontableModalSubstance />;
 };

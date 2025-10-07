@@ -14,12 +14,15 @@ import {
   Modal, ModalHeader, ModalBody, ModalFooter,
 } from 'reactstrap';
 
-import { useCurrentUser } from '~/stores-universal/context';
-import { useConflictDiffModal } from '~/stores/modal';
-import { useSWRxCurrentPage } from '~/stores/page';
+import { useCurrentUser } from '~/states/global';
 import {
-  useRemoteRevisionBody, useRemoteRevisionId, useRemoteRevisionLastUpdatedAt, useRemoteRevisionLastUpdateUser,
-} from '~/stores/remote-latest-page';
+  useCurrentPageData,
+  useRemoteRevisionBody,
+  useRemoteRevisionId,
+  useRemoteRevisionLastUpdatedAt,
+  useRemoteRevisionLastUpdateUser,
+} from '~/states/page';
+import { useConflictDiffModalActions, useConflictDiffModalStatus } from '~/states/ui/modal/conflict-diff';
 
 import styles from './ConflictDiffModal.module.scss';
 
@@ -47,7 +50,8 @@ const ConflictDiffModalCore = (props: ConflictDiffModalCoreProps): JSX.Element =
   const [isModalExpanded, setIsModalExpanded] = useState<boolean>(false);
 
   const { t } = useTranslation();
-  const { data: conflictDiffModalStatus, close: closeConflictDiffModal } = useConflictDiffModal();
+  const conflictDiffModalStatus = useConflictDiffModalStatus();
+  const { close: closeConflictDiffModal } = useConflictDiffModalActions();
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.DIFF);
 
   const selectRevisionHandler = useCallback((selectedRevision: string) => {
@@ -186,15 +190,15 @@ const ConflictDiffModalCore = (props: ConflictDiffModalCoreProps): JSX.Element =
 
 
 export const ConflictDiffModal = (): JSX.Element => {
-  const { data: currentUser } = useCurrentUser();
-  const { data: currentPage } = useSWRxCurrentPage();
-  const { data: conflictDiffModalStatus } = useConflictDiffModal();
+  const currentUser = useCurrentUser();
+  const currentPage = useCurrentPageData();
+  const conflictDiffModalStatus = useConflictDiffModalStatus();
 
   // state for latest page
-  const { data: remoteRevisionId } = useRemoteRevisionId();
-  const { data: remoteRevisionBody } = useRemoteRevisionBody();
-  const { data: remoteRevisionLastUpdateUser } = useRemoteRevisionLastUpdateUser();
-  const { data: remoteRevisionLastUpdatedAt } = useRemoteRevisionLastUpdatedAt();
+  const remoteRevisionId = useRemoteRevisionId();
+  const remoteRevisionBody = useRemoteRevisionBody();
+  const remoteRevisionLastUpdateUser = useRemoteRevisionLastUpdateUser();
+  const remoteRevisionLastUpdatedAt = useRemoteRevisionLastUpdatedAt();
 
   const isRemotePageDataInappropriate = remoteRevisionId == null || remoteRevisionBody == null || remoteRevisionLastUpdateUser == null;
 

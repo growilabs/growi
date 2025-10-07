@@ -1,8 +1,7 @@
-import React, {
-  useEffect, useMemo, useRef, useState, type JSX,
+import {
+  useEffect, useMemo, useRef, memo, type JSX,
 } from 'react';
 
-import type { IPagePopulatedToShowRevision } from '@growi/core';
 import { isUsersHomepage } from '@growi/core/dist/utils/page-path-utils';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 import dynamic from 'next/dynamic';
@@ -12,9 +11,8 @@ import type { RendererConfig } from '~/interfaces/services/renderer';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
 import { generateSSRViewOptions } from '~/services/renderer/renderer';
 import {
-  useIsForbidden, useIsIdenticalPath, useIsNotCreatable,
-} from '~/stores-universal/context';
-import { useSWRxCurrentPage, useIsNotFound } from '~/stores/page';
+  useIsForbidden, useIsIdenticalPath, useIsNotCreatable, useCurrentPageData, useCurrentPageId, usePageNotFound,
+} from '~/states/page';
 import { useViewOptions } from '~/stores/renderer';
 
 import { UserInfo } from '../User/UserInfo';
@@ -40,27 +38,36 @@ const SlideRenderer = dynamic(() => import('~/client/components/Page/SlideRender
 type Props = {
   pagePath: string,
   rendererConfig: RendererConfig,
-  initialPage?: IPagePopulatedToShowRevision,
   className?: string,
 }
 
-export const PageView = (props: Props): JSX.Element => {
+export const PageView = memo((props: Props): JSX.Element => {
+  const renderStartTime = performance.now();
 
   const commentsContainerRef = useRef<HTMLDivElement>(null);
 
   const {
-    pagePath, initialPage, rendererConfig, className,
+    pagePath, rendererConfig, className,
   } = props;
 
-  const { data: isIdenticalPathPage } = useIsIdenticalPath();
-  const { data: isForbidden } = useIsForbidden();
-  const { data: isNotCreatable } = useIsNotCreatable();
-  const { data: isNotFoundMeta } = useIsNotFound();
+  const currentPageId = useCurrentPageId();
+  const isIdenticalPathPage = useIsIdenticalPath();
+  const isForbidden = useIsForbidden();
+  const isNotCreatable = useIsNotCreatable();
+  const isNotFoundMeta = usePageNotFound();
 
-  const { data: pageBySWR } = useSWRxCurrentPage();
+  const page = useCurrentPageData();
   const { data: viewOptions } = useViewOptions();
 
-  const page = pageBySWR ?? initialPage;
+  // DEBUG: Log PageView render start
+  console.log('[PAGEVIEW-DEBUG] PageView render started:', {
+    pagePath,
+    currentPageId,
+    pageId: page?._id,
+    timestamp: new Date().toISOString(),
+    renderStartTime,
+  });
+
   const isNotFound = isNotFoundMeta || page == null;
   const isUsersHomepagePath = isUsersHomepage(pagePath);
 
@@ -70,23 +77,26 @@ export const PageView = (props: Props): JSX.Element => {
   const markdown = page?.revision?.body;
   const isSlide = useSlidesByFrontmatter(markdown, rendererConfig.isEnabledMarp);
 
-  const [currentPageId, setCurrentPageId] = useState<string | undefined>(page?._id);
-
-  useEffect(() => {
-    if (page?._id !== undefined) {
-      setCurrentPageId(page._id);
-    }
-  }, [page?._id]);
 
   // ***************************  Auto Scroll  ***************************
   useEffect(() => {
+    const scrollEffectStartTime = performance.now();
+    console.log('[PAGEVIEW-DEBUG] Auto scroll effect triggered:', {
+      currentPageId,
+      hash: window.location.hash,
+      timestamp: new Date().toISOString(),
+      effectStartTime: scrollEffectStartTime,
+    });
+
     if (currentPageId == null) {
+      console.log('[PAGEVIEW-DEBUG] Auto scroll skipped - no currentPageId');
       return;
     }
 
     // do nothing if hash is empty
     const { hash } = window.location;
     if (hash.length === 0) {
+      console.log('[PAGEVIEW-DEBUG] Auto scroll skipped - no hash');
       return;
     }
 
@@ -147,12 +157,30 @@ export const PageView = (props: Props): JSX.Element => {
     : null;
 
   const Contents = () => {
+    const contentsRenderStartTime = performance.now();
+    console.log('[PAGEVIEW-DEBUG] Contents component render started:', {
+      isNotFound,
+      hasPage: page != null,
+      hasRevision: page?.revision != null,
+      pageId: page?._id,
+      timestamp: new Date().toISOString(),
+      contentsRenderStartTime,
+    });
+
     if (isNotFound || page?.revision == null) {
+      console.log('[PAGEVIEW-DEBUG] Rendering NotFoundPage');
       return <NotFoundPage path={pagePath} />;
     }
 
     const markdown = page.revision.body;
     const rendererOptions = viewOptions ?? generateSSRViewOptions(rendererConfig, pagePath);
+
+    console.log('[PAGEVIEW-DEBUG] Rendering page content:', {
+      markdownLength: markdown?.length,
+      hasViewOptions: viewOptions != null,
+      isSlide: isSlide != null,
+      renderDuration: performance.now() - contentsRenderStartTime,
+    });
 
     return (
       <>
@@ -179,6 +207,16 @@ export const PageView = (props: Props): JSX.Element => {
     );
   };
 
+  // DEBUG: Log final render completion time
+  const renderEndTime = performance.now();
+  console.log('[PAGEVIEW-DEBUG] PageView render completed:', {
+    pagePath,
+    currentPageId,
+    pageId: page?._id,
+    totalRenderDuration: renderEndTime - renderStartTime,
+    timestamp: new Date().toISOString(),
+  });
+
   return (
     <PageViewLayout
       className={className}
@@ -201,4 +239,4 @@ export const PageView = (props: Props): JSX.Element => {
 
     </PageViewLayout>
   );
-};
+});

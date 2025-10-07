@@ -5,10 +5,10 @@ import PropTypes from 'prop-types';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastSuccess, toastError } from '~/client/util/toastr';
+import { useAdminSocket } from '~/features/admin/states/socket-io';
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { ImportOptionForPages } from '~/models/admin/import-option-for-pages';
 import { ImportOptionForRevisions } from '~/models/admin/import-option-for-revisions';
-import { useAdminSocket } from '~/stores/socket-io';
 
 
 import ErrorViewer from './ErrorViewer';
@@ -507,7 +507,7 @@ ImportForm.propTypes = {
 
 const ImportFormWrapperFc = (props) => {
   const { t } = useTranslation('admin');
-  const { data: socket } = useAdminSocket();
+  const socket = useAdminSocket();
 
   if (socket == null) {
     return;

@@ -1,62 +1,43 @@
-import type {
-  NextPage, GetServerSideProps, GetServerSidePropsContext,
-} from 'next';
-import { useTranslation } from 'next-i18next';
+import { useHydrateAtoms } from 'jotai/utils';
+import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
-import Head from 'next/head';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { CommonProps } from '~/pages/utils/commons';
-import { generateCustomTitle } from '~/pages/utils/commons';
-import { useIsAclEnabled, useCurrentUser } from '~/stores-universal/context';
+import { isAclEnabledAtom } from '~/states/server-configurations';
 
-import { retrieveServerSideProps } from '../../utils/admin-page-util';
+import type { NextPageWithLayout } from '../_app.page';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
 
-const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), { ssr: false });
+import type { AdminCommonProps } from './_shared';
+import { createAdminPageLayout, getServerSideAdminCommonProps } from './_shared';
+
 const UserGroupPage = dynamic(() => import('~/client/components/Admin/UserGroup/UserGroupPage').then(mod => mod.UserGroupPage), { ssr: false });
-const ForbiddenPage = dynamic(() => import('~/client/components/Admin/ForbiddenPage').then(mod => mod.ForbiddenPage), { ssr: false });
 
+type PageProps = { isAclEnabled: boolean };
+type Props = AdminCommonProps & PageProps;
 
-type Props = CommonProps & {
-  isAclEnabled: boolean
+const AdminUserGroupPage: NextPageWithLayout<Props> = (props: Props) => {
+  // hydrate
+  useHydrateAtoms([
+    [isAclEnabledAtom, props.isAclEnabled],
+  ], { dangerouslyForceHydrate: true });
+
+  return <UserGroupPage />;
 };
 
+AdminUserGroupPage.getLayout = createAdminPageLayout<Props>({
+  title: (_p, t) => t('user_group_management.user_group_management'),
+});
 
-const AdminUserGroupPage: NextPage<Props> = (props) => {
-  const { t } = useTranslation('admin');
-  useCurrentUser(props.currentUser ?? null);
-  useIsAclEnabled(props.isAclEnabled);
+export const getServerSideProps: GetServerSideProps<Props> = async(context: GetServerSidePropsContext) => {
+  const baseResult = await getServerSideAdminCommonProps(context);
 
-  const title = t('user_group_management.user_group_management');
-  const headTitle = generateCustomTitle(props, title);
-
-  if (props.isAccessDeniedForNonAdminUser) {
-    return <ForbiddenPage />;
-  }
-
-  return (
-    <AdminLayout componentTitle={title}>
-      <Head>
-        <title>{headTitle}</title>
-      </Head>
-      <UserGroupPage />
-    </AdminLayout>
-  );
-};
-
-
-const injectServerConfigurations = async(context: GetServerSidePropsContext, props: Props): Promise<void> => {
   const req: CrowiRequest = context.req as CrowiRequest;
   const { crowi } = req;
   const { aclService } = crowi;
 
-  props.isAclEnabled = aclService.isAclEnabled();
+  const fragment = { props: { isAclEnabled: aclService.isAclEnabled() } } satisfies { props: PageProps };
+  return mergeGetServerSidePropsResults(baseResult, fragment);
 };
-
-export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {
-  const props = await retrieveServerSideProps(context, injectServerConfigurations);
-  return props;
-};
-
 
 export default AdminUserGroupPage;

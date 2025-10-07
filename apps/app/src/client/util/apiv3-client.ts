@@ -2,8 +2,6 @@
 import type { AxiosResponse } from 'axios';
 import urljoin from 'url-join';
 
-// eslint-disable-next-line no-restricted-imports
-
 import { toArrayIfNot } from '~/utils/array-utils';
 import axios from '~/utils/axios';
 import loggerFactory from '~/utils/logger';
@@ -15,9 +13,9 @@ const logger = loggerFactory('growi:apiv3');
 
 const apiv3ErrorHandler = (_err: any): any[] => {
   // extract api errors from general 400 err
-  const err = _err.response ? _err.response.data.errors : _err;
+  const err = axios.isAxiosError(_err) ? _err.response?.data.errors : _err;
   const errs = toArrayIfNot(err);
-  const errorInfo = _err.response ? _err.response.data.info : undefined;
+  const errorInfo = axios.isAxiosError(_err) ? _err.response?.data.info : undefined;
 
   for (const err of errs) {
     logger.error(err.message);

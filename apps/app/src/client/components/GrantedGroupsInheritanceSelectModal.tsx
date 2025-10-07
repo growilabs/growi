@@ -5,18 +5,20 @@ import {
   Modal, ModalHeader, ModalBody, ModalFooter,
 } from 'reactstrap';
 
-import { useGrantedGroupsInheritanceSelectModal } from '~/stores/modal';
+import {
+  useGrantedGroupsInheritanceSelectModalActions, useGrantedGroupsInheritanceSelectModalStatus,
+} from '~/states/ui/modal/granted-groups-inheritance-select';
 
 const GrantedGroupsInheritanceSelectModal = (): JSX.Element => {
   const { t } = useTranslation();
-  const { data: modalData, close: closeModal } = useGrantedGroupsInheritanceSelectModal();
+  const { isOpened, onCreateBtnClick: _onCreateBtnClick } = useGrantedGroupsInheritanceSelectModalStatus();
+  const { close: closeModal } = useGrantedGroupsInheritanceSelectModalActions();
   const [onlyInheritUserRelatedGrantedGroups, setOnlyInheritUserRelatedGrantedGroups] = useState(false);
 
   const onCreateBtnClick = async() => {
-    await modalData?.onCreateBtnClick?.(onlyInheritUserRelatedGrantedGroups);
+    await _onCreateBtnClick?.(onlyInheritUserRelatedGrantedGroups);
     setOnlyInheritUserRelatedGrantedGroups(false); // reset to false after create request
   };
-  const isOpened = modalData?.isOpened ?? false;
 
   return (
     <Modal

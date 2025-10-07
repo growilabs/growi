@@ -7,7 +7,7 @@ import {
 } from 'reactstrap';
 
 import { apiPost } from '~/client/util/apiv1-client';
-import { usePutBackPageModal } from '~/stores/modal';
+import { usePutBackPageModalActions, usePutBackPageModalStatus } from '~/states/ui/modal/put-back-page';
 import { mutateAllPageInfo } from '~/stores/page';
 
 import ApiErrorMessageList from './PageManagement/ApiErrorMessageList';
@@ -15,7 +15,8 @@ import ApiErrorMessageList from './PageManagement/ApiErrorMessageList';
 const PutBackPageModal = () => {
   const { t } = useTranslation();
 
-  const { data: pageDataToRevert, close: closePutBackPageModal } = usePutBackPageModal();
+  const pageDataToRevert = usePutBackPageModalStatus();
+  const { close: closePutBackPageModal } = usePutBackPageModalActions();
   const { isOpened, page } = pageDataToRevert;
   const { pageId, path } = page;
   const onPutBacked = pageDataToRevert.opts?.onPutBacked;

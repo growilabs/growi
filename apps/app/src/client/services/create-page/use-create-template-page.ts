@@ -5,7 +5,7 @@ import { isCreatablePage } from '@growi/core/dist/utils/page-path-utils';
 import { normalizePath } from '@growi/core/dist/utils/path-utils';
 
 import type { LabelType } from '~/interfaces/template';
-import { useCurrentPagePath } from '~/stores/page';
+import { useCurrentPagePath } from '~/states/page';
 
 
 import { useCreatePage } from './use-create-page';
@@ -18,20 +18,20 @@ type UseCreateTemplatePage = () => {
 
 export const useCreateTemplatePage: UseCreateTemplatePage = () => {
 
-  const { data: currentPagePath, isLoading: isLoadingPagePath } = useCurrentPagePath();
+  const currentPagePath = useCurrentPagePath();
 
   const { isCreating, create } = useCreatePage();
   const isCreatable = currentPagePath != null && isCreatablePage(normalizePath(`${currentPagePath}/_template`));
 
   const createTemplate = useCallback(async(label: LabelType) => {
-    if (isLoadingPagePath || !isCreatable) return;
+    if (currentPagePath == null || !isCreatable) return;
 
     return create(
       {
         path: normalizePath(`${currentPagePath}/${label}`), parentPath: currentPagePath, wip: false, origin: Origin.View,
       },
     );
-  }, [currentPagePath, isCreatable, isLoadingPagePath, create]);
+  }, [currentPagePath, isCreatable, create]);
 
   return {
     isCreatable,

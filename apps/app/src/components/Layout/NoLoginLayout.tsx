@@ -3,7 +3,7 @@ import React from 'react';
 
 import Image from 'next/image';
 
-import { useAppTitle } from '~/stores-universal/context';
+import { useAppTitle } from '~/states/global';
 
 import GrowiLogo from '../Common/GrowiLogo';
 
@@ -21,7 +21,7 @@ export const NoLoginLayout = ({
   children, className,
 }: Props): JSX.Element => {
 
-  const { data: appTitle } = useAppTitle();
+  const appTitle = useAppTitle();
 
   const classNames: string[] = [''];
   if (className != null) {
