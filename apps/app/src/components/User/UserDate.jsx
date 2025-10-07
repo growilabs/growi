@@ -1,8 +1,6 @@
-import React from 'react';
-
 import { format } from 'date-fns/format';
 import PropTypes from 'prop-types';
-
+import React from 'react';
 
 /**
  * UserDate
@@ -10,7 +8,6 @@ import PropTypes from 'prop-types';
  * display date depends on user timezone of user settings
  */
 export default class UserDate extends React.Component {
-
   render() {
     const date = new Date(this.props.dateTime);
     const dt = format(date, this.props.format);
@@ -21,7 +18,6 @@ export default class UserDate extends React.Component {
       </span>
     );
   }
-
 }
 
 UserDate.propTypes = {

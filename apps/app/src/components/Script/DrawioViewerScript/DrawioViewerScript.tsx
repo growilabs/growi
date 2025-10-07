@@ -1,7 +1,6 @@
-import { useCallback, type JSX } from 'react';
-
 import type { IGraphViewerGlobal } from '@growi/remark-drawio';
 import Head from 'next/head';
+import { type JSX, useCallback } from 'react';
 
 import { useViewerMinJsUrl } from './use-viewer-min-js-url';
 
@@ -12,7 +11,7 @@ declare global {
 
 type Props = {
   drawioUri: string;
-}
+};
 
 export const DrawioViewerScript = ({ drawioUri }: Props): JSX.Element => {
   const viewerMinJsSrc = useViewerMinJsUrl(drawioUri);

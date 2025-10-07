@@ -1,4 +1,4 @@
-import type { ReactNode, JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 import { PrismAsyncLight } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
@@ -12,20 +12,21 @@ Object.entries<object>(oneDark).forEach(([key, value]) => {
   }
 });
 
-
 type InlineCodeBlockProps = {
-  children: ReactNode,
-  className?: string,
-}
+  children: ReactNode;
+  className?: string;
+};
 
 const InlineCodeBlockSubstance = (props: InlineCodeBlockProps): JSX.Element => {
   const { children, className, ...rest } = props;
-  return <code className={`code-inline ${className ?? ''}`} {...rest}>{children}</code>;
+  return (
+    <code className={`code-inline ${className ?? ''}`} {...rest}>
+      {children}
+    </code>
+  );
 };
 
-
 function extractChildrenToIgnoreReactNode(children: ReactNode): ReactNode {
-
   if (children == null) {
     return children;
   }
@@ -37,30 +38,46 @@ function extractChildrenToIgnoreReactNode(children: ReactNode): ReactNode {
 
   // Multiple element array
   if (Array.isArray(children) && children.length > 1) {
-    return children.map(node => extractChildrenToIgnoreReactNode(node)).join('');
+    return children
+      .map((node) => extractChildrenToIgnoreReactNode(node))
+      .join('');
   }
 
   // object
   if (typeof children === 'object') {
-    const grandChildren = (children as any).children ?? (children as any).props.children;
+    const grandChildren =
+      (children as any).children ?? (children as any).props.children;
     return extractChildrenToIgnoreReactNode(grandChildren);
   }
 
   return String(children).replace(/\n$/, '');
 }
 
-function CodeBlockSubstance({ lang, children }: { lang: string, children: ReactNode }): JSX.Element {
+function CodeBlockSubstance({
+  lang,
+  children,
+}: {
+  lang: string;
+  children: ReactNode;
+}): JSX.Element {
   // return alternative element
   //   in order to fix "CodeBlock string is be [object Object] if searched"
   // see: https://github.com/growilabs/growi/pull/7484
   //
   // Note: You can also remove this code if the user requests to see the code highlighted in Prism as-is.
 
-  const isSimpleString = typeof children === 'string' || (Array.isArray(children) && children.length === 1 && typeof children[0] === 'string');
+  const isSimpleString =
+    typeof children === 'string' ||
+    (Array.isArray(children) &&
+      children.length === 1 &&
+      typeof children[0] === 'string');
   if (!isSimpleString) {
     return (
       <div style={oneDark['pre[class*="language-"]']}>
-        <code className={`language-${lang}`} style={oneDark['code[class*="language-"]']}>
+        <code
+          className={`language-${lang}`}
+          style={oneDark['code[class*="language-"]']}
+        >
           {children}
         </code>
       </div>
@@ -68,28 +85,27 @@ function CodeBlockSubstance({ lang, children }: { lang: string, children: ReactN
   }
 
   return (
-    <PrismAsyncLight
-      PreTag="div"
-      style={oneDark}
-      language={lang}
-    >
+    <PrismAsyncLight PreTag="div" style={oneDark} language={lang}>
       {extractChildrenToIgnoreReactNode(children)}
     </PrismAsyncLight>
   );
 }
 
 type CodeBlockProps = {
-  children: ReactNode,
-  className?: string,
-  inline?: true,
-}
+  children: ReactNode;
+  className?: string;
+  inline?: true;
+};
 
 export const CodeBlock = (props: CodeBlockProps): JSX.Element => {
-
   // TODO: set border according to the value of 'customize:highlightJsStyleBorder'
   const { className, children, inline } = props;
   if (inline) {
-    return <InlineCodeBlockSubstance className={`code-inline ${className ?? ''}`}>{children}</InlineCodeBlockSubstance>;
+    return (
+      <InlineCodeBlockSubstance className={`code-inline ${className ?? ''}`}>
+        {children}
+      </InlineCodeBlockSubstance>
+    );
   }
 
   const match = /language-(\w+)(:?.+)?/.exec(className || '');
@@ -99,7 +115,11 @@ export const CodeBlock = (props: CodeBlockProps): JSX.Element => {
   return (
     <>
       {name != null && (
-        <cite className={`code-highlighted-title ${styles['code-highlighted-title']}`}>{name}</cite>
+        <cite
+          className={`code-highlighted-title ${styles['code-highlighted-title']}`}
+        >
+          {name}
+        </cite>
       )}
       <CodeBlockSubstance lang={lang}>{children}</CodeBlockSubstance>
     </>

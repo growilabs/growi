@@ -1,10 +1,13 @@
-import React, { useCallback, type JSX } from 'react';
-
 import { returnPathForURL } from '@growi/core/dist/utils/path-utils';
 import { useRouter } from 'next/router';
+import React, { type JSX, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useSWRxCurrentPage, useSWRMUTxCurrentPage, useIsLatestRevision } from '~/stores/page';
+import {
+  useIsLatestRevision,
+  useSWRMUTxCurrentPage,
+  useSWRxCurrentPage,
+} from '~/stores/page';
 
 export const OldRevisionAlert = (): JSX.Element => {
   const router = useRouter();
@@ -14,7 +17,7 @@ export const OldRevisionAlert = (): JSX.Element => {
   const { data: page } = useSWRxCurrentPage();
   const { trigger: mutateCurrentPage } = useSWRMUTxCurrentPage();
 
-  const onClickShowLatestButton = useCallback(async() => {
+  const onClickShowLatestButton = useCallback(async () => {
     if (page == null) {
       return;
     }
@@ -31,8 +34,15 @@ export const OldRevisionAlert = (): JSX.Element => {
   return (
     <div className="alert alert-warning">
       <strong>{t('Warning')}: </strong> {t('page_page.notice.version')}
-      <button type="button" className="btn btn-outline-natural-secondary" onClick={onClickShowLatestButton}>
-        <span className="material-symbols-outlined me-1">arrow_circle_right</span>{t('Show latest')}
+      <button
+        type="button"
+        className="btn btn-outline-natural-secondary"
+        onClick={onClickShowLatestButton}
+      >
+        <span className="material-symbols-outlined me-1">
+          arrow_circle_right
+        </span>
+        {t('Show latest')}
       </button>
     </div>
   );
