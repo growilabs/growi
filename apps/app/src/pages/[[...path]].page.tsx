@@ -47,7 +47,7 @@ import {
   useIsLocalAccountRegistrationEnabled,
   useIsRomUserAllowedToComment,
   useIsPdfBulkExportEnabled,
-  useIsAiEnabled, useLimitLearnablePageCountPerAssistant, useIsUsersHomepageDeletionEnabled,
+  useIsAiEnabled, useLimitLearnablePageCountPerAssistant, useIsUsersHomepageDeletionEnabled, useIsGuestUser,
 } from '~/stores-universal/context';
 import { useEditingMarkdown } from '~/stores/editor';
 import {
@@ -276,6 +276,7 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
 
   const { mutate: mutateEditingMarkdown } = useEditingMarkdown();
   const { data: currentPageId, mutate: mutateCurrentPageId } = useCurrentPageId();
+  const { data: isGuestUser } = useIsGuestUser();
 
   const { mutate: mutateIsNotFound } = useIsNotFound();
 
@@ -308,16 +309,17 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
       mutatePageData();
     }
   }, [
-    revisionId, currentPageId, mutateCurrentPage,
-    mutateCurrentPageYjsDataFromApi, mutateEditingMarkdown, props.isNotFound, props.skipSSR,
+    revisionId, currentPageId,
+    mutateCurrentPage, mutateEditingMarkdown,
+    props.isNotFound, props.skipSSR,
   ]);
 
   // Load current yjs data
   useEffect(() => {
-    if (currentPageId != null && revisionId != null && !props.isNotFound) {
+    if (!isGuestUser && currentPageId != null && revisionId != null && mutateCurrentPageYjsDataFromApi != null && !props.isNotFound) {
       mutateCurrentPageYjsDataFromApi();
     }
-  }, [currentPageId, mutateCurrentPageYjsDataFromApi, props.isNotFound, revisionId]);
+  }, [isGuestUser, currentPageId, mutateCurrentPageYjsDataFromApi, props.isNotFound, revisionId]);
 
   // sync pathname by Shallow Routing https://nextjs.org/docs/routing/shallow-routing
   useEffect(() => {

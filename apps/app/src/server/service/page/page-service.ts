@@ -4,6 +4,7 @@ import type {
   HasObjectId,
   IDataWithMeta,
   IGrantedGroup,
+  IPage,
   IPageInfo, IPageInfoAll, IPageInfoForEntity, IUser,
 } from '@growi/core';
 import type { HydratedDocument, Types } from 'mongoose';
@@ -49,4 +50,23 @@ export interface IPageService {
     page: PageDocument, creatorId: ObjectIdLike | null, operator: any | null, userRelatedGroups: PopulatedGrantedGroup[]
   ): boolean,
   getYjsData(pageId: string, revisionBody?: string): Promise<CurrentPageYjsData>,
+  updateDescendantCountOfPagesWithPaths(paths: string[]): Promise<void>,
+  revertRecursivelyMainOperation(page, user, options, pageOpId: ObjectIdLike, activity?): Promise<void>,
+  revertDeletedPage(page, user, options, isRecursively: boolean, activityParameters?),
+  deleteCompletelyRecursivelyMainOperation(page, user, options, pageOpId: ObjectIdLike, activity?): Promise<void>,
+  deleteCompletely(page, user, options, isRecursively: boolean, preventEmitting: boolean, activityParameters),
+  deleteRecursivelyMainOperation(page, user, pageOpId: ObjectIdLike, activity?): Promise<void>,
+  deletePage(page, user, options, isRecursively: boolean, activityParameters),
+  duplicateRecursivelyMainOperation(
+    page: PageDocument,
+    newPagePath: string,
+    user,
+    pageOpId: ObjectIdLike,
+    onlyDuplicateUserRelatedResources: boolean,
+  ): Promise<void>,
+  duplicate(page: PageDocument, newPagePath: string, user, isRecursively: boolean, onlyDuplicateUserRelatedResources: boolean),
+  renameSubOperation(page, newPagePath: string, user, options, renamedPage, pageOpId: ObjectIdLike, activity?): Promise<void>,
+  renamePage(page: IPage, newPagePath, user, options, activityParameters): Promise<PageDocument | null>,
+  renameMainOperation(page, newPagePath: string, user, options, pageOpId: ObjectIdLike, activity?): Promise<PageDocument | null>,
+  createSubOperation(page, user, options: IOptionsForCreate, pageOpId: ObjectIdLike): Promise<void>,
 }
