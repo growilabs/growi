@@ -668,3 +668,19 @@ export type ISearchFilter = {
   dates?: { startDate: string | null; endDate: string | null };
   actions?: SupportedActionType[];
 };
+
+
+// FIX: change to API supported types when API is done
+type SupportedRecentActivityAction = typeof ActivityLogActions[keyof typeof ActivityLogActions];
+
+export type IRecentActivitySearchFilter = {
+  actions?: SupportedRecentActivityAction[];
+  usernames?: string[];
+  userIds?: string[];
+  dates?: {
+    startDate?: string;
+    endDate?: string;
+  };
+
+  targetModels?: string[];
+};
