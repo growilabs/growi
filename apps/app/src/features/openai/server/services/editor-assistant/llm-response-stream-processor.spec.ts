@@ -36,11 +36,14 @@ describe('llm-response-stream-processor', () => {
 
   describe('process - message handling', () => {
     test('should process simple message item', () => {
-      const jsonChunk = '{"contents": [{"message": "Processing your request..."}]}';
+      const jsonChunk =
+        '{"contents": [{"message": "Processing your request..."}]}';
 
       processor.process('', jsonChunk);
 
-      expect(messageCallback).toHaveBeenCalledWith('Processing your request...');
+      expect(messageCallback).toHaveBeenCalledWith(
+        'Processing your request...',
+      );
       expect(messageCallback).toHaveBeenCalledTimes(1);
     });
 
@@ -50,12 +53,20 @@ describe('llm-response-stream-processor', () => {
       expect(messageCallback).toHaveBeenCalledWith('Step 1: ');
 
       // Second chunk with extended message
-      processor.process('', '{"contents": [{"message": "Step 1: Analyzing code"}]}');
+      processor.process(
+        '',
+        '{"contents": [{"message": "Step 1: Analyzing code"}]}',
+      );
       expect(messageCallback).toHaveBeenCalledWith('Analyzing code');
 
       // Third chunk with further extension (using actual newline character)
-      processor.process('', '{"contents": [{"message": "Step 1: Analyzing code\\nStep 2: Preparing changes"}]}');
-      expect(messageCallback).toHaveBeenCalledWith('\nStep 2: Preparing changes');
+      processor.process(
+        '',
+        '{"contents": [{"message": "Step 1: Analyzing code\\nStep 2: Preparing changes"}]}',
+      );
+      expect(messageCallback).toHaveBeenCalledWith(
+        '\nStep 2: Preparing changes',
+      );
 
       expect(messageCallback).toHaveBeenCalledTimes(3);
     });
@@ -85,11 +96,14 @@ describe('llm-response-stream-processor', () => {
     });
 
     test('should handle unicode and special characters in messages', () => {
-      const jsonChunk = '{"contents": [{"message": "コードを更新中... 🚀 Progress: 75%"}]}';
+      const jsonChunk =
+        '{"contents": [{"message": "コードを更新中... 🚀 Progress: 75%"}]}';
 
       processor.process('', jsonChunk);
 
-      expect(messageCallback).toHaveBeenCalledWith('コードを更新中... 🚀 Progress: 75%');
+      expect(messageCallback).toHaveBeenCalledWith(
+        'コードを更新中... 🚀 Progress: 75%',
+      );
     });
 
     test('should handle multiline messages', () => {
@@ -102,7 +116,9 @@ describe('llm-response-stream-processor', () => {
       processor.process('', jsonChunk);
 
       // JSON parsing converts \\n to actual newlines
-      expect(messageCallback).toHaveBeenCalledWith('Line 1: Updated function\nLine 2: Added error handling\nLine 3: Fixed indentation');
+      expect(messageCallback).toHaveBeenCalledWith(
+        'Line 1: Updated function\nLine 2: Added error handling\nLine 3: Fixed indentation',
+      );
     });
 
     test('should not call messageCallback when no message items present', () => {
@@ -283,10 +299,12 @@ describe('llm-response-stream-processor', () => {
     });
 
     test('should handle diffs with complex multiline content', () => {
-      const searchCode = 'function authenticate(token) {\\n  return validateToken(token);\\n}';
-      const replaceCode = 'async function authenticate(token) {\\n  try {\\n    if (!token) {\\n'
-        + '      throw new Error(\\"Token required\\");\\n    }\\n    return await validateToken(token);\\n'
-        + '  } catch (error) {\\n    console.error(\\"Auth failed:\\", error);\\n    throw error;\\n  }\\n}';
+      const searchCode =
+        'function authenticate(token) {\\n  return validateToken(token);\\n}';
+      const replaceCode =
+        'async function authenticate(token) {\\n  try {\\n    if (!token) {\\n' +
+        '      throw new Error(\\"Token required\\");\\n    }\\n    return await validateToken(token);\\n' +
+        '  } catch (error) {\\n    console.error(\\"Auth failed:\\", error);\\n    throw error;\\n  }\\n}';
 
       const jsonChunk = `{
         "contents": [{
@@ -300,10 +318,12 @@ describe('llm-response-stream-processor', () => {
       processor.process('', jsonChunk);
 
       // JSON parsing converts \\n to actual newlines
-      const expectedSearch = 'function authenticate(token) {\n  return validateToken(token);\n}';
-      const expectedReplace = 'async function authenticate(token) {\n  try {\n    if (!token) {\n'
-        + '      throw new Error("Token required");\n    }\n    return await validateToken(token);\n'
-        + '  } catch (error) {\n    console.error("Auth failed:", error);\n    throw error;\n  }\n}';
+      const expectedSearch =
+        'function authenticate(token) {\n  return validateToken(token);\n}';
+      const expectedReplace =
+        'async function authenticate(token) {\n  try {\n    if (!token) {\n' +
+        '      throw new Error("Token required");\n    }\n    return await validateToken(token);\n' +
+        '  } catch (error) {\n    console.error("Auth failed:", error);\n    throw error;\n  }\n}';
 
       expect(diffDetectedCallback).toHaveBeenCalledWith({
         search: expectedSearch,
@@ -332,7 +352,10 @@ describe('llm-response-stream-processor', () => {
 
       expect(messageCallback).toHaveBeenCalledTimes(2);
       expect(messageCallback).toHaveBeenNthCalledWith(1, 'Analyzing code...');
-      expect(messageCallback).toHaveBeenNthCalledWith(2, 'Changes applied successfully.');
+      expect(messageCallback).toHaveBeenNthCalledWith(
+        2,
+        'Changes applied successfully.',
+      );
 
       expect(diffDetectedCallback).toHaveBeenCalledTimes(1);
       expect(diffDetectedCallback).toHaveBeenCalledWith({
@@ -425,21 +448,30 @@ describe('llm-response-stream-processor', () => {
   describe('sendFinalResult', () => {
     test('should finalize with complete message and replacements', () => {
       // Process some data first to populate processedMessages
-      processor.process('', '{"contents": [{"message": "Step 1"}, {"search": "old", "replace": "new", "startLine": 1}]}');
-      processor.process('', '{"contents": [{"message": "Step 1\nStep 2"}, {"search": "old", "replace": "new", "startLine": 1}]}');
+      processor.process(
+        '',
+        '{"contents": [{"message": "Step 1"}, {"search": "old", "replace": "new", "startLine": 1}]}',
+      );
+      processor.process(
+        '',
+        '{"contents": [{"message": "Step 1\nStep 2"}, {"search": "old", "replace": "new", "startLine": 1}]}',
+      );
 
       // Finalize - sendFinalResult now extracts all messages from final JSON
-      const finalJson = '{"contents": [{"message": "Step 1\nStep 2\nCompleted"}, {"search": "old", "replace": "new", "startLine": 1}]}';
+      const finalJson =
+        '{"contents": [{"message": "Step 1\nStep 2\nCompleted"}, {"search": "old", "replace": "new", "startLine": 1}]}';
       processor.sendFinalResult(finalJson);
 
       // Fixed implementation now extracts messages from complete final JSON
       expect(dataFinalizedCallback).toHaveBeenCalledWith(
         'Step 1\nStep 2\nCompleted', // Complete message from final JSON
-        [{
-          search: 'old',
-          replace: 'new',
-          startLine: 1,
-        }],
+        [
+          {
+            search: 'old',
+            replace: 'new',
+            startLine: 1,
+          },
+        ],
       );
     });
 
@@ -497,21 +529,22 @@ describe('llm-response-stream-processor', () => {
       processor.sendFinalResult(finalJson);
 
       // Now correctly extracts message from final JSON
-      expect(dataFinalizedCallback).toHaveBeenCalledWith(
-        'Final message',
-        [
-          { search: 'code1', replace: 'new1', startLine: 1 },
-          { search: 'code2', replace: 'new2', startLine: 10 },
-        ],
-      );
+      expect(dataFinalizedCallback).toHaveBeenCalledWith('Final message', [
+        { search: 'code1', replace: 'new1', startLine: 1 },
+        { search: 'code2', replace: 'new2', startLine: 10 },
+      ]);
     });
 
     test('should not duplicate diffs that were already sent', () => {
       // Process diff first
-      processor.process('', '{"contents": [{"search": "test", "replace": "new", "startLine": 1}]}');
+      processor.process(
+        '',
+        '{"contents": [{"search": "test", "replace": "new", "startLine": 1}]}',
+      );
 
       // Finalize with same diff
-      const finalJson = '{"contents": [{"message": "Done"}, {"search": "test", "replace": "new", "startLine": 1}]}';
+      const finalJson =
+        '{"contents": [{"message": "Done"}, {"search": "test", "replace": "new", "startLine": 1}]}';
       processor.sendFinalResult(finalJson);
 
       // Implementation may have duplicate key generation issue
@@ -527,7 +560,10 @@ describe('llm-response-stream-processor', () => {
   describe('destroy', () => {
     test('should reset all internal state', () => {
       // Process some data
-      processor.process('', '{"contents": [{"message": "test"}, {"search": "old", "replace": "new", "startLine": 1}]}');
+      processor.process(
+        '',
+        '{"contents": [{"message": "test"}, {"search": "old", "replace": "new", "startLine": 1}]}',
+      );
 
       // Destroy
       processor.destroy();
@@ -541,12 +577,18 @@ describe('llm-response-stream-processor', () => {
 
     test('should clear all maps and sets', () => {
       // Process data to populate internal state
-      processor.process('', '{"contents": [{"message": "test"}, {"search": "old", "replace": "new", "startLine": 1}]}');
+      processor.process(
+        '',
+        '{"contents": [{"message": "test"}, {"search": "old", "replace": "new", "startLine": 1}]}',
+      );
 
       processor.destroy();
 
       // Process same data again - should not be considered duplicate
-      processor.process('', '{"contents": [{"search": "old", "replace": "new", "startLine": 1}]}');
+      processor.process(
+        '',
+        '{"contents": [{"search": "old", "replace": "new", "startLine": 1}]}',
+      );
 
       expect(diffDetectedCallback).toHaveBeenCalledTimes(2);
     });
@@ -569,8 +611,10 @@ describe('llm-response-stream-processor', () => {
       processor.process('', jsonChunk);
 
       expect(messageCallback).toHaveBeenCalledWith(largeMessage);
-    }); test('should handle unicode escape sequences', () => {
-      const jsonChunk = '{"contents": [{"message": "Unicode: \\u3053\\u3093\\u306b\\u3061\\u306f"}]}';
+    });
+    test('should handle unicode escape sequences', () => {
+      const jsonChunk =
+        '{"contents": [{"message": "Unicode: \\u3053\\u3093\\u306b\\u3061\\u306f"}]}';
 
       processor.process('', jsonChunk);
 
@@ -677,7 +721,10 @@ describe('llm-response-stream-processor', () => {
       });
 
       expect(() => {
-        partialProcessor.process('', '{"contents": [{"message": "test"}, {"search": "old", "replace": "new", "startLine": 1}]}');
+        partialProcessor.process(
+          '',
+          '{"contents": [{"message": "test"}, {"search": "old", "replace": "new", "startLine": 1}]}',
+        );
         partialProcessor.sendFinalResult('{"contents": []}');
       }).not.toThrow();
 

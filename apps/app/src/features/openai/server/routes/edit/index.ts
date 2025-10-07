@@ -16,9 +16,15 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
-import { LlmEditorAssistantDiffSchema, LlmEditorAssistantMessageSchema } from '../../../interfaces/editor-assistant/llm-response-schemas';
+import {
+  LlmEditorAssistantDiffSchema,
+  LlmEditorAssistantMessageSchema,
+} from '../../../interfaces/editor-assistant/llm-response-schemas';
 import type {
-  SseDetectedDiff, SseFinalized, SseMessage, EditRequestBody,
+  EditRequestBody,
+  SseDetectedDiff,
+  SseFinalized,
+  SseMessage,
 } from '../../../interfaces/editor-assistant/sse-schemas';
 import { MessageErrorCode } from '../../../interfaces/message-error';
 import AiAssistantModel from '../../models/ai-assistant';
@@ -32,29 +38,29 @@ import { replaceAnnotationWithPageLink } from '../../services/replace-annotation
 import { certifyAiService } from '../middlewares/certify-ai-service';
 import { SseHelper } from '../utils/sse-helper';
 
-
 const logger = loggerFactory('growi:routes:apiv3:openai:message');
 
 // -----------------------------------------------------------------------------
 // Type definitions
 // -----------------------------------------------------------------------------
 
-const LlmEditorAssistantResponseSchema = z.object({
-  contents: z.array(z.union([LlmEditorAssistantMessageSchema, LlmEditorAssistantDiffSchema])),
-}).describe('The response format for the editor assistant');
-
+const LlmEditorAssistantResponseSchema = z
+  .object({
+    contents: z.array(
+      z.union([LlmEditorAssistantMessageSchema, LlmEditorAssistantDiffSchema]),
+    ),
+  })
+  .describe('The response format for the editor assistant');
 
 type Req = Request<undefined, Response, EditRequestBody> & {
-  user: IUserHasId,
-}
-
+  user: IUserHasId;
+};
 
 // -----------------------------------------------------------------------------
 // Endpoint handler factory
 // -----------------------------------------------------------------------------
 
 type PostMessageHandlersFactory = (crowi: Crowi) => RequestHandler[];
-
 
 // -----------------------------------------------------------------------------
 // Instructions
@@ -111,7 +117,9 @@ ${withMarkdown ? withMarkdownCaution : ''}`;
 }
 /* eslint-disable max-len */
 
-function instructionForAssistantInstruction(assistantInstruction: string): string {
+function instructionForAssistantInstruction(
+  assistantInstruction: string,
+): string {
   return `# Assistant Configuration:
 
 <assistant_instructions>
@@ -127,7 +135,16 @@ ${assistantInstruction}
 `;
 }
 
-function instructionForContexts(args: Pick<EditRequestBody, 'pageBody' | 'isPageBodyPartial' | 'partialPageBodyStartIndex' | 'selectedText' | 'selectedPosition'>): string {
+function instructionForContexts(
+  args: Pick<
+    EditRequestBody,
+    | 'pageBody'
+    | 'isPageBodyPartial'
+    | 'partialPageBodyStartIndex'
+    | 'selectedText'
+    | 'selectedPosition'
+  >,
+): string {
   return `# Contexts:
 ## ${args.isPageBodyPartial ? 'pageBodyPartial' : 'pageBody'}:
 
@@ -135,17 +152,20 @@ function instructionForContexts(args: Pick<EditRequestBody, 'pageBody' | 'isPage
 ${args.pageBody}
 </page_body>
 
-${args.isPageBodyPartial && args.partialPageBodyStartIndex != null
+${
+  args.isPageBodyPartial && args.partialPageBodyStartIndex != null
     ? `- **partialPageBodyStartIndex**: ${args.partialPageBodyStartIndex ?? 0}`
     : ''
 }
 
-${args.selectedText != null && args.selectedText.length > 0
+${
+  args.selectedText != null && args.selectedText.length > 0
     ? `## selectedText: <selected_text>${args.selectedText}\n</selected_text>`
     : ''
 }
 
-${args.selectedText != null && args.selectedPosition != null
+${
+  args.selectedText != null && args.selectedPosition != null
     ? `- **selectedPosition**: ${args.selectedPosition}`
     : ''
 }
@@ -155,8 +175,12 @@ ${args.selectedText != null && args.selectedPosition != null
 /**
  * Create endpoint handlers for editor assistant
  */
-export const postMessageToEditHandlersFactory: PostMessageHandlersFactory = (crowi) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(crowi);
+export const postMessageToEditHandlersFactory: PostMessageHandlersFactory = (
+  crowi,
+) => {
+  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
+    crowi,
+  );
 
   // Validator setup
   const validator: ValidationChain[] = [
@@ -180,22 +204,41 @@ export const postMessageToEditHandlersFactory: PostMessageHandlersFactory = (cro
       .optional()
       .isNumeric()
       .withMessage('selectedPosition must be number'),
-    body('threadId').optional().isString().withMessage('threadId must be string'),
+    body('threadId')
+      .optional()
+      .isString()
+      .withMessage('threadId must be string'),
   ];
 
   return [
-    accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT], { acceptLegacy: true }), loginRequiredStrictly, certifyAiService, validator, apiV3FormValidator,
-    async(req: Req, res: ApiV3Response) => {
+    accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT], {
+      acceptLegacy: true,
+    }),
+    loginRequiredStrictly,
+    certifyAiService,
+    validator,
+    apiV3FormValidator,
+    async (req: Req, res: ApiV3Response) => {
       const {
         userMessage,
-        pageBody, isPageBodyPartial, partialPageBodyStartIndex,
-        selectedText, selectedPosition,
-        threadId, aiAssistantId: _aiAssistantId,
+        pageBody,
+        isPageBodyPartial,
+        partialPageBodyStartIndex,
+        selectedText,
+        selectedPosition,
+        threadId,
+        aiAssistantId: _aiAssistantId,
       } = req.body;
 
       // Parameter check
       if (threadId == null) {
-        return res.apiv3Err(new ErrorV3('threadId is not set', MessageErrorCode.THREAD_ID_IS_NOT_SET), 400);
+        return res.apiv3Err(
+          new ErrorV3(
+            'threadId is not set',
+            MessageErrorCode.THREAD_ID_IS_NOT_SET,
+          ),
+          400,
+        );
       }
 
       // Service check
@@ -204,21 +247,36 @@ export const postMessageToEditHandlersFactory: PostMessageHandlersFactory = (cro
         return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
       }
 
-      const threadRelation = await ThreadRelationModel.findOne({ threadId: { $eq: threadId } });
+      const threadRelation = await ThreadRelationModel.findOne({
+        threadId: { $eq: threadId },
+      });
       if (threadRelation == null) {
         return res.apiv3Err(new ErrorV3('ThreadRelation not found'), 404);
       }
 
       // Check if usable
-      const aiAssistantId = _aiAssistantId ?? (threadRelation.aiAssistant != null ? getIdStringForRef(threadRelation.aiAssistant) : undefined);
+      const aiAssistantId =
+        _aiAssistantId ??
+        (threadRelation.aiAssistant != null
+          ? getIdStringForRef(threadRelation.aiAssistant)
+          : undefined);
       if (aiAssistantId != null) {
-        const isAiAssistantUsable = await openaiService.isAiAssistantUsable(aiAssistantId, req.user);
+        const isAiAssistantUsable = await openaiService.isAiAssistantUsable(
+          aiAssistantId,
+          req.user,
+        );
         if (!isAiAssistantUsable) {
-          return res.apiv3Err(new ErrorV3('The specified AI assistant is not usable'), 400);
+          return res.apiv3Err(
+            new ErrorV3('The specified AI assistant is not usable'),
+            400,
+          );
         }
       }
 
-      const aiAssistant = aiAssistantId != null ? await AiAssistantModel.findOne({ _id: { $eq: aiAssistantId } }) : undefined;
+      const aiAssistant =
+        aiAssistantId != null
+          ? await AiAssistantModel.findOne({ _id: { $eq: aiAssistantId } })
+          : undefined;
 
       // Initialize SSE helper and stream processor
       const sseHelper = new SseHelper(res);
@@ -260,7 +318,11 @@ export const postMessageToEditHandlersFactory: PostMessageHandlersFactory = (cro
               selectedText,
               selectedPosition,
             }),
-            aiAssistant != null ? instructionForAssistantInstruction(aiAssistant.additionalInstruction) : '',
+            aiAssistant != null
+              ? instructionForAssistantInstruction(
+                  aiAssistant.additionalInstruction,
+                )
+              : '',
           ].join('\n\n'),
           additional_messages: [
             {
@@ -268,11 +330,14 @@ export const postMessageToEditHandlersFactory: PostMessageHandlersFactory = (cro
               content: `User request: ${userMessage}`,
             },
           ],
-          response_format: zodResponseFormat(LlmEditorAssistantResponseSchema, 'editor_assistant_response'),
+          response_format: zodResponseFormat(
+            LlmEditorAssistantResponseSchema,
+            'editor_assistant_response',
+          ),
         });
 
         // Message delta handler
-        const messageDeltaHandler = async(delta: MessageDelta) => {
+        const messageDeltaHandler = async (delta: MessageDelta) => {
           const content = delta.content?.[0];
 
           // Process annotations
@@ -288,8 +353,7 @@ export const postMessageToEditHandlersFactory: PostMessageHandlersFactory = (cro
             streamProcessor.process(rawBuffer, chunk);
 
             rawBuffer += chunk;
-          }
-          else {
+          } else {
             sseHelper.writeData(delta);
           }
         };
@@ -304,7 +368,10 @@ export const postMessageToEditHandlersFactory: PostMessageHandlersFactory = (cro
             if (errorMessage == null) return;
 
             logger.error(errorMessage);
-            sseHelper.writeError(errorMessage, getStreamErrorCode(errorMessage));
+            sseHelper.writeError(
+              errorMessage,
+              getStreamErrorCode(errorMessage),
+            );
           }
         });
 
@@ -326,7 +393,9 @@ export const postMessageToEditHandlersFactory: PostMessageHandlersFactory = (cro
           // Clean up
           streamProcessor.destroy();
           stream.off('messageDelta', messageDeltaHandler);
-          sseHelper.writeError('An error occurred while processing your request');
+          sseHelper.writeError(
+            'An error occurred while processing your request',
+          );
           sseHelper.end();
         });
 
@@ -341,8 +410,7 @@ export const postMessageToEditHandlersFactory: PostMessageHandlersFactory = (cro
 
           logger.debug('Connection closed by client');
         });
-      }
-      catch (err) {
+      } catch (err) {
         // Clean up and respond on error
         logger.error('Error in edit handler:', err);
         streamProcessor.destroy();

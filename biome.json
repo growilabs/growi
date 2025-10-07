@@ -30,7 +30,7 @@
       "!apps/app/public/**",
       "!apps/app/src/client/**",
       "!apps/app/src/components/**",
-      "!apps/app/src/features/openai/**",
+      "!apps/app/src/features/openai/client/**",
       "!apps/app/src/models/**",
       "!apps/app/src/pages/**",
       "!apps/app/src/server/**",

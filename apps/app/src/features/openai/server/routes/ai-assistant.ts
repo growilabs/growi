@@ -1,15 +1,14 @@
-import { type IUserHasId } from '@growi/core';
+import type { IUserHasId } from '@growi/core';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
-
-import { SCOPE } from '@growi/core/dist/interfaces';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
-import { type UpsertAiAssistantData } from '../../interfaces/ai-assistant';
+import type { UpsertAiAssistantData } from '../../interfaces/ai-assistant';
 import { getOpenaiService } from '../services/openai';
 
 import { certifyAiService } from './middlewares/certify-ai-service';
@@ -22,17 +21,23 @@ type CreateAssistantFactory = (crowi: Crowi) => RequestHandler[];
 type ReqBody = UpsertAiAssistantData;
 
 type Req = Request<undefined, Response, ReqBody> & {
-  user: IUserHasId,
-}
+  user: IUserHasId;
+};
 
 export const createAiAssistantFactory: CreateAssistantFactory = (crowi) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(crowi);
+  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
+    crowi,
+  );
 
   return [
-    accessTokenParser(
-      [SCOPE.WRITE.FEATURES.AI_ASSISTANT], { acceptLegacy: true },
-    ), loginRequiredStrictly, certifyAiService, upsertAiAssistantValidator, apiV3FormValidator,
-    async(req: Req, res: ApiV3Response) => {
+    accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT], {
+      acceptLegacy: true,
+    }),
+    loginRequiredStrictly,
+    certifyAiService,
+    upsertAiAssistantValidator,
+    apiV3FormValidator,
+    async (req: Req, res: ApiV3Response) => {
       const openaiService = getOpenaiService();
       if (openaiService == null) {
         return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
@@ -41,16 +46,25 @@ export const createAiAssistantFactory: CreateAssistantFactory = (crowi) => {
       try {
         const aiAssistantData = { ...req.body, owner: req.user._id };
 
-        const isLearnablePageLimitExceeded = await openaiService.isLearnablePageLimitExceeded(req.user, aiAssistantData.pagePathPatterns);
+        const isLearnablePageLimitExceeded =
+          await openaiService.isLearnablePageLimitExceeded(
+            req.user,
+            aiAssistantData.pagePathPatterns,
+          );
         if (isLearnablePageLimitExceeded) {
-          return res.apiv3Err(new ErrorV3('The number of learnable pages exceeds the limit'), 400);
+          return res.apiv3Err(
+            new ErrorV3('The number of learnable pages exceeds the limit'),
+            400,
+          );
         }
 
-        const aiAssistant = await openaiService.createAiAssistant(req.body, req.user);
+        const aiAssistant = await openaiService.createAiAssistant(
+          req.body,
+          req.user,
+        );
 
         return res.apiv3({ aiAssistant });
-      }
-      catch (err) {
+      } catch (err) {
         logger.error(err);
         return res.apiv3Err(new ErrorV3('AiAssistant creation failed'));
       }

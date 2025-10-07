@@ -4,8 +4,11 @@ import type { OpenAI } from 'openai';
 
 import { openaiClient } from './client';
 
-
-export const embed = async(input: string, username?: string): Promise<OpenAI.Embedding[]> => {
+export const embed = async (
+  input: string,
+  username?: string,
+): Promise<OpenAI.Embedding[]> => {
+  // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
   let user;
 
   if (username != null) {

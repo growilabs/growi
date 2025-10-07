@@ -1,13 +1,13 @@
 import { pathUtils } from '@growi/core/dist/utils';
 
 /**
-  * @example
-  * // Input: '/Sandbox/Bootstrap5/'
-  * // Output: ['/Sandbox/*', '/Sandbox/Bootstrap5/*']
-  *
-  * // Input: '/user/admin/memo/'
-  * // Output: ['/user/*', '/user/admin/*', '/user/admin/memo/*']
-  */
+ * @example
+ * // Input: '/Sandbox/Bootstrap5/'
+ * // Output: ['/Sandbox/*', '/Sandbox/Bootstrap5/*']
+ *
+ * // Input: '/user/admin/memo/'
+ * // Output: ['/user/*', '/user/admin/*', '/user/admin/memo/*']
+ */
 export const generateGlobPatterns = (path: string): string[] => {
   // Remove trailing slash if exists
   const normalizedPath = pathUtils.removeTrailingSlash(path);
