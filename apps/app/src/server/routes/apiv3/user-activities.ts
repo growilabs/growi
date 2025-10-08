@@ -12,6 +12,7 @@ import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
+
 import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 
@@ -19,17 +20,28 @@ import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
 
-
 const validator = {
   list: [
-    query('limit').optional().isInt({ max: 100 }).withMessage('limit must be a number less than or equal to 100'),
-    query('offset').optional().isInt().withMessage('page must be a number'),
+    query('limit').optional().isInt({ max: 100 }).withMessage('limit must be a number less than or equal to 100')
+      .toInt(),
+    query('offset').optional().isInt().withMessage('page must be a number')
+      .toInt(),
     query('searchFilter').optional().isString().withMessage('query must be a string'),
   ],
 };
 
-interface AuthorizedRequest extends Request {
-   user?: IUserHasId;
+type BaseParsedQs = Request['query'];
+type BaseRequest = Omit<Request, 'query'>;
+
+interface StrictActivityQuery {
+  limit?: number;
+  offset?: number;
+  searchFilter?: string;
+}
+
+interface AuthorizedRequest extends BaseRequest {
+    user?: IUserHasId;
+    query: StrictActivityQuery & BaseParsedQs;
 }
 
 /**
@@ -156,9 +168,10 @@ module.exports = (crowi: Crowi): Router => {
   router.get('/',
     loginRequiredStrictly, validator.list, apiV3FormValidator, async(req: AuthorizedRequest, res: ApiV3Response) => {
 
-      const defaultLimit = String(configManager.getConfig('customize:showPageLimitationS'));
-      const limit: number = parseInt(req.query.limit as string || defaultLimit, 10) || 10;
-      const offset: number = parseInt(req.query.offset as string || '0', 10) || 0;
+      const defaultLimit = configManager.getConfig('customize:showPageLimitationS');
+
+      const limit = req.query.limit || defaultLimit || 10;
+      const offset = req.query.offset || 0;
 
       const user = req.user;
 
