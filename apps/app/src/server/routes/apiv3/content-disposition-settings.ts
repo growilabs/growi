@@ -26,9 +26,6 @@ module.exports = (crowi) => {
     body('newAttachmentMimeTypes').isArray().withMessage('Attachment mime types must be an array.'),
   ];
 
-  type InlineMimeTypesConfig = { inlineMimeTypes: string[] };
-  type AttachmentMimeTypesConfig = { attachmentMimeTypes: string[] };
-
   interface UpdateMimeTypesPayload {
     newInlineMimeTypes: string[];
     newAttachmentMimeTypes: string[];
@@ -91,8 +88,8 @@ module.exports = (crowi) => {
         return res.apiv3Err(new ErrorV3('Internal Type Error', 'internal-error'));
       }
 
-      const { newInlineMimeTypes } = req.body;
-      const { newAttachmentMimeTypes } = req.body;
+      const newInlineMimeTypes: string[] = req.body.newInlineMimeTypes;
+      const newAttachmentMimeTypes: string[] = req.body.newAttachmentMimeTypes;
 
       // Ensure no MIME type is in both lists.
       const inlineSet = new Set(newInlineMimeTypes);
@@ -108,10 +105,10 @@ module.exports = (crowi) => {
         await configManager.updateConfigs({
           'attachments:contentDisposition:inlineMimeTypes': {
             inlineMimeTypes: Array.from(inlineSet),
-          } as InlineMimeTypesConfig,
+          },
           'attachments:contentDisposition:attachmentMimeTypes': {
             attachmentMimeTypes: Array.from(attachmentSet),
-          } as AttachmentMimeTypesConfig,
+          },
         });
 
         const parameters = {
