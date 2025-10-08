@@ -1,5 +1,5 @@
 import React, {
-  useState, useEffect, useCallback, useMemo, type JSX,
+  useState, useEffect, useCallback, useMemo,
 } from 'react';
 
 import { isIPageInfoForEntity } from '@growi/core';
@@ -26,8 +26,10 @@ const isV5Compatible = (meta: unknown): boolean => {
   return isIPageInfoForEntity(meta) ? meta.isV5Compatible : true;
 };
 
-
-const PageRenameModal = (): JSX.Element => {
+/**
+ * PageRenameModalSubstance - Heavy processing component (rendered only when modal is open)
+ */
+const PageRenameModalSubstance: React.FC = () => {
   const { t } = useTranslation();
 
   const { isUsersHomepage } = pagePathUtils;
@@ -79,15 +81,19 @@ const PageRenameModal = (): JSX.Element => {
     }
   }, [isOpened, page, updateSubordinatedList]);
 
+  // Memoize computed values
+  const isTargetPageDuplicate = useMemo(() => existingPaths.includes(pageNameInput), [existingPaths, pageNameInput]);
+  const isV5CompatiblePage = useMemo(() => (page != null ? isV5Compatible(page.meta) : true), [page]);
+
   const canRename = useMemo(() => {
     if (page == null || isMatchedWithUserHomepagePath || page.data.path === pageNameInput) {
       return false;
     }
-    if (isV5Compatible(page.meta)) {
+    if (isV5CompatiblePage) {
       return existingPaths.length === 0; // v5 data
     }
     return isRenameRecursively; // v4 data
-  }, [existingPaths.length, isMatchedWithUserHomepagePath, isRenameRecursively, page, pageNameInput]);
+  }, [existingPaths.length, isMatchedWithUserHomepagePath, isRenameRecursively, page, pageNameInput, isV5CompatiblePage]);
 
   const rename = useCallback(async() => {
     if (page == null || !canRename) {
@@ -175,10 +181,10 @@ const PageRenameModal = (): JSX.Element => {
    * change pageNameInput
    * @param {string} value
    */
-  function inputChangeHandler(value) {
+  const inputChangeHandler = useCallback((value) => {
     setErrs(null);
     setPageNameInput(value);
-  }
+  }, []);
 
   useEffect(() => {
     if (isOpened || page == null) {
@@ -199,13 +205,12 @@ const PageRenameModal = (): JSX.Element => {
 
   }, [isOpened, page]);
 
-  const bodyContent = () => {
+  const bodyContent = useMemo(() => {
     if (!isOpened || page == null) {
       return <></>;
     }
 
     const { path } = page.data;
-    const isTargetPageDuplicate = existingPaths.includes(pageNameInput);
 
     return (
       <>
@@ -324,9 +329,12 @@ const PageRenameModal = (): JSX.Element => {
         </Collapse>
       </>
     );
-  };
+  }, [isOpened, page, siteUrl, t, pageNameInput, isTargetPageDuplicate, isMatchedWithUserHomepagePath,
+      isReachable, ppacInputChangeHandler, rename, inputChangeHandler,
+      isRenameRecursively, existingPaths, expandOtherOptions, isRenameRedirect,
+      isRemainMetadata, subordinatedError]);
 
-  const footerContent = () => {
+  const footerContent = useMemo(() => {
     if (!isOpened || page == null) {
       return <></>;
     }
@@ -346,20 +354,37 @@ const PageRenameModal = (): JSX.Element => {
         </button>
       </>
     );
-  };
-
+  }, [isOpened, page, canRename, errs, pageNameInput, rename]);
 
   return (
-    <Modal size="lg" isOpen={isOpened} toggle={closeRenameModal} data-testid="page-rename-modal" autoFocus={false}>
+    <>
       <ModalHeader tag="h4" toggle={closeRenameModal}>
         { t('modal_rename.label.Move/Rename page') }
       </ModalHeader>
       <ModalBody>
-        {bodyContent()}
+        {bodyContent}
       </ModalBody>
       <ModalFooter>
-        {footerContent()}
+        {footerContent}
       </ModalFooter>
+    </>
+  );
+};
+
+/**
+ * PageRenameModal - Container component (lightweight, always rendered)
+ */
+const PageRenameModal = (): React.JSX.Element => {
+  const { isOpened } = usePageRenameModalStatus();
+  const { close: closeRenameModal } = usePageRenameModalActions();
+
+  if (!isOpened) {
+    return <></>;
+  }
+
+  return (
+    <Modal size="lg" isOpen={isOpened} toggle={closeRenameModal} data-testid="page-rename-modal" autoFocus={false}>
+      <PageRenameModalSubstance />
     </Modal>
   );
 };
