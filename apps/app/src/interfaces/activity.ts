@@ -568,6 +568,17 @@ export const LargeActionGroup = {
   ACTION_ADMIN_SEARCH_INDICES_REBUILD,
 } as const;
 
+export const ActivityLogActions = {
+  ACTION_PAGE_CREATE,
+  ACTION_PAGE_UPDATE,
+  ACTION_PAGE_RENAME,
+  ACTION_PAGE_DUPLICATE,
+  ACTION_PAGE_DELETE,
+  ACTION_COMMENT_CREATE,
+  ACTION_COMMENT_UPDATE,
+  ACTION_ATTACHMENT_ADD,
+} as const;
+
 /*
  * Array
  */
