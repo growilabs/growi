@@ -30,6 +30,9 @@ const ChatSidebarSubstance = (): JSX.Element => {
         >
           Send Message
         </button>
+
+        {/* eslint-disable-next-line max-len */}
+        <button type="button" className="tw:text-white tw:bg-gradient-to-r tw:from-purple-500 tw:to-pink-500 hover:tw:bg-gradient-to-l tw:focus:ring-4 tw:focus:outline-none tw:focus:ring-purple-200 dark:tw:focus:ring-purple-800 tw:font-medium tw:rounded-lg tw:text-sm tw:px-5 tw:py-2.5 tw:text-center tw:me-2 tw:mb-2">tailwind button</button>
         {/* ============================================ */}
 
       </SimpleBar>
