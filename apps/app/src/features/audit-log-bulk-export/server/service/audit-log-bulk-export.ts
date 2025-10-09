@@ -64,7 +64,7 @@ export class DuplicateAuditLogBulkExportJobError extends Error {
 
   duplicateJob: AuditLogBulkExportJobDocument;
 
-  constructor(duplicateJob:AuditLogBulkExportJobDocument) {
+  constructor(duplicateJob: AuditLogBulkExportJobDocument) {
     super('Duplicate audit-log bulk export job is in progress');
     this.duplicateJob = duplicateJob;
   }

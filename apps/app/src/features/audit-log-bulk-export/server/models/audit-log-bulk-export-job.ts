@@ -1,5 +1,5 @@
-import { type Model, Schema } from 'mongoose';
 import type { HydratedDocument } from 'mongoose';
+import { type Model, Schema } from 'mongoose';
 
 import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
@@ -9,7 +9,8 @@ import {
   AuditLogBulkExportJobStatus,
 } from '../../interfaces/audit-log-bulk-export';
 
-export type AuditLogBulkExportJobDocument = HydratedDocument<IAuditLogBulkExportJob>;
+export type AuditLogBulkExportJobDocument =
+  HydratedDocument<IAuditLogBulkExportJob>;
 
 export type AuditLogBulkExportJobModel = Model<AuditLogBulkExportJobDocument>;
 
@@ -38,7 +39,7 @@ const auditLogBulkExportJobSchema = new Schema<IAuditLogBulkExportJob>(
   { timestamps: true },
 );
 
-export default getOrCreateModel<AuditLogBulkExportJobDocument, AuditLogBulkExportJobModel>(
-  'AuditLogBulkExportJob',
-  auditLogBulkExportJobSchema,
-);
+export default getOrCreateModel<
+  AuditLogBulkExportJobDocument,
+  AuditLogBulkExportJobModel
+>('AuditLogBulkExportJob', auditLogBulkExportJobSchema);

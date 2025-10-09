@@ -10,8 +10,8 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 
 import {
-  DuplicateAuditLogBulkExportJobError,
   auditLogBulkExportService,
+  DuplicateAuditLogBulkExportJobError,
 } from '../../service/audit-log-bulk-export';
 
 const logger = loggerFactory('growi:routes:apiv3:audit-log-bulk-export');
@@ -35,7 +35,10 @@ module.exports = (crowi: Crowi): Router => {
       body('filters.users.*').optional({ nullable: true }).isString(),
       body('filters.actions').optional({ nullable: true }).isArray(),
       body('filters.actions.*').optional({ nullable: true }).isString(),
-      body('filters.dateFrom').optional({ nullable: true }).isISO8601().toDate(),
+      body('filters.dateFrom')
+        .optional({ nullable: true })
+        .isISO8601()
+        .toDate(),
       body('filters.dateTo').optional({ nullable: true }).isISO8601().toDate(),
       body('format')
         .optional({ nullable: true })
@@ -55,7 +58,11 @@ module.exports = (crowi: Crowi): Router => {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { filters, format = AuditLogBulkExportFormat.json, restartJob } = req.body as {
+      const {
+        filters,
+        format = AuditLogBulkExportFormat.json,
+        restartJob,
+      } = req.body as {
         filters: {
           users?: string[];
           actions?: string[];
@@ -95,7 +102,10 @@ module.exports = (crowi: Crowi): Router => {
         }
 
         return res.apiv3Err(
-          new ErrorV3('Failed to start audit-log bulk export', 'audit_log_bulk_export.failed_to_export'),
+          new ErrorV3(
+            'Failed to start audit-log bulk export',
+            'audit_log_bulk_export.failed_to_export',
+          ),
         );
       }
     },

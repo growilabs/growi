@@ -1,8 +1,4 @@
-import type {
-  HasObjectId,
-  IUser,
-  Ref,
-} from '@growi/core';
+import type { HasObjectId, IUser, Ref } from '@growi/core';
 
 export const AuditLogBulkExportFormat = {
   json: 'json',
@@ -26,10 +22,10 @@ export type AuditLogBulkExportJobStatus =
   (typeof AuditLogBulkExportJobStatus)[keyof typeof AuditLogBulkExportJobStatus];
 
 export interface IAuditLogBulkExportFilters {
-  users? : Array<Ref<IUser>>;
-  actions? : string[];
-  dateFrom? : Date;
-  dateTo? : Date;
+  users?: Array<Ref<IUser>>;
+  actions?: string[];
+  dateFrom?: Date;
+  dateTo?: Date;
 }
 
 export interface IAuditLogBulkExportJob {
@@ -47,4 +43,5 @@ export interface IAuditLogBulkExportJob {
 }
 
 export interface IAuditLogBulkExportJobHasId
-  extends IAuditLogBulkExportJob, HasObjectId {}
+  extends IAuditLogBulkExportJob,
+    HasObjectId {}
