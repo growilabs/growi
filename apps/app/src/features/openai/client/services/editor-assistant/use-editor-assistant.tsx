@@ -30,8 +30,8 @@ import type { MessageLog } from '../../../interfaces/message';
 import type { IThreadRelationHasId } from '../../../interfaces/thread-relation';
 import { ThreadType } from '../../../interfaces/thread-relation';
 import { handleIfSuccessfullyParsed } from '../../../utils/handle-if-successfully-parsed';
-import { AiAssistantDropdown } from '../../components/AiAssistant/AiAssistantSidebar/AiAssistantDropdown';
-import { QuickMenuList } from '../../components/AiAssistant/AiAssistantSidebar/QuickMenuList';
+// import { AiAssistantDropdown } from '../../components/AiAssistant/AiAssistantSidebar/AiAssistantDropdown';
+// import { QuickMenuList } from '../../components/AiAssistant/AiAssistantSidebar/QuickMenuList';
 import { useAiAssistantSidebar } from '../../stores/ai-assistant';
 import { useClientEngineIntegration, shouldUseClientProcessing } from '../client-engine-integration';
 
@@ -390,7 +390,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
 
     return (
       <>
-        <div className="py-2">
+        {/* <div className="py-2">
           <AiAssistantDropdown
             selectedAiAssistant={selectedAiAssistant}
             onSelect={selectAiAssistantHandler}
@@ -398,7 +398,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
         </div>
         <QuickMenuList
           onClick={clickQuickMenuHandler}
-        />
+        /> */}
       </>
     );
   }, [selectedAiAssistant]);
