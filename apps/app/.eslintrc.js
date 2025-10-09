@@ -27,10 +27,14 @@ module.exports = {
     'test/integration/models/**',
     'test/integration/service/**',
     'test/integration/setup.js',
+    'test-with-vite/**',
+    'public/**',
     'bin/**',
     'config/**',
+    'src/styles/**',
     'src/linter-checker/**',
     'src/migrations/**',
+    'src/models/**',
     'src/features/callout/**',
     'src/features/comment/**',
     'src/features/templates/**',
@@ -45,6 +49,7 @@ module.exports = {
     'src/stores-universal/**',
     'src/interfaces/**',
     'src/utils/**',
+    'src/services/**',
   ],
   settings: {
     // resolve path aliases by eslint-import-resolver-typescript
