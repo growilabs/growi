@@ -3,34 +3,44 @@ import { Container } from 'unstated';
 
 import { apiv3Get, apiv3Put } from '../util/apiv3-client';
 
-import type AdminAppContainer from './AdminAppContainer';
-
-type Disposition = 'inline' | 'attachment';
-type ContentDispositionSettings = Record<string, Disposition>;
-
-interface State {
-  contentDispositionSettings: ContentDispositionSettings;
-}
-interface UpdateResponse {
-  mimeType: string;
-  disposition: Disposition;
+interface ContentDispositionState {
+  inlineMimeTypes: string[];
+  attachmentMimeTypes: string[];
 }
 
-export default class AdminContentDispositionContainer extends Container<State> {
+interface ContentDispositionGetResponse {
+  inlineDispositionSettings: {
+    inlineMimeTypes: string[];
+  };
+  attachmentDispositionSettings: {
+    attachmentMimeTypes: string[];
+  };
+}
 
-  appContainer: AdminAppContainer;
+interface ContentDispositionUpdateRequest {
+  newInlineMimeTypes: string[];
+  newAttachmentMimeTypes: string[];
+}
 
-  constructor(appContainer: AdminAppContainer) {
+interface ContentDispositionUpdateResponse {
+  currentDispositionSettings: {
+    inlineMimeTypes: string[];
+    attachmentMimeTypes: string[];
+  };
+}
+
+export default class AdminContentDispositionContainer extends Container<ContentDispositionState> {
+
+  constructor() {
     super();
 
     if (isServer()) {
       return;
     }
 
-    this.appContainer = appContainer;
-
     this.state = {
-      contentDispositionSettings: {},
+      inlineMimeTypes: [],
+      attachmentMimeTypes: [],
     };
   }
 
@@ -39,51 +49,38 @@ export default class AdminContentDispositionContainer extends Container<State> {
   }
 
   async retrieveContentDispositionSettings(): Promise<void> {
-    const response = await apiv3Get<State>('/content-disposition-settings/');
-    const { contentDispositionSettings } = response.data;
+    const response = await apiv3Get<ContentDispositionGetResponse>('/content-disposition-settings/');
+    const { inlineDispositionSettings, attachmentDispositionSettings } = response.data;
 
     this.setState({
-      contentDispositionSettings,
+      inlineMimeTypes: inlineDispositionSettings.inlineMimeTypes,
+      attachmentMimeTypes: attachmentDispositionSettings.attachmentMimeTypes,
     });
   }
 
-  async updateMimeTypeDisposition(mimeType: string, disposition: Disposition): Promise<void> {
-    const response = await apiv3Put<UpdateResponse>(`/content-disposition-settings/${encodeURIComponent(mimeType)}`, {
-      disposition,
-    });
+  async updateContentDispositionSettings(newInlineMimeTypes: string[], newAttachmentMimeTypes: string[]): Promise<void> {
+    const requestBody: ContentDispositionUpdateRequest = {
+      newInlineMimeTypes,
+      newAttachmentMimeTypes,
+    };
+    const response = await apiv3Put<ContentDispositionUpdateResponse>('/content-disposition-settings/', requestBody);
 
     this.setState({
-      contentDispositionSettings: {
-        ...this.state.contentDispositionSettings,
-        [response.data.mimeType]: response.data.disposition,
-      },
+      inlineMimeTypes: response.data.currentDispositionSettings.inlineMimeTypes,
+      attachmentMimeTypes: response.data.currentDispositionSettings.attachmentMimeTypes,
     });
-  }
-
-  async setInline(mimeType: string): Promise<void> {
-    await this.updateMimeTypeDisposition(mimeType, 'inline');
-  }
-
-  async setAttachment(mimeType: string): Promise<void> {
-    await this.updateMimeTypeDisposition(mimeType, 'attachment');
-  }
-
-  getDispositionForMimeType(mimeType: string): Disposition | undefined {
-    return this.state.contentDispositionSettings[mimeType];
-  }
-
-  private getMimeTypesByDisposition(disposition: Disposition): string[] {
-    return Object.entries(this.state.contentDispositionSettings)
-      .filter(([, d]) => d === disposition)
-      .map(([mimeType]) => mimeType);
   }
 
   getInlineMimeTypes(): string[] {
-    return this.getMimeTypesByDisposition('inline');
+    return [...this.state.inlineMimeTypes];
+  }
+
+  getAttachmentMimeTypes(): string[] {
+    return [...this.state.attachmentMimeTypes];
   }
 
   getAllConfiguredMimeTypes(): string[] {
-    return Object.keys(this.state.contentDispositionSettings);
+    return [...this.state.inlineMimeTypes, ...this.state.attachmentMimeTypes];
   }
 
 }

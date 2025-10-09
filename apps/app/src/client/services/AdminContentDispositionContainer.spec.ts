@@ -19,128 +19,84 @@ vi.mock('@growi/core/dist/utils', () => ({
 
 describe('AdminContentDispositionContainer', () => {
   let container: AdminContentDispositionContainer;
-  let mockAppContainer: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAppContainer = {};
-    container = new AdminContentDispositionContainer(mockAppContainer);
+    container = new AdminContentDispositionContainer();
   });
 
   describe('retrieveContentDispositionSettings', () => {
     it('should retrieve and set content disposition settings', async() => {
-      const mockSettings = {
-        'text/html': 'attachment' as const,
-        'image/svg+xml': 'attachment' as const,
-        'image/png': 'inline' as const,
-        'application/pdf': 'inline' as const,
+      const mockResponse = {
+        inlineDispositionSettings: {
+          inlineMimeTypes: ['image/png', 'application/pdf'],
+        },
+        attachmentDispositionSettings: {
+          attachmentMimeTypes: ['text/html', 'image/svg+xml'],
+        },
       };
 
       vi.mocked(apiv3Client.apiv3Get).mockResolvedValue({
-        data: {
-          contentDispositionSettings: mockSettings,
-        },
+        data: mockResponse,
       } as any);
 
       await container.retrieveContentDispositionSettings();
 
       expect(apiv3Client.apiv3Get).toHaveBeenCalledWith('/content-disposition-settings/');
-      expect(container.state.contentDispositionSettings).toEqual(mockSettings);
+      expect(container.state.inlineMimeTypes).toEqual(['image/png', 'application/pdf']);
+      expect(container.state.attachmentMimeTypes).toEqual(['text/html', 'image/svg+xml']);
     });
   });
 
-  describe('setInline', () => {
-    it('should set a MIME type to inline', async() => {
-      const mimeType = 'application/json';
+  describe('updateContentDispositionSettings', () => {
+    it('should update content disposition settings with new values', async() => {
+      const newInline = ['application/json', 'image/png'];
+      const newAttachment = ['text/html', 'image/svg+xml'];
 
       vi.mocked(apiv3Client.apiv3Put).mockResolvedValue({
         data: {
-          mimeType,
-          disposition: 'inline',
+          currentDispositionSettings: {
+            inlineMimeTypes: newInline,
+            attachmentMimeTypes: newAttachment,
+          },
         },
       } as any);
 
-      await container.setInline(mimeType);
+      await container.updateContentDispositionSettings(newInline, newAttachment);
 
       expect(apiv3Client.apiv3Put).toHaveBeenCalledWith(
-        `/content-disposition-settings/${encodeURIComponent(mimeType)}`,
-        { disposition: 'inline' },
+        '/content-disposition-settings/',
+        {
+          newInlineMimeTypes: newInline,
+          newAttachmentMimeTypes: newAttachment,
+        },
       );
-      expect(container.state.contentDispositionSettings[mimeType]).toBe('inline');
+      expect(container.state.inlineMimeTypes).toEqual(newInline);
+      expect(container.state.attachmentMimeTypes).toEqual(newAttachment);
     });
 
-    it('should handle MIME types with special characters', async() => {
-      const mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-
+    it('should handle empty arrays', async() => {
       vi.mocked(apiv3Client.apiv3Put).mockResolvedValue({
         data: {
-          mimeType,
-          disposition: 'inline',
+          currentDispositionSettings: {
+            inlineMimeTypes: [],
+            attachmentMimeTypes: [],
+          },
         },
       } as any);
 
-      await container.setInline(mimeType);
+      await container.updateContentDispositionSettings([], []);
 
-      expect(apiv3Client.apiv3Put).toHaveBeenCalledWith(
-        `/content-disposition-settings/${encodeURIComponent(mimeType)}`,
-        { disposition: 'inline' },
-      );
-    });
-  });
-
-  describe('setAttachment', () => {
-    it('should set a MIME type to attachment', async() => {
-      const mimeType = 'text/html';
-
-      vi.mocked(apiv3Client.apiv3Put).mockResolvedValue({
-        data: {
-          mimeType,
-          disposition: 'attachment',
-        },
-      } as any);
-
-      await container.setAttachment(mimeType);
-
-      expect(apiv3Client.apiv3Put).toHaveBeenCalledWith(
-        `/content-disposition-settings/${encodeURIComponent(mimeType)}`,
-        { disposition: 'attachment' },
-      );
-      expect(container.state.contentDispositionSettings[mimeType]).toBe('attachment');
-    });
-  });
-
-  describe('getDispositionForMimeType', () => {
-    it('should return the disposition for a specific MIME type', async() => {
-      await container.setState({
-        contentDispositionSettings: {
-          'text/html': 'attachment',
-          'image/png': 'inline',
-        },
-      });
-
-      expect(container.getDispositionForMimeType('text/html')).toBe('attachment');
-      expect(container.getDispositionForMimeType('image/png')).toBe('inline');
-    });
-
-    it('should return undefined for unconfigured MIME types', async() => {
-      await container.setState({
-        contentDispositionSettings: {},
-      });
-
-      expect(container.getDispositionForMimeType('text/html')).toBeUndefined();
+      expect(container.state.inlineMimeTypes).toEqual([]);
+      expect(container.state.attachmentMimeTypes).toEqual([]);
     });
   });
 
   describe('getInlineMimeTypes', () => {
     it('should return all MIME types set to inline', async() => {
       await container.setState({
-        contentDispositionSettings: {
-          'text/html': 'attachment',
-          'image/png': 'inline',
-          'image/jpeg': 'inline',
-          'application/pdf': 'inline',
-          'image/svg+xml': 'attachment',
-        },
+        inlineMimeTypes: ['image/png', 'image/jpeg', 'application/pdf'],
+        attachmentMimeTypes: ['text/html', 'image/svg+xml'],
       });
 
       const inlineTypes = container.getInlineMimeTypes();
@@ -155,10 +111,8 @@ describe('AdminContentDispositionContainer', () => {
 
     it('should return empty array when no inline types exist', async() => {
       await container.setState({
-        contentDispositionSettings: {
-          'text/html': 'attachment',
-          'image/svg+xml': 'attachment',
-        },
+        inlineMimeTypes: [],
+        attachmentMimeTypes: ['text/html', 'image/svg+xml'],
       });
 
       expect(container.getInlineMimeTypes()).toEqual([]);
@@ -168,12 +122,8 @@ describe('AdminContentDispositionContainer', () => {
   describe('getAllConfiguredMimeTypes', () => {
     it('should return all configured MIME types', async() => {
       await container.setState({
-        contentDispositionSettings: {
-          'text/html': 'attachment',
-          'image/png': 'inline',
-          'image/svg+xml': 'attachment',
-          'application/pdf': 'inline',
-        },
+        inlineMimeTypes: ['image/png', 'application/pdf'],
+        attachmentMimeTypes: ['text/html', 'image/svg+xml'],
       });
 
       const allTypes = container.getAllConfiguredMimeTypes();
@@ -187,7 +137,8 @@ describe('AdminContentDispositionContainer', () => {
 
     it('should return empty array when no types are configured', async() => {
       await container.setState({
-        contentDispositionSettings: {},
+        inlineMimeTypes: [],
+        attachmentMimeTypes: [],
       });
 
       expect(container.getAllConfiguredMimeTypes()).toEqual([]);
@@ -195,80 +146,30 @@ describe('AdminContentDispositionContainer', () => {
   });
 
   describe('integration scenarios', () => {
-    it('should handle a complete workflow of setting MIME types', async() => {
-      // Initial state - retrieve settings
-      vi.mocked(apiv3Client.apiv3Get).mockResolvedValue({
+    it('should correctly manage state when updating multiple MIME types', async() => {
+      await container.setState({
+        inlineMimeTypes: [],
+        attachmentMimeTypes: ['text/html'],
+      });
+
+      // Add multiple inline types at once
+      vi.mocked(apiv3Client.apiv3Put).mockResolvedValueOnce({
         data: {
-          contentDispositionSettings: {
-            'text/html': 'attachment',
-            'image/png': 'inline',
+          currentDispositionSettings: {
+            inlineMimeTypes: ['image/png', 'application/pdf'],
+            attachmentMimeTypes: ['text/html'],
           },
         },
       } as any);
 
-      await container.retrieveContentDispositionSettings();
-
-      expect(container.getInlineMimeTypes()).toEqual(['image/png']);
-
-      // Set a new inline MIME type
-      vi.mocked(apiv3Client.apiv3Put).mockResolvedValue({
-        data: {
-          mimeType: 'application/pdf',
-          disposition: 'inline',
-        },
-      } as any);
-
-      await container.setInline('application/pdf');
-
-      expect(container.getInlineMimeTypes()).toContain('application/pdf');
-
-      // Change inline to attachment
-      vi.mocked(apiv3Client.apiv3Put).mockResolvedValue({
-        data: {
-          mimeType: 'image/png',
-          disposition: 'attachment',
-        },
-      } as any);
-
-      await container.setAttachment('image/png');
-
-      expect(container.getDispositionForMimeType('image/png')).toBe('attachment');
-    });
-
-    it('should correctly manage state when updating multiple MIME types', async() => {
-      await container.setState({
-        contentDispositionSettings: {
-          'text/html': 'attachment',
-        },
-      });
-
-      // Set first MIME type
-      vi.mocked(apiv3Client.apiv3Put).mockResolvedValueOnce({
-        data: {
-          mimeType: 'image/png',
-          disposition: 'inline',
-        },
-      } as any);
-
-      await container.setInline('image/png');
-
-      // Set second MIME type
-      vi.mocked(apiv3Client.apiv3Put).mockResolvedValueOnce({
-        data: {
-          mimeType: 'application/pdf',
-          disposition: 'inline',
-        },
-      } as any);
-
-      await container.setInline('application/pdf');
+      await container.updateContentDispositionSettings(
+        ['image/png', 'application/pdf'],
+        ['text/html'],
+      );
 
       // Verify both are in state
-      expect(container.state.contentDispositionSettings).toEqual({
-        'text/html': 'attachment',
-        'image/png': 'inline',
-        'application/pdf': 'inline',
-      });
-
+      expect(container.state.inlineMimeTypes).toEqual(['image/png', 'application/pdf']);
+      expect(container.state.attachmentMimeTypes).toEqual(['text/html']);
       expect(container.getInlineMimeTypes()).toHaveLength(2);
     });
   });
