@@ -196,6 +196,9 @@ export const updatePageHandlersFactory: UpdatePageHandlersFactory = (crowi) => {
           options.userRelatedGrantUserGroupIds = userRelatedGrantUserGroupIds;
         }
         previousRevision = await Revision.findById(sanitizeRevisionId);
+
+        // There are cases where "revisionId" is not required for revision updates
+        // See: https://dev.growi.org/651a6f4a008fee2f99187431#origin-%E3%81%AE%E5%BC%B7%E5%BC%B1
         updatedPage = await crowi.pageService.updatePage(currentPage, body, previousRevision?.body ?? null, req.user, options);
       }
       catch (err) {

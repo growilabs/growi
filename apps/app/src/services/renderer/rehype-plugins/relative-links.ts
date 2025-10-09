@@ -1,10 +1,9 @@
 import assert from 'assert';
 
-import type { Nodes as HastNode, Element } from 'hast';
+import type { Element, Nodes as HastNode } from 'hast';
 import { selectAll } from 'hast-util-select';
 import isAbsolute from 'is-absolute-url';
 import type { Plugin } from 'unified';
-
 
 export type IAnchorsSelector = (node: HastNode) => Element[];
 export type IUrlResolver = (relativeHref: string, basePath: string) => URL;
@@ -29,12 +28,14 @@ const isAnchorLink = (href: string): boolean => {
 };
 
 export type RelativeLinksPluginParams = {
-  pagePath?: string,
-  anchorsSelector?: IAnchorsSelector,
-  urlResolver?: IUrlResolver,
-}
+  pagePath?: string;
+  anchorsSelector?: IAnchorsSelector;
+  urlResolver?: IUrlResolver;
+};
 
-export const relativeLinks: Plugin<[RelativeLinksPluginParams]> = (options = {}) => {
+export const relativeLinks: Plugin<[RelativeLinksPluginParams]> = (
+  options = {},
+) => {
   const anchorsSelector = options.anchorsSelector ?? defaultAnchorsSelector;
   const urlResolver = options.urlResolver ?? defaultUrlResolver;
 
@@ -50,7 +51,12 @@ export const relativeLinks: Plugin<[RelativeLinksPluginParams]> = (options = {})
       assert(anchor.properties != null);
 
       const href = anchor.properties.href;
-      if (href == null || typeof href !== 'string' || isAbsolute(href) || isAnchorLink(href)) {
+      if (
+        href == null ||
+        typeof href !== 'string' ||
+        isAbsolute(href) ||
+        isAnchorLink(href)
+      ) {
         return;
       }
 

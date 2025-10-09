@@ -34,10 +34,14 @@ describe('V5 page migration', () => {
   const pageId10 = new mongoose.Types.ObjectId();
   const pageId11 = new mongoose.Types.ObjectId();
 
-  const onlyPublic = filter => ({ grant: Page.GRANT_PUBLIC, ...filter });
-  const ownedByTestUser1 = filter => ({ grant: Page.GRANT_OWNER, grantedUsers: [testUser1._id], ...filter });
-  const root = filter => ({ grantedUsers: [rootUser._id], ...filter });
-  const rootUserGroup = filter => ({
+  const onlyPublic = (filter) => ({ grant: Page.GRANT_PUBLIC, ...filter });
+  const ownedByTestUser1 = (filter) => ({
+    grant: Page.GRANT_OWNER,
+    grantedUsers: [testUser1._id],
+    ...filter,
+  });
+  const root = (filter) => ({ grantedUsers: [rootUser._id], ...filter });
+  const rootUserGroup = (filter) => ({
     grantedGroups: {
       $elemMatch: {
         item: rootUserGroupId,
@@ -45,7 +49,7 @@ describe('V5 page migration', () => {
     },
     ...filter,
   });
-  const testUser1Group = filter => ({
+  const testUser1Group = (filter) => ({
     grantedGroups: {
       $elemMatch: {
         item: testUser1GroupId,
@@ -58,7 +62,7 @@ describe('V5 page migration', () => {
   const notNormalized = { parent: null };
   const empty = { isEmpty: true };
 
-  beforeAll(async() => {
+  beforeAll(async () => {
     jest.restoreAllMocks();
 
     crowi = await getInstance();
@@ -71,7 +75,11 @@ describe('V5 page migration', () => {
 
     await User.insertMany([
       { name: 'rootUser', username: 'rootUser', email: 'rootUser@example.com' },
-      { name: 'testUser1', username: 'testUser1', email: 'testUser1@example.com' },
+      {
+        name: 'testUser1',
+        username: 'testUser1',
+        email: 'testUser1@example.com',
+      },
     ]);
     rootUser = await User.findOne({ username: 'rootUser' });
     testUser1 = await User.findOne({ username: 'testUser1' });
@@ -264,56 +272,82 @@ describe('V5 page migration', () => {
         parent: pageId7,
         descendantCount: 0,
       },
-
     ]);
-
   });
 
-  const normalizeParentRecursivelyByPages = async(pages, user) => {
+  const normalizeParentRecursivelyByPages = async (pages, user) => {
     return crowi.pageService.normalizeParentRecursivelyByPages(pages, user);
   };
 
-  const normalizeParentByPage = async(page, user) => {
+  const normalizeParentByPage = async (page, user) => {
     return crowi.pageService.normalizeParentByPage(page, user);
   };
 
   describe('normalizeParentRecursivelyByPages()', () => {
-
-    test('should migrate all pages specified by pageIds', async() => {
+    test('should migrate all pages specified by pageIds', async () => {
       jest.restoreAllMocks();
 
-      const pagesToRun = await Page.find({ path: { $in: ['/private1', '/dummyParent/private1'] } });
+      const pagesToRun = await Page.find({
+        path: { $in: ['/private1', '/dummyParent/private1'] },
+      });
 
       // migrate
       await normalizeParentRecursivelyByPages(pagesToRun, testUser1);
       const migratedPages = await Page.find({
         path: {
-          $in: ['/private1', '/dummyParent', '/dummyParent/private1', '/dummyParent/private1/private2', '/dummyParent/private1/private3'],
+          $in: [
+            '/private1',
+            '/dummyParent',
+            '/dummyParent/private1',
+            '/dummyParent/private1/private2',
+            '/dummyParent/private1/private3',
+          ],
         },
       });
-      const migratedPagePaths = migratedPages.filter(doc => doc.parent != null).map(doc => doc.path);
+      const migratedPagePaths = migratedPages
+        .filter((doc) => doc.parent != null)
+        .map((doc) => doc.path);
 
-      const expected = ['/private1', '/dummyParent', '/dummyParent/private1', '/dummyParent/private1/private2', '/dummyParent/private1/private3'];
+      const expected = [
+        '/private1',
+        '/dummyParent',
+        '/dummyParent/private1',
+        '/dummyParent/private1/private2',
+        '/dummyParent/private1/private3',
+      ];
 
       expect(migratedPagePaths.sort()).toStrictEqual(expected.sort());
     });
 
-    test('should change all v4 pages with usergroup to v5 compatible and create new parent page', async() => {
+    test('should change all v4 pages with usergroup to v5 compatible and create new parent page', async () => {
       const page8 = await Page.findOne({ path: '/normalize_7/normalize_8_gA' });
-      const page9 = await Page.findOne({ path: '/normalize_7/normalize_8_gA/normalize_9_gB' });
-      const page10 = await Page.findOne({ path: '/normalize_7/normalize_8_gC' });
+      const page9 = await Page.findOne({
+        path: '/normalize_7/normalize_8_gA/normalize_9_gB',
+      });
+      const page10 = await Page.findOne({
+        path: '/normalize_7/normalize_8_gC',
+      });
       const page11 = await Page.findOne({ path: '/normalize_7' });
       expect(page8).toBeTruthy();
       expect(page9).toBeTruthy();
       expect(page10).toBeTruthy();
       expect(page11).toBeNull();
-      await normalizeParentRecursivelyByPages([page8, page9, page10], testUser1);
+      await normalizeParentRecursivelyByPages(
+        [page8, page9, page10],
+        testUser1,
+      );
 
       // AM => After Migration
       const page7 = await Page.findOne({ path: '/normalize_7' });
-      const page8AM = await Page.findOne({ path: '/normalize_7/normalize_8_gA' });
-      const page9AM = await Page.findOne({ path: '/normalize_7/normalize_8_gA/normalize_9_gB' });
-      const page10AM = await Page.findOne({ path: '/normalize_7/normalize_8_gC' });
+      const page8AM = await Page.findOne({
+        path: '/normalize_7/normalize_8_gA',
+      });
+      const page9AM = await Page.findOne({
+        path: '/normalize_7/normalize_8_gA/normalize_9_gB',
+      });
+      const page10AM = await Page.findOne({
+        path: '/normalize_7/normalize_8_gC',
+      });
       expect(page7).toBeTruthy();
       expect(page8AM).toBeTruthy();
       expect(page9AM).toBeTruthy();
@@ -327,14 +361,31 @@ describe('V5 page migration', () => {
       expect(page10AM.parent).toStrictEqual(page7._id);
     });
 
-    test('should replace empty page with same path with new non-empty page and update all related children\'s parent', async() => {
-      const page1 = await Page.findOne({ path: '/normalize_10', isEmpty: true, parent: { $ne: null } });
-      const page2 = await Page.findOne({
-        path: '/normalize_10/normalize_11_gA', _id: pageId8, isEmpty: true, parent: { $ne: null },
+    test("should replace empty page with same path with new non-empty page and update all related children's parent", async () => {
+      const page1 = await Page.findOne({
+        path: '/normalize_10',
+        isEmpty: true,
+        parent: { $ne: null },
       });
-      const page3 = await Page.findOne({ path: '/normalize_10/normalize_11_gA', _id: pageId9, parent: null }); // not v5
-      const page4 = await Page.findOne({ path: '/normalize_10/normalize_11_gA/normalize_11_gB', parent: { $ne: null } });
-      const page5 = await Page.findOne({ path: '/normalize_10/normalize_12_gC', parent: { $ne: null } });
+      const page2 = await Page.findOne({
+        path: '/normalize_10/normalize_11_gA',
+        _id: pageId8,
+        isEmpty: true,
+        parent: { $ne: null },
+      });
+      const page3 = await Page.findOne({
+        path: '/normalize_10/normalize_11_gA',
+        _id: pageId9,
+        parent: null,
+      }); // not v5
+      const page4 = await Page.findOne({
+        path: '/normalize_10/normalize_11_gA/normalize_11_gB',
+        parent: { $ne: null },
+      });
+      const page5 = await Page.findOne({
+        path: '/normalize_10/normalize_12_gC',
+        parent: { $ne: null },
+      });
       expect(page1).toBeTruthy();
       expect(page2).toBeTruthy();
       expect(page3).toBeTruthy();
@@ -344,10 +395,20 @@ describe('V5 page migration', () => {
 
       // AM => After Migration
       const page1AM = await Page.findOne({ path: '/normalize_10' });
-      const page2AM = await Page.findOne({ path: '/normalize_10/normalize_11_gA', _id: pageId8 });
-      const page3AM = await Page.findOne({ path: '/normalize_10/normalize_11_gA', _id: pageId9 });
-      const page4AM = await Page.findOne({ path: '/normalize_10/normalize_11_gA/normalize_11_gB' });
-      const page5AM = await Page.findOne({ path: '/normalize_10/normalize_12_gC' });
+      const page2AM = await Page.findOne({
+        path: '/normalize_10/normalize_11_gA',
+        _id: pageId8,
+      });
+      const page3AM = await Page.findOne({
+        path: '/normalize_10/normalize_11_gA',
+        _id: pageId9,
+      });
+      const page4AM = await Page.findOne({
+        path: '/normalize_10/normalize_11_gA/normalize_11_gB',
+      });
+      const page5AM = await Page.findOne({
+        path: '/normalize_10/normalize_12_gC',
+      });
       expect(page1AM).toBeTruthy();
       expect(page3AM).toBeTruthy();
       expect(page4AM).toBeTruthy();
@@ -361,7 +422,6 @@ describe('V5 page migration', () => {
 
       expect(page3AM.isEmpty).toBe(false);
     });
-
   });
 
   describe('should normalize only selected pages recursively (while observing the page permission rule)', () => {
@@ -416,7 +476,7 @@ describe('V5 page migration', () => {
      *     - /normalize_g/normalize_i/normalize_k (only me) is normalized
      */
 
-    beforeAll(async() => {
+    beforeAll(async () => {
       // Prepare data
       const id1 = new mongoose.Types.ObjectId();
       const id2 = new mongoose.Types.ObjectId();
@@ -514,12 +574,25 @@ describe('V5 page migration', () => {
       ]);
     });
 
-    test('should not run normalization when the target page is GRANT_USER_GROUP surrounded by public pages', async() => {
-      const mockMainOperation = jest.spyOn(crowi.pageService, 'normalizeParentRecursivelyMainOperation').mockImplementation(v => v);
-      const _page1 = await Page.findOne(onlyPublic({ path: '/deep_path/normalize_a', ...empty }));
-      const _page2 = await Page.findOne(onlyPublic({ path: '/deep_path/normalize_a/normalize_b', ...normalized }));
-      const _page3 = await Page.findOne(testUser1Group({ path: '/deep_path/normalize_a', ...notNormalized }));
-      const _page4 = await Page.findOne(testUser1Group({ path: '/deep_path/normalize_c', ...notNormalized }));
+    test('should not run normalization when the target page is GRANT_USER_GROUP surrounded by public pages', async () => {
+      const mockMainOperation = jest
+        .spyOn(crowi.pageService, 'normalizeParentRecursivelyMainOperation')
+        .mockImplementation((v) => v);
+      const _page1 = await Page.findOne(
+        onlyPublic({ path: '/deep_path/normalize_a', ...empty }),
+      );
+      const _page2 = await Page.findOne(
+        onlyPublic({
+          path: '/deep_path/normalize_a/normalize_b',
+          ...normalized,
+        }),
+      );
+      const _page3 = await Page.findOne(
+        testUser1Group({ path: '/deep_path/normalize_a', ...notNormalized }),
+      );
+      const _page4 = await Page.findOne(
+        testUser1Group({ path: '/deep_path/normalize_c', ...notNormalized }),
+      );
 
       expect(_page1).not.toBeNull();
       expect(_page2).not.toBeNull();
@@ -534,11 +607,19 @@ describe('V5 page migration', () => {
       mockMainOperation.mockRestore();
     });
 
-    test('should not include siblings', async() => {
-      const _page1 = await Page.findOne(onlyPublic({ path: '/normalize_d', ...empty }));
-      const _page2 = await Page.findOne(testUser1Group({ path: '/normalize_d/normalize_e', ...normalized }));
-      const _page3 = await Page.findOne(testUser1Group({ path: '/normalize_d', ...notNormalized }));
-      const _page4 = await Page.findOne(testUser1Group({ path: '/normalize_f', ...notNormalized }));
+    test('should not include siblings', async () => {
+      const _page1 = await Page.findOne(
+        onlyPublic({ path: '/normalize_d', ...empty }),
+      );
+      const _page2 = await Page.findOne(
+        testUser1Group({ path: '/normalize_d/normalize_e', ...normalized }),
+      );
+      const _page3 = await Page.findOne(
+        testUser1Group({ path: '/normalize_d', ...notNormalized }),
+      );
+      const _page4 = await Page.findOne(
+        testUser1Group({ path: '/normalize_f', ...notNormalized }),
+      );
 
       expect(_page1).not.toBeNull();
       expect(_page2).not.toBeNull();
@@ -548,10 +629,18 @@ describe('V5 page migration', () => {
       // Normalize
       await normalizeParentRecursivelyByPages([_page3], testUser1);
 
-      const page1 = await Page.findOne(testUser1Group({ path: '/normalize_d/normalize_e' }));
-      const page2 = await Page.findOne(testUser1Group({ path: '/normalize_d' }));
-      const page3 = await Page.findOne(testUser1Group({ path: '/normalize_f' }));
-      const empty4 = await Page.findOne(onlyPublic({ path: '/normalize_d', ...empty }));
+      const page1 = await Page.findOne(
+        testUser1Group({ path: '/normalize_d/normalize_e' }),
+      );
+      const page2 = await Page.findOne(
+        testUser1Group({ path: '/normalize_d' }),
+      );
+      const page3 = await Page.findOne(
+        testUser1Group({ path: '/normalize_f' }),
+      );
+      const empty4 = await Page.findOne(
+        onlyPublic({ path: '/normalize_d', ...empty }),
+      );
 
       expect(page1).not.toBeNull();
       expect(page2).not.toBeNull();
@@ -569,12 +658,34 @@ describe('V5 page migration', () => {
       expect(page3.descendantCount).toBe(0); // should not be normalized
     });
 
-    test('should replace all unnecessary empty pages and normalization succeeds', async() => {
-      const _pageG = await Page.findOne(onlyPublic({ path: '/normalize_g', ...normalized }));
-      const _pageGH = await Page.findOne(ownedByTestUser1({ path: '/normalize_g/normalize_h', ...notNormalized }));
-      const _pageGI = await Page.findOne(ownedByTestUser1({ path: '/normalize_g/normalize_i', ...notNormalized }));
-      const _pageGHJ = await Page.findOne(ownedByTestUser1({ path: '/normalize_g/normalize_h/normalize_j', ...notNormalized }));
-      const _pageGIK = await Page.findOne(ownedByTestUser1({ path: '/normalize_g/normalize_i/normalize_k', ...notNormalized }));
+    test('should replace all unnecessary empty pages and normalization succeeds', async () => {
+      const _pageG = await Page.findOne(
+        onlyPublic({ path: '/normalize_g', ...normalized }),
+      );
+      const _pageGH = await Page.findOne(
+        ownedByTestUser1({
+          path: '/normalize_g/normalize_h',
+          ...notNormalized,
+        }),
+      );
+      const _pageGI = await Page.findOne(
+        ownedByTestUser1({
+          path: '/normalize_g/normalize_i',
+          ...notNormalized,
+        }),
+      );
+      const _pageGHJ = await Page.findOne(
+        ownedByTestUser1({
+          path: '/normalize_g/normalize_h/normalize_j',
+          ...notNormalized,
+        }),
+      );
+      const _pageGIK = await Page.findOne(
+        ownedByTestUser1({
+          path: '/normalize_g/normalize_i/normalize_k',
+          ...notNormalized,
+        }),
+      );
 
       expect(_pageG).not.toBeNull();
       expect(_pageGH).not.toBeNull();
@@ -588,8 +699,12 @@ describe('V5 page migration', () => {
       const countG = await Page.count({ path: '/normalize_g' });
       const countGH = await Page.count({ path: '/normalize_g/normalize_h' });
       const countGI = await Page.count({ path: '/normalize_g/normalize_i' });
-      const countGHJ = await Page.count({ path: '/normalize_g/normalize_h/normalize_j' });
-      const countGIK = await Page.count({ path: '/normalize_g/normalize_i/normalize_k' });
+      const countGHJ = await Page.count({
+        path: '/normalize_g/normalize_h/normalize_j',
+      });
+      const countGIK = await Page.count({
+        path: '/normalize_g/normalize_i/normalize_k',
+      });
 
       expect(countG).toBe(1);
       expect(countGH).toBe(2);
@@ -599,10 +714,20 @@ describe('V5 page migration', () => {
 
       // -- normalized pages
       const pageG = await Page.findOne(onlyPublic({ path: '/normalize_g' }));
-      const emptyGH = await Page.findOne({ path: '/normalize_g/normalize_h', ...empty });
-      const emptyGI = await Page.findOne({ path: '/normalize_g/normalize_i', ...empty });
-      const pageGHJ = await Page.findOne({ path: '/normalize_g/normalize_h/normalize_j' });
-      const pageGIK = await Page.findOne({ path: '/normalize_g/normalize_i/normalize_k' });
+      const emptyGH = await Page.findOne({
+        path: '/normalize_g/normalize_h',
+        ...empty,
+      });
+      const emptyGI = await Page.findOne({
+        path: '/normalize_g/normalize_i',
+        ...empty,
+      });
+      const pageGHJ = await Page.findOne({
+        path: '/normalize_g/normalize_h/normalize_j',
+      });
+      const pageGIK = await Page.findOne({
+        path: '/normalize_g/normalize_i/normalize_k',
+      });
 
       // Check existence
       expect(pageG).not.toBeNull();
@@ -624,8 +749,12 @@ describe('V5 page migration', () => {
       expect(pageGIK.descendantCount).toStrictEqual(0);
 
       // -- not normalized pages
-      const pageGH = await Page.findOne(ownedByTestUser1({ path: '/normalize_g/normalize_h' }));
-      const pageGI = await Page.findOne(ownedByTestUser1({ path: '/normalize_g/normalize_i' }));
+      const pageGH = await Page.findOne(
+        ownedByTestUser1({ path: '/normalize_g/normalize_h' }),
+      );
+      const pageGI = await Page.findOne(
+        ownedByTestUser1({ path: '/normalize_g/normalize_i' }),
+      );
       // Check existence
       expect(pageGH).not.toBeNull();
       expect(pageGI).not.toBeNull();
@@ -671,7 +800,7 @@ describe('V5 page migration', () => {
      *     - E and F are NOT normalized
      */
 
-    beforeAll(async() => {
+    beforeAll(async () => {
       // Prepare data
       const id17 = new mongoose.Types.ObjectId();
       const id21 = new mongoose.Types.ObjectId();
@@ -792,14 +921,40 @@ describe('V5 page migration', () => {
       ]);
     });
 
-
-    test('Should normalize a single page without including other pages', async() => {
-      const _owned13 = await Page.findOne(ownedByTestUser1({ path: '/normalize_13_owned', ...notNormalized }));
-      const _owned14 = await Page.findOne(ownedByTestUser1({ path: '/normalize_13_owned/normalize_14_owned', ...notNormalized }));
-      const _owned15 = await Page.findOne(ownedByTestUser1({ path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned', ...notNormalized }));
-      const _owned16 = await Page.findOne(ownedByTestUser1({ path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned/normalize_16_owned', ...notNormalized }));
-      const _root16 = await Page.findOne(root({ path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned/normalize_16_root', ...notNormalized }));
-      const _group16 = await Page.findOne(testUser1Group({ path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned/normalize_16_group', ...notNormalized }));
+    test('Should normalize a single page without including other pages', async () => {
+      const _owned13 = await Page.findOne(
+        ownedByTestUser1({ path: '/normalize_13_owned', ...notNormalized }),
+      );
+      const _owned14 = await Page.findOne(
+        ownedByTestUser1({
+          path: '/normalize_13_owned/normalize_14_owned',
+          ...notNormalized,
+        }),
+      );
+      const _owned15 = await Page.findOne(
+        ownedByTestUser1({
+          path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned',
+          ...notNormalized,
+        }),
+      );
+      const _owned16 = await Page.findOne(
+        ownedByTestUser1({
+          path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned/normalize_16_owned',
+          ...notNormalized,
+        }),
+      );
+      const _root16 = await Page.findOne(
+        root({
+          path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned/normalize_16_root',
+          ...notNormalized,
+        }),
+      );
+      const _group16 = await Page.findOne(
+        testUser1Group({
+          path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned/normalize_16_group',
+          ...notNormalized,
+        }),
+      );
 
       expect(_owned13).not.toBeNull();
       expect(_owned14).not.toBeNull();
@@ -812,12 +967,29 @@ describe('V5 page migration', () => {
       await normalizeParentByPage(_owned14, testUser1);
 
       const owned13 = await Page.findOne({ path: '/normalize_13_owned' });
-      const empty13 = await Page.findOne({ path: '/normalize_13_owned', ...empty });
-      const owned14 = await Page.findOne({ path: '/normalize_13_owned/normalize_14_owned' });
-      const owned15 = await Page.findOne({ path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned' });
-      const owned16 = await Page.findOne({ path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned/normalize_16_owned' });
-      const root16 = await Page.findOne(root({ path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned/normalize_16_root' }));
-      const group16 = await Page.findOne(testUser1Group({ path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned/normalize_16_group' }));
+      const empty13 = await Page.findOne({
+        path: '/normalize_13_owned',
+        ...empty,
+      });
+      const owned14 = await Page.findOne({
+        path: '/normalize_13_owned/normalize_14_owned',
+      });
+      const owned15 = await Page.findOne({
+        path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned',
+      });
+      const owned16 = await Page.findOne({
+        path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned/normalize_16_owned',
+      });
+      const root16 = await Page.findOne(
+        root({
+          path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned/normalize_16_root',
+        }),
+      );
+      const group16 = await Page.findOne(
+        testUser1Group({
+          path: '/normalize_13_owned/normalize_14_owned/normalize_15_owned/normalize_16_group',
+        }),
+      );
 
       expect(owned13).not.toBeNull();
       expect(empty13).not.toBeNull();
@@ -842,13 +1014,40 @@ describe('V5 page migration', () => {
       expect(owned14.descendantCount).toBe(0);
     });
 
-    test('Should normalize pages recursively excluding the pages not selected', async() => {
-      const _owned17 = await Page.findOne(ownedByTestUser1({ path: '/normalize_17_owned', ...normalized }));
-      const _owned18 = await Page.findOne(ownedByTestUser1({ path: '/normalize_17_owned/normalize_18_owned', ...normalized }));
-      const _owned19 = await Page.findOne(ownedByTestUser1({ path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned', ...notNormalized }));
-      const _owned20 = await Page.findOne(ownedByTestUser1({ path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned/normalize_20_owned', ...notNormalized }));
-      const _root20 = await Page.findOne(root({ path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned/normalize_20_root', ...notNormalized }));
-      const _group20 = await Page.findOne(rootUserGroup({ path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned/normalize_20_group', ...notNormalized }));
+    test('Should normalize pages recursively excluding the pages not selected', async () => {
+      const _owned17 = await Page.findOne(
+        ownedByTestUser1({ path: '/normalize_17_owned', ...normalized }),
+      );
+      const _owned18 = await Page.findOne(
+        ownedByTestUser1({
+          path: '/normalize_17_owned/normalize_18_owned',
+          ...normalized,
+        }),
+      );
+      const _owned19 = await Page.findOne(
+        ownedByTestUser1({
+          path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned',
+          ...notNormalized,
+        }),
+      );
+      const _owned20 = await Page.findOne(
+        ownedByTestUser1({
+          path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned/normalize_20_owned',
+          ...notNormalized,
+        }),
+      );
+      const _root20 = await Page.findOne(
+        root({
+          path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned/normalize_20_root',
+          ...notNormalized,
+        }),
+      );
+      const _group20 = await Page.findOne(
+        rootUserGroup({
+          path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned/normalize_20_group',
+          ...notNormalized,
+        }),
+      );
 
       expect(_owned17).not.toBeNull();
       expect(_owned18).not.toBeNull();
@@ -861,12 +1060,29 @@ describe('V5 page migration', () => {
       await normalizeParentRecursivelyByPages([_owned20], testUser1);
 
       const owned17 = await Page.findOne({ path: '/normalize_17_owned' });
-      const owned18 = await Page.findOne({ path: '/normalize_17_owned/normalize_18_owned' });
-      const owned19 = await Page.findOne({ path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned' });
-      const empty19 = await Page.findOne({ path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned', ...empty });
-      const owned20 = await Page.findOne({ path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned/normalize_20_owned' });
-      const root20 = await Page.findOne(root({ path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned/normalize_20_root' }));
-      const group20 = await Page.findOne(rootUserGroup({ path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned/normalize_20_group' }));
+      const owned18 = await Page.findOne({
+        path: '/normalize_17_owned/normalize_18_owned',
+      });
+      const owned19 = await Page.findOne({
+        path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned',
+      });
+      const empty19 = await Page.findOne({
+        path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned',
+        ...empty,
+      });
+      const owned20 = await Page.findOne({
+        path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned/normalize_20_owned',
+      });
+      const root20 = await Page.findOne(
+        root({
+          path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned/normalize_20_root',
+        }),
+      );
+      const group20 = await Page.findOne(
+        rootUserGroup({
+          path: '/normalize_17_owned/normalize_18_owned/normalize_19_owned/normalize_20_group',
+        }),
+      );
 
       expect(owned17).not.toBeNull();
       expect(owned18).not.toBeNull();
@@ -890,14 +1106,45 @@ describe('V5 page migration', () => {
       expect(owned18.isEmpty).toBe(false);
     });
 
-    test('Should normalize pages recursively excluding the pages of not user\'s & Should delete unnecessary empty pages', async() => {
-      const _owned21 = await Page.findOne(ownedByTestUser1({ path: '/normalize_21_owned', ...normalized }));
-      const _owned22 = await Page.findOne(ownedByTestUser1({ path: '/normalize_21_owned/normalize_22_owned', ...normalized }));
-      const _owned23 = await Page.findOne(ownedByTestUser1({ path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned', ...notNormalized }));
-      const _empty23 = await Page.findOne({ path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned', ...normalized, ...empty });
-      const _owned24 = await Page.findOne(ownedByTestUser1({ path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned/normalize_24_owned', ...normalized }));
-      const _root24 = await Page.findOne(root({ path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned/normalize_24_root', ...notNormalized }));
-      const _rootGroup24 = await Page.findOne(rootUserGroup({ path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned/normalize_24_rootGroup', ...notNormalized }));
+    test("Should normalize pages recursively excluding the pages of not user's & Should delete unnecessary empty pages", async () => {
+      const _owned21 = await Page.findOne(
+        ownedByTestUser1({ path: '/normalize_21_owned', ...normalized }),
+      );
+      const _owned22 = await Page.findOne(
+        ownedByTestUser1({
+          path: '/normalize_21_owned/normalize_22_owned',
+          ...normalized,
+        }),
+      );
+      const _owned23 = await Page.findOne(
+        ownedByTestUser1({
+          path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned',
+          ...notNormalized,
+        }),
+      );
+      const _empty23 = await Page.findOne({
+        path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned',
+        ...normalized,
+        ...empty,
+      });
+      const _owned24 = await Page.findOne(
+        ownedByTestUser1({
+          path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned/normalize_24_owned',
+          ...normalized,
+        }),
+      );
+      const _root24 = await Page.findOne(
+        root({
+          path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned/normalize_24_root',
+          ...notNormalized,
+        }),
+      );
+      const _rootGroup24 = await Page.findOne(
+        rootUserGroup({
+          path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned/normalize_24_rootGroup',
+          ...notNormalized,
+        }),
+      );
 
       expect(_owned21).not.toBeNull();
       expect(_owned22).not.toBeNull();
@@ -911,12 +1158,29 @@ describe('V5 page migration', () => {
       await normalizeParentRecursivelyByPages([_owned23], testUser1);
 
       const owned21 = await Page.findOne({ path: '/normalize_21_owned' });
-      const owned22 = await Page.findOne({ path: '/normalize_21_owned/normalize_22_owned' });
-      const owned23 = await Page.findOne({ path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned' });
-      const empty23 = await Page.findOne({ path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned', ...empty });
-      const owned24 = await Page.findOne({ path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned/normalize_24_owned' });
-      const root24 = await Page.findOne(root({ path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned/normalize_24_root' }));
-      const rootGroup24 = await Page.findOne(rootUserGroup({ path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned/normalize_24_rootGroup' }));
+      const owned22 = await Page.findOne({
+        path: '/normalize_21_owned/normalize_22_owned',
+      });
+      const owned23 = await Page.findOne({
+        path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned',
+      });
+      const empty23 = await Page.findOne({
+        path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned',
+        ...empty,
+      });
+      const owned24 = await Page.findOne({
+        path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned/normalize_24_owned',
+      });
+      const root24 = await Page.findOne(
+        root({
+          path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned/normalize_24_root',
+        }),
+      );
+      const rootGroup24 = await Page.findOne(
+        rootUserGroup({
+          path: '/normalize_21_owned/normalize_22_owned/normalize_23_owned/normalize_24_rootGroup',
+        }),
+      );
 
       expect(owned21).not.toBeNull();
       expect(owned22).not.toBeNull();
@@ -939,16 +1203,20 @@ describe('V5 page migration', () => {
       expect(owned22.isEmpty).toBe(false);
       expect(owned23.isEmpty).toBe(false);
     });
-
   });
 
   describe('normalizeAllPublicPages()', () => {
     jest.setTimeout(60000);
     let createPagePaths;
     let allPossiblePagePaths;
-    beforeAll(async() => {
+    beforeAll(async () => {
       createPagePaths = [
-        '/publicA', '/publicA/privateB', '/publicA/privateB/publicC', '/parenthesis/(a)[b]{c}d', '/parenthesis/(a)[b]{c}d/public', '/migratedD',
+        '/publicA',
+        '/publicA/privateB',
+        '/publicA/privateB/publicC',
+        '/parenthesis/(a)[b]{c}d',
+        '/parenthesis/(a)[b]{c}d/public',
+        '/migratedD',
       ];
       allPossiblePagePaths = [...createPagePaths, '/parenthesis', '/'];
 
@@ -1003,7 +1271,7 @@ describe('V5 page migration', () => {
       jest.setTimeout(30000);
     });
 
-    test('should migrate all public pages', async() => {
+    test('should migrate all public pages', async () => {
       const migratedPages = await Page.find({
         path: {
           $in: allPossiblePagePaths,
@@ -1024,12 +1292,19 @@ describe('V5 page migration', () => {
         parent: null,
       });
 
-      const migratedPaths = migratedPages.map(page => page.path).sort();
-      const migratedEmptyPaths = migratedEmptyPages.map(page => page.path).sort();
-      const nonMigratedPaths = nonMigratedPages.map(page => page.path).sort();
+      const migratedPaths = migratedPages.map((page) => page.path).sort();
+      const migratedEmptyPaths = migratedEmptyPages
+        .map((page) => page.path)
+        .sort();
+      const nonMigratedPaths = nonMigratedPages.map((page) => page.path).sort();
 
-      const expectedMigratedPaths = allPossiblePagePaths.filter(path => path !== '/').sort();
-      const expectedMigratedEmptyPaths = ['/publicA/privateB', '/parenthesis'].sort();
+      const expectedMigratedPaths = allPossiblePagePaths
+        .filter((path) => path !== '/')
+        .sort();
+      const expectedMigratedEmptyPaths = [
+        '/publicA/privateB',
+        '/parenthesis',
+      ].sort();
       const expectedNonMigratedPaths = ['/publicA/privateB', '/'].sort();
 
       expect(migratedPaths).toStrictEqual(expectedMigratedPaths);
@@ -1039,9 +1314,17 @@ describe('V5 page migration', () => {
   });
 
   describe('normalizeParentByPage()', () => {
-    test('it should normalize not v5 page with usergroup that has parent group', async() => {
-      const page1 = await Page.findOne({ _id: pageId1, path: '/normalize_1', isEmpty: true });
-      const page2 = await Page.findOne({ _id: pageId2, path: '/normalize_1/normalize_2', parent: page1._id });
+    test('it should normalize not v5 page with usergroup that has parent group', async () => {
+      const page1 = await Page.findOne({
+        _id: pageId1,
+        path: '/normalize_1',
+        isEmpty: true,
+      });
+      const page2 = await Page.findOne({
+        _id: pageId2,
+        path: '/normalize_1/normalize_2',
+        parent: page1._id,
+      });
       const page3 = await Page.findOne({ _id: pageId3, path: '/normalize_1' }); // NOT v5
       expect(page1).toBeTruthy();
       expect(page2).toBeTruthy();
@@ -1050,9 +1333,19 @@ describe('V5 page migration', () => {
       await normalizeParentByPage(page3, testUser1);
 
       // AM => After Migration
-      const page1AM = await Page.findOne({ _id: pageId1, path: '/normalize_1', isEmpty: true });
-      const page2AM = await Page.findOne({ _id: pageId2, path: '/normalize_1/normalize_2' });
-      const page3AM = await Page.findOne({ _id: pageId3, path: '/normalize_1' }); // v5 compatible
+      const page1AM = await Page.findOne({
+        _id: pageId1,
+        path: '/normalize_1',
+        isEmpty: true,
+      });
+      const page2AM = await Page.findOne({
+        _id: pageId2,
+        path: '/normalize_1/normalize_2',
+      });
+      const page3AM = await Page.findOne({
+        _id: pageId3,
+        path: '/normalize_1',
+      }); // v5 compatible
       expect(page2AM).toBeTruthy();
       expect(page3AM).toBeTruthy();
       expect(page1AM).toBeNull();
@@ -1061,9 +1354,17 @@ describe('V5 page migration', () => {
       expect(page3AM.parent).toStrictEqual(rootPage._id);
     });
 
-    test('should throw error if a page with isolated group becomes the parent of other page with different group after normalizing', async() => {
-      const page4 = await Page.findOne({ _id: pageId4, path: '/normalize_4', isEmpty: true });
-      const page5 = await Page.findOne({ _id: pageId5, path: '/normalize_4/normalize_5', parent: page4._id });
+    test('should throw error if a page with isolated group becomes the parent of other page with different group after normalizing', async () => {
+      const page4 = await Page.findOne({
+        _id: pageId4,
+        path: '/normalize_4',
+        isEmpty: true,
+      });
+      const page5 = await Page.findOne({
+        _id: pageId5,
+        path: '/normalize_4/normalize_5',
+        parent: page4._id,
+      });
       const page6 = await Page.findOne({ _id: pageId6, path: '/normalize_4' }); // NOT v5
       expect(page4).toBeTruthy();
       expect(page5).toBeTruthy();
@@ -1072,15 +1373,25 @@ describe('V5 page migration', () => {
       let isThrown;
       try {
         await normalizeParentByPage(page6, testUser1);
-      }
-      catch (err) {
+      } catch (err) {
         isThrown = true;
       }
 
       // AM => After Migration
-      const page4AM = await Page.findOne({ _id: pageId4, path: '/normalize_4', isEmpty: true });
-      const page5AM = await Page.findOne({ _id: pageId5, path: '/normalize_4/normalize_5', parent: page4._id });
-      const page6AM = await Page.findOne({ _id: pageId6, path: '/normalize_4' }); // NOT v5
+      const page4AM = await Page.findOne({
+        _id: pageId4,
+        path: '/normalize_4',
+        isEmpty: true,
+      });
+      const page5AM = await Page.findOne({
+        _id: pageId5,
+        path: '/normalize_4/normalize_5',
+        parent: page4._id,
+      });
+      const page6AM = await Page.findOne({
+        _id: pageId6,
+        path: '/normalize_4',
+      }); // NOT v5
       expect(isThrown).toBe(true);
       expect(page4AM).toBeTruthy();
       expect(page5AM).toBeTruthy();
@@ -1091,10 +1402,12 @@ describe('V5 page migration', () => {
     });
   });
 
-  test('replace private parents with empty pages', async() => {
+  test('replace private parents with empty pages', async () => {
     const replacedPathPages = await Page.find({ path: '/publicA/privateB' }); // ex-private page
 
-    const _newEmptyPage = replacedPathPages.filter(page => page.parent != null)[0];
+    const _newEmptyPage = replacedPathPages.filter(
+      (page) => page.parent != null,
+    )[0];
     const newEmptyPage = {
       path: _newEmptyPage.path,
       grant: _newEmptyPage.grant,
@@ -1106,7 +1419,9 @@ describe('V5 page migration', () => {
       isEmpty: true,
     };
 
-    const _privatePage = replacedPathPages.filter(page => page.parent == null)[0];
+    const _privatePage = replacedPathPages.filter(
+      (page) => page.parent == null,
+    )[0];
     const privatePage = {
       path: _privatePage.path,
       grant: _privatePage.grant,
@@ -1124,8 +1439,10 @@ describe('V5 page migration', () => {
   });
 
   describe('normalizeParentByPath', () => {
-    const normalizeParentByPath = async(path, user) => {
-      const mock = jest.spyOn(crowi.pageService, 'normalizeParentRecursivelyMainOperation').mockReturnValue(null);
+    const normalizeParentByPath = async (path, user) => {
+      const mock = jest
+        .spyOn(crowi.pageService, 'normalizeParentRecursivelyMainOperation')
+        .mockReturnValue(null);
       const result = await crowi.pageService.normalizeParentByPath(path, user);
       const args = mock.mock.calls[0];
 
@@ -1136,7 +1453,7 @@ describe('V5 page migration', () => {
       return result;
     };
 
-    beforeAll(async() => {
+    beforeAll(async () => {
       const pageIdD = new mongoose.Types.ObjectId();
       const pageIdG = new mongoose.Types.ObjectId();
 
@@ -1203,17 +1520,23 @@ describe('V5 page migration', () => {
       ]);
     });
 
-    test('should fail when the user is not allowed to edit the target page found by path', async() => {
-      const pageTestUser1 = await Page.findOne(ownedByTestUser1({ path: '/norm_parent_by_path_A' }));
+    test('should fail when the user is not allowed to edit the target page found by path', async () => {
+      const pageTestUser1 = await Page.findOne(
+        ownedByTestUser1({ path: '/norm_parent_by_path_A' }),
+      );
 
       expect(pageTestUser1).not.toBeNull();
 
-      await expect(normalizeParentByPath('/norm_parent_by_path_A', rootUser)).rejects.toThrowError();
+      await expect(
+        normalizeParentByPath('/norm_parent_by_path_A', rootUser),
+      ).rejects.toThrowError();
     });
 
-    test('should normalize all granted pages under the path when no page exists at the path', async() => {
+    test('should normalize all granted pages under the path when no page exists at the path', async () => {
       const _pageB = await Page.findOne({ path: '/norm_parent_by_path_B' });
-      const _pageBC = await Page.findOne(root({ path: '/norm_parent_by_path_B/norm_parent_by_path_C' }));
+      const _pageBC = await Page.findOne(
+        root({ path: '/norm_parent_by_path_B/norm_parent_by_path_C' }),
+      );
 
       expect(_pageB).toBeNull();
       expect(_pageBC).not.toBeNull();
@@ -1241,10 +1564,24 @@ describe('V5 page migration', () => {
       expect(pageBC.descendantCount).toBe(0);
     });
 
-    test('should normalize all granted pages under the path when an empty page exists at the path', async() => {
-      const _emptyD = await Page.findOne({ path: '/norm_parent_by_path_D', ...empty, ...normalized });
-      const _pageDE = await Page.findOne(onlyPublic({ path: '/norm_parent_by_path_D/norm_parent_by_path_E', ...normalized }));
-      const _pageDF = await Page.findOne(root({ path: '/norm_parent_by_path_D/norm_parent_by_path_F', ...notNormalized }));
+    test('should normalize all granted pages under the path when an empty page exists at the path', async () => {
+      const _emptyD = await Page.findOne({
+        path: '/norm_parent_by_path_D',
+        ...empty,
+        ...normalized,
+      });
+      const _pageDE = await Page.findOne(
+        onlyPublic({
+          path: '/norm_parent_by_path_D/norm_parent_by_path_E',
+          ...normalized,
+        }),
+      );
+      const _pageDF = await Page.findOne(
+        root({
+          path: '/norm_parent_by_path_D/norm_parent_by_path_F',
+          ...notNormalized,
+        }),
+      );
 
       expect(_emptyD).not.toBeNull();
       expect(_pageDE).not.toBeNull();
@@ -1281,10 +1618,22 @@ describe('V5 page migration', () => {
       expect(pageDF.descendantCount).toBe(0);
     });
 
-    test('should normalize all granted pages under the path when a non-empty page exists at the path', async() => {
-      const _pageG = await Page.findOne(onlyPublic({ path: '/norm_parent_by_path_G', ...normalized }));
-      const _pageGH = await Page.findOne(onlyPublic({ path: '/norm_parent_by_path_G/norm_parent_by_path_H', ...normalized }));
-      const _pageGI = await Page.findOne(root({ path: '/norm_parent_by_path_G/norm_parent_by_path_I', ...notNormalized }));
+    test('should normalize all granted pages under the path when a non-empty page exists at the path', async () => {
+      const _pageG = await Page.findOne(
+        onlyPublic({ path: '/norm_parent_by_path_G', ...normalized }),
+      );
+      const _pageGH = await Page.findOne(
+        onlyPublic({
+          path: '/norm_parent_by_path_G/norm_parent_by_path_H',
+          ...normalized,
+        }),
+      );
+      const _pageGI = await Page.findOne(
+        root({
+          path: '/norm_parent_by_path_G/norm_parent_by_path_I',
+          ...notNormalized,
+        }),
+      );
 
       expect(_pageG).not.toBeNull();
       expect(_pageGH).not.toBeNull();
@@ -1317,5 +1666,4 @@ describe('V5 page migration', () => {
       expect(pageGI.descendantCount).toBe(0);
     });
   });
-
 });

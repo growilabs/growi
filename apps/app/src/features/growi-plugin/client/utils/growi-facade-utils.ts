@@ -7,7 +7,6 @@ declare global {
   var growiFacade: GrowiFacade;
 }
 
-
 export const initializeGrowiFacade = (): void => {
   if (isServer()) {
     return;
@@ -33,8 +32,5 @@ export const registerGrowiFacade = (addedFacade: GrowiFacade): void => {
     throw new Error('This method is available only in client.');
   }
 
-  window.growiFacade = deepmerge(
-    getGrowiFacade(),
-    addedFacade,
-  );
+  window.growiFacade = deepmerge(getGrowiFacade(), addedFacade);
 };

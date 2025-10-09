@@ -729,7 +729,7 @@ class PageGrantService implements IPageGrantService {
   /*
    * get all groups that user is related to
    */
-  async getUserRelatedGroups(user?: IUserHasId | null): Promise<PopulatedGrantedGroup[]> {
+  async getUserRelatedGroups(user?: IUserHasId | HydratedDocument<IUser> | null): Promise<PopulatedGrantedGroup[]> {
     if (user == null) {
       return [];
     }

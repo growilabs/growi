@@ -3,8 +3,10 @@ import { selectAll } from 'hast-util-select';
 import type { Plugin } from 'unified';
 
 import {
+  type IAnchorsSelector,
+  type IUrlResolver,
+  type RelativeLinksPluginParams,
   relativeLinks,
-  type IAnchorsSelector, type IUrlResolver, type RelativeLinksPluginParams,
 } from './relative-links';
 
 const customAnchorsSelector: IAnchorsSelector = (node) => {
@@ -17,7 +19,9 @@ const customUrlResolver: IUrlResolver = (relativeHref, basePath) => {
   return new URL(relativeHref, baseUrl);
 };
 
-export const relativeLinksByPukiwikiLikeLinker: Plugin<[RelativeLinksPluginParams]> = (options = {}) => {
+export const relativeLinksByPukiwikiLikeLinker: Plugin<
+  [RelativeLinksPluginParams]
+> = (options = {}) => {
   return relativeLinks.bind(this)({
     ...options,
     anchorsSelector: customAnchorsSelector,
