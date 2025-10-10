@@ -279,6 +279,7 @@
     "@popperjs/core": "^2.11.8",
     "@swc-node/jest": "^1.8.1",
     "@swc/jest": "^0.2.36",
+    "@tailwindcss/postcss": "^4.1.14",
     "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/user-event": "^14.5.2",
     "@types/archiver": "^6.0.2",
@@ -328,6 +329,7 @@
     "morgan": "^1.10.0",
     "null-loader": "^4.0.1",
     "openapi-typescript": "^7.8.0",
+    "postcss": "^8.5.6",
     "pretty-bytes": "^6.1.1",
     "react-copy-to-clipboard": "^5.0.1",
     "react-dnd": "^14.0.5",
@@ -344,6 +346,7 @@
     "socket.io-client": "^4.7.5",
     "source-map-loader": "^4.0.1",
     "swagger2openapi": "^7.0.8",
+    "tailwindcss": "^4.1.14",
     "unist-util-is": "^6.0.0",
     "unist-util-visit-parents": "^6.0.0"
   }

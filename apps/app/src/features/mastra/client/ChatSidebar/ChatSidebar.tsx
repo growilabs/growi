@@ -30,6 +30,11 @@ const ChatSidebarSubstance = (): JSX.Element => {
         >
           Send Message
         </button>
+
+        {/* tailwind alert examples */}
+        <div className="tw:p-4 tw:mb-4 tw:text-sm tw:text-blue-800 tw:rounded-xl tw:bg-blue-50 tw:dark:bg-gray-800 tw:dark:text-blue-400" role="alert">
+          <span className="tw:font-medium ">Hello Tailwind CSS!</span>
+        </div>
         {/* ============================================ */}
 
       </SimpleBar>
