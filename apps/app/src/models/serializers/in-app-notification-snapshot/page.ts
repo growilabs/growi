@@ -1,8 +1,8 @@
 import type { IPage, IUser } from '@growi/core';
 
 export interface IPageSnapshot {
-  path: string
-  creator: IUser
+  path: string;
+  creator: IUser;
 }
 
 export const stringifySnapshot = (page: IPage): string => {

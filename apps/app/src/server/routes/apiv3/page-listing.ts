@@ -1,5 +1,5 @@
 import type {
-  IPageInfoForListing, IPageInfo, IPage, IUserHasId,
+  IPageInfoForListing, IPageInfo, IUserHasId,
 } from '@growi/core';
 import { getIdForRef, isIPageInfoForEntity } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
@@ -10,9 +10,11 @@ import { query, oneOf } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
+import type { IPageForTreeItem } from '~/interfaces/page';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { configManager } from '~/server/service/config-manager';
 import type { IPageGrantService } from '~/server/service/page-grant';
+import { pageListingService } from '~/server/service/page-listing';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
@@ -87,88 +89,17 @@ const routerFactory = (crowi: Crowi): Router => {
    *               type: object
    *               properties:
    *                 rootPage:
-   *                   $ref: '#/components/schemas/Page'
+   *                   $ref: '#/components/schemas/PageForTreeItem'
    */
   router.get('/root',
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }), loginRequired, async(req: AuthorizedRequest, res: ApiV3Response) => {
-      const Page = mongoose.model<IPage, PageModel>('Page');
-
-      let rootPage;
       try {
-        rootPage = await Page.findByPathAndViewer('/', req.user, null, true);
+        const rootPage: IPageForTreeItem = await pageListingService.findRootByViewer(req.user);
+        return res.apiv3({ rootPage });
       }
       catch (err) {
         return res.apiv3Err(new ErrorV3('rootPage not found'));
       }
-
-      return res.apiv3({ rootPage });
-    });
-
-  /**
-   * @swagger
-   *
-   * /page-listing/ancestors-children:
-   *   get:
-   *     tags: [PageListing]
-   *     security:
-   *       - bearer: []
-   *       - accessTokenInQuery: []
-   *     summary: /page-listing/ancestors-children
-   *     description: Get the ancestors and children of a page
-   *     parameters:
-   *       - name: path
-   *         in: query
-   *         required: true
-   *         schema:
-   *           type: string
-   *     responses:
-   *       200:
-   *         description: Get the ancestors and children of a page
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 ancestorsChildren:
-   *                   type: object
-   *                   additionalProperties:
-   *                     type: object
-   *                     properties:
-   *                       _id:
-   *                         type: string
-   *                         description: Document ID
-   *                       descendantCount:
-   *                         type: integer
-   *                         description: Number of descendants
-   *                       isEmpty:
-   *                         type: boolean
-   *                         description: Indicates if the node is empty
-   *                       grant:
-   *                         type: integer
-   *                         description: Access level
-   *                       path:
-   *                         type: string
-   *                         description: Path string
-   *                       revision:
-   *                         type: string
-   *                         nullable: true
-   *                         description: Revision ID (nullable)
-   */
-  router.get('/ancestors-children',
-    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
-    loginRequired, ...validator.pagePathRequired, apiV3FormValidator, async(req: AuthorizedRequest, res: ApiV3Response): Promise<any> => {
-      const { path } = req.query;
-
-      const pageService = crowi.pageService;
-      try {
-        const ancestorsChildren = await pageService.findAncestorsChildrenByPathAndViewer(path as string, req.user);
-        return res.apiv3({ ancestorsChildren });
-      }
-      catch (err) {
-        logger.error('Failed to get ancestorsChildren.', err);
-        return res.apiv3Err(new ErrorV3('Failed to get ancestorsChildren.'));
-      }
-
     });
 
   /**
@@ -202,7 +133,7 @@ const routerFactory = (crowi: Crowi): Router => {
    *                 children:
    *                   type: array
    *                   items:
-   *                     $ref: '#/components/schemas/Page'
+   *                     $ref: '#/components/schemas/PageForTreeItem'
    */
   /*
    * In most cases, using id should be prioritized
@@ -212,14 +143,12 @@ const routerFactory = (crowi: Crowi): Router => {
     loginRequired, validator.pageIdOrPathRequired, apiV3FormValidator, async(req: AuthorizedRequest, res: ApiV3Response) => {
       const { id, path } = req.query;
 
-      const pageService = crowi.pageService;
-
       const hideRestrictedByOwner = await configManager.getConfig('security:list-policy:hideRestrictedByOwner');
       const hideRestrictedByGroup = await configManager.getConfig('security:list-policy:hideRestrictedByGroup');
 
       try {
-        const pages = await pageService.findChildrenByParentPathOrIdAndViewer(
-        (id || path) as string, req.user, undefined, !hideRestrictedByOwner, !hideRestrictedByGroup,
+        const pages = await pageListingService.findChildrenByParentPathOrIdAndViewer(
+          (id || path) as string, req.user, !hideRestrictedByOwner, !hideRestrictedByGroup,
         );
         return res.apiv3({ children: pages });
       }

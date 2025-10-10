@@ -1,10 +1,12 @@
 import { connection } from 'mongoose';
-import { type IRateLimiterMongoOptions, RateLimiterMongo } from 'rate-limiter-flexible';
+import {
+  type IRateLimiterMongoOptions,
+  RateLimiterMongo,
+} from 'rate-limiter-flexible';
 
 import { DEFAULT_DURATION_SEC } from '../config';
 
 class RateLimiterFactory {
-
   private rateLimiters: Map<string, RateLimiterMongo> = new Map();
 
   getOrCreateRateLimiter(key: string, maxRequests: number): RateLimiterMongo {
@@ -24,7 +26,6 @@ class RateLimiterFactory {
 
     return rateLimiter;
   }
-
 }
 
 export const rateLimiterFactory = new RateLimiterFactory();

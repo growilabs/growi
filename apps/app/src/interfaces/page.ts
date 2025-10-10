@@ -21,6 +21,20 @@ export type IPageForItem = Partial<
   IPageHasId & { processData?: IPageOperationProcessData }
 >;
 
+export type IPageForTreeItem = Pick<
+  IPageHasId,
+  | '_id'
+  | 'path'
+  | 'parent'
+  | 'descendantCount'
+  | 'revision'
+  | 'grant'
+  | 'isEmpty'
+  | 'wip'
+> & {
+  processData?: IPageOperationProcessData;
+};
+
 export const UserGroupPageGrantStatus = {
   isGranted: 'isGranted',
   notGranted: 'notGranted',

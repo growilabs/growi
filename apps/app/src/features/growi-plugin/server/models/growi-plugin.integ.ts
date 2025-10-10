@@ -3,8 +3,7 @@ import { GrowiPluginType } from '@growi/core';
 import { GrowiPlugin } from './growi-plugin';
 
 describe('GrowiPlugin find methods', () => {
-
-  beforeAll(async() => {
+  beforeAll(async () => {
     await GrowiPlugin.insertMany([
       {
         isEnabled: false,
@@ -57,16 +56,16 @@ describe('GrowiPlugin find methods', () => {
     ]);
   });
 
-  afterAll(async() => {
+  afterAll(async () => {
     await GrowiPlugin.deleteMany({});
   });
 
   describe.concurrent('.findEnabledPlugins', () => {
-    it('shoud returns documents which isEnabled is true', async() => {
+    it('shoud returns documents which isEnabled is true', async () => {
       // when
       const results = await GrowiPlugin.findEnabledPlugins();
 
-      const pluginNames = results.map(p => p.meta.name);
+      const pluginNames = results.map((p) => p.meta.name);
 
       // then
       expect(results.length === 2).toBeTruthy();
@@ -76,24 +75,23 @@ describe('GrowiPlugin find methods', () => {
   });
 
   describe.concurrent('.findEnabledPluginsByType', () => {
-    it("shoud returns documents which type is 'template'", async() => {
+    it("shoud returns documents which type is 'template'", async () => {
       // when
-      const results = await GrowiPlugin.findEnabledPluginsByType(GrowiPluginType.Template);
+      const results = await GrowiPlugin.findEnabledPluginsByType(
+        GrowiPluginType.Template,
+      );
 
-      const pluginNames = results.map(p => p.meta.name);
+      const pluginNames = results.map((p) => p.meta.name);
 
       // then
       expect(results.length === 1).toBeTruthy();
       expect(pluginNames.includes('@growi/growi-plugin-example2')).toBeTruthy();
     });
   });
-
 });
 
-
 describe('GrowiPlugin activate/deactivate', () => {
-
-  beforeAll(async() => {
+  beforeAll(async () => {
     await GrowiPlugin.insertMany([
       {
         isEnabled: false,
@@ -110,12 +108,12 @@ describe('GrowiPlugin activate/deactivate', () => {
     ]);
   });
 
-  afterAll(async() => {
+  afterAll(async () => {
     await GrowiPlugin.deleteMany({});
   });
 
   describe('.activatePlugin', () => {
-    it('shoud update the property "isEnabled" to true', async() => {
+    it('shoud update the property "isEnabled" to true', async () => {
       // setup
       const plugin = await GrowiPlugin.findOne({});
       assert(plugin != null);
@@ -124,7 +122,9 @@ describe('GrowiPlugin activate/deactivate', () => {
 
       // when
       const result = await GrowiPlugin.activatePlugin(plugin._id);
-      const pluginAfterActivated = await GrowiPlugin.findOne({ _id: plugin._id });
+      const pluginAfterActivated = await GrowiPlugin.findOne({
+        _id: plugin._id,
+      });
 
       // then
       expect(result).toEqual('@growi/growi-plugin-example1'); // equals to meta.name
@@ -135,7 +135,7 @@ describe('GrowiPlugin activate/deactivate', () => {
   });
 
   describe('.deactivatePlugin', () => {
-    it('shoud update the property "isEnabled" to true', async() => {
+    it('shoud update the property "isEnabled" to true', async () => {
       // setup
       const plugin = await GrowiPlugin.findOne({});
       assert(plugin != null);
@@ -144,7 +144,9 @@ describe('GrowiPlugin activate/deactivate', () => {
 
       // when
       const result = await GrowiPlugin.deactivatePlugin(plugin._id);
-      const pluginAfterActivated = await GrowiPlugin.findOne({ _id: plugin._id });
+      const pluginAfterActivated = await GrowiPlugin.findOne({
+        _id: plugin._id,
+      });
 
       // then
       expect(result).toEqual('@growi/growi-plugin-example1'); // equals to meta.name
@@ -153,5 +155,4 @@ describe('GrowiPlugin activate/deactivate', () => {
       expect(pluginAfterActivated.isEnabled).toBeFalsy(); // isEnabled: false
     });
   });
-
 });

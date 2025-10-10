@@ -7,9 +7,11 @@ const DEFAULT_PROPS = {
 };
 
 export class ImportOptionForRevisions extends GrowiArchiveImportOption {
-
-  constructor(collectionName: string, mode: ImportMode = ImportMode.insert, initProps = DEFAULT_PROPS) {
+  constructor(
+    collectionName: string,
+    mode: ImportMode = ImportMode.insert,
+    initProps = DEFAULT_PROPS,
+  ) {
     super(collectionName, mode, initProps);
   }
-
 }

@@ -2,27 +2,28 @@ import { fromMarkdown, toMarkdown } from 'mdast-util-wiki-link';
 import { syntax } from 'micromark-extension-wiki-link';
 import type { Plugin } from 'unified';
 
-
 type FromMarkdownExtension = {
   enter: {
-    wikiLink: (token: string) => void,
-  },
+    wikiLink: (token: string) => void;
+  };
   exit: {
-    wikiLinkTarget: (token: string) => void,
-    wikiLinkAlias: (token: string) => void,
-    wikiLink: (token: string) => void,
-  }
-}
+    wikiLinkTarget: (token: string) => void;
+    wikiLinkAlias: (token: string) => void;
+    wikiLink: (token: string) => void;
+  };
+};
 
 type FromMarkdownData = {
-  value: string | null,
+  value: string | null;
   data: {
-    alias: string | null,
-    hProperties: Record<string, unknown>,
-  }
-}
+    alias: string | null;
+    hProperties: Record<string, unknown>;
+  };
+};
 
-function swapTargetAndAlias(fromMarkdownExtension: FromMarkdownExtension): FromMarkdownExtension {
+function swapTargetAndAlias(
+  fromMarkdownExtension: FromMarkdownExtension,
+): FromMarkdownExtension {
   return {
     enter: fromMarkdownExtension.enter,
     exit: {
@@ -52,7 +53,7 @@ function swapTargetAndAlias(fromMarkdownExtension: FromMarkdownExtension): FromM
 /**
  * Implemented with reference to https://github.com/landakram/remark-wiki-link/blob/master/src/index.js
  */
-export const pukiwikiLikeLinker: Plugin = function() {
+export const pukiwikiLikeLinker: Plugin = function () {
   const data = this.data();
 
   function add(field: string, value) {
@@ -61,20 +62,27 @@ export const pukiwikiLikeLinker: Plugin = function() {
       if (Array.isArray(array)) {
         array.push(value);
       }
-    }
-    else {
+    } else {
       data[field] = [value];
     }
   }
 
-  add('micromarkExtensions', syntax({
-    aliasDivider: '>',
-  }));
-  add('fromMarkdownExtensions', swapTargetAndAlias(fromMarkdown({
-    wikiLinkClassName: 'pukiwiki-like-linker',
-    newClassName: ' ',
-    pageResolver: value => [value],
-    hrefTemplate: permalink => permalink,
-  })));
+  add(
+    'micromarkExtensions',
+    syntax({
+      aliasDivider: '>',
+    }),
+  );
+  add(
+    'fromMarkdownExtensions',
+    swapTargetAndAlias(
+      fromMarkdown({
+        wikiLinkClassName: 'pukiwiki-like-linker',
+        newClassName: ' ',
+        pageResolver: (value) => [value],
+        hrefTemplate: (permalink) => permalink,
+      }),
+    ),
+  );
   add('toMarkdownExtensions', toMarkdown({}));
 };

@@ -128,6 +128,9 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   mutateResolvedTheme({ themeData: resolvedTheme });
 
   const currentRevisionId = currentPage?.revision?._id;
+
+  // There are cases where "revisionId" is not required for revision updates
+  // See: https://dev.growi.org/651a6f4a008fee2f99187431#origin-%E3%81%AE%E5%BC%B7%E5%BC%B1
   const isRevisionIdRequiredForPageUpdate = currentPage?.revision?.origin === undefined;
 
   const initialValueRef = useRef('');

@@ -6,6 +6,7 @@ import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
 import type { CurrentPageYjsData } from '~/interfaces/yjs';
+import { useIsGuestUser } from '~/stores-universal/context';
 
 import { useCurrentPageId } from './page';
 
@@ -16,8 +17,9 @@ type CurrentPageYjsDataUtils = {
 
 export const useCurrentPageYjsData = (): SWRResponse<CurrentPageYjsData, Error> & CurrentPageYjsDataUtils => {
   const { data: currentPageId } = useCurrentPageId();
+  const { data: isGuestUser } = useIsGuestUser();
 
-  const key = currentPageId != null
+  const key = !isGuestUser && currentPageId != null
     ? `/page/${currentPageId}/yjs-data`
     : null;
 

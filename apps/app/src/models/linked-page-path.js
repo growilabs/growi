@@ -7,9 +7,7 @@ const { isTrashPage } = pagePathUtils;
  * Linked Array Structured PagePath Model
  */
 export default class LinkedPagePath {
-
   constructor(path) {
-
     const pagePath = new DevidedPagePath(path);
 
     this.path = path;
@@ -18,7 +16,6 @@ export default class LinkedPagePath {
     this.parent = pagePath.isRoot
       ? null
       : new LinkedPagePath(pagePath.former, true);
-
   }
 
   get href() {
@@ -32,5 +29,4 @@ export default class LinkedPagePath {
   get isInTrash() {
     return isTrashPage(this.path);
   }
-
 }

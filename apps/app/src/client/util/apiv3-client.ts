@@ -50,7 +50,7 @@ export async function apiv3Post<T = any>(path: string, params: unknown = {}): Pr
 }
 
 export async function apiv3PostForm<T = any>(path: string, formData: FormData): Promise<AxiosResponse<T>> {
-  return apiv3Post<T>(path, formData);
+  return apiv3Request('postForm', path, formData);
 }
 
 export async function apiv3Put<T = any>(path: string, params: unknown = {}): Promise<AxiosResponse<T>> {

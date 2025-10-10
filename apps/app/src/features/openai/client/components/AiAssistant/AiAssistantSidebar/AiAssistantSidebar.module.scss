@@ -17,6 +17,15 @@
   .btn-submit {
     font-size: 1.1em;
   }
+
+  .thread-title-sticky {
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+
+  .input-form-area {
+    box-shadow: 0 -10px 20px 10px rgba(var(--bs-body-bg-rgb), 1);
+  }
 }
 
 // == Colors

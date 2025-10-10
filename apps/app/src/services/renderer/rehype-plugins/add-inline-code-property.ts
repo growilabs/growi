@@ -3,7 +3,10 @@ import type { Plugin } from 'unified';
 import { is } from 'unist-util-is';
 import { visitParents } from 'unist-util-visit-parents';
 
-const isInlineCodeTag = (node: Element, parent: Element | Root | null): boolean => {
+const isInlineCodeTag = (
+  node: Element,
+  parent: Element | Root | null,
+): boolean => {
   if (node.tagName !== 'code') {
     return false;
   }

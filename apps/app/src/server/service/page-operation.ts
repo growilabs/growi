@@ -25,7 +25,15 @@ const {
   Duplicate, Delete, DeleteCompletely, Revert, NormalizeParent,
 } = PageActionType;
 
-class PageOperationService {
+export interface IPageOperationService {
+  generateProcessInfo(pageOperations: PageOperationDocument[]): IPageOperationProcessInfo;
+  canOperate(isRecursively: boolean, fromPathToOp: string | null, toPathToOp: string | null): Promise<boolean>;
+  autoUpdateExpiryDate(operationId: ObjectIdLike): NodeJS.Timeout;
+  clearAutoUpdateInterval(timerObj: NodeJS.Timeout): void;
+  getAncestorsPathsByFromAndToPath(fromPath: string, toPath: string): string[];
+}
+
+class PageOperationService implements IPageOperationService {
 
   crowi: Crowi;
 
@@ -201,4 +209,9 @@ class PageOperationService {
 
 }
 
-export default PageOperationService;
+// eslint-disable-next-line import/no-mutable-exports
+export let pageOperationService: PageOperationService | undefined; // singleton instance
+export default function instanciate(crowi: Crowi): PageOperationService {
+  pageOperationService = new PageOperationService(crowi);
+  return pageOperationService;
+}

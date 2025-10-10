@@ -1,7 +1,7 @@
 import type { IUser } from '@growi/core';
 
 export interface IUserSnapshot {
-  username: string
+  username: string;
 }
 
 export const stringifySnapshot = (user: IUser): string => {

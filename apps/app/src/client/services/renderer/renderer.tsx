@@ -63,7 +63,7 @@ export const generateViewOptions = (
   remarkPlugins.push(
     math,
     [plantuml.remarkPlugin, { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode }],
-    drawio.remarkPlugin,
+    [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
     mermaid.remarkPlugin,
     xsvToTable.remarkPlugin,
     attachment.remarkPlugin,
@@ -171,7 +171,7 @@ export const generateSimpleViewOptions = (
   remarkPlugins.push(
     math,
     [plantuml.remarkPlugin, { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode }],
-    drawio.remarkPlugin,
+    [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
     mermaid.remarkPlugin,
     xsvToTable.remarkPlugin,
     attachment.remarkPlugin,
@@ -268,7 +268,7 @@ export const generatePreviewOptions = (config: RendererConfigExt, pagePath: stri
   remarkPlugins.push(
     math,
     [plantuml.remarkPlugin, { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode }],
-    drawio.remarkPlugin,
+    [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
     mermaid.remarkPlugin,
     xsvToTable.remarkPlugin,
     attachment.remarkPlugin,

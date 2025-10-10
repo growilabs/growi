@@ -29,7 +29,6 @@ export const DrawioViewerWithEditButton = React.memo((props: DrawioViewerProps):
   const { t } = useTranslation();
 
   const { bol, eol } = props;
-
   const { data: isGuestUser } = useIsGuestUser();
   const { data: isReadOnlyUser } = useIsReadOnlyUser();
   const { data: isSharedUser } = useIsSharedUser();

@@ -1,7 +1,6 @@
 import { generalXssFilter } from './general-xss-filter';
 
 describe('generalXssFilter', () => {
-
   test('should be sanitize script tag', () => {
     // Act
     const result = generalXssFilter.process('<script>alert("XSS")</script>');
@@ -12,7 +11,9 @@ describe('generalXssFilter', () => {
 
   test('should be sanitize nested script tag recursively', () => {
     // Act
-    const result = generalXssFilter.process('<scr<script>ipt>alert("XSS")</scr<script>ipt>');
+    const result = generalXssFilter.process(
+      '<scr<script>ipt>alert("XSS")</scr<script>ipt>',
+    );
 
     // Assert
     expect(result).toBe('alert("XSS")');
@@ -35,5 +36,4 @@ describe('generalXssFilter', () => {
     // Assert
     expect(result).toBe('<span>text</span>');
   });
-
 });
