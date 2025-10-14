@@ -30,19 +30,23 @@ const validator = {
   ],
 };
 
-type BaseParsedQs = Request['query'];
-type BaseRequest = Omit<Request, 'query'>;
-
 interface StrictActivityQuery {
   limit?: number;
   offset?: number;
   searchFilter?: string;
 }
 
-interface AuthorizedRequest extends BaseRequest {
+type CustomRequest<
+  TQuery = Request['query'],
+  TBody = any,
+  TParams = any
+> = Omit<Request<TParams, any, TBody, TQuery>, 'query'> & {
+    query: TQuery & Request['query'];
     user?: IUserHasId;
-    query: StrictActivityQuery & BaseParsedQs;
-}
+};
+
+type AuthorizedRequest = CustomRequest<StrictActivityQuery>;
+
 
 /**
  * @swagger
