@@ -82,8 +82,11 @@ module.exports = (crowi) => {
     validateUpdateMimeTypes,
     apiV3FormValidator,
     addActivity,
+    // FIX: set request body as payload
     async(req, res) => {
 
+      // look up express type
+      // check for other places which solves the problem of req.body is any
       if (!isUpdateMimeTypesPayload(req.body)) {
         return res.apiv3Err(new ErrorV3('Internal Type Error', 'internal-error'));
       }
