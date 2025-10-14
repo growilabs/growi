@@ -681,7 +681,6 @@ export type ISearchFilter = {
 };
 
 
-// FIX: change to API supported types when API is done
 type SupportedRecentActivityAction = typeof ActivityLogActions[keyof typeof ActivityLogActions];
 
 export type IRecentActivitySearchFilter = {
