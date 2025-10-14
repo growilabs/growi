@@ -83,6 +83,8 @@ module.exports = (crowi) => {
     apiV3FormValidator,
     addActivity,
     // FIX: set request body as payload
+    // apps/app/src/features/growi-plugin/server/routes/apiv3/admin/index.ts
+    // apps/app/src/features/external-user-group/server/routes/apiv3/external-user-group.ts
     async(req, res) => {
 
       // look up express type
