@@ -3,9 +3,8 @@
  */
 
 import mongoose from 'mongoose';
-
-import SearchService from '~/server/service/search';
 import NamedQuery from '~/server/models/named-query';
+import SearchService from '~/server/service/search';
 
 const { getInstance } = require('../../setup-crowi');
 
@@ -29,7 +28,7 @@ describe('SearchService test', () => {
     },
   };
 
-  beforeAll(async() => {
+  beforeAll(async () => {
     crowi = await getInstance();
     searchService = new SearchService(crowi);
     searchService.nqDelegators = {
@@ -37,7 +36,8 @@ describe('SearchService test', () => {
       [DEFAULT]: dummyFullTextSearchDelegator, // override with dummy full-text search delegator
     };
 
-    dummyAliasOf = 'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2';
+    dummyAliasOf =
+      'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2';
 
     await NamedQuery.insertMany([
       { name: 'named_query1', delegatorName: PRIVATE_LEGACY_PAGES },
@@ -48,13 +48,14 @@ describe('SearchService test', () => {
     namedQuery2 = await NamedQuery.findOne({ name: 'named_query2' });
   });
 
-
   describe('parseQueryString()', () => {
-    test('should parse queryString', async() => {
-      const queryString = 'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2';
+    test('should parse queryString', async () => {
+      const queryString =
+        'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2';
       const terms = await searchService.parseQueryString(queryString);
 
-      const expected = { // QueryTerms
+      const expected = {
+        // QueryTerms
         match: ['match'],
         not_match: ['notmatch'],
         phrase: ['"phrase"'],
@@ -70,11 +71,13 @@ describe('SearchService test', () => {
   });
 
   describe('parseSearchQuery()', () => {
-
-    test('should return result with delegatorName', async() => {
+    test('should return result with delegatorName', async () => {
       const queryString = '/';
       const nqName = 'named_query1';
-      const parsedQuery = await searchService.parseSearchQuery(queryString, nqName);
+      const parsedQuery = await searchService.parseSearchQuery(
+        queryString,
+        nqName,
+      );
 
       const expected = {
         queryString,
@@ -94,10 +97,13 @@ describe('SearchService test', () => {
       expect(parsedQuery).toStrictEqual(expected);
     });
 
-    test('should return result with expanded aliasOf value', async() => {
+    test('should return result with expanded aliasOf value', async () => {
       const queryString = '/';
       const nqName = 'named_query2';
-      const parsedQuery = await searchService.parseSearchQuery(queryString, nqName);
+      const parsedQuery = await searchService.parseSearchQuery(
+        queryString,
+        nqName,
+      );
       const expected = {
         queryString: dummyAliasOf,
         terms: {
@@ -117,7 +123,7 @@ describe('SearchService test', () => {
   });
 
   describe('resolve()', () => {
-    test('should resolve as full-text search delegator', async() => {
+    test('should resolve as full-text search delegator', async () => {
       const parsedQuery = {
         queryString: dummyAliasOf,
         terms: {
@@ -140,7 +146,7 @@ describe('SearchService test', () => {
       expect(typeof delegator.search).toBe('function');
     });
 
-    test('should resolve as custom search delegator', async() => {
+    test('should resolve as custom search delegator', async () => {
       const queryString = '/';
       const parsedQuery = {
         queryString,
@@ -170,12 +176,20 @@ describe('SearchService test', () => {
   });
 
   describe('searchKeyword()', () => {
-    test('should search with custom search delegator', async() => {
+    test('should search with custom search delegator', async () => {
       const Page = mongoose.model('Page');
       const User = mongoose.model('User');
       await User.insertMany([
-        { name: 'dummyuser1', username: 'dummyuser1', email: 'dummyuser1@example.com' },
-        { name: 'dummyuser2', username: 'dummyuser2', email: 'dummyuser2@example.com' },
+        {
+          name: 'dummyuser1',
+          username: 'dummyuser1',
+          email: 'dummyuser1@example.com',
+        },
+        {
+          name: 'dummyuser2',
+          username: 'dummyuser2',
+          email: 'dummyuser2@example.com',
+        },
       ]);
 
       const testUser1 = await User.findOne({ username: 'dummyuser1' });
@@ -218,14 +232,22 @@ describe('SearchService test', () => {
       const queryString = '/';
       const nqName = 'named_query1';
 
-      const [result, delegatorName] = await searchService.searchKeyword(queryString, nqName, testUser1, null, { offset: 0, limit: 100 });
+      const [result, delegatorName] = await searchService.searchKeyword(
+        queryString,
+        nqName,
+        testUser1,
+        null,
+        { offset: 0, limit: 100 },
+      );
 
-      const resultPaths = result.data.map(page => page.path);
-      const flag = resultPaths.includes('/user1') && resultPaths.includes('/user1_owner') && resultPaths.includes('/user2_public');
+      const resultPaths = result.data.map((page) => page.path);
+      const flag =
+        resultPaths.includes('/user1') &&
+        resultPaths.includes('/user1_owner') &&
+        resultPaths.includes('/user2_public');
 
       expect(flag).toBe(true);
       expect(delegatorName).toBe(PRIVATE_LEGACY_PAGES);
     });
   });
-
 });
