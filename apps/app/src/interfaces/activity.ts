@@ -1,4 +1,5 @@
 import type { HasObjectId, IUser, Ref } from '@growi/core';
+import type { PaginateResult } from './mongoose-utils';
 
 // Model
 const MODEL_PAGE = 'Page';
@@ -694,3 +695,9 @@ export type IRecentActivitySearchFilter = {
 
   targetModels?: string[];
 };
+
+export interface UserActivitiesResult {
+  data: {
+    serializedPaginationResult: PaginateResult<IActivityHasId>;
+  };
+}

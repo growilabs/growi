@@ -3,7 +3,7 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
-import type { PipelineStage } from 'mongoose';
+import type { PipelineStage, PaginateResult } from 'mongoose';
 import { Types } from 'mongoose';
 
 import type { IActivity } from '~/interfaces/activity';
@@ -46,6 +46,8 @@ type CustomRequest<
 };
 
 type AuthorizedRequest = CustomRequest<StrictActivityQuery>;
+
+type ActivityPaginationResult = PaginateResult<IActivity>;
 
 
 /**
@@ -252,7 +254,11 @@ module.exports = (crowi: Crowi): Router => {
         const totalPages = Math.ceil(totalDocs / limit);
         const page = Math.floor(offset / limit) + 1;
 
-        const serializedPaginationResult = {
+        const nextPage = page < totalPages ? page + 1 : null;
+        const prevPage = page > 1 ? page - 1 : null;
+        const pagingCounter = offset + 1;
+
+        const serializedPaginationResult: ActivityPaginationResult = {
           docs: serializedResults,
           totalDocs,
           limit,
@@ -261,6 +267,9 @@ module.exports = (crowi: Crowi): Router => {
           totalPages,
           hasPrevPage: page > 1,
           hasNextPage: page < totalPages,
+          nextPage,
+          prevPage,
+          pagingCounter,
         };
 
         return res.apiv3({ serializedPaginationResult });
