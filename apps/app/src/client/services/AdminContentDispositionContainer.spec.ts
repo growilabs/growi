@@ -28,10 +28,8 @@ describe('AdminContentDispositionContainer', () => {
   describe('retrieveContentDispositionSettings', () => {
     it('should retrieve and set content disposition settings', async() => {
       const mockResponse = {
-        inlineDispositionSettings: {
+        currentDispositionSettings: {
           inlineMimeTypes: ['image/png', 'application/pdf'],
-        },
-        attachmentDispositionSettings: {
           attachmentMimeTypes: ['text/html', 'image/svg+xml'],
         },
       };

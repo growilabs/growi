@@ -9,10 +9,8 @@ interface ContentDispositionState {
 }
 
 interface ContentDispositionGetResponse {
-  inlineDispositionSettings: {
+  currentDispositionSettings: {
     inlineMimeTypes: string[];
-  };
-  attachmentDispositionSettings: {
     attachmentMimeTypes: string[];
   };
 }
@@ -50,11 +48,11 @@ export default class AdminContentDispositionContainer extends Container<ContentD
 
   async retrieveContentDispositionSettings(): Promise<void> {
     const response = await apiv3Get<ContentDispositionGetResponse>('/content-disposition-settings/');
-    const { inlineDispositionSettings, attachmentDispositionSettings } = response.data;
+    const { currentDispositionSettings } = response.data;
 
     this.setState({
-      inlineMimeTypes: inlineDispositionSettings.inlineMimeTypes,
-      attachmentMimeTypes: attachmentDispositionSettings.attachmentMimeTypes,
+      inlineMimeTypes: currentDispositionSettings.inlineMimeTypes,
+      attachmentMimeTypes: currentDispositionSettings.attachmentMimeTypes,
     });
   }
 
