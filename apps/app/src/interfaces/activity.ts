@@ -680,8 +680,8 @@ export type ISearchFilter = {
   actions?: SupportedActionType[];
 };
 
-
-type SupportedRecentActivityAction = typeof ActivityLogActions[keyof typeof ActivityLogActions];
+type SupportedRecentActivityAction =
+  (typeof ActivityLogActions)[keyof typeof ActivityLogActions];
 
 export type IRecentActivitySearchFilter = {
   actions?: SupportedRecentActivityAction[];
