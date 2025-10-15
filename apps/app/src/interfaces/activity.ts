@@ -684,17 +684,6 @@ export type ISearchFilter = {
 type SupportedRecentActivityAction =
   (typeof ActivityLogActions)[keyof typeof ActivityLogActions];
 
-export type IRecentActivitySearchFilter = {
-  actions?: SupportedRecentActivityAction[];
-  usernames?: string[];
-  userIds?: string[];
-  dates?: {
-    startDate?: string;
-    endDate?: string;
-  };
-
-  targetModels?: string[];
-};
 
 export interface UserActivitiesResult {
   serializedPaginationResult: PaginateResult<IActivityHasId>;

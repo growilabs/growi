@@ -2,19 +2,15 @@ import type { SWRResponse } from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
-import type { UserActivitiesResult, IActivityHasId, IRecentActivitySearchFilter } from '~/interfaces/activity';
+import type { UserActivitiesResult, IActivityHasId } from '~/interfaces/activity';
 import type { PaginateResult } from '~/interfaces/mongoose-utils';
 
 export const useSWRxRecentActivity = (
     limit?: number,
     offset?: number,
-    searchFilter?: IRecentActivitySearchFilter,
-
 ): SWRResponse<PaginateResult<IActivityHasId>, Error> => {
 
-  const stringifiedSearchFilter = JSON.stringify(searchFilter);
-
-  const key = ['/user-activities', limit, offset, stringifiedSearchFilter];
+  const key = ['/user-activities', limit, offset];
 
   const fetcher = ([
     endpoint,
