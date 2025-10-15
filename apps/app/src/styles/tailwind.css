@@ -110,11 +110,11 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-@layer base {
+/* @layer base {
   * {
     @apply tw:border-border tw:outline-ring/50;
   }
   body {
     @apply tw:bg-background tw:text-foreground;
   }
-}
+} */
