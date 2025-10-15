@@ -681,10 +681,6 @@ export type ISearchFilter = {
   actions?: SupportedActionType[];
 };
 
-type SupportedRecentActivityAction =
-  (typeof ActivityLogActions)[keyof typeof ActivityLogActions];
-
-
 export interface UserActivitiesResult {
   serializedPaginationResult: PaginateResult<IActivityHasId>;
 }
