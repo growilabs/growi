@@ -697,7 +697,5 @@ export type IRecentActivitySearchFilter = {
 };
 
 export interface UserActivitiesResult {
-  data: {
-    serializedPaginationResult: PaginateResult<IActivityHasId>;
-  };
+  serializedPaginationResult: PaginateResult<IActivityHasId>;
 }
