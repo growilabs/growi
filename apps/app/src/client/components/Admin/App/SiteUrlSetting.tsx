@@ -1,6 +1,7 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 
 import { useTranslation } from 'next-i18next';
+import { useForm } from 'react-hook-form';
 
 import AdminAppContainer from '~/client/services/AdminAppContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
@@ -21,9 +22,23 @@ const SiteUrlSetting = (props: Props) => {
   const { t: tCommon } = useTranslation('commons');
   const { adminAppContainer } = props;
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+  } = useForm();
 
-  const submitHandler = useCallback(async() => {
+  // Reset form when adminAppContainer state changes
+  useEffect(() => {
+    reset({
+      siteUrl: adminAppContainer.state.siteUrl || '',
+    });
+  }, [adminAppContainer.state.siteUrl, reset]);
+
+  const onSubmit = useCallback(async(data) => {
     try {
+      // Await setState completion before API call
+      await adminAppContainer.changeSiteUrl(data.siteUrl);
       await adminAppContainer.updateSiteUrlSettingHandler();
       toastSuccess(tCommon('toaster.update_successed', { target: t('site_url.title') }));
     }
@@ -34,7 +49,7 @@ const SiteUrlSetting = (props: Props) => {
   }, [adminAppContainer, t, tCommon]);
 
   return (
-    <React.Fragment>
+    <form onSubmit={handleSubmit(onSubmit)}>
       <p className="card custom-card bg-body-tertiary">{t('site_url.desc')}</p>
       {!adminAppContainer.state.isSetSiteUrl
           && (<p className="alert alert-danger"><span className="material-symbols-outlined">error</span> {t('site_url.warn')}</p>)}
@@ -69,11 +84,9 @@ const SiteUrlSetting = (props: Props) => {
                 <input
                   className="form-control"
                   type="text"
-                  name="settingForm[app:siteUrl]"
-                  value={adminAppContainer.state.siteUrl || ''}
-                  disabled={adminAppContainer.state.siteUrlUseOnlyEnvVars ?? true}
-                  onChange={(e) => { adminAppContainer.changeSiteUrl(e.target.value) }}
+                  readOnly={adminAppContainer.state.siteUrlUseOnlyEnvVars ?? true}
                   placeholder="e.g. https://my.growi.org"
+                  {...register('siteUrl')}
                 />
                 <p className="form-text text-muted">
                   {/* eslint-disable-next-line react/no-danger */}
@@ -92,8 +105,8 @@ const SiteUrlSetting = (props: Props) => {
         </table>
       </div>
 
-      <AdminUpdateButtonRow onClick={submitHandler} disabled={adminAppContainer.state.retrieveError != null} />
-    </React.Fragment>
+      <AdminUpdateButtonRow type="submit" disabled={adminAppContainer.state.retrieveError != null} />
+    </form>
   );
 };
 

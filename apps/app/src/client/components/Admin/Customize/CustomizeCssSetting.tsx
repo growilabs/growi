@@ -1,6 +1,7 @@
-import React, { useCallback, type JSX } from 'react';
+import React, { useCallback, useEffect, type JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
+import { useForm } from 'react-hook-form';
 import { Card, CardBody } from 'reactstrap';
 
 import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer';
@@ -18,8 +19,23 @@ const CustomizeCssSetting = (props: Props): JSX.Element => {
   const { adminCustomizeContainer } = props;
   const { t } = useTranslation();
 
-  const onClickSubmit = useCallback(async() => {
+  const {
+    register,
+    handleSubmit,
+    reset,
+  } = useForm();
+
+  // Sync form with container state
+  useEffect(() => {
+    reset({
+      customizeCss: adminCustomizeContainer.state.currentCustomizeCss || '',
+    });
+  }, [adminCustomizeContainer.state.currentCustomizeCss, reset]);
+
+  const onSubmit = useCallback(async(data) => {
     try {
+      // Update container state before API call
+      await adminCustomizeContainer.changeCustomizeCss(data.customizeCss);
       await adminCustomizeContainer.updateCustomizeCss();
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.custom_css'), ns: 'commons' }));
     }
@@ -41,17 +57,17 @@ const CustomizeCssSetting = (props: Props): JSX.Element => {
             </CardBody>
           </Card>
 
-          <div>
-            <textarea
-              className="form-control"
-              name="customizeCss"
-              rows={8}
-              value={adminCustomizeContainer.state.currentCustomizeCss || ''}
-              onChange={(e) => { adminCustomizeContainer.changeCustomizeCss(e.target.value) }}
-            />
-          </div>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <div>
+              <textarea
+                className="form-control"
+                rows={8}
+                {...register('customizeCss')}
+              />
+            </div>
 
-          <AdminUpdateButtonRow onClick={onClickSubmit} disabled={adminCustomizeContainer.state.retrieveError != null} />
+            <AdminUpdateButtonRow type="submit" disabled={adminCustomizeContainer.state.retrieveError != null} />
+          </form>
         </div>
       </div>
     </React.Fragment>

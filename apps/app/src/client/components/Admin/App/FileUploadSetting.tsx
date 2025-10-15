@@ -1,7 +1,8 @@
 import type { ChangeEvent, JSX } from 'react';
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 
 import { useTranslation } from 'next-i18next';
+import { useForm } from 'react-hook-form';
 
 import AdminAppContainer from '~/client/services/AdminAppContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
@@ -22,7 +23,8 @@ type FileUploadSettingMoleculeProps = {
   isFixedFileUploadByEnvVar: boolean
   envFileUploadType?: string
   onChangeFileUploadType: (e: ChangeEvent, type: string) => void
-} & AwsSettingMoleculeProps & GcsSettingMoleculeProps & AzureSettingMoleculeProps;
+  register: ReturnType<typeof useForm>['register']
+} & Omit<AwsSettingMoleculeProps, 'register'> & Omit<GcsSettingMoleculeProps, 'register'> & Omit<AzureSettingMoleculeProps, 'register'>;
 
 export const FileUploadSettingMolecule = React.memo((props: FileUploadSettingMoleculeProps): JSX.Element => {
   const { t } = useTranslation(['admin', 'commons']);
@@ -78,6 +80,7 @@ export const FileUploadSettingMolecule = React.memo((props: FileUploadSettingMol
 
       {props.fileUploadType === 'aws' && (
         <AwsSettingMolecule
+          register={props.register}
           s3ReferenceFileWithRelayMode={props.s3ReferenceFileWithRelayMode}
           s3Region={props.s3Region}
           s3CustomEndpoint={props.s3CustomEndpoint}
@@ -94,6 +97,7 @@ export const FileUploadSettingMolecule = React.memo((props: FileUploadSettingMol
       )}
       {props.fileUploadType === 'gcs' && (
         <GcsSettingMolecule
+          register={props.register}
           gcsReferenceFileWithRelayMode={props.gcsReferenceFileWithRelayMode}
           gcsUseOnlyEnvVars={props.gcsUseOnlyEnvVars}
           gcsApiKeyJsonPath={props.gcsApiKeyJsonPath}
@@ -110,6 +114,7 @@ export const FileUploadSettingMolecule = React.memo((props: FileUploadSettingMol
       )}
       {props.fileUploadType === 'azure' && (
         <AzureSettingMolecule
+          register={props.register}
           azureReferenceFileWithRelayMode={props.azureReferenceFileWithRelayMode}
           azureUseOnlyEnvVars={props.azureUseOnlyEnvVars}
           azureTenantId={props.azureTenantId}
@@ -159,8 +164,49 @@ const FileUploadSetting = (props: FileUploadSettingProps): JSX.Element => {
     envAzureStorageAccountName, envAzureStorageContainerName,
   } = adminAppContainer.state;
 
-  const submitHandler = useCallback(async() => {
+  const { register, handleSubmit, reset } = useForm();
+
+  // Sync form with container state
+  useEffect(() => {
+    reset({
+      s3Region,
+      s3CustomEndpoint,
+      s3Bucket,
+      s3AccessKeyId,
+      gcsApiKeyJsonPath,
+      gcsBucket,
+      gcsUploadNamespace,
+      azureTenantId,
+      azureClientId,
+      azureClientSecret,
+      azureStorageAccountName,
+      azureStorageContainerName,
+    });
+  }, [
+    reset,
+    s3Region, s3CustomEndpoint, s3Bucket, s3AccessKeyId,
+    gcsApiKeyJsonPath, gcsBucket, gcsUploadNamespace,
+    azureTenantId, azureClientId, azureClientSecret,
+    azureStorageAccountName, azureStorageContainerName,
+  ]);
+
+  const submitHandler = useCallback(async(data) => {
     try {
+      // Update container state with form data
+      await adminAppContainer.changeS3Region(data.s3Region ?? '');
+      await adminAppContainer.changeS3CustomEndpoint(data.s3CustomEndpoint ?? '');
+      await adminAppContainer.changeS3Bucket(data.s3Bucket ?? '');
+      await adminAppContainer.changeS3AccessKeyId(data.s3AccessKeyId ?? '');
+      await adminAppContainer.changeS3SecretAccessKey(data.s3SecretAccessKey ?? '');
+      await adminAppContainer.changeGcsApiKeyJsonPath(data.gcsApiKeyJsonPath ?? '');
+      await adminAppContainer.changeGcsBucket(data.gcsBucket ?? '');
+      await adminAppContainer.changeGcsUploadNamespace(data.gcsUploadNamespace ?? '');
+      await adminAppContainer.changeAzureTenantId(data.azureTenantId ?? '');
+      await adminAppContainer.changeAzureClientId(data.azureClientId ?? '');
+      await adminAppContainer.changeAzureClientSecret(data.azureClientSecret ?? '');
+      await adminAppContainer.changeAzureStorageAccountName(data.azureStorageAccountName ?? '');
+      await adminAppContainer.changeAzureStorageContainerName(data.azureStorageContainerName ?? '');
+
       await adminAppContainer.updateFileUploadSettingHandler();
       toastSuccess(t('toaster.update_successed', { target: t('admin:app_setting.file_upload_settings'), ns: 'commons' }));
     }
@@ -241,8 +287,9 @@ const FileUploadSetting = (props: FileUploadSettingProps): JSX.Element => {
   }, [adminAppContainer]);
 
   return (
-    <>
+    <form onSubmit={handleSubmit(submitHandler)}>
       <FileUploadSettingMolecule
+        register={register}
         fileUploadType={fileUploadType}
         isFixedFileUploadByEnvVar={isFixedFileUploadByEnvVar}
         envFileUploadType={envFileUploadType}
@@ -290,8 +337,8 @@ const FileUploadSetting = (props: FileUploadSettingProps): JSX.Element => {
         onChangeAzureStorageAccountName={onChangeAzureStorageAccountNameHandler}
         onChangeAzureStorageContainerName={onChangeAzureStorageContainerNameHandler}
       />
-      <AdminUpdateButtonRow onClick={submitHandler} disabled={retrieveError != null} />
-    </>
+      <AdminUpdateButtonRow disabled={retrieveError != null} />
+    </form>
   );
 };
 

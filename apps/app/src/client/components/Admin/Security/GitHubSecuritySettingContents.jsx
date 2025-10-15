@@ -1,9 +1,10 @@
 /* eslint-disable react/no-danger */
-import React from 'react';
+import React, { useCallback, useEffect } from 'react';
 
 import { pathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
+import { useForm } from 'react-hook-form';
 import urljoin from 'url-join';
 
 
@@ -14,18 +15,29 @@ import { useSiteUrl } from '~/stores-universal/context';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
-class GitHubSecurityManagementContents extends React.Component {
+const GitHubSecurityManagementContents = (props) => {
+  const {
+    t, adminGeneralSecurityContainer, adminGitHubSecurityContainer, siteUrl,
+  } = props;
 
-  constructor(props) {
-    super(props);
+  const { isGitHubEnabled } = adminGeneralSecurityContainer.state;
+  const { githubClientId, githubClientSecret, retrieveError } = adminGitHubSecurityContainer.state;
+  const gitHubCallbackUrl = urljoin(pathUtils.removeTrailingSlash(siteUrl), '/passport/github/callback');
 
-    this.onClickSubmit = this.onClickSubmit.bind(this);
-  }
+  const { register, handleSubmit, reset } = useForm();
 
-  async onClickSubmit() {
-    const { t, adminGitHubSecurityContainer, adminGeneralSecurityContainer } = this.props;
+  // Sync form with container state
+  useEffect(() => {
+    reset({
+      githubClientId,
+      githubClientSecret,
+    });
+  }, [reset, githubClientId, githubClientSecret]);
 
+  const onClickSubmit = useCallback(async(data) => {
     try {
+      await adminGitHubSecurityContainer.changeGitHubClientId(data.githubClientId ?? '');
+      await adminGitHubSecurityContainer.changeGitHubClientSecret(data.githubClientSecret ?? '');
       await adminGitHubSecurityContainer.updateGitHubSetting();
       await adminGeneralSecurityContainer.retrieveSetupStratedies();
       toastSuccess(t('security_settings.OAuth.GitHub.updated_github'));
@@ -33,26 +45,19 @@ class GitHubSecurityManagementContents extends React.Component {
     catch (err) {
       toastError(err);
     }
-  }
+  }, [adminGitHubSecurityContainer, adminGeneralSecurityContainer, t]);
 
-  render() {
-    const {
-      t, adminGeneralSecurityContainer, adminGitHubSecurityContainer, siteUrl,
-    } = this.props;
-    const { isGitHubEnabled } = adminGeneralSecurityContainer.state;
-    const gitHubCallbackUrl = urljoin(pathUtils.removeTrailingSlash(siteUrl), '/passport/github/callback');
-
-    return (
-
+  return (
+    <form onSubmit={handleSubmit(onClickSubmit)}>
       <React.Fragment>
 
         <h2 className="alert-anchor border-bottom">
           {t('security_settings.OAuth.GitHub.name')}
         </h2>
 
-        {adminGitHubSecurityContainer.state.retrieveError != null && (
+        {retrieveError != null && (
           <div className="alert alert-danger">
-            <p>{t('Error occurred')} : {adminGitHubSecurityContainer.state.retrieveError}</p>
+            <p>{t('Error occurred')} : {retrieveError}</p>
           </div>
         )}
 
@@ -108,9 +113,7 @@ class GitHubSecurityManagementContents extends React.Component {
                 <input
                   className="form-control"
                   type="text"
-                  name="githubClientId"
-                  value={adminGitHubSecurityContainer.state.githubClientId || ''}
-                  onChange={e => adminGitHubSecurityContainer.changeGitHubClientId(e.target.value)}
+                  {...register('githubClientId')}
                 />
                 <p className="form-text text-muted">
                   <small dangerouslySetInnerHTML={{ __html: t('security_settings.Use env var if empty', { env: 'OAUTH_GITHUB_CLIENT_ID' }) }} />
@@ -124,9 +127,7 @@ class GitHubSecurityManagementContents extends React.Component {
                 <input
                   className="form-control"
                   type="text"
-                  name="githubClientSecret"
-                  value={adminGitHubSecurityContainer.state.githubClientSecret || ''}
-                  onChange={e => adminGitHubSecurityContainer.changeGitHubClientSecret(e.target.value)}
+                  {...register('githubClientSecret')}
                 />
                 <p className="form-text text-muted">
                   <small dangerouslySetInnerHTML={{ __html: t('security_settings.Use env var if empty', { env: 'OAUTH_GITHUB_CLIENT_SECRET' }) }} />
@@ -158,9 +159,9 @@ class GitHubSecurityManagementContents extends React.Component {
 
             <div className="row mb-4">
               <div className="offset-3 col-5">
-                <div className="btn btn-primary" disabled={adminGitHubSecurityContainer.state.retrieveError != null} onClick={this.onClickSubmit}>
+                <button type="submit" className="btn btn-primary" disabled={retrieveError != null}>
                   {t('Update')}
-                </div>
+                </button>
               </div>
             </div>
 
@@ -185,12 +186,16 @@ class GitHubSecurityManagementContents extends React.Component {
         </div>
 
       </React.Fragment>
+    </form>
+  );
+};
 
-
-    );
-  }
-
-}
+GitHubSecurityManagementContents.propTypes = {
+  t: PropTypes.func.isRequired, // i18next
+  adminGeneralSecurityContainer: PropTypes.instanceOf(AdminGeneralSecurityContainer).isRequired,
+  adminGitHubSecurityContainer: PropTypes.instanceOf(AdminGitHubSecurityContainer).isRequired,
+  siteUrl: PropTypes.string,
+};
 
 const GitHubSecurityManagementContentsFC = (props) => {
   const { t } = useTranslation('admin');
@@ -205,11 +210,5 @@ const GitHubSecurityManagementContentsWrapper = withUnstatedContainers(GitHubSec
   AdminGeneralSecurityContainer,
   AdminGitHubSecurityContainer,
 ]);
-
-GitHubSecurityManagementContents.propTypes = {
-  t: PropTypes.func.isRequired, // i18next
-  adminGeneralSecurityContainer: PropTypes.instanceOf(AdminGeneralSecurityContainer).isRequired,
-  adminGitHubSecurityContainer: PropTypes.instanceOf(AdminGitHubSecurityContainer).isRequired,
-};
 
 export default GitHubSecurityManagementContentsWrapper;
