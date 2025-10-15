@@ -1,14 +1,13 @@
-import { createHash } from 'crypto';
-
 import type { IUserHasId } from '@growi/core';
+import { createHash } from 'node:crypto';
 
 import type {
-  IAuditLogBulkExportFilters,
   AuditLogBulkExportFormat,
+  IAuditLogBulkExportFilters,
 } from '../../interfaces/audit-log-bulk-export';
 import {
-  AuditLogBulkExportJobStatus,
   AuditLogBulkExportJobInProgressJobStatus,
+  AuditLogBulkExportJobStatus,
 } from '../../interfaces/audit-log-bulk-export';
 import type { AuditLogBulkExportJobDocument } from '../models/audit-log-bulk-export-job';
 import AuditLogBulkExportJob from '../models/audit-log-bulk-export-job';
@@ -20,9 +19,7 @@ export interface IAuditLogBulkExportService {
     currentUser: IUserHasId,
     restartJob?: boolean,
   ) => Promise<void>;
-  resetExportJob: (
-    job: AuditLogBulkExportJobDocument,
-  )=> Promise<void>;
+  resetExportJob: (job: AuditLogBulkExportJobDocument) => Promise<void>;
 }
 
 /** ============================== utils ============================== */
@@ -61,37 +58,37 @@ function sha256(input: string): string {
 /** ============================== error ============================== */
 
 export class DuplicateAuditLogBulkExportJobError extends Error {
-
   duplicateJob: AuditLogBulkExportJobDocument;
 
   constructor(duplicateJob: AuditLogBulkExportJobDocument) {
     super('Duplicate audit-log bulk export job is in progress');
     this.duplicateJob = duplicateJob;
   }
-
 }
 
 /** ============================== service ============================== */
 
 class AuditLogBulkExportService implements IAuditLogBulkExportService {
-
   /**
    * Create a new audit-log bulk export job or reset the existing one
    */
   async createOrResetExportJob(
-      filters: IAuditLogBulkExportFilters,
-      format: AuditLogBulkExportFormat,
-      currentUser: IUserHasId,
-      restartJob?: boolean,
-  ) : Promise<void> {
+    filters: IAuditLogBulkExportFilters,
+    format: AuditLogBulkExportFormat,
+    currentUser: IUserHasId,
+    restartJob?: boolean,
+  ): Promise<void> {
     const normalizedFilters = canonicalizeFilters(filters);
     const filterHash = sha256(JSON.stringify(normalizedFilters));
 
-    const duplicateInProgress: AuditLogBulkExportJobDocument | null = await AuditLogBulkExportJob.findOne({
-      user: { $eq: currentUser },
-      filterHash,
-      $or: Object.values(AuditLogBulkExportJobInProgressJobStatus).map(status => ({ status })),
-    });
+    const duplicateInProgress: AuditLogBulkExportJobDocument | null =
+      await AuditLogBulkExportJob.findOne({
+        user: { $eq: currentUser },
+        filterHash,
+        $or: Object.values(AuditLogBulkExportJobInProgressJobStatus).map(
+          (status) => ({ status }),
+        ),
+      });
 
     if (duplicateInProgress != null) {
       if (restartJob) {
@@ -114,13 +111,10 @@ class AuditLogBulkExportService implements IAuditLogBulkExportService {
   /**
    * Reset audit-log export job in progress
    */
-  async resetExportJob(
-      job: AuditLogBulkExportJobDocument,
-  ): Promise<void> {
+  async resetExportJob(job: AuditLogBulkExportJobDocument): Promise<void> {
     job.restartFlag = true;
     await job.save();
   }
-
 }
 
 export const auditLogBulkExportService = new AuditLogBulkExportService(); // singleton

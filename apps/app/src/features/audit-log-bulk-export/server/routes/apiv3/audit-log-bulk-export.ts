@@ -52,7 +52,7 @@ module.exports = (crowi: Crowi): Router => {
     accessTokenParser([SCOPE.WRITE.ADMIN.AUDIT_LOG]),
     loginRequiredStrictly,
     validators.auditLogBulkExport,
-    async(req: AuthorizedRequest, res: ApiV3Response) => {
+    async (req: AuthorizedRequest, res: ApiV3Response) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
@@ -81,8 +81,7 @@ module.exports = (crowi: Crowi): Router => {
           restartJob,
         );
         return res.apiv3({}, 204);
-      }
-      catch (err) {
+      } catch (err) {
         logger.error(err);
 
         if (err instanceof DuplicateAuditLogBulkExportJobError) {
