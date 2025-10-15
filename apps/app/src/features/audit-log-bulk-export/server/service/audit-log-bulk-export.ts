@@ -59,37 +59,39 @@ function sha256(input: string): string {
 /** ============================== error ============================== */
 
 export class DuplicateAuditLogBulkExportJobError extends Error {
+
   duplicateJob: AuditLogBulkExportJobDocument;
 
   constructor(duplicateJob: AuditLogBulkExportJobDocument) {
     super('Duplicate audit-log bulk export job is in progress');
     this.duplicateJob = duplicateJob;
   }
+
 }
 
 /** ============================== service ============================== */
 
 class AuditLogBulkExportService implements IAuditLogBulkExportService {
+
   /**
    * Create a new audit-log bulk export job or reset the existing one
    */
   async createOrResetExportJob(
-    filters: IAuditLogBulkExportFilters,
-    format: AuditLogBulkExportFormat,
-    currentUser: IUserHasId,
-    restartJob?: boolean,
+      filters: IAuditLogBulkExportFilters,
+      format: AuditLogBulkExportFormat,
+      currentUser: IUserHasId,
+      restartJob?: boolean,
   ): Promise<void> {
     const normalizedFilters = canonicalizeFilters(filters);
     const filterHash = sha256(JSON.stringify(normalizedFilters));
 
-    const duplicateInProgress: AuditLogBulkExportJobDocument | null =
-      await AuditLogBulkExportJob.findOne({
-        user: { $eq: currentUser },
-        filterHash,
-        $or: Object.values(AuditLogBulkExportJobInProgressJobStatus).map(
-          (status) => ({ status }),
-        ),
-      });
+    const duplicateInProgress: AuditLogBulkExportJobDocument | null = await AuditLogBulkExportJob.findOne({
+      user: { $eq: currentUser },
+      filterHash,
+      $or: Object.values(AuditLogBulkExportJobInProgressJobStatus).map(
+        status => ({ status }),
+      ),
+    });
 
     if (duplicateInProgress != null) {
       if (restartJob) {
@@ -116,6 +118,7 @@ class AuditLogBulkExportService implements IAuditLogBulkExportService {
     job.restartFlag = true;
     await job.save();
   }
+
 }
 
 export const auditLogBulkExportService = new AuditLogBulkExportService(); // singleton
