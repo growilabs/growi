@@ -1,5 +1,6 @@
-import type { IUserHasId } from '@growi/core';
 import { createHash } from 'node:crypto';
+
+import type { IUserHasId } from '@growi/core';
 
 import type {
   AuditLogBulkExportFormat,
