@@ -1,6 +1,6 @@
+import { type JSX, useState } from 'react';
 import { format } from 'date-fns/format';
 import { useTranslation } from 'next-i18next';
-import { type JSX, useState } from 'react';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import { apiv3Post } from '~/client/util/apiv3-client';

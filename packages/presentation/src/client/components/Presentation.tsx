@@ -1,10 +1,10 @@
 import { type JSX, useEffect } from 'react';
-
 import Reveal from 'reveal.js';
 
 import type { PresentationOptions } from '../consts';
-import styles from './Presentation.module.scss';
 import { Slides } from './Slides';
+
+import styles from './Presentation.module.scss';
 
 const moduleClass = styles['grw-presentation'] ?? '';
 

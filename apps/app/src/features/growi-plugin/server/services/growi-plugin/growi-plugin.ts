@@ -23,7 +23,6 @@ import type {
 import { PLUGIN_EXPRESS_STATIC_DIR, PLUGIN_STORING_PATH } from '../../consts';
 import { GrowiPlugin } from '../../models';
 import { GitHubUrl } from '../../models/vo/github-url';
-
 import { generateTemplatePluginMeta } from './generate-template-plugin-meta';
 import { generateThemePluginMeta } from './generate-theme-plugin-meta';
 

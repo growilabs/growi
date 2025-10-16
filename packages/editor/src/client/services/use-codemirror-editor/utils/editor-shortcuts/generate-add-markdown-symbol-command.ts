@@ -4,13 +4,12 @@ import type { InsertMarkdownElements } from '../insert-markdown-elements';
 import type { InsertPrefix } from '../insert-prefix';
 
 export const generateAddMarkdownSymbolCommand = (
-    insertMarkdown: InsertMarkdownElements | InsertPrefix,
-    prefix: string,
-    suffix?: string,
+  insertMarkdown: InsertMarkdownElements | InsertPrefix,
+  prefix: string,
+  suffix?: string,
 ): Command => {
-
   const isInsertMarkdownElements = (
-      fn: InsertMarkdownElements | InsertPrefix,
+    fn: InsertMarkdownElements | InsertPrefix,
   ): fn is InsertMarkdownElements => {
     return fn.length === 2;
   };
@@ -19,8 +18,7 @@ export const generateAddMarkdownSymbolCommand = (
     if (isInsertMarkdownElements(insertMarkdown)) {
       if (suffix == null) return false;
       insertMarkdown(prefix, suffix);
-    }
-    else {
+    } else {
       insertMarkdown(prefix);
     }
 

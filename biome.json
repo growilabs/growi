@@ -25,7 +25,6 @@
       "!apps/app/src/styles/prebuilt/**",
       "!apps/app/tmp/**",
       "!apps/slackbot-proxy/src/public/bootstrap/**",
-      "!packages/editor/**",
       "!packages/pdf-converter-client/src/index.ts",
       "!packages/pdf-converter-client/specs/**",
       "!apps/app/playwright/**",
@@ -48,7 +47,24 @@
   "assist": {
     "actions": {
       "source": {
-        "organizeImports": "on"
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [
+              ["react", "react/**"],
+              ["next", "next/**"],
+              [":NODE:", ":PACKAGE:"],
+              ":BLANK_LINE:",
+              ["@/**", "^/**"],
+              ":BLANK_LINE:",
+              "~/**",
+              ":BLANK_LINE:",
+              [":PATH:", "!**/*.css", "!**/*.scss"],
+              ":BLANK_LINE:",
+              ["**/*.css", "**/*.scss"]
+            ]
+          }
+        }
       }
     }
   },

@@ -1,7 +1,6 @@
-import Link from 'next/link';
-
-import { useTranslation } from 'next-i18next';
 import React, { type JSX, useState } from 'react';
+import Link from 'next/link';
+import { useTranslation } from 'next-i18next';
 
 import { apiv3Put } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';

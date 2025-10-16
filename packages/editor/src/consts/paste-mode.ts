@@ -1,4 +1,3 @@
-
 export const PasteMode = {
   both: 'both',
   text: 'text',
@@ -7,4 +6,4 @@ export const PasteMode = {
 
 export const DEFAULT_PASTE_MODE = PasteMode.both;
 export const AllPasteMode = Object.values(PasteMode);
-export type PasteMode = typeof PasteMode[keyof typeof PasteMode];
+export type PasteMode = (typeof PasteMode)[keyof typeof PasteMode];
