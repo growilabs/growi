@@ -115,7 +115,8 @@
     "overrides": {
       "@lykmapipo/common>flat": "5.0.2",
       "@lykmapipo/common>mime": "3.0.0",
-      "@lykmapipo/common>parse-json": "5.2.0"
+      "@lykmapipo/common>parse-json": "5.2.0",
+      "bson": "6.10.4"
     }
   },
   "engines": {

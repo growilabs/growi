@@ -91,6 +91,8 @@
     "@keycloak/keycloak-admin-client": "^18.0.0",
     "@mastra/core": "^0.17.1",
     "@mastra/libsql": "^0.14.2",
+    "@mastra/memory": "^0.15.7",
+    "@mastra/mongodb": "^0.14.5",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.60.1",
     "@opentelemetry/exporter-metrics-otlp-grpc": "^0.202.0",
