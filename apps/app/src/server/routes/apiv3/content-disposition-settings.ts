@@ -1,4 +1,5 @@
 import { ErrorV3 } from '@growi/core/dist/models';
+import type { Request } from 'express';
 import { body } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
@@ -6,6 +7,9 @@ import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
+
+import type { ApiV3Response } from './interfaces/apiv3-response';
+import { IUserHasId } from '@growi/core';
 
 const logger = loggerFactory('growi:routes:apiv3:content-disposition-settings');
 const express = require('express');
@@ -26,22 +30,15 @@ module.exports = (crowi) => {
     body('newAttachmentMimeTypes').isArray().withMessage('Attachment mime types must be an array.'),
   ];
 
-  interface UpdateMimeTypesPayload {
+  interface UpdateMimeTypesBody {
     newInlineMimeTypes: string[];
     newAttachmentMimeTypes: string[];
   }
 
-  const isArrayOfStrings = (arr: unknown): arr is string[] => {
-    if (!Array.isArray(arr)) {
-      return false;
-    }
-    return arr.every(item => typeof item === 'string');
-  };
-
-  const isUpdateMimeTypesPayload = (data: any): data is UpdateMimeTypesPayload => {
-    return isArrayOfStrings(data.newInlineMimeTypes)
-      && isArrayOfStrings(data.newAttachmentMimeTypes);
-  };
+  interface UpdateMimeTypesRequest extends Request {
+    user?: IUserHasId;
+    body: UpdateMimeTypesBody;
+  }
 
   /**
  * @swagger
@@ -82,17 +79,8 @@ module.exports = (crowi) => {
     validateUpdateMimeTypes,
     apiV3FormValidator,
     addActivity,
-    // FIX: set request body as payload
-    // apps/app/src/features/growi-plugin/server/routes/apiv3/admin/index.ts
-    // apps/app/src/features/external-user-group/server/routes/apiv3/external-user-group.ts
-    async(req, res) => {
 
-      // look up express type
-      // check for other places which solves the problem of req.body is any
-      if (!isUpdateMimeTypesPayload(req.body)) {
-        return res.apiv3Err(new ErrorV3('Internal Type Error', 'internal-error'));
-      }
-
+    async(req: UpdateMimeTypesRequest, res: ApiV3Response) => {
       const newInlineMimeTypes: string[] = req.body.newInlineMimeTypes;
       const newAttachmentMimeTypes: string[] = req.body.newAttachmentMimeTypes;
 
