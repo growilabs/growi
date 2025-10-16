@@ -21,6 +21,7 @@ import { swrGlobalConfiguration } from '~/utils/swr-utils';
 import { getLocaleAtServerSide, type CommonProps } from './utils/commons';
 import '~/styles/prebuilt/vendor.css';
 import '~/styles/style-app.scss';
+import '~/styles/tailwind.css';
 import { registerTransformerForObjectId } from './utils/objectid-transformer';
 
 // eslint-disable-next-line @typescript-eslint/ban-types
