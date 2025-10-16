@@ -30,6 +30,10 @@ module.exports = (crowi) => {
     body('newAttachmentMimeTypes').isArray().withMessage('Attachment mime types must be an array.'),
   ];
 
+  interface AuthorizedRequest extends Request {
+    user?: IUserHasId;
+  }
+
   interface UpdateMimeTypesBody {
     newInlineMimeTypes: string[];
     newAttachmentMimeTypes: string[];
@@ -162,7 +166,7 @@ module.exports = (crowi) => {
  *                         type: string
  *
  */
-  router.get('/', loginRequiredStrictly, adminRequired, async(req, res) => {
+  router.get('/', loginRequiredStrictly, adminRequired, async(req: AuthorizedRequest, res: ApiV3Response) => {
     try {
       const inlineDispositionSettings = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
       const attachmentDispositionSettings = configManager.getConfig('attachments:contentDisposition:attachmentMimeTypes');
