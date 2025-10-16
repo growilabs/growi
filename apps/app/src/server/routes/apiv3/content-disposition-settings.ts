@@ -1,3 +1,4 @@
+import type { IUserHasId } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request } from 'express';
 import { body } from 'express-validator';
@@ -9,7 +10,6 @@ import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import type { ApiV3Response } from './interfaces/apiv3-response';
-import { IUserHasId } from '@growi/core';
 
 const logger = loggerFactory('growi:routes:apiv3:content-disposition-settings');
 const express = require('express');
