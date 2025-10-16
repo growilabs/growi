@@ -1,7 +1,5 @@
 import { createHash } from 'node:crypto';
 
-import type { IUserHasId } from '@growi/core';
-
 import type {
   AuditLogBulkExportFormat,
   IAuditLogBulkExportFilters,
@@ -17,7 +15,7 @@ export interface IAuditLogBulkExportService {
   createOrResetExportJob: (
     filters: IAuditLogBulkExportFilters,
     format: AuditLogBulkExportFormat,
-    currentUser: IUserHasId,
+    currentUser,
     restartJob?: boolean,
   ) => Promise<void>;
   resetExportJob: (job: AuditLogBulkExportJobDocument) => Promise<void>;
@@ -76,7 +74,7 @@ class AuditLogBulkExportService implements IAuditLogBulkExportService {
   async createOrResetExportJob(
     filters: IAuditLogBulkExportFilters,
     format: AuditLogBulkExportFormat,
-    currentUser: IUserHasId,
+    currentUser,
     restartJob?: boolean,
   ): Promise<void> {
     const normalizedFilters = canonicalizeFilters(filters);

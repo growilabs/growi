@@ -1,4 +1,5 @@
 import type { HasObjectId, IUser, Ref } from '@growi/core';
+import type { SupportedActionType } from '~/interfaces/activity';
 
 export const AuditLogBulkExportFormat = {
   json: 'json',
@@ -23,7 +24,7 @@ export type AuditLogBulkExportJobStatus =
 
 export interface IAuditLogBulkExportFilters {
   users?: Array<Ref<IUser>>;
-  actions?: string[];
+  actions?: SupportedActionType[];
   dateFrom?: Date;
   dateTo?: Date;
 }

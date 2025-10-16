@@ -2,10 +2,13 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request } from 'express';
 import { Router } from 'express';
-import { body, validationResult } from 'express-validator';
+import { body } from 'express-validator';
 
 import { AuditLogBulkExportFormat } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
+import type { SupportedActionType } from '~/interfaces/activity';
+import { AllSupportedActions } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
@@ -18,7 +21,18 @@ const logger = loggerFactory('growi:routes:apiv3:audit-log-bulk-export');
 
 const router = Router();
 
-interface AuthorizedRequest extends Request {
+interface AuditLogExportReqBody {
+  filters: {
+    users?: string[];
+    actions?: SupportedActionType[];
+    dateFrom?: Date;
+    dateTo?: Date;
+  };
+  format?: (typeof AuditLogBulkExportFormat)[keyof typeof AuditLogBulkExportFormat];
+  restartJob?: boolean;
+}
+interface AuthorizedRequest
+  extends Request<undefined, ApiV3Response, AuditLogExportReqBody> {
   user?: any;
 }
 
@@ -32,9 +46,12 @@ module.exports = (crowi: Crowi): Router => {
     auditLogBulkExport: [
       body('filters').exists({ checkFalsy: true }).isObject(),
       body('filters.users').optional({ nullable: true }).isArray(),
-      body('filters.users.*').optional({ nullable: true }).isString(),
+      body('filters.users.*').optional({ nullable: true }).isMongoId(),
       body('filters.actions').optional({ nullable: true }).isArray(),
-      body('filters.actions.*').optional({ nullable: true }).isString(),
+      body('filters.actions.*')
+        .optional({ nullable: true })
+        .isString()
+        .isIn(AllSupportedActions),
       body('filters.dateFrom')
         .optional({ nullable: true })
         .isISO8601()
@@ -52,26 +69,13 @@ module.exports = (crowi: Crowi): Router => {
     accessTokenParser([SCOPE.WRITE.ADMIN.AUDIT_LOG]),
     loginRequiredStrictly,
     validators.auditLogBulkExport,
+    apiV3FormValidator,
     async (req: AuthorizedRequest, res: ApiV3Response) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
       const {
         filters,
         format = AuditLogBulkExportFormat.json,
         restartJob,
-      } = req.body as {
-        filters: {
-          users?: string[];
-          actions?: string[];
-          dateFrom?: Date;
-          dateTo?: Date;
-        };
-        format?: (typeof AuditLogBulkExportFormat)[keyof typeof AuditLogBulkExportFormat];
-        restartJob?: boolean;
-      };
+      } = req.body;
 
       try {
         await auditLogBulkExportService.createOrResetExportJob(

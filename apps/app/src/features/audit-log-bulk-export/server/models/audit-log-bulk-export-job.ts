@@ -2,6 +2,7 @@ import type { HydratedDocument } from 'mongoose';
 import { type Model, Schema } from 'mongoose';
 
 import { getOrCreateModel } from '~/server/util/mongoose-utils';
+import { AllSupportedActions } from '~/interfaces/activity';
 
 import type { IAuditLogBulkExportJob } from '../../interfaces/audit-log-bulk-export';
 import {
@@ -17,7 +18,15 @@ export type AuditLogBulkExportJobModel = Model<AuditLogBulkExportJobDocument>;
 const auditLogBulkExportJobSchema = new Schema<IAuditLogBulkExportJob>(
   {
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    filters: { type: Schema.Types.Mixed, required: true },
+    filters: {
+      type: {
+        users: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+        actions: [{ type: String, enum: AllSupportedActions }],
+        dateFrom: { type: Date },
+        dateTo: { type: Date },
+      },
+      required: true,
+    },
     filterHash: { type: String, required: true, index: true },
     format: {
       type: String,
