@@ -171,7 +171,12 @@ module.exports = (crowi) => {
       const inlineDispositionSettings = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
       const attachmentDispositionSettings = configManager.getConfig('attachments:contentDisposition:attachmentMimeTypes');
 
-      return res.apiv3({ inlineDispositionSettings, attachmentDispositionSettings });
+      return res.apiv3({
+        currentDispositionSettings: {
+          inlineMimeTypes: inlineDispositionSettings.inlineMimeTypes,
+          attachmentMimeTypes: attachmentDispositionSettings.attachmentMimeTypes,
+        },
+      });
     }
     catch (err) {
       logger.error('Error retrieving content disposition settings:', err);
