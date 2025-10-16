@@ -167,12 +167,14 @@ export const ExternalGroupManagement: FC = () => {
   const navTabMapping = useMemo(() => {
     return {
       ldap: {
+        // biome-ignore lint/correctness/noNestedComponentDefinitions: ignore
         Icon: () => (
           <span className="material-symbols-outlined">network_node</span>
         ),
         i18n: 'LDAP',
       },
       keycloak: {
+        // biome-ignore lint/correctness/noNestedComponentDefinitions: ignore
         Icon: () => <span className="material-symbols-outlined">key</span>,
         i18n: 'Keycloak',
       },

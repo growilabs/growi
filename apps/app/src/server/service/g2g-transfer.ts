@@ -3,9 +3,8 @@ import { createReadStream } from 'fs';
 import { basename } from 'path';
 import type { Readable } from 'stream';
 
-// eslint-disable-next-line no-restricted-imports
-import type { IUser } from '@growi/core';
 import { ConfigSource } from '@growi/core';
+import type { IUser } from '@growi/core/dist/interfaces';
 import rawAxios, { type AxiosRequestConfig } from 'axios';
 import FormData from 'form-data';
 import mongoose, { Types as MongooseTypes } from 'mongoose';

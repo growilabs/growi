@@ -3,41 +3,41 @@
   "files": {
     "includes": [
       "**",
-      "!**/dist/**",
-      "!**/node_modules/**",
-      "!**/.pnpm-store/**",
-      "!**/coverage/**",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/.pnpm-store",
+      "!**/coverage",
       "!**/vite.config.ts.timestamp-*",
       "!**/vite.server.config.ts.timestamp-*",
       "!**/vite.client.config.ts.timestamp-*",
-      "!**/.turbo/**",
-      "!**/.vscode/**",
+      "!**/.turbo",
+      "!**/.vscode",
       "!**/turbo.json",
-      "!**/.claude/**",
-      "!**/.next/**",
-      "!**/.terraform/**",
-      "!bin/**",
+      "!**/.claude",
+      "!**/.next",
+      "!**/.terraform",
+      "!bin",
       "!tsconfig.base.json",
-      "!**/.devcontainer/**",
+      "!**/.devcontainer",
       "!**/.eslintrc.js",
       "!**/.stylelintrc.json",
       "!**/package.json",
-      "!apps/app/src/styles/prebuilt/**",
-      "!apps/app/tmp/**",
-      "!apps/slackbot-proxy/src/public/bootstrap/**",
+      "!apps/app/src/styles/prebuilt",
+      "!apps/app/tmp",
+      "!apps/slackbot-proxy/src/public/bootstrap",
       "!packages/pdf-converter-client/src/index.ts",
-      "!packages/pdf-converter-client/specs/**",
-      "!apps/app/playwright/**",
-      "!apps/app/src/client/**",
-      "!apps/app/src/components/**",
-      "!apps/app/src/features/openai/**",
-      "!apps/app/src/pages/**",
-      "!apps/app/src/server/**",
-      "!apps/app/src/services/**",
-      "!apps/app/src/stores/**",
-      "!apps/app/src/styles/**",
-      "!apps/app/test-with-vite/**",
-      "!apps/app/tmp/**"
+      "!packages/pdf-converter-client/specs",
+      "!apps/app/playwright",
+      "!apps/app/src/client",
+      "!apps/app/src/components",
+      "!apps/app/src/features/openai",
+      "!apps/app/src/pages",
+      "!apps/app/src/server",
+      "!apps/app/src/services",
+      "!apps/app/src/stores",
+      "!apps/app/src/styles",
+      "!apps/app/test-with-vite",
+      "!apps/app/tmp"
     ]
   },
   "formatter": {
@@ -71,7 +71,10 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "correctness": {
+        "useUniqueElementIds": "warn"
+      }
     }
   },
   "javascript": {
@@ -89,6 +92,54 @@
         "rules": {
           "style": {
             "useImportType": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/app/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "axios": "Please use src/utils/axios instead."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/app/src/stores-universal/**",
+        "apps/app/src/utils/**",
+        "apps/app/src/models/**",
+        "apps/app/src/services/**",
+        "apps/app/src/pages/**",
+        "apps/app/src/server/**",
+        "apps/app/src/components/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "axios": "Please use src/utils/axios instead."
+                },
+                "patterns": [
+                  {
+                    "group": ["~/client/*", "client/*"],
+                    "message": "Importing from client/ directories is restricted."
+                  }
+                ]
+              }
+            }
           }
         }
       }

@@ -92,7 +92,9 @@ export const useCollaborativeEditorMode = (
         removed: number[];
       }) => {
         // remove the states of disconnected clients
-        update.removed.forEach((clientId) => awareness.states.delete(clientId));
+        update.removed.forEach((clientId) => {
+          awareness.states.delete(clientId);
+        });
 
         // update editor list
         if (onEditorsUpdated != null) {
@@ -149,7 +151,9 @@ export const useCollaborativeEditorMode = (
     );
 
     return () => {
-      cleanupFunctions.forEach((cleanup) => cleanup?.());
+      cleanupFunctions.forEach((cleanup) => {
+        cleanup?.();
+      });
       codeMirrorEditor.initDoc('');
     };
   }, [isEnabled, codeMirrorEditor, provider, primaryDoc, activeDoc]);

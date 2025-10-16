@@ -58,10 +58,6 @@ module.exports = {
     },
   },
   rules: {
-    'no-restricted-imports': ['error', {
-      name: 'axios',
-      message: 'Please use src/utils/axios instead.',
-    }],
     '@typescript-eslint/no-var-requires': 'off',
 
     // set 'warn' temporarily -- 2021.08.02 Yuki Takei

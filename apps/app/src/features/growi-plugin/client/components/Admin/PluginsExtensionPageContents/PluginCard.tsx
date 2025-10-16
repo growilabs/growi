@@ -21,6 +21,7 @@ export const PluginCard = (props: Props): JSX.Element => {
 
   const { t } = useTranslation('admin');
 
+  // biome-ignore lint/correctness/noNestedComponentDefinitions: ignore
   const PluginCardButton = (): JSX.Element => {
     const [_isEnabled, setIsEnabled] = useState<boolean>(isEnabled);
 
@@ -62,6 +63,7 @@ export const PluginCard = (props: Props): JSX.Element => {
     );
   };
 
+  // biome-ignore lint/correctness/noNestedComponentDefinitions: ignore
   const PluginDeleteButton = (): JSX.Element => {
     return (
       <div>

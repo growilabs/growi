@@ -5,7 +5,7 @@ import {
   importPackageJson,
   validateGrowiDirective,
 } from '@growi/pluginkit/dist/v4/server/index.cjs';
-// eslint-disable-next-line no-restricted-imports
+// biome-ignore lint/style/noRestrictedImports: Direct axios usage for plugin downloading
 import axios from 'axios';
 import fs, { readFileSync } from 'fs';
 import type mongoose from 'mongoose';

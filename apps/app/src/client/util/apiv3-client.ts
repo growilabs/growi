@@ -1,8 +1,6 @@
-// eslint-disable-next-line no-restricted-imports
+// biome-ignore lint/style/noRestrictedImports: Type-only import from axios
 import type { AxiosResponse } from 'axios';
 import urljoin from 'url-join';
-
-// eslint-disable-next-line no-restricted-imports
 
 import { toArrayIfNot } from '~/utils/array-utils';
 import axios from '~/utils/axios';
