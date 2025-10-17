@@ -19,8 +19,7 @@ async function bootstrap() {
       $log.info('"--ci" flag is detected. Exit process.');
       process.exit();
     }
-  }
-  catch (error) {
+  } catch (error) {
     $log.error(error);
   }
 }

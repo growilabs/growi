@@ -88,7 +88,7 @@ export const getServerSideCommonProps: GetServerSideProps<CommonProps> = async(c
     namespacesRequired: ['translation'],
     currentPathname,
     appTitle: appService.getAppTitle(),
-    siteUrl: configManager.getConfig('app:siteUrl'), // DON'T USE appService.getSiteUrl()
+    siteUrl: configManager.getConfig('app:siteUrl'), // DON'T USE growiInfoService.getSiteUrl()
     confidential: appService.getAppConfidential() || '',
     customTitleTemplate: customizeService.customTitleTemplate,
     csrfToken: req.csrfToken(),
@@ -115,6 +115,7 @@ export const langMap: LangMap = {
   [Lang.en_US]: 'en-US',
   [Lang.zh_CN]: 'zh-CN',
   [Lang.fr_FR]: 'fr-FR',
+  [Lang.ko_KR]: 'ko-KR',
 } as const;
 
 // use this function to translate content

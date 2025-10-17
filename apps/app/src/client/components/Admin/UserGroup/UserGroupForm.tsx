@@ -76,7 +76,7 @@ export const UserGroupForm: FC<Props> = (props: Props) => {
           userGroup?.createdAt != null && (
             <div className="row mb-3">
               <p className="col-md-2 col-form-label">{t('Created')}</p>
-              <p className="col-md-6 my-auto">{dateFnsFormat(new Date(userGroup.createdAt), 'yyyy-MM-dd')}</p>
+              <p className="col-md-6 my-auto">{dateFnsFormat(userGroup.createdAt, 'yyyy-MM-dd')}</p>
             </div>
           )
         }

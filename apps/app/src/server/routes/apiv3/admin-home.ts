@@ -1,3 +1,5 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { configManager } from '~/server/service/config-manager';
 import { getGrowiVersion } from '~/utils/growi-version';
 
@@ -41,7 +43,6 @@ const router = express.Router();
  *              "ELASTICSEARCH_REQUEST_TIMEOUT": 15000
  *              "ELASTICSEARCH_REJECT_UNAUTHORIZED": true
  *              "OGP_URI": "http://ogp:8088"
- *              "QUESTIONNAIRE_SERVER_ORIGIN": "http://host.docker.internal:3003"
  *          isV5Compatible:
  *            type: boolean
  *            description: This value is true if this GROWI is compatible v5.
@@ -82,7 +83,7 @@ module.exports = (crowi) => {
    *                    adminHomeParams:
    *                      $ref: "#/components/schemas/SystemInformationParams"
    */
-  router.get('/', loginRequiredStrictly, adminRequired, async(req, res) => {
+  router.get('/', accessTokenParser([SCOPE.READ.ADMIN.TOP]), loginRequiredStrictly, adminRequired, async(req, res) => {
     const { getRuntimeVersions } = await import('~/server/util/runtime-versions');
     const runtimeVersions = await getRuntimeVersions();
 

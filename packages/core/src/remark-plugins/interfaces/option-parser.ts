@@ -1,4 +1,4 @@
 export type ParseRangeResult = {
-  start: number,
-  end: number,
-}
+  start: number;
+  end: number;
+};

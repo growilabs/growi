@@ -10,7 +10,6 @@ const config: UniversalBunyanConfig = {
    */
   // 'express:*': 'debug',
   // 'slackbot-proxy:*': 'debug',
-
 };
 
 export default config;

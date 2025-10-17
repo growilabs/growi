@@ -90,6 +90,28 @@ module.exports = function(crowi, app) {
   actions.api = {};
 
   /**
+   * Reject request if unexpected keys are present in form.
+   * Logs the keys and returns error response.
+   *
+   * @param {Object} form
+   * @param {Array<string>} allowedKeys
+   * @param {Object} res
+   * @returns {boolean}
+   */
+  function isValidFormKeys(form, allowedKeys, res) {
+    const receivedKeys = Object.keys(form);
+    const unexpectedKeys = receivedKeys.filter(key => !allowedKeys.includes(key));
+
+    if (unexpectedKeys.length > 0) {
+      logger.warn('Unexpected keys were found in request body.', { unexpectedKeys });
+      res.json(ApiResponse.error('Invalid config keys provided.'));
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * save esa settings, update config cache, and response json
    *
    * @param {*} req
@@ -103,6 +125,9 @@ module.exports = function(crowi, app) {
     if (!errors.isEmpty()) {
       return res.json(ApiResponse.error('esa.io form is blank'));
     }
+
+    const ALLOWED_KEYS = ['importer:esa:team_name', 'importer:esa:access_token'];
+    if (!isValidFormKeys(form, ALLOWED_KEYS, res)) return;
 
     await configManager.updateConfigs(form);
     importer.initializeEsaClient(); // let it run in the back aftert res
@@ -125,6 +150,9 @@ module.exports = function(crowi, app) {
     if (!errors.isEmpty()) {
       return res.json(ApiResponse.error('Qiita form is blank'));
     }
+
+    const ALLOWED_KEYS = ['importer:qiita:team_name', 'importer:qiita:access_token'];
+    if (!isValidFormKeys(form, ALLOWED_KEYS, res)) return;
 
     await configManager.updateConfigs(form);
     importer.initializeQiitaClient(); // let it run in the back aftert res

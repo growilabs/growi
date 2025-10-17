@@ -3,11 +3,9 @@ import { Types } from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
 import { getIdForRef, isPopulated } from './common';
-import type { IPageHasId } from './page';
-import { type IPage } from './page';
+import type { IPage, IPageHasId } from './page';
 
 describe('isPopulated', () => {
-
   it('should return true when the argument implements HasObjectId', () => {
     // Arrange
     const ref = mock<IPageHasId>();
@@ -51,12 +49,9 @@ describe('isPopulated', () => {
     // Assert
     expect(result).toBe(false);
   });
-
 });
 
-
 describe('getIdForRef', () => {
-
   it('should return the id string when the argument is populated', () => {
     // Arrange
     const id = new Types.ObjectId();
@@ -106,5 +101,4 @@ describe('getIdForRef', () => {
     // Assert
     expect(result).toStrictEqual(ref);
   });
-
 });

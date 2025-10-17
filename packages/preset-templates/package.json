@@ -5,7 +5,8 @@
   "license": "MIT",
   "private": "true",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "biome check"
   },
   "dependencies": {},
   "devDependencies": {

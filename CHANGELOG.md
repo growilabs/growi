@@ -1,8 +1,66 @@
 # Changelog
 
-## [Unreleased](https://github.com/weseek/growi/compare/v7.2.6...HEAD)
+## [Unreleased](https://github.com/weseek/growi/compare/v7.2.9...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.2.9](https://github.com/weseek/growi/compare/v7.2.8...v7.2.9) - 2025-07-01
+
+### 🚀 Improvement
+
+* imprv(ai): Assistant instructions (#10129) @yuki-takei
+* imprv: OpenTelemetry phase 2 (#10095) @yuki-takei
+* imprv: Adjust margin-top for .main at md and lg breakpoints (#10131) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Sharelink expiration date parsing when the date is cleared by the calendar UI (#10132) @yuki-takei
+* fix: Cannot change file upload destination to "MongoDB (GridFS)" or "local" for dev/7.2.x (#10119) @miya
+
+## [v7.2.8](https://github.com/weseek/growi/compare/v7.2.7...v7.2.8) - 2025-06-26
+
+### 💎 Features
+
+* feat(ai): Send pre-message before main chat stream (#10089) @miya
+
+### 🚀 Improvement
+
+* imprv(ai): Add page content around the cursor position as context for editor assistant (#10106) @yuki-takei
+* imprv(ai): Search and Replace strategy for Editor Assistant (#10093) @yuki-takei
+* imprv(ai): Submit with Enter key (#10085) @yuki-takei
+* imprv: Make axios response convert dates to type Date (#10064) @arvid-e
+* imprv: OpenAPI Spec for GROWI API v1 (#10063) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Unhandled exception in GlobalNotificationMailService (#10076) @yuki-takei
+* fix: Prevent dropdown menu from hiding behind sidebar (#10103) @arvid-e
+* fix(ai): Message gets sent when pressing Enter to confirm text conversion (#10094) @miya
+
+### 🧰 Maintenance
+
+* support: Configure biome for core package utils and models (#10082) @arafubeatbox
+* support: Configure biome for pdf-converter-client package (#10077) @arafubeatbox
+* support: Configure biome for core package biome (excluding utils and models) (#10078) @arafubeatbox
+* support: Configure biome for pluginkit package (#10071) @arafubeatbox
+* support: Configure biome for remark-attachment-refs package (#10054) @arafubeatbox
+* support: Configure biome for presentation package (#10067) @arafubeatbox
+* ci(deps): bump next from 14.2.26 to 14.2.30 (#10068) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.2.7](https://github.com/weseek/growi/compare/v7.2.6...v7.2.7) - 2025-06-11
+
+### 🐛 Bug Fixes
+
+* fix: Input values ​​in the admin settings form are sometimes not reflected (#10051) @yuki-takei
+* fix: Hide Google OAuth client secret field (#10049) @yuki-takei
+* fix: Prevent unnecessary API request when the user is guest (#10046) @yuki-takei
+* fix(ai): Prevent unnecessary API request when GROWI AI is disabled (#10044) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Configure biome for preset-templates package (#10058) @arafubeatbox
+* support: Configure biome for preset-themes package (#10055) @arafubeatbox
+* support: Configure biome for remark-drawio package (#10033) @arafubeatbox
 
 ## [v7.2.6](https://github.com/weseek/growi/compare/v7.2.5...v7.2.6) - 2025-06-10
 

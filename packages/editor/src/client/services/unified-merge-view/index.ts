@@ -24,14 +24,20 @@ export const acceptAllChunks = (view: EditorView): void => {
   }
 };
 
+type OnSelectedArgs = {
+  selectedText: string;
+  selectedTextIndex: number; // 0-based index in the selected text
+  selectedTextFirstLineNumber: number; // 0-based line number
+}
 
-type OnSelected = (selectedText: string, selectedTextFirstLineNumber: number) => void
+type OnSelected = (args: OnSelectedArgs) => void
 
 const processSelectedText = (editorView: EditorView | ViewUpdate, onSelected?: OnSelected) => {
   const selection = editorView.state.selection.main;
   const selectedText = editorView.state.sliceDoc(selection.from, selection.to);
+  const selectedTextIndex = selection.from;
   const selectedTextFirstLineNumber = editorView.state.doc.lineAt(selection.from).number - 1; // 0-based line number;
-  onSelected?.(selectedText, selectedTextFirstLineNumber);
+  onSelected?.({ selectedText, selectedTextIndex, selectedTextFirstLineNumber });
 };
 
 export const useTextSelectionEffect = (codeMirrorEditor?: UseCodeMirrorEditor, onSelected?: OnSelected): void => {

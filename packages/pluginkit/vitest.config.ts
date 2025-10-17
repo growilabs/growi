@@ -1,10 +1,8 @@
 import tsconfigPaths from 'vite-tsconfig-paths';
-import { defineConfig, coverageConfigDefaults } from 'vitest/config';
+import { coverageConfigDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  plugins: [
-    tsconfigPaths(),
-  ],
+  plugins: [tsconfigPaths()],
   test: {
     environment: 'node',
     clearMocks: true,

@@ -11,7 +11,6 @@ const config: UniversalBunyanConfig = {
   // 'express:*': 'debug',
   // 'slackbot-proxy:*': 'debug',
   'slackbot-proxy:controllers:growi-to-slack': 'debug',
-
 };
 
 export default config;

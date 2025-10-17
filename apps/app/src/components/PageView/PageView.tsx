@@ -48,8 +48,6 @@ export const PageView = (props: Props): JSX.Element => {
 
   const commentsContainerRef = useRef<HTMLDivElement>(null);
 
-  const [isCommentsLoaded, setCommentsLoaded] = useState(false);
-
   const {
     pagePath, initialPage, rendererConfig, className,
   } = props;
@@ -72,21 +70,49 @@ export const PageView = (props: Props): JSX.Element => {
   const markdown = page?.revision?.body;
   const isSlide = useSlidesByFrontmatter(markdown, rendererConfig.isEnabledMarp);
 
+  const [currentPageId, setCurrentPageId] = useState<string | undefined>(page?._id);
+
+  useEffect(() => {
+    if (page?._id !== undefined) {
+      setCurrentPageId(page._id);
+    }
+  }, [page?._id]);
 
   // ***************************  Auto Scroll  ***************************
   useEffect(() => {
+    if (currentPageId == null) {
+      return;
+    }
+
     // do nothing if hash is empty
     const { hash } = window.location;
     if (hash.length === 0) {
       return;
     }
 
-    const targetId = hash.slice(1);
+    const contentContainer = document.getElementById('page-view-content-container');
+    if (contentContainer == null) return;
 
-    const target = document.getElementById(decodeURIComponent(targetId));
-    target?.scrollIntoView();
+    const targetId = decodeURIComponent(hash.slice(1));
+    const target = document.getElementById(targetId);
+    if (target != null) {
+      target.scrollIntoView();
+      return;
+    }
 
-  }, [isCommentsLoaded]);
+    const observer = new MutationObserver(() => {
+      const target = document.getElementById(targetId);
+      if (target != null) {
+        target.scrollIntoView();
+        observer.disconnect();
+      }
+    });
+
+    observer.observe(contentContainer, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, [currentPageId]);
+
   // *******************************  end  *******************************
 
   const specialContents = useMemo(() => {
@@ -145,7 +171,6 @@ export const PageView = (props: Props): JSX.Element => {
                 pageId={page._id}
                 pagePath={pagePath}
                 revision={page.revision}
-                onLoaded={() => setCommentsLoaded(true)}
               />
             </div>
           ) }
@@ -168,7 +193,7 @@ export const PageView = (props: Props): JSX.Element => {
       {specialContents == null && (
         <>
           {(isUsersHomepagePath && page?.creator != null) && <UserInfo author={page.creator} />}
-          <div className="flex-expand-vert">
+          <div id="page-view-content-container" className="flex-expand-vert">
             <Contents />
           </div>
         </>

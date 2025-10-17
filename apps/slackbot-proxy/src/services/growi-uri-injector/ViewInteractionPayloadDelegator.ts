@@ -1,30 +1,34 @@
 import { Service } from '@tsed/di';
 
 import {
-  GrowiUriInjector, GrowiUriWithOriginalData, isGrowiUriWithOriginalData, TypedBlock,
+  GrowiUriInjector,
+  GrowiUriWithOriginalData,
+  isGrowiUriWithOriginalData,
+  TypedBlock,
 } from '~/interfaces/growi-uri-injector';
 
 // see: https://api.slack.com/reference/interaction-payloads/views
 type ViewElement = TypedBlock & {
-  'private_metadata'?: any,
-}
+  private_metadata?: any;
+};
 
 // see: https://api.slack.com/reference/interaction-payloads/views
 type ViewInteractionPayload = TypedBlock & {
   view: {
-    'private_metadata'?: any,
-  },
-}
+    private_metadata?: any;
+  };
+};
 
 @Service()
-export class ViewInteractionPayloadDelegator implements GrowiUriInjector<any, ViewElement, any, ViewInteractionPayload> {
-
+export class ViewInteractionPayloadDelegator
+  implements GrowiUriInjector<any, ViewElement, any, ViewInteractionPayload>
+{
   // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleToInject(data: any): data is ViewElement {
     return data.type != null && data.private_metadata != null;
   }
 
-  inject(data: ViewElement, growiUri :string): void {
+  inject(data: ViewElement, growiUri: string): void {
     const originalData = data.private_metadata;
 
     const urlWithOrgData: GrowiUriWithOriginalData = { growiUri, originalData };
@@ -45,19 +49,19 @@ export class ViewInteractionPayloadDelegator implements GrowiUriInjector<any, Vi
     try {
       const restoredData: any = JSON.parse(view.private_metadata);
       return isGrowiUriWithOriginalData(restoredData);
-    }
-    // when parsing failed
-    catch (err) {
+    } catch (err) {
+      // when parsing failed
       return false;
     }
   }
 
   extract(data: ViewInteractionPayload): GrowiUriWithOriginalData {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const restoredData: GrowiUriWithOriginalData = JSON.parse(data.view.private_metadata!); // private_metadata must not be null at this moment
+    const restoredData: GrowiUriWithOriginalData = JSON.parse(
+      data.view.private_metadata!,
+    ); // private_metadata must not be null at this moment
     data.view.private_metadata = restoredData.originalData;
 
     return restoredData;
   }
-
 }

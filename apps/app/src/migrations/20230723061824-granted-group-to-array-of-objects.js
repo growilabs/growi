@@ -10,21 +10,18 @@ module.exports = {
     const pageOperationCollection = await db.collection('pageoperations');
     // Convert grantedGroup to array
     // Set the model type of grantedGroup to UserGroup for Pages that were created before ExternalUserGroup was introduced
-    await pageCollection.updateMany(
-      { grantedGroup: { $ne: null } },
-      [
-        {
-          $set: {
-            grantedGroup: [
-              {
-                type: 'UserGroup',
-                item: '$grantedGroup',
-              },
-            ],
-          },
+    await pageCollection.updateMany({ grantedGroup: { $ne: null } }, [
+      {
+        $set: {
+          grantedGroup: [
+            {
+              type: 'UserGroup',
+              item: '$grantedGroup',
+            },
+          ],
         },
-      ],
-    );
+      },
+    ]);
 
     await pageOperationCollection.updateMany(
       { 'options.grantUserGroupId': { $ne: null } },
@@ -75,18 +72,24 @@ module.exports = {
     );
 
     // rename fields
-    await pageCollection.updateMany({}, {
-      $rename: {
-        grantedGroup: 'grantedGroups',
+    await pageCollection.updateMany(
+      {},
+      {
+        $rename: {
+          grantedGroup: 'grantedGroups',
+        },
       },
-    });
-    await pageOperationCollection.updateMany({}, {
-      $rename: {
-        'options.grantUserGroupId': 'options.grantUserGroupIds',
-        'page.grantedGroup': 'page.grantedGroups',
-        'exPage.grantedGroup': 'exPage.grantedGroups',
+    );
+    await pageOperationCollection.updateMany(
+      {},
+      {
+        $rename: {
+          'options.grantUserGroupId': 'options.grantUserGroupIds',
+          'page.grantedGroup': 'page.grantedGroups',
+          'exPage.grantedGroup': 'exPage.grantedGroups',
+        },
       },
-    });
+    );
 
     logger.info('Migration has successfully applied');
   },
@@ -97,22 +100,21 @@ module.exports = {
     const pageCollection = await db.collection('pages');
     const pageOperationCollection = await db.collection('pageoperations');
 
-    await pageCollection.updateMany(
-      { grantedGroups: { $exists: true } },
-      [
-        {
-          $set: {
-            grantedGroups: { $arrayElemAt: ['$grantedGroups.item', 0] },
-          },
+    await pageCollection.updateMany({ grantedGroups: { $exists: true } }, [
+      {
+        $set: {
+          grantedGroups: { $arrayElemAt: ['$grantedGroups.item', 0] },
         },
-      ],
-    );
+      },
+    ]);
     await pageOperationCollection.updateMany(
       { 'options.grantUserGroupIds': { $exists: true } },
       [
         {
           $set: {
-            'options.grantUserGroupIds': { $arrayElemAt: ['options.grantUserGroupIds.item', 0] },
+            'options.grantUserGroupIds': {
+              $arrayElemAt: ['options.grantUserGroupIds.item', 0],
+            },
           },
         },
       ],
@@ -122,7 +124,9 @@ module.exports = {
       [
         {
           $set: {
-            'page.grantedGroups': { $arrayElemAt: ['page.grantedGroups.item', 0] },
+            'page.grantedGroups': {
+              $arrayElemAt: ['page.grantedGroups.item', 0],
+            },
           },
         },
       ],
@@ -132,7 +136,9 @@ module.exports = {
       [
         {
           $set: {
-            'exPage.grantedGroups': { $arrayElemAt: ['exPage.grantedGroups.item', 0] },
+            'exPage.grantedGroups': {
+              $arrayElemAt: ['exPage.grantedGroups.item', 0],
+            },
           },
         },
       ],
@@ -147,13 +153,16 @@ module.exports = {
         },
       },
     );
-    await pageOperationCollection.updateMany({}, {
-      $rename: {
-        'options.grantUserGroupIds': 'options.grantUserGroupId',
-        'page.grantedGroups': 'page.grantedGroup',
-        'exPage.grantedGroups': 'exPage.grantedGroup',
+    await pageOperationCollection.updateMany(
+      {},
+      {
+        $rename: {
+          'options.grantUserGroupIds': 'options.grantUserGroupId',
+          'page.grantedGroups': 'page.grantedGroup',
+          'exPage.grantedGroups': 'exPage.grantedGroup',
+        },
       },
-    });
+    );
 
     logger.info('Migration has been successfully rollbacked');
   },

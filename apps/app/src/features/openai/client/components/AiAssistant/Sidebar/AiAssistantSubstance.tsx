@@ -1,10 +1,12 @@
-import React, { type JSX } from 'react';
+import React, { type JSX, useCallback } from 'react';
 
 import { useTranslation } from 'react-i18next';
 
-import { useAiAssistantManagementModal, useSWRxAiAssistants } from '../../../stores/ai-assistant';
+import { useAiAssistantManagementModal, useSWRxAiAssistants, useAiAssistantSidebar } from '../../../stores/ai-assistant';
+import { useSWRINFxRecentThreads } from '../../../stores/thread';
 
-import { AiAssistantTree } from './AiAssistantTree';
+import { AiAssistantList } from './AiAssistantList';
+import { ThreadList } from './ThreadList';
 
 import styles from './AiAssistantSubstance.module.scss';
 
@@ -13,7 +15,19 @@ const moduleClass = styles['grw-ai-assistant-substance'] ?? '';
 export const AiAssistantContent = (): JSX.Element => {
   const { t } = useTranslation();
   const { open } = useAiAssistantManagementModal();
+  const { data: aiAssistantSidebarData, close: closeAiAssistantSidebar } = useAiAssistantSidebar();
+  const { mutate: mutateRecentThreads } = useSWRINFxRecentThreads();
   const { data: aiAssistants, mutate: mutateAiAssistants } = useSWRxAiAssistants();
+
+  const deleteAiAssistantHandler = useCallback(async(aiAssistantId: string) => {
+    await mutateAiAssistants();
+    await mutateRecentThreads();
+
+    // If the sidebar is opened for the assistant being deleted, close it
+    if (aiAssistantSidebarData?.isOpened && aiAssistantSidebarData?.aiAssistantData?._id === aiAssistantId) {
+      closeAiAssistantSidebar();
+    }
+  }, [aiAssistantSidebarData?.aiAssistantData?._id, aiAssistantSidebarData?.isOpened, closeAiAssistantSidebar, mutateAiAssistants, mutateRecentThreads]);
 
   return (
     <div className={moduleClass}>
@@ -23,33 +37,33 @@ export const AiAssistantContent = (): JSX.Element => {
         onClick={() => open()}
       >
         <span className="material-symbols-outlined fs-5 me-2">add</span>
-        <span className="fw-normal">{t('ai_assistant_tree.add_assistant')}</span>
+        <span className="fw-normal">{t('ai_assistant_substance.add_assistant')}</span>
       </button>
 
       <div className="d-flex flex-column gap-4">
         <div>
-          <h3 className="fw-bold grw-ai-assistant-substance-header">
-            {t('ai_assistant_tree.my_assistants')}
-          </h3>
-          {aiAssistants?.myAiAssistants != null && aiAssistants.myAiAssistants.length !== 0 && (
-            <AiAssistantTree
-              onUpdated={mutateAiAssistants}
-              onDeleted={mutateAiAssistants}
-              aiAssistants={aiAssistants.myAiAssistants}
-            />
-          )}
+          <AiAssistantList
+            onUpdated={mutateAiAssistants}
+            onDeleted={deleteAiAssistantHandler}
+            onCollapsed={mutateAiAssistants}
+            aiAssistants={aiAssistants?.myAiAssistants ?? []}
+          />
+        </div>
+
+        <div>
+          <AiAssistantList
+            isTeamAssistant
+            onUpdated={mutateAiAssistants}
+            onCollapsed={mutateAiAssistants}
+            aiAssistants={aiAssistants?.teamAiAssistants ?? []}
+          />
         </div>
 
         <div>
           <h3 className="fw-bold grw-ai-assistant-substance-header">
-            {t('ai_assistant_tree.team_assistants')}
+            {t('ai_assistant_substance.recent_threads')}
           </h3>
-          {aiAssistants?.teamAiAssistants != null && aiAssistants.teamAiAssistants.length !== 0 && (
-            <AiAssistantTree
-              onUpdated={mutateAiAssistants}
-              aiAssistants={aiAssistants.teamAiAssistants}
-            />
-          )}
+          <ThreadList />
         </div>
       </div>
     </div>

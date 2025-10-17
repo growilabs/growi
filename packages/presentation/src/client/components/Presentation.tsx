@@ -1,15 +1,12 @@
-import { useEffect, type JSX } from 'react';
+import { type JSX, useEffect } from 'react';
 
 import Reveal from 'reveal.js';
 
 import type { PresentationOptions } from '../consts';
-
+import styles from './Presentation.module.scss';
 import { Slides } from './Slides';
 
-import styles from './Presentation.module.scss';
-
 const moduleClass = styles['grw-presentation'] ?? '';
-
 
 const baseRevealOptions: Reveal.Options = {
   // adjust size to the marp preset size
@@ -27,14 +24,16 @@ const baseRevealOptions: Reveal.Options = {
  */
 const removeAllHiddenElements = () => {
   const sections = document.querySelectorAll(`${moduleClass} section`);
-  sections.forEach(section => section.removeAttribute('hidden'));
+  for (const section of sections) {
+    section.removeAttribute('hidden');
+  }
 };
 
 export type PresentationProps = {
-  options: PresentationOptions,
-  marp?: boolean,
-  children?: string,
-}
+  options: PresentationOptions;
+  marp?: boolean;
+  children?: string;
+};
 
 export const Presentation = (props: PresentationProps): JSX.Element => {
   const { options, marp, children } = props;
@@ -45,8 +44,7 @@ export const Presentation = (props: PresentationProps): JSX.Element => {
       return;
     }
     const deck = new Reveal({ ...baseRevealOptions, ...revealOptions });
-    deck.initialize()
-      .then(() => deck.slide(0)); // navigate to the first slide
+    deck.initialize().then(() => deck.slide(0)); // navigate to the first slide
 
     deck.on('ready', removeAllHiddenElements);
     deck.on('slidechanged', removeAllHiddenElements);
@@ -59,7 +57,9 @@ export const Presentation = (props: PresentationProps): JSX.Element => {
 
   return (
     <div className={`${moduleClass} reveal`}>
-      <Slides options={options} hasMarpFlag={marp} presentation>{children}</Slides>
+      <Slides options={options} hasMarpFlag={marp} presentation>
+        {children}
+      </Slides>
     </div>
   );
 };

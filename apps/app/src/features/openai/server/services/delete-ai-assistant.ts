@@ -7,6 +7,7 @@ import loggerFactory from '~/utils/logger';
 
 import type { AiAssistantDocument } from '../models/ai-assistant';
 import AiAssistantModel from '../models/ai-assistant';
+import ThreadRelationModel from '../models/thread-relation';
 
 import { isAiEnabled } from './is-ai-enabled';
 import { getOpenaiService } from './openai';
@@ -27,6 +28,7 @@ export const deleteAiAssistant = async(ownerId: string, aiAssistantId: string): 
 
   const vectorStoreRelationId = getIdStringForRef(aiAssistant.vectorStore);
   await openaiService.deleteVectorStore(vectorStoreRelationId);
+  await ThreadRelationModel.deactivateByAiAssistantId(aiAssistant._id);
 
   const deletedAiAssistant = await aiAssistant.remove();
   return deletedAiAssistant;

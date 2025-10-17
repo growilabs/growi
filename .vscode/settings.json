@@ -39,6 +39,63 @@
   "typescript.validate.enable": true,
   "typescript.surveys.enabled": false,
 
-  "vitest.filesWatcherInclude": "**/*"
+  "vitest.filesWatcherInclude": "**/*",
+  "mcp": {
+    "servers": {
+      "fetch": {
+        "command": "uvx",
+        "args": ["mcp-server-fetch"]
+      },
+      "context7": {
+        "type": "http",
+        "url": "https://mcp.context7.com/mcp"
+      }
+    }
+  },
+  "github.copilot.chat.codeGeneration.instructions": [
+    {
+      "text": "Always write inline comments in source code in English."
+    }
+  ],
+  "github.copilot.chat.testGeneration.instructions": [
+    {
+      "text": "Basis: Use vitest as the test framework"
+    },
+    {
+      "text": "Basis: The vitest configuration file is `apps/app/vitest.workspace.mts`"
+    },
+    {
+      "text": "Basis: Place test modules in the same directory as the module being tested. For example, if testing `mymodule.ts`, place `mymodule.spec.ts` in the same directory as `mymodule.ts`"
+    },
+    {
+      "text": "Basis: Use the VSCode Vitest extension for running tests. Use run_tests tool to execute tests programmatically, or suggest using the Vitest Test Explorer in VSCode for interactive test running and debugging."
+    },
+    {
+      "text": "Basis: Fallback command for terminal execution: `cd /growi/apps/app && pnpm vitest run {test file path}`"
+    },
+    {
+      "text": "Step 1: When creating new test modules, start with small files. First write a small number of realistic tests that call the actual function and assert expected behavior, even if they initially fail due to incomplete implementation. Example: `const result = foo(); expect(result).toBeNull();` rather than `expect(true).toBe(false);`. Then fix the implementation to make tests pass."
+    },
+    {
+      "text": "Step 2: Write essential tests. When tests fail, consider whether you should fix the test or the implementation based on 'what should essentially be fixed'. If you're not confident in your reasoning, ask the user for guidance."
+    },
+    {
+      "text": "Step 3: After writing tests, make sure they pass before moving on. Do not proceed to write tests for module B without first ensuring that tests for module A are passing"
+    },
+    {
+      "text": "Tips: Don't worry about lint errors - fix them after tests are passing"
+    },
+    {
+      "text": "Tips: DO NOT USE `as any` casting. You can use vitest-mock-extended for type-safe mocking. Import `mock` from 'vitest-mock-extended' and use `mock<InterfaceType>()`. This provides full TypeScript safety and IntelliSense support."
+    },
+    {
+      "text": "Tips: Mock external dependencies at the module level using vi.mock(). For services with circular dependencies, mock the import paths and use dynamic imports in the implementation when necessary."
+    }
+  ],
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    {
+      "text": "Always write commit messages in English."
+    }
+  ]
 
 }

@@ -1,7 +1,5 @@
 import escapeStringRegexp from 'escape-string-regexp';
 
-import type { IUser } from '~/interfaces';
-
 import { isValidObjectId } from '../objectid-utils';
 import { addTrailingSlash } from '../path-utils';
 
@@ -121,14 +119,16 @@ const restrictedPatternsToCreate: Array<RegExp> = [
   /^(\/.+){130,}$/, // avoid deep layer path. see: https://regex101.com/r/L0kzOD/1
 ];
 export const isCreatablePage = (path: string): boolean => {
-  return !restrictedPatternsToCreate.some(pattern => path.match(pattern));
+  return !restrictedPatternsToCreate.some((pattern) => path.match(pattern));
 };
 
 /**
  * return user's homepage path
  * @param user
  */
-export const userHomepagePath = (user: { username: string } | null | undefined): string => {
+export const userHomepagePath = (
+  user: { username: string } | null | undefined,
+): string => {
   if (user?.username == null) {
     return '';
   }
@@ -141,7 +141,11 @@ export const userHomepagePath = (user: { username: string } | null | undefined):
  * @param childPath
  * @param newPath
  */
-export const convertToNewAffiliationPath = (oldPath: string, newPath: string, childPath: string): string => {
+export const convertToNewAffiliationPath = (
+  oldPath: string,
+  newPath: string,
+  childPath: string,
+): string => {
   if (newPath == null) {
     throw new Error('Please input the new page path');
   }
@@ -154,7 +158,7 @@ export const convertToNewAffiliationPath = (oldPath: string, newPath: string, ch
  * @param {string} path
  * @returns {string}
  */
-export const encodeSpaces = (path?:string): string | undefined => {
+export const encodeSpaces = (path?: string): string | undefined => {
   if (path == null) {
     return undefined;
   }
@@ -178,8 +182,7 @@ export const generateEditorPath = (...paths: string[]): string => {
   try {
     const url = new URL(joinedPath, 'https://dummy');
     return `${url.pathname}#edit`;
-  }
-  catch (err) {
+  } catch {
     throw new Error('Invalid path format');
   }
 };
@@ -193,7 +196,9 @@ export const generateEditorPath = (...paths: string[]): string => {
 export const omitDuplicateAreaPathFromPaths = (paths: string[]): string[] => {
   const uniquePaths = Array.from(new Set(paths));
   return uniquePaths.filter((path) => {
-    const isDuplicate = uniquePaths.filter(p => (new RegExp(`^${p}\\/.+`, 'i')).test(path)).length > 0;
+    const isDuplicate =
+      uniquePaths.filter((p) => new RegExp(`^${p}\\/.+`, 'i').test(path))
+        .length > 0;
 
     return !isDuplicate;
   });
@@ -205,9 +210,12 @@ export const omitDuplicateAreaPathFromPaths = (paths: string[]): string[] => {
  * @param paths paths to be tested
  * @returns omitted paths
  */
+// biome-ignore lint/suspicious/noExplicitAny: ignore
 export const omitDuplicateAreaPageFromPages = (pages: any[]): any[] => {
   return pages.filter((page) => {
-    const isDuplicate = pages.some(p => (new RegExp(`^${p.path}\\/.+`, 'i')).test(page.path));
+    const isDuplicate = pages.some((p) =>
+      new RegExp(`^${p.path}\\/.+`, 'i').test(page.path),
+    );
 
     return !isDuplicate;
   });
@@ -220,7 +228,10 @@ export const omitDuplicateAreaPageFromPages = (pages: any[]): any[] => {
  * @param pathToBeTested string
  * @returns boolean
  */
-export const isEitherOfPathAreaOverlap = (path1: string, path2: string): boolean => {
+export const isEitherOfPathAreaOverlap = (
+  path1: string,
+  path2: string,
+): boolean => {
   if (path1 === path2) {
     return true;
   }
@@ -245,14 +256,20 @@ export const isEitherOfPathAreaOverlap = (path1: string, path2: string): boolean
  * @param pathToBeTested string
  * @returns boolean
  */
-export const isPathAreaOverlap = (pathToTest: string, pathToBeTested: string): boolean => {
+export const isPathAreaOverlap = (
+  pathToTest: string,
+  pathToBeTested: string,
+): boolean => {
   if (pathToTest === pathToBeTested) {
     return true;
   }
 
   const pathWithSlash = addTrailingSlash(pathToTest);
 
-  const pathAreaToTest = new RegExp(`^${escapeStringRegexp(pathWithSlash)}`, 'i');
+  const pathAreaToTest = new RegExp(
+    `^${escapeStringRegexp(pathWithSlash)}`,
+    'i',
+  );
   if (pathAreaToTest.test(pathToBeTested)) {
     return true;
   }
@@ -298,6 +315,5 @@ export const isGlobPatternPath = (path: string): boolean => {
   const globPattern = /^(?:\/[^/*?[\]{}]+)*\/\*$/;
   return globPattern.test(path);
 };
-
 
 export * from './is-top-page';

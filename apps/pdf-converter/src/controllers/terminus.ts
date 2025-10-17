@@ -5,8 +5,10 @@ import PdfConvertService from '../service/pdf-convert.js';
 
 @Injectable()
 class TerminusCtrl {
-
-  constructor(private readonly pdfConvertService: PdfConvertService, private readonly logger: Logger) {}
+  constructor(
+    private readonly pdfConvertService: PdfConvertService,
+    private readonly logger: Logger,
+  ) {}
 
   async $onSignal(): Promise<void> {
     this.logger.info('Server is starting cleanup');
@@ -16,7 +18,6 @@ class TerminusCtrl {
   $onShutdown(): void {
     this.logger.info('Cleanup finished, server is shutting down');
   }
-
 }
 
 export default TerminusCtrl;

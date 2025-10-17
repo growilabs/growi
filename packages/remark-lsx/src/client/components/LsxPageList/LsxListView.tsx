@@ -1,11 +1,9 @@
-import React, { useMemo, type JSX } from 'react';
+import React, { type JSX, useMemo } from 'react';
 
 import type { PageNode } from '../../../interfaces/page-node';
 import type { LsxContext } from '../lsx-context';
-
-import { LsxPage } from './LsxPage';
-
 import styles from './LsxListView.module.scss';
+import { LsxPage } from './LsxPage';
 
 type Props = {
   nodeTree?: PageNode[];

@@ -21,5 +21,8 @@ eval "$(cat /home/vscode/.bashrc)"
 # Install turbo
 pnpm install turbo --global
 
+# Install Claude Code
+pnpm install @anthropic-ai/claude-code --global
+
 # Install dependencies
 turbo run bootstrap

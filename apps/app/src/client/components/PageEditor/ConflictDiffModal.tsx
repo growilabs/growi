@@ -60,7 +60,7 @@ const ConflictDiffModalCore = (props: ConflictDiffModalCoreProps): JSX.Element =
   }, [isRevisionselected]);
 
   const resolveConflictHandler = useCallback(async() => {
-    const newBody = codeMirrorEditor?.getDoc();
+    const newBody = codeMirrorEditor?.getDocString();
     if (newBody == null) {
       return;
     }

@@ -1,20 +1,21 @@
-import { createHash } from 'crypto';
-import { Writable, pipeline } from 'stream';
-
-import { getIdForRef, getIdStringForRef } from '@growi/core';
 import type { IPage } from '@growi/core';
+import { getIdForRef, getIdStringForRef } from '@growi/core';
+import { createHash } from 'crypto';
 import mongoose from 'mongoose';
+import { pipeline, Writable } from 'stream';
 
 import { PageBulkExportJobStatus } from '~/features/page-bulk-export/interfaces/page-bulk-export';
 import { SupportedAction } from '~/interfaces/activity';
 import type { PageDocument, PageModel } from '~/server/models/page';
-
-import type { IPageBulkExportJobCronService } from '..';
 import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
 import PageBulkExportJob from '../../../models/page-bulk-export-job';
 import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-snapshot';
+import type { IPageBulkExportJobCronService } from '..';
 
-async function reuseDuplicateExportIfExists(this: IPageBulkExportJobCronService, pageBulkExportJob: PageBulkExportJobDocument) {
+async function reuseDuplicateExportIfExists(
+  this: IPageBulkExportJobCronService,
+  pageBulkExportJob: PageBulkExportJobDocument,
+) {
   const duplicateExportJob = await PageBulkExportJob.findOne({
     user: pageBulkExportJob.user,
     page: pageBulkExportJob.page,
@@ -28,7 +29,10 @@ async function reuseDuplicateExportIfExists(this: IPageBulkExportJobCronService,
     pageBulkExportJob.status = PageBulkExportJobStatus.completed;
     await pageBulkExportJob.save();
 
-    await this.notifyExportResultAndCleanUp(SupportedAction.ACTION_PAGE_BULK_EXPORT_COMPLETED, pageBulkExportJob);
+    await this.notifyExportResultAndCleanUp(
+      SupportedAction.ACTION_PAGE_BULK_EXPORT_COMPLETED,
+      pageBulkExportJob,
+    );
   }
 }
 
@@ -36,7 +40,11 @@ async function reuseDuplicateExportIfExists(this: IPageBulkExportJobCronService,
  * Start a pipeline that creates a snapshot for each page that is to be exported in the pageBulkExportJob.
  * 'revisionListHash' is calulated and saved to the pageBulkExportJob at the end of the pipeline.
  */
-export async function createPageSnapshotsAsync(this: IPageBulkExportJobCronService, user, pageBulkExportJob: PageBulkExportJobDocument): Promise<void> {
+export async function createPageSnapshotsAsync(
+  this: IPageBulkExportJobCronService,
+  user,
+  pageBulkExportJob: PageBulkExportJobDocument,
+): Promise<void> {
   const Page = mongoose.model<IPage, PageModel>('Page');
 
   // if the process of creating snapshots was interrupted, delete the snapshots and create from the start
@@ -54,15 +62,14 @@ export async function createPageSnapshotsAsync(this: IPageBulkExportJobCronServi
   const builder = await new PageQueryBuilder(Page.find())
     .addConditionToListWithDescendants(basePage.path)
     .addViewerCondition(user);
-  const pagesReadable = builder
-    .query
+  const pagesReadable = builder.query
     .lean()
     .cursor({ batchSize: this.pageBatchSize });
 
   // create a Writable that creates a snapshot for each page
   const pageSnapshotsWritable = new Writable({
     objectMode: true,
-    write: async(page: PageDocument, encoding, callback) => {
+    write: async (page: PageDocument, encoding, callback) => {
       try {
         if (page.revision != null) {
           revisionListHash.update(getIdStringForRef(page.revision));
@@ -72,22 +79,20 @@ export async function createPageSnapshotsAsync(this: IPageBulkExportJobCronServi
           path: page.path,
           revision: page.revision,
         });
-      }
-      catch (err) {
+      } catch (err) {
         callback(err);
         return;
       }
       callback();
     },
-    final: async(callback) => {
+    final: async (callback) => {
       try {
         pageBulkExportJob.revisionListHash = revisionListHash.digest('hex');
         pageBulkExportJob.status = PageBulkExportJobStatus.exporting;
         await pageBulkExportJob.save();
 
         await reuseDuplicateExportIfExists.bind(this)(pageBulkExportJob);
-      }
-      catch (err) {
+      } catch (err) {
         callback(err);
         return;
       }

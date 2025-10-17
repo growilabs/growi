@@ -1,0 +1,43 @@
+@use '~/styles/variables' as var;
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+ .selectable-page-list :global {
+    .page-path {
+      display: inline-block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      vertical-align: middle;
+      border: 2px solid transparent;
+    }
+
+    .page-path-editable {
+      cursor: pointer;
+      &:hover {
+        border-color: var(--bs-primary-border-subtle);
+      }
+    }
+
+    .page-path-input {
+      border: 2px solid var(--bs-border-color);
+    }
+}
+
+
+// == Colors
+@include bs.color-mode(light) {
+  .selectable-page-list :global {
+    .page-list-item {
+      background-color: #{bs.$gray-100};
+    }
+  }
+}
+
+@include bs.color-mode(dark) {
+  .selectable-page-page-list :global {
+    .page-list-item {
+      background-color: #{bs.$gray-900};
+    }
+  }
+}

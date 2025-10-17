@@ -15,7 +15,7 @@ const ExternalAccountRow = (props) => {
       <td>
         <strong>{ account.accountId }</strong>
       </td>
-      <td>{dateFnsFormat(new Date(account.createdAt), 'yyyy-MM-dd')}</td>
+      <td>{dateFnsFormat(account.createdAt, 'yyyy-MM-dd')}</td>
       <td className="text-center">
         <button
           type="button"

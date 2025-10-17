@@ -56,7 +56,9 @@ module.exports = {
     logger.info('Rollback migration');
     await mongoose.connect(getMongoUri(), mongoOptions);
 
-    await Config.deleteMany({ key: { $in: ['mail:sesAccessKeyId', 'mail:sesSecretAccessKey'] } });
+    await Config.deleteMany({
+      key: { $in: ['mail:sesAccessKeyId', 'mail:sesSecretAccessKey'] },
+    });
 
     logger.info('Migration has been successfully rollbacked');
   },

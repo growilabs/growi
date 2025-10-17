@@ -12,12 +12,11 @@ const logger = loggerFactory('growi:migrate:init-serverurl');
  */
 function isAllValuesSame(array) {
   return !!array.reduce((a, b) => {
-    return (a === b) ? a : NaN;
+    return a === b ? a : NaN;
   });
 }
 
 module.exports = {
-
   async up(db) {
     logger.info('Apply migration');
     await mongoose.connect(getMongoUri(), mongoOptions);
@@ -28,7 +27,9 @@ module.exports = {
     });
     // exit if exists
     if (siteUrlConfig != null) {
-      logger.info('\'app:siteUrl\' is already exists. This migration terminates without any changes.');
+      logger.info(
+        "'app:siteUrl' is already exists. This migration terminates without any changes.",
+      );
       return;
     }
 
@@ -48,11 +49,15 @@ module.exports = {
       logger.info(configs);
 
       // extract domain
-      const siteUrls = configs.map((config) => {
-        // see https://regex101.com/r/Q0Isjo/2
-        const match = config.value.match(/^"(https?:\/\/[^/]+).*"$/);
-        return (match != null) ? match[1] : null;
-      }).filter((value) => { return value != null });
+      const siteUrls = configs
+        .map((config) => {
+          // see https://regex101.com/r/Q0Isjo/2
+          const match = config.value.match(/^"(https?:\/\/[^/]+).*"$/);
+          return match != null ? match[1] : null;
+        })
+        .filter((value) => {
+          return value != null;
+        });
 
       // determine serverUrl if all values are same
       if (siteUrls.length > 0 && isAllValuesSame(siteUrls)) {
@@ -82,5 +87,4 @@ module.exports = {
 
     logger.info('Migration has been successfully rollbacked');
   },
-
 };

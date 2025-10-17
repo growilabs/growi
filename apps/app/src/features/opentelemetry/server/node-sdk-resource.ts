@@ -1,4 +1,4 @@
-import { Resource } from '@opentelemetry/resources';
+import type { Resource } from '@opentelemetry/resources';
 import type { NodeSDK } from '@opentelemetry/sdk-node';
 
 /**
@@ -8,7 +8,7 @@ import type { NodeSDK } from '@opentelemetry/sdk-node';
 export const getResource = (sdk: NodeSDK): Resource => {
   // This cast is necessary as _resource is a private property
   const resource = (sdk as any)._resource;
-  if (!(resource instanceof Resource)) {
+  if (!resource || typeof resource !== 'object' || !resource.attributes) {
     throw new Error('Failed to access SDK resource');
   }
   return resource;
@@ -23,8 +23,7 @@ export const setResource = (sdk: NodeSDK, resource: Resource): void => {
   // Verify that we can access the _resource property
   try {
     getResource(sdk);
-  }
-  catch (e) {
+  } catch (e) {
     throw new Error('Failed to access SDK resource');
   }
 

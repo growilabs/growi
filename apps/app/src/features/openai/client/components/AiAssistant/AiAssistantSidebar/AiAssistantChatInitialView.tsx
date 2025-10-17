@@ -1,4 +1,9 @@
+import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
+
+import { removeGlobPath } from '../../../../utils/remove-glob-path';
+
+import { ThreadList } from './ThreadList';
 
 type Props = {
   description: string,
@@ -10,25 +15,34 @@ export const AiAssistantChatInitialView: React.FC<Props> = ({ description, pageP
 
   return (
     <>
-      <p className="fs-6 text-body-secondary mb-0">
-        {description}
-      </p>
+      {description.length !== 0 && (
+        <p className="text-body-secondary mb-0">
+          {description}
+        </p>
+      )}
 
       <div>
-        <div className="d-flex align-items-center">
-          <p className="text-body-secondary mb-0">{t('sidebar_ai_assistant.reference_pages_label')}</p>
-        </div>
+        <p className="text-body-secondary mb-1">
+          {t('sidebar_ai_assistant.reference_pages_label')}
+        </p>
         <div className="d-flex flex-column gap-1">
           { pagePathPatterns.map(pagePathPattern => (
-            <a
+            <Link
               key={pagePathPattern}
-              href="#"
-              className="fs-6 text-body-secondary text-decoration-none"
+              href={removeGlobPath([pagePathPattern])[0]}
+              className="text-body-secondary text-decoration-underline link-underline-secondary"
             >
               {pagePathPattern}
-            </a>
+            </Link>
           ))}
         </div>
+      </div>
+
+      <div>
+        <p className="text-body-secondary mb-1">
+          {t('sidebar_ai_assistant.recent_chat')}
+        </p>
+        <ThreadList />
       </div>
     </>
   );

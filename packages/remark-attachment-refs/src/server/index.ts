@@ -1,6 +1,6 @@
 import { routesFactory } from './routes/refs';
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: ignore
 const middleware = (crowi: any, app: any): void => {
   const refs = routesFactory(crowi);
 

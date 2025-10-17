@@ -4,7 +4,9 @@ import userModelFactory from '~/server/models/user';
 import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
-const logger = loggerFactory('growi:migrate:set-sparse-option-to-slack-member-id');
+const logger = loggerFactory(
+  'growi:migrate:set-sparse-option-to-slack-member-id',
+);
 
 /**
  * set sparse option to slackMemberId

@@ -1,8 +1,17 @@
 const isPrimitiveComparison = (value1: unknown, value2: unknown): boolean => {
-  return value1 === null || value2 === null || typeof value1 !== 'object' || typeof value2 !== 'object';
+  return (
+    value1 === null ||
+    value2 === null ||
+    typeof value1 !== 'object' ||
+    typeof value2 !== 'object'
+  );
 };
 
-export const isDeepEquals = <T extends object>(obj1: T, obj2: T, visited = new WeakMap()): boolean => {
+export const isDeepEquals = <T extends object>(
+  obj1: T,
+  obj2: T,
+  visited = new WeakMap(),
+): boolean => {
   // If references are identical, return true
   if (obj1 === obj2) {
     return true;

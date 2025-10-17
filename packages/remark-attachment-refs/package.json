@@ -37,7 +37,7 @@
     "watch": "run-p watch:*",
     "watch:client": "pnpm run dev:client -w --emptyOutDir=false",
     "watch:server": "pnpm run dev:server -w --emptyOutDir=false",
-    "lint:js": "eslint **/*.{js,jsx,ts,tsx}",
+    "lint:js": "biome check",
     "lint:styles": "stylelint \"src/**/*.scss\" \"src/**/*.css\"",
     "lint:typecheck": "vue-tsc --noEmit",
     "lint": "run-p lint:*",

@@ -1,10 +1,10 @@
 import * as pathUtils from '../utils/path-utils';
 
 // https://regex101.com/r/BahpKX/2
-const PATTERN_INCLUDE_DATE = /^(.+\/[^/]+)\/(\d{4}|\d{4}\/\d{2}|\d{4}\/\d{2}\/\d{2})$/;
+const PATTERN_INCLUDE_DATE =
+  /^(.+\/[^/]+)\/(\d{4}|\d{4}\/\d{2}|\d{4}\/\d{2}\/\d{2})$/;
 
 export class DevidedPagePath {
-
   isRoot: boolean;
 
   isFormerRoot: boolean;
@@ -14,7 +14,6 @@ export class DevidedPagePath {
   latter: string;
 
   constructor(path: string, skipNormalize = false, evalDatePath = false) {
-
     this.isRoot = false;
     this.isFormerRoot = false;
     this.former = '';
@@ -40,11 +39,11 @@ export class DevidedPagePath {
     }
 
     let PATTERN_DEFAULT = /^((.*)\/(?!em>))?(.+)$/; // this will ignore em's end tags
-    try { // for non-chrome browsers
-      // eslint-disable-next-line regex/invalid
+    try {
+      // for non-chrome browsers
+      // biome-ignore lint/complexity/useRegexLiterals: ignore
       PATTERN_DEFAULT = new RegExp('^((.*)(?<!<)\\/)?(.+)$'); // https://regex101.com/r/HJNvMW/1
-    }
-    catch (err) {
+    } catch {
       // lookbehind regex is not supported on non-chrome browsers
     }
 
@@ -55,5 +54,4 @@ export class DevidedPagePath {
       this.latter = matchDefault[3];
     }
   }
-
 }

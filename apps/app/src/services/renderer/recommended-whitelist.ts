@@ -47,7 +47,7 @@ export const tagNames: Array<string> = [
 export const attributes: Attributes = deepmerge(
   relaxedSchemaAttributes,
   {
-    iframe: ['allow', 'referrerpolicy', 'sandbox', 'src', 'srcdoc'],
+    iframe: ['allow', 'referrerpolicy', 'sandbox', 'src'],
     video: ['controls', 'src', 'muted', 'preload', 'width', 'height', 'autoplay'],
     // The special value 'data*' as a property name can be used to allow all data properties.
     // see: https://github.com/syntax-tree/hast-util-sanitize/

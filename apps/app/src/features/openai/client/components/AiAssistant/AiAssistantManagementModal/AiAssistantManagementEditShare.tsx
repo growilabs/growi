@@ -98,7 +98,7 @@ export const AiAssistantManagementEditShare = (props: Props): JSX.Element => {
 
   return (
     <>
-      <AiAssistantManagementHeader />
+      <AiAssistantManagementHeader labelTranslationKey="modal_ai_assistant.page_mode_title.share" />
 
       <ModalBody className="px-4">
         <div className="form-check form-switch mb-4">

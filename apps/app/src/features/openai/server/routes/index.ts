@@ -23,6 +23,10 @@ export const factory = (crowi: Crowi): express.Router => {
       router.post('/thread', createThreadHandlersFactory(crowi));
     });
 
+    import('./get-recent-threads').then(({ getRecentThreadsFactory }) => {
+      router.get('/threads/recent', getRecentThreadsFactory(crowi));
+    });
+
     import('./get-threads').then(({ getThreadsFactory }) => {
       router.get('/threads/:aiAssistantId', getThreadsFactory(crowi));
     });

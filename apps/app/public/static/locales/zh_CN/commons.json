@@ -1,16 +1,15 @@
 {
-	"Show": "显示",
-	"Hide": "隐藏",
+  "Show": "显示",
+  "Hide": "隐藏",
   "Add": "添加",
   "Insert": "插入",
   "Reset": "重启",
-	"Sign out": "退出",
+  "Sign out": "退出",
   "New": "新建",
   "Send": "发送",
   "Close": "关闭",
   "Done": "完成",
   "Delete": "删除",
-
   "meta": {
     "display_name": "简体中文"
   },
@@ -33,52 +32,46 @@
   "headers": {
     "app_settings": "系统设置"
   },
-
   "header_search_box": {
-		"label": {
-			"All pages": "所有页面",
-			"This tree": "当前分支"
-		},
-		"item_label": {
-			"All pages": "所有页面",
-			"This tree": "当前分支以下内容"
-		}
+    "label": {
+      "All pages": "所有页面",
+      "This tree": "当前分支"
+    },
+    "item_label": {
+      "All pages": "所有页面",
+      "This tree": "当前分支以下内容"
+    }
   },
-
   "search_method_menu_item": {
     "search_in_all": "所有页面",
     "only_children_of_this_tree": "当前分支以下内容",
     "exact_mutch": "完全匹配"
   },
-
   "share_links": {
     "Share Link": "Share Link",
     "Page Path": "Page Path",
     "expire": "Expiration",
     "description": "Description"
   },
-
   "in_app_notification": {
     "notification_list": "应用内通知列表",
     "see_all": "查看通知列表",
     "no_notification": "您没有任何通知",
     "all": "全部",
     "unopend": "未读",
-    "mark_all_as_read" : "标记为已读",
+    "mark_all_as_read": "标记为已读",
     "no_unread_messages": "no_unread_messages",
     "only_unread": "Only unread"
   },
-
   "personal_dropdown": {
     "home": "家",
     "settings": "设置",
-		"color_mode": "颜色模式",
-		"sidebar_mode": "边栏模式",
-		"sidebar_mode_editor": "编辑器上的边栏模式",
-		"use_os_settings": "使用操作系统设置",
+    "color_mode": "颜色模式",
+    "sidebar_mode": "边栏模式",
+    "sidebar_mode_editor": "编辑器上的边栏模式",
+    "use_os_settings": "使用操作系统设置",
     "feedback": "意见和要求"
   },
-
   "create_page_dropdown": {
     "new_page": "新页面",
     "open_page_create_modal": "打开新页面创建模式",
@@ -92,24 +85,21 @@
       "descendants": "子代模板"
     }
   },
-
-	"copy_to_clipboard": {
-		"Copy to clipboard": "复制到剪贴板",
-		"Page path": "页面路径",
-		"Page URL": "页面Url",
-		"Parmanent link": "参数化链接",
-		"Page path and parmanent link": "页面路径及参数化链接",
-		"Markdown link": "Markdown链接",
+  "copy_to_clipboard": {
+    "Copy to clipboard": "复制到剪贴板",
+    "Page path": "页面路径",
+    "Page URL": "页面Url",
+    "Parmanent link": "参数化链接",
+    "Page path and parmanent link": "页面路径及参数化链接",
+    "Markdown link": "Markdown链接",
     "Append params": "Append params"
-	},
-
+  },
   "crop_image_modal": {
     "image_crop": "图像裁剪",
     "crop": "修剪",
     "save": "节省",
     "cancel": "取消"
   },
-
   "handsontable_modal": {
     "title": "编辑表格",
     "data_import": "数据导入",
@@ -125,35 +115,9 @@
       "import": "导入"
     }
   },
-
-  "questionnaire_modal": {
-    "required": "必需的",
-    "submit": "发送",
-    "close": "Close",
-    "title": "改善服务的GROWI调查表",
-    "more_satisfied_services": "我们希望让使用GROWI的人更加满意",
-    "strive_to_improve_services": "我们将利用你的反馈来改善我们的服务。",
-    "length_of_experience": {
-      "more_than_two_years": "2年以上",
-      "one_to_two_years": "超过1年但少于2年",
-      "six_months_to_one_year": "超过6个月但少于1年",
-      "three_months_to_six_months": "超过3个月但少于6个月",
-      "one_month_to_three_months": "超过1个月但少于3个月",
-      "less_than_one_month": "不到1个月"
-    },
-    "satisfaction_with_growi": "对GROWI的满意程度",
-    "history_of_growi_usage": "GROWI的使用历史",
-    "occupation": "职位",
-    "position": "职业类型",
-    "comment_on_growi": "关于GROWI的评论",
-    "successfully_submitted": "问卷已经发出。",
-    "thanks_for_answering": "非常感谢您完成问卷调查。"
-  },
-
   "not_found_page": {
     "page_not_exist": "该页面不存在"
   },
-
   "g2g_data_transfer": {
     "tab": "数据迁移",
     "data_transfer": "数据迁移",
@@ -162,5 +126,97 @@
     "transfer_key_limit": "迁移密钥在签发后一小时内有效。",
     "once_transfer_key_used": "一旦迁移密钥被用于迁移，它将不再可用于进一步的迁移。",
     "transfer_to_growi_cloud": "有关更多详情，请点击<a href='{{documentationUrl}}en/admin-guide/management-cookbook/g2g-transfer.html'>此处</a>。"
+  },
+  "accesstoken_scopes_desc": {
+    "read": {
+      "all": "授予查看所有内容的权限。",
+      "admin": {
+        "all": "授予查看管理功能的权限。",
+        "top": "授予查看Wiki管理顶部的权限。",
+        "app": "授予查看应用程序设置的权限。",
+        "security": "授予查看安全设置的权限。",
+        "markdown": "授予查看markdown设置的权限。",
+        "customize": "授予查看自定义设置的权限。",
+        "import_data": "授予查看数据导入设置的权限。",
+        "export_data": "授予查看数据归档设置的权限。",
+        "data_transfer": "授予查看数据迁移设置的权限。",
+        "external_notification": "授予查看外部通知设置的权限。",
+        "slack_integration": "授予查看Slack集成设置的权限。",
+        "legacy_slack_integration": "授予查看旧版Slack集成设置的权限。",
+        "user_management": "授予查看用户管理的权限。",
+        "user_group_management": "授予查看用户组管理的权限。",
+        "audit_log": "授予查看审计日志的权限。",
+        "plugin": "授予查看插件设置的权限。",
+        "ai_integration": "授予查看AI集成设置的权限。",
+        "full_text_search": "授予查看全文搜索管理的权限。"
+      },
+      "user_settings": {
+        "all": "授予查看用户设置的权限。",
+        "info": "授予查看用户信息的权限。",
+        "external_account": "授予查看外部账户的权限。",
+        "password": "授予查看密码设置的权限。",
+        "api": {
+          "all": "授予查看API设置的权限。",
+          "api_token": "授予查看API令牌设置的权限。",
+          "access_token": "授予查看访问令牌设置的权限。"
+        },
+        "in_app_notification": "授予查看应用内通知设置的权限。",
+        "other": "授予查看其他设置的权限。"
+      },
+      "features": {
+        "all": "授予查看功能的权限。",
+        "ai_assistant": "授予查看AI助手功能的权限。",
+        "page": "授予查看页面功能的权限。",
+        "share_link": "授予查看共享链接功能的权限。",
+        "bookmark": "授予查看书签功能的权限。",
+        "attachment": "授予查看附件功能的权限。",
+        "page_bulk_export": "授予查看页面批量导出功能的权限。"
+      }
+    },
+    "write": {
+      "all": "授予编辑所有内容的权限。",
+      "admin": {
+        "all": "授予编辑管理功能的权限。",
+        "top": "授予编辑Wiki管理顶部的权限。",
+        "app": "授予编辑应用程序设置的权限。",
+        "security": "授予编辑安全设置的权限。",
+        "markdown": "授予编辑markdown设置的权限。",
+        "customize": "授予编辑自定义设置的权限。",
+        "import_data": "授予编辑数据导入设置的权限。",
+        "export_data": "授予编辑数据归档设置的权限。",
+        "data_transfer": "授予编辑数据迁移设置的权限。",
+        "external_notification": "授予编辑外部通知设置的权限。",
+        "slack_integration": "授予编辑Slack集成设置的权限。",
+        "legacy_slack_integration": "授予编辑旧版Slack集成设置的权限。",
+        "user_management": "授予编辑用户管理的权限。",
+        "user_group_management": "授予编辑用户组管理的权限。",
+        "audit_log": "授予编辑审计日志的权限。",
+        "plugin": "授予编辑插件设置的权限。",
+        "ai_integration": "授予编辑AI集成设置的权限。",
+        "full_text_search": "授予编辑全文搜索管理的权限。"
+      },
+      "user_settings": {
+        "all": "授予编辑用户设置的权限。",
+        "info": "授予编辑用户信息的权限。",
+        "external_account": "授予编辑外部账户的权限。",
+        "password": "授予编辑密码设置的权限。",
+        "api": {
+          "all": "授予编辑API设置的权限。",
+          "api_token": "授予编辑API令牌设置的权限。",
+          "access_token": "授予编辑访问令牌设置的权限。"
+        },
+        "in_app_notification": "授予编辑应用内通知设置的权限。",
+        "other": "授予编辑其他设置的权限。"
+      },
+      "features": {
+        "all": "授予编辑功能的权限。",
+        "ai_assistant": "授予编辑AI助手功能的权限。",
+        "page": "授予编辑页面功能的权限。",
+        "share_link": "授予编辑共享链接功能的权限。",
+        "bookmark": "授予编辑书签功能的权限。",
+        "attachment": "授予编辑附件功能的权限。",
+        "page_bulk_export": "授予编辑页面批量导出功能的权限。"
+      }
+    }
   }
 }
