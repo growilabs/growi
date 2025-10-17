@@ -7,6 +7,7 @@ import { body } from 'express-validator';
 import { AuditLogBulkExportFormat } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import type { SupportedActionType } from '~/interfaces/activity';
 import { AllSupportedActions } from '~/interfaces/activity';
+import type { IUserHasId } from '@growi/core';
 import type Crowi from '~/server/crowi';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
@@ -33,7 +34,7 @@ interface AuditLogExportReqBody {
 }
 interface AuthorizedRequest
   extends Request<undefined, ApiV3Response, AuditLogExportReqBody> {
-  user?: any;
+  user?: IUserHasId;
 }
 
 module.exports = (crowi: Crowi): Router => {
@@ -81,7 +82,7 @@ module.exports = (crowi: Crowi): Router => {
         await auditLogBulkExportService.createOrResetExportJob(
           filters,
           format,
-          req.user,
+          req.user?._id,
           restartJob,
         );
         return res.apiv3({}, 204);
