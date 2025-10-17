@@ -1,19 +1,20 @@
-import React, { type JSX, useCallback } from 'react';
+import { type JSX, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { UserPicture } from '@growi/ui/dist/components';
 import { format } from 'date-fns/format';
 import { useTranslation } from 'react-i18next';
 
-import { usePageDeleteModal, usePutBackPageModal } from '~/stores/modal';
 import {
+  useCurrentPageData,
   useCurrentPagePath,
+  useFetchCurrentPage,
   useIsTrashPage,
-  useSWRMUTxCurrentPage,
-  useSWRxCurrentPage,
-  useSWRxPageInfo,
-} from '~/stores/page';
+} from '~/states/page';
+import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
+import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page';
+import { useIsAbleToShowTrashPageManagementButtons } from '~/states/ui/page-abilities';
+import { useSWRxPageInfo } from '~/stores/page';
 import { mutateRecentlyUpdated } from '~/stores/page-listing';
-import { useIsAbleToShowTrashPageManagementButtons } from '~/stores/ui';
 
 const onDeletedHandler = (pathOrPathsToDelete) => {
   if (typeof pathOrPathsToDelete !== 'string') {
@@ -27,19 +28,19 @@ export const TrashPageAlert = (): JSX.Element => {
   const { t } = useTranslation();
   const router = useRouter();
 
-  const { data: isAbleToShowTrashPageManagementButtons } =
+  const isAbleToShowTrashPageManagementButtons =
     useIsAbleToShowTrashPageManagementButtons();
-  const { data: pageData } = useSWRxCurrentPage();
-  const { data: isTrashPage } = useIsTrashPage();
+  const pageData = useCurrentPageData();
+  const isTrashPage = useIsTrashPage();
   const pageId = pageData?._id;
   const pagePath = pageData?.path;
   const { data: pageInfo } = useSWRxPageInfo(pageId ?? null);
 
-  const { open: openDeleteModal } = usePageDeleteModal();
-  const { open: openPutBackPageModal } = usePutBackPageModal();
-  const { data: currentPagePath } = useCurrentPagePath();
+  const { open: openDeleteModal } = usePageDeleteModalActions();
+  const { open: openPutBackPageModal } = usePutBackPageModalActions();
+  const currentPagePath = useCurrentPagePath();
 
-  const { trigger: mutateCurrentPage } = useSWRMUTxCurrentPage();
+  const { fetchCurrentPage } = useFetchCurrentPage();
 
   const deleteUser = pageData?.deleteUser;
   const deletedAt = pageData?.deletedAt
@@ -63,7 +64,7 @@ export const TrashPageAlert = (): JSX.Element => {
         unlink(currentPagePath);
 
         router.push(`/${pageId}`);
-        mutateCurrentPage();
+        fetchCurrentPage();
         mutateRecentlyUpdated();
       } catch (err) {
         const toastError = (await import('~/client/util/toastr')).toastError;
@@ -75,13 +76,13 @@ export const TrashPageAlert = (): JSX.Element => {
       { onPutBacked: putBackedHandler },
     );
   }, [
-    currentPagePath,
-    mutateCurrentPage,
+    isEmptyPage,
     openPutBackPageModal,
     pageId,
     pagePath,
+    currentPagePath,
     router,
-    isEmptyPage,
+    fetchCurrentPage,
   ]);
 
   const openPageDeleteModalHandler = useCallback(() => {
@@ -136,35 +137,34 @@ export const TrashPageAlert = (): JSX.Element => {
 
   // Show this alert only for non-empty pages in trash.
   if (!isTrashPage || isEmptyPage) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 
   return (
-    <>
-      <div
-        className="alert alert-warning py-3 ps-4 d-flex flex-column flex-lg-row"
-        data-testid="trash-page-alert"
-      >
-        <div className="flex-grow-1">
-          This page is in the trash{' '}
-          <span className="material-symbols-outlined" aria-hidden="true">
-            delete
+    <div
+      className="alert alert-warning py-3 ps-4 d-flex flex-column flex-lg-row"
+      data-testid="trash-page-alert"
+    >
+      <div className="flex-grow-1">
+        This page is in the trash{' '}
+        <span className="material-symbols-outlined" aria-hidden="true">
+          delete
+        </span>
+        .
+        <br />
+        <UserPicture user={deleteUser} />
+        <span className="ms-2">
+          Deleted by {deleteUser?.name} at{' '}
+          <span data-vrt-blackout-datetime>
+            {deletedAt ?? pageData?.updatedAt}
           </span>
-          .
-          <br />
-          <UserPicture user={deleteUser} />
-          <span className="ms-2">
-            Deleted by {deleteUser?.name} at{' '}
-            <span data-vrt-blackout-datetime>
-              {deletedAt ?? pageData?.updatedAt}
-            </span>
-          </span>
-        </div>
-        <div className="pt-1 d-flex align-items-end align-items-lg-center">
-          {isAbleToShowTrashPageManagementButtons &&
-            renderTrashPageManagementButtons()}
-        </div>
+        </span>
       </div>
-    </>
+      <div className="pt-1 d-flex align-items-end align-items-lg-center">
+        {isAbleToShowTrashPageManagementButtons &&
+          renderTrashPageManagementButtons()}
+      </div>
+    </div>
   );
 };

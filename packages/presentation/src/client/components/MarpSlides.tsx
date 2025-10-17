@@ -1,5 +1,5 @@
-import type { JSX } from 'react';
 import Head from 'next/head';
+import type { JSX } from 'react';
 
 import { presentationMarpit, slideMarpit } from '../services/growi-marpit';
 

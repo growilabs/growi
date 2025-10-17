@@ -3,21 +3,18 @@ import React, { useState, useCallback } from 'react';
 
 import { useTranslation } from 'next-i18next';
 
+import { useMaintenanceModeActions } from '~/client/services/maintenance-mode';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useIsMaintenanceMode } from '~/stores/maintenanceMode';
-import loggerFactory from '~/utils/logger';
+import { useIsMaintenanceMode } from '~/states/global';
 
 import { ConfirmModal } from './ConfirmModal';
-
-const logger = loggerFactory('growi:maintenanceMode');
 
 
 export const MaintenanceMode: FC = () => {
   const { t } = useTranslation();
 
-  const {
-    data: isMaintenanceMode, start: startMaintenanceMode, end: endMaintenanceMode,
-  } = useIsMaintenanceMode();
+  const isMaintenanceMode = useIsMaintenanceMode();
+  const { start: startMaintenanceMode, end: endMaintenanceMode } = useMaintenanceModeActions();
 
   const [isModalOpen, setModalOpen] = useState<boolean>(false);
 

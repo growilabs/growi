@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
 import { acceptChunk, getChunks } from '@codemirror/merge';
 import type { ViewUpdate } from '@codemirror/view';
 import { EditorView } from '@codemirror/view';
+import { useEffect } from 'react';
 
 import type { UseCodeMirrorEditor } from '..';
 

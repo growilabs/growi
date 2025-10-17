@@ -1,8 +1,8 @@
-import { type JSX, useEffect, useMemo } from 'react';
 import type { Extension } from '@codemirror/state';
 import { keymap, scrollPastEnd } from '@codemirror/view';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
+import { type JSX, useEffect, useMemo } from 'react';
 import deepmerge from 'ts-deepmerge';
 
 import { GlobalCodeMirrorEditorKey } from '../../consts';

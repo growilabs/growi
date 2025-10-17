@@ -1,10 +1,11 @@
 import React, { useCallback, type JSX } from 'react';
 
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { ModalBody } from 'reactstrap';
 import SimpleBar from 'simplebar-react';
 
-import { useLimitLearnablePageCountPerAssistant } from '~/stores-universal/context';
+import { limitLearnablePageCountPerAssistantAtom } from '~/states/server-configurations';
 
 import type { SelectablePage } from '../../../../interfaces/selectable-page';
 
@@ -19,7 +20,7 @@ type Props = {
 
 export const AiAssistantManagementEditPages = (props: Props): JSX.Element => {
   const { t } = useTranslation();
-  const { data: limitLearnablePageCountPerAssistant } = useLimitLearnablePageCountPerAssistant();
+  const limitLearnablePageCountPerAssistant = useAtomValue(limitLearnablePageCountPerAssistantAtom);
 
   const { selectedPages, onRemove } = props;
 

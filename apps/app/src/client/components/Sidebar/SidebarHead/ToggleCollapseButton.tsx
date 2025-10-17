@@ -3,8 +3,8 @@ import {
 } from 'react';
 
 import {
-  useCollapsedContentsOpened, usePreferCollapsedMode, useDrawerOpened, useSidebarMode,
-} from '~/stores/ui';
+  useDrawerOpened, useSetPreferCollapsedMode, useSidebarMode, useCollapsedContentsOpened,
+} from '~/states/ui/sidebar';
 
 
 import styles from './ToggleCollapseButton.module.scss';
@@ -13,18 +13,18 @@ import styles from './ToggleCollapseButton.module.scss';
 export const ToggleCollapseButton = memo((): JSX.Element => {
 
   const { isDrawerMode, isCollapsedMode } = useSidebarMode();
-  const { data: isDrawerOpened, mutate: mutateDrawerOpened } = useDrawerOpened();
-  const { mutateAndSave: mutatePreferCollapsedMode } = usePreferCollapsedMode();
-  const { mutate: mutateCollapsedContentsOpened } = useCollapsedContentsOpened();
+  const [isDrawerOpened, setIsDrawerOpened] = useDrawerOpened();
+  const setPreferCollapsedMode = useSetPreferCollapsedMode();
+  const [, setCollapsedContentsOpened] = useCollapsedContentsOpened();
 
   const toggleDrawer = useCallback(() => {
-    mutateDrawerOpened(!isDrawerOpened);
-  }, [isDrawerOpened, mutateDrawerOpened]);
+    setIsDrawerOpened(!isDrawerOpened);
+  }, [isDrawerOpened, setIsDrawerOpened]);
 
   const toggleCollapsed = useCallback(() => {
-    mutatePreferCollapsedMode(!isCollapsedMode());
-    mutateCollapsedContentsOpened(false);
-  }, [isCollapsedMode, mutateCollapsedContentsOpened, mutatePreferCollapsedMode]);
+    setPreferCollapsedMode(!isCollapsedMode());
+    setCollapsedContentsOpened(false);
+  }, [isCollapsedMode, setCollapsedContentsOpened, setPreferCollapsedMode]);
 
   const rotationClass = isCollapsedMode() ? 'rotate180' : '';
   const icon = useMemo(() => {

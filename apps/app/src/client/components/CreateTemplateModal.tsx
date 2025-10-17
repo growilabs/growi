@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 
 import { pathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
@@ -67,9 +67,11 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
     }
   }, [createTemplate, onClose, path, t]);
 
-  const parentPath = pathUtils.addTrailingSlash(path);
+  // Memoize computed path
+  const parentPath = useMemo(() => pathUtils.addTrailingSlash(path), [path]);
 
-  const renderTemplateCard = (target: TargetType, label: LabelType) => (
+  // Memoize template card rendering function
+  const renderTemplateCard = useCallback((target: TargetType, label: LabelType) => (
     <div className="col">
       <TemplateCard
         target={target}
@@ -78,29 +80,29 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
         onClickHandler={() => onClickTemplateButtonHandler(label)}
       />
     </div>
-  );
-
-  if (!isCreatable) {
-    return <></>;
-  }
+  ), [isCreating, onClickTemplateButtonHandler]);
 
   return (
     <Modal isOpen={isOpen} toggle={onClose} data-testid="page-template-modal">
-      <ModalHeader tag="h4" toggle={onClose}>
-        {t('template.modal_label.Create/Edit Template Page')}
-      </ModalHeader>
-      <ModalBody>
-        <div>
-          <label className="form-label mb-4">
-            <code>{parentPath}</code><br />
-            {t('template.modal_label.Create template under')}
-          </label>
-          <div className="row row-cols-2">
-            {renderTemplateCard('children', '_template')}
-            {renderTemplateCard('descendants', '__template')}
-          </div>
-        </div>
-      </ModalBody>
+      {(isCreatable && isOpen) && (
+        <>
+          <ModalHeader tag="h4" toggle={onClose}>
+            {t('template.modal_label.Create/Edit Template Page')}
+          </ModalHeader>
+          <ModalBody>
+            <div>
+              <label className="form-label mb-4">
+                <code>{parentPath}</code><br />
+                {t('template.modal_label.Create template under')}
+              </label>
+              <div className="row row-cols-2">
+                {renderTemplateCard('children', '_template')}
+                {renderTemplateCard('descendants', '__template')}
+              </div>
+            </div>
+          </ModalBody>
+        </>
+      )}
     </Modal>
   );
 };

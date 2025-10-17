@@ -4,8 +4,7 @@ import useSWR from 'swr';
 import useSWRImmutable from 'swr/immutable';
 import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
 
-
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 
 import { apiv3Get } from '../client/util/apiv3-client';
 import type { IBookmarkInfo } from '../interfaces/bookmark-info';
@@ -29,7 +28,7 @@ export const useSWRxUserBookmarks = (userId: string | null): SWRResponse<(IPageH
 };
 
 export const useSWRMUTxCurrentUserBookmarks = (): SWRMutationResponse<(IPageHasId | null)[], Error> => {
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser();
 
   return useSWRMutation(
     currentUser != null ? `/bookmarks/${currentUser?._id}` : null,

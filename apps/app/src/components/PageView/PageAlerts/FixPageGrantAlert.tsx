@@ -1,4 +1,4 @@
-import React, { type JSX, useCallback, useEffect, useState } from 'react';
+import { type JSX, useCallback, useEffect, useState } from 'react';
 import { GroupType, PageGrant } from '@growi/core';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
@@ -12,12 +12,9 @@ import type {
   IResGrantData,
   PopulatedGrantedGroup,
 } from '~/interfaces/page-grant';
-import {
-  useSWRxApplicableGrant,
-  useSWRxCurrentGrantData,
-  useSWRxCurrentPage,
-} from '~/stores/page';
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
+import { useCurrentPageData } from '~/states/page';
+import { useSWRxApplicableGrant, useSWRxCurrentGrantData } from '~/stores/page';
 
 type ModalProps = {
   isOpen: boolean;
@@ -306,41 +303,39 @@ const FixPageGrantModal = (props: ModalProps): JSX.Element => {
             {t('user_group.select_group')}
           </ModalHeader>
           <ModalBody>
-            <>
-              {applicableGroups.map((group) => {
-                const groupIsGranted =
-                  selectedGroups?.find((g) => g.item._id === group.item._id) !=
-                  null;
-                const activeClass = groupIsGranted ? 'active' : '';
+            {applicableGroups.map((group) => {
+              const groupIsGranted =
+                selectedGroups?.find((g) => g.item._id === group.item._id) !=
+                null;
+              const activeClass = groupIsGranted ? 'active' : '';
 
-                return (
-                  <button
-                    className={`btn btn-outline-primary w-100 d-flex justify-content-start mb-3 align-items-center p-3 ${activeClass}`}
-                    type="button"
-                    key={group.item._id}
-                    onClick={() => groupListItemClickHandler(group)}
-                  >
-                    <span className="align-middle">
-                      <input type="checkbox" checked={groupIsGranted} />
+              return (
+                <button
+                  className={`btn btn-outline-primary w-100 d-flex justify-content-start mb-3 align-items-center p-3 ${activeClass}`}
+                  type="button"
+                  key={group.item._id}
+                  onClick={() => groupListItemClickHandler(group)}
+                >
+                  <span className="align-middle">
+                    <input type="checkbox" checked={groupIsGranted} />
+                  </span>
+                  <h5 className="d-inline-block ml-3">{group.item.name}</h5>
+                  {group.type === GroupType.externalUserGroup && (
+                    <span className="ml-2 badge badge-pill badge-info">
+                      {group.item.provider}
                     </span>
-                    <h5 className="d-inline-block ml-3">{group.item.name}</h5>
-                    {group.type === GroupType.externalUserGroup && (
-                      <span className="ml-2 badge badge-pill badge-info">
-                        {group.item.provider}
-                      </span>
-                    )}
-                    {/* TODO: Replace <div className="small">(TBD) List group members</div> */}
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                className="btn btn-primary mt-2 float-right"
-                onClick={() => setIsGroupSelectModalShown(false)}
-              >
-                {t('Done')}
-              </button>
-            </>
+                  )}
+                  {/* TODO: Replace <div className="small">(TBD) List group members</div> */}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              className="btn btn-primary mt-2 float-right"
+              onClick={() => setIsGroupSelectModalShown(false)}
+            >
+              {t('Done')}
+            </button>
           </ModalBody>
         </Modal>
       )}
@@ -351,8 +346,8 @@ const FixPageGrantModal = (props: ModalProps): JSX.Element => {
 export const FixPageGrantAlert = (): JSX.Element => {
   const { t } = useTranslation();
 
-  const { data: currentUser } = useCurrentUser();
-  const { data: pageData } = useSWRxCurrentPage();
+  const currentUser = useCurrentUser();
+  const pageData = useCurrentPageData();
   const hasParent = pageData != null ? pageData.parent != null : false;
   const pageId = pageData?._id;
 
@@ -367,10 +362,12 @@ export const FixPageGrantAlert = (): JSX.Element => {
 
   // Dependencies
   if (pageData == null) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 
   if (!hasParent) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
   if (

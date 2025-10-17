@@ -5,12 +5,12 @@ import React, {
 import { useTranslation } from 'next-i18next';
 import { useRouter } from 'next/router';
 
-import { useIsEnabledUnsavedWarning } from '~/stores/editor';
+import { useUnsavedWarning } from '~/states/ui/unsaved-warning';
 
 const UnsavedAlertDialog = (): JSX.Element => {
   const { t } = useTranslation();
   const router = useRouter();
-  const { data: isEnabledUnsavedWarning, mutate: mutateIsEnabledUnsavedWarning } = useIsEnabledUnsavedWarning();
+  const { isEnabled: isEnabledUnsavedWarning, reset } = useUnsavedWarning();
 
   const alertUnsavedWarningByBrowser = useCallback((e) => {
     if (isEnabledUnsavedWarning) {
@@ -29,15 +29,15 @@ const UnsavedAlertDialog = (): JSX.Element => {
       // eslint-disable-next-line no-alert
       const answer = window.confirm(t('page_edit.changes_not_saved'));
       if (!answer) {
-      // eslint-disable-next-line no-throw-literal
+        // eslint-disable-next-line no-throw-literal
         throw 'Abort route';
       }
     }
   }, [isEnabledUnsavedWarning, t]);
 
   const onRouterChangeComplete = useCallback(() => {
-    mutateIsEnabledUnsavedWarning(false);
-  }, [mutateIsEnabledUnsavedWarning]);
+    reset();
+  }, [reset]);
 
   /*
   * Route changes by Browser

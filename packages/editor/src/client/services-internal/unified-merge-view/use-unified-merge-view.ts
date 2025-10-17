@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import {
   getOriginalDoc,
   originalDocChangeEffect,
@@ -8,6 +7,7 @@ import {
 import type { StateEffect, Transaction } from '@codemirror/state';
 import { ChangeSet } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
+import { useEffect } from 'react';
 import * as Y from 'yjs';
 
 import { deltaToChangeSpecs } from '../../../utils/delta-to-changespecs';

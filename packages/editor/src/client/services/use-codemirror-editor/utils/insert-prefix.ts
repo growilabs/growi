@@ -1,6 +1,6 @@
-import { useCallback } from 'react';
 import type { ChangeSpec, Line, Text } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
+import { useCallback } from 'react';
 
 export type InsertPrefix = (
   prefix: string,

@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useState } from 'react';
 import type { Extension } from '@codemirror/state';
 import { Prec } from '@codemirror/state';
 import {
@@ -7,6 +6,7 @@ import {
   highlightActiveLineGutter,
   keymap,
 } from '@codemirror/view';
+import { useCallback, useEffect, useState } from 'react';
 
 import type { EditorSettings, EditorTheme, KeyMapMode } from '../../consts';
 import type { UseCodeMirrorEditor } from '../services';

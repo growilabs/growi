@@ -1,6 +1,6 @@
-import { type JSX, memo, useEffect } from 'react';
 import type { Extension } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
+import { type JSX, memo, useEffect } from 'react';
 
 import type { GlobalCodeMirrorEditorKey } from '../../consts';
 import {

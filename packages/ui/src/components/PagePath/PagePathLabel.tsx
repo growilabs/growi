@@ -1,5 +1,5 @@
-import type { FC, ReactNode } from 'react';
 import { DevidedPagePath } from '@growi/core/dist/models';
+import type { FC, ReactNode } from 'react';
 
 type TextElemProps = {
   children?: ReactNode;
@@ -48,7 +48,6 @@ export const PagePathLabel: FC<Props> = (props: Props) => {
     );
   } else if (isFormerOnly) {
     textElem = dPagePath.isFormerRoot ? (
-      // biome-ignore lint/complexity/noUselessFragments: ignore
       <>/</>
     ) : (
       <TextElement isHTML={isPathIncludedHtml}>{dPagePath.former}</TextElement>

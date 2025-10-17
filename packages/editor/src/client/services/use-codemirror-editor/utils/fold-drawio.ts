@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
 import { foldEffect } from '@codemirror/language';
 import type { EditorView } from '@codemirror/view';
+import { useEffect } from 'react';
 
 export type FoldDrawio = void;
 

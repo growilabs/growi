@@ -1,7 +1,7 @@
-import { useCallback } from 'react';
 import type { SelectionRange } from '@codemirror/state';
 import { EditorSelection } from '@codemirror/state';
 import type { Command, EditorView, KeyBinding } from '@codemirror/view';
+import { useCallback } from 'react';
 
 const addMultiCursor = (view: EditorView, direction: 'up' | 'down') => {
   const selection = view.state.selection;

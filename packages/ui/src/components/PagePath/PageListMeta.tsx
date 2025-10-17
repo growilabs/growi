@@ -1,6 +1,6 @@
-import type { FC, JSX } from 'react';
 import type { IPageHasId } from '@growi/core';
 import { pagePathUtils, templateChecker } from '@growi/core/dist/utils';
+import type { FC, JSX } from 'react';
 
 const { isTopPage } = pagePathUtils;
 const { checkTemplatePath } = templateChecker;

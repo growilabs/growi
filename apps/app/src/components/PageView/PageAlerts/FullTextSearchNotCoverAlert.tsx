@@ -1,15 +1,17 @@
 import type { JSX } from 'react';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
-import { useSWRxCurrentPage } from '~/stores/page';
-import { useElasticsearchMaxBodyLengthToIndex } from '~/stores-universal/context';
+import { useCurrentPageData } from '~/states/page';
+import { elasticsearchMaxBodyLengthToIndexAtom } from '~/states/server-configurations';
 
 export const FullTextSearchNotCoverAlert = (): JSX.Element => {
   const { t } = useTranslation();
 
-  const { data: elasticsearchMaxBodyLengthToIndex } =
-    useElasticsearchMaxBodyLengthToIndex();
-  const { data } = useSWRxCurrentPage();
+  const elasticsearchMaxBodyLengthToIndex = useAtomValue(
+    elasticsearchMaxBodyLengthToIndexAtom,
+  );
+  const data = useCurrentPageData();
 
   const markdownLength = data?.revision?.body?.length;
 
@@ -18,6 +20,7 @@ export const FullTextSearchNotCoverAlert = (): JSX.Element => {
     elasticsearchMaxBodyLengthToIndex == null ||
     markdownLength <= elasticsearchMaxBodyLengthToIndex
   ) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 

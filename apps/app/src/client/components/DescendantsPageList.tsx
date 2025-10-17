@@ -11,7 +11,7 @@ import { useTranslation } from 'next-i18next';
 import { toastSuccess } from '~/client/util/toastr';
 import type { IPagingResult } from '~/interfaces/paging-result';
 import type { OnDeletedFunction, OnPutBackedFunction } from '~/interfaces/ui';
-import { useIsGuestUser, useIsReadOnlyUser, useIsSharedUser } from '~/stores-universal/context';
+import { useIsGuestUser, useIsReadOnlyUser, useIsSharedUser } from '~/states/context';
 import {
   mutatePageTree,
   useSWRxPageInfoForList, useSWRxPageList, mutateRecentlyUpdated,
@@ -42,8 +42,8 @@ const DescendantsPageListSubstance = (props: SubstanceProps): JSX.Element => {
     pagingResult, activePage, setActivePage, forceHideMenuItems, onPagesDeleted, onPagePutBacked,
   } = props;
 
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
 
   const pageIds = pagingResult?.items?.map(page => page._id);
   const { injectTo } = useSWRxPageInfoForList(pageIds, null, true, true);
@@ -133,7 +133,7 @@ export const DescendantsPageList = (props: DescendantsPageListProps): JSX.Elemen
 
   const [activePage, setActivePage] = useState(1);
 
-  const { data: isSharedUser } = useIsSharedUser();
+  const isSharedUser = useIsSharedUser();
 
   const { data: pagingResult, error, mutate } = useSWRxPageList(isSharedUser ? null : path, activePage, limit);
 

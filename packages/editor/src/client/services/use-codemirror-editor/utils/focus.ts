@@ -1,5 +1,5 @@
-import { useCallback } from 'react';
 import type { EditorView } from '@codemirror/view';
+import { useCallback } from 'react';
 
 export type Focus = () => void;
 

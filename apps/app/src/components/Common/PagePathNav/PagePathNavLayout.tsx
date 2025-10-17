@@ -1,7 +1,7 @@
 import type { JSX, ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 
-import { useIsNotFound } from '~/stores/page';
+import { usePageNotFound } from '~/states/page';
 
 import styles from './PagePathNav.module.scss';
 
@@ -45,7 +45,7 @@ export const PagePathNavLayout = (props: Props): JSX.Element => {
     maxWidth,
   } = props;
 
-  const { data: isNotFound } = useIsNotFound();
+  const isNotFound = usePageNotFound();
 
   const copyDropdownId = `copydropdown-in-pagepathnavlayout-${pageId}`;
 

@@ -1,28 +1,38 @@
-import { useState, type JSX } from 'react';
+import { useState, useCallback } from 'react';
 
 import { useTranslation } from 'react-i18next';
 import {
   Modal, ModalHeader, ModalBody, ModalFooter,
 } from 'reactstrap';
 
-import { useGrantedGroupsInheritanceSelectModal } from '~/stores/modal';
+import {
+  useGrantedGroupsInheritanceSelectModalActions, useGrantedGroupsInheritanceSelectModalStatus,
+} from '~/states/ui/modal/granted-groups-inheritance-select';
 
-const GrantedGroupsInheritanceSelectModal = (): JSX.Element => {
+/**
+ * GrantedGroupsInheritanceSelectModalSubstance - Presentation component (heavy logic, rendered only when isOpen)
+ */
+type GrantedGroupsInheritanceSelectModalSubstanceProps = {
+  onCreateBtnClick: ((onlyInheritUserRelatedGrantedGroups: boolean) => Promise<void>) | undefined;
+  closeModal: () => void;
+};
+
+const GrantedGroupsInheritanceSelectModalSubstance = (props: GrantedGroupsInheritanceSelectModalSubstanceProps): React.JSX.Element => {
+  const { onCreateBtnClick: _onCreateBtnClick, closeModal } = props;
   const { t } = useTranslation();
-  const { data: modalData, close: closeModal } = useGrantedGroupsInheritanceSelectModal();
+
   const [onlyInheritUserRelatedGrantedGroups, setOnlyInheritUserRelatedGrantedGroups] = useState(false);
 
-  const onCreateBtnClick = async() => {
-    await modalData?.onCreateBtnClick?.(onlyInheritUserRelatedGrantedGroups);
+  const onCreateBtnClick = useCallback(async() => {
+    await _onCreateBtnClick?.(onlyInheritUserRelatedGrantedGroups);
     setOnlyInheritUserRelatedGrantedGroups(false); // reset to false after create request
-  };
-  const isOpened = modalData?.isOpened ?? false;
+  }, [_onCreateBtnClick, onlyInheritUserRelatedGrantedGroups]);
+
+  const setInheritAll = useCallback(() => setOnlyInheritUserRelatedGrantedGroups(false), []);
+  const setInheritRelatedOnly = useCallback(() => setOnlyInheritUserRelatedGrantedGroups(true), []);
 
   return (
-    <Modal
-      isOpen={isOpened}
-      toggle={() => closeModal()}
-    >
+    <>
       <ModalHeader tag="h4" toggle={() => closeModal()}>
         {t('modal_granted_groups_inheritance_select.select_granted_groups')}
       </ModalHeader>
@@ -35,7 +45,7 @@ const GrantedGroupsInheritanceSelectModal = (): JSX.Element => {
               className="form-check-input"
               form="formImageType"
               checked={!onlyInheritUserRelatedGrantedGroups}
-              onChange={() => { setOnlyInheritUserRelatedGrantedGroups(false) }}
+              onChange={setInheritAll}
             />
             <label className="form-check-label" htmlFor="inheritAllGroupsRadio">
               {t('modal_granted_groups_inheritance_select.inherit_all_granted_groups_from_parent')}
@@ -48,7 +58,7 @@ const GrantedGroupsInheritanceSelectModal = (): JSX.Element => {
               className="form-check-input"
               form="formImageType"
               checked={onlyInheritUserRelatedGrantedGroups}
-              onChange={() => { setOnlyInheritUserRelatedGrantedGroups(true) }}
+              onChange={setInheritRelatedOnly}
             />
             <label className="form-check-label" htmlFor="onlyInheritRelatedGroupsRadio">
               {t('modal_granted_groups_inheritance_select.only_inherit_related_groups')}
@@ -62,6 +72,28 @@ const GrantedGroupsInheritanceSelectModal = (): JSX.Element => {
           {t('modal_granted_groups_inheritance_select.create_page')}
         </button>
       </ModalFooter>
+    </>
+  );
+};
+
+/**
+ * GrantedGroupsInheritanceSelectModal - Container component (lightweight, always rendered)
+ */
+const GrantedGroupsInheritanceSelectModal = (): React.JSX.Element => {
+  const { isOpened, onCreateBtnClick } = useGrantedGroupsInheritanceSelectModalStatus();
+  const { close: closeModal } = useGrantedGroupsInheritanceSelectModalActions();
+
+  return (
+    <Modal
+      isOpen={isOpened}
+      toggle={() => closeModal()}
+    >
+      {isOpened && (
+        <GrantedGroupsInheritanceSelectModalSubstance
+          onCreateBtnClick={onCreateBtnClick}
+          closeModal={closeModal}
+        />
+      )}
     </Modal>
   );
 };

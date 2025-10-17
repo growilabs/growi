@@ -1,5 +1,5 @@
 import React, {
-  useState, useEffect, useCallback, useMemo, type JSX,
+  useState, useEffect, useCallback, useMemo,
 } from 'react';
 
 import type { IUser } from '@growi/core';
@@ -14,12 +14,15 @@ import {
   Modal, ModalHeader, ModalBody, ModalFooter,
 } from 'reactstrap';
 
-import { useCurrentUser } from '~/stores-universal/context';
-import { useConflictDiffModal } from '~/stores/modal';
-import { useSWRxCurrentPage } from '~/stores/page';
+import { useCurrentUser } from '~/states/global';
 import {
-  useRemoteRevisionBody, useRemoteRevisionId, useRemoteRevisionLastUpdatedAt, useRemoteRevisionLastUpdateUser,
-} from '~/stores/remote-latest-page';
+  useCurrentPageData,
+  useRemoteRevisionBody,
+  useRemoteRevisionId,
+  useRemoteRevisionLastUpdatedAt,
+  useRemoteRevisionLastUpdateUser,
+} from '~/states/page';
+import { useConflictDiffModalActions, useConflictDiffModalStatus } from '~/states/ui/modal/conflict-diff';
 
 import styles from './ConflictDiffModal.module.scss';
 
@@ -29,26 +32,37 @@ type IRevisionOnConflict = {
   user: IUser
 }
 
-type ConflictDiffModalCoreProps = {
+/**
+ * ConflictDiffModalSubstance - Presentation component (heavy logic, rendered only when isOpen)
+ */
+type ConflictDiffModalSubstanceProps = {
   request: IRevisionOnConflict
   latest: IRevisionOnConflict
+  isModalExpanded: boolean
+  setIsModalExpanded: React.Dispatch<React.SetStateAction<boolean>>
 };
 
 const formatedDate = (date: Date): string => {
   return format(date, 'yyyy/MM/dd HH:mm:ss');
 };
 
-const ConflictDiffModalCore = (props: ConflictDiffModalCoreProps): JSX.Element => {
-  const { request, latest } = props;
+const ConflictDiffModalSubstance = (props: ConflictDiffModalSubstanceProps): React.JSX.Element => {
+  const {
+    request, latest, isModalExpanded, setIsModalExpanded,
+  } = props;
 
   const [resolvedRevision, setResolvedRevision] = useState<string>('');
   const [isRevisionselected, setIsRevisionSelected] = useState<boolean>(false);
   const [revisionSelectedToggler, setRevisionSelectedToggler] = useState<boolean>(false);
-  const [isModalExpanded, setIsModalExpanded] = useState<boolean>(false);
 
   const { t } = useTranslation();
-  const { data: conflictDiffModalStatus, close: closeConflictDiffModal } = useConflictDiffModal();
+  const conflictDiffModalStatus = useConflictDiffModalStatus();
+  const { close: closeConflictDiffModal } = useConflictDiffModalActions();
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.DIFF);
+
+  // Memoize formatted dates
+  const requestFormattedDate = useMemo(() => formatedDate(request.createdAt), [request.createdAt]);
+  const latestFormattedDate = useMemo(() => formatedDate(latest.createdAt), [latest.createdAt]);
 
   const selectRevisionHandler = useCallback((selectedRevision: string) => {
     setResolvedRevision(selectedRevision);
@@ -82,11 +96,10 @@ const ConflictDiffModalCore = (props: ConflictDiffModalCoreProps): JSX.Element =
         <span className="material-symbols-outlined">close</span>
       </button>
     </div>
-  ), [closeConflictDiffModal, isModalExpanded]);
+  ), [closeConflictDiffModal, isModalExpanded, setIsModalExpanded]);
 
   return (
-    <Modal isOpen={conflictDiffModalStatus?.isOpened} className={`${styles['conflict-diff-modal']} ${isModalExpanded ? ' grw-modal-expanded' : ''}`} size="xl">
-
+    <>
       <ModalHeader tag="h4" className="d-flex align-items-center" close={headerButtons}>
         <span className="material-symbols-outlined me-1">error</span>{t('modal_resolve_conflict.resolve_conflict')}
       </ModalHeader>
@@ -105,7 +118,7 @@ const ConflictDiffModalCore = (props: ConflictDiffModalCoreProps): JSX.Element =
               </div>
               <div className="ms-3 text-muted">
                 <p className="my-0">updated by {request.user.username}</p>
-                <p className="my-0">{ formatedDate(request.createdAt) }</p>
+                <p className="my-0">{ requestFormattedDate }</p>
               </div>
             </div>
           </div>
@@ -118,7 +131,7 @@ const ConflictDiffModalCore = (props: ConflictDiffModalCoreProps): JSX.Element =
               </div>
               <div className="ms-3 text-muted">
                 <p className="my-0">updated by {latest.user.username}</p>
-                <p className="my-0">{ formatedDate(latest.createdAt) }</p>
+                <p className="my-0">{ latestFormattedDate }</p>
               </div>
             </div>
           </div>
@@ -180,41 +193,62 @@ const ConflictDiffModalCore = (props: ConflictDiffModalCoreProps): JSX.Element =
           {t('modal_resolve_conflict.resolve_and_save')}
         </button>
       </ModalFooter>
-    </Modal>
+    </>
   );
 };
 
-
-export const ConflictDiffModal = (): JSX.Element => {
-  const { data: currentUser } = useCurrentUser();
-  const { data: currentPage } = useSWRxCurrentPage();
-  const { data: conflictDiffModalStatus } = useConflictDiffModal();
+/**
+ * ConflictDiffModal - Container component (lightweight, always rendered)
+ */
+export const ConflictDiffModal = (): React.JSX.Element => {
+  const currentUser = useCurrentUser();
+  const currentPage = useCurrentPageData();
+  const conflictDiffModalStatus = useConflictDiffModalStatus();
 
   // state for latest page
-  const { data: remoteRevisionId } = useRemoteRevisionId();
-  const { data: remoteRevisionBody } = useRemoteRevisionBody();
-  const { data: remoteRevisionLastUpdateUser } = useRemoteRevisionLastUpdateUser();
-  const { data: remoteRevisionLastUpdatedAt } = useRemoteRevisionLastUpdatedAt();
+  const remoteRevisionId = useRemoteRevisionId();
+  const remoteRevisionBody = useRemoteRevisionBody();
+  const remoteRevisionLastUpdateUser = useRemoteRevisionLastUpdateUser();
+  const remoteRevisionLastUpdatedAt = useRemoteRevisionLastUpdatedAt();
 
   const isRemotePageDataInappropriate = remoteRevisionId == null || remoteRevisionBody == null || remoteRevisionLastUpdateUser == null;
 
-  if (!conflictDiffModalStatus?.isOpened || currentUser == null || currentPage == null || isRemotePageDataInappropriate) {
-    return <></>;
-  }
+  const [isModalExpanded, setIsModalExpanded] = useState<boolean>(false);
 
+  // Check if all required data is available
+  const isDataReady = conflictDiffModalStatus?.isOpened
+    && currentUser != null
+    && currentPage != null
+    && !isRemotePageDataInappropriate;
+
+  // Prepare data for Substance
   const currentTime: Date = new Date();
-
-  const request: IRevisionOnConflict = {
+  const request: IRevisionOnConflict | null = isDataReady ? {
     revisionBody: conflictDiffModalStatus.requestRevisionBody ?? '',
     createdAt: currentTime,
     user: currentUser,
-  };
+  } : null;
 
-  const latest: IRevisionOnConflict = {
+  const latest: IRevisionOnConflict | null = isDataReady ? {
     revisionBody: remoteRevisionBody,
     createdAt: new Date(remoteRevisionLastUpdatedAt ?? currentTime.toString()),
     user: remoteRevisionLastUpdateUser,
-  };
+  } : null;
 
-  return <ConflictDiffModalCore request={request} latest={latest} />;
+  return (
+    <Modal
+      isOpen={conflictDiffModalStatus?.isOpened ?? false}
+      className={`${styles['conflict-diff-modal']} ${isModalExpanded ? ' grw-modal-expanded' : ''}`}
+      size="xl"
+    >
+      {isDataReady && request != null && latest != null && (
+        <ConflictDiffModalSubstance
+          request={request}
+          latest={latest}
+          isModalExpanded={isModalExpanded}
+          setIsModalExpanded={setIsModalExpanded}
+        />
+      )}
+    </Modal>
+  );
 };

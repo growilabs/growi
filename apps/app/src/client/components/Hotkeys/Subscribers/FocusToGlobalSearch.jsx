@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
 
-import { useSearchModal } from '~/features/search/client/stores/search';
-import { useIsEditable } from '~/stores-universal/context';
+import { useSearchModalStatus, useSearchModalActions } from '~/features/search/client/states/modal/search';
+import { useIsEditable } from '~/states/page';
 
 
 const FocusToGlobalSearch = (props) => {
-  const { data: isEditable } = useIsEditable();
-  const { data: searchModalData, open: openSearchModal } = useSearchModal();
+  const isEditable = useIsEditable();
+  const searchModalData = useSearchModalStatus();
+  const { open: openSearchModal } = useSearchModalActions();
 
   // setup effect
   useEffect(() => {

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
 import { keymap } from '@codemirror/view';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
+import { useEffect, useState } from 'react';
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next';
 import { SocketIOProvider } from 'y-socket.io';
 import * as Y from 'yjs';

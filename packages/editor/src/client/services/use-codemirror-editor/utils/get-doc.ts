@@ -1,6 +1,6 @@
-import { useCallback } from 'react';
 import { Text } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
+import { useCallback } from 'react';
 
 export type GetDoc = () => Text;
 export type GetDocString = () => string;

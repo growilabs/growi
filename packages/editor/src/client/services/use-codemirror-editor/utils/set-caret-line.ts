@@ -1,7 +1,7 @@
-import { useCallback } from 'react';
 import { Compartment, StateEffect } from '@codemirror/state';
 import type { ViewUpdate } from '@codemirror/view';
 import { EditorView } from '@codemirror/view';
+import { useCallback } from 'react';
 
 export type SetCaretLine = (lineNumber?: number, schedule?: boolean) => void;
 

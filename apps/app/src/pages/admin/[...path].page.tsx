@@ -1,16 +1,10 @@
-import type {
-  GetServerSideProps,
-  GetServerSidePropsContext,
-  NextPage,
-} from 'next';
 import dynamic from 'next/dynamic';
 
-import AdminLayout from '~/components/Layout/AdminLayout';
-import type { CommonProps } from '~/pages/utils/commons';
-import { useIsMaintenanceMode } from '~/stores/maintenanceMode';
-import { useCurrentUser } from '~/stores-universal/context';
-
-import { retrieveServerSideProps } from '../../utils/admin-page-util';
+import type { NextPageWithLayout } from '../_app.page';
+import {
+  createAdminPageLayout,
+  getServerSideAdminCommonProps,
+} from './_shared';
 
 const AdminNotFoundPage = dynamic(
   () =>
@@ -19,34 +13,13 @@ const AdminNotFoundPage = dynamic(
     ),
   { ssr: false },
 );
-const ForbiddenPage = dynamic(
-  () =>
-    import('~/client/components/Admin/ForbiddenPage').then(
-      (mod) => mod.ForbiddenPage,
-    ),
-  { ssr: false },
-);
 
-const AdminAppPage: NextPage<CommonProps> = (props) => {
-  useIsMaintenanceMode(props.isMaintenanceMode);
-  useCurrentUser(props.currentUser ?? null);
+const AdminCatchAllPage: NextPageWithLayout = () => <AdminNotFoundPage />;
 
-  if (props.isAccessDeniedForNonAdminUser) {
-    return <ForbiddenPage />;
-  }
+AdminCatchAllPage.getLayout = createAdminPageLayout({
+  title: () => 'Not Found',
+});
 
-  return (
-    <AdminLayout>
-      <AdminNotFoundPage />
-    </AdminLayout>
-  );
-};
+export const getServerSideProps = getServerSideAdminCommonProps;
 
-export const getServerSideProps: GetServerSideProps = async (
-  context: GetServerSidePropsContext,
-) => {
-  const props = await retrieveServerSideProps(context);
-  return props;
-};
-
-export default AdminAppPage;
+export default AdminCatchAllPage;

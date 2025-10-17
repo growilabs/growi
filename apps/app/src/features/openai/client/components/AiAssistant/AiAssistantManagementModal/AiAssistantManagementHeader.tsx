@@ -3,7 +3,7 @@ import { type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ModalHeader } from 'reactstrap';
 
-import { useAiAssistantManagementModal, AiAssistantManagementModalPageMode } from '../../../stores/ai-assistant';
+import { useAiAssistantManagementModalActions, AiAssistantManagementModalPageMode } from '../../../states/modal/ai-assistant-management';
 
 type Props = {
   labelTranslationKey: string;
@@ -21,7 +21,7 @@ export const AiAssistantManagementHeader = (props: Props): JSX.Element => {
   } = props;
 
   const { t } = useTranslation();
-  const { close, changePageMode } = useAiAssistantManagementModal();
+  const { close, changePageMode } = useAiAssistantManagementModalActions();
 
   return (
     <ModalHeader

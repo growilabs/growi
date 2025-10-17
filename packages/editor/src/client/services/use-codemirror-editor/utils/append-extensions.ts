@@ -1,7 +1,7 @@
-import { useCallback } from 'react';
 import type { Extension } from '@codemirror/state';
 import { Compartment, StateEffect } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
+import { useCallback } from 'react';
 
 type CleanupFunctions = () => void;
 export type AppendExtensions = (

@@ -6,14 +6,13 @@ import {
   apiv3Put,
 } from '~/client/util/apiv3-client';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { usePersonalSettings, useSWRxPersonalSettings } from '~/stores/personal-settings';
+import { useSWRxPersonalSettings } from '~/stores/personal-settings';
 
 
 export const ApiTokenSettings = React.memo((): JSX.Element => {
 
   const { t } = useTranslation();
-  const { mutate: mutateDatabaseData } = useSWRxPersonalSettings();
-  const { data: personalSettingsData } = usePersonalSettings();
+  const { data: personalSettingsData, mutate: mutateDatabaseData } = useSWRxPersonalSettings();
 
   const submitHandler = useCallback(async() => {
 

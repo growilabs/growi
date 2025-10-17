@@ -1,6 +1,6 @@
-import { type JSX, useEffect } from 'react';
 import { EditorState, type Extension, Prec } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
+import { type JSX, useEffect } from 'react';
 
 import { GlobalCodeMirrorEditorKey } from '../../consts';
 import { CodeMirrorEditor } from '../components-internal/CodeMirrorEditor';

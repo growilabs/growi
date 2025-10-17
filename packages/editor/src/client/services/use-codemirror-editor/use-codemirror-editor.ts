@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
 import type { EditorState } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import { type UseCodeMirror, useCodeMirror } from '@uiw/react-codemirror';
+import { useMemo } from 'react';
 import deepmerge from 'ts-deepmerge';
 
 import {

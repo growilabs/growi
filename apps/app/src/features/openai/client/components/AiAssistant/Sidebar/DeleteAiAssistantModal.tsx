@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 
 import { useTranslation } from 'next-i18next';
 import {
@@ -15,58 +15,76 @@ export type DeleteAiAssistantModalProps = {
   onConfirm: () => void;
 };
 
-export const DeleteAiAssistantModal: React.FC<DeleteAiAssistantModalProps> = ({
-  isShown, aiAssistant, errorMessage, onCancel, onConfirm,
+/**
+ * DeleteAiAssistantModalSubstance - Presentation component (heavy logic, rendered only when isOpen)
+ */
+type DeleteAiAssistantModalSubstanceProps = {
+  errorMessage?: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+};
+
+const DeleteAiAssistantModalSubstance: React.FC<DeleteAiAssistantModalSubstanceProps> = ({
+  errorMessage, onCancel, onConfirm,
 }) => {
   const { t } = useTranslation();
 
-  const headerContent = () => {
-    if (!isShown || aiAssistant == null) {
-      return null;
-    }
-    return (
-      <>
-        <span className="material-symbols-outlined me-1">delete_forever</span>
-        <span className="fw-bold">{t('ai_assistant_substance.delete_modal.title')}</span>
-      </>
-    );
-  };
+  // Memoize header content
+  const headerContent = useMemo(() => (
+    <>
+      <span className="material-symbols-outlined me-1">delete_forever</span>
+      <span className="fw-bold">{t('ai_assistant_substance.delete_modal.title')}</span>
+    </>
+  ), [t]);
 
-  const bodyContent = () => {
-    if (!isShown || aiAssistant == null) {
-      return null;
-    }
-    return <p className="fw-bold mb-0">{t('ai_assistant_substance.delete_modal.confirm_message')}</p>;
-  };
+  // Memoize body content
+  const bodyContent = useMemo(() => (
+    <p className="fw-bold mb-0">{t('ai_assistant_substance.delete_modal.confirm_message')}</p>
+  ), [t]);
 
-  const footerContent = () => {
-    if (!isShown || aiAssistant == null) {
-      return null;
-    }
-    return (
-      <>
-        {errorMessage && <span className="text-danger">{errorMessage}</span>}
-        <Button color="outline-neutral-secondary" onClick={onCancel}>
-          {t('Cancel')}
-        </Button>
-        <Button color="danger" onClick={onConfirm}>
-          {t('Delete')}
-        </Button>
-      </>
-    );
-  };
+  // Memoize footer content
+  const footerContent = useMemo(() => (
+    <>
+      {errorMessage && <span className="text-danger">{errorMessage}</span>}
+      <Button color="outline-neutral-secondary" onClick={onCancel}>
+        {t('Cancel')}
+      </Button>
+      <Button color="danger" onClick={onConfirm}>
+        {t('Delete')}
+      </Button>
+    </>
+  ), [errorMessage, onCancel, onConfirm, t]);
 
   return (
-    <Modal isOpen={isShown} toggle={onCancel} centered>
+    <>
       <ModalHeader tag="h5" toggle={onCancel} className="text-danger px-4">
-        {headerContent()}
+        {headerContent}
       </ModalHeader>
       <ModalBody className="px-4">
-        {bodyContent()}
+        {bodyContent}
       </ModalBody>
       <ModalFooter className="px-4 gap-2">
-        {footerContent()}
+        {footerContent}
       </ModalFooter>
+    </>
+  );
+};
+
+/**
+ * DeleteAiAssistantModal - Container component (lightweight, always rendered)
+ */
+export const DeleteAiAssistantModal: React.FC<DeleteAiAssistantModalProps> = ({
+  isShown, aiAssistant, errorMessage, onCancel, onConfirm,
+}) => {
+  return (
+    <Modal isOpen={isShown} toggle={onCancel} centered>
+      {isShown && aiAssistant != null && (
+        <DeleteAiAssistantModalSubstance
+          errorMessage={errorMessage}
+          onCancel={onCancel}
+          onConfirm={onConfirm}
+        />
+      )}
     </Modal>
   );
 };

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
 import type { ViewUpdate } from '@codemirror/view';
 import { EditorView } from 'codemirror';
+import { useEffect, useState } from 'react';
 
 import type { UseCodeMirrorEditor } from '../../services';
 import { isInTable } from './insert-new-row-to-table-markdown';

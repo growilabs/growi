@@ -1,5 +1,5 @@
-import { type JSX, memo, useCallback, useRef } from 'react';
 import type { AcceptedUploadFileType } from '@growi/core';
+import { type JSX, memo, useCallback, useRef } from 'react';
 import SimpleBar from 'simplebar-react';
 
 import type { GlobalCodeMirrorEditorKey } from '../../../../consts';

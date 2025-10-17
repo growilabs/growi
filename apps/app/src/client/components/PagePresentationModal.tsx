@@ -1,4 +1,4 @@
-import React, { useCallback, type JSX } from 'react';
+import React, { useCallback } from 'react';
 
 import type { PresentationProps } from '@growi/presentation/dist/client';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
@@ -10,10 +10,10 @@ import {
   Modal, ModalBody,
 } from 'reactstrap';
 
-import { useIsEnabledMarp } from '~/stores-universal/context';
+import { useCurrentPageData } from '~/states/page';
+import { useRendererConfig } from '~/states/server-configurations';
+import { usePresentationModalActions, usePresentationModalStatus } from '~/states/ui/modal/page-presentation';
 import { useNextThemes } from '~/stores-universal/use-next-themes';
-import { usePagePresentationModal } from '~/stores/modal';
-import { useSWRxCurrentPage } from '~/stores/page';
 import { usePresentationViewOptions } from '~/stores/renderer';
 
 import { RendererErrorMessage } from './Common/RendererErrorMessage';
@@ -30,18 +30,20 @@ const Presentation = dynamic<PresentationProps>(() => import('./Presentation/Pre
   ),
 });
 
+/**
+ * PagePresentationModalSubstance - Heavy processing component (rendered only when modal is open)
+ */
+const PagePresentationModalSubstance: React.FC = () => {
 
-const PagePresentationModal = (): JSX.Element => {
-
-  const { data: presentationModalData, close: closePresentationModal } = usePagePresentationModal();
+  const { close: closePresentationModal } = usePresentationModalActions();
 
   const { isDarkMode } = useNextThemes();
   const fullscreen = useFullScreen();
 
-  const { data: currentPage } = useSWRxCurrentPage();
+  const currentPage = useCurrentPageData();
   const { data: rendererOptions, isLoading } = usePresentationViewOptions();
 
-  const { data: isEnabledMarp } = useIsEnabledMarp();
+  const { isEnabledMarp } = useRendererConfig();
 
   const markdown = currentPage?.revision?.body;
 
@@ -63,19 +65,8 @@ const PagePresentationModal = (): JSX.Element => {
     closePresentationModal();
   }, [fullscreen, closePresentationModal]);
 
-  const isOpen = presentationModalData?.isOpened ?? false;
-
-  if (!isOpen) {
-    return <></>;
-  }
-
   return (
-    <Modal
-      isOpen={isOpen}
-      toggle={closeHandler}
-      data-testid="page-presentation-modal"
-      className={moduleClass}
-    >
+    <>
       <div className="grw-presentation-controls d-flex">
         <button
           className="btn material-symbols-outlined"
@@ -105,6 +96,36 @@ const PagePresentationModal = (): JSX.Element => {
           </Presentation>
         ) }
       </ModalBody>
+    </>
+  );
+};
+
+/**
+ * PagePresentationModal - Container component (lightweight, always rendered)
+ */
+const PagePresentationModal = (): React.JSX.Element => {
+  const presentationModalData = usePresentationModalStatus();
+  const { close: closePresentationModal } = usePresentationModalActions();
+
+  const fullscreen = useFullScreen();
+
+  const closeHandler = useCallback(() => {
+    if (fullscreen.active) {
+      fullscreen.exit();
+    }
+    closePresentationModal();
+  }, [fullscreen, closePresentationModal]);
+
+  const isOpen = presentationModalData?.isOpened ?? false;
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      toggle={closeHandler}
+      data-testid="page-presentation-modal"
+      className={moduleClass}
+    >
+      {isOpen && <PagePresentationModalSubstance />}
     </Modal>
   );
 };

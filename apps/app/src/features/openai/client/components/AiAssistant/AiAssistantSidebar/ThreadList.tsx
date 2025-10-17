@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { IThreadRelationHasId } from '~/features/openai/interfaces/thread-relation';
 
-import { useAiAssistantSidebar } from '../../../stores/ai-assistant';
+import { useAiAssistantSidebarStatus, useAiAssistantSidebarActions } from '../../../states';
 import { useSWRxThreads } from '../../../stores/thread';
 
 import styles from './ThreadList.module.scss';
@@ -14,7 +14,8 @@ const moduleClass = styles['thread-list'] ?? '';
 
 export const ThreadList: React.FC = () => {
   const { t } = useTranslation();
-  const { openChat, data: aiAssistantSidebarData } = useAiAssistantSidebar();
+  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
+  const { openChat } = useAiAssistantSidebarActions();
   const { data: threads } = useSWRxThreads(aiAssistantSidebarData?.aiAssistantData?._id);
 
   const openChatHandler = useCallback((threadData: IThreadRelationHasId) => {

@@ -343,25 +343,6 @@ export const getPageSchema = (crowi) => {
     return count > 0;
   };
 
-  /**
-   * @param {string} id ObjectId
-   * @param {User} user User instance
-   * @param {UserGroup[]} userGroups List of UserGroup instances
-   */
-  pageSchema.statics.findByIdAndViewer = async function(id, user, userGroups, includeEmpty = false) {
-    const baseQuery = this.findOne({ _id: id });
-
-    const relatedUserGroups = (user != null && userGroups == null) ? [
-      ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
-      ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
-    ] : userGroups;
-
-    const queryBuilder = new this.PageQueryBuilder(baseQuery, includeEmpty);
-    queryBuilder.addConditionToFilteringByViewer(user, relatedUserGroups, true);
-
-    return queryBuilder.query.exec();
-  };
-
   // find page by path
   pageSchema.statics.findByPath = function(path, includeEmpty = false) {
     if (path == null) {

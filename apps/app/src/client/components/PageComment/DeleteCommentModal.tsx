@@ -1,4 +1,4 @@
-import React, { type JSX } from 'react';
+import React, { useMemo } from 'react';
 
 import { isPopulated } from '@growi/core';
 import { UserPicture } from '@growi/ui/dist/components';
@@ -22,80 +22,109 @@ export type DeleteCommentModalProps = {
   confirmToDelete: () => void,
 }
 
-export const DeleteCommentModal = (props: DeleteCommentModalProps): JSX.Element => {
+/**
+ * DeleteCommentModalSubstance - Presentation component (heavy logic, rendered only when isOpen)
+ */
+type DeleteCommentModalSubstanceProps = {
+  comment: ICommentHasId,
+  errorMessage: string,
+  cancelToDelete: () => void,
+  confirmToDelete: () => void,
+}
+
+const DeleteCommentModalSubstance = (props: DeleteCommentModalSubstanceProps): React.JSX.Element => {
   const {
-    isShown, comment, errorMessage, cancelToDelete, confirmToDelete,
+    comment, errorMessage, cancelToDelete, confirmToDelete,
   } = props;
 
   const { t } = useTranslation();
 
-  const headerContent = () => {
-    if (comment == null || isShown === false) {
-      return <></>;
-    }
-    return (
-      <span>
-        <span className="material-symbols-outlined">delete_forever</span>
-        {t('page_comment.delete_comment')}
-      </span>
-    );
-  };
+  // Memoize formatted date
+  const commentDate = useMemo(() => {
+    if (comment == null) return '';
+    return format(new Date(comment.createdAt), 'yyyy/MM/dd HH:mm');
+  }, [comment]);
 
-  const bodyContent = () => {
-    if (comment == null || isShown === false) {
-      return <></>;
-    }
+  // Memoize creator
+  const creator = useMemo(() => {
+    if (comment == null) return undefined;
+    return isPopulated(comment.creator) ? comment.creator : undefined;
+  }, [comment]);
 
-    // the threshold for omitting body
+  // Memoize processed comment body
+  const commentBodyElement = useMemo(() => {
+    if (comment == null) return null;
     const OMIT_BODY_THRES = 400;
-
-    const commentDate = format(new Date(comment.createdAt), 'yyyy/MM/dd HH:mm');
-
-    const creator = isPopulated(comment.creator) ? comment.creator : undefined;
-
     let commentBody = comment.comment;
-    if (commentBody.length > OMIT_BODY_THRES) { // omit
+    if (commentBody.length > OMIT_BODY_THRES) {
       commentBody = `${commentBody.substr(0, OMIT_BODY_THRES)}...`;
     }
-    const commentBodyElement = <span style={{ whiteSpace: 'pre-wrap' }}>{commentBody}</span>;
+    return <span style={{ whiteSpace: 'pre-wrap' }}>{commentBody}</span>;
+  }, [comment]);
 
-    return (
-      <>
-        <UserPicture user={creator} size="xs" /> <strong className="me-2"><Username user={creator}></Username></strong>{commentDate}:
-        <div className="card mt-2">
-          <div className="card-body comment-body px-3 py-2">{commentBodyElement}</div>
-        </div>
-      </>
-    );
-  };
+  // Memoize header content
+  const headerContent = useMemo(() => (
+    <span>
+      <span className="material-symbols-outlined">delete_forever</span>
+      {t('page_comment.delete_comment')}
+    </span>
+  ), [t]);
 
-  const footerContent = () => {
-    if (comment == null || isShown === false) {
-      return <></>;
-    }
-    return (
-      <>
-        <span className="text-danger">{errorMessage}</span>&nbsp;
-        <Button onClick={cancelToDelete}>{t('Cancel')}</Button>
-        <Button data-testid="delete-comment-button" color="danger" onClick={confirmToDelete}>
-          <span className="material-symbols-outlined">delete_forever</span>
-          {t('Delete')}
-        </Button>
-      </>
-    );
-  };
+  // Memoize body content
+  const bodyContent = useMemo(() => (
+    <>
+      <UserPicture user={creator} size="xs" /> <strong className="me-2"><Username user={creator}></Username></strong>{commentDate}:
+      <div className="card mt-2">
+        <div className="card-body comment-body px-3 py-2">{commentBodyElement}</div>
+      </div>
+    </>
+  ), [creator, commentDate, commentBodyElement]);
+
+  // Memoize footer content
+  const footerContent = useMemo(() => (
+    <>
+      <span className="text-danger">{errorMessage}</span>&nbsp;
+      <Button onClick={cancelToDelete}>{t('Cancel')}</Button>
+      <Button data-testid="delete-comment-button" color="danger" onClick={confirmToDelete}>
+        <span className="material-symbols-outlined">delete_forever</span>
+        {t('Delete')}
+      </Button>
+    </>
+  ), [errorMessage, cancelToDelete, confirmToDelete, t]);
+
+  return (
+    <>
+      <ModalHeader tag="h4" toggle={cancelToDelete} className="text-danger">
+        {headerContent}
+      </ModalHeader>
+      <ModalBody>
+        {bodyContent}
+      </ModalBody>
+      <ModalFooter>
+        {footerContent}
+      </ModalFooter>
+    </>
+  );
+};
+
+/**
+ * DeleteCommentModal - Container component (lightweight, always rendered)
+ */
+export const DeleteCommentModal = (props: DeleteCommentModalProps): React.JSX.Element => {
+  const {
+    isShown, comment, errorMessage, cancelToDelete, confirmToDelete,
+  } = props;
 
   return (
     <Modal data-testid="page-comment-delete-modal" isOpen={isShown} toggle={cancelToDelete} className={`${styles['page-comment-delete-modal']}`}>
-      <ModalHeader tag="h4" toggle={cancelToDelete} className="text-danger">
-        {headerContent()}
-      </ModalHeader>
-      <ModalBody>
-        {bodyContent()}
-      </ModalBody>
-      <ModalFooter>
-        {footerContent()}
-      </ModalFooter>
+      {isShown && comment != null && (
+        <DeleteCommentModalSubstance
+          comment={comment}
+          errorMessage={errorMessage}
+          cancelToDelete={cancelToDelete}
+          confirmToDelete={confirmToDelete}
+        />
+      )}
     </Modal>
   );
 };

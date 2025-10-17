@@ -2,7 +2,7 @@ import React, { type JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
 
-import { useIsGuestUser } from '~/stores-universal/context';
+import { useIsGuestUser } from '~/states/context';
 
 import { NotAvailable } from './NotAvailable';
 
@@ -12,7 +12,7 @@ type NotAvailableForGuestProps = {
 
 export const NotAvailableForGuest = React.memo(({ children }: NotAvailableForGuestProps): JSX.Element => {
   const { t } = useTranslation();
-  const { data: isGuestUser } = useIsGuestUser();
+  const isGuestUser = useIsGuestUser();
 
   const isDisabled = !!isGuestUser;
   const title = t('Not available for guest');

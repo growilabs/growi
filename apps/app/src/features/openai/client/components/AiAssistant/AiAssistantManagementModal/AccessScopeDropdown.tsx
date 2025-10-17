@@ -5,7 +5,7 @@ import {
   UncontrolledDropdown, DropdownToggle, DropdownMenu, DropdownItem, Label,
 } from 'reactstrap';
 
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 
 import { AiAssistantAccessScope } from '../../../../interfaces/ai-assistant';
 
@@ -25,7 +25,7 @@ export const AccessScopeDropdown: React.FC<Props> = (props: Props) => {
   } = props;
 
   const { t } = useTranslation();
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser();
 
   const getAccessScopeLabel = useCallback((accessScope: AiAssistantAccessScope) => {
     const baseLabel = `modal_ai_assistant.access_scope.${accessScope}`;

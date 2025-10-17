@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
 import type { EditorView } from '@codemirror/view';
 import { type KeyBinding, keymap } from '@codemirror/view';
+import { useEffect } from 'react';
 import type { KeyMapMode } from 'src/consts';
 
 import type { UseCodeMirrorEditor } from '../services';

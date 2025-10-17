@@ -1,12 +1,11 @@
-import React, { type JSX, useCallback, useMemo } from 'react';
 import { LoadingSpinner } from '@growi/ui/dist/components';
+import React, { type JSX, useCallback, useMemo } from 'react';
 
 import { useSWRxLsx } from '../stores/lsx';
 import { generatePageNodeTree } from '../utils/page-node';
+import styles from './Lsx.module.scss';
 import { LsxListView } from './LsxPageList/LsxListView';
 import { LsxContext } from './lsx-context';
-
-import styles from './Lsx.module.scss';
 
 type Props = {
   children: React.ReactNode;

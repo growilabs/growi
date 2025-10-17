@@ -1,5 +1,4 @@
 import type { JSX, ReactNode } from 'react';
-import React from 'react';
 import dynamic from 'next/dynamic';
 
 import { RawLayout } from './RawLayout';
@@ -98,13 +97,13 @@ const DeleteBookmarkFolderModal = dynamic(
   { ssr: false },
 );
 const SearchModal = dynamic(
-  () => import('../../features/search/client/components/SearchModal'),
+  () => import('~/features/search/client/components/SearchModal'),
   { ssr: false },
 );
 const PageBulkExportSelectModal = dynamic(
   () =>
     import(
-      '../../features/page-bulk-export/client/components/PageBulkExportSelectModal'
+      '~/features/page-bulk-export/client/components/PageBulkExportSelectModal'
     ),
   { ssr: false },
 );
@@ -147,6 +146,7 @@ export const BasicLayout = ({ children, className }: Props): JSX.Element => {
       </div>
 
       <GrowiNavbarBottom />
+      <SearchModal />
 
       <PageCreateModal />
       <PageDuplicateModal />
@@ -157,7 +157,6 @@ export const BasicLayout = ({ children, className }: Props): JSX.Element => {
       <DeleteBookmarkFolderModal />
       <PutbackPageModal />
       <PageSelectModal />
-      <SearchModal />
       <AiAssistantManagementModal />
 
       <PagePresentationModal />

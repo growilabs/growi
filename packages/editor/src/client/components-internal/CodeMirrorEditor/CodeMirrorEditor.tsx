@@ -1,9 +1,9 @@
-import type { DetailedHTMLProps, JSX } from 'react';
-import { forwardRef, useEffect, useMemo, useRef } from 'react';
 import { indentUnit } from '@codemirror/language';
 import { EditorView } from '@codemirror/view';
 import { AcceptedUploadFileType } from '@growi/core';
 import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
+import type { DetailedHTMLProps, JSX } from 'react';
+import { forwardRef, useEffect, useMemo, useRef } from 'react';
 
 import {
   type EditorSettings,
@@ -20,9 +20,8 @@ import {
 import { useCodeMirrorEditorIsolated } from '../../stores/codemirror-editor';
 import { useDefaultExtensions } from '../../stores/use-default-extensions';
 import { useEditorSettings } from '../../stores/use-editor-settings';
-import { Toolbar } from './Toolbar';
-
 import style from './CodeMirrorEditor.module.scss';
+import { Toolbar } from './Toolbar';
 
 const moduleClass = style['codemirror-editor'];
 

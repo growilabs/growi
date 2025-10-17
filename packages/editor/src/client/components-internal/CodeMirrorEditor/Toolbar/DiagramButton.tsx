@@ -1,6 +1,6 @@
 import { type JSX, useCallback } from 'react';
 
-import { useDrawioModalForEditor } from '../../../stores/use-drawio';
+import { useDrawioModalForEditorActions } from '../../../../states/modal/drawio-for-editor';
 
 type Props = {
   editorKey: string;
@@ -8,7 +8,7 @@ type Props = {
 
 export const DiagramButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
-  const { open: openDrawioModal } = useDrawioModalForEditor();
+  const { open: openDrawioModal } = useDrawioModalForEditorActions();
   const onClickDiagramButton = useCallback(() => {
     openDrawioModal(editorKey);
   }, [editorKey, openDrawioModal]);

@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 import dynamic from 'next/dynamic';
 
-import { useIsNotFound } from '~/stores/page';
+import { usePageNotFound } from '~/states/page';
 
 import { OldRevisionAlert } from './OldRevisionAlert';
 import { PageGrantAlert } from './PageGrantAlert';
@@ -29,7 +29,7 @@ const TrashPageAlert = dynamic(
 );
 
 export const PageAlerts = (): JSX.Element => {
-  const { data: isNotFound } = useIsNotFound();
+  const isNotFound = usePageNotFound();
 
   return (
     <div className="row d-edit-none">

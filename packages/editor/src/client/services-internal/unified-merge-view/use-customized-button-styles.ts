@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import { EditorView } from '@codemirror/view';
+import { useEffect } from 'react';
 
 import type { UseCodeMirrorEditor } from '../../services';
 

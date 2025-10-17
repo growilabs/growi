@@ -11,7 +11,7 @@ import urljoin from 'url-join';
 import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 import AdminSamlSecurityContainer from '~/client/services/AdminSamlSecurityContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useSiteUrl } from '~/stores-universal/context';
+import { useSiteUrlWithEmptyValueWarn } from '~/states/global';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -26,7 +26,7 @@ const SamlSecurityManagementContents = (props: Props) => {
   } = props;
 
   const { t } = useTranslation('admin');
-  const { data: siteUrl } = useSiteUrl();
+  const siteUrl = useSiteUrlWithEmptyValueWarn();
 
   const [isHelpOpened, setIsHelpOpened] = useState(false);
   const { register, handleSubmit, reset } = useForm();
@@ -75,10 +75,7 @@ const SamlSecurityManagementContents = (props: Props) => {
   const { useOnlyEnvVars } = adminSamlSecurityContainer.state;
   const { isSamlEnabled } = adminGeneralSecurityContainer.state;
 
-  const samlCallbackUrl = urljoin(
-    siteUrl == null ? '' : pathUtils.removeTrailingSlash(siteUrl),
-    '/passport/saml/callback',
-  );
+  const samlCallbackUrl = urljoin(pathUtils.removeTrailingSlash(siteUrl), '/passport/saml/callback');
 
   return (
     <React.Fragment>

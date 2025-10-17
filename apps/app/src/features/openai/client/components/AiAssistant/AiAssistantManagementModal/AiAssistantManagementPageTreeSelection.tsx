@@ -13,11 +13,14 @@ import ItemsTreeContentSkeleton from '~/client/components/ItemsTree/ItemsTreeCon
 import type { TreeItemProps } from '~/client/components/TreeItem';
 import { TreeItemLayout } from '~/client/components/TreeItem';
 import type { IPageForItem } from '~/interfaces/page';
-import { useIsGuestUser, useIsReadOnlyUser } from '~/stores-universal/context';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
 
 import { type SelectablePage, isSelectablePage } from '../../../../interfaces/selectable-page';
 import { useSelectedPages } from '../../../services/use-selected-pages';
-import { AiAssistantManagementModalPageMode, useAiAssistantManagementModal } from '../../../stores/ai-assistant';
+import {
+  AiAssistantManagementModalPageMode,
+  useAiAssistantManagementModalStatus, useAiAssistantManagementModalActions,
+} from '../../../states/modal/ai-assistant-management';
 
 import { AiAssistantManagementHeader } from './AiAssistantManagementHeader';
 import { SelectablePageList } from './SelectablePageList';
@@ -29,8 +32,8 @@ const moduleClass = styles['grw-ai-assistant-management-page-tree-selection'] ??
 const SelectablePageTree = memo((props: { onClickAddPageButton: (page: SelectablePage) => void }) => {
   const { onClickAddPageButton } = props;
 
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
 
   const pageTreeItemClickHandler = useCallback((page: IPageForItem) => {
     if (!isSelectablePage(page)) {
@@ -90,7 +93,8 @@ export const AiAssistantManagementPageTreeSelection = (props: Props): JSX.Elemen
   const { baseSelectedPages, updateBaseSelectedPages } = props;
 
   const { t } = useTranslation();
-  const { data: aiAssistantManagementModalData, changePageMode } = useAiAssistantManagementModal();
+  const aiAssistantManagementModalData = useAiAssistantManagementModalStatus();
+  const { changePageMode } = useAiAssistantManagementModalActions();
   const isNewAiAssistant = aiAssistantManagementModalData?.aiAssistantData == null;
 
   const {

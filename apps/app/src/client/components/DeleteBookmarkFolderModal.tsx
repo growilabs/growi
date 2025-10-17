@@ -1,6 +1,6 @@
 
 import type { FC } from 'react';
-import React from 'react';
+import { useCallback } from 'react';
 
 import { useTranslation } from 'next-i18next';
 import {
@@ -10,46 +10,52 @@ import {
 import { FolderIcon } from '~/client/components/Icons/FolderIcon';
 import { deleteBookmarkFolder } from '~/client/util/bookmark-utils';
 import { toastError } from '~/client/util/toastr';
-import { useBookmarkFolderDeleteModal } from '~/stores/modal';
+import type { BookmarkFolderItems } from '~/interfaces/bookmark-info';
+import { useDeleteBookmarkFolderModalStatus, useDeleteBookmarkFolderModalActions } from '~/states/ui/modal/delete-bookmark-folder';
 
+/**
+ * DeleteBookmarkFolderModalSubstance - Presentation component (all logic here)
+ */
+type DeleteBookmarkFolderModalSubstanceProps = {
+  bookmarkFolder: BookmarkFolderItems;
+  onDeleted?: (folderId: string) => void;
+  closeModal: () => void;
+};
 
-const DeleteBookmarkFolderModal: FC = () => {
+const DeleteBookmarkFolderModalSubstance = ({
+  bookmarkFolder,
+  onDeleted,
+  closeModal,
+}: DeleteBookmarkFolderModalSubstanceProps): React.JSX.Element => {
   const { t } = useTranslation();
-  const { data: deleteBookmarkFolderModalData, close: closeBookmarkFolderDeleteModal } = useBookmarkFolderDeleteModal();
-  const isOpened = deleteBookmarkFolderModalData?.isOpened ?? false;
 
-  async function deleteBookmark() {
-    if (deleteBookmarkFolderModalData == null || deleteBookmarkFolderModalData.bookmarkFolder == null) {
-      return;
-    }
-    if (deleteBookmarkFolderModalData.bookmarkFolder != null) {
-      try {
-        await deleteBookmarkFolder(deleteBookmarkFolderModalData.bookmarkFolder._id);
-        const onDeleted = deleteBookmarkFolderModalData.opts?.onDeleted;
-        if (onDeleted != null) {
-          onDeleted(deleteBookmarkFolderModalData.bookmarkFolder._id);
-        }
-        closeBookmarkFolderDeleteModal();
+  const deleteBookmark = useCallback(async() => {
+    try {
+      await deleteBookmarkFolder(bookmarkFolder._id);
+      if (onDeleted != null) {
+        onDeleted(bookmarkFolder._id);
       }
-      catch (err) {
-        toastError(err);
-      }
+      closeModal();
     }
-  }
-  async function onClickDeleteButton() {
+    catch (err) {
+      toastError(err);
+    }
+  }, [bookmarkFolder, onDeleted, closeModal]);
+
+  const onClickDeleteButton = useCallback(async() => {
     await deleteBookmark();
-  }
+  }, [deleteBookmark]);
 
   return (
-    <Modal size="md" isOpen={isOpened} toggle={closeBookmarkFolderDeleteModal} data-testid="page-delete-modal" className="grw-create-page">
-      <ModalHeader tag="h4" toggle={closeBookmarkFolderDeleteModal} className="text-danger">
+    <div>
+      <ModalHeader tag="h4" toggle={closeModal} className="text-danger">
         <span className="material-symbols-outlined">delete</span>
         {t('bookmark_folder.delete_modal.modal_header_label')}
       </ModalHeader>
       <ModalBody>
         <div className="pb-1 text-break">
           <label className="form-label">{ t('bookmark_folder.delete_modal.modal_body_description') }:</label><br />
-          <FolderIcon isOpen={false} /> {deleteBookmarkFolderModalData?.bookmarkFolder?.name}
+          <FolderIcon isOpen={false} /> {bookmarkFolder?.name}
         </div>
         {t('bookmark_folder.delete_modal.modal_body_alert')}
       </ModalBody>
@@ -63,8 +69,27 @@ const DeleteBookmarkFolderModal: FC = () => {
           {t('bookmark_folder.delete_modal.modal_footer_button')}
         </button>
       </ModalFooter>
-    </Modal>
+    </div>
+  );
+};
 
+/**
+ * DeleteBookmarkFolderModal - Container component (lightweight, always rendered)
+ */
+const DeleteBookmarkFolderModal: FC = () => {
+  const { isOpened, bookmarkFolder, opts } = useDeleteBookmarkFolderModalStatus();
+  const { close: closeModal } = useDeleteBookmarkFolderModalActions();
+
+  return (
+    <Modal size="md" isOpen={isOpened} toggle={closeModal} data-testid="page-delete-modal" className="grw-create-page">
+      {isOpened && bookmarkFolder != null && (
+        <DeleteBookmarkFolderModalSubstance
+          bookmarkFolder={bookmarkFolder}
+          onDeleted={opts?.onDeleted}
+          closeModal={closeModal}
+        />
+      )}
+    </Modal>
   );
 };
 

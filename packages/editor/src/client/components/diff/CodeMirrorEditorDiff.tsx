@@ -1,7 +1,7 @@
-import { type JSX, useEffect, useMemo, useRef } from 'react';
 import type { Extension } from '@codemirror/state';
 import { placeholder, scrollPastEnd } from '@codemirror/view';
 import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
+import { type JSX, useEffect, useMemo, useRef } from 'react';
 
 import { GlobalCodeMirrorEditorKey } from '../../../consts';
 import { useCodeMirrorEditorIsolated } from '../../stores/codemirror-editor';

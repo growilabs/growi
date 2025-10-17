@@ -1,7 +1,7 @@
-import { memo, useEffect, useRef } from 'react';
 import { MergeView } from '@codemirror/merge';
 import { EditorState, type Extension } from '@codemirror/state';
 import { basicSetup, EditorView } from 'codemirror';
+import { memo, useEffect, useRef } from 'react';
 
 type Props = {
   leftBody: string;

@@ -6,17 +6,16 @@ import useSWR, { type SWRConfiguration, type SWRResponse } from 'swr';
 import { getGrowiFacade } from '~/features/growi-plugin/client/utils/growi-facade-utils';
 import type { RendererOptions } from '~/interfaces/renderer-options';
 import type { RendererConfigExt } from '~/interfaces/services/renderer';
-import { useRendererConfig } from '~/stores-universal/context';
+import { useCurrentPagePath } from '~/states/page';
+import { useRendererConfig } from '~/states/server-configurations';
+import { useSetTocNode } from '~/states/ui/toc';
 import { useNextThemes } from '~/stores-universal/use-next-themes';
 import loggerFactory from '~/utils/logger';
-
-import { useCurrentPagePath } from './page';
-import { useCurrentPageTocNode } from './ui';
 
 const logger = loggerFactory('growi:cli:services:renderer');
 
 const useRendererConfigExt = (): RendererConfigExt | null => {
-  const { data: rendererConfig } = useRendererConfig();
+  const rendererConfig = useRendererConfig();
   const { isDarkMode } = useNextThemes();
 
   return rendererConfig == null ? null : {
@@ -27,13 +26,13 @@ const useRendererConfigExt = (): RendererConfigExt | null => {
 
 
 export const useViewOptions = (): SWRResponse<RendererOptions, Error> => {
-  const { data: currentPagePath } = useCurrentPagePath();
+  const currentPagePath = useCurrentPagePath();
   const rendererConfig = useRendererConfigExt();
-  const { mutate: mutateCurrentPageTocNode } = useCurrentPageTocNode();
+  const setTocNode = useSetTocNode();
 
   const storeTocNodeHandler = useCallback((toc: HtmlElementNode) => {
-    mutateCurrentPageTocNode(toc, { revalidate: false });
-  }, [mutateCurrentPageTocNode]);
+    setTocNode(toc);
+  }, [setTocNode]);
 
   const isAllDataValid = currentPagePath != null && rendererConfig != null;
   const customGenerater = getGrowiFacade().markdownRenderer?.optionsGenerators?.customGenerateViewOptions;
@@ -42,7 +41,7 @@ export const useViewOptions = (): SWRResponse<RendererOptions, Error> => {
     isAllDataValid
       ? ['viewOptions', currentPagePath, rendererConfig, customGenerater]
       : null,
-    async([, currentPagePath, rendererConfig]) => {
+    async ([, currentPagePath, rendererConfig]) => {
       if (customGenerater != null) {
         return customGenerater(currentPagePath, rendererConfig, storeTocNodeHandler);
       }
@@ -58,31 +57,8 @@ export const useViewOptions = (): SWRResponse<RendererOptions, Error> => {
   );
 };
 
-export const useTocOptions = (): SWRResponse<RendererOptions, Error> => {
-  const { data: currentPagePath } = useCurrentPagePath();
-  const rendererConfig = useRendererConfigExt();
-  const { data: tocNode } = useCurrentPageTocNode();
-
-  const isAllDataValid = currentPagePath != null && rendererConfig != null && tocNode != null;
-
-  return useSWR(
-    isAllDataValid
-      ? ['tocOptions', currentPagePath, tocNode, rendererConfig]
-      : null,
-    async([, , tocNode, rendererConfig]) => {
-      const { generateTocOptions } = await import('~/client/services/renderer/renderer');
-      return generateTocOptions(rendererConfig, tocNode);
-    },
-    {
-      keepPreviousData: true,
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-    },
-  );
-};
-
 export const usePreviewOptions = (): SWRResponse<RendererOptions, Error> => {
-  const { data: currentPagePath } = useCurrentPagePath();
+  const currentPagePath = useCurrentPagePath();
   const rendererConfig = useRendererConfigExt();
 
   const isAllDataValid = currentPagePath != null && rendererConfig != null;
@@ -92,7 +68,7 @@ export const usePreviewOptions = (): SWRResponse<RendererOptions, Error> => {
     isAllDataValid
       ? ['previewOptions', rendererConfig, currentPagePath, customGenerater]
       : null,
-    async([, rendererConfig, pagePath]) => {
+    async ([, rendererConfig, pagePath]) => {
       if (customGenerater != null) {
         return customGenerater(rendererConfig, pagePath);
       }
@@ -109,7 +85,7 @@ export const usePreviewOptions = (): SWRResponse<RendererOptions, Error> => {
 };
 
 export const useCommentForCurrentPageOptions = (): SWRResponse<RendererOptions, Error> => {
-  const { data: currentPagePath } = useCurrentPagePath();
+  const currentPagePath = useCurrentPagePath();
   const rendererConfig = useRendererConfigExt();
 
   const isAllDataValid = currentPagePath != null && rendererConfig != null;
@@ -118,7 +94,7 @@ export const useCommentForCurrentPageOptions = (): SWRResponse<RendererOptions, 
     isAllDataValid
       ? ['commentPreviewOptions', rendererConfig, currentPagePath]
       : null,
-    async([, rendererConfig, currentPagePath]) => {
+    async ([, rendererConfig, currentPagePath]) => {
       const { generateSimpleViewOptions } = await import('~/client/services/renderer/renderer');
       return generateSimpleViewOptions(
         rendererConfig,
@@ -145,7 +121,7 @@ export const useSelectedPagePreviewOptions = (pagePath: string, highlightKeyword
     isAllDataValid
       ? ['selectedPagePreviewOptions', rendererConfig, pagePath, highlightKeywords]
       : null,
-    async([, rendererConfig, pagePath, highlightKeywords]) => {
+    async ([, rendererConfig, pagePath, highlightKeywords]) => {
       const { generateSimpleViewOptions } = await import('~/client/services/renderer/renderer');
       return generateSimpleViewOptions(rendererConfig, pagePath, highlightKeywords);
     },
@@ -168,7 +144,7 @@ export const useCustomSidebarOptions = (config?: SWRConfiguration): SWRResponse<
     isAllDataValid
       ? ['customSidebarOptions', rendererConfig]
       : null,
-    async([, rendererConfig]) => {
+    async ([, rendererConfig]) => {
       const { generateSimpleViewOptions } = await import('~/client/services/renderer/renderer');
       return generateSimpleViewOptions(rendererConfig, '/');
     },
@@ -182,7 +158,7 @@ export const useCustomSidebarOptions = (config?: SWRConfiguration): SWRResponse<
 };
 
 export const usePresentationViewOptions = (): SWRResponse<RendererOptions, Error> => {
-  const { data: currentPagePath } = useCurrentPagePath();
+  const currentPagePath = useCurrentPagePath();
   const rendererConfig = useRendererConfigExt();
 
   const isAllDataValid = currentPagePath != null && rendererConfig != null;
@@ -197,7 +173,7 @@ export const usePresentationViewOptions = (): SWRResponse<RendererOptions, Error
     isAllDataValid
       ? ['presentationViewOptions', currentPagePath, rendererConfig]
       : null,
-    async([, currentPagePath, rendererConfig]) => {
+    async ([, currentPagePath, rendererConfig]) => {
       const { generatePresentationViewOptions } = await import('~/client/services/renderer/renderer');
       return generatePresentationViewOptions(rendererConfig, currentPagePath);
     },
