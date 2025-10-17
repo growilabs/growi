@@ -337,7 +337,7 @@ const FileUploadSetting = (props: FileUploadSettingProps): JSX.Element => {
         onChangeAzureStorageAccountName={onChangeAzureStorageAccountNameHandler}
         onChangeAzureStorageContainerName={onChangeAzureStorageContainerNameHandler}
       />
-      <AdminUpdateButtonRow disabled={retrieveError != null} />
+      <AdminUpdateButtonRow type="submit" disabled={retrieveError != null} />
     </form>
   );
 };
