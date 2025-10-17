@@ -30,13 +30,9 @@
       "!apps/app/playwright",
       "!apps/app/src/client",
       "!apps/app/src/features/openai",
-      "!apps/app/src/pages",
       "!apps/app/src/server",
       "!apps/app/src/services",
-      "!apps/app/src/stores",
-      "!apps/app/src/styles",
-      "!apps/app/test-with-vite",
-      "!apps/app/tmp"
+      "!apps/app/src/stores"
     ]
   },
   "formatter": {

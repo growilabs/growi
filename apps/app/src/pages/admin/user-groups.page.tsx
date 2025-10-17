@@ -1,26 +1,40 @@
 import type {
-  NextPage, GetServerSideProps, GetServerSidePropsContext,
+  GetServerSideProps,
+  GetServerSidePropsContext,
+  NextPage,
 } from 'next';
-import { useTranslation } from 'next-i18next';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
+import { useTranslation } from 'next-i18next';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type { CommonProps } from '~/pages/utils/commons';
 import { generateCustomTitle } from '~/pages/utils/commons';
-import { useIsAclEnabled, useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser, useIsAclEnabled } from '~/stores-universal/context';
 
 import { retrieveServerSideProps } from '../../utils/admin-page-util';
 
-const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), { ssr: false });
-const UserGroupPage = dynamic(() => import('~/client/components/Admin/UserGroup/UserGroupPage').then(mod => mod.UserGroupPage), { ssr: false });
-const ForbiddenPage = dynamic(() => import('~/client/components/Admin/ForbiddenPage').then(mod => mod.ForbiddenPage), { ssr: false });
-
+const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), {
+  ssr: false,
+});
+const UserGroupPage = dynamic(
+  () =>
+    import('~/client/components/Admin/UserGroup/UserGroupPage').then(
+      (mod) => mod.UserGroupPage,
+    ),
+  { ssr: false },
+);
+const ForbiddenPage = dynamic(
+  () =>
+    import('~/client/components/Admin/ForbiddenPage').then(
+      (mod) => mod.ForbiddenPage,
+    ),
+  { ssr: false },
+);
 
 type Props = CommonProps & {
-  isAclEnabled: boolean
+  isAclEnabled: boolean;
 };
-
 
 const AdminUserGroupPage: NextPage<Props> = (props) => {
   const { t } = useTranslation('admin');
@@ -44,8 +58,10 @@ const AdminUserGroupPage: NextPage<Props> = (props) => {
   );
 };
 
-
-const injectServerConfigurations = async(context: GetServerSidePropsContext, props: Props): Promise<void> => {
+const injectServerConfigurations = async (
+  context: GetServerSidePropsContext,
+  props: Props,
+): Promise<void> => {
   const req: CrowiRequest = context.req as CrowiRequest;
   const { crowi } = req;
   const { aclService } = crowi;
@@ -53,10 +69,14 @@ const injectServerConfigurations = async(context: GetServerSidePropsContext, pro
   props.isAclEnabled = aclService.isAclEnabled();
 };
 
-export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {
-  const props = await retrieveServerSideProps(context, injectServerConfigurations);
+export const getServerSideProps: GetServerSideProps = async (
+  context: GetServerSidePropsContext,
+) => {
+  const props = await retrieveServerSideProps(
+    context,
+    injectServerConfigurations,
+  );
   return props;
 };
-
 
 export default AdminUserGroupPage;
