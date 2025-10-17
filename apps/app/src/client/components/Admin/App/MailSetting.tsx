@@ -27,7 +27,11 @@ const MailSetting = (props: Props) => {
     register,
     handleSubmit,
     reset,
+    watch,
   } = useForm();
+
+  // Watch the transmission method to dynamically switch between SMTP and SES settings
+  const currentTransmissionMethod = watch('transmissionMethod', adminAppContainer.state.transmissionMethod || 'smtp');
 
   // Reset form when adminAppContainer state changes
   useEffect(() => {
@@ -92,7 +96,7 @@ const MailSetting = (props: Props) => {
       {!adminAppContainer.state.isMailerSetup && (
         <div className="alert alert-danger"><span className="material-symbols-outlined">error</span> {t('admin:app_setting.mailer_is_not_set_up')}</div>
       )}
-      <div className="row mb-5">
+      <div className="row mb-4">
         <label className="col-md-3 col-form-label text-end">{t('admin:app_setting.from_e-mail_address')}</label>
         <div className="col-md-6">
           <input
@@ -126,11 +130,12 @@ const MailSetting = (props: Props) => {
         </div>
       </div>
 
-      {adminAppContainer.state.transmissionMethod === 'smtp' && <SmtpSetting register={register} />}
-      {adminAppContainer.state.transmissionMethod === 'ses' && <SesSetting register={register} />}
+      {currentTransmissionMethod === 'smtp' && <SmtpSetting register={register} />}
+      {currentTransmissionMethod === 'ses' && <SesSetting register={register} />}
 
       <div className="row my-3">
-        <div className="mx-auto">
+        <div className="col-md-3"></div>
+        <div className="col-md-9">
           <button type="submit" className="btn btn-primary" disabled={adminAppContainer.state.retrieveError != null}>
             { t('Update') }
           </button>

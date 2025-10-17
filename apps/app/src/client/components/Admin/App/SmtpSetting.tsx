@@ -21,7 +21,7 @@ const SmtpSetting = (props: Props): JSX.Element => {
 
   return (
     <React.Fragment>
-      <div id="mail-smtp" className="tab-pane active mt-5">
+      <div id="mail-smtp" className="tab-pane active">
         <div className="row">
           <label className="text-start text-md-end col-md-3 col-form-label">
             {t('admin:app_setting.host')}

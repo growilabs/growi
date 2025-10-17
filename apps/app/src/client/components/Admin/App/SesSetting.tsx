@@ -18,7 +18,7 @@ const SesSetting = (props: Props): JSX.Element => {
 
   return (
     <React.Fragment>
-      <div id="mail-ses" className="tab-pane active mt-5">
+      <div id="mail-ses" className="tab-pane active">
 
         <div className="row">
           <label className="text-start text-md-end col-md-3 col-form-label">
