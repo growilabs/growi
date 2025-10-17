@@ -90,7 +90,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
         return res.apiv3Err(new ErrorV3('The specified AI assistant is not usable'), 400);
       }
 
-      const aiAssistant = await AiAssistantModel.findById(aiAssistantId);
+      const aiAssistant = await AiAssistantModel.findOne({ _id: { $eq: aiAssistantId } });
       if (aiAssistant == null) {
         return res.apiv3Err(new ErrorV3('AI assistant not found'), 404);
       }
