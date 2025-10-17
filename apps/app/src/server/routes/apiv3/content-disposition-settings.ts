@@ -1,4 +1,6 @@
+import type { IUserHasId } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
+import type { Request } from 'express';
 import { body } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
@@ -6,6 +8,8 @@ import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
+
+import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:content-disposition-settings');
 const express = require('express');
@@ -26,25 +30,19 @@ module.exports = (crowi) => {
     body('newAttachmentMimeTypes').isArray().withMessage('Attachment mime types must be an array.'),
   ];
 
-  type InlineMimeTypesConfig = { inlineMimeTypes: string[] };
-  type AttachmentMimeTypesConfig = { attachmentMimeTypes: string[] };
+  interface AuthorizedRequest extends Request {
+    user?: IUserHasId;
+  }
 
-  interface UpdateMimeTypesPayload {
+  interface UpdateMimeTypesBody {
     newInlineMimeTypes: string[];
     newAttachmentMimeTypes: string[];
   }
 
-  const isArrayOfStrings = (arr: unknown): arr is string[] => {
-    if (!Array.isArray(arr)) {
-      return false;
-    }
-    return arr.every(item => typeof item === 'string');
-  };
-
-  const isUpdateMimeTypesPayload = (data: any): data is UpdateMimeTypesPayload => {
-    return isArrayOfStrings(data.newInlineMimeTypes)
-      && isArrayOfStrings(data.newAttachmentMimeTypes);
-  };
+  interface UpdateMimeTypesRequest extends Request {
+    user?: IUserHasId;
+    body: UpdateMimeTypesBody;
+  }
 
   /**
  * @swagger
@@ -85,14 +83,10 @@ module.exports = (crowi) => {
     validateUpdateMimeTypes,
     apiV3FormValidator,
     addActivity,
-    async(req, res) => {
 
-      if (!isUpdateMimeTypesPayload(req.body)) {
-        return res.apiv3Err(new ErrorV3('Internal Type Error', 'internal-error'));
-      }
-
-      const { newInlineMimeTypes } = req.body;
-      const { newAttachmentMimeTypes } = req.body;
+    async(req: UpdateMimeTypesRequest, res: ApiV3Response) => {
+      const newInlineMimeTypes: string[] = req.body.newInlineMimeTypes;
+      const newAttachmentMimeTypes: string[] = req.body.newAttachmentMimeTypes;
 
       // Ensure no MIME type is in both lists.
       const inlineSet = new Set(newInlineMimeTypes);
@@ -108,10 +102,10 @@ module.exports = (crowi) => {
         await configManager.updateConfigs({
           'attachments:contentDisposition:inlineMimeTypes': {
             inlineMimeTypes: Array.from(inlineSet),
-          } as InlineMimeTypesConfig,
+          },
           'attachments:contentDisposition:attachmentMimeTypes': {
             attachmentMimeTypes: Array.from(attachmentSet),
-          } as AttachmentMimeTypesConfig,
+          },
         });
 
         const parameters = {
@@ -172,12 +166,17 @@ module.exports = (crowi) => {
  *                         type: string
  *
  */
-  router.get('/', loginRequiredStrictly, adminRequired, async(req, res) => {
+  router.get('/', loginRequiredStrictly, adminRequired, async(req: AuthorizedRequest, res: ApiV3Response) => {
     try {
       const inlineDispositionSettings = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
       const attachmentDispositionSettings = configManager.getConfig('attachments:contentDisposition:attachmentMimeTypes');
 
-      return res.apiv3({ inlineDispositionSettings, attachmentDispositionSettings });
+      return res.apiv3({
+        currentDispositionSettings: {
+          inlineMimeTypes: inlineDispositionSettings.inlineMimeTypes,
+          attachmentMimeTypes: attachmentDispositionSettings.attachmentMimeTypes,
+        },
+      });
     }
     catch (err) {
       logger.error('Error retrieving content disposition settings:', err);
