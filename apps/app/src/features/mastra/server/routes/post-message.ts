@@ -85,13 +85,27 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
       runtimeContext.set('vectorStoreId', vectorStoreId);
 
       const growiAgent = mastra.getAgent('growiAgent');
+      const memory = await growiAgent.getMemory();
 
       try {
+        const thread = await memory?.createThread({
+          resourceId: 'user-123', // TODO: Use real user id
+          metadata: {
+            source: 'test-script',
+            purpose: 'memory-testing',
+          },
+        });
+
+
         const stream = await growiAgent.streamVNext(
           messages, {
             format: 'aisdk',
             output: reasoningSchema,
             runtimeContext,
+            memory: {
+              thread: 'user-123',
+              resource: 'user-123',
+            },
           },
         );
 
