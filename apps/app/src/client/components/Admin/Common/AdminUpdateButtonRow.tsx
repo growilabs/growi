@@ -13,7 +13,8 @@ const AdminUpdateButtonRow = (props: Props): JSX.Element => {
 
   return (
     <div className="row my-3">
-      <div className="mx-auto">
+      <div className="col-md-3"></div>
+      <div className="col-md-9">
         <button
           // eslint-disable-next-line react/button-has-type
           type={props.type ?? 'button'}
