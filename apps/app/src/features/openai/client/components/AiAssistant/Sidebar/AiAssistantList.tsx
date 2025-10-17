@@ -16,7 +16,7 @@ import { useAiAssistantSidebarActions } from '../../../states';
 import { useAiAssistantManagementModalActions } from '../../../states/modal/ai-assistant-management';
 import { getShareScopeIcon } from '../../../utils/get-share-scope-Icon';
 
-import { DeleteAiAssistantModal } from './DeleteAiAssistantModal';
+import { DeleteAiAssistantModalLazyLoaded } from './DeleteAiAssistantModal';
 
 const logger = loggerFactory('growi:openai:client:components:AiAssistantList');
 
@@ -230,7 +230,7 @@ export const AiAssistantList: React.FC<AiAssistantListProps> = ({
         </ul>
       </Collapse>
 
-      <DeleteAiAssistantModal
+      <DeleteAiAssistantModalLazyLoaded
         isShown={isDeleteModalShown}
         aiAssistant={aiAssistantToBeDeleted}
         errorMessage={errorMessageOnDelete}

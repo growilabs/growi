@@ -1,5 +1,4 @@
 import type { JSX, ReactNode } from 'react';
-import React from 'react';
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
@@ -9,6 +8,7 @@ import {
   isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 
+import { EmptyTrashModalLazyLoaded } from '~/client/components/EmptyTrashModal';
 import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle';
 import { BasicLayout } from '~/components/Layout/BasicLayout';
 import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar';
@@ -35,10 +35,6 @@ const TrashPageList = dynamic(
     import('~/client/components/TrashPageList').then(
       (mod) => mod.TrashPageList,
     ),
-  { ssr: false },
-);
-const EmptyTrashModal = dynamic(
-  () => import('~/client/components/EmptyTrashModal'),
   { ssr: false },
 );
 
@@ -96,7 +92,7 @@ TrashPage.getLayout = function getLayout(page) {
   return (
     <>
       <Layout {...page.props}>{page}</Layout>
-      <EmptyTrashModal />
+      <EmptyTrashModalLazyLoaded />
     </>
   );
 };

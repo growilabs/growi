@@ -6,10 +6,8 @@ import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 import type { ISearchConditions, ISearchConfigurations } from '~/stores/search';
 
 import { SearchModalTriggerinput } from './SearchModalTriggerinput';
-import SearchOptionModal from './SearchOptionModal';
+import { SearchOptionModalLazyLoaded } from './SearchOptionModal';
 import SortControl from './SortControl';
-
-import styles from './SearchControl.module.scss';
 
 type Props = {
   isEnableSort: boolean;
@@ -205,7 +203,7 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
         <Collapse isOpen={isCollapsed}>{collapseContents}</Collapse>
       )}
 
-      <SearchOptionModal
+      <SearchOptionModalLazyLoaded
         isOpen={isFileterOptionModalShown || false}
         onClose={() => setIsFileterOptionModalShown(false)}
         includeUserPages={includeUserPages}

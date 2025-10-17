@@ -115,16 +115,16 @@ const DeleteAttachmentModalSubstance = ({
           {deletingIndicator}
         </div>
         <Button
+          color="outline-neutral-secondary"
+          onClick={toggleHandler}
+        >
+          {t('commons:Cancel')}
+        </Button>
+        <Button
           color="danger"
           onClick={onClickDeleteButtonHandler}
           disabled={deleting}
         >{t('commons:Delete')}
-        </Button>
-        <Button
-          color="secondary"
-          onClick={toggleHandler}
-        >
-          {t('modal_delete.cancel')}
         </Button>
       </ModalFooter>
     </div>

@@ -51,14 +51,13 @@ import {
 } from '~/stores/page';
 import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
 
+import { CreateTemplateModalLazyLoaded } from '../CreateTemplateModal';
 import { NotAvailable } from '../NotAvailable';
 import { Skeleton } from '../Skeleton';
 
 import styles from './GrowiContextualSubNavigation.module.scss';
 import PageEditorModeManagerStyles from './PageEditorModeManager.module.scss';
 
-
-const CreateTemplateModal = dynamic(() => import('../CreateTemplateModal').then(mod => mod.CreateTemplateModal), { ssr: false });
 
 const PageEditorModeManager = dynamic(
   () => import('./PageEditorModeManager').then(mod => mod.PageEditorModeManager),
@@ -461,7 +460,7 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
       </Sticky>
 
       {path != null && currentUser != null && !isReadOnlyUser && (
-        <CreateTemplateModal
+        <CreateTemplateModalLazyLoaded
           path={path}
           isOpen={isPageTemplateModalShown}
           onClose={() => setIsPageTempleteModalShown(false)}

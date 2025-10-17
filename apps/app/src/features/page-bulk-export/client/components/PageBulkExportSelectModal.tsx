@@ -159,7 +159,7 @@ const PageBulkExportSelectModalSubstance = (): JSX.Element => {
   );
 };
 
-const PageBulkExportSelectModal = (): JSX.Element => {
+export const PageBulkExportSelectModal = (): JSX.Element => {
   const status = usePageBulkExportSelectModalStatus();
 
   return (
@@ -168,5 +168,3 @@ const PageBulkExportSelectModal = (): JSX.Element => {
     </Modal>
   );
 };
-
-export default PageBulkExportSelectModal;

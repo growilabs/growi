@@ -1,0 +1,1 @@
+export { FixPageGrantAlertLazyLoaded } from './dynamic';

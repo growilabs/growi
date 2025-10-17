@@ -7,6 +7,20 @@ import Head from 'next/head';
 import { isClient } from '@growi/core/dist/utils';
 import EventEmitter from 'events';
 
+// eslint-disable-next-line no-restricted-imports
+import { DescendantsPageListModalLazyLoaded } from '~/client/components/DescendantsPageListModal';
+// eslint-disable-next-line no-restricted-imports
+import { ConflictDiffModalLazyLoaded } from '~/client/components/PageEditor/ConflictDiffModal';
+// eslint-disable-next-line no-restricted-imports
+import { DrawioModalLazyLoaded } from '~/client/components/PageEditor/DrawioModal';
+// eslint-disable-next-line no-restricted-imports
+import { HandsontableModalLazyLoaded } from '~/client/components/PageEditor/HandsontableModal';
+// eslint-disable-next-line no-restricted-imports
+import { LinkEditModalLazyLoaded } from '~/client/components/PageEditor/LinkEditModal';
+// eslint-disable-next-line no-restricted-imports
+import { TagEditModalLazyLoaded } from '~/client/components/PageTags/TagEditModal';
+// eslint-disable-next-line no-restricted-imports
+import { TemplateModalLazyLoaded } from '~/client/components/TemplateModal';
 import { BasicLayout } from '~/components/Layout/BasicLayout';
 import { PageView } from '~/components/PageView/PageView';
 import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript';
@@ -79,55 +93,6 @@ const PageStatusAlert = dynamic(
 
 const UnsavedAlertDialog = dynamic(
   () => import('~/client/components/UnsavedAlertDialog'),
-  { ssr: false },
-);
-const DescendantsPageListModal = dynamic(
-  () =>
-    import('~/client/components/DescendantsPageListModal').then(
-      (mod) => mod.DescendantsPageListModal,
-    ),
-  { ssr: false },
-);
-const DrawioModal = dynamic(
-  () =>
-    import('~/client/components/PageEditor/DrawioModal').then(
-      (mod) => mod.DrawioModal,
-    ),
-  { ssr: false },
-);
-const HandsontableModal = dynamic(
-  () =>
-    import('~/client/components/PageEditor/HandsontableModal').then(
-      (mod) => mod.HandsontableModal,
-    ),
-  { ssr: false },
-);
-const TemplateModal = dynamic(
-  () =>
-    import('~/client/components/TemplateModal').then(
-      (mod) => mod.TemplateModal,
-    ),
-  { ssr: false },
-);
-const LinkEditModal = dynamic(
-  () =>
-    import('~/client/components/PageEditor/LinkEditModal').then(
-      (mod) => mod.LinkEditModal,
-    ),
-  { ssr: false },
-);
-const TagEditModal = dynamic(
-  () =>
-    import('~/client/components/PageTags/TagEditModal').then(
-      (mod) => mod.TagEditModal,
-    ),
-  { ssr: false },
-);
-const ConflictDiffModal = dynamic(
-  () =>
-    import('~/client/components/PageEditor/ConflictDiffModal').then(
-      (mod) => mod.ConflictDiffModal,
-    ),
   { ssr: false },
 );
 
@@ -258,13 +223,13 @@ Page.getLayout = function getLayout(page: React.ReactElement<Props>) {
 
       <Layout {...page.props}>{page}</Layout>
       <UnsavedAlertDialog />
-      <DescendantsPageListModal />
-      <DrawioModal />
-      <HandsontableModal />
-      <TemplateModal />
-      <LinkEditModal />
-      <TagEditModal />
-      <ConflictDiffModal />
+      <DescendantsPageListModalLazyLoaded />
+      <DrawioModalLazyLoaded />
+      <HandsontableModalLazyLoaded />
+      <TemplateModalLazyLoaded />
+      <LinkEditModalLazyLoaded />
+      <TagEditModalLazyLoaded />
+      <ConflictDiffModalLazyLoaded />
     </>
   );
 };

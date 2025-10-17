@@ -1,0 +1,1 @@
+export { PageDeleteModalLazyLoaded } from './dynamic';

@@ -262,7 +262,8 @@ export const PageView = memo((props: Props): JSX.Element => {
     pagePath,
     viewOptions,
     isSlide,
-    isIdenticalPathPage, page
+    isIdenticalPathPage,
+    page,
   ]);
 
   // DEBUG: Log final render completion time

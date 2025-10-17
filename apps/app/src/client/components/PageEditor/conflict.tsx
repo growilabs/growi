@@ -5,9 +5,6 @@ import { GlobalCodeMirrorEditorKey } from '@growi/editor';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
 import { useTranslation } from 'react-i18next';
 
-import type { Save, SaveOptions } from '~/client/components/PageEditor/PageEditor';
-import { useUpdateStateAfterSave } from '~/client/services/page-operation';
-import { toastSuccess } from '~/client/util/toastr';
 import { SocketEventName } from '~/interfaces/websocket';
 import type { RemoteRevisionData } from '~/states/page';
 import { useCurrentPageData, useCurrentPageId, useSetRemoteLatestPageData } from '~/states/page';
@@ -15,6 +12,11 @@ import { useGlobalSocket } from '~/states/socket-io';
 import { EditorMode, useEditorMode } from '~/states/ui/editor';
 import { useConflictDiffModalActions } from '~/states/ui/modal/conflict-diff';
 import { usePageStatusAlertActions } from '~/states/ui/modal/page-status-alert';
+
+import { useUpdateStateAfterSave } from '../../services/page-operation';
+import { toastSuccess } from '../../util/toastr';
+
+import type { Save, SaveOptions } from './PageEditor';
 
 
 export type ConflictHandler = (

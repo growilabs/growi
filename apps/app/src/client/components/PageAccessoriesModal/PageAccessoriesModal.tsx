@@ -1,5 +1,5 @@
 import React, {
-  useMemo, useState, useCallback, type JSX,
+  useMemo, useCallback, useState, type JSX,
 } from 'react';
 
 import { useAtomValue } from 'jotai';
@@ -27,11 +27,14 @@ const PageAttachment = dynamic(() => import('./PageAttachment'), { ssr: false })
 const PageHistory = dynamic(() => import('./PageHistory').then(mod => mod.PageHistory), { ssr: false });
 const ShareLink = dynamic(() => import('./ShareLink').then(mod => mod.ShareLink), { ssr: false });
 
-const PageAccessoriesModalSubstance = (): JSX.Element => {
+interface PageAccessoriesModalSubstanceProps {
+  isWindowExpanded: boolean;
+  setIsWindowExpanded: (expanded: boolean) => void;
+}
+
+const PageAccessoriesModalSubstance = ({ isWindowExpanded, setIsWindowExpanded }: PageAccessoriesModalSubstanceProps): JSX.Element => {
 
   const { t } = useTranslation();
-
-  const [isWindowExpanded, setIsWindowExpanded] = useState(false);
 
   const isSharedUser = useIsSharedUser();
   const isGuestUser = useIsGuestUser();
@@ -74,8 +77,8 @@ const PageAccessoriesModalSubstance = (): JSX.Element => {
   }, [t, close, isGuestUser, isReadOnlyUser, isSharedUser, isLinkSharingDisabled]);
 
   // Memoize expand/contract handlers
-  const expandWindow = useCallback(() => setIsWindowExpanded(true), []);
-  const contractWindow = useCallback(() => setIsWindowExpanded(false), []);
+  const expandWindow = useCallback(() => setIsWindowExpanded(true), [setIsWindowExpanded]);
+  const contractWindow = useCallback(() => setIsWindowExpanded(false), [setIsWindowExpanded]);
 
   const buttons = useMemo(() => (
     <span className="me-3">
@@ -92,16 +95,8 @@ const PageAccessoriesModalSubstance = (): JSX.Element => {
     return <></>;
   }
 
-  const { isOpened } = status;
-
   return (
-    <Modal
-      size="xl"
-      isOpen={isOpened}
-      toggle={close}
-      data-testid="page-accessories-modal"
-      className={`grw-page-accessories-modal ${styles['grw-page-accessories-modal']} ${isWindowExpanded ? 'grw-modal-expanded' : ''} `}
-    >
+    <>
       <ModalHeader className={isDeviceLargerThanLg ? 'p-0' : ''} toggle={close} close={buttons}>
         {isDeviceLargerThanLg && (
           <CustomNavTab
@@ -127,16 +122,28 @@ const PageAccessoriesModalSubstance = (): JSX.Element => {
           additionalClassNames={!isDeviceLargerThanLg ? ['grw-tab-content-style-md-down'] : undefined}
         />
       </ModalBody>
-    </Modal>
+    </>
   );
 };
 
 export const PageAccessoriesModal = (): JSX.Element => {
   const status = usePageAccessoriesModalStatus();
+  const { close } = usePageAccessoriesModalActions();
+  const [isWindowExpanded, setIsWindowExpanded] = useState(false);
 
-  if (status == null || !status.isOpened) {
+  if (status == null) {
     return <></>;
   }
 
-  return <PageAccessoriesModalSubstance />;
+  return (
+    <Modal
+      size="xl"
+      isOpen={status.isOpened}
+      toggle={close}
+      data-testid="page-accessories-modal"
+      className={`grw-page-accessories-modal ${styles['grw-page-accessories-modal']} ${isWindowExpanded ? 'grw-modal-expanded' : ''} `}
+    >
+      {status.isOpened && <PageAccessoriesModalSubstance isWindowExpanded={isWindowExpanded} setIsWindowExpanded={setIsWindowExpanded} />}
+    </Modal>
+  );
 };

@@ -2,6 +2,9 @@ import type { JSX, ReactNode } from 'react';
 import React from 'react';
 import dynamic from 'next/dynamic';
 
+// eslint-disable-next-line no-restricted-imports
+import { ShortcutsModalLazyLoaded } from '~/client/components/ShortcutsModal';
+
 import { RawLayout } from './RawLayout';
 
 const PageCreateModal = dynamic(
@@ -13,10 +16,6 @@ const GrowiNavbarBottom = dynamic(
     import('~/client/components/Navbar/GrowiNavbarBottom').then(
       (mod) => mod.GrowiNavbarBottom,
     ),
-  { ssr: false },
-);
-const ShortcutsModal = dynamic(
-  () => import('~/client/components/ShortcutsModal'),
   { ssr: false },
 );
 const SystemVersion = dynamic(
@@ -35,7 +34,7 @@ export const ShareLinkLayout = ({ children }: Props): JSX.Element => {
 
       <GrowiNavbarBottom />
 
-      <ShortcutsModal />
+      <ShortcutsModalLazyLoaded />
       <PageCreateModal />
       <SystemVersion showShortcutsButton />
     </RawLayout>
