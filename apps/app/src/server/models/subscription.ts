@@ -8,6 +8,7 @@ import {
   type Types, type Document, type Model, Schema,
 } from 'mongoose';
 
+import type { IAuditLogExportJob } from '~/features/audit-log-export/interfaces/audit-log-bulk-export';
 import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export';
 import type { SupportedTargetModelType } from '~/interfaces/activity';
 import { AllSupportedTargetModels, SupportedTargetModel } from '~/interfaces/activity';
@@ -19,7 +20,12 @@ export interface SubscriptionDocument extends ISubscription, Document {}
 
 export interface SubscriptionModel extends Model<SubscriptionDocument> {
   findByUserIdAndTargetId(userId: Types.ObjectId | string, targetId: Types.ObjectId | string): any
-  upsertSubscription(user: Ref<IUser>, targetModel: SupportedTargetModelType, target: Ref<IPage> | Ref<IUser> | Ref<IPageBulkExportJob>, status: string): any
+  upsertSubscription(
+    user: Ref<IUser>,
+    targetModel: SupportedTargetModelType,
+    target: Ref<IPage> | Ref<IUser> | Ref<IPageBulkExportJob> | Ref<IAuditLogExportJob>,
+    status: string
+  ): any
   subscribeByPageId(userId: Types.ObjectId, pageId: Types.ObjectId, status: string): any
   getSubscription(target: Ref<IPage>): Promise<Ref<IUser>[]>
   getUnsubscription(target: Ref<IPage>): Promise<Ref<IUser>[]>
@@ -66,7 +72,10 @@ subscriptionSchema.statics.findByUserIdAndTargetId = function(userId, targetId) 
 };
 
 subscriptionSchema.statics.upsertSubscription = function(
-    user: Ref<IUser>, targetModel: SupportedTargetModelType, target: Ref<IPage>, status: SubscriptionStatusType,
+    user: Ref<IUser>,
+    targetModel: SupportedTargetModelType,
+    target: Ref<IPage> | Ref<IUser> | Ref<IPageBulkExportJob> | Ref<IAuditLogExportJob>,
+    status: SubscriptionStatusType,
 ) {
   const query = { user, targetModel, target };
   const doc = { ...query, status };
