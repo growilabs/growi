@@ -1,13 +1,12 @@
+import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request } from 'express';
 import { Router } from 'express';
 import { body } from 'express-validator';
-
 import { AuditLogBulkExportFormat } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import type { SupportedActionType } from '~/interfaces/activity';
 import { AllSupportedActions } from '~/interfaces/activity';
-import type { IUserHasId } from '@growi/core';
 import type Crowi from '~/server/crowi';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
