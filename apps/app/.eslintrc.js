@@ -2,12 +2,8 @@
  * @type {import('eslint').Linter.Config}
  */
 module.exports = {
-  extends: [
-    'next/core-web-vitals',
-    'weseek/react',
-  ],
-  plugins: [
-  ],
+  extends: ['next/core-web-vitals', 'weseek/react'],
+  plugins: [],
   ignorePatterns: [
     'dist/**',
     '**/dist/**',
@@ -49,7 +45,9 @@ module.exports = {
     'src/stores-universal/**',
     'src/interfaces/**',
     'src/utils/**',
+    'src/components/**',
     'src/services/**',
+    'src/pages/**',
   ],
   settings: {
     // resolve path aliases by eslint-import-resolver-typescript
@@ -58,10 +56,6 @@ module.exports = {
     },
   },
   rules: {
-    'no-restricted-imports': ['error', {
-      name: 'axios',
-      message: 'Please use src/utils/axios instead.',
-    }],
     '@typescript-eslint/no-var-requires': 'off',
 
     // set 'warn' temporarily -- 2021.08.02 Yuki Takei

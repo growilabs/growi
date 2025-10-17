@@ -1,7 +1,8 @@
 import type { FC } from 'react';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 
 import { useTranslation } from 'next-i18next';
+import { useForm } from 'react-hook-form';
 import { Card, CardBody } from 'reactstrap';
 
 import { apiv3Put } from '~/client/util/apiv3-client';
@@ -16,19 +17,30 @@ export const CustomizeTitle: FC = () => {
 
   const { data: customizeTitle } = useCustomizeTitle();
 
-  const [currentCustomizeTitle, setCrrentCustomizeTitle] = useState(customizeTitle ?? '');
+  const {
+    register,
+    handleSubmit,
+    reset,
+  } = useForm();
 
-  const onClickSubmit = async() => {
+  // Sync form with store data
+  useEffect(() => {
+    reset({
+      customizeTitle: customizeTitle ?? '',
+    });
+  }, [customizeTitle, reset]);
+
+  const onSubmit = useCallback(async(data) => {
     try {
       await apiv3Put('/customize-setting/customize-title', {
-        customizeTitle: currentCustomizeTitle,
+        customizeTitle: data.customizeTitle,
       });
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.custom_title'), ns: 'commons' }));
     }
     catch (err) {
       toastError(err);
     }
-  };
+  }, [t]);
 
   return (
     <React.Fragment>
@@ -64,16 +76,17 @@ export const CustomizeTitle: FC = () => {
           <br />
           Default Output Example: <code className="xml">&lt;title&gt;Page name - My GROWI&lt;&#047;title&gt;</code>
         </div>
-        <div className="col-12">
-          <input
-            className="form-control"
-            value={currentCustomizeTitle}
-            onChange={(e) => { setCrrentCustomizeTitle(e.target.value) }}
-          />
-        </div>
-        <div className="col-12">
-          <AdminUpdateButtonRow onClick={onClickSubmit} disabled={false} />
-        </div>
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <div className="col-12">
+            <input
+              className="form-control"
+              {...register('customizeTitle')}
+            />
+          </div>
+          <div className="col-12">
+            <AdminUpdateButtonRow type="submit" disabled={false} />
+          </div>
+        </form>
       </div>
     </React.Fragment>
   );

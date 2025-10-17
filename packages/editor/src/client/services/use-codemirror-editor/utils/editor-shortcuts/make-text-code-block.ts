@@ -1,5 +1,5 @@
+import type { ChangeSpec, Extension, SelectionRange } from '@codemirror/state';
 import { EditorSelection } from '@codemirror/state';
-import type { Extension, ChangeSpec, SelectionRange } from '@codemirror/state';
 import type { Command } from '@codemirror/view';
 import { EditorView } from '@codemirror/view';
 
@@ -13,7 +13,8 @@ const makeTextCodeBlock: Command = (view: EditorView) => {
     const startLine = doc.lineAt(range.from);
     const endLine = doc.lineAt(range.to);
     const selectedText = doc.sliceString(range.from, range.to, '');
-    const isAlreadyWrapped = selectedText.startsWith('```') && selectedText.endsWith('```');
+    const isAlreadyWrapped =
+      selectedText.startsWith('```') && selectedText.endsWith('```');
 
     const codeBlockMarkerLength = 4;
 
@@ -33,9 +34,13 @@ const makeTextCodeBlock: Command = (view: EditorView) => {
         insert: '',
       });
 
-      newSelections.push(EditorSelection.range(startLine.from, endMarkerStart - codeBlockMarkerLength));
-    }
-    else {
+      newSelections.push(
+        EditorSelection.range(
+          startLine.from,
+          endMarkerStart - codeBlockMarkerLength,
+        ),
+      );
+    } else {
       // Add code block markers
       changes.push({
         from: startLine.from,
@@ -48,10 +53,16 @@ const makeTextCodeBlock: Command = (view: EditorView) => {
       });
 
       if (selectedText.length === 0) {
-        newSelections.push(EditorSelection.cursor(startLine.from + codeBlockMarkerLength));
-      }
-      else {
-        newSelections.push(EditorSelection.range(startLine.from, endLine.to + codeBlockMarkerLength * 2));
+        newSelections.push(
+          EditorSelection.cursor(startLine.from + codeBlockMarkerLength),
+        );
+      } else {
+        newSelections.push(
+          EditorSelection.range(
+            startLine.from,
+            endLine.to + codeBlockMarkerLength * 2,
+          ),
+        );
       }
     }
   });
@@ -66,7 +77,6 @@ const makeTextCodeBlock: Command = (view: EditorView) => {
 
 const makeCodeBlockExtension: Extension = EditorView.domEventHandlers({
   keydown: (event, view) => {
-
     const isModKey = event.ctrlKey || event.metaKey;
 
     if (event.code === 'KeyC' && event.shiftKey && event.altKey && isModKey) {

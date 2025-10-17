@@ -1,24 +1,25 @@
 import { useEffect } from 'react';
-
 import useSWRImmutable from 'swr/immutable';
 import * as Y from 'yjs';
 
 type Configuration = {
   pageId?: string;
   useSecondary?: boolean;
-}
-
+};
 
 type StoredYDocs = {
   primaryDoc: Y.Doc;
   secondaryDoc: Y.Doc | undefined;
-}
+};
 
 type YDocsState = StoredYDocs & {
-  activeDoc: Y.Doc,
-}
+  activeDoc: Y.Doc;
+};
 
-export const useSecondaryYdocs = (isEnabled: boolean, configuration?: Configuration): YDocsState | null => {
+export const useSecondaryYdocs = (
+  isEnabled: boolean,
+  configuration?: Configuration,
+): YDocsState | null => {
   const { pageId, useSecondary = false } = configuration ?? {};
   const cacheKey = `swr-ydocs:${pageId}`;
 
@@ -56,7 +57,10 @@ export const useSecondaryYdocs = (isEnabled: boolean, configuration?: Configurat
     };
   }, [docs, isEnabled, useSecondary, mutate]);
 
-  if (docs?.primaryDoc == null || (useSecondary && docs?.secondaryDoc == null)) {
+  if (
+    docs?.primaryDoc == null ||
+    (useSecondary && docs?.secondaryDoc == null)
+  ) {
     return null;
   }
 

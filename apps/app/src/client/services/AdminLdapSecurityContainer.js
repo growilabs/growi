@@ -87,9 +87,10 @@ export default class AdminLdapSecurityContainer extends Container {
 
   /**
    * Change ldapBindMode
+   * @param {boolean} isUserBind true: User Bind, false: Admin Bind
    */
-  changeLdapBindMode() {
-    this.setState({ isUserBind: !this.state.isUserBind });
+  changeLdapBindMode(isUserBind) {
+    this.setState({ isUserBind });
   }
 
   /**

@@ -1,12 +1,11 @@
-import { useCallback, type JSX } from 'react';
+import { type JSX, useCallback } from 'react';
 
 import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
 import { useHandsontableModalForEditor } from '../../../stores/use-handsontable';
 
-
 type Props = {
-  editorKey: string,
-}
+  editorKey: string;
+};
 
 export const TableButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
@@ -18,7 +17,11 @@ export const TableButton = (props: Props): JSX.Element => {
   }, [editor, openTableModal]);
 
   return (
-    <button type="button" className="btn btn-toolbar-button" onClick={onClickTableButton}>
+    <button
+      type="button"
+      className="btn btn-toolbar-button"
+      onClick={onClickTableButton}
+    >
       <span className="material-symbols-outlined fs-5">table_chart</span>
     </button>
   );

@@ -1,9 +1,11 @@
 import type { JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
+import type { UseFormRegister, FieldValues } from 'react-hook-form';
 
 
 export type AwsSettingMoleculeProps = {
+  register: UseFormRegister<FieldValues>
   s3ReferenceFileWithRelayMode
   s3Region
   s3CustomEndpoint
@@ -76,10 +78,7 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
           <input
             className="form-control"
             placeholder={`${t('eg')} ap-northeast-1`}
-            value={props.s3Region || ''}
-            onChange={(e) => {
-              props?.onChangeS3Region(e.target.value);
-            }}
+            {...props.register('s3Region')}
           />
         </div>
       </div>
@@ -93,10 +92,7 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
             className="form-control"
             type="text"
             placeholder={`${t('eg')} http://localhost:9000`}
-            value={props.s3CustomEndpoint || ''}
-            onChange={(e) => {
-              props?.onChangeS3CustomEndpoint(e.target.value);
-            }}
+            {...props.register('s3CustomEndpoint')}
           />
           <p className="form-text text-muted">{t('admin:app_setting.custom_endpoint_change')}</p>
         </div>
@@ -111,10 +107,7 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
             className="form-control"
             type="text"
             placeholder={`${t('eg')} crowi`}
-            value={props.s3Bucket || ''}
-            onChange={(e) => {
-              props.onChangeS3Bucket(e.target.value);
-            }}
+            {...props.register('s3Bucket')}
           />
         </div>
       </div>
@@ -127,10 +120,7 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
           <input
             className="form-control"
             type="text"
-            value={props.s3AccessKeyId || ''}
-            onChange={(e) => {
-              props?.onChangeS3AccessKeyId(e.target.value);
-            }}
+            {...props.register('s3AccessKeyId')}
           />
         </div>
       </div>
@@ -143,9 +133,7 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
           <input
             className="form-control"
             type="text"
-            onChange={(e) => {
-              props?.onChangeS3SecretAccessKey(e.target.value);
-            }}
+            {...props.register('s3SecretAccessKey')}
           />
           <p className="form-text text-muted">{t('admin:app_setting.s3_secret_access_key_input_description')}</p>
         </div>

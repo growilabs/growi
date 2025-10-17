@@ -49,6 +49,7 @@ module.exports = function(crowi, app) {
   const tag = require('./tag')(crowi, app);
   const search = require('./search')(crowi, app);
   const ogp = require('./ogp')(crowi);
+  const { createApiRouter } = require('~/server/util/createApiRouter');
 
   const next = nextFactory(crowi);
 
@@ -121,7 +122,7 @@ module.exports = function(crowi, app) {
   // API v3
   app.use('/_api/v3', unavailableWhenMaintenanceModeForApi, apiV3Router);
 
-  const apiV1Router = express.Router();
+  const apiV1Router = createApiRouter();
 
   apiV1Router.get('/search'              , accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }) , loginRequired , search.api.search);
 

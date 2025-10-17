@@ -3,21 +3,25 @@ import type { SWRResponse } from 'swr';
 
 type TemplateSelectedCallback = (templateText: string) => void;
 type TemplateModalOptions = {
-  onSubmit?: TemplateSelectedCallback,
-}
+  onSubmit?: TemplateSelectedCallback;
+};
 export type TemplateModalStatus = TemplateModalOptions & {
-  isOpened: boolean,
-}
+  isOpened: boolean;
+};
 
 type TemplateModalUtils = {
-  open(opts: TemplateModalOptions): void,
-  close(): void,
-}
+  open(opts: TemplateModalOptions): void;
+  close(): void;
+};
 
-export const useTemplateModal = (): SWRResponse<TemplateModalStatus, Error> & TemplateModalUtils => {
-
+export const useTemplateModal = (): SWRResponse<TemplateModalStatus, Error> &
+  TemplateModalUtils => {
   const initialStatus: TemplateModalStatus = { isOpened: false };
-  const swrResponse = useSWRStatic<TemplateModalStatus, Error>('templateModal', undefined, { fallbackData: initialStatus });
+  const swrResponse = useSWRStatic<TemplateModalStatus, Error>(
+    'templateModal',
+    undefined,
+    { fallbackData: initialStatus },
+  );
 
   return Object.assign(swrResponse, {
     open: (opts: TemplateModalOptions) => {

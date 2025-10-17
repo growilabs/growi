@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useCallback, useEffect } from 'react';
 
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
+import { useForm } from 'react-hook-form';
 
 import AdminMarkDownContainer from '~/client/services/AdminMarkDownContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
@@ -16,30 +17,38 @@ import { WhitelistInput } from './WhitelistInput';
 
 const logger = loggerFactory('growi:importer');
 
-class XssForm extends React.Component {
+const XssForm = (props) => {
+  const { t, adminMarkDownContainer } = props;
+  const {
+    xssOption, tagWhitelist, attrWhitelist, retrieveError,
+  } = adminMarkDownContainer.state;
 
-  constructor(props) {
-    super(props);
+  const {
+    register, handleSubmit, reset, setValue,
+  } = useForm();
 
-    this.onClickSubmit = this.onClickSubmit.bind(this);
-  }
+  // Sync form with container state
+  useEffect(() => {
+    reset({
+      tagWhitelist,
+      attrWhitelist,
+    });
+  }, [reset, tagWhitelist, attrWhitelist]);
 
-  async onClickSubmit() {
-    const { t } = this.props;
-
+  const onClickSubmit = useCallback(async(data) => {
     try {
-      await this.props.adminMarkDownContainer.updateXssSetting();
+      await adminMarkDownContainer.changeTagWhitelist(data.tagWhitelist ?? '');
+      await adminMarkDownContainer.changeAttrWhitelist(data.attrWhitelist ?? '');
+      await adminMarkDownContainer.updateXssSetting();
       toastSuccess(t('toaster.update_successed', { target: t('markdown_settings.xss_header'), ns: 'commons' }));
     }
     catch (err) {
       toastError(err);
       logger.error(err);
     }
-  }
+  }, [adminMarkDownContainer, t]);
 
-  xssOptions() {
-    const { t, adminMarkDownContainer } = this.props;
-    const { xssOption } = adminMarkDownContainer.state;
+  const xssOptions = useCallback(() => {
 
     const rehypeRecommendedTags = recommendedTagNames.join(',');
     const rehypeRecommendedAttributes = JSON.stringify(recommendedAttributes);
@@ -102,20 +111,19 @@ class XssForm extends React.Component {
               />
               <label className="form-label form-check-label w-100" htmlFor="xssOption2">
                 <p className="fw-bold">{t('markdown_settings.xss_options.custom_whitelist')}</p>
-                <WhitelistInput adminMarkDownContainer={adminMarkDownContainer} />
+                <WhitelistInput adminMarkDownContainer={adminMarkDownContainer} register={register} setValue={setValue} />
               </label>
             </div>
           </div>
         </div>
       </div>
     );
-  }
+  }, [t, adminMarkDownContainer, xssOption, register, setValue]);
 
-  render() {
-    const { t, adminMarkDownContainer } = this.props;
-    const { isEnabledXss } = adminMarkDownContainer.state;
+  const { isEnabledXss } = adminMarkDownContainer.state;
 
-    return (
+  return (
+    <form onSubmit={handleSubmit(onClickSubmit)}>
       <React.Fragment>
         <fieldset className="col-12">
           <div>
@@ -137,16 +145,14 @@ class XssForm extends React.Component {
           </div>
 
           <div className="col-12">
-            {isEnabledXss && this.xssOptions()}
+            {isEnabledXss && xssOptions()}
           </div>
         </fieldset>
-        <AdminUpdateButtonRow onClick={this.onClickSubmit} disabled={adminMarkDownContainer.state.retrieveError != null} />
+        <AdminUpdateButtonRow disabled={retrieveError != null} />
       </React.Fragment>
-    );
-  }
-
-}
-
+    </form>
+  );
+};
 
 XssForm.propTypes = {
   t: PropTypes.func.isRequired, // i18next

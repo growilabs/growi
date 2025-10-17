@@ -1,14 +1,12 @@
-import dynamic from 'next/dynamic';
-
-import { useTranslation } from 'next-i18next';
 import React, { type JSX } from 'react';
+import dynamic from 'next/dynamic';
+import { useTranslation } from 'next-i18next';
 import { Spinner } from 'reactstrap';
 
 import {
   usePluginDeleteModal,
   useSWRxAdminPlugins,
 } from '../../../stores/admin-plugins';
-
 import { PluginCard } from './PluginCard';
 import { PluginInstallerForm } from './PluginInstallerForm';
 

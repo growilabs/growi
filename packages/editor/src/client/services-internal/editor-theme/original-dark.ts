@@ -23,7 +23,15 @@ export const originalDark = createTheme({
     // { tag: t.moduleKeyword, color: 'red' },
     { tag: [t.tagName, t.modifier], color: '#BA6666' },
     { tag: [t.url, t.escape, t.regexp, t.link], color: '#8FA7C7' },
-    { tag: [t.number, t.definition(t.tagName), t.className, t.definition(t.variableName)], color: '#fbac52' },
+    {
+      tag: [
+        t.number,
+        t.definition(t.tagName),
+        t.className,
+        t.definition(t.variableName),
+      ],
+      color: '#fbac52',
+    },
     { tag: [t.atom, t.bool, t.special(t.variableName)], color: '#BA6666' },
     { tag: t.variableName, color: '#539ac4' },
     { tag: [t.propertyName, t.typeName], color: '#629ccd' },

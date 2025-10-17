@@ -3,6 +3,7 @@
  */
 
 import mongoose from 'mongoose';
+
 import NamedQuery from '~/server/models/named-query';
 import SearchService from '~/server/service/search';
 

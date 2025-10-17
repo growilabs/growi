@@ -1,6 +1,7 @@
-import React, { useCallback, type JSX } from 'react';
+import React, { useCallback, useEffect, type JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
+import { useForm } from 'react-hook-form';
 import { PrismAsyncLight } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { Card, CardBody } from 'reactstrap';
@@ -20,8 +21,23 @@ const CustomizeScriptSetting = (props: Props): JSX.Element => {
   const { adminCustomizeContainer } = props;
   const { t } = useTranslation();
 
-  const onClickSubmit = useCallback(async() => {
+  const {
+    register,
+    handleSubmit,
+    reset,
+  } = useForm();
+
+  // Sync form with container state
+  useEffect(() => {
+    reset({
+      customizeScript: adminCustomizeContainer.state.currentCustomizeScript || '',
+    });
+  }, [adminCustomizeContainer.state.currentCustomizeScript, reset]);
+
+  const onSubmit = useCallback(async(data) => {
     try {
+      // Update container state before API call
+      await adminCustomizeContainer.changeCustomizeScript(data.customizeScript);
       await adminCustomizeContainer.updateCustomizeScript();
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.custom_script'), ns: 'commons' }));
     }
@@ -42,33 +58,32 @@ const CustomizeScriptSetting = (props: Props): JSX.Element => {
             </CardBody>
           </Card>
 
-          <div>
-            <textarea
-              className="form-control mb-2"
-              name="customizeScript"
-              rows={8}
-              value={adminCustomizeContainer.state.currentCustomizeScript || ''}
-              onChange={(e) => { adminCustomizeContainer.changeCustomizeScript(e.target.value) }}
-            />
-          </div>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <div>
+              <textarea
+                className="form-control mb-2"
+                rows={8}
+                {...register('customizeScript')}
+              />
+            </div>
 
-          <a
-            className="text-muted"
-            data-bs-toggle="collapse"
-            href="#collapseExampleScript"
-            role="button"
-            aria-expanded="false"
-            aria-controls="collapseExampleScript"
-          >
-            <span className="material-symbols-outlined me-1" aria-hidden="true">navigate_next</span>
-            Example for Google Tag Manager
-          </a>
-          <div className="collapse" id="collapseExampleScript">
-            <PrismAsyncLight
-              style={oneDark}
-              language="javascript"
+            <a
+              className="text-muted"
+              data-bs-toggle="collapse"
+              href="#collapseExampleScript"
+              role="button"
+              aria-expanded="false"
+              aria-controls="collapseExampleScript"
             >
-              {`(function(w,d,s,l,i){
+              <span className="material-symbols-outlined me-1" aria-hidden="true">navigate_next</span>
+              Example for Google Tag Manager
+            </a>
+            <div className="collapse" id="collapseExampleScript">
+              <PrismAsyncLight
+                style={oneDark}
+                language="javascript"
+              >
+                {`(function(w,d,s,l,i){
 w[l]=w[l]||[];
 w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});
 var f=d.getElementsByTagName(s)[0],
@@ -77,10 +92,11 @@ var f=d.getElementsByTagName(s)[0],
 j.async=true;
 j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
 })(window,document,'script','dataLayer','GTM-XXXXXX');`}
-            </PrismAsyncLight>
-          </div>
+              </PrismAsyncLight>
+            </div>
 
-          <AdminUpdateButtonRow onClick={onClickSubmit} disabled={adminCustomizeContainer.state.retrieveError != null} />
+            <AdminUpdateButtonRow type="submit" disabled={adminCustomizeContainer.state.retrieveError != null} />
+          </form>
         </div>
       </div>
     </React.Fragment>
