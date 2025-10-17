@@ -29,7 +29,6 @@
       "!packages/pdf-converter-client/specs",
       "!apps/app/playwright",
       "!apps/app/src/client",
-      "!apps/app/src/components",
       "!apps/app/src/features/openai",
       "!apps/app/src/pages",
       "!apps/app/src/server",
