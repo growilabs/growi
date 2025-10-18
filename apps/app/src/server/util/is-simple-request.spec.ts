@@ -4,11 +4,8 @@ import { mock } from 'vitest-mock-extended';
 import isSimpleRequest from './is-simple-request';
 
 describe('isSimpleRequest', () => {
-
-
   // method
   describe('When request method is checked', () => {
-
     // allow
     describe('When allowed method is given', () => {
       const allowedMethods = ['GET', 'HEAD', 'POST'];
@@ -30,13 +27,10 @@ describe('isSimpleRequest', () => {
         expect(isSimpleRequest(reqMock)).toBe(false);
       });
     });
-
   });
-
 
   // headers
   describe('When request headers are checked', () => {
-
     // allow(Other than content-type)
     describe('When only safe headers are given', () => {
       const safeHeaders = [
@@ -94,13 +88,16 @@ describe('isSimpleRequest', () => {
         'X-Requested-With',
         'X-CSRF-Token',
       ];
-      it.each(unsafeHeaders)('returns false for unsafe header: %s', (headerName) => {
-        const reqMock = mock<Request>({
-          method: 'POST',
-          headers: { [headerName]: 'test-value' },
-        });
-        expect(isSimpleRequest(reqMock)).toBe(false);
-      });
+      it.each(unsafeHeaders)(
+        'returns false for unsafe header: %s',
+        (headerName) => {
+          const reqMock = mock<Request>({
+            method: 'POST',
+            headers: { [headerName]: 'test-value' },
+          });
+          expect(isSimpleRequest(reqMock)).toBe(false);
+        },
+      );
       // combination
       it('returns false when safe and unsafe headers are mixed', () => {
         const reqMock = mock<Request>();
@@ -112,13 +109,10 @@ describe('isSimpleRequest', () => {
         expect(isSimpleRequest(reqMock)).toBe(false);
       });
     });
-
   });
-
 
   // content-type
   describe('When content-type is checked', () => {
-
     // allow
     describe('When a safe content-type is given', () => {
       const safeContentTypes = [
@@ -164,17 +158,17 @@ describe('isSimpleRequest', () => {
         expect(isSimpleRequest(reqMock)).toBe(false);
       });
     });
-
   });
 
   // integration
   describe('When multiple conditions are checked', () => {
-
     describe('When all conditions are met', () => {
       it('returns true', () => {
         const reqMock = mock<Request>();
         reqMock.method = 'POST';
-        reqMock.headers = { 'content-type': 'application/x-www-form-urlencoded' };
+        reqMock.headers = {
+          'content-type': 'application/x-www-form-urlencoded',
+        };
         expect(isSimpleRequest(reqMock)).toBe(true);
       });
     });

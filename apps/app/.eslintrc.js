@@ -48,6 +48,12 @@ module.exports = {
     'src/components/**',
     'src/services/**',
     'src/pages/**',
+    'src/server/crowi/**',
+    'src/server/events/**',
+    'src/server/interfaces/**',
+    'src/server/util/**',
+    'src/server/app.ts',
+    'src/server/repl.ts',
   ],
   settings: {
     // resolve path aliases by eslint-import-resolver-typescript

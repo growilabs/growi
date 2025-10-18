@@ -26,7 +26,6 @@ function createBatchStream(batchSize) {
       }
       callback();
     },
-
   });
 }
 

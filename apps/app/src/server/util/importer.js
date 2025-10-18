@@ -55,29 +55,33 @@ module.exports = (crowi) => {
    */
   const importPostsFromEsa = (pageNum, user, errors) => {
     return new Promise((resolve, reject) => {
-      esaClient.posts({ page: pageNum, per_page: 100 }).then(async(res) => {
-        const nextPage = res.next_page;
-        const postsReceived = res.posts;
+      esaClient
+        .posts({ page: pageNum, per_page: 100 })
+        .then(async (res) => {
+          const nextPage = res.next_page;
+          const postsReceived = res.posts;
 
-        const data = convertEsaDataForGrowi(postsReceived, user);
-        const newErrors = await createGrowiPages(data);
+          const data = convertEsaDataForGrowi(postsReceived, user);
+          const newErrors = await createGrowiPages(data);
 
-        if (nextPage) {
-          return resolve(importPostsFromEsa(nextPage, user, errors.concat(newErrors)));
-        }
+          if (nextPage) {
+            return resolve(
+              importPostsFromEsa(nextPage, user, errors.concat(newErrors)),
+            );
+          }
 
-        resolve(errors.concat(newErrors));
-
-      }).catch((err) => {
-        reject(new Error(`error in page ${pageNum}: ${err}`));
-      });
+          resolve(errors.concat(newErrors));
+        })
+        .catch((err) => {
+          reject(new Error(`error in page ${pageNum}: ${err}`));
+        });
     });
   };
 
   /**
    * Import page data from qiita to GROWI
    */
-  importer.importDataFromQiita = async(user) => {
+  importer.importDataFromQiita = async (user) => {
     const firstPage = 1;
     const errors = await importPostsFromQiita(firstPage, user, []);
     return errors;
@@ -87,7 +91,7 @@ module.exports = (crowi) => {
    * post page data from qiita and create GROWI page
    * @param {string} pageNum default value is '1'
    */
-  const importPostsFromQiita = async(pageNum, user, errors) => {
+  const importPostsFromQiita = async (pageNum, user, errors) => {
     const perPage = '100';
     const res = await crowi.restQiitaAPIService.getQiitaPages(pageNum, perPage);
     const next = pageNum * perPage;
@@ -116,11 +120,9 @@ module.exports = (crowi) => {
 
       if (category && name) {
         path = `${category}/${name}`;
-      }
-      else if (category) {
+      } else if (category) {
         path = category;
-      }
-      else if (name) {
+      } else if (name) {
         path = name;
       }
 
@@ -156,14 +158,14 @@ module.exports = (crowi) => {
   /**
    * Import page data from esa to GROWI
    */
-  importer.testConnectionToEsa = async() => {
+  importer.testConnectionToEsa = async () => {
     await getTeamNameFromEsa();
   };
 
   /**
    * Import page data from qiita to GROWI
    */
-  importer.testConnectionToQiita = async() => {
+  importer.testConnectionToQiita = async () => {
     await crowi.restQiitaAPIService.getQiitaUser();
   };
 
@@ -173,12 +175,14 @@ module.exports = (crowi) => {
   const getTeamNameFromEsa = () => {
     return new Promise((resolve, reject) => {
       const team = configManager.getConfig('importer:esa:team_name');
-      esaClient.team(team).then((res) => {
-        resolve(res);
-      }).catch((err) => {
-        return reject(err);
-      });
-
+      esaClient
+        .team(team)
+        .then((res) => {
+          resolve(res);
+        })
+        .catch((err) => {
+          return reject(err);
+        });
     });
   };
 

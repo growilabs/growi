@@ -1,4 +1,5 @@
 import express, { type Router } from 'express';
+
 import CertifyOrigin from '~/server/middlewares/certify-origin';
 
 function createApiRouter(): Router {
@@ -7,6 +8,4 @@ function createApiRouter(): Router {
   return router;
 }
 
-export {
-  createApiRouter,
-};
+export { createApiRouter };

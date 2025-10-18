@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import type { AccessTokenParserReq } from '~/server/middlewares/access-token-parser/interfaces';
 
 const allowedMethods = ['GET', 'HEAD', 'POST'] as const;
-type AllowedMethod = typeof allowedMethods[number];
+type AllowedMethod = (typeof allowedMethods)[number];
 function isAllowedMethod(method: string): method is AllowedMethod {
   return allowedMethods.includes(method as AllowedMethod);
 }
@@ -21,7 +21,7 @@ const safeRequestHeaders = [
   'viewport-width',
   'width',
 ] as const;
-type SafeRequestHeader = typeof safeRequestHeaders[number];
+type SafeRequestHeader = (typeof safeRequestHeaders)[number];
 
 function isSafeRequestHeader(header: string): header is SafeRequestHeader {
   return safeRequestHeaders.includes(header.toLowerCase() as SafeRequestHeader);
@@ -32,10 +32,14 @@ const allowedContentTypes = [
   'multipart/form-data',
   'text/plain',
 ] as const;
-type AllowedContentType = typeof allowedContentTypes[number];
+type AllowedContentType = (typeof allowedContentTypes)[number];
 
-function isAllowedContentType(contentType: string): contentType is AllowedContentType {
-  return allowedContentTypes.some(allowed => contentType.toLowerCase().startsWith(allowed));
+function isAllowedContentType(
+  contentType: string,
+): contentType is AllowedContentType {
+  return allowedContentTypes.some((allowed) =>
+    contentType.toLowerCase().startsWith(allowed),
+  );
 }
 
 const isSimpleRequest = (req: Request | AccessTokenParserReq): boolean => {
