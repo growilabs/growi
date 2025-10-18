@@ -1,7 +1,6 @@
 import CollectionProgress from './collection-progress';
 
 class CollectionProgressingStatus {
-
   totalCount = 0;
 
   progressList: CollectionProgress[];
@@ -29,12 +28,8 @@ class CollectionProgressingStatus {
   }
 
   get currentCount(): number {
-    return this.progressList.reduce(
-      (acc, crr) => acc + crr.currentCount,
-      0,
-    );
+    return this.progressList.reduce((acc, crr) => acc + crr.currentCount, 0);
   }
-
 }
 
 export default CollectionProgressingStatus;

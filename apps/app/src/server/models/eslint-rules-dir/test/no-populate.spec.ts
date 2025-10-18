@@ -10,13 +10,16 @@ const ruleTester = new RuleTester({
 
 test('test no-populate', () => {
   ruleTester.run('no-populate', noPopulate, {
-    valid: [
-      { code: 'Model.find();' },
-    ],
+    valid: [{ code: 'Model.find();' }],
     invalid: [
       {
         code: "Model.find().populate('children');",
-        errors: [{ message: "The 'populate' method should not be called in model modules." }],
+        errors: [
+          {
+            message:
+              "The 'populate' method should not be called in model modules.",
+          },
+        ],
       },
     ],
   });

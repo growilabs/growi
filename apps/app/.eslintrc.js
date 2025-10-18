@@ -51,6 +51,7 @@ module.exports = {
     'src/server/crowi/**',
     'src/server/events/**',
     'src/server/interfaces/**',
+    'src/server/models/**',
     'src/server/util/**',
     'src/server/app.ts',
     'src/server/repl.ts',

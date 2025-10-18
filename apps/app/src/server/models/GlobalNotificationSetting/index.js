@@ -13,8 +13,8 @@ const globalNotificationSettingSchema = new mongoose.Schema({
 });
 
 /*
-* e.g. "/a/b/c" => ["/a/b/c", "/a/b", "/a", "/"]
-*/
+ * e.g. "/a/b/c" => ["/a/b/c", "/a/b", "/a", "/"]
+ */
 const generatePathsOnTree = (path, pathList) => {
   pathList.push(path);
 
@@ -28,8 +28,8 @@ const generatePathsOnTree = (path, pathList) => {
 };
 
 /*
-* e.g. "/a/b/c" => ["/a/b/c", "/a/b", "/a", "/"]
-*/
+ * e.g. "/a/b/c" => ["/a/b/c", "/a/b", "/a", "/"]
+ */
 const generatePathsToMatch = (originalPath) => {
   const pathList = generatePathsOnTree(originalPath, []);
   return pathList.map((path) => {
@@ -48,7 +48,6 @@ const generatePathsToMatch = (originalPath) => {
  * @class GlobalNotificationSetting
  */
 class GlobalNotificationSetting {
-
   /** @type {import('~/server/crowi').default} Crowi instance */
   crowi;
 
@@ -62,7 +61,7 @@ class GlobalNotificationSetting {
    * @param {string} id
    */
   static async enable(id) {
-    const setting = await this.findOne({ _id: id });
+    const setting = await GlobalNotificationSetting.findOne({ _id: id });
 
     setting.isEnabled = true;
     setting.save();
@@ -75,7 +74,7 @@ class GlobalNotificationSetting {
    * @param {string} id
    */
   static async disable(id) {
-    const setting = await this.findOne({ _id: id });
+    const setting = await GlobalNotificationSetting.findOne({ _id: id });
 
     setting.isEnabled = false;
     setting.save();
@@ -87,7 +86,9 @@ class GlobalNotificationSetting {
    * find all notification settings
    */
   static async findAll() {
-    const settings = await this.find().sort({ triggerPath: 1 });
+    const settings = await GlobalNotificationSetting.find().sort({
+      triggerPath: 1,
+    });
 
     return settings;
   }
@@ -100,17 +101,15 @@ class GlobalNotificationSetting {
   static async findSettingByPathAndEvent(event, path, type) {
     const pathsToMatch = generatePathsToMatch(path);
 
-    const settings = await this.find({
+    const settings = await GlobalNotificationSetting.find({
       triggerPath: { $in: pathsToMatch },
       triggerEvents: event,
       __t: type,
       isEnabled: true,
-    })
-      .sort({ triggerPath: 1 });
+    }).sort({ triggerPath: 1 });
 
     return settings;
   }
-
 }
 
 module.exports = {
