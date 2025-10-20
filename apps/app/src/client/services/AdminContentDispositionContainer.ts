@@ -1,18 +1,16 @@
-import { isServer } from '@growi/core/dist/utils';
-import { Container } from 'unstated';
+import type { SWRResponse } from 'swr';
+import useSWR from 'swr';
+import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
 
 import { apiv3Get, apiv3Put } from '../util/apiv3-client';
 
-interface ContentDispositionState {
+interface ContentDispositionSettings {
   inlineMimeTypes: string[];
   attachmentMimeTypes: string[];
 }
 
 interface ContentDispositionGetResponse {
-  currentDispositionSettings: {
-    inlineMimeTypes: string[];
-    attachmentMimeTypes: string[];
-  };
+  currentDispositionSettings: ContentDispositionSettings;
 }
 
 interface ContentDispositionUpdateRequest {
@@ -21,64 +19,78 @@ interface ContentDispositionUpdateRequest {
 }
 
 interface ContentDispositionUpdateResponse {
-  currentDispositionSettings: {
-    inlineMimeTypes: string[];
-    attachmentMimeTypes: string[];
-  };
+  currentDispositionSettings: ContentDispositionSettings;
 }
 
-export default class AdminContentDispositionContainer extends Container<ContentDispositionState> {
+export const useSWRxContentDispositionSettings = (): SWRResponse<ContentDispositionSettings, Error> => {
+  return useSWR(
+    '/content-disposition-settings/',
+    endpoint => apiv3Get<ContentDispositionGetResponse>(endpoint).then((response) => {
+      return response.data.currentDispositionSettings;
+    }),
+  );
+};
 
-  constructor() {
-    super();
+export const useSWRMUTxContentDispositionSettings = (): SWRMutationResponse<
+  ContentDispositionSettings,
+  Error,
+  string,
+  ContentDispositionUpdateRequest
+> => {
+  return useSWRMutation(
+    '/content-disposition-settings/',
+    async(endpoint: string, { arg }: { arg: ContentDispositionUpdateRequest }) => {
+      const response = await apiv3Put<ContentDispositionUpdateResponse>(endpoint, arg);
+      return response.data.currentDispositionSettings;
+    },
+  );
+};
 
-    if (isServer()) {
-      return;
+export const useContentDisposition = (): {
+  setInline: (mimeType: string) => Promise<void>;
+  setAttachment: (mimeType: string) => Promise<void>;
+} => {
+  const { data, mutate } = useSWRxContentDispositionSettings();
+  const { trigger } = useSWRMUTxContentDispositionSettings();
+
+  const setInline = async(mimeType: string): Promise<void> => {
+    if (!data) return;
+
+    const newInlineMimeTypes = [...data.inlineMimeTypes];
+    const newAttachmentMimeTypes = data.attachmentMimeTypes.filter(m => m !== mimeType);
+
+    if (!newInlineMimeTypes.includes(mimeType)) {
+      newInlineMimeTypes.push(mimeType);
     }
 
-    this.state = {
-      inlineMimeTypes: [],
-      attachmentMimeTypes: [],
-    };
-  }
-
-  static getClassName(): string {
-    return 'AdminContentDispositionContainer';
-  }
-
-  async retrieveContentDispositionSettings(): Promise<void> {
-    const response = await apiv3Get<ContentDispositionGetResponse>('/content-disposition-settings/');
-    const { currentDispositionSettings } = response.data;
-
-    this.setState({
-      inlineMimeTypes: currentDispositionSettings.inlineMimeTypes,
-      attachmentMimeTypes: currentDispositionSettings.attachmentMimeTypes,
-    });
-  }
-
-  async updateContentDispositionSettings(newInlineMimeTypes: string[], newAttachmentMimeTypes: string[]): Promise<void> {
-    const requestBody: ContentDispositionUpdateRequest = {
+    await trigger({
       newInlineMimeTypes,
       newAttachmentMimeTypes,
-    };
-    const response = await apiv3Put<ContentDispositionUpdateResponse>('/content-disposition-settings/', requestBody);
-
-    this.setState({
-      inlineMimeTypes: response.data.currentDispositionSettings.inlineMimeTypes,
-      attachmentMimeTypes: response.data.currentDispositionSettings.attachmentMimeTypes,
     });
-  }
 
-  getInlineMimeTypes(): string[] {
-    return [...this.state.inlineMimeTypes];
-  }
+    mutate();
+  };
 
-  getAttachmentMimeTypes(): string[] {
-    return [...this.state.attachmentMimeTypes];
-  }
+  const setAttachment = async(mimeType: string): Promise<void> => {
+    if (!data) return;
 
-  getAllConfiguredMimeTypes(): string[] {
-    return [...this.state.inlineMimeTypes, ...this.state.attachmentMimeTypes];
-  }
+    const newInlineMimeTypes = data.inlineMimeTypes.filter(m => m !== mimeType);
+    const newAttachmentMimeTypes = [...data.attachmentMimeTypes];
 
-}
+    if (!newAttachmentMimeTypes.includes(mimeType)) {
+      newAttachmentMimeTypes.push(mimeType);
+    }
+
+    await trigger({
+      newInlineMimeTypes,
+      newAttachmentMimeTypes,
+    });
+
+    mutate();
+  };
+
+  return {
+    setInline,
+    setAttachment,
+  };
+};
