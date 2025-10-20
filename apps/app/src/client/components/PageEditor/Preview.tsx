@@ -2,9 +2,6 @@ import type { CSSProperties, JSX } from 'react';
 import { useState } from 'react';
 
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
-import {
-  Modal, ModalHeader, ModalBody,
-} from 'reactstrap';
 
 
 import RevisionRenderer from '~/components/PageView/RevisionRenderer';
@@ -48,16 +45,16 @@ const Preview = (props: Props): JSX.Element => {
   return (
     <div
       data-testid="page-editor-preview-body"
-      className={`${moduleClass} ${fluidLayoutClass} ${pagePath === '/Sidebar' ? 'preview-sidebar' : ''}`}
+      className={`${moduleClass} ${fluidLayoutClass} ${pagePath === '/Sidebar' ? 'preview-sidebar' : ''} position-relative`}
       style={style}
     >
-      <div className="position-absolute top-0 end-0 m-3" style={{ zIndex: 10 }}>
+      <div className="position-absolute top-0 end-0 m-3 z-1">
         <button
           type="button"
           className="btn btn-sm btn-primary"
           onClick={toggleModal}
         >
-          <span className="material-symbols-outlined me-1" style={{ fontSize: '18px' }}>open_in_new</span>
+          <span className="material-symbols-outlined me-1 align-middle" style={{ fontSize: '18px' }}>open_in_new</span>
           モーダルを開く
         </button>
       </div>
@@ -70,14 +67,43 @@ const Preview = (props: Props): JSX.Element => {
         )
       }
 
-      <Modal isOpen={isModalOpen} toggle={toggleModal} size="lg" centered>
-        <ModalHeader toggle={toggleModal}>
-          Editor guide
-        </ModalHeader>
-        <ModalBody>
-          <p>Editor guide contents (WIP)</p>
-        </ModalBody>
-      </Modal>
+      {isModalOpen && (
+        <>
+          <div
+            className="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-50"
+            style={{ zIndex: 1040 }}
+            onClick={toggleModal}
+            role="button"
+            tabIndex={0}
+            aria-label="Close modal"
+            onKeyDown={(e) => { if (e.key === 'Escape') toggleModal(); }}
+          />
+
+          <div
+            className="position-absolute d-flex justify-content-center align-items-center"
+            style={{
+              zIndex: 1050,
+              top: 200,
+              transform: 'translate(100%, 0%)',
+            }}
+          >
+            <div className="card shadow-lg">
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h5 className="mb-0">Editor guide</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  aria-label="Close"
+                  onClick={toggleModal}
+                />
+              </div>
+              <div className="card-body overflow-auto" style={{ maxHeight: '60vh' }}>
+                <p>Editor guide contents (WIP)</p>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 
