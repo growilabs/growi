@@ -10,7 +10,6 @@ import { getOpenaiService, type IOpenaiService } from '../openai';
 const logger = loggerFactory('growi:service:vector-store-file-deletion-cron');
 
 export class VectorStoreFileDeletionCronService {
-
   cronJob: nodeCron.ScheduledTask;
 
   openaiService: IOpenaiService;
@@ -23,7 +22,8 @@ export class VectorStoreFileDeletionCronService {
 
   vectorStoreFileDeletionApiCallInterval: number;
 
-  sleep = (msec: number): Promise<void> => new Promise(resolve => setTimeout(resolve, msec));
+  sleep = (msec: number): Promise<void> =>
+    new Promise((resolve) => setTimeout(resolve, msec));
 
   startCron(): void {
     if (!isAiEnabled()) {
@@ -36,10 +36,19 @@ export class VectorStoreFileDeletionCronService {
     }
 
     this.openaiService = openaiService;
-    this.vectorStoreFileDeletionCronExpression = configManager.getConfig('openai:vectorStoreFileDeletionCronExpression');
-    this.vectorStoreFileDeletionCronMaxMinutesUntilRequest = configManager.getConfig('app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest');
-    this.vectorStoreFileDeletionBarchSize = configManager.getConfig('openai:vectorStoreFileDeletionBarchSize');
-    this.vectorStoreFileDeletionApiCallInterval = configManager.getConfig('openai:vectorStoreFileDeletionApiCallInterval');
+    this.vectorStoreFileDeletionCronExpression = configManager.getConfig(
+      'openai:vectorStoreFileDeletionCronExpression',
+    );
+    this.vectorStoreFileDeletionCronMaxMinutesUntilRequest =
+      configManager.getConfig(
+        'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest',
+      );
+    this.vectorStoreFileDeletionBarchSize = configManager.getConfig(
+      'openai:vectorStoreFileDeletionBarchSize',
+    );
+    this.vectorStoreFileDeletionApiCallInterval = configManager.getConfig(
+      'openai:vectorStoreFileDeletionApiCallInterval',
+    );
 
     this.cronJob?.stop();
     this.cronJob = this.generateCronJob();
@@ -48,22 +57,32 @@ export class VectorStoreFileDeletionCronService {
 
   private async executeJob(): Promise<void> {
     await this.openaiService.deleteObsoletedVectorStoreRelations();
-    await this.openaiService.deleteObsoleteVectorStoreFile(this.vectorStoreFileDeletionBarchSize, this.vectorStoreFileDeletionApiCallInterval);
+    await this.openaiService.deleteObsoleteVectorStoreFile(
+      this.vectorStoreFileDeletionBarchSize,
+      this.vectorStoreFileDeletionApiCallInterval,
+    );
   }
 
   private generateCronJob() {
-    return nodeCron.schedule(this.vectorStoreFileDeletionCronExpression, async() => {
-      try {
-        // Random fractional sleep to distribute request timing among GROWI apps
-        const randomMilliseconds = getRandomIntInRange(0, this.vectorStoreFileDeletionCronMaxMinutesUntilRequest) * 60 * 1000;
-        await this.sleep(randomMilliseconds);
+    return nodeCron.schedule(
+      this.vectorStoreFileDeletionCronExpression,
+      async () => {
+        try {
+          // Random fractional sleep to distribute request timing among GROWI apps
+          const randomMilliseconds =
+            getRandomIntInRange(
+              0,
+              this.vectorStoreFileDeletionCronMaxMinutesUntilRequest,
+            ) *
+            60 *
+            1000;
+          await this.sleep(randomMilliseconds);
 
-        await this.executeJob();
-      }
-      catch (e) {
-        logger.error(e);
-      }
-    });
+          await this.executeJob();
+        } catch (e) {
+          logger.error(e);
+        }
+      },
+    );
   }
-
 }

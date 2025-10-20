@@ -29,7 +29,7 @@
       "!packages/pdf-converter-client/specs",
       "!apps/app/playwright",
       "!apps/app/src/client",
-      "!apps/app/src/features/openai",
+      "!apps/app/src/features/openai/client",
       "!apps/app/src/server"
     ]
   },
