@@ -30,7 +30,10 @@
       "!apps/app/playwright",
       "!apps/app/src/client",
       "!apps/app/src/features/openai/client",
-      "!apps/app/src/server"
+      "!apps/app/src/server/middlewares",
+      "!apps/app/src/server/models",
+      "!apps/app/src/server/routes",
+      "!apps/app/src/server/service"
     ]
   },
   "formatter": {

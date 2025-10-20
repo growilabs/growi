@@ -1,7 +1,6 @@
-import EventEmitter from 'events';
-
 import { getIdStringForRef, type IUserHasId } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
+import EventEmitter from 'events';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
@@ -13,7 +12,6 @@ import { deleteCompletelyUserHomeBySystem } from '../service/page/delete-complet
 const logger = loggerFactory('growi:events:user');
 
 class UserEvent extends EventEmitter {
-
   crowi: any;
 
   // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
@@ -23,14 +21,26 @@ class UserEvent extends EventEmitter {
   }
 
   async onActivated(user: IUserHasId): Promise<void> {
-    const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>('Page');
+    const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
+      'Page',
+    );
     const userHomepagePath = pagePathUtils.userHomepagePath(user);
 
     try {
-      let page: HydratedDocument<PageDocument> | null = await Page.findByPath(userHomepagePath, true);
+      let page: HydratedDocument<PageDocument> | null = await Page.findByPath(
+        userHomepagePath,
+        true,
+      );
 
-      if (page != null && page.creator != null && getIdStringForRef(page.creator) !== user._id.toString()) {
-        await deleteCompletelyUserHomeBySystem(userHomepagePath, this.crowi.pageService);
+      if (
+        page != null &&
+        page.creator != null &&
+        getIdStringForRef(page.creator) !== user._id.toString()
+      ) {
+        await deleteCompletelyUserHomeBySystem(
+          userHomepagePath,
+          this.crowi.pageService,
+        );
         page = null;
       }
 
@@ -40,12 +50,10 @@ class UserEvent extends EventEmitter {
         await this.crowi.pageService.create(userHomepagePath, body, user, {});
         logger.debug('User page created', page);
       }
-    }
-    catch (err) {
+    } catch (err) {
       logger.error('Failed to create user page', err);
     }
   }
-
 }
 
 export default UserEvent;

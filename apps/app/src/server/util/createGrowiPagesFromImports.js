@@ -14,7 +14,7 @@ module.exports = (crowi) => {
    *    user: Object
    * }]
    */
-  const createGrowiPages = async(pages) => {
+  const createGrowiPages = async (pages) => {
     const promises = [];
     const errors = [];
 
@@ -28,14 +28,15 @@ module.exports = (crowi) => {
 
       if (isCreatableName && !isPageNameTaken) {
         try {
-          const promise = crowi.pageService.create(path, body, user, { grant: Page.GRANT_PUBLIC, grantUserGroupId: null });
+          const promise = crowi.pageService.create(path, body, user, {
+            grant: Page.GRANT_PUBLIC,
+            grantUserGroupId: null,
+          });
           promises.push(promise);
-        }
-        catch (err) {
+        } catch (err) {
           errors.push(err);
         }
-      }
-      else {
+      } else {
         if (!isCreatableName) {
           errors.push(new Error(`${path} is not a creatable name in GROWI`));
         }
