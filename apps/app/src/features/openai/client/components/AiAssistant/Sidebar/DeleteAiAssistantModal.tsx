@@ -1,9 +1,6 @@
-import React from 'react';
-
+import type React from 'react';
 import { useTranslation } from 'next-i18next';
-import {
-  Button, Modal, ModalHeader, ModalBody, ModalFooter,
-} from 'reactstrap';
+import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 import type { AiAssistantHasId } from '../../../../interfaces/ai-assistant';
 
@@ -16,7 +13,11 @@ export type DeleteAiAssistantModalProps = {
 };
 
 export const DeleteAiAssistantModal: React.FC<DeleteAiAssistantModalProps> = ({
-  isShown, aiAssistant, errorMessage, onCancel, onConfirm,
+  isShown,
+  aiAssistant,
+  errorMessage,
+  onCancel,
+  onConfirm,
 }) => {
   const { t } = useTranslation();
 
@@ -27,7 +28,9 @@ export const DeleteAiAssistantModal: React.FC<DeleteAiAssistantModalProps> = ({
     return (
       <>
         <span className="material-symbols-outlined me-1">delete_forever</span>
-        <span className="fw-bold">{t('ai_assistant_substance.delete_modal.title')}</span>
+        <span className="fw-bold">
+          {t('ai_assistant_substance.delete_modal.title')}
+        </span>
       </>
     );
   };
@@ -36,7 +39,11 @@ export const DeleteAiAssistantModal: React.FC<DeleteAiAssistantModalProps> = ({
     if (!isShown || aiAssistant == null) {
       return null;
     }
-    return <p className="fw-bold mb-0">{t('ai_assistant_substance.delete_modal.confirm_message')}</p>;
+    return (
+      <p className="fw-bold mb-0">
+        {t('ai_assistant_substance.delete_modal.confirm_message')}
+      </p>
+    );
   };
 
   const footerContent = () => {
@@ -61,12 +68,8 @@ export const DeleteAiAssistantModal: React.FC<DeleteAiAssistantModalProps> = ({
       <ModalHeader tag="h5" toggle={onCancel} className="text-danger px-4">
         {headerContent()}
       </ModalHeader>
-      <ModalBody className="px-4">
-        {bodyContent()}
-      </ModalBody>
-      <ModalFooter className="px-4 gap-2">
-        {footerContent()}
-      </ModalFooter>
+      <ModalBody className="px-4">{bodyContent()}</ModalBody>
+      <ModalFooter className="px-4 gap-2">{footerContent()}</ModalFooter>
     </Modal>
   );
 };
