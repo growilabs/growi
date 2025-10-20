@@ -1,16 +1,17 @@
 import type { FC } from 'react';
 import React, { useState, useCallback } from 'react';
 
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import Link from 'next/link';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useIsMailerSetup } from '~/stores-universal/context';
+import { isMailerSetupAtom } from '~/states/server-configurations';
 
 const PasswordResetRequestForm: FC = () => {
   const { t } = useTranslation();
-  const { data: isMailerSetup } = useIsMailerSetup();
+  const isMailerSetup = useAtomValue(isMailerSetupAtom);
   const [email, setEmail] = useState('');
 
   const changeEmail = useCallback((inputValue) => {

@@ -7,10 +7,11 @@ import type { MarkdownTable } from '@growi/editor';
 
 import { getMarkdownTableFromLine, replaceMarkdownTableInMarkdown } from '~/client/components/Page/markdown-table-util-for-view';
 import { extractRemoteRevisionDataFromErrorObj, useUpdatePage } from '~/client/services/update-page';
-import { useShareLinkId } from '~/stores-universal/context';
-import { useHandsontableModal, useConflictDiffModal } from '~/stores/modal';
-import { useSWRxCurrentPage } from '~/stores/page';
-import { type RemoteRevisionData, useSetRemoteLatestPageData } from '~/stores/remote-latest-page';
+import { useCurrentPageData, useSetRemoteLatestPageData } from '~/states/page';
+import type { RemoteRevisionData } from '~/states/page';
+import { useShareLinkId } from '~/states/page/hooks';
+import { useConflictDiffModalActions } from '~/states/ui/modal/conflict-diff';
+import { useHandsontableModalActions } from '~/states/ui/modal/handsontable';
 import loggerFactory from '~/utils/logger';
 
 
@@ -28,17 +29,17 @@ export const useHandsontableModalLauncherForView = (opts?: {
   onSaveError?: (error: any) => void,
 }): void => {
 
-  const { data: shareLinkId } = useShareLinkId();
+  const shareLinkId = useShareLinkId();
 
-  const { data: currentPage } = useSWRxCurrentPage();
+  const currentPage = useCurrentPageData();
 
-  const { open: openHandsontableModal } = useHandsontableModal();
+  const { open: openHandsontableModal } = useHandsontableModalActions();
 
-  const { open: openConflictDiffModal, close: closeConflictDiffModal } = useConflictDiffModal();
+  const { open: openConflictDiffModal, close: closeConflictDiffModal } = useConflictDiffModalActions();
 
   const _updatePage = useUpdatePage();
 
-  const { setRemoteLatestPageData } = useSetRemoteLatestPageData();
+  const setRemoteLatestPageData = useSetRemoteLatestPageData();
 
   // eslint-disable-next-line max-len
   const updatePage = useCallback(async(revisionId:string, newMarkdown: string, onConflict: (conflictData: RemoteRevisionData, newMarkdown: string) => void) => {
@@ -68,7 +69,7 @@ export const useHandsontableModalLauncherForView = (opts?: {
       logger.error('failed to save', error);
       opts?.onSaveError?.(error);
     }
-  }, [closeConflictDiffModal, currentPage, opts, shareLinkId]);
+  }, [_updatePage, closeConflictDiffModal, currentPage, opts, shareLinkId]);
 
   // eslint-disable-next-line max-len
   const generateResolveConflictHandler = useCallback((revisionId: string, onConflict: (conflictData: RemoteRevisionData, newMarkdown: string) => void) => {

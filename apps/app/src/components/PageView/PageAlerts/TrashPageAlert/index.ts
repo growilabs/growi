@@ -1,0 +1,1 @@
+export { TrashPageAlertLazyLoaded } from './dynamic';

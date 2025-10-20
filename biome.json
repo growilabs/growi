@@ -24,6 +24,7 @@
       "!**/package.json",
       "!apps/app/src/styles/prebuilt",
       "!apps/app/tmp",
+      "!apps/pdf-converter/specs",
       "!apps/slackbot-proxy/src/public/bootstrap",
       "!packages/pdf-converter-client/src/index.ts",
       "!packages/pdf-converter-client/specs",

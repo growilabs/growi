@@ -9,7 +9,7 @@ import {
   UncontrolledDropdown,
 } from 'reactstrap';
 
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 
 import { AiAssistantAccessScope } from '../../../../interfaces/ai-assistant';
 
@@ -24,7 +24,7 @@ export const AccessScopeDropdown: React.FC<Props> = (props: Props) => {
   const { isDisabled, isDisabledGroups, selectedAccessScope, onSelect } = props;
 
   const { t } = useTranslation();
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser();
 
   const getAccessScopeLabel = useCallback(
     (accessScope: AiAssistantAccessScope) => {

@@ -10,6 +10,7 @@ import {
 } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { useRect } from '@growi/ui/dist/utils';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import { DropdownItem } from 'reactstrap';
 
@@ -18,19 +19,19 @@ import {
 } from '~/client/services/page-operation';
 import { toastError } from '~/client/util/toastr';
 import OpenDefaultAiAssistantButton from '~/features/openai/client/components/AiAssistant/OpenDefaultAiAssistantButton';
-import {
-  useIsGuestUser, useIsReadOnlyUser, useIsSearchPage, useIsUsersHomepageDeletionEnabled,
-} from '~/stores-universal/context';
+import { useIsGuestUser, useIsReadOnlyUser, useIsSearchPage } from '~/states/context';
+import { useCurrentPagePath } from '~/states/page';
+import { isUsersHomepageDeletionEnabledAtom } from '~/states/server-configurations';
+import { useDeviceLargerThanMd } from '~/states/ui/device';
 import {
   EditorMode, useEditorMode,
-} from '~/stores-universal/ui';
-import { useTagEditModal, type IPageForPageDuplicateModal } from '~/stores/modal';
-import {
-  useIsDeviceLargerThanMd, usePageControlsX,
-} from '~/stores/ui';
+} from '~/states/ui/editor';
+import { type IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate';
+import { useTagEditModalActions } from '~/states/ui/modal/tag-edit';
+import { useSetPageControlsX } from '~/states/ui/page';
 import loggerFactory from '~/utils/logger';
 
-import { useSWRxPageInfo, useSWRxTagsInfo, useCurrentPagePath } from '../../../stores/page';
+import { useSWRxPageInfo, useSWRxTagsInfo } from '../../../stores/page';
 import { useSWRxUsersList } from '../../../stores/user';
 import type { AdditionalMenuItemsRendererProps, ForceHideMenuItems } from '../Common/Dropdown/PageItemControl';
 import {
@@ -91,10 +92,10 @@ const WideViewMenuItem = (props: WideViewMenuItemProps): JSX.Element => {
           className="form-check-input pe-none"
           type="checkbox"
           checked={expandContentWidth}
-          onChange={() => {}}
+          onChange={() => { }}
         />
         <label className="form-check-label pe-none">
-          { t('wide_view') }
+          {t('wide_view')}
         </label>
       </div>
     </DropdownItem>
@@ -132,13 +133,13 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
     onClickEditTagsButton, onClickDuplicateMenuItem, onClickRenameMenuItem, onClickDeleteMenuItem, onClickSwitchContentWidth,
   } = props;
 
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { data: editorMode } = useEditorMode();
-  const { data: isDeviceLargerThanMd } = useIsDeviceLargerThanMd();
-  const { data: isSearchPage } = useIsSearchPage();
-  const { data: isUsersHomepageDeletionEnabled } = useIsUsersHomepageDeletionEnabled();
-  const { data: currentPagePath } = useCurrentPagePath();
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const { editorMode } = useEditorMode();
+  const [isDeviceLargerThanMd] = useDeviceLargerThanMd();
+  const isSearchPage = useIsSearchPage();
+  const isUsersHomepageDeletionEnabled = useAtomValue(isUsersHomepageDeletionEnabledAtom);
+  const currentPagePath = useCurrentPagePath();
 
   const isUsersHomepage = currentPagePath == null ? false : pagePathUtils.isUsersHomepage(currentPagePath);
 
@@ -147,7 +148,7 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
   const likerIds = isIPageInfoForEntity(pageInfo) ? (pageInfo.likerIds ?? []).slice(0, 15) : [];
   const seenUserIds = isIPageInfoForEntity(pageInfo) ? (pageInfo.seenUserIds ?? []).slice(0, 15) : [];
 
-  const { mutate: mutatePageControlsX } = usePageControlsX();
+  const setPageControlsX = useSetPageControlsX();
 
   const pageControlsRef = useRef<HTMLDivElement>(null);
   const [pageControlsRect] = useRect(pageControlsRef);
@@ -156,8 +157,8 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
     if (pageControlsRect?.x == null) {
       return;
     }
-    mutatePageControlsX(pageControlsRect.x);
-  }, [pageControlsRect?.x, mutatePageControlsX]);
+    setPageControlsX(pageControlsRect.x);
+  }, [pageControlsRect?.x, setPageControlsX]);
 
 
   // Put in a mixture of seenUserIds and likerIds data to make the cache work
@@ -165,7 +166,7 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
   const likers = usersList != null ? usersList.filter(({ _id }) => likerIds.includes(_id)).slice(0, 15) : [];
   const seenUsers = usersList != null ? usersList.filter(({ _id }) => seenUserIds.includes(_id)).slice(0, 15) : [];
 
-  const subscribeClickhandler = useCallback(async() => {
+  const subscribeClickhandler = useCallback(async () => {
     if (isGuestUser ?? true) {
       return;
     }
@@ -177,7 +178,7 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
     mutatePageInfo();
   }, [isGuestUser, mutatePageInfo, pageId, pageInfo]);
 
-  const likeClickhandler = useCallback(async() => {
+  const likeClickhandler = useCallback(async () => {
     if (isGuestUser ?? true) {
       return;
     }
@@ -189,7 +190,7 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
     mutatePageInfo();
   }, [isGuestUser, mutatePageInfo, pageId, pageInfo]);
 
-  const duplicateMenuItemClickHandler = useCallback(async(_pageId: string): Promise<void> => {
+  const duplicateMenuItemClickHandler = useCallback(async (): Promise<void> => {
     if (onClickDuplicateMenuItem == null || path == null) {
       return;
     }
@@ -198,7 +199,7 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
     onClickDuplicateMenuItem(page);
   }, [onClickDuplicateMenuItem, pageId, path]);
 
-  const renameMenuItemClickHandler = useCallback(async(_pageId: string): Promise<void> => {
+  const renameMenuItemClickHandler = useCallback(async (): Promise<void> => {
     if (onClickRenameMenuItem == null || path == null) {
       return;
     }
@@ -215,7 +216,7 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
     onClickRenameMenuItem(page);
   }, [onClickRenameMenuItem, pageId, pageInfo, path, revisionId]);
 
-  const deleteMenuItemClickHandler = useCallback(async(_pageId: string): Promise<void> => {
+  const deleteMenuItemClickHandler = useCallback(async (): Promise<void> => {
     if (onClickDeleteMenuItem == null || path == null) {
       return;
     }
@@ -270,7 +271,7 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
     }
 
     return true;
-  }, [isGuestUser, isUsersHomepage, isUsersHomepageDeletionEnabled]);
+  }, [currentPagePath, isGuestUser, isUsersHomepage, isUsersHomepageDeletionEnabled]);
 
   const additionalMenuItemOnTopRenderer = useMemo(() => {
     if (!isIPageInfoForEntity(pageInfo)) {
@@ -305,7 +306,7 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
 
   return (
     <div className={`${styles['grw-page-controls']} hstack gap-2`} ref={pageControlsRef}>
-      { isViewMode && isDeviceLargerThanMd && !isSearchPage && !isSearchPage && (
+      {isViewMode && isDeviceLargerThanMd && !isSearchPage && !isSearchPage && (
         <>
           <SearchButton />
           <OpenDefaultAiAssistantButton />
@@ -318,7 +319,7 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
         />
       )}
 
-      { !hideSubControls && (
+      {!hideSubControls && (
         <div className={`hstack gap-1 ${!isViewMode && 'd-none d-lg-flex'}`}>
           {revisionId != null && _isIPageInfoForOperation && (
             <SubscribeButton
@@ -347,11 +348,11 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
               sumOfSeenUsers={sumOfSeenUsers}
               disabled={disableSeenUserInfoPopover}
             />
-          ) }
+          )}
         </div>
-      ) }
+      )}
 
-      { showPageControlDropdown && _isIPageInfoForOperation && (
+      {showPageControlDropdown && _isIPageInfoForOperation && (
         <PageItemControl
           pageId={pageId}
           pageInfo={pageInfo}
@@ -379,7 +380,7 @@ export const PageControls = memo((props: PageControlsProps): JSX.Element => {
 
   const { data: pageInfo, error } = useSWRxPageInfo(pageId ?? null, shareLinkId);
   const { data: tagsInfoData } = useSWRxTagsInfo(pageId);
-  const { open: openTagEditModal } = useTagEditModal();
+  const { open: openTagEditModal } = useTagEditModalActions();
 
   const onClickEditTagsButton = useCallback(() => {
     if (tagsInfoData == null || revisionId == null) {

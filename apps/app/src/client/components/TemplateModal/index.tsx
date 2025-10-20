@@ -1,1 +1,1 @@
-export * from './TemplateModal';
+export * from './dynamic';

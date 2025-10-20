@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect } from 'react';
-
-import { useTranslation } from 'next-i18next';
 import Link from 'next/link';
+import { useTranslation } from 'next-i18next';
+import { useAtomValue } from 'jotai';
 import { useForm } from 'react-hook-form';
 
 import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 import AdminLocalSecurityContainer from '~/client/services/AdminLocalSecurityContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useIsMailerSetup } from '~/stores-universal/context';
+import { isMailerSetupAtom } from '~/states/server-configurations';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -23,7 +23,7 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
   } = props;
 
   const { t } = useTranslation('admin');
-  const { data: isMailerSetup = false } = useIsMailerSetup();
+  const isMailerSetup = useAtomValue(isMailerSetupAtom);
 
   const { register, handleSubmit, reset } = useForm();
 

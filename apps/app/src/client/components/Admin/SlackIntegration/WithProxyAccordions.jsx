@@ -7,7 +7,7 @@ import PropTypes from 'prop-types';
 
 import { apiv3Put, apiv3Post } from '~/client/util/apiv3-client';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useSiteUrl } from '~/stores-universal/context';
+import { useSiteUrlWithEmptyValueWarn } from '~/states/global';
 import loggerFactory from '~/utils/logger';
 
 import CustomCopyToClipBoard from '../../Common/CustomCopyToClipBoard';
@@ -286,7 +286,7 @@ const TestProcess = ({
 
 const WithProxyAccordions = (props) => {
   const { t } = useTranslation();
-  const { data: siteUrl } = useSiteUrl();
+  const siteUrl = useSiteUrlWithEmptyValueWarn();
   const [isLatestConnectionSuccess, setIsLatestConnectionSuccess] = useState(false);
 
   const submitForm = () => {

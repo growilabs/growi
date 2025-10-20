@@ -8,7 +8,7 @@ import Popover from 'reactstrap/esm/Popover';
 import PopoverBody from 'reactstrap/esm/PopoverBody';
 import UncontrolledTooltip from 'reactstrap/esm/UncontrolledTooltip';
 
-import { useIsGuestUser } from '~/stores-universal/context';
+import { useIsGuestUser } from '~/states/context';
 import { useSWRxBookmarkedUsers } from '~/stores/bookmark';
 
 import { BookmarkFolderMenu } from '../Bookmarks/BookmarkFolderMenu';
@@ -32,7 +32,7 @@ export const BookmarkButtons: FC<Props> = (props: Props) => {
   const [isBookmarkFolderMenuOpen, setBookmarkFolderMenuOpen] = useState(false);
   const [isBookmarkUsersPopoverOpen, setBookmarkUsersPopoverOpen] = useState(false);
 
-  const { data: isGuestUser } = useIsGuestUser();
+  const isGuestUser = useIsGuestUser();
 
   const { data: bookmarkedUsers, isLoading: isLoadingBookmarkedUsers } = useSWRxBookmarkedUsers(isBookmarkUsersPopoverOpen ? pageId : null);
 

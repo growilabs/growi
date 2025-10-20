@@ -1,13 +1,16 @@
 import type { JSX } from 'react';
 
 import { usePageUpdatedEffect } from '~/client/services/side-effects/page-updated';
-import { useCurrentPageYjsDataEffect } from '~/client/services/side-effects/yjs';
+import { useAwarenessSyncingEffect, useNewlyYjsDataSyncingEffect, useCurrentPageYjsDataAutoLoadEffect } from '~/features/collaborative-editor/side-effects';
 
 
 export const EditablePageEffects = (): JSX.Element => {
 
   usePageUpdatedEffect();
-  useCurrentPageYjsDataEffect();
+
+  useCurrentPageYjsDataAutoLoadEffect();
+  useNewlyYjsDataSyncingEffect();
+  useAwarenessSyncingEffect();
 
   return <></>;
 

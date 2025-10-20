@@ -1,7 +1,7 @@
 import type { IPageToDeleteWithMeta } from '@growi/core';
 
 import type { IPageForItem } from '~/interfaces/page';
-import type { IPageForPageDuplicateModal } from '~/stores/modal';
+import type { IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate';
 
 import type { ItemNode } from '../ItemNode';
 
