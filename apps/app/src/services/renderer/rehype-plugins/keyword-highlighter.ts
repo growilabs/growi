@@ -93,9 +93,9 @@ export const rehypePlugin: Plugin<[KeywordHighlighterPluginParams]> = (
   return rehypeRewrite.bind(this)({
     rewrite: (node, index, parent) => {
       if (parent != null && index != null && node.type === 'text') {
-        lowercasedKeywords.forEach((keyword) =>
-          highlight(keyword, node, index, parent),
-        );
+        lowercasedKeywords.forEach((keyword) => {
+          highlight(keyword, node, index, parent);
+        });
       }
     },
   });
