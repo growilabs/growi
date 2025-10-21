@@ -3,7 +3,6 @@ import ExtensibleCustomError from 'extensible-custom-error';
 import type { AllTermsKey } from '~/server/interfaces/search';
 
 export class SearchError extends ExtensibleCustomError {
-
   readonly id = 'SearchError';
 
   unavailableTermsKeys!: AllTermsKey[];
@@ -12,7 +11,6 @@ export class SearchError extends ExtensibleCustomError {
     super(message);
     this.unavailableTermsKeys = unavailableTermsKeys;
   }
-
 }
 
 export const isSearchError = (err: any): err is SearchError => {
