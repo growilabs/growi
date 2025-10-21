@@ -19,7 +19,7 @@ export const parserForApiToken = async(req: AccessTokenParserReq, res: Response)
 
   // Try all possible token sources in order of priority
   const accessToken = bearerToken
-                      ?? req.headers['x-api-token']
+                      ?? req.headers['x-growi-access-token']
                       ?? req.query.access_token
                       ?? req.body.access_token;
 

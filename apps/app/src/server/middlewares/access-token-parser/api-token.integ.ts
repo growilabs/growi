@@ -177,7 +177,7 @@ describe('access-token-parser middleware', () => {
     });
 
     // act
-    reqMock.headers['x-api-token'] = targetUser.apiToken;
+    reqMock.headers['x-growi-access-token'] = targetUser.apiToken;
     await parserForApiToken(reqMock, resMock);
 
     // assert
