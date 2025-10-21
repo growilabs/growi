@@ -1,3 +1,4 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { parseISO, addMinutes, isValid } from 'date-fns';
 import type { Request, Router } from 'express';
@@ -5,7 +6,6 @@ import express from 'express';
 import { query } from 'express-validator';
 
 import type { IActivity, ISearchFilter } from '~/interfaces/activity';
-import { SCOPE } from '@growi/core/dist/interfaces';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
