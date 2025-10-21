@@ -112,9 +112,9 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply tw:border-border tw:outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply tw:bg-background tw:text-foreground;
   }
 }
