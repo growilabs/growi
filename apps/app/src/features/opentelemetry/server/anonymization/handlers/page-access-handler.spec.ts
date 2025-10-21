@@ -1,5 +1,4 @@
 import type { IncomingMessage } from 'node:http';
-
 import { describe, expect, it } from 'vitest';
 
 import { pageAccessModule } from './page-access-handler';

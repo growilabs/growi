@@ -4,7 +4,10 @@ import styles from './GroundGlassBar.module.scss';
 
 const moduleClass = styles['ground-glass-bar'];
 
-type Props = DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>;
+type Props = DetailedHTMLProps<
+  React.HTMLAttributes<HTMLDivElement>,
+  HTMLDivElement
+>;
 
 export const GroundGlassBar = (props: Props): JSX.Element => {
   const { className, children, ...rest } = props;

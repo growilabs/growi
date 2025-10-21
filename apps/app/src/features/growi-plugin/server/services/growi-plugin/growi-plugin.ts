@@ -5,7 +5,7 @@ import {
   importPackageJson,
   validateGrowiDirective,
 } from '@growi/pluginkit/dist/v4/server/index.cjs';
-// eslint-disable-next-line no-restricted-imports
+// biome-ignore lint/style/noRestrictedImports: Direct axios usage for plugin downloading
 import axios from 'axios';
 import fs, { readFileSync } from 'fs';
 import type mongoose from 'mongoose';
@@ -23,7 +23,6 @@ import type {
 import { PLUGIN_EXPRESS_STATIC_DIR, PLUGIN_STORING_PATH } from '../../consts';
 import { GrowiPlugin } from '../../models';
 import { GitHubUrl } from '../../models/vo/github-url';
-
 import { generateTemplatePluginMeta } from './generate-template-plugin-meta';
 import { generateThemePluginMeta } from './generate-theme-plugin-meta';
 

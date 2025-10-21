@@ -1,13 +1,11 @@
-import React, {
-  useCallback, useState, useEffect, type JSX,
-} from 'react';
-
+import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ModalBody, Input, Label,
-} from 'reactstrap';
+import { Input, Label, ModalBody } from 'reactstrap';
 
-import { AiAssistantShareScope, AiAssistantAccessScope } from '~/features/openai/interfaces/ai-assistant';
+import {
+  AiAssistantAccessScope,
+  AiAssistantShareScope,
+} from '~/features/openai/interfaces/ai-assistant';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 import { useSWRxUserRelatedGroups } from '~/stores/user';
 
@@ -21,18 +19,18 @@ const ScopeType = {
   SHARE: 'Share',
 } as const;
 
-type ScopeType = typeof ScopeType[keyof typeof ScopeType];
+type ScopeType = (typeof ScopeType)[keyof typeof ScopeType];
 
 type Props = {
-  selectedShareScope: AiAssistantShareScope,
-  selectedAccessScope: AiAssistantAccessScope,
-  selectedUserGroupsForShareScope: PopulatedGrantedGroup[],
-  selectedUserGroupsForAccessScope: PopulatedGrantedGroup[],
-  onSelectShareScope: (scope: AiAssistantShareScope) => void,
-  onSelectAccessScope: (scope: AiAssistantAccessScope) => void,
-  onSelectShareScopeUserGroups: (userGroup: PopulatedGrantedGroup) => void,
-  onSelectAccessScopeUserGroups: (userGroup: PopulatedGrantedGroup) => void,
-}
+  selectedShareScope: AiAssistantShareScope;
+  selectedAccessScope: AiAssistantAccessScope;
+  selectedUserGroupsForShareScope: PopulatedGrantedGroup[];
+  selectedUserGroupsForAccessScope: PopulatedGrantedGroup[];
+  onSelectShareScope: (scope: AiAssistantShareScope) => void;
+  onSelectAccessScope: (scope: AiAssistantAccessScope) => void;
+  onSelectShareScopeUserGroups: (userGroup: PopulatedGrantedGroup) => void;
+  onSelectAccessScopeUserGroups: (userGroup: PopulatedGrantedGroup) => void;
+};
 
 export const AiAssistantManagementEditShare = (props: Props): JSX.Element => {
   const {
@@ -48,28 +46,35 @@ export const AiAssistantManagementEditShare = (props: Props): JSX.Element => {
 
   const { t } = useTranslation();
   const { data: userRelatedGroups } = useSWRxUserRelatedGroups();
-  const hasNoRelatedGroups = userRelatedGroups == null || userRelatedGroups.relatedGroups.length === 0;
+  const hasNoRelatedGroups =
+    userRelatedGroups == null || userRelatedGroups.relatedGroups.length === 0;
 
   const [isShared, setIsShared] = useState(false);
-  const [isSelectUserGroupModalOpen, setIsSelectUserGroupModalOpen] = useState(false);
-  const [selectedUserGroupType, setSelectedUserGroupType] = useState<ScopeType>(ScopeType.ACCESS);
+  const [isSelectUserGroupModalOpen, setIsSelectUserGroupModalOpen] =
+    useState(false);
+  const [selectedUserGroupType, setSelectedUserGroupType] = useState<ScopeType>(
+    ScopeType.ACCESS,
+  );
 
   useEffect(() => {
     setIsShared(() => {
       if (selectedShareScope !== AiAssistantShareScope.SAME_AS_ACCESS_SCOPE) {
         return true;
       }
-      return selectedShareScope === AiAssistantShareScope.SAME_AS_ACCESS_SCOPE && selectedAccessScope !== AiAssistantAccessScope.OWNER;
+      return (
+        selectedShareScope === AiAssistantShareScope.SAME_AS_ACCESS_SCOPE &&
+        selectedAccessScope !== AiAssistantAccessScope.OWNER
+      );
     });
-  }, [isShared, selectedAccessScope, selectedShareScope]);
+  }, [selectedAccessScope, selectedShareScope]);
 
   const changeShareToggleHandler = useCallback(() => {
     setIsShared((prev) => {
-      if (prev) { // if isShared === true
+      if (prev) {
+        // if isShared === true
         onSelectShareScope(AiAssistantShareScope.SAME_AS_ACCESS_SCOPE);
         onSelectAccessScope(AiAssistantAccessScope.OWNER);
-      }
-      else {
+      } else {
         onSelectShareScope(AiAssistantShareScope.PUBLIC_ONLY);
       }
       return !prev;
@@ -81,20 +86,28 @@ export const AiAssistantManagementEditShare = (props: Props): JSX.Element => {
     setIsSelectUserGroupModalOpen(true);
   }, []);
 
-  const selectShareScopeHandler = useCallback((shareScope: AiAssistantShareScope) => {
-    onSelectShareScope(shareScope);
-    if (shareScope === AiAssistantShareScope.GROUPS && !hasNoRelatedGroups) {
-      selectGroupScopeHandler(ScopeType.SHARE);
-    }
-  }, [hasNoRelatedGroups, onSelectShareScope, selectGroupScopeHandler]);
+  const selectShareScopeHandler = useCallback(
+    (shareScope: AiAssistantShareScope) => {
+      onSelectShareScope(shareScope);
+      if (shareScope === AiAssistantShareScope.GROUPS && !hasNoRelatedGroups) {
+        selectGroupScopeHandler(ScopeType.SHARE);
+      }
+    },
+    [hasNoRelatedGroups, onSelectShareScope, selectGroupScopeHandler],
+  );
 
-  const selectAccessScopeHandler = useCallback((accessScope: AiAssistantAccessScope) => {
-    onSelectAccessScope(accessScope);
-    if (accessScope === AiAssistantAccessScope.GROUPS && !hasNoRelatedGroups) {
-      selectGroupScopeHandler(ScopeType.ACCESS);
-    }
-  }, [hasNoRelatedGroups, onSelectAccessScope, selectGroupScopeHandler]);
-
+  const selectAccessScopeHandler = useCallback(
+    (accessScope: AiAssistantAccessScope) => {
+      onSelectAccessScope(accessScope);
+      if (
+        accessScope === AiAssistantAccessScope.GROUPS &&
+        !hasNoRelatedGroups
+      ) {
+        selectGroupScopeHandler(ScopeType.ACCESS);
+      }
+    },
+    [hasNoRelatedGroups, onSelectAccessScope, selectGroupScopeHandler],
+  );
 
   return (
     <>
@@ -133,12 +146,15 @@ export const AiAssistantManagementEditShare = (props: Props): JSX.Element => {
           isOpen={isSelectUserGroupModalOpen}
           userRelatedGroups={userRelatedGroups?.relatedGroups}
           closeModal={() => setIsSelectUserGroupModalOpen(false)}
-          selectedUserGroups={selectedUserGroupType === ScopeType.ACCESS ? selectedUserGroupsForAccessScope : selectedUserGroupsForShareScope}
+          selectedUserGroups={
+            selectedUserGroupType === ScopeType.ACCESS
+              ? selectedUserGroupsForAccessScope
+              : selectedUserGroupsForShareScope
+          }
           onSelect={(userGroup) => {
             if (selectedUserGroupType === ScopeType.ACCESS) {
               onSelectAccessScopeUserGroups(userGroup);
-            }
-            else {
+            } else {
               onSelectShareScopeUserGroups(userGroup);
             }
           }}

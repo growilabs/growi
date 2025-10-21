@@ -1,5 +1,5 @@
 import type { Bucket, File } from '@google-cloud/storage';
-// eslint-disable-next-line no-restricted-imports
+// biome-ignore lint/style/noRestrictedImports: Direct axios usage for GCS multipart upload
 import axios from 'axios';
 import urljoin from 'url-join';
 

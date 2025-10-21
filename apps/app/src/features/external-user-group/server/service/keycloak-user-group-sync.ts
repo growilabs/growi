@@ -12,7 +12,6 @@ import type {
   ExternalUserInfo,
 } from '../../interfaces/external-user-group';
 import { ExternalGroupProviderType } from '../../interfaces/external-user-group';
-
 import ExternalUserGroupSyncService from './external-user-group-sync';
 
 const logger = loggerFactory('growi:service:keycloak-user-group-sync-service');

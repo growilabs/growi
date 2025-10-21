@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
 } from 'react';
-
 import { debounce } from 'throttle-debounce';
 
 import type { IGraphViewerGlobal } from '..';

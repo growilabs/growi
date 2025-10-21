@@ -1,5 +1,4 @@
 import assert from 'assert';
-
 import type { Element, Nodes as HastNode } from 'hast';
 import { selectAll } from 'hast-util-select';
 import isAbsolute from 'is-absolute-url';

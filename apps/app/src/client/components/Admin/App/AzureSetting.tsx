@@ -1,11 +1,13 @@
 import type { JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
+import type { UseFormRegister, FieldValues } from 'react-hook-form';
 
 import MaskedInput from './MaskedInput';
 
 
 export type AzureSettingMoleculeProps = {
+  register: UseFormRegister<FieldValues>
   azureReferenceFileWithRelayMode
   azureUseOnlyEnvVars
   azureTenantId
@@ -32,15 +34,10 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
   const {
     azureReferenceFileWithRelayMode,
     azureUseOnlyEnvVars,
-    azureTenantId,
-    azureClientId,
-    azureClientSecret,
-    azureStorageAccountName,
     envAzureTenantId,
     envAzureClientId,
     envAzureClientSecret,
     envAzureStorageAccountName,
-    azureStorageContainerName,
     envAzureStorageContainerName,
   } = props;
 
@@ -116,10 +113,9 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
             <th>{t('admin:app_setting.azure_tenant_id')}</th>
             <td>
               <MaskedInput
-                name="azureTenantId"
+                register={props.register}
+                fieldName="azureTenantId"
                 readOnly={azureUseOnlyEnvVars}
-                value={azureTenantId}
-                onChange={e => props?.onChangeAzureTenantId(e.target.value)}
               />
             </td>
             <td>
@@ -134,10 +130,9 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
             <th>{t('admin:app_setting.azure_client_id')}</th>
             <td>
               <MaskedInput
-                name="azureClientId"
+                register={props.register}
+                fieldName="azureClientId"
                 readOnly={azureUseOnlyEnvVars}
-                value={azureClientId}
-                onChange={e => props?.onChangeAzureClientId(e.target.value)}
               />
             </td>
             <td>
@@ -152,10 +147,9 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
             <th>{t('admin:app_setting.azure_client_secret')}</th>
             <td>
               <MaskedInput
-                name="azureClientSecret"
+                register={props.register}
+                fieldName="azureClientSecret"
                 readOnly={azureUseOnlyEnvVars}
-                value={azureClientSecret}
-                onChange={e => props?.onChangeAzureClientSecret(e.target.value)}
               />
             </td>
             <td>
@@ -172,10 +166,8 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
               <input
                 className="form-control"
                 type="text"
-                name="azureStorageAccountName"
                 readOnly={azureUseOnlyEnvVars}
-                value={azureStorageAccountName}
-                onChange={e => props?.onChangeAzureStorageAccountName(e.target.value)}
+                {...props.register('azureStorageAccountName')}
               />
             </td>
             <td>
@@ -192,10 +184,8 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
               <input
                 className="form-control"
                 type="text"
-                name="azureStorageContainerName"
                 readOnly={azureUseOnlyEnvVars}
-                value={azureStorageContainerName}
-                onChange={e => props?.onChangeAzureStorageContainerName(e.target.value)}
+                {...props.register('azureStorageContainerName')}
               />
             </td>
             <td>

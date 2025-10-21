@@ -1,5 +1,5 @@
-import type { Parent, Root } from 'mdast';
 import { useEffect, useState } from 'react';
+import type { Parent, Root } from 'mdast';
 import type { Processor } from 'unified';
 
 type ParseResult = {

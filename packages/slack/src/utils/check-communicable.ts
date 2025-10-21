@@ -3,7 +3,6 @@ import axios, { type AxiosError } from 'axios';
 
 import { requiredScopes } from '../consts';
 import type { ConnectionStatus } from '../interfaces/connection-status';
-
 import { markdownSectionBlock } from './block-kit-builder';
 import { generateWebClient } from './webclient-factory';
 

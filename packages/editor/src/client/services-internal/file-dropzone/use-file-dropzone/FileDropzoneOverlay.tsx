@@ -1,8 +1,8 @@
 import type { JSX } from 'react';
 
 type Props = {
-  isEnabled: boolean,
-}
+  isEnabled: boolean;
+};
 
 export const FileDropzoneOverlay = (props: Props): JSX.Element => {
   const { isEnabled } = props;
@@ -11,8 +11,7 @@ export const FileDropzoneOverlay = (props: Props): JSX.Element => {
     return (
       <div className="overlay overlay-dropzone-active">
         <span className="overlay-content">
-          <span className="overlay-icon material-symbols-outlined">
-          </span>
+          <span className="overlay-icon material-symbols-outlined"></span>
         </span>
       </div>
     );

@@ -7,7 +7,6 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:cli:stores:socket-io');
 
-
 const socketFactory = (namespace: string): Socket => {
   const socket = io(namespace, {
     transports: ['websocket'],

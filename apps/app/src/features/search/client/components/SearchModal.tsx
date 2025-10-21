@@ -1,15 +1,14 @@
+import React, { type JSX, useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import Downshift, {
   type DownshiftState,
   type StateChangeOptions,
 } from 'downshift';
-import { useRouter } from 'next/router';
-import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { Modal, ModalBody } from 'reactstrap';
 
 import { isIncludeAiMenthion, removeAiMenthion } from '../../utils/ai';
 import type { DownshiftItem } from '../interfaces/downshift';
 import { useSearchModal } from '../stores/search';
-
 import { SearchForm } from './SearchForm';
 import { SearchHelp } from './SearchHelp';
 import { SearchMethodMenuItem } from './SearchMethodMenuItem';

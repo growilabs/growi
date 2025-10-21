@@ -1,5 +1,4 @@
 import { InvalidGrowiCommandError } from '../models/errors';
-
 import { parseSlashCommand } from './slash-command-parser';
 
 describe('parseSlashCommand', () => {

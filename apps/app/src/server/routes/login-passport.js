@@ -78,7 +78,7 @@ module.exports = function(crowi, app) {
     const redirectTo = redirectToForUnauthenticated ?? res.locals.redirectTo ?? '/';
 
     if (isExternalAccount) {
-      return res.redirect(redirectTo);
+      return res.safeRedirect(redirectTo);
     }
 
     return res.apiv3({ redirectTo });

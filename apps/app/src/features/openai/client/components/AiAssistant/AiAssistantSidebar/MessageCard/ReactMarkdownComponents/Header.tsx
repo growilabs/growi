@@ -9,7 +9,13 @@ const fontSizes: Record<Level, string> = {
   6: '0.625rem',
 };
 
-export const Header = ({ children, level }: { children: React.ReactNode, level: Level}): JSX.Element => {
+export const Header = ({
+  children,
+  level,
+}: {
+  children: React.ReactNode;
+  level: Level;
+}): JSX.Element => {
   const Tag = `h${level}` as keyof JSX.IntrinsicElements;
 
   return (

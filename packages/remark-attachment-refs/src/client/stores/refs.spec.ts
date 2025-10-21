@@ -4,8 +4,8 @@ import type { Server } from 'node:http';
 import { renderHook, waitFor } from '@testing-library/react';
 import axios from 'axios';
 import express from 'express';
-import refsMiddleware from '../../server';
 
+import refsMiddleware from '../../server';
 import { useSWRxRef, useSWRxRefs } from './refs';
 
 // Mock the IAttachmentHasId type for testing

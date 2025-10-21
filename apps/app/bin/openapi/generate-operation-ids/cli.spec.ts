@@ -1,5 +1,4 @@
 import { writeFileSync } from 'node:fs';
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { generateOperationIds } from './generate-operation-ids';

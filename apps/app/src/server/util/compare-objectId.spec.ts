@@ -38,7 +38,7 @@ describe('Objectid comparison utils', () => {
       });
     });
 
-    describe('When arrays don\'t have intersection', () => {
+    describe("When arrays don't have intersection", () => {
       const arr1 = [id1, id2];
       const arr2 = [id3, id4];
 
@@ -47,5 +47,4 @@ describe('Objectid comparison utils', () => {
       });
     });
   });
-
 });

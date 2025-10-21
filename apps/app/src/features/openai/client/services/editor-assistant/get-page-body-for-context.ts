@@ -16,9 +16,9 @@ export type PageBodyContextResult = {
  * @returns Page body context result with metadata, or undefined if editor is not available
  */
 export const getPageBodyForContext = (
-    codeMirrorEditor: UseCodeMirrorEditor | undefined,
-    maxLengthBeforeCursor: number,
-    maxLengthAfterCursor: number,
+  codeMirrorEditor: UseCodeMirrorEditor | undefined,
+  maxLengthBeforeCursor: number,
+  maxLengthAfterCursor: number,
 ): PageBodyContextResult | undefined => {
   const doc = codeMirrorEditor?.getDoc();
   const length = doc?.length ?? 0;
@@ -38,16 +38,28 @@ export const getPageBodyForContext = (
     const availableAfterCursor = length - cursorPos;
 
     // Calculate actual chars to take before and after cursor
-    const charsBeforeCursor = Math.min(maxLengthBeforeCursor, availableBeforeCursor);
-    const charsAfterCursor = Math.min(maxLengthAfterCursor, availableAfterCursor);
+    const charsBeforeCursor = Math.min(
+      maxLengthBeforeCursor,
+      availableBeforeCursor,
+    );
+    const charsAfterCursor = Math.min(
+      maxLengthAfterCursor,
+      availableAfterCursor,
+    );
 
     // Calculate shortfalls and redistribute
     const shortfallBefore = maxLengthBeforeCursor - charsBeforeCursor;
     const shortfallAfter = maxLengthAfterCursor - charsAfterCursor;
 
     // Redistribute shortfalls
-    const finalCharsAfterCursor = Math.min(charsAfterCursor + shortfallBefore, availableAfterCursor);
-    const finalCharsBeforeCursor = Math.min(charsBeforeCursor + shortfallAfter, availableBeforeCursor);
+    const finalCharsAfterCursor = Math.min(
+      charsAfterCursor + shortfallBefore,
+      availableAfterCursor,
+    );
+    const finalCharsBeforeCursor = Math.min(
+      charsBeforeCursor + shortfallAfter,
+      availableBeforeCursor,
+    );
 
     // Calculate start and end positions
     const startPos = Math.max(cursorPos - finalCharsBeforeCursor, 0);

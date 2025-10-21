@@ -1,11 +1,10 @@
 import type { SearchContext } from '../../interfaces/types';
-
 import {
   ClientFuzzyMatcher,
   calculateSimilarity,
-  splitLines,
   joinLines,
   measurePerformance,
+  splitLines,
 } from './fuzzy-matching';
 
 // Test utilities
@@ -66,17 +65,26 @@ describe('fuzzy-matching', () => {
     });
 
     test('should return low similarity for very different strings', () => {
-      const similarity = calculateSimilarity('hello world', 'completely different');
+      const similarity = calculateSimilarity(
+        'hello world',
+        'completely different',
+      );
       expect(similarity).toBeLessThan(0.3);
     });
 
     test('should handle length-based early filtering', () => {
-      const similarity = calculateSimilarity('a', 'very long string that is much longer');
+      const similarity = calculateSimilarity(
+        'a',
+        'very long string that is much longer',
+      );
       expect(similarity).equals(0); // fixed to zero for early filtering for performance
     });
 
     test('should handle unicode characters', () => {
-      const similarity = calculateSimilarity('こんにちは世界', 'こんにちは世界');
+      const similarity = calculateSimilarity(
+        'こんにちは世界',
+        'こんにちは世界',
+      );
       expect(similarity).toBe(1.0);
     });
   });
@@ -154,15 +162,23 @@ describe('fuzzy-matching', () => {
       });
 
       test('should throw error for invalid threshold', () => {
-        expect(() => matcher.setThreshold(-0.1)).toThrow('Threshold must be between 0.0 and 1.0');
-        expect(() => matcher.setThreshold(1.1)).toThrow('Threshold must be between 0.0 and 1.0');
+        expect(() => matcher.setThreshold(-0.1)).toThrow(
+          'Threshold must be between 0.0 and 1.0',
+        );
+        expect(() => matcher.setThreshold(1.1)).toThrow(
+          'Threshold must be between 0.0 and 1.0',
+        );
       });
     });
 
     describe('tryExactLineMatch', () => {
       test('should match exact content at specified line', () => {
         const content = createTestContent();
-        const result = matcher.tryExactLineMatch(content, 'console.log("hello world");', 2);
+        const result = matcher.tryExactLineMatch(
+          content,
+          'console.log("hello world");',
+          2,
+        );
 
         expect(result.success).toBe(true);
         expect(result.similarity).toBe(1.0);
@@ -181,7 +197,11 @@ describe('fuzzy-matching', () => {
       test('should fail for line number beyond content', () => {
         const content = createTestContent();
         const lines = content.split('\n');
-        const result = matcher.tryExactLineMatch(content, 'test', lines.length + 1);
+        const result = matcher.tryExactLineMatch(
+          content,
+          'test',
+          lines.length + 1,
+        );
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('Invalid line number');
@@ -207,7 +227,11 @@ describe('fuzzy-matching', () => {
 
       test('should handle fuzzy matching below threshold', () => {
         const content = createTestContent();
-        const result = matcher.tryExactLineMatch(content, 'completely different text', 2);
+        const result = matcher.tryExactLineMatch(
+          content,
+          'completely different text',
+          2,
+        );
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('Similarity below threshold');
@@ -217,7 +241,12 @@ describe('fuzzy-matching', () => {
     describe('performBufferedSearch', () => {
       test('should find match within buffer range', () => {
         const content = createTestContent();
-        const result = matcher.performBufferedSearch(content, 'console.log("hello world");', 2, 5);
+        const result = matcher.performBufferedSearch(
+          content,
+          'console.log("hello world");',
+          2,
+          5,
+        );
 
         expect(result.success).toBe(true);
         expect(result.similarity).toBe(1.0);
@@ -228,7 +257,12 @@ describe('fuzzy-matching', () => {
 console.log("test2");
 console.log("hello world");
 console.log("test3");`;
-        const result = matcher.performBufferedSearch(content, 'console.log("hello world");', 2, 2);
+        const result = matcher.performBufferedSearch(
+          content,
+          'console.log("hello world");',
+          2,
+          2,
+        );
 
         expect(result.success).toBe(true);
         expect(result.similarity).toBe(1.0);
@@ -236,7 +270,12 @@ console.log("test3");`;
 
       test('should return no match when nothing similar found', () => {
         const content = createTestContent();
-        const result = matcher.performBufferedSearch(content, 'nonexistent function call', 2, 5);
+        const result = matcher.performBufferedSearch(
+          content,
+          'nonexistent function call',
+          2,
+          5,
+        );
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('No match found');
@@ -273,7 +312,10 @@ return null;`;
 
       test('should return no match when threshold not met', () => {
         const content = createTestContent();
-        const result = matcher.performFullSearch(content, 'completely unrelated content here');
+        const result = matcher.performFullSearch(
+          content,
+          'completely unrelated content here',
+        );
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('No match found');
@@ -281,7 +323,10 @@ return null;`;
 
       test('should handle early exit for exact matches', () => {
         const largeContent = createLargeContent(500);
-        const result = matcher.performFullSearch(largeContent, 'Line 10: This is line number 10 with some content');
+        const result = matcher.performFullSearch(
+          largeContent,
+          'Line 10: This is line number 10 with some content',
+        );
 
         expect(result.success).toBe(true);
         expect(result.similarity).toBe(1.0);
@@ -308,7 +353,11 @@ return null;`;
       test('should use exact line match when preferredStartLine is provided', () => {
         const content = createTestContent();
         const context: SearchContext = { preferredStartLine: 2 };
-        const result = matcher.findBestMatch(content, 'console.log("hello world");', context);
+        const result = matcher.findBestMatch(
+          content,
+          'console.log("hello world");',
+          context,
+        );
 
         expect(result.success).toBe(true);
         expect(result.similarity).toBe(1.0);
@@ -317,8 +366,15 @@ return null;`;
 
       test('should fall back to buffered search when exact line match fails', () => {
         const content = createTestContent();
-        const context: SearchContext = { preferredStartLine: 1, bufferLines: 10 };
-        const result = matcher.findBestMatch(content, 'console.log("hello world");', context);
+        const context: SearchContext = {
+          preferredStartLine: 1,
+          bufferLines: 10,
+        };
+        const result = matcher.findBestMatch(
+          content,
+          'console.log("hello world");',
+          context,
+        );
 
         expect(result.success).toBe(true);
         expect(result.similarity).toBe(1.0);
@@ -350,7 +406,10 @@ return null;`;
         const largeContent = createLargeContent(1000);
 
         // This might timeout, but should not crash
-        const result = timeoutMatcher.findBestMatch(largeContent, 'some search text that might not exist');
+        const result = timeoutMatcher.findBestMatch(
+          largeContent,
+          'some search text that might not exist',
+        );
 
         // Should either succeed or fail gracefully
         expect(typeof result.success).toBe('boolean');
@@ -361,7 +420,10 @@ return null;`;
 
       test('should provide search time information', () => {
         const content = createTestContent();
-        const result = matcher.findBestMatch(content, 'console.log("hello world");');
+        const result = matcher.findBestMatch(
+          content,
+          'console.log("hello world");',
+        );
 
         expect(result.searchTime).toBeGreaterThanOrEqual(0);
         expect(typeof result.searchTime).toBe('number');
@@ -401,7 +463,10 @@ return null;`;
   const message = "こんにちは世界 🌍";
   console.log(message);
 }`;
-        const result = matcher.findBestMatch(content, 'const message = "こんにちは世界 🌍";');
+        const result = matcher.findBestMatch(
+          content,
+          'const message = "こんにちは世界 🌍";',
+        );
 
         expect(result.success).toBe(true);
         expect(result.similarity).toBe(1.0);
@@ -415,8 +480,7 @@ return null;`;
         expect(result.similarity).equal(0); // fixed to zero for early filtering for performance
         if (result.similarity >= 0.85) {
           expect(result.success).toBe(true);
-        }
-        else {
+        } else {
           expect(result.success).toBe(false);
         }
       });
@@ -439,7 +503,10 @@ return null;`;
         const largeContent = createLargeContent(2000);
         const startTime = performance.now();
 
-        const result = matcher.findBestMatch(largeContent, 'Line 1500: This is line number 1500 with some content');
+        const result = matcher.findBestMatch(
+          largeContent,
+          'Line 1500: This is line number 1500 with some content',
+        );
 
         const duration = performance.now() - startTime;
 

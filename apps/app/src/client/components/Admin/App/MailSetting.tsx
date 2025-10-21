@@ -1,14 +1,15 @@
-import React from 'react';
+import React, { useCallback, useEffect } from 'react';
 
 import { useTranslation } from 'next-i18next';
+import { useForm } from 'react-hook-form';
 
 import AdminAppContainer from '~/client/services/AdminAppContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
-import SesSetting from './SesSetting';
-import SmtpSetting from './SmtpSetting';
+import { SesSetting } from './SesSetting';
+import { SmtpSetting } from './SmtpSetting';
 
 
 type Props = {
@@ -22,15 +23,61 @@ const MailSetting = (props: Props) => {
 
   const transmissionMethods = ['smtp', 'ses'];
 
-  async function submitHandler() {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+  } = useForm();
+
+  // Watch the transmission method to dynamically switch between SMTP and SES settings
+  const currentTransmissionMethod = watch('transmissionMethod', adminAppContainer.state.transmissionMethod || 'smtp');
+
+  // Reset form when adminAppContainer state changes
+  useEffect(() => {
+    reset({
+      fromAddress: adminAppContainer.state.fromAddress || '',
+      transmissionMethod: adminAppContainer.state.transmissionMethod || 'smtp',
+      smtpHost: adminAppContainer.state.smtpHost || '',
+      smtpPort: adminAppContainer.state.smtpPort || '',
+      smtpUser: adminAppContainer.state.smtpUser || '',
+      smtpPassword: adminAppContainer.state.smtpPassword || '',
+      sesAccessKeyId: adminAppContainer.state.sesAccessKeyId || '',
+      sesSecretAccessKey: adminAppContainer.state.sesSecretAccessKey || '',
+    });
+  }, [
+    adminAppContainer.state.fromAddress,
+    adminAppContainer.state.transmissionMethod,
+    adminAppContainer.state.smtpHost,
+    adminAppContainer.state.smtpPort,
+    adminAppContainer.state.smtpUser,
+    adminAppContainer.state.smtpPassword,
+    adminAppContainer.state.sesAccessKeyId,
+    adminAppContainer.state.sesSecretAccessKey,
+    reset,
+  ]);
+
+  const onSubmit = useCallback(async(data) => {
     try {
+      // Await all setState completions before API call
+      await Promise.all([
+        adminAppContainer.changeFromAddress(data.fromAddress),
+        adminAppContainer.changeTransmissionMethod(data.transmissionMethod),
+        adminAppContainer.changeSmtpHost(data.smtpHost),
+        adminAppContainer.changeSmtpPort(data.smtpPort),
+        adminAppContainer.changeSmtpUser(data.smtpUser),
+        adminAppContainer.changeSmtpPassword(data.smtpPassword),
+        adminAppContainer.changeSesAccessKeyId(data.sesAccessKeyId),
+        adminAppContainer.changeSesSecretAccessKey(data.sesSecretAccessKey),
+      ]);
+
       await adminAppContainer.updateMailSettingHandler();
       toastSuccess(t('toaster.update_successed', { target: t('admin:app_setting.mail_settings'), ns: 'commons' }));
     }
     catch (err) {
       toastError(err);
     }
-  }
+  }, [adminAppContainer, t]);
 
   async function sendTestEmailHandler() {
     const { adminAppContainer } = props;
@@ -45,19 +92,18 @@ const MailSetting = (props: Props) => {
 
 
   return (
-    <React.Fragment>
+    <form onSubmit={handleSubmit(onSubmit)}>
       {!adminAppContainer.state.isMailerSetup && (
         <div className="alert alert-danger"><span className="material-symbols-outlined">error</span> {t('admin:app_setting.mailer_is_not_set_up')}</div>
       )}
-      <div className="row mb-5">
+      <div className="row mb-4">
         <label className="col-md-3 col-form-label text-end">{t('admin:app_setting.from_e-mail_address')}</label>
         <div className="col-md-6">
           <input
             className="form-control"
             type="text"
             placeholder={`${t('eg')} mail@growi.org`}
-            value={adminAppContainer.state.fromAddress || ''}
-            onChange={(e) => { adminAppContainer.changeFromAddress(e.target.value) }}
+            {...register('fromAddress')}
           />
         </div>
       </div>
@@ -73,12 +119,9 @@ const MailSetting = (props: Props) => {
                 <input
                   type="radio"
                   className="form-check-input"
-                  name="transmission-method"
                   id={`transmission-method-radio-${method}`}
-                  checked={adminAppContainer.state.transmissionMethod === method}
-                  onChange={(e) => {
-                    adminAppContainer.changeTransmissionMethod(method);
-                  }}
+                  value={method}
+                  {...register('transmissionMethod')}
                 />
                 <label className="form-label form-check-label" htmlFor={`transmission-method-radio-${method}`}>{t(`admin:app_setting.${method}_label`)}</label>
               </div>
@@ -87,12 +130,13 @@ const MailSetting = (props: Props) => {
         </div>
       </div>
 
-      {adminAppContainer.state.transmissionMethod === 'smtp' && <SmtpSetting />}
-      {adminAppContainer.state.transmissionMethod === 'ses' && <SesSetting />}
+      {currentTransmissionMethod === 'smtp' && <SmtpSetting register={register} />}
+      {currentTransmissionMethod === 'ses' && <SesSetting register={register} />}
 
       <div className="row my-3">
-        <div className="mx-auto">
-          <button type="button" className="btn btn-primary" onClick={submitHandler} disabled={adminAppContainer.state.retrieveError != null}>
+        <div className="col-md-3"></div>
+        <div className="col-md-9">
+          <button type="submit" className="btn btn-primary" disabled={adminAppContainer.state.retrieveError != null}>
             { t('Update') }
           </button>
           {adminAppContainer.state.transmissionMethod === 'smtp' && (
@@ -102,7 +146,7 @@ const MailSetting = (props: Props) => {
           )}
         </div>
       </div>
-    </React.Fragment>
+    </form>
   );
 
 };

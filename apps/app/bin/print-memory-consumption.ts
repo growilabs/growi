@@ -12,7 +12,6 @@
  */
 
 import { get } from 'node:http';
-
 import WebSocket from 'ws';
 
 interface MemoryInfo {
@@ -297,7 +296,9 @@ class NodeMemoryConsumptionChecker {
     // Memory Flags
     if (info.memoryFlags.length > 0) {
       console.log('\n🔸 Memory Flags:');
-      info.memoryFlags.forEach((flag) => console.log(`  ${flag}`));
+      info.memoryFlags.forEach((flag) => {
+        console.log(`  ${flag}`);
+      });
     }
 
     // Summary

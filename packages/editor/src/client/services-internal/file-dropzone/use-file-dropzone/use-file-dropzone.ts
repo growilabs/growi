@@ -1,41 +1,43 @@
 import { useCallback, useState } from 'react';
-
 import { AcceptedUploadFileType } from '@growi/core';
+import type { Accept, DropzoneOptions, DropzoneState } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
-import type { DropzoneOptions, DropzoneState, Accept } from 'react-dropzone';
-
 
 type FileDropzoneState = DropzoneState & {
-  isUploading: boolean,
-}
+  isUploading: boolean;
+};
 
 type Props = {
-  acceptedUploadFileType: AcceptedUploadFileType,
-  dropzoneOpts?: DropzoneOptions,
-  onUpload?: (files: File[]) => void,
-}
+  acceptedUploadFileType: AcceptedUploadFileType;
+  dropzoneOpts?: DropzoneOptions;
+  onUpload?: (files: File[]) => void;
+};
 
 export const useFileDropzone = (props: Props): FileDropzoneState => {
-
   const { acceptedUploadFileType, dropzoneOpts, onUpload } = props;
 
   const [isUploading, setIsUploading] = useState(false);
 
-  const dropHandler = useCallback((acceptedFiles: File[]) => {
-    if (onUpload == null) {
-      return;
-    }
-    if (acceptedUploadFileType === AcceptedUploadFileType.NONE) {
-      return;
-    }
+  const dropHandler = useCallback(
+    (acceptedFiles: File[]) => {
+      if (onUpload == null) {
+        return;
+      }
+      if (acceptedUploadFileType === AcceptedUploadFileType.NONE) {
+        return;
+      }
 
-    setIsUploading(true);
-    onUpload(acceptedFiles);
-    setIsUploading(false);
+      setIsUploading(true);
+      onUpload(acceptedFiles);
+      setIsUploading(false);
+    },
+    [onUpload, acceptedUploadFileType],
+  );
 
-  }, [onUpload, setIsUploading, acceptedUploadFileType]);
-
-  const accept: Accept | undefined = (acceptedUploadFileType === AcceptedUploadFileType.IMAGE) ? { 'image/*': [] } : undefined;
+  const accept: Accept | undefined =
+    acceptedUploadFileType === AcceptedUploadFileType.IMAGE
+      ? { 'image/*': [] }
+      : undefined;
 
   const dzState = useDropzone({
     onDrop: dropHandler,

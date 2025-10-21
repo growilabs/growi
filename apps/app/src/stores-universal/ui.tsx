@@ -2,9 +2,9 @@
  *                          Unions
  *********************************************************** */
 
+import { useCallback } from 'react';
 import type { SWRResponseWithUtils } from '@growi/core/dist/swr';
 import { isServer } from '@growi/core/dist/utils';
-import { useCallback } from 'react';
 import useSWRImmutable from 'swr/immutable';
 
 import { useIsNotFound } from '~/stores/page';

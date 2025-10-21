@@ -1,1 +1,1 @@
-export type EventActionsPermission = Map<string, boolean | string[]>
+export type EventActionsPermission = Map<string, boolean | string[]>;

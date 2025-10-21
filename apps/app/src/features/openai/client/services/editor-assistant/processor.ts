@@ -5,11 +5,15 @@
  */
 
 import type { LlmEditorAssistantDiff } from '../../../interfaces/editor-assistant/llm-response-schemas';
-import type { DiffApplicationResult, ProcessorConfig, DiffError } from '../../interfaces/types';
-
+import type {
+  DiffApplicationResult,
+  DiffError,
+  ProcessorConfig,
+} from '../../interfaces/types';
 import { ClientDiffApplicationEngine } from './diff-application';
 import { ClientErrorHandler } from './error-handling';
 import { ClientFuzzyMatcher } from './fuzzy-matching';
+
 // Note: measureNormalization import removed as it's not used in this file
 
 // Types for batch processing results
@@ -26,7 +30,13 @@ interface BatchProcessingResult {
 
 export interface ProcessingStatus {
   /** Current processing step */
-  step: 'initializing' | 'parsing' | 'applying' | 'validating' | 'completed' | 'error';
+  step:
+    | 'initializing'
+    | 'parsing'
+    | 'applying'
+    | 'validating'
+    | 'completed'
+    | 'error';
   /** Progress percentage (0-100) */
   progress: number;
   /** Current operation description */
@@ -61,7 +71,6 @@ export interface ProcessingOptions {
 // -----------------------------------------------------------------------------
 
 export class ClientSearchReplaceProcessor {
-
   private fuzzyMatcher: ClientFuzzyMatcher;
 
   private diffEngine: ClientDiffApplicationEngine;
@@ -73,8 +82,8 @@ export class ClientSearchReplaceProcessor {
   private currentStatus: ProcessingStatus | null = null;
 
   constructor(
-      config: Partial<ProcessorConfig> = {},
-      errorHandler?: ClientErrorHandler,
+    config: Partial<ProcessorConfig> = {},
+    errorHandler?: ClientErrorHandler,
   ) {
     // Browser-optimized defaults
     this.config = {
@@ -87,7 +96,10 @@ export class ClientSearchReplaceProcessor {
     };
 
     this.fuzzyMatcher = new ClientFuzzyMatcher(this.config.fuzzyThreshold);
-    this.diffEngine = new ClientDiffApplicationEngine(this.config, errorHandler);
+    this.diffEngine = new ClientDiffApplicationEngine(
+      this.config,
+      errorHandler,
+    );
     this.errorHandler = errorHandler ?? new ClientErrorHandler();
   }
 
@@ -95,9 +107,9 @@ export class ClientSearchReplaceProcessor {
    * Process multiple diffs with real-time progress and browser optimization
    */
   async processMultipleDiffs(
-      content: string,
-      diffs: LlmEditorAssistantDiff[],
-      options: ProcessingOptions = {},
+    content: string,
+    diffs: LlmEditorAssistantDiff[],
+    options: ProcessingOptions = {},
   ): Promise<DiffApplicationResult> {
     const {
       enableProgressCallbacks = true,
@@ -135,7 +147,9 @@ export class ClientSearchReplaceProcessor {
 
       if (diffs.length > this.config.maxDiffBlocks) {
         const error = this.errorHandler.createContentError(
-          new Error(`Too many diffs: ${diffs.length} > ${this.config.maxDiffBlocks}`),
+          new Error(
+            `Too many diffs: ${diffs.length} > ${this.config.maxDiffBlocks}`,
+          ),
           'Diff count validation',
         );
         return {
@@ -159,8 +173,7 @@ export class ClientSearchReplaceProcessor {
         const validation = this.diffEngine.validateDiff(diff);
         if (validation.valid) {
           validDiffs.push(diff);
-        }
-        else {
+        } else {
           validationErrors.push(
             this.errorHandler.createContentError(
               new Error(validation.issues.join(', ')),
@@ -179,7 +192,11 @@ export class ClientSearchReplaceProcessor {
       }
 
       // Update status
-      this.updateStatus('applying', 20, `Applying ${validDiffs.length} diffs...`);
+      this.updateStatus(
+        'applying',
+        20,
+        `Applying ${validDiffs.length} diffs...`,
+      );
       if (enableProgressCallbacks && onProgress && this.currentStatus) {
         onProgress(this.currentStatus);
       }
@@ -204,25 +221,36 @@ export class ClientSearchReplaceProcessor {
         success: results.errors.length === 0,
         appliedCount: results.appliedCount,
         content: results.finalContent,
-        failedParts: [...validationErrors, ...results.errors.map(e => e.error).filter((error): error is DiffError => error !== undefined)],
+        failedParts: [
+          ...validationErrors,
+          ...results.errors
+            .map((e) => e.error)
+            .filter((error): error is DiffError => error !== undefined),
+        ],
       };
 
       // Performance monitoring
       if (enablePerformanceMonitoring) {
         const totalTime = performance.now() - startTime;
-        this.logPerformanceMetrics(totalTime, diffs.length, results.appliedCount);
+        this.logPerformanceMetrics(
+          totalTime,
+          diffs.length,
+          results.appliedCount,
+        );
       }
 
       // Update status
-      this.updateStatus('completed', 100, `Completed: ${results.appliedCount}/${diffs.length} diffs applied`);
+      this.updateStatus(
+        'completed',
+        100,
+        `Completed: ${results.appliedCount}/${diffs.length} diffs applied`,
+      );
       if (enableProgressCallbacks && onProgress && this.currentStatus) {
         onProgress(this.currentStatus);
       }
 
       return finalResult;
-
-    }
-    catch (error) {
+    } catch (error) {
       const processingError = this.errorHandler.createContentError(
         error as Error,
         'Main processing error',
@@ -249,11 +277,11 @@ export class ClientSearchReplaceProcessor {
    * Process diffs in batches to prevent browser blocking
    */
   private async processDiffsInBatches(
-      content: string,
-      diffs: LlmEditorAssistantDiff[],
-      batchSize: number,
-      maxProcessingTime: number,
-      onProgress?: (status: ProcessingStatus) => void,
+    content: string,
+    diffs: LlmEditorAssistantDiff[],
+    batchSize: number,
+    maxProcessingTime: number,
+    onProgress?: (status: ProcessingStatus) => void,
   ): Promise<BatchProcessingResult> {
     let currentContent = content;
     let totalApplied = 0;
@@ -279,16 +307,24 @@ export class ClientSearchReplaceProcessor {
 
       // Update progress
       const progress = Math.floor((processedCount / diffs.length) * 70) + 20; // 20-90% range
-      this.updateStatus('applying', progress, `Processing batch ${batchIndex + 1}...`, processedCount);
+      this.updateStatus(
+        'applying',
+        progress,
+        `Processing batch ${batchIndex + 1}...`,
+        processedCount,
+      );
       if (onProgress && this.currentStatus) {
         onProgress(this.currentStatus);
       }
 
       // Process batch
-      const batchResult = this.diffEngine.applyMultipleDiffs(currentContent, batch);
+      const batchResult = this.diffEngine.applyMultipleDiffs(
+        currentContent,
+        batch,
+      );
 
-      allResults.push(...batchResult.results.map(r => ({ error: r.error })));
-      allErrors.push(...batchResult.errors.map(e => ({ error: e.error })));
+      allResults.push(...batchResult.results.map((r) => ({ error: r.error })));
+      allErrors.push(...batchResult.errors.map((e) => ({ error: e.error })));
       totalApplied += batchResult.appliedCount;
 
       if (batchResult.finalContent) {
@@ -327,10 +363,10 @@ export class ClientSearchReplaceProcessor {
    * Update processing status
    */
   private updateStatus(
-      step: ProcessingStatus['step'],
-      progress: number,
-      description: string,
-      processedCount?: number,
+    step: ProcessingStatus['step'],
+    progress: number,
+    description: string,
+    processedCount?: number,
   ): void {
     if (!this.currentStatus) return;
 
@@ -354,9 +390,9 @@ export class ClientSearchReplaceProcessor {
    * Log performance metrics for optimization
    */
   private logPerformanceMetrics(
-      totalTime: number,
-      totalDiffs: number,
-      appliedDiffs: number,
+    totalTime: number,
+    totalDiffs: number,
+    appliedDiffs: number,
   ): void {
     const metrics = {
       totalTime: Math.round(totalTime),
@@ -366,11 +402,17 @@ export class ClientSearchReplaceProcessor {
     };
 
     // eslint-disable-next-line no-console
-    console.info('[ClientSearchReplaceProcessor] Performance metrics:', metrics);
+    console.info(
+      '[ClientSearchReplaceProcessor] Performance metrics:',
+      metrics,
+    );
 
     if (totalTime > 5000) {
       // eslint-disable-next-line no-console
-      console.warn('[ClientSearchReplaceProcessor] Slow processing detected:', metrics);
+      console.warn(
+        '[ClientSearchReplaceProcessor] Slow processing detected:',
+        metrics,
+      );
     }
   }
 
@@ -409,5 +451,4 @@ export class ClientSearchReplaceProcessor {
       this.updateStatus('error', 0, 'Processing cancelled by user');
     }
   }
-
 }

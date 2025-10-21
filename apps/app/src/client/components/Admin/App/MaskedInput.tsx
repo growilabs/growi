@@ -1,13 +1,18 @@
+import type { ChangeEvent } from 'react';
 import { useState, type JSX } from 'react';
+
+import type { UseFormRegister, FieldValues } from 'react-hook-form';
 
 import styles from './MaskedInput.module.scss';
 
 type Props = {
-  name: string
+  name?: string
   readOnly: boolean
-  value: string
-  onChange?: (e: any) => void
+  value?: string
+  onChange?: (e: ChangeEvent<HTMLInputElement>) => void
   tabIndex?: number | undefined
+  register?: UseFormRegister<FieldValues>
+  fieldName?: string
 };
 
 export default function MaskedInput(props: Props): JSX.Element {
@@ -17,19 +22,26 @@ export default function MaskedInput(props: Props): JSX.Element {
   };
 
   const {
-    name, readOnly, value, onChange, tabIndex,
+    name, readOnly, value, onChange, tabIndex, register, fieldName,
   } = props;
+
+  // Use register if provided, otherwise use value/onChange
+  const inputProps = register && fieldName
+    ? register(fieldName)
+    : {
+      name,
+      value,
+      onChange,
+    };
 
   return (
     <div className={styles.MaskedInput}>
       <input
         className="form-control"
         type={passwordShown ? 'text' : 'password'}
-        name={name}
         readOnly={readOnly}
-        value={value}
-        onChange={onChange}
         tabIndex={tabIndex}
+        {...inputProps}
       />
       <span onClick={togglePassword} className={styles.PasswordReveal}>
         {passwordShown ? (
