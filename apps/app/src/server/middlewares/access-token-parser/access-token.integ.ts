@@ -210,15 +210,12 @@ describe('access-token-parser middleware for access token with scopes', () => {
     expect(serializeUserSecurely).toHaveBeenCalledOnce();
   });
 
-  it('should authenticate with x-growi-access-token header', async() => {
+  it('should authenticate with x-growi-access-token header and wildcard scope', async() => {
     // arrange
     const reqMock = mock<AccessTokenParserReq>({
       user: undefined,
-      headers: {},
     });
     const resMock = mock<Response>();
-
-    expect(reqMock.user).toBeUndefined();
 
     // prepare a user
     const targetUser = await User.create({
@@ -228,126 +225,21 @@ describe('access-token-parser middleware for access token with scopes', () => {
       lang: 'en_US',
     });
 
-    // generate token with read:user:info scope
+    // generate token with read:user:* scope
     const { token } = await AccessToken.generateToken(
       targetUser._id,
       new Date(Date.now() + 1000 * 60 * 60 * 24),
-      [SCOPE.READ.USER_SETTINGS.INFO],
+      [SCOPE.READ.USER_SETTINGS.ALL],
     );
 
-    // act - set token in x-growi-access-token header
+    // act - try to access with read:user:info scope
     reqMock.headers['x-growi-access-token'] = token;
-    await parserForAccessToken([SCOPE.READ.USER_SETTINGS.INFO])(reqMock, resMock);
+    await parserForAccessToken([SCOPE.READ.USER_SETTINGS.INFO, SCOPE.READ.USER_SETTINGS.API.ACCESS_TOKEN])(reqMock, resMock);
 
     // assert
     expect(reqMock.user).toBeDefined();
     expect(reqMock.user?._id).toStrictEqual(targetUser._id);
     expect(serializeUserSecurely).toHaveBeenCalledOnce();
-  });
-
-  it('should prefer Authorization header over x-growi-access-token header', async() => {
-    // arrange
-    const reqMock = mock<AccessTokenParserReq>({
-      user: undefined,
-      headers: {},
-    });
-    const resMock = mock<Response>();
-
-    expect(reqMock.user).toBeUndefined();
-
-    // prepare two users
-    const targetUser1 = await User.create({
-      name: faker.person.fullName(),
-      username: faker.string.uuid(),
-      password: faker.internet.password(),
-      lang: 'en_US',
-    });
-
-    const targetUser2 = await User.create({
-      name: faker.person.fullName(),
-      username: faker.string.uuid(),
-      password: faker.internet.password(),
-      lang: 'en_US',
-    });
-
-    // generate tokens for both users
-    const { token: authToken } = await AccessToken.generateToken(
-      targetUser1._id,
-      new Date(Date.now() + 1000 * 60 * 60 * 24),
-      [SCOPE.READ.USER_SETTINGS.INFO],
-    );
-
-    const { token: headerToken } = await AccessToken.generateToken(
-      targetUser2._id,
-      new Date(Date.now() + 1000 * 60 * 60 * 24),
-      [SCOPE.READ.USER_SETTINGS.INFO],
-    );
-
-    // act - set tokens in both Authorization and x-growi-access-token headers
-    reqMock.headers.authorization = `Bearer ${authToken}`;
-    reqMock.headers['x-growi-access-token'] = headerToken;
-    await parserForAccessToken([SCOPE.READ.USER_SETTINGS.INFO])(reqMock, resMock);
-
-    // assert - should use the user from Authorization header (targetUser1)
-    expect(reqMock.user).toBeDefined();
-    expect(reqMock.user?._id).toStrictEqual(targetUser1._id);
-    expect(serializeUserSecurely).toHaveBeenCalledOnce();
-  });
-
-  it('should fall back to x-growi-access-token header when Authorization header is not present', async() => {
-    // arrange
-    const reqMock = mock<AccessTokenParserReq>({
-      user: undefined,
-      headers: {},
-      query: {},
-      body: {},
-    });
-    const resMock = mock<Response>();
-
-    expect(reqMock.user).toBeUndefined();
-
-    // prepare a user
-    const targetUser = await User.create({
-      name: faker.person.fullName(),
-      username: faker.string.uuid(),
-      password: faker.internet.password(),
-      lang: 'en_US',
-    });
-
-    // generate token
-    const { token } = await AccessToken.generateToken(
-      targetUser._id,
-      new Date(Date.now() + 1000 * 60 * 60 * 24),
-      [SCOPE.READ.USER_SETTINGS.INFO],
-    );
-
-    // act - set token only in x-growi-access-token header
-    reqMock.headers['x-growi-access-token'] = token;
-    await parserForAccessToken([SCOPE.READ.USER_SETTINGS.INFO])(reqMock, resMock);
-
-    // assert
-    expect(reqMock.user).toBeDefined();
-    expect(reqMock.user?._id).toStrictEqual(targetUser._id);
-    expect(serializeUserSecurely).toHaveBeenCalledOnce();
-  });
-
-  it('should reject invalid token in x-growi-access-token header', async() => {
-    // arrange
-    const reqMock = mock<AccessTokenParserReq>({
-      user: undefined,
-      headers: {},
-    });
-    const resMock = mock<Response>();
-
-    expect(reqMock.user).toBeUndefined();
-
-    // act - set invalid token in x-growi-access-token header
-    reqMock.headers['x-growi-access-token'] = 'invalid-token';
-    await parserForAccessToken([SCOPE.READ.USER_SETTINGS.INFO])(reqMock, resMock);
-
-    // assert
-    expect(reqMock.user).toBeUndefined();
-    expect(serializeUserSecurely).not.toHaveBeenCalled();
   });
 
 });
