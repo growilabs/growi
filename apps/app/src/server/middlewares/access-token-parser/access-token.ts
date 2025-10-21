@@ -16,7 +16,10 @@ export const parserForAccessToken = (scopes: Scope[]) => {
     // It is more efficient to call it only once in "AccessTokenParser," which is the caller of the method
     const bearerToken = extractBearerToken(req.headers.authorization);
 
-    const accessToken = bearerToken ?? req.query.access_token ?? req.body.access_token;
+    const accessToken = bearerToken
+                        ?? req.headers['x-growi-access-token']
+                        ?? req.query.access_token
+                        ?? req.body.access_token;
     if (accessToken == null || typeof accessToken !== 'string') {
       return;
     }
