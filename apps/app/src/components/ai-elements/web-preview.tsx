@@ -1,22 +1,26 @@
-"use client";
+'use client';
 
-import { Button } from "~/components/ui/button";
+import type { ComponentProps, ReactNode } from 'react';
+import {
+  createContext, useContext, useEffect, useState,
+} from 'react';
+
+import { ChevronDownIcon } from 'lucide-react';
+
+import { Button } from '~/components/ui/button';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "~/components/ui/collapsible";
-import { Input } from "~/components/ui/input";
+} from '~/components/ui/collapsible';
+import { Input } from '~/components/ui/input';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "~/components/ui/tooltip";
-import { cn } from "~/lib/utils";
-import { ChevronDownIcon } from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
-import { createContext, useContext, useEffect, useState } from "react";
+} from '~/components/ui/tooltip';
+import { cn } from '~/lib/utils';
 
 export type WebPreviewContextValue = {
   url: string;
@@ -30,12 +34,12 @@ const WebPreviewContext = createContext<WebPreviewContextValue | null>(null);
 const useWebPreview = () => {
   const context = useContext(WebPreviewContext);
   if (!context) {
-    throw new Error("WebPreview components must be used within a WebPreview");
+    throw new Error('WebPreview components must be used within a WebPreview');
   }
   return context;
 };
 
-export type WebPreviewProps = ComponentProps<"div"> & {
+export type WebPreviewProps = ComponentProps<'div'> & {
   defaultUrl?: string;
   onUrlChange?: (url: string) => void;
 };
@@ -43,7 +47,7 @@ export type WebPreviewProps = ComponentProps<"div"> & {
 export const WebPreview = ({
   className,
   children,
-  defaultUrl = "",
+  defaultUrl = '',
   onUrlChange,
   ...props
 }: WebPreviewProps) => {
@@ -66,8 +70,8 @@ export const WebPreview = ({
     <WebPreviewContext.Provider value={contextValue}>
       <div
         className={cn(
-          "tw:flex tw:size-full tw:flex-col tw:rounded-lg tw:border tw:bg-card",
-          className
+          'tw:flex tw:size-full tw:flex-col tw:rounded-lg tw:border tw:bg-card',
+          className,
         )}
         {...props}
       >
@@ -77,7 +81,7 @@ export const WebPreview = ({
   );
 };
 
-export type WebPreviewNavigationProps = ComponentProps<"div">;
+export type WebPreviewNavigationProps = ComponentProps<'div'>;
 
 export const WebPreviewNavigation = ({
   className,
@@ -85,7 +89,7 @@ export const WebPreviewNavigation = ({
   ...props
 }: WebPreviewNavigationProps) => (
   <div
-    className={cn("tw:flex tw:items-center tw:gap-1 tw:border-b tw:p-2", className)}
+    className={cn('tw:flex tw:items-center tw:gap-1 tw:border-b tw:p-2', className)}
     {...props}
   >
     {children}
@@ -146,7 +150,7 @@ export const WebPreviewUrl = ({
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
+    if (event.key === 'Enter') {
       const target = event.target as HTMLInputElement;
       setUrl(target.value);
     }
@@ -165,7 +169,7 @@ export const WebPreviewUrl = ({
   );
 };
 
-export type WebPreviewBodyProps = ComponentProps<"iframe"> & {
+export type WebPreviewBodyProps = ComponentProps<'iframe'> & {
   loading?: ReactNode;
 };
 
@@ -180,7 +184,7 @@ export const WebPreviewBody = ({
   return (
     <div className="tw:flex-1">
       <iframe
-        className={cn("tw:size-full", className)}
+        className={cn('tw:size-full', className)}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
         src={(src ?? url) || undefined}
         title="Preview"
@@ -191,9 +195,9 @@ export const WebPreviewBody = ({
   );
 };
 
-export type WebPreviewConsoleProps = ComponentProps<"div"> & {
+export type WebPreviewConsoleProps = ComponentProps<'div'> & {
   logs?: Array<{
-    level: "log" | "warn" | "error";
+    level: 'log' | 'warn' | 'error';
     message: string;
     timestamp: Date;
   }>;
@@ -209,7 +213,7 @@ export const WebPreviewConsole = ({
 
   return (
     <Collapsible
-      className={cn("tw:border-t tw:bg-muted/50 tw:font-mono tw:text-sm", className)}
+      className={cn('tw:border-t tw:bg-muted/50 tw:font-mono tw:text-sm', className)}
       onOpenChange={setConsoleOpen}
       open={consoleOpen}
       {...props}
@@ -222,16 +226,16 @@ export const WebPreviewConsole = ({
           Console
           <ChevronDownIcon
             className={cn(
-              "tw:h-4 tw:w-4 tw:transition-transform tw:duration-200",
-              consoleOpen && "tw:rotate-180"
+              'tw:h-4 tw:w-4 tw:transition-transform tw:duration-200',
+              consoleOpen && 'tw:rotate-180',
             )}
           />
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent
         className={cn(
-          "tw:px-4 tw:pb-4",
-          "tw:data-[state=closed]:fade-out-0 tw:data-[state=open]:fade-in-0 tw:data-[state=closed]:zoom-out-95 tw:data-[state=open]:zoom-in-95 tw:data-[side=bottom]:slide-in-from-top-2 tw:data-[side=left]:slide-in-from-right-2 tw:data-[side=right]:slide-in-from-left-2 tw:data-[side=top]:slide-in-from-bottom-2 tw:outline-none tw:data-[state=closed]:animate-out tw:data-[state=open]:animate-in"
+          'tw:px-4 tw:pb-4',
+          'tw:data-[state=closed]:fade-out-0 tw:data-[state=open]:fade-in-0 tw:data-[state=closed]:zoom-out-95 tw:data-[state=open]:zoom-in-95 tw:data-[side=bottom]:slide-in-from-top-2 tw:data-[side=left]:slide-in-from-right-2 tw:data-[side=right]:slide-in-from-left-2 tw:data-[side=top]:slide-in-from-bottom-2 tw:outline-none tw:data-[state=closed]:animate-out tw:data-[state=open]:animate-in',
         )}
       >
         <div className="tw:max-h-48 tw:space-y-1 tw:overflow-y-auto">
@@ -241,16 +245,16 @@ export const WebPreviewConsole = ({
             logs.map((log, index) => (
               <div
                 className={cn(
-                  "tw:text-xs",
-                  log.level === "error" && "tw:text-destructive",
-                  log.level === "warn" && "tw:text-yellow-600",
-                  log.level === "log" && "tw:text-foreground"
+                  'tw:text-xs',
+                  log.level === 'error' && 'tw:text-destructive',
+                  log.level === 'warn' && 'tw:text-yellow-600',
+                  log.level === 'log' && 'tw:text-foreground',
                 )}
                 key={`${log.timestamp.getTime()}-${index}`}
               >
                 <span className="tw:text-muted-foreground">
                   {log.timestamp.toLocaleTimeString()}
-                </span>{" "}
+                </span>{' '}
                 {log.message}
               </div>
             ))

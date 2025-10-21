@@ -1,5 +1,6 @@
-import { cn } from "~/lib/utils";
-import type { HTMLAttributes } from "react";
+import type { HTMLAttributes } from 'react';
+
+import { cn } from '~/lib/utils';
 
 type LoaderIconProps = {
   size?: number;
@@ -9,7 +10,7 @@ const LoaderIcon = ({ size = 16 }: LoaderIconProps) => (
   <svg
     height={size}
     strokeLinejoin="round"
-    style={{ color: "currentcolor" }}
+    style={{ color: 'currentcolor' }}
     viewBox="0 0 16 16"
     width={size}
   >
@@ -86,8 +87,8 @@ export type LoaderProps = HTMLAttributes<HTMLDivElement> & {
 export const Loader = ({ className, size = 16, ...props }: LoaderProps) => (
   <div
     className={cn(
-      "tw:inline-flex tw:animate-spin tw:items-center tw:justify-center",
-      className
+      'tw:inline-flex tw:animate-spin tw:items-center tw:justify-center',
+      className,
     )}
     {...props}
   >

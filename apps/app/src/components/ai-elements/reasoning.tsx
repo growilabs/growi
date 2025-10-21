@@ -1,17 +1,22 @@
-"use client";
+'use client';
 
-import { useControllableState } from "@radix-ui/react-use-controllable-state";
+import type { ComponentProps } from 'react';
+import {
+  createContext, memo, useContext, useEffect, useState,
+} from 'react';
+
+import { useControllableState } from '@radix-ui/react-use-controllable-state';
+import { BrainIcon, ChevronDownIcon } from 'lucide-react';
+
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "~/components/ui/collapsible";
-import { cn } from "~/lib/utils";
-import { BrainIcon, ChevronDownIcon } from "lucide-react";
-import type { ComponentProps } from "react";
-import { createContext, memo, useContext, useEffect, useState } from "react";
-import { Response } from "./response";
-import { Shimmer } from "./shimmer";
+} from '~/components/ui/collapsible';
+import { cn } from '~/lib/utils';
+
+import { Response } from './response';
+import { Shimmer } from './shimmer';
 
 type ReasoningContextValue = {
   isStreaming: boolean;
@@ -25,7 +30,7 @@ const ReasoningContext = createContext<ReasoningContextValue | null>(null);
 const useReasoning = () => {
   const context = useContext(ReasoningContext);
   if (!context) {
-    throw new Error("Reasoning components must be used within Reasoning");
+    throw new Error('Reasoning components must be used within Reasoning');
   }
   return context;
 };
@@ -71,7 +76,8 @@ export const Reasoning = memo(
         if (startTime === null) {
           setStartTime(Date.now());
         }
-      } else if (startTime !== null) {
+      }
+      else if (startTime !== null) {
         setDuration(Math.ceil((Date.now() - startTime) / MS_IN_S));
         setStartTime(null);
       }
@@ -96,10 +102,12 @@ export const Reasoning = memo(
 
     return (
       <ReasoningContext.Provider
-        value={{ isStreaming, isOpen, setIsOpen, duration }}
+        value={{
+          isStreaming, isOpen, setIsOpen, duration,
+        }}
       >
         <Collapsible
-          className={cn("tw:not-prose tw:mb-4", className)}
+          className={cn('tw:not-prose tw:mb-4', className)}
           onOpenChange={handleOpenChange}
           open={isOpen}
           {...props}
@@ -108,7 +116,7 @@ export const Reasoning = memo(
         </Collapsible>
       </ReasoningContext.Provider>
     );
-  }
+  },
 );
 
 export type ReasoningTriggerProps = ComponentProps<typeof CollapsibleTrigger>;
@@ -130,8 +138,8 @@ export const ReasoningTrigger = memo(
     return (
       <CollapsibleTrigger
         className={cn(
-          "tw:flex tw:w-full tw:items-center tw:gap-2 tw:text-muted-foreground tw:text-sm tw:transition-colors tw:hover:text-foreground",
-          className
+          'tw:flex tw:w-full tw:items-center tw:gap-2 tw:text-muted-foreground tw:text-sm tw:transition-colors tw:hover:text-foreground',
+          className,
         )}
         {...props}
       >
@@ -141,15 +149,15 @@ export const ReasoningTrigger = memo(
             {getThinkingMessage(isStreaming, duration)}
             <ChevronDownIcon
               className={cn(
-                "tw:size-4 tw:transition-transform",
-                isOpen ? "tw:rotate-180" : "tw:rotate-0"
+                'tw:size-4 tw:transition-transform',
+                isOpen ? 'tw:rotate-180' : 'tw:rotate-0',
               )}
             />
           </>
         )}
       </CollapsibleTrigger>
     );
-  }
+  },
 );
 
 export type ReasoningContentProps = ComponentProps<
@@ -162,17 +170,18 @@ export const ReasoningContent = memo(
   ({ className, children, ...props }: ReasoningContentProps) => (
     <CollapsibleContent
       className={cn(
-        "tw:mt-4 tw:text-sm",
-        "tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:slide-out-to-top-2 tw:data-[state=open]:slide-in-from-top-2 tw:text-muted-foreground tw:outline-none tw:data-[state=closed]:animate-out tw:data-[state=open]:animate-in",
-        className
+        'tw:mt-4 tw:text-sm',
+        // eslint-disable-next-line max-len
+        'tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:slide-out-to-top-2 tw:data-[state=open]:slide-in-from-top-2 tw:text-muted-foreground tw:outline-none tw:data-[state=closed]:animate-out tw:data-[state=open]:animate-in',
+        className,
       )}
       {...props}
     >
       <Response className="tw:grid tw:gap-2">{children}</Response>
     </CollapsibleContent>
-  )
+  ),
 );
 
-Reasoning.displayName = "Reasoning";
-ReasoningTrigger.displayName = "ReasoningTrigger";
-ReasoningContent.displayName = "ReasoningContent";
+Reasoning.displayName = 'Reasoning';
+ReasoningTrigger.displayName = 'ReasoningTrigger';
+ReasoningContent.displayName = 'ReasoningContent';

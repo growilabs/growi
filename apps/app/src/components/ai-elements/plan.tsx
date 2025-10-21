@@ -1,6 +1,11 @@
-"use client";
+'use client';
 
-import { Button } from "~/components/ui/button";
+import type { ComponentProps } from 'react';
+import { createContext, useContext } from 'react';
+
+import { ChevronsUpDownIcon } from 'lucide-react';
+
+import { Button } from '~/components/ui/button';
 import {
   Card,
   CardAction,
@@ -9,17 +14,15 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "~/components/ui/card";
+} from '~/components/ui/card';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "~/components/ui/collapsible";
-import { cn } from "~/lib/utils";
-import { ChevronsUpDownIcon } from "lucide-react";
-import type { ComponentProps } from "react";
-import { createContext, useContext } from "react";
-import { Shimmer } from "./shimmer";
+} from '~/components/ui/collapsible';
+import { cn } from '~/lib/utils';
+
+import { Shimmer } from './shimmer';
 
 type PlanContextValue = {
   isStreaming: boolean;
@@ -30,7 +33,7 @@ const PlanContext = createContext<PlanContextValue | null>(null);
 const usePlan = () => {
   const context = useContext(PlanContext);
   if (!context) {
-    throw new Error("Plan components must be used within Plan");
+    throw new Error('Plan components must be used within Plan');
   }
   return context;
 };
@@ -47,7 +50,7 @@ export const Plan = ({
 }: PlanProps) => (
   <PlanContext.Provider value={{ isStreaming }}>
     <Collapsible asChild data-slot="plan" {...props}>
-      <Card className={cn("tw:shadow-none", className)}>{children}</Card>
+      <Card className={cn('tw:shadow-none', className)}>{children}</Card>
     </Collapsible>
   </PlanContext.Provider>
 );
@@ -56,7 +59,7 @@ export type PlanHeaderProps = ComponentProps<typeof CardHeader>;
 
 export const PlanHeader = ({ className, ...props }: PlanHeaderProps) => (
   <CardHeader
-    className={cn("tw:flex tw:items-start tw:justify-between", className)}
+    className={cn('tw:flex tw:items-start tw:justify-between', className)}
     data-slot="plan-header"
     {...props}
   />
@@ -64,7 +67,7 @@ export const PlanHeader = ({ className, ...props }: PlanHeaderProps) => (
 
 export type PlanTitleProps = Omit<
   ComponentProps<typeof CardTitle>,
-  "children"
+  'children'
 > & {
   children: string;
 };
@@ -81,7 +84,7 @@ export const PlanTitle = ({ children, ...props }: PlanTitleProps) => {
 
 export type PlanDescriptionProps = Omit<
   ComponentProps<typeof CardDescription>,
-  "children"
+  'children'
 > & {
   children: string;
 };
@@ -95,7 +98,7 @@ export const PlanDescription = ({
 
   return (
     <CardDescription
-      className={cn("tw:text-balance", className)}
+      className={cn('tw:text-balance', className)}
       data-slot="plan-description"
       {...props}
     >
@@ -118,7 +121,7 @@ export const PlanContent = (props: PlanContentProps) => (
   </CollapsibleContent>
 );
 
-export type PlanFooterProps = ComponentProps<"div">;
+export type PlanFooterProps = ComponentProps<'div'>;
 
 export const PlanFooter = (props: PlanFooterProps) => (
   <CardFooter data-slot="plan-footer" {...props} />
@@ -129,7 +132,7 @@ export type PlanTriggerProps = ComponentProps<typeof CollapsibleTrigger>;
 export const PlanTrigger = ({ className, ...props }: PlanTriggerProps) => (
   <CollapsibleTrigger asChild>
     <Button
-      className={cn("tw:size-8", className)}
+      className={cn('tw:size-8', className)}
       data-slot="plan-trigger"
       size="icon"
       variant="ghost"

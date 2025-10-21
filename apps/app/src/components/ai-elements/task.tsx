@@ -1,15 +1,17 @@
-"use client";
+'use client';
+
+import type { ComponentProps } from 'react';
+
+import { ChevronDownIcon, SearchIcon } from 'lucide-react';
 
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "~/components/ui/collapsible";
-import { cn } from "~/lib/utils";
-import { ChevronDownIcon, SearchIcon } from "lucide-react";
-import type { ComponentProps } from "react";
+} from '~/components/ui/collapsible';
+import { cn } from '~/lib/utils';
 
-export type TaskItemFileProps = ComponentProps<"div">;
+export type TaskItemFileProps = ComponentProps<'div'>;
 
 export const TaskItemFile = ({
   children,
@@ -18,8 +20,8 @@ export const TaskItemFile = ({
 }: TaskItemFileProps) => (
   <div
     className={cn(
-      "tw:inline-flex tw:items-center tw:gap-1 tw:rounded-md tw:border tw:bg-secondary tw:px-1.5 tw:py-0.5 tw:text-foreground tw:text-xs",
-      className
+      'tw:inline-flex tw:items-center tw:gap-1 tw:rounded-md tw:border tw:bg-secondary tw:px-1.5 tw:py-0.5 tw:text-foreground tw:text-xs',
+      className,
     )}
     {...props}
   >
@@ -27,10 +29,10 @@ export const TaskItemFile = ({
   </div>
 );
 
-export type TaskItemProps = ComponentProps<"div">;
+export type TaskItemProps = ComponentProps<'div'>;
 
 export const TaskItem = ({ children, className, ...props }: TaskItemProps) => (
-  <div className={cn("tw:text-muted-foreground tw:text-sm", className)} {...props}>
+  <div className={cn('tw:text-muted-foreground tw:text-sm', className)} {...props}>
     {children}
   </div>
 );
@@ -55,8 +57,9 @@ export const TaskTrigger = ({
   title,
   ...props
 }: TaskTriggerProps) => (
-  <CollapsibleTrigger asChild className={cn("tw:group", className)} {...props}>
+  <CollapsibleTrigger asChild className={cn('tw:group', className)} {...props}>
     {children ?? (
+    // eslint-disable-next-line max-len
       <div className="tw:flex tw:w-full tw:cursor-pointer tw:items-center tw:gap-2 tw:text-muted-foreground tw:text-sm tw:transition-colors tw:hover:text-foreground">
         <SearchIcon className="tw:size-4" />
         <p className="tw:text-sm">{title}</p>
@@ -75,8 +78,9 @@ export const TaskContent = ({
 }: TaskContentProps) => (
   <CollapsibleContent
     className={cn(
-      "tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:slide-out-to-top-2 tw:data-[state=open]:slide-in-from-top-2 tw:text-popover-foreground tw:outline-none tw:data-[state=closed]:animate-out tw:data-[state=open]:animate-in",
-      className
+      // eslint-disable-next-line max-len
+      'tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:slide-out-to-top-2 tw:data-[state=open]:slide-in-from-top-2 tw:text-popover-foreground tw:outline-none tw:data-[state=closed]:animate-out tw:data-[state=open]:animate-in',
+      className,
     )}
     {...props}
   >

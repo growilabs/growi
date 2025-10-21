@@ -1,7 +1,9 @@
-import { Background, ReactFlow, type ReactFlowProps } from "@xyflow/react";
-import type { ReactNode } from "react";
-import "@xyflow/react/dist/style.css";
-import { Controls } from "./controls";
+import type { ReactNode } from 'react';
+
+import { Background, ReactFlow, type ReactFlowProps } from '@xyflow/react';
+
+import '@xyflow/react/dist/style.css';
+import { Controls } from './controls';
 
 type CanvasProps = ReactFlowProps & {
   children?: ReactNode;
@@ -9,11 +11,11 @@ type CanvasProps = ReactFlowProps & {
 
 export const Canvas = ({ children, ...props }: CanvasProps) => (
   <ReactFlow
-    deleteKeyCode={["Backspace", "Delete"]}
+    deleteKeyCode={['Backspace', 'Delete']}
     fitView
     panOnDrag={false}
     panOnScroll
-    selectionOnDrag={true}
+    selectionOnDrag
     zoomOnDoubleClick={false}
     {...props}
   >

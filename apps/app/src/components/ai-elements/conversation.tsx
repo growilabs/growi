@@ -1,17 +1,19 @@
-"use client";
+'use client';
 
-import { Button } from "~/components/ui/button";
-import { cn } from "~/lib/utils";
-import { ArrowDownIcon } from "lucide-react";
-import type { ComponentProps } from "react";
-import { useCallback } from "react";
-import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
+import type { ComponentProps } from 'react';
+import { useCallback } from 'react';
+
+import { ArrowDownIcon } from 'lucide-react';
+import { StickToBottom, useStickToBottomContext } from 'use-stick-to-bottom';
+
+import { Button } from '~/components/ui/button';
+import { cn } from '~/lib/utils';
 
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
 
 export const Conversation = ({ className, ...props }: ConversationProps) => (
   <StickToBottom
-    className={cn("tw:relative tw:flex-1 tw:overflow-y-auto", className)}
+    className={cn('tw:relative tw:flex-1 tw:overflow-y-auto', className)}
     initial="smooth"
     resize="smooth"
     role="log"
@@ -27,10 +29,10 @@ export const ConversationContent = ({
   className,
   ...props
 }: ConversationContentProps) => (
-  <StickToBottom.Content className={cn("tw:p-4", className)} {...props} />
+  <StickToBottom.Content className={cn('tw:p-4', className)} {...props} />
 );
 
-export type ConversationEmptyStateProps = ComponentProps<"div"> & {
+export type ConversationEmptyStateProps = ComponentProps<'div'> & {
   title?: string;
   description?: string;
   icon?: React.ReactNode;
@@ -38,16 +40,16 @@ export type ConversationEmptyStateProps = ComponentProps<"div"> & {
 
 export const ConversationEmptyState = ({
   className,
-  title = "No messages yet",
-  description = "Start a conversation to see messages here",
+  title = 'No messages yet',
+  description = 'Start a conversation to see messages here',
   icon,
   children,
   ...props
 }: ConversationEmptyStateProps) => (
   <div
     className={cn(
-      "tw:flex tw:size-full tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:p-8 tw:text-center",
-      className
+      'tw:flex tw:size-full tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:p-8 tw:text-center',
+      className,
     )}
     {...props}
   >
@@ -81,8 +83,8 @@ export const ConversationScrollButton = ({
     !isAtBottom && (
       <Button
         className={cn(
-          "tw:absolute tw:bottom-4 tw:left-[50%] tw:translate-x-[-50%] tw:rounded-full",
-          className
+          'tw:absolute tw:bottom-4 tw:left-[50%] tw:translate-x-[-50%] tw:rounded-full',
+          className,
         )}
         onClick={handleScrollToBottom}
         size="icon"

@@ -1,11 +1,16 @@
-"use client";
+'use client';
 
-import { Button } from "~/components/ui/button";
-import { cn } from "~/lib/utils";
-import type { UIMessage } from "ai";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
-import { createContext, useContext, useEffect, useState } from "react";
+import type { ComponentProps, HTMLAttributes, ReactElement } from 'react';
+import {
+  createContext, useContext, useEffect, useState,
+} from 'react';
+
+import type { UIMessage } from 'ai';
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+
+import { Button } from '~/components/ui/button';
+import { cn } from '~/lib/utils';
+
 
 type BranchContextType = {
   currentBranch: number;
@@ -22,7 +27,7 @@ const useBranch = () => {
   const context = useContext(BranchContext);
 
   if (!context) {
-    throw new Error("Branch components must be used within Branch");
+    throw new Error('Branch components must be used within Branch');
   }
 
   return context;
@@ -48,14 +53,12 @@ export const Branch = ({
   };
 
   const goToPrevious = () => {
-    const newBranch =
-      currentBranch > 0 ? currentBranch - 1 : branches.length - 1;
+    const newBranch = currentBranch > 0 ? currentBranch - 1 : branches.length - 1;
     handleBranchChange(newBranch);
   };
 
   const goToNext = () => {
-    const newBranch =
-      currentBranch < branches.length - 1 ? currentBranch + 1 : 0;
+    const newBranch = currentBranch < branches.length - 1 ? currentBranch + 1 : 0;
     handleBranchChange(newBranch);
   };
 
@@ -71,7 +74,7 @@ export const Branch = ({
   return (
     <BranchContext.Provider value={contextValue}>
       <div
-        className={cn("tw:grid tw:w-full tw:gap-2 tw:[&>div]:pb-0", className)}
+        className={cn('tw:grid tw:w-full tw:gap-2 tw:[&>div]:pb-0', className)}
         {...props}
       />
     </BranchContext.Provider>
@@ -94,8 +97,8 @@ export const BranchMessages = ({ children, ...props }: BranchMessagesProps) => {
   return childrenArray.map((branch, index) => (
     <div
       className={cn(
-        "tw:grid tw:gap-2 tw:overflow-hidden tw:[&>div]:pb-0",
-        index === currentBranch ? "tw:block" : "tw:hidden"
+        'tw:grid tw:gap-2 tw:overflow-hidden tw:[&>div]:pb-0',
+        index === currentBranch ? 'tw:block' : 'tw:hidden',
       )}
       key={branch.key}
       {...props}
@@ -106,7 +109,7 @@ export const BranchMessages = ({ children, ...props }: BranchMessagesProps) => {
 };
 
 export type BranchSelectorProps = HTMLAttributes<HTMLDivElement> & {
-  from: UIMessage["role"];
+  from: UIMessage['role'];
 };
 
 export const BranchSelector = ({
@@ -124,9 +127,9 @@ export const BranchSelector = ({
   return (
     <div
       className={cn(
-        "tw:flex tw:items-center tw:gap-2 tw:self-end tw:px-10",
-        from === "assistant" ? "tw:justify-start" : "tw:justify-end",
-        className
+        'tw:flex tw:items-center tw:gap-2 tw:self-end tw:px-10',
+        from === 'assistant' ? 'tw:justify-start' : 'tw:justify-end',
+        className,
       )}
       {...props}
     />
@@ -146,10 +149,10 @@ export const BranchPrevious = ({
     <Button
       aria-label="Previous branch"
       className={cn(
-        "tw:size-7 tw:shrink-0 tw:rounded-full tw:text-muted-foreground tw:transition-colors",
-        "tw:hover:bg-accent tw:hover:text-foreground",
-        "tw:disabled:pointer-events-none tw:disabled:opacity-50",
-        className
+        'tw:size-7 tw:shrink-0 tw:rounded-full tw:text-muted-foreground tw:transition-colors',
+        'tw:hover:bg-accent tw:hover:text-foreground',
+        'tw:disabled:pointer-events-none tw:disabled:opacity-50',
+        className,
       )}
       disabled={totalBranches <= 1}
       onClick={goToPrevious}
@@ -176,10 +179,10 @@ export const BranchNext = ({
     <Button
       aria-label="Next branch"
       className={cn(
-        "tw:size-7 tw:shrink-0 tw:rounded-full tw:text-muted-foreground tw:transition-colors",
-        "tw:hover:bg-accent tw:hover:text-foreground",
-        "tw:disabled:pointer-events-none tw:disabled:opacity-50",
-        className
+        'tw:size-7 tw:shrink-0 tw:rounded-full tw:text-muted-foreground tw:transition-colors',
+        'tw:hover:bg-accent tw:hover:text-foreground',
+        'tw:disabled:pointer-events-none tw:disabled:opacity-50',
+        className,
       )}
       disabled={totalBranches <= 1}
       onClick={goToNext}
@@ -201,8 +204,8 @@ export const BranchPage = ({ className, ...props }: BranchPageProps) => {
   return (
     <span
       className={cn(
-        "tw:font-medium tw:text-muted-foreground tw:text-xs tw:tabular-nums",
-        className
+        'tw:font-medium tw:text-muted-foreground tw:text-xs tw:tabular-nums',
+        className,
       )}
       {...props}
     >
