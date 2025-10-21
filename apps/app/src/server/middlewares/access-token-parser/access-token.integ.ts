@@ -1,9 +1,9 @@
 import { faker } from '@faker-js/faker';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Response } from 'express';
 import { mock } from 'vitest-mock-extended';
 
-import { SCOPE } from '@growi/core/dist/interfaces';
 import type Crowi from '~/server/crowi';
 import type UserEvent from '~/server/events/user';
 import { AccessToken } from '~/server/models/access-token';
