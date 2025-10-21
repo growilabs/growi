@@ -1,15 +1,11 @@
 import type { IGrantedGroup } from '@growi/core';
 import { GroupType } from '@growi/core';
 import { addSeconds } from 'date-fns/addSeconds';
-import type {
-  Model, Document, QueryOptions, FilterQuery,
-} from 'mongoose';
-import mongoose, {
-  Schema,
-} from 'mongoose';
+import type { Document, FilterQuery, Model, QueryOptions } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
 
 import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
-import { PageActionType, PageActionStage } from '~/interfaces/page-operation';
+import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
 
 import loggerFactory from '../../utils/logger';
 import type { ObjectIdLike } from '../interfaces/mongoose-utils';
@@ -21,61 +17,69 @@ const logger = loggerFactory('growi:models:page-operation');
 
 const ObjectId = mongoose.Schema.Types.ObjectId;
 
-
 type IPageForResuming = {
-  _id: ObjectIdLike,
-  path: string,
-  isEmpty: boolean,
-  parent?: ObjectIdLike,
-  grant?: number,
-  grantedUsers?: ObjectIdLike[],
-  grantedGroups: IGrantedGroup[],
-  descendantCount: number,
-  status?: number,
-  revision?: ObjectIdLike,
-  lastUpdateUser?: ObjectIdLike,
-  creator?: ObjectIdLike,
+  _id: ObjectIdLike;
+  path: string;
+  isEmpty: boolean;
+  parent?: ObjectIdLike;
+  grant?: number;
+  grantedUsers?: ObjectIdLike[];
+  grantedGroups: IGrantedGroup[];
+  descendantCount: number;
+  status?: number;
+  revision?: ObjectIdLike;
+  lastUpdateUser?: ObjectIdLike;
+  creator?: ObjectIdLike;
 };
 
 type IUserForResuming = {
-  _id: ObjectIdLike,
+  _id: ObjectIdLike;
 };
 
 type IOptionsForResuming = {
-  format: 'md' | 'pdf',
-  updateMetadata?: boolean,
-  createRedirectPage?: boolean,
-  prevDescendantCount?: number,
-} & IOptionsForUpdate & IOptionsForCreate;
-
+  format: 'md' | 'pdf';
+  updateMetadata?: boolean;
+  createRedirectPage?: boolean;
+  prevDescendantCount?: number;
+} & IOptionsForUpdate &
+  IOptionsForCreate;
 
 /*
  * Main Schema
  */
 export interface IPageOperation {
-  actionType: PageActionType,
-  actionStage: PageActionStage,
-  fromPath: string,
-  toPath?: string,
-  page: IPageForResuming,
-  user: IUserForResuming,
-  options?: IOptionsForResuming,
-  incForUpdatingDescendantCount?: number,
-  unprocessableExpiryDate: Date,
-  exPage?: IPageForResuming,
+  actionType: PageActionType;
+  actionStage: PageActionStage;
+  fromPath: string;
+  toPath?: string;
+  page: IPageForResuming;
+  user: IUserForResuming;
+  options?: IOptionsForResuming;
+  incForUpdatingDescendantCount?: number;
+  unprocessableExpiryDate: Date;
+  exPage?: IPageForResuming;
 
-  isProcessable(): boolean
+  isProcessable(): boolean;
 }
 
 export interface PageOperationDocument extends IPageOperation, Document {}
 
-export type PageOperationDocumentHasId = PageOperationDocument & { _id: ObjectIdLike };
+export type PageOperationDocumentHasId = PageOperationDocument & {
+  _id: ObjectIdLike;
+};
 
 export interface PageOperationModel extends Model<PageOperationDocument> {
-  findByIdAndUpdatePageActionStage(pageOpId: ObjectIdLike, stage: PageActionStage): Promise<PageOperationDocumentHasId | null>
-  findMainOps(filter?: FilterQuery<PageOperationDocument>, projection?: any, options?: QueryOptions): Promise<PageOperationDocumentHasId[]>
-  deleteByActionTypes(deleteTypeList: PageActionType[]): Promise<void>
-  extendExpiryDate(operationId: ObjectIdLike): Promise<void>
+  findByIdAndUpdatePageActionStage(
+    pageOpId: ObjectIdLike,
+    stage: PageActionStage,
+  ): Promise<PageOperationDocumentHasId | null>;
+  findMainOps(
+    filter?: FilterQuery<PageOperationDocument>,
+    projection?: any,
+    options?: QueryOptions,
+  ): Promise<PageOperationDocumentHasId[]>;
+  deleteByActionTypes(deleteTypeList: PageActionType[]): Promise<void>;
+  extendExpiryDate(operationId: ObjectIdLike): Promise<void>;
 }
 
 const pageSchemaForResuming = new Schema<IPageForResuming>({
@@ -88,17 +92,21 @@ const pageSchemaForResuming = new Schema<IPageForResuming>({
   status: { type: String },
   grant: { type: Number },
   grantedUsers: [{ type: ObjectId, ref: 'User' }],
-  grantedGroups: [{
-    type: {
-      type: String,
-      enum: Object.values(GroupType),
-      required: true,
-      default: 'UserGroup',
+  grantedGroups: [
+    {
+      type: {
+        type: String,
+        enum: Object.values(GroupType),
+        required: true,
+        default: 'UserGroup',
+      },
+      item: {
+        type: ObjectId,
+        refPath: 'grantedGroups.type',
+        required: true,
+      },
     },
-    item: {
-      type: ObjectId, refPath: 'grantedGroups.type', required: true,
-    },
-  }],
+  ],
   creator: { type: ObjectId, ref: 'User' },
   lastUpdateUser: { type: ObjectId, ref: 'User' },
 });
@@ -107,25 +115,32 @@ const userSchemaForResuming = new Schema<IUserForResuming>({
   _id: { type: ObjectId, ref: 'User', required: true },
 });
 
-const optionsSchemaForResuming = new Schema<IOptionsForResuming>({
-  createRedirectPage: { type: Boolean },
-  updateMetadata: { type: Boolean },
-  prevDescendantCount: { type: Number },
-  grant: { type: Number },
-  grantUserGroupIds: [{
-    type: {
-      type: String,
-      enum: Object.values(GroupType),
-      required: true,
-      default: 'UserGroup',
-    },
-    item: {
-      type: ObjectId, refPath: 'grantedGroups.type', required: true,
-    },
-  }],
-  format: { type: String },
-  overwriteScopesOfDescendants: { type: Boolean },
-}, { _id: false });
+const optionsSchemaForResuming = new Schema<IOptionsForResuming>(
+  {
+    createRedirectPage: { type: Boolean },
+    updateMetadata: { type: Boolean },
+    prevDescendantCount: { type: Number },
+    grant: { type: Number },
+    grantUserGroupIds: [
+      {
+        type: {
+          type: String,
+          enum: Object.values(GroupType),
+          required: true,
+          default: 'UserGroup',
+        },
+        item: {
+          type: ObjectId,
+          refPath: 'grantedGroups.type',
+          required: true,
+        },
+      },
+    ],
+    format: { type: String },
+    overwriteScopesOfDescendants: { type: Boolean },
+  },
+  { _id: false },
+);
 
 const schema = new Schema<PageOperationDocument, PageOperationModel>({
   actionType: {
@@ -147,22 +162,30 @@ const schema = new Schema<PageOperationDocument, PageOperationModel>({
   user: { type: userSchemaForResuming, required: true },
   options: { type: optionsSchemaForResuming },
   incForUpdatingDescendantCount: { type: Number },
-  unprocessableExpiryDate: { type: Date, default: () => addSeconds(new Date(), 10) },
+  unprocessableExpiryDate: {
+    type: Date,
+    default: () => addSeconds(new Date(), 10),
+  },
 });
 
-schema.statics.findByIdAndUpdatePageActionStage = async function(
-    pageOpId: ObjectIdLike, stage: PageActionStage,
+schema.statics.findByIdAndUpdatePageActionStage = async function (
+  pageOpId: ObjectIdLike,
+  stage: PageActionStage,
 ): Promise<PageOperationDocumentHasId | null> {
-
-  return this.findByIdAndUpdate(pageOpId, {
-    $set: { actionStage: stage },
-  }, { new: true });
+  return this.findByIdAndUpdate(
+    pageOpId,
+    {
+      $set: { actionStage: stage },
+    },
+    { new: true },
+  );
 };
 
-schema.statics.findMainOps = async function(
-    filter?: FilterQuery<PageOperationDocument>, projection?: any, options?: QueryOptions,
+schema.statics.findMainOps = async function (
+  filter?: FilterQuery<PageOperationDocument>,
+  projection?: any,
+  options?: QueryOptions,
 ): Promise<PageOperationDocumentHasId[]> {
-
   return this.find(
     { ...filter, actionStage: PageActionStage.Main },
     projection,
@@ -170,25 +193,34 @@ schema.statics.findMainOps = async function(
   );
 };
 
-schema.statics.deleteByActionTypes = async function(
-    actionTypes: PageActionType[],
+schema.statics.deleteByActionTypes = async function (
+  actionTypes: PageActionType[],
 ): Promise<void> {
-
   await this.deleteMany({ actionType: { $in: actionTypes } });
-  logger.info(`Deleted all PageOperation documents with actionType: [${actionTypes}]`);
+  logger.info(
+    `Deleted all PageOperation documents with actionType: [${actionTypes}]`,
+  );
 };
 
 /**
  * add TIME_TO_ADD_SEC to current time and update unprocessableExpiryDate with it
  */
-schema.statics.extendExpiryDate = async function(operationId: ObjectIdLike): Promise<void> {
+schema.statics.extendExpiryDate = async function (
+  operationId: ObjectIdLike,
+): Promise<void> {
   const date = addSeconds(new Date(), TIME_TO_ADD_SEC);
   await this.findByIdAndUpdate(operationId, { unprocessableExpiryDate: date });
 };
 
-schema.methods.isProcessable = function(): boolean {
+schema.methods.isProcessable = function (): boolean {
   const { unprocessableExpiryDate } = this;
-  return unprocessableExpiryDate == null || (unprocessableExpiryDate != null && new Date() > unprocessableExpiryDate);
+  return (
+    unprocessableExpiryDate == null ||
+    (unprocessableExpiryDate != null && new Date() > unprocessableExpiryDate)
+  );
 };
 
-export default getOrCreateModel<PageOperationDocument, PageOperationModel>('PageOperation', schema);
+export default getOrCreateModel<PageOperationDocument, PageOperationModel>(
+  'PageOperation',
+  schema,
+);

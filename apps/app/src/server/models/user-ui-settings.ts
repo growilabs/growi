@@ -1,20 +1,16 @@
-import type { Ref, IUser } from '@growi/core';
-import type { Model, Document } from 'mongoose';
-import {
-  Schema,
-} from 'mongoose';
-
+import type { IUser, Ref } from '@growi/core';
+import type { Document, Model } from 'mongoose';
+import { Schema } from 'mongoose';
 
 import { SidebarContentsType } from '~/interfaces/ui';
 import type { IUserUISettings } from '~/interfaces/user-ui-settings';
 
 import { getOrCreateModel } from '../util/mongoose-utils';
 
-
 export interface UserUISettingsDocument extends IUserUISettings, Document {
-  user: Ref<IUser>,
+  user: Ref<IUser>;
 }
-export type UserUISettingsModel = Model<UserUISettingsDocument>
+export type UserUISettingsModel = Model<UserUISettingsDocument>;
 
 const schema = new Schema<UserUISettingsDocument, UserUISettingsModel>({
   user: { type: Schema.Types.ObjectId, ref: 'User', unique: true },
@@ -27,5 +23,7 @@ const schema = new Schema<UserUISettingsDocument, UserUISettingsModel>({
   preferCollapsedModeByUser: { type: Boolean, default: false },
 });
 
-
-export default getOrCreateModel<UserUISettingsDocument, UserUISettingsModel>('UserUISettings', schema);
+export default getOrCreateModel<UserUISettingsDocument, UserUISettingsModel>(
+  'UserUISettings',
+  schema,
+);
