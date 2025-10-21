@@ -107,6 +107,7 @@ module.exports = (crowi) => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /in-app-notification/list
    *      description: Get the list of in-app notifications
    *      parameters:
@@ -199,6 +200,7 @@ module.exports = (crowi) => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /in-app-notification/status
    *      description: Get the status of in-app notifications
    *      responses:
@@ -236,6 +238,7 @@ module.exports = (crowi) => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /in-app-notification/open
    *      description: Open the in-app notification
    *      requestBody:
@@ -283,6 +286,7 @@ module.exports = (crowi) => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *       - accessTokenHeaderAuth: []
    *      summary: /in-app-notification/all-statuses-open
    *      description: Open all in-app notifications
    *      responses:
