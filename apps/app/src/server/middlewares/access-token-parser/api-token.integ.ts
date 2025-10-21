@@ -155,6 +155,37 @@ describe('access-token-parser middleware', () => {
     expect(serializeUserSecurely).toHaveBeenCalledOnce();
   });
 
+  it('should set req.user with a valid Bearer token in X-API-TOKEN header', async() => {
+    // arrange
+    const reqMock = mock<AccessTokenParserReq>({
+      user: undefined,
+      headers: {
+        'x-api-token': undefined,
+      },
+    });
+    const resMock = mock<Response>();
+
+    expect(reqMock.user).toBeUndefined();
+
+    // prepare a user with an access token
+    const targetUser = await User.create({
+      name: faker.person.fullName(),
+      username: faker.string.uuid(),
+      password: faker.internet.password(),
+      lang: 'en_US',
+      apiToken: faker.internet.password(),
+    });
+
+    // act
+    reqMock.headers['x-api-token'] = targetUser.apiToken;
+    await parserForApiToken(reqMock, resMock);
+
+    // assert
+    expect(reqMock.user).toBeDefined();
+    expect(reqMock.user?._id).toStrictEqual(targetUser._id);
+    expect(serializeUserSecurely).toHaveBeenCalledOnce();
+  });
+
   it('should ignore non-Bearer Authorization header', async() => {
     // arrange
     const reqMock = mock<AccessTokenParserReq>({
