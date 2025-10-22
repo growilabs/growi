@@ -207,7 +207,20 @@ module.exports = (crowi: Crowi): Router => {
                 { $sort: { createdAt: -1 } },
                 { $skip: offset },
                 { $limit: limit },
-
+                {
+                  $lookup: {
+                    from: 'pages',
+                    localField: 'target',
+                    foreignField: '_id',
+                    as: 'target',
+                  },
+                },
+                {
+                  $unwind: {
+                    path: '$target',
+                    preserveNullAndEmptyArrays: true,
+                  },
+                },
                 {
                   $lookup: {
                     from: 'users',

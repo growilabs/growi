@@ -16,13 +16,12 @@ export const useSWRxRecentActivity = (
     endpoint,
     limitParam,
     offsetParam,
-    filterParam,
   ]) => {
 
     const promise = apiv3Get<UserActivitiesResult>(endpoint, {
       limit: limitParam,
       offset: offsetParam,
-      searchFilter: filterParam,
+      populate: 'target',
     });
 
     return promise.then(result => result.data.serializedPaginationResult);
