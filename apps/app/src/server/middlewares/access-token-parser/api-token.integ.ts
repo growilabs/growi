@@ -155,12 +155,13 @@ describe('access-token-parser middleware', () => {
     expect(serializeUserSecurely).toHaveBeenCalledOnce();
   });
 
-  it('should set req.user with a valid Bearer token in X-API-TOKEN header', async() => {
+  it('should set req.user with a valid Bearer token in X-GROWI-ACCESS-TOKEN header', async() => {
     // arrange
     const reqMock = mock<AccessTokenParserReq>({
       user: undefined,
       headers: {
-        'x-api-token': undefined,
+        authorization: undefined,
+        'x-growi-access-token': undefined,
       },
     });
     const resMock = mock<Response>();
