@@ -581,10 +581,25 @@ export const ActivityLogActions = {
   ACTION_PAGE_RENAME,
   ACTION_PAGE_DUPLICATE,
   ACTION_PAGE_DELETE,
+  ACTION_PAGE_REVERT,
   ACTION_COMMENT_CREATE,
   ACTION_COMMENT_UPDATE,
+  ACTION_COMMENT_REMOVE,
   ACTION_ATTACHMENT_ADD,
 } as const;
+
+export const ActivityActionTranslationMap: Record<SupportedActivityActionType, string> = {
+  [ACTION_PAGE_CREATE]: 'created a page',
+  [ACTION_PAGE_UPDATE]: 'updated a page',
+  [ACTION_PAGE_DELETE]: 'deleted a page',
+  [ACTION_PAGE_RENAME]: 'renamed a page',
+  [ACTION_PAGE_REVERT]: 'reverted a page',
+  [ACTION_PAGE_DUPLICATE]: 'duplicated a page',
+  [ACTION_COMMENT_CREATE]: 'posted a comment',
+  [ACTION_COMMENT_UPDATE]: 'edited a comment',
+  [ACTION_COMMENT_REMOVE]: 'deleted a comment',
+  [ACTION_ATTACHMENT_ADD]: 'added an attachment',
+};
 
 /*
  * Array
@@ -663,7 +678,8 @@ export type SupportedActionType =
   (typeof SupportedAction)[keyof typeof SupportedAction];
 export type SupportedActionCategoryType =
   (typeof SupportedActionCategory)[keyof typeof SupportedActionCategory];
-
+export type SupportedActivityActionType =
+  (typeof ActivityLogActions)[keyof typeof ActivityLogActions];
 export type ISnapshot = Partial<Pick<IUser, 'username'>>;
 
 export type IActivity = {
