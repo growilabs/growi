@@ -1,5 +1,5 @@
 import {
-  useState, useCallback, useRef, Fragment,
+  useState, Fragment,
 } from 'react';
 
 import { useChat } from '@ai-sdk/react';
@@ -7,7 +7,6 @@ import { DefaultChatTransport } from 'ai';
 import {
   GlobeIcon, CopyIcon, RefreshCcwIcon,
 } from 'lucide-react';
-import SimpleBar from 'simplebar-react';
 
 import { Action, Actions } from '~/components/ai-elements/actions';
 import {
@@ -35,7 +34,6 @@ import {
   PromptInputModelSelectValue,
   PromptInputSubmit,
   PromptInputTextarea,
-  // PromptInputToolbar,
   PromptInputFooter,
   PromptInputTools,
 } from '~/components/ai-elements/prompt-input';
