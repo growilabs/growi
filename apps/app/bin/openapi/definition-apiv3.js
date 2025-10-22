@@ -24,8 +24,8 @@ module.exports = {
   security: [
     {
       bearer: [],
-      accessTokenHeaderAuth: [],
       accessTokenInQuery: [],
+      accessTokenHeaderAuth: [],
     },
   ],
   components: {
