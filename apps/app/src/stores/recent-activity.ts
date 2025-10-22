@@ -21,6 +21,7 @@ export const useSWRxRecentActivity = (
     const promise = apiv3Get<UserActivitiesResult>(endpoint, {
       limit: limitParam,
       offset: offsetParam,
+      populate: 'target',
     });
 
     return promise.then(result => result.data.serializedPaginationResult);

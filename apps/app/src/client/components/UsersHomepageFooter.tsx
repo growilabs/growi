@@ -2,6 +2,7 @@ import React, { useState, type JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
 
+import { RecentActivity } from '~/client/components/RecentActivity/RecentActivity';
 import { RecentCreated } from '~/client/components/RecentCreated/RecentCreated';
 import { useCurrentUser } from '~/stores-universal/context';
 
@@ -44,6 +45,9 @@ export const UsersHomepageFooter = (props: UsersHomepageFooterProps): JSX.Elemen
         </h2>
         <div id="user-created-list" className={`page-list ${styles['page-list']}`}>
           <RecentCreated userId={creatorId} />
+        </div>
+        <div id="user-created-list" className={`page-list ${styles['page-list']}`}>
+          <RecentActivity />
         </div>
       </div>
     </div>

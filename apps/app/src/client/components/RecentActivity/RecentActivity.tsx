@@ -11,6 +11,9 @@ import loggerFactory from '~/utils/logger';
 
 import PaginationWrapper from '../PaginationWrapper';
 
+import { ActivityListItem } from './ActivityListItem';
+
+
 const logger = loggerFactory('growi:RecentActivity');
 
 type ActivityWithPageTarget = IActivityHasId & { target: IPageHasId };
@@ -23,13 +26,12 @@ const hasPageTarget = (activity: IActivityHasId): activity is ActivityWithPageTa
 
 export const RecentActivity = (): JSX.Element => {
 
-  const [activities, setActivities] = useState<IActivityHasId[]>([]);
+  const [activities, setActivities] = useState<ActivityWithPageTarget[]>([]);
   const [activePage, setActivePage] = useState(1);
   const [limit] = useState(10);
   const [offset, setOffset] = useState(0);
 
-  const { data: paginatedData, error, isLoading } = useSWRxRecentActivity(limit, offset);
-
+  const { data: paginatedData, error } = useSWRxRecentActivity(limit, offset);
 
   const handlePage = useCallback(async(selectedPage: number) => {
     const newOffset = (selectedPage - 1) * limit;
@@ -47,7 +49,7 @@ export const RecentActivity = (): JSX.Element => {
     }
 
     if (paginatedData) {
-      const activitiesWithPages: IActivityHasId[] = paginatedData.docs
+      const activitiesWithPages = paginatedData.docs
         .filter(hasPageTarget);
 
       setActivities(activitiesWithPages);
@@ -60,7 +62,6 @@ export const RecentActivity = (): JSX.Element => {
     <div className="page-list-container-activity">
       <ul className="page-list-ul page-list-ul-flat mb-3">
         {activities.map(activity => (
-          // REMINDER: make ActivityListItem component
           <li key={`recent-activity-view:${activity._id}`} className="mt-4">
             <ActivityListItem activity={activity} />
           </li>
