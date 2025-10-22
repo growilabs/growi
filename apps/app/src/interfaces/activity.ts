@@ -588,7 +588,10 @@ export const ActivityLogActions = {
   ACTION_ATTACHMENT_ADD,
 } as const;
 
-export const ActivityActionTranslationMap: Record<SupportedActivityActionType, string> = {
+export const ActivityActionTranslationMap: Record<
+  SupportedActivityActionType,
+  string
+> = {
   [ACTION_PAGE_CREATE]: 'created a page',
   [ACTION_PAGE_UPDATE]: 'updated a page',
   [ACTION_PAGE_DELETE]: 'deleted a page',

@@ -22,7 +22,6 @@ const hasPageTarget = (activity: IActivityHasId): activity is ActivityWithPageTa
 };
 
 export const RecentActivity = (): JSX.Element => {
-
   const [activities, setActivities] = useState<ActivityWithPageTarget[]>([]);
   const [activePage, setActivePage] = useState(1);
   const [limit] = useState(10);
@@ -38,7 +37,6 @@ export const RecentActivity = (): JSX.Element => {
   }, [limit]);
 
   useEffect(() => {
-
     if (error) {
       logger.error('Failed to fetch recent activity data', error);
       toastError(error);
@@ -54,6 +52,7 @@ export const RecentActivity = (): JSX.Element => {
   }, [paginatedData, error]);
 
   const totalPageCount = paginatedData?.totalDocs || 0;
+
 
   return (
     <div className="page-list-container-activity">
