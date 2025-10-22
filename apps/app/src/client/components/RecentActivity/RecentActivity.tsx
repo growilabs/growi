@@ -2,10 +2,8 @@ import React, {
   useState, useCallback, useEffect, type JSX,
 } from 'react';
 
-import type { IPageHasId } from '@growi/core';
-
 import { toastError } from '~/client/util/toastr';
-import type { IActivityHasId } from '~/interfaces/activity';
+import type { IActivityHasId, ActivityWithPageTarget } from '~/interfaces/activity';
 import { useSWRxRecentActivity } from '~/stores/recent-activity';
 import loggerFactory from '~/utils/logger';
 
@@ -16,7 +14,6 @@ import { ActivityListItem } from './ActivityListItem';
 
 const logger = loggerFactory('growi:RecentActivity');
 
-type ActivityWithPageTarget = IActivityHasId & { target: IPageHasId };
 
 const hasPageTarget = (activity: IActivityHasId): activity is ActivityWithPageTarget => {
   return activity.target != null

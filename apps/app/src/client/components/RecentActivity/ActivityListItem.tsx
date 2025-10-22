@@ -1,14 +1,11 @@
-import type { IPageHasId } from '@growi/core';
-
-import type { IActivityHasId } from '~/interfaces/activity';
+import type { ActivityWithPageTarget } from '~/interfaces/activity';
 
 import { PageListItemS } from '../PageList/PageListItemS';
 
-// Define the component's props interface
-type ActivityWithPageTarget = IActivityHasId & { target: IPageHasId };
 
 export const ActivityListItem = ({ activity }: { activity: ActivityWithPageTarget }): JSX.Element => {
 
+  const username = activity.user?.username.trim();
   const action = activity.action;
   const date = new Date(activity.createdAt).toLocaleString();
 
@@ -16,7 +13,7 @@ export const ActivityListItem = ({ activity }: { activity: ActivityWithPageTarge
   return (
     <div className="activity-row">
       <p className="text-muted small mb-1">
-        **{}** performed **{action}** on {date}
+        {username} performed {action} on {date}
       </p>
 
       <PageListItemS page={activity.target} />
