@@ -1,6 +1,7 @@
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
+import { resolveLocaleTemplatePath } from '~/server/util/locale-utils';
 
 import { growiInfoService } from '../service/growi-info';
 
@@ -10,7 +11,6 @@ import { growiInfoService } from '../service/growi-info';
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = function(crowi, app) {
   const logger = loggerFactory('growi:routes:login');
-  const path = require('path');
   const User = crowi.model('User');
   const {
     appService, aclService, mailService, activityService,
@@ -24,12 +24,17 @@ module.exports = function(crowi, app) {
     const admins = await User.findAdmins();
     const appTitle = appService.getAppTitle();
     const locale = configManager.getConfig('app:globalLang');
+    const templatePath = await resolveLocaleTemplatePath({
+      baseDir: crowi.localeDir,
+      locale,
+      templateSegments: ['admin', 'userWaitingActivation.ejs'],
+    });
 
     const promises = admins.map((admin) => {
       return mailService.send({
         to: admin.email,
         subject: `[${appTitle}:admin] A New User Created and Waiting for Activation`,
-        template: path.join(crowi.localeDir, `${locale}/admin/userWaitingActivation.ejs`),
+        template: templatePath,
         vars: {
           adminUser: admin,
           createdUser: userData,

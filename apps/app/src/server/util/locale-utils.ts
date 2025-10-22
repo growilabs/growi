@@ -1,6 +1,8 @@
 import type { IncomingHttpHeaders } from 'http';
+import { promises as fsPromises, constants as fsConstants } from 'fs';
+import path from 'path';
 
-import { Lang } from '@growi/core/dist/interfaces';
+import { Lang, AllLang } from '@growi/core/dist/interfaces';
 
 import * as i18nextConfig from '^/config/i18next.config';
 
@@ -22,6 +24,96 @@ const getPreferredLanguage = (sortedAcceptLanguagesArray: string[]): Lang => {
     if (matchingLang) return ACCEPT_LANG_MAP[matchingLang];
   }
   return i18nextConfig.defaultLang;
+};
+
+const ALLOWED_LANG_SET = new Set<Lang>(AllLang);
+
+const normalizeLocaleId = (value: string): string => value.replace(/-/g, '_');
+
+type ResolveTemplateOptions = {
+  baseDir: string;
+  locale?: string;
+  templateSegments: string[];
+  fallbackLocale?: Lang;
+};
+
+const isPathInsideBase = (basePath: string, targetPath: string): boolean => {
+  const relative = path.relative(basePath, targetPath);
+  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+};
+
+const doesTemplateExist = async(candidatePath: string, baseDir: string): Promise<boolean> => {
+  const resolvedBase = path.resolve(baseDir);
+
+  if (!isPathInsideBase(resolvedBase, candidatePath)) {
+    return false;
+  }
+
+  try {
+    await fsPromises.access(candidatePath, fsConstants.F_OK);
+    return true;
+  }
+  catch {
+    return false;
+  }
+};
+
+// Collects candidate template paths ordered by preferred and fallback locales.
+const templatePathCandidates = (
+    sanitizedLocale: Lang | undefined,
+    fallbackLocale: Lang,
+    baseDir: string,
+    segments: string[],
+): string[] => {
+  const resolvedBase = path.resolve(baseDir);
+  const locales = new Set<Lang>();
+  if (sanitizedLocale != null) {
+    locales.add(sanitizedLocale);
+  }
+  locales.add(fallbackLocale);
+
+  return Array.from(locales).map(locale => path.resolve(resolvedBase, locale, ...segments));
+};
+
+// Guard functions that collapse to undefined or default values for further processing.
+export const coerceToSupportedLang = (
+    value: unknown,
+    { fallback = i18nextConfig.defaultLang, allowUndefined = false }: { fallback?: Lang; allowUndefined?: boolean } = {},
+): Lang | undefined => {
+  if (typeof value !== 'string') {
+    return allowUndefined ? undefined : fallback;
+  }
+
+  const normalized = normalizeLocaleId(value);
+  if (ALLOWED_LANG_SET.has(normalized as Lang)) {
+    return normalized as Lang;
+  }
+
+  return allowUndefined ? undefined : fallback;
+};
+
+export const resolveLocaleTemplatePath = async({
+  baseDir,
+  locale,
+  templateSegments,
+  fallbackLocale = Lang.en_US,
+}: ResolveTemplateOptions): Promise<string> => {
+  const sanitizedLocale = coerceToSupportedLang(locale, { fallback: fallbackLocale, allowUndefined: true });
+
+  const candidates = templatePathCandidates(sanitizedLocale, fallbackLocale, baseDir, templateSegments);
+
+  for (const candidate of candidates) {
+    // sequential check is intentional to stop at first hit
+    // eslint-disable-next-line no-await-in-loop
+    const exists = await doesTemplateExist(candidate, baseDir);
+    if (exists) {
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    `Mail template is not available for locale "${locale ?? 'undefined'}" under ${baseDir} with segments ${templateSegments.join('/')}`,
+  );
 };
 
 /**
