@@ -1,4 +1,4 @@
 export interface IVectorStore {
-  vectorStoreId: string
-  isDeleted: boolean
+  vectorStoreId: string;
+  isDeleted: boolean;
 }

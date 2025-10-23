@@ -1,13 +1,7 @@
 import { Text } from '@codemirror/state';
 import type { UseCodeMirrorEditor } from '@growi/editor/dist/client/services/use-codemirror-editor';
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-} from 'vitest';
-import { mockDeep, type DeepMockProxy } from 'vitest-mock-extended';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 
 import { getPageBodyForContext } from './get-page-body-for-context';
 
@@ -119,7 +113,9 @@ describe('getPageBodyForContext', () => {
 
       // Mock view with cursor at position 1000
       if (mockEditor.view?.state?.selection?.main) {
-        Object.defineProperty(mockEditor.view.state.selection.main, 'head', { value: cursorPos });
+        Object.defineProperty(mockEditor.view.state.selection.main, 'head', {
+          value: cursorPos,
+        });
       }
 
       const result = getPageBodyForContext(mockEditor, 200, 300);
@@ -145,7 +141,9 @@ describe('getPageBodyForContext', () => {
 
       // Mock view with cursor at position 950
       if (mockEditor.view?.state?.selection?.main) {
-        Object.defineProperty(mockEditor.view.state.selection.main, 'head', { value: cursorPos });
+        Object.defineProperty(mockEditor.view.state.selection.main, 'head', {
+          value: cursorPos,
+        });
       }
 
       const result = getPageBodyForContext(mockEditor, 100, 200);
@@ -174,7 +172,9 @@ describe('getPageBodyForContext', () => {
 
       // Mock view with cursor at position 1000
       if (mockEditor.view?.state?.selection?.main) {
-        Object.defineProperty(mockEditor.view.state.selection.main, 'head', { value: cursorPos });
+        Object.defineProperty(mockEditor.view.state.selection.main, 'head', {
+          value: cursorPos,
+        });
       }
 
       const result = getPageBodyForContext(mockEditor, 100, 200);
@@ -203,7 +203,9 @@ describe('getPageBodyForContext', () => {
 
       // Mock view with cursor at position 0
       if (mockEditor.view?.state?.selection?.main) {
-        Object.defineProperty(mockEditor.view.state.selection.main, 'head', { value: cursorPos });
+        Object.defineProperty(mockEditor.view.state.selection.main, 'head', {
+          value: cursorPos,
+        });
       }
 
       const result = getPageBodyForContext(mockEditor, 100, 200);
@@ -232,7 +234,9 @@ describe('getPageBodyForContext', () => {
 
       // Mock view with cursor at position 995
       if (mockEditor.view?.state?.selection?.main) {
-        Object.defineProperty(mockEditor.view.state.selection.main, 'head', { value: cursorPos });
+        Object.defineProperty(mockEditor.view.state.selection.main, 'head', {
+          value: cursorPos,
+        });
       }
 
       const result = getPageBodyForContext(mockEditor, 50, 500); // Total: 550 < 1000
@@ -251,6 +255,5 @@ describe('getPageBodyForContext', () => {
       });
       expect(result?.content).toHaveLength(550); // 1000 - 450 = 550
     });
-
   });
 });

@@ -1,8 +1,4 @@
-import {
-  useState, useCallback,
-  type CSSProperties, type JSX,
-} from 'react';
-
+import { type CSSProperties, type JSX, useCallback, useState } from 'react';
 import emojiData from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { Modal } from 'reactstrap';
@@ -11,8 +7,8 @@ import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
 import { useResolvedThemeForEditor } from '../../../stores/use-resolved-theme';
 
 type Props = {
-  editorKey: string,
-}
+  editorKey: string;
+};
 
 export const EmojiButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
@@ -23,20 +19,20 @@ export const EmojiButton = (props: Props): JSX.Element => {
   const { data: resolvedTheme } = useResolvedThemeForEditor();
   const toggle = useCallback(() => setIsOpen(!isOpen), [isOpen]);
 
-  const selectEmoji = useCallback((emoji: { shortcodes: string }): void => {
+  const selectEmoji = useCallback(
+    (emoji: { shortcodes: string }): void => {
+      if (!isOpen) {
+        return;
+      }
 
-    if (!isOpen) {
-      return;
-    }
+      codeMirrorEditor?.insertText(emoji.shortcodes);
 
-    codeMirrorEditor?.insertText(emoji.shortcodes);
-
-    toggle();
-  }, [isOpen, toggle, codeMirrorEditor]);
-
+      toggle();
+    },
+    [isOpen, toggle, codeMirrorEditor],
+  );
 
   const setStyle = useCallback((): CSSProperties => {
-
     const view = codeMirrorEditor?.view;
     const cursorIndex = view?.state.selection.main.head;
 
@@ -73,10 +69,14 @@ export const EmojiButton = (props: Props): JSX.Element => {
       <button type="button" className="btn btn-toolbar-button" onClick={toggle}>
         <span className="material-symbols-outlined fs-5">emoji_emotions</span>
       </button>
-      { isOpen
-      && (
+      {isOpen && (
         <div className="mb-2 d-none d-md-block">
-          <Modal isOpen={isOpen} toggle={toggle} backdropClassName="emoji-picker-modal" fade={false}>
+          <Modal
+            isOpen={isOpen}
+            toggle={toggle}
+            backdropClassName="emoji-picker-modal"
+            fade={false}
+          >
             <span style={setStyle()}>
               <Picker
                 onEmojiSelect={selectEmoji}

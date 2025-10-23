@@ -33,7 +33,13 @@ export const SetCaretLineRow = (): JSX.Element => {
             aria-label="line number"
             aria-describedby="button-set-cursor"
           />
-          <button type="submit" className="btn btn-outline-secondary" id="button-set-cursor">Set the cursor</button>
+          <button
+            type="submit"
+            className="btn btn-outline-secondary"
+            id="button-set-cursor"
+          >
+            Set the cursor
+          </button>
         </div>
       </div>
     </form>

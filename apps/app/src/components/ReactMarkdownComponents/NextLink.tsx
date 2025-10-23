@@ -1,12 +1,10 @@
 import type { JSX } from 'react';
-
-import { pagePathUtils } from '@growi/core/dist/utils';
 import type { LinkProps } from 'next/link';
 import Link from 'next/link';
+import { pagePathUtils } from '@growi/core/dist/utils';
 
 import { useSiteUrl } from '~/stores-universal/context';
 import loggerFactory from '~/utils/logger';
-
 
 const logger = loggerFactory('growi:components:NextLink');
 
@@ -19,8 +17,7 @@ const isExternalLink = (href: string, siteUrl: string | undefined): boolean => {
     const baseUrl = new URL(siteUrl ?? 'https://example.com');
     const hrefUrl = new URL(href, baseUrl);
     return baseUrl.host !== hrefUrl.host;
-  }
-  catch (err) {
+  } catch (err) {
     logger.debug(err);
     return false;
   }
@@ -31,28 +28,26 @@ const isCreatablePage = (href: string) => {
     const url = new URL(href, 'http://example.com');
     const pathName = url.pathname;
     return pagePathUtils.isCreatablePage(pathName);
-  }
-  catch (err) {
+  } catch (err) {
     logger.debug(err);
     return false;
   }
 };
 
 type Props = Omit<LinkProps, 'href'> & {
-  children: React.ReactNode,
-  id?: string,
-  href?: string,
-  className?: string,
+  children: React.ReactNode;
+  id?: string;
+  href?: string;
+  className?: string;
 };
 
 export const NextLink = (props: Props): JSX.Element => {
-  const {
-    id, href, children, className, onClick, ...rest
-  } = props;
+  const { id, href, children, className, onClick, ...rest } = props;
 
   const { data: siteUrl } = useSiteUrl();
 
   if (href == null) {
+    // biome-ignore lint/a11y/useValidAnchor: ignore
     return <a className={className}>{children}</a>;
   }
 
@@ -63,8 +58,17 @@ export const NextLink = (props: Props): JSX.Element => {
 
   if (isExternalLink(href, siteUrl)) {
     return (
-      <a id={id} href={href} className={className} target="_blank" onClick={onClick} rel="noopener noreferrer" {...dataAttributes}>
-        {children}&nbsp;<span className="growi-custom-icons">external_link</span>
+      <a
+        id={id}
+        href={href}
+        className={className}
+        target="_blank"
+        onClick={onClick}
+        rel="noopener noreferrer"
+        {...dataAttributes}
+      >
+        {children}&nbsp;
+        <span className="growi-custom-icons">external_link</span>
       </a>
     );
   }
@@ -72,13 +76,28 @@ export const NextLink = (props: Props): JSX.Element => {
   // when href is an anchor link or not-creatable path
   if (isAnchorLink(href) || !isCreatablePage(href)) {
     return (
-      <a id={id} href={href} className={className} onClick={onClick} {...dataAttributes}>{children}</a>
+      <a
+        id={id}
+        href={href}
+        className={className}
+        onClick={onClick}
+        {...dataAttributes}
+      >
+        {children}
+      </a>
     );
   }
 
   return (
     <Link {...rest} href={href} prefetch={false} legacyBehavior>
-      <a href={href} className={className} {...dataAttributes} onClick={onClick}>{children}</a>
+      <a
+        href={href}
+        className={className}
+        {...dataAttributes}
+        onClick={onClick}
+      >
+        {children}
+      </a>
     </Link>
   );
 };

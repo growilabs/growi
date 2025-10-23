@@ -1,9 +1,11 @@
 import type { JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
+import type { UseFormRegister, FieldValues } from 'react-hook-form';
 
 
 export type GcsSettingMoleculeProps = {
+  register: UseFormRegister<FieldValues>
   gcsReferenceFileWithRelayMode
   gcsUseOnlyEnvVars
   gcsApiKeyJsonPath
@@ -24,11 +26,8 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
   const {
     gcsReferenceFileWithRelayMode,
     gcsUseOnlyEnvVars,
-    gcsApiKeyJsonPath,
     envGcsApiKeyJsonPath,
-    gcsBucket,
     envGcsBucket,
-    gcsUploadNamespace,
     envGcsUploadNamespace,
   } = props;
 
@@ -106,10 +105,8 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
               <input
                 className="form-control"
                 type="text"
-                name="gcsApiKeyJsonPath"
                 readOnly={gcsUseOnlyEnvVars}
-                value={gcsApiKeyJsonPath}
-                onChange={e => props?.onChangeGcsApiKeyJsonPath(e.target.value)}
+                {...props.register('gcsApiKeyJsonPath')}
               />
             </td>
             <td>
@@ -126,10 +123,8 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
               <input
                 className="form-control"
                 type="text"
-                name="gcsBucket"
                 readOnly={gcsUseOnlyEnvVars}
-                value={gcsBucket}
-                onChange={e => props?.onChangeGcsBucket(e.target.value)}
+                {...props.register('gcsBucket')}
               />
             </td>
             <td>
@@ -146,10 +141,8 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
               <input
                 className="form-control"
                 type="text"
-                name="gcsUploadNamespace"
                 readOnly={gcsUseOnlyEnvVars}
-                value={gcsUploadNamespace}
-                onChange={e => props?.onChangeGcsUploadNamespace(e.target.value)}
+                {...props.register('gcsUploadNamespace')}
               />
             </td>
             <td>

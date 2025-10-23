@@ -3,7 +3,6 @@ import path from 'path';
 
 import { PLUGIN_STORING_PATH } from '../../consts';
 import { GrowiPlugin } from '../../models';
-
 import { growiPluginService } from './growi-plugin';
 
 describe('Installing a GROWI template plugin', () => {
