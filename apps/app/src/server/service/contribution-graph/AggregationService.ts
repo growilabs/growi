@@ -1,24 +1,31 @@
 // needs
-
+//
 // date utilities
 // user id?
 // pagination
 
+// count? in pipeline?
 
 // returns
 
 //
-// pipeline input
+// pipeline
 //
-// stages
-
+// match
+//   for a certain user
+//   within a specified period (since lastUpdate)
+//   with certain action groups
+//
 // returns
-// activity data for a specific period
+// Activiy
+//   user.id
+//   createdAt
+//   action
+//
+//
 // activities from lastUpdated until now
 // in minified JSON format, {"d":"", "c": "X"}
 
-// IDEA
-// another cheaper pipeline for getting current week data?
 
 import type { PipelineStage } from 'mongoose';
 
