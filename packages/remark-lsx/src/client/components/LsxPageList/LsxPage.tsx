@@ -1,7 +1,7 @@
+import React, { type JSX, useMemo } from 'react';
+import Link from 'next/link';
 import { pathUtils } from '@growi/core/dist/utils';
 import { PageListMeta, PagePathLabel } from '@growi/ui/dist/components';
-import Link from 'next/link';
-import React, { type JSX, useMemo } from 'react';
 
 import type { PageNode } from '../../../interfaces/page-node';
 import type { LsxContext } from '../lsx-context';

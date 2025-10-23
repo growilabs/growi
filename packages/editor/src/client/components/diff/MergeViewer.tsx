@@ -1,13 +1,12 @@
 import { memo, useEffect, useRef } from 'react';
-
 import { MergeView } from '@codemirror/merge';
-import { type Extension, EditorState } from '@codemirror/state';
-import { EditorView, basicSetup } from 'codemirror';
+import { EditorState, type Extension } from '@codemirror/state';
+import { basicSetup, EditorView } from 'codemirror';
 
 type Props = {
-  leftBody: string
-  rightBody: string
-}
+  leftBody: string;
+  rightBody: string;
+};
 
 const MergeViewerExtensions: Extension = [
   basicSetup,

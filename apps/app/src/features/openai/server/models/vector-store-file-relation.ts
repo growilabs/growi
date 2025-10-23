@@ -1,6 +1,6 @@
-import type { Types } from 'mongoose';
 import type mongoose from 'mongoose';
-import { type Model, type Document, Schema } from 'mongoose';
+import type { Types } from 'mongoose';
+import { type Document, type Model, Schema } from 'mongoose';
 
 import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
@@ -12,21 +12,24 @@ export interface VectorStoreFileRelation {
   isAttachedToVectorStore: boolean;
 }
 
-interface VectorStoreFileRelationDocument extends VectorStoreFileRelation, Document {}
+interface VectorStoreFileRelationDocument
+  extends VectorStoreFileRelation,
+    Document {}
 
 interface VectorStoreFileRelationModel extends Model<VectorStoreFileRelation> {
-  upsertVectorStoreFileRelations(vectorStoreFileRelations: VectorStoreFileRelation[]): Promise<void>;
+  upsertVectorStoreFileRelations(
+    vectorStoreFileRelations: VectorStoreFileRelation[],
+  ): Promise<void>;
   markAsAttachedToVectorStore(pageIds: Types.ObjectId[]): Promise<void>;
 }
 
 export const prepareVectorStoreFileRelations = (
-    vectorStoreRelationId: Types.ObjectId,
-    page: Types.ObjectId,
-    fileId: string,
-    relationsMap: Map<string, VectorStoreFileRelation>,
-    attachment?: Types.ObjectId,
+  vectorStoreRelationId: Types.ObjectId,
+  page: Types.ObjectId,
+  fileId: string,
+  relationsMap: Map<string, VectorStoreFileRelation>,
+  attachment?: Types.ObjectId,
 ): Map<string, VectorStoreFileRelation> => {
-
   const key = (() => {
     if (attachment == null) {
       return page.toHexString();
@@ -54,7 +57,10 @@ export const prepareVectorStoreFileRelations = (
   return relationsMap;
 };
 
-const schema = new Schema<VectorStoreFileRelationDocument, VectorStoreFileRelationModel>({
+const schema = new Schema<
+  VectorStoreFileRelationDocument,
+  VectorStoreFileRelationModel
+>({
   vectorStoreRelationId: {
     type: Schema.Types.ObjectId,
     ref: 'VectorStore',
@@ -69,10 +75,12 @@ const schema = new Schema<VectorStoreFileRelationDocument, VectorStoreFileRelati
     type: Schema.Types.ObjectId,
     ref: 'Attachment',
   },
-  fileIds: [{
-    type: String,
-    required: true,
-  }],
+  fileIds: [
+    {
+      type: String,
+      required: true,
+    },
+  ],
   isAttachedToVectorStore: {
     type: Boolean,
     default: false, // File is not attached to the Vector Store at the time it is uploaded
@@ -81,12 +89,17 @@ const schema = new Schema<VectorStoreFileRelationDocument, VectorStoreFileRelati
 });
 
 // define unique compound index
-schema.index({ vectorStoreRelationId: 1, page: 1, attachment: 1 }, { unique: true });
+schema.index(
+  { vectorStoreRelationId: 1, page: 1, attachment: 1 },
+  { unique: true },
+);
 
-schema.statics.upsertVectorStoreFileRelations = async function(vectorStoreFileRelations: VectorStoreFileRelation[]): Promise<void> {
+schema.statics.upsertVectorStoreFileRelations = async function (
+  vectorStoreFileRelations: VectorStoreFileRelation[],
+): Promise<void> {
   const upsertOps = vectorStoreFileRelations
-    .filter(data => data.attachment == null)
-    .map(data => ({
+    .filter((data) => data.attachment == null)
+    .map((data) => ({
       updateOne: {
         filter: {
           page: data.page,
@@ -101,8 +114,8 @@ schema.statics.upsertVectorStoreFileRelations = async function(vectorStoreFileRe
     }));
 
   const insertOps = vectorStoreFileRelations
-    .filter(data => data.attachment != null)
-    .map(data => ({
+    .filter((data) => data.attachment != null)
+    .map((data) => ({
       insertOne: {
         document: {
           vectorStoreRelationId: data.vectorStoreRelationId,
@@ -121,11 +134,16 @@ schema.statics.upsertVectorStoreFileRelations = async function(vectorStoreFileRe
 };
 
 // Used when attached to VectorStore
-schema.statics.markAsAttachedToVectorStore = async function(pageIds: Types.ObjectId[]): Promise<void> {
+schema.statics.markAsAttachedToVectorStore = async function (
+  pageIds: Types.ObjectId[],
+): Promise<void> {
   await this.updateMany(
     { page: { $in: pageIds } },
     { $set: { isAttachedToVectorStore: true } },
   );
 };
 
-export default getOrCreateModel<VectorStoreFileRelationDocument, VectorStoreFileRelationModel>('VectorStoreFileRelation', schema);
+export default getOrCreateModel<
+  VectorStoreFileRelationDocument,
+  VectorStoreFileRelationModel
+>('VectorStoreFileRelation', schema);

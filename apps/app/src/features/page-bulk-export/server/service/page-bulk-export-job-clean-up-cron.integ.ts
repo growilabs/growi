@@ -8,7 +8,6 @@ import {
   PageBulkExportJobStatus,
 } from '../../interfaces/page-bulk-export';
 import PageBulkExportJob from '../models/page-bulk-export-job';
-
 import instanciatePageBulkExportJobCleanUpCronService, {
   pageBulkExportJobCleanUpCronService,
 } from './page-bulk-export-job-clean-up-cron';

@@ -1,6 +1,6 @@
 {
   "name": "@growi/app",
-  "version": "7.3.3-RC.0",
+  "version": "7.3.4-RC.0",
   "license": "MIT",
   "private": "true",
   "scripts": {

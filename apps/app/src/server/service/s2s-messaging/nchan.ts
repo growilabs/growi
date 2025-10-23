@@ -1,6 +1,6 @@
 import path from 'path';
 
-// eslint-disable-next-line no-restricted-imports
+// biome-ignore lint/style/noRestrictedImports: Direct axios usage for external S2S messaging
 import axios from 'axios';
 import ReconnectingWebSocket from 'reconnecting-websocket';
 import WebSocket from 'ws';

@@ -1,16 +1,20 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
-import { describe, it, expect } from 'vitest';
-
+import { describe, expect, it } from 'vitest';
 
 import {
-  isValidScope, hasAllScope, extractAllScope, extractScopes,
+  extractAllScope,
+  extractScopes,
+  hasAllScope,
+  isValidScope,
 } from './scope-utils';
 
 describe('scope-utils', () => {
   describe('isValidScope', () => {
     it('should return true for valid scopes', () => {
       expect(isValidScope(SCOPE.READ.USER_SETTINGS.API.API_TOKEN)).toBe(true);
-      expect(isValidScope(SCOPE.WRITE.USER_SETTINGS.API.ACCESS_TOKEN)).toBe(true);
+      expect(isValidScope(SCOPE.WRITE.USER_SETTINGS.API.ACCESS_TOKEN)).toBe(
+        true,
+      );
       expect(isValidScope(SCOPE.READ.ADMIN.APP)).toBe(true);
     });
 
@@ -29,7 +33,9 @@ describe('scope-utils', () => {
 
     it('should return false for specific scopes', () => {
       expect(hasAllScope(SCOPE.READ.USER_SETTINGS.API.API_TOKEN)).toBe(false);
-      expect(hasAllScope(SCOPE.WRITE.USER_SETTINGS.API.ACCESS_TOKEN)).toBe(false);
+      expect(hasAllScope(SCOPE.WRITE.USER_SETTINGS.API.ACCESS_TOKEN)).toBe(
+        false,
+      );
     });
   });
 
@@ -83,7 +89,9 @@ describe('scope-utils', () => {
       ];
       const extracted = extractScopes(scopes);
 
-      const accessTokenScopes = extracted.filter(s => s.endsWith('access_token'));
+      const accessTokenScopes = extracted.filter((s) =>
+        s.endsWith('access_token'),
+      );
       expect(accessTokenScopes).toHaveLength(2); // Only READ and WRITE, no duplicates
     });
   });

@@ -2,7 +2,6 @@ import type { ParseRangeResult } from '@growi/core/dist/remark-plugins';
 import createError from 'http-errors';
 
 import { getDepthOfPath } from '../../../utils/depth-utils';
-
 import type { PageQuery } from './generate-base-query';
 
 export const addDepthCondition = (

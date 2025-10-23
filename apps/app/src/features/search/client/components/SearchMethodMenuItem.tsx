@@ -1,11 +1,10 @@
+import React, { type JSX } from 'react';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { useTranslation } from 'next-i18next';
-import React, { type JSX } from 'react';
 
 import { useCurrentPagePath } from '~/stores/page';
 
 import type { GetItemProps } from '../interfaces/downshift';
-
 import { SearchMenuItem } from './SearchMenuItem';
 
 type Props = {

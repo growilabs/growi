@@ -1,12 +1,12 @@
 import {
-  SseMessageSchema,
-  SseDetectedDiffSchema,
-  SseFinalizedSchema,
-  EditRequestBodySchema,
-  type SseMessage,
-  type SseDetectedDiff,
-  type SseFinalized,
   type EditRequestBody,
+  EditRequestBodySchema,
+  type SseDetectedDiff,
+  SseDetectedDiffSchema,
+  type SseFinalized,
+  SseFinalizedSchema,
+  type SseMessage,
+  SseMessageSchema,
 } from './sse-schemas';
 
 describe('sse-schemas', () => {
@@ -34,7 +34,8 @@ describe('sse-schemas', () => {
 
     test('should validate multiline appended message', () => {
       const validMessage = {
-        appendedMessage: 'Step 1: Analyzing code\nStep 2: Preparing changes\nStep 3: Applying diff',
+        appendedMessage:
+          'Step 1: Analyzing code\nStep 2: Preparing changes\nStep 3: Applying diff',
       };
 
       const result = SseMessageSchema.safeParse(validMessage);
@@ -106,7 +107,9 @@ describe('sse-schemas', () => {
       if (result.success) {
         expect(result.data.diff.search).toBe(validDetectedDiff.diff.search);
         expect(result.data.diff.replace).toBe(validDetectedDiff.diff.replace);
-        expect(result.data.diff.startLine).toBe(validDetectedDiff.diff.startLine);
+        expect(result.data.diff.startLine).toBe(
+          validDetectedDiff.diff.startLine,
+        );
         expect(result.data.diff.endLine).toBe(validDetectedDiff.diff.endLine);
       }
     });
@@ -252,9 +255,15 @@ describe('sse-schemas', () => {
       if (result.success) {
         expect(result.data.aiAssistantId).toBe(validRequest.aiAssistantId);
         expect(result.data.selectedText).toBe(validRequest.selectedText);
-        expect(result.data.selectedPosition).toBe(validRequest.selectedPosition);
-        expect(result.data.isPageBodyPartial).toBe(validRequest.isPageBodyPartial);
-        expect(result.data.partialPageBodyStartIndex).toBe(validRequest.partialPageBodyStartIndex);
+        expect(result.data.selectedPosition).toBe(
+          validRequest.selectedPosition,
+        );
+        expect(result.data.isPageBodyPartial).toBe(
+          validRequest.isPageBodyPartial,
+        );
+        expect(result.data.partialPageBodyStartIndex).toBe(
+          validRequest.partialPageBodyStartIndex,
+        );
       }
     });
 

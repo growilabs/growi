@@ -1,16 +1,17 @@
-import { useCallback, type JSX } from 'react';
-
+import { type JSX, useCallback } from 'react';
 import { DropdownItem } from 'reactstrap';
 
 import type { GlobalCodeMirrorEditorKey } from '../../../../consts';
-import { getMarkdownLink, replaceFocusedMarkdownLinkWithEditor } from '../../../services-internal';
+import {
+  getMarkdownLink,
+  replaceFocusedMarkdownLinkWithEditor,
+} from '../../../services-internal';
 import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
 import { useLinkEditModal } from '../../../stores/use-link-edit-modal';
 
-
 type Props = {
-  editorKey: string | GlobalCodeMirrorEditorKey,
-}
+  editorKey: string | GlobalCodeMirrorEditorKey;
+};
 
 export const LinkEditButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
@@ -33,7 +34,10 @@ export const LinkEditButton = (props: Props): JSX.Element => {
   }, [codeMirrorEditor?.view, openLinkEditModal]);
 
   return (
-    <DropdownItem className="d-flex gap-2 align-items-center" onClick={onClickOpenLinkEditModal}>
+    <DropdownItem
+      className="d-flex gap-2 align-items-center"
+      onClick={onClickOpenLinkEditModal}
+    >
       <span className="material-symbols-outlined fs-5">link</span>Link
     </DropdownItem>
   );
