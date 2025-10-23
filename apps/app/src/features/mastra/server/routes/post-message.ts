@@ -3,6 +3,7 @@ import { SCOPE, isPopulated } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { RuntimeContext } from '@mastra/core/runtime-context';
 import { pipeUIMessageStreamToResponse, validateUIMessages, type UIMessage } from 'ai';
+import type { Experimental_GeneratedImage } from 'ai';
 import type { Request, RequestHandler } from 'express';
 import { body, type ValidationChain } from 'express-validator';
 import { z } from 'zod';
@@ -90,7 +91,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
         const stream = await growiAgent.streamVNext(
           messages, {
             format: 'aisdk',
-            output: reasoningSchema,
+            // output: reasoningSchema,
             runtimeContext,
           },
         );
