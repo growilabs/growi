@@ -106,6 +106,7 @@ describe('PageService page operations with only public pages', () => {
 
     generalXssFilterProcessSpy = jest.spyOn(generalXssFilter, 'process');
 
+    // biome-ignore lint/style/noNonNullAssertion: ignore
     rootPage = (await Page.findOne({ path: '/' }))!;
     if (rootPage == null) {
       const pages = await Page.insertMany([
@@ -185,8 +186,6 @@ describe('PageService page operations with only public pages', () => {
     const childPageIdForRename4 = new mongoose.Types.ObjectId();
     const childPageIdForRename5 = new mongoose.Types.ObjectId();
     const childPageIdForRename7 = new mongoose.Types.ObjectId();
-
-    const pageIdForRename16 = new mongoose.Types.ObjectId();
 
     const pageIdForRename17 = new mongoose.Types.ObjectId();
     const pageIdForRename18 = new mongoose.Types.ObjectId();
@@ -1362,7 +1361,7 @@ describe('PageService page operations with only public pages', () => {
             endpoint: '/_api/v3/pages/rename',
           },
         );
-      } catch (err) {
+      } catch {
         isThrown = true;
       }
 
@@ -1588,7 +1587,7 @@ describe('PageService page operations with only public pages', () => {
             endpoint: '/_api/v3/pages/rename',
           },
         );
-      } catch (err) {
+      } catch {
         isThrown = true;
       }
 
@@ -2056,7 +2055,7 @@ describe('PageService page operations with only public pages', () => {
       try {
         const newPagePath = '/duplicatedv5PageForDuplicate2';
         duplicatedPage = await duplicate(page, newPagePath, dummyUser1, false);
-      } catch (err) {
+      } catch {
         isThrown = true;
       }
 
@@ -2354,7 +2353,7 @@ describe('PageService page operations with only public pages', () => {
           ip: '::ffff:127.0.0.1',
           endpoint: '/_api/v3/pages/delete',
         });
-      } catch (err) {
+      } catch {
         isThrown = true;
       }
 
@@ -2395,7 +2394,7 @@ describe('PageService page operations with only public pages', () => {
           ip: '::ffff:127.0.0.1',
           endpoint: '/_api/v3/pages/delete',
         });
-      } catch (err) {
+      } catch {
         isThrown = true;
       }
 
@@ -2553,7 +2552,7 @@ describe('PageService page operations with only public pages', () => {
           ip: '::ffff:127.0.0.1',
           endpoint: '/_api/v3/pages/deletecompletely',
         });
-      } catch (err) {
+      } catch {
         isThrown = true;
       }
       const page = await Page.findOne({ path: '/' });

@@ -47,6 +47,7 @@ export const PagePathHierarchicalLink = memo(
     // render root element
     if (linkedPagePath.isRoot) {
       if (basePath != null || isIconHidden) {
+        // biome-ignore lint/complexity/noUselessFragments: ignore
         return <></>;
       }
 
