@@ -1,4 +1,4 @@
-import React, {
+import {
   type JSX,
   useCallback,
   useEffect,
@@ -221,6 +221,7 @@ export const PageView = (props: Props): JSX.Element => {
           )}
 
           {!isIdenticalPathPage && !isNotFound && (
+            // biome-ignore lint/correctness/useUniqueElementIds: ignore
             <div id="comments-container" ref={commentsContainerRef}>
               <Comments
                 pageId={page._id}
@@ -259,6 +260,7 @@ export const PageView = (props: Props): JSX.Element => {
           {isUsersHomepagePath && page?.creator != null && (
             <UserInfo author={page.creator} />
           )}
+          {/** biome-ignore lint/correctness/useUniqueElementIds: ignore*/}
           <div id="page-view-content-container" className="flex-expand-vert">
             <Contents />
           </div>

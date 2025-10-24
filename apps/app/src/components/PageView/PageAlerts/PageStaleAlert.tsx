@@ -20,10 +20,12 @@ export const PageStaleAlert = (): JSX.Element => {
     : null;
 
   if (!isEnabledStaleNotification) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 
   if (pageInfo == null || contentAge == null || contentAge === 0) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 

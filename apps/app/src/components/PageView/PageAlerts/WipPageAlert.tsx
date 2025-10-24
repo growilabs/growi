@@ -1,4 +1,4 @@
-import React, { type JSX, useCallback } from 'react';
+import { type JSX, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useSWRMUTxCurrentPage, useSWRxCurrentPage } from '~/stores/page';
@@ -39,6 +39,7 @@ export const WipPageAlert = (): JSX.Element => {
   }, [currentPage?._id, mutateCurrentPage, t]);
 
   if (!currentPage?.wip) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 

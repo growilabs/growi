@@ -1,4 +1,4 @@
-import React, { type JSX, useCallback } from 'react';
+import { type JSX, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { UserPicture } from '@growi/ui/dist/components';
 import { format } from 'date-fns/format';
@@ -136,35 +136,34 @@ export const TrashPageAlert = (): JSX.Element => {
 
   // Show this alert only for non-empty pages in trash.
   if (!isTrashPage || isEmptyPage) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 
   return (
-    <>
-      <div
-        className="alert alert-warning py-3 ps-4 d-flex flex-column flex-lg-row"
-        data-testid="trash-page-alert"
-      >
-        <div className="flex-grow-1">
-          This page is in the trash{' '}
-          <span className="material-symbols-outlined" aria-hidden="true">
-            delete
+    <div
+      className="alert alert-warning py-3 ps-4 d-flex flex-column flex-lg-row"
+      data-testid="trash-page-alert"
+    >
+      <div className="flex-grow-1">
+        This page is in the trash{' '}
+        <span className="material-symbols-outlined" aria-hidden="true">
+          delete
+        </span>
+        .
+        <br />
+        <UserPicture user={deleteUser} />
+        <span className="ms-2">
+          Deleted by {deleteUser?.name} at{' '}
+          <span data-vrt-blackout-datetime>
+            {deletedAt ?? pageData?.updatedAt}
           </span>
-          .
-          <br />
-          <UserPicture user={deleteUser} />
-          <span className="ms-2">
-            Deleted by {deleteUser?.name} at{' '}
-            <span data-vrt-blackout-datetime>
-              {deletedAt ?? pageData?.updatedAt}
-            </span>
-          </span>
-        </div>
-        <div className="pt-1 d-flex align-items-end align-items-lg-center">
-          {isAbleToShowTrashPageManagementButtons &&
-            renderTrashPageManagementButtons()}
-        </div>
+        </span>
       </div>
-    </>
+      <div className="pt-1 d-flex align-items-end align-items-lg-center">
+        {isAbleToShowTrashPageManagementButtons &&
+          renderTrashPageManagementButtons()}
+      </div>
+    </div>
   );
 };

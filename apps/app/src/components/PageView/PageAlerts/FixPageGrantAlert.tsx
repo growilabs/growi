@@ -1,4 +1,4 @@
-import React, { type JSX, useCallback, useEffect, useState } from 'react';
+import { type JSX, useCallback, useEffect, useState } from 'react';
 import { GroupType, PageGrant } from '@growi/core';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
@@ -98,7 +98,7 @@ const FixPageGrantModal = (props: ModalProps): JSX.Element => {
 
       const toastSuccess = (await import('~/client/util/toastr')).toastSuccess;
       toastSuccess(t('Successfully updated'));
-    } catch (err) {
+    } catch {
       const toastError = (await import('~/client/util/toastr')).toastError;
       toastError(t('Failed to update'));
     }
@@ -201,6 +201,7 @@ const FixPageGrantModal = (props: ModalProps): JSX.Element => {
 
             <div className="ms-2">
               <div className="form-check mb-3">
+                {/** biome-ignore lint/correctness/useUniqueElementIds: ignore */}
                 <input
                   className="form-check-input"
                   name="grantRestricted"
@@ -220,6 +221,7 @@ const FixPageGrantModal = (props: ModalProps): JSX.Element => {
                 </label>
               </div>
               <div className="form-check mb-3">
+                {/** biome-ignore lint/correctness/useUniqueElementIds: ignore */}
                 <input
                   className="form-check-input"
                   name="grantUser"
@@ -237,6 +239,7 @@ const FixPageGrantModal = (props: ModalProps): JSX.Element => {
                 </label>
               </div>
               <div className="form-check d-flex mb-3">
+                {/** biome-ignore lint/correctness/useUniqueElementIds: ignore */}
                 <input
                   className="form-check-input"
                   name="grantUserGroup"
@@ -306,41 +309,39 @@ const FixPageGrantModal = (props: ModalProps): JSX.Element => {
             {t('user_group.select_group')}
           </ModalHeader>
           <ModalBody>
-            <>
-              {applicableGroups.map((group) => {
-                const groupIsGranted =
-                  selectedGroups?.find((g) => g.item._id === group.item._id) !=
-                  null;
-                const activeClass = groupIsGranted ? 'active' : '';
+            {applicableGroups.map((group) => {
+              const groupIsGranted =
+                selectedGroups?.find((g) => g.item._id === group.item._id) !=
+                null;
+              const activeClass = groupIsGranted ? 'active' : '';
 
-                return (
-                  <button
-                    className={`btn btn-outline-primary w-100 d-flex justify-content-start mb-3 align-items-center p-3 ${activeClass}`}
-                    type="button"
-                    key={group.item._id}
-                    onClick={() => groupListItemClickHandler(group)}
-                  >
-                    <span className="align-middle">
-                      <input type="checkbox" checked={groupIsGranted} />
+              return (
+                <button
+                  className={`btn btn-outline-primary w-100 d-flex justify-content-start mb-3 align-items-center p-3 ${activeClass}`}
+                  type="button"
+                  key={group.item._id}
+                  onClick={() => groupListItemClickHandler(group)}
+                >
+                  <span className="align-middle">
+                    <input type="checkbox" checked={groupIsGranted} />
+                  </span>
+                  <h5 className="d-inline-block ml-3">{group.item.name}</h5>
+                  {group.type === GroupType.externalUserGroup && (
+                    <span className="ml-2 badge badge-pill badge-info">
+                      {group.item.provider}
                     </span>
-                    <h5 className="d-inline-block ml-3">{group.item.name}</h5>
-                    {group.type === GroupType.externalUserGroup && (
-                      <span className="ml-2 badge badge-pill badge-info">
-                        {group.item.provider}
-                      </span>
-                    )}
-                    {/* TODO: Replace <div className="small">(TBD) List group members</div> */}
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                className="btn btn-primary mt-2 float-right"
-                onClick={() => setIsGroupSelectModalShown(false)}
-              >
-                {t('Done')}
-              </button>
-            </>
+                  )}
+                  {/* TODO: Replace <div className="small">(TBD) List group members</div> */}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              className="btn btn-primary mt-2 float-right"
+              onClick={() => setIsGroupSelectModalShown(false)}
+            >
+              {t('Done')}
+            </button>
           </ModalBody>
         </Modal>
       )}
@@ -367,16 +368,19 @@ export const FixPageGrantAlert = (): JSX.Element => {
 
   // Dependencies
   if (pageData == null) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 
   if (!hasParent) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
   if (
     dataIsGrantNormalized?.isGrantNormalized == null ||
     dataIsGrantNormalized.isGrantNormalized
   ) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 

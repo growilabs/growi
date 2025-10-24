@@ -21,6 +21,7 @@ export const PageContentFooter = (
   const { creator, lastUpdateUser, createdAt, updatedAt } = page;
 
   if (page.isEmpty) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 

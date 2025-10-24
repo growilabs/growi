@@ -1,5 +1,5 @@
 import type { JSX, ReactNode } from 'react';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import type { ColorScheme } from '@growi/core';
@@ -9,13 +9,10 @@ import {
   NextThemesProvider,
   useNextThemes,
 } from '~/stores-universal/use-next-themes';
-import loggerFactory from '~/utils/logger';
 
 import styles from './RawLayout.module.scss';
 
 const toastContainerClass = styles['grw-toast-container'] ?? '';
-
-const logger = loggerFactory('growi:cli:RawLayout');
 
 const ToastContainer = dynamic(
   () => import('react-toastify').then((mod) => mod.ToastContainer),

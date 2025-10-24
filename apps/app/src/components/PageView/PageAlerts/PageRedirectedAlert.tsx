@@ -26,6 +26,7 @@ export const PageRedirectedAlert = React.memo((): JSX.Element => {
   }, [currentPagePath]);
 
   if (redirectFrom == null || redirectFrom === '') {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 
@@ -43,6 +44,7 @@ export const PageRedirectedAlert = React.memo((): JSX.Element => {
         <strong>{t('Redirected')}:</strong> {t('page_page.notice.redirected')}{' '}
         <code>{redirectFrom}</code> {t('page_page.notice.redirected_period')}
       </span>
+      {/** biome-ignore lint/correctness/useUniqueElementIds: ignore*/}
       <button
         type="button"
         id="unlink-page-button"
