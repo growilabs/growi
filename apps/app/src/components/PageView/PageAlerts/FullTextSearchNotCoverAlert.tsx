@@ -18,6 +18,7 @@ export const FullTextSearchNotCoverAlert = (): JSX.Element => {
     elasticsearchMaxBodyLengthToIndex == null ||
     markdownLength <= elasticsearchMaxBodyLengthToIndex
   ) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 

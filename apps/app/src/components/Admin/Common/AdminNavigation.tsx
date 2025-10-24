@@ -317,6 +317,7 @@ export const AdminNavigation = (): JSX.Element => {
 
       {/* Dropdown */}
       <div className="dropdown d-block d-lg-none mb-5">
+        {/** biome-ignore lint/correctness/useUniqueElementIds: ignore*/}
         <button
           className="btn btn-outline-primary btn-lg dropdown-toggle col-12 text-end"
           type="button"
