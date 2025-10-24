@@ -32,8 +32,7 @@
       "!apps/app/src/server/middlewares",
       "!apps/app/src/server/models",
       "!apps/app/src/server/routes",
-      "!apps/app/src/server/service",
-      "!apps/app/features/mastra"
+      "!apps/app/src/server/service"
     ]
   },
   "formatter": {
