@@ -43,6 +43,7 @@ module.exports = {
     'src/features/opentelemetry/**',
     'src/features/openai/**',
     'src/features/rate-limiter/**',
+    'src/features/mastra/**',
     'src/stores-universal/**',
     'src/interfaces/**',
     'src/utils/**',
