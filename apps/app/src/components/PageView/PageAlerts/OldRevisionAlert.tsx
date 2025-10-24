@@ -1,4 +1,4 @@
-import React, { type JSX, useCallback } from 'react';
+import { type JSX, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { returnPathForURL } from '@growi/core/dist/utils/path-utils';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +28,7 @@ export const OldRevisionAlert = (): JSX.Element => {
   }, [mutateCurrentPage, page, router]);
 
   if (page == null || isOldRevisionPage) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 

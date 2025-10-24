@@ -1,5 +1,4 @@
 import type { JSX, ReactNode } from 'react';
-import React from 'react';
 import Image from 'next/image';
 
 import { useAppTitle } from '~/stores-universal/context';

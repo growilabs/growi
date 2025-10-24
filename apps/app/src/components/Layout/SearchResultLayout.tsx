@@ -1,4 +1,4 @@
-import React, { type JSX, type ReactNode } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 import { BasicLayout } from './BasicLayout';
 

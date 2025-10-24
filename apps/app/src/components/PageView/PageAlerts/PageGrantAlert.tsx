@@ -1,4 +1,4 @@
-import React, { type JSX } from 'react';
+import type { JSX } from 'react';
 import { isPopulated } from '@growi/core';
 import { useTranslation } from 'react-i18next';
 
@@ -9,6 +9,7 @@ export const PageGrantAlert = (): JSX.Element => {
   const { data: pageData } = useSWRxCurrentPage();
 
   if (pageData == null || pageData.grant == null || pageData.grant === 1) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 

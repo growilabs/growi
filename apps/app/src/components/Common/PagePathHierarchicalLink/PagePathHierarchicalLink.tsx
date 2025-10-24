@@ -1,4 +1,4 @@
-import React, { type JSX, memo, useCallback } from 'react';
+import { type JSX, memo, useCallback } from 'react';
 import Link from 'next/link';
 import urljoin from 'url-join';
 
@@ -33,8 +33,9 @@ export const PagePathHierarchicalLink = memo(
     const RootElm = useCallback(
       ({ children }) => {
         return isInnerElem ? (
-          <>{children}</>
+          {children}
         ) : (
+          // biome-ignore lint/correctness/useUniqueElementIds: ignore
           <span className="text-break" id="grw-page-path-hierarchical-link">
             {children}
           </span>
