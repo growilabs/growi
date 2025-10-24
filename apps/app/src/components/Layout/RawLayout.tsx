@@ -1,5 +1,5 @@
 import type { JSX, ReactNode } from 'react';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import type { ColorScheme } from '@growi/core';
