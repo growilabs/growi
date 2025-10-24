@@ -2375,7 +2375,7 @@ describe('PageService page operations with only public pages', () => {
           ip: '::ffff:127.0.0.1',
           endpoint: '/_api/v3/pages/delete',
         });
-      } catch (err) {
+      } catch {
         isThrown = true;
       }
 

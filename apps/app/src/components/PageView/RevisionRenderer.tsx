@@ -4,11 +4,8 @@ import { ErrorBoundary } from 'react-error-boundary';
 import ReactMarkdown from 'react-markdown';
 
 import type { RendererOptions } from '~/interfaces/renderer-options';
-import loggerFactory from '~/utils/logger';
 
 import 'katex/dist/katex.min.css';
-
-const logger = loggerFactory('components:Page:RevisionRenderer');
 
 type Props = {
   rendererOptions: RendererOptions;
