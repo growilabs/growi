@@ -234,7 +234,7 @@ describe('access-token-parser middleware for access token with scopes', () => {
 
     // act - try to access with read:user:info scope
     reqMock.headers['x-growi-access-token'] = token;
-    await parserForAccessToken([SCOPE.READ.USER_SETTINGS.INFO, SCOPE.READ.USER_SETTINGS.API.ACCESS_TOKEN])(reqMock, resMock);
+    await parserForAccessToken([SCOPE.READ.USER_SETTINGS.INFO])(reqMock, resMock);
 
     // assert
     expect(reqMock.user).toBeDefined();
