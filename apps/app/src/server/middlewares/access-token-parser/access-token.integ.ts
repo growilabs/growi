@@ -1,9 +1,9 @@
 import { faker } from '@faker-js/faker';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Response } from 'express';
 import { mock } from 'vitest-mock-extended';
 
-import { SCOPE } from '@growi/core/dist/interfaces';
 import type Crowi from '~/server/crowi';
 import type UserEvent from '~/server/events/user';
 import { AccessToken } from '~/server/models/access-token';
@@ -203,6 +203,38 @@ describe('access-token-parser middleware for access token with scopes', () => {
     // act - try to access with read:user:info scope
     reqMock.query.access_token = token;
     await parserForAccessToken([SCOPE.READ.USER_SETTINGS.INFO, SCOPE.READ.USER_SETTINGS.API.ACCESS_TOKEN])(reqMock, resMock);
+
+    // assert
+    expect(reqMock.user).toBeDefined();
+    expect(reqMock.user?._id).toStrictEqual(targetUser._id);
+    expect(serializeUserSecurely).toHaveBeenCalledOnce();
+  });
+
+  it('should authenticate with X-GROWI-ACCESS-TOKEN header and wildcard scope', async() => {
+    // arrange
+    const reqMock = mock<AccessTokenParserReq>({
+      user: undefined,
+    });
+    const resMock = mock<Response>();
+
+    // prepare a user
+    const targetUser = await User.create({
+      name: faker.person.fullName(),
+      username: faker.string.uuid(),
+      password: faker.internet.password(),
+      lang: 'en_US',
+    });
+
+    // generate token with read:user:* scope
+    const { token } = await AccessToken.generateToken(
+      targetUser._id,
+      new Date(Date.now() + 1000 * 60 * 60 * 24),
+      [SCOPE.READ.USER_SETTINGS.ALL],
+    );
+
+    // act - try to access with read:user:info scope
+    reqMock.headers['x-growi-access-token'] = token;
+    await parserForAccessToken([SCOPE.READ.USER_SETTINGS.INFO])(reqMock, resMock);
 
     // assert
     expect(reqMock.user).toBeDefined();

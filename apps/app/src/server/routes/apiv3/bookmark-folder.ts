@@ -1,9 +1,9 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { body } from 'express-validator';
 import type { Types } from 'mongoose';
 
 import type { BookmarkFolderItems } from '~/interfaces/bookmark-info';
-import { SCOPE } from '@growi/core/dist/interfaces';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { InvalidParentBookmarkFolderError } from '~/server/models/errors';
@@ -132,6 +132,7 @@ module.exports = (crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: Create bookmark folder
    *        description: Create a new bookmark folder
    *        requestBody:
@@ -189,6 +190,7 @@ module.exports = (crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: List bookmark folders of a user
    *        description: List bookmark folders of a user
    *        parameters:
@@ -278,6 +280,7 @@ module.exports = (crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: Delete bookmark folder
    *        description: Delete a bookmark folder and its children
    *        parameters:
@@ -321,6 +324,7 @@ module.exports = (crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: Update bookmark folder
    *        description: Update a bookmark folder
    *        requestBody:
@@ -379,6 +383,7 @@ module.exports = (crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: Update bookmark folder
    *        description: Update a bookmark folder
    *        requestBody:
@@ -431,6 +436,7 @@ module.exports = (crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: Update bookmark in folder
    *        description: Update a bookmark in a folder
    *        requestBody:
