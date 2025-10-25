@@ -210,7 +210,7 @@ describe('access-token-parser middleware for access token with scopes', () => {
     expect(serializeUserSecurely).toHaveBeenCalledOnce();
   });
 
-  it('should authenticate with x-growi-access-token header and wildcard scope', async() => {
+  it('should authenticate with X-GROWI-ACCESS-TOKEN header and wildcard scope', async() => {
     // arrange
     const reqMock = mock<AccessTokenParserReq>({
       user: undefined,
