@@ -8,8 +8,8 @@ export const getISOWeekId = (date: Date): string => {
 };
 
 export const daysSinceLastUpdate = (
-    lastUpdateDate: Date,
-    currentDate: Date = new Date(),
+  lastUpdateDate: Date,
+  currentDate: Date = new Date(),
 ): number => {
   const diffDays = differenceInDays(lastUpdateDate, currentDate);
   return Math.max(0, diffDays);
