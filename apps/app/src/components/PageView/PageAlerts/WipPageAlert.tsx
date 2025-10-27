@@ -8,7 +8,7 @@ export const WipPageAlert = (): JSX.Element => {
   const { data: currentPage } = useSWRxCurrentPage();
   const { trigger: mutateCurrentPage } = useSWRMUTxCurrentPage();
 
-  console.log('hello')
+  console.log('hello');
 
   const clickPagePublishButton = useCallback(async () => {
     const pageId = currentPage?._id;
