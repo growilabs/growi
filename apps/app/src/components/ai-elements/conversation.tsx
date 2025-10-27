@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import type { ComponentProps } from 'react';
 import { useCallback } from 'react';
 import { ArrowDownIcon } from 'lucide-react';
@@ -17,8 +18,16 @@ export const Conversation = ({
   children,
   ...props
 }: ConversationProps): React.ReactElement => {
+  const Component = StickToBottom as unknown as React.FC<{
+    className?: string;
+    initial?: string;
+    resize?: string;
+    role?: string;
+    children: React.ReactNode;
+  }>;
+
   return (
-    <StickToBottom
+    <Component
       className={cn('tw:relative tw:flex-1 tw:overflow-y-auto', className)}
       initial="smooth"
       resize="smooth"
@@ -26,7 +35,7 @@ export const Conversation = ({
       {...props}
     >
       {children}
-    </StickToBottom>
+    </Component>
   );
 };
 
@@ -39,10 +48,15 @@ export const ConversationContent = ({
   children,
   ...props
 }: ConversationContentProps): React.ReactElement => {
+  const Component = StickToBottom.Content as unknown as React.FC<{
+    className?: string;
+    children: React.ReactNode;
+  }>;
+
   return (
-    <StickToBottom.Content className={cn('tw:p-4', className)} {...props}>
+    <Component className={cn('tw:p-4', className)} {...props}>
       {children}
-    </StickToBottom.Content>
+    </Component>
   );
 };
 

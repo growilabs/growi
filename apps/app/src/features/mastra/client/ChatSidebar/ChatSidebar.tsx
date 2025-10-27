@@ -106,14 +106,14 @@ const ChatSidebarSubstance = (): JSX.Element => {
                         />
                         {message.parts
                           .filter((part) => part.type === 'source-url')
-                          .map((part, i) => (
+                          .map((_part, i) => (
                             // eslint-disable-next-line react/no-array-index-key
                             <SourcesContent key={`${message.id}-${i}`}>
                               <Source
                                 // eslint-disable-next-line react/no-array-index-key
                                 key={`${message.id}-${i}`}
-                                href={part.url}
-                                title={part.url}
+                                // href={part.url}
+                                // title={part.url}
                               />
                             </SourcesContent>
                           ))}
