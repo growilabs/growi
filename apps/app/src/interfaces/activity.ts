@@ -588,22 +588,6 @@ export const ActivityLogActions = {
   ACTION_ATTACHMENT_ADD,
 } as const;
 
-export const ActivityActionTranslationMap: Record<
-  SupportedActivityActionType,
-  string
-> = {
-  [ACTION_PAGE_CREATE]: 'created a page',
-  [ACTION_PAGE_UPDATE]: 'updated a page',
-  [ACTION_PAGE_DELETE]: 'deleted a page',
-  [ACTION_PAGE_RENAME]: 'renamed a page',
-  [ACTION_PAGE_REVERT]: 'reverted a page',
-  [ACTION_PAGE_DUPLICATE]: 'duplicated a page',
-  [ACTION_COMMENT_CREATE]: 'posted a comment',
-  [ACTION_COMMENT_UPDATE]: 'edited a comment',
-  [ACTION_COMMENT_REMOVE]: 'deleted a comment',
-  [ACTION_ATTACHMENT_ADD]: 'added an attachment',
-};
-
 /*
  * Array
  */
