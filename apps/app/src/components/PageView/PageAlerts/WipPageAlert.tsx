@@ -1,13 +1,14 @@
 import React, { type JSX, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-
 import { useSWRMUTxCurrentPage, useSWRxCurrentPage } from '~/stores/page';
 
 export const WipPageAlert = (): JSX.Element => {
   const { t } = useTranslation();
   const { data: currentPage } = useSWRxCurrentPage();
   const { trigger: mutateCurrentPage } = useSWRMUTxCurrentPage();
+
+  console.log('hello')
 
   const clickPagePublishButton = useCallback(async () => {
     const pageId = currentPage?._id;
