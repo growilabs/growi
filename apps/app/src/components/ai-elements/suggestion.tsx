@@ -3,10 +3,7 @@
 import type { ComponentProps } from 'react';
 
 import { Button } from '~/components/ui/button';
-import {
-  ScrollArea,
-  ScrollBar,
-} from '~/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '~/components/ui/scroll-area';
 import { cn } from '~/lib/utils';
 
 export type SuggestionsProps = ComponentProps<typeof ScrollArea>;
@@ -16,8 +13,16 @@ export const Suggestions = ({
   children,
   ...props
 }: SuggestionsProps) => (
-  <ScrollArea className="tw:w-full tw:overflow-x-auto tw:whitespace-nowrap" {...props}>
-    <div className={cn('tw:flex tw:w-max tw:flex-nowrap tw:items-center tw:gap-2', className)}>
+  <ScrollArea
+    className="tw:w-full tw:overflow-x-auto tw:whitespace-nowrap"
+    {...props}
+  >
+    <div
+      className={cn(
+        'tw:flex tw:w-max tw:flex-nowrap tw:items-center tw:gap-2',
+        className,
+      )}
+    >
       {children}
     </div>
     <ScrollBar className="tw:hidden" orientation="horizontal" />

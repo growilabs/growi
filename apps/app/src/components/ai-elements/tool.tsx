@@ -2,7 +2,6 @@
 
 import type { ComponentProps, ReactNode } from 'react';
 import { isValidElement } from 'react';
-
 import type { ToolUIPart } from 'ai';
 import {
   CheckCircleIcon,
@@ -21,14 +20,16 @@ import {
 } from '~/components/ui/collapsible';
 import { cn } from '~/lib/utils';
 
-
 import { CodeBlock } from './code-block';
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 
 export const Tool = ({ className, ...props }: ToolProps) => (
   <Collapsible
-    className={cn('tw:not-prose tw:mb-4 tw:w-full tw:rounded-md tw:border', className)}
+    className={cn(
+      'tw:not-prose tw:mb-4 tw:w-full tw:rounded-md tw:border',
+      className,
+    )}
     {...props}
   />
 );
@@ -51,12 +52,17 @@ const getStatusBadge = (status: ToolUIPart['state']) => {
   const icons = {
     'input-streaming': <CircleIcon className="tw:size-4" />,
     'input-available': <ClockIcon className="tw:size-4 tw:animate-pulse" />,
-    'output-available': <CheckCircleIcon className="tw:size-4 tw:text-green-600" />,
+    'output-available': (
+      <CheckCircleIcon className="tw:size-4 tw:text-green-600" />
+    ),
     'output-error': <XCircleIcon className="tw:size-4 tw:text-red-600" />,
   } as const;
 
   return (
-    <Badge className="tw:gap-1.5 tw:rounded-full tw:text-xs" variant="secondary">
+    <Badge
+      className="tw:gap-1.5 tw:rounded-full tw:text-xs"
+      variant="secondary"
+    >
       {icons[status]}
       {labels[status]}
     </Badge>
@@ -105,7 +111,10 @@ export type ToolInputProps = ComponentProps<'div'> & {
 };
 
 export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
-  <div className={cn('tw:space-y-2 tw:overflow-hidden tw:p-4', className)} {...props}>
+  <div
+    className={cn('tw:space-y-2 tw:overflow-hidden tw:p-4', className)}
+    {...props}
+  >
     <h4 className="tw:font-medium tw:text-muted-foreground tw:text-xs tw:uppercase tw:tracking-wide">
       Parameters
     </h4>
@@ -136,8 +145,7 @@ export const ToolOutput = ({
     Output = (
       <CodeBlock code={JSON.stringify(output, null, 2)} language="json" />
     );
-  }
-  else if (typeof output === 'string') {
+  } else if (typeof output === 'string') {
     Output = <CodeBlock code={output} language="json" />;
   }
 

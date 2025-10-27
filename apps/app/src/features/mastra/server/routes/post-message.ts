@@ -1,8 +1,12 @@
 import type { IUserHasId } from '@growi/core';
-import { SCOPE, isPopulated } from '@growi/core';
+import { isPopulated, SCOPE } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { RuntimeContext } from '@mastra/core/runtime-context';
-import { pipeUIMessageStreamToResponse, validateUIMessages, type UIMessage } from 'ai';
+import {
+  pipeUIMessageStreamToResponse,
+  type UIMessage,
+  validateUIMessages,
+} from 'ai';
 import type { Request, RequestHandler } from 'express';
 import { body, type ValidationChain } from 'express-validator';
 import { z } from 'zod';
@@ -19,46 +23,55 @@ import { mastra } from '../services/mastra-modules';
 
 const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
 
-
 type ReqBody = {
-  aiAssistantId: string,
-  messages: UIMessage[],
-}
+  aiAssistantId: string;
+  messages: UIMessage[];
+};
 
 type Req = Request<undefined, Response, ReqBody> & {
-  user: IUserHasId,
-}
+  user: IUserHasId;
+};
 
 type PostMessageHandlersFactory = (crowi: Crowi) => RequestHandler[];
 
 const runtimeContext = new RuntimeContext<{ vectorStoreId: string }>();
 
 const reasoningSchema = z.object({
-  thoughtProcess: z.array(z.object({
-    step: z.string(),
-    reasoning: z.string(),
-    conclusion: z.string(),
-  })),
+  thoughtProcess: z.array(
+    z.object({
+      step: z.string(),
+      reasoning: z.string(),
+      conclusion: z.string(),
+    }),
+  ),
   finalAnswer: z.string(),
 });
 
-export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(crowi);
+export const postMessageHandlersFactory: PostMessageHandlersFactory = (
+  crowi,
+) => {
+  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
+    crowi,
+  );
 
   const validator: ValidationChain[] = [
     body('aiAssistantId')
       .isMongoId()
       .withMessage('aiAssistantId must be string'),
 
-    body('messages')
-      .custom(async(data) => {
-        await validateUIMessages({ messages: data });
-      }),
+    body('messages').custom(async (data) => {
+      await validateUIMessages({ messages: data });
+    }),
   ];
 
   return [
-    accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT], { acceptLegacy: true }),
-    loginRequiredStrictly, ...validator, apiV3FormValidator, async(req: Req, res: ApiV3Response) => {
+    accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT], {
+      acceptLegacy: true,
+    }),
+    loginRequiredStrictly,
+    ...validator,
+    apiV3FormValidator,
+    async (req: Req, res: ApiV3Response) => {
       const { aiAssistantId, messages } = req.body;
 
       const openaiService = getOpenaiService();
@@ -66,9 +79,15 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
         return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
       }
 
-      const isAiAssistantUsable = await openaiService.isAiAssistantUsable(aiAssistantId, req.user);
+      const isAiAssistantUsable = await openaiService.isAiAssistantUsable(
+        aiAssistantId,
+        req.user,
+      );
       if (!isAiAssistantUsable) {
-        return res.apiv3Err(new ErrorV3('The specified AI assistant is not usable'), 400);
+        return res.apiv3Err(
+          new ErrorV3('The specified AI assistant is not usable'),
+          400,
+        );
       }
 
       const aiAssistant = await AiAssistantModel.findById(aiAssistantId);
@@ -76,24 +95,24 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
         return res.apiv3Err(new ErrorV3('AI assistant not found'), 404);
       }
 
-      const aiAssistantWithPopulatedVectorStore = await aiAssistant.populate('vectorStore');
+      const aiAssistantWithPopulatedVectorStore =
+        await aiAssistant.populate('vectorStore');
       if (!isPopulated(aiAssistantWithPopulatedVectorStore.vectorStore)) {
         return res.apiv3Err(new ErrorV3('Vector store not found'), 404);
       }
 
-      const vectorStoreId = aiAssistantWithPopulatedVectorStore.vectorStore.vectorStoreId;
+      const vectorStoreId =
+        aiAssistantWithPopulatedVectorStore.vectorStore.vectorStoreId;
       runtimeContext.set('vectorStoreId', vectorStoreId);
 
       const growiAgent = mastra.getAgent('growiAgent');
 
       try {
-        const stream = await growiAgent.streamVNext(
-          messages, {
-            format: 'aisdk',
-            output: reasoningSchema,
-            runtimeContext,
-          },
-        );
+        const stream = await growiAgent.streamVNext(messages, {
+          format: 'aisdk',
+          output: reasoningSchema,
+          runtimeContext,
+        });
 
         // debug: log all chunks from the full stream
         // for await (const chunk of stream.fullStream) {
@@ -108,9 +127,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
           response: res,
           stream: stream.toUIMessageStream(),
         });
-      }
-
-      catch (error) {
+      } catch (error) {
         logger.error(error);
         if (!res.headersSent) {
           return res.apiv3Err(new ErrorV3('Failed to post message'));

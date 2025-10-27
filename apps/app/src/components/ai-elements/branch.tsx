@@ -1,16 +1,12 @@
 'use client';
 
 import type { ComponentProps, HTMLAttributes, ReactElement } from 'react';
-import {
-  createContext, useContext, useEffect, useState,
-} from 'react';
-
+import { createContext, useContext, useEffect, useState } from 'react';
 import type { UIMessage } from 'ai';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 
 import { Button } from '~/components/ui/button';
 import { cn } from '~/lib/utils';
-
 
 type BranchContextType = {
   currentBranch: number;
@@ -53,12 +49,14 @@ export const Branch = ({
   };
 
   const goToPrevious = () => {
-    const newBranch = currentBranch > 0 ? currentBranch - 1 : branches.length - 1;
+    const newBranch =
+      currentBranch > 0 ? currentBranch - 1 : branches.length - 1;
     handleBranchChange(newBranch);
   };
 
   const goToNext = () => {
-    const newBranch = currentBranch < branches.length - 1 ? currentBranch + 1 : 0;
+    const newBranch =
+      currentBranch < branches.length - 1 ? currentBranch + 1 : 0;
     handleBranchChange(newBranch);
   };
 

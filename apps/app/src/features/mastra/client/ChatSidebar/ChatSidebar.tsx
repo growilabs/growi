@@ -1,12 +1,7 @@
-import {
-  useState, Fragment,
-} from 'react';
-
+import { Fragment, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import {
-  GlobeIcon, CopyIcon, RefreshCcwIcon,
-} from 'lucide-react';
+import { CopyIcon, GlobeIcon, RefreshCcwIcon } from 'lucide-react';
 
 import { Action, Actions } from '~/components/ai-elements/actions';
 import {
@@ -26,6 +21,7 @@ import {
   PromptInputAttachments,
   PromptInputBody,
   PromptInputButton,
+  PromptInputFooter,
   type PromptInputMessage,
   PromptInputModelSelect,
   PromptInputModelSelectContent,
@@ -34,7 +30,6 @@ import {
   PromptInputModelSelectValue,
   PromptInputSubmit,
   PromptInputTextarea,
-  PromptInputFooter,
   PromptInputTools,
 } from '~/components/ai-elements/prompt-input';
 import {
@@ -49,7 +44,6 @@ import {
   SourcesContent,
   SourcesTrigger,
 } from '~/components/ai-elements/sources';
-
 
 import styles from './ChatSidebar.module.scss';
 
@@ -70,9 +64,7 @@ const ChatSidebarSubstance = (): JSX.Element => {
   const [input, setInput] = useState('');
   const [model, setModel] = useState<string>(models[0].value);
   const [webSearch, setWebSearch] = useState(false);
-  const {
-    messages, sendMessage, status, regenerate,
-  } = useChat({
+  const { messages, sendMessage, status, regenerate } = useChat({
     transport: new DefaultChatTransport({ api: '/_api/v3/mastra/message' }),
   });
 
@@ -92,35 +84,41 @@ const ChatSidebarSubstance = (): JSX.Element => {
   };
 
   return (
-    <div className={`position-fixed top-0 end-0 h-100 border-start bg-body shadow-sm overflow-hidden ${moduleClass}`}>
+    <div
+      className={`position-fixed top-0 end-0 h-100 border-start bg-body shadow-sm overflow-hidden ${moduleClass}`}
+    >
       <div className="tw:max-w-4xl tw:mx-auto tw:p-6 tw:relative tw:size-full twh-screen">
         <div className="tw:flex tw:flex-col tw:h-full">
           <Conversation className="tw:h-full">
             <ConversationContent>
-              {messages.map(message => (
+              {messages.map((message) => (
                 <div key={message.id}>
-                  {message.role === 'assistant' && message.parts.filter(part => part.type === 'source-url').length > 0 && (
-                    <Sources>
-                      <SourcesTrigger
-                        count={
-                          message.parts.filter(
-                            part => part.type === 'source-url',
-                          ).length
-                        }
-                      />
-                      {message.parts.filter(part => part.type === 'source-url').map((part, i) => (
-                        // eslint-disable-next-line react/no-array-index-key
-                        <SourcesContent key={`${message.id}-${i}`}>
-                          <Source
+                  {message.role === 'assistant' &&
+                    message.parts.filter((part) => part.type === 'source-url')
+                      .length > 0 && (
+                      <Sources>
+                        <SourcesTrigger
+                          count={
+                            message.parts.filter(
+                              (part) => part.type === 'source-url',
+                            ).length
+                          }
+                        />
+                        {message.parts
+                          .filter((part) => part.type === 'source-url')
+                          .map((part, i) => (
                             // eslint-disable-next-line react/no-array-index-key
-                            key={`${message.id}-${i}`}
-                            href={part.url}
-                            title={part.url}
-                          />
-                        </SourcesContent>
-                      ))}
-                    </Sources>
-                  )}
+                            <SourcesContent key={`${message.id}-${i}`}>
+                              <Source
+                                // eslint-disable-next-line react/no-array-index-key
+                                key={`${message.id}-${i}`}
+                                href={part.url}
+                                title={part.url}
+                              />
+                            </SourcesContent>
+                          ))}
+                      </Sources>
+                    )}
                   {message.parts.map((part, i) => {
                     switch (part.type) {
                       case 'text':
@@ -129,28 +127,28 @@ const ChatSidebarSubstance = (): JSX.Element => {
                           <Fragment key={`${message.id}-${i}`}>
                             <Message from={message.role}>
                               <MessageContent>
-                                <Response>
-                                  {part.text}
-                                </Response>
+                                <Response>{part.text}</Response>
                               </MessageContent>
                             </Message>
-                            {message.role === 'assistant' && i === messages.length - 1 && (
-                              <Actions className="mt-2">
-                                <Action
-                                  onClick={() => regenerate()}
-                                  label="Retry"
-                                >
-                                  <RefreshCcwIcon className="size-3" />
-                                </Action>
-                                <Action
-                                  onClick={() => navigator.clipboard.writeText(part.text)
-                                  }
-                                  label="Copy"
-                                >
-                                  <CopyIcon className="size-3" />
-                                </Action>
-                              </Actions>
-                            )}
+                            {message.role === 'assistant' &&
+                              i === messages.length - 1 && (
+                                <Actions className="mt-2">
+                                  <Action
+                                    onClick={() => regenerate()}
+                                    label="Retry"
+                                  >
+                                    <RefreshCcwIcon className="size-3" />
+                                  </Action>
+                                  <Action
+                                    onClick={() =>
+                                      navigator.clipboard.writeText(part.text)
+                                    }
+                                    label="Copy"
+                                  >
+                                    <CopyIcon className="size-3" />
+                                  </Action>
+                                </Actions>
+                              )}
                           </Fragment>
                         );
                       case 'reasoning':
@@ -159,7 +157,11 @@ const ChatSidebarSubstance = (): JSX.Element => {
                             // eslint-disable-next-line react/no-array-index-key
                             key={`${message.id}-${i}`}
                             className="w-full"
-                            isStreaming={status === 'streaming' && i === message.parts.length - 1 && message.id === messages.at(-1)?.id}
+                            isStreaming={
+                              status === 'streaming' &&
+                              i === message.parts.length - 1 &&
+                              message.id === messages.at(-1)?.id
+                            }
                           >
                             <ReasoningTrigger />
                             <ReasoningContent>{part.text}</ReasoningContent>
@@ -176,13 +178,18 @@ const ChatSidebarSubstance = (): JSX.Element => {
             <ConversationScrollButton />
           </Conversation>
 
-          <PromptInput onSubmit={handleSubmit} className="tw:mt-4" globalDrop multiple>
+          <PromptInput
+            onSubmit={handleSubmit}
+            className="tw:mt-4"
+            globalDrop
+            multiple
+          >
             <PromptInputBody>
               <PromptInputAttachments>
-                {attachment => <PromptInputAttachment data={attachment} />}
+                {(attachment) => <PromptInputAttachment data={attachment} />}
               </PromptInputAttachments>
               <PromptInputTextarea
-                onChange={e => setInput(e.target.value)}
+                onChange={(e) => setInput(e.target.value)}
                 value={input}
               />
             </PromptInputBody>
@@ -211,8 +218,11 @@ const ChatSidebarSubstance = (): JSX.Element => {
                     <PromptInputModelSelectValue />
                   </PromptInputModelSelectTrigger>
                   <PromptInputModelSelectContent>
-                    {models.map(model => (
-                      <PromptInputModelSelectItem key={model.value} value={model.value}>
+                    {models.map((model) => (
+                      <PromptInputModelSelectItem
+                        key={model.value}
+                        value={model.value}
+                      >
                         {model.name}
                       </PromptInputModelSelectItem>
                     ))}
@@ -235,7 +245,5 @@ export const ChatSidebar = (): JSX.Element => {
     return <></>;
   }
 
-  return (
-    <ChatSidebarSubstance />
-  );
+  return <ChatSidebarSubstance />;
 };

@@ -1,5 +1,4 @@
 import type { ComponentProps } from 'react';
-
 import { Handle, Position } from '@xyflow/react';
 
 import {
@@ -38,7 +37,10 @@ export type NodeHeaderProps = ComponentProps<typeof CardHeader>;
 
 export const NodeHeader = ({ className, ...props }: NodeHeaderProps) => (
   <CardHeader
-    className={cn('tw:gap-0.5 tw:rounded-t-md tw:border-b tw:bg-secondary tw:p-3!', className)}
+    className={cn(
+      'tw:gap-0.5 tw:rounded-t-md tw:border-b tw:bg-secondary tw:p-3!',
+      className,
+    )}
     {...props}
   />
 );
@@ -67,7 +69,10 @@ export type NodeFooterProps = ComponentProps<typeof CardFooter>;
 
 export const NodeFooter = ({ className, ...props }: NodeFooterProps) => (
   <CardFooter
-    className={cn('tw:rounded-b-md tw:border-t tw:bg-secondary tw:p-3!', className)}
+    className={cn(
+      'tw:rounded-b-md tw:border-t tw:bg-secondary tw:p-3!',
+      className,
+    )}
     {...props}
   />
 );

@@ -1,10 +1,7 @@
 'use client';
 
 import type { ComponentProps } from 'react';
-import {
-  createContext, memo, useContext, useMemo,
-} from 'react';
-
+import { createContext, memo, useContext, useMemo } from 'react';
 import { useControllableState } from '@radix-ui/react-use-controllable-state';
 import {
   BrainIcon,
@@ -152,7 +149,9 @@ export const ChainOfThoughtStep = memo(
         <div className="tw:flex-1 tw:space-y-2">
           <div>{label}</div>
           {description && (
-            <div className="tw:text-muted-foreground tw:text-xs">{description}</div>
+            <div className="tw:text-muted-foreground tw:text-xs">
+              {description}
+            </div>
           )}
           {children}
         </div>
@@ -165,7 +164,10 @@ export type ChainOfThoughtSearchResultsProps = ComponentProps<'div'>;
 
 export const ChainOfThoughtSearchResults = memo(
   ({ className, ...props }: ChainOfThoughtSearchResultsProps) => (
-    <div className={cn('tw:flex tw:items-center tw:gap-2', className)} {...props} />
+    <div
+      className={cn('tw:flex tw:items-center tw:gap-2', className)}
+      {...props}
+    />
   ),
 );
 
@@ -174,7 +176,10 @@ export type ChainOfThoughtSearchResultProps = ComponentProps<typeof Badge>;
 export const ChainOfThoughtSearchResult = memo(
   ({ className, children, ...props }: ChainOfThoughtSearchResultProps) => (
     <Badge
-      className={cn('tw:gap-1 tw:px-2 tw:py-0.5 tw:font-normal tw:text-xs', className)}
+      className={cn(
+        'tw:gap-1 tw:px-2 tw:py-0.5 tw:font-normal tw:text-xs',
+        className,
+      )}
       variant="secondary"
       {...props}
     >
@@ -213,14 +218,14 @@ export type ChainOfThoughtImageProps = ComponentProps<'div'> & {
 };
 
 export const ChainOfThoughtImage = memo(
-  ({
-    className, children, caption, ...props
-  }: ChainOfThoughtImageProps) => (
+  ({ className, children, caption, ...props }: ChainOfThoughtImageProps) => (
     <div className={cn('tw:mt-2 tw:space-y-2', className)} {...props}>
       <div className="tw:relative tw:flex tw:max-h-[22rem] tw:items-center tw:justify-center tw:overflow-hidden tw:rounded-lg tw:bg-muted tw:p-3">
         {children}
       </div>
-      {caption && <p className="tw:text-muted-foreground tw:text-xs">{caption}</p>}
+      {caption && (
+        <p className="tw:text-muted-foreground tw:text-xs">{caption}</p>
+      )}
     </div>
   ),
 );

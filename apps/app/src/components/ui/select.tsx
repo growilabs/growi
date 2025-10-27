@@ -1,7 +1,6 @@
 'use client';
 
-import * as React from 'react';
-
+import type * as React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 
@@ -31,7 +30,7 @@ function SelectTrigger({
   children,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
-  size?: 'sm' | 'default'
+  size?: 'sm' | 'default';
 }) {
   return (
     <SelectPrimitive.Trigger
@@ -66,8 +65,8 @@ function SelectContent({
         className={cn(
           // eslint-disable-next-line max-len
           'tw:bg-popover tw:text-popover-foreground tw:data-[state=open]:animate-in tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=open]:fade-in-0 tw:data-[state=closed]:zoom-out-95 tw:data-[state=open]:zoom-in-95 tw:data-[side=bottom]:slide-in-from-top-2 tw:data-[side=left]:slide-in-from-right-2 tw:data-[side=right]:slide-in-from-left-2 tw:data-[side=top]:slide-in-from-bottom-2 tw:relative tw:z-50 tw:max-h-(--radix-select-content-available-height) tw:min-w-[8rem] tw:origin-(--radix-select-content-transform-origin) tw:overflow-x-hidden tw:overflow-y-auto tw:rounded-md tw:border tw:shadow-md',
-          position === 'popper'
-            && 'tw:data-[side=bottom]:translate-y-1 tw:data-[side=left]:-translate-x-1 tw:data-[side=right]:translate-x-1 tw:data-[side=top]:-translate-y-1',
+          position === 'popper' &&
+            'tw:data-[side=bottom]:translate-y-1 tw:data-[side=left]:-translate-x-1 tw:data-[side=right]:translate-x-1 tw:data-[side=top]:-translate-y-1',
           className,
         )}
         position={position}
@@ -78,8 +77,8 @@ function SelectContent({
         <SelectPrimitive.Viewport
           className={cn(
             'tw:p-1',
-            position === 'popper'
-              && 'tw:h-[var(--radix-select-trigger-height)] tw:w-full tw:min-w-[var(--radix-select-trigger-width)] tw:scroll-my-1',
+            position === 'popper' &&
+              'tw:h-[var(--radix-select-trigger-height)] tw:w-full tw:min-w-[var(--radix-select-trigger-width)] tw:scroll-my-1',
           )}
         >
           {children}
@@ -97,7 +96,10 @@ function SelectLabel({
   return (
     <SelectPrimitive.Label
       data-slot="select-label"
-      className={cn('tw:text-muted-foreground tw:px-2 tw:py-1.5 tw:text-xs', className)}
+      className={cn(
+        'tw:text-muted-foreground tw:px-2 tw:py-1.5 tw:text-xs',
+        className,
+      )}
       {...props}
     />
   );
@@ -135,7 +137,10 @@ function SelectSeparator({
   return (
     <SelectPrimitive.Separator
       data-slot="select-separator"
-      className={cn('tw:bg-border tw:pointer-events-none tw:-mx-1 tw:my-1 tw:h-px', className)}
+      className={cn(
+        'tw:bg-border tw:pointer-events-none tw:-mx-1 tw:my-1 tw:h-px',
+        className,
+      )}
       {...props}
     />
   );

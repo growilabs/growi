@@ -1,10 +1,7 @@
 'use client';
 
 import type { ComponentProps, ReactNode } from 'react';
-import {
-  createContext, useContext, useEffect, useState,
-} from 'react';
-
+import { createContext, useContext, useEffect, useState } from 'react';
 import { ChevronDownIcon } from 'lucide-react';
 
 import { Button } from '~/components/ui/button';
@@ -89,7 +86,10 @@ export const WebPreviewNavigation = ({
   ...props
 }: WebPreviewNavigationProps) => (
   <div
-    className={cn('tw:flex tw:items-center tw:gap-1 tw:border-b tw:p-2', className)}
+    className={cn(
+      'tw:flex tw:items-center tw:gap-1 tw:border-b tw:p-2',
+      className,
+    )}
     {...props}
   >
     {children}
@@ -213,7 +213,10 @@ export const WebPreviewConsole = ({
 
   return (
     <Collapsible
-      className={cn('tw:border-t tw:bg-muted/50 tw:font-mono tw:text-sm', className)}
+      className={cn(
+        'tw:border-t tw:bg-muted/50 tw:font-mono tw:text-sm',
+        className,
+      )}
       onOpenChange={setConsoleOpen}
       open={consoleOpen}
       {...props}

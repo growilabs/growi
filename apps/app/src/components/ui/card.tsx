@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type * as React from 'react';
 
 import { cn } from '~/lib/utils';
 
@@ -76,7 +76,10 @@ function CardFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="card-footer"
-      className={cn('tw:flex tw:items-center tw:px-6 tw:[.border-t]:pt-6', className)}
+      className={cn(
+        'tw:flex tw:items-center tw:px-6 tw:[.border-t]:pt-6',
+        className,
+      )}
       {...props}
     />
   );

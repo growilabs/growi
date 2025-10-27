@@ -1,7 +1,6 @@
 'use client';
 
 import type { ComponentProps } from 'react';
-
 import { BookIcon, ChevronDownIcon } from 'lucide-react';
 
 import {
@@ -62,9 +61,7 @@ export const SourcesContent = ({
 
 export type SourceProps = ComponentProps<'a'>;
 
-export const Source = ({
-  href, title, children, ...props
-}: SourceProps) => (
+export const Source = ({ href, title, children, ...props }: SourceProps) => (
   <a
     className="tw:flex tw:items-center tw:gap-2"
     href={href}

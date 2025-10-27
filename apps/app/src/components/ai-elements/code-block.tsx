@@ -2,7 +2,6 @@
 
 import type { ComponentProps, HTMLAttributes, ReactNode } from 'react';
 import { createContext, useContext, useState } from 'react';
-
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
@@ -118,7 +117,7 @@ export const CodeBlockCopyButton = ({
   const [isCopied, setIsCopied] = useState(false);
   const { code } = useContext(CodeBlockContext);
 
-  const copyToClipboard = async() => {
+  const copyToClipboard = async () => {
     if (typeof window === 'undefined' || !navigator.clipboard.writeText) {
       onError?.(new Error('Clipboard API not available'));
       return;
@@ -129,8 +128,7 @@ export const CodeBlockCopyButton = ({
       setIsCopied(true);
       onCopy?.();
       setTimeout(() => setIsCopied(false), timeout);
-    }
-    catch (error) {
+    } catch (error) {
       onError?.(error as Error);
     }
   };

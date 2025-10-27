@@ -1,5 +1,4 @@
-import * as React from 'react';
-
+import type * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { XIcon } from 'lucide-react';
 
@@ -52,7 +51,7 @@ function DialogContent({
   showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
-  showCloseButton?: boolean
+  showCloseButton?: boolean;
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -86,7 +85,10 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn('tw:flex tw:flex-col tw:gap-2 tw:text-center tw:sm:text-left', className)}
+      className={cn(
+        'tw:flex tw:flex-col tw:gap-2 tw:text-center tw:sm:text-left',
+        className,
+      )}
       {...props}
     />
   );

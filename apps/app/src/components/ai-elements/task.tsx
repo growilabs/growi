@@ -1,7 +1,6 @@
 'use client';
 
 import type { ComponentProps } from 'react';
-
 import { ChevronDownIcon, SearchIcon } from 'lucide-react';
 
 import {
@@ -32,7 +31,10 @@ export const TaskItemFile = ({
 export type TaskItemProps = ComponentProps<'div'>;
 
 export const TaskItem = ({ children, className, ...props }: TaskItemProps) => (
-  <div className={cn('tw:text-muted-foreground tw:text-sm', className)} {...props}>
+  <div
+    className={cn('tw:text-muted-foreground tw:text-sm', className)}
+    {...props}
+  >
     {children}
   </div>
 );
@@ -59,7 +61,7 @@ export const TaskTrigger = ({
 }: TaskTriggerProps) => (
   <CollapsibleTrigger asChild className={cn('tw:group', className)} {...props}>
     {children ?? (
-    // eslint-disable-next-line max-len
+      // eslint-disable-next-line max-len
       <div className="tw:flex tw:w-full tw:cursor-pointer tw:items-center tw:gap-2 tw:text-muted-foreground tw:text-sm tw:transition-colors tw:hover:text-foreground">
         <SearchIcon className="tw:size-4" />
         <p className="tw:text-sm">{title}</p>

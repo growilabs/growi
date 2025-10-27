@@ -1,5 +1,4 @@
-import * as React from 'react';
-
+import type * as React from 'react';
 import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
 
 import { cn } from '~/lib/utils';
@@ -38,10 +37,10 @@ function ScrollBar({
       orientation={orientation}
       className={cn(
         'tw:flex tw:touch-none tw:p-px tw:transition-colors tw:select-none',
-        orientation === 'vertical'
-          && 'tw:h-full tw:w-2.5 tw:border-l tw:border-l-transparent',
-        orientation === 'horizontal'
-          && 'tw:h-2.5 tw:flex-col tw:border-t tw:border-t-transparent',
+        orientation === 'vertical' &&
+          'tw:h-full tw:w-2.5 tw:border-l tw:border-l-transparent',
+        orientation === 'horizontal' &&
+          'tw:h-2.5 tw:flex-col tw:border-t tw:border-t-transparent',
         className,
       )}
       {...props}

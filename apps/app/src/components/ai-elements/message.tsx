@@ -1,15 +1,9 @@
 import type { ComponentProps, HTMLAttributes } from 'react';
-
 import type { UIMessage } from 'ai';
 import { cva, type VariantProps } from 'class-variance-authority';
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from '~/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
 import { cn } from '~/lib/utils';
-
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage['role'];
@@ -19,7 +13,9 @@ export const Message = ({ className, from, ...props }: MessageProps) => (
   <div
     className={cn(
       'tw:group tw:flex tw:w-full tw:items-end tw:justify-end tw:gap-2 tw:py-4',
-      from === 'user' ? 'tw:is-user' : 'tw:is-assistant tw:flex-row-reverse tw:justify-end',
+      from === 'user'
+        ? 'tw:is-user'
+        : 'tw:is-assistant tw:flex-row-reverse tw:justify-end',
       className,
     )}
     {...props}
@@ -76,7 +72,10 @@ export const MessageAvatar = ({
   className,
   ...props
 }: MessageAvatarProps) => (
-  <Avatar className={cn('tw:size-8 tw:ring-1 tw:ring-border', className)} {...props}>
+  <Avatar
+    className={cn('tw:size-8 tw:ring-1 tw:ring-border', className)}
+    {...props}
+  >
     <AvatarImage alt="" className="tw:mt-0 tw:mb-0" src={src} />
     <AvatarFallback>{name?.slice(0, 2) || 'ME'}</AvatarFallback>
   </Avatar>

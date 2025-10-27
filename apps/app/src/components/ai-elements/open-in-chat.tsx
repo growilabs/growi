@@ -1,5 +1,4 @@
 import { type ComponentProps, createContext, useContext } from 'react';
-
 import {
   ChevronDownIcon,
   ExternalLinkIcon,
@@ -31,9 +30,10 @@ const providers = {
   },
   scira: {
     title: 'Open in Scira',
-    createUrl: (q: string) => `https://scira.ai/?${new URLSearchParams({
-      q,
-    })}`,
+    createUrl: (q: string) =>
+      `https://scira.ai/?${new URLSearchParams({
+        q,
+      })}`,
     icon: (
       <svg
         fill="none"
@@ -102,10 +102,11 @@ const providers = {
   },
   chatgpt: {
     title: 'Open in ChatGPT',
-    createUrl: (prompt: string) => `https://chatgpt.com/?${new URLSearchParams({
-      hints: 'search',
-      prompt,
-    })}`,
+    createUrl: (prompt: string) =>
+      `https://chatgpt.com/?${new URLSearchParams({
+        hints: 'search',
+        prompt,
+      })}`,
     icon: (
       <svg
         fill="currentColor"
@@ -121,9 +122,10 @@ const providers = {
   },
   claude: {
     title: 'Open in Claude',
-    createUrl: (q: string) => `https://claude.ai/new?${new URLSearchParams({
-      q,
-    })}`,
+    createUrl: (q: string) =>
+      `https://claude.ai/new?${new URLSearchParams({
+        q,
+      })}`,
     icon: (
       <svg
         fill="currentColor"
@@ -143,16 +145,18 @@ const providers = {
   },
   t3: {
     title: 'Open in T3 Chat',
-    createUrl: (q: string) => `https://t3.chat/new?${new URLSearchParams({
-      q,
-    })}`,
+    createUrl: (q: string) =>
+      `https://t3.chat/new?${new URLSearchParams({
+        q,
+      })}`,
     icon: <MessageCircleIcon />,
   },
   v0: {
     title: 'Open in v0',
-    createUrl: (q: string) => `https://v0.app?${new URLSearchParams({
-      q,
-    })}`,
+    createUrl: (q: string) =>
+      `https://v0.app?${new URLSearchParams({
+        q,
+      })}`,
     icon: (
       <svg
         fill="currentColor"

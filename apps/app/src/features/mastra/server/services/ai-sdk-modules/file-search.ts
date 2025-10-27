@@ -4,14 +4,17 @@ import { configManager } from '~/server/service/config-manager';
 
 import { getOpenaiProvider } from './get-openai-provider';
 
-
 type FileSearchParameters = {
   prompt: string;
   instruction: string;
   vectorStoreId: string;
 };
 
-export const fileSearch = async({ prompt, instruction, vectorStoreId }: FileSearchParameters) => {
+export const fileSearch = async ({
+  prompt,
+  instruction,
+  vectorStoreId,
+}: FileSearchParameters) => {
   const openai = getOpenaiProvider();
   const model = configManager.getConfig('openai:assistantModel:chat');
 

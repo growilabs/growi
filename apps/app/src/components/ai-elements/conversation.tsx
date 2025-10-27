@@ -2,7 +2,6 @@
 
 import type { ComponentProps } from 'react';
 import { useCallback } from 'react';
-
 import { ArrowDownIcon } from 'lucide-react';
 import { StickToBottom, useStickToBottomContext } from 'use-stick-to-bottom';
 
@@ -13,9 +12,12 @@ export type ConversationProps = ComponentProps<'div'> & {
   children: React.ReactNode;
 };
 
-export const Conversation = ({ className, children, ...props }: ConversationProps): React.ReactElement => {
+export const Conversation = ({
+  className,
+  children,
+  ...props
+}: ConversationProps): React.ReactElement => {
   return (
-    // @ts-expect-error - StickToBottom returns ReactNode but we know it returns a valid element
     <StickToBottom
       className={cn('tw:relative tw:flex-1 tw:overflow-y-auto', className)}
       initial="smooth"
@@ -38,7 +40,6 @@ export const ConversationContent = ({
   ...props
 }: ConversationContentProps): React.ReactElement => {
   return (
-    // @ts-expect-error - StickToBottom.Content returns ReactNode but we know it returns a valid element
     <StickToBottom.Content className={cn('tw:p-4', className)} {...props}>
       {children}
     </StickToBottom.Content>

@@ -1,5 +1,4 @@
 import type { ComponentProps } from 'react';
-
 import { Panel as PanelPrimitive } from '@xyflow/react';
 
 import { cn } from '~/lib/utils';

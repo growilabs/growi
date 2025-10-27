@@ -1,7 +1,6 @@
 'use client';
 
 import { type ComponentProps, createContext, useContext } from 'react';
-
 import type { LanguageModelUsage } from 'ai';
 import { estimateCost, type ModelId } from 'tokenlens';
 
@@ -13,7 +12,6 @@ import {
 } from '~/components/ui/hover-card';
 import { Progress } from '~/components/ui/progress';
 import { cn } from '~/lib/utils';
-
 
 const PERCENT_MAX = 100;
 const ICON_RADIUS = 10;
@@ -133,7 +131,10 @@ export const ContextContent = ({
   ...props
 }: ContextContentProps) => (
   <HoverCardContent
-    className={cn('tw:min-w-[240px] tw:divide-y tw:overflow-hidden tw:p-0', className)}
+    className={cn(
+      'tw:min-w-[240px] tw:divide-y tw:overflow-hidden tw:p-0',
+      className,
+    )}
     {...props}
   />
 );
@@ -169,7 +170,10 @@ export const ContextContentHeader = ({
             </p>
           </div>
           <div className="tw:space-y-2">
-            <Progress className="tw:bg-muted" value={usedPercent * PERCENT_MAX} />
+            <Progress
+              className="tw:bg-muted"
+              value={usedPercent * PERCENT_MAX}
+            />
           </div>
         </>
       )}
@@ -199,12 +203,12 @@ export const ContextContentFooter = ({
   const { modelId, usage } = useContextValue();
   const costUSD = modelId
     ? estimateCost({
-      modelId,
-      usage: {
-        input: usage?.inputTokens ?? 0,
-        output: usage?.outputTokens ?? 0,
-      },
-    }).totalUSD
+        modelId,
+        usage: {
+          input: usage?.inputTokens ?? 0,
+          output: usage?.outputTokens ?? 0,
+        },
+      }).totalUSD
     : undefined;
   const totalCost = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -249,9 +253,9 @@ export const ContextInputUsage = ({
 
   const inputCost = modelId
     ? estimateCost({
-      modelId,
-      usage: { input: inputTokens, output: 0 },
-    }).totalUSD
+        modelId,
+        usage: { input: inputTokens, output: 0 },
+      }).totalUSD
     : undefined;
   const inputCostText = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -260,7 +264,10 @@ export const ContextInputUsage = ({
 
   return (
     <div
-      className={cn('tw:flex tw:items-center tw:justify-between tw:text-xs', className)}
+      className={cn(
+        'tw:flex tw:items-center tw:justify-between tw:text-xs',
+        className,
+      )}
       {...props}
     >
       <span className="tw:text-muted-foreground">Input</span>
@@ -289,9 +296,9 @@ export const ContextOutputUsage = ({
 
   const outputCost = modelId
     ? estimateCost({
-      modelId,
-      usage: { input: 0, output: outputTokens },
-    }).totalUSD
+        modelId,
+        usage: { input: 0, output: outputTokens },
+      }).totalUSD
     : undefined;
   const outputCostText = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -300,7 +307,10 @@ export const ContextOutputUsage = ({
 
   return (
     <div
-      className={cn('tw:flex tw:items-center tw:justify-between tw:text-xs', className)}
+      className={cn(
+        'tw:flex tw:items-center tw:justify-between tw:text-xs',
+        className,
+      )}
       {...props}
     >
       <span className="tw:text-muted-foreground">Output</span>
@@ -329,9 +339,9 @@ export const ContextReasoningUsage = ({
 
   const reasoningCost = modelId
     ? estimateCost({
-      modelId,
-      usage: { reasoningTokens },
-    }).totalUSD
+        modelId,
+        usage: { reasoningTokens },
+      }).totalUSD
     : undefined;
   const reasoningCostText = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -340,7 +350,10 @@ export const ContextReasoningUsage = ({
 
   return (
     <div
-      className={cn('tw:flex tw:items-center tw:justify-between tw:text-xs', className)}
+      className={cn(
+        'tw:flex tw:items-center tw:justify-between tw:text-xs',
+        className,
+      )}
       {...props}
     >
       <span className="tw:text-muted-foreground">Reasoning</span>
@@ -369,9 +382,9 @@ export const ContextCacheUsage = ({
 
   const cacheCost = modelId
     ? estimateCost({
-      modelId,
-      usage: { cacheReads: cacheTokens, input: 0, output: 0 },
-    }).totalUSD
+        modelId,
+        usage: { cacheReads: cacheTokens, input: 0, output: 0 },
+      }).totalUSD
     : undefined;
   const cacheCostText = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -380,7 +393,10 @@ export const ContextCacheUsage = ({
 
   return (
     <div
-      className={cn('tw:flex tw:items-center tw:justify-between tw:text-xs', className)}
+      className={cn(
+        'tw:flex tw:items-center tw:justify-between tw:text-xs',
+        className,
+      )}
       {...props}
     >
       <span className="tw:text-muted-foreground">Cache</span>
@@ -400,8 +416,8 @@ const TokensWithCost = ({
     {tokens === undefined
       ? '—'
       : new Intl.NumberFormat('en-US', {
-        notation: 'compact',
-      }).format(tokens)}
+          notation: 'compact',
+        }).format(tokens)}
     {costText ? (
       <span className="tw:ml-2 tw:text-muted-foreground">• {costText}</span>
     ) : null}

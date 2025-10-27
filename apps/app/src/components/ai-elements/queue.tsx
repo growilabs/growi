@@ -1,7 +1,6 @@
 'use client';
 
 import type { ComponentProps } from 'react';
-
 import { ChevronDownIcon, PaperclipIcon } from 'lucide-react';
 
 import { Button } from '~/components/ui/button';
@@ -144,7 +143,10 @@ export const QueueItemAttachment = ({
   className,
   ...props
 }: QueueItemAttachmentProps) => (
-  <div className={cn('tw:mt-1 tw:flex tw:flex-wrap tw:gap-2', className)} {...props} />
+  <div
+    className={cn('tw:mt-1 tw:flex tw:flex-wrap tw:gap-2', className)}
+    {...props}
+  />
 );
 
 export type QueueItemImageProps = ComponentProps<'img'>;
@@ -155,7 +157,10 @@ export const QueueItemImage = ({
 }: QueueItemImageProps) => (
   <img
     alt=""
-    className={cn('tw:h-8 tw:w-8 tw:rounded tw:border tw:object-cover', className)}
+    className={cn(
+      'tw:h-8 tw:w-8 tw:rounded tw:border tw:object-cover',
+      className,
+    )}
     height={32}
     width={32}
     {...props}
@@ -242,7 +247,10 @@ export const QueueSectionLabel = ({
   className,
   ...props
 }: QueueSectionLabelProps) => (
-  <span className={cn('tw:flex tw:items-center tw:gap-2', className)} {...props}>
+  <span
+    className={cn('tw:flex tw:items-center tw:gap-2', className)}
+    {...props}
+  >
     <ChevronDownIcon className="tw:group-data-[state=closed]:-rotate-90 tw:size-4 tw:transition-transform" />
     {icon}
     <span>

@@ -8,7 +8,6 @@ import {
   useEffect,
   useState,
 } from 'react';
-
 import { ArrowLeftIcon, ArrowRightIcon } from 'lucide-react';
 
 import { Badge } from '~/components/ui/badge';
@@ -88,7 +87,10 @@ export const InlineCitationCardBody = ({
   className,
   ...props
 }: InlineCitationCardBodyProps) => (
-  <HoverCardContent className={cn('tw:relative tw:w-80 tw:p-0', className)} {...props} />
+  <HoverCardContent
+    className={cn('tw:relative tw:w-80 tw:p-0', className)}
+    {...props}
+  />
 );
 
 const CarouselApiContext = createContext<CarouselApi | undefined>(undefined);
@@ -109,7 +111,11 @@ export const InlineCitationCarousel = ({
 
   return (
     <CarouselApiContext.Provider value={api}>
-      <Carousel className={cn('tw:w-full', className)} setApi={setApi} {...props}>
+      <Carousel
+        className={cn('tw:w-full', className)}
+        setApi={setApi}
+        {...props}
+      >
         {children}
       </Carousel>
     </CarouselApiContext.Provider>
@@ -119,7 +125,7 @@ export const InlineCitationCarousel = ({
 export type InlineCitationCarouselContentProps = ComponentProps<'div'>;
 
 export const InlineCitationCarouselContent = (
-    props: InlineCitationCarouselContentProps,
+  props: InlineCitationCarouselContentProps,
 ) => <CarouselContent {...props} />;
 
 export type InlineCitationCarouselItemProps = ComponentProps<'div'>;
@@ -256,10 +262,14 @@ export const InlineCitationSource = ({
 }: InlineCitationSourceProps) => (
   <div className={cn('tw:space-y-1', className)} {...props}>
     {title && (
-      <h4 className="tw:truncate tw:font-medium tw:text-sm tw:leading-tight">{title}</h4>
+      <h4 className="tw:truncate tw:font-medium tw:text-sm tw:leading-tight">
+        {title}
+      </h4>
     )}
     {url && (
-      <p className="tw:truncate tw:break-all tw:text-muted-foreground tw:text-xs">{url}</p>
+      <p className="tw:truncate tw:break-all tw:text-muted-foreground tw:text-xs">
+        {url}
+      </p>
     )}
     {description && (
       <p className="tw:line-clamp-3 tw:text-muted-foreground tw:text-sm tw:leading-relaxed">

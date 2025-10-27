@@ -1,10 +1,7 @@
 'use client';
 
 import type { ComponentProps } from 'react';
-import {
-  createContext, memo, useContext, useEffect, useState,
-} from 'react';
-
+import { createContext, memo, useContext, useEffect, useState } from 'react';
 import { useControllableState } from '@radix-ui/react-use-controllable-state';
 import { BrainIcon, ChevronDownIcon } from 'lucide-react';
 
@@ -76,8 +73,7 @@ export const Reasoning = memo(
         if (startTime === null) {
           setStartTime(Date.now());
         }
-      }
-      else if (startTime !== null) {
+      } else if (startTime !== null) {
         setDuration(Math.ceil((Date.now() - startTime) / MS_IN_S));
         setStartTime(null);
       }
@@ -103,7 +99,10 @@ export const Reasoning = memo(
     return (
       <ReasoningContext.Provider
         value={{
-          isStreaming, isOpen, setIsOpen, duration,
+          isStreaming,
+          isOpen,
+          setIsOpen,
+          duration,
         }}
       >
         <Collapsible

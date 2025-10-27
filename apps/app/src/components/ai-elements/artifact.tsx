@@ -1,7 +1,6 @@
 'use client';
 
 import type { ComponentProps, HTMLAttributes } from 'react';
-
 import { type LucideIcon, XIcon } from 'lucide-react';
 
 import { Button } from '~/components/ui/button';
@@ -79,7 +78,10 @@ export const ArtifactDescription = ({
   className,
   ...props
 }: ArtifactDescriptionProps) => (
-  <p className={cn('tw:text-muted-foreground tw:text-sm', className)} {...props} />
+  <p
+    className={cn('tw:text-muted-foreground tw:text-sm', className)}
+    {...props}
+  />
 );
 
 export type ArtifactActionsProps = HTMLAttributes<HTMLDivElement>;
@@ -88,7 +90,10 @@ export const ArtifactActions = ({
   className,
   ...props
 }: ArtifactActionsProps) => (
-  <div className={cn('tw:flex tw:items-center tw:gap-1', className)} {...props} />
+  <div
+    className={cn('tw:flex tw:items-center tw:gap-1', className)}
+    {...props}
+  />
 );
 
 export type ArtifactActionProps = ComponentProps<typeof Button> & {
@@ -145,5 +150,8 @@ export const ArtifactContent = ({
   className,
   ...props
 }: ArtifactContentProps) => (
-  <div className={cn('tw:flex-1 tw:overflow-auto tw:p-4', className)} {...props} />
+  <div
+    className={cn('tw:flex-1 tw:overflow-auto tw:p-4', className)}
+    {...props}
+  />
 );
