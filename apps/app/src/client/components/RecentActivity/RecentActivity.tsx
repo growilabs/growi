@@ -14,7 +14,8 @@ import { ActivityListItem } from './ActivityListItem';
 
 const logger = loggerFactory('growi:RecentActivity');
 
-
+// REMINDER: Fix so deleted pages with no target can be displayed.
+// Change ActivityWithPageTarget Type.
 const hasPageTarget = (activity: IActivityHasId): activity is ActivityWithPageTarget => {
   return activity.target != null
         && typeof activity.target === 'object'
@@ -43,6 +44,7 @@ export const RecentActivity = (): JSX.Element => {
       return;
     }
 
+    // REMINDER: Remove page target filter.
     if (paginatedData) {
       const activitiesWithPages = paginatedData.docs
         .filter(hasPageTarget);

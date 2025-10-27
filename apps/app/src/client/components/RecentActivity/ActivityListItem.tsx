@@ -29,6 +29,8 @@ export const ActivityListItem = ({ activity }: { activity: ActivityWithPageTarge
   const action = activity.action as SupportedActivityActionType;
   const date = new Date(activity.createdAt).toLocaleString();
 
+  // REMINDER: Fix so items without page target can be listed also.
+
   return (
     <div className="activity-row">
       <p className="text-muted small mb-1">
