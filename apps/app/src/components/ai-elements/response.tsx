@@ -3,7 +3,7 @@
 import { type ComponentProps, memo } from 'react';
 import { Streamdown } from 'streamdown';
 
-import { cn } from '~/lib/utils';
+import { cn } from '~/utils/shadcn-ui';
 
 type ResponseProps = ComponentProps<typeof Streamdown>;
 

@@ -10,7 +10,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '~/components/ui/collapsible';
-import { cn } from '~/lib/utils';
+import { cn } from '~/utils/shadcn-ui';
 
 import { Response } from './response';
 import { Shimmer } from './shimmer';
