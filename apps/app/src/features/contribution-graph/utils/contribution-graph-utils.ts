@@ -7,7 +7,10 @@ export const getISOWeekId = (date: Date): string => {
   return format(date, "RRRR-'W'II");
 };
 
-export const getDaysDifference = (dateFrom: Date, dateTo: Date = new Date()): number => {
+export const getDaysDifference = (
+  dateFrom: Date,
+  dateTo: Date = new Date(),
+): number => {
   const diffDays = differenceInDays(dateFrom, dateTo);
   return Math.max(0, diffDays);
 };
