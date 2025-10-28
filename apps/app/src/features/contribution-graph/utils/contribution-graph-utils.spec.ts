@@ -1,6 +1,6 @@
 import {
-  daysSinceLastUpdate,
   getCurrentWeekStart,
+  getDaysDifference,
   getISOWeekId,
 } from './contribution-graph-utils';
 
@@ -34,14 +34,14 @@ describe('Date Utility Functions (date-fns refactor)', () => {
   describe('daysSinceLastUpdate', () => {
     test('should return 0 when lastUpdateDate equals currentDate', () => {
       const date = new Date('2025-10-01T12:00:00Z');
-      expect(daysSinceLastUpdate(date, date)).toBe(0);
+      expect(getDaysDifference(date, date)).toBe(0);
     });
 
     test('should return 3 if lastUpdateDate is 3 days in the future', () => {
       const currentDate = new Date('2025-10-01T12:00:00Z');
       const lastUpdateDate = new Date('2025-10-04T12:00:00Z');
       // differenceInDays(lastUpdateDate, currentDate) -> 3
-      expect(daysSinceLastUpdate(lastUpdateDate, currentDate)).toBe(3);
+      expect(getDaysDifference(lastUpdateDate, currentDate)).toBe(3);
     });
 
     test('should return 0 if lastUpdateDate is 3 days in the past (i.e., the update already occurred)', () => {
@@ -49,14 +49,14 @@ describe('Date Utility Functions (date-fns refactor)', () => {
       const lastUpdateDate = new Date('2025-10-01T12:00:00Z');
       // differenceInDays(lastUpdateDate, currentDate) -> -3
       // Math.max(0, -3) -> 0
-      expect(daysSinceLastUpdate(lastUpdateDate, currentDate)).toBe(0);
+      expect(getDaysDifference(lastUpdateDate, currentDate)).toBe(0);
     });
 
     test('should return 0 regardless of time if lastUpdateDate is in the past', () => {
       const currentDate = new Date('2025-10-02T01:00:00Z');
       const lastUpdateDate = new Date('2025-10-01T23:00:00Z');
       // differenceInDays ignores time, so lastUpdateDate (Oct 1) is before currentDate (Oct 2), resulting in -1
-      expect(daysSinceLastUpdate(lastUpdateDate, currentDate)).toBe(0);
+      expect(getDaysDifference(lastUpdateDate, currentDate)).toBe(0);
     });
   });
 
