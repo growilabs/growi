@@ -23,6 +23,7 @@
       "!**/.stylelintrc.json",
       "!**/package.json",
       "!apps/app/src/styles/prebuilt",
+      "!apps/app/src/styles/tailwind.css",
       "!apps/app/tmp",
       "!apps/slackbot-proxy/src/public/bootstrap",
       "!packages/pdf-converter-client/src/index.ts",
@@ -32,8 +33,7 @@
       "!apps/app/src/server/middlewares",
       "!apps/app/src/server/models",
       "!apps/app/src/server/routes",
-      "!apps/app/src/server/service",
-      "!apps/app/features/mastra"
+      "!apps/app/src/server/service"
     ]
   },
   "formatter": {
