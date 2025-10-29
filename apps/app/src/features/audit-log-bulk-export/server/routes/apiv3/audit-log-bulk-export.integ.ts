@@ -12,11 +12,13 @@ vi.mock('~/server/middlewares/apiv3-form-validator', () => {
     apiV3FormValidator: (req: Request, res: Response, next: NextFunction) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        const validationErrors = errors.array().map((err: any) => ({
-          message: `${err.param}: ${err.msg}`,
-          code: 'validation_failed',
-        }));
-        return (res as any).apiv3Err(validationErrors, 400);
+        const validationErrors = errors
+          .array()
+          .map((err: { param: string; msg: string }) => ({
+            message: `${err.param}: ${err.msg}`,
+            code: 'validation_failed',
+          }));
+        return (res as ApiV3Response).apiv3Err(validationErrors, 400);
       }
       return next();
     },
@@ -34,9 +36,12 @@ vi.mock('../../service/audit-log-bulk-export', async () => {
 });
 
 import type Crowi from '~/server/crowi';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { auditLogBulkExportService } from '../../service/audit-log-bulk-export';
 
-const routerMod = await import('./audit-log-bulk-export') as any;
+const routerMod = (await import('./audit-log-bulk-export')) as {
+  default: (crowi: Crowi) => express.Router;
+};
 const routerFactory = routerMod.default;
 
 import * as ServiceModule from '../../service/audit-log-bulk-export';
@@ -57,15 +62,19 @@ function buildCrowi(): Crowi {
 }
 
 function withApiV3Helpers(app: express.Express) {
-  app.use((req, res, next) => {
-    (res as any).apiv3 = (body: unknown, status = 200) =>
+  app.use((_req, res, next) => {
+    (res as ApiV3Response).apiv3 = (body: unknown, status = 200) =>
       res.status(status).json(body);
 
-    (res as any).apiv3Err = (_err: unknown, status = 500, info?: unknown) => {
+    (res as ApiV3Response).apiv3Err = (
+      _err: unknown,
+      status = 500,
+      info?: unknown,
+    ) => {
       let errors = Array.isArray(_err) ? _err : [_err];
 
-      errors = errors.map((e: any) => {
-        if (e && typeof e === 'object' && e.message && e.code) {
+      errors = errors.map((e: unknown) => {
+        if (e && typeof e === 'object' && 'message' in e && 'code' in e) {
           return e;
         }
         return e;
@@ -127,7 +136,13 @@ describe('POST /_api/v3/audit-log-bulk-export', () => {
 
   it('returns 409 with proper error code when DuplicateAuditLogBulkExportJobError is thrown', async () => {
     const DuplicateErrCtor =
-      (ServiceModule as any).DuplicateAuditLogBulkExportJobError ?? (() => {});
+      (
+        ServiceModule as {
+          DuplicateAuditLogBulkExportJobError?: new (
+            ...args: unknown[]
+          ) => Error;
+        }
+      ).DuplicateAuditLogBulkExportJobError ?? (() => {});
     const err = Object.create(DuplicateErrCtor.prototype);
     err.message = 'Duplicate audit-log bulk export job is in progress';
     err.code = 'audit_log_bulk_export.duplicate_export_job_error';

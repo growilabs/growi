@@ -109,7 +109,9 @@ describe('AuditLogBulkExportService', () => {
 
         const createdJob = await AuditLogBulkExportJob.findById(jobId);
         expect(createdJob?.filters.actions).toEqual(['PAGE_CREATE']);
-        expect(createdJob?.filters.users?.map(String)).toEqual([user._id.toString()]);
+        expect(createdJob?.filters.users?.map(String)).toEqual([
+          user._id.toString(),
+        ]);
       });
 
       it('should reset existing job when restartJob is true', async () => {
