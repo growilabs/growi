@@ -384,6 +384,7 @@ export const SupportedAction = {
 
 // Action required for notification
 export const EssentialActionGroup = {
+  ACTION_PAGE_CREATE,
   ACTION_PAGE_LIKE,
   ACTION_PAGE_BOOKMARK,
   ACTION_PAGE_UPDATE,
@@ -581,11 +582,10 @@ export const ActivityLogActions = {
   ACTION_PAGE_RENAME,
   ACTION_PAGE_DUPLICATE,
   ACTION_PAGE_DELETE,
+  ACTION_PAGE_DELETE_COMPLETELY,
   ACTION_PAGE_REVERT,
+  ACTION_PAGE_LIKE,
   ACTION_COMMENT_CREATE,
-  ACTION_COMMENT_UPDATE,
-  ACTION_COMMENT_REMOVE,
-  ACTION_ATTACHMENT_ADD,
 } as const;
 
 /*

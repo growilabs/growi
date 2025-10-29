@@ -10,13 +10,12 @@ export const ActivityActionTranslationMap: Record<
   [ActivityLogActions.ACTION_PAGE_CREATE]: 'created a page',
   [ActivityLogActions.ACTION_PAGE_UPDATE]: 'updated a page',
   [ActivityLogActions.ACTION_PAGE_DELETE]: 'deleted a page',
+  [ActivityLogActions.ACTION_PAGE_DELETE_COMPLETELY]: 'deleted a page',
   [ActivityLogActions.ACTION_PAGE_RENAME]: 'renamed a page',
   [ActivityLogActions.ACTION_PAGE_REVERT]: 'reverted a page',
   [ActivityLogActions.ACTION_PAGE_DUPLICATE]: 'duplicated a page',
+  [ActivityLogActions.ACTION_PAGE_LIKE]: 'liked a page',
   [ActivityLogActions.ACTION_COMMENT_CREATE]: 'posted a comment',
-  [ActivityLogActions.ACTION_COMMENT_UPDATE]: 'edited a comment',
-  [ActivityLogActions.ACTION_COMMENT_REMOVE]: 'deleted a comment',
-  [ActivityLogActions.ACTION_ATTACHMENT_ADD]: 'added an attachment',
 };
 
 const translateAction = (action: SupportedActivityActionType): string => {
