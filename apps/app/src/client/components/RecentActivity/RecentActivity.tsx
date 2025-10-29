@@ -14,6 +14,9 @@ import { ActivityListItem } from './ActivityListItem';
 
 const logger = loggerFactory('growi:RecentActivity');
 
+type RecentActivityProps = {
+  userId: string,
+}
 
 const hasPageTarget = (activity: IActivityHasId): activity is ActivityWithPageTarget => {
   return activity.target != null
@@ -21,13 +24,15 @@ const hasPageTarget = (activity: IActivityHasId): activity is ActivityWithPageTa
         && '_id' in activity.target;
 };
 
-export const RecentActivity = (): JSX.Element => {
+export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
+  const { userId } = props;
+
   const [activities, setActivities] = useState<ActivityWithPageTarget[]>([]);
   const [activePage, setActivePage] = useState(1);
   const [limit] = useState(10);
   const [offset, setOffset] = useState(0);
 
-  const { data: paginatedData, error } = useSWRxRecentActivity(limit, offset);
+  const { data: paginatedData, error } = useSWRxRecentActivity(limit, offset, userId);
 
   const handlePage = useCallback(async(selectedPage: number) => {
     const newOffset = (selectedPage - 1) * limit;

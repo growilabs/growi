@@ -178,7 +178,7 @@ module.exports = (crowi: Crowi): Router => {
 
       const limit = req.query.limit || defaultLimit || 10;
       const offset = req.query.offset || 0;
-      const targetUserId = req.params.targetUserId;
+      const targetUserId = req.query.targetUserId;
 
       if (typeof targetUserId !== 'string') {
         logger.error('Bad request: targetUserId must be of type string.');

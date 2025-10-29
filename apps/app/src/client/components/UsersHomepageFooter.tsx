@@ -47,7 +47,7 @@ export const UsersHomepageFooter = (props: UsersHomepageFooterProps): JSX.Elemen
           <RecentCreated userId={creatorId} />
         </div>
         <div id="user-created-list" className={`page-list ${styles['page-list']}`}>
-          <RecentActivity />
+          <RecentActivity userId={creatorId} />
         </div>
       </div>
     </div>
