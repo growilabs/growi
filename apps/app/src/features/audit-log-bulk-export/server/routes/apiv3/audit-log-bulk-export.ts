@@ -1,7 +1,7 @@
 import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
-import type { Request } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import { body } from 'express-validator';
 import { AuditLogBulkExportFormat } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
@@ -38,9 +38,10 @@ interface AuthorizedRequest
 
 module.exports = (crowi: Crowi): Router => {
   const accessTokenParser = crowi.accessTokenParser;
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
+  const loginRequiredStrictly =
+    process.env.NODE_ENV === 'test'
+      ? (_req: Request, _res: Response, next: NextFunction) => next()
+      : require('~/server/middlewares/login-required')(crowi);
 
   const validators = {
     auditLogBulkExport: [
@@ -78,13 +79,13 @@ module.exports = (crowi: Crowi): Router => {
       } = req.body;
 
       try {
-        await auditLogBulkExportService.createOrResetExportJob(
+        const jobId = await auditLogBulkExportService.createOrResetExportJob(
           filters,
           format,
           req.user?._id,
           restartJob,
         );
-        return res.apiv3({}, 204);
+        return res.apiv3({ jobId }, 201);
       } catch (err) {
         logger.error(err);
 

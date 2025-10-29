@@ -17,7 +17,7 @@ export interface IAuditLogBulkExportService {
     format: AuditLogBulkExportFormat,
     currentUser,
     restartJob?: boolean,
-  ) => Promise<void>;
+  ) => Promise<string>;
   resetExportJob: (job: AuditLogBulkExportJobDocument) => Promise<void>;
 }
 
@@ -76,7 +76,7 @@ class AuditLogBulkExportService implements IAuditLogBulkExportService {
     format: AuditLogBulkExportFormat,
     currentUser,
     restartJob?: boolean,
-  ): Promise<void> {
+  ): Promise<string> {
     const normalizedFilters = canonicalizeFilters(filters);
     const filterHash = sha256(JSON.stringify(normalizedFilters));
 
@@ -92,12 +92,12 @@ class AuditLogBulkExportService implements IAuditLogBulkExportService {
     if (duplicateInProgress != null) {
       if (restartJob) {
         await this.resetExportJob(duplicateInProgress);
-        return;
+        return duplicateInProgress._id.toString();
       }
       throw new DuplicateAuditLogBulkExportJobError(duplicateInProgress);
     }
 
-    await AuditLogBulkExportJob.create({
+    const createdJob = await AuditLogBulkExportJob.create({
       user: currentUser,
       filters: normalizedFilters,
       filterHash,
@@ -105,6 +105,7 @@ class AuditLogBulkExportService implements IAuditLogBulkExportService {
       status: AuditLogBulkExportJobStatus.exporting,
       totalExportedCount: 0,
     });
+    return createdJob._id.toString();
   }
 
   /**
