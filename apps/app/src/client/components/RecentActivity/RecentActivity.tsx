@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 
 import { toastError } from '~/client/util/toastr';
-import type { IActivityHasId, ActivityWithPageTarget } from '~/interfaces/activity';
+import type { IActivityHasId, ActivityHasUserId } from '~/interfaces/activity';
 import { useSWRxRecentActivity } from '~/stores/recent-activity';
 import loggerFactory from '~/utils/logger';
 
@@ -18,10 +18,9 @@ type RecentActivityProps = {
   userId: string,
 }
 
-const hasPageTarget = (activity: IActivityHasId): activity is ActivityWithPageTarget => {
-  return activity.target != null
-        && typeof activity.target === 'object'
-        && '_id' in activity.target;
+const hasUser = (activity: IActivityHasId): activity is ActivityHasUserId => {
+  return activity.user != null
+        && typeof activity.user === 'object';
 };
 
 export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
@@ -50,7 +49,7 @@ export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
 
     if (paginatedData) {
       const activitiesWithPages = paginatedData.docs
-        .filter(hasPageTarget);
+        .filter(hasUser);
 
       setActivities(activitiesWithPages);
     }

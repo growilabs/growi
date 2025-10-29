@@ -1,7 +1,5 @@
-import type { ActivityWithPageTarget, SupportedActivityActionType } from '~/interfaces/activity';
+import type { ActivityHasUserId, SupportedActivityActionType } from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
-
-import { PageListItemS } from '../PageList/PageListItemS';
 
 export const ActivityActionTranslationMap: Record<
   SupportedActivityActionType,
@@ -23,7 +21,7 @@ const translateAction = (action: SupportedActivityActionType): string => {
 };
 
 
-export const ActivityListItem = ({ activity }: { activity: ActivityWithPageTarget }): JSX.Element => {
+export const ActivityListItem = ({ activity }: { activity: ActivityHasUserId }): JSX.Element => {
   const username = activity.user?.username;
   const action = activity.action as SupportedActivityActionType;
   const date = new Date(activity.createdAt).toLocaleString();
@@ -33,8 +31,6 @@ export const ActivityListItem = ({ activity }: { activity: ActivityWithPageTarge
       <p className="text-muted small mb-1">
         {username} {translateAction(action)} on {date}
       </p>
-
-      <PageListItemS page={activity.target} />
     </div>
   );
 };

@@ -682,8 +682,7 @@ export type IActivity = {
   snapshot?: ISnapshot;
 };
 
-export type ActivityWithPageTarget = IActivityHasId & {
-  target: IPageHasId;
+export type ActivityHasUserId = IActivityHasId & {
   user: IUserHasId;
 };
 
