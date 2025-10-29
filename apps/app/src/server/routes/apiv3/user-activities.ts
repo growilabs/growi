@@ -178,18 +178,16 @@ module.exports = (crowi: Crowi): Router => {
 
       const limit = req.query.limit || defaultLimit || 10;
       const offset = req.query.offset || 0;
+      const targetUserId = req.params.targetUserId;
 
-      const user = req.user;
-
-      if (!user || !user._id) {
-        logger.error('Authentication failure: req.user is missing after loginRequiredStrictly.');
-        return res.apiv3Err('Authentication failed.', 401);
+      if (typeof targetUserId !== 'string') {
+        logger.error('Bad request: targetUserId must be of type string.');
+        return res.apiv3Err('Bad request.', 400);
       }
 
-      const userId = user._id;
 
       try {
-        const userObjectId = new Types.ObjectId(userId);
+        const userObjectId = new Types.ObjectId(targetUserId);
 
         const userActivityPipeline: PipelineStage[] = [
           {
