@@ -8,6 +8,7 @@ import type { IAttachmentDocument } from '~/server/models/attachment';
 import { Attachment } from '~/server/models/attachment';
 import type { FileUploader } from '~/server/service/file-uploader';
 import loggerFactory from '~/utils/logger';
+
 import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
 import type { IPageBulkExportJobCronService } from '..';
 
@@ -76,7 +77,7 @@ export async function compressAndUpload(
 
   pageArchiver.directory(this.getTmpOutputDir(pageBulkExportJob), false);
   pageArchiver.finalize();
-  this.setStreamInExecution(pageBulkExportJob._id, pageArchiver);
+  this.setStreamsInExecution(pageBulkExportJob._id, pageArchiver);
 
   try {
     await fileUploadService.uploadAttachment(pageArchiver, attachment);

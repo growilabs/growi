@@ -8,7 +8,6 @@ import {
   PageBulkExportJobStatus,
 } from '../../interfaces/page-bulk-export';
 import PageBulkExportJob from '../models/page-bulk-export-job';
-
 import instanciatePageBulkExportJobCleanUpCronService, {
   pageBulkExportJobCleanUpCronService,
 } from './page-bulk-export-job-clean-up-cron';
@@ -31,6 +30,7 @@ vi.mock('./page-bulk-export-job-cron', () => {
   return {
     pageBulkExportJobCronService: {
       cleanUpExportJobResources: vi.fn(() => Promise.resolve()),
+      notifyExportResultAndCleanUp: vi.fn(() => Promise.resolve()),
     },
   };
 });

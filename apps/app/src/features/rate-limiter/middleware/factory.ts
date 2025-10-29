@@ -1,13 +1,15 @@
 import type { IUserHasId } from '@growi/core';
 import type { Handler, Request } from 'express';
 import md5 from 'md5';
-import { type RateLimiterRes } from 'rate-limiter-flexible';
+import type { RateLimiterRes } from 'rate-limiter-flexible';
 
 import loggerFactory from '~/utils/logger';
 
-import { DEFAULT_USERS_PER_IP_PROSPECTION, type IApiRateLimitConfig } from '../config';
+import {
+  DEFAULT_USERS_PER_IP_PROSPECTION,
+  type IApiRateLimitConfig,
+} from '../config';
 import { generateApiRateLimitConfig } from '../utils/config-generator';
-
 import { consumePoints } from './consume-points';
 
 const logger = loggerFactory('growi:middleware:api-rate-limit');
@@ -22,9 +24,10 @@ const apiRateLimitConfig = generateApiRateLimitConfig();
 const configWithoutRegExp = apiRateLimitConfig.withoutRegExp;
 const configWithRegExp = apiRateLimitConfig.withRegExp;
 const allRegExp = new RegExp(Object.keys(configWithRegExp).join('|'));
-const keysWithRegExp = Object.keys(configWithRegExp).map(key => new RegExp(`^${key}`));
+const keysWithRegExp = Object.keys(configWithRegExp).map(
+  (key) => new RegExp(`^${key}`),
+);
 const valuesWithRegExp = Object.values(configWithRegExp);
-
 
 /**
  * consume per user per endpoint
@@ -33,8 +36,10 @@ const valuesWithRegExp = Object.values(configWithRegExp);
  * @param customizedConfig
  * @returns
  */
-const consumePointsByUser = async(
-    method: string, key: string | null, customizedConfig?: IApiRateLimitConfig,
+const consumePointsByUser = async (
+  method: string,
+  key: string | null,
+  customizedConfig?: IApiRateLimitConfig,
 ): Promise<RateLimiterRes | undefined> => {
   return consumePoints(method, key, customizedConfig);
 };
@@ -46,24 +51,25 @@ const consumePointsByUser = async(
  * @param customizedConfig
  * @returns
  */
-const consumePointsByIp = async(
-    method: string, key: string | null, customizedConfig?: IApiRateLimitConfig,
+const consumePointsByIp = async (
+  method: string,
+  key: string | null,
+  customizedConfig?: IApiRateLimitConfig,
 ): Promise<RateLimiterRes | undefined> => {
-  const maxRequestsMultiplier = customizedConfig?.usersPerIpProspection ?? DEFAULT_USERS_PER_IP_PROSPECTION;
+  const maxRequestsMultiplier =
+    customizedConfig?.usersPerIpProspection ?? DEFAULT_USERS_PER_IP_PROSPECTION;
   return consumePoints(method, key, customizedConfig, maxRequestsMultiplier);
 };
 
-
 export const middlewareFactory = (): Handler => {
-
-  return async(req: Request & { user?: IUserHasId }, res, next) => {
-
+  return async (req: Request & { user?: IUserHasId }, res, next) => {
     const endpoint = req.path;
 
     // determine keys
-    const keyForUser: string | null = req.user != null
-      ? md5(`${req.user._id}_${endpoint}_${req.method}`)
-      : null;
+    const keyForUser: string | null =
+      req.user != null
+        ? md5(`${req.user._id}_${endpoint}_${req.method}`)
+        : null;
     const keyForIp: string = md5(`${req.ip}_${endpoint}_${req.method}`);
 
     // determine customized config
@@ -71,8 +77,7 @@ export const middlewareFactory = (): Handler => {
     const configForEndpoint = configWithoutRegExp[endpoint];
     if (configForEndpoint) {
       customizedConfig = configForEndpoint;
-    }
-    else if (allRegExp.test(endpoint)) {
+    } else if (allRegExp.test(endpoint)) {
       keysWithRegExp.forEach((key, index) => {
         if (key.test(endpoint)) {
           customizedConfig = valuesWithRegExp[index];
@@ -84,8 +89,7 @@ export const middlewareFactory = (): Handler => {
     if (req.user != null) {
       try {
         await consumePointsByUser(req.method, keyForUser, customizedConfig);
-      }
-      catch {
+      } catch {
         logger.error(`${req.user._id}: too many request at ${endpoint}`);
         return res.sendStatus(429);
       }
@@ -94,8 +98,7 @@ export const middlewareFactory = (): Handler => {
     // check for ip
     try {
       await consumePointsByIp(req.method, keyForIp, customizedConfig);
-    }
-    catch {
+    } catch {
       logger.error(`${req.ip}: too many request at ${endpoint}`);
       return res.sendStatus(429);
     }

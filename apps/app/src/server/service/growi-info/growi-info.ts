@@ -13,6 +13,7 @@ import mongoose from 'mongoose';
 
 import { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 import { Config } from '~/server/models/config';
+import type { PageDocument, PageModel } from '~/server/models/page';
 import { aclService } from '~/server/service/acl';
 import { configManager } from '~/server/service/config-manager';
 import { getGrowiVersion } from '~/utils/growi-version';
@@ -22,6 +23,7 @@ const FULL_ADDITIONAL_INFO_OPTIONS = {
   includeAttachmentInfo: true,
   includeInstalledInfo: true,
   includeUserCountInfo: true,
+  includePageCountInfo: true,
 } as const;
 
 
@@ -116,9 +118,10 @@ export class GrowiInfoService {
 
   private async getAdditionalInfoByOptions<T extends GrowiInfoOptions>(options: T): Promise<IGrowiAdditionalInfoResult<T>> {
     const User = mongoose.model<IUser, Model<IUser>>('User');
+    const Page = mongoose.model<PageDocument, PageModel>('Page');
 
     // Check if any option is enabled to determine if we should return additional info
-    const hasAnyOption = options.includeAttachmentInfo || options.includeInstalledInfo || options.includeUserCountInfo;
+    const hasAnyOption = options.includeAttachmentInfo || options.includeInstalledInfo || options.includeUserCountInfo || options.includePageCountInfo;
 
     if (!hasAnyOption) {
       return undefined as IGrowiAdditionalInfoResult<T>;
@@ -137,6 +140,7 @@ export class GrowiInfoService {
       installedAtByOldestUser: Date | null;
       currentUsersCount: number;
       currentActiveUsersCount: number;
+      currentPagesCount: number;
     }> = {
       attachmentType: configManager.getConfig('app:fileUploadType'),
       activeExternalAccountTypes,
@@ -161,6 +165,12 @@ export class GrowiInfoService {
 
       partialResult.currentUsersCount = currentUsersCount;
       partialResult.currentActiveUsersCount = currentActiveUsersCount;
+    }
+
+    if (options.includePageCountInfo) {
+      const rootPage = await Page.findOne({ path: '/' });
+      const currentPagesCount = (rootPage?.descendantCount ?? 0) + 1;
+      partialResult.currentPagesCount = currentPagesCount;
     }
 
     return partialResult as IGrowiAdditionalInfoResult<T>;

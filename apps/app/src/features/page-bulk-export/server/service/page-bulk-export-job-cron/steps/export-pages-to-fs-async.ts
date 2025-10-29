@@ -16,10 +16,12 @@ import {
   PageBulkExportFormat,
   PageBulkExportJobStatus,
 } from '~/features/page-bulk-export/interfaces/page-bulk-export';
+
 import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
 import type { PageBulkExportPageSnapshotDocument } from '../../../models/page-bulk-export-page-snapshot';
 import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-snapshot';
 import type { IPageBulkExportJobCronService } from '..';
+import { BulkExportJobStreamDestroyedByCleanupError } from '../errors';
 
 async function convertMdToHtml(
   md: string,
@@ -132,9 +134,16 @@ export async function exportPagesToFsAsync(
 
   const pagesWritable = await getPageWritable.bind(this)(pageBulkExportJob);
 
-  this.setStreamInExecution(pageBulkExportJob._id, pageSnapshotsReadable);
+  this.setStreamsInExecution(
+    pageBulkExportJob._id,
+    pageSnapshotsReadable,
+    pagesWritable,
+  );
 
   pipeline(pageSnapshotsReadable, pagesWritable, (err) => {
-    this.handleError(err, pageBulkExportJob);
+    // prevent overlapping cleanup
+    if (!(err instanceof BulkExportJobStreamDestroyedByCleanupError)) {
+      this.handleError(err, pageBulkExportJob);
+    }
   });
 }

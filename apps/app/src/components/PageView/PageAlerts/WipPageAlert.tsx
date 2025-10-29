@@ -1,16 +1,14 @@
-import React, { useCallback, type JSX } from 'react';
-
+import React, { type JSX, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useSWRMUTxCurrentPage, useSWRxCurrentPage } from '~/stores/page';
-
 
 export const WipPageAlert = (): JSX.Element => {
   const { t } = useTranslation();
   const { data: currentPage } = useSWRxCurrentPage();
   const { trigger: mutateCurrentPage } = useSWRMUTxCurrentPage();
 
-  const clickPagePublishButton = useCallback(async() => {
+  const clickPagePublishButton = useCallback(async () => {
     const pageId = currentPage?._id;
 
     if (pageId == null) {
@@ -18,26 +16,27 @@ export const WipPageAlert = (): JSX.Element => {
     }
 
     try {
-      const publish = (await import('~/client/services/page-operation')).publish;
+      const publish = (await import('~/client/services/page-operation'))
+        .publish;
       await publish(pageId);
 
       await mutateCurrentPage();
 
-      const mutatePageTree = (await import('~/stores/page-listing')).mutatePageTree;
+      const mutatePageTree = (await import('~/stores/page-listing'))
+        .mutatePageTree;
       await mutatePageTree();
 
-      const mutateRecentlyUpdated = (await import('~/stores/page-listing')).mutateRecentlyUpdated;
+      const mutateRecentlyUpdated = (await import('~/stores/page-listing'))
+        .mutateRecentlyUpdated;
       await mutateRecentlyUpdated();
 
       const toastSuccess = (await import('~/client/util/toastr')).toastSuccess;
       toastSuccess(t('wip_page.success_publish_page'));
-    }
-    catch {
+    } catch {
       const toastError = (await import('~/client/util/toastr')).toastError;
       toastError(t('wip_page.fail_publish_page'));
     }
   }, [currentPage?._id, mutateCurrentPage, t]);
-
 
   if (!currentPage?.wip) {
     return <></>;
@@ -52,7 +51,7 @@ export const WipPageAlert = (): JSX.Element => {
         className="btn btn-outline-secondary ms-auto"
         onClick={clickPagePublishButton}
       >
-        {t('wip_page.publish_page') }
+        {t('wip_page.publish_page')}
       </button>
     </p>
   );

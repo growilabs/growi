@@ -36,7 +36,7 @@ class CustomizeService implements S2sMessageHandlable {
 
   theme: string;
 
-  themeHref: string;
+  themeHref: string | undefined;
 
   forcedColorScheme?: ColorScheme;
 

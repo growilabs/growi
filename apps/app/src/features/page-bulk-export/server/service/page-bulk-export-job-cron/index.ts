@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Readable } from 'node:stream';
+import type { Readable, Writable } from 'node:stream';
 import type { IUser } from '@growi/core';
 import { getIdForRef, isPopulated } from '@growi/core';
 import mongoose from 'mongoose';
@@ -23,10 +23,9 @@ import {
 import type { PageBulkExportJobDocument } from '../../models/page-bulk-export-job';
 import PageBulkExportJob from '../../models/page-bulk-export-job';
 import PageBulkExportPageSnapshot from '../../models/page-bulk-export-page-snapshot';
-
 import {
   BulkExportJobExpiredError,
-  BulkExportJobRestartedError,
+  BulkExportJobStreamDestroyedByCleanupError,
 } from './errors';
 import { requestPdfConverter } from './request-pdf-converter';
 import { compressAndUpload } from './steps/compress-and-upload';
@@ -40,7 +39,10 @@ export interface IPageBulkExportJobCronService {
   pageBatchSize: number;
   maxPartSize: number;
   compressExtension: string;
-  setStreamInExecution(jobId: ObjectIdLike, stream: Readable): void;
+  setStreamsInExecution(
+    jobId: ObjectIdLike,
+    ...streams: (Readable | Writable)[]
+  ): void;
   removeStreamInExecution(jobId: ObjectIdLike): void;
   handleError(
     err: Error | null,
@@ -78,10 +80,10 @@ class PageBulkExportJobCronService
   // temporal path of local fs to output page files before upload
   tmpOutputRootDir = '/tmp/page-bulk-export';
 
-  // Keep track of the stream executed for PageBulkExportJob to destroy it on job failure.
-  // The key is the id of a PageBulkExportJob.
+  // Keep track of all streams executed for PageBulkExportJob to destroy them on job failure.
+  // The key is the id of a PageBulkExportJob, value is array of streams.
   private streamInExecutionMemo: {
-    [key: string]: Readable;
+    [key: string]: (Readable | Writable)[];
   } = {};
 
   private parallelExecLimit: number;
@@ -133,22 +135,27 @@ class PageBulkExportJobCronService
   }
 
   /**
-   * Get the stream in execution for a job.
+   * Get all streams in execution for a job.
    * A getter method that includes "undefined" in the return type
    */
-  getStreamInExecution(jobId: ObjectIdLike): Readable | undefined {
+  getStreamsInExecution(
+    jobId: ObjectIdLike,
+  ): (Readable | Writable)[] | undefined {
     return this.streamInExecutionMemo[jobId.toString()];
   }
 
   /**
-   * Set the stream in execution for a job
+   * Set streams in execution for a job
    */
-  setStreamInExecution(jobId: ObjectIdLike, stream: Readable) {
-    this.streamInExecutionMemo[jobId.toString()] = stream;
+  setStreamsInExecution(
+    jobId: ObjectIdLike,
+    ...streams: (Readable | Writable)[]
+  ) {
+    this.streamInExecutionMemo[jobId.toString()] = streams;
   }
 
   /**
-   * Remove the stream in execution for a job
+   * Remove all streams in execution for a job
    */
   removeStreamInExecution(jobId: ObjectIdLike) {
     delete this.streamInExecutionMemo[jobId.toString()];
@@ -161,7 +168,7 @@ class PageBulkExportJobCronService
   async proceedBulkExportJob(pageBulkExportJob: PageBulkExportJobDocument) {
     try {
       if (pageBulkExportJob.restartFlag) {
-        await this.cleanUpExportJobResources(pageBulkExportJob, true);
+        await this.cleanUpExportJobResources(pageBulkExportJob);
         pageBulkExportJob.restartFlag = false;
         pageBulkExportJob.status = PageBulkExportJobStatus.initializing;
         pageBulkExportJob.statusOnPreviousCronExec = undefined;
@@ -226,9 +233,6 @@ class PageBulkExportJobCronService
         SupportedAction.ACTION_PAGE_BULK_EXPORT_JOB_EXPIRED,
         pageBulkExportJob,
       );
-    } else if (err instanceof BulkExportJobRestartedError) {
-      logger.info(err.message);
-      await this.cleanUpExportJobResources(pageBulkExportJob);
     } else {
       logger.error(err);
       await this.notifyExportResultAndCleanUp(
@@ -269,15 +273,24 @@ class PageBulkExportJobCronService
    */
   async cleanUpExportJobResources(
     pageBulkExportJob: PageBulkExportJobDocument,
-    restarted = false,
   ) {
-    const streamInExecution = this.getStreamInExecution(pageBulkExportJob._id);
-    if (streamInExecution != null) {
-      if (restarted) {
-        streamInExecution.destroy(new BulkExportJobRestartedError());
-      } else {
-        streamInExecution.destroy(new BulkExportJobExpiredError());
-      }
+    const streamsInExecution = this.getStreamsInExecution(
+      pageBulkExportJob._id,
+    );
+    if (streamsInExecution != null && streamsInExecution.length > 0) {
+      // Wait for all streams to be destroyed before proceeding with cleanup
+      await Promise.allSettled(
+        streamsInExecution.map((stream) => {
+          if (!stream.destroyed) {
+            return new Promise<void>((resolve) => {
+              stream.destroy(new BulkExportJobStreamDestroyedByCleanupError());
+              stream.once('close', () => resolve());
+            });
+          }
+          return Promise.resolve();
+        }),
+      );
+
       this.removeStreamInExecution(pageBulkExportJob._id);
     }
 

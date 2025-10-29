@@ -1,7 +1,6 @@
 import React, { type JSX, useMemo } from 'react';
 
 import { useSWRxRefs } from '../stores/refs';
-
 import { AttachmentList } from './AttachmentList';
 import { RefsContext } from './util/refs-context';
 

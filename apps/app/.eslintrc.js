@@ -2,12 +2,8 @@
  * @type {import('eslint').Linter.Config}
  */
 module.exports = {
-  extends: [
-    'next/core-web-vitals',
-    'weseek/react',
-  ],
-  plugins: [
-  ],
+  extends: ['next/core-web-vitals', 'weseek/react'],
+  plugins: [],
   ignorePatterns: [
     'dist/**',
     '**/dist/**',
@@ -25,11 +21,16 @@ module.exports = {
     'test/integration/middlewares/**',
     'test/integration/migrations/**',
     'test/integration/models/**',
+    'test/integration/service/**',
     'test/integration/setup.js',
+    'test-with-vite/**',
+    'public/**',
     'bin/**',
     'config/**',
+    'src/styles/**',
     'src/linter-checker/**',
     'src/migrations/**',
+    'src/models/**',
     'src/features/callout/**',
     'src/features/comment/**',
     'src/features/templates/**',
@@ -38,10 +39,23 @@ module.exports = {
     'src/features/plantuml/**',
     'src/features/external-user-group/**',
     'src/features/page-bulk-export/**',
+    'src/features/growi-plugin/**',
     'src/features/opentelemetry/**',
+    'src/features/openai/**',
+    'src/features/rate-limiter/**',
     'src/stores-universal/**',
     'src/interfaces/**',
     'src/utils/**',
+    'src/components/**',
+    'src/services/**',
+    'src/stores/**',
+    'src/pages/**',
+    'src/server/crowi/**',
+    'src/server/events/**',
+    'src/server/interfaces/**',
+    'src/server/util/**',
+    'src/server/app.ts',
+    'src/server/repl.ts',
   ],
   settings: {
     // resolve path aliases by eslint-import-resolver-typescript
@@ -50,10 +64,6 @@ module.exports = {
     },
   },
   rules: {
-    'no-restricted-imports': ['error', {
-      name: 'axios',
-      message: 'Please use src/utils/axios instead.',
-    }],
     '@typescript-eslint/no-var-requires': 'off',
 
     // set 'warn' temporarily -- 2021.08.02 Yuki Takei

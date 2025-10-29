@@ -1,12 +1,15 @@
 import { ImportMode } from './import-mode';
 
 export class GrowiArchiveImportOption {
-
   collectionName: string;
 
   mode: ImportMode;
 
-  constructor(collectionName: string, mode: ImportMode = ImportMode.insert, initProps = {}) {
+  constructor(
+    collectionName: string,
+    mode: ImportMode = ImportMode.insert,
+    initProps = {},
+  ) {
     this.collectionName = collectionName;
     this.mode = mode;
 
@@ -14,5 +17,4 @@ export class GrowiArchiveImportOption {
       this[key] = value;
     });
   }
-
 }

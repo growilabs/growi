@@ -1,7 +1,6 @@
-import type { Root, Element, Text } from 'hast';
+import type { Element, Root, Text } from 'hast';
 import rehypeRewrite from 'rehype-rewrite';
 import type { Plugin } from 'unified';
-
 
 /**
  * This method returns ['foo', 'bar', 'foo']
@@ -50,7 +49,12 @@ function wrapWithEm(textElement: Text): Element {
   };
 }
 
-function highlight(lowercasedKeyword: string, node: Text, index: number, parent: Root | Element): void {
+function highlight(
+  lowercasedKeyword: string,
+  node: Text,
+  index: number,
+  parent: Root | Element,
+): void {
   if (node.value.toLowerCase().includes(lowercasedKeyword)) {
     const splitted = splitWithKeyword(lowercasedKeyword, node.value);
 
@@ -67,25 +71,31 @@ function highlight(lowercasedKeyword: string, node: Text, index: number, parent:
   }
 }
 
-
 export type KeywordHighlighterPluginParams = {
-  keywords?: string | string[],
-}
+  keywords?: string | string[];
+};
 
-export const rehypePlugin: Plugin<[KeywordHighlighterPluginParams]> = (options) => {
+export const rehypePlugin: Plugin<[KeywordHighlighterPluginParams]> = (
+  options,
+) => {
   if (options?.keywords == null) {
-    return node => node;
+    return (node) => node;
   }
 
-  const keywords = (typeof options.keywords === 'string') ? [options.keywords] : options.keywords;
+  const keywords =
+    typeof options.keywords === 'string'
+      ? [options.keywords]
+      : options.keywords;
 
-  const lowercasedKeywords = keywords.map(keyword => keyword.toLowerCase());
+  const lowercasedKeywords = keywords.map((keyword) => keyword.toLowerCase());
 
   // return rehype-rewrite with hithlighter
   return rehypeRewrite.bind(this)({
     rewrite: (node, index, parent) => {
       if (parent != null && index != null && node.type === 'text') {
-        lowercasedKeywords.forEach(keyword => highlight(keyword, node, index, parent));
+        lowercasedKeywords.forEach((keyword) => {
+          highlight(keyword, node, index, parent);
+        });
       }
     },
   });

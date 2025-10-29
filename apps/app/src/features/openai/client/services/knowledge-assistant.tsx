@@ -1,31 +1,39 @@
 import type { Dispatch, SetStateAction } from 'react';
-import {
-  useCallback, useMemo, useState, useEffect,
-} from 'react';
-
-import { useForm, type UseFormReturn } from 'react-hook-form';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { type UseFormReturn, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import {
-  UncontrolledTooltip, Dropdown, DropdownToggle, DropdownMenu, DropdownItem,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
+  UncontrolledTooltip,
 } from 'reactstrap';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import {
-  SseMessageSchema, type SseMessage, SsePreMessageSchema, type SsePreMessage,
+  type SseMessage,
+  SseMessageSchema,
+  type SsePreMessage,
+  SsePreMessageSchema,
 } from '~/features/openai/interfaces/knowledge-assistant/sse-schemas';
 import { handleIfSuccessfullyParsed } from '~/features/openai/utils/handle-if-successfully-parsed';
 
-import type { MessageLog, MessageWithCustomMetaData } from '../../interfaces/message';
+import type {
+  MessageLog,
+  MessageWithCustomMetaData,
+} from '../../interfaces/message';
 import type { IThreadRelationHasId } from '../../interfaces/thread-relation';
 import { ThreadType } from '../../interfaces/thread-relation';
 import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
 import { useAiAssistantSidebar } from '../stores/ai-assistant';
 import { useSWRMUTxMessages } from '../stores/message';
-import { useSWRMUTxThreads, useSWRINFxRecentThreads } from '../stores/thread';
+import { useSWRINFxRecentThreads, useSWRMUTxThreads } from '../stores/thread';
 
-interface CreateThread {
-  (aiAssistantId: string, initialUserMessage: string): Promise<IThreadRelationHasId>;
-}
+type CreateThread = (
+  aiAssistantId: string,
+  initialUserMessage: string,
+) => Promise<IThreadRelationHasId>;
 
 type PostMessageArgs = {
   aiAssistantId: string;
@@ -33,47 +41,45 @@ type PostMessageArgs = {
   formData: FormData;
 };
 
-interface PostMessage {
-  (args: PostMessageArgs): Promise<Response>;
-}
+type PostMessage = (args: PostMessageArgs) => Promise<Response>;
 
-interface ProcessMessage {
-  (data: unknown, handler: {
-    onMessage: (data: SseMessage) => void
-    onPreMessage: (data: SsePreMessage) => void
-  }
-  ): void;
-}
+type ProcessMessage = (
+  data: unknown,
+  handler: {
+    onMessage: (data: SseMessage) => void;
+    onPreMessage: (data: SsePreMessage) => void;
+  },
+) => void;
 
 export interface FormData {
-  input: string
-  summaryMode?: boolean
-  extendedThinkingMode?: boolean
+  input: string;
+  summaryMode?: boolean;
+  extendedThinkingMode?: boolean;
 }
 
-interface GenerateModeSwitchesDropdown {
-  (isGenerating: boolean): JSX.Element
-}
+type GenerateModeSwitchesDropdown = (isGenerating: boolean) => JSX.Element;
 
 type UseKnowledgeAssistant = () => {
-  createThread: CreateThread
-  postMessage: PostMessage
-  processMessage: ProcessMessage
-  form: UseFormReturn<FormData>
-  resetForm: () => void
+  createThread: CreateThread;
+  postMessage: PostMessage;
+  processMessage: ProcessMessage;
+  form: UseFormReturn<FormData>;
+  resetForm: () => void;
+  threadTitleView: JSX.Element;
 
   // Views
-  initialView: JSX.Element
-  generateModeSwitchesDropdown: GenerateModeSwitchesDropdown
-  headerIcon: JSX.Element
-  headerText: JSX.Element
-  placeHolder: string
-}
+  initialView: JSX.Element;
+  generateModeSwitchesDropdown: GenerateModeSwitchesDropdown;
+  headerIcon: JSX.Element;
+  headerText: JSX.Element;
+  placeHolder: string;
+};
 
 export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
   // Hooks
-  const { data: aiAssistantSidebarData } = useAiAssistantSidebar();
-  const { aiAssistantData, threadData } = aiAssistantSidebarData ?? {};
+  const { data: aiAssistantSidebarData, refreshThreadData } =
+    useAiAssistantSidebar();
+  const { aiAssistantData } = aiAssistantSidebarData ?? {};
   const { mutate: mutateRecentThreads } = useSWRINFxRecentThreads();
   const { trigger: mutateThreadData } = useSWRMUTxThreads(aiAssistantData?._id);
   const { t } = useTranslation();
@@ -85,6 +91,9 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
       extendedThinkingMode: false,
     },
   });
+  const handleBackToInitialView = useCallback(() => {
+    refreshThreadData(undefined);
+  }, [refreshThreadData]);
 
   // Functions
   const resetForm = useCallback(() => {
@@ -93,58 +102,74 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
     form.reset({ input: '', summaryMode, extendedThinkingMode });
   }, [form]);
 
-  const createThread: CreateThread = useCallback(async(aiAssistantId, initialUserMessage) => {
-    const response = await apiv3Post<IThreadRelationHasId>('/openai/thread', {
-      type: ThreadType.KNOWLEDGE,
-      aiAssistantId,
-      initialUserMessage,
-    });
-    const thread = response.data;
-
-    // No need to await because data is not used
-    mutateThreadData();
-
-    return thread;
-  }, [mutateThreadData]);
-
-  const postMessage: PostMessage = useCallback(async({ aiAssistantId, threadId, formData }) => {
-    const response = await fetch('/_api/v3/openai/message', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+  const createThread: CreateThread = useCallback(
+    async (aiAssistantId, initialUserMessage) => {
+      const response = await apiv3Post<IThreadRelationHasId>('/openai/thread', {
+        type: ThreadType.KNOWLEDGE,
         aiAssistantId,
-        threadId,
-        userMessage: formData.input,
-        summaryMode: form.getValues('summaryMode'),
-        extendedThinkingMode: form.getValues('extendedThinkingMode'),
-      }),
-    });
+        initialUserMessage,
+      });
+      const thread = response.data;
 
-    mutateRecentThreads();
+      // No need to await because data is not used
+      mutateThreadData();
 
-    return response;
-  }, [form, mutateRecentThreads]);
+      return thread;
+    },
+    [mutateThreadData],
+  );
+
+  const postMessage: PostMessage = useCallback(
+    async ({ aiAssistantId, threadId, formData }) => {
+      const response = await fetch('/_api/v3/openai/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aiAssistantId,
+          threadId,
+          userMessage: formData.input,
+          summaryMode: form.getValues('summaryMode'),
+          extendedThinkingMode: form.getValues('extendedThinkingMode'),
+        }),
+      });
+
+      mutateRecentThreads();
+
+      return response;
+    },
+    [form, mutateRecentThreads],
+  );
 
   const processMessage: ProcessMessage = useCallback((data, handler) => {
     handleIfSuccessfullyParsed(data, SseMessageSchema, (data: SseMessage) => {
       handler.onMessage(data);
     });
 
-    handleIfSuccessfullyParsed(data, SsePreMessageSchema, (data: SsePreMessage) => {
-      handler.onPreMessage(data);
-    });
+    handleIfSuccessfullyParsed(
+      data,
+      SsePreMessageSchema,
+      (data: SsePreMessage) => {
+        handler.onPreMessage(data);
+      },
+    );
   }, []);
 
   // Views
   const headerIcon = useMemo(() => {
-    return <span className="growi-custom-icons growi-ai-chat-icon me-3 fs-4">ai_assistant</span>;
+    return (
+      <span className="growi-custom-icons growi-ai-chat-icon me-3 fs-4">
+        ai_assistant
+      </span>
+    );
   }, []);
 
   const headerText = useMemo(() => {
-    return <>{threadData?.title ?? aiAssistantData?.name}</>;
-  }, [aiAssistantData?.name, threadData?.title]);
+    return <>{aiAssistantData?.name}</>;
+  }, [aiAssistantData?.name]);
 
-  const placeHolder = useMemo(() => { return 'sidebar_ai_assistant.knowledge_assistant_placeholder' }, []);
+  const placeHolder = useMemo(() => {
+    return 'sidebar_ai_assistant.knowledge_assistant_placeholder';
+  }, []);
 
   const initialView = useMemo(() => {
     if (aiAssistantSidebarData?.aiAssistantData == null) {
@@ -154,7 +179,9 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
     return (
       <AiAssistantChatInitialView
         description={aiAssistantSidebarData.aiAssistantData.description}
-        pagePathPatterns={aiAssistantSidebarData.aiAssistantData.pagePathPatterns}
+        pagePathPatterns={
+          aiAssistantSidebarData.aiAssistantData.pagePathPatterns
+        }
       />
     );
   }, [aiAssistantSidebarData?.aiAssistantData]);
@@ -162,74 +189,116 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const toggleDropdown = useCallback(() => {
-    setDropdownOpen(prevState => !prevState);
+    setDropdownOpen((prevState) => !prevState);
   }, []);
 
-  const generateModeSwitchesDropdown: GenerateModeSwitchesDropdown = useCallback((isGenerating) => {
-    return (
-      <Dropdown isOpen={dropdownOpen} toggle={toggleDropdown} direction="up">
-        <DropdownToggle size="sm" outline className="border-0">
-          <span className="material-symbols-outlined">tune</span>
-        </DropdownToggle>
-        <DropdownMenu>
-          <DropdownItem tag="div" toggle={false}>
-            <div className="form-check form-switch">
-              <input
-                id="swSummaryMode"
-                type="checkbox"
-                role="switch"
-                className="form-check-input"
-                {...form.register('summaryMode')}
-                disabled={form.formState.isSubmitting || isGenerating}
-              />
-              <label className="form-check-label" htmlFor="swSummaryMode">
-                {t('sidebar_ai_assistant.summary_mode_label')}
-              </label>
-              <a
-                id="tooltipForHelpOfSummaryMode"
-                role="button"
-                className="ms-1"
-              >
-                <span className="material-symbols-outlined fs-6" style={{ lineHeight: 'unset' }}>help</span>
-              </a>
-              <UncontrolledTooltip
-                target="tooltipForHelpOfSummaryMode"
-              >
-                {t('sidebar_ai_assistant.summary_mode_help')}
-              </UncontrolledTooltip>
-            </div>
-          </DropdownItem>
-          <DropdownItem tag="div" toggle={false}>
-            <div className="form-check form-switch">
-              <input
-                id="swExtendedThinkingMode"
-                type="checkbox"
-                role="switch"
-                className="form-check-input"
-                {...form.register('extendedThinkingMode')}
-                disabled={form.formState.isSubmitting || isGenerating}
-              />
-              <label className="form-check-label" htmlFor="swExtendedThinkingMode">
-                {t('sidebar_ai_assistant.extended_thinking_mode_label')}
-              </label>
-              <a
-                id="tooltipForHelpOfExtendedThinkingMode"
-                role="button"
-                className="ms-1"
-              >
-                <span className="material-symbols-outlined fs-6" style={{ lineHeight: 'unset' }}>help</span>
-              </a>
-              <UncontrolledTooltip
-                target="tooltipForHelpOfExtendedThinkingMode"
-              >
-                {t('sidebar_ai_assistant.extended_thinking_mode_help')}
-              </UncontrolledTooltip>
-            </div>
-          </DropdownItem>
-        </DropdownMenu>
-      </Dropdown>
+  const generateModeSwitchesDropdown: GenerateModeSwitchesDropdown =
+    useCallback(
+      (isGenerating) => {
+        return (
+          <Dropdown
+            isOpen={dropdownOpen}
+            toggle={toggleDropdown}
+            direction="up"
+          >
+            <DropdownToggle size="sm" outline className="border-0">
+              <span className="material-symbols-outlined">tune</span>
+            </DropdownToggle>
+            <DropdownMenu>
+              <DropdownItem tag="div" toggle={false}>
+                <div className="form-check form-switch">
+                  <input
+                    id="swSummaryMode"
+                    type="checkbox"
+                    role="switch"
+                    aria-checked={form.watch('summaryMode')}
+                    className="form-check-input"
+                    {...form.register('summaryMode')}
+                    disabled={form.formState.isSubmitting || isGenerating}
+                  />
+                  <label className="form-check-label" htmlFor="swSummaryMode">
+                    {t('sidebar_ai_assistant.summary_mode_label')}
+                  </label>
+                  <button
+                    type="button"
+                    id="tooltipForHelpOfSummaryMode"
+                    className="btn btn-link p-0 ms-1"
+                  >
+                    <span
+                      className="material-symbols-outlined fs-6"
+                      style={{ lineHeight: 'unset' }}
+                    >
+                      help
+                    </span>
+                  </button>
+                  <UncontrolledTooltip target="tooltipForHelpOfSummaryMode">
+                    {t('sidebar_ai_assistant.summary_mode_help')}
+                  </UncontrolledTooltip>
+                </div>
+              </DropdownItem>
+              <DropdownItem tag="div" toggle={false}>
+                <div className="form-check form-switch">
+                  <input
+                    id="swExtendedThinkingMode"
+                    type="checkbox"
+                    role="switch"
+                    aria-checked={form.watch('extendedThinkingMode')}
+                    className="form-check-input"
+                    {...form.register('extendedThinkingMode')}
+                    disabled={form.formState.isSubmitting || isGenerating}
+                  />
+                  <label
+                    className="form-check-label"
+                    htmlFor="swExtendedThinkingMode"
+                  >
+                    {t('sidebar_ai_assistant.extended_thinking_mode_label')}
+                  </label>
+                  <button
+                    type="button"
+                    id="tooltipForHelpOfExtendedThinkingMode"
+                    className="btn btn-link p-0 ms-1"
+                  >
+                    <span
+                      className="material-symbols-outlined fs-6"
+                      style={{ lineHeight: 'unset' }}
+                    >
+                      help
+                    </span>
+                  </button>
+                  <UncontrolledTooltip target="tooltipForHelpOfExtendedThinkingMode">
+                    {t('sidebar_ai_assistant.extended_thinking_mode_help')}
+                  </UncontrolledTooltip>
+                </div>
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        );
+      },
+      [dropdownOpen, toggleDropdown, form, t],
     );
-  }, [dropdownOpen, toggleDropdown, form, t]);
+
+  const threadTitleView = useMemo(() => {
+    const { threadData } = aiAssistantSidebarData ?? {};
+
+    if (threadData?.title == null) {
+      return <></>;
+    }
+
+    return (
+      <div className="thread-title-sticky sticky-top bg-body bg-opacity-75 py-2 px-3 z-1 ">
+        <div className="d-flex align-items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-sm btn-link p-0 text-secondary"
+            onClick={handleBackToInitialView}
+          >
+            <span className="material-symbols-outlined">chevron_left</span>
+          </button>
+          <span className="text-truncate small">{threadData.title}</span>
+        </div>
+      </div>
+    );
+  }, [aiAssistantSidebarData, handleBackToInitialView]);
 
   return {
     createThread,
@@ -237,6 +306,7 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
     processMessage,
     form,
     resetForm,
+    threadTitleView,
 
     // Views
     initialView,
@@ -248,10 +318,9 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
   };
 };
 
-
 // Helper function to transform API message data to MessageLog[]
 const transformApiMessagesToLogs = (
-    apiMessageData: MessageWithCustomMetaData | null | undefined,
+  apiMessageData: MessageWithCustomMetaData | null | undefined,
 ): MessageLog[] => {
   if (apiMessageData?.data == null || !Array.isArray(apiMessageData.data)) {
     return [];
@@ -263,11 +332,16 @@ const transformApiMessagesToLogs = (
   return apiMessageData.data
     .slice() // Create a shallow copy before reversing
     .reverse()
-    .filter((message: ApiMessageItem) => message.metadata?.shouldHideMessage !== 'true')
+    .filter(
+      (message: ApiMessageItem) =>
+        message.metadata?.shouldHideMessage !== 'true',
+    )
     .map((message: ApiMessageItem): MessageLog => {
       // Extract the first text content block, if any
       let messageTextContent = '';
-      const textContentBlock = message.content?.find(contentBlock => contentBlock.type === 'text');
+      const textContentBlock = message.content?.find(
+        (contentBlock) => contentBlock.type === 'text',
+      );
       if (textContentBlock != null && textContentBlock.type === 'text') {
         messageTextContent = textContentBlock.text.value;
       }
@@ -281,8 +355,8 @@ const transformApiMessagesToLogs = (
 };
 
 export const useFetchAndSetMessageDataEffect = (
-    setMessageLogs: Dispatch<SetStateAction<MessageLog[]>>,
-    threadId?: string,
+  setMessageLogs: Dispatch<SetStateAction<MessageLog[]>>,
+  threadId?: string,
 ): void => {
   const { data: aiAssistantSidebarData } = useAiAssistantSidebar();
   const { trigger: mutateMessageData } = useSWRMUTxMessages(
@@ -300,29 +374,35 @@ export const useFetchAndSetMessageDataEffect = (
       return; // Early return if no threadId
     }
 
-    const fetchAndSetLogs = async() => {
+    const fetchAndSetLogs = async () => {
       try {
         // Assuming mutateMessageData() returns a Promise<MessageWithCustomMetaData | null | undefined>
-        const rawApiMessageData: MessageWithCustomMetaData | null | undefined = await mutateMessageData();
+        const rawApiMessageData: MessageWithCustomMetaData | null | undefined =
+          await mutateMessageData();
         const fetchedLogs = transformApiMessagesToLogs(rawApiMessageData);
 
         setMessageLogs((currentLogs) => {
           // Preserve current logs if they represent a single, user-submitted message
           // AND the newly fetched logs are empty (common for new threads).
-          const shouldPreserveCurrentMessage = currentLogs.length === 1
-            && currentLogs[0].isUserMessage
-            && fetchedLogs.length === 0;
+          const shouldPreserveCurrentMessage =
+            currentLogs.length === 1 &&
+            currentLogs[0].isUserMessage &&
+            fetchedLogs.length === 0;
 
           // Update with fetched logs, or preserve current if applicable
           return shouldPreserveCurrentMessage ? currentLogs : fetchedLogs;
         });
-      }
-      catch (error) {
+      } catch (error) {
         // console.error('Failed to fetch or process message data:', error); // Optional: for debugging
         setMessageLogs([]); // Clear logs on error to avoid inconsistent state
       }
     };
 
     fetchAndSetLogs();
-  }, [threadId, mutateMessageData, setMessageLogs, aiAssistantSidebarData?.isEditorAssistant]); // Dependencies
+  }, [
+    threadId,
+    mutateMessageData,
+    setMessageLogs,
+    aiAssistantSidebarData?.isEditorAssistant,
+  ]); // Dependencies
 };

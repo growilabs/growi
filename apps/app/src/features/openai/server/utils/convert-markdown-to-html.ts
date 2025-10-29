@@ -1,7 +1,7 @@
 import { dynamicImport } from '@cspell/dynamic-import';
 import type { IPage } from '@growi/core/dist/interfaces';
 import { DevidedPagePath } from '@growi/core/dist/models';
-import type { Root, Code } from 'mdast';
+import type { Code, Root } from 'mdast';
 import type * as RehypeMeta from 'rehype-meta';
 import type * as RehypeStringify from 'rehype-stringify';
 import type * as RemarkParse from 'remark-parse';
@@ -20,13 +20,14 @@ interface ModuleCache {
 
 let moduleCache: ModuleCache = {};
 
-const initializeModules = async(): Promise<void> => {
-  if (moduleCache.unified != null
-    && moduleCache.visit != null
-    && moduleCache.remarkParse != null
-    && moduleCache.remarkRehype != null
-    && moduleCache.rehypeMeta != null
-    && moduleCache.rehypeStringify != null
+const initializeModules = async (): Promise<void> => {
+  if (
+    moduleCache.unified != null &&
+    moduleCache.visit != null &&
+    moduleCache.remarkParse != null &&
+    moduleCache.remarkRehype != null &&
+    moduleCache.rehypeMeta != null &&
+    moduleCache.rehypeStringify != null
   ) {
     return;
   }
@@ -58,18 +59,33 @@ const initializeModules = async(): Promise<void> => {
 };
 
 type ConvertMarkdownToHtmlArgs = {
-  page: IPage,
-  siteUrl: string | undefined,
-}
+  page: IPage;
+  siteUrl: string | undefined;
+};
 
-export const convertMarkdownToHtml = async(revisionBody: string, args: ConvertMarkdownToHtmlArgs): Promise<string> => {
+export const convertMarkdownToHtml = async (
+  revisionBody: string,
+  args: ConvertMarkdownToHtmlArgs,
+): Promise<string> => {
   await initializeModules();
 
   const {
-    unified, visit, remarkParse, remarkRehype, rehypeMeta, rehypeStringify,
+    unified,
+    visit,
+    remarkParse,
+    remarkRehype,
+    rehypeMeta,
+    rehypeStringify,
   } = moduleCache;
 
-  if (unified == null || visit == null || remarkParse == null || remarkRehype == null || rehypeMeta == null || rehypeStringify == null) {
+  if (
+    unified == null ||
+    visit == null ||
+    remarkParse == null ||
+    remarkRehype == null ||
+    rehypeMeta == null ||
+    rehypeStringify == null
+  ) {
     throw new Error('Failed to initialize required modules');
   }
 

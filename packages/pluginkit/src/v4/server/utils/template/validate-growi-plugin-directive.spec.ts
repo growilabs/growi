@@ -1,5 +1,4 @@
 import path from 'node:path';
-
 import { GrowiPluginType } from '@growi/core';
 
 import { validateTemplatePluginGrowiDirective } from './validate-growi-plugin-directive';

@@ -1,5 +1,4 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-
 import type { NextFunction, Response } from 'express';
 import createError from 'http-errors';
 import { stringify } from 'qs';

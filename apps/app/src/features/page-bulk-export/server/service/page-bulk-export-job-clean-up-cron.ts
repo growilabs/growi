@@ -1,5 +1,6 @@
 import type { HydratedDocument } from 'mongoose';
 
+import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
@@ -11,7 +12,6 @@ import {
 } from '../../interfaces/page-bulk-export';
 import type { PageBulkExportJobDocument } from '../models/page-bulk-export-job';
 import PageBulkExportJob from '../models/page-bulk-export-job';
-
 import { pageBulkExportJobCronService } from './page-bulk-export-job-cron';
 
 const logger = loggerFactory(
@@ -57,13 +57,16 @@ class PageBulkExportJobCleanUpCronService extends CronService {
       },
     });
 
-    if (pageBulkExportJobCronService != null) {
-      await this.cleanUpAndDeleteBulkExportJobs(
-        expiredExportJobs,
-        pageBulkExportJobCronService.cleanUpExportJobResources.bind(
-          pageBulkExportJobCronService,
-        ),
+    const cleanUp = async (job: PageBulkExportJobDocument) => {
+      await pageBulkExportJobCronService?.notifyExportResultAndCleanUp(
+        SupportedAction.ACTION_PAGE_BULK_EXPORT_JOB_EXPIRED,
+        job,
       );
+      logger.error(`Bulk export job has expired: ${job._id.toString()}`);
+    };
+
+    if (pageBulkExportJobCronService != null) {
+      await this.cleanUpAndDeleteBulkExportJobs(expiredExportJobs, cleanUp);
     }
   }
 

@@ -1,5 +1,4 @@
 import path from 'node:path';
-
 import { isGrowiThemeMetadata } from '@growi/core';
 
 import { validateThemePluginGrowiDirective } from './validate-growi-plugin-directive';

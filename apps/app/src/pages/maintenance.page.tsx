@@ -1,23 +1,32 @@
-import type { IUser } from '@growi/core';
-import type { NextPage, GetServerSideProps, GetServerSidePropsContext } from 'next';
-import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
+import type {
+  GetServerSideProps,
+  GetServerSidePropsContext,
+  NextPage,
+} from 'next';
 import dynamic from 'next/dynamic';
+import type { IUser } from '@growi/core';
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import { useCurrentUser } from '~/stores-universal/context';
 
 import type { CommonProps } from './utils/commons';
-import { getServerSideCommonProps, getNextI18NextConfig } from './utils/commons';
+import {
+  getNextI18NextConfig,
+  getServerSideCommonProps,
+} from './utils/commons';
 
-
-const Maintenance = dynamic(() => import('~/client/components/Maintenance').then(mod => mod.Maintenance), { ssr: false });
+const Maintenance = dynamic(
+  () =>
+    import('~/client/components/Maintenance').then((mod) => mod.Maintenance),
+  { ssr: false },
+);
 
 type Props = CommonProps & {
-  currentUser: IUser,
+  currentUser: IUser;
 };
 
 const MaintenancePage: NextPage<CommonProps> = (props: Props) => {
-
   useCurrentUser(props.currentUser ?? null);
 
   return (
@@ -33,12 +42,22 @@ const MaintenancePage: NextPage<CommonProps> = (props: Props) => {
   );
 };
 
-async function injectNextI18NextConfigurations(context: GetServerSidePropsContext, props: Props, namespacesRequired?: string[] | undefined): Promise<void> {
-  const nextI18NextConfig = await getNextI18NextConfig(serverSideTranslations, context, namespacesRequired);
+async function injectNextI18NextConfigurations(
+  context: GetServerSidePropsContext,
+  props: Props,
+  namespacesRequired?: string[] | undefined,
+): Promise<void> {
+  const nextI18NextConfig = await getNextI18NextConfig(
+    serverSideTranslations,
+    context,
+    namespacesRequired,
+  );
   props._nextI18Next = nextI18NextConfig._nextI18Next;
 }
 
-export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {
+export const getServerSideProps: GetServerSideProps = async (
+  context: GetServerSidePropsContext,
+) => {
   const req = context.req as CrowiRequest;
 
   const result = await getServerSideCommonProps(context);
