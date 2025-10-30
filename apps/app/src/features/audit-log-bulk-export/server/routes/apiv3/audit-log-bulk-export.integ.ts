@@ -3,8 +3,22 @@ import express, {
   type Request,
   type Response,
 } from 'express';
+import mockRequire from 'mock-require';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type Crowi from '~/server/crowi';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+
+import * as ServiceModule from '../../service/audit-log-bulk-export';
+import { auditLogBulkExportService } from '../../service/audit-log-bulk-export';
+import routerFactory from './audit-log-bulk-export';
+
+mockRequire('~/server/middlewares/login-required', () => {
+  return (_req: Request, _res: Response, next: NextFunction) => {
+    next();
+  };
+});
 
 vi.mock('~/server/middlewares/apiv3-form-validator', () => {
   const { validationResult } = require('express-validator');
@@ -34,17 +48,6 @@ vi.mock('../../service/audit-log-bulk-export', async () => {
     },
   };
 });
-
-import type Crowi from '~/server/crowi';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
-import { auditLogBulkExportService } from '../../service/audit-log-bulk-export';
-
-const routerMod = (await import('./audit-log-bulk-export')) as {
-  default: (crowi: Crowi) => express.Router;
-};
-const routerFactory = routerMod.default;
-
-import * as ServiceModule from '../../service/audit-log-bulk-export';
 
 function buildCrowi(): Crowi {
   const accessTokenParser =

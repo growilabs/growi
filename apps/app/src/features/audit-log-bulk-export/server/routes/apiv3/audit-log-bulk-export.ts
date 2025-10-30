@@ -1,7 +1,7 @@
 import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
-import type { NextFunction, Request, Response } from 'express';
+import type { Request } from 'express';
 import { Router } from 'express';
 import { body } from 'express-validator';
 import { AuditLogBulkExportFormat } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
@@ -36,12 +36,11 @@ interface AuthorizedRequest
   user?: IUserHasId;
 }
 
-module.exports = (crowi: Crowi): Router => {
+const routerFactory = (crowi: Crowi): Router => {
   const accessTokenParser = crowi.accessTokenParser;
-  const loginRequiredStrictly =
-    process.env.NODE_ENV === 'test'
-      ? (_req: Request, _res: Response, next: NextFunction) => next()
-      : require('~/server/middlewares/login-required')(crowi);
+  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
+    crowi,
+  );
 
   const validators = {
     auditLogBulkExport: [
@@ -116,3 +115,5 @@ module.exports = (crowi: Crowi): Router => {
   );
   return router;
 };
+
+export default routerFactory;
