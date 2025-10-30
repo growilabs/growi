@@ -39,6 +39,7 @@ module.exports = {
     'src/features/plantuml/**',
     'src/features/external-user-group/**',
     'src/features/page-bulk-export/**',
+    'src/features/audit-log-bulk-export/**',
     'src/features/growi-plugin/**',
     'src/features/opentelemetry/**',
     'src/features/rate-limiter/**',
