@@ -53,7 +53,6 @@ import {
   useSWRMUTxCurrentPageYjsData,
 } from '~/stores/yjs';
 import {
-  useCsrfToken,
   useCurrentPathname,
   useCurrentUser,
   useDefaultIndentSize,
@@ -322,7 +321,6 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
   useCurrentUser(props.currentUser ?? null);
 
   // commons
-  useCsrfToken(props.csrfToken);
   useGrowiCloudUri(props.growiCloudUri);
 
   // page
