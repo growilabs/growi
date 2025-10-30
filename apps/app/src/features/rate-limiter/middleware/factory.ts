@@ -10,7 +10,6 @@ import {
   type IApiRateLimitConfig,
 } from '../config';
 import { generateApiRateLimitConfig } from '../utils/config-generator';
-
 import { consumePoints } from './consume-points';
 
 const logger = loggerFactory('growi:middleware:api-rate-limit');

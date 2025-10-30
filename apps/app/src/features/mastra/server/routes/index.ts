@@ -8,7 +8,6 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 const router = express.Router();
 
 export const factory = (crowi: Crowi): express.Router => {
-
   // disable all routes if AI is not enabled
   if (!isAiEnabled()) {
     router.all('*', (req, res: ApiV3Response) => {

@@ -1,9 +1,9 @@
-// eslint-disable-next-line no-restricted-imports
+// biome-ignore lint/style/noRestrictedImports: This is the axios wrapper utility
 import axios from 'axios';
 import { formatISO } from 'date-fns';
 import qs from 'qs';
 
-// eslint-disable-next-line no-restricted-imports
+// biome-ignore lint/style/noRestrictedImports: Re-exporting axios types
 export * from 'axios';
 
 const isoDateRegex =

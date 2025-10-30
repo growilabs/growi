@@ -2,6 +2,7 @@
 import React from 'react';
 
 import { useTranslation } from 'next-i18next';
+import type { UseFormRegister } from 'react-hook-form';
 
 import AdminAppContainer from '~/client/services/AdminAppContainer';
 
@@ -9,16 +10,18 @@ import { withUnstatedContainers } from '../../UnstatedUtils';
 
 
 type Props = {
-  adminAppContainer: AdminAppContainer,
+  adminAppContainer?: AdminAppContainer,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  register: UseFormRegister<any>,
 }
 
-const SmtpSetting = (props: Props) => {
+const SmtpSetting = (props: Props): JSX.Element => {
   const { t } = useTranslation();
-  const { adminAppContainer } = props;
+  const { register } = props;
 
   return (
     <React.Fragment>
-      <div id="mail-smtp" className="tab-pane active mt-5">
+      <div id="mail-smtp" className="tab-pane active">
         <div className="row">
           <label className="text-start text-md-end col-md-3 col-form-label">
             {t('admin:app_setting.host')}
@@ -27,8 +30,7 @@ const SmtpSetting = (props: Props) => {
             <input
               className="form-control"
               type="text"
-              value={adminAppContainer.state.smtpHost || ''}
-              onChange={(e) => { adminAppContainer.changeSmtpHost(e.target.value) }}
+              {...register('smtpHost')}
             />
           </div>
         </div>
@@ -40,8 +42,7 @@ const SmtpSetting = (props: Props) => {
           <div className="col-md-6">
             <input
               className="form-control"
-              value={adminAppContainer.state.smtpPort || ''}
-              onChange={(e) => { adminAppContainer.changeSmtpPort(e.target.value) }}
+              {...register('smtpPort')}
             />
           </div>
         </div>
@@ -54,8 +55,7 @@ const SmtpSetting = (props: Props) => {
             <input
               className="form-control"
               type="text"
-              value={adminAppContainer.state.smtpUser || ''}
-              onChange={(e) => { adminAppContainer.changeSmtpUser(e.target.value) }}
+              {...register('smtpUser')}
             />
           </div>
         </div>
@@ -68,8 +68,7 @@ const SmtpSetting = (props: Props) => {
             <input
               className="form-control"
               type="password"
-              value={adminAppContainer.state.smtpPassword || ''}
-              onChange={(e) => { adminAppContainer.changeSmtpPassword(e.target.value) }}
+              {...register('smtpPassword')}
             />
           </div>
         </div>
@@ -77,6 +76,8 @@ const SmtpSetting = (props: Props) => {
     </React.Fragment>
   );
 };
+
+export { SmtpSetting };
 
 /**
  * Wrapper component for using unstated

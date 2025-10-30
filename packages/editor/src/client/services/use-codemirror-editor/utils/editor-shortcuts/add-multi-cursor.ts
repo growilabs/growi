@@ -1,19 +1,15 @@
 import { useCallback } from 'react';
-
 import type { SelectionRange } from '@codemirror/state';
 import { EditorSelection } from '@codemirror/state';
-import type { EditorView, Command, KeyBinding } from '@codemirror/view';
-
+import type { Command, EditorView, KeyBinding } from '@codemirror/view';
 
 const addMultiCursor = (view: EditorView, direction: 'up' | 'down') => {
-
   const selection = view.state.selection;
   const doc = view.state.doc;
   const ranges = selection.ranges;
   const newRanges: SelectionRange[] = [];
 
   ranges.forEach((range) => {
-
     const head = range.head;
     const line = doc.lineAt(head);
     const targetLine = direction === 'up' ? line.number - 1 : line.number + 1;
@@ -26,7 +22,6 @@ const addMultiCursor = (view: EditorView, direction: 'up' | 'down') => {
     const cursorPos = targetLineText.from + col;
 
     newRanges.push(EditorSelection.cursor(cursorPos));
-
   });
 
   if (newRanges.length) {
@@ -41,15 +36,17 @@ const addMultiCursor = (view: EditorView, direction: 'up' | 'down') => {
 };
 
 const useAddMultiCursorCommand = (direction: 'up' | 'down'): Command => {
-  return useCallback((view?: EditorView) => {
-    if (view == null) return false;
-    addMultiCursor(view, direction);
-    return true;
-  }, [direction]);
+  return useCallback(
+    (view?: EditorView) => {
+      if (view == null) return false;
+      addMultiCursor(view, direction);
+      return true;
+    },
+    [direction],
+  );
 };
 
 export const useAddMultiCursorKeyBindings = (): KeyBinding[] => {
-
   const upMultiCursorCommand = useAddMultiCursorCommand('up');
   const downMultiCursorCommand = useAddMultiCursorCommand('down');
 

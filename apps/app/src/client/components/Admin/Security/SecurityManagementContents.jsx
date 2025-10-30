@@ -12,7 +12,7 @@ import LdapSecuritySetting from './LdapSecuritySetting';
 import LocalSecuritySetting from './LocalSecuritySetting';
 import OidcSecuritySetting from './OidcSecuritySetting';
 import SamlSecuritySetting from './SamlSecuritySetting';
-import SecuritySetting from './SecuritySetting';
+import { SecuritySetting } from './SecuritySetting';
 import ShareLinkSetting from './ShareLinkSetting';
 
 const SecurityManagementContents = () => {

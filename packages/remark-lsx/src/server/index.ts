@@ -2,6 +2,7 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import type { NextFunction, Request, Response } from 'express';
 import { query, validationResult } from 'express-validator';
 import { FilterXSS } from 'xss';
+
 import type { LsxApiOptions } from '../interfaces/api';
 import { listPages } from './routes/list-pages';
 

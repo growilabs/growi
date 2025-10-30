@@ -57,7 +57,7 @@ export const generateApiRateLimitConfig = (): ApiRateLimitConfigResult => {
     const result = key.match(regExp);
 
     if (result == null) {
-      return null;
+      return;
     }
 
     const target = result[1];

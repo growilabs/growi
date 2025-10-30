@@ -1,5 +1,4 @@
 import * as os from 'node:os';
-
 import type { Attributes } from '@opentelemetry/api';
 
 import loggerFactory from '~/utils/logger';

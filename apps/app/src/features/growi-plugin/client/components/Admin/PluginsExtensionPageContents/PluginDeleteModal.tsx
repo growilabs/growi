@@ -1,8 +1,7 @@
-import Link from 'next/link';
-
-import { useTranslation } from 'next-i18next';
 import type React from 'react';
 import { useCallback } from 'react';
+import Link from 'next/link';
+import { useTranslation } from 'next-i18next';
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 import { apiv3Delete } from '~/client/util/apiv3-client';

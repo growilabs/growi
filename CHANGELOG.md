@@ -1,8 +1,35 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.3.2...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.3.3...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.3.3](https://github.com/growilabs/compare/v7.3.2...v7.3.3) - 2025-10-15
+
+### 💎 Features
+
+* feat(otel): Page counts metrics (#10367) @Ryosei-Fukushima
+
+### 🚀 Improvement
+
+* imprv: Improve KnowledgeAssistant chat UI UX (#10355) @satof3
+* imprv: Guest user client performance by Socket.io event optimization (#10379) @yuki-takei
+* imprv: PageTree performance by page-listing API (#10362) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Draw.io color mode (#10390) @miya
+* fix: Cannot update v4 format pages (#10378) @miya
+* fix: Bulk export cleanup and notification occasionally not working on job expire (#10366) @arafubeatbox
+
+### 🧰 Maintenance
+
+* support: Configure biome for app services dir (#10381) @arafubeatbox
+* support: Configure biome for app etc. dirs (#10380) @arafubeatbox
+* support: Configure biome for rate-limiter feature (#10376) @arafubeatbox
+* support: Configure biome for growi-plugin feature (#10309) @arafubeatbox
+* support: Service integration test biome migration (#10234) @arafubeatbox
+* support: Update axios (#10353) @arafubeatbox
 
 ## [v7.3.2](https://github.com/growilabs/compare/v7.3.1...v7.3.2) - 2025-09-29
 

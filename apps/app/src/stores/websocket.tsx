@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
-
 import {
-  useGlobalSocket, GLOBAL_SOCKET_NS, useSWRStatic,
+  GLOBAL_SOCKET_NS,
+  useGlobalSocket,
+  useSWRStatic,
 } from '@growi/core/dist/swr';
 import type { Socket } from 'socket.io-client';
 import type { SWRResponse } from 'swr';
@@ -19,7 +20,6 @@ export const GLOBAL_ADMIN_SOCKET_KEY = 'globalAdminSocket';
  * Global Socket
  */
 export const useSetupGlobalSocket = (): void => {
-
   const { data: socket, mutate } = useGlobalSocket();
   const { data: isGuestUser } = useIsGuestUser();
 
@@ -35,21 +35,29 @@ export const useSetupGlobalSocket = (): void => {
       return;
     }
 
-    mutate(async() => {
+    mutate(async () => {
       const { io } = await import('socket.io-client');
       const newSocket = io(GLOBAL_SOCKET_NS, {
         transports: ['websocket'],
       });
 
-      newSocket.on('error', (err) => { logger.error(err) });
-      newSocket.on('connect_error', (err) => { logger.error('Failed to connect with websocket.', err) });
+      newSocket.on('error', (err) => {
+        logger.error(err);
+      });
+      newSocket.on('connect_error', (err) => {
+        logger.error('Failed to connect with websocket.', err);
+      });
 
       return newSocket;
     });
 
     // Cleanup function to disconnect socket when component unmounts or user logs out
     return () => {
-      if (socket != null && typeof socket === 'object' && 'disconnect' in socket) {
+      if (
+        socket != null &&
+        typeof socket === 'object' &&
+        'disconnect' in socket
+      ) {
         logger.debug('Disconnecting Socket.IO connection');
         (socket as Socket).disconnect();
         mutate(undefined, false); // Clear the SWR cache without revalidation
@@ -81,11 +89,15 @@ export const useGlobalAdminSocket = (): SWRResponse<Socket, Error> => {
   return useSWRStatic(GLOBAL_ADMIN_SOCKET_KEY);
 };
 
-export const useSetupGlobalSocketForPage = (pageId: string | undefined): void => {
+export const useSetupGlobalSocketForPage = (
+  pageId: string | undefined,
+): void => {
   const { data: socket } = useGlobalSocket();
 
   useEffect(() => {
-    if (socket == null || pageId == null) { return }
+    if (socket == null || pageId == null) {
+      return;
+    }
 
     socket.emit(SocketEventName.JoinPage, { pageId });
 

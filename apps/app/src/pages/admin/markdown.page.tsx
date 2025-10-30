@@ -1,11 +1,12 @@
 import { useEffect, useMemo } from 'react';
-
 import type {
-  NextPage, GetServerSideProps, GetServerSidePropsContext,
+  GetServerSideProps,
+  GetServerSidePropsContext,
+  NextPage,
 } from 'next';
-import { useTranslation } from 'next-i18next';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
+import { useTranslation } from 'next-i18next';
 import type { Container } from 'unstated';
 import { Provider } from 'unstated';
 
@@ -15,10 +16,21 @@ import { useCurrentUser } from '~/stores-universal/context';
 
 import { retrieveServerSideProps } from '../../utils/admin-page-util';
 
-const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), { ssr: false });
-const MarkDownSettingContents = dynamic(() => import('~/client/components/Admin/MarkdownSetting/MarkDownSettingContents'), { ssr: false });
-const ForbiddenPage = dynamic(() => import('~/client/components/Admin/ForbiddenPage').then(mod => mod.ForbiddenPage), { ssr: false });
-
+const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), {
+  ssr: false,
+});
+const MarkDownSettingContents = dynamic(
+  () =>
+    import('~/client/components/Admin/MarkdownSetting/MarkDownSettingContents'),
+  { ssr: false },
+);
+const ForbiddenPage = dynamic(
+  () =>
+    import('~/client/components/Admin/ForbiddenPage').then(
+      (mod) => mod.ForbiddenPage,
+    ),
+  { ssr: false },
+);
 
 const AdminMarkdownPage: NextPage<CommonProps> = (props) => {
   const { t } = useTranslation('admin');
@@ -30,8 +42,10 @@ const AdminMarkdownPage: NextPage<CommonProps> = (props) => {
   const injectableContainers: Container<any>[] = useMemo(() => [], []);
 
   useEffect(() => {
-    (async() => {
-      const AdminMarkDownContainer = (await import('~/client/services/AdminMarkDownContainer')).default;
+    (async () => {
+      const AdminMarkDownContainer = (
+        await import('~/client/services/AdminMarkDownContainer')
+      ).default;
       const adminMarkDownContainer = new AdminMarkDownContainer();
       injectableContainers.push(adminMarkDownContainer);
     })();
@@ -51,14 +65,13 @@ const AdminMarkdownPage: NextPage<CommonProps> = (props) => {
       </AdminLayout>
     </Provider>
   );
-
 };
 
-
-export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {
+export const getServerSideProps: GetServerSideProps = async (
+  context: GetServerSidePropsContext,
+) => {
   const props = await retrieveServerSideProps(context);
   return props;
 };
-
 
 export default AdminMarkdownPage;

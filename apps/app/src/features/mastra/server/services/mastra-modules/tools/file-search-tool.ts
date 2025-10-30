@@ -18,7 +18,10 @@ export const fileSearchTool = createTool({
     output: z.any().describe('file search results'),
   }),
 
-  execute: async({ context, runtimeContext }: FileSearchToolExecutionContext) => {
+  execute: async ({
+    context,
+    runtimeContext,
+  }: FileSearchToolExecutionContext) => {
     const vectorStoreId = runtimeContext.get('vectorStoreId');
 
     // Type-safe access to runtimeContext variables

@@ -1,5 +1,5 @@
-import mermaid from 'mermaid';
 import React, { type JSX, useEffect, useRef } from 'react';
+import mermaid from 'mermaid';
 import { v7 as uuidV7 } from 'uuid';
 
 import { useNextThemes } from '~/stores-universal/use-next-themes';
