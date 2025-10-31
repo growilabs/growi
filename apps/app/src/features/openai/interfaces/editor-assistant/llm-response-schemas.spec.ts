@@ -1,15 +1,16 @@
 import {
-  LlmEditorAssistantMessageSchema,
+  type LlmEditorAssistantDiff,
   LlmEditorAssistantDiffSchema,
   type LlmEditorAssistantMessage,
-  type LlmEditorAssistantDiff,
+  LlmEditorAssistantMessageSchema,
 } from './llm-response-schemas';
 
 describe('llm-response-schemas', () => {
   describe('LlmEditorAssistantMessageSchema', () => {
     test('should validate valid message objects', () => {
       const validMessage = {
-        message: 'I have successfully updated the function to include error handling.',
+        message:
+          'I have successfully updated the function to include error handling.',
       };
 
       const result = LlmEditorAssistantMessageSchema.safeParse(validMessage);
@@ -186,7 +187,9 @@ Line 3: Fixed indentation`,
       const result = LlmEditorAssistantDiffSchema.safeParse(invalidDiff);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const searchError = result.error.issues.find(issue => issue.path.includes('search'));
+        const searchError = result.error.issues.find((issue) =>
+          issue.path.includes('search'),
+        );
         expect(searchError).toBeDefined();
         expect(searchError?.code).toBe('invalid_type');
       }
@@ -201,7 +204,9 @@ Line 3: Fixed indentation`,
       const result = LlmEditorAssistantDiffSchema.safeParse(invalidDiff);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const replaceError = result.error.issues.find(issue => issue.path.includes('replace'));
+        const replaceError = result.error.issues.find((issue) =>
+          issue.path.includes('replace'),
+        );
         expect(replaceError).toBeDefined();
         expect(replaceError?.code).toBe('invalid_type');
       }
@@ -216,7 +221,9 @@ Line 3: Fixed indentation`,
       const result = LlmEditorAssistantDiffSchema.safeParse(invalidDiff);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const startLineError = result.error.issues.find(issue => issue.path.includes('startLine'));
+        const startLineError = result.error.issues.find((issue) =>
+          issue.path.includes('startLine'),
+        );
         expect(startLineError).toBeDefined();
         expect(startLineError?.code).toBe('invalid_type');
       }
@@ -232,7 +239,9 @@ Line 3: Fixed indentation`,
       const result = LlmEditorAssistantDiffSchema.safeParse(invalidDiff);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const searchError = result.error.issues.find(issue => issue.path.includes('search'));
+        const searchError = result.error.issues.find((issue) =>
+          issue.path.includes('search'),
+        );
         expect(searchError?.code).toBe('too_small');
       }
     });
@@ -247,7 +256,9 @@ Line 3: Fixed indentation`,
       const result = LlmEditorAssistantDiffSchema.safeParse(invalidDiff);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const startLineError = result.error.issues.find(issue => issue.path.includes('startLine'));
+        const startLineError = result.error.issues.find((issue) =>
+          issue.path.includes('startLine'),
+        );
         expect(startLineError?.code).toBe('too_small');
       }
     });
@@ -273,7 +284,9 @@ Line 3: Fixed indentation`,
       const result = LlmEditorAssistantDiffSchema.safeParse(invalidDiff);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const startLineError = result.error.issues.find(issue => issue.path.includes('startLine'));
+        const startLineError = result.error.issues.find((issue) =>
+          issue.path.includes('startLine'),
+        );
         expect(startLineError?.code).toBe('invalid_type');
       }
     });
@@ -289,7 +302,9 @@ Line 3: Fixed indentation`,
       const result = LlmEditorAssistantDiffSchema.safeParse(invalidDiff);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const endLineError = result.error.issues.find(issue => issue.path.includes('endLine'));
+        const endLineError = result.error.issues.find((issue) =>
+          issue.path.includes('endLine'),
+        );
         expect(endLineError?.code).toBe('too_small');
       }
     });
@@ -328,7 +343,9 @@ Line 3: Fixed indentation`,
       const result = LlmEditorAssistantDiffSchema.safeParse(invalidDiff);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const searchError = result.error.issues.find(issue => issue.path.includes('search'));
+        const searchError = result.error.issues.find((issue) =>
+          issue.path.includes('search'),
+        );
         expect(searchError?.code).toBe('invalid_type');
       }
     });
@@ -343,7 +360,9 @@ Line 3: Fixed indentation`,
       const result = LlmEditorAssistantDiffSchema.safeParse(invalidDiff);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const replaceError = result.error.issues.find(issue => issue.path.includes('replace'));
+        const replaceError = result.error.issues.find((issue) =>
+          issue.path.includes('replace'),
+        );
         expect(replaceError?.code).toBe('invalid_type');
       }
     });
@@ -404,9 +423,11 @@ Line 3: Fixed indentation`,
   describe('Real-world scenarios', () => {
     test('should validate typical code replacement scenario', () => {
       const realWorldDiff = {
-        search: 'function getUserData(id) {\n  return users.find(u => u.id === id);\n}',
+        search:
+          'function getUserData(id) {\n  return users.find(u => u.id === id);\n}',
         // eslint-disable-next-line max-len, no-template-curly-in-string
-        replace: 'async function getUserData(id) {\n  const user = await userService.findById(id);\n  if (!user) {\n    throw new Error(`User not found: \\${id}`);\n  }\n  return user;\n}',
+        replace:
+          'async function getUserData(id) {\n  const user = await userService.findById(id);\n  if (!user) {\n    throw new Error(`User not found: \\${id}`);\n  }\n  return user;\n}',
         startLine: 15,
         endLine: 17,
       };
@@ -429,7 +450,8 @@ Line 3: Fixed indentation`,
     test('should validate comment addition', () => {
       const commentDiff = {
         search: 'const result = processData(input);',
-        replace: '// Process the input data and return the result\nconst result = processData(input);',
+        replace:
+          '// Process the input data and return the result\nconst result = processData(input);',
         startLine: 42,
       };
 

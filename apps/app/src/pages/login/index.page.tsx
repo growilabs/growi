@@ -22,7 +22,7 @@ import {
   getNextI18NextConfig,
   getServerSideCommonProps,
 } from '~/pages/utils/commons';
-import { useCsrfToken, useCurrentPathname } from '~/stores-universal/context';
+import { useCurrentPathname } from '~/stores-universal/context';
 
 import styles from './index.module.scss';
 
@@ -50,9 +50,6 @@ type Props = CommonProps & {
 
 const LoginPage: NextPage<Props> = (props: Props) => {
   const { t } = useTranslation();
-
-  // commons
-  useCsrfToken(props.csrfToken);
 
   // page
   useCurrentPathname(props.currentPathname);

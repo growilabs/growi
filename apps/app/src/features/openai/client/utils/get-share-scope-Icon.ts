@@ -2,7 +2,10 @@ import type { AiAssistantAccessScope } from '../../interfaces/ai-assistant';
 import { AiAssistantShareScope } from '../../interfaces/ai-assistant';
 import { determineShareScope } from '../../utils/determine-share-scope';
 
-export const getShareScopeIcon = (shareScope: AiAssistantShareScope, accessScope: AiAssistantAccessScope): string => {
+export const getShareScopeIcon = (
+  shareScope: AiAssistantShareScope,
+  accessScope: AiAssistantAccessScope,
+): string => {
   const determinedSharedScope = determineShareScope(shareScope, accessScope);
   switch (determinedSharedScope) {
     case AiAssistantShareScope.OWNER:

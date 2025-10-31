@@ -3,15 +3,11 @@
  * Provides seamless integration between existing SSE processing and new client-side engine
  */
 
-import {
-  useCallback, useRef, useMemo,
-} from 'react';
-
+import { useCallback, useMemo, useRef } from 'react';
 import type { Text as YText } from 'yjs';
 
 import type { SseDetectedDiff } from '../../interfaces/editor-assistant/sse-schemas';
 import type { ProcessingResult } from '../interfaces/types';
-
 import { ClientSearchReplaceProcessor } from './editor-assistant/processor';
 
 // -----------------------------------------------------------------------------
@@ -59,24 +55,33 @@ export interface ProcessingProgress {
 // Client Engine Integration Hook
 // -----------------------------------------------------------------------------
 
-export function useClientEngineIntegration(config: Partial<ClientEngineConfig> = {}): {
+export function useClientEngineIntegration(
+  config: Partial<ClientEngineConfig> = {},
+): {
   processHybrid: (
     content: string,
     detectedDiffs: SseDetectedDiff[],
     serverProcessingFn: () => Promise<void>,
-  ) => Promise<{ success: boolean; method: 'client' | 'server'; result?: ProcessingResult }>;
+  ) => Promise<{
+    success: boolean;
+    method: 'client' | 'server';
+    result?: ProcessingResult;
+  }>;
   applyToYText: (yText: YText, processedContent: string) => boolean;
   isClientProcessingEnabled: boolean;
 } {
   // Configuration with defaults
-  const finalConfig: ClientEngineConfig = useMemo(() => ({
-    enableClientProcessing: true,
-    enableServerFallback: true,
-    enablePerformanceMetrics: true,
-    maxProcessingTime: 10000,
-    batchSize: 5,
-    ...config,
-  }), [config]);
+  const finalConfig: ClientEngineConfig = useMemo(
+    () => ({
+      enableClientProcessing: true,
+      enableServerFallback: true,
+      enablePerformanceMetrics: true,
+      maxProcessingTime: 10000,
+      batchSize: 5,
+      ...config,
+    }),
+    [config],
+  );
 
   // Client processor instance
   const clientProcessor = useRef<ClientSearchReplaceProcessor>();
@@ -93,102 +98,111 @@ export function useClientEngineIntegration(config: Partial<ClientEngineConfig> =
   /**
    * Apply processed content to YText (CodeMirror integration)
    */
-  const applyToYText = useCallback((
-      yText: YText,
-      processedContent: string,
-  ): boolean => {
-    try {
-      const currentContent = yText.toString();
+  const applyToYText = useCallback(
+    (yText: YText, processedContent: string): boolean => {
+      try {
+        const currentContent = yText.toString();
 
-      if (currentContent === processedContent) {
-        // No changes needed
+        if (currentContent === processedContent) {
+          // No changes needed
+          return true;
+        }
+
+        // Apply changes in a transaction
+        yText.doc?.transact(() => {
+          // Clear existing content
+          yText.delete(0, yText.length);
+          // Insert new content
+          yText.insert(0, processedContent);
+        });
+
         return true;
+      } catch (error) {
+        return false;
       }
-
-      // Apply changes in a transaction
-      yText.doc?.transact(() => {
-        // Clear existing content
-        yText.delete(0, yText.length);
-        // Insert new content
-        yText.insert(0, processedContent);
-      });
-
-      return true;
-    }
-    catch (error) {
-      return false;
-    }
-  }, []);
+    },
+    [],
+  );
 
   /**
    * Hybrid processing: try client first, fallback to server
    */
-  const processHybrid = useCallback(async(
+  const processHybrid = useCallback(
+    async (
       content: string,
       detectedDiffs: SseDetectedDiff[],
       serverProcessingFn: () => Promise<void>,
-  ): Promise<{ success: boolean; method: 'client' | 'server'; result?: ProcessingResult }> => {
-    if (!finalConfig.enableClientProcessing || !clientProcessor.current) {
-      // Client processing disabled, use server only
-      await serverProcessingFn();
-      return { success: true, method: 'server' };
-    }
+    ): Promise<{
+      success: boolean;
+      method: 'client' | 'server';
+      result?: ProcessingResult;
+    }> => {
+      if (!finalConfig.enableClientProcessing || !clientProcessor.current) {
+        // Client processing disabled, use server only
+        await serverProcessingFn();
+        return { success: true, method: 'server' };
+      }
 
-    try {
-      // Convert SseDetectedDiff to LlmEditorAssistantDiff format
-      const diffs = detectedDiffs
-        .map(d => d.diff)
-        .filter((diff): diff is NonNullable<typeof diff> => diff != null);
+      try {
+        // Convert SseDetectedDiff to LlmEditorAssistantDiff format
+        const diffs = detectedDiffs
+          .map((d) => d.diff)
+          .filter((diff): diff is NonNullable<typeof diff> => diff != null);
 
-      // Validate required fields for client processing
-      for (const diff of diffs) {
-        if (!diff.startLine || !diff.search) {
-          throw new Error('Missing required fields for client processing');
+        // Validate required fields for client processing
+        for (const diff of diffs) {
+          if (!diff.startLine || !diff.search) {
+            throw new Error('Missing required fields for client processing');
+          }
         }
+
+        // Process with client engine
+        const diffResult = await clientProcessor.current.processMultipleDiffs(
+          content,
+          diffs,
+          {
+            enableProgressCallbacks: true,
+            batchSize: finalConfig.batchSize,
+            maxProcessingTime: finalConfig.maxProcessingTime,
+          },
+        );
+
+        // Convert DiffApplicationResult to ProcessingResult
+        const processingTime = performance.now();
+        const result: ProcessingResult = {
+          success: diffResult.success,
+          error: diffResult.failedParts?.[0],
+          matches: [],
+          appliedCount: diffResult.appliedCount,
+          skippedCount: Math.max(0, diffs.length - diffResult.appliedCount),
+          modifiedText: diffResult.content || content,
+          processingTime,
+        };
+
+        if (result.success) {
+          return { success: true, method: 'client', result };
+        }
+
+        // Client processing failed, fallback to server if enabled
+        if (finalConfig.enableServerFallback) {
+          await serverProcessingFn();
+          return { success: true, method: 'server' };
+        }
+
+        // No fallback, return client error
+        return { success: false, method: 'client', result };
+      } catch (error) {
+        // Fallback to server on error
+        if (finalConfig.enableServerFallback) {
+          await serverProcessingFn();
+          return { success: true, method: 'server' };
+        }
+
+        return { success: false, method: 'client' };
       }
-
-      // Process with client engine
-      const diffResult = await clientProcessor.current.processMultipleDiffs(content, diffs, {
-        enableProgressCallbacks: true,
-        batchSize: finalConfig.batchSize,
-        maxProcessingTime: finalConfig.maxProcessingTime,
-      });
-
-      // Convert DiffApplicationResult to ProcessingResult
-      const processingTime = performance.now();
-      const result: ProcessingResult = {
-        success: diffResult.success,
-        error: diffResult.failedParts?.[0],
-        matches: [],
-        appliedCount: diffResult.appliedCount,
-        skippedCount: Math.max(0, diffs.length - diffResult.appliedCount),
-        modifiedText: diffResult.content || content,
-        processingTime,
-      };
-
-      if (result.success) {
-        return { success: true, method: 'client', result };
-      }
-
-      // Client processing failed, fallback to server if enabled
-      if (finalConfig.enableServerFallback) {
-        await serverProcessingFn();
-        return { success: true, method: 'server' };
-      }
-
-      // No fallback, return client error
-      return { success: false, method: 'client', result };
-    }
-    catch (error) {
-      // Fallback to server on error
-      if (finalConfig.enableServerFallback) {
-        await serverProcessingFn();
-        return { success: true, method: 'server' };
-      }
-
-      return { success: false, method: 'client' };
-    }
-  }, [finalConfig]);
+    },
+    [finalConfig],
+  );
 
   return {
     // Processing functions
@@ -209,9 +223,12 @@ export function useClientEngineIntegration(config: Partial<ClientEngineConfig> =
  */
 export function shouldUseClientProcessing(): boolean {
   // This could be controlled by environment variables, user settings, etc.
-  return (process.env.NODE_ENV === 'development')
-    || (typeof window !== 'undefined'
-        && (window as { __GROWI_CLIENT_PROCESSING_ENABLED__?: boolean }).__GROWI_CLIENT_PROCESSING_ENABLED__ === true);
+  return (
+    process.env.NODE_ENV === 'development' ||
+    (typeof window !== 'undefined' &&
+      (window as { __GROWI_CLIENT_PROCESSING_ENABLED__?: boolean })
+        .__GROWI_CLIENT_PROCESSING_ENABLED__ === true)
+  );
 }
 
 export default useClientEngineIntegration;

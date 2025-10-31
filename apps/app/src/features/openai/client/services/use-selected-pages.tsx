@@ -1,22 +1,24 @@
-import {
-  useState, useCallback, useEffect, useMemo, useRef,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { SelectablePage } from '../../interfaces/selectable-page';
 import { useAiAssistantManagementModal } from '../stores/ai-assistant';
 
-
 type UseSelectedPages = {
-  selectedPages: Map<string, SelectablePage>,
-  selectedPagesRef: React.RefObject<Map<string, SelectablePage>>,
-  selectedPagesArray: SelectablePage[],
-  addPage: (page: SelectablePage) => void,
-  removePage: (page: SelectablePage) => void,
-}
+  selectedPages: Map<string, SelectablePage>;
+  selectedPagesRef: React.RefObject<Map<string, SelectablePage>>;
+  selectedPagesArray: SelectablePage[];
+  addPage: (page: SelectablePage) => void;
+  removePage: (page: SelectablePage) => void;
+};
 
-export const useSelectedPages = (initialPages?: SelectablePage[]): UseSelectedPages => {
-  const [selectedPages, setSelectedPages] = useState<Map<string, SelectablePage>>(new Map());
-  const { data: aiAssistantManagementModalData } = useAiAssistantManagementModal();
+export const useSelectedPages = (
+  initialPages?: SelectablePage[],
+): UseSelectedPages => {
+  const [selectedPages, setSelectedPages] = useState<
+    Map<string, SelectablePage>
+  >(new Map());
+  const { data: aiAssistantManagementModalData } =
+    useAiAssistantManagementModal();
 
   const selectedPagesRef = useRef(selectedPages);
 
@@ -30,7 +32,10 @@ export const useSelectedPages = (initialPages?: SelectablePage[]): UseSelectedPa
 
   useEffect(() => {
     // Initialize each time PageMode is changed
-    if (initialPages != null && aiAssistantManagementModalData?.pageMode != null) {
+    if (
+      initialPages != null &&
+      aiAssistantManagementModalData?.pageMode != null
+    ) {
       const initialMap = new Map<string, SelectablePage>();
       initialPages.forEach((page) => {
         if (page.path != null) {
@@ -60,7 +65,6 @@ export const useSelectedPages = (initialPages?: SelectablePage[]): UseSelectedPa
       return newMap;
     });
   }, []);
-
 
   return {
     selectedPages,

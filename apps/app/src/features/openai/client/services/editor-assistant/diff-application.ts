@@ -5,8 +5,11 @@
  */
 
 import type { LlmEditorAssistantDiff } from '../../../interfaces/editor-assistant/llm-response-schemas';
-import type { SingleDiffResult, ProcessorConfig, SearchContext } from '../../interfaces/types';
-
+import type {
+  ProcessorConfig,
+  SearchContext,
+  SingleDiffResult,
+} from '../../interfaces/types';
 import { ClientErrorHandler } from './error-handling';
 import { ClientFuzzyMatcher } from './fuzzy-matching';
 
@@ -15,7 +18,6 @@ import { ClientFuzzyMatcher } from './fuzzy-matching';
 // -----------------------------------------------------------------------------
 
 export class ClientDiffApplicationEngine {
-
   private fuzzyMatcher: ClientFuzzyMatcher;
 
   private errorHandler: ClientErrorHandler;
@@ -23,8 +25,8 @@ export class ClientDiffApplicationEngine {
   private config: Required<ProcessorConfig>;
 
   constructor(
-      config: Partial<ProcessorConfig> = {},
-      errorHandler?: ClientErrorHandler,
+    config: Partial<ProcessorConfig> = {},
+    errorHandler?: ClientErrorHandler,
   ) {
     // Set defaults optimized for browser environment
     this.config = {
@@ -44,9 +46,9 @@ export class ClientDiffApplicationEngine {
    * Apply a single diff to content with browser-optimized processing
    */
   applySingleDiff(
-      content: string,
-      diff: LlmEditorAssistantDiff,
-      lineDelta = 0,
+    content: string,
+    diff: LlmEditorAssistantDiff,
+    lineDelta = 0,
   ): SingleDiffResult {
     try {
       // Validate search content
@@ -92,9 +94,7 @@ export class ClientDiffApplicationEngine {
         updatedLines: replacementResult.lines,
         lineDelta: replacementResult.lineDelta,
       };
-
-    }
-    catch (error) {
+    } catch (error) {
       return {
         success: false,
         error: this.errorHandler.createContentError(
@@ -105,13 +105,12 @@ export class ClientDiffApplicationEngine {
     }
   }
 
-
   /**
    * Apply multiple diffs in sequence with proper delta tracking
    */
   applyMultipleDiffs(
-      content: string,
-      diffs: LlmEditorAssistantDiff[],
+    content: string,
+    diffs: LlmEditorAssistantDiff[],
   ): {
     success: boolean;
     finalContent?: string;
@@ -136,8 +135,7 @@ export class ClientDiffApplicationEngine {
         currentContent = result.updatedLines.join('\n');
         totalLineDelta += result.lineDelta || 0;
         appliedCount++;
-      }
-      else {
+      } else {
         errors.push(result);
       }
     }
@@ -159,8 +157,8 @@ export class ClientDiffApplicationEngine {
    * Create search context with line adjustments
    */
   private createSearchContext(
-      diff: LlmEditorAssistantDiff,
-      lineDelta: number,
+    diff: LlmEditorAssistantDiff,
+    lineDelta: number,
   ): SearchContext {
     return {
       startLine: diff.startLine ? diff.startLine + lineDelta : undefined,
@@ -173,9 +171,9 @@ export class ClientDiffApplicationEngine {
    * Apply replacement with indentation preservation
    */
   private applyReplacement(
-      lines: string[],
-      matchResult: { index: number; content: string },
-      replaceText: string,
+    lines: string[],
+    matchResult: { index: number; content: string },
+    replaceText: string,
   ): { lines: string[]; lineDelta: number } {
     const startLineIndex = matchResult.index;
     const originalLines = matchResult.content.split('\n');
@@ -206,7 +204,10 @@ export class ClientDiffApplicationEngine {
   /**
    * Preserve indentation pattern from original content
    */
-  private preserveIndentation(originalLine: string, replaceText: string): string {
+  private preserveIndentation(
+    originalLine: string,
+    replaceText: string,
+  ): string {
     // Extract indentation from the original line
     const indentMatch = originalLine.match(/^(\s*)/);
     const originalIndent = indentMatch ? indentMatch[1] : '';
@@ -236,7 +237,7 @@ export class ClientDiffApplicationEngine {
    * Sort diffs for optimal application order (bottom to top)
    */
   private sortDiffsForApplication(
-      diffs: LlmEditorAssistantDiff[],
+    diffs: LlmEditorAssistantDiff[],
   ): LlmEditorAssistantDiff[] {
     return [...diffs].sort((a, b) => {
       // If both have line numbers, sort by line number (descending)
@@ -293,5 +294,4 @@ export class ClientDiffApplicationEngine {
       issues,
     };
   }
-
 }

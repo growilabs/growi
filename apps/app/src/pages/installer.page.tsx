@@ -14,7 +14,6 @@ import type { CrowiRequest } from '~/interfaces/crowi-request';
 import {
   useAppTitle,
   useConfidential,
-  useCsrfToken,
   useGrowiCloudUri,
   useSiteUrl,
 } from '~/stores-universal/context';
@@ -95,7 +94,6 @@ const InstallerPage: NextPage<Props> = (props: Props) => {
   useAppTitle(props.appTitle);
   useSiteUrl(props.siteUrl);
   useConfidential(props.confidential);
-  useCsrfToken(props.csrfToken);
   useGrowiCloudUri(props.growiCloudUri);
 
   const title = generateCustomTitle(props, t('installer.title'));

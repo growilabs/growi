@@ -73,11 +73,7 @@ export default class AdminImportContainer extends Container {
 
   async esaHandleSubmit() {
     try {
-      const params = {
-        'importer:esa:team_name': this.state.esaTeamName,
-        'importer:esa:access_token': this.state.esaAccessToken,
-      };
-      await apiPost('/admin/import/esa', params);
+      await apiPost('/admin/import/esa');
       toastSuccess('Import posts from esa success.');
     }
     catch (err) {
@@ -88,11 +84,7 @@ export default class AdminImportContainer extends Container {
 
   async esaHandleSubmitTest() {
     try {
-      const params = {
-        'importer:esa:team_name': this.state.esaTeamName,
-        'importer:esa:access_token': this.state.esaAccessToken,
-      };
-      await apiPost('/admin/import/testEsaAPI', params);
+      await apiPost('/admin/import/testEsaAPI');
       toastSuccess('Test connection to esa success.');
     }
     catch (error) {
@@ -100,10 +92,10 @@ export default class AdminImportContainer extends Container {
     }
   }
 
-  async esaHandleSubmitUpdate() {
+  async esaHandleSubmitUpdate(formData) {
     const params = {
-      'importer:esa:team_name': this.state.esaTeamName,
-      'importer:esa:access_token': this.state.esaAccessToken,
+      'importer:esa:team_name': formData.esaTeamName,
+      'importer:esa:access_token': formData.esaAccessToken,
     };
     try {
       await apiPost('/admin/settings/importerEsa', params);
@@ -117,11 +109,7 @@ export default class AdminImportContainer extends Container {
 
   async qiitaHandleSubmit() {
     try {
-      const params = {
-        'importer:qiita:team_name': this.state.qiitaTeamName,
-        'importer:qiita:access_token': this.state.qiitaAccessToken,
-      };
-      await apiPost('/admin/import/qiita', params);
+      await apiPost('/admin/import/qiita');
       toastSuccess('Import posts from qiita:team success.');
     }
     catch (err) {
@@ -133,11 +121,7 @@ export default class AdminImportContainer extends Container {
 
   async qiitaHandleSubmitTest() {
     try {
-      const params = {
-        'importer:qiita:team_name': this.state.qiitaTeamName,
-        'importer:qiita:access_token': this.state.qiitaAccessToken,
-      };
-      await apiPost('/admin/import/testQiitaAPI', params);
+      await apiPost('/admin/import/testQiitaAPI');
       toastSuccess('Test connection to qiita:team success.');
     }
     catch (err) {
@@ -146,10 +130,10 @@ export default class AdminImportContainer extends Container {
     }
   }
 
-  async qiitaHandleSubmitUpdate() {
+  async qiitaHandleSubmitUpdate(formData) {
     const params = {
-      'importer:qiita:team_name': this.state.qiitaTeamName,
-      'importer:qiita:access_token': this.state.qiitaAccessToken,
+      'importer:qiita:team_name': formData.qiitaTeamName,
+      'importer:qiita:access_token': formData.qiitaAccessToken,
     };
     try {
       await apiPost('/admin/settings/importerQiita', params);
