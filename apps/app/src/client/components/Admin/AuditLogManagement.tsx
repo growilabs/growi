@@ -20,6 +20,8 @@ import { DateRangePicker } from './AuditLog/DateRangePicker';
 import { SearchUsernameTypeahead } from './AuditLog/SearchUsernameTypeahead';
 import { SelectActionDropdown } from './AuditLog/SelectActionDropdown';
 
+import { AuditLogExportButton } from '~/features/audit-log-export/client/components/AuditLogExportButton';
+
 const formatDate = (date: Date | null) => {
   if (date == null) {
     return '';
@@ -162,9 +164,12 @@ export const AuditLogManagement: FC = () => {
           {isSettingPage ? t('audit_log_management.audit_log_settings') : t('audit_log_management.audit_log')}
         </span>
         { !isSettingPage && (
-          <button type="button" className="btn btn-sm ms-auto grw-btn-reload" onClick={reloadButtonPushedHandler}>
-            <span className="material-symbols-outlined">refresh</span>
-          </button>
+          <div className="d-flex ms-auto">
+            <button type="button" className="btn btn-sm grw-btn-reload me-2" onClick={reloadButtonPushedHandler}>
+              <span className="material-symbols-outlined">refresh</span>
+            </button>
+            <AuditLogExportButton />
+          </div>
         )}
       </h2>
 
