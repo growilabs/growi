@@ -386,7 +386,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
       <div
         ref={previewRef}
         onScroll={scrollPreviewHandlerThrottle}
-        className="page-editor-preview-container position-relative flex-expand-vert overflow-y-auto d-none d-lg-flex"
+        className="page-editor-preview-container flex-expand-vert overflow-y-auto d-none d-lg-flex"
       >
         <Preview
           rendererOptions={rendererOptions}
