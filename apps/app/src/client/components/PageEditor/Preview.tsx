@@ -41,70 +41,80 @@ const Preview = (props: Props): JSX.Element => {
 
   const toggleModal = () => setIsModalOpen(!isModalOpen);
 
-
   return (
-    <div
-      data-testid="page-editor-preview-body"
-      className={`${moduleClass} ${fluidLayoutClass} ${pagePath === '/Sidebar' ? 'preview-sidebar' : ''} position-relative`}
-      style={style}
-    >
-      <div className="position-absolute top-0 end-0 m-3 z-1">
-        <button
-          type="button"
-          className="btn btn-sm btn-primary"
-          onClick={toggleModal}
-        >
-          <span className="material-symbols-outlined me-1 align-middle" style={{ fontSize: '18px' }}>open_in_new</span>
-          モーダルを開く
-        </button>
-      </div>
-
-      { markdown != null
-        && (
-          isSlide != null
-            ? <SlideRenderer marp={isSlide.marp} markdown={markdown} />
-            : <RevisionRenderer rendererOptions={rendererOptions} markdown={markdown}></RevisionRenderer>
-        )
-      }
+    <>
+      {/* wip Trigger */}
+      <button
+        type="button"
+        className="btn btn-light btn-sm position-fixed top-0 end-0 m-3 shadow-sm"
+        style={{
+          top: '70px',
+          zIndex: 10,
+        }}
+        onClick={toggleModal}
+      >
+        <span className="material-symbols-outlined align-middle" style={{ fontSize: '18px' }}>
+          help
+        </span>
+        <span className="ms-1">Guide</span>
+      </button>
 
       {isModalOpen && (
         <>
+          {/* Editor Guide Modal Overlay */}
           <div
-            className="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-50"
-            style={{ zIndex: 1040 }}
+            className="position-fixed top-0 bottom-0 bg-dark opacity-50 start-50 end-0"
+            style={{
+              zIndex: 1040,
+            }}
             onClick={toggleModal}
-            role="button"
-            tabIndex={0}
-            aria-label="Close modal"
-            onKeyDown={(e) => { if (e.key === 'Escape') toggleModal(); }}
           />
 
+          {/* Editor Guide Modal */}
           <div
-            className="position-absolute d-flex justify-content-center align-items-center"
+            className="position-fixed top-0 bottom-0 d-flex align-items-center justify-content-center start-50 end-0"
             style={{
               zIndex: 1050,
-              top: 200,
-              transform: 'translate(100%, 0%)',
+              pointerEvents: 'none',
             }}
           >
-            <div className="card shadow-lg">
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="mb-0">Editor guide</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  aria-label="Close"
-                  onClick={toggleModal}
-                />
-              </div>
-              <div className="card-body overflow-auto" style={{ maxHeight: '60vh' }}>
-                <p>Editor guide contents (WIP)</p>
+            <div className="w-100 px-3" style={{ maxWidth: '500px', pointerEvents: 'auto' }}>
+              <div className="card shadow-lg">
+                <div className="card-header d-flex justify-content-between align-items-center">
+                  <h5 className="mb-0">Editor Guide</h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={toggleModal}
+                    aria-label="Close"
+                  />
+                </div>
+                <div className="card-body overflow-auto">
+                  <p>This is a test modal.</p>
+                  <p>It appears in the center of the preview area on the right side.</p>
+                  <p>The background is darkened to emphasize the modal.</p>
+                  <p className="mb-0">Click the close button or the background to close.</p>
+                </div>
               </div>
             </div>
           </div>
         </>
       )}
-    </div>
+
+      <div
+        data-testid="page-editor-preview-body"
+        className={`${moduleClass} ${fluidLayoutClass} ${pagePath === '/Sidebar' ? 'preview-sidebar' : ''}`}
+        style={style}
+      >
+        { markdown != null
+          && (
+            isSlide != null
+              ? <SlideRenderer marp={isSlide.marp} markdown={markdown} />
+              : <RevisionRenderer rendererOptions={rendererOptions} markdown={markdown}></RevisionRenderer>
+          )
+        }
+      </div>
+    </>
   );
 
 };
