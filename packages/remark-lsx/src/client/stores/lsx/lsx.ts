@@ -6,7 +6,6 @@ import type {
   LsxApiParams,
   LsxApiResponseData,
 } from '../../../interfaces/api';
-
 import { type ParseNumOptionResult, parseNumOption } from './parse-num-option';
 
 const LOADMORE_PAGES_NUM = 10;

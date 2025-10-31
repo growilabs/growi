@@ -1,5 +1,4 @@
 import type { IncomingMessage } from 'node:http';
-
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { pageApiModule } from './page-api-handler';

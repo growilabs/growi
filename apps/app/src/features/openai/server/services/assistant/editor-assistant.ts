@@ -4,8 +4,11 @@ import { configManager } from '~/server/service/config-manager';
 
 import { AssistantType } from './assistant-types';
 import { getOrCreateAssistant } from './create-assistant';
-import { instructionsForFileSearch, instructionsForInjectionCountermeasures, instructionsForSystem } from './instructions/commons';
-
+import {
+  instructionsForFileSearch,
+  instructionsForInjectionCountermeasures,
+  instructionsForSystem,
+} from './instructions/commons';
 
 /* eslint-disable max-len */
 const instructionsForUserIntentDetection = `# USER INTENT DETECTION:
@@ -60,19 +63,19 @@ The main content of the page, which is written in markdown format. The uer is ed
   - This is expected to be used to **selectedText** exactly and provide **startLine** exactly.
 `;
 
-
 let editorAssistant: OpenAI.Beta.Assistant | undefined;
 
-export const getOrCreateEditorAssistant = async(): Promise<OpenAI.Beta.Assistant> => {
-  if (editorAssistant != null) {
-    return editorAssistant;
-  }
+export const getOrCreateEditorAssistant =
+  async (): Promise<OpenAI.Beta.Assistant> => {
+    if (editorAssistant != null) {
+      return editorAssistant;
+    }
 
-  editorAssistant = await getOrCreateAssistant({
-    type: AssistantType.EDIT,
-    model: configManager.getConfig('openai:assistantModel:edit'),
-    /* eslint-disable max-len */
-    instructions: `# Your Role
+    editorAssistant = await getOrCreateAssistant({
+      type: AssistantType.EDIT,
+      model: configManager.getConfig('openai:assistantModel:edit'),
+      /* eslint-disable max-len */
+      instructions: `# Your Role
 You are an Editor Assistant for GROWI, a markdown wiki system.
 Your task is to help users edit their markdown content based on their requests.
 ---
@@ -95,8 +98,8 @@ ${instructionsForUserIntentDetection}
 
 ${instructionsForFileSearch}
 `,
-    /* eslint-enable max-len */
-  });
+      /* eslint-enable max-len */
+    });
 
-  return editorAssistant;
-};
+    return editorAssistant;
+  };

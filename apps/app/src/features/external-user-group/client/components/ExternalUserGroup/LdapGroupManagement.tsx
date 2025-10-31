@@ -1,6 +1,5 @@
 import type { FC } from 'react';
-import { type JSX, useCallback, useEffect, useState } from 'react';
-
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
@@ -39,6 +38,7 @@ export const LdapGroupManagement: FC = () => {
     [isUserBind],
   );
 
+  // biome-ignore lint/correctness/noNestedComponentDefinitions: ignore
   const AdditionalForm = (): JSX.Element => {
     return isUserBind ? (
       <div className="row form-group">

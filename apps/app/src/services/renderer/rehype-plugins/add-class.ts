@@ -45,5 +45,9 @@ const adder = (entry: AdditionsEntry) => {
 export const rehypePlugin: Plugin<[Additions]> = (additions) => {
   const adders = Object.entries(additions).map(adder);
 
-  return (node) => adders.forEach((a) => a(node as HastNode));
+  return (node) => {
+    adders.forEach((a) => {
+      a(node as HastNode);
+    });
+  };
 };

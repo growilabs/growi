@@ -4,4 +4,5 @@ export const GlobalCodeMirrorEditorKey = {
   DIFF: 'diff',
   READONLY: 'readonly',
 } as const;
-export type GlobalCodeMirrorEditorKey = typeof GlobalCodeMirrorEditorKey[keyof typeof GlobalCodeMirrorEditorKey]
+export type GlobalCodeMirrorEditorKey =
+  (typeof GlobalCodeMirrorEditorKey)[keyof typeof GlobalCodeMirrorEditorKey];

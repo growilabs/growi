@@ -1,5 +1,5 @@
 import {
-  ConfigSource, toNonBlankString, toNonBlankStringOrUndefined, SCOPE,
+  ConfigSource, SCOPE,
 } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { body } from 'express-validator';
@@ -12,8 +12,8 @@ import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 
 
 const logger = loggerFactory('growi:routes:apiv3:app-settings');
@@ -317,9 +317,9 @@ const router = express.Router();
  */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(crowi);
-  const adminRequired = require('../../middlewares/admin-required')(crowi);
-  const addActivity = generateAddActivityMiddleware(crowi);
+  const loginRequiredStrictly = require('../../../middlewares/login-required')(crowi);
+  const adminRequired = require('../../../middlewares/admin-required')(crowi);
+  const addActivity = generateAddActivityMiddleware();
 
   const activityEvent = crowi.event('activity');
 
@@ -348,44 +348,6 @@ module.exports = (crowi) => {
     sesSetting: [
       body('sesAccessKeyId').trim().if(value => value !== '').matches(/^[\da-zA-Z]+$/),
       body('sesSecretAccessKey').trim(),
-    ],
-    fileUploadSetting: [
-      body('fileUploadType').isIn(['aws', 'gcs', 'local', 'gridfs', 'azure']),
-      body('gcsApiKeyJsonPath').trim(),
-      body('gcsBucket').trim(),
-      body('gcsUploadNamespace').trim(),
-      body('gcsReferenceFileWithRelayMode').if(value => value != null).isBoolean(),
-      body('s3Bucket').trim(),
-      body('s3Region')
-        .trim()
-        .if(value => value !== '')
-        .custom(async(value) => {
-          const { t } = await getTranslation();
-          if (!/^[a-z]+-[a-z]+-\d+$/.test(value)) {
-            throw new Error(t('validation.aws_region'));
-          }
-          return true;
-        }),
-      body('s3CustomEndpoint')
-        .trim()
-        .if(value => value !== '')
-        .custom(async(value) => {
-          const { t } = await getTranslation();
-          if (!/^(https?:\/\/[^/]+|)$/.test(value)) {
-            throw new Error(t('validation.aws_custom_endpoint'));
-          }
-          return true;
-        }),
-      body('s3AccessKeyId').trim().if(value => value !== '').matches(/^[\da-zA-Z]+$/),
-      body('s3SecretAccessKey').trim(),
-      body('s3ReferenceFileWithRelayMode').if(value => value != null).isBoolean(),
-      body('azureTenantId').trim(),
-      body('azureClientId').trim(),
-      body('azureClientSecret').trim(),
-      body('azureStorageAccountName').trim(),
-      body('azureStorageStorageName').trim(),
-      body('azureReferenceFileWithRelayMode').if(value => value != null).isBoolean(),
-
     ],
     pageBulkExportSettings: [
       body('isBulkExportPagesEnabled').isBoolean(),
@@ -474,8 +436,6 @@ module.exports = (crowi) => {
       envAzureClientSecret: configManager.getConfig('azure:clientSecret', ConfigSource.env),
       envAzureStorageAccountName: configManager.getConfig('azure:storageAccountName', ConfigSource.env),
       envAzureStorageContainerName: configManager.getConfig('azure:storageContainerName', ConfigSource.env),
-
-      isEnabledPlugins: configManager.getConfig('plugin:isEnabledPlugins'),
 
       isMaintenanceMode: configManager.getConfig('app:isMaintenanceMode'),
 
@@ -652,7 +612,13 @@ module.exports = (crowi) => {
     const smtpUser = configManager.getConfig('mail:smtpUser');
     const smtpPassword = configManager.getConfig('mail:smtpPassword');
 
-    const option = {
+    // Define the option object with possible 'auth' and 'secure' properties
+    const option: {
+      host: string | undefined;
+      port: string | undefined;
+      auth?: { user: string; pass: string };
+      secure?: boolean;
+    } = {
       host: smtpHost,
       port: smtpPort,
     };
@@ -662,7 +628,7 @@ module.exports = (crowi) => {
         pass: smtpPassword,
       };
     }
-    if (option.port === 465) {
+    if (option.port === '465') {
       option.secure = true;
     }
 
@@ -844,175 +810,7 @@ module.exports = (crowi) => {
       return res.apiv3({ mailSettingParams });
     });
 
-  /**
-   * @swagger
-   *
-   *    /app-settings/file-upload-settings:
-   *      put:
-   *        tags: [AppSettings]
-   *        security:
-   *          - cookieAuth: []
-   *        summary: /app-settings/file-upload-setting
-   *        description: Update fileUploadSetting
-   *        requestBody:
-   *          required: true
-   *          content:
-   *            application/json:
-   *              schema:
-   *                $ref: '#/components/schemas/FileUploadSettingParams'
-   *        responses:
-   *          200:
-   *            description: Succeeded to update fileUploadSetting
-   *            content:
-   *              application/json:
-   *                schema:
-   *                  type: object
-   *                  properties:
-   *                    responseParams:
-   *                      type: object
-   *                      $ref: '#/components/schemas/FileUploadSettingParams'
-   */
-  //  eslint-disable-next-line max-len
-  router.put('/file-upload-setting', accessTokenParser([SCOPE.WRITE.ADMIN.APP]),
-    loginRequiredStrictly, adminRequired, addActivity, validator.fileUploadSetting, apiV3FormValidator, async(req, res) => {
-      const { fileUploadType } = req.body;
-
-      if (fileUploadType === 'local' || fileUploadType === 'gridfs') {
-        try {
-          await configManager.updateConfigs({
-            'app:fileUploadType': fileUploadType,
-          }, { skipPubsub: true });
-        }
-        catch (err) {
-          const msg = `Error occurred in updating ${fileUploadType} settings: ${err.message}`;
-          logger.error('Error', err);
-          return res.apiv3Err(new ErrorV3(msg, 'update-fileUploadType-failed'));
-        }
-      }
-
-      if (fileUploadType === 'aws') {
-        try {
-          try {
-            toNonBlankString(req.body.s3Bucket);
-          }
-          catch (err) {
-            throw new Error('S3 Bucket name is required');
-          }
-          try {
-            toNonBlankString(req.body.s3Region);
-          }
-          catch (err) {
-            throw new Error('S3 Region is required');
-          }
-          await configManager.updateConfigs({
-            'app:fileUploadType': fileUploadType,
-            'aws:s3Region': toNonBlankString(req.body.s3Region),
-            'aws:s3Bucket': toNonBlankString(req.body.s3Bucket),
-            'aws:referenceFileWithRelayMode': req.body.s3ReferenceFileWithRelayMode,
-          },
-          { skipPubsub: true });
-          await configManager.updateConfigs({
-            'aws:s3CustomEndpoint': toNonBlankStringOrUndefined(req.body.s3CustomEndpoint),
-            'aws:s3AccessKeyId': toNonBlankStringOrUndefined(req.body.s3AccessKeyId),
-            'aws:s3SecretAccessKey': toNonBlankStringOrUndefined(req.body.s3SecretAccessKey),
-          },
-          {
-            skipPubsub: true,
-            removeIfUndefined: true,
-          });
-        }
-        catch (err) {
-          const msg = `Error occurred in updating AWS S3 settings: ${err.message}`;
-          logger.error('Error', err);
-          return res.apiv3Err(new ErrorV3(msg, 'update-fileUploadType-failed'));
-        }
-      }
-
-      if (fileUploadType === 'gcs') {
-        try {
-          await configManager.updateConfigs({
-            'app:fileUploadType': fileUploadType,
-            'gcs:referenceFileWithRelayMode': req.body.gcsReferenceFileWithRelayMode,
-          },
-          { skipPubsub: true });
-          await configManager.updateConfigs({
-            'gcs:apiKeyJsonPath': toNonBlankStringOrUndefined(req.body.gcsApiKeyJsonPath),
-            'gcs:bucket': toNonBlankStringOrUndefined(req.body.gcsBucket),
-            'gcs:uploadNamespace': toNonBlankStringOrUndefined(req.body.gcsUploadNamespace),
-          },
-          { skipPubsub: true, removeIfUndefined: true });
-        }
-        catch (err) {
-          const msg = `Error occurred in updating GCS settings: ${err.message}`;
-          logger.error('Error', err);
-          return res.apiv3Err(new ErrorV3(msg, 'update-fileUploadType-failed'));
-        }
-      }
-
-      if (fileUploadType === 'azure') {
-        try {
-          await configManager.updateConfigs({
-            'app:fileUploadType': fileUploadType,
-            'azure:referenceFileWithRelayMode': req.body.azureReferenceFileWithRelayMode,
-          },
-          { skipPubsub: true });
-          await configManager.updateConfigs({
-            'azure:tenantId': toNonBlankStringOrUndefined(req.body.azureTenantId),
-            'azure:clientId': toNonBlankStringOrUndefined(req.body.azureClientId),
-            'azure:clientSecret': toNonBlankStringOrUndefined(req.body.azureClientSecret),
-            'azure:storageAccountName': toNonBlankStringOrUndefined(req.body.azureStorageAccountName),
-            'azure:storageContainerName': toNonBlankStringOrUndefined(req.body.azureStorageContainerName),
-          }, { skipPubsub: true, removeIfUndefined: true });
-        }
-        catch (err) {
-          const msg = `Error occurred in updating Azure settings: ${err.message}`;
-          logger.error('Error', err);
-          return res.apiv3Err(new ErrorV3(msg, 'update-fileUploadType-failed'));
-        }
-      }
-
-      try {
-        await crowi.setUpFileUpload(true);
-        crowi.fileUploaderSwitchService.publishUpdatedMessage();
-
-        const responseParams = {
-          fileUploadType: configManager.getConfig('app:fileUploadType'),
-        };
-
-        if (fileUploadType === 'gcs') {
-          responseParams.gcsApiKeyJsonPath = configManager.getConfig('gcs:apiKeyJsonPath');
-          responseParams.gcsBucket = configManager.getConfig('gcs:bucket');
-          responseParams.gcsUploadNamespace = configManager.getConfig('gcs:uploadNamespace');
-          responseParams.gcsReferenceFileWithRelayMode = configManager.getConfig('gcs:referenceFileWithRelayMode ');
-        }
-
-        if (fileUploadType === 'aws') {
-          responseParams.s3Region = configManager.getConfig('aws:s3Region');
-          responseParams.s3CustomEndpoint = configManager.getConfig('aws:s3CustomEndpoint');
-          responseParams.s3Bucket = configManager.getConfig('aws:s3Bucket');
-          responseParams.s3AccessKeyId = configManager.getConfig('aws:s3AccessKeyId');
-          responseParams.s3ReferenceFileWithRelayMode = configManager.getConfig('aws:referenceFileWithRelayMode');
-        }
-
-        if (fileUploadType === 'azure') {
-          responseParams.azureTenantId = configManager.getConfig('azure:tenantId');
-          responseParams.azureClientId = configManager.getConfig('azure:clientId');
-          responseParams.azureClientSecret = configManager.getConfig('azure:clientSecret');
-          responseParams.azureStorageAccountName = configManager.getConfig('azure:storageAccountName');
-          responseParams.azureStorageContainerName = configManager.getConfig('azure:storageContainerName');
-          responseParams.azureReferenceFileWithRelayMode = configManager.getConfig('azure:referenceFileWithRelayMode');
-        }
-        const parameters = { action: SupportedAction.ACTION_ADMIN_FILE_UPLOAD_CONFIG_UPDATE };
-        activityEvent.emit('update', res.locals.activity._id, parameters);
-        return res.apiv3({ responseParams });
-      }
-      catch (err) {
-        const msg = 'Error occurred in retrieving file upload configurations';
-        logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(msg, 'update-fileUploadType-failed'));
-      }
-
-    });
+  router.use('/file-upload-setting', require('./file-upload-setting')(crowi));
 
 
   router.put('/page-bulk-export-settings',

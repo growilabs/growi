@@ -4,7 +4,6 @@ import {
   type GrowiPluginValidationData,
   GrowiPluginValidationError,
 } from '../../../../model';
-
 import { importPackageJson } from './import-package-json';
 
 export const validateGrowiDirective = (

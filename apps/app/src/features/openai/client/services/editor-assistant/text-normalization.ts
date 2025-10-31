@@ -85,13 +85,18 @@ export function normalizeForBrowserFuzzyMatch(text: string): string {
   // Fast typographic character replacement
   normalized = normalized.replace(TYPOGRAPHIC_REGEX, (match) => {
     switch (match) {
-      case '\u2026': return '...';
+      case '\u2026':
+        return '...';
       case '\u2014':
-      case '\u2013': return '-';
+      case '\u2013':
+        return '-';
       case '\u00A0':
-      case '\u2009': return ' ';
-      case '\u200B': return '';
-      default: return match;
+      case '\u2009':
+        return ' ';
+      case '\u200B':
+        return '';
+      default:
+        return match;
     }
   });
 
@@ -109,8 +114,8 @@ export function normalizeForBrowserFuzzyMatch(text: string): string {
  * General client-side string normalization with configurable options
  */
 export function clientNormalizeString(
-    str: string,
-    options: ClientNormalizeOptions = GENERAL_OPTIONS,
+  str: string,
+  options: ClientNormalizeOptions = GENERAL_OPTIONS,
 ): string {
   if (!str) return str;
 
@@ -126,7 +131,11 @@ export function clientNormalizeString(
   // Apply typographic character normalization
   if (options.typographicChars) {
     normalized = normalized.replace(TYPOGRAPHIC_REGEX, (match) => {
-      return CLIENT_NORMALIZATION_MAPS.TYPOGRAPHIC[match as keyof typeof CLIENT_NORMALIZATION_MAPS.TYPOGRAPHIC] || match;
+      return (
+        CLIENT_NORMALIZATION_MAPS.TYPOGRAPHIC[
+          match as keyof typeof CLIENT_NORMALIZATION_MAPS.TYPOGRAPHIC
+        ] || match
+      );
     });
   }
 
@@ -160,14 +169,16 @@ export function clientNormalizeString(
 export function quickNormalizeForFuzzyMatch(text: string): string {
   if (!text) return '';
 
-  return text
-    // Smart quotes (fastest replacement)
-    .replace(/[""]/g, '"')
-    .replace(/['']/g, "'")
-    // Basic whitespace normalization
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
+  return (
+    text
+      // Smart quotes (fastest replacement)
+      .replace(/[""]/g, '"')
+      .replace(/['']/g, "'")
+      // Basic whitespace normalization
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase()
+  );
 }
 
 // -----------------------------------------------------------------------------
@@ -178,11 +189,14 @@ export function quickNormalizeForFuzzyMatch(text: string): string {
  * Check if two strings are equal after client-side normalization
  */
 export function clientNormalizedEquals(
-    str1: string,
-    str2: string,
-    options?: ClientNormalizeOptions,
+  str1: string,
+  str2: string,
+  options?: ClientNormalizeOptions,
 ): boolean {
-  return clientNormalizeString(str1, options) === clientNormalizeString(str2, options);
+  return (
+    clientNormalizeString(str1, options) ===
+    clientNormalizeString(str2, options)
+  );
 }
 
 /**
@@ -209,9 +223,9 @@ export function prepareSimilarityText(text: string): string {
  * Performance-measured normalization with browser optimization
  */
 export function measureNormalization<T>(
-    text: string,
-    normalizer: (text: string) => T,
-    label = 'Text normalization',
+  text: string,
+  normalizer: (text: string) => T,
+  label = 'Text normalization',
 ): { result: T; duration: number } {
   const start = performance.now();
   const result = normalizer(text);
@@ -220,7 +234,9 @@ export function measureNormalization<T>(
   // Log slow normalizations for optimization
   if (duration > 10) {
     // eslint-disable-next-line no-console
-    console.warn(`${label} took ${duration.toFixed(2)}ms for ${text.length} characters`);
+    console.warn(
+      `${label} took ${duration.toFixed(2)}ms for ${text.length} characters`,
+    );
   }
 
   return { result, duration };
@@ -237,7 +253,7 @@ export function checkUnicodeSupport(): {
   nfc: boolean;
   smartQuotes: boolean;
   typographic: boolean;
-  } {
+} {
   try {
     const testString = 'Test\u201C\u2019\u2026';
     const normalized = testString.normalize('NFC');
@@ -247,8 +263,7 @@ export function checkUnicodeSupport(): {
       smartQuotes: testString.includes('\u201C'),
       typographic: testString.includes('\u2026'),
     };
-  }
-  catch (error) {
+  } catch (error) {
     return {
       nfc: false,
       smartQuotes: false,

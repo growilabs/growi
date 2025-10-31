@@ -1,5 +1,4 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
-import csrf from 'csurf';
 import express from 'express';
 
 import { middlewareFactory as rateLimiterFactory } from '~/features/rate-limiter';
@@ -26,8 +25,6 @@ import * as userActivation from './user-activation';
 const multer = require('multer');
 const autoReap = require('multer-autoreap');
 
-const csrfProtection = csrf({ cookie: false });
-
 autoReap.options.reapOnError = true; // continue reaping the file even if an error occurs
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
@@ -49,6 +46,7 @@ module.exports = function(crowi, app) {
   const tag = require('./tag')(crowi, app);
   const search = require('./search')(crowi, app);
   const ogp = require('./ogp')(crowi);
+  const { createApiRouter } = require('~/server/util/createApiRouter');
 
   const next = nextFactory(crowi);
 
@@ -104,12 +102,12 @@ module.exports = function(crowi, app) {
   app.post('/_api/login/testLdap'    ,  accessTokenParser([SCOPE.WRITE.USER_SETTINGS.EXTERNAL_ACCOUNT]), loginRequiredStrictly , loginFormValidator.loginRules() , loginFormValidator.loginValidation , loginPassport.testLdapCredentials);
 
   // importer management for admin
-  app.post('/_api/admin/settings/importerEsa'   , accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]), loginRequiredStrictly , adminRequired , csrfProtection, addActivity, admin.importer.api.validators.importer.esa(),admin.api.importerSettingEsa);
-  app.post('/_api/admin/settings/importerQiita' , accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]), loginRequiredStrictly , adminRequired , csrfProtection, addActivity, admin.importer.api.validators.importer.qiita(), admin.api.importerSettingQiita);
-  app.post('/_api/admin/import/esa'             , accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]), loginRequiredStrictly , adminRequired , csrfProtection, addActivity, admin.api.importDataFromEsa);
-  app.post('/_api/admin/import/testEsaAPI'      , accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]), loginRequiredStrictly , adminRequired , csrfProtection, addActivity, admin.api.testEsaAPI);
-  app.post('/_api/admin/import/qiita'           , accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]), loginRequiredStrictly , adminRequired , csrfProtection, addActivity, admin.api.importDataFromQiita);
-  app.post('/_api/admin/import/testQiitaAPI'    , accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]), loginRequiredStrictly , adminRequired , csrfProtection, addActivity, admin.api.testQiitaAPI);
+  app.post('/_api/admin/settings/importerEsa'   , accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]), loginRequiredStrictly , adminRequired , addActivity, admin.importer.api.validators.importer.esa(),admin.api.importerSettingEsa);
+  app.post('/_api/admin/settings/importerQiita' , accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]), loginRequiredStrictly , adminRequired , addActivity, admin.importer.api.validators.importer.qiita(), admin.api.importerSettingQiita);
+  app.post('/_api/admin/import/esa'             , accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]), loginRequiredStrictly , adminRequired , addActivity, admin.api.importDataFromEsa);
+  app.post('/_api/admin/import/testEsaAPI'      , accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]), loginRequiredStrictly , adminRequired , addActivity, admin.api.testEsaAPI);
+  app.post('/_api/admin/import/qiita'           , accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]), loginRequiredStrictly , adminRequired , addActivity, admin.api.importDataFromQiita);
+  app.post('/_api/admin/import/testQiitaAPI'    , accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]), loginRequiredStrictly , adminRequired , addActivity, admin.api.testQiitaAPI);
 
   // brand logo
   app.use('/attachment', attachment.getBrandLogoRouterFactory(crowi));
@@ -121,7 +119,7 @@ module.exports = function(crowi, app) {
   // API v3
   app.use('/_api/v3', unavailableWhenMaintenanceModeForApi, apiV3Router);
 
-  const apiV1Router = express.Router();
+  const apiV1Router = createApiRouter();
 
   apiV1Router.get('/search'              , accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }) , loginRequired , search.api.search);
 
@@ -140,9 +138,9 @@ module.exports = function(crowi, app) {
   apiV1Router.post('/comments.update'    , accessTokenParser([SCOPE.WRITE.FEATURES.PAGE], { acceptLegacy: true }), comment.api.validators.add(), loginRequiredStrictly , excludeReadOnlyUserIfCommentNotAllowed, addActivity, comment.api.update);
   apiV1Router.post('/comments.remove'    , accessTokenParser([SCOPE.WRITE.FEATURES.PAGE], { acceptLegacy: true }), loginRequiredStrictly , excludeReadOnlyUserIfCommentNotAllowed, addActivity, comment.api.remove);
 
-  apiV1Router.post('/attachments.uploadProfileImage'   , accessTokenParser([SCOPE.WRITE.FEATURES.ATTACHMENT], { acceptLegacy: true }), uploads.single('file'), accessTokenParser , loginRequiredStrictly , excludeReadOnlyUser, uploads.single('file'), autoReap, attachmentApi.uploadProfileImage);
+  apiV1Router.post('/attachments.uploadProfileImage'   , accessTokenParser([SCOPE.WRITE.FEATURES.ATTACHMENT], { acceptLegacy: true }), loginRequiredStrictly , uploads.single('file'), autoReap, attachmentApi.uploadProfileImage);
   apiV1Router.post('/attachments.remove'               , accessTokenParser([SCOPE.WRITE.FEATURES.ATTACHMENT], { acceptLegacy: true }), loginRequiredStrictly , excludeReadOnlyUser, addActivity ,attachmentApi.remove);
-  apiV1Router.post('/attachments.removeProfileImage'   , accessTokenParser([SCOPE.WRITE.FEATURES.ATTACHMENT], { acceptLegacy: true }), loginRequiredStrictly , excludeReadOnlyUser, attachmentApi.removeProfileImage);
+  apiV1Router.post('/attachments.removeProfileImage'   , accessTokenParser([SCOPE.WRITE.FEATURES.ATTACHMENT], { acceptLegacy: true }), loginRequiredStrictly , attachmentApi.removeProfileImage);
 
   // API v1
   app.use('/_api', unavailableWhenMaintenanceModeForApi, apiV1Router);

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useCallback, useEffect } from 'react';
 
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
+import { useForm } from 'react-hook-form';
 
 import AdminSlackIntegrationLegacyContainer from '~/client/services/AdminSlackIntegrationLegacyContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
@@ -12,18 +13,24 @@ import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 
 const logger = loggerFactory('growi:slackAppConfiguration');
 
-class SlackConfiguration extends React.Component {
+const SlackConfiguration = (props) => {
+  const { t, adminSlackIntegrationLegacyContainer } = props;
+  const { webhookUrl, slackToken, retrieveError } = adminSlackIntegrationLegacyContainer.state;
 
-  constructor(props) {
-    super(props);
+  const { register, handleSubmit, reset } = useForm();
 
-    this.onClickSubmit = this.onClickSubmit.bind(this);
-  }
+  // Sync form with container state
+  useEffect(() => {
+    reset({
+      webhookUrl,
+      slackToken,
+    });
+  }, [reset, webhookUrl, slackToken]);
 
-  async onClickSubmit() {
-    const { t, adminSlackIntegrationLegacyContainer } = this.props;
-
+  const onClickSubmit = useCallback(async(data) => {
     try {
+      await adminSlackIntegrationLegacyContainer.changeWebhookUrl(data.webhookUrl ?? '');
+      await adminSlackIntegrationLegacyContainer.changeSlackToken(data.slackToken ?? '');
       await adminSlackIntegrationLegacyContainer.updateSlackAppConfiguration();
       toastSuccess(t('notification_settings.updated_slackApp'));
     }
@@ -31,12 +38,10 @@ class SlackConfiguration extends React.Component {
       toastError(err);
       logger.error(err);
     }
-  }
+  }, [adminSlackIntegrationLegacyContainer, t]);
 
-  render() {
-    const { t, adminSlackIntegrationLegacyContainer } = this.props;
-
-    return (
+  return (
+    <form onSubmit={handleSubmit(onClickSubmit)}>
       <React.Fragment>
         <div className="row my-3">
           <div className="col-6 text-start">
@@ -70,8 +75,7 @@ class SlackConfiguration extends React.Component {
                 <input
                   className="form-control"
                   type="text"
-                  value={adminSlackIntegrationLegacyContainer.state.webhookUrl || ''}
-                  onChange={e => adminSlackIntegrationLegacyContainer.changeWebhookUrl(e.target.value)}
+                  {...register('webhookUrl')}
                 />
               </div>
             </div>
@@ -122,8 +126,7 @@ class SlackConfiguration extends React.Component {
                   <input
                     className="form-control"
                     type="text"
-                    value={adminSlackIntegrationLegacyContainer.state.slackToken || ''}
-                    onChange={e => adminSlackIntegrationLegacyContainer.changeSlackToken(e.target.value)}
+                    {...register('slackToken')}
                   />
                 </div>
               </div>
@@ -133,8 +136,8 @@ class SlackConfiguration extends React.Component {
         }
 
         <AdminUpdateButtonRow
-          onClick={this.onClickSubmit}
-          disabled={adminSlackIntegrationLegacyContainer.state.retrieveError != null}
+          disabled={retrieveError != null}
+          onClick={handleSubmit(onClickSubmit)}
         />
 
         <hr />
@@ -149,7 +152,7 @@ class SlackConfiguration extends React.Component {
             {t('notification_settings.how_to.workspace')}
             <ol>
               {/* eslint-disable-next-line react/no-danger */}
-              <li dangerouslySetInnerHTML={{ __html:  t('notification_settings.how_to.workspace_desc1') }} />
+              <li dangerouslySetInnerHTML={{ __html: t('notification_settings.how_to.workspace_desc1') }} />
               <li>{t('notification_settings.how_to.workspace_desc2')}</li>
               <li>{t('notification_settings.how_to.workspace_desc3')}</li>
             </ol>
@@ -164,16 +167,13 @@ class SlackConfiguration extends React.Component {
         </ol>
 
       </React.Fragment>
-    );
-  }
-
-}
-
+    </form>
+  );
+};
 
 SlackConfiguration.propTypes = {
   t: PropTypes.func.isRequired, // i18next
   adminSlackIntegrationLegacyContainer: PropTypes.instanceOf(AdminSlackIntegrationLegacyContainer).isRequired,
-
 };
 
 const SlackConfigurationWrapperFc = (props) => {

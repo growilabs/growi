@@ -1,6 +1,5 @@
-import { useEffect, type JSX } from 'react';
-
-import { type Extension, EditorState, Prec } from '@codemirror/state';
+import { type JSX, useEffect } from 'react';
+import { EditorState, type Extension, Prec } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 
 import { GlobalCodeMirrorEditorKey } from '../../consts';
@@ -8,29 +7,28 @@ import { CodeMirrorEditor } from '../components-internal/CodeMirrorEditor';
 import { setDataLine } from '../services-internal';
 import { useCodeMirrorEditorIsolated } from '../stores/codemirror-editor';
 
-
 const additionalExtensions: Extension[] = [
-  [
-    setDataLine,
-    EditorState.readOnly.of(true),
-    EditorView.editable.of(false),
-  ],
+  [setDataLine, EditorState.readOnly.of(true), EditorView.editable.of(false)],
 ];
 
 type Props = {
-  markdown?: string,
-  onScroll?: () => void,
-}
+  markdown?: string;
+  onScroll?: () => void;
+};
 
-export const CodeMirrorEditorReadOnly = ({ markdown, onScroll }: Props): JSX.Element => {
-  const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.READONLY);
+export const CodeMirrorEditorReadOnly = ({
+  markdown,
+  onScroll,
+}: Props): JSX.Element => {
+  const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(
+    GlobalCodeMirrorEditorKey.READONLY,
+  );
 
   codeMirrorEditor?.initDoc(markdown);
 
   useEffect(() => {
     return codeMirrorEditor?.appendExtensions?.(additionalExtensions);
   }, [codeMirrorEditor]);
-
 
   // prevent Ctrl+V and paste
   useEffect(() => {
@@ -57,11 +55,12 @@ export const CodeMirrorEditorReadOnly = ({ markdown, onScroll }: Props): JSX.Ele
       paste: handlePaste,
     });
 
-    const cleanupFunction = codeMirrorEditor?.appendExtensions?.(Prec.high(extension));
+    const cleanupFunction = codeMirrorEditor?.appendExtensions?.(
+      Prec.high(extension),
+    );
 
     return cleanupFunction;
   }, [codeMirrorEditor]);
-
 
   return (
     <CodeMirrorEditor

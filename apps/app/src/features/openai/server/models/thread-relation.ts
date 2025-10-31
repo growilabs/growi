@@ -1,11 +1,13 @@
 import { addDays } from 'date-fns';
-import { type Document, Schema, type PaginateModel } from 'mongoose';
+import { type Document, type PaginateModel, Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 
 import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
-import { type IThreadRelation, ThreadType } from '../../interfaces/thread-relation';
-
+import {
+  type IThreadRelation,
+  ThreadType,
+} from '../../interfaces/thread-relation';
 
 const DAYS_UNTIL_EXPIRATION = 3;
 
@@ -18,56 +20,69 @@ export interface ThreadRelationDocument extends IThreadRelation, Document {
 }
 
 interface ThreadRelationModel extends PaginateModel<ThreadRelationDocument> {
-  getExpiredThreadRelations(limit?: number): Promise<ThreadRelationDocument[] | undefined>;
+  getExpiredThreadRelations(
+    limit?: number,
+  ): Promise<ThreadRelationDocument[] | undefined>;
   deactivateByAiAssistantId(aiAssistantId: string): Promise<void>;
 }
 
-const schema = new Schema<ThreadRelationDocument, ThreadRelationModel>({
-  userId: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
+const schema = new Schema<ThreadRelationDocument, ThreadRelationModel>(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    aiAssistant: {
+      type: Schema.Types.ObjectId,
+      ref: 'AiAssistant',
+    },
+    threadId: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    title: {
+      type: String,
+    },
+    type: {
+      type: String,
+      enum: Object.values(ThreadType),
+      required: true,
+    },
+    expiredAt: {
+      type: Date,
+      default: generateExpirationDate,
+      required: true,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+      required: true,
+    },
   },
-  aiAssistant: {
-    type: Schema.Types.ObjectId,
-    ref: 'AiAssistant',
+  {
+    timestamps: { createdAt: false, updatedAt: true },
   },
-  threadId: {
-    type: String,
-    required: true,
-    unique: true,
-  },
-  title: {
-    type: String,
-  },
-  type: {
-    type: String,
-    enum: Object.values(ThreadType),
-    required: true,
-  },
-  expiredAt: {
-    type: Date,
-    default: generateExpirationDate,
-    required: true,
-  },
-  isActive: {
-    type: Boolean,
-    default: true,
-    required: true,
-  },
-}, {
-  timestamps: { createdAt: false, updatedAt: true },
-});
+);
 
 schema.plugin(mongoosePaginate);
 
-schema.statics.getExpiredThreadRelations = async function(limit?: number): Promise<ThreadRelationDocument[] | undefined> {
+schema.statics.getExpiredThreadRelations = async function (
+  limit?: number,
+): Promise<ThreadRelationDocument[] | undefined> {
   const currentDate = new Date();
-  const expiredThreadRelations = await this.find({ expiredAt: { $lte: currentDate } }).limit(limit ?? 100).exec();
+  const expiredThreadRelations = await this.find({
+    expiredAt: { $lte: currentDate },
+  })
+    .limit(limit ?? 100)
+    .exec();
   return expiredThreadRelations;
 };
 
-schema.statics.deactivateByAiAssistantId = async function(aiAssistantId: string): Promise<void> {
+schema.statics.deactivateByAiAssistantId = async function (
+  aiAssistantId: string,
+): Promise<void> {
   await this.updateMany(
     {
       aiAssistant: aiAssistantId,
@@ -79,10 +94,12 @@ schema.statics.deactivateByAiAssistantId = async function(aiAssistantId: string)
   );
 };
 
-
-schema.methods.updateThreadExpiration = async function(): Promise<void> {
+schema.methods.updateThreadExpiration = async function (): Promise<void> {
   this.expiredAt = generateExpirationDate();
   await this.save();
 };
 
-export default getOrCreateModel<ThreadRelationDocument, ThreadRelationModel>('ThreadRelation', schema);
+export default getOrCreateModel<ThreadRelationDocument, ThreadRelationModel>(
+  'ThreadRelation',
+  schema,
+);

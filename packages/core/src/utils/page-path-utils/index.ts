@@ -2,10 +2,10 @@ import escapeStringRegexp from 'escape-string-regexp';
 
 import { isValidObjectId } from '../objectid-utils';
 import { addTrailingSlash } from '../path-utils';
-
 import { isTopPage as _isTopPage } from './is-top-page';
 
 export const isTopPage = _isTopPage;
+
 export * from './generate-children-regexp';
 
 /**

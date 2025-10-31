@@ -2,16 +2,20 @@ import { themesRootPath as presetThemesRootPath } from '@growi/preset-themes';
 import csrf from 'csurf';
 import qs from 'qs';
 
-import { PLUGIN_EXPRESS_STATIC_DIR, PLUGIN_STORING_PATH } from '~/features/growi-plugin/server/consts';
 import { resolveFromRoot } from '~/server/util/project-dir-utils';
-import loggerFactory from '~/utils/logger';
 
+import {
+  PLUGIN_EXPRESS_STATIC_DIR,
+  PLUGIN_STORING_PATH,
+} from '../../features/growi-plugin/server/consts';
+import loggerFactory from '../../utils/logger';
+import CertifyOrigin from '../middlewares/certify-origin';
 import registerSafeRedirectFactory from '../middlewares/safe-redirect';
 
 const logger = loggerFactory('growi:crowi:express-init');
 
 /** @param {import('./index').default} crowi Crowi instance */
-module.exports = function(crowi, app) {
+module.exports = (crowi, app) => {
   const express = require('express');
   const compression = require('compression');
   const helmet = require('helmet');
@@ -24,19 +28,19 @@ module.exports = function(crowi, app) {
   const mongoSanitize = require('express-mongo-sanitize');
 
   const registerSafeRedirect = registerSafeRedirectFactory();
-  const injectCurrentuserToLocalvars = require('../middlewares/inject-currentuser-to-localvars')();
-  const autoReconnectToS2sMsgServer = require('../middlewares/auto-reconnect-to-s2s-msg-server')(crowi);
-
+  const injectCurrentuserToLocalvars =
+    require('../middlewares/inject-currentuser-to-localvars')();
+  const autoReconnectToS2sMsgServer =
+    require('../middlewares/auto-reconnect-to-s2s-msg-server')(crowi);
   const avoidSessionRoutes = require('../routes/avoid-session-routes');
 
   const env = crowi.node_env;
 
   // see: https://qiita.com/nazomikan/items/9458d591a4831480098d
   // Cannot set a custom query parser after app.use() has been called: https://github.com/expressjs/express/issues/3454
-  app.set('query parser', str => qs.parse(str, { arrayLimit: Infinity }));
+  app.set('query parser', (str) => qs.parse(str, { arrayLimit: Infinity }));
 
   app.use(compression());
-
 
   const { configManager } = crowi;
 
@@ -48,24 +52,30 @@ module.exports = function(crowi, app) {
 
   try {
     if (trustProxy != null) {
-      const isNotSpec = [trustProxyBool, trustProxyCsv, trustProxyHops].filter(trustProxy => trustProxy != null).length !== 1;
+      const isNotSpec =
+        [trustProxyBool, trustProxyCsv, trustProxyHops].filter(
+          (trustProxy) => trustProxy != null,
+        ).length !== 1;
       if (isNotSpec) {
         // eslint-disable-next-line max-len
-        logger.warn(`If more than one TRUST_PROXY_ ~ environment variable is set, the values are set in the following order of inequality size (BOOL > CSV > HOPS) first. Set value: ${trustProxy}`);
+        logger.warn(
+          `If more than one TRUST_PROXY_ ~ environment variable is set, the values are set in the following order of inequality size (BOOL > CSV > HOPS) first. Set value: ${trustProxy}`,
+        );
       }
       app.set('trust proxy', trustProxy);
     }
-  }
-  catch (err) {
+  } catch (err) {
     logger.error(err);
   }
 
-  app.use(helmet({
-    contentSecurityPolicy: false,
-    expectCt: false,
-    referrerPolicy: false,
-    permittedCrossDomainPolicies: false,
-  }));
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      expectCt: false,
+      referrerPolicy: false,
+      permittedCrossDomainPolicies: false,
+    }),
+  );
 
   app.use((req, res, next) => {
     const now = new Date();
@@ -82,11 +92,16 @@ module.exports = function(crowi, app) {
 
   app.set('port', crowi.port);
 
-  const staticOption = (crowi.node_env === 'production') ? { maxAge: '30d' } : {};
+  const staticOption = crowi.node_env === 'production' ? { maxAge: '30d' } : {};
   app.use(express.static(crowi.publicDir, staticOption));
-  app.use('/static/preset-themes', express.static(
-    resolveFromRoot(`node_modules/@growi/preset-themes/${presetThemesRootPath}`),
-  ));
+  app.use(
+    '/static/preset-themes',
+    express.static(
+      resolveFromRoot(
+        `node_modules/@growi/preset-themes/${presetThemesRootPath}`,
+      ),
+    ),
+  );
   app.use(PLUGIN_EXPRESS_STATIC_DIR, express.static(PLUGIN_STORING_PATH));
 
   app.use(methodOverride());
@@ -121,7 +136,14 @@ module.exports = function(crowi, app) {
 
   // csurf should be initialized after express-session
   // default methods + PUT. See: https://expressjs.com/en/resources/middleware/csurf.html#ignoremethods
-  app.use(csrf({ ignoreMethods: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'POST', 'DELETE'], cookie: false }));
+  app.use(
+    csrf({
+      ignoreMethods: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'POST', 'DELETE'],
+      cookie: false,
+    }),
+  );
+
+  app.use('/_api', CertifyOrigin);
 
   // passport
   logger.debug('initialize Passport');

@@ -1,5 +1,5 @@
-import { useTranslation } from 'next-i18next';
 import React, { type JSX, useState } from 'react';
+import { useTranslation } from 'next-i18next';
 import { Collapse } from 'reactstrap';
 
 export const SearchHelp = (): JSX.Element => {

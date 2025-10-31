@@ -1,24 +1,26 @@
-import {
-  useCallback, useEffect, useMemo, useState, type JSX,
-} from 'react';
-
+import { type JSX, useCallback, useEffect, useMemo, useState } from 'react';
 import { AcceptedUploadFileType } from '@growi/core';
-import { GLOBAL_SOCKET_KEY, GLOBAL_SOCKET_NS, useSWRStatic } from '@growi/core/dist/swr';
+import {
+  GLOBAL_SOCKET_KEY,
+  GLOBAL_SOCKET_NS,
+  useSWRStatic,
+} from '@growi/core/dist/swr';
 import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
 import { toast } from 'react-toastify';
 
-import { GlobalCodeMirrorEditorKey } from '../../../consts';
 import type {
-  EditorSettings, EditorTheme, KeyMapMode, PasteMode,
+  EditorSettings,
+  EditorTheme,
+  KeyMapMode,
+  PasteMode,
 } from '../../../consts';
+import { GlobalCodeMirrorEditorKey } from '../../../consts';
 import { CodeMirrorEditorMain } from '../../components/CodeMirrorEditorMain';
 import { useCodeMirrorEditorIsolated } from '../../stores/codemirror-editor';
-
 import { PlaygroundController } from './PlaygroundController';
 import { Preview } from './Preview';
 
 export const Playground = (): JSX.Element => {
-
   const [markdownToPreview, setMarkdownToPreview] = useState('');
   const [editorTheme, setEditorTheme] = useState<EditorTheme>('defaultlight');
   const [editorKeymap, setEditorKeymap] = useState<KeyMapMode>('default');
@@ -26,7 +28,9 @@ export const Playground = (): JSX.Element => {
   const [enableUnifiedMergeView, setUnifiedMergeViewEnabled] = useState(false);
   const [editorSettings, setEditorSettings] = useState<EditorSettings>();
 
-  const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.MAIN);
+  const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(
+    GlobalCodeMirrorEditorKey.MAIN,
+  );
 
   const { mutate } = useSWRStatic(GLOBAL_SOCKET_KEY);
 
@@ -43,26 +47,29 @@ export const Playground = (): JSX.Element => {
       autoFormatMarkdownTable: true,
       pasteMode: editorPaste,
     });
-  }, [setEditorSettings, editorKeymap, editorTheme, editorPaste]);
+  }, [editorKeymap, editorTheme, editorPaste]);
 
   // initialize global socket
   useEffect(() => {
-    const setUpSocket = async() => {
+    const setUpSocket = async () => {
       const { io } = await import('socket.io-client');
       const socket = io(GLOBAL_SOCKET_NS, {
         transports: ['websocket'],
       });
 
       // eslint-disable-next-line no-console
-      socket.on('error', (err) => { console.error(err) });
+      socket.on('error', (err) => {
+        console.error(err);
+      });
       // eslint-disable-next-line no-console
-      socket.on('connect_error', (err) => { console.error('Failed to connect with websocket.', err) });
+      socket.on('connect_error', (err) => {
+        console.error('Failed to connect with websocket.', err);
+      });
 
       mutate(socket);
     };
 
     setUpSocket();
-
   }, [mutate]);
 
   // set handler to save with shortcut key
@@ -74,22 +81,30 @@ export const Playground = (): JSX.Element => {
 
   // the upload event handler
   // demo of uploading a file.
-  const uploadHandler = useCallback((files: File[]) => {
-    files.forEach((file) => {
-      // set dummy file name.
-      const insertText = `[${file.name}](/attachment/aaaabbbbccccdddd)\n`;
-      codeMirrorEditor?.insertText(insertText);
-    });
+  const uploadHandler = useCallback(
+    (files: File[]) => {
+      files.forEach((file) => {
+        // set dummy file name.
+        const insertText = `[${file.name}](/attachment/aaaabbbbccccdddd)\n`;
+        codeMirrorEditor?.insertText(insertText);
+      });
+    },
+    [codeMirrorEditor],
+  );
 
-  }, [codeMirrorEditor]);
-
-  const cmProps = useMemo<ReactCodeMirrorProps>(() => ({
-    onChange: setMarkdownToPreview,
-  }), []);
+  const cmProps = useMemo<ReactCodeMirrorProps>(
+    () => ({
+      onChange: setMarkdownToPreview,
+    }),
+    [],
+  );
 
   return (
     <div className="d-flex flex-column vw-100 flex-expand-vh-100">
-      <div className="flex-expand-vert justify-content-center align-items-center bg-dark" style={{ minHeight: '83px' }}>
+      <div
+        className="flex-expand-vert justify-content-center align-items-center bg-dark"
+        style={{ minHeight: '83px' }}
+      >
         <div className="text-white">GrowiSubNavigation</div>
       </div>
       <div className="flex-expand-horiz">
@@ -117,7 +132,10 @@ export const Playground = (): JSX.Element => {
           />
         </div>
       </div>
-      <div className="flex-expand-vert justify-content-center align-items-center bg-dark" style={{ minHeight: '50px' }}>
+      <div
+        className="flex-expand-vert justify-content-center align-items-center bg-dark"
+        style={{ minHeight: '50px' }}
+      >
         <div className="text-white">EditorNavbarBottom</div>
       </div>
     </div>

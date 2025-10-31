@@ -14,18 +14,22 @@ export const EditRequestBodySchema = z.object({
   pageBody: z.string(),
   selectedText: z.string().optional(),
   selectedPosition: z.number().optional(),
-  isPageBodyPartial: z.boolean().optional()
+  isPageBodyPartial: z
+    .boolean()
+    .optional()
     .describe('Whether the page body is a partial content'),
-  partialPageBodyStartIndex: z.number().optional()
+  partialPageBodyStartIndex: z
+    .number()
+    .optional()
     .describe('0-based index for the start of the partial page body'),
 });
 
 // Type definitions
 export type EditRequestBody = z.infer<typeof EditRequestBodySchema>;
 
-
 export const SseMessageSchema = z.object({
-  appendedMessage: z.string()
+  appendedMessage: z
+    .string()
     .describe('The message that should be appended to the chat window'),
 });
 

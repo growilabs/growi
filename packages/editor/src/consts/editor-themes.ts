@@ -3,7 +3,7 @@ const EditorTheme = {
   eclipse: 'eclipse',
   basic: 'basic',
   ayu: 'ayu',
-  rosepine:  'rosepine',
+  rosepine: 'rosepine',
   defaultdark: 'defaultdark',
   material: 'material',
   nord: 'nord',
@@ -13,4 +13,4 @@ const EditorTheme = {
 
 export const DEFAULT_THEME = 'defaultlight';
 export const AllEditorTheme = Object.values(EditorTheme);
-export type EditorTheme = typeof EditorTheme[keyof typeof EditorTheme];
+export type EditorTheme = (typeof EditorTheme)[keyof typeof EditorTheme];

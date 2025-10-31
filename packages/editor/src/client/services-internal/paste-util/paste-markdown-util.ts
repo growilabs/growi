@@ -1,9 +1,11 @@
 import type { EditorView } from '@codemirror/view';
 
 // https://regex101.com/r/r9plEA/1
-const indentAndMarkRE = /^(\s*)(>[> ]*|[*+-] \[[x ]\]\s|[*+-]\s|(\d+)([.)]\s))(\s*)/;
+const indentAndMarkRE =
+  /^(\s*)(>[> ]*|[*+-] \[[x ]\]\s|[*+-]\s|(\d+)([.)]\s))(\s*)/;
 // https://regex101.com/r/HFYoFN/1
-const indentAndMarkOnlyRE = /^(\s*)(>[> ]*|[*+-] \[[x ]\]|[*+-]|(\d+)[.)])(\s*)$/;
+const indentAndMarkOnlyRE =
+  /^(\s*)(>[> ]*|[*+-] \[[x ]\]|[*+-]|(\d+)[.)])(\s*)$/;
 
 const getBol = (editor: EditorView) => {
   const curPos = editor.state.selection.main.head;
@@ -17,7 +19,6 @@ export const getStrFromBol = (editor: EditorView): string => {
 };
 
 export const adjustPasteData = (strFromBol: string, text: string): string => {
-
   let adjusted = text;
 
   if (indentAndMarkOnlyRE.test(strFromBol)) {
@@ -28,7 +29,6 @@ export const adjustPasteData = (strFromBol: string, text: string): string => {
       const lines = text.match(/[^\r\n]+/g);
 
       const replacedLines = lines?.map((line, index) => {
-
         if (index === 0 && strFromBol.match(indentAndMarkOnlyRE)) {
           return line.replace(indentAndMarkRE, '');
         }
@@ -37,9 +37,7 @@ export const adjustPasteData = (strFromBol: string, text: string): string => {
       });
 
       adjusted = replacedLines ? replacedLines.join('\n') : '';
-    }
-
-    else {
+    } else {
       const replacedText = text.replace(/(\r\n|\r|\n)/g, `$1${strFromBol}`);
 
       adjusted = replacedText;

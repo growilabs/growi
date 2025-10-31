@@ -1,4 +1,5 @@
 import { pagePathUtils } from '@growi/core/dist/utils';
+
 import { removeGlobPath } from './remove-glob-path';
 
 export const isCreatablePagePathPattern = (pagePath: string): boolean => {

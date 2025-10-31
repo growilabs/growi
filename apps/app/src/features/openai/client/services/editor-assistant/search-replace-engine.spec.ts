@@ -1,10 +1,10 @@
-import { type Text as YText, Doc as YDoc } from 'yjs';
+import { Doc as YDoc, type Text as YText } from 'yjs';
 
 import {
-  performSearchReplace,
-  performExactSearchReplace,
-  getLineFromIndex,
   getContextAroundLine,
+  getLineFromIndex,
+  performExactSearchReplace,
+  performSearchReplace,
 } from './search-replace-engine';
 
 // Test utilities
@@ -107,11 +107,7 @@ describe('search-replace-engine', () => {
       const content = createTestContent();
       const ytext = createYTextFromString(content);
 
-      const success = performExactSearchReplace(
-        ytext,
-        '',
-        'replacement',
-      );
+      const success = performExactSearchReplace(ytext, '', 'replacement');
 
       expect(success).toBe(true); // Empty string is found at index 0
       expect(ytext.toString()).toContain('replacement');
@@ -183,8 +179,7 @@ console.log("different");`;
       // May pass or fail depending on similarity threshold
       if (success) {
         expect(ytext.toString()).toContain('console.log("world");');
-      }
-      else {
+      } else {
         expect(ytext.toString()).toBe(content); // Unchanged if fuzzy match fails
       }
     });
@@ -286,7 +281,9 @@ line5`;
       const contextSmall = getContextAroundLine(content, 5, 1);
       const contextLarge = getContextAroundLine(content, 5, 3);
 
-      expect(contextLarge.split('\n').length).toBeGreaterThan(contextSmall.split('\n').length);
+      expect(contextLarge.split('\n').length).toBeGreaterThan(
+        contextSmall.split('\n').length,
+      );
     });
   });
 
@@ -319,7 +316,12 @@ line5`;
       const largeContent = `${'line\n'.repeat(1000)}target line\n${'line\n'.repeat(1000)}`;
       const ytext = createYTextFromString(largeContent);
 
-      const success = performSearchReplace(ytext, 'target line', 'found target', 1001);
+      const success = performSearchReplace(
+        ytext,
+        'target line',
+        'found target',
+        1001,
+      );
       if (success) {
         expect(ytext.toString()).toContain('found target');
       }
@@ -329,7 +331,11 @@ line5`;
       const content = 'Hello 👋 World\nこんにちは世界\nLine 3';
       const ytext = createYTextFromString(content);
 
-      const success = performExactSearchReplace(ytext, 'こんにちは世界', 'Hello World');
+      const success = performExactSearchReplace(
+        ytext,
+        'こんにちは世界',
+        'Hello World',
+      );
       expect(success).toBe(true);
       expect(ytext.toString()).toContain('Hello World');
       expect(ytext.toString()).not.toContain('こんにちは世界');
@@ -339,7 +345,11 @@ line5`;
       const content = 'function test() { return /regex/g; }';
       const ytext = createYTextFromString(content);
 
-      const success = performExactSearchReplace(ytext, '/regex/g', '/newregex/g');
+      const success = performExactSearchReplace(
+        ytext,
+        '/regex/g',
+        '/newregex/g',
+      );
       expect(success).toBe(true);
       expect(ytext.toString()).toContain('/newregex/g');
     });

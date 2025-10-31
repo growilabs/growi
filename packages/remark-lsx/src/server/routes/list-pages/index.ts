@@ -6,7 +6,6 @@ import type { Request, Response } from 'express';
 import createError, { isHttpError } from 'http-errors';
 
 import type { LsxApiParams, LsxApiResponseData } from '../../../interfaces/api';
-
 import { addDepthCondition } from './add-depth-condition';
 import { addNumCondition } from './add-num-condition';
 import { addSortCondition } from './add-sort-condition';

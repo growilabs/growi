@@ -5,31 +5,34 @@ import { apiGet } from '~/client/util/apiv1-client';
 import type { IFormattedSearchResult } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 
-
 export type ISearchConfigurations = {
-  limit: number,
-  offset?: number,
-  sort?: SORT_AXIS,
-  order?: SORT_ORDER,
-  includeTrashPages?: boolean,
-  includeUserPages?: boolean,
-}
+  limit: number;
+  offset?: number;
+  sort?: SORT_AXIS;
+  order?: SORT_ORDER;
+  includeTrashPages?: boolean;
+  includeUserPages?: boolean;
+};
 
 type ISearchConfigurationsFixed = {
-  limit: number,
-  offset: number,
-  sort: SORT_AXIS,
-  order: SORT_ORDER,
-  includeTrashPages: boolean,
-  includeUserPages: boolean,
-}
+  limit: number;
+  offset: number;
+  sort: SORT_AXIS;
+  order: SORT_ORDER;
+  includeTrashPages: boolean;
+  includeUserPages: boolean;
+};
 
 export type ISearchConditions = ISearchConfigurationsFixed & {
-  keyword: string | null,
-  rawQuery: string,
-}
+  keyword: string | null;
+  rawQuery: string;
+};
 
-const createSearchQuery = (keyword: string, includeTrashPages: boolean, includeUserPages: boolean): string => {
+const createSearchQuery = (
+  keyword: string,
+  includeTrashPages: boolean,
+  includeUserPages: boolean,
+): string => {
   let query = keyword;
 
   // pages included in specific path are not retrived when prefix is added
@@ -43,18 +46,19 @@ const createSearchQuery = (keyword: string, includeTrashPages: boolean, includeU
   return query;
 };
 
-export const mutateSearching = async(): Promise<void[]> => {
-  return mutate(
-    key => Array.isArray(key) && key[0] === '/search',
-  );
+export const mutateSearching = async (): Promise<void[]> => {
+  return mutate((key) => Array.isArray(key) && key[0] === '/search');
 };
 
 export const useSWRxSearch = (
-    keyword: string | null, nqName: string | null, configurations: ISearchConfigurations,
-): SWRResponse<IFormattedSearchResult, Error> & { conditions: ISearchConditions } => {
-  const {
-    limit, offset, sort, order, includeTrashPages, includeUserPages,
-  } = configurations;
+  keyword: string | null,
+  nqName: string | null,
+  configurations: ISearchConfigurations,
+): SWRResponse<IFormattedSearchResult, Error> & {
+  conditions: ISearchConditions;
+} => {
+  const { limit, offset, sort, order, includeTrashPages, includeUserPages } =
+    configurations;
 
   const fixedConfigurations: ISearchConfigurationsFixed = {
     limit,
@@ -64,19 +68,22 @@ export const useSWRxSearch = (
     includeTrashPages: includeTrashPages ?? false,
     includeUserPages: includeUserPages ?? false,
   };
-  const rawQuery = createSearchQuery(keyword ?? '', fixedConfigurations.includeTrashPages, fixedConfigurations.includeUserPages);
+  const rawQuery = createSearchQuery(
+    keyword ?? '',
+    fixedConfigurations.includeTrashPages,
+    fixedConfigurations.includeUserPages,
+  );
 
   const isKeywordValid = keyword != null && keyword.length > 0;
 
   const swrResult = useSWR(
     isKeywordValid ? ['/search', keyword, fixedConfigurations] : null,
     ([endpoint, , fixedConfigurations]) => {
-      const {
-        limit, offset, sort, order,
-      } = fixedConfigurations;
+      const { limit, offset, sort, order } = fixedConfigurations;
 
       return apiGet(
-        endpoint, {
+        endpoint,
+        {
           q: encodeURIComponent(rawQuery),
           nq: typeof nqName === 'string' ? encodeURIComponent(nqName) : null,
           limit,
@@ -84,8 +91,8 @@ export const useSWRxSearch = (
           sort,
           order,
         },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ).then(result => result as IFormattedSearchResult);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ).then((result) => result as IFormattedSearchResult);
     },
     {
       keepPreviousData: true,

@@ -22,7 +22,7 @@ export const CLIENT_SUGGESTIONS = {
     'Check for exact whitespace and formatting',
     'Try a smaller, more specific search pattern',
     'Verify line endings match your content',
-    'Use the browser\'s search function to locate content first',
+    "Use the browser's search function to locate content first",
   ],
   EMPTY_SEARCH: [
     'Provide valid search content',
@@ -45,7 +45,6 @@ export const CLIENT_SUGGESTIONS = {
 // -----------------------------------------------------------------------------
 
 export class ClientErrorHandler {
-
   private readonly enableConsoleLogging: boolean;
 
   private readonly enableUserFeedback: boolean;
@@ -59,9 +58,9 @@ export class ClientErrorHandler {
    * Create a detailed error for search content not found
    */
   createSearchNotFoundError(
-      searchContent: string,
-      matchResult?: MatchResult,
-      startLine?: number,
+    searchContent: string,
+    matchResult?: MatchResult,
+    startLine?: number,
   ): DiffError {
     const lineRange = startLine ? ` (starting at line ${startLine})` : '';
     const similarityInfo = matchResult?.similarity
@@ -77,7 +76,9 @@ export class ClientErrorHandler {
         bestMatch: matchResult?.content,
         similarity: matchResult?.similarity,
         suggestions: [...CLIENT_SUGGESTIONS.SEARCH_NOT_FOUND],
-        lineRange: startLine ? `starting at line ${startLine}` : 'entire document',
+        lineRange: startLine
+          ? `starting at line ${startLine}`
+          : 'entire document',
       },
     };
 
@@ -105,10 +106,7 @@ export class ClientErrorHandler {
   /**
    * Create an error for content/parsing issues
    */
-  createContentError(
-      originalError: Error,
-      context?: string,
-  ): DiffError {
+  createContentError(originalError: Error, context?: string): DiffError {
     const error: DiffError = {
       type: 'CONTENT_ERROR',
       message: `${CLIENT_ERROR_MESSAGES.CONTENT_ERROR}: ${originalError.message}`,
@@ -128,10 +126,7 @@ export class ClientErrorHandler {
   /**
    * Create an error for browser timeout
    */
-  createTimeoutError(
-      searchContent: string,
-      timeoutMs: number,
-  ): DiffError {
+  createTimeoutError(searchContent: string, timeoutMs: number): DiffError {
     const error: DiffError = {
       type: 'CONTENT_ERROR', // Using CONTENT_ERROR as base type
       message: `${CLIENT_ERROR_MESSAGES.TIMEOUT_ERROR} (${timeoutMs}ms)`,
@@ -155,7 +150,10 @@ export class ClientErrorHandler {
   /**
    * Generate a suggested correct format based on the best match
    */
-  private generateCorrectFormat(searchContent: string, bestMatch: string): string {
+  private generateCorrectFormat(
+    searchContent: string,
+    bestMatch: string,
+  ): string {
     // Simple diff-like format for user guidance
     const searchLines = searchContent.split('\n');
     const matchLines = bestMatch.split('\n');
@@ -171,9 +169,9 @@ export class ClientErrorHandler {
    * Log error to console (if enabled) with contextual information
    */
   private logError(
-      error: DiffError,
-      context: string,
-      originalError?: Error,
+    error: DiffError,
+    context: string,
+    originalError?: Error,
   ): void {
     if (!this.enableConsoleLogging) {
       return;
@@ -202,7 +200,8 @@ export class ClientErrorHandler {
    * Format error for user display
    */
   formatErrorForUser(error: DiffError): string {
-    const suggestions = error.details.suggestions?.slice(0, 3).join('\n• ') || '';
+    const suggestions =
+      error.details.suggestions?.slice(0, 3).join('\n• ') || '';
 
     return `❌ ${error.message}\n\n💡 Suggestions:\n• ${suggestions}`;
   }
@@ -225,9 +224,9 @@ export class ClientErrorHandler {
       .map((error, index) => `${index + 1}. ${error.message}`)
       .join('\n');
 
-    const moreErrors = errors.length > 5 ? `\n... and ${errors.length - 5} more issues` : '';
+    const moreErrors =
+      errors.length > 5 ? `\n... and ${errors.length - 5} more issues` : '';
 
     return summary + errorList + moreErrors;
   }
-
 }

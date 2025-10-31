@@ -53,8 +53,6 @@ export type IResAppSettings = {
   envAzureStorageAccountName: string;
   envAzureStorageContainerName: string;
 
-  isEnabledPlugins: boolean;
-
   isAppSiteUrlHashed: boolean;
 
   isMaintenanceMode: boolean;

@@ -1,30 +1,28 @@
-import {
-  useCallback, useEffect, useState, useRef, useMemo,
-} from 'react';
-
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GlobalCodeMirrorEditorKey } from '@growi/editor';
 import {
-  acceptAllChunks, useTextSelectionEffect,
+  acceptAllChunks,
+  useTextSelectionEffect,
 } from '@growi/editor/dist/client/services/unified-merge-view';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
 import { useSecondaryYdocs } from '@growi/editor/dist/client/stores/use-secondary-ydocs';
-import { useForm, type UseFormReturn } from 'react-hook-form';
+import { type UseFormReturn, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { type Text as YText } from 'yjs';
+import type { Text as YText } from 'yjs';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
-import { useIsEnableUnifiedMergeView } from '~/stores-universal/context';
 import { useCurrentPageId } from '~/stores/page';
+import { useIsEnableUnifiedMergeView } from '~/stores-universal/context';
 
 import type { AiAssistantHasId } from '../../../interfaces/ai-assistant';
 import {
-  SseMessageSchema,
+  type EditRequestBody,
+  type SseDetectedDiff,
   SseDetectedDiffSchema,
+  type SseFinalized,
   SseFinalizedSchema,
   type SseMessage,
-  type SseDetectedDiff,
-  type SseFinalized,
-  type EditRequestBody,
+  SseMessageSchema,
 } from '../../../interfaces/editor-assistant/sse-schemas';
 import type { MessageLog } from '../../../interfaces/message';
 import type { IThreadRelationHasId } from '../../../interfaces/thread-relation';
@@ -33,68 +31,73 @@ import { handleIfSuccessfullyParsed } from '../../../utils/handle-if-successfull
 import { AiAssistantDropdown } from '../../components/AiAssistant/AiAssistantSidebar/AiAssistantDropdown';
 import { QuickMenuList } from '../../components/AiAssistant/AiAssistantSidebar/QuickMenuList';
 import { useAiAssistantSidebar } from '../../stores/ai-assistant';
-import { useClientEngineIntegration, shouldUseClientProcessing } from '../client-engine-integration';
-
+import {
+  shouldUseClientProcessing,
+  useClientEngineIntegration,
+} from '../client-engine-integration';
 import { getPageBodyForContext } from './get-page-body-for-context';
 import { performSearchReplace } from './search-replace-engine';
 
-interface CreateThread {
-  (): Promise<IThreadRelationHasId>;
-}
+type CreateThread = () => Promise<IThreadRelationHasId>;
 
 type PostMessageArgs = {
   threadId: string;
   formData: FormData;
-}
+};
 
-interface PostMessage {
-  (args: PostMessageArgs): Promise<Response>;
-}
-interface ProcessMessage {
-  (data: unknown, handler: {
+type PostMessage = (args: PostMessageArgs) => Promise<Response>;
+type ProcessMessage = (
+  data: unknown,
+  handler: {
     onMessage: (data: SseMessage) => void;
     onDetectedDiff: (data: SseDetectedDiff) => void;
     onFinalized: (data: SseFinalized) => void;
-  }): void;
-}
+  },
+) => void;
 
-interface GenerateInitialView {
-  (onSubmit: (data: FormData) => Promise<void>): JSX.Element;
-}
-interface GenerateActionButtons {
-  (messageId: string, messageLogs: MessageLog[], generatingAnswerMessage?: MessageLog): JSX.Element;
-}
+type GenerateInitialView = (
+  onSubmit: (data: FormData) => Promise<void>,
+) => JSX.Element;
+type GenerateActionButtons = (
+  messageId: string,
+  messageLogs: MessageLog[],
+  generatingAnswerMessage?: MessageLog,
+) => JSX.Element;
 export interface FormData {
-  input: string,
-  markdownType?: 'full' | 'selected' | 'none'
+  input: string;
+  markdownType?: 'full' | 'selected' | 'none';
 }
 
 type DetectedDiff = Array<{
-  data: SseDetectedDiff,
-  applied: boolean,
-  id: string,
-}>
+  data: SseDetectedDiff;
+  applied: boolean;
+  id: string;
+}>;
 
 type UseEditorAssistant = () => {
-  createThread: CreateThread,
-  postMessage: PostMessage,
-  processMessage: ProcessMessage,
-  form: UseFormReturn<FormData>
-  resetForm: () => void
-  isTextSelected: boolean,
-  isGeneratingEditorText: boolean,
+  createThread: CreateThread;
+  postMessage: PostMessage;
+  processMessage: ProcessMessage;
+  form: UseFormReturn<FormData>;
+  resetForm: () => void;
+  isTextSelected: boolean;
+  isGeneratingEditorText: boolean;
 
   // Views
-  generateInitialView: GenerateInitialView,
-  generatingEditorTextLabel?: JSX.Element,
-  partialContentWarnLabel?: JSX.Element,
-  generateActionButtons: GenerateActionButtons,
-  headerIcon: JSX.Element,
-  headerText: JSX.Element,
-  placeHolder: string,
-}
+  generateInitialView: GenerateInitialView;
+  generatingEditorTextLabel?: JSX.Element;
+  partialContentWarnLabel?: JSX.Element;
+  generateActionButtons: GenerateActionButtons;
+  headerIcon: JSX.Element;
+  headerText: JSX.Element;
+  placeHolder: string;
+};
 
-const insertTextAtLine = (yText: YText, lineNumber: number, textToInsert: string): void => {
+const insertTextAtLine = (
+  yText: YText,
+  lineNumber: number,
+  textToInsert: string,
+): void => {
   // Get the entire text content
   const content = yText.toString();
 
@@ -126,23 +129,36 @@ export const useEditorAssistant: UseEditorAssistant = () => {
 
   // States
   const [detectedDiff, setDetectedDiff] = useState<DetectedDiff>();
-  const [selectedAiAssistant, setSelectedAiAssistant] = useState<AiAssistantHasId>();
+  const [selectedAiAssistant, setSelectedAiAssistant] =
+    useState<AiAssistantHasId>();
   const [selectedText, setSelectedText] = useState<string>();
   const [selectedTextIndex, setSelectedTextIndex] = useState<number>();
-  const [isGeneratingEditorText, setIsGeneratingEditorText] = useState<boolean>(false);
+  const [isGeneratingEditorText, setIsGeneratingEditorText] =
+    useState<boolean>(false);
   const [partialContentInfo, setPartialContentInfo] = useState<{
     startIndex: number;
     endIndex: number;
   } | null>(null);
 
-  const isTextSelected = useMemo(() => selectedText != null && selectedText.length !== 0, [selectedText]);
+  const isTextSelected = useMemo(
+    () => selectedText != null && selectedText.length !== 0,
+    [selectedText],
+  );
 
   // Hooks
   const { t } = useTranslation();
   const { data: currentPageId } = useCurrentPageId();
-  const { data: isEnableUnifiedMergeView, mutate: mutateIsEnableUnifiedMergeView } = useIsEnableUnifiedMergeView();
-  const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.MAIN);
-  const yDocs = useSecondaryYdocs(isEnableUnifiedMergeView ?? false, { pageId: currentPageId ?? undefined, useSecondary: isEnableUnifiedMergeView ?? false });
+  const {
+    data: isEnableUnifiedMergeView,
+    mutate: mutateIsEnableUnifiedMergeView,
+  } = useIsEnableUnifiedMergeView();
+  const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(
+    GlobalCodeMirrorEditorKey.MAIN,
+  );
+  const yDocs = useSecondaryYdocs(isEnableUnifiedMergeView ?? false, {
+    pageId: currentPageId ?? undefined,
+    useSecondary: isEnableUnifiedMergeView ?? false,
+  });
   const { data: aiAssistantSidebarData } = useAiAssistantSidebar();
   const clientEngine = useClientEngineIntegration({
     enableClientProcessing: shouldUseClientProcessing(),
@@ -161,7 +177,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
     form.reset({ input: '' });
   }, [form]);
 
-  const createThread: CreateThread = useCallback(async() => {
+  const createThread: CreateThread = useCallback(async () => {
     const response = await apiv3Post<IThreadRelationHasId>('/openai/thread', {
       type: ThreadType.EDITOR,
       aiAssistantId: selectedAiAssistant?._id,
@@ -169,166 +185,231 @@ export const useEditorAssistant: UseEditorAssistant = () => {
     return response.data;
   }, [selectedAiAssistant?._id]);
 
-  const postMessage: PostMessage = useCallback(async({ threadId, formData }) => {
-    // Clear partial content info on new request
-    setPartialContentInfo(null);
+  const postMessage: PostMessage = useCallback(
+    async ({ threadId, formData }) => {
+      // Clear partial content info on new request
+      setPartialContentInfo(null);
 
-    // Disable UnifiedMergeView when a Form is submitted with UnifiedMergeView enabled
-    mutateIsEnableUnifiedMergeView(false);
+      // Disable UnifiedMergeView when a Form is submitted with UnifiedMergeView enabled
+      mutateIsEnableUnifiedMergeView(false);
 
-    const pageBodyContext = getPageBodyForContext(codeMirrorEditor, 2000, 8000);
+      const pageBodyContext = getPageBodyForContext(
+        codeMirrorEditor,
+        2000,
+        8000,
+      );
 
-    if (!pageBodyContext) {
-      throw new Error('Unable to get page body context');
-    }
+      if (!pageBodyContext) {
+        throw new Error('Unable to get page body context');
+      }
 
-    // Store partial content info if applicable
-    if (pageBodyContext.isPartial && pageBodyContext.startIndex != null && pageBodyContext.endIndex != null) {
-      setPartialContentInfo({
-        startIndex: pageBodyContext.startIndex,
-        endIndex: pageBodyContext.endIndex,
+      // Store partial content info if applicable
+      if (
+        pageBodyContext.isPartial &&
+        pageBodyContext.startIndex != null &&
+        pageBodyContext.endIndex != null
+      ) {
+        setPartialContentInfo({
+          startIndex: pageBodyContext.startIndex,
+          endIndex: pageBodyContext.endIndex,
+        });
+      }
+
+      const requestBody = {
+        threadId,
+        aiAssistantId: selectedAiAssistant?._id,
+        userMessage: formData.input,
+        pageBody: pageBodyContext.content,
+        ...(pageBodyContext.isPartial && {
+          isPageBodyPartial: pageBodyContext.isPartial,
+          partialPageBodyStartIndex: pageBodyContext.startIndex,
+        }),
+        ...(selectedText != null &&
+          selectedText.length > 0 && {
+            selectedText,
+            selectedPosition: selectedTextIndex,
+          }),
+      } satisfies EditRequestBody;
+
+      const response = await fetch('/_api/v3/openai/edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
       });
-    }
 
-    const requestBody = {
-      threadId,
-      aiAssistantId: selectedAiAssistant?._id,
-      userMessage: formData.input,
-      pageBody: pageBodyContext.content,
-      ...(pageBodyContext.isPartial && {
-        isPageBodyPartial: pageBodyContext.isPartial,
-        partialPageBodyStartIndex: pageBodyContext.startIndex,
-      }),
-      ...(selectedText != null && selectedText.length > 0 && {
-        selectedText,
-        selectedPosition: selectedTextIndex,
-      }),
-    } satisfies EditRequestBody;
-
-    const response = await fetch('/_api/v3/openai/edit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
-    });
-
-    return response;
-  }, [codeMirrorEditor, mutateIsEnableUnifiedMergeView, selectedAiAssistant?._id, selectedText, selectedTextIndex]);
-
+      return response;
+    },
+    [
+      codeMirrorEditor,
+      mutateIsEnableUnifiedMergeView,
+      selectedAiAssistant?._id,
+      selectedText,
+      selectedTextIndex,
+    ],
+  );
 
   // Enhanced processMessage with client engine support (保持)
-  const processMessage = useCallback(async(data: unknown, handler: {
-    onMessage: (data: SseMessage) => void;
-    onDetectedDiff: (data: SseDetectedDiff) => void;
-    onFinalized: (data: SseFinalized) => void;
-  }) => {
-    // Reset timer whenever data is received
-    const handleDataReceived = () => {
-    // Clear existing timer
-      if (timerRef.current != null) {
-        clearTimeout(timerRef.current);
-      }
+  const processMessage = useCallback(
+    async (
+      data: unknown,
+      handler: {
+        onMessage: (data: SseMessage) => void;
+        onDetectedDiff: (data: SseDetectedDiff) => void;
+        onFinalized: (data: SseFinalized) => void;
+      },
+    ) => {
+      // Reset timer whenever data is received
+      const handleDataReceived = () => {
+        // Clear existing timer
+        if (timerRef.current != null) {
+          clearTimeout(timerRef.current);
+        }
 
-      // Hide spinner since data is flowing
-      if (isGeneratingEditorText) {
-        setIsGeneratingEditorText(false);
-      }
+        // Hide spinner since data is flowing
+        if (isGeneratingEditorText) {
+          setIsGeneratingEditorText(false);
+        }
 
-      // Set new timer
-      timerRef.current = setTimeout(() => {
-        setIsGeneratingEditorText(true);
-      }, 500);
-    };
+        // Set new timer
+        timerRef.current = setTimeout(() => {
+          setIsGeneratingEditorText(true);
+        }, 500);
+      };
 
-    handleIfSuccessfullyParsed(data, SseMessageSchema, (data: SseMessage) => {
-      handleDataReceived();
-      handler.onMessage(data);
-    });
+      handleIfSuccessfullyParsed(data, SseMessageSchema, (data: SseMessage) => {
+        handleDataReceived();
+        handler.onMessage(data);
+      });
 
-    handleIfSuccessfullyParsed(data, SseDetectedDiffSchema, async(diffData: SseDetectedDiff) => {
-      handleDataReceived();
-      mutateIsEnableUnifiedMergeView(true);
+      handleIfSuccessfullyParsed(
+        data,
+        SseDetectedDiffSchema,
+        async (diffData: SseDetectedDiff) => {
+          handleDataReceived();
+          mutateIsEnableUnifiedMergeView(true);
 
-      // Check if client engine processing is enabled
-      if (clientEngine.isClientProcessingEnabled && yDocs?.secondaryDoc != null) {
-        try {
-          // Get current content
-          const yText = yDocs.secondaryDoc.getText('codemirror');
-          const currentContent = yText.toString();
+          // Check if client engine processing is enabled
+          if (
+            clientEngine.isClientProcessingEnabled &&
+            yDocs?.secondaryDoc != null
+          ) {
+            try {
+              // Get current content
+              const yText = yDocs.secondaryDoc.getText('codemirror');
+              const currentContent = yText.toString();
 
-          // Process with client engine
-          const result = await clientEngine.processHybrid(
-            currentContent,
-            [diffData],
-            async() => {
-              // Fallback to original server-side processing
-              setDetectedDiff((prev) => {
-                const newData = { data: diffData, applied: false, id: crypto.randomUUID() };
-                if (prev == null) {
-                  return [newData];
+              // Process with client engine
+              const result = await clientEngine.processHybrid(
+                currentContent,
+                [diffData],
+                async () => {
+                  // Fallback to original server-side processing
+                  setDetectedDiff((prev) => {
+                    const newData = {
+                      data: diffData,
+                      applied: false,
+                      id: crypto.randomUUID(),
+                    };
+                    if (prev == null) {
+                      return [newData];
+                    }
+                    return [...prev, newData];
+                  });
+                },
+              );
+
+              // Apply result if client processing succeeded
+              if (
+                result.success &&
+                result.method === 'client' &&
+                result.result?.modifiedText
+              ) {
+                const applied = clientEngine.applyToYText(
+                  yText,
+                  result.result.modifiedText,
+                );
+                if (applied) {
+                  handler.onDetectedDiff(diffData);
+                  return;
                 }
-                return [...prev, newData];
-              });
-            },
-          );
-
-          // Apply result if client processing succeeded
-          if (result.success && result.method === 'client' && result.result?.modifiedText) {
-            const applied = clientEngine.applyToYText(yText, result.result.modifiedText);
-            if (applied) {
-              handler.onDetectedDiff(diffData);
-              return;
+              }
+            } catch (error) {
+              // Fall through to server-side processing
             }
           }
-        }
-        catch (error) {
-          // Fall through to server-side processing
-        }
-      }
 
-      // Original server-side processing (fallback or default)
-      setDetectedDiff((prev) => {
-        const newData = { data: diffData, applied: false, id: crypto.randomUUID() };
-        if (prev == null) {
-          return [newData];
-        }
-        return [...prev, newData];
-      });
-      handler.onDetectedDiff(diffData);
-    });
+          // Original server-side processing (fallback or default)
+          setDetectedDiff((prev) => {
+            const newData = {
+              data: diffData,
+              applied: false,
+              id: crypto.randomUUID(),
+            };
+            if (prev == null) {
+              return [newData];
+            }
+            return [...prev, newData];
+          });
+          handler.onDetectedDiff(diffData);
+        },
+      );
 
-    handleIfSuccessfullyParsed(data, SseFinalizedSchema, (data: SseFinalized) => {
-      handler.onFinalized(data);
-    });
-  }, [isGeneratingEditorText, mutateIsEnableUnifiedMergeView, clientEngine, yDocs]);
+      handleIfSuccessfullyParsed(
+        data,
+        SseFinalizedSchema,
+        (data: SseFinalized) => {
+          handler.onFinalized(data);
+        },
+      );
+    },
+    [
+      isGeneratingEditorText,
+      mutateIsEnableUnifiedMergeView,
+      clientEngine,
+      yDocs,
+    ],
+  );
 
-  const selectTextHandler = useCallback(({ selectedText, selectedTextIndex, selectedTextFirstLineNumber }) => {
-    setSelectedText(selectedText);
-    setSelectedTextIndex(selectedTextIndex);
-    lineRef.current = selectedTextFirstLineNumber;
-  }, []);
-
+  const selectTextHandler = useCallback(
+    ({ selectedText, selectedTextIndex, selectedTextFirstLineNumber }) => {
+      setSelectedText(selectedText);
+      setSelectedTextIndex(selectedTextIndex);
+      lineRef.current = selectedTextFirstLineNumber;
+    },
+    [],
+  );
 
   // Effects
   useTextSelectionEffect(codeMirrorEditor, selectTextHandler);
 
   useEffect(() => {
-    const pendingDetectedDiff: DetectedDiff | undefined = detectedDiff?.filter(diff => diff.applied === false);
-    if (yDocs?.secondaryDoc != null && pendingDetectedDiff != null && pendingDetectedDiff.length > 0) {
+    const pendingDetectedDiff: DetectedDiff | undefined = detectedDiff?.filter(
+      (diff) => diff.applied === false,
+    );
+    if (
+      yDocs?.secondaryDoc != null &&
+      pendingDetectedDiff != null &&
+      pendingDetectedDiff.length > 0
+    ) {
       const yText = yDocs.secondaryDoc.getText('codemirror');
       yDocs.secondaryDoc.transact(() => {
         pendingDetectedDiff.forEach((detectedDiff) => {
           if (detectedDiff.data.diff) {
             const { search, replace, startLine } = detectedDiff.data.diff;
             // New search and replace processing
-            const success = performSearchReplace(yText, search, replace, startLine);
+            const success = performSearchReplace(
+              yText,
+              search,
+              replace,
+              startLine,
+            );
 
             if (!success) {
               // Fallback: existing behavior
               if (isTextSelected) {
                 insertTextAtLine(yText, lineRef.current, replace);
                 lineRef.current += 1;
-              }
-              else {
+              } else {
                 appendTextLastLine(yText, replace);
               }
             }
@@ -339,7 +420,9 @@ export const useEditorAssistant: UseEditorAssistant = () => {
       // Mark items as applied after applying to secondaryDoc
       setDetectedDiff((prev) => {
         if (!prev) return prev;
-        const pendingDetectedDiffIds = pendingDetectedDiff.map(diff => diff.id);
+        const pendingDetectedDiffIds = pendingDetectedDiff.map(
+          (diff) => diff.id,
+        );
         return prev.map((diff) => {
           if (pendingDetectedDiffIds.includes(diff.id)) {
             return { ...diff, applied: true };
@@ -348,11 +431,14 @@ export const useEditorAssistant: UseEditorAssistant = () => {
         });
       });
     }
-  }, [codeMirrorEditor, detectedDiff, isTextSelected, selectedText, yDocs?.secondaryDoc]);
+  }, [detectedDiff, isTextSelected, yDocs?.secondaryDoc]);
 
   // Set detectedDiff to undefined after applying all detectedDiff to secondaryDoc
   useEffect(() => {
-    if (detectedDiff?.filter(detectedDiff => detectedDiff.applied === false).length === 0) {
+    if (
+      detectedDiff?.filter((detectedDiff) => detectedDiff.applied === false)
+        .length === 0
+    ) {
       setSelectedText(undefined);
       setSelectedTextIndex(undefined);
       setDetectedDiff(undefined);
@@ -370,107 +456,121 @@ export const useEditorAssistant: UseEditorAssistant = () => {
   }, []);
   // Views
   const headerIcon = useMemo(() => {
-    return <span className="material-symbols-outlined growi-ai-chat-icon me-3 fs-4">support_agent</span>;
+    return (
+      <span className="material-symbols-outlined growi-ai-chat-icon me-3 fs-4">
+        support_agent
+      </span>
+    );
   }, []);
 
   const headerText = useMemo(() => {
     return <>{t('Editor Assistant')}</>;
   }, [t]);
 
-  const placeHolder = useMemo(() => { return 'sidebar_ai_assistant.editor_assistant_placeholder' }, []);
+  const placeHolder = useMemo(() => {
+    return 'sidebar_ai_assistant.editor_assistant_placeholder';
+  }, []);
 
-  const generateInitialView: GenerateInitialView = useCallback((onSubmit) => {
-    const selectAiAssistantHandler = (aiAssistant?: AiAssistantHasId) => {
-      setSelectedAiAssistant(aiAssistant);
-    };
+  const generateInitialView: GenerateInitialView = useCallback(
+    (onSubmit) => {
+      const selectAiAssistantHandler = (aiAssistant?: AiAssistantHasId) => {
+        setSelectedAiAssistant(aiAssistant);
+      };
 
-    const clickQuickMenuHandler = async(quickMenu: string) => {
-      await onSubmit({ input: quickMenu, markdownType: 'full' });
-    };
+      const clickQuickMenuHandler = async (quickMenu: string) => {
+        await onSubmit({ input: quickMenu, markdownType: 'full' });
+      };
 
-    return (
-      <>
-        <div className="py-2">
-          <AiAssistantDropdown
-            selectedAiAssistant={selectedAiAssistant}
-            onSelect={selectAiAssistantHandler}
-          />
+      return (
+        <>
+          <div className="py-2">
+            <AiAssistantDropdown
+              selectedAiAssistant={selectedAiAssistant}
+              onSelect={selectAiAssistantHandler}
+            />
+          </div>
+          <QuickMenuList onClick={clickQuickMenuHandler} />
+        </>
+      );
+    },
+    [selectedAiAssistant],
+  );
+
+  const generateActionButtons: GenerateActionButtons = useCallback(
+    (messageId, messageLogs, generatingAnswerMessage) => {
+      const isActionButtonShown = (() => {
+        if (!aiAssistantSidebarData?.isEditorAssistant) {
+          return false;
+        }
+
+        if (!isEnableUnifiedMergeView) {
+          return false;
+        }
+
+        if (generatingAnswerMessage != null) {
+          return false;
+        }
+
+        const latestAssistantMessageLogId = messageLogs
+          .filter((message) => !message.isUserMessage)
+          .slice(-1)[0];
+
+        if (messageId === latestAssistantMessageLogId?.id) {
+          return true;
+        }
+
+        return false;
+      })();
+
+      const accept = () => {
+        if (codeMirrorEditor?.view == null) {
+          return;
+        }
+
+        acceptAllChunks(codeMirrorEditor.view);
+        mutateIsEnableUnifiedMergeView(false);
+      };
+
+      const reject = () => {
+        mutateIsEnableUnifiedMergeView(false);
+      };
+
+      if (!isActionButtonShown) {
+        return <></>;
+      }
+
+      return (
+        <div className="d-flex mt-2 justify-content-start">
+          <button
+            type="button"
+            className="btn btn-outline-secondary me-2"
+            onClick={reject}
+          >
+            {t('sidebar_ai_assistant.discard')}
+          </button>
+          <button type="button" className="btn btn-success" onClick={accept}>
+            {t('sidebar_ai_assistant.accept')}
+          </button>
         </div>
-        <QuickMenuList
-          onClick={clickQuickMenuHandler}
-        />
-      </>
-    );
-  }, [selectedAiAssistant]);
-
-  const generateActionButtons: GenerateActionButtons = useCallback((messageId, messageLogs, generatingAnswerMessage) => {
-    const isActionButtonShown = (() => {
-      if (!aiAssistantSidebarData?.isEditorAssistant) {
-        return false;
-      }
-
-      if (!isEnableUnifiedMergeView) {
-        return false;
-      }
-
-      if (generatingAnswerMessage != null) {
-        return false;
-      }
-
-      const latestAssistantMessageLogId = messageLogs
-        .filter(message => !message.isUserMessage)
-        .slice(-1)[0];
-
-      if (messageId === latestAssistantMessageLogId?.id) {
-        return true;
-      }
-
-      return false;
-    })();
-
-    const accept = () => {
-      if (codeMirrorEditor?.view == null) {
-        return;
-      }
-
-      acceptAllChunks(codeMirrorEditor.view);
-      mutateIsEnableUnifiedMergeView(false);
-    };
-
-    const reject = () => {
-      mutateIsEnableUnifiedMergeView(false);
-    };
-
-    if (!isActionButtonShown) {
-      return <></>;
-    }
-
-    return (
-      <div className="d-flex mt-2 justify-content-start">
-        <button
-          type="button"
-          className="btn btn-outline-secondary me-2"
-          onClick={reject}
-        >
-          {t('sidebar_ai_assistant.discard')}
-        </button>
-        <button
-          type="button"
-          className="btn btn-success"
-          onClick={accept}
-        >
-          {t('sidebar_ai_assistant.accept')}
-        </button>
-      </div>
-    );
-  }, [aiAssistantSidebarData?.isEditorAssistant, codeMirrorEditor?.view, isEnableUnifiedMergeView, mutateIsEnableUnifiedMergeView, t]);
+      );
+    },
+    [
+      aiAssistantSidebarData?.isEditorAssistant,
+      codeMirrorEditor?.view,
+      isEnableUnifiedMergeView,
+      mutateIsEnableUnifiedMergeView,
+      t,
+    ],
+  );
 
   const generatingEditorTextLabel = useMemo(() => {
     return (
       <>
         {isGeneratingEditorText && (
           <span className="text-thinking">
-            {t('sidebar_ai_assistant.text_generation_by_editor_assistant_label')}
+            {t(
+              'sidebar_ai_assistant.text_generation_by_editor_assistant_label',
+            )}
           </span>
         )}
       </>
@@ -491,8 +591,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
       try {
         // return line number if possible
         return doc.lineAt(index).number;
-      }
-      catch {
+      } catch {
         // Fallback: return character index and switch to character mode
         isLineMode = false;
         return index + 1;
@@ -508,9 +607,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
 
     return (
       <div className="alert alert-warning py-2 px-3 mb-3" role="alert">
-        <small>
-          {t(translationKey, { startPosition, endPosition })}
-        </small>
+        <small>{t(translationKey, { startPosition, endPosition })}</small>
       </div>
     );
   }, [partialContentInfo, t, codeMirrorEditor]);
@@ -536,6 +633,12 @@ export const useEditorAssistant: UseEditorAssistant = () => {
 };
 
 // type guard
-export const isEditorAssistantFormData = (formData: unknown): formData is FormData => {
-  return typeof formData === 'object' && formData != null && 'markdownType' in formData;
+export const isEditorAssistantFormData = (
+  formData: unknown,
+): formData is FormData => {
+  return (
+    typeof formData === 'object' &&
+    formData != null &&
+    'markdownType' in formData
+  );
 };

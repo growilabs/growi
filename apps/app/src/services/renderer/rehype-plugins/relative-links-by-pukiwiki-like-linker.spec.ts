@@ -5,7 +5,6 @@ import rehype from 'remark-rehype';
 import { unified } from 'unified';
 
 import { pukiwikiLikeLinker } from '../remark-plugins/pukiwiki-like-linker';
-
 import { relativeLinksByPukiwikiLikeLinker } from './relative-links-by-pukiwiki-like-linker';
 
 describe('relativeLinksByPukiwikiLikeLinker', () => {

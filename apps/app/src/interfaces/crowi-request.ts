@@ -10,9 +10,6 @@ export interface CrowiProperties {
   crowi: Crowi;
 
   session: any;
-
-  // provided by csurf
-  csrfToken: () => string;
 }
 
 export interface CrowiRequest extends CrowiProperties, Request {}

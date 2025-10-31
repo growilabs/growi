@@ -1,8 +1,8 @@
 import type { JSX } from 'react';
 
 type Props = {
-  markdown?: string,
-}
+  markdown?: string;
+};
 
 export const Preview = (props: Props): JSX.Element => {
   return (

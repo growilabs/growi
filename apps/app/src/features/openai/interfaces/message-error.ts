@@ -6,4 +6,5 @@ export const StreamErrorCode = {
   BUDGET_EXCEEDED: 'budget-exceeded',
 } as const;
 
-export type StreamErrorCode = typeof StreamErrorCode[keyof typeof StreamErrorCode];
+export type StreamErrorCode =
+  (typeof StreamErrorCode)[keyof typeof StreamErrorCode];

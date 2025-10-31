@@ -18,12 +18,6 @@ declare global {
 
 type Nullable<T> = T | null;
 
-export const useCsrfToken = (
-  initialData?: string,
-): SWRResponse<string, Error> => {
-  return useContextSWR<string, Error>('csrfToken', initialData);
-};
-
 export const useAppTitle = (
   initialData?: string,
 ): SWRResponse<string, Error> => {

@@ -11,6 +11,10 @@
     "editor.defaultFormatter": "biomejs.biome"
   },
 
+  "[json]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+
   // use vscode-stylelint
   // see https://github.com/stylelint/vscode-stylelint
   "stylelint.validate": ["css", "less", "scss"],

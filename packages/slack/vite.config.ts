@@ -1,5 +1,4 @@
 import path from 'node:path';
-
 import glob from 'glob';
 import { nodeExternals } from 'rollup-plugin-node-externals';
 import { defineConfig } from 'vite';

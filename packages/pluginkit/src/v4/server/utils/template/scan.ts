@@ -7,7 +7,6 @@ import {
   type TemplateStatus,
   type TemplateSummary,
 } from '../../../interfaces';
-
 import { getStatus } from './get-status';
 import { validateTemplatePluginGrowiDirective } from './validate-growi-plugin-directive';
 

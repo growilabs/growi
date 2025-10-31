@@ -1,6 +1,7 @@
+import React, { type JSX, useCallback } from 'react';
 import type { IAttachmentHasId } from '@growi/core';
 import type { Property } from 'csstype';
-import React, { type JSX, useCallback } from 'react';
+
 // import Carousel, { Modal, ModalGateway } from 'react-images';
 
 import type { RefsContext } from './util/refs-context';
