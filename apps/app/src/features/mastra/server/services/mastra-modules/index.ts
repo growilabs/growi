@@ -7,5 +7,4 @@ export const mastra = new Mastra({
   agents: {
     growiAgent,
   },
-  storage,
 });

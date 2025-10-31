@@ -6,19 +6,9 @@ import { configManager } from '~/server/service/config-manager';
 
 import { getOpenaiProvider } from '../../ai-sdk-modules/get-openai-provider';
 import { fileSearchTool } from '../tools/file-search-tool';
+import { memory } from '../memory';
 
-const memory = new Memory({
-  storage: new MongoDBStore({
-    url: 'mongodb://mongo:27017',
-    dbName: 'growi-app-test',
-  }),
-  options: {
-    threads: {
-      generateTitle: true,
-    },
-    lastMessages: 30,
-  },
-});
+
 
 const model = configManager.getConfig('openai:assistantModel:chat');
 
@@ -40,4 +30,5 @@ export const growiAgent = new Agent({
 
   model: getOpenaiProvider()(model),
   tools: { fileSearchTool },
+  memory,
 });
