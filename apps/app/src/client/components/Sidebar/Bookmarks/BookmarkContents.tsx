@@ -6,7 +6,7 @@ import { BookmarkFolderNameInput } from '~/client/components/Bookmarks/BookmarkF
 import { BookmarkFolderTree } from '~/client/components/Bookmarks/BookmarkFolderTree';
 import { addNewFolder } from '~/client/util/bookmark-utils';
 import { toastError } from '~/client/util/toastr';
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 import { useSWRxBookmarkFolderAndChild } from '~/stores/bookmark-folder';
 
 export const BookmarkContents = (): JSX.Element => {
@@ -14,7 +14,7 @@ export const BookmarkContents = (): JSX.Element => {
   const { t } = useTranslation();
   const [isCreateAction, setIsCreateAction] = useState<boolean>(false);
 
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser();
   const { mutate: mutateBookmarkFolders } = useSWRxBookmarkFolderAndChild(currentUser?._id);
 
   const onClickNewBookmarkFolder = useCallback(() => {

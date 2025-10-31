@@ -2,11 +2,12 @@ import type { FC } from 'react';
 import React, { useState } from 'react';
 
 import { LoadingSpinner } from '@growi/ui/dist/components';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
 import { apiv3Put } from '~/client/util/apiv3-client';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
-import { useShowPageLimitationXL } from '~/stores-universal/context';
+import { showPageLimitationXLAtom } from '~/states/server-configurations';
 import { useSWRxInAppNotifications, useSWRxInAppNotificationStatus } from '~/stores/in-app-notification';
 
 import CustomNavAndContents from '../CustomNavigation/CustomNavAndContents';
@@ -17,7 +18,7 @@ import InAppNotificationList from './InAppNotificationList';
 export const InAppNotificationPage: FC = () => {
   const { t } = useTranslation('commons');
 
-  const { data: showPageLimitationXL } = useShowPageLimitationXL();
+  const showPageLimitationXL = useAtomValue(showPageLimitationXLAtom);
 
   const limit = showPageLimitationXL != null ? showPageLimitationXL : 20;
 

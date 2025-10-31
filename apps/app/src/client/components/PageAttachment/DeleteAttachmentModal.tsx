@@ -2,6 +2,7 @@ import React, {
   useCallback, useMemo, useState,
 } from 'react';
 
+import type { IAttachmentHasId } from '@growi/core';
 import { UserPicture, LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import {
@@ -9,7 +10,7 @@ import {
 } from 'reactstrap';
 
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useDeleteAttachmentModal } from '~/stores/modal';
+import { useDeleteAttachmentModalStatus, useDeleteAttachmentModalActions } from '~/states/ui/modal/delete-attachment';
 import loggerFactory from '~/utils/logger';
 
 import { Username } from '../../../components/User/Username';
@@ -22,21 +23,30 @@ const iconByFormat = (format: string): string => {
   return format.match(/image\/.+/i) ? 'image' : 'description';
 };
 
-export const DeleteAttachmentModal: React.FC = () => {
+/**
+ * DeleteAttachmentModalSubstance - Presentation component (all logic here)
+ */
+type DeleteAttachmentModalSubstanceProps = {
+  attachment: IAttachmentHasId | undefined;
+  remove: ((args: { attachment_id: string }) => Promise<void>) | undefined;
+  closeModal: () => void;
+};
+
+const DeleteAttachmentModalSubstance = ({
+  attachment,
+  remove,
+  closeModal,
+}: DeleteAttachmentModalSubstanceProps): React.JSX.Element => {
   const [deleting, setDeleting] = useState<boolean>(false);
   const [deleteError, setDeleteError] = useState<string>('');
 
   const { t } = useTranslation();
-  const { data: deleteAttachmentModal, close: closeDeleteAttachmentModal } = useDeleteAttachmentModal();
-  const isOpen = deleteAttachmentModal?.isOpened;
-  const attachment = deleteAttachmentModal?.attachment;
-  const remove = deleteAttachmentModal?.remove;
 
   const toggleHandler = useCallback(() => {
-    closeDeleteAttachmentModal();
+    closeModal();
     setDeleting(false);
     setDeleteError('');
-  }, [closeDeleteAttachmentModal]);
+  }, [closeModal]);
 
   const onClickDeleteButtonHandler = useCallback(async() => {
     if (remove == null || attachment == null) {
@@ -48,7 +58,7 @@ export const DeleteAttachmentModal: React.FC = () => {
     try {
       await remove({ attachment_id: attachment._id });
       setDeleting(false);
-      closeDeleteAttachmentModal();
+      closeModal();
       toastSuccess(`Delete ${attachment.originalName}`);
     }
     catch (err) {
@@ -57,7 +67,7 @@ export const DeleteAttachmentModal: React.FC = () => {
       toastError(err);
       logger.error(err);
     }
-  }, [attachment, closeDeleteAttachmentModal, remove]);
+  }, [attachment, closeModal, remove]);
 
   const attachmentFileFormat = useMemo(() => {
     if (attachment == null) {
@@ -93,13 +103,7 @@ export const DeleteAttachmentModal: React.FC = () => {
   }, [deleting, deleteError]);
 
   return (
-    <Modal
-      isOpen={isOpen}
-      className={`${styles['attachment-delete-modal']} attachment-delete-modal`}
-      size="lg"
-      aria-labelledby="contained-modal-title-lg"
-      fade={false}
-    >
+    <div>
       <ModalHeader tag="h4" toggle={toggleHandler} className="text-danger">
         <span id="contained-modal-title-lg">{t('delete_attachment_modal.confirm_delete_attachment')}</span>
       </ModalHeader>
@@ -111,12 +115,45 @@ export const DeleteAttachmentModal: React.FC = () => {
           {deletingIndicator}
         </div>
         <Button
+          color="outline-neutral-secondary"
+          onClick={toggleHandler}
+        >
+          {t('commons:Cancel')}
+        </Button>
+        <Button
           color="danger"
           onClick={onClickDeleteButtonHandler}
           disabled={deleting}
         >{t('commons:Delete')}
         </Button>
       </ModalFooter>
+    </div>
+  );
+};
+
+/**
+ * DeleteAttachmentModal - Container component (lightweight, always rendered)
+ */
+export const DeleteAttachmentModal: React.FC = () => {
+  const deleteAttachmentModal = useDeleteAttachmentModalStatus();
+  const { close: closeModal } = useDeleteAttachmentModalActions();
+  const isOpen = deleteAttachmentModal?.isOpened;
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      className={`${styles['attachment-delete-modal']} attachment-delete-modal`}
+      size="lg"
+      aria-labelledby="contained-modal-title-lg"
+      fade={false}
+    >
+      {isOpen && (
+        <DeleteAttachmentModalSubstance
+          attachment={deleteAttachmentModal?.attachment}
+          remove={deleteAttachmentModal?.remove}
+          closeModal={closeModal}
+        />
+      )}
     </Modal>
   );
 };

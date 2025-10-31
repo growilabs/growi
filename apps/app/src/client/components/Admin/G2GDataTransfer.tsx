@@ -7,9 +7,9 @@ import { useTranslation } from 'next-i18next';
 import { useGenerateTransferKey } from '~/client/services/g2g-transfer';
 import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useAdminSocket } from '~/features/admin/states/socket-io';
 import { G2G_PROGRESS_STATUS, type G2GProgress } from '~/interfaces/g2g-transfer';
-import { useGrowiDocumentationUrl } from '~/stores-universal/context';
-import { useAdminSocket } from '~/stores/socket-io';
+import { useGrowiDocumentationUrl } from '~/states/context';
 
 import CustomCopyToClipBoard from '../Common/CustomCopyToClipBoard';
 
@@ -22,7 +22,7 @@ const IGNORED_COLLECTION_NAMES = [
 ];
 
 const G2GDataTransfer = (): JSX.Element => {
-  const { data: socket } = useAdminSocket();
+  const socket = useAdminSocket();
   const { t } = useTranslation(['admin', 'commons']);
 
   const [startTransferKey, setStartTransferKey] = useState('');
@@ -124,7 +124,7 @@ const G2GDataTransfer = (): JSX.Element => {
     }
   }, [setTransferring, startTransferKey, selectedCollections, optionsMap]);
 
-  const { data: documentationUrl } = useGrowiDocumentationUrl();
+  const documentationUrl = useGrowiDocumentationUrl();
 
   // File upload
   // const onChangeFileUploadTypeHandler = useCallback((e: ChangeEvent, type: string) => {

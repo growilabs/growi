@@ -9,7 +9,7 @@ import urljoin from 'url-join';
 import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 import AdminOidcSecurityContainer from '~/client/services/AdminOidcSecurityContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useSiteUrl } from '~/stores-universal/context';
+import { useSiteUrlWithEmptyValueWarn } from '~/states/global';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -20,7 +20,7 @@ type Props = {
 
 const OidcSecurityManagementContents = (props: Props) => {
   const { t } = useTranslation('admin');
-  const { data: siteUrl } = useSiteUrl();
+  const siteUrl = useSiteUrlWithEmptyValueWarn();
 
   const {
     adminGeneralSecurityContainer, adminOidcSecurityContainer,
@@ -33,10 +33,7 @@ const OidcSecurityManagementContents = (props: Props) => {
     oidcAttrMapId, oidcAttrMapUserName, oidcAttrMapName, oidcAttrMapEmail,
   } = adminOidcSecurityContainer.state;
 
-  const oidcCallbackUrl = urljoin(
-    siteUrl == null ? '' : pathUtils.removeTrailingSlash(siteUrl),
-    '/passport/oidc/callback',
-  );
+  const oidcCallbackUrl = urljoin(pathUtils.removeTrailingSlash(siteUrl), '/passport/oidc/callback');
 
   const { register, handleSubmit, reset } = useForm();
 

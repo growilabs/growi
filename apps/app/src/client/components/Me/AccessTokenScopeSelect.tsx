@@ -5,7 +5,7 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import type { UseFormRegisterReturn } from 'react-hook-form';
 
 import { extractScopes, getDisabledScopes, parseScopes } from '~/client/util/scope-util';
-import { useIsAdmin } from '~/stores-universal/context';
+import { useIsAdmin } from '~/states/context';
 
 import { AccessTokenScopeList } from './AccessTokenScopeList';
 
@@ -23,7 +23,7 @@ type AccessTokenScopeSelectProps = {
  */
 export const AccessTokenScopeSelect: React.FC<AccessTokenScopeSelectProps> = ({ register, selectedScopes }) => {
   const [disabledScopes, setDisabledScopes] = useState<Set<Scope>>(new Set());
-  const { data: isAdmin } = useIsAdmin();
+  const isAdmin = useIsAdmin();
 
   const ScopesMap = useMemo(() => parseScopes({ scopes: SCOPE, isAdmin }), [isAdmin]);
   const extractedScopes = useMemo(() => extractScopes(ScopesMap), [ScopesMap]);

@@ -8,7 +8,7 @@ import type { GrowiPluginResourceEntries } from '~/features/growi-plugin/server/
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import loggerFactory from '~/utils/logger';
 
-import { getLocaleAtServerSide } from './utils/commons';
+import { getLocaleAtServerSide } from './utils/locale';
 
 const logger = loggerFactory('growi:page:_document');
 

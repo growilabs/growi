@@ -1,0 +1,10 @@
+web_dashboard: false
+# whether to open the Serena web dashboard (which will be accessible through your web browser) that
+# shows Serena's current session logs - as an alternative to the GUI log window which
+# is supported on all platforms.
+
+web_dashboard_open_on_launch: false
+# whether to open a browser window with the web dashboard when Serena starts (provided that web_dashboard
+# is enabled). If set to False, you can still open the dashboard manually by navigating to
+# http://localhost:24282/dashboard/ in your web browser (24282 = 0x5EDA, SErena DAshboard).
+# If you have multiple instances running, a higher port will be used; try port 24283, 24284, etc.

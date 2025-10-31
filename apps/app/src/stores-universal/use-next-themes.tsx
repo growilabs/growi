@@ -3,7 +3,7 @@ import { isClient } from '@growi/core/dist/utils';
 import { ThemeProvider, useTheme } from 'next-themes';
 import type { ThemeProviderProps, UseThemeProps } from 'next-themes/dist/types';
 
-import { useForcedColorScheme } from './context';
+import { useForcedColorScheme } from '~/states/global';
 
 export const Themes = {
   ...ColorScheme,
@@ -14,7 +14,7 @@ export type Themes = (typeof Themes)[keyof typeof Themes];
 const ATTRIBUTE = 'data-bs-theme';
 
 export const NextThemesProvider: React.FC<ThemeProviderProps> = (props) => {
-  const { data: forcedColorScheme } = useForcedColorScheme();
+  const forcedColorScheme = useForcedColorScheme();
 
   return (
     <ThemeProvider
@@ -36,7 +36,7 @@ type UseThemeExtendedProps = Omit<UseThemeProps, 'theme' | 'resolvedTheme'> & {
 
 export const useNextThemes = (): UseThemeProps & UseThemeExtendedProps => {
   const props = useTheme();
-  const { data: forcedColorScheme } = useForcedColorScheme();
+  const forcedColorScheme = useForcedColorScheme();
 
   const resolvedTheme =
     forcedColorScheme ?? (props.resolvedTheme as ColorScheme);

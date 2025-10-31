@@ -9,11 +9,10 @@ import {
 } from '@growi/remark-drawio';
 import { useTranslation } from 'next-i18next';
 
-import {
-  useIsGuestUser, useIsReadOnlyUser, useIsSharedUser, useShareLinkId,
-} from '~/stores-universal/context';
-import { useIsRevisionOutdated } from '~/stores/page';
-import { useCurrentPageYjsData } from '~/stores/yjs';
+import { useCurrentPageYjsData } from '~/features/collaborative-editor/states';
+import { useIsGuestUser, useIsReadOnlyUser, useIsSharedUser } from '~/states/context';
+import { useIsRevisionOutdated } from '~/states/page';
+import { useShareLinkId } from '~/states/page/hooks';
 
 import '@growi/remark-drawio/dist/style.css';
 import styles from './DrawioViewerWithEditButton.module.scss';
@@ -29,12 +28,13 @@ export const DrawioViewerWithEditButton = React.memo((props: DrawioViewerProps):
   const { t } = useTranslation();
 
   const { bol, eol } = props;
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { data: isSharedUser } = useIsSharedUser();
-  const { data: shareLinkId } = useShareLinkId();
-  const { data: isRevisionOutdated } = useIsRevisionOutdated();
-  const { data: currentPageYjsData } = useCurrentPageYjsData();
+
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const isSharedUser = useIsSharedUser();
+  const shareLinkId = useShareLinkId();
+  const isRevisionOutdated = useIsRevisionOutdated();
+  const currentPageYjsData = useCurrentPageYjsData();
 
   const [isRendered, setRendered] = useState(false);
   const [mxfile, setMxfile] = useState('');

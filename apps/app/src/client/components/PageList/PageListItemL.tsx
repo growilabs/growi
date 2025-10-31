@@ -4,7 +4,7 @@ import React, {
 } from 'react';
 
 import type {
-  IPageInfoAll, IPageWithMeta, IPageInfoForListing,
+  IPageInfoExt, IPageWithMeta, IPageInfoForListing,
 } from '@growi/core';
 import { isIPageInfoForListing, isIPageInfoForEntity } from '@growi/core';
 import { DevidedPagePath } from '@growi/core/dist/models';
@@ -25,11 +25,12 @@ import type {
   OnDuplicatedFunction, OnRenamedFunction, OnDeletedFunction, OnPutBackedFunction,
 } from '~/interfaces/ui';
 import LinkedPagePath from '~/models/linked-page-path';
+import { useDeviceLargerThanLg } from '~/states/ui/device';
+import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
+import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate';
+import { usePageRenameModalActions } from '~/states/ui/modal/page-rename';
+import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page';
 import { useSWRMUTxCurrentUserBookmarks } from '~/stores/bookmark';
-import {
-  usePageRenameModal, usePageDuplicateModal, usePageDeleteModal, usePutBackPageModal,
-} from '~/stores/modal';
-import { useIsDeviceLargerThanLg } from '~/stores/ui';
 
 import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink';
 import { useSWRMUTxPageInfo, useSWRxPageInfo } from '../../../stores/page';
@@ -84,11 +85,11 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (pr
     },
   }));
 
-  const { data: isDeviceLargerThanLg } = useIsDeviceLargerThanLg();
-  const { open: openDuplicateModal } = usePageDuplicateModal();
-  const { open: openRenameModal } = usePageRenameModal();
-  const { open: openDeleteModal } = usePageDeleteModal();
-  const { open: openPutBackPageModal } = usePutBackPageModal();
+  const [isDeviceLargerThanLg] = useDeviceLargerThanLg();
+  const { open: openDuplicateModal } = usePageDuplicateModalActions();
+  const { open: openRenameModal } = usePageRenameModalActions();
+  const { open: openDeleteModal } = usePageDeleteModalActions();
+  const { open: openPutBackPageModal } = usePutBackPageModalActions();
 
   const shouldFetch = isSelected && (pageData != null || pageMeta != null);
   const { data: pageInfo } = useSWRxPageInfo(shouldFetch ? pageData?._id : null);
@@ -127,7 +128,7 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (pr
     }
   }, [isDeviceLargerThanLg, onClickItem, pageData._id]);
 
-  const bookmarkMenuItemClickHandler = async(_pageId: string, _newValue: boolean): Promise<void> => {
+  const bookmarkMenuItemClickHandler = async (_pageId: string, _newValue: boolean): Promise<void> => {
     const bookmarkOperation = _newValue ? bookmark : unbookmark;
     await bookmarkOperation(_pageId);
     mutateCurrentUserBookmarks();
@@ -142,23 +143,23 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (pr
     openDuplicateModal(page, { onDuplicated: onPageDuplicated });
   }, [onPageDuplicated, openDuplicateModal, pageData._id, pageData.path]);
 
-  const renameMenuItemClickHandler = useCallback((_id: string, pageInfo: IPageInfoAll | undefined) => {
+  const renameMenuItemClickHandler = useCallback((_id: string, pageInfo: IPageInfoExt | undefined) => {
     const page = { data: pageData, meta: pageInfo };
     openRenameModal(page, { onRenamed: onPageRenamed });
   }, [pageData, onPageRenamed, openRenameModal]);
 
 
-  const deleteMenuItemClickHandler = useCallback((_id: string, pageInfo: IPageInfoAll | undefined) => {
+  const deleteMenuItemClickHandler = useCallback((_id: string, pageInfo: IPageInfoExt | undefined) => {
     const pageToDelete = { data: pageData, meta: pageInfo };
 
     // open modal
     openDeleteModal([pageToDelete], { onDeleted: onPageDeleted });
   }, [pageData, openDeleteModal, onPageDeleted]);
 
-  const revertMenuItemClickHandler = useCallback(async() => {
+  const revertMenuItemClickHandler = useCallback(async () => {
     const { _id: pageId, path } = pageData;
 
-    const putBackedHandler = async(path) => {
+    const putBackedHandler = async (path) => {
       try {
         // pageData path should be `/trash/fuga` (`/trash` should be included to the prefix)
         await unlink(pageData.path);

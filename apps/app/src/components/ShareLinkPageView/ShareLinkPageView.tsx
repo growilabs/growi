@@ -1,6 +1,5 @@
-import { type JSX, useCallback, useMemo } from 'react';
+import { type JSX, memo, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import type { IPagePopulatedToShowRevision } from '@growi/core';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 
 import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle';
@@ -8,7 +7,7 @@ import type { RendererConfig } from '~/interfaces/services/renderer';
 import type { IShareLinkHasId } from '~/interfaces/share-link';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
 import { generateSSRViewOptions } from '~/services/renderer/renderer';
-import { useIsNotFound } from '~/stores/page';
+import { useCurrentPageData, usePageNotFound } from '~/states/page';
 import { useViewOptions } from '~/stores/renderer';
 import loggerFactory from '~/utils/logger';
 
@@ -17,8 +16,9 @@ import { PageViewLayout } from '../PageView/PageViewLayout';
 import RevisionRenderer from '../PageView/RevisionRenderer';
 import ShareLinkAlert from './ShareLinkAlert';
 
-const logger = loggerFactory('growi:Page');
+const logger = loggerFactory('growi:components:ShareLinkPageView');
 
+// biome-ignore-start lint/style/noRestrictedImports: no-problem dynamic import
 const PageSideContents = dynamic(
   () =>
     import('~/client/components/PageSideContents').then(
@@ -37,27 +37,23 @@ const SlideRenderer = dynamic(
     ),
   { ssr: false },
 );
+// biome-ignore-end lint/style/noRestrictedImports: no-problem dynamic import
 
 type Props = {
   pagePath: string;
   rendererConfig: RendererConfig;
-  page?: IPagePopulatedToShowRevision;
   shareLink?: IShareLinkHasId;
-  isExpired: boolean;
+  isExpired?: boolean;
   disableLinkSharing: boolean;
 };
 
-export const ShareLinkPageView = (props: Props): JSX.Element => {
-  const {
-    pagePath,
-    rendererConfig,
-    page,
-    shareLink,
-    isExpired,
-    disableLinkSharing,
-  } = props;
+export const ShareLinkPageView = memo((props: Props): JSX.Element => {
+  const { pagePath, rendererConfig, shareLink, isExpired, disableLinkSharing } =
+    props;
 
-  const { data: isNotFoundMeta } = useIsNotFound();
+  const isNotFoundMeta = usePageNotFound();
+
+  const page = useCurrentPageData();
 
   const { data: viewOptions } = useViewOptions();
 
@@ -92,19 +88,18 @@ export const ShareLinkPageView = (props: Props): JSX.Element => {
 
   const Contents = useCallback(() => {
     if (isNotFound || page.revision == null) {
+      // biome-ignore lint/complexity/noUselessFragments: ignore
       return <></>;
     }
 
     if (isExpired) {
       return (
-        <>
-          <h2 className="text-muted mt-4">
-            <span className="material-symbols-outlined" aria-hidden="true">
-              block
-            </span>
-            <span> Page is expired</span>
-          </h2>
-        </>
+        <h2 className="text-muted mt-4">
+          <span className="material-symbols-outlined" aria-hidden="true">
+            block
+          </span>
+          <span> Page is expired</span>
+        </h2>
       );
     }
 
@@ -162,4 +157,5 @@ export const ShareLinkPageView = (props: Props): JSX.Element => {
       )}
     </PageViewLayout>
   );
-};
+});
+ShareLinkPageView.displayName = 'ShareLinkPageView';
