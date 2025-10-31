@@ -14,11 +14,11 @@ import {
   Modal, ModalHeader, ModalBody, ModalFooter,
 } from 'reactstrap';
 
+
 import { useCurrentUser } from '~/states/global';
 import {
   useCurrentPageData,
   useRemoteRevisionBody,
-  useRemoteRevisionId,
   useRemoteRevisionLastUpdatedAt,
   useRemoteRevisionLastUpdateUser,
 } from '~/states/page';
@@ -206,12 +206,11 @@ export const ConflictDiffModal = (): React.JSX.Element => {
   const conflictDiffModalStatus = useConflictDiffModalStatus();
 
   // state for latest page
-  const remoteRevisionId = useRemoteRevisionId();
   const remoteRevisionBody = useRemoteRevisionBody();
   const remoteRevisionLastUpdateUser = useRemoteRevisionLastUpdateUser();
   const remoteRevisionLastUpdatedAt = useRemoteRevisionLastUpdatedAt();
 
-  const isRemotePageDataInappropriate = remoteRevisionId == null || remoteRevisionBody == null || remoteRevisionLastUpdateUser == null;
+  const isRemotePageDataInappropriate = remoteRevisionBody == null || remoteRevisionLastUpdateUser == null;
 
   const [isModalExpanded, setIsModalExpanded] = useState<boolean>(false);
 

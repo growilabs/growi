@@ -11,11 +11,9 @@ import {
   currentPageDataAtom,
   currentPageIdAtom,
   isForbiddenAtom,
-  latestRevisionAtom,
   pageNotFoundAtom,
   redirectFromAtom,
   remoteRevisionBodyAtom,
-  remoteRevisionIdAtom,
   shareLinkIdAtom,
   templateBodyAtom,
   templateTagsAtom,
@@ -30,8 +28,8 @@ import {
  *
  * Data sources:
  * - page._id, page.revision -> Auto-extracted from IPagePopulatedToShowRevision
- * - remoteRevisionId, remoteRevisionBody -> Auto-extracted from page.revision
- * - templateTags, templateBody, isLatestRevision -> Explicitly provided via options
+ * - remoteRevisionBody -> Auto-extracted from page.revision
+ * - templateTags, templateBody -> Explicitly provided via options
  *
  * @example
  * // Basic usage
@@ -39,7 +37,6 @@ import {
  *
  * // With template data and custom flags
  * useHydratePageAtoms(pageWithMeta?.data, {
- *   isLatestRevision: false,
  *   templateTags: ['tag1', 'tag2'],
  *   templateBody: 'Template content'
  * });
@@ -49,7 +46,6 @@ export const useHydratePageAtoms = (
   pageMeta: IPageNotFoundInfo | IPageInfo | undefined,
   options?: {
     // always overwrited
-    isLatestRevision?: boolean;
     shareLinkId?: string;
     redirectFrom?: string;
     templateTags?: string[];
@@ -71,16 +67,13 @@ export const useHydratePageAtoms = (
       isIPageNotFoundInfo(pageMeta) ? pageMeta.isForbidden : false,
     ],
 
-    // Remote revision data - auto-extracted from page.revision
-    [remoteRevisionIdAtom, page?.revision?._id],
+    // Remote revision data - used by ConflictDiffModal
     [remoteRevisionBodyAtom, page?.revision?.body],
   ]);
 
   // always overwrited
   useHydrateAtoms(
     [
-      [latestRevisionAtom, options?.isLatestRevision ?? true],
-
       // ShareLink page state
       [shareLinkIdAtom, options?.shareLinkId],
 

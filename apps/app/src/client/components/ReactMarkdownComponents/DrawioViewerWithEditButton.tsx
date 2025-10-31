@@ -11,8 +11,8 @@ import { useTranslation } from 'next-i18next';
 
 import { useCurrentPageYjsData } from '~/features/collaborative-editor/states';
 import { useIsGuestUser, useIsReadOnlyUser, useIsSharedUser } from '~/states/context';
-import { useIsRevisionOutdated } from '~/states/page';
 import { useShareLinkId } from '~/states/page/hooks';
+import { useIsRevisionOutdated } from '~/stores/page';
 
 import '@growi/remark-drawio/dist/style.css';
 import styles from './DrawioViewerWithEditButton.module.scss';

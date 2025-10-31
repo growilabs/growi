@@ -3,9 +3,10 @@ import React, { useCallback, type JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
-import { useCurrentPageData, useRemoteRevisionId, useRemoteRevisionLastUpdateUser } from '~/states/page';
+import { useRemoteRevisionLastUpdateUser } from '~/states/page';
 import { useEditorMode } from '~/states/ui/editor';
 import { usePageStatusAlertStatus } from '~/states/ui/modal/page-status-alert';
+import { useIsRevisionOutdated } from '~/stores/page';
 
 import { Username } from '../../components/User/Username';
 
@@ -18,9 +19,8 @@ export const PageStatusAlert = (): JSX.Element => {
   const isGuestUser = useIsGuestUser();
   const isReadOnlyUser = useIsReadOnlyUser();
   const pageStatusAlertData = usePageStatusAlertStatus();
-  const remoteRevisionId = useRemoteRevisionId();
+  const isRevisionOutdated = useIsRevisionOutdated();
   const remoteRevisionLastUpdateUser = useRemoteRevisionLastUpdateUser();
-  const pageData = useCurrentPageData();
 
   const onClickRefreshPage = useCallback(() => {
     pageStatusAlertData?.onRefleshPage?.();
@@ -32,9 +32,6 @@ export const PageStatusAlert = (): JSX.Element => {
 
   const hasResolveConflictHandler = pageStatusAlertData?.onResolveConflict != null;
   const hasRefreshPageHandler = pageStatusAlertData?.onRefleshPage != null;
-
-  const currentRevisionId = pageData?.revision?._id;
-  const isRevisionOutdated = (currentRevisionId != null || remoteRevisionId != null) && currentRevisionId !== remoteRevisionId;
 
   if (!pageStatusAlertData?.isOpen || !!isGuestUser || !!isReadOnlyUser || !isRevisionOutdated) {
     return <></>;

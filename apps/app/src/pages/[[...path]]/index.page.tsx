@@ -4,8 +4,9 @@ import { useEffect } from 'react';
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
+import EventEmitter from 'node:events';
+import { isIPageInfo } from '@growi/core';
 import { isClient } from '@growi/core/dist/utils';
-import EventEmitter from 'events';
 
 // biome-ignore-start lint/style/noRestrictedImports: no-problem lazy loaded components
 import { DescendantsPageListModalLazyLoaded } from '~/client/components/DescendantsPageListModal';
@@ -30,6 +31,7 @@ import {
   useSetupGlobalSocketForPage,
 } from '~/states/socket-io';
 import { useSetEditingMarkdown } from '~/states/ui/editor';
+import { useSWRxPageInfo } from '~/stores/page';
 
 import type { NextPageWithLayout } from '../_app.page';
 import { useHydrateBasicLayoutConfigurationAtoms } from '../basic-layout-page/hydrate';
@@ -145,6 +147,14 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
       setEditingMarkdown(currentPage?.revision?.body || '');
     }
   }, [currentPagePath, currentPage?.revision?.body, setEditingMarkdown]);
+
+  // Optimistically update PageInfo SWR cache with SSR data
+  const { mutate: mutatePageInfo } = useSWRxPageInfo(currentPage?._id);
+  useEffect(() => {
+    if (isInitialProps(props) && pageMeta != null && isIPageInfo(pageMeta)) {
+      mutatePageInfo(pageMeta, { revalidate: false });
+    }
+  }, [pageMeta, mutatePageInfo, props]);
 
   // If the data on the page changes without router.push, pageWithMeta remains old because getServerSideProps() is not executed
   // So preferentially take page data from useSWRxCurrentPage

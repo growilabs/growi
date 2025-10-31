@@ -11,8 +11,10 @@ import { useAtomValue } from 'jotai';
 import { useAtomCallback } from 'jotai/utils';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
+import { useSWRxPageInfo } from '~/stores/page';
 import loggerFactory from '~/utils/logger';
 
+import { useRevisionIdFromUrl } from '../context';
 import {
   currentPageDataAtom,
   currentPageIdAtom,
@@ -21,7 +23,6 @@ import {
   pageLoadingAtom,
   pageNotFoundAtom,
   remoteRevisionBodyAtom,
-  remoteRevisionIdAtom,
   shareLinkIdAtom,
 } from './internal-atoms';
 
@@ -105,6 +106,7 @@ type BuildApiParamsArgs = {
   decodedPathname: string | undefined;
   currentPageId: string | undefined;
   shareLinkId: string | undefined;
+  revisionIdFromUrl: string | undefined;
 };
 type ApiParams = { params: Record<string, string>; shouldSkip: boolean };
 
@@ -116,21 +118,17 @@ const buildApiParams = ({
   decodedPathname,
   currentPageId,
   shareLinkId,
+  revisionIdFromUrl,
 }: BuildApiParamsArgs): ApiParams => {
-  const revisionId =
-    fetchPageArgs?.revisionId ??
-    (isClient()
-      ? new URLSearchParams(window.location.search).get('revisionId')
-      : undefined);
+  // Priority: explicit arg > URL query parameter
+  const revisionId = fetchPageArgs?.revisionId ?? revisionIdFromUrl;
 
   const params: {
     path?: string;
     pageId?: string;
     revisionId?: string;
     shareLinkId?: string;
-  } = {
-    revisionId: fetchPageArgs?.revisionId,
-  };
+  } = {};
 
   if (shareLinkId != null) {
     params.shareLinkId = shareLinkId;
@@ -179,9 +177,13 @@ export const useFetchCurrentPage = (): {
   error: Error | null;
 } => {
   const shareLinkId = useAtomValue(shareLinkIdAtom);
+  const revisionIdFromUrl = useRevisionIdFromUrl();
+  const currentPageId = useAtomValue(currentPageIdAtom);
 
   const isLoading = useAtomValue(pageLoadingAtom);
   const error = useAtomValue(pageErrorAtom);
+
+  const { mutate: mutatePageInfo } = useSWRxPageInfo(currentPageId, shareLinkId);
 
   const fetchCurrentPage = useAtomCallback(
     useCallback(
@@ -217,6 +219,7 @@ export const useFetchCurrentPage = (): {
           decodedPathname,
           currentPageId,
           shareLinkId,
+          revisionIdFromUrl,
         });
 
         if (shouldSkip) {
@@ -235,6 +238,9 @@ export const useFetchCurrentPage = (): {
           set(pageNotFoundAtom, false);
           set(isForbiddenAtom, false);
 
+          // Mutate PageInfo to refetch latest metadata including latestRevisionId
+          mutatePageInfo();
+
           return newData;
         } catch (err) {
           if (!Array.isArray(err) || err.length === 0) {
@@ -252,7 +258,6 @@ export const useFetchCurrentPage = (): {
               set(isForbiddenAtom, error.args.isForbidden ?? false);
               set(currentPageDataAtom, undefined);
               set(currentPageIdAtom, undefined);
-              set(remoteRevisionIdAtom, undefined);
               set(remoteRevisionBodyAtom, undefined);
             }
           }
@@ -262,7 +267,7 @@ export const useFetchCurrentPage = (): {
 
         return null;
       },
-      [shareLinkId],
+      [shareLinkId, revisionIdFromUrl, mutatePageInfo],
     ),
   );
 

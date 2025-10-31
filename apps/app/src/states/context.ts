@@ -1,3 +1,4 @@
+import { useRouter } from 'next/router';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
 import { currentUserAtomGetter, growiCloudUriAtomGetter } from './global';
@@ -77,6 +78,26 @@ const growiDocumentationUrlAtom = atom((get) => {
 
 export const useGrowiDocumentationUrl = () =>
   useAtomValue(growiDocumentationUrlAtom);
+
+/**
+ * Hook to get revisionId from URL query parameters
+ * Returns undefined if revisionId is not present in the URL
+ */
+export const useRevisionIdFromUrl = (): string | undefined => {
+  const router = useRouter();
+  const revisionId = router.query.revisionId;
+  return typeof revisionId === 'string' ? revisionId : undefined;
+};
+
+/**
+ * Hook to check if user is intentionally viewing a specific (old) revision
+ * Returns true when URL has ?revisionId=xxx parameter
+ * This indicates the user explicitly wants to see that revision
+ */
+export const useIsViewingSpecificRevision = (): boolean => {
+  const revisionId = useRevisionIdFromUrl();
+  return revisionId != null;
+};
 
 /**
  * Internal atoms for derived atom usage (special naming convention)

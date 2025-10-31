@@ -110,6 +110,7 @@ export type IPageInfoForEntity = Omit<IPageInfo, 'isNotFound' | 'isEmpty'> & {
   contentAge: number;
   descendantCount: number;
   commentCount: number;
+  latestRevisionId: Ref<IRevision>;
 };
 
 export type IPageInfoForOperation = IPageInfoForEntity & {

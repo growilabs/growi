@@ -25,7 +25,6 @@ import {
   pageLoadingAtom,
   pageNotFoundAtom,
   remoteRevisionBodyAtom,
-  remoteRevisionIdAtom,
 } from '~/states/page/internal-atoms';
 
 // Mock Next.js router
@@ -736,7 +735,6 @@ describe('useFetchCurrentPage - Integration Test', () => {
     );
     store.set(currentPageIdAtom, existingPage._id);
     store.set(currentPageDataAtom, existingPage);
-    store.set(remoteRevisionIdAtom, 'rev_xxx');
     store.set(remoteRevisionBodyAtom, 'remote body');
 
     // Mock API rejection with ErrorV3 like object
@@ -760,7 +758,6 @@ describe('useFetchCurrentPage - Integration Test', () => {
       });
       expect(store.get(currentPageDataAtom)).toBeUndefined();
       expect(store.get(currentPageIdAtom)).toBeUndefined();
-      expect(store.get(remoteRevisionIdAtom)).toBeUndefined();
       expect(store.get(remoteRevisionBodyAtom)).toBeUndefined();
     });
   });

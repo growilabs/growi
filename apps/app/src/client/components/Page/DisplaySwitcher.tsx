@@ -3,8 +3,9 @@ import type { JSX } from 'react';
 import dynamic from 'next/dynamic';
 
 import { useHashChangedEffect } from '~/client/services/side-effects/hash-changed';
-import { useIsEditable, useLatestRevision } from '~/states/page';
+import { useIsEditable } from '~/states/page';
 import { EditorMode, useEditorMode, useReservedNextCaretLine } from '~/states/ui/editor';
+import { useIsLatestRevision } from '~/stores/page';
 
 import { LazyRenderer } from '../Common/LazyRenderer';
 
@@ -17,14 +18,14 @@ export const DisplaySwitcher = (): JSX.Element => {
 
   const { editorMode } = useEditorMode();
   const isEditable = useIsEditable();
-  const isLatestRevision = useLatestRevision();
+  const { data: isLatestRevision } = useIsLatestRevision();
 
   useHashChangedEffect();
   useReservedNextCaretLine();
 
   return (
     <LazyRenderer shouldRender={isEditable === true && editorMode === EditorMode.Editor}>
-      { isLatestRevision
+      { isLatestRevision !== false
         ? <PageEditor />
         : <PageEditorReadOnly />
       }

@@ -26,8 +26,8 @@ import type {
   IRecordApplicableGrant,
   IResCurrentGrantData,
 } from '~/interfaces/page-grant';
-import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
-import { usePageNotFound } from '~/states/page';
+import { useIsGuestUser, useIsReadOnlyUser, useIsViewingSpecificRevision } from '~/states/context';
+import { useCurrentPageData, usePageNotFound } from '~/states/page';
 import { useShareLinkId } from '~/states/page/hooks';
 
 import type { IPageTagsInfo } from '../interfaces/tag';
@@ -152,6 +152,70 @@ export const useSWRMUTxPageInfo = (
         (response) => response.data,
       ),
   );
+};
+
+/**
+ * Hook to check if the current page is displaying the latest revision
+ * Returns SWRResponse with boolean value:
+ * - data: undefined - not yet determined (no currentPage data)
+ * - data: true - viewing the latest revision (or latestRevisionId not available)
+ * - data: false - viewing an old revision
+ */
+export const useIsLatestRevision = (): SWRResponse<boolean, Error> => {
+  const currentPage = useCurrentPageData();
+  const pageId = currentPage?._id;
+  const shareLinkId = useShareLinkId();
+  const { data: pageInfo } = useSWRxPageInfo(pageId, shareLinkId);
+
+  // Extract latestRevisionId if available (only exists in IPageInfoForEntity)
+  const latestRevisionId = pageInfo && 'latestRevisionId' in pageInfo ? pageInfo.latestRevisionId : undefined;
+
+  const key = useMemo(() => {
+    // Cannot determine without currentPage
+    if (currentPage?.revision?._id == null) {
+      return null;
+    }
+    return ['isLatestRevision', currentPage.revision._id, latestRevisionId ?? null];
+  }, [currentPage?.revision?._id, latestRevisionId]);
+
+  return useSWRImmutable(
+    key,
+    ([, currentRevisionId, latestRevisionId]) => {
+      // If latestRevisionId is not available, assume it's the latest
+      if (latestRevisionId == null) {
+        return true;
+      }
+      return latestRevisionId === currentRevisionId;
+    },
+  );
+};
+
+/**
+ * Check if current revision is outdated and user should be notified to refetch
+ *
+ * Returns true when:
+ * - User is NOT intentionally viewing a specific (old) revision (no ?revisionId in URL)
+ * - AND the current page data is not the latest revision
+ *
+ * This indicates "new data is available, please refetch" rather than
+ * "you are viewing an old revision" (which is handled by useIsLatestRevision)
+ */
+export const useIsRevisionOutdated = (): boolean => {
+  const { data: isLatestRevision } = useIsLatestRevision();
+  const isViewingSpecificRevision = useIsViewingSpecificRevision();
+
+  // If user intentionally views a specific revision, don't show "outdated" alert
+  if (isViewingSpecificRevision) {
+    return false;
+  }
+
+  // If we can't determine yet, assume not outdated
+  if (isLatestRevision == null) {
+    return false;
+  }
+
+  // User expects latest, but it's not latest = outdated
+  return !isLatestRevision;
 };
 
 export const useSWRxPageRevision = (

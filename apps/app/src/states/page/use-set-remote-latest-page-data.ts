@@ -4,7 +4,6 @@ import { useSetAtom } from 'jotai/react';
 
 import {
   remoteRevisionBodyAtom,
-  remoteRevisionIdAtom,
   remoteRevisionLastUpdatedAtAtom,
   remoteRevisionLastUpdateUserAtom,
 } from './internal-atoms';
@@ -22,7 +21,6 @@ type SetRemoteLatestPageData = (pageData: RemoteRevisionData) => void;
  * Set remote data all at once
  */
 export const useSetRemoteLatestPageData = (): SetRemoteLatestPageData => {
-  const setRemoteRevisionId = useSetAtom(remoteRevisionIdAtom);
   const setRemoteRevisionBody = useSetAtom(remoteRevisionBodyAtom);
   const setRemoteRevisionLastUpdateUser = useSetAtom(
     remoteRevisionLastUpdateUserAtom,
@@ -33,7 +31,8 @@ export const useSetRemoteLatestPageData = (): SetRemoteLatestPageData => {
 
   return useCallback(
     (remoteRevisionData: RemoteRevisionData) => {
-      setRemoteRevisionId(remoteRevisionData.remoteRevisionId);
+      // Note: remoteRevisionId is part of the type for conflict resolution
+      // but not stored in atom (we use useSWRxPageInfo.data.latestRevisionId instead)
       setRemoteRevisionBody(remoteRevisionData.remoteRevisionBody);
       setRemoteRevisionLastUpdateUser(
         remoteRevisionData.remoteRevisionLastUpdateUser,
@@ -46,7 +45,6 @@ export const useSetRemoteLatestPageData = (): SetRemoteLatestPageData => {
       setRemoteRevisionLastUpdateUser,
       setRemoteRevisionLastUpdatedAt,
       setRemoteRevisionBody,
-      setRemoteRevisionId,
     ],
   );
 };
