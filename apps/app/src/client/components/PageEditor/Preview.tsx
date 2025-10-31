@@ -59,53 +59,53 @@ const Preview = (props: Props): JSX.Element => {
         <span className="ms-1">Guide</span>
       </button>
 
+      {/* Editor Guide Modal */}
       {isModalOpen && (
-        <>
-          {/* Editor Guide Modal Overlay */}
+        <div
+          className="position-fixed top-0 bottom-0 start-50 end-0 d-flex align-items-center justify-content-center"
+          style={{
+            zIndex: 1050,
+            pointerEvents: 'none',
+          }}
+        >
+          <div className="px-3" style={{ pointerEvents: 'auto' }}>
+            <div className="card shadow-lg">
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h5 className="mb-0">Editor Guide</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={toggleModal}
+                  aria-label="Close"
+                />
+              </div>
+              <div className="card-body overflow-auto">
+                <p>This is a test modal.</p>
+                <p>It appears in the center of the preview area on the right side.</p>
+                <p>The background is darkened to emphasize the modal.</p>
+                <p className="mb-0">Click the close button or the background to close.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div
+        data-testid="page-editor-preview-body"
+        className={`${moduleClass} ${fluidLayoutClass} ${pagePath === '/Sidebar' ? 'preview-sidebar' : ''} position-relative`}
+        style={style}
+      >
+        {/* Editor Guide Modal Overlay */}
+        {isModalOpen && (
           <div
-            className="position-fixed top-0 bottom-0 bg-dark opacity-50 start-50 end-0"
+            className="position-absolute top-0 start-0 w-100 h-100 bg-dark opacity-50"
             style={{
               zIndex: 1040,
             }}
             onClick={toggleModal}
           />
+        )}
 
-          {/* Editor Guide Modal */}
-          <div
-            className="position-fixed top-0 bottom-0 d-flex align-items-center justify-content-center start-50 end-0"
-            style={{
-              zIndex: 1050,
-              pointerEvents: 'none',
-            }}
-          >
-            <div className="w-100 px-3" style={{ maxWidth: '500px', pointerEvents: 'auto' }}>
-              <div className="card shadow-lg">
-                <div className="card-header d-flex justify-content-between align-items-center">
-                  <h5 className="mb-0">Editor Guide</h5>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    onClick={toggleModal}
-                    aria-label="Close"
-                  />
-                </div>
-                <div className="card-body overflow-auto">
-                  <p>This is a test modal.</p>
-                  <p>It appears in the center of the preview area on the right side.</p>
-                  <p>The background is darkened to emphasize the modal.</p>
-                  <p className="mb-0">Click the close button or the background to close.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      <div
-        data-testid="page-editor-preview-body"
-        className={`${moduleClass} ${fluidLayoutClass} ${pagePath === '/Sidebar' ? 'preview-sidebar' : ''}`}
-        style={style}
-      >
         { markdown != null
           && (
             isSlide != null
