@@ -1,17 +1,14 @@
 import { type JSX, useCallback } from 'react';
 
-import { useDrawioModalForEditor } from '../../../stores/use-drawio';
+import { useEditorGuideModal } from '../../../stores/use-editor-guide-modal';
 
-type Props = {
-  editorKey: string;
-};
+export const EditorGuideButton = (): JSX.Element => {
+  const { open: openEditorGuideModal } = useEditorGuideModal();
 
-export const EditorGuideButton = (props: Props): JSX.Element => {
-  const { editorKey } = props;
-  const { open: openDrawioModal } = useDrawioModalForEditor();
   const onClickEditorGuideButton = useCallback(() => {
-    openDrawioModal(editorKey);
-  }, [editorKey, openDrawioModal]);
+    openEditorGuideModal();
+  }, [openEditorGuideModal]);
+
   return (
     <button
       type="button"

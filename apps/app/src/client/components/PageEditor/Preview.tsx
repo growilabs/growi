@@ -1,14 +1,14 @@
 import type { CSSProperties, JSX } from 'react';
-import { useState } from 'react';
 
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
-
 
 import RevisionRenderer from '~/components/PageView/RevisionRenderer';
 import type { RendererOptions } from '~/interfaces/renderer-options';
 import { useIsEnabledMarp } from '~/stores-universal/context';
 
 import { SlideRenderer } from '../Page/SlideRenderer';
+
+import { EditorGuideModal } from './EditorGuideModal';
 
 import styles from './Preview.module.scss';
 
@@ -22,6 +22,8 @@ type Props = {
   expandContentWidth?: boolean,
   style?: CSSProperties,
   onScroll?: (scrollTop: number) => void,
+  isEditorGuideModalOpen?: boolean,
+  onCloseEditorGuideModal?: () => void,
 }
 
 const Preview = (props: Props): JSX.Element => {
@@ -30,6 +32,8 @@ const Preview = (props: Props): JSX.Element => {
     rendererOptions,
     markdown, pagePath, style,
     expandContentWidth,
+    isEditorGuideModalOpen,
+    onCloseEditorGuideModal,
   } = props;
 
   const { data: isEnabledMarp } = useIsEnabledMarp();
@@ -37,84 +41,25 @@ const Preview = (props: Props): JSX.Element => {
 
   const fluidLayoutClass = expandContentWidth ? 'fluid-layout' : '';
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const toggleModal = () => setIsModalOpen(!isModalOpen);
-
   return (
-    <>
-      {/* wip Trigger */}
-      <button
-        type="button"
-        className="btn btn-light btn-sm position-fixed top-0 end-0 m-3 shadow-sm"
-        style={{
-          top: '70px',
-          zIndex: 10,
-        }}
-        onClick={toggleModal}
-      >
-        <span className="material-symbols-outlined align-middle" style={{ fontSize: '18px' }}>
-          help
-        </span>
-        <span className="ms-1">Guide</span>
-      </button>
+    <div
+      data-testid="page-editor-preview-body"
+      className={`${moduleClass} ${fluidLayoutClass} ${pagePath === '/Sidebar' ? 'preview-sidebar' : ''} position-relative`}
+      style={style}
+    >
+      <EditorGuideModal
+        isOpen={isEditorGuideModalOpen ?? false}
+        onClose={onCloseEditorGuideModal ?? (() => {})}
+      />
 
-      {/* Editor Guide Modal */}
-      {isModalOpen && (
-        <div
-          className="position-fixed top-0 bottom-0 start-50 end-0 d-flex align-items-center justify-content-center"
-          style={{
-            zIndex: 1050,
-            pointerEvents: 'none',
-          }}
-        >
-          <div className="px-3" style={{ pointerEvents: 'auto' }}>
-            <div className="card shadow-lg">
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h5 className="mb-0">Editor Guide</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={toggleModal}
-                  aria-label="Close"
-                />
-              </div>
-              <div className="card-body overflow-auto">
-                <p>This is a test modal.</p>
-                <p>It appears in the center of the preview area on the right side.</p>
-                <p>The background is darkened to emphasize the modal.</p>
-                <p className="mb-0">Click the close button or the background to close.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div
-        data-testid="page-editor-preview-body"
-        className={`${moduleClass} ${fluidLayoutClass} ${pagePath === '/Sidebar' ? 'preview-sidebar' : ''} position-relative`}
-        style={style}
-      >
-        {/* Editor Guide Modal Overlay */}
-        {isModalOpen && (
-          <div
-            className="position-absolute top-0 start-0 w-100 h-100 bg-dark opacity-50"
-            style={{
-              zIndex: 1040,
-            }}
-            onClick={toggleModal}
-          />
-        )}
-
-        { markdown != null
-          && (
-            isSlide != null
-              ? <SlideRenderer marp={isSlide.marp} markdown={markdown} />
-              : <RevisionRenderer rendererOptions={rendererOptions} markdown={markdown}></RevisionRenderer>
-          )
-        }
-      </div>
-    </>
+      { markdown != null
+        && (
+          isSlide != null
+            ? <SlideRenderer marp={isSlide.marp} markdown={markdown} />
+            : <RevisionRenderer rendererOptions={rendererOptions} markdown={markdown}></RevisionRenderer>
+        )
+      }
+    </div>
   );
 
 };

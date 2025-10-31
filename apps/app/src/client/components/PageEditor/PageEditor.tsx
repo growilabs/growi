@@ -12,6 +12,7 @@ import { pathUtils } from '@growi/core/dist/utils';
 import { GlobalCodeMirrorEditorKey } from '@growi/editor';
 import { CodeMirrorEditorMain } from '@growi/editor/dist/client/components/CodeMirrorEditorMain';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
+import { useEditorGuideModal } from '@growi/editor/dist/client/stores/use-editor-guide-modal';
 import { useResolvedThemeForEditor } from '@growi/editor/dist/client/stores/use-resolved-theme';
 import { useRect } from '@growi/ui/dist/utils';
 import detectIndent from 'detect-indent';
@@ -330,6 +331,8 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
     }
   }, [editorMode, mutateReservedNextCaretLine]);
 
+  const { data: editorGuideModalStatus, close: closeEditorGuideModal } = useEditorGuideModal();
+
 
   // TODO: Check the reproduction conditions that made this code necessary and confirm reproduction
   // // when transitioning to a different page, if the initialValue is the same,
@@ -394,6 +397,8 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
           pagePath={currentPagePath}
           expandContentWidth={shouldExpandContent}
           style={pastEndStyle}
+          isEditorGuideModalOpen={editorGuideModalStatus?.isOpened ?? false}
+          onCloseEditorGuideModal={closeEditorGuideModal}
         />
       </div>
     </div>
