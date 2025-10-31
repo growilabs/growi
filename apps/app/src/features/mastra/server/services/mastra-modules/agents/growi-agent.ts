@@ -40,5 +40,4 @@ export const growiAgent = new Agent({
 
   model: getOpenaiProvider()(model),
   tools: { fileSearchTool },
-  memory,
 });
