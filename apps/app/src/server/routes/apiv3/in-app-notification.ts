@@ -1,9 +1,9 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import { SCOPE } from '@growi/core/dist/interfaces';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 
@@ -107,6 +107,7 @@ module.exports = (crowi) => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /in-app-notification/list
    *      description: Get the list of in-app notifications
    *      parameters:
@@ -199,6 +200,7 @@ module.exports = (crowi) => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /in-app-notification/status
    *      description: Get the status of in-app notifications
    *      responses:
@@ -236,6 +238,7 @@ module.exports = (crowi) => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /in-app-notification/open
    *      description: Open the in-app notification
    *      requestBody:
@@ -283,6 +286,7 @@ module.exports = (crowi) => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *       - accessTokenHeaderAuth: []
    *      summary: /in-app-notification/all-statuses-open
    *      description: Open all in-app notifications
    *      responses:
