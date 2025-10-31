@@ -3,10 +3,24 @@ import { toBoolean } from '@growi/core/dist/utils/env-utils';
 
 import loggerFactory from '~/utils/logger';
 
+import { Lang } from '@growi/core/dist/interfaces';
+import { coerceToSupportedLang } from '../../util/locale-utils';
+
 import type { ConfigKey, ConfigValues } from './config-definition';
 import { CONFIG_DEFINITIONS } from './config-definition';
 
 const logger = loggerFactory('growi:service:ConfigLoader');
+
+export const sanitizeConfigValue = (key: ConfigKey, value: unknown): ConfigValues[ConfigKey] => {
+  switch (key) {
+    case 'app:globalLang':
+      return coerceToSupportedLang(value, { fallback: Lang.en_US }) as ConfigValues[ConfigKey];
+    case 'autoInstall:globalLang':
+      return coerceToSupportedLang(value, { allowUndefined: true }) as ConfigValues[ConfigKey];
+    default:
+      return value as ConfigValues[ConfigKey];
+  }
+};
 
 export class ConfigLoader implements IConfigLoader<ConfigKey, ConfigValues> {
 
@@ -14,18 +28,21 @@ export class ConfigLoader implements IConfigLoader<ConfigKey, ConfigValues> {
     const envConfig = {} as RawConfigData<ConfigKey, ConfigValues>;
 
     for (const [key, metadata] of Object.entries(CONFIG_DEFINITIONS)) {
-      let configValue = metadata.defaultValue;
+      let configValue: unknown = metadata.defaultValue;
 
       if (metadata.envVarName != null) {
         const envVarValue = process.env[metadata.envVarName];
         if (envVarValue != null) {
-          configValue = this.parseEnvValue(envVarValue, typeof metadata.defaultValue) as ConfigValues[ConfigKey];
+          configValue = this.parseEnvValue(envVarValue, typeof metadata.defaultValue);
         }
       }
 
-      envConfig[key as ConfigKey] = {
+      const typedKey = key as ConfigKey;
+      const sanitizedValue = sanitizeConfigValue(typedKey, configValue);
+
+      envConfig[typedKey] = {
         definition: metadata,
-        value: configValue,
+        value: sanitizedValue,
       };
     }
 
@@ -42,16 +59,20 @@ export class ConfigLoader implements IConfigLoader<ConfigKey, ConfigValues> {
     const docs = await Config.find().exec();
 
     for (const doc of docs) {
-      dbConfig[doc.key as ConfigKey] = {
-        definition: (doc.key in CONFIG_DEFINITIONS) ? CONFIG_DEFINITIONS[doc.key as ConfigKey] : undefined,
-        value: doc.value != null ? (() => {
-          try {
-            return JSON.parse(doc.value);
-          }
-          catch {
-            return null;
-          }
-        })() : null,
+      const typedKey = doc.key as ConfigKey;
+      const parsedValue: unknown = doc.value != null ? (() => {
+        try {
+          return JSON.parse(doc.value);
+        }
+        catch {
+          return null;
+        }
+      })() : null;
+      const sanitizedValue = sanitizeConfigValue(typedKey, parsedValue);
+
+      dbConfig[typedKey] = {
+        definition: (doc.key in CONFIG_DEFINITIONS) ? CONFIG_DEFINITIONS[typedKey] : undefined,
+        value: sanitizedValue,
       };
     }
 

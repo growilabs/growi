@@ -10,7 +10,7 @@ import type { S2sMessageHandlable } from '../s2s-messaging/handlable';
 
 import type { ConfigKey, ConfigValues } from './config-definition';
 import { ENV_ONLY_GROUPS } from './config-definition';
-import { ConfigLoader } from './config-loader';
+import { ConfigLoader, sanitizeConfigValue } from './config-loader';
 
 const logger = loggerFactory('growi:service:ConfigManager');
 
@@ -111,14 +111,18 @@ export class ConfigManager implements IConfigManagerForApp, S2sMessageHandlable 
     // Dynamic import to avoid loading database modules too early
     const { Config } = await import('../../models/config');
 
-    if (options?.removeIfUndefined && value === undefined) {
-      // remove the config if the value is undefined and removeIfUndefined is true
+    const sanitizedValue = value === undefined ? undefined : sanitizeConfigValue(key, value);
+    const shouldRemove = sanitizedValue === undefined
+      && (value === undefined ? (options?.removeIfUndefined ?? false) : true);
+
+    if (shouldRemove) {
+      // remove the config when sanitized value is undefined
       await Config.deleteOne({ key });
     }
     else {
       await Config.updateOne(
         { key },
-        { value: JSON.stringify(value) },
+        { value: JSON.stringify(sanitizedValue) },
         { upsert: true },
       );
     }
@@ -135,14 +139,17 @@ export class ConfigManager implements IConfigManagerForApp, S2sMessageHandlable 
     const { Config } = await import('../../models/config');
 
     const operations = Object.entries(updates).map(([key, value]) => {
-      return (options?.removeIfUndefined && value === undefined)
-        // remove the config if the value is undefined
+      const typedKey = key as ConfigKey;
+      const sanitizedValue = value === undefined ? undefined : sanitizeConfigValue(typedKey, value);
+      const shouldRemove = sanitizedValue === undefined
+        && (value === undefined ? (options?.removeIfUndefined ?? false) : true);
+
+      return shouldRemove
         ? { deleteOne: { filter: { key } } }
-        // update
         : {
           updateOne: {
             filter: { key },
-            update: { value: JSON.stringify(value) },
+            update: { value: JSON.stringify(sanitizedValue) },
             upsert: true,
           },
         };
