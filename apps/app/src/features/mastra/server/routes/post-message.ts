@@ -112,6 +112,10 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
           format: 'aisdk',
           output: reasoningSchema,
           runtimeContext,
+          memory: {
+            thread: 'user-123',
+            resource: 'user-123',
+          },
         });
 
         // debug: log all chunks from the full stream
