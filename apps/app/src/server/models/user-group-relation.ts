@@ -1,8 +1,6 @@
-import {
-  getIdForRef, isPopulated,
-} from '@growi/core';
+import { getIdForRef, isPopulated } from '@growi/core';
 import type { IUserGroupRelation } from '@growi/core/dist/interfaces';
-import type { Model, Document } from 'mongoose';
+import type { Document, Model } from 'mongoose';
 import mongoose, { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
@@ -11,48 +9,64 @@ import loggerFactory from '~/utils/logger';
 
 import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 import { getOrCreateModel } from '../util/mongoose-utils';
-
 import type { UserGroupDocument } from './user-group';
 
 const logger = loggerFactory('growi:models:userGroupRelation');
 
+export interface UserGroupRelationDocument
+  extends IUserGroupRelation,
+    Document {}
 
-export interface UserGroupRelationDocument extends IUserGroupRelation, Document {}
+export interface UserGroupRelationModel
+  extends Model<UserGroupRelationDocument> {
+  [x: string]: any; // for old methods
 
-export interface UserGroupRelationModel extends Model<UserGroupRelationDocument> {
-  [x:string]: any, // for old methods
+  PAGE_ITEMS: 50;
 
-  PAGE_ITEMS: 50,
+  removeAllByUserGroups: (groupsToDelete: UserGroupDocument[]) => Promise<any>;
 
-  removeAllByUserGroups: (groupsToDelete: UserGroupDocument[]) => Promise<any>,
+  findAllUserIdsForUserGroups: (
+    userGroupIds: ObjectIdLike[],
+  ) => Promise<string[]>;
 
-  findAllUserIdsForUserGroups: (userGroupIds: ObjectIdLike[]) => Promise<string[]>,
+  findGroupsWithDescendantsByGroupAndUser: (
+    group: UserGroupDocument,
+    user,
+  ) => Promise<UserGroupDocument[]>;
 
-  findGroupsWithDescendantsByGroupAndUser: (group: UserGroupDocument, user) => Promise<UserGroupDocument[]>,
+  countByGroupIdsAndUser: (
+    userGroupIds: ObjectIdLike[],
+    userData,
+  ) => Promise<number>;
 
-  countByGroupIdsAndUser: (userGroupIds: ObjectIdLike[], userData) => Promise<number>
+  findAllGroupsForUser: (user) => Promise<UserGroupDocument[]>;
 
-  findAllGroupsForUser: (user) => Promise<UserGroupDocument[]>
-
-  findAllUserGroupIdsRelatedToUser: (user) => Promise<ObjectIdLike[]>
+  findAllUserGroupIdsRelatedToUser: (user) => Promise<ObjectIdLike[]>;
 }
 
 /*
  * define schema
  */
-const schema = new Schema<UserGroupRelationDocument, UserGroupRelationModel>({
-  relatedGroup: { type: Schema.Types.ObjectId, ref: 'UserGroup', required: true },
-  relatedUser: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-}, {
-  timestamps: { createdAt: true, updatedAt: false },
-});
+const schema = new Schema<UserGroupRelationDocument, UserGroupRelationModel>(
+  {
+    relatedGroup: {
+      type: Schema.Types.ObjectId,
+      ref: 'UserGroup',
+      required: true,
+    },
+    relatedUser: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  },
+  {
+    timestamps: { createdAt: true, updatedAt: false },
+  },
+);
 schema.plugin(mongoosePaginate);
 schema.plugin(uniqueValidator);
 
 /**
  * remove all invalid relations that has reference to unlinked document
  */
-schema.statics.removeAllInvalidRelations = function() {
+schema.statics.removeAllInvalidRelations = function () {
   return this.findAllRelation()
     .then((relations) => {
       // filter invalid documents
@@ -61,24 +75,22 @@ schema.statics.removeAllInvalidRelations = function() {
       });
     })
     .then((invalidRelations) => {
-      const ids = invalidRelations.map((relation) => { return relation._id });
+      const ids = invalidRelations.map((relation) => {
+        return relation._id;
+      });
       return this.deleteMany({ _id: { $in: ids } });
     });
 };
 
 /**
-   * find all user and group relation
-   *
-   * @static
-   * @returns {Promise<UserGroupRelation[]>}
-   * @memberof UserGroupRelation
-   */
-schema.statics.findAllRelation = function() {
-  return this
-    .find()
-    .populate('relatedUser')
-    .populate('relatedGroup')
-    .exec();
+ * find all user and group relation
+ *
+ * @static
+ * @returns {Promise<UserGroupRelation[]>}
+ * @memberof UserGroupRelation
+ */
+schema.statics.findAllRelation = function () {
+  return this.find().populate('relatedUser').populate('relatedGroup').exec();
 };
 
 /**
@@ -89,22 +101,20 @@ schema.statics.findAllRelation = function() {
  * @returns {Promise<UserGroupRelation[]>}
  * @memberof UserGroupRelation
  */
-schema.statics.findAllRelationForUserGroup = function(userGroup) {
+schema.statics.findAllRelationForUserGroup = function (userGroup) {
   logger.debug('findAllRelationForUserGroup is called', userGroup);
-  return this
-    .find({ relatedGroup: userGroup })
-    .populate('relatedUser')
-    .exec();
+  return this.find({ relatedGroup: userGroup }).populate('relatedUser').exec();
 };
 
-schema.statics.findAllUserIdsForUserGroups = async function(userGroupIds: ObjectIdLike[]): Promise<string[]> {
-  const relations = await this
-    .find({ relatedGroup: { $in: userGroupIds } })
+schema.statics.findAllUserIdsForUserGroups = async function (
+  userGroupIds: ObjectIdLike[],
+): Promise<string[]> {
+  const relations = await this.find({ relatedGroup: { $in: userGroupIds } })
     .select('relatedUser')
     .exec();
 
   // return unique ids
-  return [...new Set(relations.map(r => r.relatedUser.toString()))];
+  return [...new Set(relations.map((r) => r.relatedUser.toString()))];
 };
 
 /**
@@ -115,9 +125,8 @@ schema.statics.findAllUserIdsForUserGroups = async function(userGroupIds: Object
  * @returns {Promise<UserGroupRelation[]>}
  * @memberof UserGroupRelation
  */
-schema.statics.findAllRelationForUserGroups = function(userGroups) {
-  return this
-    .find({ relatedGroup: { $in: userGroups } })
+schema.statics.findAllRelationForUserGroups = function (userGroups) {
+  return this.find({ relatedGroup: { $in: userGroups } })
     .populate('relatedUser')
     .exec();
 };
@@ -130,12 +139,20 @@ schema.statics.findAllRelationForUserGroups = function(userGroups) {
  * @returns {Promise<UserGroupDocument[]>}
  * @memberof UserGroupRelation
  */
-schema.statics.findAllGroupsForUser = async function(user): Promise<UserGroupDocument[]> {
-  const userGroupRelations = await this.find({ relatedUser: user._id }).populate('relatedGroup');
+schema.statics.findAllGroupsForUser = async function (
+  user,
+): Promise<UserGroupDocument[]> {
+  const userGroupRelations = await this.find({
+    relatedUser: user._id,
+  }).populate('relatedGroup');
   const userGroups = userGroupRelations.map((relation) => {
-    return isPopulated(relation.relatedGroup) ? relation.relatedGroup as unknown as UserGroupDocument : null;
+    return isPopulated(relation.relatedGroup)
+      ? (relation.relatedGroup as unknown as UserGroupDocument)
+      : null;
   });
-  return userGroups.filter((group): group is NonNullable<UserGroupDocument> => group != null);
+  return userGroups.filter(
+    (group): group is NonNullable<UserGroupDocument> => group != null,
+  );
 };
 
 /**
@@ -145,12 +162,16 @@ schema.statics.findAllGroupsForUser = async function(user): Promise<UserGroupDoc
  * @param {User} user
  * @returns {Promise<ObjectId[]>}
  */
-schema.statics.findAllUserGroupIdsRelatedToUser = async function(user): Promise<ObjectIdLike[]> {
+schema.statics.findAllUserGroupIdsRelatedToUser = async function (
+  user,
+): Promise<ObjectIdLike[]> {
   const relations = await this.find({ relatedUser: user._id })
     .select('relatedGroup')
     .exec();
 
-  return relations.map((relation) => { return getIdForRef(relation.relatedGroup) });
+  return relations.map((relation) => {
+    return getIdForRef(relation.relatedGroup);
+  });
 };
 
 /**
@@ -161,7 +182,10 @@ schema.statics.findAllUserGroupIdsRelatedToUser = async function(user): Promise<
  * @param {User} userData find query param for relatedUser
  * @returns {Promise<number>}
  */
-schema.statics.countByGroupIdsAndUser = async function(userGroupIds: ObjectIdLike[], userData): Promise<number> {
+schema.statics.countByGroupIdsAndUser = async function (
+  userGroupIds: ObjectIdLike[],
+  userData,
+): Promise<number> {
   const query = {
     relatedGroup: { $in: userGroupIds },
     relatedUser: userData._id,
@@ -178,7 +202,7 @@ schema.statics.countByGroupIdsAndUser = async function(userGroupIds: ObjectIdLik
  * @returns {Promise<User>}
  * @memberof UserGroupRelation
  */
-schema.statics.findUserByNotRelatedGroup = function(userGroup, queryOptions) {
+schema.statics.findUserByNotRelatedGroup = function (userGroup, queryOptions) {
   const User = mongoose.model('User') as any;
   let searchWord = new RegExp(`${queryOptions.searchWord}`);
   switch (queryOptions.searchType) {
@@ -189,26 +213,27 @@ schema.statics.findUserByNotRelatedGroup = function(userGroup, queryOptions) {
       searchWord = new RegExp(`${queryOptions.searchWord}$`);
       break;
   }
-  const searthField: Record<string, RegExp>[] = [
-    { username: searchWord },
-  ];
-  if (queryOptions.isAlsoMailSearched === 'true') { searthField.push({ email: searchWord }) }
-  if (queryOptions.isAlsoNameSearched === 'true') { searthField.push({ name: searchWord }) }
+  const searthField: Record<string, RegExp>[] = [{ username: searchWord }];
+  if (queryOptions.isAlsoMailSearched === 'true') {
+    searthField.push({ email: searchWord });
+  }
+  if (queryOptions.isAlsoNameSearched === 'true') {
+    searthField.push({ name: searchWord });
+  }
 
-  return this.findAllRelationForUserGroup(userGroup)
-    .then((relations) => {
-      const relatedUserIds = relations.map((relation) => {
-        return relation.relatedUser.id;
-      });
-      const query = {
-        _id: { $nin: relatedUserIds },
-        status: User.STATUS_ACTIVE,
-        $or: searthField,
-      };
-
-      logger.debug('findUserByNotRelatedGroup ', query);
-      return User.find(query).exec();
+  return this.findAllRelationForUserGroup(userGroup).then((relations) => {
+    const relatedUserIds = relations.map((relation) => {
+      return relation.relatedUser.id;
     });
+    const query = {
+      _id: { $nin: relatedUserIds },
+      status: User.STATUS_ACTIVE,
+      $or: searthField,
+    };
+
+    logger.debug('findUserByNotRelatedGroup ', query);
+    return User.find(query).exec();
+  });
 };
 
 /**
@@ -220,18 +245,17 @@ schema.statics.findUserByNotRelatedGroup = function(userGroup, queryOptions) {
  * @returns {Promise<boolean>} is user related for group(or not)
  * @memberof UserGroupRelation
  */
-schema.statics.isRelatedUserForGroup = function(userGroup, user) {
+schema.statics.isRelatedUserForGroup = function (userGroup, user) {
   const query = {
     relatedGroup: userGroup.id,
     relatedUser: user.id,
   };
 
-  return this
-    .count(query)
+  return this.count(query)
     .exec()
     .then((count) => {
       // return true or false of the relation is exists(not count)
-      return (count > 0);
+      return count > 0;
     });
 };
 
@@ -244,14 +268,14 @@ schema.statics.isRelatedUserForGroup = function(userGroup, user) {
  * @returns {Promise<UserGroupRelation>} created relation
  * @memberof UserGroupRelation
  */
-schema.statics.createRelation = function(userGroup, user) {
+schema.statics.createRelation = function (userGroup, user) {
   return this.create({
     relatedGroup: userGroup.id,
     relatedUser: user.id,
   });
 };
 
-schema.statics.createRelations = async function(userGroupIds, user) {
+schema.statics.createRelations = async function (userGroupIds, user) {
   const documentsToInsertMany = userGroupIds.map((groupId) => {
     return {
       relatedGroup: groupId,
@@ -271,7 +295,9 @@ schema.statics.createRelations = async function(userGroupIds, user) {
  * @returns {Promise<any>}
  * @memberof UserGroupRelation
  */
-schema.statics.removeAllByUserGroups = function(groupsToDelete: UserGroupDocument[]) {
+schema.statics.removeAllByUserGroups = function (
+  groupsToDelete: UserGroupDocument[],
+) {
   return this.deleteMany({ relatedGroup: { $in: groupsToDelete } });
 };
 
@@ -283,25 +309,28 @@ schema.statics.removeAllByUserGroups = function(groupsToDelete: UserGroupDocumen
  * @returns {Promise<any>}
  * @memberof UserGroupRelation
  */
-schema.statics.removeById = function(id) {
-  return this.findById(id)
-    .then((relationData) => {
-      if (relationData == null) {
-        throw new Error('UserGroupRelation data is not exists. id:', id);
-      }
-      else {
-        relationData.remove();
-      }
-    });
+schema.statics.removeById = function (id) {
+  return this.findById(id).then((relationData) => {
+    if (relationData == null) {
+      throw new Error('UserGroupRelation data is not exists. id:', id);
+    } else {
+      relationData.remove();
+    }
+  });
 };
 
-schema.statics.findUserIdsByGroupId = async function(groupId) {
-  const relations = await this.find({ relatedGroup: groupId }, { _id: 0, relatedUser: 1 }).lean().exec(); // .lean() to get not ObjectId but string
+schema.statics.findUserIdsByGroupId = async function (groupId) {
+  const relations = await this.find(
+    { relatedGroup: groupId },
+    { _id: 0, relatedUser: 1 },
+  )
+    .lean()
+    .exec(); // .lean() to get not ObjectId but string
 
-  return relations.map(relation => relation.relatedUser);
+  return relations.map((relation) => relation.relatedUser);
 };
 
-schema.statics.createByGroupIdsAndUserIds = async function(groupIds, userIds) {
+schema.statics.createByGroupIdsAndUserIds = async function (groupIds, userIds) {
   const insertOperations: any[] = [];
 
   groupIds.forEach((groupId) => {
@@ -327,11 +356,14 @@ schema.statics.createByGroupIdsAndUserIds = async function(groupIds, userIds) {
  * @param {UserDocument} user
  * @returns UserGroupDocument[]
  */
-schema.statics.findGroupsWithDescendantsByGroupAndUser = async function(group: UserGroupDocument, user): Promise<UserGroupDocument[]> {
+schema.statics.findGroupsWithDescendantsByGroupAndUser = async function (
+  group: UserGroupDocument,
+  user,
+): Promise<UserGroupDocument[]> {
   const descendantGroups = [group];
 
-  const incrementGroupsRecursively = async(groups, user) => {
-    const groupIds = groups.map(g => g._id);
+  const incrementGroupsRecursively = async (groups, user) => {
+    const groupIds = groups.map((g) => g._id);
 
     const populatedRelations = await this.aggregate([
       {
@@ -359,7 +391,7 @@ schema.statics.findGroupsWithDescendantsByGroupAndUser = async function(group: U
       },
     ]);
 
-    const nextGroups = populatedRelations.map(d => d.relatedGroup);
+    const nextGroups = populatedRelations.map((d) => d.relatedGroup);
 
     // End
     const shouldEnd = nextGroups.length === 0;
@@ -378,4 +410,7 @@ schema.statics.findGroupsWithDescendantsByGroupAndUser = async function(group: U
   return descendantGroups;
 };
 
-export default getOrCreateModel<UserGroupRelationDocument, UserGroupRelationModel>('UserGroupRelation', schema);
+export default getOrCreateModel<
+  UserGroupRelationDocument,
+  UserGroupRelationModel
+>('UserGroupRelation', schema);

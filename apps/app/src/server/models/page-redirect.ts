@@ -1,47 +1,54 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import type { Model, Document } from 'mongoose';
+import type { Document, Model } from 'mongoose';
 import { Schema } from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
 
 import { getOrCreateModel } from '../util/mongoose-utils';
 
-
 const logger = loggerFactory('growi:models:page-redirects');
 
-
 export type IPageRedirect = {
-  fromPath: string,
-  toPath: string,
-}
+  fromPath: string;
+  toPath: string;
+};
 
 export type IPageRedirectEndpoints = {
-  start: IPageRedirect,
-  end: IPageRedirect,
-}
+  start: IPageRedirect;
+  end: IPageRedirect;
+};
 
 export interface PageRedirectDocument extends IPageRedirect, Document {}
 
 export interface PageRedirectModel extends Model<PageRedirectDocument> {
-  retrievePageRedirectEndpoints(fromPath: string): Promise<IPageRedirectEndpoints>
-  removePageRedirectsByToPath(toPath: string): Promise<void>
+  retrievePageRedirectEndpoints(
+    fromPath: string,
+  ): Promise<IPageRedirectEndpoints>;
+  removePageRedirectsByToPath(toPath: string): Promise<void>;
 }
 
 const CHAINS_FIELD_NAME = 'chains';
 const DEPTH_FIELD_NAME = 'depth';
 type IPageRedirectWithChains = PageRedirectDocument & {
-  [CHAINS_FIELD_NAME]: (PageRedirectDocument & { [DEPTH_FIELD_NAME]: number })[]
+  [CHAINS_FIELD_NAME]: (PageRedirectDocument & {
+    [DEPTH_FIELD_NAME]: number;
+  })[];
 };
 
 const schema = new Schema<PageRedirectDocument, PageRedirectModel>({
   fromPath: {
-    type: String, required: true, unique: true, index: true,
+    type: String,
+    required: true,
+    unique: true,
+    index: true,
   },
   toPath: { type: String, required: true },
 });
 
-schema.statics.retrievePageRedirectEndpoints = async function(fromPath: string): Promise<IPageRedirectEndpoints|null> {
+schema.statics.retrievePageRedirectEndpoints = async function (
+  fromPath: string,
+): Promise<IPageRedirectEndpoints | null> {
   const aggResult: IPageRedirectWithChains[] = await this.aggregate([
     { $match: { fromPath } },
     {
@@ -82,23 +89,30 @@ schema.statics.retrievePageRedirectEndpoints = async function(fromPath: string):
   }
 
   if (aggResult.length > 1) {
-    logger.warn(`Although two or more PageRedirect documents starts from '${fromPath}' exists, The first one is used.`);
+    logger.warn(
+      `Although two or more PageRedirect documents starts from '${fromPath}' exists, The first one is used.`,
+    );
   }
 
   const redirectWithChains = aggResult[0];
 
   // sort chains in desc
-  const sortedChains = redirectWithChains[CHAINS_FIELD_NAME].sort((a, b) => b[DEPTH_FIELD_NAME] - a[DEPTH_FIELD_NAME]);
+  const sortedChains = redirectWithChains[CHAINS_FIELD_NAME].sort(
+    (a, b) => b[DEPTH_FIELD_NAME] - a[DEPTH_FIELD_NAME],
+  );
 
-  const start = { fromPath: redirectWithChains.fromPath, toPath: redirectWithChains.toPath };
-  const end = sortedChains.length === 0
-    ? start
-    : sortedChains[0];
+  const start = {
+    fromPath: redirectWithChains.fromPath,
+    toPath: redirectWithChains.toPath,
+  };
+  const end = sortedChains.length === 0 ? start : sortedChains[0];
 
   return { start, end };
 };
 
-schema.statics.removePageRedirectsByToPath = async function(toPath: string): Promise<void> {
+schema.statics.removePageRedirectsByToPath = async function (
+  toPath: string,
+): Promise<void> {
   const aggResult: IPageRedirectWithChains[] = await this.aggregate([
     { $match: { toPath } },
     {
@@ -145,17 +159,18 @@ schema.statics.removePageRedirectsByToPath = async function(toPath: string): Pro
     return;
   }
 
-  const idsToRemove = aggResult
-    .map((redirectWithChains) => {
-      return [
-        redirectWithChains._id,
-        redirectWithChains[CHAINS_FIELD_NAME].map(doc => doc._id),
-      ].flat();
-    })
-    .flat();
+  const idsToRemove = aggResult.flatMap((redirectWithChains) => {
+    return [
+      redirectWithChains._id,
+      redirectWithChains[CHAINS_FIELD_NAME].map((doc) => doc._id),
+    ].flat();
+  });
 
   await this.deleteMany({ _id: { $in: idsToRemove } });
   return;
 };
 
-export default getOrCreateModel<PageRedirectDocument, PageRedirectModel>('PageRedirect', schema);
+export default getOrCreateModel<PageRedirectDocument, PageRedirectModel>(
+  'PageRedirect',
+  schema,
+);

@@ -1,8 +1,13 @@
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 
 function serializeInsecureUserAttributes(userGroupRelation) {
-  if (userGroupRelation.relatedUser != null && userGroupRelation.relatedUser._id != null) {
-    userGroupRelation.relatedUser = serializeUserSecurely(userGroupRelation.relatedUser);
+  if (
+    userGroupRelation.relatedUser != null &&
+    userGroupRelation.relatedUser._id != null
+  ) {
+    userGroupRelation.relatedUser = serializeUserSecurely(
+      userGroupRelation.relatedUser,
+    );
   }
   return userGroupRelation;
 }

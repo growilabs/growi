@@ -16,25 +16,27 @@ const factory = (crowi) => {
 
   let bookmarkSchema = null;
 
-
-  bookmarkSchema = new mongoose.Schema({
-    page: { type: ObjectId, ref: 'Page', index: true },
-    user: { type: ObjectId, ref: 'User', index: true },
-  }, {
-    timestamps: { createdAt: true, updatedAt: false },
-  });
+  bookmarkSchema = new mongoose.Schema(
+    {
+      page: { type: ObjectId, ref: 'Page', index: true },
+      user: { type: ObjectId, ref: 'User', index: true },
+    },
+    {
+      timestamps: { createdAt: true, updatedAt: false },
+    },
+  );
   bookmarkSchema.index({ page: 1, user: 1 }, { unique: true });
   bookmarkSchema.plugin(mongoosePaginate);
   bookmarkSchema.plugin(uniqueValidator);
 
-  bookmarkSchema.statics.countByPageId = async function(pageId) {
+  bookmarkSchema.statics.countByPageId = async function (pageId) {
     return await this.count({ page: pageId });
   };
 
   /**
    * @return {object} key: page._id, value: bookmark count
    */
-  bookmarkSchema.statics.getPageIdToCountMap = async function(pageIds) {
+  bookmarkSchema.statics.getPageIdToCountMap = async function (pageIds) {
     const results = await this.aggregate()
       .match({ page: { $in: pageIds } })
       .group({ _id: '$page', count: { $sum: 1 } });
@@ -49,21 +51,20 @@ const factory = (crowi) => {
   };
 
   // bookmark チェック用
-  bookmarkSchema.statics.findByPageIdAndUserId = function(pageId, userId) {
-    const Bookmark = this;
-
-    return new Promise(((resolve, reject) => {
-      return Bookmark.findOne({ page: pageId, user: userId }, (err, doc) => {
+  bookmarkSchema.statics.findByPageIdAndUserId = function (pageId, userId) {
+    return new Promise((resolve, reject) => {
+      return this.findOne({ page: pageId, user: userId }, (err, doc) => {
         if (err) {
           return reject(err);
         }
 
         return resolve(doc);
       });
-    }));
+    });
   };
 
-  bookmarkSchema.statics.add = async function(page, user) {
+  bookmarkSchema.statics.add = async function (page, user) {
+    // biome-ignore lint/complexity/noUselessThisAlias: ignore
     const Bookmark = this;
 
     const newBookmark = new Bookmark({ page, user });
@@ -72,8 +73,7 @@ const factory = (crowi) => {
       const bookmark = await newBookmark.save();
       bookmarkEvent.emit('create', page._id);
       return bookmark;
-    }
-    catch (err) {
+    } catch (err) {
       if (err.code === 11000) {
         // duplicate key (dummy response of new object)
         return newBookmark;
@@ -88,29 +88,29 @@ const factory = (crowi) => {
    * used only when removing the page
    * @param {string} pageId
    */
-  bookmarkSchema.statics.removeBookmarksByPageId = async function(pageId) {
+  bookmarkSchema.statics.removeBookmarksByPageId = async function (pageId) {
+    // biome-ignore lint/complexity/noUselessThisAlias: ignore
     const Bookmark = this;
 
     try {
       const data = await Bookmark.remove({ page: pageId });
       bookmarkEvent.emit('delete', pageId);
       return data;
-    }
-    catch (err) {
+    } catch (err) {
       logger.debug('Bookmark.remove failed (removeBookmarkByPage)', err);
       throw err;
     }
   };
 
-  bookmarkSchema.statics.removeBookmark = async function(pageId, user) {
+  bookmarkSchema.statics.removeBookmark = async function (pageId, user) {
+    // biome-ignore lint/complexity/noUselessThisAlias: ignore
     const Bookmark = this;
 
     try {
       const data = await Bookmark.findOneAndRemove({ page: pageId, user });
       bookmarkEvent.emit('delete', pageId);
       return data;
-    }
-    catch (err) {
+    } catch (err) {
       logger.debug('Bookmark.findOneAndRemove failed', err);
       throw err;
     }
