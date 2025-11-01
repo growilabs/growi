@@ -2,8 +2,7 @@ import { test } from '@playwright/test';
 
 import { collapseSidebar } from '../utils';
 
-
-test('Switch sidebar mode', async({ page }) => {
+test('Switch sidebar mode', async ({ page }) => {
   await page.goto('/');
   await collapseSidebar(page, false);
   await collapseSidebar(page, true);

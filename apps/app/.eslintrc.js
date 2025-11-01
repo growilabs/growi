@@ -23,6 +23,7 @@ module.exports = {
     'test/integration/models/**',
     'test/integration/service/**',
     'test/integration/setup.js',
+    'playwright/**',
     'test-with-vite/**',
     'public/**',
     'bin/**',
