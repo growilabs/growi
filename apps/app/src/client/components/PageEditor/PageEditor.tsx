@@ -331,8 +331,14 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
     }
   }, [editorMode, mutateReservedNextCaretLine]);
 
-  const { data: editorGuideModalStatus, close: closeEditorGuideModal } = useEditorGuideModal();
+  const { close: closeEditorGuideModal } = useEditorGuideModal();
 
+  // close modal if unmount page editor
+  useEffect(() => {
+    return () => {
+      closeEditorGuideModal();
+    };
+  }, [closeEditorGuideModal]);
 
   // TODO: Check the reproduction conditions that made this code necessary and confirm reproduction
   // // when transitioning to a different page, if the initialValue is the same,
@@ -397,8 +403,6 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
           pagePath={currentPagePath}
           expandContentWidth={shouldExpandContent}
           style={pastEndStyle}
-          isEditorGuideModalOpen={editorGuideModalStatus?.isOpened ?? false}
-          onCloseEditorGuideModal={closeEditorGuideModal}
         />
       </div>
     </div>

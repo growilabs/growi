@@ -1,5 +1,6 @@
 import type { CSSProperties, JSX } from 'react';
 
+import { useEditorGuideModal } from '@growi/editor/dist/client/stores/use-editor-guide-modal';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 
 import RevisionRenderer from '~/components/PageView/RevisionRenderer';
@@ -22,8 +23,6 @@ type Props = {
   expandContentWidth?: boolean,
   style?: CSSProperties,
   onScroll?: (scrollTop: number) => void,
-  isEditorGuideModalOpen?: boolean,
-  onCloseEditorGuideModal?: () => void,
 }
 
 const Preview = (props: Props): JSX.Element => {
@@ -32,14 +31,14 @@ const Preview = (props: Props): JSX.Element => {
     rendererOptions,
     markdown, pagePath, style,
     expandContentWidth,
-    isEditorGuideModalOpen,
-    onCloseEditorGuideModal,
   } = props;
 
   const { data: isEnabledMarp } = useIsEnabledMarp();
   const isSlide = useSlidesByFrontmatter(markdown, isEnabledMarp);
 
   const fluidLayoutClass = expandContentWidth ? 'fluid-layout' : '';
+
+  const { data: editorGuideModalStatus, close: closeEditorGuideModal } = useEditorGuideModal();
 
   return (
     <div
@@ -48,8 +47,8 @@ const Preview = (props: Props): JSX.Element => {
       style={style}
     >
       <EditorGuideModal
-        isOpen={isEditorGuideModalOpen ?? false}
-        onClose={onCloseEditorGuideModal ?? (() => {})}
+        isOpen={editorGuideModalStatus?.isOpened ?? false}
+        onClose={closeEditorGuideModal}
       />
 
       { markdown != null
