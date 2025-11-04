@@ -1,4 +1,10 @@
 import { type IUserHasId, SCOPE } from '@growi/core/dist/interfaces';
+import {
+  isCreatablePage,
+  userHomepagePath,
+} from '@growi/core/dist/utils/page-path-utils';
+import { normalizePath } from '@growi/core/dist/utils/path-utils';
+import { format } from 'date-fns/format';
 import type { Request, RequestHandler } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { body } from 'express-validator';
@@ -7,21 +13,34 @@ import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:routes:apiv3:ai-tools:create-page');
 
 const determinePath = async (
+  user: IUserHasId,
   path?: string,
   todaysMemoTitle?: string,
   pathHintKeywords?: string[],
 ): Promise<string> => {
   if (path != null) {
-    return '';
+    const normalizedPath = normalizePath(path);
+    if (isCreatablePage(normalizedPath)) {
+      return normalizedPath;
+    }
+
+    throw new Error('The specified path is not creatable page path');
   }
 
   if (todaysMemoTitle != null) {
-    return '';
+    console.log(user.lang);
+    const { t } = await getTranslation({ lang: user.lang });
+    const parentDirName = t('create_page_dropdown.todays.memo');
+    const now = format(new Date(), 'yyyy/MM/dd');
+    const parentPath = `${userHomepagePath(user)}/${parentDirName}`;
+    const todaysPath = `${parentPath}/${now}`;
+    return todaysPath;
   }
 
   if (pathHintKeywords != null && pathHintKeywords.length > 0) {
@@ -98,6 +117,7 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
 
       try {
         const determinedPath = await determinePath(
+          req.user,
           path,
           todaysMemoTitle,
           pathHintKeywords,
