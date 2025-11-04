@@ -11,6 +11,26 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:routes:apiv3:ai-tools:create-page');
 
+const determinePath = async (
+  path?: string,
+  todaysMemoTitle?: string,
+  pathHintKeywords?: string[],
+): Promise<string> => {
+  if (path != null) {
+    return '';
+  }
+
+  if (todaysMemoTitle != null) {
+    return '';
+  }
+
+  if (pathHintKeywords != null && pathHintKeywords.length > 0) {
+    return '';
+  }
+
+  throw new Error('Cannot determine page path');
+};
+
 type ReqBody = {
   path?: string;
   pathHintKeywords?: string[];
@@ -77,6 +97,12 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
       }
 
       try {
+        const determinedPath = await determinePath(
+          path,
+          todaysMemoTitle,
+          pathHintKeywords,
+        );
+        console.log('determinedPath:', determinedPath);
         return res.apiv3({});
       } catch (err) {
         logger.error(err);
