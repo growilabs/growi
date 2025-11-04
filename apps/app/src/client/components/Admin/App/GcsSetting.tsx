@@ -1,23 +1,18 @@
 import type { JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
-import type { UseFormRegister, FieldValues } from 'react-hook-form';
+import type { UseFormRegister } from 'react-hook-form';
 
+import type { FileUploadFormValues } from './FileUploadSetting.types';
 
 export type GcsSettingMoleculeProps = {
-  register: UseFormRegister<FieldValues>
-  gcsReferenceFileWithRelayMode
-  gcsUseOnlyEnvVars
-  gcsApiKeyJsonPath
-  gcsBucket
-  gcsUploadNamespace
-  envGcsApiKeyJsonPath?
-  envGcsBucket?
-  envGcsUploadNamespace?
+  register: UseFormRegister<FileUploadFormValues>
+  gcsReferenceFileWithRelayMode: boolean
+  gcsUseOnlyEnvVars: boolean
+  envGcsApiKeyJsonPath?: string
+  envGcsBucket?: string
+  envGcsUploadNamespace?: string
   onChangeGcsReferenceFileWithRelayMode: (val: boolean) => void
-  onChangeGcsApiKeyJsonPath: (val: string) => void
-  onChangeGcsBucket: (val: string) => void
-  onChangeGcsUploadNamespace: (val: string) => void
 };
 
 export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element => {
@@ -33,7 +28,6 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
 
   return (
     <>
-
       <div className="row my-3">
         <label className="text-start text-md-end col-md-3 col-form-label">
           {t('admin:app_setting.file_delivery_method')}
@@ -56,16 +50,16 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props?.onChangeGcsReferenceFileWithRelayMode(true) }}
+                onClick={() => { props.onChangeGcsReferenceFileWithRelayMode(true) }}
               >
                 {t('admin:app_setting.file_delivery_method_relay')}
               </button>
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props?.onChangeGcsReferenceFileWithRelayMode(false) }}
+                onClick={() => { props.onChangeGcsReferenceFileWithRelayMode(false) }}
               >
-                { t('admin:app_setting.file_delivery_method_redirect')}
+                {t('admin:app_setting.file_delivery_method_redirect')}
               </button>
             </div>
 
@@ -155,7 +149,6 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
           </tr>
         </tbody>
       </table>
-
     </>
   );
 };

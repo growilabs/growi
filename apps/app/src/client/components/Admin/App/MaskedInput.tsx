@@ -1,7 +1,7 @@
 import type { ChangeEvent } from 'react';
 import { useState, type JSX } from 'react';
 
-import type { UseFormRegister, FieldValues } from 'react-hook-form';
+import type { UseFormRegister } from 'react-hook-form';
 
 import styles from './MaskedInput.module.scss';
 
@@ -11,7 +11,8 @@ type Props = {
   value?: string
   onChange?: (e: ChangeEvent<HTMLInputElement>) => void
   tabIndex?: number | undefined
-  register?: UseFormRegister<FieldValues>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  register?: UseFormRegister<any>
   fieldName?: string
 };
 

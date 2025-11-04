@@ -1,23 +1,14 @@
 import type { JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
-import type { UseFormRegister, FieldValues } from 'react-hook-form';
+import type { UseFormRegister } from 'react-hook-form';
 
+import type { FileUploadFormValues } from './FileUploadSetting.types';
 
 export type AwsSettingMoleculeProps = {
-  register: UseFormRegister<FieldValues>
-  s3ReferenceFileWithRelayMode
-  s3Region
-  s3CustomEndpoint
-  s3Bucket
-  s3AccessKeyId
-  s3SecretAccessKey
+  register: UseFormRegister<FileUploadFormValues>
+  s3ReferenceFileWithRelayMode: boolean
   onChangeS3ReferenceFileWithRelayMode: (val: boolean) => void
-  onChangeS3Region: (val: string) => void
-  onChangeS3CustomEndpoint: (val: string) => void
-  onChangeS3Bucket: (val: string) => void
-  onChangeS3AccessKeyId: (val: string) => void
-  onChangeS3SecretAccessKey: (val: string) => void
 };
 
 export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element => {
@@ -25,7 +16,6 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
 
   return (
     <>
-
       <div className="row my-3">
         <label className="text-start text-md-end col-md-3 col-form-label">
           {t('admin:app_setting.file_delivery_method')}
@@ -48,16 +38,16 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props?.onChangeS3ReferenceFileWithRelayMode(true) }}
+                onClick={() => { props.onChangeS3ReferenceFileWithRelayMode(true) }}
               >
                 {t('admin:app_setting.file_delivery_method_relay')}
               </button>
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props?.onChangeS3ReferenceFileWithRelayMode(false) }}
+                onClick={() => { props.onChangeS3ReferenceFileWithRelayMode(false) }}
               >
-                { t('admin:app_setting.file_delivery_method_redirect')}
+                {t('admin:app_setting.file_delivery_method_redirect')}
               </button>
             </div>
 
@@ -138,8 +128,6 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
           <p className="form-text text-muted">{t('admin:app_setting.s3_secret_access_key_input_description')}</p>
         </div>
       </div>
-
-
     </>
   );
 };

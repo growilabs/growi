@@ -288,6 +288,7 @@
     "@types/react-input-autosize": "^2.2.4",
     "@types/react-scroll": "^1.8.4",
     "@types/react-stickynode": "^4.0.3",
+    "@types/supertest": "^6.0.3",
     "@types/testing-library__dom": "^7.5.0",
     "@types/throttle-debounce": "^5.0.1",
     "@types/unist": "^3.0.3",
@@ -337,6 +338,7 @@
     "simplebar-react": "^2.3.6",
     "socket.io-client": "^4.7.5",
     "source-map-loader": "^4.0.1",
+    "supertest": "^7.1.4",
     "swagger2openapi": "^7.0.8",
     "unist-util-is": "^6.0.0",
     "unist-util-visit-parents": "^6.0.0"

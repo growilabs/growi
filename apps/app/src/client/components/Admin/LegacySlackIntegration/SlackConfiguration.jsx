@@ -135,7 +135,10 @@ const SlackConfiguration = (props) => {
           )
         }
 
-        <AdminUpdateButtonRow disabled={retrieveError != null} />
+        <AdminUpdateButtonRow
+          disabled={retrieveError != null}
+          onClick={handleSubmit(onClickSubmit)}
+        />
 
         <hr />
 
@@ -149,7 +152,7 @@ const SlackConfiguration = (props) => {
             {t('notification_settings.how_to.workspace')}
             <ol>
               {/* eslint-disable-next-line react/no-danger */}
-              <li dangerouslySetInnerHTML={{ __html:  t('notification_settings.how_to.workspace_desc1') }} />
+              <li dangerouslySetInnerHTML={{ __html: t('notification_settings.how_to.workspace_desc1') }} />
               <li>{t('notification_settings.how_to.workspace_desc2')}</li>
               <li>{t('notification_settings.how_to.workspace_desc3')}</li>
             </ol>
