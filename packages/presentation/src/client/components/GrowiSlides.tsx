@@ -1,5 +1,5 @@
-import Head from 'next/head';
 import type { JSX } from 'react';
+import Head from 'next/head';
 import ReactMarkdown from 'react-markdown';
 
 import type { PresentationOptions } from '../consts';
@@ -9,7 +9,6 @@ import {
   slideMarpit,
 } from '../services/growi-marpit';
 import * as extractSections from '../services/renderer/extract-sections';
-
 import {
   PresentationRichSlideSection,
   RichSlideSection,

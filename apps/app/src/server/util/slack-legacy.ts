@@ -1,37 +1,40 @@
 import type { ChatPostMessageArguments } from '@slack/web-api';
 import { WebClient } from '@slack/web-api';
-import { IncomingWebhook, type IncomingWebhookSendArguments } from '@slack/webhook';
+import {
+  IncomingWebhook,
+  type IncomingWebhookSendArguments,
+} from '@slack/webhook';
 
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:util:slack-legacy');
 
-
 interface SlackLegacyUtil {
-  postMessage(messageObj: IncomingWebhookSendArguments | ChatPostMessageArguments): Promise<void>,
+  postMessage(
+    messageObj: IncomingWebhookSendArguments | ChatPostMessageArguments,
+  ): Promise<void>;
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export const slackLegacyUtilFactory = (configManager: any): SlackLegacyUtil => {
-
-  const postWithIwh = async(messageObj: IncomingWebhookSendArguments) => {
-    const webhook = new IncomingWebhook(configManager.getConfig('slack:incomingWebhookUrl'));
+  const postWithIwh = async (messageObj: IncomingWebhookSendArguments) => {
+    const webhook = new IncomingWebhook(
+      configManager.getConfig('slack:incomingWebhookUrl'),
+    );
     try {
       await webhook.send(messageObj);
-    }
-    catch (error) {
+    } catch (error) {
       logger.debug('Post error', error);
       logger.debug('Sent data to slack is:', messageObj);
       throw error;
     }
   };
 
-  const postWithWebApi = async(messageObj?: ChatPostMessageArguments) => {
+  const postWithWebApi = async (messageObj?: ChatPostMessageArguments) => {
     const client = new WebClient(configManager.getConfig('slack:token'));
     try {
       await client.chat.postMessage(messageObj);
-    }
-    catch (error) {
+    } catch (error) {
       logger.debug('Post error', error);
       logger.debug('Sent data to slack is:', messageObj);
       throw error;
@@ -39,7 +42,7 @@ export const slackLegacyUtilFactory = (configManager: any): SlackLegacyUtil => {
   };
 
   return {
-    postMessage: async(messageObj) => {
+    postMessage: async (messageObj) => {
       // when incoming Webhooks is prioritized
       if (configManager.getConfig('slack:isIncomingWebhookPrioritized')) {
         if (configManager.getConfig('slack:incomingWebhookUrl')) {

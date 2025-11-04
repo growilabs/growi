@@ -1,11 +1,12 @@
 import { useEffect, useMemo } from 'react';
-
 import type {
-  NextPage, GetServerSideProps, GetServerSidePropsContext,
+  GetServerSideProps,
+  GetServerSidePropsContext,
+  NextPage,
 } from 'next';
-import { useTranslation } from 'next-i18next';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
+import { useTranslation } from 'next-i18next';
 import type { Container } from 'unstated';
 import { Provider } from 'unstated';
 
@@ -16,15 +17,24 @@ import { useCurrentUser, useIsMailerSetup } from '~/stores-universal/context';
 
 import { retrieveServerSideProps } from '../../../utils/admin-page-util';
 
-const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), { ssr: false });
-const UserManagement = dynamic(() => import('~/client/components/Admin/UserManagement'), { ssr: false });
-const ForbiddenPage = dynamic(() => import('~/client/components/Admin/ForbiddenPage').then(mod => mod.ForbiddenPage), { ssr: false });
-
+const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), {
+  ssr: false,
+});
+const UserManagement = dynamic(
+  () => import('~/client/components/Admin/UserManagement'),
+  { ssr: false },
+);
+const ForbiddenPage = dynamic(
+  () =>
+    import('~/client/components/Admin/ForbiddenPage').then(
+      (mod) => mod.ForbiddenPage,
+    ),
+  { ssr: false },
+);
 
 type Props = CommonProps & {
-  isMailerSetup: boolean,
+  isMailerSetup: boolean;
 };
-
 
 const AdminUserManagementPage: NextPage<Props> = (props) => {
   const { t } = useTranslation('admin');
@@ -37,8 +47,10 @@ const AdminUserManagementPage: NextPage<Props> = (props) => {
   const injectableContainers: Container<any>[] = useMemo(() => [], []);
 
   useEffect(() => {
-    (async() => {
-      const AdminUsersContainer = (await import('~/client/services/AdminUsersContainer')).default;
+    (async () => {
+      const AdminUsersContainer = (
+        await import('~/client/services/AdminUsersContainer')
+      ).default;
       const adminUsersContainer = new AdminUsersContainer();
       injectableContainers.push(adminUsersContainer);
     })();
@@ -58,10 +70,12 @@ const AdminUserManagementPage: NextPage<Props> = (props) => {
       </AdminLayout>
     </Provider>
   );
-
 };
 
-const injectServerConfigurations = async(context: GetServerSidePropsContext, props: Props): Promise<void> => {
+const injectServerConfigurations = async (
+  context: GetServerSidePropsContext,
+  props: Props,
+): Promise<void> => {
   const req: CrowiRequest = context.req as CrowiRequest;
   const { crowi } = req;
   const { mailService } = crowi;
@@ -69,10 +83,14 @@ const injectServerConfigurations = async(context: GetServerSidePropsContext, pro
   props.isMailerSetup = mailService.isMailerSetup;
 };
 
-export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {
-  const props = await retrieveServerSideProps(context, injectServerConfigurations);
+export const getServerSideProps: GetServerSideProps = async (
+  context: GetServerSidePropsContext,
+) => {
+  const props = await retrieveServerSideProps(
+    context,
+    injectServerConfigurations,
+  );
   return props;
 };
-
 
 export default AdminUserManagementPage;

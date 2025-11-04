@@ -1,21 +1,29 @@
 import React from 'react';
-
-import type { NextPage, GetServerSideProps, GetServerSidePropsContext } from 'next';
+import type {
+  GetServerSideProps,
+  GetServerSidePropsContext,
+  NextPage,
+} from 'next';
+import dynamic from 'next/dynamic';
 import { useTranslation } from 'next-i18next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
-import dynamic from 'next/dynamic';
 
 import { RawLayout } from '~/components/Layout/RawLayout';
 
 import type { CommonProps } from './utils/commons';
-import { getNextI18NextConfig, getServerSideCommonProps } from './utils/commons';
-
+import {
+  getNextI18NextConfig,
+  getServerSideCommonProps,
+} from './utils/commons';
 
 type Props = CommonProps & {
-  email: string
+  email: string;
 };
 
-const PasswordResetExecutionForm = dynamic(() => import('~/client/components/PasswordResetExecutionForm'), { ssr: false });
+const PasswordResetExecutionForm = dynamic(
+  () => import('~/client/components/PasswordResetExecutionForm'),
+  { ssr: false },
+);
 
 const ForgotPasswordPage: NextPage<Props> = (props: Props) => {
   const { t } = useTranslation();
@@ -28,10 +36,18 @@ const ForgotPasswordPage: NextPage<Props> = (props: Props) => {
             <div className="row justify-content-md-center">
               <div className="col-md-6 mt-5">
                 <div className="text-center">
-                  <h1><span className="material-symbols-outlined large">lock_open</span></h1>
-                  <h2 className="text-center">{ t('forgot_password.reset_password') }</h2>
-                  <h5>{ props.email }</h5>
-                  <p className="mt-4">{ t('forgot_password.password_reset_excecution_desc') }</p>
+                  <h1>
+                    <span className="material-symbols-outlined large">
+                      lock_open
+                    </span>
+                  </h1>
+                  <h2 className="text-center">
+                    {t('forgot_password.reset_password')}
+                  </h2>
+                  <h5>{props.email}</h5>
+                  <p className="mt-4">
+                    {t('forgot_password.password_reset_excecution_desc')}
+                  </p>
                   <PasswordResetExecutionForm />
                 </div>
               </div>
@@ -44,12 +60,22 @@ const ForgotPasswordPage: NextPage<Props> = (props: Props) => {
 };
 
 // eslint-disable-next-line max-len
-async function injectNextI18NextConfigurations(context: GetServerSidePropsContext, props: Props, namespacesRequired?: string[] | undefined): Promise<void> {
-  const nextI18NextConfig = await getNextI18NextConfig(serverSideTranslations, context, namespacesRequired);
+async function injectNextI18NextConfigurations(
+  context: GetServerSidePropsContext,
+  props: Props,
+  namespacesRequired?: string[] | undefined,
+): Promise<void> {
+  const nextI18NextConfig = await getNextI18NextConfig(
+    serverSideTranslations,
+    context,
+    namespacesRequired,
+  );
   props._nextI18Next = nextI18NextConfig._nextI18Next;
 }
 
-export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {
+export const getServerSideProps: GetServerSideProps = async (
+  context: GetServerSidePropsContext,
+) => {
   const result = await getServerSideCommonProps(context);
 
   // check for presence
@@ -65,7 +91,10 @@ export const getServerSideProps: GetServerSideProps = async(context: GetServerSi
     props.email = email;
   }
 
-  await injectNextI18NextConfigurations(context, props, ['translation', 'commons']);
+  await injectNextI18NextConfigurations(context, props, [
+    'translation',
+    'commons',
+  ]);
 
   return {
     props,

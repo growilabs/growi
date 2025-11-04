@@ -12,14 +12,16 @@ const doc = (editor: EditorView) => {
 
 const getCursorLine = (editor: EditorView) => {
   return doc(editor).lineAt(curPos(editor));
-
 };
 
 export const isInLink = (editor: EditorView): boolean => {
   const cursorLine = getCursorLine(editor);
   const startPos = curPos(editor) - cursorLine.from;
 
-  const { beginningOfLink, endOfLink } = Linker.getBeginningAndEndIndexOfLink(cursorLine.text, startPos);
+  const { beginningOfLink, endOfLink } = Linker.getBeginningAndEndIndexOfLink(
+    cursorLine.text,
+    startPos,
+  );
   return beginningOfLink >= 0 && endOfLink >= 0;
 };
 export const getMarkdownLink = (editor: EditorView): Linker => {
@@ -36,6 +38,9 @@ export const getMarkdownLink = (editor: EditorView): Linker => {
   return Linker.fromLineWithIndex(cursorLine.text, startPos);
 };
 
-export const replaceFocusedMarkdownLinkWithEditor = (editor: EditorView, linkText: string): void => {
+export const replaceFocusedMarkdownLinkWithEditor = (
+  editor: EditorView,
+  linkText: string,
+): void => {
   editor.dispatch(editor.state.replaceSelection(linkText));
 };

@@ -4,7 +4,6 @@ import loggerFactory from '~/utils/logger';
 
 import { PageBulkExportJobInProgressStatus } from '../../interfaces/page-bulk-export';
 import PageBulkExportJob from '../models/page-bulk-export-job';
-
 import { pageBulkExportJobCronService } from './page-bulk-export-job-cron';
 
 const logger = loggerFactory(

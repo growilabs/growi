@@ -1,5 +1,4 @@
 import { ServerResponse } from 'node:http';
-
 import {
   type GrowiCommand,
   type IChannelOptionalId,

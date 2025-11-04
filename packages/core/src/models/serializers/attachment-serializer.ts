@@ -3,7 +3,6 @@ import { Document } from 'mongoose';
 import type { IAttachment, IUser } from '~/interfaces';
 
 import { isPopulated, isRef, type Ref } from '../../interfaces/common';
-
 import {
   type IUserSerializedSecurely,
   serializeUserSecurely,

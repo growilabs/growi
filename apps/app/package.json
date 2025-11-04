@@ -1,6 +1,6 @@
 {
   "name": "@growi/app",
-  "version": "7.3.3",
+  "version": "7.3.4-RC.0",
   "license": "MIT",
   "private": "true",
   "scripts": {
@@ -246,7 +246,7 @@
     "url-join": "^4.0.0",
     "usehooks-ts": "^2.6.0",
     "uuid": "^11.0.3",
-    "validator": "^13.7.0",
+    "validator": "^13.15.20",
     "ws": "^8.17.1",
     "xss": "^1.0.15",
     "y-mongodb-provider": "^0.2.0",
@@ -288,6 +288,7 @@
     "@types/react-input-autosize": "^2.2.4",
     "@types/react-scroll": "^1.8.4",
     "@types/react-stickynode": "^4.0.3",
+    "@types/supertest": "^6.0.3",
     "@types/testing-library__dom": "^7.5.0",
     "@types/throttle-debounce": "^5.0.1",
     "@types/unist": "^3.0.3",
@@ -337,6 +338,7 @@
     "simplebar-react": "^2.3.6",
     "socket.io-client": "^4.7.5",
     "source-map-loader": "^4.0.1",
+    "supertest": "^7.1.4",
     "swagger2openapi": "^7.0.8",
     "unist-util-is": "^6.0.0",
     "unist-util-visit-parents": "^6.0.0"

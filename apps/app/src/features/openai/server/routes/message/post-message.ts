@@ -6,7 +6,7 @@ import type { ValidationChain } from 'express-validator';
 import { body } from 'express-validator';
 import type { AssistantStream } from 'openai/lib/AssistantStream';
 import type { MessageDelta } from 'openai/resources/beta/threads/messages.mjs';
-import { type ChatCompletionChunk } from 'openai/resources/chat/completions';
+import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
 
 import { getOrCreateChatAssistant } from '~/features/openai/server/services/assistant';
 import type Crowi from '~/server/crowi';
@@ -15,7 +15,10 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
-import { MessageErrorCode, type StreamErrorCode } from '../../../interfaces/message-error';
+import {
+  MessageErrorCode,
+  type StreamErrorCode,
+} from '../../../interfaces/message-error';
 import AiAssistantModel from '../../models/ai-assistant';
 import ThreadRelationModel from '../../models/thread-relation';
 import { openaiClient } from '../../services/client';
@@ -26,8 +29,9 @@ import { certifyAiService } from '../middlewares/certify-ai-service';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:message');
 
-
-function instructionForAssistantInstruction(assistantInstruction: string): string {
+function instructionForAssistantInstruction(
+  assistantInstruction: string,
+): string {
   return `# Assistant Configuration:
 
 <assistant_instructions>
@@ -43,23 +47,26 @@ ${assistantInstruction}
 `;
 }
 
-
 type ReqBody = {
-  userMessage: string,
-  aiAssistantId: string,
-  threadId?: string,
-  summaryMode?: boolean,
-  extendedThinkingMode?: boolean,
-}
+  userMessage: string;
+  aiAssistantId: string;
+  threadId?: string;
+  summaryMode?: boolean;
+  extendedThinkingMode?: boolean;
+};
 
 type Req = Request<undefined, Response, ReqBody> & {
-  user: IUserHasId,
-}
+  user: IUserHasId;
+};
 
 type PostMessageHandlersFactory = (crowi: Crowi) => RequestHandler[];
 
-export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(crowi);
+export const postMessageHandlersFactory: PostMessageHandlersFactory = (
+  crowi,
+) => {
+  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
+    crowi,
+  );
 
   const validator: ValidationChain[] = [
     body('userMessage')
@@ -67,17 +74,34 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
       .withMessage('userMessage must be string')
       .notEmpty()
       .withMessage('userMessage must be set'),
-    body('aiAssistantId').isMongoId().withMessage('aiAssistantId must be string'),
-    body('threadId').optional().isString().withMessage('threadId must be string'),
+    body('aiAssistantId')
+      .isMongoId()
+      .withMessage('aiAssistantId must be string'),
+    body('threadId')
+      .optional()
+      .isString()
+      .withMessage('threadId must be string'),
   ];
 
   return [
-    accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT], { acceptLegacy: true }), loginRequiredStrictly, certifyAiService, validator, apiV3FormValidator,
-    async(req: Req, res: ApiV3Response) => {
+    accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT], {
+      acceptLegacy: true,
+    }),
+    loginRequiredStrictly,
+    certifyAiService,
+    validator,
+    apiV3FormValidator,
+    async (req: Req, res: ApiV3Response) => {
       const { aiAssistantId, threadId } = req.body;
 
       if (threadId == null) {
-        return res.apiv3Err(new ErrorV3('threadId is not set', MessageErrorCode.THREAD_ID_IS_NOT_SET), 400);
+        return res.apiv3Err(
+          new ErrorV3(
+            'threadId is not set',
+            MessageErrorCode.THREAD_ID_IS_NOT_SET,
+          ),
+          400,
+        );
       }
 
       const openaiService = getOpenaiService();
@@ -85,9 +109,15 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
         return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
       }
 
-      const isAiAssistantUsable = await openaiService.isAiAssistantUsable(aiAssistantId, req.user);
+      const isAiAssistantUsable = await openaiService.isAiAssistantUsable(
+        aiAssistantId,
+        req.user,
+      );
       if (!isAiAssistantUsable) {
-        return res.apiv3Err(new ErrorV3('The specified AI assistant is not usable'), 400);
+        return res.apiv3Err(
+          new ErrorV3('The specified AI assistant is not usable'),
+          400,
+        );
       }
 
       const aiAssistant = await AiAssistantModel.findById(aiAssistantId);
@@ -116,7 +146,9 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
             { role: 'user', content: req.body.userMessage },
           ],
           additional_instructions: [
-            instructionForAssistantInstruction(aiAssistant.additionalInstruction),
+            instructionForAssistantInstruction(
+              aiAssistant.additionalInstruction,
+            ),
             useSummaryMode
               ? '**IMPORTANT** : Turn on "Summary Mode"'
               : '**IMPORTANT** : Turn off "Summary Mode"',
@@ -125,9 +157,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
               : '**IMPORTANT** : Turn off "Extended Thinking Mode"',
           ].join('\n\n'),
         });
-
-      }
-      catch (err) {
+      } catch (err) {
         logger.error(err);
 
         // TODO: improve error handling by https://redmine.weseek.co.jp/issues/155004
@@ -135,8 +165,8 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
       }
 
       /**
-      * Create SSE (Server-Sent Events) Responses
-      */
+       * Create SSE (Server-Sent Events) Responses
+       */
       res.writeHead(200, {
         'Content-Type': 'text/event-stream;charset=utf-8',
         'Cache-Control': 'no-cache, no-transform',
@@ -153,7 +183,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
         res.write(`data: ${JSON.stringify(content)}\n\n`);
       };
 
-      const messageDeltaHandler = async(delta: MessageDelta) => {
+      const messageDeltaHandler = async (delta: MessageDelta) => {
         const content = delta.content?.[0];
 
         // If annotation is found
@@ -169,7 +199,11 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (crowi) =>
       };
 
       // Don't add await since SSE is performed asynchronously with main message
-      openaiService.generateAndProcessPreMessage(req.body.userMessage, preMessageChunkHandler)
+      openaiService
+        .generateAndProcessPreMessage(
+          req.body.userMessage,
+          preMessageChunkHandler,
+        )
         .catch((err) => {
           logger.error(err);
         });

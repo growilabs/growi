@@ -1,12 +1,11 @@
-import type { ReactNode, JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 import React, { useEffect } from 'react';
-
-import type { Locale } from '@growi/core/dist/interfaces';
 import type { NextPage } from 'next';
-import { appWithTranslation } from 'next-i18next';
 import type { AppContext, AppProps } from 'next/app';
 import App from 'next/app';
 import { useRouter } from 'next/router';
+import type { Locale } from '@growi/core/dist/interfaces';
+import { appWithTranslation } from 'next-i18next';
 import { SWRConfig } from 'swr';
 
 import * as nextI18nConfig from '^/config/next-i18next.config';
@@ -14,29 +13,39 @@ import * as nextI18nConfig from '^/config/next-i18next.config';
 import { GlobalFonts } from '~/components/FontFamily/GlobalFonts';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import {
-  useAppTitle, useConfidential, useGrowiVersion, useSiteUrl, useIsDefaultLogo, useForcedColorScheme,
+  useAppTitle,
+  useConfidential,
+  useForcedColorScheme,
+  useGrowiVersion,
+  useIsDefaultLogo,
+  useSiteUrl,
 } from '~/stores-universal/context';
 import { swrGlobalConfiguration } from '~/utils/swr-utils';
 
-import { getLocaleAtServerSide, type CommonProps } from './utils/commons';
+import { type CommonProps, getLocaleAtServerSide } from './utils/commons';
 import '~/styles/prebuilt/vendor.css';
 import '~/styles/style-app.scss';
+
 import { registerTransformerForObjectId } from './utils/objectid-transformer';
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
-  getLayout?: (page: JSX.Element) => ReactNode,
-}
+  getLayout?: (page: JSX.Element) => ReactNode;
+};
 
 type GrowiAppProps = AppProps & {
-  Component: NextPageWithLayout,
-  userLocale: Locale,
+  Component: NextPageWithLayout;
+  userLocale: Locale;
 };
 
 // register custom serializer
 registerTransformerForObjectId();
 
-function GrowiApp({ Component, pageProps, userLocale }: GrowiAppProps): JSX.Element {
+function GrowiApp({
+  Component,
+  pageProps,
+  userLocale,
+}: GrowiAppProps): JSX.Element {
   const router = useRouter();
 
   useEffect(() => {
@@ -64,7 +73,7 @@ function GrowiApp({ Component, pageProps, userLocale }: GrowiAppProps): JSX.Elem
   useForcedColorScheme(commonPageProps.forcedColorScheme);
 
   // Use the layout defined at the page level, if available
-  const getLayout = Component.getLayout ?? (page => page);
+  const getLayout = Component.getLayout ?? ((page) => page);
 
   return (
     <>
@@ -76,9 +85,11 @@ function GrowiApp({ Component, pageProps, userLocale }: GrowiAppProps): JSX.Elem
   );
 }
 
-GrowiApp.getInitialProps = async(appContext: AppContext) => {
+GrowiApp.getInitialProps = async (appContext: AppContext) => {
   const appProps = App.getInitialProps(appContext);
-  const userLocale = getLocaleAtServerSide(appContext.ctx.req as unknown as CrowiRequest);
+  const userLocale = getLocaleAtServerSide(
+    appContext.ctx.req as unknown as CrowiRequest,
+  );
 
   return { ...appProps, userLocale };
 };

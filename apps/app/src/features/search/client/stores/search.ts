@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-
 import type { SWRResponse } from 'swr';
 
 import { useStaticSWR } from '~/stores/use-static-swr';

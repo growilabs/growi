@@ -1,38 +1,48 @@
 import { useCallback } from 'react';
-
 import { useSWRStatic } from '@growi/core/dist/swr';
 import type { SWRResponse } from 'swr';
 
 import type { EditorMode } from '../stores-universal/ui';
 
 /*
-* PageStatusAlert
-*/
+ * PageStatusAlert
+ */
 type OpenPageStatusAlertOptions = {
-  hideEditorMode?: EditorMode
-  onRefleshPage?: () => void
-  onResolveConflict?: () => void
-}
+  hideEditorMode?: EditorMode;
+  onRefleshPage?: () => void;
+  onResolveConflict?: () => void;
+};
 
 type PageStatusAlertStatus = {
-  isOpen: boolean
-  hideEditorMode?: EditorMode,
-  onRefleshPage?: () => void
-  onResolveConflict?: () => void
-}
+  isOpen: boolean;
+  hideEditorMode?: EditorMode;
+  onRefleshPage?: () => void;
+  onResolveConflict?: () => void;
+};
 
 type PageStatusAlertUtils = {
-  open: (openPageStatusAlert: OpenPageStatusAlertOptions) => void,
-  close: () => void,
-}
-export const usePageStatusAlert = (): SWRResponse<PageStatusAlertStatus, Error> & PageStatusAlertUtils => {
+  open: (openPageStatusAlert: OpenPageStatusAlertOptions) => void;
+  close: () => void;
+};
+export const usePageStatusAlert = (): SWRResponse<
+  PageStatusAlertStatus,
+  Error
+> &
+  PageStatusAlertUtils => {
   const initialData: PageStatusAlertStatus = { isOpen: false };
-  const swrResponse = useSWRStatic<PageStatusAlertStatus, Error>('pageStatusAlert', undefined, { fallbackData: initialData });
+  const swrResponse = useSWRStatic<PageStatusAlertStatus, Error>(
+    'pageStatusAlert',
+    undefined,
+    { fallbackData: initialData },
+  );
   const { mutate } = swrResponse;
 
-  const open = useCallback(({ ...options }) => {
-    mutate({ isOpen: true, ...options });
-  }, [mutate]);
+  const open = useCallback(
+    ({ ...options }) => {
+      mutate({ isOpen: true, ...options });
+    },
+    [mutate],
+  );
 
   const close = useCallback(() => {
     mutate({ isOpen: false });

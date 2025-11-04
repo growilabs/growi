@@ -3,7 +3,7 @@ import path from 'path';
 
 import { getIdStringForRef, type IUser } from '@growi/core';
 import { DevidedPagePath } from '@growi/core/dist/models';
-// eslint-disable-next-line no-restricted-imports
+// biome-ignore lint/style/noRestrictedImports: Direct axios usage for OGP image fetching
 import axios from 'axios';
 import type {
   Request, Response, NextFunction,
