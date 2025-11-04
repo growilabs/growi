@@ -56,7 +56,7 @@ export const Toolbar = memo((props: Props): JSX.Element => {
               <TableButton editorKey={editorKey} />
               <DiagramButton editorKey={editorKey} />
               <TemplateButton editorKey={editorKey} />
-              							<EditorGuideButton editorKey={editorKey} />
+              <EditorGuideButton editorKey={editorKey} />
             </div>
           </SimpleBar>
         </div>
