@@ -11,7 +11,8 @@ export const useSWRxRecentActivity = (
     targetUserId?: string,
 ): SWRResponse<PaginateResult<IActivityHasId>, Error> => {
 
-  const key = ['/user-activities', limit, offset, targetUserId];
+  const shouldFetch = targetUserId && targetUserId.length > 0;
+  const key = shouldFetch ? ['/user-activities', limit, offset, targetUserId] : null;
 
   const fetcher = ([
     endpoint,

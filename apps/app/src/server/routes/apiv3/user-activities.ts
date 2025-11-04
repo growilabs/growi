@@ -180,11 +180,14 @@ module.exports = (crowi: Crowi): Router => {
 
       const limit = req.query.limit || defaultLimit || 10;
       const offset = req.query.offset || 0;
-      const targetUserId = req.query.targetUserId;
+      let targetUserId = req.query.targetUserId;
 
       if (typeof targetUserId !== 'string') {
-        logger.error('Bad request: targetUserId must be of type string.');
-        return res.apiv3Err('Bad request.', 400);
+        targetUserId = req.user?._id;
+      }
+
+      if (!targetUserId) {
+        return res.apiv3Err('Target user ID is missing and authenticated user ID is unavailable.', 400);
       }
 
 
