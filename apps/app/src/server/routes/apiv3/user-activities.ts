@@ -27,6 +27,7 @@ const validator = {
     query('offset').optional().isInt().withMessage('page must be a number')
       .toInt(),
     query('searchFilter').optional().isString().withMessage('query must be a string'),
+    query('targetUserId').optional().isMongoId().withMessage('user ID must be a MongoDB ID'),
   ],
 };
 
@@ -34,6 +35,7 @@ interface StrictActivityQuery {
   limit?: number;
   offset?: number;
   searchFilter?: string;
+  targetUserId?: string;
 }
 
 type CustomRequest<
