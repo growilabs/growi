@@ -999,7 +999,8 @@
   },
   "user_home_page": {
     "bookmarks": "Bookmarks",
-    "recently_created": "Recently Created"
+    "recently_created": "Recently Created",
+    "recent_activity": "Recent Activity"
   },
   "bookmark_folder": {
     "bookmark_folder": "bookmark folder",

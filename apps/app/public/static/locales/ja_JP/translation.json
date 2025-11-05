@@ -1032,7 +1032,8 @@
   },
   "user_home_page": {
     "bookmarks": "ブックマーク",
-    "recently_created": "最近作成したページ"
+    "recently_created": "最近作成したページ",
+    "recent_activity": "最近のアクティビティ"
   },
   "bookmark_folder": {
     "bookmark_folder": "ブックマークフォルダ",

@@ -959,7 +959,8 @@
   },
   "user_home_page": {
     "bookmarks": "북마크",
-    "recently_created": "최근 생성됨"
+    "recently_created": "최근 생성됨",
+    "recent_activity": "최근 활동"
   },
   "bookmark_folder": {
     "bookmark_folder": "북마크 폴더",

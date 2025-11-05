@@ -993,7 +993,8 @@
   },
   "user_home_page": {
     "bookmarks": "Favoris",
-    "recently_created": "Page récentes"
+    "recently_created": "Page récentes",
+    "recent_activity": "Activité récente"
   },
   "bookmark_folder": {
     "bookmark_folder": "dossier de favoris",
