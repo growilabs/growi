@@ -36,7 +36,7 @@ interface AuthorizedRequest
   user?: IUserHasId;
 }
 
-const routerFactory = (crowi: Crowi): Router => {
+export const factory = (crowi: Crowi): Router => {
   const accessTokenParser = crowi.accessTokenParser;
   const loginRequiredStrictly = require('~/server/middlewares/login-required')(
     crowi,
@@ -115,5 +115,3 @@ const routerFactory = (crowi: Crowi): Router => {
   );
   return router;
 };
-
-export default routerFactory;
