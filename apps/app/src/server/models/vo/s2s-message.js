@@ -2,7 +2,6 @@
  * Server-to-server message VO
  */
 class S2sMessage {
-
   constructor(eventName, body = {}) {
     this.eventName = eventName;
     for (const [key, value] of Object.entries(body)) {
@@ -18,12 +17,11 @@ class S2sMessage {
     const body = JSON.parse(messageString);
 
     if (body.eventName == null) {
-      throw new Error('message body must contain \'eventName\'');
+      throw new Error("message body must contain 'eventName'");
     }
 
     return new S2sMessage(body.eventName, body);
   }
-
 }
 
 module.exports = S2sMessage;

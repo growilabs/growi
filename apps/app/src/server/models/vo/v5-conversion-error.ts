@@ -3,7 +3,6 @@ import ExtensibleCustomError from 'extensible-custom-error';
 import type { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
 
 export class V5ConversionError extends ExtensibleCustomError {
-
   readonly id = 'V5ConversionError';
 
   code!: V5ConversionErrCode;
@@ -12,7 +11,6 @@ export class V5ConversionError extends ExtensibleCustomError {
     super(message);
     this.code = code;
   }
-
 }
 
 export const isV5ConversionError = (err: any): err is V5ConversionError => {

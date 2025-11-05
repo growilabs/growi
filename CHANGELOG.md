@@ -1,8 +1,34 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.3.3...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.3.4...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.3.4](https://github.com/growilabs/compare/v7.3.3...v7.3.4) - 2025-11-04
+
+### 🚀 Improvement
+
+* imprv: Admin form text input (#10401) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Enable profile picture uploads for read only users (#10454) @miya
+* fix: CodeQL security issues: insecure randomness and unvalidated redirect (#10431) @[copilot-swe-agent[bot]](https://github.com/apps/copilot-swe-agent)
+* fix: CSRF protection by origin comparison (#10345) @yusa-bot
+
+### 🧰 Maintenance
+
+* support: Clean CSRF token storing hook (#10452) @yuki-takei
+* ci(deps): bump validator from 13.12.0 to 13.15.20 (#10445) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps-dev): bump vite from 5.4.20 to 5.4.21 (#10432) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Configure biome for OpenAI feature client dir (#10422) @arafubeatbox
+* support: Configure biome for small dirs in app/src/server (#10417) @arafubeatbox
+* support: Configure biome for OpenAI feature exluding client dir (#10377) @arafubeatbox
+* support: Configure biome for app services/stores dir (#10411) @arafubeatbox
+* support: Configure biome for app pages dir (#10410) @arafubeatbox
+* support: Configure biome for app components dir (#10382) @arafubeatbox
+* support: Biome v2.2 and use noRestrictedImports instead of eslint(no-restricted-imports) (#10408) @yuki-takei
+* support: Apply Biome and organize imports (#10406) @yuki-takei
 
 ## [v7.3.3](https://github.com/growilabs/compare/v7.3.2...v7.3.3) - 2025-10-15
 
