@@ -49,7 +49,11 @@ describe('AuditLogBulkExportService', () => {
   describe('createOrResetExportJob', () => {
     describe('normal cases', () => {
       it('should create a new export job with valid parameters', async () => {
-        const filters: { actions: SupportedActionType[]; dateFrom: Date; dateTo: Date } = {
+        const filters: {
+          actions: SupportedActionType[];
+          dateFrom: Date;
+          dateTo: Date;
+        } = {
           actions: ['PAGE_VIEW', 'PAGE_CREATE'],
           dateFrom: new Date('2023-01-01'),
           dateTo: new Date('2023-12-31'),
@@ -115,7 +119,9 @@ describe('AuditLogBulkExportService', () => {
       });
 
       it('should reset existing job when restartJob is true', async () => {
-        const filters: { actions: SupportedActionType[] } = { actions: ['PAGE_VIEW'] };
+        const filters: { actions: SupportedActionType[] } = {
+          actions: ['PAGE_VIEW'],
+        };
 
         const firstJobId =
           await auditLogBulkExportService.createOrResetExportJob(
@@ -141,7 +147,9 @@ describe('AuditLogBulkExportService', () => {
 
     describe('error cases', () => {
       it('should throw DuplicateAuditLogBulkExportJobError when duplicate job exists', async () => {
-        const filters: { actions: SupportedActionType[] } = { actions: ['PAGE_VIEW'] };
+        const filters: { actions: SupportedActionType[] } = {
+          actions: ['PAGE_VIEW'],
+        };
 
         await auditLogBulkExportService.createOrResetExportJob(
           filters,
@@ -165,7 +173,9 @@ describe('AuditLogBulkExportService', () => {
           email: 'another@example.com',
         });
 
-        const filters: { actions: SupportedActionType[] } = { actions: ['PAGE_VIEW'] };
+        const filters: { actions: SupportedActionType[] } = {
+          actions: ['PAGE_VIEW'],
+        };
 
         const firstJobId =
           await auditLogBulkExportService.createOrResetExportJob(
@@ -212,7 +222,9 @@ describe('AuditLogBulkExportService', () => {
       });
 
       it('should not throw error if previous job is completed', async () => {
-        const filters: { actions: SupportedActionType[] } = { actions: ['PAGE_VIEW'] };
+        const filters: { actions: SupportedActionType[] } = {
+          actions: ['PAGE_VIEW'],
+        };
 
         const firstJobId =
           await auditLogBulkExportService.createOrResetExportJob(
