@@ -4,14 +4,10 @@ const { serializePageSecurely } = require('../serializers/page-serializer');
  * Server-to-client message VO
  */
 class S2cMessagePageUpdated {
-
-
   constructor(page, user) {
     const serializedPage = serializePageSecurely(page);
 
-    const {
-      _id, revision, updatedAt,
-    } = serializedPage;
+    const { _id, revision, updatedAt } = serializedPage;
 
     this.pageId = _id;
     this.revisionId = revision;
@@ -25,7 +21,6 @@ class S2cMessagePageUpdated {
       this.lastUpdateUsername = user.name;
     }
   }
-
 }
 
 module.exports = {
