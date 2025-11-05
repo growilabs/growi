@@ -3,6 +3,7 @@ export const AttachmentType = {
   WIKI_PAGE: 'WIKI_PAGE',
   PROFILE_IMAGE: 'PROFILE_IMAGE',
   PAGE_BULK_EXPORT: 'PAGE_BULK_EXPORT',
+  AUDIT_LOG_EXPORT: 'AUDIT_LOG_EXPORT',
 } as const;
 
 export type AttachmentType =
@@ -35,4 +36,5 @@ export const FilePathOnStoragePrefix = {
   attachment: 'attachment',
   user: 'user',
   pageBulkExport: 'page-bulk-export',
+  auditLogExport: 'audit-log-export',
 } as const;

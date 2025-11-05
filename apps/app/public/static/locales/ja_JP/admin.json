@@ -879,6 +879,19 @@
       "log_type": "https://docs.growi.org/ja/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
   },
+  "audit_log_export": {
+    "export": "エクスポート",
+    "export_audit_log": "監査ログのエクスポート",
+    "modal_description": "監査ログデータをエクスポートするためのフィルターを選択してください。エクスポートされたファイルはアプリ内通知で配信されます。",
+    "notification_info": "エクスポートが完了すると、アプリ内でダウンロードリンク付きの通知を受け取ります。",
+    "export_started": "監査ログのエクスポートを開始しました",
+    "notification_message": "エクスポートが完了すると通知が届きます",
+    "duplicate_job_error": "重複するジョブが進行中です（作成日時: {{createdAt}}）",
+    "export_failed": "エクスポートの開始に失敗しました: {{message}}",
+    "request_failed": "リクエストに失敗しました: {{error}}",
+    "start_export": "エクスポート開始",
+    "exporting": "エクスポート中..."
+  },
   "g2g_data_transfer": {
     "transfer_data_to_another_growi": "このGROWIのデータを別GROWIへ移行する",
     "advanced_options": "詳細オプション",

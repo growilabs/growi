@@ -327,6 +327,14 @@ export const CONFIG_KEYS = [
   'app:isBulkExportPagesEnabled',
   'env:useOnlyEnvVars:app:isBulkExportPagesEnabled',
 
+  // Audit Log Bulk Export Settings
+  'app:auditLogBulkExportJobCronSchedule',
+  'app:checkAuditLogExportJobInProgressCronSchedule',
+  'app:auditLogBulkExportJobCleanUpCronSchedule',
+  'app:auditLogBulkExportParallelExecLimit',
+  'app:isAuditLogExportEnabled',
+  'env:useOnlyEnvVars:app:isAuditLogExportEnabled',
+
   // Access Token Settings
   'accessToken:deletionCronExpression',
 ] as const;
@@ -1295,6 +1303,30 @@ export const CONFIG_DEFINITIONS = {
   }),
   'env:useOnlyEnvVars:app:isBulkExportPagesEnabled': defineConfig<boolean>({
     envVarName: 'BULK_EXPORT_PAGES_ENABLED_USES_ONLY_ENV_VARS',
+    defaultValue: false,
+  }),
+  'app:auditLogBulkExportJobCronSchedule': defineConfig<string>({
+    envVarName: 'AUDIT_LOG_EXPORT_JOB_CRON_SCHEDULE',
+    defaultValue: '*/10 * * * * *',
+  }),
+  'app:checkAuditLogExportJobInProgressCronSchedule': defineConfig<string>({
+    envVarName: 'CHECK_AUDIT_LOG_EXPORT_JOB_IN_PROGRESS_CRON_SCHEDULE',
+    defaultValue: '*/3 * * * *',
+  }),
+  'app:auditLogBulkExportJobCleanUpCronSchedule': defineConfig<string>({
+    envVarName: 'AUDIT_LOG_EXPORT_JOB_CLEAN_UP_CRON_SCHEDULE',
+    defaultValue: '0 */6 * * *',
+  }),
+  'app:auditLogBulkExportParallelExecLimit': defineConfig<number>({
+    envVarName: 'AUDIT_LOG_EXPORT_PARALLEL_EXEC_LIMIT',
+    defaultValue: 5,
+  }),
+  'app:isAuditLogExportEnabled': defineConfig<boolean>({
+    envVarName: 'AUDIT_LOG_EXPORT_ENABLED',
+    defaultValue: true,
+  }),
+  'env:useOnlyEnvVars:app:isAuditLogExportEnabled': defineConfig<boolean>({
+    envVarName: 'AUDIT_LOG_EXPORT_ENABLED_USES_ONLY_ENV_VARS',
     defaultValue: false,
   }),
 

@@ -870,6 +870,19 @@
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
   },
+  "audit_log_export": {
+    "export": "Export",
+    "export_audit_log": "Export Audit Log",
+    "modal_description": "Select filters to export audit log data. The exported file will be delivered via in-app notification.",
+    "notification_info": "When the export is complete, you will receive a notification with a download link in the app.",
+    "export_started": "Audit log export has been started",
+    "notification_message": "You will receive a notification when the export is complete",
+    "duplicate_job_error": "Duplicate job in progress (created at: {{createdAt}})",
+    "export_failed": "Failed to start export: {{message}}",
+    "request_failed": "Request failed: {{error}}",
+    "start_export": "Start Export",
+    "exporting": "Exporting..."
+  },
   "g2g_data_transfer": {
     "transfer_data_to_another_growi": "Transfer data from this GROWI to another GROWI",
     "advanced_options": "Advanced options",
