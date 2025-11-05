@@ -1,14 +1,10 @@
 import { Agent } from '@mastra/core/agent';
-import { Memory } from '@mastra/memory';
-import { MongoDBStore } from '@mastra/mongodb';
 
 import { configManager } from '~/server/service/config-manager';
 
 import { getOpenaiProvider } from '../../ai-sdk-modules/get-openai-provider';
-import { fileSearchTool } from '../tools/file-search-tool';
 import { memory } from '../memory';
-
-
+import { fileSearchTool } from '../tools/file-search-tool';
 
 const model = configManager.getConfig('openai:assistantModel:chat');
 

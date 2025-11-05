@@ -1,6 +1,7 @@
 import type { IUserHasId } from '@growi/core';
 import { isPopulated, SCOPE } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
+import type { AgentMemoryOption } from '@mastra/core/agent';
 import { RuntimeContext } from '@mastra/core/runtime-context';
 import {
   pipeUIMessageStreamToResponse,
@@ -107,21 +108,64 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
 
       const growiAgent = mastra.getAgent('growiAgent');
 
+      const conversationId = 'hogehoge';
+
+      const memory = await growiAgent.getMemory({
+        runtimeContext,
+      });
+
+      let memoryOptions: AgentMemoryOption = {
+        thread: {
+          id: 'undefined',
+        },
+        resource: 'undefined',
+      };
+      // Populate session ID if provided
+      const thread = await memory?.getThreadById({ threadId: conversationId });
+      if (thread) {
+        logger.debug('Found existing thread', {
+          requestId: res.locals.requestId,
+          threadId: thread.id,
+          resourceId: thread.resourceId,
+        });
+        memoryOptions = {
+          thread: {
+            id: thread.id,
+          },
+          resource: thread.resourceId,
+        };
+      } else {
+        const newThread = await memory?.createThread({
+          metadata: runtimeContext.toJSON(),
+          resourceId: 'parsley_completions',
+          threadId: conversationId,
+        });
+        if (!newThread) {
+          res.status(500).json({
+            message: 'Failed to create new thread',
+          });
+          return;
+        }
+        memoryOptions = {
+          thread: {
+            id: newThread.id,
+          },
+          resource: newThread.resourceId,
+        };
+      }
+
       try {
         const stream = await growiAgent.streamVNext(messages, {
           format: 'aisdk',
           output: reasoningSchema,
           runtimeContext,
-          memory: {
-            thread: 'user-123',
-            resource: 'user-123',
-          },
+          memory: memoryOptions,
         });
 
         // debug: log all chunks from the full stream
-        // for await (const chunk of stream.fullStream) {
-        //   console.log(chunk);
-        // }
+        for await (const chunk of stream.fullStream) {
+          console.log(chunk);
+        }
 
         // Use pipeUIMessageStreamToResponse for Express servers
         // Express requires piping to ServerResponse object, not returning Web API Response
