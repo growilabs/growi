@@ -12,7 +12,7 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 
 import * as ServiceModule from '../../service/audit-log-bulk-export';
 import { auditLogBulkExportService } from '../../service/audit-log-bulk-export';
-import routerFactory from './audit-log-bulk-export';
+import { factory } from './audit-log-bulk-export';
 
 mockRequire('~/server/middlewares/login-required', () => {
   return (_req: Request, _res: Response, next: NextFunction) => {
@@ -95,7 +95,7 @@ function buildApp() {
   app.use(express.json());
   withApiV3Helpers(app);
   const crowi = buildCrowi();
-  const router = routerFactory(crowi);
+  const router = factory(crowi);
   app.use('/_api/v3/audit-log-bulk-export', router);
   return app;
 }
