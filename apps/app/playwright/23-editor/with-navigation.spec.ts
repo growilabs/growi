@@ -1,14 +1,15 @@
+import { expect, type Page, test } from '@playwright/test';
 import { readFileSync } from 'fs';
 import path from 'path';
-
-import { test, expect, type Page } from '@playwright/test';
 
 /**
  * for the issues:
  * @see https://redmine.weseek.co.jp/issues/122040
  * @see https://redmine.weseek.co.jp/issues/124281
  */
-test('should not be cleared and should prevent GrantSelector from modified', async({ page }) => {
+test('should not be cleared and should prevent GrantSelector from modified', async ({
+  page,
+}) => {
   await page.goto('/Sandbox/for-122040');
 
   // Open Editor
@@ -26,10 +27,10 @@ test('should not be cleared and should prevent GrantSelector from modified', asy
   const filePath = path.resolve(__dirname, '../23-editor/assets/example.txt');
   const buffer = readFileSync(filePath).toString('base64');
   const dataTransfer = await page.evaluateHandle(
-    async({ bufferData, localFileName, localFileType }) => {
+    async ({ bufferData, localFileName, localFileType }) => {
       const dt = new DataTransfer();
 
-      const blobData = await fetch(bufferData).then(res => res.blob());
+      const blobData = await fetch(bufferData).then((res) => res.blob());
 
       const file = new File([blobData], localFileName, {
         type: localFileType,
@@ -43,32 +44,40 @@ test('should not be cleared and should prevent GrantSelector from modified', asy
       localFileType: 'application/octet-stream',
     },
   );
-  await page.locator('.dropzone').first().dispatchEvent('drop', { dataTransfer });
-  await expect(page.getByTestId('page-editor-preview-body').getByTestId('rich-attachment')).toBeVisible();
+  await page
+    .locator('.dropzone')
+    .first()
+    .dispatchEvent('drop', { dataTransfer });
+  await expect(
+    page.getByTestId('page-editor-preview-body').getByTestId('rich-attachment'),
+  ).toBeVisible();
 
   // Save page
   await page.getByTestId('save-page-btn').click();
 
   // Expect grant not to be reset after uploading an attachment
-  await expect(page.getByTestId('page-grant-alert')).toContainText('Browsing of this page is restricted');
+  await expect(page.getByTestId('page-grant-alert')).toContainText(
+    'Browsing of this page is restricted',
+  );
 });
 
-const appendTextToEditorUntilContains = async(page: Page, text: string) => {
+const appendTextToEditorUntilContains = async (page: Page, text: string) => {
   await page.locator('.cm-content').fill(text);
-  await expect(page.getByTestId('page-editor-preview-body')).toContainText(text);
+  await expect(page.getByTestId('page-editor-preview-body')).toContainText(
+    text,
+  );
 };
 
 /**
  * for the issue:
  * @see https://redmine.weseek.co.jp/issues/115285
  */
-test('Successfully updating the page body', async({ page }) => {
+test('Successfully updating the page body', async ({ page }) => {
   const page1Path = '/Sandbox/for-115285/page1';
   const page2Path = '/Sandbox/for-115285/page2';
 
   const page1Body = 'Hello';
   const page2Body = 'World';
-
 
   await page.goto(page1Path);
 
@@ -85,7 +94,10 @@ test('Successfully updating the page body', async({ page }) => {
   await expect(page.locator('.main')).toContainText(page1Body);
 
   // Duplicate page1
-  await page.getByTestId('grw-contextual-sub-nav').getByTestId('open-page-item-control-btn').click();
+  await page
+    .getByTestId('grw-contextual-sub-nav')
+    .getByTestId('open-page-item-control-btn')
+    .click();
   await page.getByTestId('open-page-duplicate-modal-btn').click();
   await expect(page.getByTestId('page-duplicate-modal')).toBeVisible();
   await page.locator('.form-control').fill(page2Path);
@@ -96,11 +108,12 @@ test('Successfully updating the page body', async({ page }) => {
   await expect(page.getByTestId('grw-editor-navbar-bottom')).toBeVisible();
 
   // Expect to see the text from which you are duplicating
-  await expect(page.getByTestId('page-editor-preview-body')).toContainText(page1Body);
+  await expect(page.getByTestId('page-editor-preview-body')).toContainText(
+    page1Body,
+  );
 
   // Append text
   await appendTextToEditorUntilContains(page, page1Body + page2Body);
-
 
   await page.goto(page1Path);
 
@@ -108,6 +121,7 @@ test('Successfully updating the page body', async({ page }) => {
   await page.getByTestId('editor-button').click();
   await expect(page.getByTestId('grw-editor-navbar-bottom')).toBeVisible();
 
-  await expect(page.getByTestId('page-editor-preview-body')).toContainText(page1Body);
-
+  await expect(page.getByTestId('page-editor-preview-body')).toContainText(
+    page1Body,
+  );
 });
