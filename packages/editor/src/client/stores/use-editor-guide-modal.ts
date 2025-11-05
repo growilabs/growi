@@ -1,7 +1,7 @@
 import { useSWRStatic } from '@growi/core/dist/swr';
 import type { SWRResponse } from 'swr';
 
-export type EditorGuideModalStatus = {
+type EditorGuideModalStatus = {
   isOpened: boolean;
 };
 
