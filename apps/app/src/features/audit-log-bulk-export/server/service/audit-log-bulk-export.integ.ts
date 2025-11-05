@@ -49,8 +49,8 @@ describe('AuditLogBulkExportService', () => {
   describe('createOrResetExportJob', () => {
     describe('normal cases', () => {
       it('should create a new export job with valid parameters', async () => {
-        const filters = {
-          actions: ['PAGE_VIEW', 'PAGE_CREATE'] as SupportedActionType[],
+        const filters: { actions: SupportedActionType[]; dateFrom: Date; dateTo: Date } = {
+          actions: ['PAGE_VIEW', 'PAGE_CREATE'],
           dateFrom: new Date('2023-01-01'),
           dateTo: new Date('2023-12-31'),
         };
@@ -77,8 +77,8 @@ describe('AuditLogBulkExportService', () => {
       });
 
       it('should create a job with minimal filters', async () => {
-        const filters = {
-          actions: ['PAGE_VIEW'] as SupportedActionType[],
+        const filters: { actions: SupportedActionType[] } = {
+          actions: ['PAGE_VIEW'],
         };
 
         const jobId = await auditLogBulkExportService.createOrResetExportJob(
@@ -96,9 +96,9 @@ describe('AuditLogBulkExportService', () => {
       });
 
       it('should create a job with user filters', async () => {
-        const filters = {
+        const filters: { users: string[]; actions: SupportedActionType[] } = {
           users: [user._id.toString()],
-          actions: ['PAGE_CREATE'] as SupportedActionType[],
+          actions: ['PAGE_CREATE'],
         };
 
         const jobId = await auditLogBulkExportService.createOrResetExportJob(
@@ -115,7 +115,7 @@ describe('AuditLogBulkExportService', () => {
       });
 
       it('should reset existing job when restartJob is true', async () => {
-        const filters = { actions: ['PAGE_VIEW'] as SupportedActionType[] };
+        const filters: { actions: SupportedActionType[] } = { actions: ['PAGE_VIEW'] };
 
         const firstJobId =
           await auditLogBulkExportService.createOrResetExportJob(
@@ -141,7 +141,7 @@ describe('AuditLogBulkExportService', () => {
 
     describe('error cases', () => {
       it('should throw DuplicateAuditLogBulkExportJobError when duplicate job exists', async () => {
-        const filters = { actions: ['PAGE_VIEW'] as SupportedActionType[] };
+        const filters: { actions: SupportedActionType[] } = { actions: ['PAGE_VIEW'] };
 
         await auditLogBulkExportService.createOrResetExportJob(
           filters,
@@ -165,7 +165,7 @@ describe('AuditLogBulkExportService', () => {
           email: 'another@example.com',
         });
 
-        const filters = { actions: ['PAGE_VIEW'] as SupportedActionType[] };
+        const filters: { actions: SupportedActionType[] } = { actions: ['PAGE_VIEW'] };
 
         const firstJobId =
           await auditLogBulkExportService.createOrResetExportJob(
@@ -187,11 +187,11 @@ describe('AuditLogBulkExportService', () => {
       });
 
       it('should allow creating job with different filters for same user', async () => {
-        const firstFilters = {
-          actions: ['PAGE_VIEW'] as SupportedActionType[],
+        const firstFilters: { actions: SupportedActionType[] } = {
+          actions: ['PAGE_VIEW'],
         };
-        const secondFilters = {
-          actions: ['PAGE_CREATE'] as SupportedActionType[],
+        const secondFilters: { actions: SupportedActionType[] } = {
+          actions: ['PAGE_CREATE'],
         };
 
         const firstJobId =
@@ -212,7 +212,7 @@ describe('AuditLogBulkExportService', () => {
       });
 
       it('should not throw error if previous job is completed', async () => {
-        const filters = { actions: ['PAGE_VIEW'] as SupportedActionType[] };
+        const filters: { actions: SupportedActionType[] } = { actions: ['PAGE_VIEW'] };
 
         const firstJobId =
           await auditLogBulkExportService.createOrResetExportJob(
@@ -266,13 +266,13 @@ describe('AuditLogBulkExportService', () => {
       const validUserId1 = new mongoose.Types.ObjectId().toString();
       const validUserId2 = new mongoose.Types.ObjectId().toString();
 
-      const filters1 = {
-        actions: ['PAGE_VIEW', 'PAGE_CREATE'] as SupportedActionType[],
+      const filters1: { actions: SupportedActionType[]; users: string[] } = {
+        actions: ['PAGE_VIEW', 'PAGE_CREATE'],
         users: [validUserId1, validUserId2],
       };
 
-      const filters2 = {
-        actions: ['PAGE_CREATE', 'PAGE_VIEW'] as SupportedActionType[],
+      const filters2: { actions: SupportedActionType[]; users: string[] } = {
+        actions: ['PAGE_CREATE', 'PAGE_VIEW'],
         users: [validUserId2, validUserId1],
       };
 
@@ -295,13 +295,13 @@ describe('AuditLogBulkExportService', () => {
       const dateString = '2023-01-01T00:00:00.000Z';
       const dateObject = new Date(dateString);
 
-      const filters1 = {
-        actions: ['PAGE_VIEW'] as SupportedActionType[],
+      const filters1: { actions: SupportedActionType[]; dateFrom: Date } = {
+        actions: ['PAGE_VIEW'],
         dateFrom: new Date(dateString),
       };
 
-      const filters2 = {
-        actions: ['PAGE_VIEW'] as SupportedActionType[],
+      const filters2: { actions: SupportedActionType[]; dateFrom: Date } = {
+        actions: ['PAGE_VIEW'],
         dateFrom: dateObject,
       };
 
