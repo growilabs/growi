@@ -34,13 +34,17 @@ const determinePath = async (
   }
 
   if (todaysMemoTitle != null) {
-    console.log(user.lang);
-    const { t } = await getTranslation({ lang: user.lang });
+    const { t } = await getTranslation({ lang: user.lang, ns: 'commons' });
     const parentDirName = t('create_page_dropdown.todays.memo');
     const now = format(new Date(), 'yyyy/MM/dd');
-    const parentPath = `${userHomepagePath(user)}/${parentDirName}`;
-    const todaysPath = `${parentPath}/${now}`;
-    return todaysPath;
+    const path = `${userHomepagePath(user)}/${parentDirName}/${now}/${todaysMemoTitle}`;
+    const normalizedPath = normalizePath(path);
+    console.log('determined path from todaysMemoTitle:', normalizedPath);
+    if (isCreatablePage(normalizedPath)) {
+      return normalizedPath;
+    }
+
+    throw new Error('The specified path is not creatable page path');
   }
 
   if (pathHintKeywords != null && pathHintKeywords.length > 0) {
