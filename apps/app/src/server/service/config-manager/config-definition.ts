@@ -1,6 +1,7 @@
 import { GrowiDeploymentType, GrowiServiceType } from '@growi/core/dist/consts';
-import type { ConfigDefinition, Lang, NonBlankString } from '@growi/core/dist/interfaces';
+import type { ConfigDefinition, NonBlankString } from '@growi/core/dist/interfaces';
 import {
+  Lang,
   toNonBlankString,
   defineConfig,
 } from '@growi/core/dist/interfaces';
@@ -389,8 +390,8 @@ export const CONFIG_DEFINITIONS = {
   'app:timezone': defineConfig<number | undefined>({
     defaultValue: undefined,
   }),
-  'app:globalLang': defineConfig<string>({
-    defaultValue: 'en_US',
+  'app:globalLang': defineConfig<Lang>({
+    defaultValue: Lang.en_US,
   }),
   'app:fileUpload': defineConfig<boolean>({
     defaultValue: false,

@@ -1,9 +1,8 @@
-import nodePath from 'path';
-
 import { GlobalNotificationSettingEvent, GlobalNotificationSettingType } from '~/server/models/GlobalNotificationSetting';
 import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
+import { resolveLocaleTemplatePath } from '~/server/util/locale-utils';
 
 const logger = loggerFactory('growi:service:GlobalNotificationMailService'); // eslint-disable-line no-unused-vars
 
@@ -36,7 +35,7 @@ class GlobalNotificationMailService {
     const GlobalNotification = this.crowi.model('GlobalNotificationSetting');
     const notifications = await GlobalNotification.findSettingByPathAndEvent(event, page.path, GlobalNotificationSettingType.MAIL);
 
-    const option = this.generateOption(event, page, triggeredBy, vars);
+    const option = await this.generateOption(event, page, triggeredBy, vars);
 
     await Promise.all(notifications.map((notification) => {
       return mailService.send({ ...option, to: notification.toEmail });
@@ -55,14 +54,18 @@ class GlobalNotificationMailService {
    *
    * @return  {{ subject: string, template: string, vars: object }}
    */
-  generateOption(event, page, triggeredBy, { comment, oldPath }) {
+  async generateOption(event, page, triggeredBy, { comment, oldPath }) {
     const locale = configManager.getConfig('app:globalLang');
     // validate for all events
     if (event == null || page == null || triggeredBy == null) {
       throw new Error(`invalid vars supplied to GlobalNotificationMailService.generateOption for event ${event}`);
     }
 
-    const template = nodePath.join(this.crowi.localeDir, `${locale}/notifications/${event}.ejs`);
+    const template = await resolveLocaleTemplatePath({
+      baseDir: this.crowi.localeDir,
+      locale,
+      templateSegments: ['notifications', `${event}.ejs`],
+    });
 
     const path = page.path;
     const appTitle = this.crowi.appService.getAppTitle();

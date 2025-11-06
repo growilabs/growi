@@ -9,6 +9,7 @@ import PasswordResetOrder from '~/server/models/password-reset-order';
 import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
+import { resolveLocaleTemplatePath } from '~/server/util/locale-utils';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import httpErrorHandler from '../../middlewares/http-error-handler';
@@ -45,7 +46,6 @@ const router = express.Router();
 module.exports = (crowi) => {
   const { appService, mailService } = crowi;
   const User = crowi.model('User');
-  const path = require('path');
 
   const addActivity = generateAddActivityMiddleware(crowi);
 
@@ -77,10 +77,16 @@ module.exports = (crowi) => {
   const checkPassportStrategyMiddleware = checkForgotPasswordEnabledMiddlewareFactory(crowi, true);
 
   async function sendPasswordResetEmail(templateFileName, locale, email, url, expiredAt) {
+    const templatePath = await resolveLocaleTemplatePath({
+      baseDir: crowi.localeDir,
+      locale,
+      templateSegments: ['notifications', `${templateFileName}.ejs`],
+    });
+
     return mailService.send({
       to: email,
       subject: '[GROWI] Password Reset',
-      template: path.join(crowi.localeDir, `${locale}/notifications/${templateFileName}.ejs`),
+      template: templatePath,
       vars: {
         appTitle: appService.getAppTitle(),
         email,
@@ -148,7 +154,8 @@ module.exports = (crowi) => {
     catch (err) {
       const msg = 'Error occurred during password reset request procedure.';
       logger.error(err);
-      return res.apiv3Err(`${msg} Cause: ${err}`);
+      // Keep response generic so internal error details are not exposed to clients.
+      return res.apiv3Err(msg);
     }
   });
 
