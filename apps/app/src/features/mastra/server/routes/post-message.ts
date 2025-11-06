@@ -164,9 +164,9 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
         });
 
         // debug: log all chunks from the full stream
-        for await (const chunk of stream.fullStream) {
-          console.log(chunk);
-        }
+        // for await (const chunk of stream.fullStream) {
+        //   console.log(chunk);
+        // }
 
         // Use pipeUIMessageStreamToResponse for Express servers
         // Express requires piping to ServerResponse object, not returning Web API Response
