@@ -54,7 +54,9 @@ const determinePath = async (
   }
 
   if (pathHintKeywords != null && pathHintKeywords.length > 0) {
-    throw new Error('Path determination based on keywords is not yet implemented');
+    throw new Error(
+      'Path determination based on keywords is not yet implemented',
+    );
   }
 
   throw new Error('Cannot determine page path');
@@ -62,8 +64,8 @@ const determinePath = async (
 
 type ReqBody = {
   path?: string;
-  pathHintKeywords?: string[];
   todaysMemoTitle?: string;
+  pathHintKeywords?: string[];
   body: string;
   grant?: PageGrant;
   grantUserGroupIds?: IGrantedGroup[];
@@ -128,8 +130,8 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
     async (req: CreatePageReq, res: ApiV3Response) => {
       const {
         path,
-        pathHintKeywords,
         todaysMemoTitle,
+        pathHintKeywords,
         body,
         grant,
         grantUserGroupIds,
