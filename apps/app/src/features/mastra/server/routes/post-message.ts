@@ -1,7 +1,6 @@
 import type { IUserHasId } from '@growi/core';
 import { isPopulated, SCOPE } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
-import type { AgentMemoryOption } from '@mastra/core/agent';
 import { RuntimeContext } from '@mastra/core/runtime-context';
 import {
   pipeUIMessageStreamToResponse,
@@ -20,6 +19,7 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import { getOrCreateThread } from '../services/get-or-create-thread';
 import { mastra } from '../services/mastra-modules';
 
 const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
@@ -57,11 +57,14 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
   );
 
   const validator: ValidationChain[] = [
-    body('threadId').isString().withMessage('threadId must be string'),
+    body('threadId')
+      .isUUID()
+      .optional()
+      .withMessage('threadId must be a valid UUID'),
 
     body('aiAssistantId')
       .isMongoId()
-      .withMessage('aiAssistantId must be string'),
+      .withMessage('aiAssistantId must be a valid MongoDB ObjectId'),
 
     body('messages').custom(async (data) => {
       await validateUIMessages({ messages: data });
@@ -111,51 +114,30 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
 
       const growiAgent = mastra.getAgent('growiAgent');
       const memory = await growiAgent.getMemory();
-
-      let memoryOptions: AgentMemoryOption = {
-        thread: {
-          id: 'undefined',
-        },
-        resource: 'undefined',
-      };
-
-      // Populate session ID if provided
-      const thread = await memory?.getThreadById({ threadId });
-      if (thread) {
-        logger.debug('Found existing thread', {
-          requestId: res.locals.requestId,
-          threadId: thread.id,
-          resourceId: thread.resourceId,
-        });
-        memoryOptions = {
-          thread: {
-            id: thread.id,
-          },
-          resource: thread.resourceId,
-        };
-      } else {
-        const newThread = await memory?.createThread({
-          threadId,
-          metadata: runtimeContext.toJSON(),
-          resourceId: req.user._id.toString(),
-        });
-        if (newThread == null) {
-          return res.apiv3Err(new ErrorV3('Failed to create new thread'), 500);
-        }
-        memoryOptions = {
-          thread: {
-            id: newThread.id,
-          },
-          resource: newThread.resourceId,
-        };
+      if (memory == null) {
+        return res.apiv3Err(
+          new ErrorV3('Memory service is not available'),
+          500,
+        );
       }
+
+      const thread = await getOrCreateThread(
+        memory,
+        req.user._id.toString(),
+        threadId,
+      );
+
+      console.log('thread', thread);
 
       try {
         const stream = await growiAgent.streamVNext(messages, {
           format: 'aisdk',
           output: reasoningSchema,
           runtimeContext,
-          memory: memoryOptions,
+          memory: {
+            thread: thread.id,
+            resource: thread.resourceId,
+          },
         });
 
         // debug: log all chunks from the full stream

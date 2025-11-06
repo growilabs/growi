@@ -77,7 +77,6 @@ const ChatSidebarSubstance = (): JSX.Element => {
       {
         body: {
           aiAssistantId: '690993662bddbe7c2428bdde',
-          threadId: "test-thread-id"
         },
       },
     );
