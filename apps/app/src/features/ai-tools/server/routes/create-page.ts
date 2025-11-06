@@ -42,9 +42,7 @@ const determinePath = async (
 
   if (todaysMemoTitle != null) {
     const { t } = await getTranslation({ lang: user.lang, ns: 'commons' });
-    const parentDirName = t('create_page_dropdown.todays.memo');
-    const now = format(new Date(), 'yyyy/MM/dd');
-    const path = `${userHomepagePath(user)}/${parentDirName}/${now}/${todaysMemoTitle}`;
+    const path = `${userHomepagePath(user)}/${t('create_page_dropdown.todays.memo')}/${format(new Date(), 'yyyy/MM/dd')}/${todaysMemoTitle}`;
     const normalizedPath = normalizePath(path);
     if (isCreatablePage(normalizedPath)) {
       return normalizedPath;
@@ -54,6 +52,7 @@ const determinePath = async (
   }
 
   if (pathHintKeywords != null && pathHintKeywords.length > 0) {
+    // TODO: https://redmine.weseek.co.jp/issues/173810
     throw new Error(
       'Path determination based on keywords is not yet implemented',
     );
