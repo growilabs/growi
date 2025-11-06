@@ -89,10 +89,6 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
       .optional()
       .isInt({ min: 0, max: 5 })
       .withMessage('"grant" must be integer from 1 to 5'),
-    body('pageTags')
-      .optional()
-      .isArray()
-      .withMessage('"pageTags" must be array'),
   ];
 
   return [
@@ -101,8 +97,7 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
     validator,
     apiV3FormValidator,
     async (req: CreatePageReq, res: ApiV3Response) => {
-      const { path, pathHintKeywords, todaysMemoTitle, body, grant, pageTags } =
-        req.body;
+      const { path, pathHintKeywords, todaysMemoTitle, body, grant } = req.body;
 
       if (
         path == null &&
