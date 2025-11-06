@@ -1,4 +1,9 @@
-import { type IUserHasId, SCOPE } from '@growi/core/dist/interfaces';
+import {
+  GroupType,
+  type IGrantedGroup,
+  type IUserHasId,
+  SCOPE,
+} from '@growi/core/dist/interfaces';
 import {
   isCreatablePage,
   userHomepagePath,
@@ -60,7 +65,7 @@ type ReqBody = {
   todaysMemoTitle?: string;
   body: string;
   grant?: number;
-  pageTags?: string[];
+  grantUserGroupIds?: IGrantedGroup[];
 };
 
 type CreatePageReq = Request<undefined, ApiV3Response, ReqBody> & {
@@ -76,19 +81,42 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
 
   const validator: ValidationChain[] = [
     body('path').optional().isString().withMessage('"path" must be string'),
+
     body('pathHintKeywords')
       .optional()
       .isArray()
       .withMessage('"pathHintKeywords" must be array'),
+
     body('todaysMemoTitle')
       .optional()
       .isString()
       .withMessage('"todaysMemoTitle" must be string'),
+
     body('body').isString().withMessage('"body" must be string'),
+
     body('grant')
       .optional()
       .isInt({ min: 0, max: 5 })
       .withMessage('"grant" must be integer from 1 to 5'),
+
+    body('grantUserGroupIds')
+      .optional()
+      .isArray()
+      .withMessage('"grantUserGroupIds" must be array'),
+
+    body('grantUserGroupIds.*.type')
+      .optional()
+      .isIn([GroupType.userGroup, GroupType.externalUserGroup])
+      .withMessage(
+        '"grantUserGroupIds.*.type" must be either "userGroup" or "externalUserGroup"',
+      ),
+
+    body('grantUserGroupIds.*.item')
+      .optional()
+      .isMongoId()
+      .withMessage(
+        '"grantUserGroupIds.*.item" must be a valid MongoDB ObjectId',
+      ),
   ];
 
   return [
@@ -97,7 +125,14 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
     validator,
     apiV3FormValidator,
     async (req: CreatePageReq, res: ApiV3Response) => {
-      const { path, pathHintKeywords, todaysMemoTitle, body, grant } = req.body;
+      const {
+        path,
+        pathHintKeywords,
+        todaysMemoTitle,
+        body,
+        grant,
+        grantUserGroupIds,
+      } = req.body;
 
       if (
         path == null &&
@@ -122,6 +157,9 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
         const option: IOptionsForCreate = {};
         if (grant == null) {
           option.grant = grant;
+        }
+        if (grantUserGroupIds != null) {
+          option.grantUserGroupIds = grantUserGroupIds;
         }
 
         const createdPage = await crowi.pageService.create(
