@@ -127,8 +127,6 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
         threadId,
       );
 
-      console.log('thread', thread);
-
       try {
         const stream = await growiAgent.streamVNext(messages, {
           format: 'aisdk',
