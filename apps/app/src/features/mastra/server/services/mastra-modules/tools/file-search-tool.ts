@@ -24,6 +24,8 @@ export const fileSearchTool = createTool({
   }: FileSearchToolExecutionContext) => {
     const vectorStoreId = runtimeContext.get('vectorStoreId');
 
+    console.log('到達');
+
     // Type-safe access to runtimeContext variables
     if (typeof vectorStoreId !== 'string') {
       throw new Error('vectorStoreId is required in runtimeContext');
