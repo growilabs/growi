@@ -8,6 +8,7 @@ import lsxRoutes from '@growi/remark-lsx/dist/server/index.cjs';
 import mongoose from 'mongoose';
 import next from 'next';
 
+import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron';
@@ -363,6 +364,8 @@ Crowi.prototype.setupCron = function() {
 
   instanciatePageBulkExportJobCleanUpCronService(this);
   pageBulkExportJobCleanUpCronService.startCron();
+
+  checkAuditLogExportJobInProgressCronService.startCron();
 
   startOpenaiCronIfEnabled();
   startAccessTokenCron();
