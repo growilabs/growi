@@ -54,7 +54,7 @@ const determinePath = async (
   }
 
   if (pathHintKeywords != null && pathHintKeywords.length > 0) {
-    return '';
+    throw new Error('Path determination based on keywords is not yet implemented');
   }
 
   throw new Error('Cannot determine page path');
