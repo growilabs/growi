@@ -25,6 +25,7 @@ import { mastra } from '../services/mastra-modules';
 const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
 
 type ReqBody = {
+  threadId: string;
   aiAssistantId: string;
   messages: UIMessage[];
 };
@@ -56,6 +57,8 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
   );
 
   const validator: ValidationChain[] = [
+    body('threadId').isString().withMessage('threadId must be string'),
+
     body('aiAssistantId')
       .isMongoId()
       .withMessage('aiAssistantId must be string'),
@@ -120,6 +123,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
         },
         resource: 'undefined',
       };
+
       // Populate session ID if provided
       const thread = await memory?.getThreadById({ threadId: conversationId });
       if (thread) {
@@ -137,14 +141,11 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       } else {
         const newThread = await memory?.createThread({
           metadata: runtimeContext.toJSON(),
-          resourceId: 'parsley_completions',
+          resourceId: req.user._id.toString(),
           threadId: conversationId,
         });
-        if (!newThread) {
-          res.status(500).json({
-            message: 'Failed to create new thread',
-          });
-          return;
+        if (newThread == null) {
+          return res.apiv3Err(new ErrorV3('Failed to create new thread'), 500);
         }
         memoryOptions = {
           thread: {
