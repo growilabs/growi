@@ -9,6 +9,7 @@ import type { Request, RequestHandler } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { body } from 'express-validator';
 
+import type { IOptionsForCreate } from '~/interfaces/page';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
@@ -39,7 +40,6 @@ const determinePath = async (
     const now = format(new Date(), 'yyyy/MM/dd');
     const path = `${userHomepagePath(user)}/${parentDirName}/${now}/${todaysMemoTitle}`;
     const normalizedPath = normalizePath(path);
-    console.log('determined path from todaysMemoTitle:', normalizedPath);
     if (isCreatablePage(normalizedPath)) {
       return normalizedPath;
     }
@@ -58,7 +58,7 @@ type ReqBody = {
   path?: string;
   pathHintKeywords?: string[];
   todaysMemoTitle?: string;
-  body?: string;
+  body: string;
   grant?: number;
   pageTags?: string[];
 };
@@ -84,10 +84,7 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
       .optional()
       .isString()
       .withMessage('"todaysMemoTitle" must be string'),
-    body('body')
-      .optional()
-      .isString()
-      .withMessage('"body" must be string or undefined'),
+    body('body').isString().withMessage('"body" must be string'),
     body('grant')
       .optional()
       .isInt({ min: 0, max: 5 })
@@ -126,7 +123,19 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
           todaysMemoTitle,
           pathHintKeywords,
         );
-        console.log('determinedPath:', determinedPath);
+
+        const option: IOptionsForCreate = {};
+        if (grant == null) {
+          option.grant = grant;
+        }
+
+        const createdPage = await crowi.pageService.create(
+          determinedPath,
+          body,
+          req.user,
+          option,
+        );
+
         return res.apiv3({});
       } catch (err) {
         logger.error(err);
