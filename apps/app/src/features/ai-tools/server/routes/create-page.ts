@@ -169,6 +169,7 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
           option,
         );
 
+        // TODO: https://redmine.weseek.co.jp/issues/173816
         return res.apiv3({});
       } catch (err) {
         logger.error(err);
