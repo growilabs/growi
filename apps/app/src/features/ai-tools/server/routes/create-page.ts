@@ -97,7 +97,7 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
 
     body('grant')
       .optional()
-      .isInt({ min: 0, max: 5 })
+      .isInt({ min: 1, max: 5 })
       .withMessage('"grant" must be integer from 1 to 5'),
 
     body('grantUserGroupIds')
