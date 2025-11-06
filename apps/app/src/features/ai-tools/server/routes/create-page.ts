@@ -82,15 +82,15 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
   const validator: ValidationChain[] = [
     body('path').optional().isString().withMessage('"path" must be string'),
 
-    body('pathHintKeywords')
-      .optional()
-      .isArray()
-      .withMessage('"pathHintKeywords" must be array'),
-
     body('todaysMemoTitle')
       .optional()
       .isString()
       .withMessage('"todaysMemoTitle" must be string'),
+
+    body('pathHintKeywords')
+      .optional()
+      .isArray()
+      .withMessage('"pathHintKeywords" must be array'),
 
     body('body').isString().withMessage('"body" must be string'),
 
