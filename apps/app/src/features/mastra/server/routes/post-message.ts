@@ -76,7 +76,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
     ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
-      const { aiAssistantId, messages } = req.body;
+      const { threadId, aiAssistantId, messages } = req.body;
 
       const openaiService = getOpenaiService();
       if (openaiService == null) {
@@ -110,12 +110,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       runtimeContext.set('vectorStoreId', vectorStoreId);
 
       const growiAgent = mastra.getAgent('growiAgent');
-
-      const conversationId = 'hogehoge';
-
-      const memory = await growiAgent.getMemory({
-        runtimeContext,
-      });
+      const memory = await growiAgent.getMemory();
 
       let memoryOptions: AgentMemoryOption = {
         thread: {
@@ -125,7 +120,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       };
 
       // Populate session ID if provided
-      const thread = await memory?.getThreadById({ threadId: conversationId });
+      const thread = await memory?.getThreadById({ threadId });
       if (thread) {
         logger.debug('Found existing thread', {
           requestId: res.locals.requestId,
@@ -140,9 +135,9 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
         };
       } else {
         const newThread = await memory?.createThread({
+          threadId,
           metadata: runtimeContext.toJSON(),
           resourceId: req.user._id.toString(),
-          threadId: conversationId,
         });
         if (newThread == null) {
           return res.apiv3Err(new ErrorV3('Failed to create new thread'), 500);
