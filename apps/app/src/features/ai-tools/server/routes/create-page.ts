@@ -2,6 +2,7 @@ import {
   GroupType,
   type IGrantedGroup,
   type IUserHasId,
+  type PageGrant,
   SCOPE,
 } from '@growi/core/dist/interfaces';
 import {
@@ -64,7 +65,7 @@ type ReqBody = {
   pathHintKeywords?: string[];
   todaysMemoTitle?: string;
   body: string;
-  grant?: number;
+  grant?: PageGrant;
   grantUserGroupIds?: IGrantedGroup[];
 };
 
@@ -155,10 +156,8 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
         );
 
         const option: IOptionsForCreate = {};
-        if (grant == null) {
+        if (grant != null) {
           option.grant = grant;
-        }
-        if (grantUserGroupIds != null) {
           option.grantUserGroupIds = grantUserGroupIds;
         }
 
