@@ -14,7 +14,7 @@ import { format } from 'date-fns/format';
 import type { Request, RequestHandler } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { body } from 'express-validator';
-import mongoose from 'mongoose';
+import mongoose, { type HydratedDocument } from 'mongoose';
 
 import type { IApiv3PageCreateParams } from '~/interfaces/apiv3';
 import type { IOptionsForCreate } from '~/interfaces/page';
@@ -23,6 +23,7 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
+import type { PageDocument } from '~/server/models/page';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import {
   determineBodyAndTags,
@@ -210,10 +211,11 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
         }
       }
 
-      try {
-        const { body: determinedBody, tags: determinedTags } =
-          await determineBodyAndTags(pathToCreate, body, pageTags);
+      const { body: determinedBody, tags: determinedTags } =
+        await determineBodyAndTags(pathToCreate, body, pageTags);
 
+      let createdPage: HydratedDocument<PageDocument>;
+      try {
         const options: IOptionsForCreate = {
           onlyInheritUserRelatedGrantedGroups,
           overwriteScopesOfDescendants,
@@ -225,23 +227,23 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
           options.grantUserGroupIds = grantUserGroupIds;
         }
 
-        const createdPage = await crowi.pageService.create(
+        createdPage = await crowi.pageService.create(
           pathToCreate,
           determinedBody,
           req.user,
           options,
         );
-
-        await saveTags({ createdPage, pageTags: determinedTags }, crowi);
-
-        // TODO: https://redmine.weseek.co.jp/issues/173816
-        res.apiv3({}, 201);
-
-        postAction(req, res, createdPage, crowi);
       } catch (err) {
-        logger.error(err);
+        logger.error('Error occurred while creating a page.', err);
         return res.apiv3Err(err);
       }
+
+      await saveTags({ createdPage, pageTags: determinedTags }, crowi);
+
+      // TODO: https://redmine.weseek.co.jp/issues/173816
+      res.apiv3({}, 201);
+
+      postAction(req, res, createdPage, crowi);
     },
   ];
 };
