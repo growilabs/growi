@@ -1,0 +1,9 @@
+@use '@growi/core-styles/scss/helpers/modifier-keys';
+
+.help-dropdown :global {
+  @include modifier-keys.modifier-key;
+}
+
+.help-dropdown-menu :global {
+  @include modifier-keys.modifier-key;
+}

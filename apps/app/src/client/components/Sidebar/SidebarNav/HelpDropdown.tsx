@@ -7,20 +7,29 @@ import {
 } from 'reactstrap';
 
 import { useGrowiVersion } from '~/stores-universal/context';
+import { useShortcutsModal } from '~/stores/modal';
 
 import { SkeletonItem } from './SkeletonItem';
+
+import styles from './HelpDropdown.module.scss';
 
 
 export const HelpDropdown: FC = memo(() => {
   const { t } = useTranslation('commons');
   const { data: growiVersion } = useGrowiVersion();
+  const { open: openShortcutsModal } = useShortcutsModal();
 
   if (growiVersion == null) {
     return <SkeletonItem />;
   }
 
+  // add classes to cmd-key by OS
+  const platform = window.navigator.platform.toLowerCase();
+  const isMac = (platform.indexOf('mac') > -1);
+  const os = isMac ? 'mac' : 'win';
+
   return (
-    <UncontrolledDropdown direction="end">
+    <UncontrolledDropdown direction="end" className={styles['help-dropdown']}>
       <DropdownToggle
         className="btn btn-primary d-flex align-items-center justify-content-center"
         data-testid="help-dropdown-button"
@@ -32,6 +41,7 @@ export const HelpDropdown: FC = memo(() => {
         container="body"
         data-testid="help-dropdown-menu"
         style={{ minWidth: '280px', fontSize: '14px' }}
+        className={styles['help-dropdown-menu']}
       >
         <DropdownItem header className="fw-semibold pt-3 pb-3" style={{ fontSize: '16px' }}>
           {t('Help')}
@@ -64,6 +74,19 @@ export const HelpDropdown: FC = memo(() => {
           <span className="d-flex align-items-center">
             <span className="flex-grow-1">GROWI.cloud {t('Help')}</span>
             <span className="material-symbols-outlined ms-1 fs-6 opacity-50">open_in_new</span>
+          </span>
+        </DropdownItem>
+
+        <DropdownItem divider className="my-2" />
+
+        <DropdownItem
+          className="my-1"
+          onClick={() => openShortcutsModal()}
+        >
+          <span className="d-flex align-items-center">
+            <span className="material-symbols-outlined me-2 fs-6">keyboard</span>
+            <span className="flex-grow-1">{t('Shortcuts')}</span>
+            <span className={`cmd-key ${os}`}></span>&nbsp;-/
           </span>
         </DropdownItem>
 
