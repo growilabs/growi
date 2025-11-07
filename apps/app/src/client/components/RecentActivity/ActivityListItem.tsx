@@ -36,7 +36,7 @@ export const IconActivityTranslationMap: Record<
 };
 
 const translateAction = (action: SupportedActivityActionType): string => {
-  return ActivityActionTranslationMap[action] || 'KEY_MISSING_ERROR';
+  return ActivityActionTranslationMap[action] || 'unknown_action';
 };
 
 const setIcon = (action: SupportedActivityActionType): string => {
