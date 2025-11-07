@@ -1,6 +1,12 @@
-import { GroupType, type IUserHasId, SCOPE } from '@growi/core/dist/interfaces';
+import {
+  GroupType,
+  type IUser,
+  type IUserHasId,
+  SCOPE,
+} from '@growi/core/dist/interfaces';
 import {
   isCreatablePage,
+  isUserPage,
   userHomepagePath,
 } from '@growi/core/dist/utils/page-path-utils';
 import { normalizePath } from '@growi/core/dist/utils/path-utils';
@@ -8,6 +14,7 @@ import { format } from 'date-fns/format';
 import type { Request, RequestHandler } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { body } from 'express-validator';
+import mongoose from 'mongoose';
 
 import type { IApiv3PageCreateParams } from '~/interfaces/apiv3';
 import type { IOptionsForCreate } from '~/interfaces/page';
@@ -75,6 +82,10 @@ type CreatePageReq = Request<undefined, ApiV3Response, ReqBody> & {
 type CreatePageFactory = (crowi: Crowi) => RequestHandler[];
 
 export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
+  const User = mongoose.model<IUser, { isExistUserByUserPagePath: any }>(
+    'User',
+  );
+
   const loginRequiredStrictly = require('~/server/middlewares/login-required')(
     crowi,
   );
@@ -172,22 +183,36 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
         (pathHintKeywords == null || pathHintKeywords.length === 0)
       ) {
         return res.apiv3Err(
-          new Error(
-            'Either "path", "todaysMemoTitle" or "pathHintKeywords" is required',
-          ),
+          'Either "path", "todaysMemoTitle" or "pathHintKeywords" is required',
+          400,
         );
       }
 
+      let pathToCreate: string;
       try {
-        const determinedPath = await determinePath(
+        pathToCreate = await determinePath(
           req.user,
           path,
           todaysMemoTitle,
           pathHintKeywords,
         );
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err('Could not determine page path', 400);
+      }
 
+      if (isUserPage(pathToCreate)) {
+        const isExistUser = await User.isExistUserByUserPagePath(pathToCreate);
+        if (!isExistUser) {
+          return res.apiv3Err(
+            "Unable to create a page under a non-existent user's user page",
+          );
+        }
+      }
+
+      try {
         const { body: determinedBody, tags: determinedTags } =
-          await determineBodyAndTags(determinedPath, body, pageTags);
+          await determineBodyAndTags(pathToCreate, body, pageTags);
 
         const options: IOptionsForCreate = {
           onlyInheritUserRelatedGrantedGroups,
@@ -201,7 +226,7 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
         }
 
         const createdPage = await crowi.pageService.create(
-          determinedPath,
+          pathToCreate,
           determinedBody,
           req.user,
           options,
