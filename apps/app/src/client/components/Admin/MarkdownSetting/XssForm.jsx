@@ -37,8 +37,8 @@ const XssForm = (props) => {
 
   const onClickSubmit = useCallback(async(data) => {
     try {
-      await adminMarkDownContainer.changeTagWhitelist(data.tagWhitelist ?? '');
-      await adminMarkDownContainer.changeAttrWhitelist(data.attrWhitelist ?? '');
+      await adminMarkDownContainer.setState({ tagWhitelist: data.tagWhitelist ?? '' });
+      await adminMarkDownContainer.setState({ attrWhitelist: data.attrWhitelist ?? '' });
       await adminMarkDownContainer.updateXssSetting();
       toastSuccess(t('toaster.update_successed', { target: t('markdown_settings.xss_header'), ns: 'commons' }));
     }
@@ -148,7 +148,10 @@ const XssForm = (props) => {
             {isEnabledXss && xssOptions()}
           </div>
         </fieldset>
-        <AdminUpdateButtonRow disabled={retrieveError != null} />
+        <AdminUpdateButtonRow
+          disabled={retrieveError != null}
+          onClick={handleSubmit(onClickSubmit)}
+        />
       </React.Fragment>
     </form>
   );

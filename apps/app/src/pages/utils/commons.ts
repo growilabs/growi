@@ -28,7 +28,6 @@ export type CommonProps = {
   siteUrl: string | undefined;
   confidential: string;
   customTitleTemplate: string;
-  csrfToken: string;
   isContainerFluid: boolean;
   growiVersion: string;
   isMaintenanceMode: boolean;
@@ -102,7 +101,6 @@ export const getServerSideCommonProps: GetServerSideProps<CommonProps> = async (
     siteUrl: configManager.getConfig('app:siteUrl'), // DON'T USE growiInfoService.getSiteUrl()
     confidential: appService.getAppConfidential() || '',
     customTitleTemplate: customizeService.customTitleTemplate,
-    csrfToken: req.csrfToken(),
     isContainerFluid:
       configManager.getConfig('customize:isContainerFluid') ?? false,
     growiVersion: getGrowiVersion(),

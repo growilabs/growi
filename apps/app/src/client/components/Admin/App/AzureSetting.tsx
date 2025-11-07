@@ -1,31 +1,21 @@
 import type { JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
-import type { UseFormRegister, FieldValues } from 'react-hook-form';
+import type { UseFormRegister } from 'react-hook-form';
 
+import type { FileUploadFormValues } from './FileUploadSetting.types';
 import MaskedInput from './MaskedInput';
 
-
 export type AzureSettingMoleculeProps = {
-  register: UseFormRegister<FieldValues>
-  azureReferenceFileWithRelayMode
-  azureUseOnlyEnvVars
-  azureTenantId
-  azureClientId
-  azureClientSecret
-  azureStorageAccountName
-  azureStorageContainerName
-  envAzureTenantId?
-  envAzureClientId?
-  envAzureClientSecret?
-  envAzureStorageAccountName?
-  envAzureStorageContainerName?
+  register: UseFormRegister<FileUploadFormValues>
+  azureReferenceFileWithRelayMode: boolean
+  azureUseOnlyEnvVars: boolean
+  envAzureTenantId?: string
+  envAzureClientId?: string
+  envAzureClientSecret?: string
+  envAzureStorageAccountName?: string
+  envAzureStorageContainerName?: string
   onChangeAzureReferenceFileWithRelayMode: (val: boolean) => void
-  onChangeAzureTenantId: (val: string) => void
-  onChangeAzureClientId: (val: string) => void
-  onChangeAzureClientSecret: (val: string) => void
-  onChangeAzureStorageAccountName: (val: string) => void
-  onChangeAzureStorageContainerName: (val: string) => void
 };
 
 export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Element => {
@@ -43,7 +33,6 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
 
   return (
     <>
-
       <div className="row form-group my-3">
         <label className="text-left text-md-right col-md-3 col-form-label">
           {t('admin:app_setting.file_delivery_method')}
@@ -66,16 +55,16 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props?.onChangeAzureReferenceFileWithRelayMode(true) }}
+                onClick={() => { props.onChangeAzureReferenceFileWithRelayMode(true) }}
               >
                 {t('admin:app_setting.file_delivery_method_relay')}
               </button>
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props?.onChangeAzureReferenceFileWithRelayMode(false) }}
+                onClick={() => { props.onChangeAzureReferenceFileWithRelayMode(false) }}
               >
-                { t('admin:app_setting.file_delivery_method_redirect')}
+                {t('admin:app_setting.file_delivery_method_redirect')}
               </button>
             </div>
 
@@ -198,7 +187,6 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
           </tr>
         </tbody>
       </table>
-
     </>
   );
 };

@@ -1,5 +1,4 @@
 class CollectionProgress {
-
   collectionName: string;
 
   currentCount = 0;
@@ -13,7 +12,6 @@ class CollectionProgress {
   constructor(collectionName: string) {
     this.collectionName = collectionName;
   }
-
 }
 
 export default CollectionProgress;
