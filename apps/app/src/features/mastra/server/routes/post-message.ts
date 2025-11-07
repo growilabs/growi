@@ -76,7 +76,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
-    ...validator,
+    validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
       const { threadId, aiAssistantId, messages } = req.body;
@@ -115,10 +115,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       const growiAgent = mastra.getAgent('growiAgent');
       const memory = await growiAgent.getMemory();
       if (memory == null) {
-        return res.apiv3Err(
-          new ErrorV3('Memory service is not available'),
-          500,
-        );
+        return res.apiv3Err(new ErrorV3('Mastra Memory is not available'), 500);
       }
 
       const thread = await getOrCreateThread(
