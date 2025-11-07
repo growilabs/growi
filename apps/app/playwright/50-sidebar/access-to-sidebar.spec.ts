@@ -1,39 +1,43 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { collapseSidebar } from '../utils';
 
-
 test.describe('Access to sidebar', () => {
-
-  test.beforeEach(async({ page }) => {
+  test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await collapseSidebar(page, false);
   });
 
-  test('Successfully show sidebar', async({ page }) => {
+  test('Successfully show sidebar', async ({ page }) => {
     await expect(page.getByTestId('grw-sidebar-contents')).toBeVisible();
   });
 
-  test('Successfully access to page tree', async({ page }) => {
+  test('Successfully access to page tree', async ({ page }) => {
     await page.getByTestId('grw-sidebar-nav-primary-page-tree').click();
     await expect(page.getByTestId('grw-sidebar-contents')).toBeVisible();
-    await expect(page.getByTestId('grw-pagetree-item-container').first()).toBeVisible();
+    await expect(
+      page.getByTestId('grw-pagetree-item-container').first(),
+    ).toBeVisible();
   });
 
-  test('Successfully access to recent changes', async({ page }) => {
+  test('Successfully access to recent changes', async ({ page }) => {
     await page.getByTestId('grw-sidebar-nav-primary-recent-changes').click();
     await expect(page.getByTestId('grw-recent-changes')).toBeVisible();
     await expect(page.locator('.list-group-item').first()).toBeVisible();
   });
 
-  test('Successfully access to custom sidebar', async({ page }) => {
+  test('Successfully access to custom sidebar', async ({ page }) => {
     await page.getByTestId('grw-sidebar-nav-primary-custom-sidebar').click();
     await expect(page.getByTestId('grw-sidebar-contents')).toBeVisible();
-    await expect(page.locator('.grw-sidebar-content-header > h3').locator('a')).toBeVisible();
+    await expect(
+      page.locator('.grw-sidebar-content-header > h3').locator('a'),
+    ).toBeVisible();
   });
 
-  test('Successfully access to GROWI Docs page', async({ page }) => {
-    const linkElement = page.locator('.grw-sidebar-nav-secondary-container a[href*="https://docs.growi.org"]');
+  test('Successfully access to GROWI Docs page', async ({ page }) => {
+    const linkElement = page.locator(
+      '.grw-sidebar-nav-secondary-container a[href*="https://docs.growi.org"]',
+    );
     const docsUrl = await linkElement.getAttribute('href');
     if (docsUrl == null) {
       throw new Error('url is null');
@@ -43,11 +47,12 @@ test.describe('Access to sidebar', () => {
     expect(body).toContain('</html>');
   });
 
-  test('Successfully access to trash page', async({ page }) => {
-    await page.locator('.grw-sidebar-nav-secondary-container a[href*="/trash"]').click();
+  test('Successfully access to trash page', async ({ page }) => {
+    await page
+      .locator('.grw-sidebar-nav-secondary-container a[href*="/trash"]')
+      .click();
     await expect(page.getByTestId('trash-page-list')).toBeVisible();
   });
-
 
   //
   // Deactivate: An error occurs that cannot be reproduced in the development environment. -- Yuki Takei 2024.05.10
@@ -166,5 +171,4 @@ test.describe('Access to sidebar', () => {
   //     cy.get('.modal-header > button').click();
   //   });
   // });
-
 });

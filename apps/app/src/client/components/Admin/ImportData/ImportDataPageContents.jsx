@@ -16,8 +16,8 @@ import GrowiArchiveSection from './GrowiArchiveSection';
 const logger = loggerFactory('growi:importer');
 
 const ImportDataPageContents = ({ t, adminImportContainer }) => {
-  const { register: registerEsa, reset: resetEsa } = useForm();
-  const { register: registerQiita, reset: resetQiita } = useForm();
+  const { register: registerEsa, reset: resetEsa, handleSubmit: handleSubmitEsa } = useForm();
+  const { register: registerQiita, reset: resetQiita, handleSubmit: handleSubmitQiita } = useForm();
 
   useEffect(() => {
     resetEsa({
@@ -41,6 +41,7 @@ const ImportDataPageContents = ({ t, adminImportContainer }) => {
         className="mt-5"
         id="importerSettingFormEsa"
         role="form"
+        onSubmit={handleSubmitEsa(adminImportContainer.esaHandleSubmitUpdate)}
       >
         <fieldset>
           <h2 className="admin-setting-header">{t('importer_management.import_from', { from: 'esa.io' })}</h2>
@@ -118,7 +119,7 @@ const ImportDataPageContents = ({ t, adminImportContainer }) => {
                 onClick={adminImportContainer.esaHandleSubmit}
                 value={t('importer_management.import')}
               />
-              <input type="button" className="btn btn-secondary" onClick={adminImportContainer.esaHandleSubmitUpdate} value={t('Update')} />
+              <input type="submit" className="btn btn-secondary" value={t('Update')} />
               <span className="offset-0 offset-sm-1">
                 <input
                   id="importFromEsa"
@@ -129,7 +130,6 @@ const ImportDataPageContents = ({ t, adminImportContainer }) => {
                   value={t('importer_management.esa_settings.test_connection')}
                 />
               </span>
-
             </div>
           </div>
         </fieldset>
@@ -139,6 +139,7 @@ const ImportDataPageContents = ({ t, adminImportContainer }) => {
         className="mt-5"
         id="importerSettingFormQiita"
         role="form"
+        onSubmit={handleSubmitQiita(adminImportContainer.qiitaHandleSubmitUpdate)}
       >
         <fieldset>
           <h2 className="admin-setting-header">{t('importer_management.import_from', { from: 'Qiita:Team' })}</h2>
@@ -219,7 +220,7 @@ const ImportDataPageContents = ({ t, adminImportContainer }) => {
                 onClick={adminImportContainer.qiitaHandleSubmit}
                 value={t('importer_management.import')}
               />
-              <input type="button" className="btn btn-secondary" onClick={adminImportContainer.qiitaHandleSubmitUpdate} value={t('Update')} />
+              <input type="submit" className="btn btn-secondary" value={t('Update')} />
               <span className="offset-0 offset-sm-1">
                 <input
                   name="Qiita"

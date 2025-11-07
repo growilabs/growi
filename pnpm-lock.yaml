@@ -294,13 +294,13 @@ importers:
         version: 0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12)
       '@mastra/libsql':
         specifier: ^0.16.1
-        version: 0.16.1(@mastra/core@0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12))
+        version: 0.16.2(@mastra/core@0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12))
       '@mastra/memory':
         specifier: ^0.15.10
-        version: 0.15.10(@mastra/core@0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12))(react@18.2.0)(zod@4.1.12)
+        version: 0.15.11(@mastra/core@0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12))(react@18.2.0)(zod@4.1.12)
       '@mastra/mongodb':
         specifier: ^0.14.8
-        version: 0.14.8(@aws-sdk/client-sso-oidc@3.600.0)(@aws-sdk/credential-providers@3.600.0(@aws-sdk/client-sso-oidc@3.600.0))(@mastra/core@0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12))(encoding@0.1.13)(socks@2.8.3)
+        version: 0.14.9(@aws-sdk/client-sso-oidc@3.600.0)(@aws-sdk/credential-providers@3.600.0(@aws-sdk/client-sso-oidc@3.600.0))(@mastra/core@0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12))(encoding@0.1.13)(socks@2.8.3)
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.0
@@ -854,7 +854,7 @@ importers:
         specifier: ^11.0.3
         version: 11.1.0
       validator:
-        specifier: ^13.7.0
+        specifier: ^13.15.20
         version: 13.15.20
       ws:
         specifier: ^8.17.1
@@ -962,6 +962,9 @@ importers:
       '@types/react-syntax-highlighter':
         specifier: ^15.5.13
         version: 15.5.13
+      '@types/supertest':
+        specifier: ^6.0.3
+        version: 6.0.3
       '@types/testing-library__dom':
         specifier: ^7.5.0
         version: 7.5.0
@@ -1112,6 +1115,9 @@ importers:
       source-map-loader:
         specifier: ^4.0.1
         version: 4.0.2(webpack@5.92.1(@swc/core@1.10.7(@swc/helpers@0.5.15))(esbuild@0.25.11))
+      supertest:
+        specifier: ^7.1.4
+        version: 7.1.4
       swagger2openapi:
         specifier: ^7.0.8
         version: 7.0.8(encoding@0.1.13)
@@ -4093,10 +4099,10 @@ packages:
       '@mastra/core': '>=0.19.1-0 <0.20.0-0'
       zod: ^3.25.0 || ^4.0.0
 
-  '@mastra/libsql@0.16.1':
-    resolution: {integrity: sha512-jkYCsv00qzhjq4nyscChovW8cfeb8r8VkgzW+iPU9SBLu7pDX2HGgC/WSvSOeH1Ll0twqL2iql6gKXGAnDmRfw==}
+  '@mastra/libsql@0.16.2':
+    resolution: {integrity: sha512-yQ3FYQkRdmIE9Z0RJqVJsKH7H4YjgYb4WcpTfe1C7ulz6OS0VANyXUxiggUhs/mC/WCRjXYlMIj5D19+8o+KeA==}
     peerDependencies:
-      '@mastra/core': '>=0.21.2-0 <0.24.0-0'
+      '@mastra/core': '>=0.21.2-0 <0.25.0-0'
 
   '@mastra/loggers@0.10.18':
     resolution: {integrity: sha512-Ti711VpYqAwUbxEkYnJ11KeERROI7c6Nf9nNh/t85rCbLspLB/wpwX/FYH9/JUqC0fe5U2kKfergoTs9SKq9Qw==}
@@ -4109,16 +4115,16 @@ packages:
       '@mastra/core': '>=0.20.1-0 <0.22.0-0'
       zod: ^3.25.0 || ^4.0.0
 
-  '@mastra/memory@0.15.10':
-    resolution: {integrity: sha512-ZSL3iQCgtBpXf/8i504eW2gX+mx0A93DAY4T+9lPx7tgVESZJ2e4C7U4L3mcn/laQtkcdhHC+fX54J1ahaphxQ==}
+  '@mastra/memory@0.15.11':
+    resolution: {integrity: sha512-HxcvJ+JBCEN9f8JQ+mPgxBm2K9Ln52aGsX0OeqG1sgt1vac60PqQi1MbywbiIsLxlMkVFysE2C/7bFh+d6vtjQ==}
     peerDependencies:
-      '@mastra/core': '>=0.20.1-0 <0.24.0-0'
+      '@mastra/core': '>=0.20.1-0 <0.25.0-0'
       zod: ^3.25.0 || ^4.0.0
 
-  '@mastra/mongodb@0.14.8':
-    resolution: {integrity: sha512-SrcMfo1Wq0FfTEqddXTL5HeESNjEvt8fvv+QSjfpTaFjSNBKwhegjwjdu07KLR+PDS5OgeOAJYU9KsfSvhCACg==}
+  '@mastra/mongodb@0.14.9':
+    resolution: {integrity: sha512-7W+UL+Hpqcv4aVdvC8OXG7NDkGpcESv/sxLgDgC+3Q3mcnDxTaBGfAhXXUp8ky/Y5il5Ro+CJ9DJ0c4g79BtBQ==}
     peerDependencies:
-      '@mastra/core': '>=0.18.1-0 <0.24.0-0'
+      '@mastra/core': '>=0.18.1-0 <0.25.0-0'
 
   '@mastra/schema-compat@0.11.3':
     resolution: {integrity: sha512-P50JETxpEFilgp3WIpSidr3Jt+JyZzIwzU9EoYZF+JyeTee/QLXVC4cMTCEU+Uj+4GVDV+L2g+qTHEVWcqxsSA==}
@@ -4126,8 +4132,8 @@ packages:
       ai: ^4.0.0 || ^5.0.0
       zod: ^3.25.0 || ^4.0.0
 
-  '@mastra/schema-compat@0.11.6':
-    resolution: {integrity: sha512-oPsnOj6CyWjCyXitDB3BLQjzf83Xo/TsyKZAMPoRaxRd673C1QzHf/1hwF2vTunpGeiwpBpVJE+WO7rYUX9ZvQ==}
+  '@mastra/schema-compat@0.11.7':
+    resolution: {integrity: sha512-F/Q2myO7ar5+p2zRb1anGvLrUCKmdrJraXq9TWsWRp7frrcGUwlewf6Qo9+lp6NSumH0XlC/yvcjzzDwVzaMEw==}
     peerDependencies:
       ai: ^4.0.0 || ^5.0.0
       zod: ^3.25.0 || ^4.0.0
@@ -16490,6 +16496,10 @@ packages:
     engines: {node: '>=14.18.0'}
     deprecated: Please upgrade to superagent v10.2.2+, see release notes at https://github.com/forwardemail/superagent/releases/tag/v10.2.2 - maintenance is supported by Forward Email @ https://forwardemail.net
 
+  superagent@10.2.3:
+    resolution: {integrity: sha512-y/hkYGeXAj7wUMjxRbB21g/l6aAEituGXM9Rwl4o20+SX3e8YOSV6BxFXl+dL3Uk0mjSL3kCbNkwURm8/gEDig==}
+    engines: {node: '>=14.18.0'}
+
   superjson@1.13.3:
     resolution: {integrity: sha512-mJiVjfd2vokfDxsQPOwJ/PtanO87LhpYY88ubI5dUB1Ab58Txbyje3+jpm+/83R/fevaq/107NNhtYBLuoTrFg==}
     engines: {node: '>=10'}
@@ -16498,6 +16508,10 @@ packages:
     resolution: {integrity: sha512-aI59HBTlG9e2wTjxGJV+DygfNLgnWbGdZxiA/sgrnNNikIW8lbDvCtF6RnhZoJ82nU7qv7ZLjrvWqCEm52fAmw==}
     engines: {node: '>=14.18.0'}
     deprecated: Please upgrade to supertest v7.1.3+, see release notes at https://github.com/forwardemail/supertest/releases/tag/v7.1.3 - maintenance is supported by Forward Email @ https://forwardemail.net
+
+  supertest@7.1.4:
+    resolution: {integrity: sha512-tjLPs7dVyqgItVFirHYqe2T+MfWc2VOBQ8QFKKbWTA3PU7liZR8zoSpAi/C1k1ilm9RsXIKYf197oap9wXGVYg==}
+    engines: {node: '>=14.18.0'}
 
   supports-color@10.0.0:
     resolution: {integrity: sha512-HRVVSbCCMbj7/kdWF9Q+bbckjBHLtHMEoJWlkmYzzdwhYMkjkOwubLM6t7NbWKjgKamGDrWL1++KrjUO1t9oAQ==}
@@ -19721,7 +19735,7 @@ snapshots:
       '@babel/helper-split-export-declaration': 7.24.6
       '@babel/parser': 7.25.6
       '@babel/types': 7.25.6
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       globals: 11.12.0
     transitivePeerDependencies:
       - supports-color
@@ -20603,7 +20617,7 @@ snapshots:
   '@eslint/eslintrc@2.0.3':
     dependencies:
       ajv: 6.12.6
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       espree: 9.6.1
       globals: 13.24.0
       ignore: 5.3.1
@@ -20715,7 +20729,7 @@ snapshots:
   '@humanwhocodes/config-array@0.11.8':
     dependencies:
       '@humanwhocodes/object-schema': 1.2.1
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       minimatch: 3.1.2
     transitivePeerDependencies:
       - supports-color
@@ -21410,7 +21424,7 @@ snapshots:
       - supports-color
       - typescript
 
-  '@mastra/libsql@0.16.1(@mastra/core@0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12))':
+  '@mastra/libsql@0.16.2(@mastra/core@0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12))':
     dependencies:
       '@libsql/client': 0.15.15
       '@mastra/core': 0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12)
@@ -21440,10 +21454,10 @@ snapshots:
       - '@types/json-schema'
       - supports-color
 
-  '@mastra/memory@0.15.10(@mastra/core@0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12))(react@18.2.0)(zod@4.1.12)':
+  '@mastra/memory@0.15.11(@mastra/core@0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12))(react@18.2.0)(zod@4.1.12)':
     dependencies:
       '@mastra/core': 0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12)
-      '@mastra/schema-compat': 0.11.6(ai@4.3.19(react@18.2.0)(zod@4.1.12))(zod@4.1.12)
+      '@mastra/schema-compat': 0.11.7(ai@4.3.19(react@18.2.0)(zod@4.1.12))(zod@4.1.12)
       '@upstash/redis': 1.35.6
       ai: 4.3.19(react@18.2.0)(zod@4.1.12)
       ai-v5: ai@5.0.60(zod@4.1.12)
@@ -21461,7 +21475,7 @@ snapshots:
       - pg-native
       - react
 
-  '@mastra/mongodb@0.14.8(@aws-sdk/client-sso-oidc@3.600.0)(@aws-sdk/credential-providers@3.600.0(@aws-sdk/client-sso-oidc@3.600.0))(@mastra/core@0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12))(encoding@0.1.13)(socks@2.8.3)':
+  '@mastra/mongodb@0.14.9(@aws-sdk/client-sso-oidc@3.600.0)(@aws-sdk/credential-providers@3.600.0(@aws-sdk/client-sso-oidc@3.600.0))(@mastra/core@0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12))(encoding@0.1.13)(socks@2.8.3)':
     dependencies:
       '@mastra/core': 0.17.1(encoding@0.1.13)(openapi-types@12.1.3)(react@18.2.0)(zod@4.1.12)
       '@types/mongodb': 4.0.7(@aws-sdk/client-sso-oidc@3.600.0)
@@ -21489,7 +21503,7 @@ snapshots:
       zod-from-json-schema-v3: zod-from-json-schema@0.0.5
       zod-to-json-schema: 3.24.6(zod@4.1.12)
 
-  '@mastra/schema-compat@0.11.6(ai@4.3.19(react@18.2.0)(zod@4.1.12))(zod@4.1.12)':
+  '@mastra/schema-compat@0.11.7(ai@4.3.19(react@18.2.0)(zod@4.1.12))(zod@4.1.12)':
     dependencies:
       ai: 4.3.19(react@18.2.0)(zod@4.1.12)
       json-schema: 0.4.0
@@ -23099,7 +23113,7 @@ snapshots:
       ajv: 8.17.1
       chalk: 4.1.2
       compare-versions: 6.1.1
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       esbuild: 0.24.2
       esutils: 2.0.3
       fs-extra: 11.2.0
@@ -23273,7 +23287,7 @@ snapshots:
 
   '@puppeteer/browsers@2.4.0':
     dependencies:
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       extract-zip: 2.0.1
       progress: 2.0.3
       proxy-agent: 6.4.0
@@ -26225,7 +26239,7 @@ snapshots:
     dependencies:
       '@typescript-eslint/typescript-estree': 5.59.7(typescript@5.0.4)
       '@typescript-eslint/utils': 5.59.7(eslint@8.41.0)(typescript@5.0.4)
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       eslint: 8.41.0
       tsutils: 3.21.0(typescript@5.0.4)
     optionalDependencies:
@@ -26237,7 +26251,7 @@ snapshots:
     dependencies:
       '@typescript-eslint/typescript-estree': 5.59.7(typescript@5.4.2)
       '@typescript-eslint/utils': 5.59.7(eslint@8.41.0)(typescript@5.4.2)
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       eslint: 8.41.0
       tsutils: 3.21.0(typescript@5.4.2)
     optionalDependencies:
@@ -26252,7 +26266,7 @@ snapshots:
     dependencies:
       '@typescript-eslint/types': 5.59.7
       '@typescript-eslint/visitor-keys': 5.59.7
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       globby: 11.1.0
       is-glob: 4.0.3
       semver: 7.6.3
@@ -26266,7 +26280,7 @@ snapshots:
     dependencies:
       '@typescript-eslint/types': 5.59.7
       '@typescript-eslint/visitor-keys': 5.59.7
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       globby: 11.1.0
       is-glob: 4.0.3
       semver: 7.6.3
@@ -26690,7 +26704,7 @@ snapshots:
 
   agent-base@6.0.2:
     dependencies:
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
 
@@ -29314,7 +29328,7 @@ snapshots:
 
   eslint-import-resolver-typescript@2.7.1(eslint-plugin-import@2.26.0)(eslint@8.41.0):
     dependencies:
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       eslint: 8.41.0
       eslint-plugin-import: 2.26.0(@typescript-eslint/parser@5.59.7(eslint@8.41.0)(typescript@5.0.4))(eslint-import-resolver-typescript@3.2.5)(eslint@8.41.0)
       glob: 7.2.3
@@ -29836,7 +29850,7 @@ snapshots:
 
   extract-zip@2.0.1:
     dependencies:
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       get-stream: 5.2.0
       yauzl: 2.10.0
     optionalDependencies:
@@ -30325,7 +30339,7 @@ snapshots:
     dependencies:
       basic-ftp: 5.0.5
       data-uri-to-buffer: 6.0.2
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       fs-extra: 11.2.0
     transitivePeerDependencies:
       - supports-color
@@ -30888,14 +30902,14 @@ snapshots:
     dependencies:
       '@tootallnate/once': 2.0.0
       agent-base: 6.0.2
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
 
   http-proxy-agent@7.0.2:
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
 
@@ -30918,7 +30932,7 @@ snapshots:
   https-proxy-agent@5.0.1:
     dependencies:
       agent-base: 6.0.2
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
 
@@ -31115,7 +31129,7 @@ snapshots:
     dependencies:
       es-errors: 1.3.0
       hasown: 2.0.2
-      side-channel: 1.0.6
+      side-channel: 1.1.0
 
   internmap@1.0.1: {}
 
@@ -31410,7 +31424,7 @@ snapshots:
 
   istanbul-lib-source-maps@4.0.1:
     dependencies:
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       istanbul-lib-coverage: 3.2.2
       source-map: 0.6.1
     transitivePeerDependencies:
@@ -31419,7 +31433,7 @@ snapshots:
   istanbul-lib-source-maps@5.0.6:
     dependencies:
       '@jridgewell/trace-mapping': 0.3.30
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       istanbul-lib-coverage: 3.2.2
     transitivePeerDependencies:
       - supports-color
@@ -34137,7 +34151,7 @@ snapshots:
     dependencies:
       '@tootallnate/quickjs-emscripten': 0.23.0
       agent-base: 7.1.4
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       get-uri: 6.0.3
       http-proxy-agent: 7.0.2
       https-proxy-agent: 7.0.6
@@ -34690,7 +34704,7 @@ snapshots:
   proxy-agent@6.4.0:
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       http-proxy-agent: 7.0.2
       https-proxy-agent: 7.0.6
       lru-cache: 7.18.3
@@ -34747,7 +34761,7 @@ snapshots:
     dependencies:
       '@puppeteer/browsers': 2.4.0
       chromium-bidi: 0.8.0(devtools-protocol@0.0.1354347)
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       devtools-protocol: 0.0.1354347
       typed-query-selector: 2.12.0
       ws: 8.18.0
@@ -35588,7 +35602,7 @@ snapshots:
 
   require-in-the-middle@7.4.0:
     dependencies:
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       module-details-from-path: 1.0.3
       resolve: 1.22.8
     transitivePeerDependencies:
@@ -36250,7 +36264,7 @@ snapshots:
   socks-proxy-agent@7.0.0:
     dependencies:
       agent-base: 6.0.2
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       socks: 2.8.3
     transitivePeerDependencies:
       - supports-color
@@ -36258,7 +36272,7 @@ snapshots:
   socks-proxy-agent@8.0.4:
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       socks: 2.8.3
     transitivePeerDependencies:
       - supports-color
@@ -36503,7 +36517,7 @@ snapshots:
       has-symbols: 1.1.0
       internal-slot: 1.0.7
       regexp.prototype.flags: 1.5.2
-      side-channel: 1.0.6
+      side-channel: 1.1.0
 
   string.prototype.padend@3.0.0:
     dependencies:
@@ -36708,13 +36722,27 @@ snapshots:
     dependencies:
       component-emitter: 1.3.1
       cookiejar: 2.1.4
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       fast-safe-stringify: 2.1.1
       form-data: 4.0.4
       formidable: 3.5.4
       methods: 1.1.2
       mime: 2.6.0
-      qs: 6.13.0
+      qs: 6.14.0
+    transitivePeerDependencies:
+      - supports-color
+
+  superagent@10.2.3:
+    dependencies:
+      component-emitter: 1.3.1
+      cookiejar: 2.1.4
+      debug: 4.4.3
+      fast-safe-stringify: 2.1.1
+      form-data: 4.0.4
+      formidable: 3.5.4
+      methods: 1.1.2
+      mime: 2.6.0
+      qs: 6.14.0
     transitivePeerDependencies:
       - supports-color
 
@@ -36726,6 +36754,13 @@ snapshots:
     dependencies:
       methods: 1.1.2
       superagent: 10.2.1
+    transitivePeerDependencies:
+      - supports-color
+
+  supertest@7.1.4:
+    dependencies:
+      methods: 1.1.2
+      superagent: 10.2.3
     transitivePeerDependencies:
       - supports-color
 
@@ -37796,7 +37831,7 @@ snapshots:
   vite-node@2.1.1(@types/node@20.19.17)(lightningcss@1.30.2)(sass@1.77.6)(terser@5.44.0):
     dependencies:
       cac: 6.7.14
-      debug: 4.4.1(supports-color@5.5.0)
+      debug: 4.4.3
       pathe: 1.1.2
       vite: 5.4.21(@types/node@20.19.17)(lightningcss@1.30.2)(sass@1.77.6)(terser@5.44.0)
     transitivePeerDependencies:

@@ -13,7 +13,6 @@ import type { RendererConfig } from '~/interfaces/services/renderer';
 import type { ISidebarConfig } from '~/interfaces/sidebar-config';
 import { useCurrentPageId, useSWRxCurrentPage } from '~/stores/page';
 import {
-  useCsrfToken,
   useCurrentPathname,
   useCurrentUser,
   useGrowiCloudUri,
@@ -116,7 +115,6 @@ const MePage: NextPageWithLayout<Props> = (props: Props) => {
   useShowPageLimitationXL(props.showPageLimitationXL);
 
   // commons
-  useCsrfToken(props.csrfToken);
   useGrowiCloudUri(props.growiCloudUri);
 
   useCurrentUser(props.currentUser ?? null);

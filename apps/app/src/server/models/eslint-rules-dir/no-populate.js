@@ -18,7 +18,8 @@ module.exports = {
         if (node.callee.property && node.callee.property.name === 'populate') {
           context.report({
             node,
-            message: "The 'populate' method should not be called in model modules.",
+            message:
+              "The 'populate' method should not be called in model modules.",
           });
         }
       },
