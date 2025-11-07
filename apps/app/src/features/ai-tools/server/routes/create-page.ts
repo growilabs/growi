@@ -1,10 +1,4 @@
-import {
-  GroupType,
-  type IGrantedGroup,
-  type IUserHasId,
-  type PageGrant,
-  SCOPE,
-} from '@growi/core/dist/interfaces';
+import { GroupType, type IUserHasId, SCOPE } from '@growi/core/dist/interfaces';
 import {
   isCreatablePage,
   userHomepagePath,
@@ -15,11 +9,19 @@ import type { Request, RequestHandler } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { body } from 'express-validator';
 
+import type { IApiv3PageCreateParams } from '~/interfaces/apiv3';
 import type { IOptionsForCreate } from '~/interfaces/page';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import {
+  determineBodyAndTags,
+  postAction,
+  saveTags,
+} from '~/server/routes/apiv3/page/create-page-helpers';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
@@ -61,13 +63,9 @@ const determinePath = async (
   throw new Error('Cannot determine page path');
 };
 
-type ReqBody = {
-  path?: string;
+type ReqBody = IApiv3PageCreateParams & {
   todaysMemoTitle?: string;
   pathHintKeywords?: string[];
-  body: string;
-  grant?: PageGrant;
-  grantUserGroupIds?: IGrantedGroup[];
 };
 
 type CreatePageReq = Request<undefined, ApiV3Response, ReqBody> & {
@@ -119,11 +117,39 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
       .withMessage(
         '"grantUserGroupIds.*.item" must be a valid MongoDB ObjectId',
       ),
+
+    body('onlyInheritUserRelatedGrantedGroups')
+      .optional()
+      .isBoolean()
+      .withMessage('onlyInheritUserRelatedGrantedGroups must be boolean'),
+
+    body('overwriteScopesOfDescendants')
+      .optional()
+      .isBoolean()
+      .withMessage('overwriteScopesOfDescendants must be boolean'),
+
+    body('pageTags').optional().isArray().withMessage('pageTags must be array'),
+
+    body('isSlackEnabled')
+      .optional()
+      .isBoolean()
+      .withMessage('isSlackEnabled must be boolean'),
+
+    body('slackChannels')
+      .optional()
+      .isString()
+      .withMessage('slackChannels must be string'),
+
+    body('wip').optional().isBoolean().withMessage('wip must be boolean'),
   ];
+
+  const addActivity = generateAddActivityMiddleware();
 
   return [
     accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT]), // TODO: https://redmine.weseek.co.jp/issues/172491
     loginRequiredStrictly,
+    excludeReadOnlyUser,
+    addActivity,
     validator,
     apiV3FormValidator,
     async (req: CreatePageReq, res: ApiV3Response) => {
@@ -134,6 +160,10 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
         body,
         grant,
         grantUserGroupIds,
+        pageTags,
+        onlyInheritUserRelatedGrantedGroups,
+        overwriteScopesOfDescendants,
+        wip,
       } = req.body;
 
       if (
@@ -156,21 +186,33 @@ export const createPageHandlersFactory: CreatePageFactory = (crowi) => {
           pathHintKeywords,
         );
 
-        const option: IOptionsForCreate = {};
+        const { body: determinedBody, tags: determinedTags } =
+          await determineBodyAndTags(determinedPath, body, pageTags);
+
+        const options: IOptionsForCreate = {
+          onlyInheritUserRelatedGrantedGroups,
+          overwriteScopesOfDescendants,
+          wip,
+        };
+
         if (grant != null) {
-          option.grant = grant;
-          option.grantUserGroupIds = grantUserGroupIds;
+          options.grant = grant;
+          options.grantUserGroupIds = grantUserGroupIds;
         }
 
         const createdPage = await crowi.pageService.create(
           determinedPath,
-          body,
+          determinedBody,
           req.user,
-          option,
+          options,
         );
 
+        await saveTags({ createdPage, pageTags: determinedTags }, crowi);
+
         // TODO: https://redmine.weseek.co.jp/issues/173816
-        return res.apiv3({});
+        res.apiv3({}, 201);
+
+        postAction(req, res, createdPage, crowi);
       } catch (err) {
         logger.error(err);
         return res.apiv3Err(err);
