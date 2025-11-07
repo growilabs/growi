@@ -56,7 +56,7 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
 
         if (memory == null) {
           return res.apiv3Err(
-            new ErrorV3('Memory service is not available'),
+            new ErrorV3('Mastra Memory is not available'),
             501,
           );
         }
