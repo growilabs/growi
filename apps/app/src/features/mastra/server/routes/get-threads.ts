@@ -33,7 +33,7 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
   );
 
   const validator: ValidationChain[] = [
-    query('page').isInt({ min: 1 }).toInt(),
+    query('page').isInt({ min: 0 }).toInt(),
 
     query('perPage').isInt({ min: 1, max: 20 }).toInt(),
 
@@ -61,12 +61,7 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
           );
         }
 
-        const {
-          page,
-          perPage,
-          orderBy = 'updatedAt',
-          sortDirection = 'DESC',
-        } = req.query;
+        const { page, perPage, orderBy, sortDirection } = req.query;
 
         const threads = await memory.getThreadsByResourceIdPaginated({
           resourceId: req.user._id.toString(),
