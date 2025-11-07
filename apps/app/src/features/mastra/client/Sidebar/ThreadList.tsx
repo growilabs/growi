@@ -24,7 +24,6 @@ export const ThreadList: React.FC = () => {
     openChat,
     data: aiAssistantSidebarData,
     close: closeAiAssistantSidebar,
-
   } = useAiAssistantSidebar();
   const { trigger: mutateAssistantThreadData } = useSWRMUTxThreads(
     aiAssistantSidebarData?.aiAssistantData?._id,
@@ -69,59 +68,57 @@ export const ThreadList: React.FC = () => {
   );
 
   return (
-    <>
-      <ul className="list-group">
-        <InfiniteScroll
-          swrInifiniteResponse={swrInifiniteThreads}
-          isReachingEnd={isReachingEnd}
-        >
-          {data
-            ?.flatMap((thread) => thread.paginateResult.docs)
-            .map((thread) => (
-              <li key={thread._id} className="list-group-item border-0 p-0">
-                <button
-                  type="button"
-                  className="btn btn-link list-group-item-action border-0 d-flex align-items-center rounded-1"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openChat(thread.aiAssistant, thread);
-                  }}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                  }}
-                >
-                  <div>
-                    <span className="material-symbols-outlined fs-5">chat</span>
-                  </div>
+    <ul className="list-group">
+      <InfiniteScroll
+        swrInifiniteResponse={swrInifiniteThreads}
+        isReachingEnd={isReachingEnd}
+      >
+        {data
+          ?.flatMap((thread) => thread.paginateResult.docs)
+          .map((thread) => (
+            <li key={thread._id} className="list-group-item border-0 p-0">
+              <button
+                type="button"
+                className="btn btn-link list-group-item-action border-0 d-flex align-items-center rounded-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openChat(thread.aiAssistant, thread);
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                }}
+              >
+                <div>
+                  <span className="material-symbols-outlined fs-5">chat</span>
+                </div>
 
-                  <div className="grw-item-title ps-1">
-                    <p className="text-truncate m-auto">
-                      {thread.title ?? 'Untitled thread'}
-                    </p>
-                  </div>
+                <div className="grw-item-title ps-1">
+                  <p className="text-truncate m-auto">
+                    {thread.title ?? 'Untitled thread'}
+                  </p>
+                </div>
 
-                  <div className="grw-btn-actions opacity-0 d-flex justify-content-center">
-                    <button
-                      type="button"
-                      className="btn btn-link text-secondary p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteThreadHandler(
-                          getIdStringForRef(thread.aiAssistant),
-                          thread._id,
-                        );
-                      }}
-                    >
-                      <span className="material-symbols-outlined fs-5">
-                        delete
-                      </span>
-                    </button>
-                  </div>
-                </button>
-              </li>
-            ))}
-        </InfiniteScroll>
-      </ul>
-    </>
+                <div className="grw-btn-actions opacity-0 d-flex justify-content-center">
+                  <button
+                    type="button"
+                    className="btn btn-link text-secondary p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteThreadHandler(
+                        getIdStringForRef(thread.aiAssistant),
+                        thread._id,
+                      );
+                    }}
+                  >
+                    <span className="material-symbols-outlined fs-5">
+                      delete
+                    </span>
+                  </button>
+                </div>
+              </button>
+            </li>
+          ))}
+      </InfiniteScroll>
+    </ul>
   );
 };
