@@ -14,9 +14,14 @@ export const factory = (crowi: Crowi): express.Router => {
       return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
     });
   }
+
   // enabled
   import('./post-message').then(({ postMessageHandlersFactory }) => {
     router.post('/message', postMessageHandlersFactory(crowi));
+  });
+
+  import('./get-threads').then(({ getThreadsFactory }) => {
+    router.get('/threads', getThreadsFactory(crowi));
   });
 
   return router;
