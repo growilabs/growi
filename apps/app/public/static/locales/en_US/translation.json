@@ -1000,7 +1000,17 @@
   "user_home_page": {
     "bookmarks": "Bookmarks",
     "recently_created": "Recently Created",
-    "recent_activity": "Recent Activity"
+    "recent_activity": "Recent Activity",
+    "unknown_action": "performed an unknown action",
+    "page_create": "created a page",
+    "page_update": "updated a page",
+    "page_delete": "deleted a page",
+    "page_delete_completely": "deleted a page",
+    "page_rename": "renamed a page",
+    "page_revert": "reverted a page",
+    "page_like": "liked a page",
+    "page_duplicate": "duplicated a page",
+    "comment_create": "posted a comment"
   },
   "bookmark_folder": {
     "bookmark_folder": "bookmark folder",

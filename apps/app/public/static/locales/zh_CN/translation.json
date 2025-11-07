@@ -1005,7 +1005,17 @@
   "user_home_page": {
     "bookmarks": "书签",
     "recently_created": "最近创建页面",
-    "recent_activity": "最近动态"
+    "recent_activity": "最近动态",
+    "unknown_action": "执行了未知操作",
+    "page_create": "创建了页面",
+    "page_update": "更新了页面",
+    "page_delete": "删除了页面",
+    "page_delete_completely": "彻底删除了页面",
+    "page_rename": "重命名了页面",
+    "page_revert": "还原了页面",
+    "page_duplicate": "复制了页面",
+    "page_like": "赞了页面",
+    "comment_create": "发布了评论"
   },
   "bookmark_folder": {
     "bookmark_folder": "书签文件夹",

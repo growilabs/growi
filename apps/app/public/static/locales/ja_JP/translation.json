@@ -1033,7 +1033,17 @@
   "user_home_page": {
     "bookmarks": "ブックマーク",
     "recently_created": "最近作成したページ",
-    "recent_activity": "最近のアクティビティ"
+    "recent_activity": "最近のアクティビティ",
+    "unknown_action": "不明な操作を実行しました",
+    "page_create": "ページを作成しました",
+    "page_update": "ページを更新しました",
+    "page_delete": "ページを削除しました",
+    "page_delete_completely": "ページを完全に削除しました",
+    "page_rename": "ページの名前を変更しました",
+    "page_revert": "ページを元に戻しました",
+    "page_duplicate": "ページを複製しました",
+    "page_like": "ページをいいねしました",
+    "comment_create": "コメントを投稿しました"
   },
   "bookmark_folder": {
     "bookmark_folder": "ブックマークフォルダ",

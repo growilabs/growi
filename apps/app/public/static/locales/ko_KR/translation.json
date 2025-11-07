@@ -960,7 +960,17 @@
   "user_home_page": {
     "bookmarks": "북마크",
     "recently_created": "최근 생성됨",
-    "recent_activity": "최근 활동"
+    "recent_activity": "최근 활동",
+    "unknown_action": "알 수 없는 작업을 수행했습니다",
+    "page_create": "페이지를 생성했습니다",
+    "page_update": "페이지를 업데이트했습니다",
+    "page_delete": "페이지를 삭제했습니다",
+    "page_delete_completely": "페이지를 완전히 삭제했습니다",
+    "page_rename": "페이지 이름을 변경했습니다",
+    "page_revert": "페이지를 되돌렸습니다",
+    "page_duplicate": "페이지를 복제했습니다",
+    "page_like": "페이지에 좋아요를 눌렀습니다",
+    "comment_create": "댓글을 게시했습니다"
   },
   "bookmark_folder": {
     "bookmark_folder": "북마크 폴더",

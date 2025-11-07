@@ -994,7 +994,17 @@
   "user_home_page": {
     "bookmarks": "Favoris",
     "recently_created": "Page récentes",
-    "recent_activity": "Activité récente"
+    "recent_activity": "Activité récente",
+    "unknown_action": "a effectué une action inconnue",
+    "page_create": "a créé une page",
+    "page_update": "a mis à jour une page",
+    "page_delete": "a supprimé une page",
+    "page_delete_completely": "a supprimé complètement une page",
+    "page_rename": "a renommé une page",
+    "page_revert": "a restauré une page",
+    "page_duplicate": "a dupliqué une page",
+    "page_like": "a aimé une page",
+    "comment_create": "a publié un commentaire"
   },
   "bookmark_folder": {
     "bookmark_folder": "dossier de favoris",
