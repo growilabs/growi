@@ -1,6 +1,6 @@
 import React, { memo, useMemo } from 'react';
 
-import { AiAssistant } from '~/features/openai/client/components/AiAssistant/Sidebar/AiAssistant';
+import { AiAssistant } from '~/features/mastra/client/Sidebar/AiAssistant';
 import { SidebarContentsType } from '~/interfaces/ui';
 import { useIsAiEnabled, useIsGuestUser } from '~/stores-universal/context';
 import { useCollapsedContentsOpened, useCurrentSidebarContents, useSidebarMode } from '~/stores/ui';

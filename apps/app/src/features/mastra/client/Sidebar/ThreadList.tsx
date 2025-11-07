@@ -11,8 +11,8 @@ import {
 } from '~/features/openai/client/stores/thread';
 import loggerFactory from '~/utils/logger';
 
-import { deleteThread } from '../../../services/thread';
-import { useAiAssistantSidebar } from '../../../stores/ai-assistant';
+import { deleteThread } from '../../../openai/client/services/thread';
+import { useAiAssistantSidebar } from '../../../openai/client/stores/ai-assistant';
 
 const logger = loggerFactory('growi:openai:client:components:ThreadList');
 
@@ -24,6 +24,7 @@ export const ThreadList: React.FC = () => {
     openChat,
     data: aiAssistantSidebarData,
     close: closeAiAssistantSidebar,
+
   } = useAiAssistantSidebar();
   const { trigger: mutateAssistantThreadData } = useSWRMUTxThreads(
     aiAssistantSidebarData?.aiAssistantData?._id,

@@ -10,19 +10,19 @@ import { useCurrentUser } from '~/stores-universal/context';
 import loggerFactory from '~/utils/logger';
 
 import {
-  type AiAssistantHasId,
-  AiAssistantShareScope,
-} from '../../../../interfaces/ai-assistant';
-import { determineShareScope } from '../../../../utils/determine-share-scope';
-import {
   deleteAiAssistant,
   setDefaultAiAssistant,
-} from '../../../services/ai-assistant';
+} from '../../../openai/client/services/ai-assistant';
 import {
   useAiAssistantManagementModal,
   useAiAssistantSidebar,
-} from '../../../stores/ai-assistant';
-import { getShareScopeIcon } from '../../../utils/get-share-scope-Icon';
+} from '../../../openai/client/stores/ai-assistant';
+import { getShareScopeIcon } from '../../../openai/client/utils/get-share-scope-Icon';
+import {
+  type AiAssistantHasId,
+  AiAssistantShareScope,
+} from '../../../openai/interfaces/ai-assistant';
+import { determineShareScope } from '../../../openai/utils/determine-share-scope';
 import { DeleteAiAssistantModal } from './DeleteAiAssistantModal';
 
 const logger = loggerFactory('growi:openai:client:components:AiAssistantList');
