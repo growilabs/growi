@@ -4,7 +4,7 @@ import { memo } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
-import { useIsGuestUser, useGrowiCloudUri, useIsAdmin } from '~/stores-universal/context';
+import { useIsGuestUser, useIsAdmin } from '~/stores-universal/context';
 
 import { SkeletonItem } from './SkeletonItem';
 
@@ -12,6 +12,11 @@ import styles from './SecondaryItems.module.scss';
 
 
 const PersonalDropdown = dynamic(() => import('./PersonalDropdown').then(mod => mod.PersonalDropdown), {
+  ssr: false,
+  loading: () => <SkeletonItem />,
+});
+
+const HelpDropdown = dynamic(() => import('./HelpDropdown').then(mod => mod.HelpDropdown), {
   ssr: false,
   loading: () => <SkeletonItem />,
 });
@@ -42,12 +47,11 @@ const SecondaryItem: FC<SecondaryItemProps> = (props: SecondaryItemProps) => {
 export const SecondaryItems: FC = memo(() => {
 
   const { data: isAdmin } = useIsAdmin();
-  const { data: growiCloudUri } = useGrowiCloudUri();
   const { data: isGuestUser } = useIsGuestUser();
 
   return (
     <div className={styles['grw-secondary-items']}>
-      <SecondaryItem label="Help" iconName="help" href={growiCloudUri != null ? 'https://growi.cloud/help/' : 'https://docs.growi.org'} isBlank />
+      <HelpDropdown />
       {isAdmin && <SecondaryItem label="Admin" iconName="settings" href="/admin" />}
       <SecondaryItem label="Trash" href="/trash" iconName="delete" />
       {!isGuestUser && <PersonalDropdown />}
