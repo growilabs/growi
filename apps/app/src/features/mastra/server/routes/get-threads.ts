@@ -61,14 +61,12 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
           );
         }
 
-        const { page, perPage, orderBy, sortDirection } = req.query;
-
         const threads = await memory.getThreadsByResourceIdPaginated({
           resourceId: req.user._id.toString(),
-          page,
-          perPage,
-          orderBy,
-          sortDirection,
+          page: req.query.page,
+          perPage: req.query.perPage,
+          orderBy: req.query.orderBy,
+          sortDirection: req.query.sortDirection,
         });
 
         return res.apiv3({ threads });
