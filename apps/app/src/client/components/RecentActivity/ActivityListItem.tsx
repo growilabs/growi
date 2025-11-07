@@ -24,15 +24,15 @@ export const IconActivityTranslationMap: Record<
   SupportedActivityActionType,
   string
 > = {
-  [ActivityLogActions.ACTION_PAGE_CREATE]: '➕',
-  [ActivityLogActions.ACTION_PAGE_UPDATE]: '✏️',
-  [ActivityLogActions.ACTION_PAGE_DELETE]: '🗑️',
-  [ActivityLogActions.ACTION_PAGE_DELETE_COMPLETELY]: '❌',
-  [ActivityLogActions.ACTION_PAGE_RENAME]: '🏷️',
-  [ActivityLogActions.ACTION_PAGE_REVERT]: '⏪',
-  [ActivityLogActions.ACTION_PAGE_DUPLICATE]: '📄📄',
-  [ActivityLogActions.ACTION_PAGE_LIKE]: '❤️',
-  [ActivityLogActions.ACTION_COMMENT_CREATE]: '💬',
+  [ActivityLogActions.ACTION_PAGE_CREATE]: 'add_box',
+  [ActivityLogActions.ACTION_PAGE_UPDATE]: 'edit',
+  [ActivityLogActions.ACTION_PAGE_DELETE]: 'delete',
+  [ActivityLogActions.ACTION_PAGE_DELETE_COMPLETELY]: 'delete_forever',
+  [ActivityLogActions.ACTION_PAGE_RENAME]: 'label',
+  [ActivityLogActions.ACTION_PAGE_REVERT]: 'undo',
+  [ActivityLogActions.ACTION_PAGE_DUPLICATE]: 'content_copy',
+  [ActivityLogActions.ACTION_PAGE_LIKE]: 'favorite',
+  [ActivityLogActions.ACTION_COMMENT_CREATE]: 'comment',
 };
 
 const translateAction = (action: SupportedActivityActionType): string => {
