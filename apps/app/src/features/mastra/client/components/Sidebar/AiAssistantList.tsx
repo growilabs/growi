@@ -12,17 +12,17 @@ import loggerFactory from '~/utils/logger';
 import {
   deleteAiAssistant,
   setDefaultAiAssistant,
-} from '../../../openai/client/services/ai-assistant';
+} from '../../../../openai/client/services/ai-assistant';
 import {
   useAiAssistantManagementModal,
   useAiAssistantSidebar,
-} from '../../../openai/client/stores/ai-assistant';
-import { getShareScopeIcon } from '../../../openai/client/utils/get-share-scope-Icon';
+} from '../../../../openai/client/stores/ai-assistant';
+import { getShareScopeIcon } from '../../../../openai/client/utils/get-share-scope-Icon';
 import {
   type AiAssistantHasId,
   AiAssistantShareScope,
-} from '../../../openai/interfaces/ai-assistant';
-import { determineShareScope } from '../../../openai/utils/determine-share-scope';
+} from '../../../../openai/interfaces/ai-assistant';
+import { determineShareScope } from '../../../../openai/utils/determine-share-scope';
 import { DeleteAiAssistantModal } from './DeleteAiAssistantModal';
 
 const logger = loggerFactory('growi:openai:client:components:AiAssistantList');

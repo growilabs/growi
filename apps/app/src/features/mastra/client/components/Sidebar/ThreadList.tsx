@@ -11,8 +11,8 @@ import {
 } from '~/features/openai/client/stores/thread';
 import loggerFactory from '~/utils/logger';
 
-import { deleteThread } from '../../../openai/client/services/thread';
-import { useAiAssistantSidebar } from '../../../openai/client/stores/ai-assistant';
+import { deleteThread } from '../../../../openai/client/services/thread';
+import { useAiAssistantSidebar } from '../../../../openai/client/stores/ai-assistant';
 
 const logger = loggerFactory('growi:openai:client:components:ThreadList');
 

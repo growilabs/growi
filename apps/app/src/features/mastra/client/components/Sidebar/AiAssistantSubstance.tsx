@@ -5,8 +5,8 @@ import {
   useAiAssistantManagementModal,
   useAiAssistantSidebar,
   useSWRxAiAssistants,
-} from '../../../openai/client/stores/ai-assistant';
-import { useSWRINFxRecentThreads } from '../../../openai/client/stores/thread';
+} from '../../../../openai/client/stores/ai-assistant';
+import { useSWRINFxRecentThreads } from '../../../../openai/client/stores/thread';
 import { AiAssistantList } from './AiAssistantList';
 import { ThreadList } from './ThreadList';
 
