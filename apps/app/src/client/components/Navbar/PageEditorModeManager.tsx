@@ -8,10 +8,10 @@ import { useTranslation } from 'next-i18next';
 
 import { useCreatePage } from '~/client/services/create-page';
 import { toastError } from '~/client/util/toastr';
-import { EditorMode, useEditorMode } from '~/stores-universal/ui';
-import { useIsNotFound } from '~/stores/page';
-import { useIsDeviceLargerThanMd } from '~/stores/ui';
-import { useCurrentPageYjsData } from '~/stores/yjs';
+import { useCurrentPageYjsData } from '~/features/collaborative-editor/states';
+import { usePageNotFound } from '~/states/page';
+import { useDeviceLargerThanMd } from '~/states/ui/device';
+import { useEditorMode, EditorMode } from '~/states/ui/editor';
 
 import { shouldCreateWipPage } from '../../../utils/should-create-wip-page';
 
@@ -66,19 +66,20 @@ export const PageEditorModeManager = (props: Props): JSX.Element => {
 
   const { t } = useTranslation('commons');
 
-  const { data: isNotFound } = useIsNotFound();
-  const { mutate: mutateEditorMode } = useEditorMode();
-  const { data: isDeviceLargerThanMd } = useIsDeviceLargerThanMd();
-  const { data: currentPageYjsData } = useCurrentPageYjsData();
+  const isNotFound = usePageNotFound();
+  const { setEditorMode } = useEditorMode();
+  const [isDeviceLargerThanMd] = useDeviceLargerThanMd();
+  const currentPageYjsData = useCurrentPageYjsData();
 
   const { isCreating, create } = useCreatePage();
 
-  const editButtonClickedHandler = useCallback(async() => {
-    if (isNotFound == null || isNotFound === false) {
-      mutateEditorMode(EditorMode.Editor);
+  const editButtonClickedHandler = useCallback(async () => {
+    if (!isNotFound) {
+      setEditorMode(EditorMode.Editor);
       return;
     }
 
+    // Create a new page if it does not exist and transit to the editor mode
     try {
       const parentPath = path != null ? getParentPath(path) : undefined; // does not have to exist
       await create(
@@ -86,11 +87,13 @@ export const PageEditorModeManager = (props: Props): JSX.Element => {
           path, parentPath, wip: shouldCreateWipPage(path), origin: Origin.View,
         },
       );
+
+      setEditorMode(EditorMode.Editor);
     }
     catch (err) {
       toastError(t('toaster.create_failed', { target: path }));
     }
-  }, [create, isNotFound, mutateEditorMode, path, t]);
+  }, [create, isNotFound, setEditorMode, path, t]);
 
   const _isBtnDisabled = isCreating || isBtnDisabled;
 
@@ -118,7 +121,7 @@ export const PageEditorModeManager = (props: Props): JSX.Element => {
             currentEditorMode={editorMode}
             editorMode={EditorMode.View}
             isBtnDisabled={_isBtnDisabled}
-            onClick={() => mutateEditorMode(EditorMode.View)}
+            onClick={() => setEditorMode(EditorMode.View)}
           >
             <span className="material-symbols-outlined fs-4">play_arrow</span>{t('View')}
           </PageEditorModeButton>
@@ -131,7 +134,7 @@ export const PageEditorModeManager = (props: Props): JSX.Element => {
             onClick={editButtonClickedHandler}
           >
             <span className="material-symbols-outlined me-1 fs-5">edit_square</span>{t('Edit')}
-            { circleColor != null && <span className={`position-absolute top-0 start-100 translate-middle p-1 rounded-circle ${circleColor}`} />}
+            {circleColor != null && <span className={`position-absolute top-0 start-100 translate-middle p-1 rounded-circle ${circleColor}`} />}
           </PageEditorModeButton>
         )}
       </div>

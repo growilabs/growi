@@ -3,7 +3,7 @@ import React, { useState, type JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import { RecentCreated } from '~/client/components/RecentCreated/RecentCreated';
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 
 import { BookmarkFolderTree } from './Bookmarks/BookmarkFolderTree';
 
@@ -17,7 +17,7 @@ export const UsersHomepageFooter = (props: UsersHomepageFooterProps): JSX.Elemen
   const { t } = useTranslation();
   const { creatorId } = props;
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser();
   const isOperable = currentUser?._id === creatorId;
 
   return (

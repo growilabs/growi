@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { apiDelete } from '~/client/util/apiv1-client';
 import { apiv3Get } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useAdminSocket } from '~/stores/socket-io';
+import { useAdminSocket } from '~/features/admin/states/socket-io';
 
 import LabeledProgressBar from './Common/LabeledProgressBar';
 import ArchiveFilesTable from './ExportArchiveData/ArchiveFilesTable';
@@ -20,7 +20,7 @@ const IGNORED_COLLECTION_NAMES = [
 ];
 
 const ExportArchiveDataPage = (): JSX.Element => {
-  const { data: socket } = useAdminSocket();
+  const socket = useAdminSocket();
   const { t } = useTranslation('admin');
 
   const [collections, setCollections] = useState<any[]>([]);

@@ -33,6 +33,7 @@ module.exports = {
     'src/migrations/**',
     'src/models/**',
     'src/features/callout/**',
+    'src/features/collaborative-editor/**',
     'src/features/comment/**',
     'src/features/templates/**',
     'src/features/mermaid/**',
@@ -49,6 +50,7 @@ module.exports = {
     'src/utils/**',
     'src/components/**',
     'src/services/**',
+    'src/states/**',
     'src/stores/**',
     'src/pages/**',
     'src/server/crowi/**',
@@ -66,6 +68,7 @@ module.exports = {
     },
   },
   rules: {
+    'space-before-function-paren': 'off',
     '@typescript-eslint/no-var-requires': 'off',
 
     // set 'warn' temporarily -- 2021.08.02 Yuki Takei
