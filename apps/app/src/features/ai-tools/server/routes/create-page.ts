@@ -26,7 +26,7 @@ import {
 } from '~/server/routes/apiv3/page/create-page-helpers';
 import loggerFactory from '~/utils/logger';
 
-import { determinePath } from '../services/create-page-helper';
+import { determinePath } from '../services/create-page';
 
 const logger = loggerFactory('growi:routes:apiv3:ai-tools:create-page');
 
