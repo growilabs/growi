@@ -21,7 +21,13 @@ const generateTodaysMemoPath = async (
   todaysMemoTitle: string,
 ): Promise<string> => {
   const { t } = await getTranslation({ lang: user.lang, ns: 'commons' });
-  const path = `${userHomepagePath(user)}/${t('create_page_dropdown.todays.memo')}/${format(new Date(), 'yyyy/MM/dd')}/${todaysMemoTitle}`;
+
+  const userHomepagePathName = userHomepagePath(user);
+  const memoPathName = t('create_page_dropdown.todays.memo');
+  const datePathName = format(new Date(), 'yyyy/MM/dd');
+  const title = todaysMemoTitle;
+
+  const path = `${userHomepagePathName}/${memoPathName}/${datePathName}/${title}`;
   const normalizedPath = normalizeAndValidatePath(path);
   return normalizedPath;
 };
