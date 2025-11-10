@@ -28,8 +28,8 @@ class CheckAuditLogBulkExportJobInProgressCronService extends CronService {
     const auditLogExportInProgressExists = auditLogExportJobInProgress != null;
 
     if (
-      auditLogExportInProgressExists
-      && !auditLogBulkExportJobCronService?.isJobRunning()
+      auditLogExportInProgressExists &&
+      !auditLogBulkExportJobCronService?.isJobRunning()
     ) {
       auditLogBulkExportJobCronService?.startCron();
     } else if (!auditLogExportInProgressExists) {
