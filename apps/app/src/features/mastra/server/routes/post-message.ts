@@ -19,11 +19,13 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import { getOrCreateThread } from '../services/get-or-create-thread';
 import { mastra } from '../services/mastra-modules';
 
 const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
 
 type ReqBody = {
+  threadId: string;
   aiAssistantId: string;
   messages: UIMessage[];
 };
@@ -55,9 +57,14 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
   );
 
   const validator: ValidationChain[] = [
+    body('threadId')
+      .isUUID()
+      .optional()
+      .withMessage('threadId must be a valid UUID'),
+
     body('aiAssistantId')
       .isMongoId()
-      .withMessage('aiAssistantId must be string'),
+      .withMessage('aiAssistantId must be a valid MongoDB ObjectId'),
 
     body('messages').custom(async (data) => {
       await validateUIMessages({ messages: data });
@@ -69,10 +76,10 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
-    ...validator,
+    validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
-      const { aiAssistantId, messages } = req.body;
+      const { threadId, aiAssistantId, messages } = req.body;
 
       const openaiService = getOpenaiService();
       if (openaiService == null) {
@@ -106,12 +113,26 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       runtimeContext.set('vectorStoreId', vectorStoreId);
 
       const growiAgent = mastra.getAgent('growiAgent');
+      const memory = await growiAgent.getMemory();
+      if (memory == null) {
+        return res.apiv3Err(new ErrorV3('Mastra Memory is not available'), 500);
+      }
+
+      const thread = await getOrCreateThread(
+        memory,
+        req.user._id.toString(),
+        threadId,
+      );
 
       try {
         const stream = await growiAgent.streamVNext(messages, {
           format: 'aisdk',
           output: reasoningSchema,
           runtimeContext,
+          memory: {
+            thread: thread.id,
+            resource: thread.resourceId,
+          },
         });
 
         // debug: log all chunks from the full stream

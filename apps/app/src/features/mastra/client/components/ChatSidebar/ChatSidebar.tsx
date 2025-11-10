@@ -76,7 +76,7 @@ const ChatSidebarSubstance = (): JSX.Element => {
       },
       {
         body: {
-          aiAssistantId: '68f1fabd97d4fbba9e4896c4',
+          aiAssistantId: '690993662bddbe7c2428bdde',
         },
       },
     );
