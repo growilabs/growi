@@ -11,7 +11,6 @@ import type { IAuditLogBulkExportJobCronService } from '..';
  */
 export async function compressAndUpload(
   this: IAuditLogBulkExportJobCronService,
-  user: IUser,
   job: AuditLogBulkExportJobDocument,
 ): Promise<void> {
   await this.notifyExportResultAndCleanUp(
