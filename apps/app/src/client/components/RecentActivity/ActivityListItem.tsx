@@ -1,4 +1,8 @@
 import { formatDistanceToNow } from 'date-fns';
+import type { Locale } from 'date-fns/locale';
+import {
+  enUS, ja, fr, ko, zhCN,
+} from 'date-fns/locale';
 import { useTranslation } from 'next-i18next';
 
 import type { ActivityHasUserId, SupportedActivityActionType } from '~/interfaces/activity';
@@ -35,6 +39,39 @@ export const IconActivityTranslationMap: Record<
   [ActivityLogActions.ACTION_COMMENT_CREATE]: 'comment',
 };
 
+const localeMap: Record<string, Locale | undefined> = {
+  en: enUS,
+  'en-US': enUS,
+  en_US: enUS,
+
+  ja,
+  'ja-JP': ja,
+  ja_JP: ja,
+
+  fr,
+  'fr-FR': fr,
+  fr_FR: fr,
+
+  ko,
+  'ko-KR': ko,
+  ko_KR: ko,
+
+  zh: zhCN,
+  'zh-CN': zhCN,
+  zh_CN: zhCN,
+};
+
+const getLocale = (langCode: string): Locale => {
+  let locale = localeMap[langCode];
+
+  if (!locale) {
+    const baseCode = langCode.split('-')[0];
+    locale = localeMap[baseCode];
+  }
+
+  return locale ?? enUS;
+};
+
 const translateAction = (action: SupportedActivityActionType): string => {
   return ActivityActionTranslationMap[action] || 'unknown_action';
 };
@@ -43,8 +80,11 @@ const setIcon = (action: SupportedActivityActionType): string => {
   return IconActivityTranslationMap[action] || '';
 };
 
-const calculateTimePassed = (date: Date): string => {
-  const timePassed = formatDistanceToNow(date, { addSuffix: true });
+const calculateTimePassed = (date: Date, locale: Locale): string => {
+  const timePassed = formatDistanceToNow(date, {
+    addSuffix: true,
+    locale,
+  });
 
   return timePassed;
 };
