@@ -4,13 +4,7 @@ import {
   type IUserHasId,
   SCOPE,
 } from '@growi/core/dist/interfaces';
-import {
-  isCreatablePage,
-  isUserPage,
-  userHomepagePath,
-} from '@growi/core/dist/utils/page-path-utils';
-import { normalizePath } from '@growi/core/dist/utils/path-utils';
-import { format } from 'date-fns/format';
+import { isUserPage } from '@growi/core/dist/utils/page-path-utils';
 import type { Request, RequestHandler } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { body } from 'express-validator';
@@ -30,46 +24,11 @@ import {
   postAction,
   saveTags,
 } from '~/server/routes/apiv3/page/create-page-helpers';
-import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
+import { determinePath } from '../services/create-page-helper';
+
 const logger = loggerFactory('growi:routes:apiv3:ai-tools:create-page');
-
-const determinePath = async (
-  user: IUserHasId,
-  path?: string,
-  todaysMemoTitle?: string,
-  pathHintKeywords?: string[],
-): Promise<string> => {
-  if (path != null) {
-    const normalizedPath = normalizePath(path);
-    if (isCreatablePage(normalizedPath)) {
-      return normalizedPath;
-    }
-
-    throw new Error('The specified path is not creatable page path');
-  }
-
-  if (todaysMemoTitle != null) {
-    const { t } = await getTranslation({ lang: user.lang, ns: 'commons' });
-    const path = `${userHomepagePath(user)}/${t('create_page_dropdown.todays.memo')}/${format(new Date(), 'yyyy/MM/dd')}/${todaysMemoTitle}`;
-    const normalizedPath = normalizePath(path);
-    if (isCreatablePage(normalizedPath)) {
-      return normalizedPath;
-    }
-
-    throw new Error('The specified path is not creatable page path');
-  }
-
-  if (pathHintKeywords != null && pathHintKeywords.length > 0) {
-    // TODO: https://redmine.weseek.co.jp/issues/173810
-    throw new Error(
-      'Path determination based on keywords is not yet implemented',
-    );
-  }
-
-  throw new Error('Cannot determine page path');
-};
 
 type ReqBody = IApiv3PageCreateParams & {
   todaysMemoTitle?: string;
