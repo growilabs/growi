@@ -8,7 +8,7 @@ import { useTranslation } from 'next-i18next';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useCurrentPageId } from '~/stores/page';
+import { useCurrentPageId } from '~/states/page';
 
 
 const ExpirationType = {
@@ -33,7 +33,7 @@ export const ShareLinkForm: FC<Props> = (props: Props) => {
   const [customExpirationDate, setCustomExpirationDate] = useState<Date>(new Date());
   const [customExpirationTime, setCustomExpirationTime] = useState<Date>(new Date());
 
-  const { data: currentPageId } = useCurrentPageId();
+  const currentPageId = useCurrentPageId();
 
   const handleChangeExpirationType = useCallback((expirationType: ExpirationType) => {
     setExpirationType(expirationType);

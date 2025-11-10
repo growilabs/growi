@@ -14,6 +14,7 @@ const PagePathNavSticky = withLoadingProps<PagePathNavLayoutProps>(
   (useLoadingProps) =>
     dynamic(
       () =>
+        // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
         import('~/client/components/PagePathNavSticky').then(
           (mod) => mod.PagePathNavSticky,
         ),

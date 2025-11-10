@@ -11,8 +11,7 @@ import { useTranslation } from 'react-i18next';
 import type { Text as YText } from 'yjs';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
-import { useCurrentPageId } from '~/stores/page';
-import { useIsEnableUnifiedMergeView } from '~/stores-universal/context';
+import { useCurrentPageId } from '~/states/page';
 
 import type { AiAssistantHasId } from '../../../interfaces/ai-assistant';
 import {
@@ -30,7 +29,11 @@ import { ThreadType } from '../../../interfaces/thread-relation';
 import { handleIfSuccessfullyParsed } from '../../../utils/handle-if-successfully-parsed';
 import { AiAssistantDropdown } from '../../components/AiAssistant/AiAssistantSidebar/AiAssistantDropdown';
 import { QuickMenuList } from '../../components/AiAssistant/AiAssistantSidebar/QuickMenuList';
-import { useAiAssistantSidebar } from '../../stores/ai-assistant';
+import {
+  useAiAssistantSidebarStatus,
+  useIsEnableUnifiedMergeView,
+  useUnifiedMergeViewActions,
+} from '../../states';
 import {
   shouldUseClientProcessing,
   useClientEngineIntegration,
@@ -147,11 +150,10 @@ export const useEditorAssistant: UseEditorAssistant = () => {
 
   // Hooks
   const { t } = useTranslation();
-  const { data: currentPageId } = useCurrentPageId();
-  const {
-    data: isEnableUnifiedMergeView,
-    mutate: mutateIsEnableUnifiedMergeView,
-  } = useIsEnableUnifiedMergeView();
+  const currentPageId = useCurrentPageId();
+  const isEnableUnifiedMergeView = useIsEnableUnifiedMergeView();
+  const { disable: disableUnifiedMergeView, enable: enableUnifiedMergeView } =
+    useUnifiedMergeViewActions();
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(
     GlobalCodeMirrorEditorKey.MAIN,
   );
@@ -159,7 +161,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
     pageId: currentPageId ?? undefined,
     useSecondary: isEnableUnifiedMergeView ?? false,
   });
-  const { data: aiAssistantSidebarData } = useAiAssistantSidebar();
+  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
   const clientEngine = useClientEngineIntegration({
     enableClientProcessing: shouldUseClientProcessing(),
     enableServerFallback: true,
@@ -191,7 +193,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
       setPartialContentInfo(null);
 
       // Disable UnifiedMergeView when a Form is submitted with UnifiedMergeView enabled
-      mutateIsEnableUnifiedMergeView(false);
+      disableUnifiedMergeView();
 
       const pageBodyContext = getPageBodyForContext(
         codeMirrorEditor,
@@ -241,7 +243,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
     },
     [
       codeMirrorEditor,
-      mutateIsEnableUnifiedMergeView,
+      disableUnifiedMergeView,
       selectedAiAssistant?._id,
       selectedText,
       selectedTextIndex,
@@ -286,7 +288,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
         SseDetectedDiffSchema,
         async (diffData: SseDetectedDiff) => {
           handleDataReceived();
-          mutateIsEnableUnifiedMergeView(true);
+          enableUnifiedMergeView();
 
           // Check if client engine processing is enabled
           if (
@@ -362,12 +364,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
         },
       );
     },
-    [
-      isGeneratingEditorText,
-      mutateIsEnableUnifiedMergeView,
-      clientEngine,
-      yDocs,
-    ],
+    [isGeneratingEditorText, enableUnifiedMergeView, clientEngine, yDocs],
   );
 
   const selectTextHandler = useCallback(
@@ -528,11 +525,11 @@ export const useEditorAssistant: UseEditorAssistant = () => {
         }
 
         acceptAllChunks(codeMirrorEditor.view);
-        mutateIsEnableUnifiedMergeView(false);
+        disableUnifiedMergeView();
       };
 
       const reject = () => {
-        mutateIsEnableUnifiedMergeView(false);
+        disableUnifiedMergeView();
       };
 
       if (!isActionButtonShown) {
@@ -558,7 +555,7 @@ export const useEditorAssistant: UseEditorAssistant = () => {
       aiAssistantSidebarData?.isEditorAssistant,
       codeMirrorEditor?.view,
       isEnableUnifiedMergeView,
-      mutateIsEnableUnifiedMergeView,
+      disableUnifiedMergeView,
       t,
     ],
   );

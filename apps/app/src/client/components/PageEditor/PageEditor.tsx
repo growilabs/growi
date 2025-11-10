@@ -3,18 +3,17 @@ import React, {
   useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
 } from 'react';
 
-import type EventEmitter from 'events';
 import nodePath from 'path';
 
 import { Origin } from '@growi/core';
 import type { IPageHasId } from '@growi/core/dist/interfaces';
-import { pathUtils } from '@growi/core/dist/utils';
-import { GlobalCodeMirrorEditorKey } from '@growi/editor';
+import { pathUtils, globalEventTarget } from '@growi/core/dist/utils';
+import { GlobalCodeMirrorEditorKey, useSetResolvedTheme } from '@growi/editor';
 import { CodeMirrorEditorMain } from '@growi/editor/dist/client/components/CodeMirrorEditorMain';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
-import { useResolvedThemeForEditor } from '@growi/editor/dist/client/stores/use-resolved-theme';
 import { useRect } from '@growi/ui/dist/utils';
 import detectIndent from 'detect-indent';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import { throttle, debounce } from 'throttle-debounce';
 
@@ -22,29 +21,37 @@ import { useUpdateStateAfterSave } from '~/client/services/page-operation';
 import { useUpdatePage, extractRemoteRevisionDataFromErrorObj } from '~/client/services/update-page';
 import { uploadAttachments } from '~/client/services/upload-attachments';
 import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
+import { useIsEnableUnifiedMergeView } from '~/features/openai/client/states';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
+import { useCurrentPathname, useCurrentUser } from '~/states/global';
 import {
-  useDefaultIndentSize, useCurrentUser,
-  useCurrentPathname, useIsEnabledAttachTitleHeader,
-  useIsEditable, useIsIndentSizeForced,
-  useAcceptedUploadFileType, useIsEnableUnifiedMergeView,
-} from '~/stores-universal/context';
-import { EditorMode, useEditorMode } from '~/stores-universal/ui';
+  useIsEditable,
+  useCurrentPagePath,
+  useCurrentPageData,
+  useCurrentPageId,
+  usePageNotFound,
+  useIsUntitledPage,
+} from '~/states/page';
+import { useTemplateBody } from '~/states/page/hooks';
+import {
+  defaultIndentSizeAtom,
+  isEnabledAttachTitleHeaderAtom,
+  isIndentSizeForcedAtom,
+  useAcceptedUploadFileType,
+} from '~/states/server-configurations';
+import {
+  useCurrentIndentSize, useCurrentIndentSizeActions,
+  useEditorMode, EditorMode, useEditingMarkdown, useSelectedGrant,
+  useWaitingSaveProcessingActions, useSetReservedNextCaretLine, useReservedNextCaretLineValue,
+} from '~/states/ui/editor';
+import { useSetEditingClients } from '~/states/ui/editor/editing-clients';
 import { useNextThemes } from '~/stores-universal/use-next-themes';
+import { useEditorSettings } from '~/stores/editor';
 import {
-  useReservedNextCaretLine,
-  useEditorSettings,
-  useCurrentIndentSize,
-  useEditingMarkdown,
-  useWaitingSaveProcessing,
-} from '~/stores/editor';
-import {
-  useCurrentPagePath, useSWRxCurrentPage, useCurrentPageId, useIsNotFound, useTemplateBodyData, useSWRxCurrentGrantData,
+  useSWRxCurrentGrantData,
 } from '~/stores/page';
 import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
 import { usePreviewOptions } from '~/stores/renderer';
-import { useIsUntitledPage, useSelectedGrant } from '~/stores/ui';
-import { useEditingClients } from '~/stores/use-editing-clients';
 import loggerFactory from '~/utils/logger';
 
 import { EditorNavbar } from './EditorNavbar';
@@ -55,14 +62,8 @@ import { useConflictResolver, useConflictEffect, type ConflictHandler } from './
 
 import '@growi/editor/dist/style.css';
 
-
 const logger = loggerFactory('growi:PageEditor');
 
-
-declare global {
-  // eslint-disable-next-line vars-on-top, no-var
-  var globalEmitter: EventEmitter;
-}
 
 export type SaveOptions = {
   wip: boolean,
@@ -88,34 +89,34 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   const previewRef = useRef<HTMLDivElement>(null);
   const [previewRect] = useRect(previewRef);
 
-  const { data: isNotFound } = useIsNotFound();
-  const { data: pageId } = useCurrentPageId();
-  const { data: currentPagePath } = useCurrentPagePath();
-  const { data: currentPathname } = useCurrentPathname();
-  const { data: currentPage } = useSWRxCurrentPage();
-  const { data: selectedGrant } = useSelectedGrant();
-  const { data: editingMarkdown } = useEditingMarkdown();
-  const { data: isEnabledAttachTitleHeader } = useIsEnabledAttachTitleHeader();
-  const { data: templateBodyData } = useTemplateBodyData();
-  const { data: isEditable } = useIsEditable();
-  const { mutate: mutateWaitingSaveProcessing } = useWaitingSaveProcessing();
-  const { data: editorMode, mutate: mutateEditorMode } = useEditorMode();
-  const { data: isUntitledPage } = useIsUntitledPage();
-  const { data: isIndentSizeForced } = useIsIndentSizeForced();
-  const { data: currentIndentSize, mutate: mutateCurrentIndentSize } = useCurrentIndentSize();
-  const { data: defaultIndentSize } = useDefaultIndentSize();
-  const { data: acceptedUploadFileType } = useAcceptedUploadFileType();
+  const isNotFound = usePageNotFound();
+  const pageId = useCurrentPageId();
+  const currentPagePath = useCurrentPagePath();
+  const currentPathname = useCurrentPathname();
+  const currentPage = useCurrentPageData();
+  const [selectedGrant] = useSelectedGrant();
+  const editingMarkdown = useEditingMarkdown();
+  const isEnabledAttachTitleHeader = useAtomValue(isEnabledAttachTitleHeaderAtom);
+  const templateBody = useTemplateBody();
+  const isEditable = useIsEditable();
+  const { mutate: mutateWaitingSaveProcessing } = useWaitingSaveProcessingActions();
+  const { editorMode, setEditorMode } = useEditorMode();
+  const isUntitledPage = useIsUntitledPage();
+  const isIndentSizeForced = useAtomValue(isIndentSizeForcedAtom);
+  const currentIndentSize = useCurrentIndentSize();
+  const { mutate: mutateCurrentIndentSize } = useCurrentIndentSizeActions();
+  const defaultIndentSize = useAtomValue(defaultIndentSizeAtom);
+  const acceptedUploadFileType = useAcceptedUploadFileType();
   const { data: editorSettings } = useEditorSettings();
   const { mutate: mutateIsGrantNormalized } = useSWRxCurrentGrantData(currentPage?._id);
-  const { data: user } = useCurrentUser();
-  const { mutate: mutateEditingUsers } = useEditingClients();
+  const user = useCurrentUser();
+  const setEditingClients = useSetEditingClients();
   const onConflict = useConflictResolver();
-  const { data: reservedNextCaretLine, mutate: mutateReservedNextCaretLine } = useReservedNextCaretLine();
-  const { data: isEnableUnifiedMergeView } = useIsEnableUnifiedMergeView();
+  const reservedNextCaretLine = useReservedNextCaretLineValue();
+  const setReservedNextCaretLine = useSetReservedNextCaretLine();
+  const isEnableUnifiedMergeView = useIsEnableUnifiedMergeView();
 
   const { data: rendererOptions } = usePreviewOptions();
-
-  const { mutate: mutateResolvedTheme } = useResolvedThemeForEditor();
 
   const shouldExpandContent = useShouldExpandContent(currentPage);
 
@@ -124,8 +125,11 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
 
   useConflictEffect();
 
+  const setResolvedTheme = useSetResolvedTheme();
   const { resolvedTheme } = useNextThemes();
-  mutateResolvedTheme({ themeData: resolvedTheme });
+  useEffect(() => {
+    setResolvedTheme(resolvedTheme);
+  }, [resolvedTheme, setResolvedTheme]);
 
   const currentRevisionId = currentPage?.revision?._id;
 
@@ -144,13 +148,13 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
       const pageTitle = nodePath.basename(currentPathname);
       initialValue += `${pathUtils.attachTitleHeader(pageTitle)}\n`;
     }
-    if (templateBodyData != null) {
-      initialValue += `${templateBodyData}\n`;
+    if (templateBody != null) {
+      initialValue += `${templateBody}\n`;
     }
 
     return initialValue;
 
-  }, [isNotFound, currentPathname, editingMarkdown, isEnabledAttachTitleHeader, templateBodyData]);
+  }, [isNotFound, currentPathname, editingMarkdown, isEnabledAttachTitleHeader, templateBody]);
 
   useEffect(() => {
     // set to ref
@@ -170,7 +174,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   const scrollEditorHandlerThrottle = useMemo(() => throttle(25, scrollEditorHandler), [scrollEditorHandler]);
   const scrollPreviewHandlerThrottle = useMemo(() => throttle(25, scrollPreviewHandler), [scrollPreviewHandler]);
 
-  const save: Save = useCallback(async(revisionId, markdown, opts, onConflict) => {
+  const save: Save = useCallback(async (revisionId, markdown, opts, onConflict) => {
     if (pageId == null || selectedGrant == null) {
       logger.error('Some materials to save are invalid', {
         pageId, selectedGrant,
@@ -219,19 +223,19 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
     }
   }, [pageId, selectedGrant, mutateWaitingSaveProcessing, updatePage, mutateIsGrantNormalized, t]);
 
-  const saveAndReturnToViewHandler = useCallback(async(opts: SaveOptions) => {
+  const saveAndReturnToViewHandler = useCallback(async(evt: CustomEvent<SaveOptions>) => {
     const markdown = codeMirrorEditor?.getDocString();
     const revisionId = isRevisionIdRequiredForPageUpdate ? currentRevisionId : undefined;
-    const page = await save(revisionId, markdown, opts, onConflict);
+    const page = await save(revisionId, markdown, evt.detail, onConflict);
     if (page == null) {
       return;
     }
 
-    mutateEditorMode(EditorMode.View);
+    setEditorMode(EditorMode.View);
     updateStateAfterSave?.();
-  }, [codeMirrorEditor, currentRevisionId, isRevisionIdRequiredForPageUpdate, mutateEditorMode, onConflict, save, updateStateAfterSave]);
+  }, [codeMirrorEditor, currentRevisionId, isRevisionIdRequiredForPageUpdate, setEditorMode, onConflict, save, updateStateAfterSave]);
 
-  const saveWithShortcut = useCallback(async() => {
+  const saveWithShortcut = useCallback(async () => {
     const markdown = codeMirrorEditor?.getDocString();
     const revisionId = isRevisionIdRequiredForPageUpdate ? currentRevisionId : undefined;
     const page = await save(revisionId, markdown, undefined, onConflict);
@@ -270,20 +274,21 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
     });
   }, [codeMirrorEditor, pageId]);
 
+  const onChangeHandler = useCallback((value: string) => {
+    setMarkdownPreviewWithDebounce(value);
+  }, [setMarkdownPreviewWithDebounce]);
 
   const cmProps = useMemo(() => ({
-    onChange: (value: string) => {
-      setMarkdownPreviewWithDebounce(value);
-    },
-  }), [setMarkdownPreviewWithDebounce]);
+    onChange: onChangeHandler,
+  }), [onChangeHandler]);
 
 
   // set handler to save and return to View
   useEffect(() => {
-    globalEmitter.on('saveAndReturnToView', saveAndReturnToViewHandler);
+    globalEventTarget.addEventListener('saveAndReturnToView', saveAndReturnToViewHandler);
 
     return function cleanup() {
-      globalEmitter.removeListener('saveAndReturnToView', saveAndReturnToViewHandler);
+      globalEventTarget.removeEventListener('saveAndReturnToView', saveAndReturnToViewHandler);
     };
   }, [saveAndReturnToViewHandler]);
 
@@ -326,9 +331,9 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   // reset caret line if returning to the View.
   useEffect(() => {
     if (editorMode === EditorMode.View) {
-      mutateReservedNextCaretLine(0);
+      setReservedNextCaretLine(0);
     }
-  }, [editorMode, mutateReservedNextCaretLine]);
+  }, [editorMode, setReservedNextCaretLine]);
 
 
   // TODO: Check the reproduction conditions that made this code necessary and confirm reproduction
@@ -379,7 +384,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
           user={user ?? undefined}
           pageId={pageId ?? undefined}
           editorSettings={editorSettings}
-          onEditorsUpdated={mutateEditingUsers}
+          onEditorsUpdated={setEditingClients}
           cmProps={cmProps}
         />
       </div>

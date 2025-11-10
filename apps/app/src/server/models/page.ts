@@ -45,6 +45,8 @@ import {
 import type { UserGroupDocument } from './user-group';
 import UserGroupRelation from './user-group-relation';
 
+type ObjectId = mongoose.Types.ObjectId;
+
 const logger = loggerFactory('growi:models:page');
 /*
  * define schema
@@ -97,6 +99,20 @@ export type CreateMethod = (
   user,
   options: IOptionsForCreate,
 ) => Promise<HydratedDocument<PageDocument>>;
+type FindByPathAndViewerMethod = (
+  this: PageModel,
+  id: string | ObjectId,
+  user,
+  userGroups?,
+  includeEmpty?: boolean,
+) => Promise<HydratedDocument<PageDocument> | null>;
+type CountByPathAndViewerMethod = (
+  this: PageModel,
+  id: string | ObjectId,
+  user,
+  userGroups?,
+  includeEmpty?: boolean,
+) => Promise<number>;
 
 export interface PageModel extends Model<PageDocument> {
   [x: string]: any; // for obsolete static methods
@@ -105,12 +121,8 @@ export interface PageModel extends Model<PageDocument> {
     parent,
     descendantCount?: number,
   ): Promise<HydratedDocument<PageDocument>>;
-  findByIdAndViewer(
-    pageId: ObjectIdLike,
-    user,
-    userGroups?,
-    includeEmpty?: boolean,
-  ): Promise<HydratedDocument<PageDocument> | null>;
+  findByIdAndViewer: FindByPathAndViewerMethod;
+  countByIdAndViewer: CountByPathAndViewerMethod;
   findByIdsAndViewer(
     pageIds: ObjectIdLike[],
     user,
@@ -662,6 +674,58 @@ schema.statics.createEmptyPage = async function (
 
   return page.save();
 };
+
+const findByIdAndViewer: FindByPathAndViewerMethod = async function (
+  this,
+  id,
+  user,
+  userGroups = null,
+  includeEmpty = false,
+) {
+  const baseQuery = this.findOne({ _id: id });
+
+  const relatedUserGroups =
+    user != null && userGroups == null
+      ? [
+          ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
+          ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
+            user,
+          )),
+        ]
+      : userGroups;
+
+  const queryBuilder = new this.PageQueryBuilder(baseQuery, includeEmpty);
+  queryBuilder.addConditionToFilteringByViewer(user, relatedUserGroups, true);
+
+  return queryBuilder.query.exec();
+};
+schema.statics.findByIdAndViewer = findByIdAndViewer;
+
+const countByIdAndViewer: CountByPathAndViewerMethod = async function (
+  this,
+  id,
+  user,
+  userGroups = null,
+  includeEmpty = false,
+) {
+  const baseQuery = this.countDocuments({ _id: id });
+
+  const relatedUserGroups =
+    user != null && userGroups == null
+      ? [
+          ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
+          ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
+            user,
+          )),
+        ]
+      : userGroups;
+
+  const queryBuilder = new this.PageQueryBuilder(baseQuery, includeEmpty);
+  queryBuilder.addConditionToFilteringByViewer(user, relatedUserGroups, true);
+
+  return queryBuilder.query.exec();
+};
+schema.statics.countByIdAndViewer = countByIdAndViewer;
 
 /**
  * Replace an existing page with an empty page.

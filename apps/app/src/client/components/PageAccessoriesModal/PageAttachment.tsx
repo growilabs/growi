@@ -5,10 +5,10 @@ import React, {
 import type { IAttachmentHasId } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 
-import { useIsGuestUser, useIsReadOnlyUser } from '~/stores-universal/context';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
+import { useCurrentPageData, useCurrentPageId } from '~/states/page';
+import { useDeleteAttachmentModalActions } from '~/states/ui/modal/delete-attachment';
 import { useSWRxAttachments } from '~/stores/attachment';
-import { useDeleteAttachmentModal } from '~/stores/modal';
-import { useSWRxCurrentPage, useCurrentPageId } from '~/stores/page';
 
 import { PageAttachmentList } from '../PageAttachment/PageAttachmentList';
 import PaginationWrapper from '../PaginationWrapper';
@@ -20,10 +20,11 @@ const checkIfFileInUse = (markdown: string, attachment): boolean => {
 
 const PageAttachment = (): JSX.Element => {
 
-  // Static SWRs
-  const { data: pageId } = useCurrentPageId();
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
+  const pageId = useCurrentPageId();
+  const currentPage = useCurrentPageData();
+
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
 
   const isPageAttachmentDisabled = !!isGuestUser || !!isReadOnlyUser;
 
@@ -32,8 +33,7 @@ const PageAttachment = (): JSX.Element => {
 
   // SWRs
   const { data: dataAttachments, remove } = useSWRxAttachments(pageId, pageNumber);
-  const { open: openDeleteAttachmentModal } = useDeleteAttachmentModal();
-  const { data: currentPage } = useSWRxCurrentPage();
+  const { open: openDeleteAttachmentModal } = useDeleteAttachmentModalActions();
   const markdown = currentPage?.revision?.body;
 
   // Custom hooks

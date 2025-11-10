@@ -11,6 +11,7 @@ import type {
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { GlobalCodeMirrorEditorKey } from '@growi/editor';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -21,37 +22,42 @@ import { DropdownItem, UncontrolledTooltip, Tooltip } from 'reactstrap';
 import { exportAsMarkdown, updateContentWidth, syncLatestRevisionBody } from '~/client/services/page-operation';
 import { toastSuccess, toastError, toastWarning } from '~/client/util/toastr';
 import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar';
-import { usePageBulkExportSelectModal } from '~/features/page-bulk-export/client/stores/modal';
+import { usePageBulkExportSelectModalActions } from '~/features/page-bulk-export/client/states/modal';
 import type { OnDuplicatedFunction, OnRenamedFunction, OnDeletedFunction } from '~/interfaces/ui';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
+import { useIsGuestUser, useIsReadOnlyUser, useIsSharedUser } from '~/states/context';
+import { useCurrentPathname, useCurrentUser } from '~/states/global';
+import { useCurrentPageId, useFetchCurrentPage } from '~/states/page';
+import { useShareLinkId } from '~/states/page/hooks';
 import {
-  useCurrentPathname,
-  useCurrentUser, useIsGuestUser, useIsReadOnlyUser, useIsBulkExportPagesEnabled,
-  useIsLocalAccountRegistrationEnabled, useIsSharedUser, useShareLinkId, useIsUploadEnabled,
-} from '~/stores-universal/context';
-import { useEditorMode } from '~/stores-universal/ui';
-import {
-  usePageAccessoriesModal, PageAccessoriesModalContents, type IPageForPageDuplicateModal,
-  usePageDuplicateModal, usePageRenameModal, usePageDeleteModal, usePagePresentationModal,
-} from '~/stores/modal';
-import {
-  useSWRMUTxCurrentPage, useCurrentPageId, useSWRxPageInfo,
-} from '~/stores/page';
-import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
+  disableLinkSharingAtom,
+  isBulkExportPagesEnabledAtom,
+  isLocalAccountRegistrationEnabledAtom,
+  isUploadEnabledAtom,
+} from '~/states/server-configurations';
+import { useDeviceLargerThanMd } from '~/states/ui/device';
+import { useEditorMode } from '~/states/ui/editor';
+import { PageAccessoriesModalContents, usePageAccessoriesModalActions } from '~/states/ui/modal/page-accessories';
+import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
+import { usePageDuplicateModalActions, type IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate';
+import { usePresentationModalActions } from '~/states/ui/modal/page-presentation';
+import { usePageRenameModalActions } from '~/states/ui/modal/page-rename';
 import {
   useIsAbleToShowPageManagement,
   useIsAbleToChangeEditorMode,
-  useIsDeviceLargerThanMd,
-} from '~/stores/ui';
+} from '~/states/ui/page-abilities';
+import {
+  useSWRxPageInfo,
+} from '~/stores/page';
+import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
 
+import { CreateTemplateModalLazyLoaded } from '../CreateTemplateModal';
 import { NotAvailable } from '../NotAvailable';
 import { Skeleton } from '../Skeleton';
 
 import styles from './GrowiContextualSubNavigation.module.scss';
 import PageEditorModeManagerStyles from './PageEditorModeManager.module.scss';
 
-
-const CreateTemplateModal = dynamic(() => import('../CreateTemplateModal').then(mod => mod.CreateTemplateModal), { ssr: false });
 
 const PageEditorModeManager = dynamic(
   () => import('./PageEditorModeManager').then(mod => mod.PageEditorModeManager),
@@ -76,21 +82,21 @@ const PageOperationMenuItems = (props: PageOperationMenuItemsProps): JSX.Element
     pageId, revisionId, isLinkSharingDisabled,
   } = props;
 
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { data: isSharedUser } = useIsSharedUser();
-  const { data: isBulkExportPagesEnabled } = useIsBulkExportPagesEnabled();
-  const { data: isUploadEnabled } = useIsUploadEnabled();
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const isSharedUser = useIsSharedUser();
+  const isBulkExportPagesEnabled = useAtomValue(isBulkExportPagesEnabledAtom);
+  const isUploadEnabled = useAtomValue(isUploadEnabledAtom);
 
-  const { open: openPresentationModal } = usePagePresentationModal();
-  const { open: openAccessoriesModal } = usePageAccessoriesModal();
-  const { open: openPageBulkExportSelectModal } = usePageBulkExportSelectModal();
+  const { open: openPresentationModal } = usePresentationModalActions();
+  const { open: openAccessoriesModal } = usePageAccessoriesModalActions();
+  const { open: openPageBulkExportSelectModal } = usePageBulkExportSelectModalActions();
 
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.MAIN);
 
   const [isBulkExportTooltipOpen, setIsBulkExportTooltipOpen] = useState(false);
 
-  const syncLatestRevisionBodyHandler = useCallback(async() => {
+  const syncLatestRevisionBodyHandler = useCallback(async () => {
     // eslint-disable-next-line no-alert
     const answer = window.confirm(t('sync-latest-revision-body.confirm'));
     if (answer) {
@@ -242,7 +248,6 @@ const CreateTemplateMenuItems = (props: CreateTemplateMenuItemsProps): JSX.Eleme
 
 type GrowiContextualSubNavigationProps = {
   currentPage?: IPagePopulatedToShowRevision | null,
-  isLinkSharingDisabled?: boolean,
 };
 
 const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps): JSX.Element => {
@@ -253,32 +258,33 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
 
   const router = useRouter();
 
-  const { data: shareLinkId } = useShareLinkId();
-  const { trigger: mutateCurrentPage } = useSWRMUTxCurrentPage();
+  const shareLinkId = useShareLinkId();
+  const { fetchCurrentPage } = useFetchCurrentPage();
 
-  const { data: currentPathname } = useCurrentPathname();
+  const currentPathname = useCurrentPathname();
   const isSharedPage = pagePathUtils.isSharedPage(currentPathname ?? '');
 
   const revision = currentPage?.revision;
   const revisionId = (revision != null && isPopulated(revision)) ? revision._id : undefined;
 
-  const { data: editorMode } = useEditorMode();
-  const { data: pageId } = useCurrentPageId();
-  const { data: currentUser } = useCurrentUser();
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { data: isLocalAccountRegistrationEnabled } = useIsLocalAccountRegistrationEnabled();
-  const { data: isSharedUser } = useIsSharedUser();
+  const { editorMode } = useEditorMode();
+  const pageId = useCurrentPageId();
+  const currentUser = useCurrentUser();
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const isLocalAccountRegistrationEnabled = useAtomValue(isLocalAccountRegistrationEnabledAtom);
+  const isLinkSharingDisabled = useAtomValue(disableLinkSharingAtom);
+  const isSharedUser = useIsSharedUser();
 
   const shouldExpandContent = useShouldExpandContent(currentPage);
 
-  const { data: isAbleToShowPageManagement } = useIsAbleToShowPageManagement();
-  const { data: isAbleToChangeEditorMode } = useIsAbleToChangeEditorMode();
-  const { data: isDeviceLargerThanMd } = useIsDeviceLargerThanMd();
+  const isAbleToShowPageManagement = useIsAbleToShowPageManagement();
+  const isAbleToChangeEditorMode = useIsAbleToChangeEditorMode();
+  const [isDeviceLargerThanMd] = useDeviceLargerThanMd();
 
-  const { open: openDuplicateModal } = usePageDuplicateModal();
-  const { open: openRenameModal } = usePageRenameModal();
-  const { open: openDeleteModal } = usePageDeleteModal();
+  const { open: openDuplicateModal } = usePageDuplicateModalActions();
+  const { open: openRenameModal } = usePageRenameModalActions();
+  const { open: openDeleteModal } = usePageDeleteModalActions();
   const { mutate: mutatePageInfo } = useSWRxPageInfo(pageId);
 
   const [isStickyActive, setStickyActive] = useState(false);
@@ -290,24 +296,22 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
 
   const [isPageTemplateModalShown, setIsPageTempleteModalShown] = useState(false);
 
-  const { isLinkSharingDisabled } = props;
-
-  const duplicateItemClickedHandler = useCallback(async(page: IPageForPageDuplicateModal) => {
+  const duplicateItemClickedHandler = useCallback(async (page: IPageForPageDuplicateModal) => {
     const duplicatedHandler: OnDuplicatedFunction = (fromPath, toPath) => {
       router.push(toPath);
     };
     openDuplicateModal(page, { onDuplicated: duplicatedHandler });
   }, [openDuplicateModal, router]);
 
-  const renameItemClickedHandler = useCallback(async(page: IPageToRenameWithMeta<IPageInfoForEntity>) => {
+  const renameItemClickedHandler = useCallback(async (page: IPageToRenameWithMeta<IPageInfoForEntity>) => {
     const renamedHandler: OnRenamedFunction = () => {
-      mutateCurrentPage();
+      fetchCurrentPage({ force: true });
       mutatePageInfo();
       mutatePageTree();
       mutateRecentlyUpdated();
     };
     openRenameModal(page, { onRenamed: renamedHandler });
-  }, [mutateCurrentPage, mutatePageInfo, openRenameModal]);
+  }, [fetchCurrentPage, mutatePageInfo, openRenameModal]);
 
   const deleteItemClickedHandler = useCallback((pageWithMeta: IPageWithMeta) => {
     const deletedHandler: OnDeletedFunction = (pathOrPathsToDelete, isRecursively, isCompletely) => {
@@ -325,20 +329,20 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
         router.push(currentPathname);
       }
 
-      mutateCurrentPage();
+      fetchCurrentPage({ force: true });
       mutatePageInfo();
       mutatePageTree();
       mutateRecentlyUpdated();
     };
     openDeleteModal([pageWithMeta], { onDeleted: deletedHandler });
-  }, [currentPathname, mutateCurrentPage, openDeleteModal, router, mutatePageInfo]);
+  }, [currentPathname, fetchCurrentPage, openDeleteModal, router, mutatePageInfo]);
 
-  const switchContentWidthHandler = useCallback(async(pageId: string, value: boolean) => {
+  const switchContentWidthHandler = useCallback(async (pageId: string, value: boolean) => {
     if (!isSharedPage) {
       await updateContentWidth(pageId, value);
-      mutateCurrentPage();
+      fetchCurrentPage();
     }
-  }, [isSharedPage, mutateCurrentPage]);
+  }, [isSharedPage, fetchCurrentPage]);
 
   const additionalMenuItemsRenderer = useCallback(() => {
     if (revisionId == null || pageId == null) {
@@ -372,7 +376,7 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
         }
       </>
     );
-  }, [isLinkSharingDisabled, isReadOnlyUser, pageId, revisionId]);
+  }, [isLinkSharingDisabled, pageId, revisionId, isReadOnlyUser]);
 
   // hide sub controls when sticky on mobile device
   const hideSubControls = useMemo(() => {
@@ -421,12 +425,12 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
                 editorMode={editorMode}
                 isBtnDisabled={!!isGuestUser || !!isReadOnlyUser}
                 path={path}
-                // grant={grant}
-                // grantUserGroupId={grantUserGroupId}
+              // grant={grant}
+              // grantUserGroupId={grantUserGroupId}
               />
             )}
 
-            { isGuestUser && (
+            {isGuestUser && (
               <div className="mt-2">
                 <span>
                   <span className="d-inline-block" id="sign-up-link">
@@ -449,14 +453,14 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
                   <span className="material-symbols-outlined me-1">login</span>{t('Sign in')}
                 </Link>
               </div>
-            ) }
+            )}
           </nav>
 
         </GroundGlassBar>
       </Sticky>
 
       {path != null && currentUser != null && !isReadOnlyUser && (
-        <CreateTemplateModal
+        <CreateTemplateModalLazyLoaded
           path={path}
           isOpen={isPageTemplateModalShown}
           onClose={() => setIsPageTempleteModalShown(false)}

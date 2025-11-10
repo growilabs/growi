@@ -1,26 +1,23 @@
 import { useEffect, useMemo } from 'react';
-import type {
-  IPageInfo,
-  IPageInfoForEntity,
-  IPageInfoForOperation,
-  IPagePopulatedToShowRevision,
-  IRevision,
-  IRevisionHasId,
-  Nullable,
-  Ref,
-  SWRInfinitePageRevisionsResponse,
+import {
+  type IPageInfo,
+  type IPageInfoForEntity,
+  type IPageInfoForOperation,
+  type IPageNotFoundInfo,
+  type IPagePopulatedToShowRevision,
+  type IRevision,
+  type IRevisionHasId,
+  isIPageNotFoundInfo,
+  type Nullable,
+  type Ref,
+  type SWRInfinitePageRevisionsResponse,
 } from '@growi/core';
-import { useSWRStatic } from '@growi/core/dist/swr';
-import { isClient, pagePathUtils } from '@growi/core/dist/utils';
-import useSWR, {
-  mutate,
-  type SWRConfiguration,
-  type SWRResponse,
-  useSWRConfig,
-} from 'swr';
+import useSWR, { mutate, type SWRConfiguration, type SWRResponse } from 'swr';
 import useSWRImmutable from 'swr/immutable';
 import useSWRInfinite, { type SWRInfiniteResponse } from 'swr/infinite';
 import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
+
+import type { ErrorV3 } from '^/../../packages/core/dist/models';
 
 import { apiGet } from '~/client/util/apiv1-client';
 import { apiv3Get } from '~/client/util/apiv3-client';
@@ -29,165 +26,24 @@ import type {
   IRecordApplicableGrant,
   IResCurrentGrantData,
 } from '~/interfaces/page-grant';
-import {
-  useCurrentPathname,
-  useIsGuestUser,
-  useIsReadOnlyUser,
-  useShareLinkId,
-} from '~/stores-universal/context';
-import type { AxiosResponse } from '~/utils/axios';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
+import { useCurrentPageData, usePageNotFound } from '~/states/page';
+import { useRevisionIdFromUrl, useShareLinkId } from '~/states/page/hooks';
 
 import type { IPageTagsInfo } from '../interfaces/tag';
-import { useRemoteRevisionId } from './remote-latest-page';
 
-const { isPermalink: _isPermalink } = pagePathUtils;
-
-export const useCurrentPageId = (
-  initialData?: Nullable<string>,
-): SWRResponse<Nullable<string>, Error> => {
-  return useSWRStatic<Nullable<string>, Error>('currentPageId', initialData);
-};
-
-export const useIsLatestRevision = (
-  initialData?: boolean,
-): SWRResponse<boolean, any> => {
-  return useSWRStatic('isLatestRevision', initialData);
-};
-
-export const useIsNotFound = (
-  initialData?: boolean,
-): SWRResponse<boolean, Error> => {
-  return useSWRStatic<boolean, Error>('isNotFound', initialData, {
-    fallbackData: false,
-  });
-};
-
-export const useTemplateTagData = (
-  initialData?: string[],
-): SWRResponse<string[], Error> => {
-  return useSWRStatic<string[], Error>('templateTagData', initialData);
-};
-
-export const useTemplateBodyData = (
-  initialData?: string,
-): SWRResponse<string, Error> => {
-  return useSWRStatic<string, Error>('templateBodyData', initialData);
-};
-
-/** "useSWRxCurrentPage" is intended for initial data retrieval only. Use "useSWRMUTxCurrentPage" for revalidation */
-export const useSWRxCurrentPage = (
-  initialData?: IPagePopulatedToShowRevision | null,
-): SWRResponse<IPagePopulatedToShowRevision | null> => {
-  const key = 'currentPage';
-
-  const { data: isLatestRevision } = useIsLatestRevision();
-
-  const { cache } = useSWRConfig();
-
-  // Problem 1: https://github.com/growilabs/growi/pull/7772/files#diff-4c1708c4f959974166c15435c6b35950ba01bbf35e7e4b8e99efeb125a8000a7
-  // Problem 2: https://redmine.weseek.co.jp/issues/141027
-  // Problem 3: https://redmine.weseek.co.jp/issues/153618
-  // Problem 4: https://redmine.weseek.co.jp/issues/153759
-  const shouldMutate = (() => {
-    if (initialData === undefined) {
-      return false;
-    }
-
-    // reset when null
-    if (initialData == null) {
-      return true;
-    }
-
-    const cachedData = cache.get(key)
-      ?.data as IPagePopulatedToShowRevision | null;
-    if (initialData._id !== cachedData?._id) {
-      return true;
-    }
-
-    // mutate when the empty page has updated
-    if (cachedData?.revision == null && initialData.revision != null) {
-      return true;
-    }
-
-    // mutate when opening a previous revision.
-    if (
-      !isLatestRevision &&
-      cachedData.revision?._id != null &&
-      initialData.revision?._id != null &&
-      cachedData.revision._id !== initialData.revision._id
-    ) {
-      return true;
-    }
-
-    return false;
-  })();
-
-  useEffect(() => {
-    if (shouldMutate) {
-      mutate(key, initialData, {
-        optimisticData: initialData,
-        populateCache: true,
-        revalidate: false,
-      });
-    }
-  }, [initialData, shouldMutate]);
-
-  return useSWR(key, null, {
-    keepPreviousData: true,
-  });
-};
-
-const getPageApiErrorHandler = (errs: AxiosResponse[]) => {
+const getPageApiErrorHandler = (errs: ErrorV3<IPageNotFoundInfo>[]) => {
   if (!Array.isArray(errs)) {
     throw Error('error is not array');
   }
 
-  const statusCode = errs[0].status;
-  if (statusCode === 403 || statusCode === 404) {
+  const { args } = errs[0];
+  if (isIPageNotFoundInfo(args)) {
     // for NotFoundPage
     return null;
   }
   throw Error('failed to get page');
 };
-
-export const useSWRMUTxCurrentPage =
-  (): SWRMutationResponse<IPagePopulatedToShowRevision | null> => {
-    const key = 'currentPage';
-
-    const { data: currentPageId } = useCurrentPageId();
-    const { data: shareLinkId } = useShareLinkId();
-
-    // Get URL parameter for specific revisionId
-    let revisionId: string | undefined;
-    if (isClient()) {
-      const urlParams = new URLSearchParams(window.location.search);
-      const requestRevisionId = urlParams.get('revisionId');
-      revisionId = requestRevisionId != null ? requestRevisionId : undefined;
-    }
-
-    return useSWRMutation(
-      key,
-      () =>
-        apiv3Get<{ page: IPagePopulatedToShowRevision }>('/page', {
-          pageId: currentPageId,
-          shareLinkId,
-          revisionId,
-        })
-          .then((result) => {
-            const newData = result.data.page;
-
-            // for the issue https://redmine.weseek.co.jp/issues/156150
-            mutate('currentPage', newData, false);
-
-            return newData;
-          })
-          .catch(getPageApiErrorHandler),
-      {
-        populateCache: true,
-        revalidate: false,
-      },
-    );
-  };
 
 export const useSWRxPageByPath = (
   path?: string,
@@ -212,7 +68,7 @@ export const useSWRxTagsInfo = (
   pageId: Nullable<string>,
   config?: SWRConfiguration,
 ): SWRResponse<IPageTagsInfo | null, Error> => {
-  const { data: shareLinkId } = useShareLinkId();
+  const shareLinkId = useShareLinkId();
 
   const endpoint = `/pages.getPageTag?pageId=${pageId}`;
 
@@ -240,7 +96,7 @@ export const useSWRxPageInfo = (
   initialData?: IPageInfoForEntity,
 ): SWRResponse<IPageInfo | IPageInfoForOperation> => {
   // Cache remains from guest mode when logging in via the Login lead, so add 'isGuestUser' key
-  const { data: isGuestUser } = useIsGuestUser();
+  const isGuestUser = useIsGuestUser();
 
   // assign null if shareLinkId is undefined in order to identify SWR key only by pageId
   const fixedShareLinkId = shareLinkId ?? null;
@@ -278,7 +134,7 @@ export const useSWRMUTxPageInfo = (
   shareLinkId?: string | null,
 ): SWRMutationResponse<IPageInfo | IPageInfoForOperation> => {
   // Cache remains from guest mode when logging in via the Login lead, so add 'isGuestUser' key
-  const { data: isGuestUser } = useIsGuestUser();
+  const isGuestUser = useIsGuestUser();
 
   // assign null if shareLinkId is undefined in order to identify SWR key only by pageId
   const fixedShareLinkId = shareLinkId ?? null;
@@ -296,6 +152,74 @@ export const useSWRMUTxPageInfo = (
         (response) => response.data,
       ),
   );
+};
+
+/**
+ * Hook to check if the current page is displaying the latest revision
+ * Returns SWRResponse with boolean value:
+ * - data: undefined - not yet determined (no currentPage data)
+ * - data: true - viewing the latest revision (or latestRevisionId not available)
+ * - data: false - viewing an old revision
+ */
+export const useSWRxIsLatestRevision = (): SWRResponse<boolean, Error> => {
+  const currentPage = useCurrentPageData();
+  const pageId = currentPage?._id;
+  const shareLinkId = useShareLinkId();
+  const { data: pageInfo } = useSWRxPageInfo(pageId, shareLinkId);
+
+  // Extract latestRevisionId if available (only exists in IPageInfoForEntity)
+  const latestRevisionId =
+    pageInfo && 'latestRevisionId' in pageInfo
+      ? pageInfo.latestRevisionId
+      : undefined;
+
+  const key = useMemo(() => {
+    // Cannot determine without currentPage
+    if (currentPage?.revision?._id == null) {
+      return null;
+    }
+    return [
+      'isLatestRevision',
+      currentPage.revision._id,
+      latestRevisionId ?? null,
+    ];
+  }, [currentPage?.revision?._id, latestRevisionId]);
+
+  return useSWRImmutable(key, ([, currentRevisionId, latestRevisionId]) => {
+    // If latestRevisionId is not available, assume it's the latest
+    if (latestRevisionId == null) {
+      return true;
+    }
+    return latestRevisionId === currentRevisionId;
+  });
+};
+
+/**
+ * Check if current revision is outdated and user should be notified to refetch
+ *
+ * Returns true when:
+ * - User is NOT intentionally viewing a specific (old) revision (no ?revisionId in URL)
+ * - AND the current page data is not the latest revision
+ *
+ * This indicates "new data is available, please refetch" rather than
+ * "you are viewing an old revision" (which is handled by useSWRxIsLatestRevision)
+ */
+export const useIsRevisionOutdated = (): boolean => {
+  const { data: isLatestRevision } = useSWRxIsLatestRevision();
+  const revisionIdFromUrl = useRevisionIdFromUrl();
+
+  // If user intentionally views a specific revision, don't show "outdated" alert
+  if (revisionIdFromUrl != null) {
+    return false;
+  }
+
+  // If we can't determine yet, assume not outdated
+  if (isLatestRevision == null) {
+    return false;
+  }
+
+  // User expects latest, but it's not latest = outdated
+  return !isLatestRevision;
 };
 
 export const useSWRxPageRevision = (
@@ -351,9 +275,9 @@ export const useSWRxInfinitePageRevisions = (
 export const useSWRxCurrentGrantData = (
   pageId: string | null | undefined,
 ): SWRResponse<IResCurrentGrantData, Error> => {
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { data: isNotFound } = useIsNotFound();
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const isNotFound = usePageNotFound();
 
   const key =
     !isGuestUser && !isReadOnlyUser && !isNotFound && pageId != null
@@ -377,57 +301,8 @@ export const useSWRxApplicableGrant = (
 
 /** **********************************************************
  *                     Computed states
+ *                     @deprecated Use enhanced versions from ~/states/page instead
  *********************************************************** */
-
-export const useCurrentPagePath = (): SWRResponse<
-  string | undefined,
-  Error
-> => {
-  const { data: currentPage } = useSWRxCurrentPage();
-  const { data: currentPathname } = useCurrentPathname();
-
-  return useSWRImmutable(
-    ['currentPagePath', currentPage?.path, currentPathname],
-    ([, , pathname]) => {
-      if (currentPage?.path != null) {
-        return currentPage.path;
-      }
-      if (pathname != null && !_isPermalink(pathname)) {
-        return pathname;
-      }
-      return undefined;
-    },
-    // TODO: set fallbackData
-    // { fallbackData:  }
-  );
-};
-
-export const useIsTrashPage = (): SWRResponse<boolean, Error> => {
-  const { data: pagePath } = useCurrentPagePath();
-
-  return useSWRImmutable(
-    pagePath == null ? null : ['isTrashPage', pagePath],
-    ([, pagePath]) => pagePathUtils.isTrashPage(pagePath),
-    // TODO: set fallbackData
-    // { fallbackData:  }
-  );
-};
-
-export const useIsRevisionOutdated = (): SWRResponse<boolean, Error> => {
-  const { data: currentPage } = useSWRxCurrentPage();
-  const { data: remoteRevisionId } = useRemoteRevisionId();
-
-  const currentRevisionId = currentPage?.revision?._id;
-
-  return useSWRImmutable(
-    currentRevisionId != null && remoteRevisionId != null
-      ? ['useIsRevisionOutdated', currentRevisionId, remoteRevisionId]
-      : null,
-    ([, remoteRevisionId, currentRevisionId]) => {
-      return remoteRevisionId !== currentRevisionId;
-    },
-  );
-};
 
 export const useSWRxPagePathsWithDescendantCount = (
   paths?: string[],

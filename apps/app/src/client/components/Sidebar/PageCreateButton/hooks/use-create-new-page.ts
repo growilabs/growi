@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import { Origin } from '@growi/core';
 
 import { useCreatePage } from '~/client/services/create-page';
-import { useCurrentPagePath } from '~/stores/page';
+import { useCurrentPagePath } from '~/states/page';
 
 
 type UseCreateNewPage = () => {
@@ -12,12 +12,12 @@ type UseCreateNewPage = () => {
 }
 
 export const useCreateNewPage: UseCreateNewPage = () => {
-  const { data: currentPagePath, isLoading: isLoadingPagePath } = useCurrentPagePath();
+  const currentPagePath = useCurrentPagePath();
 
   const { isCreating, create } = useCreatePage();
 
   const createNewPage = useCallback(async() => {
-    if (isLoadingPagePath) return;
+    if (currentPagePath == null) return;
 
     return create(
       {
@@ -30,7 +30,7 @@ export const useCreateNewPage: UseCreateNewPage = () => {
         skipPageExistenceCheck: true,
       },
     );
-  }, [create, currentPagePath, isLoadingPagePath]);
+  }, [create, currentPagePath]);
 
   return {
     isCreating,

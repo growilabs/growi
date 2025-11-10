@@ -3,14 +3,14 @@ import React, { type JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import { useGenerateTransferKey } from '~/client/services/g2g-transfer';
-import { useGrowiDocumentationUrl } from '~/stores-universal/context';
+import { useGrowiDocumentationUrl } from '~/states/context';
 
 import CustomCopyToClipBoard from './Common/CustomCopyToClipBoard';
 
 const DataTransferForm = (): JSX.Element => {
   const { t } = useTranslation('commons');
   const { transferKey, generateTransferKey } = useGenerateTransferKey();
-  const { data: documentationUrl } = useGrowiDocumentationUrl();
+  const documentationUrl = useGrowiDocumentationUrl();
 
   return (
     <div data-testid="installerForm" className="py-3 px-4">

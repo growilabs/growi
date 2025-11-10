@@ -1,12 +1,11 @@
 import type { FC } from 'react';
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useGrowiDocumentationUrl } from '~/stores-universal/context';
+import { useGrowiDocumentationUrl } from '~/states/context';
 
 export const AiIntegrationDisableMode: FC = () => {
   const { t } = useTranslation('admin');
-  const { data: documentationUrl } = useGrowiDocumentationUrl();
+  const documentationUrl = useGrowiDocumentationUrl();
 
   return (
     <div className="ccontainer-lg">

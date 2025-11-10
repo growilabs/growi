@@ -5,7 +5,7 @@ import { useTranslation } from 'next-i18next';
 import { useRouter } from 'next/router';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 
 
 type InvitedFormProps = {
@@ -17,7 +17,7 @@ export const InvitedForm = (props: InvitedFormProps): JSX.Element => {
 
   const { t } = useTranslation();
   const router = useRouter();
-  const { data: user } = useCurrentUser();
+  const user = useCurrentUser();
   const [loginErrors, setLoginErrors] = useState<Error[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 

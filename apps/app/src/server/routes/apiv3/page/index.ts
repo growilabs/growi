@@ -2,8 +2,12 @@ import path from 'path';
 import { type Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 
-import type { IPage, IRevision } from '@growi/core';
+import type {
+  IDataWithMeta, IPage, IPageInfoExt, IPageNotFoundInfo, IRevision,
+} from '@growi/core';
 import {
+  getIdStringForRef,
+  isIPageNotFoundInfo,
   AllSubscriptionStatusType, PageGrant, SCOPE, SubscriptionStatusType,
   getIdForRef,
 } from '@growi/core';
@@ -16,6 +20,7 @@ import sanitize from 'sanitize-filename';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IPageGrantData } from '~/interfaces/page';
+import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
@@ -70,8 +75,7 @@ const router = express.Router();
  *            description: boolean for like status
  *
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+module.exports = (crowi: Crowi) => {
   const loginRequired = require('../../../middlewares/login-required')(crowi, true);
   const loginRequiredStrictly = require('../../../middlewares/login-required')(crowi);
   const certifySharedPage = require('../../../middlewares/certify-shared-page')(crowi);
@@ -183,21 +187,20 @@ module.exports = (crowi) => {
         return res.apiv3Err(new Error('Either parameter of (pageId or path) or (pageId and shareLinkId) is required.'), 400);
       }
 
-      let page;
+      let pageWithMeta: IDataWithMeta<HydratedDocument<PageDocument>, IPageInfoExt> | IDataWithMeta<null, IPageNotFoundInfo> = {
+        data: null,
+      };
       let pages;
       try {
         if (isSharedPage) {
           const shareLink = await ShareLink.findOne({ _id: { $eq: shareLinkId } });
           if (shareLink == null) {
-            throw new Error('ShareLink is not found');
+            return res.apiv3Err('ShareLink is not found', 404);
           }
-          page = await Page.findOne({ _id: getIdForRef(shareLink.relatedPage) });
-        }
-        else if (pageId != null) { // prioritized
-          page = await Page.findByIdAndViewer(pageId, user);
+          pageWithMeta = await pageService.findPageAndMetaDataByViewer(getIdStringForRef(shareLink.relatedPage), path, user, true);
         }
         else if (!findAll) {
-          page = await Page.findByPathAndViewer(path, user, null, true, false);
+          pageWithMeta = await pageService.findPageAndMetaDataByViewer(pageId, path, user);
         }
         else {
           pages = await Page.findByPathAndViewer(path, user, null, false, includeEmpty);
@@ -208,8 +211,15 @@ module.exports = (crowi) => {
         return res.apiv3Err(err, 500);
       }
 
-      if (page == null && (pages == null || pages.length === 0)) {
-        return res.apiv3Err('Page is not found', 404);
+      let { data: page } = pageWithMeta;
+      const { meta } = pageWithMeta;
+
+      // not found or forbidden
+      if (isIPageNotFoundInfo(meta) || (Array.isArray(pages) && pages.length === 0)) {
+        if (isIPageNotFoundInfo(meta) && meta.isForbidden) {
+          return res.apiv3Err(new ErrorV3('Page is forbidden', 'page-is-forbidden', undefined, meta), 403);
+        }
+        return res.apiv3Err(new ErrorV3('Page is not found', 'page-not-found', undefined, meta), 404);
       }
 
       if (page != null) {
@@ -221,11 +231,11 @@ module.exports = (crowi) => {
         }
         catch (err) {
           logger.error('populate-page-failed', err);
-          return res.apiv3Err(err, 500);
+          return res.apiv3Err(new ErrorV3('Failed to populate page', 'populate-page-failed', undefined, { err, meta }), 500);
         }
       }
 
-      return res.apiv3({ page, pages });
+      return res.apiv3({ page, pages, meta });
     });
 
   router.get('/page-paths-with-descendant-count', getPagePathsWithDescendantCountFactory(crowi));
@@ -487,13 +497,13 @@ module.exports = (crowi) => {
     const { pageId } = req.query;
 
     try {
-      const pageWithMeta = await pageService.findPageAndMetaDataByViewer(pageId, null, user, true, isSharedPage);
+      const { meta } = await pageService.findPageAndMetaDataByViewer(pageId, null, user, isSharedPage);
 
-      if (pageWithMeta == null) {
+      if (isIPageNotFoundInfo(meta)) {
         return res.apiv3Err(`Page '${pageId}' is not found or forbidden`);
       }
 
-      return res.apiv3(pageWithMeta.meta);
+      return res.apiv3(meta);
     }
     catch (err) {
       logger.error('get-page-info', err);
@@ -709,7 +719,7 @@ module.exports = (crowi) => {
     async(req, res) => {
       const { pageId } = req.query;
 
-      const Page = crowi.model('Page');
+      const Page = mongoose.model<IPage, PageModel>('Page');
       const page = await Page.findByIdAndViewer(pageId, req.user, null);
 
       if (page == null) {
@@ -772,7 +782,7 @@ module.exports = (crowi) => {
       const { pageId } = req.params;
       const { grant, userRelatedGrantedGroups } = req.body;
 
-      const Page = crowi.model('Page');
+      const Page = mongoose.model<IPage, PageModel>('Page');
 
       const page = await Page.findByIdAndViewer(pageId, req.user, null, false);
 
@@ -783,9 +793,8 @@ module.exports = (crowi) => {
 
       let data;
       try {
-        const shouldUseV4Process = false;
         const grantData = { grant, userRelatedGrantedGroups };
-        data = await crowi.pageService.updateGrant(page, req.user, grantData, shouldUseV4Process);
+        data = await crowi.pageService.updateGrant(page, req.user, grantData);
       }
       catch (err) {
         logger.error('Error occurred while processing calcApplicableGrantData.', err);

@@ -3,7 +3,7 @@ import React, { memo, type JSX } from 'react';
 import Link from 'next/link';
 import { UncontrolledTooltip } from 'reactstrap';
 
-import { useAppTitle, useConfidential, useIsDefaultLogo } from '~/stores-universal/context';
+import { useAppTitle, useConfidential, useIsDefaultLogo } from '~/states/global';
 
 import { SidebarBrandLogo } from '../SidebarBrandLogo';
 
@@ -17,9 +17,9 @@ type Props = {
 
 const AppTitleSubstance = memo(({ className = '', hideAppTitle = false }: Props): JSX.Element => {
 
-  const { data: isDefaultLogo } = useIsDefaultLogo();
-  const { data: appTitle } = useAppTitle();
-  const { data: confidential } = useConfidential();
+  const isDefaultLogo = useIsDefaultLogo();
+  const appTitle = useAppTitle();
+  const confidential = useConfidential();
 
   return (
     <div className={`${styles['grw-app-title']} ${className} d-flex`}>
