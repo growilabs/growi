@@ -41,7 +41,8 @@ export const handleAsApiError = (
   next: NextFunction,
 ): void => {
   if (error == null) {
-    return next();
+    next();
+    return;
   }
 
   if (isHttpError(error)) {
@@ -63,7 +64,8 @@ export const redirectToTopOnError = (
   next: NextFunction,
 ): void => {
   if (error != null) {
-    return res.redirect('/');
+    res.redirect('/');
+    return;
   }
-  return next();
+  next();
 };

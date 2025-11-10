@@ -30,13 +30,15 @@ const certifyOrigin = (
   if (!isSameOriginReq && req.headers.origin != null && isSimpleRequest(req)) {
     const message = 'Invalid request (origin check failed but simple request)';
     logger.error(message);
-    return res.apiv3Err(new ErrorV3(message));
+    res.apiv3Err(new ErrorV3(message));
+    return;
   }
 
   if (!isSameOriginReq && accessToken == null && !isSimpleRequest(req)) {
     const message = 'Invalid request (origin check failed and no access token)';
     logger.error(message);
-    return res.apiv3Err(new ErrorV3(message));
+    res.apiv3Err(new ErrorV3(message));
+    return;
   }
 
   next();

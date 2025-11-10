@@ -17,7 +17,8 @@ export const apiV3FormValidator = (
 
   const errObjArray = validationResult(req);
   if (errObjArray.isEmpty()) {
-    return next();
+    next();
+    return;
   }
 
   const errs = errObjArray.array().map((err) => {
@@ -25,5 +26,5 @@ export const apiV3FormValidator = (
     return new ErrorV3(`${err.param}: ${err.msg}`, 'validation_failed');
   });
 
-  return res.apiv3Err(errs);
+  res.apiv3Err(errs);
 };

@@ -14,6 +14,7 @@ import type { AccessTokenParserReq } from './interfaces';
 vi.mock('@growi/core/dist/models/serializers', { spy: true });
 
 describe('access-token-parser middleware for access token with scopes', () => {
+  // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
   let User;
 
   beforeAll(async () => {
