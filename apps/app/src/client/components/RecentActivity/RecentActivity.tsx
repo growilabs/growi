@@ -55,8 +55,8 @@ export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
     }
   }, [paginatedData, error]);
 
-  const totalPageCount = paginatedData?.totalDocs || 0;
-
+  const totalItemsCount = paginatedData?.totalDocs || 0;
+  const needsPagination = totalItemsCount > limit;
 
   return (
     <div className="page-list-container-activity">
@@ -68,14 +68,16 @@ export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
         ))}
       </ul>
 
-      <PaginationWrapper
-        activePage={activePage}
-        changePage={handlePage}
-        totalItemsCount={totalPageCount}
-        pagingLimit={limit}
-        align="center"
-        size="sm"
-      />
+      {needsPagination && (
+        <PaginationWrapper
+          activePage={activePage}
+          changePage={handlePage}
+          totalItemsCount={totalItemsCount}
+          pagingLimit={limit}
+          align="center"
+          size="sm"
+        />
+      )}
     </div>
   );
 };
