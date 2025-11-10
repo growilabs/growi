@@ -1034,7 +1034,7 @@
     "bookmarks": "ブックマーク",
     "recently_created": "最近作成したページ",
     "recent_activity": "最近のアクティビティ",
-    "unknown_action": "不明な操作を実行しました",
+    "unknown_action": "未指定の変更を加えました",
     "page_create": "ページを作成しました",
     "page_update": "ページを更新しました",
     "page_delete": "ページを削除しました",

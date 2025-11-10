@@ -1006,7 +1006,7 @@
     "bookmarks": "书签",
     "recently_created": "最近创建页面",
     "recent_activity": "最近动态",
-    "unknown_action": "执行了未知操作",
+    "unknown_action": "进行了未指明的更改",
     "page_create": "创建了页面",
     "page_update": "更新了页面",
     "page_delete": "删除了页面",
