@@ -1,4 +1,4 @@
-import React, { type JSX, memo, useCallback } from 'react';
+import { type JSX, memo, useCallback } from 'react';
 import Link from 'next/link';
 import urljoin from 'url-join';
 

@@ -5,13 +5,13 @@ import { useDrawioModalLauncherForView } from '~/client/services/side-effects/dr
 import { useHandsontableModalLauncherForView } from '~/client/services/side-effects/handsontable-modal-launcher-for-view';
 import { toastSuccess, toastError, toastWarning } from '~/client/util/toastr';
 import { PageUpdateErrorCode } from '~/interfaces/apiv3';
-import { useCurrentPageId } from '~/stores/page';
+import { useCurrentPageId } from '~/states/page';
 
 
 export const PageContentsUtilities = (): null => {
   const { t } = useTranslation();
 
-  const { data: pageId } = useCurrentPageId();
+  const pageId = useCurrentPageId();
   const updateStateAfterSave = useUpdateStateAfterSave(pageId);
 
   useHandsontableModalLauncherForView({

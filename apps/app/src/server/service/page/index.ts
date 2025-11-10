@@ -1,3 +1,4 @@
+import assert from 'assert';
 import type EventEmitter from 'events';
 import pathlib from 'path';
 import { Readable, Writable } from 'stream';
@@ -7,11 +8,12 @@ import {
   PageStatus, YDocStatus, getIdForRef,
   getIdStringForRef,
 } from '@growi/core';
-import { PageGrant } from '@growi/core/dist/interfaces';
+import { PageGrant, isIPageInfoForEntity } from '@growi/core/dist/interfaces';
 import type {
   Ref, HasObjectId, IUserHasId, IUser,
-  IPage, IPageInfo, IPageInfoAll, IPageInfoForEntity, IGrantedGroup, IRevisionHasId,
-  IDataWithMeta,
+  IPage, IGrantedGroup, IRevisionHasId,
+  IPageNotFoundInfo, IPageInfoExt, IPageInfo, IPageInfoForEntity, IPageInfoForOperation,
+  IDataWithRequiredMeta,
 } from '@growi/core/dist/interfaces';
 import {
   pagePathUtils, pathUtils,
@@ -402,59 +404,70 @@ class PageService implements IPageService {
 
   // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   async findPageAndMetaDataByViewer(
-      pageId: string | null, path: string, user?: HydratedDocument<IUser>, includeEmpty = false, isSharedPage = false,
-  ): Promise<IDataWithMeta<HydratedDocument<PageDocument>, IPageInfoAll>|null> {
+      pageId: string | null, // either pageId or path must be specified
+      path: string | null, // either pageId or path must be specified
+      user?: HydratedDocument<IUser>,
+      isSharedPage = false,
+  ): Promise<
+    IDataWithRequiredMeta<HydratedDocument<PageDocument>, IPageInfoExt> |
+    IDataWithRequiredMeta<null, IPageNotFoundInfo>
+  > {
+    assert(pageId != null || path != null);
 
     const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>('Page');
 
     let page: HydratedDocument<PageDocument> | null;
     if (pageId != null) { // prioritized
-      page = await Page.findByIdAndViewer(pageId, user, null, includeEmpty);
+      page = await Page.findByIdAndViewer(pageId, user, null, true);
     }
     else {
-      page = await Page.findByPathAndViewer(path, user, null, true, includeEmpty);
+      page = await Page.findByPathAndViewer(path, user, null, true, true);
     }
 
+    // not found or forbidden
     if (page == null) {
-      return null;
+      const count = pageId != null ? await Page.count({ _id: pageId }) : await Page.count({ path });
+      const isForbidden = count > 0;
+      return {
+        data: null,
+        meta: {
+          isNotFound: true,
+          isForbidden,
+        } satisfies IPageNotFoundInfo,
+      };
     }
+
+    const isGuestUser = user == null;
+    const basicPageInfo = this.constructBasicPageInfo(page, isGuestUser);
 
     if (isSharedPage) {
       return {
         data: page,
         meta: {
-          isV5Compatible: isTopPage(page.path) || page.parent != null,
-          isEmpty: page.isEmpty,
+          ...basicPageInfo,
           isMovable: false,
           isDeletable: false,
           isAbleToDeleteCompletely: false,
           isRevertible: false,
-        },
+          bookmarkCount: 0,
+        } satisfies IPageInfo | IPageInfoForEntity,
       };
     }
 
-    const isGuestUser = user == null;
-    const pageInfo = this.constructBasicPageInfo(page, isGuestUser);
+    const Bookmark = mongoose.model<BookmarkedPage, { countDocuments, findByPageIdAndUserId }>('Bookmark');
+    const bookmarkCount: number = await Bookmark.countDocuments({ page: pageId });
 
-    const Bookmark = mongoose.model<BookmarkedPage, { countByPageId, findByPageIdAndUserId }>('Bookmark');
-    const bookmarkCount = await Bookmark.countByPageId(pageId);
-
-    const metadataForGuest = {
-      ...pageInfo,
+    const pageInfo = {
+      ...basicPageInfo,
       bookmarkCount,
-    };
+    } satisfies IPageInfo | IPageInfoForEntity;
 
     if (isGuestUser) {
       return {
         data: page,
-        meta: metadataForGuest,
+        meta: pageInfo,
       };
     }
-
-    const isBookmarked: boolean = (await Bookmark.findByPageIdAndUserId(pageId, user._id)) != null;
-    const isLiked: boolean = page.isLiked(user);
-
-    const subscription = await Subscription.findByUserIdAndTargetId(user._id, page._id);
 
     const creatorId = await this.getCreatorIdForCanDelete(page);
 
@@ -463,17 +476,36 @@ class PageService implements IPageService {
     const isDeletable = this.canDelete(page, creatorId, user, false);
     const isAbleToDeleteCompletely = this.canDeleteCompletely(page, creatorId, user, false, userRelatedGroups); // use normal delete config
 
+    if (!isIPageInfoForEntity(pageInfo)) {
+      return {
+        data: page,
+        meta: {
+          ...pageInfo,
+          isDeletable,
+          isAbleToDeleteCompletely,
+        } satisfies IPageInfo,
+      };
+    }
+
+    const isBookmarked: boolean = isGuestUser
+      ? false
+      : (await Bookmark.findByPageIdAndUserId(pageId, user._id)) != null;
+
+    const isLiked: boolean = page.isLiked(user);
+    const subscription = await Subscription.findByUserIdAndTargetId(user._id, page._id);
+
     return {
       data: page,
       meta: {
-        ...metadataForGuest,
+        ...pageInfo,
         isDeletable,
         isAbleToDeleteCompletely,
         isBookmarked,
         isLiked,
         subscriptionStatus: subscription?.status,
-      },
+      } satisfies IPageInfoForOperation,
     };
+
   }
 
   private shouldUseV4ProcessForRevert(page): boolean {
@@ -2536,12 +2568,13 @@ class PageService implements IPageService {
     });
   }
 
-  constructBasicPageInfo(page: PageDocument, isGuestUser?: boolean): IPageInfo | Omit<IPageInfoForEntity, 'bookmarkCount'> {
+  constructBasicPageInfo(page: PageDocument, isGuestUser?: boolean): | Omit<IPageInfo | IPageInfoForEntity, 'bookmarkCount'> {
     const isMovable = isGuestUser ? false : isMovablePage(page.path);
     const isDeletable = !(isGuestUser || isTopPage(page.path) || isUsersTopPage(page.path));
 
     if (page.isEmpty) {
       return {
+        isNotFound: true,
         isV5Compatible: true,
         isEmpty: true,
         isMovable,
@@ -2555,6 +2588,7 @@ class PageService implements IPageService {
     const seenUsers = page.seenUsers.slice(0, 15) as Ref<IUserHasId>[];
 
     const infoForEntity: Omit<IPageInfoForEntity, 'bookmarkCount'> = {
+      isNotFound: false,
       isV5Compatible: isTopPage(page.path) || page.parent != null,
       isEmpty: false,
       sumOfLikers: page.liker.length,
@@ -2568,6 +2602,9 @@ class PageService implements IPageService {
       contentAge: page.getContentAge(),
       descendantCount: page.descendantCount,
       commentCount: page.commentCount,
+      // the page must have a revision if it is not empty
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      latestRevisionId: getIdStringForRef(page.revision!),
     };
 
     return infoForEntity;
@@ -4042,11 +4079,11 @@ class PageService implements IPageService {
 
   /**
    * A wrapper method of updatePage for updating grant only.
-   * @param {PageDocument} page
-   * @param {UserDocument} user
-   * @param options
    */
-  async updateGrant(page, user, grantData: {grant: PageGrant, userRelatedGrantedGroups: IGrantedGroup[]}): Promise<PageDocument> {
+  async updateGrant(
+      page: HydratedDocument<PageDocument>, user: IUserHasId, grantData: {grant: PageGrant, userRelatedGrantedGroups: IGrantedGroup[]},
+  ): Promise<PageDocument> {
+
     const { grant, userRelatedGrantedGroups } = grantData;
 
     const options: IOptionsForUpdate = {

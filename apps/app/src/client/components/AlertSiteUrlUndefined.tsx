@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
 
-import { useSiteUrl } from '~/stores-universal/context';
+import { useSiteUrl } from '~/states/global';
 
 const isValidUrl = (str: string): boolean => {
   try {
@@ -17,12 +17,7 @@ const isValidUrl = (str: string): boolean => {
 
 export const AlertSiteUrlUndefined = (): JSX.Element => {
   const { t } = useTranslation('commons');
-  const { data: siteUrl, error: errorSiteUrl } = useSiteUrl();
-  const isLoadingSiteUrl = siteUrl === undefined && errorSiteUrl === undefined;
-
-  if (isLoadingSiteUrl) {
-    return <></>;
-  }
+  const siteUrl = useSiteUrl();
 
   if (typeof siteUrl === 'string' && isValidUrl(siteUrl)) {
     return <></>;

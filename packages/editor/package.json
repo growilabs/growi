@@ -18,6 +18,7 @@
     "lint": "npm-run-all -p lint:*"
   },
   "dependencies": {
+    "jotai": "^2.12.3",
     "lib0": "^0.2.94",
     "markdown-table": "^3.0.3",
     "react": "^18.2.0",
@@ -30,7 +31,7 @@
     "@codemirror/autocomplete": "^6.18.4",
     "@codemirror/commands": "^6.8.0",
     "@codemirror/lang-markdown": "^6.3.2",
-    "@codemirror/language": "^6.10.8",
+    "@codemirror/language": "^6.11.3",
     "@codemirror/language-data": "^6.5.1",
     "@codemirror/merge": "^6.8.0",
     "@codemirror/state": "^6.5.2",

@@ -15,7 +15,7 @@ import type { InputValidationResult } from '~/client/util/use-input-validator';
 import { ValidationTarget, useInputValidator } from '~/client/util/use-input-validator';
 import type { IPageForItem } from '~/interfaces/page';
 import LinkedPagePath from '~/models/linked-page-path';
-import { usePageSelectModal } from '~/stores/modal';
+import { usePageSelectModalActions } from '~/states/ui/modal/page-select';
 
 import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink';
 import { AutosizeSubmittableInput, getAdjustedMaxWidthForAutosizeInput } from '../Common/SubmittableInput';
@@ -47,7 +47,7 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
   const [isRenameInputShown, setRenameInputShown] = useState(false);
   const [isHover, setHover] = useState(false);
 
-  const { open: openPageSelectModal } = usePageSelectModal();
+  const { open: openPageSelectModal } = usePageSelectModalActions();
 
   const [validationResult, setValidationResult] = useState<InputValidationResult>();
 

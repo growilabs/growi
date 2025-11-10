@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 
 import type { IApiv3PageUpdateParams, IApiv3PageUpdateResponse } from '~/interfaces/apiv3';
-import { useIsUntitledPage } from '~/stores/ui';
+import { useSetIsUntitledPage } from '~/states/page';
 
 import { updatePage } from './update-page';
 
@@ -10,16 +10,16 @@ type UseUpdatePage = (params: IApiv3PageUpdateParams) => Promise<IApiv3PageUpdat
 
 
 export const useUpdatePage = (): UseUpdatePage => {
-  const { mutate: mutateUntitledPage } = useIsUntitledPage();
+  const setIsUntitledPage = useSetIsUntitledPage();
 
-  const updatePageExt: UseUpdatePage = useCallback(async(params) => {
+  const updatePageExt: UseUpdatePage = useCallback(async (params) => {
     const result = await updatePage(params);
 
     // set false to isUntitledPage
-    mutateUntitledPage(false);
+    setIsUntitledPage(false);
 
     return result;
-  }, [mutateUntitledPage]);
+  }, [setIsUntitledPage]);
 
   return updatePageExt;
 };

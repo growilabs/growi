@@ -3,7 +3,6 @@ import React, { useEffect, useCallback, type JSX } from 'react';
 import path from 'path';
 
 import type { IPageToDeleteWithMeta } from '@growi/core';
-import { useGlobalSocket } from '@growi/core/dist/swr';
 import { useTranslation } from 'next-i18next';
 import { useRouter } from 'next/router';
 
@@ -12,14 +11,17 @@ import type { IPageForItem } from '~/interfaces/page';
 import type { OnDuplicatedFunction, OnDeletedFunction } from '~/interfaces/ui';
 import type { UpdateDescCountData, UpdateDescCountRawData } from '~/interfaces/websocket';
 import { SocketEventName } from '~/interfaces/websocket';
-import type { IPageForPageDuplicateModal } from '~/stores/modal';
-import { usePageDuplicateModal, usePageDeleteModal } from '~/stores/modal';
-import { mutateAllPageInfo, useCurrentPagePath, useSWRMUTxCurrentPage } from '~/stores/page';
+import { useCurrentPagePath, useFetchCurrentPage } from '~/states/page';
+import { useGlobalSocket } from '~/states/socket-io';
+import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
+import type { IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate';
+import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate';
+import { usePageTreeDescCountMapAction } from '~/states/ui/page-tree-desc-count-map';
+import { mutateAllPageInfo } from '~/stores/page';
 import {
   useSWRxRootPage, mutatePageTree, mutatePageList,
 } from '~/stores/page-listing';
 import { mutateSearching } from '~/stores/search';
-import { usePageTreeDescCountMap } from '~/stores/ui';
 import loggerFactory from '~/utils/logger';
 
 import { ItemNode, type TreeItemProps } from '../TreeItem';
@@ -54,15 +56,15 @@ export const ItemsTree = (props: ItemsTreeProps): JSX.Element => {
   const router = useRouter();
 
   const { data: rootPageResult, error } = useSWRxRootPage({ suspense: true });
-  const { data: currentPagePath } = useCurrentPagePath();
-  const { open: openDuplicateModal } = usePageDuplicateModal();
-  const { open: openDeleteModal } = usePageDeleteModal();
+  const currentPagePath = useCurrentPagePath();
+  const { open: openDuplicateModal } = usePageDuplicateModalActions();
+  const { open: openDeleteModal } = usePageDeleteModalActions();
 
-  const { data: socket } = useGlobalSocket();
-  const { data: ptDescCountMap, update: updatePtDescCountMap } = usePageTreeDescCountMap();
+  const socket = useGlobalSocket();
+  const { update: updatePtDescCountMap } = usePageTreeDescCountMapAction();
 
   // for mutation
-  const { trigger: mutateCurrentPage } = useSWRMUTxCurrentPage();
+  const { fetchCurrentPage } = useFetchCurrentPage();
 
   useEffect(() => {
     if (socket == null) {
@@ -78,7 +80,7 @@ export const ItemsTree = (props: ItemsTreeProps): JSX.Element => {
 
     return () => { socket.off(SocketEventName.UpdateDescCount) };
 
-  }, [socket, ptDescCountMap, updatePtDescCountMap]);
+  }, [socket, updatePtDescCountMap]);
 
   const onRenamed = useCallback((fromPath: string | undefined, toPath: string) => {
     mutatePageTree();
@@ -86,9 +88,9 @@ export const ItemsTree = (props: ItemsTreeProps): JSX.Element => {
     mutatePageList();
 
     if (currentPagePath === fromPath || currentPagePath === toPath) {
-      mutateCurrentPage();
+      fetchCurrentPage({ force: true });
     }
-  }, [currentPagePath, mutateCurrentPage]);
+  }, [currentPagePath, fetchCurrentPage]);
 
   const onClickDuplicateMenuItem = useCallback((pageToDuplicate: IPageForPageDuplicateModal) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -122,13 +124,13 @@ export const ItemsTree = (props: ItemsTreeProps): JSX.Element => {
       mutateAllPageInfo();
 
       if (currentPagePath === pathOrPathsToDelete) {
-        mutateCurrentPage();
+        fetchCurrentPage({ force: true });
         router.push(isCompletely ? path.dirname(pathOrPathsToDelete) : `/trash${pathOrPathsToDelete}`);
       }
     };
 
     openDeleteModal([pageToDelete], { onDeleted: onDeletedHandler });
-  }, [currentPagePath, mutateCurrentPage, openDeleteModal, router, t]);
+  }, [currentPagePath, fetchCurrentPage, openDeleteModal, router, t]);
 
 
   if (error != null) {

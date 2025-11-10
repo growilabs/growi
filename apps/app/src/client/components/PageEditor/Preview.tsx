@@ -5,7 +5,7 @@ import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 
 import RevisionRenderer from '~/components/PageView/RevisionRenderer';
 import type { RendererOptions } from '~/interfaces/renderer-options';
-import { useIsEnabledMarp } from '~/stores-universal/context';
+import { useRendererConfig } from '~/states/server-configurations';
 
 import { SlideRenderer } from '../Page/SlideRenderer';
 
@@ -33,7 +33,7 @@ const Preview = (props: Props): JSX.Element => {
     expandContentWidth,
   } = props;
 
-  const { data: isEnabledMarp } = useIsEnabledMarp();
+  const { isEnabledMarp } = useRendererConfig();
   const isSlide = useSlidesByFrontmatter(markdown, isEnabledMarp);
 
   const fluidLayoutClass = expandContentWidth ? 'fluid-layout' : '';

@@ -1,26 +1,21 @@
 import { useCallback, useEffect } from 'react';
 
-import type EventEmitter from 'events';
-
 import { Origin } from '@growi/core';
+import { globalEventTarget } from '@growi/core/dist/utils';
 import type { MarkdownTable } from '@growi/editor';
 
 import { getMarkdownTableFromLine, replaceMarkdownTableInMarkdown } from '~/client/components/Page/markdown-table-util-for-view';
+import type { LaunchHandsonTableModalEventDetail } from '~/client/interfaces/handsontable-modal';
 import { extractRemoteRevisionDataFromErrorObj, useUpdatePage } from '~/client/services/update-page';
-import { useShareLinkId } from '~/stores-universal/context';
-import { useHandsontableModal, useConflictDiffModal } from '~/stores/modal';
-import { useSWRxCurrentPage } from '~/stores/page';
-import { type RemoteRevisionData, useSetRemoteLatestPageData } from '~/stores/remote-latest-page';
+import { useCurrentPageData, useSetRemoteLatestPageData } from '~/states/page';
+import type { RemoteRevisionData } from '~/states/page';
+import { useShareLinkId } from '~/states/page/hooks';
+import { useConflictDiffModalActions } from '~/states/ui/modal/conflict-diff';
+import { useHandsontableModalActions } from '~/states/ui/modal/handsontable';
 import loggerFactory from '~/utils/logger';
 
 
 const logger = loggerFactory('growi:cli:side-effects:useHandsontableModalLauncherForView');
-
-
-declare global {
-  // eslint-disable-next-line vars-on-top, no-var
-  var globalEmitter: EventEmitter;
-}
 
 
 export const useHandsontableModalLauncherForView = (opts?: {
@@ -28,17 +23,17 @@ export const useHandsontableModalLauncherForView = (opts?: {
   onSaveError?: (error: any) => void,
 }): void => {
 
-  const { data: shareLinkId } = useShareLinkId();
+  const shareLinkId = useShareLinkId();
 
-  const { data: currentPage } = useSWRxCurrentPage();
+  const currentPage = useCurrentPageData();
 
-  const { open: openHandsontableModal } = useHandsontableModal();
+  const { open: openHandsontableModal } = useHandsontableModalActions();
 
-  const { open: openConflictDiffModal, close: closeConflictDiffModal } = useConflictDiffModal();
+  const { open: openConflictDiffModal, close: closeConflictDiffModal } = useConflictDiffModalActions();
 
   const _updatePage = useUpdatePage();
 
-  const { setRemoteLatestPageData } = useSetRemoteLatestPageData();
+  const setRemoteLatestPageData = useSetRemoteLatestPageData();
 
   // eslint-disable-next-line max-len
   const updatePage = useCallback(async(revisionId:string, newMarkdown: string, onConflict: (conflictData: RemoteRevisionData, newMarkdown: string) => void) => {
@@ -68,7 +63,7 @@ export const useHandsontableModalLauncherForView = (opts?: {
       logger.error('failed to save', error);
       opts?.onSaveError?.(error);
     }
-  }, [closeConflictDiffModal, currentPage, opts, shareLinkId]);
+  }, [_updatePage, closeConflictDiffModal, currentPage, opts, shareLinkId]);
 
   // eslint-disable-next-line max-len
   const generateResolveConflictHandler = useCallback((revisionId: string, onConflict: (conflictData: RemoteRevisionData, newMarkdown: string) => void) => {
@@ -106,17 +101,18 @@ export const useHandsontableModalLauncherForView = (opts?: {
       return;
     }
 
-    const handler = (bol: number, eol: number) => {
+    const handler = (evt: CustomEvent<LaunchHandsonTableModalEventDetail>) => {
       if (currentPage.revision == null) return;
 
       const markdown = currentPage.revision.body;
+      const { bol, eol } = evt.detail;
       const currentMarkdownTable = getMarkdownTableFromLine(markdown, bol, eol);
       openHandsontableModal(currentMarkdownTable, false, table => saveByHandsontableModal(table, bol, eol));
     };
-    globalEmitter.on('launchHandsonTableModal', handler);
+    globalEventTarget.addEventListener('launchHandsonTableModal', handler);
 
     return function cleanup() {
-      globalEmitter.removeListener('launchHandsonTableModal', handler);
+      globalEventTarget.removeEventListener('launchHandsonTableModal', handler);
     };
   }, [currentPage, openHandsontableModal, saveByHandsontableModal, shareLinkId]);
 };
