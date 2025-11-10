@@ -91,7 +91,9 @@ const calculateTimePassed = (date: Date, locale: Locale): string => {
 
 
 export const ActivityListItem = ({ activity }: { activity: ActivityHasUserId }): JSX.Element => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLangCode = i18n.language;
+  const dateFnsLocale = getLocale(currentLangCode);
 
   const action = activity.action as SupportedActivityActionType;
   const keyToTranslate = translateAction(action);
@@ -108,7 +110,7 @@ export const ActivityListItem = ({ activity }: { activity: ActivityHasUserId }):
 
         <span className="text-secondary">
           {' '}・{' '}
-          {calculateTimePassed(activity.createdAt)}
+          {calculateTimePassed(activity.createdAt, dateFnsLocale)}
         </span>
       </p>
     </div>
