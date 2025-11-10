@@ -13,8 +13,8 @@ module.exports = (crowi) => {
     }
 
     const sharelink = await ShareLink.findOne({
-      _id: shareLinkId,
-      relatedPage: pageId,
+      _id: { $eq: shareLinkId },
+      relatedPage: { $eq: pageId },
     });
 
     // check sharelink enabled
