@@ -6,10 +6,13 @@ import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../service/config-manager';
 
-
 const logger = loggerFactory('growi:middleware:exclude-read-only-user');
 
-export const excludeReadOnlyUser = (req: Request, res: Response & { apiv3Err }, next: () => NextFunction): NextFunction => {
+export const excludeReadOnlyUser = (
+  req: Request,
+  res: Response & { apiv3Err },
+  next: () => NextFunction,
+): NextFunction => {
   const user = req.user;
 
   if (user == null) {
@@ -27,10 +30,16 @@ export const excludeReadOnlyUser = (req: Request, res: Response & { apiv3Err }, 
   return next();
 };
 
-export const excludeReadOnlyUserIfCommentNotAllowed = (req: Request, res: Response & { apiv3Err }, next: () => NextFunction): NextFunction => {
+export const excludeReadOnlyUserIfCommentNotAllowed = (
+  req: Request,
+  res: Response & { apiv3Err },
+  next: () => NextFunction,
+): NextFunction => {
   const user = req.user;
 
-  const isRomUserAllowedToComment = configManager.getConfig('security:isRomUserAllowedToComment');
+  const isRomUserAllowedToComment = configManager.getConfig(
+    'security:isRomUserAllowedToComment',
+  );
 
   if (user == null) {
     logger.warn('req.user is null');
@@ -45,5 +54,4 @@ export const excludeReadOnlyUserIfCommentNotAllowed = (req: Request, res: Respon
   }
 
   return next();
-
 };

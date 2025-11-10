@@ -1,4 +1,3 @@
-
 import { faker } from '@faker-js/faker';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Response } from 'express';
@@ -10,15 +9,12 @@ import type UserEvent from '~/server/events/user';
 import { parserForApiToken } from './api-token';
 import type { AccessTokenParserReq } from './interfaces';
 
-
 vi.mock('@growi/core/dist/models/serializers', { spy: true });
 
-
 describe('access-token-parser middleware', () => {
-
   let User;
 
-  beforeAll(async() => {
+  beforeAll(async () => {
     const crowiMock = mock<Crowi>({
       event: vi.fn().mockImplementation((eventName) => {
         if (eventName === 'user') {
@@ -32,7 +28,7 @@ describe('access-token-parser middleware', () => {
     User = userModelFactory(crowiMock);
   });
 
-  it('should call next if no access token is provided', async() => {
+  it('should call next if no access token is provided', async () => {
     // arrange
     const reqMock = mock<AccessTokenParserReq>({
       user: undefined,
@@ -49,7 +45,7 @@ describe('access-token-parser middleware', () => {
     expect(serializeUserSecurely).not.toHaveBeenCalled();
   });
 
-  it('should call next if the given access token is invalid', async() => {
+  it('should call next if the given access token is invalid', async () => {
     // arrange
     const reqMock = mock<AccessTokenParserReq>({
       user: undefined,
@@ -67,7 +63,7 @@ describe('access-token-parser middleware', () => {
     expect(serializeUserSecurely).not.toHaveBeenCalled();
   });
 
-  it('should set req.user with a valid api token in query', async() => {
+  it('should set req.user with a valid api token in query', async () => {
     // arrange
     const reqMock = mock<AccessTokenParserReq>({
       user: undefined,
@@ -96,7 +92,7 @@ describe('access-token-parser middleware', () => {
     expect(serializeUserSecurely).toHaveBeenCalledOnce();
   });
 
-  it('should set req.user with a valid api token in body', async() => {
+  it('should set req.user with a valid api token in body', async () => {
     // arrange
     const reqMock = mock<AccessTokenParserReq>({
       user: undefined,
@@ -124,7 +120,7 @@ describe('access-token-parser middleware', () => {
     expect(serializeUserSecurely).toHaveBeenCalledOnce();
   });
 
-  it('should set req.user with a valid Bearer token in Authorization header', async() => {
+  it('should set req.user with a valid Bearer token in Authorization header', async () => {
     // arrange
     const reqMock = mock<AccessTokenParserReq>({
       user: undefined,
@@ -155,7 +151,7 @@ describe('access-token-parser middleware', () => {
     expect(serializeUserSecurely).toHaveBeenCalledOnce();
   });
 
-  it('should ignore non-Bearer Authorization header', async() => {
+  it('should ignore non-Bearer Authorization header', async () => {
     // arrange
     const reqMock = mock<AccessTokenParserReq>({
       user: undefined,
@@ -178,5 +174,4 @@ describe('access-token-parser middleware', () => {
     expect(reqMock.user).toBeUndefined();
     expect(serializeUserSecurely).not.toHaveBeenCalled();
   });
-
 });
