@@ -26,7 +26,7 @@ const hasUser = (activity: IActivityHasId): activity is ActivityHasUserId => {
 export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
   const { userId } = props;
 
-  const [activities, setActivities] = useState<ActivityWithPageTarget[]>([]);
+  const [activities, setActivities] = useState<ActivityHasUserId[]>([]);
   const [activePage, setActivePage] = useState(1);
   const [limit] = useState(10);
   const [offset, setOffset] = useState(0);

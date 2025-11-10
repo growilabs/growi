@@ -5,6 +5,7 @@ import type {
   IUserHasId,
   Ref,
 } from '@growi/core';
+
 import type { PaginateResult } from './mongoose-utils';
 
 // Model

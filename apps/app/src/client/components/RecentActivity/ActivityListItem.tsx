@@ -77,14 +77,11 @@ const translateAction = (action: SupportedActivityActionType): string => {
 };
 
 const setIcon = (action: SupportedActivityActionType): string => {
-  return IconActivityTranslationMap[action] || '';
+  return IconActivityTranslationMap[action] || 'question_mark';
 };
 
-const calculateTimePassed = (date: Date, locale: Locale): string => {
-  const timePassed = formatDistanceToNow(date, {
-    addSuffix: true,
-    locale,
-  });
+const calculateTimePassed = (date: Date): string => {
+  const timePassed = formatDistanceToNow(date, { addSuffix: true });
 
   return timePassed;
 };
