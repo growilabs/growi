@@ -1,4 +1,3 @@
-import type { IUser } from '@growi/core';
 import { SupportedAction } from '~/interfaces/activity';
 import type { AuditLogBulkExportJobDocument } from '../../../models/audit-log-bulk-export-job';
 import type { IAuditLogBulkExportJobCronService } from '..';
