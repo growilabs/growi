@@ -2,17 +2,19 @@ import { Memory } from '@mastra/memory';
 import { MongoDBStore } from '@mastra/mongodb';
 
 import { getMongoUri } from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
 
-const mongodbUri = getMongoUri();
+const logger = loggerFactory('growi:service:mastra:memory');
 
-// https://regex101.com/r/7skgng/1
-const regex = /^(mongodb:\/\/[^@/]+:\d+)\/(\w+)$/;
-const match = mongodbUri.match(regex);
-const url = match?.[1];
-const dbName = match?.[2];
-
-if (url == null || dbName == null) {
-  throw new Error('Invalid MongoDB URI');
+let dbName: string;
+let url: string;
+try {
+  const mongoUrl = new URL(getMongoUri());
+  dbName = mongoUrl.pathname.substring(1);
+  url = `${mongoUrl.protocol}//${mongoUrl.host}`;
+} catch (err) {
+  logger.error('Failed to parse MongoDB URI', err);
+  throw new Error(`Invalid MongoDB URI`);
 }
 
 export const memory = new Memory({

@@ -8,7 +8,7 @@ import styles from './BasicLayout.module.scss';
 
 const ChatSidebar = dynamic(
   () =>
-    import('~/features/mastra/client/ChatSidebar/ChatSidebar').then(
+    import('~/features/mastra/client/components/ChatSidebar/ChatSidebar').then(
       (mod) => mod.ChatSidebar,
     ),
   { ssr: false },
