@@ -93,7 +93,7 @@ class AuditLogBulkExportJobCronService
       } else if (
         auditLogBulkExportJob.status === AuditLogBulkExportJobStatus.uploading
       ) {
-        await compressAndUpload.bind(this)(user, auditLogBulkExportJob);
+        await compressAndUpload.bind(this)(auditLogBulkExportJob);
       }
     } catch (err) {
       logger.error(err);
