@@ -68,9 +68,11 @@ class AuditLogBulkExportJobCronService
     })
       .sort({ createdAt: 1 })
       .limit(this.parallelExecLimit);
-    auditLogBulkExportJobInProgress.forEach((auditLogBulkExportJob) => {
-      this.proceedBulkExportJob(auditLogBulkExportJob);
-    });
+    await Promise.all(
+      auditLogBulkExportJobInProgress.map((job) =>
+        this.proceedBulkExportJob(job),
+      ),
+    );
   }
 
   async proceedBulkExportJob(
@@ -89,7 +91,7 @@ class AuditLogBulkExportJobCronService
       if (
         auditLogBulkExportJob.status === AuditLogBulkExportJobStatus.exporting
       ) {
-        exportAuditLogsToFsAsync.bind(this)(auditLogBulkExportJob);
+        await exportAuditLogsToFsAsync.bind(this)(auditLogBulkExportJob);
       } else if (
         auditLogBulkExportJob.status === AuditLogBulkExportJobStatus.uploading
       ) {
@@ -158,7 +160,7 @@ class AuditLogBulkExportJobCronService
 export let auditLogBulkExportJobCronService:
   | AuditLogBulkExportJobCronService
   | undefined;
-export default function instanciate(crowi: Crowi): void {
+export default function instantiate(crowi: Crowi): void {
   auditLogBulkExportJobCronService = new AuditLogBulkExportJobCronService(
     crowi,
   );
