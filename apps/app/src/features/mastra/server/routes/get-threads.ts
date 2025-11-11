@@ -34,7 +34,7 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
 
   const validator: ValidationChain[] = [
     query('page')
-      .isInt({ min: 1 })
+      .isInt({ min: 0 })
       .toInt()
       .withMessage('"page" must be a number'),
 
@@ -73,15 +73,15 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
           );
         }
 
-        const threads = await memory.getThreadsByResourceIdPaginated({
+        const paginatedThread = await memory.getThreadsByResourceIdPaginated({
           resourceId: req.user._id.toString(),
-          page: req.query.page - 1,
+          page: req.query.page,
           perPage: req.query.perPage,
           orderBy: req.query.orderBy,
           sortDirection: req.query.sortDirection,
         });
 
-        return res.apiv3({ threads });
+        return res.apiv3({ paginatedThread });
       } catch (err) {
         logger.error(err);
         return res.apiv3Err(new ErrorV3('Failed to get threads'));
