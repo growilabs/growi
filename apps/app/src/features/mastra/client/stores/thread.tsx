@@ -11,12 +11,12 @@ const getRecentThreadsKey = (
   pageIndex: number,
   previousPageData: PaginatedThread | null,
 ): [string, number, number] | null => {
-  if (previousPageData && !previousPageData.hasMore) {
+  if (previousPageData != null && !previousPageData.hasMore) {
     return null;
   }
 
   const PER_PAGE = 20;
-  const page = pageIndex + 1;
+  const page = pageIndex;
 
   return ['/mastra/threads', page, PER_PAGE];
 };
@@ -28,13 +28,12 @@ export const useSWRINFxRecentThreads = (
     (pageIndex, previousPageData) =>
       getRecentThreadsKey(pageIndex, previousPageData),
     ([endpoint, page, perPage]) =>
-      apiv3Get<PaginatedThread>(endpoint, { page, perPage }).then(
-        (response) => response.data.threads,
+      apiv3Get<{ paginatedThread: PaginatedThread }>(endpoint, { page, perPage }).then(
+        (response) => response.data.paginatedThread,
       ),
     {
       ...config,
-      revalidateFirstPage: false,
-      revalidateAll: true,
+      initialSize: 0
     },
   );
 };
