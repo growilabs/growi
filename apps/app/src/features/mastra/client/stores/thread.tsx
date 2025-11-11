@@ -28,12 +28,13 @@ export const useSWRINFxRecentThreads = (
     (pageIndex, previousPageData) =>
       getRecentThreadsKey(pageIndex, previousPageData),
     ([endpoint, page, perPage]) =>
-      apiv3Get<{ paginatedThread: PaginatedThread }>(endpoint, { page, perPage }).then(
-        (response) => response.data.paginatedThread,
-      ),
+      apiv3Get<{ paginatedThread: PaginatedThread }>(endpoint, {
+        page,
+        perPage,
+      }).then((response) => response.data.paginatedThread),
     {
       ...config,
-      initialSize: 0
+      initialSize: 0,
     },
   );
 };
