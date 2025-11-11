@@ -11,7 +11,6 @@ import { pathUtils, globalEventTarget } from '@growi/core/dist/utils';
 import { GlobalCodeMirrorEditorKey, useSetResolvedTheme } from '@growi/editor';
 import { CodeMirrorEditorMain } from '@growi/editor/dist/client/components/CodeMirrorEditorMain';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
-import { useEditorGuideModal } from '@growi/editor/dist/client/stores/use-editor-guide-modal';
 import { useRect } from '@growi/ui/dist/utils';
 import detectIndent from 'detect-indent';
 import { useAtomValue } from 'jotai';
@@ -335,15 +334,6 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
       setReservedNextCaretLine(0);
     }
   }, [editorMode, setReservedNextCaretLine]);
-
-  const { close: closeEditorGuideModal } = useEditorGuideModal();
-
-  // close modal if unmount page editor
-  useEffect(() => {
-    return () => {
-      closeEditorGuideModal();
-    };
-  }, [closeEditorGuideModal]);
 
   // TODO: Check the reproduction conditions that made this code necessary and confirm reproduction
   // // when transitioning to a different page, if the initialValue is the same,

@@ -1,6 +1,5 @@
 import type { CSSProperties, JSX } from 'react';
 
-import { useEditorGuideModal } from '@growi/editor/dist/client/stores/use-editor-guide-modal';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 
 import RevisionRenderer from '~/components/PageView/RevisionRenderer';
@@ -38,18 +37,13 @@ const Preview = (props: Props): JSX.Element => {
 
   const fluidLayoutClass = expandContentWidth ? 'fluid-layout' : '';
 
-  const { data: editorGuideModalStatus, close: closeEditorGuideModal } = useEditorGuideModal();
-
   return (
     <div
       data-testid="page-editor-preview-body"
       className={`${moduleClass} ${fluidLayoutClass} ${pagePath === '/Sidebar' ? 'preview-sidebar' : ''} position-relative`}
       style={style}
     >
-      <EditorGuideModal
-        isOpen={editorGuideModalStatus?.isOpened ?? false}
-        onClose={closeEditorGuideModal}
-      />
+      <EditorGuideModal />
 
       { markdown != null
         && (

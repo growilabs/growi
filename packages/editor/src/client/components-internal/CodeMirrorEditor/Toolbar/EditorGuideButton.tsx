@@ -1,9 +1,9 @@
 import { type JSX, useCallback } from 'react';
 
-import { useEditorGuideModal } from '../../../stores/use-editor-guide-modal';
+import { useEditorGuideModalActions } from '../../../../states/modal/editor-guide';
 
 export const EditorGuideButton = (): JSX.Element => {
-  const { open: openEditorGuideModal } = useEditorGuideModal();
+  const { open: openEditorGuideModal } = useEditorGuideModalActions();
 
   const onClickEditorGuideButton = useCallback(() => {
     openEditorGuideModal();

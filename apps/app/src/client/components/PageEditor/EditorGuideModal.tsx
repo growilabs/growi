@@ -1,14 +1,12 @@
 import type { JSX } from 'react';
 
-type Props = {
-  isOpen: boolean;
-  onClose: () => void;
-};
+import { useEditorGuideModalStatus, useEditorGuideModalActions } from '@growi/editor/dist/states/modal/editor-guide';
 
-export const EditorGuideModal = (props: Props): JSX.Element => {
-  const { isOpen, onClose } = props;
+export const EditorGuideModal = (): JSX.Element => {
+  const { isOpened } = useEditorGuideModalStatus();
+  const { close } = useEditorGuideModalActions();
 
-  if (!isOpen) {
+  if (!isOpened) {
     return <></>;
   }
 
@@ -17,7 +15,7 @@ export const EditorGuideModal = (props: Props): JSX.Element => {
       {/* Editor Guide Modal Overlay */}
       <div
         className="position-absolute w-100 h-100 modal-backdrop fade show z-2"
-        onClick={onClose}
+        onClick={close}
       />
 
       {/* Editor Guide Modal */}
@@ -31,7 +29,7 @@ export const EditorGuideModal = (props: Props): JSX.Element => {
               <button
                 type="button"
                 className="btn-close"
-                onClick={onClose}
+                onClick={close}
                 aria-label="Close"
               />
             </div>
