@@ -18,7 +18,6 @@ export const ThreadList: React.FC = () => {
   const swrInifiniteThreads = useSWRINFxRecentThreads();
   const { t } = useTranslation();
   const { data, mutate: mutateRecentThreads } = swrInifiniteThreads;
-  console.log('data', data);
   const {
     openChat,
     data: aiAssistantSidebarData,
