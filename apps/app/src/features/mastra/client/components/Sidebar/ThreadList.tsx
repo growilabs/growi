@@ -5,9 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import InfiniteScroll from '~/client/components/InfiniteScroll';
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import {
-  useSWRMUTxThreads,
-} from '~/features/openai/client/stores/thread';
+import { useSWRMUTxThreads } from '~/features/openai/client/stores/thread';
 import loggerFactory from '~/utils/logger';
 
 import { deleteThread } from '../../../../openai/client/services/thread';
@@ -32,9 +30,7 @@ export const ThreadList: React.FC = () => {
 
   const isEmpty = data?.[0]?.total === 0;
   const isReachingEnd =
-    isEmpty ||
-    (data != null &&
-      data[data.length - 1].hasMore === false);
+    isEmpty || (data != null && data[data.length - 1].hasMore === false);
 
   const deleteThreadHandler = useCallback(
     async (aiAssistantId: string, threadRelationId: string) => {
