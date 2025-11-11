@@ -15,9 +15,9 @@ import { useSWRINFxRecentThreads } from '../../stores/thread';
 const logger = loggerFactory('growi:openai:client:components:ThreadList');
 
 export const ThreadList: React.FC = () => {
-  const swrInifiniteThreads = useSWRINFxRecentThreads();
+  const swrInfiniteThreads = useSWRINFxRecentThreads();
   const { t } = useTranslation();
-  const { data, mutate: mutateRecentThreads } = swrInifiniteThreads;
+  const { data, mutate: mutateRecentThreads } = swrInfiniteThreads;
   const {
     openChat,
     data: aiAssistantSidebarData,
@@ -29,7 +29,7 @@ export const ThreadList: React.FC = () => {
 
   const isEmpty = data?.[0]?.total === 0;
   const isReachingEnd =
-    isEmpty || (data != null && data[data.length - 1].hasMore === false);
+    isEmpty || (data != null && data[data.length - 1]?.hasMore === false);
 
   const deleteThreadHandler = useCallback(
     async (aiAssistantId: string, threadRelationId: string) => {
@@ -66,11 +66,11 @@ export const ThreadList: React.FC = () => {
   return (
     <ul className="list-group">
       <InfiniteScroll
-        swrInifiniteResponse={swrInifiniteThreads}
+        swrInifiniteResponse={swrInfiniteThreads}
         isReachingEnd={isReachingEnd}
       >
         {data
-          ?.flatMap((thread) => thread.threads)
+          ?.flatMap((threadData) => threadData.threads)
           .map((thread) => (
             <li key={thread.id} className="list-group-item border-0 p-0">
               <button
