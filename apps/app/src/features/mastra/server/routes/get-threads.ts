@@ -33,13 +33,25 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
   );
 
   const validator: ValidationChain[] = [
-    query('page').isInt({ min: 0 }).toInt(),
+    query('page')
+      .isInt({ min: 0 })
+      .toInt()
+      .withMessage('"page" must be a number'),
 
-    query('perPage').isInt({ min: 1, max: 20 }).toInt(),
+    query('perPage')
+      .isInt({ min: 1, max: 20 })
+      .toInt()
+      .withMessage('"perPage" must be a number between 1 and 20'),
 
-    query('orderBy').optional().isIn(['updatedAt', 'createdAt']),
+    query('orderBy')
+      .optional()
+      .isIn(['updatedAt', 'createdAt'])
+      .withMessage('"orderBy" must be one of "updatedAt" or "createdAt"'),
 
-    query('sortDirection').optional().isIn(['ASC', 'DESC']),
+    query('sortDirection')
+      .optional()
+      .isIn(['ASC', 'DESC'])
+      .withMessage('"sortDirection" must be one of "ASC" or "DESC"'),
   ];
 
   return [
