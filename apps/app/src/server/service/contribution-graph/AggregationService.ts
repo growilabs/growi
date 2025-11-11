@@ -1,6 +1,8 @@
 // match
 //   for a certain user
+//   for certain activities only
 //   within a specified period (since lastUpdate)
+
 
 // activities from lastUpdated until now
 // in minified JSON format, {"d":"", "c": "X"}
@@ -38,10 +40,14 @@ export class ContributionAggregationService {
   private buildPipeline(params: PipelineParams): PipelineStage[] {
     const { userId, startDate } = params;
 
+    // REMINDER: Only look for supported actions
+    const supportedActions = '';
+
     const pipeline: PipelineStage[] = [
       {
         $match: {
           userId,
+          action: supportedActions,
           timestamp: {
             $gte: startDate,
             $lt: new Date(),
