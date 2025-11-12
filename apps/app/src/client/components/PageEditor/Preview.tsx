@@ -8,7 +8,7 @@ import { useRendererConfig } from '~/states/server-configurations';
 
 import { SlideRenderer } from '../Page/SlideRenderer';
 
-import { EditorGuideModal } from './EditorGuideModal';
+import { EditorGuideModalLazyLoaded } from './EditorGuideModal';
 
 import styles from './Preview.module.scss';
 
@@ -43,7 +43,7 @@ const Preview = (props: Props): JSX.Element => {
       className={`${moduleClass} ${fluidLayoutClass} ${pagePath === '/Sidebar' ? 'preview-sidebar' : ''} position-relative`}
       style={style}
     >
-      <EditorGuideModal />
+      <EditorGuideModalLazyLoaded />
 
       { markdown != null
         && (
