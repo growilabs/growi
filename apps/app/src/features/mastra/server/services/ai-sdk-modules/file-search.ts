@@ -10,15 +10,19 @@ type FileSearchParameters = {
   vectorStoreId: string;
 };
 
+type FileSearchResult = {
+  text: string;
+};
+
 export const fileSearch = async ({
   prompt,
   instruction,
   vectorStoreId,
-}: FileSearchParameters) => {
+}: FileSearchParameters): Promise<FileSearchResult> => {
   const openai = getOpenaiProvider();
   const model = configManager.getConfig('openai:assistantModel:chat');
 
-  return generateText({
+  const result = await generateText({
     prompt,
     system: instruction,
     model: openai(model),
@@ -40,4 +44,5 @@ export const fileSearch = async ({
     // see: https://ai-sdk.dev/providers/ai-sdk-providers/openai#file-search-tool
     toolChoice: { type: 'tool', toolName: 'file_search' },
   });
+  return { text: result.text };
 };
