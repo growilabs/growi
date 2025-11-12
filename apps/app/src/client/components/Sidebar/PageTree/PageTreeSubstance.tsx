@@ -79,8 +79,6 @@ PageTreeHeader.displayName = 'PageTreeHeader';
 const PageTreeUnavailable = () => {
   const { t } = useTranslation();
 
-  // TODO : improve design
-  // Story : https://redmine.weseek.co.jp/issues/83755
   return (
     <div className="mt-5 mx-2 text-center">
       <h3 className="text-gray">{t('v5_page_migration.page_tree_not_avaliable')}</h3>
