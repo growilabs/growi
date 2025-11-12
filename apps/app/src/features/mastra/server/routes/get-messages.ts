@@ -18,9 +18,6 @@ export type GetMessagesHandlersFactory = (crowi: Crowi) => RequestHandler[];
 
 export type ReqParam = {
   threadId: string;
-  before?: string;
-  after?: string;
-  limit?: number;
 };
 
 export type Req = Request<ReqParam, Response, undefined> & {
@@ -39,12 +36,6 @@ export const getMessagesHandlersFactory: GetMessagesHandlersFactory = (
       .isUUID()
       .optional()
       .withMessage('threadId must be a valid UUID'),
-
-    param('limit').optional().isInt().withMessage('limit must be integer'),
-
-    param('before').optional().isString().withMessage('before must be string'),
-
-    param('after').optional().isString().withMessage('after must be string'),
   ];
 
   return [
@@ -56,7 +47,7 @@ export const getMessagesHandlersFactory: GetMessagesHandlersFactory = (
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
       try {
-        const { threadId, limit, before, after } = req.params;
+        const { threadId } = req.params;
 
         const agent = mastra.getAgent('growiAgent');
         const memory = await agent?.getMemory();
@@ -68,6 +59,7 @@ export const getMessagesHandlersFactory: GetMessagesHandlersFactory = (
           );
         }
 
+        // TODO: Pagination
         const message = await memory.query({
           threadId,
           resourceId: req.user._id.toString(),
