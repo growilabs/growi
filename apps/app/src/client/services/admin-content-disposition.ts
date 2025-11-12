@@ -1,3 +1,5 @@
+import { useCallback, useMemo } from 'react';
+
 import type { SWRResponse } from 'swr';
 import useSWR from 'swr';
 import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
@@ -53,11 +55,16 @@ export const useContentDisposition = (): {
   const { data, mutate } = useSWRxContentDispositionSettings();
   const { trigger } = useSWRMUTxContentDispositionSettings();
 
-  const setInline = async(mimeType: string): Promise<void> => {
-    if (!data) return;
+  const inlineMimeTypesStr = data?.inlineMimeTypes?.join(',');
+  const attachmentMimeTypesStr = data?.attachmentMimeTypes?.join(',');
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally using array contents instead of data object reference
+  const memoizedData = useMemo(() => data, [inlineMimeTypesStr, attachmentMimeTypesStr]);
 
-    const newInlineMimeTypes = [...data.inlineMimeTypes];
-    const newAttachmentMimeTypes = data.attachmentMimeTypes.filter(m => m !== mimeType);
+  const setInline = useCallback(async(mimeType: string): Promise<void> => {
+    if (!memoizedData) return;
+
+    const newInlineMimeTypes = [...memoizedData.inlineMimeTypes];
+    const newAttachmentMimeTypes = memoizedData.attachmentMimeTypes.filter(m => m !== mimeType);
 
     if (!newInlineMimeTypes.includes(mimeType)) {
       newInlineMimeTypes.push(mimeType);
@@ -69,13 +76,13 @@ export const useContentDisposition = (): {
     });
 
     mutate();
-  };
+  }, [memoizedData, trigger, mutate]);
 
-  const setAttachment = async(mimeType: string): Promise<void> => {
-    if (!data) return;
+  const setAttachment = useCallback(async(mimeType: string): Promise<void> => {
+    if (!memoizedData) return;
 
-    const newInlineMimeTypes = data.inlineMimeTypes.filter(m => m !== mimeType);
-    const newAttachmentMimeTypes = [...data.attachmentMimeTypes];
+    const newInlineMimeTypes = memoizedData.inlineMimeTypes.filter(m => m !== mimeType);
+    const newAttachmentMimeTypes = [...memoizedData.attachmentMimeTypes];
 
     if (!newAttachmentMimeTypes.includes(mimeType)) {
       newAttachmentMimeTypes.push(mimeType);
@@ -87,7 +94,7 @@ export const useContentDisposition = (): {
     });
 
     mutate();
-  };
+  }, [memoizedData, trigger, mutate]);
 
   return {
     setInline,
