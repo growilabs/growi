@@ -37,6 +37,7 @@ const Preview = (props: Props): JSX.Element => {
 
   const fluidLayoutClass = expandContentWidth ? 'fluid-layout' : '';
 
+
   return (
     <div
       data-testid="page-editor-preview-body"

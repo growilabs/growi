@@ -335,6 +335,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
     }
   }, [editorMode, setReservedNextCaretLine]);
 
+
   // TODO: Check the reproduction conditions that made this code necessary and confirm reproduction
   // // when transitioning to a different page, if the initialValue is the same,
   // // UnControlled CodeMirror value does not reset, so explicitly set the value to initialValue
