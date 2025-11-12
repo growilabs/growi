@@ -8,6 +8,8 @@ import { useRendererConfig } from '~/states/server-configurations';
 
 import { SlideRenderer } from '../Page/SlideRenderer';
 
+import { EditorGuideModalLazyLoaded } from './EditorGuideModal';
+
 import styles from './Preview.module.scss';
 
 const moduleClass = styles['page-editor-preview-body'] ?? '';
@@ -39,9 +41,11 @@ const Preview = (props: Props): JSX.Element => {
   return (
     <div
       data-testid="page-editor-preview-body"
-      className={`${moduleClass} ${fluidLayoutClass} ${pagePath === '/Sidebar' ? 'preview-sidebar' : ''}`}
+      className={`${moduleClass} ${fluidLayoutClass} ${pagePath === '/Sidebar' ? 'preview-sidebar' : ''} position-relative`}
       style={style}
     >
+      <EditorGuideModalLazyLoaded />
+
       { markdown != null
         && (
           isSlide != null
