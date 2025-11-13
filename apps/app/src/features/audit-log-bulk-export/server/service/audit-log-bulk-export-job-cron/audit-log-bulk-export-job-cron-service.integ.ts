@@ -679,7 +679,7 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
 
         const updatedJob = await AuditLogBulkExportJob.findById(job._id);
         await new Promise((resolve) => setTimeout(resolve, 50));
-        
+
         expect(updatedJob?.restartFlag).toBe(false);
         expect(updatedJob?.totalExportedCount).toBe(0);
         expect(updatedJob?.lastExportedId).toBeUndefined();
