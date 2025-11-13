@@ -11,6 +11,7 @@ import {
 } from 'reactstrap';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
+import { useSWRINFxRecentThreads } from '~/features/mastra/client/stores/thread';
 import {
   type SseMessage,
   SseMessageSchema,
@@ -28,7 +29,7 @@ import { ThreadType } from '../../interfaces/thread-relation';
 // import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
 import { useAiAssistantSidebar } from '../stores/ai-assistant';
 import { useSWRMUTxMessages } from '../stores/message';
-import { useSWRINFxRecentThreads, useSWRMUTxThreads } from '../stores/thread';
+import { useSWRMUTxThreads } from '../stores/thread';
 
 type CreateThread = (
   aiAssistantId: string,
