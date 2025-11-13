@@ -25,6 +25,7 @@ import { swrGlobalConfiguration } from '~/utils/swr-utils';
 import { type CommonProps, getLocaleAtServerSide } from './utils/commons';
 import '~/styles/prebuilt/vendor.css';
 import '~/styles/style-app.scss';
+import '~/styles/tailwind.css';
 
 import { registerTransformerForObjectId } from './utils/objectid-transformer';
 

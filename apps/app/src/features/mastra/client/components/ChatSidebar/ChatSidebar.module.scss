@@ -1,0 +1,10 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+.grw-chat-sidebar :global {
+  z-index: bs.$zindex-fixed + 2;
+  width: 100%;
+
+  @include bs.media-breakpoint-up(sm) {
+    width: 500px;
+  }
+}
