@@ -65,7 +65,10 @@ export const deleteThreadHandlersFactory: DeleteThreadHandlersFactory = (
         const messageIds = uiMessages.map((message) => message.id);
 
         // The deleteMessage method is not implemented
-        // See: https://github.com/mastra-ai/mastra/blob/main/stores/mongodb/src/storage/index.ts#L78
+        // Refs:
+        // https://github.com/mastra-ai/mastra/tree/35667834530f6fee2cc4f68adf7c7b9ca1122b14/stores/mongodb#storage-methods
+        // https://github.com/mastra-ai/mastra/blob/35667834530f6fee2cc4f68adf7c7b9ca1122b14/stores/mongodb/src/storage/index.ts#L86
+
         // TODO: https://redmine.weseek.co.jp/issues/174091
 
         // await memory.deleteMessages([...messageIds]);
