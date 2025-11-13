@@ -25,13 +25,6 @@ export const factory = (crowi: Crowi): express.Router => {
       router.get('/threads/recent', getRecentThreadsFactory(crowi));
     });
 
-    import('./delete-thread').then(({ deleteThreadFactory }) => {
-      router.delete(
-        '/thread/:aiAssistantId/:threadRelationId',
-        deleteThreadFactory(crowi),
-      );
-    });
-
     import('./edit').then(({ postMessageToEditHandlersFactory }) => {
       router.post('/edit', postMessageToEditHandlersFactory(crowi));
     });
