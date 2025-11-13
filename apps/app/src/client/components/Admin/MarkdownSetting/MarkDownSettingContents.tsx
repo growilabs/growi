@@ -11,6 +11,7 @@ import loggerFactory from '~/utils/logger';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
 import IndentForm from './IndentForm';
+import { InlineFileTypeSelector } from './InlineFileTypeSelector';
 import LineBreakForm from './LineBreakForm';
 import XssForm from './XssForm';
 
@@ -61,6 +62,13 @@ const MarkDownSettingContents = React.memo((props: Props): JSX.Element => {
         <CardBody className="px-0 py-2">{ t('markdown_settings.xss_desc') }</CardBody>
       </Card>
       <XssForm />
+
+      {/* Allowed file types for inline display */}
+      <h2 className="admin-setting-header mt-5">{t('markdown_settings.inline_file_type_header')}</h2>
+      <Card className="card custom-card bg-body-tertiary my-3">
+        <CardBody className="px-0 py-2">{t('markdown_settings.inline_file_type_desc')}</CardBody>
+      </Card>
+      <InlineFileTypeSelector />
     </div>
   );
 });

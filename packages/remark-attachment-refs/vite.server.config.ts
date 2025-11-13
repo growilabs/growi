@@ -21,9 +21,7 @@ export default defineConfig({
     outDir: 'dist/server',
     sourcemap: true,
     lib: {
-      entry: [
-        'src/server/index.ts',
-      ],
+      entry: ['src/server/index.ts'],
       name: 'remark-attachment-refs-libs',
       formats: ['cjs'],
     },

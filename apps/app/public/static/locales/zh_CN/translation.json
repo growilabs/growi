@@ -123,8 +123,8 @@
   "V5 Page Migration": "转换为V5的兼容性",
   "GROWI.5.0_new_schema": "GROWI.5.0 new schema",
   "See_more_detail_on_new_schema": "更多详情请见<a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html#about-the-new-v5-compatible-format' target='_blank'> {{title}}</a> <span class='growi-custom-icons'>external_link</span> ",
-	"Markdown Settings": "Markdown设置",
-	"external_account_management": "外部账户管理",
+  "Markdown Settings": "Markdown设置",
+  "external_account_management": "外部账户管理",
   "UserGroup": "用户组",
   "ChildUserGroup": "儿童用户组",
   "Basic Settings": "基础设置",
@@ -192,12 +192,12 @@
   "custom_navigation": {
     "no_pages_under_this_page": "There are no pages under this page."
   },
-"author_info": {
-  "created_at": "创建日期",
-  "created_by": "创建者:",
-  "last_revision_posted_at": "最后更新日期",
-  "updated_by": "更新者:"
-},
+  "author_info": {
+    "created_at": "创建日期",
+    "created_by": "创建者:",
+    "last_revision_posted_at": "最后更新日期",
+    "updated_by": "更新者:"
+  },
   "installer": {
     "tab": "创建账户",
     "title": "安装",
@@ -230,13 +230,46 @@
       "profile_image2": "设置AWS或启用本地上传。"
     }
   },
+  "API Token Settings": "API token 设置",
+  "Current API Token": "当前 API token",
+  "Update API Token": "更新 API token",
   "page_me_apitoken": {
     "api_token": "API Token",
     "notice": {
       "apitoken_issued": "API token 未发布。",
       "update_token1": "您可以更新以生成新的API令牌。",
       "update_token2": "您需要更新任何现有进程中的API令牌。"
-    }
+    },
+    "form_help": {}
+  },
+  "Access Token Settings": "Access token 设置",
+  "page_me_access_token": {
+    "access_token": "访问令牌",
+    "expiredAt": "过期日期",
+    "description": "描述",
+    "scope": "范围",
+    "scope_read": "读取",
+    "action": "操作",
+    "create_token": "创建令牌",
+    "no_tokens_found": "未找到访问令牌",
+    "new_token": {
+      "title": "新访问令牌",
+      "copy_to_clipboard": "复制到剪贴板",
+      "message": "此令牌仅显示一次。请安全保存。"
+    },
+    "modal": {
+      "message": "确定要删除此访问令牌吗？",
+      "alert": "此操作无法撤消。",
+      "delete_token": "删除令牌"
+    },
+    "form": {
+      "title": "创建新访问令牌",
+      "expiredAt_desc": "选择此访问令牌的过期时间。",
+      "description_desc": "提供描述以帮助您稍后识别此令牌。",
+      "description_max_length": "请输入最多 {{length}} 个字符",
+      "scope_desc": "选择访问令牌的范围。"
+    },
+    "copy_to_clipboard": "复制到剪贴板"
   },
   "Password": "密码",
   "Password Settings": "密码设置",
@@ -252,9 +285,6 @@
   },
   "API Settings": "API设置",
   "Other Settings": "其他设置",
-  "API Token Settings": "API token 设置",
-  "Current API Token": "当前 API token",
-  "Update API Token": "更新 API token",
   "in_app_notification_settings": {
     "in_app_notification_settings": "在应用程序通知设置",
     "subscribe_settings": "自动订阅（接收通知）页面的设置",
@@ -321,9 +351,9 @@
       "no_deadline": "此页面没有到期日期",
       "not_indexed1": "此页面可能不会被全文搜索引擎索引。",
       "not_indexed2": "页面正文超过了{{threshold}}指定的阈值。"
-		}
-	},
-	"page_edit": {
+    }
+  },
+  "page_edit": {
     "input_channels": "频道名",
     "theme": "主题",
     "keymap": "键表",
@@ -336,12 +366,12 @@
     },
     "editor_config": "编辑器配置",
     "editor_assistant": "编辑助手",
-		"Show active line": "显示活动行",
-		"auto_format_table": "自动格式化表格",
-		"overwrite_scopes": "{{operation}和覆盖所有子体的作用域",
-		"notice": {
-			"conflict": "无法保存您所做的更改，因为其他人正在编辑此页。请在重新加载页面后重新编辑受影响的部分。"
-		},
+    "Show active line": "显示活动行",
+    "auto_format_table": "自动格式化表格",
+    "overwrite_scopes": "{{operation}和覆盖所有子体的作用域",
+    "notice": {
+      "conflict": "无法保存您所做的更改，因为其他人正在编辑此页。请在重新加载页面后重新编辑受影响的部分。"
+    },
     "changes_not_saved": "您所做的更改可能不会保存。你真的想继续前进吗？"
   },
   "page_comment": {
@@ -469,9 +499,27 @@
       "Search in Editor": "编辑器内搜索",
       "Move Line": "移动行",
       "Copy Line": "复制行",
-      "Toggle Line": "注释/取消注释行",
       "Insert Line": "插入行",
-      "Post Comment": "(发表评论)"
+      "Post Comment": "(发表评论)",
+      "Multiple Cursors": "多光标",
+      "Or Alt Click": "或 Alt + 点击"
+    },
+    "format": {
+      "title": "格式设置（编辑器）",
+      "Bold": "粗体",
+      "Italic": "斜体",
+      "Strikethrough": "删除线",
+      "Code Text": "代码文本",
+      "Hyperlink": "超链接"
+    },
+    "line_settings": {
+      "title": "行设置（编辑器）",
+      "Bullet List": "项目符号列表",
+      "Numbered List": "编号列表",
+      "Quote": "引用",
+      "Code Block": "代码块",
+      "Comment Out": "隐藏",
+      "Comment Out Desc": "（注释）"
     }
   },
   "modal_resolve_conflict": {
@@ -487,6 +535,8 @@
   },
   "sidebar_ai_assistant": {
     "reference_pages_label": "参考页面",
+    "recent_chat": "最近聊天",
+    "no_recent_chat": "最近没有聊天",
     "knowledge_assistant_placeholder": "问我任何问题。",
     "editor_assistant_placeholder": "有什么需要帮忙的吗？",
     "summary_mode_label": "摘要模式",
@@ -500,6 +550,8 @@
     "budget_exceeded_for_growi_cloud": "您已达到 OpenAI API 使用上限。如需再次使用知识助手，请从GROWI.cloud管理页面为托管用户添加点数，或从OpenAI计费页面为自有用户添加点数。",
     "error_message": "错误",
     "show_error_detail": "显示详情",
+    "editor_assistant_long_context_warn_with_unit_line": "文本过长，编辑助理将参考大约第 {{startPosition}} 行到第 {{endPosition}} 行来响应",
+    "editor_assistant_long_context_warn_with_unit_char": "文本过长，编辑助理将参考第 {{startPosition}} 个字符到第 {{endPosition}} 个字符来响应",
     "discard": "丢弃",
     "accept": "接受",
     "use_assistant": "使用助手",
@@ -539,6 +591,17 @@
       "create_failed": "创建助手失败",
       "update_failed": "更新助手失败"
     },
+    "select_source_pages": "选择助手要参考的页面",
+    "search_reference_pages_by_keyword": "按关键词搜索助手参考的页面",
+    "search_by_keyword": "按关键词搜索",
+    "max_items_space_separated_hint": "请输入最多5个项目，用空格分隔",
+    "select_assistant_reference_pages": "请选择助手参考的页面",
+    "enter_keywords": "输入关键词",
+    "reference_pages": "参考页面",
+    "no_pages_selected": "未选择任何页面",
+    "can_add_later": "稍后也可以添加",
+    "next": "下一步",
+    "select_from_page_tree": "从页面树选择",
     "edit_page_description": "编辑助手可以参考的页面。<br> 助手可以参考最多 {{limitLearnablePageCountPerAssistant}} 个页面，包括子页面。",
     "default_instruction": "您是这个Wiki的知识助手。\n\n## 多语言支持：\n请使用用户输入中使用的相同语言进行回复。\n",
     "add_page_button": "添加页面",
@@ -590,11 +653,12 @@
   "default_ai_assistant": {
     "not_set": "未设置默认助手"
   },
-  "ai_assistant_tree": {
+  "ai_assistant_substance": {
     "add_assistant": "添加助手",
     "my_assistants": "我的助手",
     "team_assistants": "团队助手",
     "thread_does_not_exist": "暂无会话",
+    "recent_threads": "最近的项目",
     "toaster": {
       "ai_assistant_deleted_success": "已删除助手",
       "ai_assistant_deleted_failed": "删除助手失败",
@@ -602,6 +666,10 @@
       "thread_deleted_failed": "删除会话失败",
       "ai_assistant_set_default_success": "已成功设置默认助手",
       "ai_assistant_set_default_failed": "设置默认助手失败"
+    },
+    "delete_modal": {
+      "title": "删除助手",
+      "confirm_message": "确定要删除此助手吗？"
     }
   },
   "link_edit": {
@@ -954,23 +1022,6 @@
     "cancel_bookmark": "取消收藏此页面",
     "move_to_root": "移动到根部",
     "root": "root (default)"
-  },
-  "questionnaire": {
-    "give_us_feedback": "向我们提供反馈以进行改进",
-    "thank_you_for_answering": "谢谢你的回答",
-    "additional_feedback": "从用户图标下拉菜单向我们发送更多反馈。",
-    "dont_show_again": "不再显示",
-    "deny": "不要回答",
-    "agree": "同意",
-    "disagree": "不同意",
-    "answer": "答案是",
-    "no_answer": "没有答案",
-    "settings": "问卷设置",
-    "failed_to_send": "无法发送反馈",
-    "denied": "问卷不会再显示",
-    "personal_settings_explanation": "将展示改进 GROWI 的问卷。 如果您有其他反馈，可以从用户图标下拉菜单中发送。",
-    "enable_questionnaire": "启用问卷",
-    "disabled_by_admin": "问卷已被管理员禁用"
   },
   "v5_page_migration": {
     "page_tree_not_avaliable": "Page Tree 功能不可用",

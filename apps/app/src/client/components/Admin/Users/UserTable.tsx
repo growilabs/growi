@@ -168,7 +168,7 @@ const UserTable = (props: UserTableProps) => {
                 </td>
                 <td>{user.name}</td>
                 <td>{user.email}</td>
-                <td>{dateFnsFormat(new Date(user.createdAt), 'yyyy-MM-dd')}</td>
+                <td>{dateFnsFormat(user.createdAt, 'yyyy-MM-dd')}</td>
                 <td>
                   {user.lastLoginAt && <span>{dateFnsFormat(new Date(user.lastLoginAt), 'yyyy-MM-dd HH:mm')}</span>}
                 </td>

@@ -13,26 +13,33 @@ const GRID_AVAILABLE_OPTIONS_LIST = [
   'col-6',
 ];
 
-type tags = 'ref' | 'refs' | 'refimg' | 'refsimg'
+type tags = 'ref' | 'refs' | 'refimg' | 'refsimg';
 
 /**
  * Context Object class for $ref() and $refimg()
  */
 export class RefsContext {
-
   tag: tags;
 
   pagePath: string;
 
-  options?: Record<string, string|undefined>;
+  options?: Record<string, string | undefined>;
 
-  constructor(tag: tags, pagePath: string, options: Record<string, string|undefined>) {
+  constructor(
+    tag: tags,
+    pagePath: string,
+    options: Record<string, string | undefined>,
+  ) {
     this.tag = tag;
 
     this.pagePath = pagePath;
 
     // remove undefined keys
-    Object.keys(options).forEach(key => options[key] === undefined && delete options[key]);
+    for (const key of Object.keys(options)) {
+      if (options[key] === undefined) {
+        delete options[key];
+      }
+    }
 
     this.options = options;
   }
@@ -66,12 +73,14 @@ export class RefsContext {
   }
 
   getOptGrid(): string | undefined {
-    return GRID_AVAILABLE_OPTIONS_LIST.find(item => item === this.options?.grid);
+    return GRID_AVAILABLE_OPTIONS_LIST.find(
+      (item) => item === this.options?.grid,
+    );
   }
 
   isOptGridColumnEnabled(): boolean {
     const optGrid = this.getOptGrid();
-    return (optGrid != null) && optGrid.startsWith('col-');
+    return optGrid?.startsWith('col-') ?? false;
   }
 
   /**
@@ -162,5 +171,4 @@ export class RefsContext {
 
     return columnsNum;
   }
-
 }

@@ -1,4 +1,4 @@
-import { IPage } from '..';
+import type { IPage } from '..';
 
 import { isTopPage } from './page-path-utils/is-top-page';
 

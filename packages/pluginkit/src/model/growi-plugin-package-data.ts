@@ -1,12 +1,14 @@
 import type { GrowiPluginType } from '@growi/core';
 
 export type GrowiPluginDirective = {
-  [key: string]: any,
-  schemaVersion: number,
-  types: GrowiPluginType[],
-}
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
+  [key: string]: any;
+  schemaVersion: number;
+  types: GrowiPluginType[];
+};
 
 export type GrowiPluginPackageData = {
-  [key: string]: any,
-  growiPlugin: GrowiPluginDirective,
-}
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
+  [key: string]: any;
+  growiPlugin: GrowiPluginDirective;
+};

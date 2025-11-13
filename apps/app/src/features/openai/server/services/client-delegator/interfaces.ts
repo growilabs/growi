@@ -1,4 +1,5 @@
 import type OpenAI from 'openai';
+import { type Stream } from 'openai/streaming';
 import type { Uploadable } from 'openai/uploads';
 
 import type { MessageListParams } from '../../../interfaces/message';
@@ -16,5 +17,7 @@ export interface IOpenaiClientDelegator {
   createVectorStoreFile(vectorStoreId: string, fileId: string): Promise<OpenAI.VectorStores.Files.VectorStoreFile>
   createVectorStoreFileBatch(vectorStoreId: string, fileIds: string[]): Promise<OpenAI.VectorStores.FileBatches.VectorStoreFileBatch>
   deleteFile(fileId: string): Promise<OpenAI.Files.FileDeleted>;
-  chatCompletion(body: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming): Promise<OpenAI.Chat.Completions.ChatCompletion>
+  chatCompletion(
+    body: OpenAI.Chat.Completions.ChatCompletionCreateParams
+  ): Promise<OpenAI.Chat.Completions.ChatCompletion | Stream<OpenAI.Chat.Completions.ChatCompletionChunk>>
 }

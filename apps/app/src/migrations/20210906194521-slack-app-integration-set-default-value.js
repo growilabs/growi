@@ -4,8 +4,9 @@ import slackAppIntegrationFactory from '~/server/models/slack-app-integration';
 import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
-
-const logger = loggerFactory('growi:migrate:slack-app-integration-set-default-value');
+const logger = loggerFactory(
+  'growi:migrate:slack-app-integration-set-default-value',
+);
 
 module.exports = {
   async up(db) {
@@ -16,8 +17,11 @@ module.exports = {
 
     // Add togetter command if supportedCommandsForBroadcastUse already exists
     const slackAppIntegrations = await SlackAppIntegration.find();
-    slackAppIntegrations.forEach(async(doc) => {
-      if (doc.supportedCommandsForSingleUse != null && !doc.supportedCommandsForSingleUse.includes('togetter')) {
+    slackAppIntegrations.forEach(async (doc) => {
+      if (
+        doc.supportedCommandsForSingleUse != null &&
+        !doc.supportedCommandsForSingleUse.includes('togetter')
+      ) {
         doc.supportedCommandsForSingleUse.push('togetter');
       }
       await doc.save();

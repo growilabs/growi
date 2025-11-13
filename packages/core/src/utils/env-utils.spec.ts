@@ -1,9 +1,7 @@
 import { toBoolean } from './env-utils';
 
-
 describe('env-utils', () => {
   describe('.toBoolean', () => {
-
     it('should convert to true', () => {
       expect(toBoolean('true')).toBe(true);
       expect(toBoolean('True')).toBe(true);
@@ -16,6 +14,5 @@ describe('env-utils', () => {
       expect(toBoolean('false')).toBe(false);
       expect(toBoolean('0')).toBe(false);
     });
-
   });
 });

@@ -1,6 +1,6 @@
 import type { IPageHasId, IUser } from '@growi/core';
-import { model } from 'mongoose';
 import type { Document, Query } from 'mongoose';
+import { model } from 'mongoose';
 
 export type PageQuery = Query<IPageHasId[], Document>;
 

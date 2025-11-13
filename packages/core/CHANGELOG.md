@@ -1,5 +1,13 @@
 # @growi/core
 
+## 1.6.0
+
+### Minor Changes
+
+- [#10189](https://github.com/weseek/growi/pull/10189) [`e6bd8c8`](https://github.com/weseek/growi/commit/e6bd8c8ca0b50be85e27ca0ca5f40ad0400fc5ea) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Update IGrowiInfo type
+
+- [#10185](https://github.com/weseek/growi/pull/10185) [`8d28e19`](https://github.com/weseek/growi/commit/8d28e1990cf90a8957594a27b400af86728fb69a) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Updated the interface to accommodate the removal of the questionnaire feature.
+
 ## 1.5.0
 
 ### Minor Changes

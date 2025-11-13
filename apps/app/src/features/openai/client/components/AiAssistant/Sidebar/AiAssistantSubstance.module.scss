@@ -1,5 +1,39 @@
+// == Colors
+.grw-ai-assistant-substance :global {
+  .grw-btn-actions {
+    .btn-link {
+      &:hover {
+        color: var(--bs-gray-800) !important;
+      }
+    }
+  }
+}
+
 .grw-ai-assistant-substance :global {
   .grw-ai-assistant-substance-header {
     font-size: 14px;
+  }
+}
+
+.grw-ai-assistant-substance :global {
+  .list-group-item {
+    height: 40px;
+    padding-left: 4px;
+
+    .grw-item-title {
+      width: 100%;
+      overflow: hidden;
+      font-size: 14px;
+    }
+
+    .grw-btn-actions {
+      transition: opacity 0.2s ease-out;
+    }
+
+    &:hover {
+      .grw-btn-actions {
+        opacity: 1 !important;
+      }
+    }
   }
 }

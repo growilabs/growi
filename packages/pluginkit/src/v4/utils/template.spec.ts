@@ -1,6 +1,6 @@
 import type { TemplateSummary } from '../interfaces';
 
-import { getLocalizedTemplate, extractSupportedLocales } from './template';
+import { extractSupportedLocales, getLocalizedTemplate } from './template';
 
 describe('getLocalizedTemplate', () => {
   it('should return undefined if templateSummary is undefined', () => {
@@ -17,7 +17,9 @@ describe('getLocalizedTemplate', () => {
         title: 'Default Title',
       },
     };
-    expect(getLocalizedTemplate(templateSummary)).toEqual(templateSummary.default);
+    expect(getLocalizedTemplate(templateSummary)).toEqual(
+      templateSummary.default,
+    );
   });
 
   it('should return the localized template if locale is provided and exists in templateSummary', () => {
@@ -37,7 +39,9 @@ describe('getLocalizedTemplate', () => {
         title: 'Japanese Title',
       },
     };
-    expect(getLocalizedTemplate(templateSummary, 'ja_JP')).toEqual(templateSummary.ja_JP);
+    expect(getLocalizedTemplate(templateSummary, 'ja_JP')).toEqual(
+      templateSummary.ja_JP,
+    );
   });
 
   it('should return the default template if locale is provided but does not exist in templateSummary', () => {
@@ -50,7 +54,9 @@ describe('getLocalizedTemplate', () => {
         title: 'Default Title',
       },
     };
-    expect(getLocalizedTemplate(templateSummary, 'fr')).toEqual(templateSummary.default);
+    expect(getLocalizedTemplate(templateSummary, 'fr')).toEqual(
+      templateSummary.default,
+    );
   });
 });
 
@@ -76,6 +82,8 @@ describe('extractSupportedLocales', () => {
         title: 'Japanese Title',
       },
     };
-    expect(extractSupportedLocales(templateSummary)).toEqual(new Set(['en_US', 'ja_JP']));
+    expect(extractSupportedLocales(templateSummary)).toEqual(
+      new Set(['en_US', 'ja_JP']),
+    );
   });
 });

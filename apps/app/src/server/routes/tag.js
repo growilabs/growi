@@ -37,15 +37,17 @@ module.exports = function(crowi, app) {
    *            content:
    *              application/json:
    *                schema:
-   *                  properties:
-   *                    ok:
-   *                      $ref: '#/components/schemas/V1ResponseOK'
-   *                    tags:
-   *                      $ref: '#/components/schemas/Tags'
+   *                  allOf:
+   *                    - $ref: '#/components/schemas/ApiResponseSuccess'
+   *                    - type: object
+   *                      properties:
+   *                        tags:
+   *                          $ref: '#/components/schemas/Tags'
+   *                          description: List of matching tags
    *          403:
-   *            $ref: '#/components/responses/403'
+   *            $ref: '#/components/responses/Forbidden'
    *          500:
-   *            $ref: '#/components/responses/500'
+   *            $ref: '#/components/responses/InternalServerError'
    */
   /**
    * @api {get} /tags.search search tags
@@ -91,15 +93,17 @@ module.exports = function(crowi, app) {
    *            content:
    *              application/json:
    *                schema:
-   *                  properties:
-   *                    ok:
-   *                      $ref: '#/components/schemas/V1ResponseOK'
-   *                    tags:
-   *                      $ref: '#/components/schemas/Tags'
+   *                  allOf:
+   *                    - $ref: '#/components/schemas/ApiResponseSuccess'
+   *                    - type: object
+   *                      properties:
+   *                        tags:
+   *                          $ref: '#/components/schemas/Tags'
+   *                          description: Updated tags for the page
    *          403:
-   *            $ref: '#/components/responses/403'
+   *            $ref: '#/components/responses/Forbidden'
    *          500:
-   *            $ref: '#/components/responses/500'
+   *            $ref: '#/components/responses/InternalServerError'
    */
   /**
    * @api {post} /tags.update update tags on view-mode (not edit-mode)
@@ -168,17 +172,19 @@ module.exports = function(crowi, app) {
    *            content:
    *              application/json:
    *                schema:
-   *                  properties:
-   *                    ok:
-   *                      $ref: '#/components/schemas/V1ResponseOK'
-   *                    data:
-   *                      type: array
-   *                      items:
-   *                        $ref: '#/components/schemas/Tag'
+   *                  allOf:
+   *                    - $ref: '#/components/schemas/ApiResponseSuccess'
+   *                    - type: object
+   *                      properties:
+   *                        data:
+   *                          type: array
+   *                          items:
+   *                            $ref: '#/components/schemas/Tag'
+   *                          description: List of tags with count information
    *          403:
-   *            $ref: '#/components/responses/403'
+   *            $ref: '#/components/responses/Forbidden'
    *          500:
-   *            $ref: '#/components/responses/500'
+   *            $ref: '#/components/responses/InternalServerError'
    */
   /**
    * @api {get} /tags.list get tagnames and count pages relate each tag

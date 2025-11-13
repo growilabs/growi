@@ -4,4 +4,5 @@ export const RegistrationMode = {
   CLOSED: 'Closed',
 } as const;
 
-export type RegistrationMode = typeof RegistrationMode[keyof typeof RegistrationMode];
+export type RegistrationMode =
+  (typeof RegistrationMode)[keyof typeof RegistrationMode];

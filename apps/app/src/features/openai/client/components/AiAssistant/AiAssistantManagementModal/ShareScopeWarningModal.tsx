@@ -5,11 +5,11 @@ import {
   Modal, ModalHeader, ModalBody, ModalFooter,
 } from 'reactstrap';
 
-import type { SelectedPage } from '../../../../interfaces/selected-page';
+import type { SelectablePage } from '../../../../interfaces/selectable-page';
 
 type Props = {
   isOpen: boolean,
-  selectedPages: SelectedPage[],
+  selectedPages: SelectablePage[],
   closeModal: () => void,
   onSubmit: () => Promise<void>,
 }
@@ -48,8 +48,8 @@ export const ShareScopeWarningModal = (props: Props): JSX.Element => {
         <div className="mb-4">
           <p className="mb-2 text-secondary">{t('share_scope_warning_modal.selected_pages_label')}</p>
           {selectedPages.map(selectedPage => (
-            <code key={selectedPage.page.path}>
-              {selectedPage.page.path}
+            <code key={selectedPage.path}>
+              {selectedPage.path}
             </code>
           ))}
         </div>

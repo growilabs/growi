@@ -44,7 +44,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [22.x]
 
     steps:
       - uses: actions/checkout@v4
@@ -93,10 +93,11 @@ jobs:
     strategy:
       matrix:
         node-version: [20.x]
+        mongodb-version: ['6.0', '8.0']
 
     services:
       mongodb:
-        image: mongo:6.0
+        image: mongo:${{ matrix.mongodb-version }}
         ports:
           - 27017/tcp
 
@@ -135,7 +136,7 @@ jobs:
       - name: Upload coverage report as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Coverage Report
+          name: coverage-mongo${{ matrix.mongodb-version }}
           path: |
             apps/app/coverage
             packages/remark-growi-directive/coverage
@@ -157,10 +158,11 @@ jobs:
     strategy:
       matrix:
         node-version: [20.x]
+        mongodb-version: ['6.0', '8.0']
 
     services:
       mongodb:
-        image: mongo:6.0
+        image: mongo:${{ matrix.mongodb-version }}
         ports:
           - 27017/tcp
 

@@ -8,6 +8,7 @@ import { generatePageNodeTree } from './page-node';
 
 function omitPageData(pageNode: PageNode): Omit<PageNode, 'page'> {
   // Destructure to omit 'page', and recursively process children
+  // biome-ignore lint/correctness/noUnusedVariables: ignore
   const { page, children, ...rest } = pageNode;
   return {
     ...rest,

@@ -152,7 +152,7 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
   }, [onCanceled, initializeEditor]);
 
   const postCommentHandler = useCallback(async() => {
-    const commentBodyToPost = codeMirrorEditor?.getDoc() ?? '';
+    const commentBodyToPost = codeMirrorEditor?.getDocString() ?? '';
 
     try {
       if (currentCommentId != null) {
@@ -276,7 +276,7 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
           </TabPane>
           <TabPane tabId="comment_preview">
             <div className="comment-preview-container">
-              <CommentPreview markdown={codeMirrorEditor?.getDoc() ?? ''} />
+              <CommentPreview markdown={codeMirrorEditor?.getDocString() ?? ''} />
             </div>
           </TabPane>
         </TabContent>

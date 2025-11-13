@@ -1,6 +1,7 @@
 import { DefaultAzureCredential, getBearerTokenProvider } from '@azure/identity';
 import type OpenAI from 'openai';
 import { AzureOpenAI } from 'openai';
+import { type Stream } from 'openai/streaming';
 import { type Uploadable } from 'openai/uploads';
 
 import type { MessageListParams } from '../../../interfaces/message';
@@ -94,7 +95,9 @@ export class AzureOpenaiClientDelegator implements IOpenaiClientDelegator {
     return this.client.vectorStores.fileBatches.uploadAndPoll(vectorStoreId, { files });
   }
 
-  async chatCompletion(body: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+  async chatCompletion(
+      body: OpenAI.Chat.Completions.ChatCompletionCreateParams,
+  ): Promise<OpenAI.Chat.Completions.ChatCompletion | Stream<OpenAI.Chat.Completions.ChatCompletionChunk>> {
     return this.client.chat.completions.create(body);
   }
 

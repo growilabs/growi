@@ -77,9 +77,9 @@ export const useSWRxLsx = (
         return res.data;
       } catch (err) {
         if (axios.isAxiosError(err)) {
-          throw new Error(err.response?.data.message);
+          throw new Error(err.response?.data);
         }
-        throw err;
+        throw new Error(err);
       }
     },
 

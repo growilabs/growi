@@ -15,7 +15,5 @@
     "noImplicitAny": false,
     "noImplicitOverride": true
   },
-  "include": [
-    "src"
-  ]
+  "include": ["src"]
 }

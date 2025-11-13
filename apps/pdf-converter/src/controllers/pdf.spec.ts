@@ -1,15 +1,13 @@
 import { PlatformTest } from '@tsed/platform-http/testing';
-import SuperTest from 'supertest';
-
-import Server from '../server';
-
 import { JobStatus, JobStatusSharedWithGrowi } from 'src/service/pdf-convert';
+import SuperTest from 'supertest';
+import Server from '../server';
 
 describe('PdfCtrl', () => {
   beforeAll(PlatformTest.bootstrap(Server));
   afterAll(PlatformTest.reset);
 
-  it('should return 500 for invalid appId', async() => {
+  it('should return 500 for invalid appId', async () => {
     const request = SuperTest(PlatformTest.callback());
     await request
       .post('/pdf/sync-job')
@@ -22,7 +20,7 @@ describe('PdfCtrl', () => {
       .expect(500);
   });
 
-  it('should return 400 for invalid jobId', async() => {
+  it('should return 400 for invalid jobId', async () => {
     const request = SuperTest(PlatformTest.callback());
     const res = await request
       .post('/pdf/sync-job')
@@ -34,10 +32,12 @@ describe('PdfCtrl', () => {
       })
       .expect(400);
 
-    expect(res.body.message).toContain('jobId must be a valid MongoDB ObjectId');
+    expect(res.body.message).toContain(
+      'jobId must be a valid MongoDB ObjectId',
+    );
   });
 
-  it('should return 202 and status for valid request', async() => {
+  it('should return 202 and status for valid request', async () => {
     const request = SuperTest(PlatformTest.callback());
     const res = await request
       .post('/pdf/sync-job')

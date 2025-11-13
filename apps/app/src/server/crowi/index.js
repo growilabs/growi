@@ -17,8 +17,7 @@ import instanciatePageBulkExportJobCleanUpCronService, {
   pageBulkExportJobCleanUpCronService,
 } from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
-import QuestionnaireService from '~/features/questionnaire/server/service/questionnaire';
-import questionnaireCronService from '~/features/questionnaire/server/service/questionnaire-cron';
+import { startCron as startAccessTokenCron } from '~/server/service/access-token';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
 import { projectRoot } from '~/utils/project-dir-utils';
@@ -61,7 +60,7 @@ class Crowi {
 
   /**
    * For retrieving other packages
-   * @type {(req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => Promise<void>}
+   * @type {import('~/server/middlewares/access-token-parser').AccessTokenParser}
    */
   accessTokenParser;
 
@@ -94,9 +93,6 @@ class Crowi {
 
   /** @type {PassportService} */
   passportService;
-
-  /** @type {QuestionnaireService} */
-  questionnaireService;
 
   /** @type {import('../service/rest-qiita-API')} */
   restQiitaAPIService;
@@ -147,7 +143,6 @@ class Crowi {
     this.inAppNotificationService = null;
     this.activityService = null;
     this.commentService = null;
-    this.questionnaireService = null;
     this.openaiThreadDeletionCronService = null;
     this.openaiVectorStoreFileDeletionCronService = null;
 
@@ -212,7 +207,6 @@ Crowi.prototype.init = async function() {
     this.setupActivityService(),
     this.setupCommentService(),
     this.setupSyncPageStatusService(),
-    this.setupQuestionnaireService(),
     this.setUpCustomize(), // depends on pluginService
   ]);
 
@@ -362,8 +356,6 @@ Crowi.prototype.setupSocketIoService = async function() {
 };
 
 Crowi.prototype.setupCron = function() {
-  questionnaireCronService.startCron();
-
   instanciatePageBulkExportJobCronService(this);
   checkPageBulkExportJobInProgressCronService.startCron();
 
@@ -371,10 +363,7 @@ Crowi.prototype.setupCron = function() {
   pageBulkExportJobCleanUpCronService.startCron();
 
   startOpenaiCronIfEnabled();
-};
-
-Crowi.prototype.setupQuestionnaireService = function() {
-  this.questionnaireService = new QuestionnaireService(this);
+  startAccessTokenCron();
 };
 
 Crowi.prototype.getSlack = function() {

@@ -9,6 +9,7 @@ const ACCEPT_LANG_MAP = {
   ja: Lang.ja_JP,
   zh: Lang.zh_CN,
   fr: Lang.fr_FR,
+  ko: Lang.ko_KR,
 };
 
 /**

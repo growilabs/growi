@@ -79,24 +79,26 @@ module.exports = function(crowi: Crowi, app) {
    *           content:
    *             application/json:
    *               schema:
-   *                 properties:
-   *                   ok:
-   *                     $ref: '#/components/schemas/V1ResponseOK'
-   *                   meta:
-   *                     $ref: '#/components/schemas/ElasticsearchResultMeta'
-   *                   totalCount:
-   *                     type: integer
-   *                     description: total count of pages
-   *                     example: 35
-   *                   data:
-   *                     type: array
-   *                     items:
-   *                       $ref: '#/components/schemas/Page'
-   *                     description: page list
+   *                 allOf:
+   *                   - $ref: '#/components/schemas/ApiResponseSuccess'
+   *                   - type: object
+   *                     properties:
+   *                       meta:
+   *                         $ref: '#/components/schemas/ElasticsearchResultMeta'
+   *                         description: Elasticsearch metadata
+   *                       totalCount:
+   *                         type: integer
+   *                         description: total count of pages
+   *                         example: 35
+   *                       data:
+   *                         type: array
+   *                         items:
+   *                           $ref: '#/components/schemas/Page'
+   *                         description: page list
    *         403:
-   *           $ref: '#/components/responses/403'
+   *           $ref: '#/components/responses/Forbidden'
    *         500:
-   *           $ref: '#/components/responses/500'
+   *           $ref: '#/components/responses/InternalServerError'
    */
   /**
    * @api {get} /search search page

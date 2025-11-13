@@ -1,67 +1,66 @@
 export type IResAppSettings = {
-  title: string,
-  confidential: string,
-  globalLang: string,
-  isEmailPublishedForNewUser: boolean,
-  fileUpload: string,
-  isV5Compatible: boolean,
-  siteUrl: string,
-  envSiteUrl: string,
-  isMailerSetup: boolean,
-  fromAddress: string,
+  title: string;
+  confidential: string;
+  globalLang: string;
+  isEmailPublishedForNewUser: boolean;
+  fileUpload: string;
+  isV5Compatible: boolean;
+  siteUrl: string;
+  envSiteUrl: string;
+  isMailerSetup: boolean;
+  fromAddress: string;
 
-  transmissionMethod: string,
-  smtpHost: string,
-  smtpPort: string | number, // TODO: check
-  smtpUser: string,
-  smtpPassword: string,
-  sesAccessKeyId: string,
-  sesSecretAccessKey: string,
+  transmissionMethod: string;
+  smtpHost: string;
+  smtpPort: string | number; // TODO: check
+  smtpUser: string;
+  smtpPassword: string;
+  sesAccessKeyId: string;
+  sesSecretAccessKey: string;
 
-  fileUploadType: string,
-  envFileUploadType: string,
-  useOnlyEnvVarForFileUploadType: boolean,
+  fileUploadType: string;
+  envFileUploadType: string;
+  useOnlyEnvVarForFileUploadType: boolean;
 
-  s3Region: string,
-  s3CustomEndpoint: string,
-  s3Bucket:string,
-  s3AccessKeyId: string,
-  s3SecretAccessKey: string,
-  s3ReferenceFileWithRelayMode: string,
+  s3Region: string;
+  s3CustomEndpoint: string;
+  s3Bucket: string;
+  s3AccessKeyId: string;
+  s3SecretAccessKey: string;
+  s3ReferenceFileWithRelayMode: string;
 
-  gcsUseOnlyEnvVars: boolean,
-  gcsApiKeyJsonPath: string,
-  gcsBucket: string,
-  gcsUploadNamespace: string,
-  gcsReferenceFileWithRelayMode: string,
+  gcsUseOnlyEnvVars: boolean;
+  gcsApiKeyJsonPath: string;
+  gcsBucket: string;
+  gcsUploadNamespace: string;
+  gcsReferenceFileWithRelayMode: string;
 
-  envGcsApiKeyJsonPath: string,
-  envGcsBucket: string,
-  envGcsUploadNamespace: string,
+  envGcsApiKeyJsonPath: string;
+  envGcsBucket: string;
+  envGcsUploadNamespace: string;
 
-  azureUseOnlyEnvVars: boolean,
-  azureTenantId: string,
-  azureClientId: string,
-  azureClientSecret: string,
-  azureStorageAccountName: string,
-  azureStorageContainerName: string,
-  azureReferenceFileWithRelayMode: string,
+  azureUseOnlyEnvVars: boolean;
+  azureTenantId: string;
+  azureClientId: string;
+  azureClientSecret: string;
+  azureStorageAccountName: string;
+  azureStorageContainerName: string;
+  azureReferenceFileWithRelayMode: string;
 
-  envAzureTenantId: string,
-  envAzureClientId: string,
-  envAzureClientSecret: string,
-  envAzureStorageAccountName: string,
-  envAzureStorageContainerName: string,
+  envAzureTenantId: string;
+  envAzureClientId: string;
+  envAzureClientSecret: string;
+  envAzureStorageAccountName: string;
+  envAzureStorageContainerName: string;
 
-  isEnabledPlugins: boolean,
+  isEnabledPlugins: boolean;
 
-  isQuestionnaireEnabled: boolean,
-  isAppSiteUrlHashed: boolean,
+  isAppSiteUrlHashed: boolean;
 
-  isMaintenanceMode: boolean,
+  isMaintenanceMode: boolean;
 
-  isBulkExportPagesEnabled: boolean,
-  envIsBulkExportPagesEnabled: boolean,
-  bulkExportDownloadExpirationSeconds: number,
-  useOnlyEnvVarsForIsBulkExportPagesEnabled: boolean,
-}
+  isBulkExportPagesEnabled: boolean;
+  envIsBulkExportPagesEnabled: boolean;
+  bulkExportDownloadExpirationSeconds: number;
+  useOnlyEnvVarsForIsBulkExportPagesEnabled: boolean;
+};

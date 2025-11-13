@@ -113,5 +113,100 @@ describe('GrowiInfoService', () => {
       });
     });
 
+    test('Should get correct GROWI info with specific options - attachment only', async() => {
+      // act
+      const growiInfo = await growiInfoService.getGrowiInfo({ includeAttachmentInfo: true });
+
+      // assert
+      assert(growiInfo != null);
+      expect(growiInfo.additionalInfo).toEqual({
+        attachmentType: 'aws',
+        activeExternalAccountTypes: ['saml', 'github'],
+      });
+    });
+
+    test('Should get correct GROWI info with specific options - user count only', async() => {
+      // act
+      const growiInfo = await growiInfoService.getGrowiInfo({ includeUserCountInfo: true });
+
+      // assert
+      assert(growiInfo != null);
+      expect(growiInfo.additionalInfo).toEqual({
+        attachmentType: 'aws',
+        activeExternalAccountTypes: ['saml', 'github'],
+        currentUsersCount: 1, // Only one user from the legacy test
+        currentActiveUsersCount: 1,
+      });
+    });
+
+    test('Should get correct GROWI info with specific options - installed info only', async() => {
+      // act
+      const growiInfo = await growiInfoService.getGrowiInfo({ includeInstalledInfo: true });
+
+      // assert
+      assert(growiInfo != null);
+      expect(growiInfo.additionalInfo).toEqual({
+        attachmentType: 'aws',
+        activeExternalAccountTypes: ['saml', 'github'],
+        installedAt: new Date('2000-01-01'),
+        installedAtByOldestUser: new Date('2000-01-01'),
+      });
+    });
+
+    test('Should get correct GROWI info with combined options', async() => {
+      // act
+      const growiInfo = await growiInfoService.getGrowiInfo({
+        includeAttachmentInfo: true,
+        includeUserCountInfo: true,
+      });
+
+      // assert
+      assert(growiInfo != null);
+      expect(growiInfo.additionalInfo).toEqual({
+        attachmentType: 'aws',
+        activeExternalAccountTypes: ['saml', 'github'],
+        currentUsersCount: 1,
+        currentActiveUsersCount: 1,
+      });
+    });
+
+    test('Should get correct GROWI info with all options', async() => {
+      // act
+      const growiInfo = await growiInfoService.getGrowiInfo({
+        includeAttachmentInfo: true,
+        includeInstalledInfo: true,
+        includeUserCountInfo: true,
+      });
+
+      // assert
+      assert(growiInfo != null);
+      expect(growiInfo.additionalInfo).toEqual({
+        attachmentType: 'aws',
+        activeExternalAccountTypes: ['saml', 'github'],
+        installedAt: new Date('2000-01-01'),
+        installedAtByOldestUser: new Date('2000-01-01'),
+        currentUsersCount: 1,
+        currentActiveUsersCount: 1,
+      });
+    });
+
+    test('Should get correct GROWI info with empty options', async() => {
+      // act
+      const growiInfo = await growiInfoService.getGrowiInfo({});
+
+      // assert
+      assert(growiInfo != null);
+      expect(growiInfo.additionalInfo).toBeUndefined();
+      expect(growiInfo).toEqual({
+        version: appVersion,
+        appSiteUrl: 'http://growi.test.jp',
+        serviceInstanceId: '',
+        type: 'on-premise',
+        wikiType: 'closed',
+        deploymentType: 'growi-docker-compose',
+        osInfo: growiInfo.osInfo, // Keep the osInfo as it's dynamic
+      });
+    });
+
   });
 });

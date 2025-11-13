@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { type Stream } from 'openai/streaming';
 import { type Uploadable } from 'openai/uploads';
 
 import { configManager } from '~/server/service/config-manager';
@@ -95,7 +96,9 @@ export class OpenaiClientDelegator implements IOpenaiClientDelegator {
     return this.client.vectorStores.fileBatches.uploadAndPoll(vectorStoreId, { files });
   }
 
-  async chatCompletion(body: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+  async chatCompletion(
+      body: OpenAI.Chat.Completions.ChatCompletionCreateParams,
+  ): Promise<OpenAI.Chat.Completions.ChatCompletion | Stream<OpenAI.Chat.Completions.ChatCompletionChunk>> {
     return this.client.chat.completions.create(body);
   }
 

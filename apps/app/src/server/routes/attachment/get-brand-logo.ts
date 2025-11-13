@@ -4,6 +4,8 @@ import type {
 } from 'express';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
+import { SCOPE } from '@growi/core/dist/interfaces';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
@@ -25,7 +27,7 @@ export const getBrandLogoRouterFactory = (crowi: Crowi): Router => {
 
   const router = express.Router();
 
-  router.get('/brand-logo', certifyBrandLogo, loginRequired, async(req: CrowiRequest, res: Response) => {
+  router.get('/brand-logo', certifyBrandLogo, accessTokenParser([SCOPE.READ.FEATURES.ATTACHMENT]), loginRequired, async(req: CrowiRequest, res: Response) => {
     const brandLogoAttachment = await Attachment.findOne({ attachmentType: AttachmentType.BRAND_LOGO });
 
     if (brandLogoAttachment == null) {

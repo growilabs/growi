@@ -6,7 +6,7 @@ ARG PNPM_HOME="/root/.local/share/pnpm"
 ##
 ## base
 ##
-FROM node:20-slim AS base
+FROM node:22-slim AS base
 
 ARG OPT_DIR
 ARG PNPM_HOME
@@ -15,7 +15,7 @@ WORKDIR $OPT_DIR
 
 # install tools
 RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
   apt-get update && apt-get install -y ca-certificates wget --no-install-recommends
 
 # install pnpm
@@ -63,7 +63,7 @@ RUN tar -zcf /tmp/packages.tar.gz \
 ##
 ## release
 ##
-FROM node:20-slim
+FROM node:22-slim
 LABEL maintainer="Yuki Takei <yuki@weseek.co.jp>"
 
 ARG OPT_DIR
@@ -75,11 +75,11 @@ ENV LANG="ja_JP.UTF-8"
 ENV appDir="$OPT_DIR/pdf-converter"
 
 RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
   apt-get update; \
   apt-get install -y chromium fonts-lato fonts-ipafont-gothic fonts-noto-cjk gosu; \
   rm -rf /var/lib/apt/lists/*; \
-# verify that the binary works
+  # verify that the binary works
   gosu nobody true
 
 # extract artifacts as 'node' user

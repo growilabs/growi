@@ -1,4 +1,3 @@
-
 import { getIdStringForRef } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 
@@ -101,17 +100,19 @@ module.exports = function(crowi, app) {
    *            content:
    *              application/json:
    *                schema:
-   *                  properties:
-   *                    ok:
-   *                      $ref: '#/components/schemas/V1ResponseOK'
-   *                    comments:
-   *                      type: array
-   *                      items:
-   *                        $ref: '#/components/schemas/Comment'
+   *                  allOf:
+   *                    - $ref: '#/components/schemas/ApiResponseSuccess'
+   *                    - type: object
+   *                      properties:
+   *                        comments:
+   *                          type: array
+   *                          items:
+   *                            $ref: '#/components/schemas/Comment'
+   *                          description: List of comments for the page revision
    *          403:
-   *            $ref: '#/components/responses/403'
+   *            $ref: '#/components/responses/Forbidden'
    *          500:
-   *            $ref: '#/components/responses/500'
+   *            $ref: '#/components/responses/InternalServerError'
    */
   /**
    * @api {get} /comments.get Get comments of the page of the revision
@@ -207,15 +208,17 @@ module.exports = function(crowi, app) {
    *            content:
    *              application/json:
    *                schema:
-   *                  properties:
-   *                    ok:
-   *                      $ref: '#/components/schemas/V1ResponseOK'
-   *                    comment:
-   *                      $ref: '#/components/schemas/Comment'
+   *                  allOf:
+   *                    - $ref: '#/components/schemas/ApiResponseSuccess'
+   *                    - type: object
+   *                      properties:
+   *                        comment:
+   *                          $ref: '#/components/schemas/Comment'
+   *                          description: The newly created comment
    *          403:
-   *            $ref: '#/components/responses/403'
+   *            $ref: '#/components/responses/Forbidden'
    *          500:
-   *            $ref: '#/components/responses/500'
+   *            $ref: '#/components/responses/InternalServerError'
    */
   /**
    * @api {post} /comments.add Post comment for the page
@@ -353,15 +356,17 @@ module.exports = function(crowi, app) {
    *            content:
    *              application/json:
    *                schema:
-   *                  properties:
-   *                    ok:
-   *                      $ref: '#/components/schemas/V1ResponseOK'
-   *                    comment:
-   *                      $ref: '#/components/schemas/Comment'
+   *                  allOf:
+   *                    - $ref: '#/components/schemas/ApiResponseSuccess'
+   *                    - type: object
+   *                      properties:
+   *                        comment:
+   *                          $ref: '#/components/schemas/Comment'
+   *                          description: The updated comment
    *          403:
-   *            $ref: '#/components/responses/403'
+   *            $ref: '#/components/responses/Forbidden'
    *          500:
-   *            $ref: '#/components/responses/500'
+   *            $ref: '#/components/responses/InternalServerError'
    */
   /**
    * @api {post} /comments.update Update comment dody
@@ -444,15 +449,11 @@ module.exports = function(crowi, app) {
    *            content:
    *              application/json:
    *                schema:
-   *                  properties:
-   *                    ok:
-   *                      $ref: '#/components/schemas/V1ResponseOK'
-   *                    comment:
-   *                      $ref: '#/components/schemas/Comment'
+   *                  $ref: '#/components/schemas/ApiResponseSuccess'
    *          403:
-   *            $ref: '#/components/responses/403'
+   *            $ref: '#/components/responses/Forbidden'
    *          500:
-   *            $ref: '#/components/responses/500'
+   *            $ref: '#/components/responses/InternalServerError'
    */
   /**
    * @api {post} /comments.remove Remove specified comment

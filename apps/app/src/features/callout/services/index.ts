@@ -1,1 +1,1 @@
-export { sanitizeOption, remarkPlugin } from './callout';
+export { remarkPlugin, sanitizeOption } from './callout';

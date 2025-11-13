@@ -1,6 +1,6 @@
 import { GroupType } from '@growi/core';
-import { isGlobPatternPath, isCreatablePage } from '@growi/core/dist/utils/page-path-utils';
 import { type ValidationChain, body } from 'express-validator';
+import { isCreatablePagePathPattern } from '../../../utils/is-creatable-page-path-pattern';
 
 import { AiAssistantShareScope, AiAssistantAccessScope } from '../../../interfaces/ai-assistant';
 
@@ -42,12 +42,7 @@ export const upsertAiAssistantValidator: ValidationChain[] = [
     .notEmpty()
     .withMessage('pagePathPatterns must not be empty')
     .custom((value: string) => {
-      // check if the value is a glob pattern path
-      if (value.includes('*')) {
-        return isGlobPatternPath(value) && isCreatablePage(value.replaceAll('*', ''));
-      }
-
-      return isCreatablePage(value);
+      return isCreatablePagePathPattern(value);
     }),
 
   body('grantedGroupsForShareScope')

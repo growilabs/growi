@@ -11,6 +11,12 @@ export const SseMessageSchema = z.object({
   })),
 });
 
+export const SsePreMessageSchema = z.object({
+  text: z.string().nullish().describe('The pre-message that should be appended to the chat window'),
+  finished: z.boolean().describe('Indicates if the pre-message generation is finished'),
+});
+
 
 // Type definitions
 export type SseMessage = z.infer<typeof SseMessageSchema>;
+export type SsePreMessage = z.infer<typeof SsePreMessageSchema>;

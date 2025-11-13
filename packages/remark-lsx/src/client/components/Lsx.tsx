@@ -1,14 +1,11 @@
-import React, { useCallback, useMemo, type JSX } from 'react';
-
 import { LoadingSpinner } from '@growi/ui/dist/components';
+import React, { type JSX, useCallback, useMemo } from 'react';
 
 import { useSWRxLsx } from '../stores/lsx';
 import { generatePageNodeTree } from '../utils/page-node';
-
+import styles from './Lsx.module.scss';
 import { LsxListView } from './LsxPageList/LsxListView';
 import { LsxContext } from './lsx-context';
-
-import styles from './Lsx.module.scss';
 
 type Props = {
   children: React.ReactNode;
@@ -60,7 +57,7 @@ const LsxSubstance = React.memo(
 
     const ErrorMessage = useCallback((): JSX.Element => {
       if (!hasError) {
-        return <></>;
+        return;
       }
 
       return (
@@ -69,6 +66,8 @@ const LsxSubstance = React.memo(
             <span className="material-symbols-outlined me-1">warning</span>{' '}
             {lsxContext.toString()}
           </summary>
+          {/* Since error messages may contain user-input strings, use JSX embedding as shown below */}
+          {/* https://legacy.reactjs.org/docs/introducing-jsx.html#jsx-prevents-injection-attacks */}
           <small className="ms-3 text-muted">{errorMessage}</small>
         </details>
       );
@@ -76,10 +75,10 @@ const LsxSubstance = React.memo(
 
     const Loading = useCallback((): JSX.Element => {
       if (hasError) {
-        return <></>;
+        return;
       }
       if (!isLoading) {
-        return <></>;
+        return;
       }
 
       return (
@@ -119,14 +118,14 @@ const LsxSubstance = React.memo(
       const lastResult = data?.at(-1);
 
       if (lastResult == null) {
-        return <></>;
+        return;
       }
 
       const { cursor, total } = lastResult;
       const leftItemsNum = total - cursor;
 
       if (leftItemsNum === 0) {
-        return <></>;
+        return;
       }
 
       return (

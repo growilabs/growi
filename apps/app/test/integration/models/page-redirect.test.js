@@ -7,19 +7,19 @@ describe('PageRedirect', () => {
   let crowi;
   let PageRedirect;
 
-  beforeAll(async() => {
+  beforeAll(async () => {
     crowi = await getInstance();
 
     PageRedirect = mongoose.model('PageRedirect');
   });
 
-  beforeEach(async() => {
+  beforeEach(async () => {
     // clear collection
     await PageRedirect.deleteMany({});
   });
 
   describe('.removePageRedirectsByToPath', () => {
-    test('works fine', async() => {
+    test('works fine', async () => {
       // setup:
       await PageRedirect.insertMany([
         { fromPath: '/org/path1', toPath: '/path1' },
@@ -28,48 +28,66 @@ describe('PageRedirect', () => {
         { fromPath: '/org/path33', toPath: '/org/path333' },
         { fromPath: '/org/path333', toPath: '/path3' },
       ]);
-      expect(await PageRedirect.findOne({ fromPath: '/org/path1' })).not.toBeNull();
-      expect(await PageRedirect.findOne({ fromPath: '/org/path2' })).not.toBeNull();
-      expect(await PageRedirect.findOne({ fromPath: '/org/path3' })).not.toBeNull();
-      expect(await PageRedirect.findOne({ fromPath: '/org/path33' })).not.toBeNull();
-      expect(await PageRedirect.findOne({ fromPath: '/org/path333' })).not.toBeNull();
+      expect(
+        await PageRedirect.findOne({ fromPath: '/org/path1' }),
+      ).not.toBeNull();
+      expect(
+        await PageRedirect.findOne({ fromPath: '/org/path2' }),
+      ).not.toBeNull();
+      expect(
+        await PageRedirect.findOne({ fromPath: '/org/path3' }),
+      ).not.toBeNull();
+      expect(
+        await PageRedirect.findOne({ fromPath: '/org/path33' }),
+      ).not.toBeNull();
+      expect(
+        await PageRedirect.findOne({ fromPath: '/org/path333' }),
+      ).not.toBeNull();
 
       // when:
       // remove all documents that have { toPath: '/path/3' }
       await PageRedirect.removePageRedirectsByToPath('/path3');
 
       // then:
-      expect(await PageRedirect.findOne({ fromPath: '/org/path1' })).not.toBeNull();
-      expect(await PageRedirect.findOne({ fromPath: '/org/path2' })).not.toBeNull();
+      expect(
+        await PageRedirect.findOne({ fromPath: '/org/path1' }),
+      ).not.toBeNull();
+      expect(
+        await PageRedirect.findOne({ fromPath: '/org/path2' }),
+      ).not.toBeNull();
       expect(await PageRedirect.findOne({ fromPath: '/org/path3' })).toBeNull();
-      expect(await PageRedirect.findOne({ fromPath: '/org/path33' })).toBeNull();
-      expect(await PageRedirect.findOne({ fromPath: '/org/path333' })).toBeNull();
+      expect(
+        await PageRedirect.findOne({ fromPath: '/org/path33' }),
+      ).toBeNull();
+      expect(
+        await PageRedirect.findOne({ fromPath: '/org/path333' }),
+      ).toBeNull();
     });
   });
 
   describe('.retrievePageRedirectEndpoints', () => {
-    test('shoud return null when data is not found', async() => {
+    test('shoud return null when data is not found', async () => {
       // setup:
       expect(await PageRedirect.findOne({ fromPath: '/path1' })).toBeNull();
 
       // when:
       // retrieve
-      const endpoints = await PageRedirect.retrievePageRedirectEndpoints('/path1');
+      const endpoints =
+        await PageRedirect.retrievePageRedirectEndpoints('/path1');
 
       // then:
       expect(endpoints).toBeNull();
     });
 
-    test('shoud return IPageRedirectEnds (start and end is the same)', async() => {
+    test('shoud return IPageRedirectEnds (start and end is the same)', async () => {
       // setup:
-      await PageRedirect.insertMany([
-        { fromPath: '/path1', toPath: '/path2' },
-      ]);
+      await PageRedirect.insertMany([{ fromPath: '/path1', toPath: '/path2' }]);
       expect(await PageRedirect.findOne({ fromPath: '/path1' })).not.toBeNull();
 
       // when:
       // retrieve
-      const endpoints = await PageRedirect.retrievePageRedirectEndpoints('/path1');
+      const endpoints =
+        await PageRedirect.retrievePageRedirectEndpoints('/path1');
 
       // then:
       expect(endpoints).not.toBeNull();
@@ -81,7 +99,7 @@ describe('PageRedirect', () => {
       expect(endpoints.end.toPath).toEqual('/path2');
     });
 
-    test('shoud return IPageRedirectEnds', async() => {
+    test('shoud return IPageRedirectEnds', async () => {
       // setup:
       await PageRedirect.insertMany([
         { fromPath: '/path1', toPath: '/path2' },
@@ -94,7 +112,8 @@ describe('PageRedirect', () => {
 
       // when:
       // retrieve
-      const endpoints = await PageRedirect.retrievePageRedirectEndpoints('/path1');
+      const endpoints =
+        await PageRedirect.retrievePageRedirectEndpoints('/path1');
 
       // then:
       expect(endpoints).not.toBeNull();
@@ -106,5 +125,4 @@ describe('PageRedirect', () => {
       expect(endpoints.end.toPath).toEqual('/path4');
     });
   });
-
 });

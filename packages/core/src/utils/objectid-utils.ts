@@ -1,6 +1,8 @@
 import ObjectId from 'bson-objectid';
 
-export function isValidObjectId(id: string | ObjectId | null | undefined): boolean {
+export function isValidObjectId(
+  id: string | ObjectId | null | undefined,
+): boolean {
   if (id == null) {
     return false;
   }

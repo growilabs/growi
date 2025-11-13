@@ -14,54 +14,6 @@ import UpdatePost from '../models/update-post';
  *    name: Pages
  */
 
-/**
- * @swagger
- *
- *  components:
- *    schemas:
- *
- *      UpdatePost:
- *        description: UpdatePost
- *        type: object
- *        properties:
- *          _id:
- *            type: string
- *            description: update post ID
- *            example: 5e0734e472560e001761fa68
- *          __v:
- *            type: number
- *            description: DB record version
- *            example: 0
- *          pathPattern:
- *            type: string
- *            description: path pattern
- *            example: /test
- *          patternPrefix:
- *            type: string
- *            description: patternPrefix prefix
- *            example: /
- *          patternPrefix2:
- *            type: string
- *            description: path
- *            example: test
- *          channel:
- *            type: string
- *            description: channel
- *            example: general
- *          provider:
- *            type: string
- *            description: provider
- *            enum:
- *              - slack
- *            example: slack
- *          creator:
- *            $ref: '#/components/schemas/User'
- *          createdAt:
- *            type: string
- *            description: date created at
- *            example: 2010-01-01T00:00:00.000Z
- */
-
 /* eslint-disable no-use-before-define */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = function(crowi, app) {
@@ -134,37 +86,57 @@ module.exports = function(crowi, app) {
   const validator = {};
 
   actions.api = api;
-  actions.validator = validator;
-
-  /**
+  actions.validator = validator; /**
    * @swagger
    *
-   *    /pages.getPageTag:
-   *      get:
-   *        tags: [Pages]
-   *        operationId: getPageTag
-   *        summary: /pages.getPageTag
-   *        description: Get page tag
-   *        parameters:
-   *          - in: query
-   *            name: pageId
-   *            schema:
-   *              $ref: '#/components/schemas/ObjectId'
-   *        responses:
-   *          200:
-   *            description: Succeeded to get page tags.
-   *            content:
-   *              application/json:
-   *                schema:
-   *                  properties:
-   *                    ok:
-   *                      $ref: '#/components/schemas/V1ResponseOK'
-   *                    tags:
-   *                      $ref: '#/components/schemas/Tags'
-   *          403:
-   *            $ref: '#/components/responses/403'
-   *          500:
-   *            $ref: '#/components/responses/500'
+   * components:
+   *   schemas:
+   *     PageTagsData:
+   *       type: object
+   *       properties:
+   *         tags:
+   *           type: array
+   *           items:
+   *             type: string
+   *           description: Array of tag names associated with the page
+   *           example: ["javascript", "tutorial", "backend"]
+   *
+   *   responses:
+   *     PageTagsSuccess:
+   *       description: Successfully retrieved page tags
+   *       content:
+   *         application/json:
+   *           schema:
+   *             allOf:
+   *               - $ref: '#/components/schemas/ApiResponseSuccess'
+   *               - $ref: '#/components/schemas/PageTagsData'
+   *
+   * /pages.getPageTag:
+   *   get:
+   *     tags: [Pages]
+   *     operationId: getPageTag
+   *     summary: Get page tags
+   *     description: Retrieve all tags associated with a specific page
+   *     parameters:
+   *       - in: query
+   *         name: pageId
+   *         required: true
+   *         description: Unique identifier of the page
+   *         schema:
+   *           type: string
+   *           format: ObjectId
+   *           example: "507f1f77bcf86cd799439011"
+   *     responses:
+   *       200:
+   *         $ref: '#/components/responses/PageTagsSuccess'
+   *       400:
+   *         $ref: '#/components/responses/BadRequest'
+   *       403:
+   *         $ref: '#/components/responses/Forbidden'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       500:
+   *         $ref: '#/components/responses/InternalServerError'
    */
   /**
    * @api {get} /pages.getPageTag get page tags
@@ -187,32 +159,58 @@ module.exports = function(crowi, app) {
   /**
    * @swagger
    *
-   *    /pages.updatePost:
-   *      get:
-   *        tags: [Pages]
-   *        operationId: getUpdatePostPage
-   *        summary: /pages.updatePost
-   *        description: Get UpdatePost setting list
-   *        parameters:
-   *          - in: query
-   *            name: path
-   *            schema:
-   *              $ref: '#/components/schemas/PagePath'
-   *        responses:
-   *          200:
-   *            description: Succeeded to get UpdatePost setting list.
-   *            content:
-   *              application/json:
-   *                schema:
-   *                  properties:
-   *                    ok:
-   *                      $ref: '#/components/schemas/V1ResponseOK'
-   *                    updatePost:
-   *                      $ref: '#/components/schemas/UpdatePost'
-   *          403:
-   *            $ref: '#/components/responses/403'
-   *          500:
-   *            $ref: '#/components/responses/500'
+   * components:
+   *   schemas:
+   *     UpdatePostData:
+   *       type: object
+   *       properties:
+   *         updatePost:
+   *           type: array
+   *           items:
+   *             type: string
+   *           description: Array of channel names for notifications
+   *           example: ["general", "development", "notifications"]
+   *
+   *   responses:
+   *     UpdatePostSuccess:
+   *       description: Successfully retrieved UpdatePost settings
+   *       content:
+   *         application/json:
+   *           schema:
+   *             allOf:
+   *               - $ref: '#/components/schemas/ApiResponseSuccess'
+   *               - $ref: '#/components/schemas/UpdatePostData'
+   *
+   * /pages.updatePost:
+   *   get:
+   *     tags: [Pages]
+   *     operationId: getUpdatePost
+   *     summary: Get UpdatePost settings
+   *     description: Retrieve UpdatePost notification settings for a specific path
+   *     parameters:
+   *       - in: query
+   *         name: path
+   *         required: true
+   *         description: Page path to get UpdatePost settings for
+   *         schema:
+   *           type: string
+   *           example: "/user/example"
+   *         examples:
+   *           userPage:
+   *             value: "/user/john"
+   *             description: User page path
+   *           projectPage:
+   *             value: "/project/myproject"
+   *             description: Project page path
+   *     responses:
+   *       200:
+   *         $ref: '#/components/responses/UpdatePostSuccess'
+   *       400:
+   *         $ref: '#/components/responses/BadRequest'
+   *       403:
+   *         $ref: '#/components/responses/Forbidden'
+   *       500:
+   *         $ref: '#/components/responses/InternalServerError'
    */
   /**
    * @api {get} /pages.updatePost
@@ -254,12 +252,102 @@ module.exports = function(crowi, app) {
   ];
 
   /**
-   * @api {post} /pages.remove Remove page
-   * @apiName RemovePage
-   * @apiGroup Page
+   * @swagger
    *
-   * @apiParam {String} page_id Page Id.
-   * @apiParam {String} revision_id
+   * components:
+   *   schemas:
+   *     PageRemoveData:
+   *       type: object
+   *       required:
+   *         - path
+   *       properties:
+   *         path:
+   *           type: string
+   *           description: Path of the deleted page
+   *           example: "/user/example"
+   *         isRecursively:
+   *           type: boolean
+   *           description: Whether deletion was recursive
+   *           example: true
+   *         isCompletely:
+   *           type: boolean
+   *           description: Whether deletion was complete
+   *           example: false
+   *
+   *   responses:
+   *     PageRemoveSuccess:
+   *       description: Page successfully deleted
+   *       content:
+   *         application/json:
+   *           schema:
+   *             allOf:
+   *               - $ref: '#/components/schemas/ApiResponseSuccess'
+   *               - $ref: '#/components/schemas/PageRemoveData'
+   *
+   * /pages.remove:
+   *   post:
+   *     tags: [Pages]
+   *     operationId: removePage
+   *     summary: Remove page
+   *     description: Delete a page either softly or completely, with optional recursive deletion
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - page_id
+   *             properties:
+   *               page_id:
+   *                 type: string
+   *                 format: ObjectId
+   *                 description: Unique identifier of the page to delete
+   *                 example: "507f1f77bcf86cd799439011"
+   *               revision_id:
+   *                 type: string
+   *                 format: ObjectId
+   *                 description: Revision ID for conflict detection
+   *                 example: "507f1f77bcf86cd799439012"
+   *               completely:
+   *                 type: boolean
+   *                 description: Whether to delete the page completely (true) or soft delete (false)
+   *                 default: false
+   *                 example: false
+   *               recursively:
+   *                 type: boolean
+   *                 description: Whether to delete child pages recursively
+   *                 default: false
+   *                 example: true
+   *           examples:
+   *             softDelete:
+   *               summary: Soft delete single page
+   *               value:
+   *                 page_id: "507f1f77bcf86cd799439011"
+   *                 revision_id: "507f1f77bcf86cd799439012"
+   *             recursiveDelete:
+   *               summary: Recursive soft delete
+   *               value:
+   *                 page_id: "507f1f77bcf86cd799439011"
+   *                 recursively: true
+   *             completeDelete:
+   *               summary: Complete deletion
+   *               value:
+   *                 page_id: "507f1f77bcf86cd799439011"
+   *                 completely: true
+   *     responses:
+   *       200:
+   *         $ref: '#/components/responses/PageRemoveSuccess'
+   *       400:
+   *         $ref: '#/components/responses/BadRequest'
+   *       403:
+   *         $ref: '#/components/responses/Forbidden'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       409:
+   *         $ref: '#/components/responses/Conflict'
+   *       500:
+   *         $ref: '#/components/responses/InternalServerError'
    */
   api.remove = async function(req, res) {
     const pageId = req.body.page_id;
@@ -365,11 +453,89 @@ module.exports = function(crowi, app) {
   ];
 
   /**
-   * @api {post} /pages.revertRemove Revert removed page
-   * @apiName RevertRemovePage
-   * @apiGroup Page
+   * @swagger
    *
-   * @apiParam {String} page_id Page Id.
+   * components:
+   *   schemas:
+   *     PageRevertData:
+   *       type: object
+   *       properties:
+   *         page:
+   *           type: object
+   *           description: Restored page object
+   *           properties:
+   *             _id:
+   *               type: string
+   *               format: ObjectId
+   *               example: "507f1f77bcf86cd799439011"
+   *             path:
+   *               type: string
+   *               example: "/user/example"
+   *             title:
+   *               type: string
+   *               example: "Example Page"
+   *             status:
+   *               type: string
+   *               example: "published"
+   *
+   *   responses:
+   *     PageRevertSuccess:
+   *       description: Page successfully restored
+   *       content:
+   *         application/json:
+   *           schema:
+   *             allOf:
+   *               - $ref: '#/components/schemas/ApiResponseSuccess'
+   *               - $ref: '#/components/schemas/PageRevertData'
+   *
+   * /pages.revertRemove:
+   *   post:
+   *     tags: [Pages]
+   *     operationId: revertRemovePage
+   *     summary: Revert removed page
+   *     description: Restore a previously deleted (soft-deleted) page
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - page_id
+   *             properties:
+   *               page_id:
+   *                 type: string
+   *                 format: ObjectId
+   *                 description: Unique identifier of the page to restore
+   *                 example: "507f1f77bcf86cd799439011"
+   *               recursively:
+   *                 type: boolean
+   *                 description: Whether to restore child pages recursively
+   *                 default: false
+   *                 example: true
+   *           examples:
+   *             singleRevert:
+   *               summary: Revert single page
+   *               value:
+   *                 page_id: "507f1f77bcf86cd799439011"
+   *             recursiveRevert:
+   *               summary: Revert page and children
+   *               value:
+   *                 page_id: "507f1f77bcf86cd799439011"
+   *                 recursively: true
+   *     responses:
+   *       200:
+   *         $ref: '#/components/responses/PageRevertSuccess'
+   *       400:
+   *         $ref: '#/components/responses/BadRequest'
+   *       403:
+   *         $ref: '#/components/responses/Forbidden'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       409:
+   *         $ref: '#/components/responses/Conflict'
+   *       500:
+   *         $ref: '#/components/responses/InternalServerError'
    */
   api.revertRemove = async function(req, res, options) {
     const pageId = req.body.page_id;
@@ -406,12 +572,61 @@ module.exports = function(crowi, app) {
   };
 
   /**
-   * @api {post} /pages.unlink Remove the redirecting page
-   * @apiName UnlinkPage
-   * @apiGroup Page
+   * @swagger
    *
-   * @apiParam {String} page_id Page Id.
-   * @apiParam {String} revision_id
+   * components:
+   *   schemas:
+   *     PageUnlinkData:
+   *       type: object
+   *       properties:
+   *         path:
+   *           type: string
+   *           description: Path for which redirects were removed
+   *           example: "/user/example"
+   *
+   *   responses:
+   *     PageUnlinkSuccess:
+   *       description: Successfully removed page redirects
+   *       content:
+   *         application/json:
+   *           schema:
+   *             allOf:
+   *               - $ref: '#/components/schemas/ApiResponseSuccess'
+   *               - $ref: '#/components/schemas/PageUnlinkData'
+   *
+   * /pages.unlink:
+   *   post:
+   *     tags: [Pages]
+   *     operationId: unlinkPage
+   *     summary: Remove page redirects
+   *     description: Remove all redirect entries that point to the specified page path
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - path
+   *             properties:
+   *               path:
+   *                 type: string
+   *                 description: Target path to remove redirects for
+   *                 example: "/user/example"
+   *           examples:
+   *             unlinkPage:
+   *               summary: Remove redirects to a page
+   *               value:
+   *                 path: "/user/example"
+   *     responses:
+   *       200:
+   *         $ref: '#/components/responses/PageUnlinkSuccess'
+   *       400:
+   *         $ref: '#/components/responses/BadRequest'
+   *       403:
+   *         $ref: '#/components/responses/Forbidden'
+   *       500:
+   *         $ref: '#/components/responses/InternalServerError'
    */
   api.unlink = async function(req, res) {
     const path = req.body.path;

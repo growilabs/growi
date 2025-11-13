@@ -3,6 +3,8 @@ import express from 'express';
 import { body } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
+import { SCOPE } from '@growi/core/dist/interfaces';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
@@ -75,7 +77,7 @@ module.exports = (crowi) => {
    *                              type: boolean
    *                              description: whether slackbot is configured
    */
-  router.get('/', loginRequiredStrictly, adminRequired, async(req, res) => {
+  router.get('/', accessTokenParser([SCOPE.READ.ADMIN.LEGACY_SLACK_INTEGRATION]), loginRequiredStrictly, adminRequired, async(req, res) => {
 
     const slackIntegrationParams = {
       isSlackbotConfigured: crowi.slackIntegrationService.isSlackbotConfigured,
@@ -121,34 +123,35 @@ module.exports = (crowi) => {
    *                      type: object
    *                      $ref: '#/components/schemas/SlackConfigurationParams'
    */
-  router.put('/', loginRequiredStrictly, adminRequired, addActivity, validator.slackConfiguration, apiV3FormValidator, async(req, res) => {
+  router.put('/', accessTokenParser([SCOPE.WRITE.ADMIN.LEGACY_SLACK_INTEGRATION]), loginRequiredStrictly, adminRequired, addActivity,
+    validator.slackConfiguration, apiV3FormValidator, async(req, res) => {
 
-    const requestParams = {
-      'slack:incomingWebhookUrl': req.body.webhookUrl,
-      'slack:isIncomingWebhookPrioritized': req.body.isIncomingWebhookPrioritized,
-      'slack:token': req.body.slackToken,
-    };
-
-    try {
-      await configManager.updateConfigs(requestParams);
-      const responseParams = {
-        webhookUrl: await crowi.configManager.getConfig('slack:incomingWebhookUrl'),
-        isIncomingWebhookPrioritized: await crowi.configManager.getConfig('slack:isIncomingWebhookPrioritized'),
-        slackToken: await crowi.configManager.getConfig('slack:token'),
+      const requestParams = {
+        'slack:incomingWebhookUrl': req.body.webhookUrl,
+        'slack:isIncomingWebhookPrioritized': req.body.isIncomingWebhookPrioritized,
+        'slack:token': req.body.slackToken,
       };
 
-      const parameters = { action: SupportedAction.ACTION_ADMIN_SLACK_CONFIGURATION_SETTING_UPDATE };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
+      try {
+        await configManager.updateConfigs(requestParams);
+        const responseParams = {
+          webhookUrl: await crowi.configManager.getConfig('slack:incomingWebhookUrl'),
+          isIncomingWebhookPrioritized: await crowi.configManager.getConfig('slack:isIncomingWebhookPrioritized'),
+          slackToken: await crowi.configManager.getConfig('slack:token'),
+        };
 
-      return res.apiv3({ responseParams });
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating slack configuration';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-slackConfiguration-failed'));
-    }
+        const parameters = { action: SupportedAction.ACTION_ADMIN_SLACK_CONFIGURATION_SETTING_UPDATE };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
 
-  });
+        return res.apiv3({ responseParams });
+      }
+      catch (err) {
+        const msg = 'Error occurred in updating slack configuration';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-slackConfiguration-failed'));
+      }
+
+    });
 
   return router;
 };
