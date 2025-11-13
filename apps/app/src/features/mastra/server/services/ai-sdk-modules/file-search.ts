@@ -10,11 +10,15 @@ type FileSearchParameters = {
   vectorStoreId: string;
 };
 
+type FileSearchResult = {
+  text: string;
+};
+
 export const fileSearch = async ({
   prompt,
   instruction,
   vectorStoreId,
-}: FileSearchParameters) => {
+}: FileSearchParameters): Promise<FileSearchResult> => {
   const openai = getOpenaiProvider();
   const model = configManager.getConfig('openai:assistantModel:chat');
 
