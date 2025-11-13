@@ -3,6 +3,7 @@ import CronService from '~/server/service/cron';
 
 import { AuditLogBulkExportJobInProgressJobStatus } from '../../interfaces/audit-log-bulk-export';
 import AuditLogExportJob from '../models/audit-log-bulk-export-job';
+import { auditLogBulkExportJobCronService } from './audit-log-bulk-export-job-cron';
 
 /**
  * Manages cronjob which checks if AuditLogExportJob in progress exists.
@@ -26,9 +27,13 @@ class CheckAuditLogBulkExportJobInProgressCronService extends CronService {
     });
     const auditLogExportInProgressExists = auditLogExportJobInProgress != null;
 
-    if (auditLogExportInProgressExists) {
-      // TODO: Start the cron that actually performs audit-log export.
-      // This will be implemented in a later task.
+    if (
+      auditLogExportInProgressExists &&
+      !auditLogBulkExportJobCronService?.isJobRunning()
+    ) {
+      auditLogBulkExportJobCronService?.startCron();
+    } else if (!auditLogExportInProgressExists) {
+      auditLogBulkExportJobCronService?.stopCron();
     }
   }
 }
