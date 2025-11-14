@@ -148,7 +148,7 @@
     "is-absolute-url": "^4.0.1",
     "is-iso-date": "^0.0.1",
     "js-tiktoken": "^1.0.15",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.1.1",
     "jsonrepair": "^3.12.0",
     "katex": "^0.16.21",
     "ldapjs": "^3.0.2",
