@@ -16,8 +16,8 @@ import { useCreatePage } from '~/client/services/create-page';
 import { toastWarning, toastError, toastSuccess } from '~/client/util/toastr';
 import type { InputValidationResult } from '~/client/util/use-input-validator';
 import { ValidationTarget, useInputValidator } from '~/client/util/use-input-validator';
+import { usePageTreeDescCountMap } from '~/states/ui/page-tree-desc-count-map';
 import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
-import { usePageTreeDescCountMap } from '~/stores/ui';
 
 import { shouldCreateWipPage } from '../../../../utils/should-create-wip-page';
 import type { TreeItemToolProps } from '../interfaces';
@@ -78,7 +78,7 @@ export const useNewPageInput = (): UseNewPageInput => {
 
     const inputValidator = useInputValidator(ValidationTarget.PAGE);
 
-    const changeHandler = useCallback(async(e: ChangeEvent<HTMLInputElement>) => {
+    const changeHandler = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
       const validationResult = inputValidator(e.target.value);
       setValidationResult(validationResult ?? undefined);
     }, [inputValidator]);
@@ -89,7 +89,7 @@ export const useNewPageInput = (): UseNewPageInput => {
       setShowInput(false);
     }, []);
 
-    const create = useCallback(async(inputText) => {
+    const create = useCallback(async (inputText) => {
       if (inputText.trim() === '') {
         return cancel();
       }
@@ -162,11 +162,11 @@ export const useNewPageInput = (): UseNewPageInput => {
             onCancel={cancel}
             autoFocus
           />
-          { isInvalid && (
+          {isInvalid && (
             <div id="new-page-input" className="invalid-feedback d-block my-1">
               {validationResult.message}
             </div>
-          ) }
+          )}
         </div>
       )
       : <></>;

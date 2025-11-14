@@ -3,7 +3,7 @@ import type { LinkProps } from 'next/link';
 import Link from 'next/link';
 import { pagePathUtils } from '@growi/core/dist/utils';
 
-import { useSiteUrl } from '~/stores-universal/context';
+import { useSiteUrl } from '~/states/global';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:components:NextLink');
@@ -44,7 +44,7 @@ type Props = Omit<LinkProps, 'href'> & {
 export const NextLink = (props: Props): JSX.Element => {
   const { id, href, children, className, onClick, ...rest } = props;
 
-  const { data: siteUrl } = useSiteUrl();
+  const siteUrl = useSiteUrl();
 
   if (href == null) {
     // biome-ignore lint/a11y/useValidAnchor: ignore

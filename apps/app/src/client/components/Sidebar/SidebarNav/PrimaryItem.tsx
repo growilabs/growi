@@ -5,10 +5,11 @@ import { UncontrolledTooltip } from 'reactstrap';
 
 import type { SidebarContentsType } from '~/interfaces/ui';
 import { SidebarMode } from '~/interfaces/ui';
-import { useCollapsedContentsOpened, useCurrentSidebarContents, useIsMobile } from '~/stores/ui';
+import { useIsMobile } from '~/states/ui/device';
+import { useCollapsedContentsOpened, useCurrentSidebarContents } from '~/states/ui/sidebar';
 
 const useIndicator = (sidebarMode: SidebarMode, isSelected: boolean): string => {
-  const { data: isCollapsedContentsOpened } = useCollapsedContentsOpened();
+  const [isCollapsedContentsOpened] = useCollapsedContentsOpened();
 
   if (sidebarMode === SidebarMode.COLLAPSED && !isCollapsedContentsOpened) {
     return '';
@@ -34,15 +35,15 @@ export const PrimaryItem = (props: PrimaryItemProps): JSX.Element => {
     onClick, onHover,
   } = props;
 
-  const { data: currentContents, mutateAndSave: mutateContents } = useCurrentSidebarContents();
+  const [currentContents, setCurrentContents] = useCurrentSidebarContents();
 
   const indicatorClass = useIndicator(sidebarMode, contents === currentContents);
-  const { data: isMobile } = useIsMobile();
+  const [isMobile] = useIsMobile();
   const { t } = useTranslation();
 
   const selectThisItem = useCallback(() => {
-    mutateContents(contents, false);
-  }, [contents, mutateContents]);
+    setCurrentContents(contents);
+  }, [contents, setCurrentContents]);
 
   const itemClickedHandler = useCallback(() => {
     // do nothing ONLY WHEN the collapse mode
@@ -78,10 +79,10 @@ export const PrimaryItem = (props: PrimaryItemProps): JSX.Element => {
         id={labelForTestId}
       >
         <div className="position-relative">
-          { badgeContents != null && (
+          {badgeContents != null && (
             <span className="position-absolute badge rounded-pill bg-primary">{badgeContents}</span>
           )}
-          { isCustomIcon
+          {isCustomIcon
             ? (<span className="growi-custom-icons fs-4 align-middle">{iconName}</span>)
             : (<span className="material-symbols-outlined">{iconName}</span>)
           }

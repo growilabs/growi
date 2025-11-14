@@ -2,10 +2,9 @@ import type EventEmitter from 'events';
 
 import type {
   HasObjectId,
-  IDataWithMeta,
+  IDataWithRequiredMeta,
   IGrantedGroup,
-  IPage,
-  IPageInfo, IPageInfoAll, IPageInfoForEntity, IUser,
+  IPageInfo, IPageInfoForEntity, IPageNotFoundInfo, IUser, IPageInfoExt, IPage, PageGrant, IUserHasId,
 } from '@growi/core';
 import type { HydratedDocument, Types } from 'mongoose';
 
@@ -26,12 +25,18 @@ export interface IPageService {
     pageData: HydratedDocument<PageDocument>, body: string | null, previousBody: string | null, user: IUser, options: IOptionsForUpdate
   ): Promise<HydratedDocument<PageDocument>>,
   updateDescendantCountOfAncestors: (pageId: ObjectIdLike, inc: number, shouldIncludeTarget: boolean) => Promise<void>,
+  updateGrant(
+    page: HydratedDocument<PageDocument>, user: IUserHasId, grantData: {grant: PageGrant, userRelatedGrantedGroups: IGrantedGroup[]},
+  ): Promise<PageDocument>,
   deleteCompletelyOperation: (pageIds: ObjectIdLike[], pagePaths: string[]) => Promise<void>,
   getEventEmitter: () => EventEmitter,
   deleteMultipleCompletely: (pages: ObjectIdLike[], user: IUser | undefined) => Promise<void>,
   findPageAndMetaDataByViewer(
-      pageId: string | null, path: string, user?: HydratedDocument<IUser>, includeEmpty?: boolean, isSharedPage?: boolean,
-  ): Promise<IDataWithMeta<HydratedDocument<PageDocument>, IPageInfoAll>|null>
+      pageId: string, path: string | null, user?: HydratedDocument<IUser>, isSharedPage?: boolean,
+  ): Promise<IDataWithRequiredMeta<HydratedDocument<PageDocument>, IPageInfoExt> | IDataWithRequiredMeta<null, IPageNotFoundInfo>>
+  findPageAndMetaDataByViewer(
+      pageId: string | null, path: string, user?: HydratedDocument<IUser>, isSharedPage?: boolean,
+  ): Promise<IDataWithRequiredMeta<HydratedDocument<PageDocument>, IPageInfoExt> | IDataWithRequiredMeta<null, IPageNotFoundInfo>>
   resumeRenameSubOperation(renamedPage: PageDocument, pageOp: PageOperationDocument, activity?): Promise<void>
   handlePrivatePagesForGroupsToDelete(
     groupsToDelete: UserGroupDocument[] | ExternalUserGroupDocument[],
@@ -40,7 +45,7 @@ export interface IPageService {
     user: IUser,
 ): Promise<void>
   shortBodiesMapByPageIds(pageIds?: Types.ObjectId[], user?): Promise<Record<string, string | null>>,
-  constructBasicPageInfo(page: PageDocument, isGuestUser?: boolean): IPageInfo | Omit<IPageInfoForEntity, 'bookmarkCount'>,
+  constructBasicPageInfo(page: PageDocument, isGuestUser?: boolean): Omit<IPageInfo | IPageInfoForEntity, 'bookmarkCount'>,
   normalizeAllPublicPages(): Promise<void>,
   canDelete(page: PageDocument, creatorId: ObjectIdLike | null, operator: any | null, isRecursively: boolean): boolean,
   canDeleteCompletely(

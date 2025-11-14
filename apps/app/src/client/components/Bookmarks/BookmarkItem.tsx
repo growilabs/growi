@@ -2,7 +2,7 @@ import React, { useCallback, useState, type JSX } from 'react';
 
 import nodePath from 'path';
 
-import type { IPageHasId, IPageInfoAll, IPageToDeleteWithMeta } from '@growi/core';
+import type { IPageHasId, IPageInfoExt, IPageToDeleteWithMeta } from '@growi/core';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { pathUtils } from '@growi/core/dist/utils';
 import { useRouter } from 'next/router';
@@ -15,8 +15,9 @@ import { addBookmarkToFolder, renamePage } from '~/client/util/bookmark-utils';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import type { BookmarkFolderItems, DragItemDataType } from '~/interfaces/bookmark-info';
 import { DRAG_ITEM_TYPE } from '~/interfaces/bookmark-info';
-import { usePutBackPageModal } from '~/stores/modal';
-import { mutateAllPageInfo, useSWRMUTxCurrentPage, useSWRxPageInfo } from '~/stores/page';
+import { useFetchCurrentPage } from '~/states/page';
+import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page';
+import { mutateAllPageInfo, useSWRxPageInfo } from '~/stores/page';
 
 import { MenuItemType, PageItemControl } from '../Common/Dropdown/PageItemControl';
 import { PageListItemS } from '../PageList/PageListItemS';
@@ -47,11 +48,11 @@ export const BookmarkItem = (props: Props): JSX.Element => {
     isReadOnlyUser, isOperable, bookmarkedPage, onClickDeleteMenuItemHandler,
     parentFolder, level, canMoveToRoot, bookmarkFolderTreeMutation,
   } = props;
-  const { open: openPutBackPageModal } = usePutBackPageModal();
+  const { open: openPutBackPageModal } = usePutBackPageModalActions();
   const [isRenameInputShown, setRenameInputShown] = useState(false);
 
   const { data: pageInfo, mutate: mutatePageInfo } = useSWRxPageInfo(bookmarkedPage?._id);
-  const { trigger: mutateCurrentPage } = useSWRMUTxCurrentPage();
+  const { fetchCurrentPage } = useFetchCurrentPage();
 
   const paddingLeft = BASE_BOOKMARK_PADDING + (BASE_FOLDER_PADDING * (level));
   const dragItem: Partial<DragItemDataType> = {
@@ -116,7 +117,7 @@ export const BookmarkItem = (props: Props): JSX.Element => {
     }
   }, [bookmarkedPage, cancel, bookmarkFolderTreeMutation, mutatePageInfo]);
 
-  const deleteMenuItemClickHandler = useCallback(async(_pageId: string, pageInfo: IPageInfoAll | undefined): Promise<void> => {
+  const deleteMenuItemClickHandler = useCallback(async(_pageId: string, pageInfo: IPageInfoExt | undefined): Promise<void> => {
     if (bookmarkedPage == null) return;
 
     if (bookmarkedPage._id == null || bookmarkedPage.path == null) {
@@ -145,7 +146,7 @@ export const BookmarkItem = (props: Props): JSX.Element => {
         mutateAllPageInfo();
         bookmarkFolderTreeMutation();
         router.push(`/${pageId}`);
-        mutateCurrentPage();
+        fetchCurrentPage({ force: true });
         toastSuccess(t('page_has_been_reverted', { path }));
       }
       catch (err) {
@@ -153,7 +154,7 @@ export const BookmarkItem = (props: Props): JSX.Element => {
       }
     };
     openPutBackPageModal({ pageId, path }, { onPutBacked: putBackedHandler });
-  }, [bookmarkedPage, openPutBackPageModal, bookmarkFolderTreeMutation, router, mutateCurrentPage, t]);
+  }, [bookmarkedPage, openPutBackPageModal, bookmarkFolderTreeMutation, router, fetchCurrentPage, t]);
 
   if (bookmarkedPage == null) {
     return <></>;

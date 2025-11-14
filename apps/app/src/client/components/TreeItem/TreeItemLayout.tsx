@@ -11,8 +11,8 @@ import React, {
 
 import { addTrailingSlash } from '@growi/core/dist/utils/path-utils';
 
+import { usePageTreeDescCountMap } from '~/states/ui/page-tree-desc-count-map';
 import { useSWRxPageChildren } from '~/stores/page-listing';
-import { usePageTreeDescCountMap } from '~/stores/ui';
 
 import { ItemNode } from './ItemNode';
 import { SimpleItemContent } from './SimpleItemContent';
@@ -175,7 +175,7 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
           )}
         </div>
 
-        { showAlternativeContent && AlternativeComponents != null
+        {showAlternativeContent && AlternativeComponents != null
           ? (
             AlternativeComponents.map((AlternativeContent, index) => (
               // eslint-disable-next-line react/no-array-index-key
@@ -202,7 +202,7 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
         }
 
       </li>
-      { isOpen && (
+      {isOpen && (
         <div className={`tree-item-layout-children level-${baseItemLevel + 1}`}>
 
           {HeadObChildrenComponents?.map((HeadObChildrenContents, index) => (
@@ -210,7 +210,7 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
             (<HeadObChildrenContents key={index} {...toolProps} itemLevel={baseItemLevel + 1} />)
           ))}
 
-          { hasChildren() && currentChildren.map((node) => {
+          {hasChildren() && currentChildren.map((node) => {
             const itemProps = {
               ...baseProps,
               className,
@@ -224,10 +224,10 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
             return (
               <ItemClassFixed key={node.page._id} {...itemProps} />
             );
-          }) }
+          })}
 
         </div>
-      ) }
+      )}
     </div>
   );
 };

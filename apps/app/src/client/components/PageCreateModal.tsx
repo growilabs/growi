@@ -9,6 +9,7 @@ import { Origin } from '@growi/core';
 import { pagePathUtils, pathUtils } from '@growi/core/dist/utils';
 import { normalizePath } from '@growi/core/dist/utils/path-utils';
 import { format } from 'date-fns/format';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import {
   Modal, ModalHeader, ModalBody, UncontrolledButtonDropdown, DropdownToggle, DropdownMenu, DropdownItem,
@@ -18,9 +19,9 @@ import { debounce } from 'throttle-debounce';
 import { useCreateTemplatePage } from '~/client/services/create-page';
 import { useCreatePage } from '~/client/services/create-page/use-create-page';
 import { useToastrOnError } from '~/client/services/use-toastr-on-error';
-import { useCurrentUser, useIsSearchServiceReachable } from '~/stores-universal/context';
-import { usePageCreateModal } from '~/stores/modal';
-
+import { useCurrentUser } from '~/states/global';
+import { isSearchServiceReachableAtom } from '~/states/server-configurations';
+import { usePageCreateModalStatus, usePageCreateModalActions } from '~/states/ui/modal/page-create';
 
 import PagePathAutoComplete from './PagePathAutoComplete';
 
@@ -33,22 +34,25 @@ const {
 const PageCreateModal: React.FC = () => {
   const { t } = useTranslation();
 
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser();
 
-  const { data: pageCreateModalData, close: closeCreateModal } = usePageCreateModal();
-
-  const isOpened = pageCreateModalData?.isOpened ?? false;
+  const { isOpened, path: pathname = '' } = usePageCreateModalStatus();
+  const { close: closeCreateModal } = usePageCreateModalActions();
 
   const { create } = useCreatePage();
   const { createTemplate } = useCreateTemplatePage();
 
-  const { data: isReachable } = useIsSearchServiceReachable();
-  const pathname = pageCreateModalData?.path ?? '';
-  const userHomepagePath = pagePathUtils.userHomepagePath(currentUser);
-  const isCreatable = isCreatablePage(pathname) || isUsersHomepage(pathname);
-  const pageNameInputInitialValue = isCreatable ? pathUtils.addTrailingSlash(pathname) : '/';
-  const now = format(new Date(), 'yyyy/MM/dd');
-  const todaysParentPath = [userHomepagePath, t('create_page_dropdown.todays.memo', { ns: 'commons' }), now].join('/');
+  const isReachable = useAtomValue(isSearchServiceReachableAtom);
+
+  // Memoize computed values
+  const userHomepagePath = useMemo(() => pagePathUtils.userHomepagePath(currentUser), [currentUser]);
+  const isCreatable = useMemo(() => isCreatablePage(pathname) || isUsersHomepage(pathname), [pathname]);
+  const pageNameInputInitialValue = useMemo(() => (isCreatable ? pathUtils.addTrailingSlash(pathname) : '/'), [isCreatable, pathname]);
+  const now = useMemo(() => format(new Date(), 'yyyy/MM/dd'), []);
+  const todaysParentPath = useMemo(
+    () => [userHomepagePath, t('create_page_dropdown.todays.memo', { ns: 'commons' }), now].join('/'),
+    [userHomepagePath, t, now],
+  );
 
   const [todayInput, setTodayInput] = useState('');
   const [pageNameInput, setPageNameInput] = useState(pageNameInputInitialValue);
@@ -56,41 +60,38 @@ const PageCreateModal: React.FC = () => {
   const [isMatchedWithUserHomepagePath, setIsMatchedWithUserHomepagePath] = useState(false);
 
   const checkIsUsersHomepageDebounce = useMemo(() => {
-    const checkIsUsersHomepage = () => {
-      setIsMatchedWithUserHomepagePath(isUsersHomepage(pageNameInput));
-    };
-
-    return debounce(1000, checkIsUsersHomepage);
-  }, [pageNameInput]);
+    return debounce(1000, (input: string) => {
+      setIsMatchedWithUserHomepagePath(isUsersHomepage(input));
+    });
+  }, []);
 
   useEffect(() => {
     if (isOpened) {
-      checkIsUsersHomepageDebounce();
+      checkIsUsersHomepageDebounce(pageNameInput);
     }
   }, [isOpened, checkIsUsersHomepageDebounce, pageNameInput]);
 
-
-  function transitBySubmitEvent(e, transitHandler) {
+  const transitBySubmitEvent = useCallback((e, transitHandler) => {
     // prevent page transition by submit
     e.preventDefault();
     transitHandler();
-  }
+  }, []);
 
   /**
    * change todayInput
    * @param {string} value
    */
-  function onChangeTodayInputHandler(value) {
+  const onChangeTodayInputHandler = useCallback((value) => {
     setTodayInput(value);
-  }
+  }, []);
 
   /**
    * change template
    * @param {string} value
    */
-  function onChangeTemplateHandler(value) {
+  const onChangeTemplateHandler = useCallback((value) => {
     setTemplate(value);
-  }
+  }, []);
 
   /**
    * access today page
@@ -138,7 +139,7 @@ const PageCreateModal: React.FC = () => {
   const createInputPageWithToastr = useToastrOnError(createInputPage);
   const createTemplateWithToastr = useToastrOnError(createTemplatePage);
 
-  function renderCreateTodayForm() {
+  const renderCreateTodayForm = useMemo(() => {
     if (!isOpened) {
       return <></>;
     }
@@ -181,9 +182,9 @@ const PageCreateModal: React.FC = () => {
         </fieldset>
       </div>
     );
-  }
+  }, [isOpened, todaysParentPath, todayInput, t, onChangeTodayInputHandler, transitBySubmitEvent, createTodaysMemoWithToastr]);
 
-  function renderInputPageForm() {
+  const renderInputPageForm = useMemo(() => {
     if (!isOpened) {
       return <></>;
     }
@@ -238,9 +239,9 @@ const PageCreateModal: React.FC = () => {
         </fieldset>
       </div>
     );
-  }
+  }, [isOpened, isReachable, pageNameInputInitialValue, createInputPageWithToastr, pageNameInput, isMatchedWithUserHomepagePath, t, transitBySubmitEvent]);
 
-  function renderTemplatePageForm() {
+  const renderTemplatePageForm = useMemo(() => {
     if (!isOpened) {
       return <></>;
     }
@@ -290,7 +291,7 @@ const PageCreateModal: React.FC = () => {
         </fieldset>
       </div>
     );
-  }
+  }, [isOpened, pathname, template, onChangeTemplateHandler, createTemplateWithToastr, t]);
 
   return (
     <Modal
@@ -305,9 +306,9 @@ const PageCreateModal: React.FC = () => {
         {t('New Page')}
       </ModalHeader>
       <ModalBody>
-        {renderCreateTodayForm()}
-        {renderInputPageForm()}
-        {renderTemplatePageForm()}
+        {renderCreateTodayForm}
+        {renderInputPageForm}
+        {renderTemplatePageForm}
       </ModalBody>
     </Modal>
 

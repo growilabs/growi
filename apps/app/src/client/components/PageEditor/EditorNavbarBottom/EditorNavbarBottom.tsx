@@ -1,9 +1,10 @@
 import type { JSX } from 'react';
 
+import { useAtomValue } from 'jotai';
 import dynamic from 'next/dynamic';
 
-import { useIsAiEnabled } from '~/stores-universal/context';
-import { useDrawerOpened } from '~/stores/ui';
+import { aiEnabledAtom } from '~/states/server-configurations';
+import { useDrawerOpened } from '~/states/ui/sidebar';
 
 import { EditorAssistantToggleButton } from './EditorAssistantToggleButton';
 
@@ -16,8 +17,8 @@ const SavePageControls = dynamic(() => import('./SavePageControls').then(mod => 
 const OptionsSelector = dynamic(() => import('./OptionsSelector').then(mod => mod.OptionsSelector), { ssr: false });
 
 export const EditorNavbarBottom = (): JSX.Element => {
-  const { data: isAiEnabled } = useIsAiEnabled();
-  const { mutate: mutateDrawerOpened } = useDrawerOpened();
+  const isAiEnabled = useAtomValue(aiEnabledAtom);
+  const [, setIsDrawerOpened] = useDrawerOpened();
 
   return (
     <div className="border-top" data-testid="grw-editor-navbar-bottom">
@@ -25,7 +26,7 @@ export const EditorNavbarBottom = (): JSX.Element => {
         <a
           role="button"
           className="nav-link btn-lg p-2 d-md-none me-3 opacity-50"
-          onClick={() => mutateDrawerOpened(true)}
+          onClick={() => setIsDrawerOpened(true)}
         >
           <span className="material-symbols-outlined fs-2">reorder</span>
         </a>

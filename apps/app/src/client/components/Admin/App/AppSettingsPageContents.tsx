@@ -4,7 +4,7 @@ import { useTranslation } from 'next-i18next';
 
 import AdminAppContainer from '~/client/services/AdminAppContainer';
 import { toastError } from '~/client/util/toastr';
-import { useIsMaintenanceMode } from '~/stores/maintenanceMode';
+import { useIsMaintenanceMode } from '~/states/global';
 import { toArrayIfNot } from '~/utils/array-utils';
 import loggerFactory from '~/utils/logger';
 
@@ -29,7 +29,7 @@ const AppSettingsPageContents = (props: Props) => {
   const { t } = useTranslation('admin');
   const { adminAppContainer } = props;
 
-  const { data: isMaintenanceMode } = useIsMaintenanceMode();
+  const isMaintenanceMode = useIsMaintenanceMode();
 
   const { isV5Compatible } = adminAppContainer.state;
 

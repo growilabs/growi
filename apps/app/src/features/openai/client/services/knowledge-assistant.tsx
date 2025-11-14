@@ -26,7 +26,10 @@ import type {
 import type { IThreadRelationHasId } from '../../interfaces/thread-relation';
 import { ThreadType } from '../../interfaces/thread-relation';
 import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
-import { useAiAssistantSidebar } from '../stores/ai-assistant';
+import {
+  useAiAssistantSidebarActions,
+  useAiAssistantSidebarStatus,
+} from '../states';
 import { useSWRMUTxMessages } from '../stores/message';
 import { useSWRINFxRecentThreads, useSWRMUTxThreads } from '../stores/thread';
 
@@ -77,9 +80,8 @@ type UseKnowledgeAssistant = () => {
 
 export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
   // Hooks
-  const { data: aiAssistantSidebarData, refreshThreadData } =
-    useAiAssistantSidebar();
-  const { aiAssistantData } = aiAssistantSidebarData ?? {};
+  const { aiAssistantData, threadData } = useAiAssistantSidebarStatus();
+  const { refreshThreadData } = useAiAssistantSidebarActions();
   const { mutate: mutateRecentThreads } = useSWRINFxRecentThreads();
   const { trigger: mutateThreadData } = useSWRMUTxThreads(aiAssistantData?._id);
   const { t } = useTranslation();
@@ -172,19 +174,17 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
   }, []);
 
   const initialView = useMemo(() => {
-    if (aiAssistantSidebarData?.aiAssistantData == null) {
+    if (aiAssistantData == null) {
       return <></>;
     }
 
     return (
       <AiAssistantChatInitialView
-        description={aiAssistantSidebarData.aiAssistantData.description}
-        pagePathPatterns={
-          aiAssistantSidebarData.aiAssistantData.pagePathPatterns
-        }
+        description={aiAssistantData.description}
+        pagePathPatterns={aiAssistantData.pagePathPatterns}
       />
     );
-  }, [aiAssistantSidebarData?.aiAssistantData]);
+  }, [aiAssistantData]);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -278,8 +278,6 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
     );
 
   const threadTitleView = useMemo(() => {
-    const { threadData } = aiAssistantSidebarData ?? {};
-
     if (threadData?.title == null) {
       return <></>;
     }
@@ -298,7 +296,7 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
         </div>
       </div>
     );
-  }, [aiAssistantSidebarData, handleBackToInitialView]);
+  }, [threadData, handleBackToInitialView]);
 
   return {
     createThread,
@@ -358,7 +356,7 @@ export const useFetchAndSetMessageDataEffect = (
   setMessageLogs: Dispatch<SetStateAction<MessageLog[]>>,
   threadId?: string,
 ): void => {
-  const { data: aiAssistantSidebarData } = useAiAssistantSidebar();
+  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
   const { trigger: mutateMessageData } = useSWRMUTxMessages(
     aiAssistantSidebarData?.aiAssistantData?._id,
     threadId,

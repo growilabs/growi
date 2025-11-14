@@ -2,37 +2,34 @@ import React, {
   useCallback, useState, useEffect, type JSX,
 } from 'react';
 
-import type EventEmitter from 'events';
-
 import { PageGrant } from '@growi/core';
+import { globalEventTarget } from '@growi/core/dist/utils';
 import { isTopPage, isUsersProtectedPages } from '@growi/core/dist/utils/page-path-utils';
 import { LoadingSpinner } from '@growi/ui/dist/components';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import {
   UncontrolledButtonDropdown, Button,
   DropdownToggle, DropdownMenu, DropdownItem, Modal,
 } from 'reactstrap';
 
+import { useIsEditable, useCurrentPageData, useCurrentPagePath } from '~/states/page';
 import {
-  useIsEditable, useIsAclEnabled,
-  useIsSlackConfigured,
-} from '~/stores-universal/context';
-import { useEditorMode } from '~/stores-universal/ui';
-import { useWaitingSaveProcessing, useSWRxSlackChannels, useIsSlackEnabled } from '~/stores/editor';
-import { useSWRxCurrentPage, useCurrentPagePath } from '~/stores/page';
-import { useIsDeviceLargerThanMd, useSelectedGrant } from '~/stores/ui';
+  isAclEnabledAtom,
+  isSlackConfiguredAtom,
+} from '~/states/server-configurations';
+import { useDeviceLargerThanMd } from '~/states/ui/device';
+import {
+  useEditorMode, useSelectedGrant, useWaitingSaveProcessing, useIsSlackEnabled, EditorMode,
+} from '~/states/ui/editor';
+import { useSWRxSlackChannels } from '~/stores/editor';
 import loggerFactory from '~/utils/logger';
 
 import { NotAvailable } from '../../NotAvailable';
 import { SlackNotification } from '../../SlackNotification';
+import type { SaveOptions } from '../PageEditor';
 
 import { GrantSelector } from './GrantSelector';
-
-
-declare global {
-  // eslint-disable-next-line vars-on-top, no-var
-  var globalEmitter: EventEmitter;
-}
 
 
 const logger = loggerFactory('growi:SavePageControls');
@@ -41,29 +38,39 @@ const logger = loggerFactory('growi:SavePageControls');
 const SavePageButton = (props: { slackChannels: string, isSlackEnabled?: boolean, isDeviceLargerThanMd?: boolean }) => {
 
   const { t } = useTranslation();
-  const { data: _isWaitingSaveProcessing } = useWaitingSaveProcessing();
+  const _isWaitingSaveProcessing = useWaitingSaveProcessing();
   const [isSavePageModalShown, setIsSavePageModalShown] = useState<boolean>(false);
-  const { data: selectedGrant } = useSelectedGrant();
+  const [selectedGrant] = useSelectedGrant();
 
-  const { slackChannels, isSlackEnabled, isDeviceLargerThanMd } = props;
+  const { slackChannels, isSlackEnabled = false, isDeviceLargerThanMd } = props;
 
   const isWaitingSaveProcessing = _isWaitingSaveProcessing === true; // ignore undefined
 
-  const save = useCallback(async(): Promise<void> => {
+  const save = useCallback(async (): Promise<void> => {
     // save
-    globalEmitter.emit('saveAndReturnToView', { wip: false, slackChannels, isSlackEnabled });
+    globalEventTarget.dispatchEvent(new CustomEvent<SaveOptions>('saveAndReturnToView', {
+      detail: {
+        wip: false, slackChannels, isSlackEnabled,
+      },
+    }));
   }, [isSlackEnabled, slackChannels]);
 
   const saveAndOverwriteScopesOfDescendants = useCallback(() => {
     // save
-    globalEmitter.emit('saveAndReturnToView', {
-      wip: false, overwriteScopesOfDescendants: true, slackChannels, isSlackEnabled,
-    });
+    globalEventTarget.dispatchEvent(new CustomEvent<SaveOptions>('saveAndReturnToView', {
+      detail: {
+        wip: false, overwriteScopesOfDescendants: true, slackChannels, isSlackEnabled,
+      },
+    }));
   }, [isSlackEnabled, slackChannels]);
 
   const saveAndMakeWip = useCallback(() => {
     // save
-    globalEmitter.emit('saveAndReturnToView', { wip: true, slackChannels, isSlackEnabled });
+    globalEventTarget.dispatchEvent(new CustomEvent<SaveOptions>('saveAndReturnToView', {
+      detail: {
+        wip: true, slackChannels, isSlackEnabled,
+      },
+    }));
   }, [isSlackEnabled, slackChannels]);
 
   const labelSubmitButton = t('Update');
@@ -145,16 +152,16 @@ const SavePageButton = (props: { slackChannels: string, isSlackEnabled?: boolean
 
 export const SavePageControls = (): JSX.Element | null => {
   const { t } = useTranslation('commons');
-  const { data: currentPage } = useSWRxCurrentPage();
-  const { data: isEditable } = useIsEditable();
-  const { data: isAclEnabled } = useIsAclEnabled();
+  const currentPage = useCurrentPageData();
+  const isEditable = useIsEditable();
+  const isAclEnabled = useAtomValue(isAclEnabledAtom);
 
-  const { data: editorMode } = useEditorMode();
-  const { data: currentPagePath } = useCurrentPagePath();
-  const { data: isSlackConfigured } = useIsSlackConfigured();
-  const { data: isSlackEnabled, mutate: mutateIsSlackEnabled } = useIsSlackEnabled();
+  const { editorMode } = useEditorMode();
+  const currentPagePath = useCurrentPagePath();
+  const isSlackConfigured = useAtomValue(isSlackConfiguredAtom);
+  const [isSlackEnabled, setIsSlackEnabled] = useIsSlackEnabled();
   const { data: slackChannelsData } = useSWRxSlackChannels(currentPagePath);
-  const { data: isDeviceLargerThanMd } = useIsDeviceLargerThanMd();
+  const [isDeviceLargerThanMd] = useDeviceLargerThanMd();
 
   const [slackChannels, setSlackChannels] = useState<string>('');
   const [isSavePageControlsModalShown, setIsSavePageControlsModalShown] = useState<boolean>(false);
@@ -162,16 +169,12 @@ export const SavePageControls = (): JSX.Element | null => {
   // DO NOT dependent on slackChannelsData directly: https://github.com/growilabs/growi/pull/7332
   const slackChannelsDataString = slackChannelsData?.toString();
   useEffect(() => {
-    if (editorMode === 'editor') {
+    if (editorMode === EditorMode.Editor) {
       setSlackChannels(slackChannelsDataString ?? '');
-      mutateIsSlackEnabled(false);
+      setIsSlackEnabled(false);
     }
-  }, [editorMode, mutateIsSlackEnabled, slackChannelsDataString]);
+  }, [editorMode, setIsSlackEnabled, slackChannelsDataString]);
 
-
-  const isSlackEnabledToggleHandler = (bool: boolean) => {
-    mutateIsSlackEnabled(bool, false);
-  };
 
   const slackChannelsChangedHandler = useCallback((slackChannels: string) => {
     setSlackChannels(slackChannels);
@@ -199,7 +202,7 @@ export const SavePageControls = (): JSX.Element | null => {
                     <SlackNotification
                       isSlackEnabled={isSlackEnabled}
                       slackChannels={slackChannels}
-                      onEnabledFlagChange={isSlackEnabledToggleHandler}
+                      onEnabledFlagChange={setIsSlackEnabled}
                       onChannelChange={slackChannelsChangedHandler}
                       id="idForEditorNavbarBottom"
                     />
@@ -251,7 +254,7 @@ export const SavePageControls = (): JSX.Element | null => {
                       <SlackNotification
                         isSlackEnabled={isSlackEnabled}
                         slackChannels={slackChannels}
-                        onEnabledFlagChange={isSlackEnabledToggleHandler}
+                        onEnabledFlagChange={setIsSlackEnabled}
                         onChannelChange={slackChannelsChangedHandler}
                         id="idForEditorNavbarBottom"
                       />

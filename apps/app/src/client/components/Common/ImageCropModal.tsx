@@ -76,14 +76,14 @@ const ImageCropModal: FC<Props> = (props: Props) => {
     reset();
   }, [reset]);
 
-  const onImageLoaded = (image) => {
+  // Memoize image processing functions
+  const onImageLoaded = useCallback((image) => {
     setImageRef(image);
     reset();
     return false;
-  };
+  }, [reset]);
 
-
-  const getCroppedImg = async(image: HTMLImageElement, crop: ICropOptions) => {
+  const getCroppedImg = useCallback(async(image: HTMLImageElement, crop: ICropOptions) => {
     const {
       naturalWidth: imageNaturalWidth, naturalHeight: imageNaturalHeight, width: imageWidth, height: imageHeight,
     } = image;
@@ -107,82 +107,86 @@ const ImageCropModal: FC<Props> = (props: Props) => {
       logger.error(err);
       toastError(new Error('Failed to draw image'));
     }
-  };
+  }, []);
 
   // Convert base64 Image to blob
-  const convertBase64ToBlob = async(base64Image: string) => {
+  const convertBase64ToBlob = useCallback(async(base64Image: string) => {
     const base64Response = await fetch(base64Image);
     return base64Response.blob();
-  };
+  }, []);
 
 
-  // Clear image and set isImageCrop true on modal close
-  const onModalCloseHandler = async() => {
+  // Memoize event handlers
+  const onModalCloseHandler = useCallback(async() => {
     setImageRef(null);
     onModalClose();
-  };
+  }, [onModalClose]);
 
-  // Process and save image
-  // Cropping image is optional
-  // If crop is active , the saved image is cropped image (png). Otherwise, the original image will be saved (Original size and file type)
-  const processAndSaveImage = async() => {
+  const processAndSaveImage = useCallback(async() => {
     if (imageRef && cropOptions?.width && cropOptions.height) {
       const processedImage = isCropImage ? await getCroppedImg(imageRef, cropOptions) : await convertBase64ToBlob(imageRef.src);
       // Save image to database
       onImageProcessCompleted(processedImage);
     }
     onModalCloseHandler();
-  };
+  }, [imageRef, cropOptions, isCropImage, getCroppedImg, convertBase64ToBlob, onImageProcessCompleted, onModalCloseHandler]);
+
+  const toggleCropMode = useCallback(() => setIsCropImage(!isCropImage), [isCropImage]);
+  const handleCropChange = useCallback((crop: CropOptions) => setCropOtions(crop), []);
 
   return (
     <Modal isOpen={isShow} toggle={onModalCloseHandler}>
-      <ModalHeader tag="h4" toggle={onModalCloseHandler} className="text-info">
-        {t('crop_image_modal.image_crop')}
-      </ModalHeader>
-      <ModalBody className="my-4">
-        {
-          isCropImage
-            ? (
-              <ReactCrop
-                style={{ backgroundColor: 'transparent' }}
-                src={src}
-                crop={cropOptions}
-                onImageLoaded={onImageLoaded}
-                onChange={crop => setCropOtions(crop)}
-                circularCrop={isCircular}
-              />
+      {isShow && (
+        <>
+          <ModalHeader tag="h4" toggle={onModalCloseHandler} className="text-info">
+            {t('crop_image_modal.image_crop')}
+          </ModalHeader>
+          <ModalBody className="my-4">
+            {
+              isCropImage
+                ? (
+                  <ReactCrop
+                    style={{ backgroundColor: 'transparent' }}
+                    src={src}
+                    crop={cropOptions}
+                    onImageLoaded={onImageLoaded}
+                    onChange={handleCropChange}
+                    circularCrop={isCircular}
+                  />
+                )
+                : (<img style={{ maxWidth: imageRef?.width }} src={imageRef?.src} />)
+            }
+          </ModalBody>
+          <ModalFooter>
+            <button type="button" className="btn btn-outline-danger rounded-pill me-auto" disabled={!isCropImage} onClick={reset}>
+              {t('commons:Reset')}
+            </button>
+            { !showCropOption && (
+              <div className="me-auto">
+                <div className="form-check form-switch">
+                  <input
+                    id="cropImageOption"
+                    className="form-check-input me-auto"
+                    type="checkbox"
+                    checked={isCropImage}
+                    onChange={toggleCropMode}
+                  />
+                  <label className="form-label form-check-label" htmlFor="cropImageOption">
+                    { t('crop_image_modal.image_crop') }
+                  </label>
+                </div>
+              </div>
             )
-            : (<img style={{ maxWidth: imageRef?.width }} src={imageRef?.src} />)
-        }
-      </ModalBody>
-      <ModalFooter>
-        <button type="button" className="btn btn-outline-danger rounded-pill me-auto" disabled={!isCropImage} onClick={reset}>
-          {t('commons:Reset')}
-        </button>
-        { !showCropOption && (
-          <div className="me-auto">
-            <div className="form-check form-switch">
-              <input
-                id="cropImageOption"
-                className="form-check-input me-auto"
-                type="checkbox"
-                checked={isCropImage}
-                onChange={() => { setIsCropImage(!isCropImage) }}
-              />
-              <label className="form-label form-check-label" htmlFor="cropImageOption">
-                { t('crop_image_modal.image_crop') }
-              </label>
-            </div>
-          </div>
-        )
-        }
-        <button type="button" className="btn btn-outline-secondary rounded-pill me-2" onClick={onModalCloseHandler}>
-          {t('crop_image_modal.cancel')}
-        </button>
-        <button type="button" className="btn btn-outline-primary rounded-pill" onClick={processAndSaveImage}>
-          { isCropImage ? t('crop_image_modal.crop') : t('crop_image_modal.save') }
-        </button>
-      </ModalFooter>
+            }
+            <button type="button" className="btn btn-outline-secondary rounded-pill me-2" onClick={onModalCloseHandler}>
+              {t('crop_image_modal.cancel')}
+            </button>
+            <button type="button" className="btn btn-outline-primary rounded-pill" onClick={processAndSaveImage}>
+              { isCropImage ? t('crop_image_modal.crop') : t('crop_image_modal.save') }
+            </button>
+          </ModalFooter>
+        </>
+      )}
     </Modal>
   );
 };

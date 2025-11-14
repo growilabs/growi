@@ -5,7 +5,7 @@ import React, {
 
 import nodePath from 'path';
 
-import type { IPageInfoAll, IPageToDeleteWithMeta } from '@growi/core';
+import type { IPageInfoExt, IPageToDeleteWithMeta } from '@growi/core';
 import { pathUtils } from '@growi/core/dist/utils';
 import { useRect } from '@growi/ui/dist/utils';
 import { useTranslation } from 'next-i18next';
@@ -76,7 +76,7 @@ export const usePageItemControl = (): UsePageItemControl => {
       setShowRenameInput(true);
     }, []);
 
-    const deleteMenuItemClickHandler = useCallback(async(_pageId: string, pageInfo: IPageInfoAll | undefined): Promise<void> => {
+    const deleteMenuItemClickHandler = useCallback(async(_pageId: string, pageInfo: IPageInfoExt | undefined): Promise<void> => {
       if (onClickDeleteMenuItem == null) {
         return;
       }

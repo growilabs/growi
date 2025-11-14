@@ -1,27 +1,41 @@
-import React, { type JSX } from 'react';
+import React, { useState, useEffect, type JSX } from 'react';
 
+import type { IUser } from '@growi/core/dist/interfaces';
+import { useAtomValue } from 'jotai';
 import { useTranslation, i18n } from 'next-i18next';
 
 import { i18n as i18nConfig } from '^/config/next-i18next.config';
 
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useRegistrationWhitelist } from '~/stores-universal/context';
-import { usePersonalSettings } from '~/stores/personal-settings';
+import { registrationWhitelistAtom } from '~/states/server-configurations';
+import { useSWRxPersonalSettings, useUpdateBasicInfo } from '~/stores/personal-settings';
 
 export const BasicInfoSettings = (): JSX.Element => {
   const { t } = useTranslation();
-  const { data: registrationWhitelist } = useRegistrationWhitelist();
+  const registrationWhitelist = useAtomValue(registrationWhitelistAtom);
 
   const {
-    data: personalSettingsInfo, mutate: mutatePersonalSettings, sync, updateBasicInfo, error,
-  } = usePersonalSettings();
+    data: personalSettingsInfo, error,
+  } = useSWRxPersonalSettings();
 
+  // Form state management
+  const [formData, setFormData] = useState<IUser | null>(null);
+
+  // Sync form data with server data
+  useEffect(() => {
+    if (personalSettingsInfo != null) {
+      setFormData(personalSettingsInfo);
+    }
+  }, [personalSettingsInfo]);
+
+  const { trigger: updateBasicInfo, isMutating } = useUpdateBasicInfo();
 
   const submitHandler = async() => {
-
     try {
-      await updateBasicInfo();
-      sync();
+      if (formData == null) {
+        throw new Error('personalSettingsInfo is not loaded');
+      }
+      await updateBasicInfo(formData);
       toastSuccess(t('toaster.update_successed', { target: t('Basic Info'), ns: 'commons' }));
     }
     catch (errs) {
@@ -38,11 +52,11 @@ export const BasicInfoSettings = (): JSX.Element => {
     }
   };
 
-  const changePersonalSettingsHandler = (updateData) => {
-    if (personalSettingsInfo == null) {
+  const changePersonalSettingsHandler = (updateData: Partial<IUser>) => {
+    if (formData == null) {
       return;
     }
-    mutatePersonalSettings({ ...personalSettingsInfo, ...updateData });
+    setFormData({ ...formData, ...updateData });
   };
 
 
@@ -56,7 +70,7 @@ export const BasicInfoSettings = (): JSX.Element => {
             className="form-control"
             type="text"
             name="userForm[name]"
-            defaultValue={personalSettingsInfo?.name || ''}
+            value={formData?.name || ''}
             onChange={e => changePersonalSettingsHandler({ name: e.target.value })}
           />
         </div>
@@ -69,7 +83,7 @@ export const BasicInfoSettings = (): JSX.Element => {
             className="form-control"
             type="text"
             name="userForm[email]"
-            defaultValue={personalSettingsInfo?.email || ''}
+            value={formData?.email || ''}
             onChange={e => changePersonalSettingsHandler({ email: e.target.value })}
           />
           {registrationWhitelist != null && registrationWhitelist.length !== 0 && (
@@ -92,7 +106,7 @@ export const BasicInfoSettings = (): JSX.Element => {
               id="radioEmailShow"
               className="form-check-input"
               name="userForm[isEmailPublished]"
-              checked={personalSettingsInfo?.isEmailPublished === true}
+              checked={formData?.isEmailPublished === true}
               onChange={() => changePersonalSettingsHandler({ isEmailPublished: true })}
             />
             <label className="form-label form-check-label mb-0" htmlFor="radioEmailShow">{t('Show')}</label>
@@ -103,7 +117,7 @@ export const BasicInfoSettings = (): JSX.Element => {
               id="radioEmailHide"
               className="form-check-input"
               name="userForm[isEmailPublished]"
-              checked={personalSettingsInfo?.isEmailPublished === false}
+              checked={formData?.isEmailPublished === false}
               onChange={() => changePersonalSettingsHandler({ isEmailPublished: false })}
             />
             <label className="form-label form-check-label mb-0" htmlFor="radioEmailHide">{t('Hide')}</label>
@@ -126,8 +140,8 @@ export const BasicInfoSettings = (): JSX.Element => {
                     id={`radioLang${locale}`}
                     className="form-check-input"
                     name="userForm[lang]"
-                    checked={personalSettingsInfo?.lang === locale}
-                    onChange={() => changePersonalSettingsHandler({ lang: locale })}
+                    checked={formData?.lang === locale}
+                    onChange={() => changePersonalSettingsHandler({ lang: locale as IUser['lang'] })}
                   />
                   <label className="form-label form-check-label mb-0" htmlFor={`radioLang${locale}`}>{fixedT('meta.display_name') as string}</label>
                 </div>
@@ -144,7 +158,7 @@ export const BasicInfoSettings = (): JSX.Element => {
             type="text"
             key="slackMemberId"
             name="userForm[slackMemberId]"
-            defaultValue={personalSettingsInfo?.slackMemberId || ''}
+            value={formData?.slackMemberId || ''}
             onChange={e => changePersonalSettingsHandler({ slackMemberId: e.target.value })}
           />
         </div>
@@ -157,7 +171,7 @@ export const BasicInfoSettings = (): JSX.Element => {
             type="button"
             className="btn btn-primary"
             onClick={submitHandler}
-            disabled={error != null}
+            disabled={error != null || isMutating || formData == null}
           >
             {t('Update')}
           </button>
