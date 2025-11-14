@@ -4,7 +4,7 @@ import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 
 
-interface PipelineParams {
+export interface PipelineParams {
   userId: string;
   startDate: Date;
 }
@@ -18,7 +18,7 @@ export class ContributionAggregationService {
     return activityResults;
   }
 
-  private buildPipeline(params: PipelineParams): PipelineStage[] {
+  public buildPipeline(params: PipelineParams): PipelineStage[] {
     const { userId, startDate } = params;
 
     const pipeline: PipelineStage[] = [
