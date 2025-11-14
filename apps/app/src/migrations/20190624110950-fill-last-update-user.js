@@ -7,10 +7,9 @@ import loggerFactory from '~/utils/logger';
 const logger = loggerFactory('growi:migrate:abolish-page-group-relation');
 
 /**
- * FIX https://github.com/weseek/growi/issues/1067
+ * FIX https://github.com/growilabs/growi/issues/1067
  */
 module.exports = {
-
   async up(db) {
     logger.info('Apply migration');
     await mongoose.connect(getMongoUri(), mongoOptions);
@@ -47,5 +46,4 @@ module.exports = {
   down(db) {
     // do not rollback
   },
-
 };

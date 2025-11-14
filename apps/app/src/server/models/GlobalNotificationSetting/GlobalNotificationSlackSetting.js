@@ -12,15 +12,22 @@ const factory = (crowi) => {
   GlobalNotificationSettingClass.crowi = crowi;
   GlobalNotificationSettingSchema.loadClass(GlobalNotificationSettingClass);
 
-  const GlobalNotificationSettingModel = mongoose.model('GlobalNotificationSetting', GlobalNotificationSettingSchema);
-  const GlobalNotificationSlackSettingModel = GlobalNotificationSettingModel.discriminator(
-    GlobalNotificationSettingType.SLACK,
-    new mongoose.Schema({
-      slackChannels: String,
-    }, {
-      discriminatorKey: 'type',
-    }),
+  const GlobalNotificationSettingModel = mongoose.model(
+    'GlobalNotificationSetting',
+    GlobalNotificationSettingSchema,
   );
+  const GlobalNotificationSlackSettingModel =
+    GlobalNotificationSettingModel.discriminator(
+      GlobalNotificationSettingType.SLACK,
+      new mongoose.Schema(
+        {
+          slackChannels: String,
+        },
+        {
+          discriminatorKey: 'type',
+        },
+      ),
+    );
 
   return GlobalNotificationSlackSettingModel;
 };

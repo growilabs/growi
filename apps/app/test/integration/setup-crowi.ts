@@ -1,20 +1,18 @@
-import { Server } from 'http';
+import { Server } from 'node:http';
 
 import Crowi from '../../src/server/crowi';
 import { setupModelsDependentOnCrowi } from '../../src/server/crowi/setup-models';
 
 let _instance: Crowi;
 
-const initCrowi = async(crowi: Crowi) => {
+const initCrowi = async (crowi: Crowi) => {
   crowi.models = await setupModelsDependentOnCrowi(crowi);
   await crowi.setupConfigManager();
 
   await crowi.setupSocketIoService();
   await crowi.socketIoService.attachServer(new Server()); // attach dummy server
 
-  await Promise.all([
-    crowi.setUpApp(),
-  ]);
+  await Promise.all([crowi.setUpApp()]);
 
   await Promise.all([
     crowi.setupPassport(),

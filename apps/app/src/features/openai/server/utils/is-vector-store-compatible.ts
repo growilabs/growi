@@ -7,7 +7,8 @@ const supportedFormats = {
   '.cs': 'text/x-csharp',
   '.css': 'text/css',
   '.doc': 'application/msword',
-  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.docx':
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   '.go': 'text/x-golang',
   '.html': 'text/html',
   '.java': 'text/x-java',
@@ -16,7 +17,8 @@ const supportedFormats = {
   '.md': 'text/markdown',
   '.pdf': 'application/pdf',
   '.php': 'text/x-php',
-  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.pptx':
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   '.py': ['text/x-python', 'text/x-script.python'],
   '.rb': 'text/x-ruby',
   '.sh': 'application/x-sh',
@@ -27,7 +29,10 @@ const supportedFormats = {
 
 type SupportedExtension = keyof typeof supportedFormats;
 
-export const isVectorStoreCompatible = (originalName: string, mimeType: string): boolean => {
+export const isVectorStoreCompatible = (
+  originalName: string,
+  mimeType: string,
+): boolean => {
   // Get extension
   const extension = path.extname(originalName).toLowerCase();
 

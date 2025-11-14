@@ -122,7 +122,6 @@ export function normalizePath(path: string): string {
   return `/${parts.content}`;
 }
 
-
 export function attachTitleHeader(path: string): string {
   return `# ${path}`;
 }

@@ -2,6 +2,7 @@ import nodePath from 'path';
 
 import { GlobalNotificationSettingEvent, GlobalNotificationSettingType } from '~/server/models/GlobalNotificationSetting';
 import { configManager } from '~/server/service/config-manager';
+import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:service:GlobalNotificationMailService'); // eslint-disable-line no-unused-vars
@@ -65,7 +66,7 @@ class GlobalNotificationMailService {
 
     const path = page.path;
     const appTitle = this.crowi.appService.getAppTitle();
-    const siteUrl = this.crowi.appService.getSiteUrl();
+    const siteUrl = growiInfoService.getSiteUrl();
     const pageUrl = new URL(page._id, siteUrl);
 
     let subject;

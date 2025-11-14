@@ -1,23 +1,20 @@
-
-import React, {
-  useState, useCallback, useEffect, type JSX,
-} from 'react';
-
-import Downshift, { type DownshiftState, type StateChangeOptions } from 'downshift';
+import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Downshift, {
+  type DownshiftState,
+  type StateChangeOptions,
+} from 'downshift';
 import { Modal, ModalBody } from 'reactstrap';
 
 import { isIncludeAiMenthion, removeAiMenthion } from '../../utils/ai';
 import type { DownshiftItem } from '../interfaces/downshift';
 import { useSearchModal } from '../stores/search';
-
 import { SearchForm } from './SearchForm';
 import { SearchHelp } from './SearchHelp';
 import { SearchMethodMenuItem } from './SearchMethodMenuItem';
 import { SearchResultMenuItem } from './SearchResultMenuItem';
 
 const SearchModal = (): JSX.Element => {
-
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isMenthionedToAi, setMenthionedToAi] = useState(false);
 
@@ -29,10 +26,13 @@ const SearchModal = (): JSX.Element => {
     setSearchKeyword(searchText);
   }, []);
 
-  const selectSearchMenuItemHandler = useCallback((selectedItem: DownshiftItem) => {
-    router.push(selectedItem.url);
-    closeSearchModal();
-  }, [closeSearchModal, router]);
+  const selectSearchMenuItemHandler = useCallback(
+    (selectedItem: DownshiftItem) => {
+      router.push(selectedItem.url);
+      closeSearchModal();
+    },
+    [closeSearchModal, router],
+  );
 
   const submitHandler = useCallback(() => {
     const url = new URL('_search', 'http://example.com');
@@ -41,7 +41,10 @@ const SearchModal = (): JSX.Element => {
     closeSearchModal();
   }, [closeSearchModal, router, searchKeyword]);
 
-  const stateReducer = (state: DownshiftState<DownshiftItem>, changes: StateChangeOptions<DownshiftItem>) => {
+  const stateReducer = (
+    state: DownshiftState<DownshiftItem>,
+    changes: StateChangeOptions<DownshiftItem>,
+  ) => {
     // Do not update highlightedIndex on mouse hover
     if (changes.type === Downshift.stateChangeTypes.itemMouseEnter) {
       return {
@@ -59,8 +62,7 @@ const SearchModal = (): JSX.Element => {
     }
     if (searchModalData?.searchKeyword == null) {
       setSearchKeyword('');
-    }
-    else {
+    } else {
       setSearchKeyword(searchModalData.searchKeyword);
     }
   }, [searchModalData?.isOpened, searchModalData?.searchKeyword]);
@@ -72,7 +74,12 @@ const SearchModal = (): JSX.Element => {
   const searchKeywordWithoutAi = removeAiMenthion(searchKeyword);
 
   return (
-    <Modal size="lg" isOpen={searchModalData?.isOpened ?? false} toggle={closeSearchModal} data-testid="search-modal">
+    <Modal
+      size="lg"
+      isOpen={searchModalData?.isOpened ?? false}
+      toggle={closeSearchModal}
+      data-testid="search-modal"
+    >
       <ModalBody className="pb-2">
         <Downshift
           onSelect={selectSearchMenuItemHandler}
@@ -88,7 +95,9 @@ const SearchModal = (): JSX.Element => {
           }) => (
             <div {...getRootProps({}, { suppressRefError: true })}>
               <div className="text-muted d-flex justify-content-center align-items-center p-1">
-                <span className={`material-symbols-outlined fs-4 me-3 ${isMenthionedToAi ? 'text-primary' : ''}`}>
+                <span
+                  className={`material-symbols-outlined fs-4 me-3 ${isMenthionedToAi ? 'text-primary' : ''}`}
+                >
                   {isMenthionedToAi ? 'psychology' : 'search'}
                 </span>
                 <SearchForm
@@ -102,7 +111,9 @@ const SearchModal = (): JSX.Element => {
                   className="btn border-0 d-flex justify-content-center p-0"
                   onClick={closeSearchModal}
                 >
-                  <span className="material-symbols-outlined fs-4 ms-3 py-0">close</span>
+                  <span className="material-symbols-outlined fs-4 ms-3 py-0">
+                    close
+                  </span>
                 </button>
               </div>
 

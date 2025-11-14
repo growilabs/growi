@@ -1,6 +1,7 @@
-import React, { useCallback, type JSX } from 'react';
+import React, { useCallback, useEffect, type JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
+import { useForm } from 'react-hook-form';
 import { PrismAsyncLight } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { Card, CardBody } from 'reactstrap';
@@ -20,8 +21,23 @@ const CustomizeNoscriptSetting = (props: Props): JSX.Element => {
   const { adminCustomizeContainer } = props;
   const { t } = useTranslation();
 
-  const onClickSubmit = useCallback(async() => {
+  const {
+    register,
+    handleSubmit,
+    reset,
+  } = useForm();
+
+  // Sync form with container state
+  useEffect(() => {
+    reset({
+      customizeNoscript: adminCustomizeContainer.state.currentCustomizeNoscript || '',
+    });
+  }, [adminCustomizeContainer.state.currentCustomizeNoscript, reset]);
+
+  const onSubmit = useCallback(async(data) => {
     try {
+      // Update container state before API call
+      await adminCustomizeContainer.changeCustomizeNoscript(data.customizeNoscript);
       await adminCustomizeContainer.updateCustomizeNoscript();
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.custom_noscript'), ns: 'commons' }));
     }
@@ -45,40 +61,40 @@ const CustomizeNoscriptSetting = (props: Props): JSX.Element => {
             </CardBody>
           </Card>
 
-          <div>
-            <textarea
-              className="form-control mb-2"
-              name="customizeNoscript"
-              rows={8}
-              value={adminCustomizeContainer.state.currentCustomizeNoscript || ''}
-              onChange={(e) => { adminCustomizeContainer.changeCustomizeNoscript(e.target.value) }}
-            />
-          </div>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <div>
+              <textarea
+                className="form-control mb-2"
+                rows={8}
+                {...register('customizeNoscript')}
+              />
+            </div>
 
-          <a
-            className="text-muted"
-            data-bs-toggle="collapse"
-            href="#collapseExampleHtml"
-            role="button"
-            aria-expanded="false"
-            aria-controls="collapseExampleHtml"
-          >
-            <span className="material-symbols-outlined me-1" aria-hidden="true">navigate_next</span>
-            Example for Google Tag Manager
-          </a>
-          <div className="collapse" id="collapseExampleHtml">
-            <PrismAsyncLight
-              style={oneDark}
-              language="javascript"
+            <a
+              className="text-muted"
+              data-bs-toggle="collapse"
+              href="#collapseExampleHtml"
+              role="button"
+              aria-expanded="false"
+              aria-controls="collapseExampleHtml"
             >
-              {`<iframe src="https://www.googletagmanager.com/ns.html?id=GTM-XXXXXXX"
+              <span className="material-symbols-outlined me-1" aria-hidden="true">navigate_next</span>
+              Example for Google Tag Manager
+            </a>
+            <div className="collapse" id="collapseExampleHtml">
+              <PrismAsyncLight
+                style={oneDark}
+                language="javascript"
+              >
+                {`<iframe src="https://www.googletagmanager.com/ns.html?id=GTM-XXXXXXX"
   height="0"
   width="0"
   style="display:none;visibility:hidden"></iframe>`}
-            </PrismAsyncLight>
-          </div>
+              </PrismAsyncLight>
+            </div>
 
-          <AdminUpdateButtonRow onClick={onClickSubmit} disabled={adminCustomizeContainer.state.retrieveError != null} />
+            <AdminUpdateButtonRow type="submit" disabled={adminCustomizeContainer.state.retrieveError != null} />
+          </form>
         </div>
       </div>
     </React.Fragment>

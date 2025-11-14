@@ -12,15 +12,22 @@ const factory = (crowi) => {
   GlobalNotificationSettingClass.crowi = crowi;
   GlobalNotificationSettingSchema.loadClass(GlobalNotificationSettingClass);
 
-  const GlobalNotificationSettingModel = mongoose.model('GlobalNotificationSetting', GlobalNotificationSettingSchema);
-  const GlobalNotificationMailSettingModel = GlobalNotificationSettingModel.discriminator(
-    GlobalNotificationSettingType.MAIL,
-    new mongoose.Schema({
-      toEmail: String,
-    }, {
-      discriminatorKey: 'type',
-    }),
+  const GlobalNotificationSettingModel = mongoose.model(
+    'GlobalNotificationSetting',
+    GlobalNotificationSettingSchema,
   );
+  const GlobalNotificationMailSettingModel =
+    GlobalNotificationSettingModel.discriminator(
+      GlobalNotificationSettingType.MAIL,
+      new mongoose.Schema(
+        {
+          toEmail: String,
+        },
+        {
+          discriminatorKey: 'type',
+        },
+      ),
+    );
 
   return GlobalNotificationMailSettingModel;
 };

@@ -5,7 +5,6 @@ import { KeycloakUserGroupSyncService } from './keycloak-user-group-sync';
 vi.mock('@keycloak/keycloak-admin-client', () => {
   return {
     default: class {
-
       auth() {}
 
       groups = {
@@ -40,48 +39,40 @@ vi.mock('@keycloak/keycloak-admin-client', () => {
         // mock group detail
         findOne: (payload) => {
           if (payload?.id === 'groupId1') {
-            return Promise.resolve(
-              {
-                id: 'groupId1',
-                name: 'grandParentGroup',
-                attributes: {
-                  description: ['this is a grand parent group'],
-                },
+            return Promise.resolve({
+              id: 'groupId1',
+              name: 'grandParentGroup',
+              attributes: {
+                description: ['this is a grand parent group'],
               },
-            );
+            });
           }
           if (payload?.id === 'groupId2') {
-            return Promise.resolve(
-              {
-                id: 'groupId2',
-                name: 'parentGroup',
-                attributes: {
-                  description: ['this is a parent group'],
-                },
+            return Promise.resolve({
+              id: 'groupId2',
+              name: 'parentGroup',
+              attributes: {
+                description: ['this is a parent group'],
               },
-            );
+            });
           }
           if (payload?.id === 'groupId3') {
-            return Promise.resolve(
-              {
-                id: 'groupId3',
-                name: 'childGroup',
-                attributes: {
-                  description: ['this is a child group'],
-                },
+            return Promise.resolve({
+              id: 'groupId3',
+              name: 'childGroup',
+              attributes: {
+                description: ['this is a child group'],
               },
-            );
+            });
           }
           if (payload?.id === 'groupId4') {
-            return Promise.resolve(
-              {
-                id: 'groupId3',
-                name: 'childGroup',
-                attributes: {
-                  description: ['this is a root group'],
-                },
+            return Promise.resolve({
+              id: 'groupId3',
+              name: 'childGroup',
+              attributes: {
+                description: ['this is a root group'],
               },
-            );
+            });
           }
           return Promise.reject(new Error('not found'));
         },
@@ -128,7 +119,6 @@ vi.mock('@keycloak/keycloak-admin-client', () => {
           return Promise.resolve([]);
         },
       };
-
     },
   };
 });
@@ -145,49 +135,56 @@ describe('KeycloakUserGroupSyncService.generateExternalUserGroupTrees', () => {
     'external-user-group:keycloak:groupSyncClientSecret': '123456',
   };
 
-  beforeAll(async() => {
+  beforeAll(async () => {
     await configManager.loadConfigs();
     await configManager.updateConfigs(configParams, { skipPubsub: true });
     keycloakUserGroupSyncService = new KeycloakUserGroupSyncService(null, null);
     keycloakUserGroupSyncService.init('oidc');
   });
 
-  it('creates ExternalUserGroupTrees', async() => {
-    const rootNodes = await keycloakUserGroupSyncService?.generateExternalUserGroupTrees();
+  it('creates ExternalUserGroupTrees', async () => {
+    const rootNodes =
+      await keycloakUserGroupSyncService?.generateExternalUserGroupTrees();
 
     expect(rootNodes?.length).toBe(2);
 
     // check grandParentGroup
-    const grandParentNode = rootNodes?.find(node => node.id === 'groupId1');
+    const grandParentNode = rootNodes?.find((node) => node.id === 'groupId1');
     const expectedChildNode = {
       id: 'groupId3',
-      userInfos: [{
-        id: 'userId3',
-        username: 'childGroupUser',
-        email: 'user@childGroup.com',
-      }],
+      userInfos: [
+        {
+          id: 'userId3',
+          username: 'childGroupUser',
+          email: 'user@childGroup.com',
+        },
+      ],
       childGroupNodes: [],
       name: 'childGroup',
       description: 'this is a child group',
     };
     const expectedParentNode = {
       id: 'groupId2',
-      userInfos: [{
-        id: 'userId2',
-        username: 'parentGroupUser',
-        email: 'user@parentGroup.com',
-      }],
+      userInfos: [
+        {
+          id: 'userId2',
+          username: 'parentGroupUser',
+          email: 'user@parentGroup.com',
+        },
+      ],
       childGroupNodes: [expectedChildNode],
       name: 'parentGroup',
       description: 'this is a parent group',
     };
     const expectedGrandParentNode = {
       id: 'groupId1',
-      userInfos: [{
-        id: 'userId1',
-        username: 'grandParentGroupUser',
-        email: 'user@grandParentGroup.com',
-      }],
+      userInfos: [
+        {
+          id: 'userId1',
+          username: 'grandParentGroupUser',
+          email: 'user@grandParentGroup.com',
+        },
+      ],
       childGroupNodes: [expectedParentNode],
       name: 'grandParentGroup',
       description: 'this is a grand parent group',
@@ -195,14 +192,16 @@ describe('KeycloakUserGroupSyncService.generateExternalUserGroupTrees', () => {
     expect(grandParentNode).toStrictEqual(expectedGrandParentNode);
 
     // check rootGroup
-    const rootNode = rootNodes?.find(node => node.id === 'groupId4');
+    const rootNode = rootNodes?.find((node) => node.id === 'groupId4');
     const expectedRootNode = {
       id: 'groupId4',
-      userInfos: [{
-        id: 'userId4',
-        username: 'rootGroupUser',
-        email: 'user@rootGroup.com',
-      }],
+      userInfos: [
+        {
+          id: 'userId4',
+          username: 'rootGroupUser',
+          email: 'user@rootGroup.com',
+        },
+      ],
       childGroupNodes: [],
       name: 'rootGroup',
       description: 'this is a root group',

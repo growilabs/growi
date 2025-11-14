@@ -1,7 +1,8 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 
 import { useTranslation, i18n } from 'next-i18next';
 import PropTypes from 'prop-types';
+import { useForm } from 'react-hook-form';
 
 import { i18n as i18nConfig } from '^/config/next-i18next.config';
 
@@ -20,8 +21,44 @@ const AppSetting = (props) => {
   const { adminAppContainer } = props;
   const { t } = useTranslation(['admin', 'commons']);
 
-  const submitHandler = useCallback(async() => {
+  const {
+    register,
+    handleSubmit,
+    reset,
+  } = useForm();
+
+  // Reset form when adminAppContainer state changes (e.g., after reload)
+  useEffect(() => {
+    reset({
+      title: adminAppContainer.state.title || '',
+      confidential: adminAppContainer.state.confidential || '',
+      globalLang: adminAppContainer.state.globalLang || 'en-US',
+      // Convert boolean to string for radio button value
+      isEmailPublishedForNewUser: String(adminAppContainer.state.isEmailPublishedForNewUser ?? true),
+      fileUpload: adminAppContainer.state.fileUpload ?? false,
+    });
+  }, [
+    adminAppContainer.state.title,
+    adminAppContainer.state.confidential,
+    adminAppContainer.state.globalLang,
+    adminAppContainer.state.isEmailPublishedForNewUser,
+    adminAppContainer.state.fileUpload,
+    reset,
+  ]);
+
+  const onSubmit = useCallback(async(data) => {
     try {
+      // Await all setState completions before API call
+      await Promise.all([
+        adminAppContainer.changeTitle(data.title),
+        adminAppContainer.changeConfidential(data.confidential),
+        adminAppContainer.changeGlobalLang(data.globalLang),
+      ]);
+      // Convert string 'true'/'false' to boolean
+      const isEmailPublished = data.isEmailPublishedForNewUser === 'true' || data.isEmailPublishedForNewUser === true;
+      await adminAppContainer.changeIsEmailPublishedForNewUserShow(isEmailPublished);
+      await adminAppContainer.changeFileUpload(data.fileUpload);
+
       await adminAppContainer.updateAppSettingHandler();
       toastSuccess(t('commons:toaster.update_successed', { target: t('commons:headers.app_settings') }));
     }
@@ -33,18 +70,15 @@ const AppSetting = (props) => {
 
 
   return (
-    <React.Fragment>
+    <form onSubmit={handleSubmit(onSubmit)}>
       <div className="row">
         <label className="text-start text-md-end col-md-3 col-form-label">{t('admin:app_setting.site_name')}</label>
         <div className="col-md-6">
           <input
             className="form-control"
             type="text"
-            value={adminAppContainer.state.title || ''}
-            onChange={(e) => {
-              adminAppContainer.changeTitle(e.target.value);
-            }}
             placeholder="GROWI"
+            {...register('title')}
           />
           <p className="form-text text-muted">{t('admin:app_setting.sitename_change')}</p>
         </div>
@@ -60,11 +94,8 @@ const AppSetting = (props) => {
           <input
             className="form-control"
             type="text"
-            value={adminAppContainer.state.confidential || ''}
-            onChange={(e) => {
-              adminAppContainer.changeConfidential(e.target.value);
-            }}
             placeholder={t('admin:app_setting.confidential_example')}
+            {...register('confidential')}
           />
           <p className="form-text text-muted">{t('admin:app_setting.header_content')}</p>
         </div>
@@ -88,12 +119,8 @@ const AppSetting = (props) => {
                     type="radio"
                     id={`radioLang${locale}`}
                     className="form-check-input"
-                    name="globalLang"
                     value={locale}
-                    checked={adminAppContainer.state.globalLang === locale}
-                    onChange={(e) => {
-                      adminAppContainer.changeGlobalLang(e.target.value);
-                    }}
+                    {...register('globalLang')}
                   />
                   <label className="form-label form-check-label" htmlFor={`radioLang${locale}`}>{fixedT('meta.display_name')}</label>
                 </div>
@@ -116,9 +143,8 @@ const AppSetting = (props) => {
               type="radio"
               id="radio-email-show"
               className="form-check-input"
-              name="mailVisibility"
-              checked={adminAppContainer.state.isEmailPublishedForNewUser === true}
-              onChange={() => { adminAppContainer.changeIsEmailPublishedForNewUserShow(true) }}
+              value="true"
+              {...register('isEmailPublishedForNewUser')}
             />
             <label className="form-label form-check-label" htmlFor="radio-email-show">{t('commons:Show')}</label>
           </div>
@@ -128,9 +154,8 @@ const AppSetting = (props) => {
               type="radio"
               id="radio-email-hide"
               className="form-check-input"
-              name="mailVisibility"
-              checked={adminAppContainer.state.isEmailPublishedForNewUser === false}
-              onChange={() => { adminAppContainer.changeIsEmailPublishedForNewUserShow(false) }}
+              value="false"
+              {...register('isEmailPublishedForNewUser')}
             />
             <label className="form-label form-check-label" htmlFor="radio-email-hide">{t('commons:Hide')}</label>
           </div>
@@ -150,11 +175,7 @@ const AppSetting = (props) => {
               type="checkbox"
               id="cbFileUpload"
               className="form-check-input"
-              name="fileUpload"
-              checked={adminAppContainer.state.fileUpload}
-              onChange={(e) => {
-                adminAppContainer.changeFileUpload(e.target.checked);
-              }}
+              {...register('fileUpload')}
             />
             <label
               className="form-label form-check-label"
@@ -170,8 +191,8 @@ const AppSetting = (props) => {
         </div>
       </div>
 
-      <AdminUpdateButtonRow onClick={submitHandler} disabled={adminAppContainer.state.retrieveError != null} />
-    </React.Fragment>
+      <AdminUpdateButtonRow type="submit" disabled={adminAppContainer.state.retrieveError != null} />
+    </form>
   );
 
 };

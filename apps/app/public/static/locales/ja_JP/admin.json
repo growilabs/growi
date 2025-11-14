@@ -322,7 +322,7 @@
       "done": "クリップボードにコピーしました！"
     },
     "bug_report": "バグを報告する",
-    "submit_bug_report": "<a href='https://github.com/weseek/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>次に GitHub で Issue を投稿してください。</a>"
+    "submit_bug_report": "<a href='https://github.com/growilabs/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>次に GitHub で Issue を投稿してください。</a>"
   },
   "v5_page_migration": {
     "migration_desc": "公開されているページに 古い v4 互換形式のものが存在します。ページツリーや簡単なリネームなどの新機能を利用するには、全てのページを v5 互換形式に変換してください。",
@@ -420,17 +420,7 @@
     "enable": "有効",
     "disable": "無効",
     "use_env_var_if_empty": "データベース側の値が空の場合、環境変数 <code>{{variable}}</code> の値を利用します",
-    "note_for_the_only_env_option": "現在GCS設定は環境変数の値によって制限されています<br>この設定を変更する場合は環境変数 <code>{{env}}</code> の値をfalseに変更もしくは削除してください",
-    "questionnaire_settings": "アンケート設定",
-    "questionnaire_settings_explanation": "システム全体でアンケート機能を有効/無効にします。有効の場合、各ユーザーはユーザー設定ページの「その他の設定」から個別にアンケート機能を有効/無効にできます。",
-    "about_data_sent": "送信される情報について",
-    "docs_link": "https://docs.growi.org/ja/admin-guide/management-cookbook/app-settings.html#%E3%82%A2%E3%83%B3%E3%82%B1%E3%83%BC%E3%83%88%E8%A8%AD%E5%AE%9A",
-    "learn_more": "詳細",
-    "other_info_will_be_sent": "アンケートの回答と合わせて、GROWI の改善に必要な情報を送信します。送信されるデータにユーザーの個人情報は含まれません。",
-    "we_will_use_the_data_to_improve_growi": "私たちはそれらを活用し、最大限ユーザーの体験を向上させるよう努めます。",
-    "anonymize_app_site_url": "サイト URL を匿名化して送信する",
-    "url_anonymization_explanation": "アンケート回答データに含まれるサイト URL が匿名化されます。この設定を有効にすることで、アンケート回答データの送信元である GROWI アプリケーションが特定されなくなります。",
-    "enable_questionnaire": "アンケートを有効にする"
+    "note_for_the_only_env_option": "現在GCS設定は環境変数の値によって制限されています<br>この設定を変更する場合は環境変数 <code>{{env}}</code> の値をfalseに変更もしくは削除してください"
   },
   "markdown_settings": {
     "markdown_settings": "マークダウン設定",

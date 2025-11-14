@@ -16,19 +16,21 @@ jobs:
         ref: ${{ github.event.pull_request.base.ref }}
 
     - name: Retrieve information from package.json
-      uses: myrotvorets/info-from-package-json-action@2.0.1
+      uses: myrotvorets/info-from-package-json-action@v2.0.2
       id: package-json
       with:
         workingDir: apps/pdf-converter
 
     - name: Docker meta
       id: meta
-      uses: docker/metadata-action@v4
+      uses: docker/metadata-action@v5
       with:
         images: growilabs/pdf-converter
         tags: |
           type=raw,value=latest
-          type=raw,value=${{ steps.package-json.outputs.packageVersion }}
+          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}
+          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}.{{minor}}
+          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}.{{minor}}.{{patch}}
 
     - name: Login to docker.io registry
       run: |
@@ -57,7 +59,7 @@ jobs:
         VERBOSE : true
 
     - name: Update Docker Hub Description
-      uses: peter-evans/dockerhub-description@v3
+      uses: peter-evans/dockerhub-description@v4
       with:
         username: growimoogle
         password: ${{ secrets.DOCKER_REGISTRY_PASSWORD_GROWIMOOGLE }}
@@ -96,7 +98,7 @@ jobs:
         turbo run version:prerelease --filter=@growi/pdf-converter
 
     - name: Retrieve information from package.json
-      uses: myrotvorets/info-from-package-json-action@2.0.1
+      uses: myrotvorets/info-from-package-json-action@v2.0.2
       id: package-json
       with:
         workingDir: apps/pdf-converter

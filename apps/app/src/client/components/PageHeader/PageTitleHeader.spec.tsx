@@ -1,5 +1,3 @@
-import '@testing-library/jest-dom/vitest';
-
 import { faker } from '@faker-js/faker';
 import type { IPagePopulatedToShowRevision } from '@growi/core';
 import {

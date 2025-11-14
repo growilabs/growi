@@ -5,13 +5,14 @@ const REPETITIONS_NUM = 50;
 
 const option: IFilterXSSOptions = {
   stripIgnoreTag: true,
-  stripIgnoreTagBody: false, // see https://github.com/weseek/growi/pull/505
+  stripIgnoreTagBody: false, // see https://github.com/growilabs/growi/pull/505
   css: false,
-  escapeHtml: (html) => { return html }, // resolve https://github.com/weseek/growi/issues/221
+  escapeHtml: (html) => {
+    return html;
+  }, // resolve https://github.com/growilabs/growi/issues/221
 };
 
 class GeneralXssFilter extends FilterXSS {
-
   override process(document: string | undefined): string {
     let count = 0;
     let currDoc = document;
@@ -26,12 +27,10 @@ class GeneralXssFilter extends FilterXSS {
 
       prevDoc = currDoc;
       currDoc = super.process(currDoc ?? '');
-    }
-    while (currDoc !== prevDoc);
+    } while (currDoc !== prevDoc);
 
     return currDoc;
   }
-
 }
 
 export const generalXssFilter = new GeneralXssFilter(option);

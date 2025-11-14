@@ -4,9 +4,14 @@
   "description": "GROWI UI Libraries",
   "license": "MIT",
   "private": "true",
-  "keywords": ["growi"],
+  "keywords": [
+    "growi"
+  ],
   "type": "module",
-  "files": ["dist", "scss"],
+  "files": [
+    "dist",
+    "scss"
+  ],
   "exports": {
     "./dist/components": {
       "import": "./dist/components/index.js"

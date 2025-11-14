@@ -1,5 +1,4 @@
 import type { FC, JSX } from 'react';
-
 import type { IPageHasId } from '@growi/core';
 import { pagePathUtils, templateChecker } from '@growi/core/dist/utils';
 
@@ -19,6 +18,7 @@ const SeenUsersCount = (props: SeenUsersCountProps): JSX.Element => {
   const { count, shouldSpaceOutIcon, basisViewersCount } = props;
 
   if (count === 0) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 
@@ -26,6 +26,7 @@ const SeenUsersCount = (props: SeenUsersCountProps): JSX.Element => {
     basisViewersCount != null &&
     basisViewersCount <= SEEN_USERS_HIDE_THRES__ACTIVE_USERS_COUNT
   ) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 
@@ -36,6 +37,7 @@ const SeenUsersCount = (props: SeenUsersCountProps): JSX.Element => {
   );
 
   if (strengthLevel > MAX_STRENGTH_LEVEL) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 

@@ -11,7 +11,7 @@ phases:
   pre_build:
     commands:
       # login to docker.io
-      - echo ${DOCKER_REGISTRY_PASSWORD} | docker login --username wsmoogle --password-stdin
+      - echo ${DOCKER_REGISTRY_PASSWORD} | docker login --username growimoogle --password-stdin
   build:
     commands:
       - docker build -t ${IMAGE_TAG} -f ./apps/app/docker/Dockerfile .

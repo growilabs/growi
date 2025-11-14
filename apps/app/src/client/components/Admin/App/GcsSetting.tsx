@@ -1,21 +1,18 @@
 import type { JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
+import type { UseFormRegister } from 'react-hook-form';
 
+import type { FileUploadFormValues } from './FileUploadSetting.types';
 
 export type GcsSettingMoleculeProps = {
-  gcsReferenceFileWithRelayMode
-  gcsUseOnlyEnvVars
-  gcsApiKeyJsonPath
-  gcsBucket
-  gcsUploadNamespace
-  envGcsApiKeyJsonPath?
-  envGcsBucket?
-  envGcsUploadNamespace?
+  register: UseFormRegister<FileUploadFormValues>
+  gcsReferenceFileWithRelayMode: boolean
+  gcsUseOnlyEnvVars: boolean
+  envGcsApiKeyJsonPath?: string
+  envGcsBucket?: string
+  envGcsUploadNamespace?: string
   onChangeGcsReferenceFileWithRelayMode: (val: boolean) => void
-  onChangeGcsApiKeyJsonPath: (val: string) => void
-  onChangeGcsBucket: (val: string) => void
-  onChangeGcsUploadNamespace: (val: string) => void
 };
 
 export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element => {
@@ -24,17 +21,13 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
   const {
     gcsReferenceFileWithRelayMode,
     gcsUseOnlyEnvVars,
-    gcsApiKeyJsonPath,
     envGcsApiKeyJsonPath,
-    gcsBucket,
     envGcsBucket,
-    gcsUploadNamespace,
     envGcsUploadNamespace,
   } = props;
 
   return (
     <>
-
       <div className="row my-3">
         <label className="text-start text-md-end col-md-3 col-form-label">
           {t('admin:app_setting.file_delivery_method')}
@@ -57,16 +50,16 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props?.onChangeGcsReferenceFileWithRelayMode(true) }}
+                onClick={() => { props.onChangeGcsReferenceFileWithRelayMode(true) }}
               >
                 {t('admin:app_setting.file_delivery_method_relay')}
               </button>
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props?.onChangeGcsReferenceFileWithRelayMode(false) }}
+                onClick={() => { props.onChangeGcsReferenceFileWithRelayMode(false) }}
               >
-                { t('admin:app_setting.file_delivery_method_redirect')}
+                {t('admin:app_setting.file_delivery_method_redirect')}
               </button>
             </div>
 
@@ -106,10 +99,8 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
               <input
                 className="form-control"
                 type="text"
-                name="gcsApiKeyJsonPath"
                 readOnly={gcsUseOnlyEnvVars}
-                value={gcsApiKeyJsonPath}
-                onChange={e => props?.onChangeGcsApiKeyJsonPath(e.target.value)}
+                {...props.register('gcsApiKeyJsonPath')}
               />
             </td>
             <td>
@@ -126,10 +117,8 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
               <input
                 className="form-control"
                 type="text"
-                name="gcsBucket"
                 readOnly={gcsUseOnlyEnvVars}
-                value={gcsBucket}
-                onChange={e => props?.onChangeGcsBucket(e.target.value)}
+                {...props.register('gcsBucket')}
               />
             </td>
             <td>
@@ -146,10 +135,8 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
               <input
                 className="form-control"
                 type="text"
-                name="gcsUploadNamespace"
                 readOnly={gcsUseOnlyEnvVars}
-                value={gcsUploadNamespace}
-                onChange={e => props?.onChangeGcsUploadNamespace(e.target.value)}
+                {...props.register('gcsUploadNamespace')}
               />
             </td>
             <td>
@@ -162,7 +149,6 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
           </tr>
         </tbody>
       </table>
-
     </>
   );
 };

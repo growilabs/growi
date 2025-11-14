@@ -1,42 +1,86 @@
 import type { JSX } from 'react';
-
 import { useTranslation } from 'react-i18next';
-import { ModalBody, Input } from 'reactstrap';
+import {
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
+  Input,
+  ModalBody,
+  UncontrolledDropdown,
+} from 'reactstrap';
 
+import {
+  AiAssistantManagementModalPageMode,
+  useAiAssistantManagementModal,
+} from '../../../stores/ai-assistant';
 import { AiAssistantManagementHeader } from './AiAssistantManagementHeader';
-
 
 type Props = {
   instruction: string;
   onChange: (value: string) => void;
   onReset: () => void;
-}
+};
 
-export const AiAssistantManagementEditInstruction = (props: Props): JSX.Element => {
+export const AiAssistantManagementEditInstruction = (
+  props: Props,
+): JSX.Element => {
   const { instruction, onChange, onReset } = props;
   const { t } = useTranslation();
+  const { changePageMode } = useAiAssistantManagementModal();
+
+  const handleComplete = () => {
+    changePageMode(AiAssistantManagementModalPageMode.HOME);
+  };
 
   return (
     <>
-      <AiAssistantManagementHeader />
+      <AiAssistantManagementHeader labelTranslationKey="modal_ai_assistant.page_mode_title.instruction" />
 
-      <ModalBody className="px-4">
-        <p className="text-secondary py-1">
-          {t('modal_ai_assistant.instructions.description')}
-        </p>
+      <ModalBody className="p-4">
+        <p
+          className="text-secondary py-1"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: ignore
+          dangerouslySetInnerHTML={{
+            __html: t('modal_ai_assistant.instructions.description'),
+          }}
+        />
 
         <Input
           autoFocus
           type="textarea"
-          className="mb-3"
+          className="mb-4"
           rows="8"
           value={instruction}
-          onChange={e => onChange(e.target.value)}
+          onChange={(e) => onChange(e.target.value)}
         />
 
-        <button type="button" onClick={onReset} className="btn btn-outline-secondary btn-sm">
-          {t('modal_ai_assistant.instructions.reset_to_default')}
-        </button>
+        <div className="d-flex justify-content-end align-items-center">
+          <UncontrolledDropdown>
+            <DropdownToggle
+              className="btn btn-outline-neutral-secondary text-secondary p-2"
+              tag="button"
+              type="button"
+            >
+              <span className="material-symbols-outlined">more_horiz</span>
+            </DropdownToggle>
+            <DropdownMenu end>
+              <DropdownItem onClick={onReset}>
+                <span className="material-symbols-outlined me-2 align-middle">
+                  undo
+                </span>
+                {t('modal_ai_assistant.instructions.reset_to_default')}
+              </DropdownItem>
+            </DropdownMenu>
+          </UncontrolledDropdown>
+
+          <button
+            type="button"
+            onClick={handleComplete}
+            className="btn btn-primary ms-3"
+          >
+            {t('Done')}
+          </button>
+        </div>
       </ModalBody>
     </>
   );

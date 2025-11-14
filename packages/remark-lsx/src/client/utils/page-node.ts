@@ -1,7 +1,9 @@
 import type { IPageHasId } from '@growi/core';
 import type { ParseRangeResult } from '@growi/core/dist/remark-plugins';
-import { getParentPath as getParentPathCore } from '@growi/core/dist/utils/path-utils';
-import { removeTrailingSlash } from '@growi/core/dist/utils/path-utils';
+import {
+  getParentPath as getParentPathCore,
+  removeTrailingSlash,
+} from '@growi/core/dist/utils/path-utils';
 
 import type { PageNode } from '../../interfaces/page-node';
 import { getDepthOfPath } from '../../utils/depth-utils';

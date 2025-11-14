@@ -7,7 +7,7 @@ export const swrGlobalConfiguration = Object.assign(
   // set the request scoped cache provider in server
   isServer()
     ? {
-      provider: (cache: any) => new Map<string, any>(cache),
-    }
+        provider: (cache: any) => new Map<string, any>(cache),
+      }
     : {},
 );

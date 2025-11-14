@@ -1,8 +1,11 @@
 import { GroupType } from '@growi/core';
-import { isGlobPatternPath, isCreatablePage } from '@growi/core/dist/utils/page-path-utils';
-import { type ValidationChain, body } from 'express-validator';
+import { body, type ValidationChain } from 'express-validator';
 
-import { AiAssistantShareScope, AiAssistantAccessScope } from '../../../interfaces/ai-assistant';
+import {
+  AiAssistantAccessScope,
+  AiAssistantShareScope,
+} from '../../../interfaces/ai-assistant';
+import { isCreatablePagePathPattern } from '../../../utils/is-creatable-page-path-pattern';
 
 export const upsertAiAssistantValidator: ValidationChain[] = [
   body('name')
@@ -30,7 +33,9 @@ export const upsertAiAssistantValidator: ValidationChain[] = [
     .withMessage('pagePathPatterns must not be empty')
     .custom((pagePathPattens: string[]) => {
       if (pagePathPattens.length > 300) {
-        throw new Error('pagePathPattens must be an array of strings with a maximum length of 300');
+        throw new Error(
+          'pagePathPattens must be an array of strings with a maximum length of 300',
+        );
       }
 
       return true;
@@ -42,12 +47,7 @@ export const upsertAiAssistantValidator: ValidationChain[] = [
     .notEmpty()
     .withMessage('pagePathPatterns must not be empty')
     .custom((value: string) => {
-      // check if the value is a glob pattern path
-      if (value.includes('*')) {
-        return isGlobPatternPath(value) && isCreatablePage(value.replaceAll('*', ''));
-      }
-
-      return isCreatablePage(value);
+      return isCreatablePagePathPattern(value);
     }),
 
   body('grantedGroupsForShareScope')

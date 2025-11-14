@@ -1,31 +1,35 @@
 import type { JSX } from 'react';
-
 import Head from 'next/head';
 import ReactMarkdown from 'react-markdown';
 
 import type { PresentationOptions } from '../consts';
-import { MARP_CONTAINER_CLASS_NAME, presentationMarpit, slideMarpit } from '../services/growi-marpit';
+import {
+  MARP_CONTAINER_CLASS_NAME,
+  presentationMarpit,
+  slideMarpit,
+} from '../services/growi-marpit';
 import * as extractSections from '../services/renderer/extract-sections';
-
-import { PresentationRichSlideSection, RichSlideSection } from './RichSlideSection';
-
+import {
+  PresentationRichSlideSection,
+  RichSlideSection,
+} from './RichSlideSection';
 
 type Props = {
-  options: PresentationOptions,
-  children?: string,
-  presentation?: boolean,
-}
+  options: PresentationOptions;
+  children?: string;
+  presentation?: boolean;
+};
 
 export const GrowiSlides = (props: Props): JSX.Element => {
-  const {
-    options, children, presentation,
-  } = props;
-  const {
-    rendererOptions, isDarkMode, disableSeparationByHeader,
-  } = options;
+  const { options, children, presentation } = props;
+  const { rendererOptions, isDarkMode, disableSeparationByHeader } = options;
 
-  if (rendererOptions == null || rendererOptions.remarkPlugins == null || rendererOptions.components == null) {
-    return <></>;
+  if (
+    rendererOptions == null ||
+    rendererOptions.remarkPlugins == null ||
+    rendererOptions.components == null
+  ) {
+    return;
   }
 
   rendererOptions.remarkPlugins.push([
@@ -35,7 +39,9 @@ export const GrowiSlides = (props: Props): JSX.Element => {
       disableSeparationByHeader,
     },
   ]);
-  rendererOptions.components.section = presentation ? PresentationRichSlideSection : RichSlideSection;
+  rendererOptions.components.section = presentation
+    ? PresentationRichSlideSection
+    : RichSlideSection;
 
   const marpit = presentation ? presentationMarpit : slideMarpit;
   const { css } = marpit.render('');
@@ -46,10 +52,9 @@ export const GrowiSlides = (props: Props): JSX.Element => {
       </Head>
       <div className={`slides ${MARP_CONTAINER_CLASS_NAME}`}>
         <ReactMarkdown {...rendererOptions}>
-          { children ?? '## No Contents' }
+          {children ?? '## No Contents'}
         </ReactMarkdown>
       </div>
     </>
   );
-
 };

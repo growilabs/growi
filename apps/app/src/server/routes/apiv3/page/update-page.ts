@@ -2,6 +2,7 @@ import { Origin, allOrigin, getIdForRef } from '@growi/core';
 import type {
   IPage, IRevisionHasId, IUserHasId,
 } from '@growi/core';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { isTopPage, isUsersProtectedPages } from '@growi/core/dist/utils/page-path-utils';
@@ -51,7 +52,8 @@ export const updatePageHandlersFactory: UpdatePageHandlersFactory = (crowi) => {
 
   // define validators for req.body
   const validator: ValidationChain[] = [
-    body('pageId').exists().not().isEmpty({ ignore_whitespace: true })
+    body('pageId').isMongoId().exists().not()
+      .isEmpty({ ignore_whitespace: true })
       .withMessage("'pageId' must be specified"),
     body('revisionId').optional().exists().not()
       .isEmpty({ ignore_whitespace: true })
@@ -133,7 +135,7 @@ export const updatePageHandlersFactory: UpdatePageHandlersFactory = (crowi) => {
   const addActivity = generateAddActivityMiddleware();
 
   return [
-    accessTokenParser, loginRequiredStrictly, excludeReadOnlyUser, addActivity,
+    accessTokenParser([SCOPE.WRITE.FEATURES.PAGE], { acceptLegacy: true }), loginRequiredStrictly, excludeReadOnlyUser, addActivity,
     validator, apiV3FormValidator,
     async(req: UpdatePageRequest, res: ApiV3Response) => {
       const {
@@ -143,7 +145,7 @@ export const updatePageHandlersFactory: UpdatePageHandlersFactory = (crowi) => {
       const sanitizeRevisionId = revisionId == null ? undefined : generalXssFilter.process(revisionId);
 
       // check page existence
-      const isExist = await Page.count({ _id: pageId }) > 0;
+      const isExist = await Page.count({ _id: { $eq: pageId } }) > 0;
       if (!isExist) {
         return res.apiv3Err(new ErrorV3(`Page('${pageId}' is not found or forbidden`, 'notfound_or_forbidden'), 400);
       }
@@ -194,6 +196,9 @@ export const updatePageHandlersFactory: UpdatePageHandlersFactory = (crowi) => {
           options.userRelatedGrantUserGroupIds = userRelatedGrantUserGroupIds;
         }
         previousRevision = await Revision.findById(sanitizeRevisionId);
+
+        // There are cases where "revisionId" is not required for revision updates
+        // See: https://dev.growi.org/651a6f4a008fee2f99187431#origin-%E3%81%AE%E5%BC%B7%E5%BC%B1
         updatedPage = await crowi.pageService.updatePage(currentPage, body, previousRevision?.body ?? null, req.user, options);
       }
       catch (err) {

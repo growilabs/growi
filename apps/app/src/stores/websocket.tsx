@@ -1,12 +1,14 @@
 import { useEffect } from 'react';
-
 import {
-  useGlobalSocket, GLOBAL_SOCKET_KEY, GLOBAL_SOCKET_NS, useSWRStatic,
+  GLOBAL_SOCKET_NS,
+  useGlobalSocket,
+  useSWRStatic,
 } from '@growi/core/dist/swr';
 import type { Socket } from 'socket.io-client';
 import type { SWRResponse } from 'swr';
 
 import { SocketEventName } from '~/interfaces/websocket';
+import { useIsGuestUser } from '~/stores-universal/context';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:stores:ui');
@@ -18,29 +20,53 @@ export const GLOBAL_ADMIN_SOCKET_KEY = 'globalAdminSocket';
  * Global Socket
  */
 export const useSetupGlobalSocket = (): void => {
-
-  const { data, mutate } = useSWRStatic(GLOBAL_SOCKET_KEY);
+  const { data: socket, mutate } = useGlobalSocket();
+  const { data: isGuestUser } = useIsGuestUser();
 
   useEffect(() => {
-    if (data != null) {
+    // Skip Socket.IO connection for guest users (not logged in)
+    // Guest users don't need real-time updates as they can only read pages
+    if (isGuestUser) {
+      logger.debug('Socket.IO connection skipped for guest user');
       return;
     }
 
-    mutate(async() => {
+    if (socket != null) {
+      return;
+    }
+
+    mutate(async () => {
       const { io } = await import('socket.io-client');
-      const socket = io(GLOBAL_SOCKET_NS, {
+      const newSocket = io(GLOBAL_SOCKET_NS, {
         transports: ['websocket'],
       });
 
-      socket.on('error', (err) => { logger.error(err) });
-      socket.on('connect_error', (err) => { logger.error('Failed to connect with websocket.', err) });
+      newSocket.on('error', (err) => {
+        logger.error(err);
+      });
+      newSocket.on('connect_error', (err) => {
+        logger.error('Failed to connect with websocket.', err);
+      });
 
-      return socket;
+      return newSocket;
     });
-  }, [data, mutate]);
+
+    // Cleanup function to disconnect socket when component unmounts or user logs out
+    return () => {
+      if (
+        socket != null &&
+        typeof socket === 'object' &&
+        'disconnect' in socket
+      ) {
+        logger.debug('Disconnecting Socket.IO connection');
+        (socket as Socket).disconnect();
+        mutate(undefined, false); // Clear the SWR cache without revalidation
+      }
+    };
+  }, [socket, isGuestUser, mutate]);
 };
 
-// comment out for porduction build error: https://github.com/weseek/growi/pull/7131
+// comment out for porduction build error: https://github.com/growilabs/growi/pull/7131
 /*
  * Global Admin Socket
  */
@@ -63,11 +89,15 @@ export const useGlobalAdminSocket = (): SWRResponse<Socket, Error> => {
   return useSWRStatic(GLOBAL_ADMIN_SOCKET_KEY);
 };
 
-export const useSetupGlobalSocketForPage = (pageId: string | undefined): void => {
+export const useSetupGlobalSocketForPage = (
+  pageId: string | undefined,
+): void => {
   const { data: socket } = useGlobalSocket();
 
   useEffect(() => {
-    if (socket == null || pageId == null) { return }
+    if (socket == null || pageId == null) {
+      return;
+    }
 
     socket.emit(SocketEventName.JoinPage, { pageId });
 

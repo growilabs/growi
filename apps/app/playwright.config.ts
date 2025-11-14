@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-
 import { defineConfig, devices, type Project } from '@playwright/test';
 
 const authFile = path.resolve(__dirname, './playwright/.auth/admin.json');
@@ -10,18 +9,20 @@ const storageState = fs.existsSync(authFile) ? authFile : undefined;
 
 const supportedBrowsers = ['chromium', 'firefox', 'webkit'] as const;
 
-const projects: Array<Project> = supportedBrowsers.map(browser => ({
+const projects: Array<Project> = supportedBrowsers.map((browser) => ({
   name: browser,
   use: { ...devices[`Desktop ${browser}`], storageState },
   testIgnore: /(10-installer|21-basic-features-for-guest)\/.*\.spec\.ts/,
   dependencies: ['setup', 'auth'],
 }));
 
-const projectsForGuestMode: Array<Project> = supportedBrowsers.map(browser => ({
-  name: `${browser}/guest-mode`,
-  use: { ...devices[`Desktop ${browser}`] }, // Do not use storageState
-  testMatch: /21-basic-features-for-guest\/.*\.spec\.ts/,
-}));
+const projectsForGuestMode: Array<Project> = supportedBrowsers.map(
+  (browser) => ({
+    name: `${browser}/guest-mode`,
+    use: { ...devices[`Desktop ${browser}`] }, // Do not use storageState
+    testMatch: /21-basic-features-for-guest\/.*\.spec\.ts/,
+  }),
+);
 
 /**
  * Read environment variables from file.
@@ -48,12 +49,7 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: process.env.CI
-    ? [
-      ['github'],
-      ['blob'],
-    ]
-    : 'list',
+  reporter: process.env.CI ? [['github'], ['blob']] : 'list',
 
   webServer: {
     command: 'pnpm run server',
@@ -79,7 +75,11 @@ export default defineConfig({
   /* Configure projects for major browsers */
   projects: [
     // Setup project
-    { name: 'setup', testMatch: /.*\.setup\.ts/, testIgnore: /auth\.setup\.ts/ },
+    {
+      name: 'setup',
+      testMatch: /.*\.setup\.ts/,
+      testIgnore: /auth\.setup\.ts/,
+    },
     { name: 'auth', testMatch: /auth\.setup\.ts/ },
 
     {
@@ -113,5 +113,4 @@ export default defineConfig({
     //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     // },
   ],
-
 });

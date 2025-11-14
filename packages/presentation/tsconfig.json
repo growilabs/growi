@@ -5,13 +5,10 @@
     "jsx": "react-jsx",
 
     "baseUrl": ".",
-    "paths": {
-    },
+    "paths": {},
 
     /* TODO: remove below flags for strict checking */
     "noImplicitAny": false
   },
-  "include": [
-    "src"
-  ]
+  "include": ["src"]
 }

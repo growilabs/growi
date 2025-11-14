@@ -1,18 +1,19 @@
-import {
-  getIdStringForRef, type IPage, type IUser,
-} from '@growi/core';
+import { getIdStringForRef, type IPage, type IUser } from '@growi/core';
+import type { NextFunction, Request, Response, Router } from 'express';
 import express from 'express';
-import type {
-  NextFunction, Request, Response, Router,
-} from 'express';
 import mongoose from 'mongoose';
 
 import type { CrowiProperties, CrowiRequest } from '~/interfaces/crowi-request';
-import { ResponseMode, type ExpressHttpHeader, type RespondOptions } from '~/server/interfaces/attachment';
-import { configManager } from '~/server/service/config-manager';
 import {
+  type ExpressHttpHeader,
+  type RespondOptions,
+  ResponseMode,
+} from '~/server/interfaces/attachment';
+import {
+  applyHeaders,
+  createContentHeaders,
   type FileUploader,
-  toExpressHttpHeaders, ContentHeaders, applyHeaders,
+  toExpressHttpHeaders,
 } from '~/server/service/file-uploader';
 import loggerFactory from '~/utils/logger';
 
@@ -21,32 +22,31 @@ import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify
 import { Attachment, type IAttachmentDocument } from '../../models/attachment';
 import ApiResponse from '../../util/apiResponse';
 
-
 const logger = loggerFactory('growi:routes:attachment:get');
-
 
 // TODO: remove this local interface when models/page has typescriptized
 interface PageModel {
-  isAccessiblePageByViewer: (pageId: string, user: IUser | undefined) => Promise<boolean>
+  isAccessiblePageByViewer: (
+    pageId: string,
+    user: IUser | undefined,
+  ) => Promise<boolean>;
 }
 
 type LocalsAfterDataInjection = { attachment: IAttachmentDocument };
 
-type RetrieveAttachmentFromIdParamRequest = CrowiProperties & Request<
-  { id: string },
-  any, any, any,
-  LocalsAfterDataInjection
->;
+type RetrieveAttachmentFromIdParamRequest = CrowiProperties &
+  Request<{ id: string }, any, any, any, LocalsAfterDataInjection>;
 
 type RetrieveAttachmentFromIdParamResponse = Response<
   any,
   LocalsAfterDataInjection
 >;
 
-export const retrieveAttachmentFromIdParam = async(
-    req: RetrieveAttachmentFromIdParamRequest, res: RetrieveAttachmentFromIdParamResponse, next: NextFunction,
+export const retrieveAttachmentFromIdParam = async (
+  req: RetrieveAttachmentFromIdParamRequest,
+  res: RetrieveAttachmentFromIdParamResponse,
+  next: NextFunction,
 ): Promise<void> => {
-
   const id = req.params.id;
   const attachment = await Attachment.findById(id);
 
@@ -60,9 +60,16 @@ export const retrieveAttachmentFromIdParam = async(
   // check viewer has permission
   if (user != null && attachment.page != null) {
     const Page = mongoose.model<IPage, PageModel>('Page');
-    const isAccessible = await Page.isAccessiblePageByViewer(getIdStringForRef(attachment.page), user);
+    const isAccessible = await Page.isAccessiblePageByViewer(
+      getIdStringForRef(attachment.page),
+      user,
+    );
     if (!isAccessible) {
-      res.json(ApiResponse.error(`Forbidden to access to the attachment '${attachment.id}'. This attachment might belong to other pages.`));
+      res.json(
+        ApiResponse.error(
+          `Forbidden to access to the attachment '${attachment.id}'. This attachment might belong to other pages.`,
+        ),
+      );
       return;
     }
   }
@@ -72,16 +79,21 @@ export const retrieveAttachmentFromIdParam = async(
   return next();
 };
 
-
-export const generateHeadersForFresh = (attachment: IAttachmentDocument): ExpressHttpHeader[] => {
+export const generateHeadersForFresh = (
+  attachment: IAttachmentDocument,
+): ExpressHttpHeader[] => {
   return toExpressHttpHeaders({
     ETag: `Attachment-${attachment._id}`,
     'Last-Modified': attachment.createdAt.toUTCString(),
   });
 };
 
-
-const respondForRedirectMode = async(res: Response, fileUploadService: FileUploader, attachment: IAttachmentDocument, opts?: RespondOptions): Promise<void> => {
+const respondForRedirectMode = async (
+  res: Response,
+  fileUploadService: FileUploader,
+  attachment: IAttachmentDocument,
+  opts?: RespondOptions,
+): Promise<void> => {
   const isDownload = opts?.download ?? false;
 
   if (!isDownload) {
@@ -92,42 +104,59 @@ const respondForRedirectMode = async(res: Response, fileUploadService: FileUploa
     }
   }
 
-  const temporaryUrl = await fileUploadService.generateTemporaryUrl(attachment, opts);
+  const temporaryUrl = await fileUploadService.generateTemporaryUrl(
+    attachment,
+    opts,
+  );
 
   res.redirect(temporaryUrl.url);
 
   // persist temporaryUrl
   if (!isDownload) {
     try {
-      attachment.cashTemporaryUrlByProvideSec(temporaryUrl.url, temporaryUrl.lifetimeSec);
+      attachment.cashTemporaryUrlByProvideSec(
+        temporaryUrl.url,
+        temporaryUrl.lifetimeSec,
+      );
       return;
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
     }
   }
 };
 
-const respondForRelayMode = async(res: Response, fileUploadService: FileUploader,
-    attachment: IAttachmentDocument, opts?: RespondOptions): Promise<void> => {
+const respondForRelayMode = async (
+  res: Response,
+  fileUploadService: FileUploader,
+  attachment: IAttachmentDocument,
+  opts?: RespondOptions,
+): Promise<void> => {
   // apply content-* headers before response
-  const contentHeaders = new ContentHeaders(attachment);
-  applyHeaders(res, contentHeaders.toExpressHttpHeaders());
+  const isDownload = opts?.download ?? false;
+  const contentHeaders = createContentHeaders(attachment, {
+    inline: !isDownload,
+  });
+  applyHeaders(res, contentHeaders);
 
   try {
     const readable = await fileUploadService.findDeliveryFile(attachment);
     readable.pipe(res);
-  }
-  catch (e) {
+  } catch (e) {
     logger.error(e);
     res.json(ApiResponse.error(e.message));
     return;
   }
 };
 
-export const getActionFactory = (crowi: Crowi, attachment: IAttachmentDocument) => {
-  return async(req: CrowiRequest, res: Response, opts?: RespondOptions): Promise<void> => {
-
+export const getActionFactory = (
+  crowi: Crowi,
+  attachment: IAttachmentDocument,
+) => {
+  return async (
+    req: CrowiRequest,
+    res: Response,
+    opts?: RespondOptions,
+  ): Promise<void> => {
     // add headers before evaluating 'req.fresh'
     applyHeaders(res, generateHeadersForFresh(attachment));
 
@@ -155,34 +184,32 @@ export const getActionFactory = (crowi: Crowi, attachment: IAttachmentDocument) 
   };
 };
 
+export type GetRequest = CrowiProperties &
+  Request<{ id: string }, any, any, any, LocalsAfterDataInjection>;
 
-export type GetRequest = CrowiProperties & Request<
-  { id: string },
-  any, any, any,
-  LocalsAfterDataInjection
->;
-
-export type GetResponse = Response<
-  any,
-  LocalsAfterDataInjection
->
+export type GetResponse = Response<any, LocalsAfterDataInjection>;
 
 export const getRouterFactory = (crowi: Crowi): Router => {
-
-  const loginRequired = require('../../middlewares/login-required')(crowi, true);
+  const loginRequired = require('../../middlewares/login-required')(
+    crowi,
+    true,
+  );
 
   const router = express.Router();
 
   // note: retrieveAttachmentFromIdParam requires `req.params.id`
-  router.get<{ id: string }>('/:id([0-9a-z]{24})',
-    certifySharedPageAttachmentMiddleware, loginRequired,
+  router.get<{ id: string }>(
+    '/:id([0-9a-z]{24})',
+    certifySharedPageAttachmentMiddleware,
+    loginRequired,
     retrieveAttachmentFromIdParam,
 
     (req: GetRequest, res: GetResponse) => {
       const { attachment } = res.locals;
       const getAction = getActionFactory(crowi, attachment);
       getAction(req, res);
-    });
+    },
+  );
 
   return router;
 };

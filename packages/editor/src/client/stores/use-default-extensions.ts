@@ -1,19 +1,22 @@
-import { indentWithTab, defaultKeymap, deleteCharBackward } from '@codemirror/commands';
 import {
-  markdown, markdownLanguage,
-} from '@codemirror/lang-markdown';
-import { syntaxHighlighting, HighlightStyle, defaultHighlightStyle } from '@codemirror/language';
+  defaultKeymap,
+  deleteCharBackward,
+  indentWithTab,
+} from '@codemirror/commands';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
+import {
+  defaultHighlightStyle,
+  HighlightStyle,
+  syntaxHighlighting,
+} from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
-import {
-  Prec, type Extension,
-} from '@codemirror/state';
+import { type Extension, Prec } from '@codemirror/state';
 import type { KeyBinding } from '@codemirror/view';
-import { keymap, EditorView } from '@codemirror/view';
+import { EditorView, keymap } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 
 import type { UseCodeMirrorEditor } from '../services';
 import { emojiAutocompletionSettings } from '../services-internal';
-
 
 // set new markdownKeymap instead of default one
 // https://github.com/codemirror/lang-markdown/blob/main/src/index.ts#L17
@@ -32,7 +35,11 @@ const markdownHighlighting = HighlightStyle.define([
 
 const defaultExtensions: Extension[] = [
   EditorView.lineWrapping,
-  markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false }),
+  markdown({
+    base: markdownLanguage,
+    codeLanguages: languages,
+    addKeymap: false,
+  }),
   keymap.of(markdownKeymap),
   keymap.of([indentWithTab]),
   Prec.lowest(keymap.of(defaultKeymap)),
@@ -42,7 +49,7 @@ const defaultExtensions: Extension[] = [
 ];
 
 export const useDefaultExtensions = (
-    codeMirrorEditor?: UseCodeMirrorEditor,
+  codeMirrorEditor?: UseCodeMirrorEditor,
 ): void => {
   codeMirrorEditor?.appendExtensions([defaultExtensions]);
 };

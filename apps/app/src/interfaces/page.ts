@@ -1,5 +1,10 @@
 import type {
-  GroupType, IGrantedGroup, IPageHasId, Nullable, PageGrant, Origin,
+  GroupType,
+  IGrantedGroup,
+  IPageHasId,
+  Nullable,
+  Origin,
+  PageGrant,
 } from '@growi/core';
 
 import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
@@ -7,77 +12,96 @@ import type { ExternalGroupProviderType } from '~/features/external-user-group/i
 import type { IPageOperationProcessData } from './page-operation';
 
 export {
-  isIPageInfoForEntity, isIPageInfoForOperation, isIPageInfoForListing,
+  isIPageInfoForEntity,
+  isIPageInfoForListing,
+  isIPageInfoForOperation,
 } from '@growi/core';
 
-export type IPageForItem = Partial<IPageHasId & {processData?: IPageOperationProcessData}>;
+export type IPageForItem = Partial<
+  IPageHasId & { processData?: IPageOperationProcessData }
+>;
+
+export type IPageForTreeItem = Pick<
+  IPageHasId,
+  | '_id'
+  | 'path'
+  | 'parent'
+  | 'descendantCount'
+  | 'revision'
+  | 'grant'
+  | 'isEmpty'
+  | 'wip'
+> & {
+  processData?: IPageOperationProcessData;
+};
 
 export const UserGroupPageGrantStatus = {
   isGranted: 'isGranted',
   notGranted: 'notGranted',
   cannotGrant: 'cannotGrant',
 };
-type UserGroupPageGrantStatus = typeof UserGroupPageGrantStatus[keyof typeof UserGroupPageGrantStatus];
+type UserGroupPageGrantStatus =
+  (typeof UserGroupPageGrantStatus)[keyof typeof UserGroupPageGrantStatus];
 export type UserRelatedGroupsData = {
-  id: string,
-  name: string,
-  type: GroupType,
-  provider?: ExternalGroupProviderType,
-  status: UserGroupPageGrantStatus,
-}
+  id: string;
+  name: string;
+  type: GroupType;
+  provider?: ExternalGroupProviderType;
+  status: UserGroupPageGrantStatus;
+};
 export type GroupGrantData = {
-  userRelatedGroups: UserRelatedGroupsData[],
+  userRelatedGroups: UserRelatedGroupsData[];
   nonUserRelatedGrantedGroups: {
-    id: string,
-    name: string,
-    type: GroupType,
-    provider?: ExternalGroupProviderType,
-  }[],
-}
+    id: string;
+    name: string;
+    type: GroupType;
+    provider?: ExternalGroupProviderType;
+  }[];
+};
 // current grant data of page
 export type IPageGrantData = {
-  grant: PageGrant,
-  groupGrantData?: GroupGrantData,
-}
+  grant: PageGrant;
+  groupGrantData?: GroupGrantData;
+};
 // grant selected by user which is not yet applied
 export type IPageSelectedGrant = {
-  grant: PageGrant,
-  userRelatedGrantedGroups?: IGrantedGroup[]
-}
+  grant: PageGrant;
+  userRelatedGrantedGroups?: IGrantedGroup[];
+};
 
 export type IDeleteSinglePageApiv1Result = {
-  ok: boolean
-  path: string,
-  isRecursively: Nullable<true>,
-  isCompletely: Nullable<true>,
+  ok: boolean;
+  path: string;
+  isRecursively: Nullable<true>;
+  isCompletely: Nullable<true>;
 };
 
 export type IDeleteManyPageApiv3Result = {
-  paths: string[],
-  isRecursively: Nullable<true>,
-  isCompletely: Nullable<true>,
+  paths: string[];
+  isRecursively: Nullable<true>;
+  isCompletely: Nullable<true>;
 };
 
 export type IOptionsForUpdate = {
-  origin?: Origin
-  wip?: boolean,
-  grant?: PageGrant,
-  userRelatedGrantUserGroupIds?: IGrantedGroup[],
+  origin?: Origin;
+  wip?: boolean;
+  grant?: PageGrant;
+  userRelatedGrantUserGroupIds?: IGrantedGroup[];
   // isSyncRevisionToHackmd?: boolean,
-  overwriteScopesOfDescendants?: boolean,
+  overwriteScopesOfDescendants?: boolean;
 };
 
 export type IOptionsForCreate = {
-  grant?: PageGrant,
-  grantUserGroupIds?: IGrantedGroup[],
-  onlyInheritUserRelatedGrantedGroups?: boolean,
-  overwriteScopesOfDescendants?: boolean,
+  grant?: PageGrant;
+  grantUserGroupIds?: IGrantedGroup[];
+  onlyInheritUserRelatedGrantedGroups?: boolean;
+  overwriteScopesOfDescendants?: boolean;
 
-  origin?: Origin
-  wip?: boolean,
+  origin?: Origin;
+  wip?: boolean;
 };
 
 export type IPagePathWithDescendantCount = {
-  path: string,
-  descendantCount: number,
+  path: string;
+  descendantCount: number;
 };

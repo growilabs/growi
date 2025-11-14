@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
-
 import { EditorView } from '@codemirror/view';
 
 import type { UseCodeMirrorEditor } from '../../services';
 
-export const useCustomizedButtonStyles = (codeMirrorEditor?: UseCodeMirrorEditor): void => {
-
+export const useCustomizedButtonStyles = (
+  codeMirrorEditor?: UseCodeMirrorEditor,
+): void => {
   // Setup button styles
   useEffect(() => {
     if (codeMirrorEditor?.view == null) {
@@ -13,10 +13,14 @@ export const useCustomizedButtonStyles = (codeMirrorEditor?: UseCodeMirrorEditor
     }
 
     const updateButtonStyles = () => {
-      const acceptButton = codeMirrorEditor.view?.dom.querySelector('button[name="accept"]');
+      const acceptButton = codeMirrorEditor.view?.dom.querySelector(
+        'button[name="accept"]',
+      );
       acceptButton?.classList.add('btn', 'btn-sm', 'btn-success');
 
-      const rejectButton = codeMirrorEditor.view?.dom.querySelector('button[name="reject"]');
+      const rejectButton = codeMirrorEditor.view?.dom.querySelector(
+        'button[name="reject"]',
+      );
       rejectButton?.classList.add('btn', 'btn-sm', 'btn-outline-secondary');
       // Set button text
       if (rejectButton != null) {
@@ -35,5 +39,4 @@ export const useCustomizedButtonStyles = (codeMirrorEditor?: UseCodeMirrorEditor
     const cleanupFunction = codeMirrorEditor?.appendExtensions([extension]);
     return cleanupFunction;
   }, [codeMirrorEditor]);
-
 };

@@ -1,0 +1,127 @@
+{
+  "Show": "표시",
+  "Hide": "숨기기",
+  "Add": "추가",
+  "Insert": "삽입",
+  "Reset": "재설정",
+  "Sign out": "로그아웃",
+  "New": "새로 만들기",
+  "Delete": "삭제",
+  "meta": {
+    "display_name": "한국어"
+  },
+  "toaster": {
+    "add_succeeded": "{{target}} 추가 성공",
+    "create_failed": "{{target}} 생성 실패",
+    "create_succeeded": "{{target}} 생성 성공",
+    "delete_succeeded": "{{target}} 삭제 성공",
+    "remove_share_link": "{{count}}개 공유 링크 제거 성공",
+    "remove_share_link_success": "{{shareLinkId}} 제거 성공",
+    "update_failed": "{{target}} 업데이트 실패",
+    "update_successed": "{{target}} 업데이트 성공"
+  },
+  "alert": {
+    "siteUrl_is_not_set": "'사이트 URL'이 설정되지 않았습니다. {{link}}에서 설정하십시오.",
+    "please_enable_mailer": "먼저 메일러를 설정하십시오.",
+    "password_reset_please_enable_mailer": "먼저 메일러를 설정하십시오.",
+    "email_is_already_in_use": "이 이메일 주소는 이미 사용 중입니다."
+  },
+  "headers": {
+    "app_settings": "앱 설정"
+  },
+  "header_search_box": {
+    "label": {
+      "All pages": "모든 페이지",
+      "This tree": "이 트리"
+    },
+    "item_label": {
+      "All pages": "모든 페이지",
+      "This tree": "이 트리의 하위 항목만"
+    }
+  },
+  "search_method_menu_item": {
+    "search_in_all": "모두 검색",
+    "only_children_of_this_tree": "이 트리의 하위 항목만",
+    "exact_mutch": "정확히 일치"
+  },
+  "share_links": {
+    "Share Link": "공유 링크",
+    "Page Path": "페이지 경로",
+    "expire": "만료",
+    "description": "설명"
+  },
+  "in_app_notification": {
+    "notification_list": "앱 내 알림 목록",
+    "see_all": "모두 보기",
+    "no_notification": "알림이 없습니다.",
+    "all": "모두",
+    "unopend": "읽지 않음",
+    "mark_all_as_read": "모두 읽음으로 표시",
+    "no_unread_messages": "읽지 않은 메시지 없음",
+    "only_unread": "읽지 않은 메시지만"
+  },
+  "personal_dropdown": {
+    "home": "홈",
+    "settings": "설정",
+    "color_mode": "색상 모드",
+    "sidebar_mode": "사이드바 모드",
+    "sidebar_mode_editor": "편집기 사이드바 모드",
+    "use_os_settings": "OS 설정 사용",
+    "feedback": "피드백"
+  },
+  "create_page_dropdown": {
+    "new_page": "새 페이지 생성",
+    "open_page_create_modal": "새 페이지 생성 모달 열기",
+    "todays": {
+      "desc": "오늘의 메모 생성",
+      "memo": "메모"
+    },
+    "template": {
+      "desc": "템플릿 페이지 생성/편집",
+      "children": "하위 항목용 템플릿",
+      "descendants": "하위 항목용 템플릿"
+    }
+  },
+  "copy_to_clipboard": {
+    "Copy to clipboard": "클립보드에 복사",
+    "Page path": "페이지 경로",
+    "Page URL": "페이지 URL",
+    "Permanent link": "영구 링크",
+    "Page path and permanent link": "페이지 경로 및 영구 링크",
+    "Markdown link": "마크다운 링크",
+    "Append params": "매개변수 추가"
+  },
+  "crop_image_modal": {
+    "image_crop": "이미지 자르기",
+    "crop": "자르기",
+    "save": "저장",
+    "cancel": "취소"
+  },
+  "handsontable_modal": {
+    "title": "테이블 편집",
+    "data_import": "데이터 가져오기",
+    "save": "저장",
+    "cancel": "취소",
+    "done": "완료",
+    "data_import_form": {
+      "select_data_format": "데이터 형식 선택",
+      "import_data": "데이터 가져오기",
+      "paste_table_data": "테이블 데이터 붙여넣기",
+      "parse_error": "구문 분석 오류",
+      "cancel": "취소",
+      "import": "가져오기"
+    }
+  },
+  "not_found_page": {
+    "page_not_exist": "이 페이지는 존재하지 않습니다."
+  },
+  "g2g_data_transfer": {
+    "tab": "데이터 전송",
+    "data_transfer": "데이터 전송",
+    "transfer_data_to_this_growi": "다른 GROWI에서 이 GROWI로 데이터 전송",
+    "publish_transfer_key": "전송 키 게시",
+    "transfer_key_limit": "전송 키는 발급 후 1시간 동안 유효합니다.",
+    "once_transfer_key_used": "전송 키가 전송에 사용되면 다른 전송에는 사용할 수 없습니다.",
+    "transfer_to_growi_cloud": "자세한 내용은 <a href='{{documentationUrl}}en/admin-guide/management-cookbook/g2g-transfer.html'>여기를 클릭하십시오.</a>"
+  }
+}

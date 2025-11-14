@@ -97,7 +97,7 @@ export const useConflictEffect = (): void => {
         closePageStatusAlert();
       };
 
-      const markdown = codeMirrorEditor?.getDoc();
+      const markdown = codeMirrorEditor?.getDocString();
       openConflictDiffModal(markdown ?? '', resolveConflictHandler);
     };
 

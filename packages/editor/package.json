@@ -13,7 +13,7 @@
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
     "serve": "vite",
-    "lint:js": "eslint **/*.{js,ts}",
+    "lint:js": "biome check",
     "lint:typecheck": "vue-tsc --noEmit",
     "lint": "npm-run-all -p lint:*"
   },

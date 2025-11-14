@@ -1,6 +1,8 @@
-import { USER_STATUS, type IUserStatus } from '@growi/core';
+import { type IUserStatus, USER_STATUS } from '@growi/core';
 
-export const createRedirectToForUnauthenticated = (userStatus: IUserStatus): string | null => {
+export const createRedirectToForUnauthenticated = (
+  userStatus: IUserStatus,
+): string | null => {
   switch (userStatus) {
     case USER_STATUS.REGISTERED:
       return '/login/error/registered';

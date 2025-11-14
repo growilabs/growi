@@ -11,9 +11,9 @@ import { Tooltip } from 'reactstrap';
 
 import type { IActivityHasId } from '~/interfaces/activity';
 
-type Props = {
-  activityList: IActivityHasId[]
-}
+ type Props = {
+   activityList: IActivityHasId[]
+ }
 
 const formatDate = (date: Date): string => {
   return format(new Date(date), 'yyyy/MM/dd HH:mm:ss');
@@ -21,17 +21,18 @@ const formatDate = (date: Date): string => {
 
 export const ActivityTable : FC<Props> = (props: Props) => {
   const { t } = useTranslation();
-  const [tooltopOpen, setTooltipOpen] = useState(false);
+  const [activeTooltipId, setActiveTooltipId] = useState<string | null>(null);
 
-  const showToolTip = useCallback(() => {
-    setTooltipOpen(true);
+
+  const showToolTip = useCallback((id: string) => {
+    setActiveTooltipId(id);
     setTimeout(() => {
-      setTooltipOpen(false);
+      setActiveTooltipId(null);
     }, 1000);
-  }, [setTooltipOpen]);
+  }, []);
 
   return (
-    <div className="table-responsive text-nowrap h-100">
+    <div className="table-responsive admin-audit-log">
       <table className="table table-default table-bordered table-user-list">
         <thead>
           <tr>
@@ -62,16 +63,20 @@ export const ActivityTable : FC<Props> = (props: Props) => {
                 <td>{formatDate(activity.createdAt)}</td>
                 <td>{t(`admin:audit_log_action.${activity.action}`)}</td>
                 <td>{activity.ip}</td>
-                <td>
-                  {activity.endpoint}
-                  <CopyToClipboard text={activity.endpoint} onCopy={showToolTip}>
-                    <button type="button" className="btn btn-outline-secondary border-0 pull-right" id="tooltipTarget">
-                      <span className="material-symbols-outlined" aria-hidden="true">content_paste</span>
-                    </button>
-                  </CopyToClipboard>
-                  <Tooltip placement="top" isOpen={tooltopOpen} fade={false} target="tooltipTarget">
-                    copied!
-                  </Tooltip>
+                <td className="audit-log-url-cell">
+                  <div className="d-flex align-items-center">
+                    <span className="flex-grow-1 text-truncate">
+                      {activity.endpoint}
+                    </span>
+                    <CopyToClipboard text={activity.endpoint} onCopy={() => showToolTip(activity._id)}>
+                      <button type="button" className="btn btn-outline-secondary border-0 ms-2" id={`tooltipTarget-${activity._id}`}>
+                        <span className="material-symbols-outlined" aria-hidden="true">content_paste</span>
+                      </button>
+                    </CopyToClipboard>
+                    <Tooltip placement="top" isOpen={activeTooltipId === activity._id} fade={false} target={`tooltipTarget-${activity._id}`}>
+                      copied!
+                    </Tooltip>
+                  </div>
                 </td>
               </tr>
             );

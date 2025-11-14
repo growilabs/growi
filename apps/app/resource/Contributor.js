@@ -104,10 +104,7 @@ const contributors = [
       },
       {
         additionalClass: 'col-md-6 my-4',
-        members: [
-          { name: 'shaminmeerankutty' },
-          { name: 'rabitarochan' },
-        ],
+        members: [{ name: 'shaminmeerankutty' }, { name: 'rabitarochan' }],
       },
       {
         additionalClass: 'col-md-4 my-4',
@@ -150,7 +147,10 @@ const contributors = [
           { position: 'Flatt Security', name: 'stypr' },
           { position: 'Flatt Security', name: 'Azara/Norihide Saito' },
           { position: 'CyberAgent, Inc.', name: 'Daisuke Takahashi' },
-          { position: 'Mitsui Bussan Secure Directions, Inc.', name: 'Yuji Tounai' },
+          {
+            position: 'Mitsui Bussan Secure Directions, Inc.',
+            name: 'Yuji Tounai',
+          },
           { name: 'yy0931' },
         ],
       },
@@ -172,9 +172,7 @@ const contributors = [
       },
       {
         additionalClass: 'col-12 staff-credit-mt-10rem',
-        members: [
-          { name: 'AND YOU' },
-        ],
+        members: [{ name: 'AND YOU' }],
       },
     ],
   },

@@ -1,37 +1,45 @@
 import React, {
-  useCallback, useRef, useEffect, useMemo, type JSX,
+  type JSX,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
 } from 'react';
 
 import type { GetInputProps } from '../interfaces/downshift';
 
 type Props = {
-  searchKeyword: string,
-  onChange?: (text: string) => void,
-  onSubmit?: () => void,
-  getInputProps: GetInputProps,
-}
+  searchKeyword: string;
+  onChange?: (text: string) => void;
+  onSubmit?: () => void;
+  getInputProps: GetInputProps;
+};
 
 export const SearchForm = (props: Props): JSX.Element => {
-  const {
-    searchKeyword, onChange, onSubmit, getInputProps,
-  } = props;
+  const { searchKeyword, onChange, onSubmit, getInputProps } = props;
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const changeSearchTextHandler = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange?.(e.target.value);
-  }, [onChange]);
+  const changeSearchTextHandler = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange?.(e.target.value);
+    },
+    [onChange],
+  );
 
-  const submitHandler = useCallback((e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const submitHandler = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
 
-    const isEmptyKeyword = searchKeyword.trim().length === 0;
-    if (isEmptyKeyword) {
-      return;
-    }
+      const isEmptyKeyword = searchKeyword.trim().length === 0;
+      if (isEmptyKeyword) {
+        return;
+      }
 
-    onSubmit?.();
-  }, [searchKeyword, onSubmit]);
+      onSubmit?.();
+    },
+    [searchKeyword, onSubmit],
+  );
 
   const inputOptions = useMemo(() => {
     return getInputProps({
@@ -60,7 +68,9 @@ export const SearchForm = (props: Props): JSX.Element => {
       <button
         type="button"
         className="btn btn-neutral-secondary text-muted position-absolute bottom-0 end-0 w-auto h-100 border-0"
-        onClick={() => { onChange?.('') }}
+        onClick={() => {
+          onChange?.('');
+        }}
       >
         <span className="material-symbols-outlined p-0">cancel</span>
       </button>

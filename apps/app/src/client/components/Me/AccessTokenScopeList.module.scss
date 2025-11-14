@@ -1,0 +1,36 @@
+$baseMargin: 20px;
+
+.access-token-scope-list :global {
+  .indentation {
+    &.indentation-level-1 {
+      margin-left: $baseMargin;
+    }
+    &.indentation-level-2 {
+      margin-left: $baseMargin * 2;
+    }
+    &.indentation-level-3 {
+      margin-left: $baseMargin * 3;
+    }
+    &.indentation-level-4 {
+      margin-left: $baseMargin * 4;
+    }
+    &.indentation-level-5 {
+      margin-left: $baseMargin * 5;
+    }
+    &.indentation-level-6 {
+      margin-left: $baseMargin * 6;
+    }
+    &.indentation-level-7 {
+      margin-left: $baseMargin * 7;
+    }
+    &.indentation-level-8 {
+      margin-left: $baseMargin * 8;
+    }
+    &.indentation-level-9 {
+      margin-left: $baseMargin * 9;
+    }
+    &.indentation-level-10 {
+      margin-left: $baseMargin * 10;
+    }
+  }
+}

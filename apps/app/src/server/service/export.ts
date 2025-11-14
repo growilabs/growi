@@ -13,7 +13,7 @@ import CollectionProgressingStatus from '../models/vo/collection-progressing-sta
 
 import type AppService from './app';
 import { configManager } from './config-manager';
-import type GrowiBridgeService from './growi-bridge';
+import type { GrowiBridgeService } from './growi-bridge';
 import { growiInfoService } from './growi-info';
 import type { ZipFileStat } from './interfaces/export';
 

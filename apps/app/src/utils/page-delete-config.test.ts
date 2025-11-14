@@ -1,5 +1,4 @@
 import { PageDeleteConfigValue } from '../interfaces/page-delete-config';
-
 import { validateDeleteConfigs } from './page-delete-config';
 
 describe('validateDeleteConfigs utility function', () => {

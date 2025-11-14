@@ -15,7 +15,7 @@ WORKDIR $OPT_DIR
 
 # install tools
 RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
   apt-get update && apt-get install -y ca-certificates wget --no-install-recommends
 
 # install pnpm
@@ -75,11 +75,11 @@ ENV LANG="ja_JP.UTF-8"
 ENV appDir="$OPT_DIR/pdf-converter"
 
 RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
   apt-get update; \
   apt-get install -y chromium fonts-lato fonts-ipafont-gothic fonts-noto-cjk gosu; \
   rm -rf /var/lib/apt/lists/*; \
-# verify that the binary works
+  # verify that the binary works
   gosu nobody true
 
 # extract artifacts as 'node' user
