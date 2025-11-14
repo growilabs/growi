@@ -1,17 +1,26 @@
-import type { ShareLinkDocument, ShareLinkModel } from '~/server/models/share-link';
+import type {
+  ShareLinkDocument,
+  ShareLinkModel,
+} from '~/server/models/share-link';
 import { getModelSafely } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
 import type { ValidReferer } from './interfaces';
 
+const logger = loggerFactory(
+  'growi:middleware:certify-shared-page-attachment:retrieve-valid-share-link',
+);
 
-const logger = loggerFactory('growi:middleware:certify-shared-page-attachment:retrieve-valid-share-link');
-
-
-export const retrieveValidShareLinkByReferer = async(referer: ValidReferer): Promise<ShareLinkDocument | null> => {
-  const ShareLink = getModelSafely<ShareLinkDocument, ShareLinkModel>('ShareLink');
+export const retrieveValidShareLinkByReferer = async (
+  referer: ValidReferer,
+): Promise<ShareLinkDocument | null> => {
+  const ShareLink = getModelSafely<ShareLinkDocument, ShareLinkModel>(
+    'ShareLink',
+  );
   if (ShareLink == null) {
-    logger.warn('Could not get ShareLink model. next() will be called without processing anything.');
+    logger.warn(
+      'Could not get ShareLink model. next() will be called without processing anything.',
+    );
     return null;
   }
 
@@ -20,7 +29,9 @@ export const retrieveValidShareLinkByReferer = async(referer: ValidReferer): Pro
     _id: shareLinkId,
   });
   if (shareLink == null || shareLink.isExpired()) {
-    logger.info(`ShareLink ('${shareLinkId}') is not found or has already expired.`);
+    logger.info(
+      `ShareLink ('${shareLinkId}') is not found or has already expired.`,
+    );
     return null;
   }
 

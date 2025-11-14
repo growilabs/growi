@@ -12,11 +12,8 @@ vi.mock('~/server/service/config-manager', () => {
   return { configManager: mocks.configManagerMock };
 });
 
-
 describe('retrieveSiteUrl', () => {
-
   describe('returns null', () => {
-
     it('when the siteUrl is not set', () => {
       // setup
       mocks.configManagerMock.getConfig.mockImplementation(() => {
@@ -55,5 +52,4 @@ describe('retrieveSiteUrl', () => {
     // then
     expect(result).toEqual(new URL(siteUrl));
   });
-
 });
