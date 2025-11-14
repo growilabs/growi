@@ -8,13 +8,11 @@ import { growiInfoService } from '../service/growi-info';
 // because this file is a deprecated legacy of Crowi
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = function(crowi, app) {
+module.exports = (crowi, app) => {
   const logger = loggerFactory('growi:routes:login');
   const path = require('path');
   const User = crowi.model('User');
-  const {
-    appService, aclService, mailService, activityService,
-  } = crowi;
+  const { appService, aclService, mailService, activityService } = crowi;
   const activityEvent = crowi.event('activity');
 
   const actions = {};
@@ -29,7 +27,10 @@ module.exports = function(crowi, app) {
       return mailService.send({
         to: admin.email,
         subject: `[${appTitle}:admin] A New User Created and Waiting for Activation`,
-        template: path.join(crowi.localeDir, `${locale}/admin/userWaitingActivation.ejs`),
+        template: path.join(
+          crowi.localeDir,
+          `${locale}/admin/userWaitingActivation.ejs`,
+        ),
         vars: {
           adminUser: admin,
           createdUser: userData,
@@ -41,12 +42,13 @@ module.exports = function(crowi, app) {
 
     const results = await Promise.allSettled(promises);
     results
-      .filter(result => result.status === 'rejected')
-      .forEach(result => logger.error(result.reason));
+      .filter((result) => result.status === 'rejected')
+      .forEach((result) => {
+        logger.error(result.reason);
+      });
   }
 
   async function sendNotificationToAllAdmins(user) {
-
     const activity = await activityService.createActivity({
       action: SupportedAction.ACTION_USER_REGISTRATION_APPROVAL_REQUEST,
       target: user,
@@ -56,7 +58,7 @@ module.exports = function(crowi, app) {
     /**
      * @param {import('../service/pre-notify').PreNotifyProps} props
      */
-    const preNotify = async(props) => {
+    const preNotify = async (props) => {
       /** @type {(import('mongoose').HydratedDocument<import('@growi/core').IUser>)[]} */
       const adminUsers = await User.findAdmins();
 
@@ -68,13 +70,23 @@ module.exports = function(crowi, app) {
     return;
   }
 
-  const registerSuccessHandler = async function(req, res, userData, registrationMode) {
-    const parameters = { action: SupportedAction.ACTION_USER_REGISTRATION_SUCCESS };
+  const registerSuccessHandler = async (
+    req,
+    res,
+    userData,
+    registrationMode,
+  ) => {
+    const parameters = {
+      action: SupportedAction.ACTION_USER_REGISTRATION_SUCCESS,
+    };
     activityEvent.emit('update', res.locals.activity._id, parameters);
 
     const isMailerSetup = mailService.isMailerSetup ?? false;
 
-    if (registrationMode === aclService.labels.SECURITY_REGISTRATION_MODE_RESTRICTED) {
+    if (
+      registrationMode ===
+      aclService.labels.SECURITY_REGISTRATION_MODE_RESTRICTED
+    ) {
       sendNotificationToAllAdmins(userData);
       if (isMailerSetup) {
         await sendEmailToAllAdmins(userData);
@@ -117,8 +129,7 @@ module.exports = function(crowi, app) {
     req.login(userData, (err) => {
       if (err) {
         logger.debug(err);
-      }
-      else {
+      } else {
         // update lastLoginAt
         userData.updateLastLoginAt(new Date(), (err) => {
           if (err) {
@@ -132,12 +143,10 @@ module.exports = function(crowi, app) {
         // userData.password can't be empty but, prepare redirect because password property in User Model is optional
         // https://github.com/growilabs/growi/pull/6670
         redirectTo = '/me#password_settings';
-      }
-      else if (req.session.redirectTo != null) {
+      } else if (req.session.redirectTo != null) {
         redirectTo = req.session.redirectTo;
         delete req.session.redirectTo;
-      }
-      else {
+      } else {
         redirectTo = '/';
       }
 
@@ -145,7 +154,7 @@ module.exports = function(crowi, app) {
     });
   };
 
-  actions.preLogin = function(req, res, next) {
+  actions.preLogin = (req, res, next) => {
     // user has already logged in
     const { user } = req;
     if (user != null && user.status === User.STATUS_ACTIVE) {
@@ -199,13 +208,16 @@ module.exports = function(crowi, app) {
    *                 redirectTo:
    *                   type: string
    */
-  actions.register = function(req, res) {
+  actions.register = (req, res) => {
     if (req.user != null) {
       return res.apiv3Err('message.user_already_logged_in', 403);
     }
 
     // config で closed ならさよなら
-    if (configManager.getConfig('security:registrationMode') === aclService.labels.SECURITY_REGISTRATION_MODE_CLOSED) {
+    if (
+      configManager.getConfig('security:registrationMode') ===
+      aclService.labels.SECURITY_REGISTRATION_MODE_CLOSED
+    ) {
       return res.apiv3Err('message.registration_closed', 403);
     }
 
@@ -240,21 +252,29 @@ module.exports = function(crowi, app) {
         return res.apiv3Err(errors, 400);
       }
 
-      const registrationMode = configManager.getConfig('security:registrationMode');
+      const registrationMode = configManager.getConfig(
+        'security:registrationMode',
+      );
 
-      User.createUserByEmailAndPassword(name, username, email, password, undefined, async(err, userData) => {
-        if (err) {
-          const errors = [];
-          if (err.name === 'UserUpperLimitException') {
-            errors.push('message.can_not_register_maximum_number_of_users');
+      User.createUserByEmailAndPassword(
+        name,
+        username,
+        email,
+        password,
+        undefined,
+        async (err, userData) => {
+          if (err) {
+            const errors = [];
+            if (err.name === 'UserUpperLimitException') {
+              errors.push('message.can_not_register_maximum_number_of_users');
+            } else {
+              errors.push('message.failed_to_register');
+            }
+            return res.apiv3Err(errors, 405);
           }
-          else {
-            errors.push('message.failed_to_register');
-          }
-          return res.apiv3Err(errors, 405);
-        }
-        return registerSuccessHandler(req, res, userData, registrationMode);
-      });
+          return registerSuccessHandler(req, res, userData, registrationMode);
+        },
+      );
     });
   };
 
