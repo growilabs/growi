@@ -1,3 +1,1 @@
-module.exports = [
-  /^\/api-docs\//,
-];
+module.exports = [/^\/api-docs\//];

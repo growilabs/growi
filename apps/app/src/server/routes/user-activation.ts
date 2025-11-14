@@ -1,16 +1,16 @@
-import type { Response, NextFunction } from 'express';
+import type { NextFunction, Response } from 'express';
 
 import type { UserActivationErrorCode } from '~/interfaces/errors/user-activation';
 import type { ReqWithUserRegistrationOrder } from '~/server/middlewares/inject-user-registration-order-by-token-middleware';
 
 type Crowi = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  nextApp: any,
-}
+  nextApp: any;
+};
 
 type CrowiReq = ReqWithUserRegistrationOrder & {
-  crowi: Crowi,
-}
+  crowi: Crowi;
+};
 
 /**
  * @swagger
@@ -45,7 +45,12 @@ export const renderUserActivationPage = (crowi: Crowi) => {
 
 // middleware to handle error
 export const tokenErrorHandlerMiddeware = (crowi: Crowi) => {
-  return (error: Error & { code: UserActivationErrorCode, statusCode: number }, req: CrowiReq, res: Response, next: NextFunction): void => {
+  return (
+    error: Error & { code: UserActivationErrorCode; statusCode: number },
+    req: CrowiReq,
+    res: Response,
+    next: NextFunction,
+  ): void => {
     if (error != null) {
       const { nextApp } = crowi;
       req.crowi = crowi;

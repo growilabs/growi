@@ -1,6 +1,9 @@
-import { describe, test, expect } from 'vitest';
+import { describe, expect, test } from 'vitest';
 
-import { validateImageContentType, type SupportedImageMimeType } from './image-content-type-validator';
+import {
+  type SupportedImageMimeType,
+  validateImageContentType,
+} from './image-content-type-validator';
 
 describe('validateImageContentType', () => {
   describe('valid cases', () => {

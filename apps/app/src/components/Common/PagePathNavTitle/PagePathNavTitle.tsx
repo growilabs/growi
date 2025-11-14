@@ -41,17 +41,15 @@ export const PagePathNavTitle = (
     setClient(true);
   }, []);
 
+  const className = `${moduleClass} mb-4`;
+
   return isClient ? (
     <PagePathNavSticky
       {...props}
-      className={moduleClass}
+      className={className}
       latterLinkClassName="fs-2"
     />
   ) : (
-    <PagePathNav
-      {...props}
-      className={moduleClass}
-      latterLinkClassName="fs-2"
-    />
+    <PagePathNav {...props} className={className} latterLinkClassName="fs-2" />
   );
 };
