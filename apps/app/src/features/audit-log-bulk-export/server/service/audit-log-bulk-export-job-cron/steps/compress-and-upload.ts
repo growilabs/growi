@@ -26,8 +26,11 @@ function setUpAuditLogArchiver(
 
   // good practice to catch warnings (ie stat failures and other non-blocking errors)
   auditLogArchiver.on('warning', (err) => {
-    if (err.code === 'ENOENT') logger.error(err);
-    else throw err;
+    if (err.code === 'ENOENT') {
+      logger.error(err);
+    } else {
+      auditLogArchiver.emit('error', err);
+    }
   });
 
   return auditLogArchiver;
@@ -86,7 +89,13 @@ export async function compressAndUpload(
     await fileUploadService.uploadAttachment(auditLogArchiver, attachment);
   } catch (e) {
     logger.error(e);
-    await this.handleError(e as Error, job);
+    try {
+      await this.handleError(e as Error, job);
+    } catch (handleErrorErr) {
+      logger.error('Error in handleError:', handleErrorErr);
+    }
+    job.status = AuditLogBulkExportJobStatus.failed;
+    await job.save();
     return;
   }
   await postProcess.bind(this)(job, attachment, auditLogArchiver.pointer());

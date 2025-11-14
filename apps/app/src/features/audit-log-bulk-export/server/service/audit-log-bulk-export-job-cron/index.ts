@@ -105,9 +105,11 @@ class AuditLogBulkExportJobCronService
     })
       .sort({ createdAt: 1 })
       .limit(this.parallelExecLimit);
-    auditLogBulkExportJobInProgress.forEach((auditLogBulkExportJob) => {
-      this.proceedBulkExportJob(auditLogBulkExportJob);
-    });
+    await Promise.all(
+      auditLogBulkExportJobInProgress.map((auditLogBulkExportJob) =>
+        this.proceedBulkExportJob(auditLogBulkExportJob),
+      ),
+    );
   }
 
   async proceedBulkExportJob(

@@ -120,6 +120,7 @@ export async function exportAuditLogsToFsAsync(
   if (!hasAny) {
     job.totalExportedCount = 0;
     job.status = AuditLogBulkExportJobStatus.completed;
+    job.lastExportedId = undefined;
     await job.save();
 
     await this.notifyExportResultAndCleanUp(
@@ -130,6 +131,7 @@ export async function exportAuditLogsToFsAsync(
   }
 
   const logsCursor = Activity.find(query)
+
     .sort({ _id: 1 })
     .lean()
     .cursor({ batchSize: this.pageBatchSize });
