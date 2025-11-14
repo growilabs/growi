@@ -89,6 +89,11 @@ body {
     padding: 30px;
   }
 
+  // Avoid the issue where the footer element overlaps the main content
+  .dynamic-layout-root {
+    display: block !important;
+  }
+
   a::after {
     display: none !important;
   }
