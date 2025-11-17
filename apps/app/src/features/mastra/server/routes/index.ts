@@ -24,5 +24,9 @@ export const factory = (crowi: Crowi): express.Router => {
     router.get('/threads', getThreadsFactory(crowi));
   });
 
+  import('./get-messages').then(({ getMessagesHandlersFactory }) => {
+    router.get('/messages/:threadId', getMessagesHandlersFactory(crowi));
+  });
+
   return router;
 };
