@@ -6,6 +6,7 @@ import { DevidedPagePath } from '@growi/core/dist/models';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import Sticky from 'react-stickynode';
 
+import { usePrintMode } from '~/client/services/use-print-mode';
 import LinkedPagePath from '~/models/linked-page-path';
 import { usePageControlsX } from '~/states/ui/page';
 import { useSidebarMode, useCurrentProductNavWidth } from '~/states/ui/sidebar';
@@ -25,6 +26,10 @@ const { isTrashPage } = pagePathUtils;
 
 export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element => {
   const { pagePath } = props;
+
+  const isPrinting = usePrintMode();
+
+  const isPrinting = usePrintMode();
 
   const pageControlsX = usePageControlsX();
   const [sidebarWidth] = useCurrentProductNavWidth();
@@ -81,7 +86,7 @@ export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element =>
     // Controlling pointer-events
     //  1. disable pointer-events with 'pe-none'
     <div ref={pagePathNavRef}>
-      <Sticky className={`${moduleClass} mb-4`} innerClass="pe-none" innerActiveClass="active mt-1">
+      <Sticky className={moduleClass} enabled={!isPrinting} innerClass="pe-none" innerActiveClass="active mt-1">
         {({ status }) => {
           const isParentsCollapsed = status === Sticky.STATUS_FIXED;
 

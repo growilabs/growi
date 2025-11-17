@@ -29,7 +29,8 @@
       "!packages/pdf-converter-client/src/index.ts",
       "!packages/pdf-converter-client/specs",
       "!apps/app/src/client",
-      "!apps/app/src/server/routes",
+      "!apps/app/src/server/middlewares",
+      "!apps/app/src/server/routes/apiv3",
       "!apps/app/src/server/service"
     ]
   },

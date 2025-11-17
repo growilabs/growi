@@ -61,6 +61,9 @@ module.exports = {
     'src/server/app.ts',
     'src/server/repl.ts',
     'src/server/middlewares/**',
+    'src/server/routes/*.js',
+    'src/server/routes/*.ts',
+    'src/server/routes/attachment/**',
   ],
   settings: {
     // resolve path aliases by eslint-import-resolver-typescript

@@ -20,6 +20,7 @@ import Sticky from 'react-stickynode';
 import { DropdownItem, UncontrolledTooltip, Tooltip } from 'reactstrap';
 
 import { exportAsMarkdown, updateContentWidth, syncLatestRevisionBody } from '~/client/services/page-operation';
+import { usePrintMode } from '~/client/services/use-print-mode';
 import { toastSuccess, toastError, toastWarning } from '~/client/util/toastr';
 import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar';
 import { usePageBulkExportSelectModalActions } from '~/features/page-bulk-export/client/states/modal';
@@ -257,6 +258,7 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
   const { t } = useTranslation();
 
   const router = useRouter();
+  const isPrinting = usePrintMode();
 
   const shareLinkId = useShareLinkId();
   const { fetchCurrentPage } = useFetchCurrentPage();
@@ -389,6 +391,7 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
 
       <Sticky
         className="z-1"
+        enabled={!isPrinting}
         onStateChange={status => setStickyActive(status.status === Sticky.STATUS_FIXED)}
         innerActiveClass="w-100 end-0"
       >
