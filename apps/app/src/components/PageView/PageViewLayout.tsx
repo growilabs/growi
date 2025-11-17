@@ -1,3 +1,10 @@
+// import type { JSX, ReactNode } from 'react';
+
+// import styles from './PageViewLayout.module.scss';
+
+// const pageViewLayoutClass = styles['page-view-layout'] ?? '';
+// const _fluidLayoutClass = styles['fluid-layout'] ?? '';
+
 import type { JSX, ReactNode } from 'react';
 
 import styles from './PageViewLayout.module.scss';
