@@ -1,7 +1,5 @@
 import type { JSX, ReactNode } from 'react';
 
-import { usePrintMode } from '~/client/services/use-print-mode';
-
 import styles from './PageViewLayout.module.scss';
 
 const pageViewLayoutClass = styles['page-view-layout'] ?? '';
