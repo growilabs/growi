@@ -56,7 +56,8 @@ module.exports = {
         name: 'mimeType',
         in: 'path',
         required: true,
-        description: 'Configurable MIME type (e.g., image/png, application/pdf)',
+        description:
+          'Configurable MIME type (e.g., image/png, application/pdf)',
         schema: {
           type: 'string',
           enum: [
@@ -116,11 +117,7 @@ module.exports = {
     },
     {
       name: 'User Personal Settings API',
-      tags: [
-        'GeneralSetting',
-        'EditorSetting',
-        'InAppNotificationSettings',
-      ],
+      tags: ['GeneralSetting', 'EditorSetting', 'InAppNotificationSettings'],
     },
     {
       name: 'System Management API',
