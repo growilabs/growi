@@ -683,11 +683,25 @@ export type IActivity = {
   snapshot?: ISnapshot;
 };
 
+export type IActivityHasId = IActivity & HasObjectId;
+
 export type ActivityHasUserId = IActivityHasId & {
   user: IUserHasId;
 };
 
-export type IActivityHasId = IActivity & HasObjectId;
+export type ActivityHasTargetPage = IActivityHasId & {
+  user: IUserHasId;
+  target: IPopulatedPageTarget;
+}
+
+export interface IPopulatedPageTarget {
+  _id: string;
+  path: string;
+}
+
+export interface PopulatedUserActivitiesResult {
+  serializedPaginationResult: PaginateResult<ActivityHasTargetPage>;
+}
 
 export type ISearchFilter = {
   usernames?: string[];
@@ -695,6 +709,3 @@ export type ISearchFilter = {
   actions?: SupportedActionType[];
 };
 
-export interface UserActivitiesResult {
-  serializedPaginationResult: PaginateResult<IActivityHasId>;
-}
