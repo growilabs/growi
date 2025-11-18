@@ -1,9 +1,10 @@
 import { formatDistanceToNow } from 'date-fns';
-import { useTranslation } from 'next-i18next';
 import { type Locale } from 'date-fns/locale';
-import { getLocale } from '~/server/util/locale-utils';
-import type { ActivityHasUserId, SupportedActivityActionType } from '~/interfaces/activity';
+import { useTranslation } from 'next-i18next';
+
+import type { SupportedActivityActionType, ActivityHasTargetPage } from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
+import { getLocale } from '~/server/util/locale-utils';
 
 
 export const ActivityActionTranslationMap: Record<
@@ -36,6 +37,10 @@ export const IconActivityTranslationMap: Record<
   [ActivityLogActions.ACTION_COMMENT_CREATE]: 'comment',
 };
 
+type ActivityListItemProps = {
+  activity: ActivityHasTargetPage,
+}
+
 const translateAction = (action: SupportedActivityActionType): string => {
   return ActivityActionTranslationMap[action] || 'unknown_action';
 };
@@ -54,10 +59,13 @@ const calculateTimePassed = (date: Date, locale: Locale): string => {
 };
 
 
-export const ActivityListItem = ({ activity }: { activity: ActivityHasUserId }): JSX.Element => {
+export const ActivityListItem = ({ props }: { props: ActivityListItemProps }): JSX.Element => {
   const { t, i18n } = useTranslation();
   const currentLangCode = i18n.language;
   const dateFnsLocale = getLocale(currentLangCode);
+
+  const { activity } = props;
+  const targetPagePath = activity.target.path;
 
   const action = activity.action as SupportedActivityActionType;
   const keyToTranslate = translateAction(action);
@@ -65,17 +73,35 @@ export const ActivityListItem = ({ activity }: { activity: ActivityHasUserId }):
 
   return (
     <div className="activity-row">
-      <p className="mb-1">
-        <span className="material-symbols-outlined me-2">{setIcon(action)}</span>
-
-        <span className="dark:text-white">
-          {' '}{t(fullKeyPath)}
+      <div className="d-flex align-items-center">
+        <span className="material-symbols-outlined me-2 flex-shrink-0">
+          {setIcon(action)}
         </span>
 
-        <span className="text-secondary small ms-3">
-          {calculateTimePassed(activity.createdAt, dateFnsLocale)}
-        </span>
-      </p>
+        <div className="flex-grow-1 ms-2">
+          <div className="activity-path-line mb-0">
+            <a
+              href={targetPagePath}
+              className="activity-target-link fw-bold text-wrap d-block"
+            >
+              <span className="dark:text-white">
+                {targetPagePath}
+              </span>
+            </a>
+          </div>
+
+          <div className="activity-details-line d-flex mt-1">
+            <span className="dark:text-white">
+              {t(fullKeyPath)}
+            </span>
+
+            <span className="text-secondary ms-2">
+              {calculateTimePassed(activity.createdAt, dateFnsLocale)}
+            </span>
+
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
