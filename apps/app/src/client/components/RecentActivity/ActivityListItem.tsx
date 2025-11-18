@@ -90,12 +90,12 @@ export const ActivityListItem = ({ props }: { props: ActivityListItemProps }): J
             </a>
           </div>
 
-          <div className="activity-details-line d-flex mt-1">
+          <div className="activity-details-line d-flex">
             <span className="dark:text-white">
               {t(fullKeyPath)}
             </span>
 
-            <span className="text-secondary ms-2">
+            <span className="text-secondary small ms-2">
               {calculateTimePassed(activity.createdAt, dateFnsLocale)}
             </span>
 
