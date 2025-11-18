@@ -2,53 +2,38 @@ import {
   vi, describe, beforeAll, beforeEach, it, expect,
 } from 'vitest';
 
-
-// Global reference for the mock function used in test assertions.
-let aggregateMockFn: ReturnType<typeof vi.fn>;
-
-vi.mock('~/server/models/activity', () => {
-  const aggregateMock = vi.fn();
-
-  // Assign the reference for use in the test suite assertions
-  aggregateMockFn = aggregateMock;
-
-  // Define the mock object structure that the service will import
-  const ActivityMock = {
-    aggregate: aggregateMock,
-  };
-
-  return {
-    default: ActivityMock,
-  };
-});
-
-vi.mock('~/interfaces/activity', () => {
-  const MOCK_ACTIONS = {
-    ACTION_PAGE_CREATED: 'PAGE_CREATE',
-    ACTION_PAGE_UPDATED: 'PAGE_UPDATE',
-  };
-
-  return {
-    ActivityLogActions: MOCK_ACTIONS,
-  };
-});
-
-
 interface MockAggregate {
     exec: () => Promise<any>;
 }
 
 describe('ContributionAggregationService', { timeout: 15000 }, () => {
   let service: any;
-  let aggregateMock: ReturnType<typeof vi.fn>;
+  let aggregateMockFn: ReturnType<typeof vi.fn>;
 
+  // --- Setup and Teardown ---
   beforeAll(async() => {
-    const { ContributionAggregationService } = await import('./aggregation-service');
+    aggregateMockFn = vi.fn();
 
-    if (!aggregateMockFn) {
-      throw new Error('Mongoose mock was not initialized correctly by vi.mock factory.');
-    }
-    aggregateMock = aggregateMockFn;
+    vi.doMock('~/server/models/activity', () => {
+      const ActivityMock = {
+        aggregate: aggregateMockFn,
+      };
+      return {
+        default: ActivityMock,
+      };
+    });
+
+    vi.doMock('~/interfaces/activity', () => {
+      const MOCK_ACTIONS = {
+        ACTION_PAGE_CREATED: 'PAGE_CREATE',
+        ACTION_PAGE_UPDATED: 'PAGE_UPDATE',
+      };
+      return {
+        ActivityLogActions: MOCK_ACTIONS,
+      };
+    });
+
+    const { ContributionAggregationService } = await import('./aggregation-service');
 
     service = new ContributionAggregationService();
   });
@@ -56,6 +41,7 @@ describe('ContributionAggregationService', { timeout: 15000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+
 
   // Test Case 1: Verifies the pipeline structure and parameterization
   it('should build a correctly structured 5-stage pipeline with dynamic parameters', () => {
@@ -86,11 +72,11 @@ describe('ContributionAggregationService', { timeout: 15000 }, () => {
     const mockExec = vi.fn().mockResolvedValue(mockDbOutput);
     const mockAggregate: MockAggregate = { exec: mockExec };
 
-    aggregateMock.mockReturnValue(mockAggregate);
+    aggregateMockFn.mockReturnValue(mockAggregate);
 
     const result = await service.runAggregationPipeline({ userId, startDate }).exec();
 
-    expect(aggregateMock).toHaveBeenCalledTimes(1);
+    expect(aggregateMockFn).toHaveBeenCalledTimes(1);
     expect(mockExec).toHaveBeenCalledTimes(1);
     expect(result).toEqual(mockDbOutput);
   });
@@ -103,11 +89,11 @@ describe('ContributionAggregationService', { timeout: 15000 }, () => {
     const mockExec = vi.fn().mockResolvedValue([]);
     const mockAggregate: MockAggregate = { exec: mockExec };
 
-    aggregateMock.mockReturnValue(mockAggregate);
+    aggregateMockFn.mockReturnValue(mockAggregate);
 
     const result = await service.runAggregationPipeline({ userId, startDate }).exec();
 
-    expect(aggregateMock).toHaveBeenCalledTimes(1);
+    expect(aggregateMockFn).toHaveBeenCalledTimes(1);
     expect(result).toEqual([]);
   });
 });
