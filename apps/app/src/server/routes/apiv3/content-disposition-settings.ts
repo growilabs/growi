@@ -65,15 +65,15 @@ module.exports = (crowi) => {
  *                   type: object
  *                   properties:
  *                     inlineMimeTypes:
- *                     type: array
- *                     description: The list of MIME types set to inline.
- *                     items:
- *                       type: string
+ *                       type: array
+ *                       description: The list of MIME types set to inline.
+ *                       items:
+ *                         type: string
  *                     attachmentMimeTypes:
- *                     type: array
- *                     description: The list of MIME types set to attachment.
- *                     items:
- *                       type: string
+ *                       type: array
+ *                       description: The list of MIME types set to attachment.
+ *                       items:
+ *                         type: string
  *
  */
   router.put(
