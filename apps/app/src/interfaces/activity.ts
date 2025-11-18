@@ -697,11 +697,11 @@ export type ActivityHasTargetPage = IActivityHasId & {
 export interface IPopulatedPageTarget {
   _id: string;
   path: string;
-};
+}
 
 export interface PopulatedUserActivitiesResult {
   serializedPaginationResult: PaginateResult<ActivityHasTargetPage>;
-};
+}
 
 export type ISearchFilter = {
   usernames?: string[];
