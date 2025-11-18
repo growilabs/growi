@@ -29,8 +29,6 @@ export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element =>
 
   const isPrinting = usePrintMode();
 
-  const isPrinting = usePrintMode();
-
   const pageControlsX = usePageControlsX();
   const [sidebarWidth] = useCurrentProductNavWidth();
   const { sidebarMode } = useSidebarMode();
