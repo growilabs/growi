@@ -49,6 +49,7 @@ export const useSWRMUTxContentDispositionSettings = (): SWRMutationResponse<
 };
 
 export const useContentDisposition = (): {
+  currentSettings: ContentDispositionSettings | undefined;
   setInline: (mimeType: string) => Promise<void>;
   setAttachment: (mimeType: string) => Promise<void>;
 } => {
@@ -59,6 +60,7 @@ export const useContentDisposition = (): {
   const attachmentMimeTypesStr = data?.attachmentMimeTypes?.join(',');
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally using array contents instead of data object reference
   const memoizedData = useMemo(() => data, [inlineMimeTypesStr, attachmentMimeTypesStr]);
+  const currentSettings = memoizedData;
 
   const setInline = useCallback(async(mimeType: string): Promise<void> => {
     if (!memoizedData) return;
@@ -97,6 +99,7 @@ export const useContentDisposition = (): {
   }, [memoizedData, trigger, mutate]);
 
   return {
+    currentSettings,
     setInline,
     setAttachment,
   };

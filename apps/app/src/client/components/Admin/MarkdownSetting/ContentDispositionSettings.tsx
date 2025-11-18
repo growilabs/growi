@@ -1,18 +1,19 @@
 import React, { useState, useCallback } from 'react';
 
-import { useContentDisposition } from './useContentDisposition';
+import { useContentDisposition } from '../../../services/admin-content-disposition';
 
-interface ContentDispositionSettings {
-  inlineMimeTypes: string[];
-  attachmentMimeTypes: string[];
-}
 
 /**
  * Helper function to ensure the mime type is normalized / clean before use.
  */
 const normalizeMimeType = (mimeType: string): string => mimeType.trim().toLowerCase();
 
-const ContentDispositionSettingsManager: React.FC = () => {
+// REMINDER: Change so it sets the settings using an "Update" button, like the other settings do.
+// Add remove button and reset button.
+// Fix error handling, currently just logging.
+// Make sure that the component is in the correct place (markdown settings?).
+
+const ContentDispositionSettings: React.FC = () => {
 
   const {
     currentSettings,
@@ -51,9 +52,8 @@ const ContentDispositionSettingsManager: React.FC = () => {
     }
   }, [currentInput, setAttachment]);
 
-
-  // REMINDER: define types
-  const { inlineMimeTypes, attachmentMimeTypes } = currentSettings;
+  const inlineMimeTypes = currentSettings?.inlineMimeTypes ?? [];
+  const attachmentMimeTypes = currentSettings?.attachmentMimeTypes ?? [];
   const renderInlineMimeTypes = inlineMimeTypes || [];
   const renderAttachmentMimeTypes = attachmentMimeTypes || [];
 
@@ -140,4 +140,4 @@ const ContentDispositionSettingsManager: React.FC = () => {
   );
 };
 
-export default ContentDispositionSettingsManager;
+export default ContentDispositionSettings;

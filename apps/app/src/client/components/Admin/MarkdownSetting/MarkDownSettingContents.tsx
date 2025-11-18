@@ -3,6 +3,7 @@ import React, { useEffect, type JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Card, CardBody } from 'reactstrap';
 
+
 import AdminMarkDownContainer from '~/client/services/AdminMarkDownContainer';
 import { toastError } from '~/client/util/toastr';
 import { toArrayIfNot } from '~/utils/array-utils';
@@ -10,6 +11,7 @@ import loggerFactory from '~/utils/logger';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
+import ContentDispositionSettings from './ContentDispositionSettings';
 import IndentForm from './IndentForm';
 import LineBreakForm from './LineBreakForm';
 import XssForm from './XssForm';
@@ -61,6 +63,8 @@ const MarkDownSettingContents = React.memo((props: Props): JSX.Element => {
         <CardBody className="px-0 py-2">{ t('markdown_settings.xss_desc') }</CardBody>
       </Card>
       <XssForm />
+
+      <ContentDispositionSettings />
     </div>
   );
 });
