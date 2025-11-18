@@ -1,41 +1,38 @@
-import { useCallback, useRef, type JSX } from 'react';
+import { useCallback, type JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
+import type { UseFormRegister, UseFormSetValue } from 'react-hook-form';
 
 import type AdminMarkDownContainer from '~/client/services/AdminMarkDownContainer';
 import { tagNames as recommendedTagNames, attributes as recommendedAttributes } from '~/services/renderer/recommended-whitelist';
 
+type FormValues = {
+  tagWhitelist: string,
+  attrWhitelist: string,
+}
+
 type Props ={
-  adminMarkDownContainer: AdminMarkDownContainer
+  adminMarkDownContainer: AdminMarkDownContainer,
+  register: UseFormRegister<FormValues>,
+  setValue: UseFormSetValue<FormValues>,
 }
 
 export const WhitelistInput = (props: Props): JSX.Element => {
 
   const { t } = useTranslation('admin');
-  const { adminMarkDownContainer } = props;
-
-  const tagNamesRef = useRef<HTMLTextAreaElement>(null);
-  const attrsRef = useRef<HTMLTextAreaElement>(null);
+  const { adminMarkDownContainer, register, setValue } = props;
 
   const clickRecommendTagButtonHandler = useCallback(() => {
-    if (tagNamesRef.current == null) {
-      return;
-    }
-
     const tagWhitelist = recommendedTagNames.join(',');
-    tagNamesRef.current.value = tagWhitelist;
+    setValue('tagWhitelist', tagWhitelist);
     adminMarkDownContainer.setState({ tagWhitelist });
-  }, [adminMarkDownContainer]);
+  }, [adminMarkDownContainer, setValue]);
 
   const clickRecommendAttrButtonHandler = useCallback(() => {
-    if (attrsRef.current == null) {
-      return;
-    }
-
     const attrWhitelist = JSON.stringify(recommendedAttributes);
-    attrsRef.current.value = attrWhitelist;
+    setValue('attrWhitelist', attrWhitelist);
     adminMarkDownContainer.setState({ attrWhitelist });
-  }, [adminMarkDownContainer]);
+  }, [adminMarkDownContainer, setValue]);
 
   return (
     <>
@@ -47,13 +44,10 @@ export const WhitelistInput = (props: Props): JSX.Element => {
           </p>
         </div>
         <textarea
-          ref={tagNamesRef}
           className="form-control xss-list"
-          name="recommendedTags"
           rows={6}
           cols={40}
-          value={adminMarkDownContainer.state.tagWhitelist}
-          onChange={(e) => { adminMarkDownContainer.setState({ tagWhitelist: e.target.value }) }}
+          {...register('tagWhitelist')}
         />
       </div>
       <div className="mt-4">
@@ -64,13 +58,10 @@ export const WhitelistInput = (props: Props): JSX.Element => {
           </p>
         </div>
         <textarea
-          ref={attrsRef}
           className="form-control xss-list"
-          name="recommendedAttrs"
           rows={6}
           cols={40}
-          value={adminMarkDownContainer.state.attrWhitelist}
-          onChange={(e) => { adminMarkDownContainer.setState({ attrWhitelist: e.target.value }) }}
+          {...register('attrWhitelist')}
         />
       </div>
     </>

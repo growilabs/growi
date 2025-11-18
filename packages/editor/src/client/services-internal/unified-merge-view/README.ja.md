@@ -2,7 +2,7 @@
 
 ## 背景
 
-- 現在のエディタは y-codemirror.next を使用した collaborative editor として実装されている
+- 現在のエディターは y-codemirror.next を使用した collaborative editor として実装されている
 - Socket.IO を介して同時多人数編集が可能
 - CodeMirror 6 の `@codemirror/merge` パッケージの Unified Merge View を用いた差分機能を実現するフックとして `useUnifiedMergeView` を実装する
 
@@ -10,8 +10,8 @@
 
 ### 前提条件
 
-- Editor 1: Unified Merge View を有効化したエディタ（レビューモード）
-- Editor 2: 通常のエディタ（通常モード）
+- Editor 1: Unified Merge View を有効化したエディター（レビューモード）
+- Editor 2: 通常のエディター（通常モード）
 - original: 編集開始時点のドキュメント
 - diff1: Editor 1 でのローカルな変更の差分
 - diff2: Editor 2 でのローカルな変更の差分
@@ -22,7 +22,7 @@
    - diff2 が発生した場合、yjs を通じて受け取る
    - original + diff2 を基準として diff1 との差分を表示
    - diff1 に対して Accept/Reject が可能
-   - Accept された時のみ diff1 が他のエディタに反映(送信)される
+   - Accept された時のみ diff1 が他のエディターに反映(送信)される
 
 2. Editor 2（通常モード）では:
    - original + diff2 を表示
@@ -30,7 +30,7 @@
 
 3. collaborative editing 関連:
    - y-codemirror.next による collaborative editing 機能は維持
-   - diff2（通常モードでの変更）は即座に他のエディタに反映
+   - diff2（通常モードでの変更）は即座に他のエディターに反映
 
 ## 技術的な制約・検討事項
 
@@ -40,7 +40,7 @@
    - Accept/Reject 機能が標準で実装されている
 
 2. y-codemirror.next との統合:
-   - 標準では全ての変更が即座に他のエディタに反映される
+   - 標準では全ての変更が即座に他のエディターに反映される
    - この機能を維持しながら、レビューモードでの変更（diff1）のみを一時的にバッファリングする必要がある
 
 ## 実装方針
@@ -50,7 +50,7 @@
    - リモートからの変更は通常通り処理
 
 2. Accept 時の処理:
-   - secondaryDoc にバッファリングされた変更を primaryDoc に適用することにより、他のエディタに反映される
+   - secondaryDoc にバッファリングされた変更を primaryDoc に適用することにより、他のエディターに反映される
    - バッファをクリア
 
 3. Unified Merge View の設定:
@@ -93,6 +93,6 @@
    1. Editor1 で chunk の Accept ボタンがクリックされる
    2. `@codemirror/merge` が `updateOriginalDoc` effect を発行
    3. effect から変更内容を取得し、YText の操作に変換
-   4. primaryDoc に変更を適用し、他のエディタに伝播
+   4. primaryDoc に変更を適用し、他のエディターに伝播
 
 この実装により、個々の chunk の Accept が正しく機能し、他の chunk には影響を与えません。

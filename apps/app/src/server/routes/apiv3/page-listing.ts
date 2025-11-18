@@ -1,7 +1,8 @@
 import type {
-  IPageInfoForListing, IPageInfo, IPage,
+  IPageInfoForListing, IPageInfo, IUserHasId,
 } from '@growi/core';
 import { getIdForRef, isIPageInfoForEntity } from '@growi/core';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, Router } from 'express';
 import express from 'express';
@@ -9,9 +10,11 @@ import { query, oneOf } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
+import type { IPageForTreeItem } from '~/interfaces/page';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { configManager } from '~/server/service/config-manager';
 import type { IPageGrantService } from '~/server/service/page-grant';
+import { pageListingService } from '~/server/service/page-listing';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
@@ -27,7 +30,7 @@ const logger = loggerFactory('growi:routes:apiv3:page-tree');
  * Types & Interfaces
  */
 interface AuthorizedRequest extends Request {
-  user?: any
+  user?: IUserHasId,
 }
 
 /*
@@ -65,6 +68,7 @@ const routerFactory = (crowi: Crowi): Router => {
 
   const router = express.Router();
 
+
   /**
    * @swagger
    *
@@ -85,87 +89,18 @@ const routerFactory = (crowi: Crowi): Router => {
    *               type: object
    *               properties:
    *                 rootPage:
-   *                   $ref: '#/components/schemas/Page'
+   *                   $ref: '#/components/schemas/PageForTreeItem'
    */
-  router.get('/root', accessTokenParser, loginRequired, async(req: AuthorizedRequest, res: ApiV3Response) => {
-    const Page = mongoose.model<IPage, PageModel>('Page');
-
-    let rootPage;
-    try {
-      rootPage = await Page.findByPathAndViewer('/', req.user, null, true);
-    }
-    catch (err) {
-      return res.apiv3Err(new ErrorV3('rootPage not found'));
-    }
-
-    return res.apiv3({ rootPage });
-  });
-
-  /**
-   * @swagger
-   *
-   * /page-listing/ancestors-children:
-   *   get:
-   *     tags: [PageListing]
-   *     security:
-   *       - bearer: []
-   *       - accessTokenInQuery: []
-   *     summary: /page-listing/ancestors-children
-   *     description: Get the ancestors and children of a page
-   *     parameters:
-   *       - name: path
-   *         in: query
-   *         required: true
-   *         schema:
-   *           type: string
-   *     responses:
-   *       200:
-   *         description: Get the ancestors and children of a page
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 ancestorsChildren:
-   *                   type: object
-   *                   additionalProperties:
-   *                     type: object
-   *                     properties:
-   *                       _id:
-   *                         type: string
-   *                         description: Document ID
-   *                       descendantCount:
-   *                         type: integer
-   *                         description: Number of descendants
-   *                       isEmpty:
-   *                         type: boolean
-   *                         description: Indicates if the node is empty
-   *                       grant:
-   *                         type: integer
-   *                         description: Access level
-   *                       path:
-   *                         type: string
-   *                         description: Path string
-   *                       revision:
-   *                         type: string
-   *                         nullable: true
-   *                         description: Revision ID (nullable)
-   */
-  // eslint-disable-next-line max-len
-  router.get('/ancestors-children', accessTokenParser, loginRequired, ...validator.pagePathRequired, apiV3FormValidator, async(req: AuthorizedRequest, res: ApiV3Response): Promise<any> => {
-    const { path } = req.query;
-
-    const pageService = crowi.pageService;
-    try {
-      const ancestorsChildren = await pageService.findAncestorsChildrenByPathAndViewer(path as string, req.user);
-      return res.apiv3({ ancestorsChildren });
-    }
-    catch (err) {
-      logger.error('Failed to get ancestorsChildren.', err);
-      return res.apiv3Err(new ErrorV3('Failed to get ancestorsChildren.'));
-    }
-
-  });
+  router.get('/root',
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }), loginRequired, async(req: AuthorizedRequest, res: ApiV3Response) => {
+      try {
+        const rootPage: IPageForTreeItem = await pageListingService.findRootByViewer(req.user);
+        return res.apiv3({ rootPage });
+      }
+      catch (err) {
+        return res.apiv3Err(new ErrorV3('rootPage not found'));
+      }
+    });
 
   /**
    * @swagger
@@ -198,31 +133,30 @@ const routerFactory = (crowi: Crowi): Router => {
    *                 children:
    *                   type: array
    *                   items:
-   *                     $ref: '#/components/schemas/Page'
+   *                     $ref: '#/components/schemas/PageForTreeItem'
    */
   /*
    * In most cases, using id should be prioritized
    */
-  // eslint-disable-next-line max-len
-  router.get('/children', accessTokenParser, loginRequired, validator.pageIdOrPathRequired, apiV3FormValidator, async(req: AuthorizedRequest, res: ApiV3Response) => {
-    const { id, path } = req.query;
+  router.get('/children',
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    loginRequired, validator.pageIdOrPathRequired, apiV3FormValidator, async(req: AuthorizedRequest, res: ApiV3Response) => {
+      const { id, path } = req.query;
 
-    const pageService = crowi.pageService;
+      const hideRestrictedByOwner = await configManager.getConfig('security:list-policy:hideRestrictedByOwner');
+      const hideRestrictedByGroup = await configManager.getConfig('security:list-policy:hideRestrictedByGroup');
 
-    const hideRestrictedByOwner = await configManager.getConfig('security:list-policy:hideRestrictedByOwner');
-    const hideRestrictedByGroup = await configManager.getConfig('security:list-policy:hideRestrictedByGroup');
-
-    try {
-      const pages = await pageService.findChildrenByParentPathOrIdAndViewer(
-        (id || path) as string, req.user, undefined, !hideRestrictedByOwner, !hideRestrictedByGroup,
-      );
-      return res.apiv3({ children: pages });
-    }
-    catch (err) {
-      logger.error('Error occurred while finding children.', err);
-      return res.apiv3Err(new ErrorV3('Error occurred while finding children.'));
-    }
-  });
+      try {
+        const pages = await pageListingService.findChildrenByParentPathOrIdAndViewer(
+          (id || path) as string, req.user, !hideRestrictedByOwner, !hideRestrictedByGroup,
+        );
+        return res.apiv3({ children: pages });
+      }
+      catch (err) {
+        logger.error('Error occurred while finding children.', err);
+        return res.apiv3Err(new ErrorV3('Error occurred while finding children.'));
+      }
+    });
 
   /**
    * @swagger
@@ -234,16 +168,18 @@ const routerFactory = (crowi: Crowi): Router => {
    *       - bearer: []
    *       - accessTokenInQuery: []
    *     summary: /page-listing/info
-   *     description: Get the information of a page
+   *     description: Get summary information of pages
    *     parameters:
    *       - name: pageIds
    *         in: query
+   *         description: Array of page IDs to retrieve information for (One of pageIds or path is required)
    *         schema:
    *           type: array
    *           items:
    *             type: string
    *       - name: path
    *         in: query
+   *         description: Path of the page to retrieve information for (One of pageIds or path is required)
    *         schema:
    *           type: string
    *       - name: attachBookmarkCount
@@ -261,116 +197,83 @@ const routerFactory = (crowi: Crowi): Router => {
    *           application/json:
    *             schema:
    *               type: object
-   *               properties:
-   *                 idToPageInfoMap:
-   *                   type: object
-   *                   additionalProperties:
-   *                     type: object
-   *                     properties:
-   *                       commentCount:
-   *                         type: integer
-   *                       contentAge:
-   *                         type: integer
-   *                       descendantCount:
-   *                         type: integer
-   *                       isAbleToDeleteCompletely:
-   *                         type: boolean
-   *                       isDeletable:
-   *                         type: boolean
-   *                       isEmpty:
-   *                         type: boolean
-   *                       isMovable:
-   *                         type: boolean
-   *                       isRevertible:
-   *                         type: boolean
-   *                       isV5Compatible:
-   *                         type: boolean
-   *                       likerIds:
-   *                         type: array
-   *                         items:
-   *                           type: string
-   *                       seenUserIds:
-   *                         type: array
-   *                         items:
-   *                           type: string
-   *                       sumOfLikers:
-   *                         type: integer
-   *                       sumOfSeenUsers:
-   *                         type: integer
+   *               additionalProperties:
+   *                 $ref: '#/components/schemas/PageInfoAll'
    */
-  // eslint-disable-next-line max-len
-  router.get('/info', accessTokenParser, loginRequired, validator.pageIdsOrPathRequired, validator.infoParams, apiV3FormValidator, async(req: AuthorizedRequest, res: ApiV3Response) => {
-    const {
-      pageIds, path, attachBookmarkCount: attachBookmarkCountParam, attachShortBody: attachShortBodyParam,
-    } = req.query;
+  router.get('/info',
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    validator.pageIdsOrPathRequired, validator.infoParams, apiV3FormValidator, async(req: AuthorizedRequest, res: ApiV3Response) => {
+      const {
+        pageIds, path, attachBookmarkCount: attachBookmarkCountParam, attachShortBody: attachShortBodyParam,
+      } = req.query;
 
-    const attachBookmarkCount: boolean = attachBookmarkCountParam === 'true';
-    const attachShortBody: boolean = attachShortBodyParam === 'true';
+      const attachBookmarkCount: boolean = attachBookmarkCountParam === 'true';
+      const attachShortBody: boolean = attachShortBodyParam === 'true';
 
-    const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>('Page');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const Bookmark = mongoose.model<any, any>('Bookmark');
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const pageService = crowi.pageService;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const pageGrantService: IPageGrantService = crowi.pageGrantService!;
+      const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>('Page');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const Bookmark = mongoose.model<any, any>('Bookmark');
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const pageService = crowi.pageService;
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const pageGrantService: IPageGrantService = crowi.pageGrantService!;
 
-    try {
-      const pages = pageIds != null
-        ? await Page.findByIdsAndViewer(pageIds as string[], req.user, null, true)
-        : await Page.findByPathAndViewer(path as string, req.user, null, false, true);
+      try {
+        const pages = pageIds != null
+          ? await Page.findByIdsAndViewer(pageIds as string[], req.user, null, true)
+          : await Page.findByPathAndViewer(path as string, req.user, null, false, true);
 
-      const foundIds = pages.map(page => page._id);
+        const foundIds = pages.map(page => page._id);
 
-      let shortBodiesMap;
-      if (attachShortBody) {
-        shortBodiesMap = await pageService.shortBodiesMapByPageIds(foundIds, req.user);
-      }
+        let shortBodiesMap;
+        if (attachShortBody) {
+          shortBodiesMap = await pageService.shortBodiesMapByPageIds(foundIds, req.user);
+        }
 
-      let bookmarkCountMap;
-      if (attachBookmarkCount) {
-        bookmarkCountMap = await Bookmark.getPageIdToCountMap(foundIds) as Record<string, number>;
-      }
+        let bookmarkCountMap;
+        if (attachBookmarkCount) {
+          bookmarkCountMap = await Bookmark.getPageIdToCountMap(foundIds) as Record<string, number>;
+        }
 
-      const idToPageInfoMap: Record<string, IPageInfo | IPageInfoForListing> = {};
+        const idToPageInfoMap: Record<string, IPageInfo | IPageInfoForListing> = {};
 
-      const isGuestUser = req.user == null;
+        const isGuestUser = req.user == null;
 
-      const userRelatedGroups = await pageGrantService.getUserRelatedGroups(req.user);
+        const userRelatedGroups = await pageGrantService.getUserRelatedGroups(req.user);
 
-      for (const page of pages) {
+        for (const page of pages) {
         // construct isIPageInfoForListing
-        const basicPageInfo = pageService.constructBasicPageInfo(page, isGuestUser);
+          const basicPageInfo = pageService.constructBasicPageInfo(page, isGuestUser);
 
-        // TODO: use pageService.getCreatorIdForCanDelete to get creatorId (https://redmine.weseek.co.jp/issues/140574)
-        const canDeleteCompletely = pageService.canDeleteCompletely(
-          page,
-          page.creator == null ? null : getIdForRef(page.creator),
-          req.user,
-          false,
-          userRelatedGroups,
-        ); // use normal delete config
+          // TODO: use pageService.getCreatorIdForCanDelete to get creatorId (https://redmine.weseek.co.jp/issues/140574)
+          const canDeleteCompletely = pageService.canDeleteCompletely(
+            page,
+            page.creator == null ? null : getIdForRef(page.creator),
+            req.user,
+            false,
+            userRelatedGroups,
+          ); // use normal delete config
 
-        const pageInfo = (!isIPageInfoForEntity(basicPageInfo))
-          ? basicPageInfo
+          const pageInfo = (!isIPageInfoForEntity(basicPageInfo))
+            ? basicPageInfo
           // create IPageInfoForListing
-          : {
-            ...basicPageInfo,
-            isAbleToDeleteCompletely: canDeleteCompletely,
-            bookmarkCount: bookmarkCountMap != null ? bookmarkCountMap[page._id.toString()] : undefined,
-            revisionShortBody: shortBodiesMap != null ? shortBodiesMap[page._id.toString()] : undefined,
-          } as IPageInfoForListing;
+            : {
+              ...basicPageInfo,
+              isAbleToDeleteCompletely: canDeleteCompletely,
+              bookmarkCount: bookmarkCountMap != null ? bookmarkCountMap[page._id.toString()] : undefined,
+              revisionShortBody: shortBodiesMap != null ? shortBodiesMap[page._id.toString()] : undefined,
+            } as IPageInfoForListing;
 
-        idToPageInfoMap[page._id.toString()] = pageInfo;
+          idToPageInfoMap[page._id.toString()] = pageInfo;
+        }
+
+        return res.apiv3(idToPageInfoMap);
       }
-
-      return res.apiv3(idToPageInfoMap);
-    }
-    catch (err) {
-      logger.error('Error occurred while fetching page informations.', err);
-      return res.apiv3Err(new ErrorV3('Error occurred while fetching page informations.'));
-    }
-  });
+      catch (err) {
+        logger.error('Error occurred while fetching page informations.', err);
+        return res.apiv3Err(new ErrorV3('Error occurred while fetching page informations.'));
+      }
+    });
 
   return router;
 };

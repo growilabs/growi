@@ -4,8 +4,12 @@ import { configManager } from '~/server/service/config-manager';
 
 import { AssistantType } from './assistant-types';
 import { getOrCreateAssistant } from './create-assistant';
-import { instructionsForFileSearch, instructionsForInformationTypes, instructionsForInjectionCountermeasures } from './instructions/commons';
-
+import {
+  instructionsForFileSearch,
+  instructionsForInformationTypes,
+  instructionsForInjectionCountermeasures,
+  instructionsForSystem,
+} from './instructions/commons';
 
 const instructionsForResponseModes = `## Response Modes
 
@@ -49,20 +53,24 @@ Controls the depth and breadth of information retrieval and analysis:
 These modes can be combined as needed.
 For example, Extended Thinking Mode ON with Summary Mode ON would involve thorough research but with results presented in a highly concise format.`;
 
-
 let chatAssistant: OpenAI.Beta.Assistant | undefined;
 
-export const getOrCreateChatAssistant = async(): Promise<OpenAI.Beta.Assistant> => {
-  if (chatAssistant != null) {
-    return chatAssistant;
-  }
+export const getOrCreateChatAssistant =
+  async (): Promise<OpenAI.Beta.Assistant> => {
+    if (chatAssistant != null) {
+      return chatAssistant;
+    }
 
-  chatAssistant = await getOrCreateAssistant({
-    type: AssistantType.CHAT,
-    model: configManager.getConfig('openai:assistantModel:chat'),
-    instructions: `# Your Role
+    chatAssistant = await getOrCreateAssistant({
+      type: AssistantType.CHAT,
+      model: configManager.getConfig('openai:assistantModel:chat'),
+      instructions: `# Your Role
 You are an Knowledge Assistant for GROWI, a markdown wiki system.
 Your task is to respond to user requests with relevant answers and help them obtain the information they need.
+---
+
+${instructionsForSystem}
+
 ---
 
 ${instructionsForInjectionCountermeasures}
@@ -94,7 +102,7 @@ ${instructionsForInformationTypes}
 ${instructionsForResponseModes}
 ---
 `,
-  });
+    });
 
-  return chatAssistant;
-};
+    return chatAssistant;
+  };

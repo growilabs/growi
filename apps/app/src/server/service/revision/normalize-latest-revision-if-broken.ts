@@ -11,7 +11,7 @@ const logger = loggerFactory('growi:service:revision:normalize-latest-revision')
 /**
  * Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js'
  *
- * @ref https://github.com/weseek/growi/pull/8998
+ * @ref https://github.com/growilabs/growi/pull/8998
  */
 export const normalizeLatestRevisionIfBroken = async(pageId: string | Types.ObjectId): Promise<void> => {
 

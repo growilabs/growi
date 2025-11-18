@@ -33,9 +33,7 @@ import {
   PageDeleteConfigValue, PageSingleDeleteCompConfigValue,
 } from '~/interfaces/page-delete-config';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
-import {
-  type IPageOperationProcessInfo, type IPageOperationProcessData, PageActionStage, PageActionType,
-} from '~/interfaces/page-operation';
+import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
 import { PageActionOnGroupDelete } from '~/interfaces/user-group';
 import { SocketEventName, type PageMigrationErrorData, type UpdateDescCountRawData } from '~/interfaces/websocket';
 import type { CurrentPageYjsData } from '~/interfaces/yjs';
@@ -4124,6 +4122,9 @@ class PageService implements IPageService {
     return [...userUnrelatedPreviousGrantedGroups, ...userRelatedGrantedGroups];
   }
 
+
+  // There are cases where "revisionId" is not required for revision updates
+  // See: https://dev.growi.org/651a6f4a008fee2f99187431#origin-%E3%81%AE%E5%BC%B7%E5%BC%B1
   async updatePage(
       pageData: HydratedDocument<PageDocument>,
       body: string | null,
@@ -4273,6 +4274,8 @@ class PageService implements IPageService {
   }
 
 
+  // There are cases where "revisionId" is not required for revision updates
+  // See: https://dev.growi.org/651a6f4a008fee2f99187431#origin-%E3%81%AE%E5%BC%B7%E5%BC%B1
   async updatePageV4(
       pageData: HydratedDocument<PageDocument>, body, previousBody, user, options: IOptionsForUpdate = {},
   ): Promise<HydratedDocument<PageDocument>> {
@@ -4293,10 +4296,10 @@ class PageService implements IPageService {
     let savedPage = await pageData.save();
 
     // Update revision
-    const isBodyPresent = body != null && previousBody != null;
+    const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
     if (shouldUpdateBody) {
-      const newRevision = await Revision.prepareRevision(pageData, body, previousBody, user);
+      const newRevision = await Revision.prepareRevision(pageData, body, previousBody, user, options.origin);
       savedPage = await pushRevision(savedPage, newRevision, user);
       await savedPage.populateDataToShowRevision();
     }
@@ -4312,45 +4315,10 @@ class PageService implements IPageService {
     return savedPage;
   }
 
-  /*
-   * Find all children by parent's path or id. Using id should be prioritized
-   */
-  async findChildrenByParentPathOrIdAndViewer(
-      parentPathOrId: string,
-      user,
-      userGroups = null,
-      showPagesRestrictedByOwner = false,
-      showPagesRestrictedByGroup = false,
-  ): Promise<(HydratedDocument<PageDocument> & { processData?: IPageOperationProcessData })[]> {
-    const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>('Page');
-    let queryBuilder: PageQueryBuilder;
-    if (hasSlash(parentPathOrId)) {
-      const path = parentPathOrId;
-      const regexp = generateChildrenRegExp(path);
-      queryBuilder = new PageQueryBuilder(Page.find({ path: { $regex: regexp } }), true);
-    }
-    else {
-      const parentId = parentPathOrId;
-      // Use $eq for user-controlled sources. see: https://codeql.github.com/codeql-query-help/javascript/js-sql-injection/#recommendation
-      queryBuilder = new PageQueryBuilder(Page.find({ parent: { $eq: parentId } } as any), true); // TODO: improve type
-    }
-    await queryBuilder.addViewerCondition(user, userGroups, undefined, showPagesRestrictedByOwner, showPagesRestrictedByGroup);
-
-    const pages: HydratedDocument<PageDocument>[] = await queryBuilder
-      .addConditionToSortPagesByAscPath()
-      .query
-      .lean()
-      .exec();
-
-    await this.injectProcessDataIntoPagesByActionTypes(pages, [PageActionType.Rename]);
-
-    return pages;
-  }
-
   /**
    * Find all pages in trash page
    */
-  async findAllTrashPages(user: IUserHasId, userGroups = null): Promise<PageDocument[]> {
+  async findAllTrashPages(user: IUserHasId, userGroups = null): Promise<HydratedDocument<IPage>[]> {
     const Page = mongoose.model('Page') as unknown as PageModel;
 
     // https://regex101.com/r/KYZWls/1
@@ -4360,78 +4328,13 @@ class PageService implements IPageService {
 
     await queryBuilder.addViewerCondition(user, userGroups);
 
-    const pages = await queryBuilder
+    const pages: HydratedDocument<IPage>[] = await queryBuilder
       .addConditionToSortPagesByAscPath()
       .query
       .lean()
       .exec();
-
-    await this.injectProcessDataIntoPagesByActionTypes(pages, [PageActionType.Rename]);
 
     return pages;
-  }
-
-  async findAncestorsChildrenByPathAndViewer(path: string, user, userGroups = null): Promise<Record<string, PageDocument[]>> {
-    const Page = mongoose.model('Page') as unknown as PageModel;
-
-    const ancestorPaths = isTopPage(path) ? ['/'] : collectAncestorPaths(path); // root path is necessary for rendering
-    const regexps = ancestorPaths.map(path => generateChildrenRegExp(path)); // cannot use re2
-
-    // get pages at once
-    const queryBuilder = new PageQueryBuilder(Page.find({ path: { $in: regexps } }), true);
-    await queryBuilder.addViewerCondition(user, userGroups);
-    const pages = await queryBuilder
-      .addConditionAsOnTree()
-      .addConditionToMinimizeDataForRendering()
-      .addConditionToSortPagesByAscPath()
-      .query
-      .lean()
-      .exec();
-
-    await this.injectProcessDataIntoPagesByActionTypes(pages, [PageActionType.Rename]);
-
-    /*
-     * If any non-migrated page is found during creating the pathToChildren map, it will stop incrementing at that moment
-     */
-    const pathToChildren: Record<string, PageDocument[]> = {};
-    const sortedPaths = ancestorPaths.sort((a, b) => a.length - b.length); // sort paths by path.length
-    sortedPaths.every((path) => {
-      const children = pages.filter(page => pathlib.dirname(page.path) === path);
-      if (children.length === 0) {
-        return false; // break when children do not exist
-      }
-      pathToChildren[path] = children;
-      return true;
-    });
-
-    return pathToChildren;
-  }
-
-  /**
-   * Inject processData into page docuements
-   * The processData is a combination of actionType as a key and information on whether the action is processable as a value.
-   */
-  private async injectProcessDataIntoPagesByActionTypes(
-      pages: (HydratedDocument<PageDocument> & { processData?: IPageOperationProcessData })[],
-      actionTypes: PageActionType[],
-  ): Promise<void> {
-
-    const pageOperations = await PageOperation.find({ actionType: { $in: actionTypes } });
-    if (pageOperations == null || pageOperations.length === 0) {
-      return;
-    }
-
-    const processInfo: IPageOperationProcessInfo = this.crowi.pageOperationService.generateProcessInfo(pageOperations);
-    const operatingPageIds: string[] = Object.keys(processInfo);
-
-    // inject processData into pages
-    pages.forEach((page) => {
-      const pageId = page._id.toString();
-      if (operatingPageIds.includes(pageId)) {
-        const processData: IPageOperationProcessData = processInfo[pageId];
-        page.processData = processData;
-      }
-    });
   }
 
   async getYjsData(pageId: string): Promise<CurrentPageYjsData> {

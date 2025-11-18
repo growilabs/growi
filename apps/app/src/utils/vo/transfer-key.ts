@@ -2,7 +2,6 @@
  * VO for TransferKey which has appSiteUrlOrigin and key as its public member
  */
 export class TransferKey {
-
   private static _internalSeperator = '__grw_internal_tranferkey__';
 
   public appSiteUrlOrigin: string;
@@ -37,8 +36,7 @@ export class TransferKey {
     let appSiteUrlOrigin: string;
     try {
       appSiteUrlOrigin = new URL(appSiteUrl).origin;
-    }
-    catch (e) {
+    } catch (e) {
       throw Error(generalErrorPhrase + (e as Error));
     }
 
@@ -54,5 +52,4 @@ export class TransferKey {
   static generateKeyString(key: string, appSiteUrlOrigin: string): string {
     return `${key}${TransferKey._internalSeperator}${appSiteUrlOrigin}`;
   }
-
 }

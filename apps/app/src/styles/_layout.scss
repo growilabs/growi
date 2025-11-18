@@ -42,8 +42,12 @@ body {
 .main {
   margin-top: 1rem;
 
-  @include bs.media-breakpoint-up(lg) {
+  @include bs.media-breakpoint-up(md) {
     margin-top: 2rem;
+  }
+
+  @include bs.media-breakpoint-up(lg) {
+    margin-top: 4rem;
   }
 }
 
@@ -83,6 +87,11 @@ body {
 @media print {
   body {
     padding: 30px;
+  }
+
+  // Avoid the issue where the footer element overlaps the main content
+  .dynamic-layout-root {
+    display: block !important;
   }
 
   a::after {

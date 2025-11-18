@@ -4,9 +4,9 @@ import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type { CommonProps } from '~/pages/utils/commons';
 import {
-  getServerSideCommonProps, getNextI18NextConfig,
+  getNextI18NextConfig,
+  getServerSideCommonProps,
 } from '~/pages/utils/commons';
-
 
 /**
  * for Server Side Translations
@@ -14,15 +14,27 @@ import {
  * @param props
  * @param namespacesRequired
  */
-async function injectNextI18NextConfigurations(context: GetServerSidePropsContext, props, namespacesRequired?: string[] | undefined): Promise<void> {
+async function injectNextI18NextConfigurations(
+  context: GetServerSidePropsContext,
+  props,
+  namespacesRequired?: string[] | undefined,
+): Promise<void> {
   // preload all languages because of language lists in user setting
-  const nextI18NextConfig = await getNextI18NextConfig(serverSideTranslations, context, namespacesRequired, true);
+  const nextI18NextConfig = await getNextI18NextConfig(
+    serverSideTranslations,
+    context,
+    namespacesRequired,
+    true,
+  );
   props._nextI18Next = nextI18NextConfig._nextI18Next;
 }
 
-
-export const retrieveServerSideProps: any = async(
-    context: GetServerSidePropsContext, injectServerConfigurations?:(context: GetServerSidePropsContext, props) => Promise<void>,
+export const retrieveServerSideProps: any = async (
+  context: GetServerSidePropsContext,
+  injectServerConfigurations?: (
+    context: GetServerSidePropsContext,
+    props,
+  ) => Promise<void>,
 ) => {
   const req = context.req as CrowiRequest;
   const { user } = req;
@@ -44,9 +56,8 @@ export const retrieveServerSideProps: any = async(
     props.currentUser = user.toObject();
   }
 
-  props.isAccessDeniedForNonAdminUser = props.currentUser == null
-    ? true
-    : !props.currentUser.admin;
+  props.isAccessDeniedForNonAdminUser =
+    props.currentUser == null ? true : !props.currentUser.admin;
 
   await injectNextI18NextConfigurations(context, props, ['admin', 'commons']);
 

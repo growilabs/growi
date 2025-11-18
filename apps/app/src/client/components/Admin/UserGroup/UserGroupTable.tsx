@@ -218,7 +218,7 @@ export const UserGroupTable: FC<Props> = ({
                     })}
                   </ul>
                 </td>
-                <td>{dateFnsFormat(new Date(group.createdAt), 'yyyy-MM-dd')}</td>
+                <td>{dateFnsFormat(group.createdAt, 'yyyy-MM-dd')}</td>
                 {isAclEnabled
                   ? (
                     <td>

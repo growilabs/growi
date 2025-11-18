@@ -1,9 +1,9 @@
-import { type IUserHasId } from '@growi/core';
+import type { IUserHasId } from '@growi/core';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
-import { type ValidationChain, param } from 'express-validator';
+import { param, type ValidationChain } from 'express-validator';
 import { isHttpError } from 'http-errors';
-
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -12,40 +12,45 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 
 import { deleteAiAssistant } from '../services/delete-ai-assistant';
-
 import { certifyAiService } from './middlewares/certify-ai-service';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:delete-ai-assistants');
 
-
 type DeleteAiAssistantsFactory = (crowi: Crowi) => RequestHandler[];
 
 type ReqParams = {
-  id: string,
-}
+  id: string;
+};
 
 type Req = Request<ReqParams, Response, undefined> & {
-  user: IUserHasId,
-}
+  user: IUserHasId;
+};
 
 export const deleteAiAssistantsFactory: DeleteAiAssistantsFactory = (crowi) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(crowi);
+  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
+    crowi,
+  );
 
   const validator: ValidationChain[] = [
     param('id').isMongoId().withMessage('aiAssistant id is required'),
   ];
 
   return [
-    accessTokenParser, loginRequiredStrictly, certifyAiService, validator, apiV3FormValidator,
-    async(req: Req, res: ApiV3Response) => {
+    accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT], {
+      acceptLegacy: true,
+    }),
+    loginRequiredStrictly,
+    certifyAiService,
+    validator,
+    apiV3FormValidator,
+    async (req: Req, res: ApiV3Response) => {
       const { id } = req.params;
       const { user } = req;
 
       try {
         const deletedAiAssistant = await deleteAiAssistant(user._id, id);
         return res.apiv3({ deletedAiAssistant });
-      }
-      catch (err) {
+      } catch (err) {
         logger.error(err);
 
         if (isHttpError(err)) {

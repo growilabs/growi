@@ -24,4 +24,4 @@ TODO
 - [ ] impl `except` option
 - [x] impl `filter` option
 
-[GROWI]: https://github.com/weseek/growi
+[GROWI]: https://github.com/growilabs/growi

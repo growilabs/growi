@@ -7,22 +7,24 @@ export const FileUploadType = {
   local: 'local',
 } as const;
 
-export type FileUploadType = typeof FileUploadType[keyof typeof FileUploadType]
+export type FileUploadType =
+  (typeof FileUploadType)[keyof typeof FileUploadType];
 
 // file upload type strings you can specify in the env variable
 export const FileUploadTypeForEnvVar = {
   ...FileUploadType,
-  mongo:   'mongo',
+  mongo: 'mongo',
   mongodb: 'mongodb',
-  gcp:     'gcp',
+  gcp: 'gcp',
 } as const;
 
-export type FileUploadTypeForEnvVar = typeof FileUploadTypeForEnvVar[keyof typeof FileUploadTypeForEnvVar]
+export type FileUploadTypeForEnvVar =
+  (typeof FileUploadTypeForEnvVar)[keyof typeof FileUploadTypeForEnvVar];
 
 // mapping from env variable to actual module name
 export const EnvToModuleMappings = {
   ...FileUploadTypeForEnvVar,
-  mongo:   'gridfs',
+  mongo: 'gridfs',
   mongodb: 'gridfs',
-  gcp:     'gcs',
+  gcp: 'gcs',
 } as const;

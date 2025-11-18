@@ -1,8 +1,5 @@
-import { writeFileSync } from 'fs';
-
-import {
-  beforeEach, describe, expect, it, vi,
-} from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { generateOperationIds } from './generate-operation-ids';
 
@@ -23,7 +20,7 @@ describe('cli', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  it('processes input file and writes output to specified file', async() => {
+  it('processes input file and writes output to specified file', async () => {
     // Mock generateOperationIds to return success
     vi.mocked(generateOperationIds).mockResolvedValue(mockJsonStrings);
 
@@ -35,13 +32,15 @@ describe('cli', () => {
     await cliModule.main();
 
     // Verify generateOperationIds was called with correct arguments
-    expect(generateOperationIds).toHaveBeenCalledWith('input.json', { overwriteExisting: undefined });
+    expect(generateOperationIds).toHaveBeenCalledWith('input.json', {
+      overwriteExisting: undefined,
+    });
 
     // Verify writeFileSync was called with correct arguments
     expect(writeFileSync).toHaveBeenCalledWith('output.json', mockJsonStrings);
   });
 
-  it('uses input file as output when no output file is specified', async() => {
+  it('uses input file as output when no output file is specified', async () => {
     // Mock generateOperationIds to return success
     vi.mocked(generateOperationIds).mockResolvedValue(mockJsonStrings);
 
@@ -53,13 +52,15 @@ describe('cli', () => {
     await cliModule.main();
 
     // Verify generateOperationIds was called with correct arguments
-    expect(generateOperationIds).toHaveBeenCalledWith('input.json', { overwriteExisting: undefined });
+    expect(generateOperationIds).toHaveBeenCalledWith('input.json', {
+      overwriteExisting: undefined,
+    });
 
     // Verify writeFileSync was called with input file as output
     expect(writeFileSync).toHaveBeenCalledWith('input.json', mockJsonStrings);
   });
 
-  it('handles overwrite-existing option correctly', async() => {
+  it('handles overwrite-existing option correctly', async () => {
     // Mock generateOperationIds to return success
     vi.mocked(generateOperationIds).mockResolvedValue(mockJsonStrings);
 
@@ -71,10 +72,12 @@ describe('cli', () => {
     await cliModule.main();
 
     // Verify generateOperationIds was called with overwriteExisting option
-    expect(generateOperationIds).toHaveBeenCalledWith('input.json', { overwriteExisting: true });
+    expect(generateOperationIds).toHaveBeenCalledWith('input.json', {
+      overwriteExisting: true,
+    });
   });
 
-  it('handles generateOperationIds error correctly', async() => {
+  it('handles generateOperationIds error correctly', async () => {
     // Mock generateOperationIds to throw error
     const error = new Error('Test error');
     vi.mocked(generateOperationIds).mockRejectedValue(error);

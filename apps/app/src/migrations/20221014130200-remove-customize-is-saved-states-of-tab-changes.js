@@ -3,7 +3,6 @@ import { Config } from '~/server/models/config';
 import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
-
 const logger = loggerFactory('growi:migrate:remove-isSavedStatesOfTabChanges');
 
 const mongoose = require('mongoose');
@@ -13,7 +12,9 @@ module.exports = {
     logger.info('Apply migration');
     await mongoose.connect(getMongoUri(), mongoOptions);
 
-    await Config.findOneAndDelete({ key: 'customize:isSavedStatesOfTabChanges' }); // remove isSavedStatesOfTabChanges
+    await Config.findOneAndDelete({
+      key: 'customize:isSavedStatesOfTabChanges',
+    }); // remove isSavedStatesOfTabChanges
 
     logger.info('Migration has successfully applied');
   },

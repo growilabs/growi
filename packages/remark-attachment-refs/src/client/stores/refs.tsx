@@ -6,17 +6,21 @@ import type { SWRResponse } from 'swr';
 import useSWR, { unstable_serialize } from 'swr';
 
 export const useSWRxRef = (
-    pagePath: string, fileNameOrId: string, isImmutable?: boolean,
+  pagePath: string,
+  fileNameOrId: string,
+  isImmutable?: boolean,
 ): SWRResponse<IAttachmentHasId | null, Error> => {
   return useSWR(
     ['/_api/attachment-refs/ref', pagePath, fileNameOrId, isImmutable],
     ([endpoint, pagePath, fileNameOrId]) => {
-      return axios.get(endpoint, {
-        params: {
-          pagePath,
-          fileNameOrId,
-        },
-      }).then(result => result.data.attachment)
+      return axios
+        .get(endpoint, {
+          params: {
+            pagePath,
+            fileNameOrId,
+          },
+        })
+        .then((result) => result.data.attachment)
         .catch(() => null);
     },
     {
@@ -29,20 +33,31 @@ export const useSWRxRef = (
 };
 
 export const useSWRxRefs = (
-    pagePath: string, prefix?: string, options?: Record<string, string | undefined>, isImmutable?: boolean,
+  pagePath: string,
+  prefix?: string,
+  options?: Record<string, string | undefined>,
+  isImmutable?: boolean,
 ): SWRResponse<IAttachmentHasId[], AxiosError<string>> => {
   const serializedOptions = unstable_serialize(options);
 
   return useSWR(
-    ['/_api/attachment-refs/refs', pagePath, prefix, serializedOptions, isImmutable],
-    async([endpoint, pagePath, prefix]) => {
-      return axios.get(endpoint, {
-        params: {
-          pagePath,
-          prefix,
-          options,
-        },
-      }).then(result => result.data.attachments);
+    [
+      '/_api/attachment-refs/refs',
+      pagePath,
+      prefix,
+      serializedOptions,
+      isImmutable,
+    ],
+    async ([endpoint, pagePath, prefix]) => {
+      return axios
+        .get(endpoint, {
+          params: {
+            pagePath,
+            prefix,
+            options,
+          },
+        })
+        .then((result) => result.data.attachments);
     },
     {
       keepPreviousData: true,

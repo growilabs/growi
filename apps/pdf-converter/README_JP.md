@@ -13,7 +13,7 @@ GROWI には、ページを PDF 形式で一括エクスポートする機能が
 1. `.devcontainer/compose.extend.template.yml` と同様の内容で `.devcontainer/compose.extend.yml` を作成
 1. コマンドパレットを開く（Windows: `Ctrl + Shift + P`、Mac: `Cmd + Shift + P`）
 1. `Dev Containers: Open folder in Container...` を選択
-1. [https://github.com/weseek/growi](https://github.com/weseek/growi) からクローンした GROWI のルートディレクトリを選択
+1. [https://github.com/growilabs/growi](https://github.com/growilabs/growi) からクローンした GROWI のルートディレクトリを選択
    - **PDF-Converter のディレクトリ（growi/apps/pdf-converter）ではなく、GROWI のルートディレクトリを選択すること**
 1. `GROWI-PDF-Converter` をコンテナとして選択
 1. `cd apps/pdf-converter && turbo dev:pdf-converter` を実行し、PDF-Converter アプリを起動

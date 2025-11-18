@@ -20,7 +20,7 @@ import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
 import type { ForceHideMenuItems } from '../Common/Dropdown/PageItemControl';
 
 // Do not import with next/dynamic
-// see: https://github.com/weseek/growi/pull/7923
+// see: https://github.com/growilabs/growi/pull/7923
 import { SearchResultList } from './SearchResultList';
 
 import styles from './SearchPageBase.module.scss';
@@ -52,7 +52,7 @@ const SearchResultContent = dynamic(() => import('./SearchResultContent').then(m
   ssr: false,
   loading: () => <></>,
 });
-const SearchPageBaseSubstance: ForwardRefRenderFunction<ISelectableAll & IReturnSelectedPageIds, Props> = (props:Props, ref) => {
+const SearchPageBaseSubstance: ForwardRefRenderFunction<ISelectableAll & IReturnSelectedPageIds, Props> = (props: Props, ref) => {
 
   const {
     className,
@@ -63,7 +63,7 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<ISelectableAll & IReturn
     searchControl, searchResultListHead, searchPager,
   } = props;
 
-  const searchResultListRef = useRef<ISelectableAll|null>(null);
+  const searchResultListRef = useRef<ISelectableAll | null>(null);
 
   const { data: isGuestUser } = useIsGuestUser();
   const { data: isReadOnlyUser } = useIsReadOnlyUser();
@@ -182,20 +182,20 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<ISelectableAll & IReturn
         <div className="overflow-y-scroll">
 
           {/* Loading */}
-          { pages == null && (
+          {pages == null && (
             <div className="mw-0 flex-grow-1 flex-basis-0 m-5 text-muted text-center">
               <LoadingSpinner className="me-1 fs-3" />
             </div>
-          ) }
+          )}
 
           {/* Loaded */}
-          { pages != null && (
+          {pages != null && (
             <>
               <div className="my-3 px-md-4 px-3">
                 {searchResultListHead}
               </div>
 
-              { pages.length > 0 && (
+              {pages.length > 0 && (
                 <div className={`page-list ${styles['page-list']} px-md-4`}>
                   <SearchResultList
                     ref={searchResultListRef}
@@ -206,12 +206,12 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<ISelectableAll & IReturn
                     onCheckboxChanged={checkboxChangedHandler}
                   />
                 </div>
-              ) }
+              )}
               <div className="my-4 d-flex justify-content-center">
                 {searchPager}
               </div>
             </>
-          ) }
+          )}
 
         </div>
 

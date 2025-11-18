@@ -5,7 +5,6 @@ import { configManager } from '~/server/service/config-manager';
 import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
-
 const logger = loggerFactory('growi:migrate:generate-service-instance-id');
 
 module.exports = {
@@ -15,7 +14,9 @@ module.exports = {
 
     await configManager.loadConfigs();
 
-    await configManager.updateConfig('app:serviceInstanceId', uuidv4(), { skipPubsub: true });
+    await configManager.updateConfig('app:serviceInstanceId', uuidv4(), {
+      skipPubsub: true,
+    });
   },
 
   async down() {

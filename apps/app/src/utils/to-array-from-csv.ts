@@ -6,8 +6,8 @@ export const toArrayFromCsv = (text: string): string[] => {
 
   const array = text
     .split(',')
-    .map(el => el.trim())
-    .filter(el => el !== '');
+    .map((el) => el.trim())
+    .filter((el) => el !== '');
 
   return array;
 };

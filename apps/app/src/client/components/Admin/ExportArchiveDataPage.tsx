@@ -50,29 +50,40 @@ const ExportArchiveDataPage = (): JSX.Element => {
   }, []);
 
   const setupWebsocketEventHandler = useCallback(() => {
-    if (socket != null) {
-      // websocket event
-      socket.on('admin:onProgressForExport', ({ currentCount, totalCount, progressList }) => {
-        setExporting(true);
-        setProgressList(progressList);
-      });
-
-      // websocket event
-      socket.on('admin:onStartZippingForExport', () => {
-        setZipping(true);
-      });
-
-      // websocket event
-      socket.on('admin:onTerminateForExport', ({ addedZipFileStat }) => {
-
-        setExporting(false);
-        setZipping(false);
-        setExported(true);
-        setZipFileStats(prev => prev.concat([addedZipFileStat]));
-
-        toastSuccess(`New Archive Data '${addedZipFileStat.fileName}' is added`);
-      });
+    if (socket == null) {
+      return () => {};
     }
+
+    const onProgress = ({ currentCount, totalCount, progressList }) => {
+      setExporting(true);
+      setProgressList(progressList);
+    };
+
+    const onStartZipping = () => {
+      setZipping(true);
+    };
+
+    const onTerminateForExport = ({ addedZipFileStat }) => {
+      setExporting(false);
+      setZipping(false);
+      setExported(true);
+      setZipFileStats(prev => prev.concat([addedZipFileStat]));
+
+      toastSuccess(`New Archive Data '${addedZipFileStat.fileName}' is added`);
+    };
+
+    // Add listeners
+    socket.on('admin:onProgressForExport', onProgress);
+    socket.on('admin:onStartZippingForExport', onStartZipping);
+    socket.on('admin:onTerminateForExport', onTerminateForExport);
+
+    // Cleanup listeners
+    return () => {
+      socket.off('admin:onProgressForExport', onProgress);
+      socket.off('admin:onStartZippingForExport', onStartZipping);
+      socket.off('admin:onTerminateForExport', onTerminateForExport);
+    };
+
   }, [socket]);
 
   const onZipFileStatRemove = useCallback(async(fileName) => {
@@ -130,8 +141,11 @@ const ExportArchiveDataPage = (): JSX.Element => {
 
   useEffect(() => {
     fetchData();
+    const cleanupWebsocket = setupWebsocketEventHandler();
 
-    setupWebsocketEventHandler();
+    return () => {
+      if (cleanupWebsocket) cleanupWebsocket();
+    };
   }, [fetchData, setupWebsocketEventHandler]);
 
   const showExportingData = (isExported || isExporting) && (progressList != null);

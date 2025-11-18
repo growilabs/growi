@@ -4,4 +4,5 @@ export const GrowiPluginType = {
   Theme: 'theme',
   Script: 'script',
 } as const;
-export type GrowiPluginType = typeof GrowiPluginType[keyof typeof GrowiPluginType];
+export type GrowiPluginType =
+  (typeof GrowiPluginType)[keyof typeof GrowiPluginType];

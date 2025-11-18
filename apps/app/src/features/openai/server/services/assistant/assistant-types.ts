@@ -4,4 +4,4 @@ export const AssistantType = {
   EDIT: 'Edit',
 } as const;
 
-export type AssistantType = typeof AssistantType[keyof typeof AssistantType];
+export type AssistantType = (typeof AssistantType)[keyof typeof AssistantType];

@@ -1,6 +1,7 @@
 import { createReadStream } from 'fs';
 import path from 'path';
 
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { NextFunction, Request, Router } from 'express';
 import express from 'express';
@@ -13,6 +14,7 @@ import { configManager } from '~/server/service/config-manager';
 import { exportService } from '~/server/service/export';
 import type { IDataGROWIInfo } from '~/server/service/g2g-transfer';
 import { X_GROWI_TRANSFER_KEY_HEADER_NAME } from '~/server/service/g2g-transfer';
+import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
 import loggerFactory from '~/utils/logger';
 import { TransferKey } from '~/utils/vo/transfer-key';
@@ -20,6 +22,7 @@ import { TransferKey } from '~/utils/vo/transfer-key';
 
 import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import { Attachment } from '../../models/attachment';
 
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
@@ -197,7 +200,6 @@ module.exports = (crowi: Crowi): Router => {
    *                          type: number
    *                          description: The size of the file
    */
-  // eslint-disable-next-line max-len
   receiveRouter.get('/files', validateTransferKey, async(req: Request, res: ApiV3Response) => {
     const files = await crowi.fileUploadService.listFiles();
     return res.apiv3({ files });
@@ -249,7 +251,6 @@ module.exports = (crowi: Crowi): Router => {
    *                    type: string
    *                    description: The message of the result
    */
-  // eslint-disable-next-line max-len
   receiveRouter.post('/', validateTransferKey, uploads.single('transferDataZipFile'), async(req: Request & { file: any; }, res: ApiV3Response) => {
     const { file } = req;
     const {
@@ -313,7 +314,7 @@ module.exports = (crowi: Crowi): Router => {
     /*
      * generate maps of ImportSettings to import
      */
-    let importSettingsMap;
+    let importSettingsMap: Map<string, ImportSettings>;
     try {
       importSettingsMap = g2gTransferReceiverService.getImportSettingMap(innerFileStats, optionsMap, operatorUserId);
     }
@@ -381,6 +382,27 @@ module.exports = (crowi: Crowi): Router => {
       catch (err) {
         logger.error(err);
         return res.apiv3Err(new ErrorV3('Failed to parse body.', 'parse_failed'), 500);
+      }
+
+      try {
+        const { fileName, fileSize } = attachmentMap;
+        if (typeof fileName !== 'string' || fileName.length === 0 || fileName.length > 256) {
+          logger.warn('Invalid fileName in attachment metadata.', { fileName });
+          return res.apiv3Err(new ErrorV3('Invalid fileName in attachment metadata.', 'invalid_metadata'), 400);
+        }
+        if (typeof fileSize !== 'number' || !Number.isInteger(fileSize) || fileSize < 0) {
+          logger.warn('Invalid fileSize in attachment metadata.', { fileSize });
+          return res.apiv3Err(new ErrorV3('Invalid fileSize in attachment metadata.', 'invalid_metadata'), 400);
+        }
+        const count = await Attachment.countDocuments({ fileName, fileSize });
+        if (count === 0) {
+          logger.warn('Attachment not found in collection.', { fileName, fileSize });
+          return res.apiv3Err(new ErrorV3('Attachment not found in collection.', 'attachment_not_found'), 404);
+        }
+      }
+      catch (err) {
+        logger.error(err);
+        return res.apiv3Err(new ErrorV3('Failed to check attachment existence.', 'attachment_check_failed'), 500);
       }
 
       const fileStream = createReadStream(file.path, {
@@ -467,31 +489,32 @@ module.exports = (crowi: Crowi): Router => {
    *                    type: string
    *                    description: The transfer key
    */
-  // eslint-disable-next-line max-len
-  receiveRouter.post('/generate-key', accessTokenParser, adminRequiredIfInstalled, appSiteUrlRequiredIfNotInstalled, async(req: Request, res: ApiV3Response) => {
-    const appSiteUrl = req.body.appSiteUrl ?? configManager.getConfig('app:siteUrl');
+  receiveRouter.post('/generate-key',
+    accessTokenParser([SCOPE.WRITE.ADMIN.EXPORT_DATA], { acceptLegacy: true }),
+    adminRequiredIfInstalled, appSiteUrlRequiredIfNotInstalled, async(req: Request, res: ApiV3Response) => {
+      const appSiteUrl = req.body.appSiteUrl ?? configManager.getConfig('app:siteUrl');
 
-    let appSiteUrlOrigin: string;
-    try {
-      appSiteUrlOrigin = new URL(appSiteUrl).origin;
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err(new ErrorV3('appSiteUrl may be wrong', 'failed_to_generate_key_string'));
-    }
+      let appSiteUrlOrigin: string;
+      try {
+        appSiteUrlOrigin = new URL(appSiteUrl).origin;
+      }
+      catch (err) {
+        logger.error(err);
+        return res.apiv3Err(new ErrorV3('appSiteUrl may be wrong', 'failed_to_generate_key_string'));
+      }
 
-    // Save TransferKey document
-    let transferKeyString: string;
-    try {
-      transferKeyString = await g2gTransferReceiverService.createTransferKey(appSiteUrlOrigin);
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err(new ErrorV3('Error occurred while generating transfer key.', 'failed_to_generate_key'));
-    }
+      // Save TransferKey document
+      let transferKeyString: string;
+      try {
+        transferKeyString = await g2gTransferReceiverService.createTransferKey(appSiteUrlOrigin);
+      }
+      catch (err) {
+        logger.error(err);
+        return res.apiv3Err(new ErrorV3('Error occurred while generating transfer key.', 'failed_to_generate_key'));
+      }
 
-    return res.apiv3({ transferKey: transferKeyString });
-  });
+      return res.apiv3({ transferKey: transferKeyString });
+    });
 
   /**
    * @swagger
@@ -533,43 +556,44 @@ module.exports = (crowi: Crowi): Router => {
    *                    type: string
    *                    description: The message of the result
    */
-  // eslint-disable-next-line max-len
-  pushRouter.post('/transfer', accessTokenParser, loginRequiredStrictly, adminRequired, validator.transfer, apiV3FormValidator, async(req: AuthorizedRequest, res: ApiV3Response) => {
-    const { transferKey, collections, optionsMap } = req.body;
+  pushRouter.post('/transfer',
+    accessTokenParser([SCOPE.WRITE.ADMIN.EXPORT_DATA], { acceptLegacy: true }),
+    loginRequiredStrictly, adminRequired, validator.transfer, apiV3FormValidator, async(req: AuthorizedRequest, res: ApiV3Response) => {
+      const { transferKey, collections, optionsMap } = req.body;
 
-    // Parse transfer key
-    let tk: TransferKey;
-    try {
-      tk = TransferKey.parse(transferKey);
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err(new ErrorV3('Transfer key is invalid', 'transfer_key_invalid'), 400);
-    }
+      // Parse transfer key
+      let tk: TransferKey;
+      try {
+        tk = TransferKey.parse(transferKey);
+      }
+      catch (err) {
+        logger.error(err);
+        return res.apiv3Err(new ErrorV3('Transfer key is invalid', 'transfer_key_invalid'), 400);
+      }
 
-    // get growi info
-    let destGROWIInfo: IDataGROWIInfo;
-    try {
-      destGROWIInfo = await g2gTransferPusherService.askGROWIInfo(tk);
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err(new ErrorV3('Error occurred while asking GROWI info.', 'failed_to_ask_growi_info'));
-    }
+      // get growi info
+      let destGROWIInfo: IDataGROWIInfo;
+      try {
+        destGROWIInfo = await g2gTransferPusherService.askGROWIInfo(tk);
+      }
+      catch (err) {
+        logger.error(err);
+        return res.apiv3Err(new ErrorV3('Error occurred while asking GROWI info.', 'failed_to_ask_growi_info'));
+      }
 
-    // Check if can transfer
-    const transferability = await g2gTransferPusherService.getTransferability(destGROWIInfo);
-    if (!transferability.canTransfer) {
-      return res.apiv3Err(new ErrorV3(transferability.reason, 'growi_incompatible_to_transfer'));
-    }
+      // Check if can transfer
+      const transferability = await g2gTransferPusherService.getTransferability(destGROWIInfo);
+      if (!transferability.canTransfer) {
+        return res.apiv3Err(new ErrorV3(transferability.reason, 'growi_incompatible_to_transfer'));
+      }
 
-    // Start transfer
-    // DO NOT "await". Let it run in the background.
-    // Errors should be emitted through websocket.
-    g2gTransferPusherService.startTransfer(tk, req.user, collections, optionsMap, destGROWIInfo);
+      // Start transfer
+      // DO NOT "await". Let it run in the background.
+      // Errors should be emitted through websocket.
+      g2gTransferPusherService.startTransfer(tk, req.user, collections, optionsMap, destGROWIInfo);
 
-    return res.apiv3({ message: 'Successfully requested auto transfer.' });
-  });
+      return res.apiv3({ message: 'Successfully requested auto transfer.' });
+    });
 
   // Merge receiveRouter and pushRouter
   router.use(receiveRouter, pushRouter);

@@ -7,7 +7,6 @@
   "Sign out": "Logout",
   "New": "New",
   "Delete": "Delete",
-
   "meta": {
     "display_name": "English"
   },
@@ -30,7 +29,6 @@
   "headers": {
     "app_settings": "App Settings"
   },
-
   "header_search_box": {
     "label": {
       "All pages": "All pages",
@@ -41,20 +39,17 @@
       "This tree": "Only children of this tree"
     }
   },
-
   "search_method_menu_item": {
     "search_in_all": "Search in all",
     "only_children_of_this_tree": "Only children of this tree",
     "exact_mutch": "Exact match"
   },
-
   "share_links": {
     "Share Link": "Share Link",
     "Page Path": "Page Path",
     "expire": "Expiration",
     "description": "Description"
   },
-
   "in_app_notification": {
     "notification_list": "In-App Notification List",
     "see_all": "See All",
@@ -65,7 +60,6 @@
     "no_unread_messages": "no_unread_messages",
     "only_unread": "Only unread"
   },
-
   "personal_dropdown": {
     "home": "Home",
     "settings": "Settings",
@@ -75,7 +69,6 @@
     "use_os_settings": "Use OS settings",
     "feedback": "Feedback"
   },
-
   "create_page_dropdown": {
     "new_page": "Create New Page",
     "open_page_create_modal": "Open new page create modal",
@@ -89,7 +82,6 @@
       "descendants": "Template for descendants"
     }
   },
-
   "copy_to_clipboard": {
     "Copy to clipboard": "Copy to clipboard",
     "Page path": "Page path",
@@ -99,14 +91,12 @@
     "Markdown link": "Markdown link",
     "Append params": "Append params"
   },
-
   "crop_image_modal": {
     "image_crop": "Image Crop",
     "crop": "Crop",
     "save": "Save",
     "cancel": "Cancel"
   },
-
   "handsontable_modal": {
     "title": "Edit Table",
     "data_import": "Data Import",
@@ -122,35 +112,9 @@
       "import": "Import"
     }
   },
-
-  "questionnaire_modal": {
-    "required": "Required",
-    "submit": "Submit",
-    "close": "Close",
-    "title": "GROWI questionnaire for service improvement",
-    "more_satisfied_services": "We hope that GROWI customers will be even more satisfied",
-    "strive_to_improve_services": "once we improve our services based on your feedback.",
-    "length_of_experience": {
-      "more_than_two_years": "More than 2 years",
-      "one_to_two_years": "More than 1 year but less than 2 years",
-      "six_months_to_one_year": "More than 6 months but less than 1 year",
-      "three_months_to_six_months": "More than 3 months but less than 6 months",
-      "one_month_to_three_months": "More than 1 month but less than 3 months",
-      "less_than_one_month": "Less than 1 month"
-    },
-    "satisfaction_with_growi": "Satisfaction with GROWI",
-    "history_of_growi_usage": "History of GROWI usage",
-    "occupation": "Occupation",
-    "position": "Position",
-    "comment_on_growi": "Comment on GROWI",
-    "successfully_submitted": "Your survey has been submitted.",
-    "thanks_for_answering": "Thank you very much for answering."
-  },
-
   "not_found_page": {
     "page_not_exist": "This page does not exist."
   },
-
   "g2g_data_transfer": {
     "tab": "Data transfer",
     "data_transfer": "Data Transfer",
@@ -159,5 +123,97 @@
     "transfer_key_limit": "Transfer keys are valid for 1 hour after issuance.",
     "once_transfer_key_used": "Once the transfer key is used for transfer, it cannot be used for any other transfer.",
     "transfer_to_growi_cloud": "For more details, please click <a href='{{documentationUrl}}en/admin-guide/management-cookbook/g2g-transfer.html'>here.</a>"
+  },
+  "accesstoken_scopes_desc": {
+    "read": {
+      "all": "Grants permission to view all content.",
+      "admin": {
+        "all": "Grants permission to view admin features.",
+        "top": "Grants permission to view Wiki management top.",
+        "app": "Grants permission to view app settings.",
+        "security": "Grants permission to view security settings.",
+        "markdown": "Grants permission to view markdown settings.",
+        "customize": "Grants permission to view customization settings.",
+        "import_data": "Grants permission to view data import settings.",
+        "export_data": "Grants permission to view data archive settings.",
+        "data_transfer": "Grants permission to view data transfer settings.",
+        "external_notification": "Grants permission to view external notification settings.",
+        "slack_integration": "Grants permission to view Slack integration settings.",
+        "legacy_slack_integration": "Grants permission to view legacy Slack integration settings.",
+        "user_management": "Grants permission to view user management.",
+        "user_group_management": "Grants permission to view user group management.",
+        "audit_log": "Grants permission to view audit logs.",
+        "plugin": "Grants permission to view plugin settings.",
+        "ai_integration": "Grants permission to view AI integration settings.",
+        "full_text_search": "Grants permission to view full text search management."
+      },
+      "user_settings": {
+        "all": "Grants permission to view user settings.",
+        "info": "Grants permission to view user information.",
+        "external_account": "Grants permission to view external accounts.",
+        "password": "Grants permission to view password settings.",
+        "api": {
+          "all": "Grants permission to view API settings.",
+          "api_token": "Grants permission to view API token settings.",
+          "access_token": "Grants permission to view access token settings."
+        },
+        "in_app_notification": "Grants permission to view in-app notification settings.",
+        "other": "Grants permission to view other settings."
+      },
+      "features": {
+        "all": "Grants permission to view features.",
+        "ai_assistant": "Grants permission to view AI assistant features.",
+        "page": "Grants permission to view page features.",
+        "share_link": "Grants permission to view share link features.",
+        "bookmark": "Grants permission to view bookmark features.",
+        "attachment": "Grants permission to view attachment features.",
+        "page_bulk_export": "Grants permission to view page bulk export features."
+      }
+    },
+    "write": {
+      "all": "Grants permission to edit all content.",
+      "admin": {
+        "all": "Grants permission to edit admin features.",
+        "top": "Grants permission to edit Wiki management top.",
+        "app": "Grants permission to edit app settings.",
+        "security": "Grants permission to edit security settings.",
+        "markdown": "Grants permission to edit markdown settings.",
+        "customize": "Grants permission to edit customization settings.",
+        "import_data": "Grants permission to edit data import settings.",
+        "export_data": "Grants permission to edit data archive settings.",
+        "data_transfer": "Grants permission to edit data transfer settings.",
+        "external_notification": "Grants permission to edit external notification settings.",
+        "slack_integration": "Grants permission to edit Slack integration settings.",
+        "legacy_slack_integration": "Grants permission to edit legacy Slack integration settings.",
+        "user_management": "Grants permission to edit user management.",
+        "user_group_management": "Grants permission to edit user group management.",
+        "audit_log": "Grants permission to edit audit logs.",
+        "plugin": "Grants permission to edit plugin settings.",
+        "ai_integration": "Grants permission to edit AI integration settings.",
+        "full_text_search": "Grants permission to edit full text search management."
+      },
+      "user_settings": {
+        "all": "Grants permission to edit user settings.",
+        "info": "Grants permission to edit user information.",
+        "external_account": "Grants permission to edit external accounts.",
+        "password": "Grants permission to edit password settings.",
+        "api": {
+          "all": "Grants permission to edit API settings.",
+          "api_token": "Grants permission to edit API token settings.",
+          "access_token": "Grants permission to edit access token settings."
+        },
+        "in_app_notification": "Grants permission to edit in-app notification settings.",
+        "other": "Grants permission to edit other settings."
+      },
+      "features": {
+        "all": "Grants permission to edit features.",
+        "ai_assistant": "Grants permission to edit AI assistant features.",
+        "page": "Grants permission to edit page features.",
+        "share_link": "Grants permission to edit share link features.",
+        "bookmark": "Grants permission to edit bookmark features.",
+        "attachment": "Grants permission to edit attachment features.",
+        "page_bulk_export": "Grants permission to edit page bulk export features."
+      }
+    }
   }
 }

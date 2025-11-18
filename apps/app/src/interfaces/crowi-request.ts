@@ -4,18 +4,12 @@ import type { HydratedDocument } from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 
-
 export interface CrowiProperties {
+  user?: HydratedDocument<IUser>;
 
-  user?: HydratedDocument<IUser>,
+  crowi: Crowi;
 
-  crowi: Crowi,
-
-  session: any,
-
-  // provided by csurf
-  csrfToken: () => string,
-
+  session: any;
 }
 
 export interface CrowiRequest extends CrowiProperties, Request {}

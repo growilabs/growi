@@ -6,7 +6,6 @@ import type {
   LsxApiParams,
   LsxApiResponseData,
 } from '../../../interfaces/api';
-
 import { type ParseNumOptionResult, parseNumOption } from './parse-num-option';
 
 const LOADMORE_PAGES_NUM = 10;
@@ -77,9 +76,9 @@ export const useSWRxLsx = (
         return res.data;
       } catch (err) {
         if (axios.isAxiosError(err)) {
-          throw new Error(err.response?.data.message);
+          throw new Error(err.response?.data);
         }
-        throw err;
+        throw new Error(err);
       }
     },
 

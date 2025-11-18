@@ -12,6 +12,8 @@ sudo chmod 700 /tmp/page-bulk-export
 # Setup pnpm
 SHELL=bash pnpm setup
 eval "$(cat /home/node/.bashrc)"
+pnpm config set store-dir /workspace/.pnpm-store
+
 # Update pnpm
 pnpm i -g pnpm
 

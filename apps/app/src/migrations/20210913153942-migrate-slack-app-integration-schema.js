@@ -1,12 +1,16 @@
-import { defaultSupportedCommandsNameForBroadcastUse, defaultSupportedCommandsNameForSingleUse } from '@growi/slack';
+import {
+  defaultSupportedCommandsNameForBroadcastUse,
+  defaultSupportedCommandsNameForSingleUse,
+} from '@growi/slack';
 import mongoose from 'mongoose';
 
 import slackAppIntegrationFactory from '~/server/models/slack-app-integration';
 import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
-
-const logger = loggerFactory('growi:migrate:migrate-slack-app-integration-schema');
+const logger = loggerFactory(
+  'growi:migrate:migrate-slack-app-integration-schema',
+);
 
 // create default data
 const defaultDataForBroadcastUse = {};

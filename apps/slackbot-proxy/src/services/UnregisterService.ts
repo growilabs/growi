@@ -1,12 +1,18 @@
 import type {
-  GrowiCommand, GrowiCommandProcessor, GrowiInteractionProcessor, InteractionHandledResult,
+  GrowiCommand,
+  GrowiCommandProcessor,
+  GrowiInteractionProcessor,
+  InteractionHandledResult,
 } from '@growi/slack';
 import {
-  inputBlock, markdownSectionBlock, actionsBlock, buttonElement,
+  actionsBlock,
+  buttonElement,
+  inputBlock,
+  markdownSectionBlock,
 } from '@growi/slack/dist/utils/block-kit-builder';
 import { InteractionPayloadAccessor } from '@growi/slack/dist/utils/interaction-payload-accessor';
 import { getInteractionIdRegexpFromCommandName } from '@growi/slack/dist/utils/payload-interaction-id-helpers';
-import { respond, replaceOriginal } from '@growi/slack/dist/utils/response-url';
+import { replaceOriginal, respond } from '@growi/slack/dist/utils/response-url';
 import { AuthorizeResult } from '@slack/oauth';
 import { MultiStaticSelect } from '@slack/web-api';
 import { Inject, Service } from '@tsed/di';
@@ -21,8 +27,9 @@ import loggerFactory from '~/utils/logger';
 const logger = loggerFactory('slackbot-proxy:services:UnregisterService');
 
 @Service()
-export class UnregisterService implements GrowiCommandProcessor, GrowiInteractionProcessor<void> {
-
+export class UnregisterService
+  implements GrowiCommandProcessor, GrowiInteractionProcessor<void>
+{
   @Inject()
   relationRepository: RelationRepository;
 
@@ -33,12 +40,20 @@ export class UnregisterService implements GrowiCommandProcessor, GrowiInteractio
     return growiCommand.growiCommandType === 'unregister';
   }
 
-  async processCommand(growiCommand: GrowiCommand, authorizeResult: AuthorizeResult): Promise<void> {
+  async processCommand(
+    growiCommand: GrowiCommand,
+    authorizeResult: AuthorizeResult,
+  ): Promise<void> {
     // get growi urls
-    const installationId = authorizeResult.enterpriseId || authorizeResult.teamId;
+    const installationId =
+      authorizeResult.enterpriseId || authorizeResult.teamId;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const installation = await this.installationRepository.findByTeamIdOrEnterpriseId(installationId!);
-    const relations = await this.relationRepository.createQueryBuilder('relation')
+    const installation =
+      await this.installationRepository.findByTeamIdOrEnterpriseId(
+        installationId!,
+      );
+    const relations = await this.relationRepository
+      .createQueryBuilder('relation')
       .where('relation.installationId = :id', { id: installation?.id })
       .leftJoinAndSelect('relation.installation', 'installation')
       .getMany();
@@ -47,7 +62,9 @@ export class UnregisterService implements GrowiCommandProcessor, GrowiInteractio
       await respond(growiCommand.responseUrl, {
         text: 'No GROWI found to unregister.',
         blocks: [
-          markdownSectionBlock('You haven\'t registered any GROWI to this workspace.'),
+          markdownSectionBlock(
+            "You haven't registered any GROWI to this workspace.",
+          ),
           markdownSectionBlock('Send `/growi register` to register.'),
         ],
       });
@@ -77,9 +94,16 @@ export class UnregisterService implements GrowiCommandProcessor, GrowiInteractio
       blocks: [
         inputBlock(staticSelectElement, 'growiUris', 'GROWI URL to unregister'),
         actionsBlock(
-          buttonElement({ text: 'Cancel', actionId: 'unregister:cancel', value: JSON.stringify({}) }),
           buttonElement({
-            text: 'Unregister', actionId: 'unregister:unregister', style: 'danger', value: JSON.stringify({}),
+            text: 'Cancel',
+            actionId: 'unregister:cancel',
+            value: JSON.stringify({}),
+          }),
+          buttonElement({
+            text: 'Unregister',
+            actionId: 'unregister:unregister',
+            style: 'danger',
+            value: JSON.stringify({}),
           }),
         ),
       ],
@@ -87,29 +111,45 @@ export class UnregisterService implements GrowiCommandProcessor, GrowiInteractio
   }
 
   // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  shouldHandleInteraction(interactionPayloadAccessor: InteractionPayloadAccessor): boolean {
-    const { actionId, callbackId } = interactionPayloadAccessor.getActionIdAndCallbackIdFromPayLoad();
-    const registerRegexp: RegExp = getInteractionIdRegexpFromCommandName('unregister');
+  shouldHandleInteraction(
+    interactionPayloadAccessor: InteractionPayloadAccessor,
+  ): boolean {
+    const { actionId, callbackId } =
+      interactionPayloadAccessor.getActionIdAndCallbackIdFromPayLoad();
+    const registerRegexp: RegExp =
+      getInteractionIdRegexpFromCommandName('unregister');
     return registerRegexp.test(actionId) || registerRegexp.test(callbackId);
   }
 
   async processInteraction(
-      // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-      authorizeResult: AuthorizeResult, interactionPayload: any, interactionPayloadAccessor: InteractionPayloadAccessor,
+    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+    authorizeResult: AuthorizeResult,
+    interactionPayload: any,
+    interactionPayloadAccessor: InteractionPayloadAccessor,
   ): Promise<InteractionHandledResult<void>> {
     const interactionHandledResult: InteractionHandledResult<void> = {
       isTerminated: false,
     };
-    if (!this.shouldHandleInteraction(interactionPayloadAccessor)) return interactionHandledResult;
+    if (!this.shouldHandleInteraction(interactionPayloadAccessor))
+      return interactionHandledResult;
 
-    const { actionId } = interactionPayloadAccessor.getActionIdAndCallbackIdFromPayLoad();
+    const { actionId } =
+      interactionPayloadAccessor.getActionIdAndCallbackIdFromPayLoad();
 
     switch (actionId) {
       case 'unregister:unregister':
-        interactionHandledResult.result = await this.handleUnregisterInteraction(authorizeResult, interactionPayload, interactionPayloadAccessor);
+        interactionHandledResult.result =
+          await this.handleUnregisterInteraction(
+            authorizeResult,
+            interactionPayload,
+            interactionPayloadAccessor,
+          );
         break;
       case 'unregister:cancel':
-        interactionHandledResult.result = await this.handleUnregisterCancelInteraction(interactionPayloadAccessor);
+        interactionHandledResult.result =
+          await this.handleUnregisterCancelInteraction(
+            interactionPayloadAccessor,
+          );
         break;
       case 'unregister:selectedGrowiUris':
         break;
@@ -124,12 +164,17 @@ export class UnregisterService implements GrowiCommandProcessor, GrowiInteractio
 
   // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   async handleUnregisterInteraction(
-      // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-      authorizeResult: AuthorizeResult, interactionPayload: any, interactionPayloadAccessor: InteractionPayloadAccessor,
-  ):Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+    authorizeResult: AuthorizeResult,
+    interactionPayload: any,
+    interactionPayloadAccessor: InteractionPayloadAccessor,
+  ): Promise<void> {
     const responseUrl = interactionPayloadAccessor.getResponseUrl();
 
-    const selectedOptions = interactionPayloadAccessor.getStateValues()?.growiUris?.['unregister:selectedGrowiUris']?.selected_options;
+    const selectedOptions =
+      interactionPayloadAccessor.getStateValues()?.growiUris?.[
+        'unregister:selectedGrowiUris'
+      ]?.selected_options;
     if (!Array.isArray(selectedOptions)) {
       logger.error('Unregisteration failed: Mulformed object was detected\n');
       await respond(responseUrl, {
@@ -140,15 +185,20 @@ export class UnregisterService implements GrowiCommandProcessor, GrowiInteractio
       });
       return;
     }
-    const growiUris = selectedOptions.map(selectedOption => selectedOption.value);
+    const growiUris = selectedOptions.map(
+      (selectedOption) => selectedOption.value,
+    );
 
-    const installationId = authorizeResult.enterpriseId || authorizeResult.teamId;
+    const installationId =
+      authorizeResult.enterpriseId || authorizeResult.teamId;
     let installation: Installation | undefined;
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      installation = await this.installationRepository.findByTeamIdOrEnterpriseId(installationId!);
-    }
-    catch (err) {
+      installation =
+        await this.installationRepository.findByTeamIdOrEnterpriseId(
+          installationId!,
+        );
+    } catch (err) {
       logger.error('Unregisteration failed:\n', err);
       await respond(responseUrl, {
         text: 'Unregistration failed',
@@ -161,13 +211,15 @@ export class UnregisterService implements GrowiCommandProcessor, GrowiInteractio
 
     let deleteResult: DeleteResult;
     try {
-      deleteResult = await this.relationRepository.createQueryBuilder('relation')
+      deleteResult = await this.relationRepository
+        .createQueryBuilder('relation')
         .where('relation.growiUri IN (:uris)', { uris: growiUris })
-        .andWhere('relation.installationId = :installationId', { installationId: installation?.id })
+        .andWhere('relation.installationId = :installationId', {
+          installationId: installation?.id,
+        })
         .delete()
         .execute();
-    }
-    catch (err) {
+    } catch (err) {
       logger.error('Unregisteration failed\n', err);
       await respond(responseUrl, {
         text: 'Unregistration failed',
@@ -181,17 +233,20 @@ export class UnregisterService implements GrowiCommandProcessor, GrowiInteractio
     await replaceOriginal(responseUrl, {
       text: 'Unregistration completed',
       blocks: [
-        markdownSectionBlock(`Unregistered *${deleteResult.affected}* GROWI from this workspace.`),
+        markdownSectionBlock(
+          `Unregistered *${deleteResult.affected}* GROWI from this workspace.`,
+        ),
       ],
     });
     return;
   }
 
   // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  async handleUnregisterCancelInteraction(interactionPayloadAccessor: InteractionPayloadAccessor): Promise<void> {
+  async handleUnregisterCancelInteraction(
+    interactionPayloadAccessor: InteractionPayloadAccessor,
+  ): Promise<void> {
     await axios.post(interactionPayloadAccessor.getResponseUrl(), {
       delete_original: true,
     });
   }
-
 }

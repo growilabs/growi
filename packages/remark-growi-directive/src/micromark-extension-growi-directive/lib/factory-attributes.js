@@ -50,8 +50,6 @@ export function factoryAttributes(
   attributeValueData,
   disallowEol,
 ) {
-  /** @type {string} */
-  let type;
   /** @type {Code|undefined} */
   let marker;
 

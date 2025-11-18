@@ -1,28 +1,58 @@
 import type { JSX } from 'react';
-
 import { useTranslation } from 'react-i18next';
 import { ModalHeader } from 'reactstrap';
 
-import { useAiAssistantManagementModal, AiAssistantManagementModalPageMode } from '../../../stores/ai-assistant';
+import {
+  AiAssistantManagementModalPageMode,
+  useAiAssistantManagementModal,
+} from '../../../stores/ai-assistant';
 
+type Props = {
+  labelTranslationKey: string;
+  hideBackButton?: boolean;
+  backButtonColor?: 'primary' | 'secondary';
+  backToPageMode?: AiAssistantManagementModalPageMode;
+};
 
-export const AiAssistantManagementHeader = (): JSX.Element => {
+export const AiAssistantManagementHeader = (props: Props): JSX.Element => {
+  const {
+    labelTranslationKey,
+    hideBackButton,
+    backButtonColor = 'primary',
+    backToPageMode = AiAssistantManagementModalPageMode.HOME,
+  } = props;
+
   const { t } = useTranslation();
-  const { data, close, changePageMode } = useAiAssistantManagementModal();
+  const { close, changePageMode } = useAiAssistantManagementModal();
 
   return (
     <ModalHeader
-      close={(
+      tag="h4"
+      close={
         <button type="button" className="btn p-0" onClick={close}>
           <span className="material-symbols-outlined">close</span>
         </button>
-      )}
+      }
     >
       <div className="d-flex align-items-center">
-        <button type="button" className="btn p-0 me-3" onClick={() => changePageMode(AiAssistantManagementModalPageMode.HOME)}>
-          <span className="material-symbols-outlined text-primary">chevron_left</span>
-        </button>
-        <span>{t(`modal_ai_assistant.page_mode_title.${data?.pageMode}`)}</span>
+        {hideBackButton ? (
+          <span className="growi-custom-icons growi-ai-assistant-icon me-3 fs-4">
+            growi_ai
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="btn p-0 me-3"
+            onClick={() => changePageMode(backToPageMode)}
+          >
+            <span
+              className={`material-symbols-outlined text-${backButtonColor}`}
+            >
+              chevron_left
+            </span>
+          </button>
+        )}
+        <span className="fw-bold">{t(labelTranslationKey)}</span>
       </div>
     </ModalHeader>
   );

@@ -14,7 +14,11 @@ function serializeInsecureUserAttributes(page) {
   if (page.creator != null && page.creator._id != null) {
     page.creator = serializeUserSecurely(page.creator);
   }
-  if (page.revision != null && page.revision.author != null && page.revision.author._id != null) {
+  if (
+    page.revision != null &&
+    page.revision.author != null &&
+    page.revision.author._id != null
+  ) {
     page.revision.author = serializeUserSecurely(page.revision.author);
   }
   return page;

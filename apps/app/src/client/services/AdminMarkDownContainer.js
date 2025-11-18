@@ -101,8 +101,8 @@ export default class AdminMarkDownContainer extends Container {
    * Update Xss Setting
    */
   async updateXssSetting() {
-    let { tagWhitelist } = this.state;
-    const { attrWhitelist } = this.state;
+    let { tagWhitelist = '' } = this.state;
+    const { attrWhitelist = '{}' } = this.state;
 
     tagWhitelist = Array.isArray(tagWhitelist) ? tagWhitelist : tagWhitelist.split(',');
 
@@ -111,14 +111,14 @@ export default class AdminMarkDownContainer extends Container {
       JSON.parse(attrWhitelist);
     }
     catch (err) {
-      throw Error(err);
+      throw Error(`attrWhitelist parsing error occured: ${err.message}`);
     }
 
     await apiv3Put('/markdown-setting/xss', {
       isEnabledXss: this.state.isEnabledXss,
       xssOption: this.state.xssOption,
       tagWhitelist,
-      attrWhitelist: attrWhitelist ?? '{}',
+      attrWhitelist,
     });
   }
 

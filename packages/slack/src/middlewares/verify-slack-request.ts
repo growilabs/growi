@@ -1,5 +1,4 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-
 import type { NextFunction, Response } from 'express';
 import createError from 'http-errors';
 import { stringify } from 'qs';
@@ -16,7 +15,7 @@ const logger = loggerFactory('@growi/slack:middlewares:verify-slack-request');
 export const verifySlackRequest = (
   // biome-ignore lint/suspicious/noExplicitAny: ignore
   req: RequestFromSlack & { rawBody: any },
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ): void => {
   const signingSecret = req.slackSigningSecret;
@@ -40,7 +39,7 @@ export const verifySlackRequest = (
   }
 
   // protect against replay attacks
-  const time = Math.floor(new Date().getTime() / 1000);
+  const time = Math.floor(Date.now() / 1000);
   if (Math.abs(time - timestamp) > 300) {
     const message = 'Verification failed.';
     logger.warn(message, { body: req.body });

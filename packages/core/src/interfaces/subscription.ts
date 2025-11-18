@@ -7,15 +7,16 @@ export const SubscriptionStatusType = {
   UNSUBSCRIBE: 'UNSUBSCRIBE',
 } as const;
 export const AllSubscriptionStatusType = Object.values(SubscriptionStatusType);
-export type SubscriptionStatusType = typeof SubscriptionStatusType[keyof typeof SubscriptionStatusType];
+export type SubscriptionStatusType =
+  (typeof SubscriptionStatusType)[keyof typeof SubscriptionStatusType];
 
 export interface ISubscription {
-  user: Ref<IUser>
-  targetModel: string
-  target: Ref<IPage>
-  status: string
-  createdAt: Date
+  user: Ref<IUser>;
+  targetModel: string;
+  target: Ref<IPage>;
+  status: string;
+  createdAt: Date;
 
-  isSubscribing(): boolean
-  isUnsubscribing(): boolean
+  isSubscribing(): boolean;
+  isUnsubscribing(): boolean;
 }

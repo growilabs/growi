@@ -19,8 +19,6 @@ import TableOfContents from '../TableOfContents';
 
 import { PageAccessoriesControl } from './PageAccessoriesControl';
 
-import styles from './PageSideContents.module.scss';
-
 
 const { isTopPage, isUsersHomepage, isTrashPage } = pagePathUtils;
 
@@ -109,22 +107,22 @@ export const PageSideContents = (props: PageSideContentsProps): JSX.Element => {
       )}
 
       {/* Tags */}
-      { page.revision != null && (
+      {page.revision != null && (
         <div ref={tagsRef}>
           <Suspense fallback={<PageTagsSkeleton />}>
             <Tags pageId={page._id} revisionId={page.revision._id} />
           </Suspense>
         </div>
-      ) }
+      )}
 
-      <div className={`${styles['grw-page-accessories-controls']} d-flex flex-column gap-2`}>
+      <div className=" d-flex flex-column gap-2">
         {/* Page list */}
         {!isSharedUser && (
           <div className="d-flex" data-testid="pageListButton">
             <PageAccessoriesControl
               icon={<span className="material-symbols-outlined">subject</span>}
               label={t('page_list')}
-              // Do not display CountBadge if '/trash/*': https://github.com/weseek/growi/pull/7600
+              // Do not display CountBadge if '/trash/*': https://github.com/growilabs/growi/pull/7600
               count={!isTrash && pageInfo != null ? (pageInfo as IPageInfoForOperation).descendantCount : undefined}
               offset={1}
               onClick={() => openDescendantPageListModal(pagePath)}

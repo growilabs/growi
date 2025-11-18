@@ -11,7 +11,10 @@ on:
         default: 'docker.io'
       image-name:
         type: string
-        default: weseek/growi
+        default: growilabs/growi
+      docker-registry-username:
+        type: string
+        default: growimoogle
       tag-temporary:
         type: string
         default: latest
@@ -41,7 +44,7 @@ jobs:
       uses: docker/login-action@v3
       with:
         registry: ${{ inputs.registry }}
-        username: wsmoogle
+        username: ${{ inputs.docker-registry-username }}
         password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
 
     - name: Create and push manifest images

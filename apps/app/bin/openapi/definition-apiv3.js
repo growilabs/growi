@@ -12,7 +12,8 @@ module.exports = {
       variables: {
         server: {
           default: 'https://demo.growi.org',
-          description: 'The base URL for the GROWI API except for the version path (/_api/v3). This can be set to your GROWI instance URL.',
+          description:
+            'The base URL for the GROWI API except for the version path (/_api/v3). This can be set to your GROWI instance URL.',
         },
       },
     },
@@ -55,7 +56,8 @@ module.exports = {
         name: 'mimeType',
         in: 'path',
         required: true,
-        description: 'Configurable MIME type (e.g., image/png, application/pdf)',
+        description:
+          'Configurable MIME type (e.g., image/png, application/pdf)',
         schema: {
           type: 'string',
           enum: [
@@ -115,11 +117,7 @@ module.exports = {
     },
     {
       name: 'User Personal Settings API',
-      tags: [
-        'GeneralSetting',
-        'EditorSetting',
-        'InAppNotificationSettings',
-      ],
+      tags: ['GeneralSetting', 'EditorSetting', 'InAppNotificationSettings'],
     },
     {
       name: 'System Management API',
@@ -138,8 +136,6 @@ module.exports = {
         'MongoDB',
         'NotificationSetting',
         'Plugins',
-        'Questionnaire',
-        'QuestionnaireSetting',
         'SlackIntegration',
         'SlackIntegrationSettings',
         'SlackIntegrationSettings (with proxy)',
@@ -157,10 +153,7 @@ module.exports = {
     },
     {
       name: 'Public API',
-      tags: [
-        'Healthcheck',
-        'Statistics',
-      ],
+      tags: ['Healthcheck', 'Statistics', '', '', '', '', '', ''],
     },
   ],
 };

@@ -1,10 +1,9 @@
-import { writeFileSync } from 'fs';
-
+import { writeFileSync } from 'node:fs';
 import { Command } from 'commander';
 
 import { generateOperationIds } from './generate-operation-ids';
 
-export const main = async(): Promise<void> => {
+export const main = async (): Promise<void> => {
   // parse command line arguments
   const program = new Command();
   program
@@ -18,7 +17,9 @@ export const main = async(): Promise<void> => {
   const [inputFile] = program.args;
 
   // eslint-disable-next-line no-console
-  const jsonStrings = await generateOperationIds(inputFile, { overwriteExisting }).catch(console.error);
+  const jsonStrings = await generateOperationIds(inputFile, {
+    overwriteExisting,
+  }).catch(console.error);
   if (jsonStrings != null) {
     writeFileSync(outputFile ?? inputFile, jsonStrings);
   }

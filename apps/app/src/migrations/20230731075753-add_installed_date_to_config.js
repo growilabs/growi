@@ -23,11 +23,15 @@ module.exports = {
       // Set app:installed date.
       // refs: https://mongoosejs.com/docs/6.x/docs/timestamps.html#disabling-timestamps
       //       Read the section after "Disabling timestamps also lets you set timestamps yourself..."
-      const updatedConfig = await Config.findOneAndUpdate({ _id: appInstalled._id }, { createdAt: initialUserCreatedAt }, {
-        new: true,
-        timestamps: false,
-        strict: false,
-      });
+      const updatedConfig = await Config.findOneAndUpdate(
+        { _id: appInstalled._id },
+        { createdAt: initialUserCreatedAt },
+        {
+          new: true,
+          timestamps: false,
+          strict: false,
+        },
+      );
       logger.debug('updatedConfig: ', updatedConfig);
     }
 
@@ -40,13 +44,16 @@ module.exports = {
 
     const appInstalled = await Config.findOne({ key: 'app:installed' });
     if (appInstalled != null) {
-
       // Unset app:installed date.
-      const updatedConfig = await Config.findOneAndUpdate({ _id: appInstalled._id }, { $unset: { createdAt: 1 } }, {
-        new: true,
-        timestamps: false,
-        strict: false,
-      });
+      const updatedConfig = await Config.findOneAndUpdate(
+        { _id: appInstalled._id },
+        { $unset: { createdAt: 1 } },
+        {
+          new: true,
+          timestamps: false,
+          strict: false,
+        },
+      );
       logger.debug('updatedConfig: ', updatedConfig);
     }
 

@@ -128,6 +128,9 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   mutateResolvedTheme({ themeData: resolvedTheme });
 
   const currentRevisionId = currentPage?.revision?._id;
+
+  // There are cases where "revisionId" is not required for revision updates
+  // See: https://dev.growi.org/651a6f4a008fee2f99187431#origin-%E3%81%AE%E5%BC%B7%E5%BC%B1
   const isRevisionIdRequiredForPageUpdate = currentPage?.revision?.origin === undefined;
 
   const initialValueRef = useRef('');
@@ -156,7 +159,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
 
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.MAIN);
 
-  const [markdownToPreview, setMarkdownToPreview] = useState<string>(codeMirrorEditor?.getDoc() ?? '');
+  const [markdownToPreview, setMarkdownToPreview] = useState<string>(codeMirrorEditor?.getDocString() ?? '');
   const setMarkdownPreviewWithDebounce = useMemo(() => debounce(100, throttle(150, (value: string) => {
     setMarkdownToPreview(value);
   })), []);
@@ -189,7 +192,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
         ...(opts ?? {}),
       });
 
-      // to sync revision id with page tree: https://github.com/weseek/growi/pull/7227
+      // to sync revision id with page tree: https://github.com/growilabs/growi/pull/7227
       mutatePageTree();
 
       mutateRecentlyUpdated();
@@ -217,7 +220,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   }, [pageId, selectedGrant, mutateWaitingSaveProcessing, updatePage, mutateIsGrantNormalized, t]);
 
   const saveAndReturnToViewHandler = useCallback(async(opts: SaveOptions) => {
-    const markdown = codeMirrorEditor?.getDoc();
+    const markdown = codeMirrorEditor?.getDocString();
     const revisionId = isRevisionIdRequiredForPageUpdate ? currentRevisionId : undefined;
     const page = await save(revisionId, markdown, opts, onConflict);
     if (page == null) {
@@ -229,7 +232,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   }, [codeMirrorEditor, currentRevisionId, isRevisionIdRequiredForPageUpdate, mutateEditorMode, onConflict, save, updateStateAfterSave]);
 
   const saveWithShortcut = useCallback(async() => {
-    const markdown = codeMirrorEditor?.getDoc();
+    const markdown = codeMirrorEditor?.getDocString();
     const revisionId = isRevisionIdRequiredForPageUpdate ? currentRevisionId : undefined;
     const page = await save(revisionId, markdown, undefined, onConflict);
     if (page == null) {

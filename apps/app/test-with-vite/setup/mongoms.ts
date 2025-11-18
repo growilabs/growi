@@ -3,8 +3,7 @@ import mongoose from 'mongoose';
 
 import { mongoOptions } from '~/server/util/mongoose-utils';
 
-
-beforeAll(async() => {
+beforeAll(async () => {
   // set debug flag
   process.env.MONGOMS_DEBUG = process.env.VITE_MONGOMS_DEBUG;
 
@@ -25,6 +24,6 @@ beforeAll(async() => {
   await mongoose.connect(mongoServer.getUri(), mongoOptions);
 });
 
-afterAll(async() => {
+afterAll(async () => {
   await mongoose.disconnect();
 });

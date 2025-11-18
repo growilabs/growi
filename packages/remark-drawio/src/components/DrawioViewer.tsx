@@ -1,14 +1,13 @@
 import {
   type JSX,
-  type ReactNode,
   memo,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
-
 import { debounce } from 'throttle-debounce';
 
 import type { IGraphViewerGlobal } from '..';
@@ -23,6 +22,7 @@ declare global {
 }
 
 export type DrawioViewerProps = {
+  isDarkMode: 'true' | 'false';
   diagramIndex: number;
   bol: number;
   eol: number;
@@ -39,6 +39,7 @@ export type DrawioEditByViewerProps = {
 
 export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
   const {
+    isDarkMode,
     diagramIndex,
     bol,
     eol,
@@ -109,13 +110,13 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
 
     let mxgraphData: string | undefined;
     try {
-      mxgraphData = generateMxgraphData(code);
+      mxgraphData = generateMxgraphData(code, isDarkMode === 'true');
     } catch (err) {
       setError(err);
     }
 
     return `<div class="mxgraph" data-mxgraph="${mxgraphData}"></div>`;
-  }, [children]);
+  }, [children, isDarkMode]);
 
   useEffect(() => {
     if (mxgraphHtml.length > 0) {
@@ -162,7 +163,7 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
     }
 
     const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
+      for (const _entry of entries) {
         // setElementWidth(entry.contentRect.width);
         onRenderingStart?.();
         renderDrawioWithDebounce();

@@ -1,10 +1,10 @@
 import type { GrowiThemeMetadata } from '@growi/core';
 
 export type IResLayoutSetting = {
-  isContainerFluid: boolean,
+  isContainerFluid: boolean;
 };
 
 export type IResGrowiTheme = {
-  currentTheme: string,
-  pluginThemesMetadatas: GrowiThemeMetadata[],
-}
+  currentTheme: string;
+  pluginThemesMetadatas: GrowiThemeMetadata[];
+};

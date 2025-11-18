@@ -2,8 +2,10 @@ import React, { useCallback } from 'react';
 
 import { UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
+import Image from 'next/image';
 import prettyBytes from 'pretty-bytes';
 
+import { useIsGuestUser, useIsReadOnlyUser, useIsSharedUser } from '~/stores-universal/context';
 import { useSWRxAttachment } from '~/stores/attachment';
 import { useDeleteAttachmentModal } from '~/stores/modal';
 
@@ -20,6 +22,12 @@ export const RichAttachment = React.memo((props: RichAttachmentProps) => {
   const { t } = useTranslation();
   const { data: attachment, remove } = useSWRxAttachment(attachmentId);
   const { open: openDeleteAttachmentModal } = useDeleteAttachmentModal();
+
+  const { data: isGuestUser } = useIsGuestUser();
+  const { data: isSharedUser } = useIsSharedUser();
+  const { data: isReadOnlyUser } = useIsReadOnlyUser();
+
+  const showTrashButton = isGuestUser === false && isSharedUser === false && isReadOnlyUser === false;
 
   const onClickTrashButtonHandler = useCallback(() => {
     if (attachment == null) {
@@ -57,7 +65,13 @@ export const RichAttachment = React.memo((props: RichAttachmentProps) => {
       <div className="my-2 p-2 card">
         <div className="p-1 card-body d-flex align-items-center">
           <div className="me-2 px-0 d-flex align-items-center justify-content-center">
-            <img src="/images/icons/editor/attachment.svg" className="attachment-icon" alt="attachment icon" />
+            <Image
+              width={20}
+              height={20}
+              src="/images/icons/editor/attachment.svg"
+              className="attachment-icon"
+              alt="attachment icon"
+            />
           </div>
           <div className="ps-0">
             <div className="d-inline-block">
@@ -69,9 +83,13 @@ export const RichAttachment = React.memo((props: RichAttachmentProps) => {
               <a className="ms-2 attachment-download" href={downloadPathProxied}>
                 <span className="material-symbols-outlined">cloud_download</span>
               </a>
-              <a className="ml-2 text-danger attachment-delete d-share-link-none" type="button" onClick={onClickTrashButtonHandler}>
-                <span className="material-symbols-outlined">delete</span>
-              </a>
+
+              {showTrashButton && (
+                <a className="ml-2 text-danger attachment-delete d-share-link-none" type="button" onClick={onClickTrashButtonHandler}>
+                  <span className="material-symbols-outlined">delete</span>
+                </a>
+              )}
+
             </div>
             <div className="d-flex align-items-center">
               <UserPicture user={creator} size="sm" />

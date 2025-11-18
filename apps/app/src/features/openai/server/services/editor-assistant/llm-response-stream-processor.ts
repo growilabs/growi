@@ -1,14 +1,16 @@
 import { jsonrepair } from 'jsonrepair';
-import type { z } from 'zod';
 
 import loggerFactory from '~/utils/logger';
 
 import {
+  type LlmEditorAssistantDiff,
+  LlmEditorAssistantDiffSchema,
   type LlmEditorAssistantMessage,
-  LlmEditorAssistantDiffSchema, type LlmEditorAssistantDiff,
 } from '../../../interfaces/editor-assistant/llm-response-schemas';
 
-const logger = loggerFactory('growi:routes:apiv3:openai:edit:editor-stream-processor');
+const logger = loggerFactory(
+  'growi:routes:apiv3:openai:edit:editor-stream-processor',
+);
 
 /**
  * Type guard: Check if item is a message type
@@ -18,26 +20,32 @@ const isMessageItem = (item: unknown): item is LlmEditorAssistantMessage => {
 };
 
 /**
- * Type guard: Check if item is a diff type
+ * Type guard: Check if item is a diff type with required startLine
  */
 const isDiffItem = (item: unknown): item is LlmEditorAssistantDiff => {
-  return typeof item === 'object' && item !== null
-    // && ('insert' in item || 'delete' in item || 'retain' in item);
-    && ('replace' in item);
+  return (
+    typeof item === 'object' &&
+    item !== null &&
+    'replace' in item &&
+    'search' in item &&
+    'startLine' in item
+  ); // Phase 2B: Enforce startLine requirement
 };
 
 type Options = {
-  messageCallback?: (appendedMessage: string) => void,
-  diffDetectedCallback?: (detected: LlmEditorAssistantDiff) => void,
-  dataFinalizedCallback?: (message: string | null, replacements: LlmEditorAssistantDiff[]) => void,
-}
+  messageCallback?: (appendedMessage: string) => void;
+  diffDetectedCallback?: (detected: LlmEditorAssistantDiff) => void;
+  dataFinalizedCallback?: (
+    message: string | null,
+    replacements: LlmEditorAssistantDiff[],
+  ) => void;
+};
 
 /**
  * AI response stream processor for Editor Assisntant
  * Extracts messages and diffs from JSON stream for editor
  */
 export class LlmResponseStreamProcessor {
-
   // Final response data
   private message: string | null = null;
 
@@ -58,9 +66,7 @@ export class LlmResponseStreamProcessor {
   // Last processed content length - to optimize processing
   private lastProcessedContentLength = 0;
 
-  constructor(
-      private options?: Options,
-  ) {
+  constructor(private options?: Options) {
     this.options = options;
   }
 
@@ -83,7 +89,10 @@ export class LlmResponseStreamProcessor {
         const currentContentIndex = contents.length - 1;
 
         // Calculate processing start index - to avoid reprocessing known elements
-        const startProcessingIndex = Math.max(0, Math.min(this.lastProcessedContentLength, contents.length) - 1);
+        const startProcessingIndex = Math.max(
+          0,
+          Math.min(this.lastProcessedContentLength, contents.length) - 1,
+        );
 
         // Process both messages and diffs in a single loop
         let diffUpdated = false;
@@ -103,9 +112,11 @@ export class LlmResponseStreamProcessor {
 
               if (previousMessage == null) {
                 appendedContent = currentMessage;
-              }
-              else {
-                appendedContent = this.getAppendedContent(previousMessage, currentMessage);
+              } else {
+                appendedContent = this.getAppendedContent(
+                  previousMessage,
+                  currentMessage,
+                );
               }
 
               this.processedMessages.set(i, currentMessage);
@@ -119,9 +130,29 @@ export class LlmResponseStreamProcessor {
           // Process diff items
           else if (isDiffItem(item)) {
             const validDiff = LlmEditorAssistantDiffSchema.safeParse(item);
-            if (!validDiff.success) continue;
+            if (!validDiff.success) {
+              // Phase 2B: Enhanced error logging for diff validation failures
+              logger.warn('Diff validation failed', {
+                errors: validDiff.error.errors,
+                item: JSON.stringify(item).substring(0, 200),
+                hasStartLine: 'startLine' in item,
+                hasSearch: 'search' in item,
+                hasReplace: 'replace' in item,
+              });
+              continue;
+            }
 
             const diff = validDiff.data;
+
+            // Phase 2B: Additional validation for required fields
+            if (!diff.startLine) {
+              logger.error('startLine is required but missing in diff', {
+                search: diff.search?.substring(0, 50),
+                replace: diff.replace?.substring(0, 50),
+              });
+              continue;
+            }
+
             const key = this.getDiffKey(diff, i);
 
             // Skip if already sent
@@ -130,7 +161,10 @@ export class LlmResponseStreamProcessor {
             // Consider the diff as finalized if:
             // 1. This is not the last element OR
             // 2. The last element has changed from previous parsing
-            if (i < currentContentIndex || currentContentIndex > this.lastContentIndex) {
+            if (
+              i < currentContentIndex ||
+              currentContentIndex > this.lastContentIndex
+            ) {
               this.replacements.push(diff);
               this.sentDiffKeys.add(key);
               diffUpdated = true;
@@ -146,11 +180,12 @@ export class LlmResponseStreamProcessor {
         // Send diff notification if new diffs were detected
         if (diffUpdated && processedDiffIndex > this.lastSentDiffIndex) {
           this.lastSentDiffIndex = processedDiffIndex;
-          this.options?.diffDetectedCallback?.(this.replacements[this.replacements.length - 1]);
+          this.options?.diffDetectedCallback?.(
+            this.replacements[this.replacements.length - 1],
+          );
         }
       }
-    }
-    catch (e) {
+    } catch (e) {
       // Ignore parse errors (expected for incomplete JSON)
       logger.debug('JSON parsing error (expected for partial data):', e);
     }
@@ -162,7 +197,10 @@ export class LlmResponseStreamProcessor {
    * @param currentMessage The current complete message
    * @returns The appended content (difference)
    */
-  private getAppendedContent(previousMessage: string, currentMessage: string): string {
+  private getAppendedContent(
+    previousMessage: string,
+    currentMessage: string,
+  ): string {
     // If current message is shorter, return empty string (shouldn't happen in normal flow)
     if (currentMessage.length <= previousMessage.length) {
       return '';
@@ -173,14 +211,13 @@ export class LlmResponseStreamProcessor {
   }
 
   /**
-   * Generate unique key for a diff
+   * Generate unique key for a diff (Phase 2B enhanced)
    */
   private getDiffKey(diff: LlmEditorAssistantDiff, index: number): string {
-    // if ('insert' in diff) return `insert-${index}`;
-    // if ('delete' in diff) return `delete-${index}`;
-    // if ('retain' in diff) return `retain-${index}`;
-    if ('replace' in diff) return `replace-${index}`;
-    return '';
+    // Phase 2B: More precise key generation using search content and startLine
+    const searchHash = diff.search.substring(0, 20).replace(/\s+/g, '_');
+    const startLine = diff.startLine || 0;
+    return `replace-${index}-${startLine}-${searchHash}`;
   }
 
   /**
@@ -213,17 +250,49 @@ export class LlmResponseStreamProcessor {
         }
       }
 
-      // Final notification
-      const fullMessage = Array.from(this.processedMessages.values()).join('');
-      this.options?.dataFinalizedCallback?.(fullMessage, this.replacements);
-    }
-    catch (e) {
+      // Final notification - extract all messages from complete JSON
+      const finalMessage = this.extractFinalMessage(rawBuffer);
+      this.options?.dataFinalizedCallback?.(finalMessage, this.replacements);
+    } catch (e) {
       logger.debug('Failed to parse final JSON response:', e);
 
       // Send final notification even on error
-      const fullMessage = Array.from(this.processedMessages.values()).join('');
-      this.options?.dataFinalizedCallback?.(fullMessage, this.replacements);
+      const finalMessage = this.extractFinalMessage(rawBuffer);
+      this.options?.dataFinalizedCallback?.(finalMessage, this.replacements);
     }
+  }
+
+  /**
+   * Extract final message from JSON or fallback to processed messages
+   * @param rawBuffer The raw JSON buffer to extract from
+   * @returns The final message string
+   */
+  private extractFinalMessage(rawBuffer: string): string {
+    let finalMessage = '';
+
+    try {
+      const repairedJson = jsonrepair(rawBuffer);
+      const parsedJson = JSON.parse(repairedJson);
+
+      // Extract all messages from the final complete JSON
+      if (parsedJson?.contents && Array.isArray(parsedJson.contents)) {
+        const messageContents = parsedJson.contents
+          .filter((item) => isMessageItem(item))
+          .map((item) => item.message)
+          .join('');
+
+        finalMessage = messageContents;
+      }
+    } catch (parseError) {
+      // Ignore parse errors and fallback
+    }
+
+    // Fallback to processedMessages if final extraction fails
+    if (!finalMessage) {
+      finalMessage = Array.from(this.processedMessages.values()).join('');
+    }
+
+    return finalMessage;
   }
 
   /**
@@ -238,5 +307,4 @@ export class LlmResponseStreamProcessor {
     this.lastSentDiffIndex = -1;
     this.lastProcessedContentLength = 0;
   }
-
 }

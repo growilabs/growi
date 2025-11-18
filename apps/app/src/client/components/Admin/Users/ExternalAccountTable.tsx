@@ -89,7 +89,7 @@ const ExternalAccountTable = (props: ExternalAccountTableProps): JSX.Element => 
                     : (<span className="badge bg-warning text-dark">{t('user_management.unset')}</span>)
                   }
                 </td>
-                <td>{dateFnsFormat(new Date(ea.createdAt), 'yyyy-MM-dd')}</td>
+                <td>{dateFnsFormat(ea.createdAt, 'yyyy-MM-dd')}</td>
                 <td>
                   <div className="btn-group admin-user-menu">
                     <button type="button" className="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">

@@ -14,11 +14,11 @@ mongoose.Promise = global.Promise;
 
 jest.setTimeout(30000); // default 5000
 
-beforeAll(async() => {
+beforeAll(async () => {
   await mongoose.connect(getMongoUri(), mongoOptions);
 });
 
-afterAll(async() => {
+afterAll(async () => {
   await mongoose.disconnect();
   gc();
 });

@@ -1,24 +1,14 @@
-import type { IPageHasId } from '@growi/core';
-
-import type { IPageForItem } from './page';
-
-
-type ParentPath = string;
+import type { IPageForTreeItem } from './page';
 
 export interface RootPageResult {
-  rootPage: IPageHasId
+  rootPage: IPageForTreeItem;
 }
-
-export interface AncestorsChildrenResult {
-  ancestorsChildren: Record<ParentPath, Partial<IPageForItem>[]>
-}
-
 
 export interface ChildrenResult {
-  children: Partial<IPageForItem>[]
+  children: IPageForTreeItem[];
 }
 
 export interface V5MigrationStatus {
-  isV5Compatible : boolean,
-  migratablePagesCount: number
+  isV5Compatible: boolean;
+  migratablePagesCount: number;
 }

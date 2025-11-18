@@ -1,121 +1,67 @@
 import type { Response } from 'express';
 
-import type { ExpressHttpHeader, IContentHeaders } from '~/server/interfaces/attachment';
+import type { ExpressHttpHeader } from '~/server/interfaces/attachment';
 import type { IAttachmentDocument } from '~/server/models/attachment';
 
-import { configManager } from '../../config-manager';
+type ContentHeaderField = 'Content-Type' | 'Content-Security-Policy' | 'Content-Disposition' | 'Content-Length';
+type ContentHeader = ExpressHttpHeader<ContentHeaderField>;
 
-import { defaultContentDispositionSettings } from './security';
+/**
+ * Factory function to generate content headers.
+ * This approach avoids creating a class instance for each call, improving memory efficiency.
+ */
+export const createContentHeaders = (attachment: IAttachmentDocument, opts?: { inline?: boolean }): ContentHeader[] => {
+  const headers: ContentHeader[] = [];
 
+  // Content-Type
+  headers.push({
+    field: 'Content-Type',
+    value: attachment.fileFormat,
+  });
 
-export class ContentHeaders implements IContentHeaders {
+  // Content-Security-Policy
+  headers.push({
+    field: 'Content-Security-Policy',
+    // eslint-disable-next-line max-len
+    value: "script-src 'unsafe-hashes'; style-src 'self' 'unsafe-inline'; object-src 'none'; require-trusted-types-for 'script'; media-src 'self'; default-src 'none';",
+  });
 
-  contentType?: ExpressHttpHeader<'Content-Type'>;
+  // Content-Disposition
+  headers.push({
+    field: 'Content-Disposition',
+    value: `${opts?.inline ? 'inline' : 'attachment'};filename*=UTF-8''${encodeURIComponent(attachment.originalName)}`,
+  });
 
-  contentLength?: ExpressHttpHeader<'Content-Length'>;
-
-  contentSecurityPolicy?: ExpressHttpHeader<'Content-Security-Policy'>;
-
-  contentDisposition?: ExpressHttpHeader<'Content-Disposition'>;
-
-  xContentTypeOptions?: ExpressHttpHeader<'X-Content-Type-Options'>;
-
-  constructor(
-      attachment: IAttachmentDocument,
-  ) {
-    const attachmentContentType = attachment.fileFormat;
-    const filename = attachment.originalName;
-
-    const mimeType: string = attachmentContentType || 'application/octet-stream';
-
-    this.contentType = {
-      field: 'Content-Type',
-      value: mimeType,
-    };
-
-    let finalDispositionValue: string;
-
-    const currentInlineMimeTypes = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes');
-    const adminInlineMimeTypes = currentInlineMimeTypes.inlineMimeTypes;
-
-    const currentAttachmentMimeTypes = configManager.getConfig('attachments:contentDisposition:attachmentMimeTypes');
-    const adminAttachmentMimeTypes = currentAttachmentMimeTypes.attachmentMimeTypes;
-
-
-    // 1. Check for explicit admin override to 'inline'
-    if (adminInlineMimeTypes.includes(mimeType)) {
-      finalDispositionValue = 'inline';
-    }
-    // 2. Check for explicit admin override to 'attachment'
-    else if (adminAttachmentMimeTypes.includes(mimeType)) {
-      finalDispositionValue = 'attachment';
-    }
-    // 3. If no override, fall back to the default setting
-    else {
-      const defaultSetting = defaultContentDispositionSettings[mimeType];
-
-      if (defaultSetting === 'inline') {
-        finalDispositionValue = 'inline';
-      }
-      else {
-        finalDispositionValue = 'attachment';
-      }
-    }
-
-
-    this.contentDisposition = {
-      field: 'Content-Disposition',
-      value: finalDispositionValue === 'inline'
-        ? 'inline'
-        : `attachment;filename*=UTF-8''${encodeURIComponent(filename)}`,
-    };
-
-    this.contentSecurityPolicy = {
-      field: 'Content-Security-Policy',
-      value: "script-src 'unsafe-hashes';"
-         + " style-src 'self' 'unsafe-inline';"
-         + " object-src 'none';"
-         + " require-trusted-types-for 'script';"
-         + " media-src 'self';"
-         + " default-src 'none';",
-    };
-
-    this.xContentTypeOptions = {
-      field: 'X-Content-Type-Options',
-      value: 'nosniff',
-    };
-
-    if (attachment.fileSize) {
-      this.contentLength = {
-        field: 'Content-Length',
-        value: attachment.fileSize.toString(),
-      };
-    }
+  // Content-Length
+  if (attachment.fileSize != null) {
+    headers.push({
+      field: 'Content-Length',
+      value: attachment.fileSize.toString(),
+    });
   }
 
-  /**
-   * Convert to ExpressHttpHeader[]
-   */
-  toExpressHttpHeaders(): ExpressHttpHeader[] {
-    return [
-      this.contentType,
-      this.contentLength,
-      this.contentSecurityPolicy,
-      this.contentDisposition,
-      this.xContentTypeOptions,
-    ]
+  return headers;
+};
+
+export const getContentHeaderValue = (contentHeaders: ContentHeader[], field: ContentHeaderField): string | undefined => {
+  const header = contentHeaders.find(h => h.field === field);
+  return header?.value.toString();
+};
+
+/**
+ * Convert to ExpressHttpHeader[]
+ */
+export function toExpressHttpHeaders(records: Record<string, string | string[]>): ExpressHttpHeader[];
+export function toExpressHttpHeaders(contentHeaders: ContentHeader[]): ExpressHttpHeader[];
+export function toExpressHttpHeaders(arg: Record<string, string | string[]> | ContentHeader[]): ExpressHttpHeader[] {
+  if (Array.isArray(arg)) {
+    return arg
       // exclude undefined
       .filter((member): member is NonNullable<typeof member> => member != null);
   }
 
+  return Object.entries(arg).map(([field, value]) => { return { field, value } });
 }
-
-/**
- * Convert Record to ExpressHttpHeader[]
- */
-export const toExpressHttpHeaders = (records: Record<string, string | string[]>): ExpressHttpHeader[] => {
-  return Object.entries(records).map(([field, value]) => { return { field, value } });
-};
 
 export const applyHeaders = (res: Response, headers: ExpressHttpHeader[]): void => {
   headers.forEach((header) => {

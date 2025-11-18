@@ -1,9 +1,8 @@
-import { useState, type JSX } from 'react';
+import { type JSX } from 'react';
 
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import {
   UncontrolledDropdown, DropdownToggle, DropdownMenu, DropdownItem,
@@ -17,13 +16,9 @@ import { SkeletonItem } from './SkeletonItem';
 
 import styles from './PersonalDropdown.module.scss';
 
-const ProactiveQuestionnaireModal = dynamic(() => import('~/features/questionnaire/client/components/ProactiveQuestionnaireModal'), { ssr: false });
-
 export const PersonalDropdown = (): JSX.Element => {
   const { t } = useTranslation('commons');
   const { data: currentUser } = useCurrentUser();
-
-  const [isQuestionnaireModalOpen, setQuestionnaireModalOpen] = useState(false);
 
   if (currentUser == null) {
     return <SkeletonItem />;
@@ -97,17 +92,6 @@ export const PersonalDropdown = (): JSX.Element => {
             </DropdownItem>
           </Link>
 
-          <DropdownItem
-            data-testid="grw-proactive-questionnaire-modal-toggle-btn"
-            onClick={() => setQuestionnaireModalOpen(true)}
-            className={`my-1 ${styles['personal-dropdown-item']}`}
-          >
-            <span className="d-flex align-items-center">
-              <span className="item-icon material-symbols-outlined me-2 pb-0 fs-6">edit_note</span>
-              <span className="item-text">{t('personal_dropdown.feedback')}</span>
-            </span>
-          </DropdownItem>
-
           <DropdownItem data-testid="logout-button" onClick={logoutHandler} className={`my-1 ${styles['personal-dropdown-item']}`}>
             <span className="d-flex align-items-center">
               <span className="item-icon material-symbols-outlined me-2 pb-0 fs-6">logout</span>
@@ -116,8 +100,6 @@ export const PersonalDropdown = (): JSX.Element => {
           </DropdownItem>
         </DropdownMenu>
       </UncontrolledDropdown>
-
-      <ProactiveQuestionnaireModal isOpen={isQuestionnaireModalOpen} onClose={() => setQuestionnaireModalOpen(false)} />
     </>
   );
 

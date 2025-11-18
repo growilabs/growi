@@ -7,7 +7,6 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:adjust-pages-path');
 
-
 module.exports = {
   async up(db) {
     logger.info('Apply migration');
@@ -17,7 +16,6 @@ module.exports = {
 
     // retrieve target data
     const pages = await Page.find({ path: /^(?!\/)/ });
-
 
     // create requests for bulkWrite
     const requests = pages.map((page) => {
