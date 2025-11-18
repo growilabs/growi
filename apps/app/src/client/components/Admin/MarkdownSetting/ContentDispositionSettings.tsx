@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 
-import { useContentDisposition } from '../../../services/admin-content-disposition';
+import { useContentDisposition } from '../../../services/AdminContentDispositionSettings';
 
 
 /**
