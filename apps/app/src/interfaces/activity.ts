@@ -692,20 +692,19 @@ export type ActivityHasUserId = IActivityHasId & {
 export type ActivityHasTargetPage = IActivityHasId & {
   user: IUserHasId;
   target: IPopulatedPageTarget;
-}
+};
 
 export interface IPopulatedPageTarget {
   _id: string;
   path: string;
-}
+};
 
 export interface PopulatedUserActivitiesResult {
   serializedPaginationResult: PaginateResult<ActivityHasTargetPage>;
-}
+};
 
 export type ISearchFilter = {
   usernames?: string[];
   dates?: { startDate: string | null; endDate: string | null };
   actions?: SupportedActionType[];
 };
-
