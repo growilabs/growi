@@ -1,5 +1,6 @@
 import type { PipelineStage, Aggregate } from 'mongoose';
 
+import { getUTCMidnightToday } from '~/features/contribution-graph/utils/contribution-graph-utils';
 import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 
@@ -21,6 +22,8 @@ export class ContributionAggregationService {
   public buildPipeline(params: PipelineParams): PipelineStage[] {
     const { userId, startDate } = params;
 
+    const endDate = getUTCMidnightToday();
+
     const pipeline: PipelineStage[] = [
       {
         // 1. Find actions for a user, with certain actions and date
@@ -29,43 +32,40 @@ export class ContributionAggregationService {
           action: { $in: Object.values(ActivityLogActions) },
           timestamp: {
             $gte: startDate,
-            $lt: new Date(),
+            $lt: endDate,
           },
         },
       },
 
-      // 2. Convert precise timestamp to a simple YYYY-MM-DD date string
+      // 2. Group activities by day
+      {
+        $group: {
+          _id: {
+            $dateTrunc: {
+              date: '$timestamp',
+              unit: 'day',
+              timezone: 'Z',
+            },
+          },
+          count: { $sum: 1 },
+        },
+      },
+
+      // 3. Project the result into the minified format for caching
       {
         $project: {
           _id: 0,
-          date_key: {
+          d: {
             $dateToString: {
               format: '%Y-%m-%d',
-              date: '$timestamp',
+              date: '$_id',
               timezone: 'Z',
             },
           },
         },
       },
 
-      // 3. Count the activities for each unique date
-      {
-        $group: {
-          _id: '$date_key',
-          count: { $sum: 1 },
-        },
-      },
-
-      // 4. Format the output into the minified { "d": "...", "c": X } structure
-      {
-        $project: {
-          _id: 0,
-          d: '$_id',
-          c: '$count',
-        },
-      },
-
-      // 5. Ensure the results are in chronological order
+      // 4. Ensure the results are in chronological order
       {
         $sort: {
           d: 1,
