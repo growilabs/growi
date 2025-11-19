@@ -95,7 +95,7 @@ export const ActivityListItem = ({ props }: { props: ActivityListItemProps }): J
               {t(fullKeyPath)}
             </span>
 
-            <span className="text-secondary small ms-2">
+            <span className="text-secondary small ms-3 align-self-center">
               {calculateTimePassed(activity.createdAt, dateFnsLocale)}
             </span>
 
