@@ -1,5 +1,8 @@
+import type { IAttachment } from '@growi/core/dist/interfaces';
+
 import loggerFactory from '~/utils/logger';
 
+import type Crowi from '../crowi';
 import { AttachmentType } from '../interfaces/attachment';
 import { Attachment } from '../models/attachment';
 
@@ -16,22 +19,23 @@ const createReadStream = (filePath) => {
   });
 };
 
+type AttachHandler = (pageId: string | null, attachment: IAttachment, file: Express.Multer.File) => Promise<void>;
+
+type DetachHandler = (attachmentId: string) => Promise<void>;
+
+
 /**
  * the service class for Attachment and file-uploader
  */
 class AttachmentService {
 
-  /** @type {Array<(pageId: string, attachment: Attachment, file: Express.Multer.File) => Promise<void>>} */
-  attachHandlers = [];
+  attachHandlers: AttachHandler[] = [];
 
-  /** @type {Array<(attachmentId: string) => Promise<void>>} */
-  detachHandlers = [];
+  detachHandlers: DetachHandler[] = [];
 
-  /** @type {import('~/server/crowi').default} Crowi instance */
-  crowi;
+  crowi: Crowi;
 
-  /** @param {import('~/server/crowi').default} crowi Crowi instance */
-  constructor(crowi) {
+  constructor(crowi: Crowi) {
     this.crowi = crowi;
   }
 
@@ -100,6 +104,10 @@ class AttachmentService {
   async removeAttachment(attachmentId) {
     const { fileUploadService } = this.crowi;
     const attachment = await Attachment.findById(attachmentId);
+
+    if (attachment == null) {
+      throw new Error(`Attachment not found: ${attachmentId}`);
+    }
 
     await fileUploadService.deleteFile(attachment);
     await attachment.remove();
