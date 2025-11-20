@@ -120,7 +120,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
         );
       }
 
-      const aiAssistant = await AiAssistantModel.findById(aiAssistantId);
+      const aiAssistant = await AiAssistantModel.findOne({ _id: { $eq: aiAssistantId } });
       if (aiAssistant == null) {
         return res.apiv3Err(new ErrorV3('AI assistant not found'), 404);
       }
