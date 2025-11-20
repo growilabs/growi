@@ -186,24 +186,28 @@ src/client/components/Common/SimplifiedItemsTree/
 
 **実装方針**: 既存実装よりも @headless-tree の機能を使って新規実装、APIは既存を使用
 
-6. **Create**
+6. **Create** - ⏸️ 実装中
    - @headless-tree/core の renameFeature を活用
    - 仮のノードを追加してから renameFeature によりページ名を入力、確定したら API を呼び出してページの実態を作成する
+   - NewPageCreateButton を customHoveredEndComponents として表示
+   - AutosizeSubmittableInput を使用してページ名を入力
 
-7. **Drag and Drop**
+7. **Drag and Drop** - ⏸️ 未着手
    - @headless-tree/core の dragAndDropFeature を活用
    - 既存の移動API（mutation）を使用
    
-8. **Rename**
+8. **Rename** - ⏸️ 未着手
    - @headless-tree/core の renameFeature を活用
    - 既存のrename API（mutation）を使用
    
-9. **Duplicate**
-   - SimplifiedTreeItem にDuplicateボタンの挙動を実装
+9. **Duplicate** - ✅ 完了
+   - SimplifiedPageTreeItem にDuplicateボタンの挙動を実装済み
+   - use-page-item-control の Control コンポーネントで提供
    - 既存のduplicate API（mutation）を使用
    
-10. **Delete**
-   - SimplifiedTreeItem にDeleteボタンの挙動を実装
+10. **Delete** - ✅ 完了
+   - SimplifiedPageTreeItem にDeleteボタンの挙動を実装済み
+   - use-page-item-control の Control コンポーネントで提供
    - 既存のdelete API（mutation）を使用
 
 **工数**: 2日
@@ -255,7 +259,7 @@ src/client/components/Common/SimplifiedItemsTree/
 | **M2** 調査+API+Virtualization | 0ファイル | 2ファイル | ✅ 完了 |
 | **M3-A** UI機能移植 | 0-1ファイル | 2ファイル | 🔄 次 |
 | **M3-B** ナビゲーション機能 | 0ファイル | 1ファイル | ⏸️ 未着手 |
-| **M3-C** 操作機能 | 0ファイル | 1-2ファイル | ⏸️ 未着手 |
+| **M3-C** 操作機能 | 0ファイル | 1-2ファイル | 🔄 実装中 (Create) |
 | **M3-D** リアルタイム更新 | 0ファイル | 1ファイル | ⏸️ 検討中 |
 | **M4** デグレチェック | 0ファイル | 0ファイル | ⏸️ 未着手 |
 
@@ -354,12 +358,12 @@ src/client/components/Common/SimplifiedItemsTree/
 ## 📊 現在の進捗状況（2025-11-20）
 
 **完了**: M1 ✅、M2 ✅、M3-A ✅、M3-B ✅  
-**次のステップ**: M3-C（操作機能）またはM4（デグレチェック）  
-**優先対応**: M3-Cの必要性を検討、不要ならM4へ進む
+**次のステップ**: M3-C（操作機能）のCreate実装中  
+**優先対応**: Duplicate/Delete完了を確認済み、Create機能を実装中
 
 **実装済みコンポーネント**:
 - `SimplifiedItemsTree.tsx`: @headless-tree/react + @tanstack/react-virtual 統合済み
-- `SimplifiedPageTreeItem.tsx`: UI機能、ナビゲーション機能すべて実装済み
+- `SimplifiedPageTreeItem.tsx`: UI機能、ナビゲーション機能、Duplicate/Delete操作すべて実装済み
 - バックエンドAPI: `/page-listing/item` エンドポイント追加済み
 
 **実装済み機能**:
@@ -368,10 +372,16 @@ src/client/components/Common/SimplifiedItemsTree/
 - ✅ hover時の操作ボタン（duplicate/delete）
 - ✅ 選択ページまでの自動展開
 - ✅ 選択ページへの初期スクロール
+- ✅ Duplicate操作（use-page-item-control経由）
+- ✅ Delete操作（use-page-item-control経由）
+
+**実装中の機能**:
+- 🔄 Create操作（NewPageCreateButton + renameFeature）
 
 **既知の課題**:
 1. ~~選択ページの祖先が自動展開されない~~ → M3-B で解決済み ✅
-2. まだPageTreeSubstanceで差し替えていない → 実際にはPageTreeSubstanceでSimplifiedItemsTreeを使用中 ✅
+2. ~~まだPageTreeSubstanceで差し替えていない~~ → 実際にはPageTreeSubstanceでSimplifiedItemsTreeを使用中 ✅
+3. ~~Duplicate/Delete操作が未実装~~ → use-page-item-controlで実装済み ✅
 
 ---
 

@@ -18,6 +18,7 @@ import { TreeItemLayout } from '../../TreeItem';
 
 import { CountBadgeForPageTreeItem } from './CountBadgeForPageTreeItem';
 import { usePageItemControl } from './use-page-item-control';
+import { useSimplifiedPageCreate } from './use-simplified-page-create';
 
 import styles from './PageTreeItem.module.scss';
 
@@ -65,6 +66,7 @@ export const SimplifiedPageTreeItem: FC<TreeItemProps> = ({
   }, [openDeleteModal, item.parent, notifyUpdateItems]);
 
   const { Control } = usePageItemControl();
+  const { CreateButton } = useSimplifiedPageCreate(onToggle, isExpanded);
 
   const itemSelectedHandler = useCallback((page: IPageForItem) => {
     if (page.path == null || page._id == null) return;
@@ -97,7 +99,7 @@ export const SimplifiedPageTreeItem: FC<TreeItemProps> = ({
       onClickDuplicateMenuItem={onClickDuplicateMenuItem}
       onClickDeleteMenuItem={onClickDeleteMenuItem}
       customEndComponents={[CountBadgeForPageTreeItem]}
-      customHoveredEndComponents={[Control]}
+      customHoveredEndComponents={[Control, CreateButton]}
     />
   );
 };
