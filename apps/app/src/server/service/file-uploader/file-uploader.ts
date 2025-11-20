@@ -38,7 +38,7 @@ export interface FileUploader {
   deleteFiles(): void,
   getFileUploadTotalLimit(): number,
   getTotalFileSize(): Promise<number>,
-  doCheckLimit(uploadFileSize: number, maxFileSize: number, totalLimit: number): Promise<ICheckLimitResult>,
+  checkLimit(uploadFileSize: number): Promise<ICheckLimitResult>,
   determineResponseMode(): ResponseMode,
   uploadAttachment(readable: Readable, attachment: IAttachmentDocument): Promise<void>,
   respond(res: Response, attachment: IAttachmentDocument, opts?: RespondOptions): void,
@@ -107,16 +107,10 @@ export abstract class AbstractFileUploader implements FileUploader {
 
   /**
    * Returns file upload total limit in bytes.
-   * Reference to previous implementation is
-   * {@link https://github.com/growilabs/growi/blob/798e44f14ad01544c1d75ba83d4dfb321a94aa0b/src/server/service/file-uploader/gridfs.js#L86-L88}
    * @returns file upload total limit in bytes
    */
-  getFileUploadTotalLimit() {
-    const fileUploadTotalLimit = configManager.getConfig('app:fileUploadType') === 'mongodb'
-      // Use app:fileUploadTotalLimit if gridfs:totalLimit is null (default for gridfs:totalLimit is null)
-      ? configManager.getConfig('app:fileUploadTotalLimit')
-      : configManager.getConfig('app:fileUploadTotalLimit');
-    return fileUploadTotalLimit;
+  getFileUploadTotalLimit(): number {
+    return configManager.getConfig('app:fileUploadTotalLimit');
   }
 
   /**
@@ -135,10 +129,19 @@ export abstract class AbstractFileUploader implements FileUploader {
   }
 
   /**
+   * check the file size limit
+   */
+  checkLimit(uploadFileSize: number): Promise<ICheckLimitResult> {
+    const maxFileSize = configManager.getConfig('app:maxFileSize');
+    const totalLimit = this.getFileUploadTotalLimit();
+    return this.doCheckLimit(uploadFileSize, maxFileSize, totalLimit);
+  }
+
+  /**
    * Check files size limits for all uploaders
    *
    */
-  async doCheckLimit(uploadFileSize: number, maxFileSize: number, totalLimit: number): Promise<ICheckLimitResult> {
+  protected async doCheckLimit(uploadFileSize: number, maxFileSize: number, totalLimit: number): Promise<ICheckLimitResult> {
     if (uploadFileSize > maxFileSize) {
       return { isUploadable: false, errorMessage: 'File size exceeds the size limit per file' };
     }

@@ -400,12 +400,6 @@ module.exports = (crowi: Crowi) => {
     }));
   };
 
-  (lib as any).checkLimit = async function(uploadFileSize) {
-    const maxFileSize = configManager.getConfig('app:maxFileSize');
-    const totalLimit = configManager.getConfig('app:fileUploadTotalLimit');
-    return lib.doCheckLimit(uploadFileSize, maxFileSize, totalLimit);
-  };
-
   /**
    * List files in storage
    */

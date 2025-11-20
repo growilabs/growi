@@ -110,6 +110,16 @@ class GridfsFileUploader extends AbstractFileUploader {
 
   /**
    * @inheritdoc
+   *
+   * Reference to previous implementation is
+   * {@link https://github.com/growilabs/growi/blob/798e44f14ad01544c1d75ba83d4dfb321a94aa0b/src/server/service/file-uploader/gridfs.js#L86-L88}
+   */
+  override getFileUploadTotalLimit() {
+    return configManager.getConfig('gridfs:totalLimit') ?? configManager.getConfig('app:fileUploadTotalLimit');
+  }
+
+  /**
+   * @inheritdoc
    */
   override async uploadAttachment(readable: Readable, attachment: IAttachmentDocument): Promise<void> {
     logger.debug(`File uploading: fileName=${attachment.fileName}`);
@@ -188,19 +198,6 @@ module.exports = function(crowi: Crowi) {
       attachmentFileModel.deleteMany({ filename: { $in: filenameValues } }),
       chunkCollection.deleteMany({ files_id: { $in: idsRelatedFiles } }),
     ]);
-  };
-
-  /**
-   * check the file size limit
-   *
-   * In detail, the followings are checked.
-   * - per-file size limit (specified by MAX_FILE_SIZE)
-   * - mongodb(gridfs) size limit (specified by MONGO_GRIDFS_TOTAL_LIMIT)
-   */
-  (lib as any).checkLimit = async function(uploadFileSize) {
-    const maxFileSize = configManager.getConfig('app:maxFileSize');
-    const totalLimit = lib.getFileUploadTotalLimit();
-    return lib.doCheckLimit(uploadFileSize, maxFileSize, totalLimit);
   };
 
   lib.saveFile = async function({ filePath, contentType, data }) {

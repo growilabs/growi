@@ -345,12 +345,6 @@ module.exports = (crowi: Crowi) => {
     return;
   };
 
-  (lib as any).checkLimit = async function(uploadFileSize) {
-    const maxFileSize = configManager.getConfig('app:maxFileSize');
-    const gcsTotalLimit = configManager.getConfig('app:fileUploadTotalLimit');
-    return lib.doCheckLimit(uploadFileSize, maxFileSize, gcsTotalLimit);
-  };
-
   (lib as any).listFiles = async function() {
     if (!lib.getIsReadable()) {
       throw new Error('Azure is not configured.');

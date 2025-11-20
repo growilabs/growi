@@ -300,18 +300,6 @@ module.exports = function(crowi: Crowi) {
   };
 
   /**
-   * check the file size limit
-   *
-   * In detail, the followings are checked.
-   * - per-file size limit (specified by MAX_FILE_SIZE)
-   */
-  (lib as any).checkLimit = async function(uploadFileSize) {
-    const maxFileSize = configManager.getConfig('app:maxFileSize');
-    const gcsTotalLimit = configManager.getConfig('app:fileUploadTotalLimit');
-    return lib.doCheckLimit(uploadFileSize, maxFileSize, gcsTotalLimit);
-  };
-
-  /**
    * List files in storage
    */
   (lib as any).listFiles = async function() {
