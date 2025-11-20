@@ -161,8 +161,27 @@ class AzureFileUploader extends AbstractFileUploader {
   /**
    * @inheritdoc
    */
-  override deleteFiles() {
-    throw new Error('Method not implemented.');
+  override async deleteFile(attachment: IAttachmentDocument): Promise<void> {
+    const filePath = getFilePathOnStorage(attachment);
+    const containerClient = await getContainerClient();
+    const blockBlobClient = await containerClient.getBlockBlobClient(filePath);
+    const options: BlobDeleteOptions = { deleteSnapshots: 'include' };
+    const blobDeleteIfExistsResponse: BlobDeleteIfExistsResponse = await blockBlobClient.deleteIfExists(options);
+    if (!blobDeleteIfExistsResponse.errorCode) {
+      logger.info(`deleted blob ${filePath}`);
+    }
+  }
+
+  /**
+   * @inheritdoc
+   */
+  override async deleteFiles(attachments: IAttachmentDocument[]): Promise<void> {
+    if (!this.getIsUploadable()) {
+      throw new Error('Azure is not configured.');
+    }
+    for await (const attachment of attachments) {
+      await this.deleteFile(attachment);
+    }
   }
 
   /**
@@ -310,26 +329,6 @@ module.exports = (crowi: Crowi) => {
   lib.isValidUploadSettings = function() {
     return configManager.getConfig('azure:storageAccountName') != null
       && configManager.getConfig('azure:storageContainerName') != null;
-  };
-
-  (lib as any).deleteFile = async function(attachment) {
-    const filePath = getFilePathOnStorage(attachment);
-    const containerClient = await getContainerClient();
-    const blockBlobClient = await containerClient.getBlockBlobClient(filePath);
-    const options: BlobDeleteOptions = { deleteSnapshots: 'include' };
-    const blobDeleteIfExistsResponse: BlobDeleteIfExistsResponse = await blockBlobClient.deleteIfExists(options);
-    if (!blobDeleteIfExistsResponse.errorCode) {
-      logger.info(`deleted blob ${filePath}`);
-    }
-  };
-
-  (lib as any).deleteFiles = async function(attachments) {
-    if (!lib.getIsUploadable()) {
-      throw new Error('Azure is not configured.');
-    }
-    for await (const attachment of attachments) {
-      (lib as any).deleteFile(attachment);
-    }
   };
 
   lib.saveFile = async function({ filePath, contentType, data }) {

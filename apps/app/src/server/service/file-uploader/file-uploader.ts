@@ -1,6 +1,7 @@
 import type { Readable } from 'stream';
 
 import type { Response } from 'express';
+import type { HydratedDocument } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 
 import type { ICheckLimitResult } from '~/interfaces/attachment';
@@ -35,7 +36,8 @@ export interface FileUploader {
   getFileUploadEnabled(): boolean,
   listFiles(): any,
   saveFile(param: SaveFileParam): Promise<any>,
-  deleteFiles(): void,
+  deleteFile(attachment: HydratedDocument<IAttachmentDocument>): void,
+  deleteFiles(attachments: HydratedDocument<IAttachmentDocument>[]): void,
   getFileUploadTotalLimit(): number,
   getTotalFileSize(): Promise<number>,
   checkLimit(uploadFileSize: number): Promise<ICheckLimitResult>,
@@ -103,7 +105,9 @@ export abstract class AbstractFileUploader implements FileUploader {
 
   abstract saveFile(param: SaveFileParam);
 
-  abstract deleteFiles();
+  abstract deleteFile(attachment: HydratedDocument<IAttachmentDocument>): void;
+
+  abstract deleteFiles(attachments: HydratedDocument<IAttachmentDocument>[]): void;
 
   /**
    * Returns file upload total limit in bytes.

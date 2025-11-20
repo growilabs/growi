@@ -105,8 +105,36 @@ class GcsFileUploader extends AbstractFileUploader {
   /**
    * @inheritdoc
    */
-  override deleteFiles() {
-    throw new Error('Method not implemented.');
+  override async deleteFile(attachment: IAttachmentDocument): Promise<void> {
+    const filePath = getFilePathOnStorage(attachment);
+    return this.deleteFilesByFilePaths([filePath]);
+  }
+
+  /**
+   * @inheritdoc
+   */
+  override async deleteFiles(attachments: IAttachmentDocument[]): Promise<void> {
+    const filePaths = attachments.map((attachment) => {
+      return getFilePathOnStorage(attachment);
+    });
+    return this.deleteFilesByFilePaths(filePaths);
+  }
+
+  private async deleteFilesByFilePaths(filePaths: string[]): Promise<void> {
+    if (!this.getIsUploadable()) {
+      throw new Error('GCS is not configured.');
+    }
+
+    const gcs = getGcsInstance();
+    const myBucket = gcs.bucket(getGcsBucket());
+
+    const files = filePaths.map((filePath) => {
+      return myBucket.file(filePath);
+    });
+
+    files.forEach((file) => {
+      file.delete({ ignoreNotFound: true });
+    });
   }
 
   /**
@@ -261,35 +289,6 @@ module.exports = function(crowi: Crowi) {
   lib.isValidUploadSettings = function() {
     return configManager.getConfig('gcs:apiKeyJsonPath') != null
       && configManager.getConfig('gcs:bucket') != null;
-  };
-
-  (lib as any).deleteFile = function(attachment) {
-    const filePath = getFilePathOnStorage(attachment);
-    return (lib as any).deleteFilesByFilePaths([filePath]);
-  };
-
-  (lib as any).deleteFiles = function(attachments) {
-    const filePaths = attachments.map((attachment) => {
-      return getFilePathOnStorage(attachment);
-    });
-    return (lib as any).deleteFilesByFilePaths(filePaths);
-  };
-
-  (lib as any).deleteFilesByFilePaths = function(filePaths) {
-    if (!lib.getIsUploadable()) {
-      throw new Error('GCS is not configured.');
-    }
-
-    const gcs = getGcsInstance();
-    const myBucket = gcs.bucket(getGcsBucket());
-
-    const files = filePaths.map((filePath) => {
-      return myBucket.file(filePath);
-    });
-
-    files.forEach((file) => {
-      file.delete({ ignoreNotFound: true });
-    });
   };
 
   lib.saveFile = async function({ filePath, contentType, data }) {

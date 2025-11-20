@@ -166,8 +166,50 @@ class AwsFileUploader extends AbstractFileUploader {
   /**
    * @inheritdoc
    */
-  override deleteFiles() {
-    throw new Error('Method not implemented.');
+  override async deleteFile(attachment: IAttachmentDocument): Promise<void> {
+    const filePath = getFilePathOnStorage(attachment);
+    return this.deleteFileByFilePath(filePath);
+  }
+
+  /**
+   * @inheritdoc
+   */
+  override async deleteFiles(attachments: IAttachmentDocument[]): Promise<void> {
+    if (!this.getIsUploadable()) {
+      throw new Error('AWS is not configured.');
+    }
+    const s3 = S3Factory();
+
+    const filePaths = attachments.map((attachment) => {
+      return { Key: getFilePathOnStorage(attachment) };
+    });
+
+    const totalParams = {
+      Bucket: getS3Bucket(),
+      Delete: { Objects: filePaths },
+    };
+    await s3.send(new DeleteObjectsCommand(totalParams));
+  }
+
+  private async deleteFileByFilePath(filePath: string): Promise<void> {
+    if (!this.getIsUploadable()) {
+      throw new Error('AWS is not configured.');
+    }
+    const s3 = S3Factory();
+
+    const params = {
+      Bucket: getS3Bucket(),
+      Key: filePath,
+    };
+
+    // check file exists
+    const isExists = await isFileExists(s3, params);
+    if (!isExists) {
+      logger.warn(`Any object that relate to the Attachment (${filePath}) does not exist in AWS S3`);
+      return;
+    }
+
+    await s3.send(new DeleteObjectCommand(params));
   }
 
   /**
@@ -343,49 +385,6 @@ module.exports = (crowi: Crowi) => {
           || configManager.getConfig('aws:s3CustomEndpoint') != null
       )
       && configManager.getConfig('aws:s3Bucket') != null;
-  };
-
-  (lib as any).deleteFile = async function(attachment) {
-    const filePath = getFilePathOnStorage(attachment);
-    return (lib as any).deleteFileByFilePath(filePath);
-  };
-
-  (lib as any).deleteFiles = async function(attachments) {
-    if (!lib.getIsUploadable()) {
-      throw new Error('AWS is not configured.');
-    }
-    const s3 = S3Factory();
-
-    const filePaths = attachments.map((attachment) => {
-      return { Key: getFilePathOnStorage(attachment) };
-    });
-
-    const totalParams = {
-      Bucket: getS3Bucket(),
-      Delete: { Objects: filePaths },
-    };
-    return s3.send(new DeleteObjectsCommand(totalParams));
-  };
-
-  (lib as any).deleteFileByFilePath = async function(filePath) {
-    if (!lib.getIsUploadable()) {
-      throw new Error('AWS is not configured.');
-    }
-    const s3 = S3Factory();
-
-    const params = {
-      Bucket: getS3Bucket(),
-      Key: filePath,
-    };
-
-    // check file exists
-    const isExists = await isFileExists(s3, params);
-    if (!isExists) {
-      logger.warn(`Any object that relate to the Attachment (${filePath}) does not exist in AWS S3`);
-      return;
-    }
-
-    return s3.send(new DeleteObjectCommand(params));
   };
 
   lib.saveFile = async function({ filePath, contentType, data }) {
