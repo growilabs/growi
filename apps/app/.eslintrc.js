@@ -34,7 +34,6 @@ module.exports = {
     'src/models/**',
     'src/features/callout/**',
     'src/features/comment/**',
-    'src/features/contribution-graph/utils/contribution-graph-utils.ts',
     'src/features/templates/**',
     'src/features/mermaid/**',
     'src/features/search/**',
