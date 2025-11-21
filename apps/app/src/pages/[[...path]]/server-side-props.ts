@@ -83,12 +83,18 @@ export async function getServerSidePropsForInitial(
 export async function getServerSidePropsForSameRoute(
   context: GetServerSidePropsContext,
 ): Promise<GetServerSidePropsResult<Stage2EachProps>> {
-  // Get page data
-  const result = await getPageDataForSameRoute(context);
+  const [i18nPropsResult, pageDataResult] = await Promise.all([
+    getServerSideI18nProps(context, ['translation']),
+    getPageDataForSameRoute(context),
+  ]);
 
   // -- TODO: persist activity
-
   // const mergedProps = await mergedResult.props;
   // await addActivity(context, getActivityAction(mergedProps));
-  return result;
+  const mergedResult = mergeGetServerSidePropsResults(
+    pageDataResult,
+    i18nPropsResult,
+  );
+
+  return mergedResult;
 }
