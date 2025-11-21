@@ -98,6 +98,9 @@ class Crowi {
   /** @type {import('../service/page-operation').IPageOperationService} */
   pageOperationService;
 
+  /** @type {import('../service/customize').CustomizeService} */
+  customizeService;
+
   /** @type {PassportService} */
   passportService;
 
@@ -632,7 +635,7 @@ Crowi.prototype.setUpAcl = async function () {
  * setup CustomizeService
  */
 Crowi.prototype.setUpCustomize = async function () {
-  const CustomizeService = require('../service/customize');
+  const { CustomizeService } = await import('../service/customize');
   if (this.customizeService == null) {
     this.customizeService = new CustomizeService(this);
     this.customizeService.initCustomCss();
