@@ -84,14 +84,14 @@ export const ActivityListItem = ({ props }: { props: ActivityListItemProps }): J
               href={targetPagePath}
               className="activity-target-link fw-bold text-wrap d-block"
             >
-              <span className="dark:text-white">
+              <span>
                 {targetPagePath}
               </span>
             </a>
           </div>
 
           <div className="activity-details-line d-flex">
-            <span className="dark:text-white">
+            <span>
               {t(fullKeyPath)}
             </span>
 
