@@ -1,11 +1,15 @@
 import { ConfigSource, SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import {
-  SlackbotType, REQUEST_TIMEOUT_FOR_GTOP,
-  defaultSupportedSlackEventActions, defaultSupportedCommandsNameForBroadcastUse, defaultSupportedCommandsNameForSingleUse,
+  defaultSupportedCommandsNameForBroadcastUse,
+  defaultSupportedCommandsNameForSingleUse,
+  defaultSupportedSlackEventActions,
+  REQUEST_TIMEOUT_FOR_GTOP,
+  SlackbotType,
 } from '@growi/slack';
 import {
-  getConnectionStatus, getConnectionStatuses,
+  getConnectionStatus,
+  getConnectionStatuses,
   sendSuccessMessage,
 } from '@growi/slack/dist/utils/check-communicable';
 
@@ -24,7 +28,6 @@ const urljoin = require('url-join');
 const logger = loggerFactory('growi:routes:apiv3:slack-integration-settings');
 
 const router = express.Router();
-
 
 /**
  * @swagger
@@ -46,7 +49,9 @@ const router = express.Router();
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(crowi);
+  const loginRequiredStrictly = require('../../middlewares/login-required')(
+    crowi,
+  );
   const adminRequired = require('../../middlewares/admin-required')(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
@@ -55,20 +60,18 @@ module.exports = (crowi) => {
   const activityEvent = crowi.event('activity');
 
   const validator = {
-    botType: [
-      body('currentBotType').isString(),
-    ],
+    botType: [body('currentBotType').isString()],
     slackIntegration: [
-      body('currentBotType')
-        .isIn(Object.values(SlackbotType)),
+      body('currentBotType').isIn(Object.values(SlackbotType)),
     ],
     proxyUri: [
-      body('proxyUri').if(value => value !== '').trim().matches(/^(https?:\/\/)/)
+      body('proxyUri')
+        .if((value) => value !== '')
+        .trim()
+        .matches(/^(https?:\/\/)/)
         .isURL({ require_tld: false }),
     ],
-    makePrimary: [
-      param('id').isMongoId().withMessage('id is required'),
-    ],
+    makePrimary: [param('id').isMongoId().withMessage('id is required')],
     updatePermissionsWithoutProxy: [
       body('commandPermission').exists(),
       body('eventActionsPermission').exists(),
@@ -80,20 +83,10 @@ module.exports = (crowi) => {
       body('permissionsForSlackEventActions').exists(),
       param('id').isMongoId().withMessage('id is required'),
     ],
-    relationTest: [
-      param('id').isMongoId(),
-      body('channel').trim().isString(),
-    ],
-    regenerateTokens: [
-      param('id').isMongoId(),
-    ],
-    deleteIntegration: [
-      param('id').isMongoId(),
-    ],
-    slackChannel: [
-      body('channel').trim().not().isEmpty()
-        .isString(),
-    ],
+    relationTest: [param('id').isMongoId(), body('channel').trim().isString()],
+    regenerateTokens: [param('id').isMongoId()],
+    deleteIntegration: [param('id').isMongoId()],
+    slackChannel: [body('channel').trim().not().isEmpty().isString()],
   };
 
   async function updateSlackBotSettings(params) {
@@ -121,12 +114,15 @@ module.exports = (crowi) => {
     const csv = tokens.join(',');
     const proxyUri = crowi.slackIntegrationService.proxyUriForCurrentType;
 
-    const result = await axios.get(urljoin(proxyUri, '/g2s/connection-status'), {
-      headers: {
-        'x-growi-gtop-tokens': csv,
-        timeout: REQUEST_TIMEOUT_FOR_GTOP,
+    const result = await axios.get(
+      urljoin(proxyUri, '/g2s/connection-status'),
+      {
+        headers: {
+          'x-growi-gtop-tokens': csv,
+          timeout: REQUEST_TIMEOUT_FOR_GTOP,
+        },
       },
-    });
+    );
 
     return result.data;
   }
@@ -138,19 +134,15 @@ module.exports = (crowi) => {
     }
 
     try {
-      const result = await axios[method](
-        urljoin(proxyUri, endpoint),
-        body, {
-          headers: {
-            'x-growi-gtop-tokens': token,
-          },
-          timeout: REQUEST_TIMEOUT_FOR_GTOP,
+      const result = await axios[method](urljoin(proxyUri, endpoint), body, {
+        headers: {
+          'x-growi-gtop-tokens': token,
         },
-      );
+        timeout: REQUEST_TIMEOUT_FOR_GTOP,
+      });
 
       return result.data;
-    }
-    catch (err) {
+    } catch (err) {
       throw new Error(`Requesting to proxy server failed: ${err.message}`);
     }
   }
@@ -197,93 +189,127 @@ module.exports = (crowi) => {
    *                    errorCode:
    *                      type: string
    */
-  router.get('/', accessTokenParser([SCOPE.READ.ADMIN.SLACK_INTEGRATION], { acceptLegacy: true }), loginRequiredStrictly, adminRequired, async(req, res) => {
+  router.get(
+    '/',
+    accessTokenParser([SCOPE.READ.ADMIN.SLACK_INTEGRATION], {
+      acceptLegacy: true,
+    }),
+    loginRequiredStrictly,
+    adminRequired,
+    async (req, res) => {
+      const { configManager, slackIntegrationService } = crowi;
+      const currentBotType = configManager.getConfig('slackbot:currentBotType');
 
-    const { configManager, slackIntegrationService } = crowi;
-    const currentBotType = configManager.getConfig('slackbot:currentBotType');
+      // retrieve settings
+      const settings = {};
+      if (currentBotType === SlackbotType.CUSTOM_WITHOUT_PROXY) {
+        settings.slackSigningSecretEnvVars = configManager.getConfig(
+          'slackbot:withoutProxy:signingSecret',
+          ConfigSource.env,
+        );
+        settings.slackBotTokenEnvVars = configManager.getConfig(
+          'slackbot:withoutProxy:botToken',
+          ConfigSource.env,
+        );
+        settings.slackSigningSecret = configManager.getConfig(
+          'slackbot:withoutProxy:signingSecret',
+        );
+        settings.slackBotToken = configManager.getConfig(
+          'slackbot:withoutProxy:botToken',
+        );
+        settings.commandPermission = configManager.getConfig(
+          'slackbot:withoutProxy:commandPermission',
+        );
+        settings.eventActionsPermission = configManager.getConfig(
+          'slackbot:withoutProxy:eventActionsPermission',
+        );
+      } else {
+        settings.proxyServerUri =
+          slackIntegrationService.proxyUriForCurrentType;
+      }
 
-    // retrieve settings
-    const settings = {};
-    if (currentBotType === SlackbotType.CUSTOM_WITHOUT_PROXY) {
-      settings.slackSigningSecretEnvVars = configManager.getConfig('slackbot:withoutProxy:signingSecret', ConfigSource.env);
-      settings.slackBotTokenEnvVars = configManager.getConfig('slackbot:withoutProxy:botToken', ConfigSource.env);
-      settings.slackSigningSecret = configManager.getConfig('slackbot:withoutProxy:signingSecret');
-      settings.slackBotToken = configManager.getConfig('slackbot:withoutProxy:botToken');
-      settings.commandPermission = configManager.getConfig('slackbot:withoutProxy:commandPermission');
-      settings.eventActionsPermission = configManager.getConfig('slackbot:withoutProxy:eventActionsPermission');
-    }
-    else {
-      settings.proxyServerUri = slackIntegrationService.proxyUriForCurrentType;
-    }
-
-    // retrieve connection statuses
-    let connectionStatuses = {};
-    let errorMsg;
-    let errorCode;
-    if (currentBotType == null) {
-      // no need to do anything
-    }
-    else if (currentBotType === SlackbotType.CUSTOM_WITHOUT_PROXY) {
-      const token = settings.slackBotToken;
-      // check the token is not null
-      if (token != null) {
-        try {
-          connectionStatuses = await getConnectionStatuses([token]);
+      // retrieve connection statuses
+      let connectionStatuses = {};
+      let errorMsg;
+      let errorCode;
+      if (currentBotType == null) {
+        // no need to do anything
+      } else if (currentBotType === SlackbotType.CUSTOM_WITHOUT_PROXY) {
+        const token = settings.slackBotToken;
+        // check the token is not null
+        if (token != null) {
+          try {
+            connectionStatuses = await getConnectionStatuses([token]);
+          } catch (e) {
+            errorMsg = 'Error occured in getting connection statuses';
+            errorCode = 'get-connection-failed';
+            logger.error(errorMsg, e);
+          }
         }
-        catch (e) {
-          errorMsg = 'Error occured in getting connection statuses';
-          errorCode = 'get-connection-failed';
+      } else {
+        try {
+          const slackAppIntegrations = await SlackAppIntegration.find();
+          settings.slackAppIntegrations = slackAppIntegrations;
+        } catch (e) {
+          errorMsg = 'Error occured in finding SlackAppIntegration entities.';
+          errorCode = 'get-slackappintegration-failed';
           logger.error(errorMsg, e);
         }
-      }
-    }
-    else {
-      try {
-        const slackAppIntegrations = await SlackAppIntegration.find();
-        settings.slackAppIntegrations = slackAppIntegrations;
-      }
-      catch (e) {
-        errorMsg = 'Error occured in finding SlackAppIntegration entities.';
-        errorCode = 'get-slackappintegration-failed';
-        logger.error(errorMsg, e);
-      }
 
-      const proxyServerUri = settings.proxyServerUri;
+        const proxyServerUri = settings.proxyServerUri;
 
-      if (proxyServerUri != null && settings.slackAppIntegrations != null && settings.slackAppIntegrations.length > 0) {
-        try {
-          // key: slackAppIntegration.tokenGtoP, value: slackAppIntegration._id
-          const tokenGtoPToSlackAppIntegrationId = {};
-          settings.slackAppIntegrations.forEach((slackAppIntegration) => {
-            tokenGtoPToSlackAppIntegrationId[slackAppIntegration.tokenGtoP] = slackAppIntegration._id;
-          });
-          const result = (await getConnectionStatusesFromProxy(Object.keys(tokenGtoPToSlackAppIntegrationId)));
-          Object.entries(result.connectionStatuses).forEach(([tokenGtoP, connectionStatus]) => {
-            connectionStatuses[tokenGtoPToSlackAppIntegrationId[tokenGtoP]] = connectionStatus;
-          });
+        if (
+          proxyServerUri != null &&
+          settings.slackAppIntegrations != null &&
+          settings.slackAppIntegrations.length > 0
+        ) {
+          try {
+            // key: slackAppIntegration.tokenGtoP, value: slackAppIntegration._id
+            const tokenGtoPToSlackAppIntegrationId = {};
+            settings.slackAppIntegrations.forEach((slackAppIntegration) => {
+              tokenGtoPToSlackAppIntegrationId[slackAppIntegration.tokenGtoP] =
+                slackAppIntegration._id;
+            });
+            const result = await getConnectionStatusesFromProxy(
+              Object.keys(tokenGtoPToSlackAppIntegrationId),
+            );
+            Object.entries(result.connectionStatuses).forEach(
+              ([tokenGtoP, connectionStatus]) => {
+                connectionStatuses[
+                  tokenGtoPToSlackAppIntegrationId[tokenGtoP]
+                ] = connectionStatus;
+              },
+            );
+          } catch (e) {
+            errorMsg =
+              'Something went wrong when retrieving information from Proxy Server.';
+            errorCode = 'test-connection-failed';
+            logger.error(errorMsg, e);
+          }
         }
-        catch (e) {
-          errorMsg = 'Something went wrong when retrieving information from Proxy Server.';
-          errorCode = 'test-connection-failed';
-          logger.error(errorMsg, e);
-        }
       }
-    }
 
-    return res.apiv3({
-      currentBotType, settings, connectionStatuses, errorMsg, errorCode,
-    });
-  });
+      return res.apiv3({
+        currentBotType,
+        settings,
+        connectionStatuses,
+        errorMsg,
+        errorCode,
+      });
+    },
+  );
 
-
-  const handleBotTypeChanging = async(req, res, initializedBotType) => {
+  const handleBotTypeChanging = async (req, res, initializedBotType) => {
     await resetAllBotSettings(initializedBotType);
     crowi.slackIntegrationService.publishUpdatedMessage();
 
     if (initializedBotType === 'customBotWithoutProxy') {
       // set without-proxy command permissions at bot type changing
       const commandPermission = {};
-      [...defaultSupportedCommandsNameForBroadcastUse, ...defaultSupportedCommandsNameForSingleUse].forEach((commandName) => {
+      [
+        ...defaultSupportedCommandsNameForBroadcastUse,
+        ...defaultSupportedCommandsNameForSingleUse,
+      ].forEach((commandName) => {
         commandPermission[commandName] = true;
       });
 
@@ -300,16 +326,20 @@ module.exports = (crowi) => {
       try {
         await updateSlackBotSettings(params);
         crowi.slackIntegrationService.publishUpdatedMessage();
-      }
-      catch (error) {
+      } catch (error) {
         const msg = 'Error occured in updating command permission settigns';
         logger.error('Error', error);
-        return res.apiv3Err(new ErrorV3(msg, 'update-CustomBotSetting-failed'), 500);
+        return res.apiv3Err(
+          new ErrorV3(msg, 'update-CustomBotSetting-failed'),
+          500,
+        );
       }
     }
 
     // TODO Impl to delete AccessToken both of Proxy and GROWI when botType changes.
-    const slackBotTypeParam = { slackBotType: crowi.configManager.getConfig('slackbot:currentBotType') };
+    const slackBotTypeParam = {
+      slackBotType: crowi.configManager.getConfig('slackbot:currentBotType'),
+    };
     return res.apiv3({ slackBotTypeParam });
   };
 
@@ -331,26 +361,45 @@ module.exports = (crowi) => {
    *           200:
    *             description: Succeeded to put botType setting.
    */
-  router.put('/bot-type',
-    accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION], { acceptLegacy: true }),
-    loginRequiredStrictly, adminRequired, addActivity, validator.botType, apiV3FormValidator, async(req, res) => {
+  router.put(
+    '/bot-type',
+    accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION], {
+      acceptLegacy: true,
+    }),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    validator.botType,
+    apiV3FormValidator,
+    async (req, res) => {
       const { currentBotType } = req.body;
 
       if (currentBotType == null) {
-        return res.apiv3Err(new ErrorV3('The param \'currentBotType\' must be specified.', 'update-CustomBotSetting-failed'), 400);
+        return res.apiv3Err(
+          new ErrorV3(
+            "The param 'currentBotType' must be specified.",
+            'update-CustomBotSetting-failed',
+          ),
+          400,
+        );
       }
 
       try {
         await handleBotTypeChanging(req, res, currentBotType);
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SLACK_BOT_TYPE_UPDATE });
-      }
-      catch (error) {
+        activityEvent.emit('update', res.locals.activity._id, {
+          action: SupportedAction.ACTION_ADMIN_SLACK_BOT_TYPE_UPDATE,
+        });
+      } catch (error) {
         const msg = 'Error occured in updating Custom bot setting';
         logger.error('Error', error);
-        return res.apiv3Err(new ErrorV3(msg, 'update-CustomBotSetting-failed'), 500);
+        return res.apiv3Err(
+          new ErrorV3(msg, 'update-CustomBotSetting-failed'),
+          500,
+        );
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -369,20 +418,29 @@ module.exports = (crowi) => {
    *           200:
    *             description: Succeeded to delete botType setting.
    */
-  router.delete('/bot-type',
-    accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION], { acceptLegacy: true }), loginRequiredStrictly, adminRequired, addActivity, apiV3FormValidator,
-    async(req, res) => {
+  router.delete(
+    '/bot-type',
+    accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION], {
+      acceptLegacy: true,
+    }),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    apiV3FormValidator,
+    async (req, res) => {
       try {
         await handleBotTypeChanging(req, res, null);
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SLACK_BOT_TYPE_DELETE });
-      }
-      catch (error) {
+        activityEvent.emit('update', res.locals.activity._id, {
+          action: SupportedAction.ACTION_ADMIN_SLACK_BOT_TYPE_DELETE,
+        });
+      } catch (error) {
         const msg = 'Error occured in resetting all';
         logger.error('Error', error);
         return res.apiv3Err(new ErrorV3(msg, 'resetting-all-failed'), 500);
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -409,9 +467,16 @@ module.exports = (crowi) => {
    *           200:
    *             description: Succeeded to put CustomBotWithoutProxy setting.
    */
-  router.put('/without-proxy/update-settings', accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]), loginRequiredStrictly, adminRequired, addActivity,
-    async(req, res) => {
-      const currentBotType = crowi.configManager.getConfig('slackbot:currentBotType');
+  router.put(
+    '/without-proxy/update-settings',
+    accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    async (req, res) => {
+      const currentBotType = crowi.configManager.getConfig(
+        'slackbot:currentBotType',
+      );
       if (currentBotType !== SlackbotType.CUSTOM_WITHOUT_PROXY) {
         const msg = 'Not CustomBotWithoutProxy';
         return res.apiv3Err(new ErrorV3(msg, 'not-customBotWithoutProxy'), 400);
@@ -426,16 +491,22 @@ module.exports = (crowi) => {
         await updateSlackBotSettings(requestParams);
         crowi.slackIntegrationService.publishUpdatedMessage();
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SLACK_WITHOUT_PROXY_SETTINGS_UPDATE });
+        activityEvent.emit('update', res.locals.activity._id, {
+          action:
+            SupportedAction.ACTION_ADMIN_SLACK_WITHOUT_PROXY_SETTINGS_UPDATE,
+        });
 
         return res.apiv3();
-      }
-      catch (error) {
+      } catch (error) {
         const msg = 'Error occured in updating Custom bot setting';
         logger.error('Error', error);
-        return res.apiv3Err(new ErrorV3(msg, 'update-CustomBotSetting-failed'), 500);
+        return res.apiv3Err(
+          new ErrorV3(msg, 'update-CustomBotSetting-failed'),
+          500,
+        );
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -462,10 +533,17 @@ module.exports = (crowi) => {
    *           200:
    *             description: Succeeded to put CustomBotWithoutProxy permissions.
    */
-  router.put('/without-proxy/update-permissions',
+  router.put(
+    '/without-proxy/update-permissions',
     accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]),
-    loginRequiredStrictly, adminRequired, addActivity, validator.updatePermissionsWithoutProxy, async(req, res) => {
-      const currentBotType = crowi.configManager.getConfig('slackbot:currentBotType');
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    validator.updatePermissionsWithoutProxy,
+    async (req, res) => {
+      const currentBotType = crowi.configManager.getConfig(
+        'slackbot:currentBotType',
+      );
       if (currentBotType !== SlackbotType.CUSTOM_WITHOUT_PROXY) {
         const msg = 'Not CustomBotWithoutProxy';
         return res.apiv3Err(new ErrorV3(msg, 'not-customBotWithoutProxy'), 400);
@@ -481,17 +559,22 @@ module.exports = (crowi) => {
         await updateSlackBotSettings(params);
         crowi.slackIntegrationService.publishUpdatedMessage();
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SLACK_WITHOUT_PROXY_PERMISSION_UPDATE });
+        activityEvent.emit('update', res.locals.activity._id, {
+          action:
+            SupportedAction.ACTION_ADMIN_SLACK_WITHOUT_PROXY_PERMISSION_UPDATE,
+        });
 
         return res.apiv3();
-      }
-      catch (error) {
+      } catch (error) {
         const msg = 'Error occured in updating command permission settigns';
         logger.error('Error', error);
-        return res.apiv3Err(new ErrorV3(msg, 'update-CustomBotSetting-failed'), 500);
+        return res.apiv3Err(
+          new ErrorV3(msg, 'update-CustomBotSetting-failed'),
+          500,
+        );
       }
-    });
-
+    },
+  );
 
   /**
    * @swagger
@@ -524,43 +607,76 @@ module.exports = (crowi) => {
    *                    isPrimary:
    *                      type: boolean
    */
-  router.post('/slack-app-integrations', accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]), loginRequiredStrictly, adminRequired, addActivity,
-    async(req, res) => {
-      const SlackAppIntegrationRecordsNum = await SlackAppIntegration.countDocuments();
+  router.post(
+    '/slack-app-integrations',
+    accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    async (req, res) => {
+      const SlackAppIntegrationRecordsNum =
+        await SlackAppIntegration.countDocuments();
       if (SlackAppIntegrationRecordsNum >= 10) {
-        const msg = 'Not be able to create more than 10 slack workspace integration settings';
+        const msg =
+          'Not be able to create more than 10 slack workspace integration settings';
         logger.error('Error', msg);
-        return res.apiv3Err(new ErrorV3(msg, 'create-slackAppIntegeration-failed'), 500);
+        return res.apiv3Err(
+          new ErrorV3(msg, 'create-slackAppIntegeration-failed'),
+          500,
+        );
       }
 
       const count = await SlackAppIntegration.count();
 
-      const { tokenGtoP, tokenPtoG } = await SlackAppIntegration.generateUniqueAccessTokens();
+      const { tokenGtoP, tokenPtoG } =
+        await SlackAppIntegration.generateUniqueAccessTokens();
       try {
-        const initialSupportedCommandsForBroadcastUse = new Map(defaultSupportedCommandsNameForBroadcastUse.map(command => [command, true]));
-        const initialSupportedCommandsForSingleUse = new Map(defaultSupportedCommandsNameForSingleUse.map(command => [command, true]));
-        const initialPermissionsForSlackEventActions = new Map(defaultSupportedSlackEventActions.map(action => [action, true]));
+        const initialSupportedCommandsForBroadcastUse = new Map(
+          defaultSupportedCommandsNameForBroadcastUse.map((command) => [
+            command,
+            true,
+          ]),
+        );
+        const initialSupportedCommandsForSingleUse = new Map(
+          defaultSupportedCommandsNameForSingleUse.map((command) => [
+            command,
+            true,
+          ]),
+        );
+        const initialPermissionsForSlackEventActions = new Map(
+          defaultSupportedSlackEventActions.map((action) => [action, true]),
+        );
 
         const slackAppTokens = await SlackAppIntegration.create({
           tokenGtoP,
           tokenPtoG,
-          permissionsForBroadcastUseCommands: initialSupportedCommandsForBroadcastUse,
+          permissionsForBroadcastUseCommands:
+            initialSupportedCommandsForBroadcastUse,
           permissionsForSingleUseCommands: initialSupportedCommandsForSingleUse,
           permissionsForSlackEvents: initialPermissionsForSlackEventActions,
           isPrimary: count === 0,
         });
 
-        const parameters = { action: SupportedAction.ACTION_ADMIN_SLACK_WORKSPACE_CREATE };
+        const parameters = {
+          action: SupportedAction.ACTION_ADMIN_SLACK_WORKSPACE_CREATE,
+        };
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
         return res.apiv3(slackAppTokens, 200);
-      }
-      catch (error) {
-        const msg = 'Error occurred during creating slack integration settings procedure';
+      } catch (error) {
+        const msg =
+          'Error occurred during creating slack integration settings procedure';
         logger.error('Error', error);
-        return res.apiv3Err(new ErrorV3(msg, 'creating-slack-integration-settings-procedure-failed'), 500);
+        return res.apiv3Err(
+          new ErrorV3(
+            msg,
+            'creating-slack-integration-settings-procedure-failed',
+          ),
+          500,
+        );
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -589,30 +705,46 @@ module.exports = (crowi) => {
    *                    response:
    *                      type: object
    */
-  router.delete('/slack-app-integrations/:id', accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]), loginRequiredStrictly, adminRequired,
-    validator.deleteIntegration, apiV3FormValidator, addActivity,
-    async(req, res) => {
+  router.delete(
+    '/slack-app-integrations/:id',
+    accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]),
+    loginRequiredStrictly,
+    adminRequired,
+    validator.deleteIntegration,
+    apiV3FormValidator,
+    addActivity,
+    async (req, res) => {
       const { id } = req.params;
 
       try {
-        const response = await SlackAppIntegration.findOneAndDelete({ _id: id });
+        const response = await SlackAppIntegration.findOneAndDelete({
+          _id: id,
+        });
 
         // update primary
-        const countOfPrimary = await SlackAppIntegration.countDocuments({ isPrimary: true });
+        const countOfPrimary = await SlackAppIntegration.countDocuments({
+          isPrimary: true,
+        });
         if (countOfPrimary === 0) {
           await SlackAppIntegration.updateOne({}, { isPrimary: true });
         }
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SLACK_WORKSPACE_DELETE });
+        activityEvent.emit('update', res.locals.activity._id, {
+          action: SupportedAction.ACTION_ADMIN_SLACK_WORKSPACE_DELETE,
+        });
 
         return res.apiv3({ response });
-      }
-      catch (error) {
-        const msg = 'Error occured in deleting access token for slack app tokens';
+      } catch (error) {
+        const msg =
+          'Error occured in deleting access token for slack app tokens';
         logger.error('Error', error);
-        return res.apiv3Err(new ErrorV3(msg, 'update-slackAppTokens-failed'), 500);
+        return res.apiv3Err(
+          new ErrorV3(msg, 'update-slackAppTokens-failed'),
+          500,
+        );
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -639,9 +771,15 @@ module.exports = (crowi) => {
    *               schema:
    *                 type: object
    */
-  router.put('/proxy-uri', accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]), loginRequiredStrictly, adminRequired, addActivity,
-    validator.proxyUri, apiV3FormValidator,
-    async(req, res) => {
+  router.put(
+    '/proxy-uri',
+    accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    validator.proxyUri,
+    apiV3FormValidator,
+    async (req, res) => {
       const { proxyUri } = req.body;
 
       const requestParams = { 'slackbot:proxyUri': proxyUri };
@@ -650,17 +788,21 @@ module.exports = (crowi) => {
         await updateSlackBotSettings(requestParams);
         crowi.slackIntegrationService.publishUpdatedMessage();
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SLACK_PROXY_URI_UPDATE });
+        activityEvent.emit('update', res.locals.activity._id, {
+          action: SupportedAction.ACTION_ADMIN_SLACK_PROXY_URI_UPDATE,
+        });
 
         return res.apiv3({});
-      }
-      catch (error) {
+      } catch (error) {
         const msg = 'Error occured in updating Custom bot setting';
         logger.error('Error', error);
-        return res.apiv3Err(new ErrorV3(msg, 'delete-SlackAppIntegration-failed'), 500);
+        return res.apiv3Err(
+          new ErrorV3(msg, 'delete-SlackAppIntegration-failed'),
+          500,
+        );
       }
-
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -682,15 +824,20 @@ module.exports = (crowi) => {
    *          200:
    *            description: Succeeded to make it primary
    */
-  router.put('/slack-app-integrations/:id/make-primary',
+  router.put(
+    '/slack-app-integrations/:id/make-primary',
     accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]),
-    loginRequiredStrictly, adminRequired, addActivity, validator.makePrimary, apiV3FormValidator, async(req, res) => {
-
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    validator.makePrimary,
+    apiV3FormValidator,
+    async (req, res) => {
       const { id } = req.params;
 
       try {
         await SlackAppIntegration.bulkWrite([
-        // unset isPrimary for others
+          // unset isPrimary for others
           {
             updateMany: {
               filter: { _id: { $ne: id } },
@@ -706,16 +853,18 @@ module.exports = (crowi) => {
           },
         ]);
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SLACK_MAKE_APP_PRIMARY });
+        activityEvent.emit('update', res.locals.activity._id, {
+          action: SupportedAction.ACTION_ADMIN_SLACK_MAKE_APP_PRIMARY,
+        });
 
         return res.apiv3();
-      }
-      catch (error) {
+      } catch (error) {
         const msg = 'Error occurred during making SlackAppIntegration primary';
         logger.error('Error', error);
         return res.apiv3Err(new ErrorV3(msg, 'making-primary-failed'), 500);
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -741,26 +890,40 @@ module.exports = (crowi) => {
    *                schema:
    *                  type: object
    */
-  router.put('/slack-app-integrations/:id/regenerate-tokens',
+  router.put(
+    '/slack-app-integrations/:id/regenerate-tokens',
     accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]),
-    loginRequiredStrictly, adminRequired, addActivity, validator.regenerateTokens, apiV3FormValidator, async(req, res) => {
-
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    validator.regenerateTokens,
+    apiV3FormValidator,
+    async (req, res) => {
       const { id } = req.params;
 
       try {
-        const { tokenGtoP, tokenPtoG } = await SlackAppIntegration.generateUniqueAccessTokens();
-        const slackAppTokens = await SlackAppIntegration.findByIdAndUpdate(id, { tokenGtoP, tokenPtoG });
+        const { tokenGtoP, tokenPtoG } =
+          await SlackAppIntegration.generateUniqueAccessTokens();
+        const slackAppTokens = await SlackAppIntegration.findByIdAndUpdate(id, {
+          tokenGtoP,
+          tokenPtoG,
+        });
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SLACK_ACCESS_TOKEN_REGENERATE });
+        activityEvent.emit('update', res.locals.activity._id, {
+          action: SupportedAction.ACTION_ADMIN_SLACK_ACCESS_TOKEN_REGENERATE,
+        });
 
         return res.apiv3(slackAppTokens, 200);
-      }
-      catch (error) {
+      } catch (error) {
         const msg = 'Error occurred during regenerating slack app tokens';
         logger.error('Error', error);
-        return res.apiv3Err(new ErrorV3(msg, 'regenerating-slackAppTokens-failed'), 500);
+        return res.apiv3Err(
+          new ErrorV3(msg, 'regenerating-slackAppTokens-failed'),
+          500,
+        );
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -798,24 +961,41 @@ module.exports = (crowi) => {
    *                schema:
    *                  type: object
    */
-  router.put('/slack-app-integrations/:id/permissions',
+  router.put(
+    '/slack-app-integrations/:id/permissions',
     accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]),
-    loginRequiredStrictly, adminRequired, addActivity, validator.updatePermissionsWithProxy, apiV3FormValidator, async(req, res) => {
-    // TODO: look here 78975
-      const { permissionsForBroadcastUseCommands, permissionsForSingleUseCommands, permissionsForSlackEventActions } = req.body;
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    validator.updatePermissionsWithProxy,
+    apiV3FormValidator,
+    async (req, res) => {
+      // TODO: look here 78975
+      const {
+        permissionsForBroadcastUseCommands,
+        permissionsForSingleUseCommands,
+        permissionsForSlackEventActions,
+      } = req.body;
       const { id } = req.params;
 
-      const updatePermissionsForBroadcastUseCommands = new Map(Object.entries(permissionsForBroadcastUseCommands));
-      const updatePermissionsForSingleUseCommands = new Map(Object.entries(permissionsForSingleUseCommands));
-      const newPermissionsForSlackEventActions = new Map(Object.entries(permissionsForSlackEventActions));
-
+      const updatePermissionsForBroadcastUseCommands = new Map(
+        Object.entries(permissionsForBroadcastUseCommands),
+      );
+      const updatePermissionsForSingleUseCommands = new Map(
+        Object.entries(permissionsForSingleUseCommands),
+      );
+      const newPermissionsForSlackEventActions = new Map(
+        Object.entries(permissionsForSlackEventActions),
+      );
 
       try {
         const slackAppIntegration = await SlackAppIntegration.findByIdAndUpdate(
           id,
           {
-            permissionsForBroadcastUseCommands: updatePermissionsForBroadcastUseCommands,
-            permissionsForSingleUseCommands: updatePermissionsForSingleUseCommands,
+            permissionsForBroadcastUseCommands:
+              updatePermissionsForBroadcastUseCommands,
+            permissionsForSingleUseCommands:
+              updatePermissionsForSingleUseCommands,
             permissionsForSlackEventActions: newPermissionsForSlackEventActions,
           },
           { new: true },
@@ -828,22 +1008,26 @@ module.exports = (crowi) => {
             'put',
             '/g2s/supported-commands',
             {
-              permissionsForBroadcastUseCommands: slackAppIntegration.permissionsForBroadcastUseCommands,
-              permissionsForSingleUseCommands: slackAppIntegration.permissionsForSingleUseCommands,
+              permissionsForBroadcastUseCommands:
+                slackAppIntegration.permissionsForBroadcastUseCommands,
+              permissionsForSingleUseCommands:
+                slackAppIntegration.permissionsForSingleUseCommands,
             },
           );
         }
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SLACK_PERMISSION_UPDATE });
+        activityEvent.emit('update', res.locals.activity._id, {
+          action: SupportedAction.ACTION_ADMIN_SLACK_PERMISSION_UPDATE,
+        });
 
         return res.apiv3({});
-      }
-      catch (error) {
+      } catch (error) {
         const msg = `Error occured in updating settings. Cause: ${error.message}`;
         logger.error('Error', error);
         return res.apiv3Err(new ErrorV3(msg, 'update-permissions-failed'), 500);
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -874,62 +1058,97 @@ module.exports = (crowi) => {
    *             description: Succeeded to delete botType setting.
    */
   // eslint-disable-next-line max-len
-  router.post('/slack-app-integrations/:id/relation-test', accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]), loginRequiredStrictly, adminRequired, addActivity, validator.relationTest, apiV3FormValidator, async(req, res) => {
-    const currentBotType = crowi.configManager.getConfig('slackbot:currentBotType');
-    if (currentBotType === SlackbotType.CUSTOM_WITHOUT_PROXY) {
-      const msg = 'Not Proxy Type';
-      return res.apiv3Err(new ErrorV3(msg, 'not-proxy-type'), 400);
-    }
-
-    const proxyUri = crowi.slackIntegrationService.proxyUriForCurrentType;
-    if (proxyUri == null) {
-      return res.apiv3Err(new ErrorV3('Proxy URL is null.', 'not-proxy-Uri'), 400);
-    }
-
-    const { id } = req.params;
-    let slackBotToken;
-    try {
-      const slackAppIntegration = await SlackAppIntegration.findOne({ _id: id });
-      if (slackAppIntegration == null) {
-        const msg = 'Could not find SlackAppIntegration by id';
-        return res.apiv3Err(new ErrorV3(msg, 'find-slackAppIntegration-failed'), 400);
-      }
-
-      const result = await requestToProxyServer(
-        slackAppIntegration.tokenGtoP,
-        'post',
-        '/g2s/relation-test',
-        {
-          permissionsForBroadcastUseCommands: slackAppIntegration.permissionsForBroadcastUseCommands,
-          permissionsForSingleUseCommands: slackAppIntegration.permissionsForSingleUseCommands,
-        },
+  router.post(
+    '/slack-app-integrations/:id/relation-test',
+    accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    validator.relationTest,
+    apiV3FormValidator,
+    async (req, res) => {
+      const currentBotType = crowi.configManager.getConfig(
+        'slackbot:currentBotType',
       );
-
-      slackBotToken = result.slackBotToken;
-      if (slackBotToken == null) {
-        const msg = 'Could not find slackBotToken by relation';
-        return res.apiv3Err(new ErrorV3(msg, 'find-slackBotToken-failed'), 400);
+      if (currentBotType === SlackbotType.CUSTOM_WITHOUT_PROXY) {
+        const msg = 'Not Proxy Type';
+        return res.apiv3Err(new ErrorV3(msg, 'not-proxy-type'), 400);
       }
-    }
-    catch (error) {
-      logger.error('Error', error);
-      return res.apiv3Err(new ErrorV3(`Error occured while testing. Cause: ${error.message}`, 'test-failed', error.stack));
-    }
 
-    const { channel } = req.body;
-    const appSiteURL = crowi.configManager.getConfig('app:siteUrl');
-    try {
-      await sendSuccessMessage(slackBotToken, channel, appSiteURL);
-    }
-    catch (error) {
-      return res.apiv3Err(new ErrorV3(`Error occured while sending message. Cause: ${error.message}`, 'send-message-failed', error.stack));
-    }
+      const proxyUri = crowi.slackIntegrationService.proxyUriForCurrentType;
+      if (proxyUri == null) {
+        return res.apiv3Err(
+          new ErrorV3('Proxy URL is null.', 'not-proxy-Uri'),
+          400,
+        );
+      }
 
-    activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SLACK_RELATION_TEST });
+      const { id } = req.params;
+      let slackBotToken;
+      try {
+        const slackAppIntegration = await SlackAppIntegration.findOne({
+          _id: id,
+        });
+        if (slackAppIntegration == null) {
+          const msg = 'Could not find SlackAppIntegration by id';
+          return res.apiv3Err(
+            new ErrorV3(msg, 'find-slackAppIntegration-failed'),
+            400,
+          );
+        }
 
-    return res.apiv3();
+        const result = await requestToProxyServer(
+          slackAppIntegration.tokenGtoP,
+          'post',
+          '/g2s/relation-test',
+          {
+            permissionsForBroadcastUseCommands:
+              slackAppIntegration.permissionsForBroadcastUseCommands,
+            permissionsForSingleUseCommands:
+              slackAppIntegration.permissionsForSingleUseCommands,
+          },
+        );
 
-  });
+        slackBotToken = result.slackBotToken;
+        if (slackBotToken == null) {
+          const msg = 'Could not find slackBotToken by relation';
+          return res.apiv3Err(
+            new ErrorV3(msg, 'find-slackBotToken-failed'),
+            400,
+          );
+        }
+      } catch (error) {
+        logger.error('Error', error);
+        return res.apiv3Err(
+          new ErrorV3(
+            `Error occured while testing. Cause: ${error.message}`,
+            'test-failed',
+            error.stack,
+          ),
+        );
+      }
+
+      const { channel } = req.body;
+      const appSiteURL = crowi.configManager.getConfig('app:siteUrl');
+      try {
+        await sendSuccessMessage(slackBotToken, channel, appSiteURL);
+      } catch (error) {
+        return res.apiv3Err(
+          new ErrorV3(
+            `Error occured while sending message. Cause: ${error.message}`,
+            'send-message-failed',
+            error.stack,
+          ),
+        );
+      }
+
+      activityEvent.emit('update', res.locals.activity._id, {
+        action: SupportedAction.ACTION_ADMIN_SLACK_RELATION_TEST,
+      });
+
+      return res.apiv3();
+    },
+  );
 
   /**
    * @swagger
@@ -952,34 +1171,57 @@ module.exports = (crowi) => {
    *           200:
    *             description: Succeeded to connect to slack work space.
    */
-  router.post('/without-proxy/test', accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]), loginRequiredStrictly, adminRequired, addActivity,
-    validator.slackChannel, apiV3FormValidator,
-    async(req, res) => {
-      const currentBotType = crowi.configManager.getConfig('slackbot:currentBotType');
+  router.post(
+    '/without-proxy/test',
+    accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    validator.slackChannel,
+    apiV3FormValidator,
+    async (req, res) => {
+      const currentBotType = crowi.configManager.getConfig(
+        'slackbot:currentBotType',
+      );
       if (currentBotType !== SlackbotType.CUSTOM_WITHOUT_PROXY) {
         const msg = 'Select Without Proxy Type';
         return res.apiv3Err(new ErrorV3(msg, 'select-not-proxy-type'), 400);
       }
 
-      const slackBotToken = crowi.configManager.getConfig('slackbot:withoutProxy:botToken');
+      const slackBotToken = crowi.configManager.getConfig(
+        'slackbot:withoutProxy:botToken',
+      );
       const status = await getConnectionStatus(slackBotToken);
       if (status.error != null) {
-        return res.apiv3Err(new ErrorV3(`Error occured while getting connection. ${status.error}`, 'send-message-failed'));
+        return res.apiv3Err(
+          new ErrorV3(
+            `Error occured while getting connection. ${status.error}`,
+            'send-message-failed',
+          ),
+        );
       }
 
       const { channel } = req.body;
       const appSiteURL = crowi.configManager.getConfig('app:siteUrl');
       try {
         await sendSuccessMessage(slackBotToken, channel, appSiteURL);
-      }
-      catch (error) {
-        return res.apiv3Err(new ErrorV3(`Error occured while sending message. Cause: ${error.message}`, 'send-message-failed', error.stack));
+      } catch (error) {
+        return res.apiv3Err(
+          new ErrorV3(
+            `Error occured while sending message. Cause: ${error.message}`,
+            'send-message-failed',
+            error.stack,
+          ),
+        );
       }
 
-      activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SLACK_WITHOUT_PROXY_TEST });
+      activityEvent.emit('update', res.locals.activity._id, {
+        action: SupportedAction.ACTION_ADMIN_SLACK_WITHOUT_PROXY_TEST,
+      });
 
       return res.apiv3();
-    });
+    },
+  );
 
   return router;
 };
