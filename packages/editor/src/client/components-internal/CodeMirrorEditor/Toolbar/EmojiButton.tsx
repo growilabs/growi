@@ -3,8 +3,8 @@ import emojiData from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { Modal } from 'reactstrap';
 
+import { useResolvedTheme } from '../../../../states/ui/resolved-theme';
 import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
-import { useResolvedThemeForEditor } from '../../../stores/use-resolved-theme';
 
 type Props = {
   editorKey: string;
@@ -16,7 +16,7 @@ export const EmojiButton = (props: Props): JSX.Element => {
   const [isOpen, setIsOpen] = useState(false);
 
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(editorKey);
-  const { data: resolvedTheme } = useResolvedThemeForEditor();
+  const resolvedTheme = useResolvedTheme();
   const toggle = useCallback(() => setIsOpen(!isOpen), [isOpen]);
 
   const selectEmoji = useCallback(
@@ -80,7 +80,7 @@ export const EmojiButton = (props: Props): JSX.Element => {
             <span style={setStyle()}>
               <Picker
                 onEmojiSelect={selectEmoji}
-                theme={resolvedTheme?.themeData}
+                theme={resolvedTheme}
                 data={emojiData}
                 // TODO: https://redmine.weseek.co.jp/issues/133681
                 // i18n={}

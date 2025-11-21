@@ -1,4 +1,8 @@
-import type { IDataWithMeta, IPageHasId } from '@growi/core';
+import type {
+  IDataWithMeta,
+  IDataWithRequiredMeta,
+  IPageHasId,
+} from '@growi/core';
 
 export type IPageSearchMeta = {
   bookmarkCount?: number;
@@ -14,11 +18,9 @@ export const isIPageSearchMeta = (meta: any): meta is IPageSearchMeta => {
 };
 
 export type ISearchResultMeta = {
-  meta: {
-    took?: number;
-    total: number;
-    hitsCount: number;
-  };
+  took?: number;
+  total: number;
+  hitsCount: number;
 };
 
 export type ISearchResultData = {
@@ -28,15 +30,14 @@ export type ISearchResultData = {
   _highlight: any;
 };
 
-export type ISearchResult<T> = ISearchResultMeta & {
-  data: T[];
-};
+export type ISearchResult<T> = IDataWithRequiredMeta<T[], ISearchResultMeta>;
 
 export type IPageWithSearchMeta = IDataWithMeta<IPageHasId, IPageSearchMeta>;
 
-export type IFormattedSearchResult = ISearchResultMeta & {
-  data: IPageWithSearchMeta[];
-};
+export type IFormattedSearchResult = IDataWithRequiredMeta<
+  IPageWithSearchMeta[],
+  ISearchResultMeta
+>;
 
 export const SORT_AXIS = {
   RELATION_SCORE: 'relationScore',

@@ -1,25 +1,29 @@
 import React, {
-  Suspense, useCallback, useRef, type JSX,
+  Suspense,
+  useCallback,
+  useRef,
+  type JSX,
 } from 'react';
 
 import type { IPagePopulatedToShowRevision, IPageInfoForOperation } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import dynamic from 'next/dynamic';
 import { scroller } from 'react-scroll';
 
-import { useIsGuestUser, useIsReadOnlyUser, useShowPageSideAuthors } from '~/stores-universal/context';
-import { useDescendantsPageListModal, useTagEditModal } from '~/stores/modal';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
+import { showPageSideAuthorsAtom } from '~/states/server-configurations';
+import { useDescendantsPageListModalActions } from '~/states/ui/modal/descendants-page-list';
+import { useTagEditModalActions } from '~/states/ui/modal/tag-edit';
+import { useIsAbleToShowTagLabel } from '~/states/ui/page-abilities';
 import { useSWRxPageInfo, useSWRxTagsInfo } from '~/stores/page';
-import { useIsAbleToShowTagLabel } from '~/stores/ui';
 
 import { ContentLinkButtons } from '../ContentLinkButtons';
 import { PageTagsSkeleton } from '../PageTags';
 import TableOfContents from '../TableOfContents';
 
 import { PageAccessoriesControl } from './PageAccessoriesControl';
-
-import styles from './PageSideContents.module.scss';
 
 
 const { isTopPage, isUsersHomepage, isTrashPage } = pagePathUtils;
@@ -42,10 +46,10 @@ const Tags = (props: TagsProps): JSX.Element => {
 
   const { data: tagsInfoData } = useSWRxTagsInfo(pageId, { suspense: true });
 
-  const { data: showTagLabel } = useIsAbleToShowTagLabel();
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { open: openTagEditModal } = useTagEditModal();
+  const showTagLabel = useIsAbleToShowTagLabel();
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const { open: openTagEditModal } = useTagEditModalActions();
 
   const onClickEditTagsButton = useCallback(() => {
     if (tagsInfoData == null) {
@@ -80,14 +84,14 @@ type PageSideContentsProps = {
 export const PageSideContents = (props: PageSideContentsProps): JSX.Element => {
   const { t } = useTranslation();
 
-  const { open: openDescendantPageListModal } = useDescendantsPageListModal();
+  const { open: openDescendantPageListModal } = useDescendantsPageListModalActions();
 
   const { page, isSharedUser } = props;
 
   const tagsRef = useRef<HTMLDivElement>(null);
 
   const { data: pageInfo } = useSWRxPageInfo(page._id);
-  const { data: showPageSideAuthors } = useShowPageSideAuthors();
+  const showPageSideAuthors = useAtomValue(showPageSideAuthorsAtom);
 
   const {
     creator, lastUpdateUser, createdAt, updatedAt,
@@ -117,7 +121,7 @@ export const PageSideContents = (props: PageSideContentsProps): JSX.Element => {
         </div>
       )}
 
-      <div className={`${styles['grw-page-accessories-controls']} d-flex flex-column gap-2`}>
+      <div className=" d-flex flex-column gap-2">
         {/* Page list */}
         {!isSharedUser && (
           <div className="d-flex" data-testid="pageListButton">

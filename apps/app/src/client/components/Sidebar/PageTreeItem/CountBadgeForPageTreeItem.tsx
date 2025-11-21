@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 
 import CountBadge from '~/client/components/Common/CountBadge';
 import type { TreeItemToolProps } from '~/client/components/TreeItem';
-import { usePageTreeDescCountMap } from '~/stores/ui';
+import { usePageTreeDescCountMap } from '~/states/ui/page-tree-desc-count-map';
 
 
 export const CountBadgeForPageTreeItem = (props: TreeItemToolProps): JSX.Element => {

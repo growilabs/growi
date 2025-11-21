@@ -8,7 +8,7 @@ import ImageCropModal from '~/client/components/Common/ImageCropModal';
 import { apiPost, apiPostForm } from '~/client/util/apiv1-client';
 import { apiv3Put } from '~/client/util/apiv3-client';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 import { generateGravatarSrc, GRAVATAR_DEFAULT } from '~/utils/gravatar';
 
 const DEFAULT_IMAGE = '/images/icons/user.svg';
@@ -17,7 +17,7 @@ const DEFAULT_IMAGE = '/images/icons/user.svg';
 const ProfileImageSettings = (): JSX.Element => {
   const { t } = useTranslation();
 
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser();
 
   const [isGravatarEnabled, setGravatarEnabled] = useState(currentUser?.isGravatarEnabled);
   const [uploadedPictureSrc, setUploadedPictureSrc] = useState(() => {

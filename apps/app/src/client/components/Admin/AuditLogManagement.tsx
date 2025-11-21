@@ -3,12 +3,13 @@ import React, { useState, useCallback, useRef } from 'react';
 
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { format } from 'date-fns/format';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
 import type { IClearable } from '~/client/interfaces/clearable';
 import { toastError } from '~/client/util/toastr';
 import type { SupportedActionType } from '~/interfaces/activity';
-import { useAuditLogEnabled, useAuditLogAvailableActions } from '~/stores-universal/context';
+import { auditLogEnabledAtom, auditLogAvailableActionsAtom } from '~/states/server-configurations';
 import { useSWRxActivity } from '~/stores/activity';
 
 import PaginationWrapper from '../PaginationWrapper';
@@ -34,7 +35,7 @@ export const AuditLogManagement: FC = () => {
 
   const typeaheadRef = useRef<IClearable>(null);
 
-  const { data: auditLogAvailableActionsData } = useAuditLogAvailableActions();
+  const auditLogAvailableActionsData = useAtomValue(auditLogAvailableActionsAtom);
 
   /*
    * State
@@ -67,7 +68,7 @@ export const AuditLogManagement: FC = () => {
     toastError('Failed to get Audit Log');
   }
 
-  const { data: auditLogEnabled } = useAuditLogEnabled();
+  const auditLogEnabled = useAtomValue(auditLogEnabledAtom);
 
   /*
    * Functions

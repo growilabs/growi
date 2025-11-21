@@ -5,17 +5,16 @@ import useSWR, { type SWRConfiguration, type SWRResponse } from 'swr';
 import { getGrowiFacade } from '~/features/growi-plugin/client/utils/growi-facade-utils';
 import type { RendererOptions } from '~/interfaces/renderer-options';
 import type { RendererConfigExt } from '~/interfaces/services/renderer';
-import { useRendererConfig } from '~/stores-universal/context';
+import { useCurrentPagePath } from '~/states/page';
+import { useRendererConfig } from '~/states/server-configurations';
+import { useSetTocNode } from '~/states/ui/toc';
 import { useNextThemes } from '~/stores-universal/use-next-themes';
 import loggerFactory from '~/utils/logger';
-
-import { useCurrentPagePath } from './page';
-import { useCurrentPageTocNode } from './ui';
 
 const logger = loggerFactory('growi:cli:services:renderer');
 
 const useRendererConfigExt = (): RendererConfigExt | null => {
-  const { data: rendererConfig } = useRendererConfig();
+  const rendererConfig = useRendererConfig();
   const { isDarkMode } = useNextThemes();
 
   return rendererConfig == null
@@ -27,15 +26,15 @@ const useRendererConfigExt = (): RendererConfigExt | null => {
 };
 
 export const useViewOptions = (): SWRResponse<RendererOptions, Error> => {
-  const { data: currentPagePath } = useCurrentPagePath();
+  const currentPagePath = useCurrentPagePath();
   const rendererConfig = useRendererConfigExt();
-  const { mutate: mutateCurrentPageTocNode } = useCurrentPageTocNode();
+  const setTocNode = useSetTocNode();
 
   const storeTocNodeHandler = useCallback(
     (toc: HtmlElementNode) => {
-      mutateCurrentPageTocNode(toc, { revalidate: false });
+      setTocNode(toc);
     },
-    [mutateCurrentPageTocNode],
+    [setTocNode],
   );
 
   const isAllDataValid = currentPagePath != null && rendererConfig != null;
@@ -73,34 +72,8 @@ export const useViewOptions = (): SWRResponse<RendererOptions, Error> => {
   );
 };
 
-export const useTocOptions = (): SWRResponse<RendererOptions, Error> => {
-  const { data: currentPagePath } = useCurrentPagePath();
-  const rendererConfig = useRendererConfigExt();
-  const { data: tocNode } = useCurrentPageTocNode();
-
-  const isAllDataValid =
-    currentPagePath != null && rendererConfig != null && tocNode != null;
-
-  return useSWR(
-    isAllDataValid
-      ? ['tocOptions', currentPagePath, tocNode, rendererConfig]
-      : null,
-    async ([, , tocNode, rendererConfig]) => {
-      const { generateTocOptions } = await import(
-        '~/client/services/renderer/renderer'
-      );
-      return generateTocOptions(rendererConfig, tocNode);
-    },
-    {
-      keepPreviousData: true,
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-    },
-  );
-};
-
 export const usePreviewOptions = (): SWRResponse<RendererOptions, Error> => {
-  const { data: currentPagePath } = useCurrentPagePath();
+  const currentPagePath = useCurrentPagePath();
   const rendererConfig = useRendererConfigExt();
 
   const isAllDataValid = currentPagePath != null && rendererConfig != null;
@@ -134,7 +107,7 @@ export const useCommentForCurrentPageOptions = (): SWRResponse<
   RendererOptions,
   Error
 > => {
-  const { data: currentPagePath } = useCurrentPagePath();
+  const currentPagePath = useCurrentPagePath();
   const rendererConfig = useRendererConfigExt();
 
   const isAllDataValid = currentPagePath != null && rendererConfig != null;
@@ -228,7 +201,7 @@ export const usePresentationViewOptions = (): SWRResponse<
   RendererOptions,
   Error
 > => {
-  const { data: currentPagePath } = useCurrentPagePath();
+  const currentPagePath = useCurrentPagePath();
   const rendererConfig = useRendererConfigExt();
 
   const isAllDataValid = currentPagePath != null && rendererConfig != null;

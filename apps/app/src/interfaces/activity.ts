@@ -1,4 +1,12 @@
-import type { HasObjectId, IUser, Ref } from '@growi/core';
+import type {
+  HasObjectId,
+  IPageHasId,
+  IUser,
+  IUserHasId,
+  Ref,
+} from '@growi/core';
+
+import type { PaginateResult } from './mongoose-utils';
 
 // Model
 const MODEL_PAGE = 'Page';
@@ -377,6 +385,7 @@ export const SupportedAction = {
 
 // Action required for notification
 export const EssentialActionGroup = {
+  ACTION_PAGE_CREATE,
   ACTION_PAGE_LIKE,
   ACTION_PAGE_BOOKMARK,
   ACTION_PAGE_UPDATE,
@@ -568,6 +577,18 @@ export const LargeActionGroup = {
   ACTION_ADMIN_SEARCH_INDICES_REBUILD,
 } as const;
 
+export const ActivityLogActions = {
+  ACTION_PAGE_CREATE,
+  ACTION_PAGE_UPDATE,
+  ACTION_PAGE_RENAME,
+  ACTION_PAGE_DUPLICATE,
+  ACTION_PAGE_DELETE,
+  ACTION_PAGE_DELETE_COMPLETELY,
+  ACTION_PAGE_REVERT,
+  ACTION_PAGE_LIKE,
+  ACTION_COMMENT_CREATE,
+} as const;
+
 /*
  * Array
  */
@@ -645,7 +666,8 @@ export type SupportedActionType =
   (typeof SupportedAction)[keyof typeof SupportedAction];
 export type SupportedActionCategoryType =
   (typeof SupportedActionCategory)[keyof typeof SupportedActionCategory];
-
+export type SupportedActivityActionType =
+  (typeof ActivityLogActions)[keyof typeof ActivityLogActions];
 export type ISnapshot = Partial<Pick<IUser, 'username'>>;
 
 export type IActivity = {
@@ -661,6 +683,10 @@ export type IActivity = {
   snapshot?: ISnapshot;
 };
 
+export type ActivityHasUserId = IActivityHasId & {
+  user: IUserHasId;
+};
+
 export type IActivityHasId = IActivity & HasObjectId;
 
 export type ISearchFilter = {
@@ -668,3 +694,7 @@ export type ISearchFilter = {
   dates?: { startDate: string | null; endDate: string | null };
   actions?: SupportedActionType[];
 };
+
+export interface UserActivitiesResult {
+  serializedPaginationResult: PaginateResult<IActivityHasId>;
+}

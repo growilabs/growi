@@ -6,7 +6,7 @@ interface AggregateResult {
   count: number;
 }
 
-const checkLocalStrategyHasAdmin = async(): Promise<boolean> => {
+const checkLocalStrategyHasAdmin = async (): Promise<boolean> => {
   const User = mongoose.model('User') as any;
 
   const localAdmins: AggregateResult[] = await User.aggregate([
@@ -23,7 +23,9 @@ const checkLocalStrategyHasAdmin = async(): Promise<boolean> => {
   return localAdmins.length > 0 && localAdmins[0].count > 0;
 };
 
-const checkExternalStrategiesHasAdmin = async(setupExternalStrategies: IExternalAuthProviderType[]): Promise<boolean> => {
+const checkExternalStrategiesHasAdmin = async (
+  setupExternalStrategies: IExternalAuthProviderType[],
+): Promise<boolean> => {
   const User = mongoose.model('User') as any;
 
   const externalAdmins: AggregateResult[] = await User.aggregate([
@@ -47,7 +49,9 @@ const checkExternalStrategiesHasAdmin = async(setupExternalStrategies: IExternal
   return externalAdmins.length > 0 && externalAdmins[0].count > 0;
 };
 
-export const checkSetupStrategiesHasAdmin = async(setupStrategies: (IExternalAuthProviderType | 'local')[]): Promise<boolean> => {
+export const checkSetupStrategiesHasAdmin = async (
+  setupStrategies: (IExternalAuthProviderType | 'local')[],
+): Promise<boolean> => {
   if (setupStrategies.includes('local')) {
     const isLocalStrategyHasAdmin = await checkLocalStrategyHasAdmin();
     if (isLocalStrategyHasAdmin) {
@@ -55,12 +59,16 @@ export const checkSetupStrategiesHasAdmin = async(setupStrategies: (IExternalAut
     }
   }
 
-  const setupExternalStrategies = setupStrategies.filter(strategy => strategy !== 'local') as IExternalAuthProviderType[];
+  const setupExternalStrategies = setupStrategies.filter(
+    (strategy) => strategy !== 'local',
+  ) as IExternalAuthProviderType[];
   if (setupExternalStrategies.length === 0) {
     return false;
   }
 
-  const isExternalStrategiesHasAdmin = await checkExternalStrategiesHasAdmin(setupExternalStrategies);
+  const isExternalStrategiesHasAdmin = await checkExternalStrategiesHasAdmin(
+    setupExternalStrategies,
+  );
 
   return isExternalStrategiesHasAdmin;
 };

@@ -6,31 +6,43 @@ import type Crowi from '../crowi';
 /**
  * Middleware factory to check if the application is already installed
  */
-export const generateCheckerMiddleware = (crowi: Crowi) => async(req: Request, res: Response, next: NextFunction): Promise<void> => {
-  const { appService } = crowi;
+export const generateCheckerMiddleware =
+  (crowi: Crowi) =>
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { appService } = crowi;
 
-  const isDBInitialized = await appService.isDBInitialized(true);
+    const isDBInitialized = await appService.isDBInitialized(true);
 
-  if (isDBInitialized) {
-    return next(createError(409, 'Application is already installed'));
-  }
+    if (isDBInitialized) {
+      return next(createError(409, 'Application is already installed'));
+    }
 
-  return next();
-};
+    return next();
+  };
 
 /**
  * Middleware to return HttpError 409 if the application is already installed
  */
-export const allreadyInstalledMiddleware = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const allreadyInstalledMiddleware = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
   return next(createError(409, 'Application is already installed'));
 };
 
 /**
  * Error handler to handle errors as API errors
  */
-export const handleAsApiError = (error: Error, req: Request, res: Response, next: NextFunction): void => {
+export const handleAsApiError = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void => {
   if (error == null) {
-    return next();
+    next();
+    return;
   }
 
   if (isHttpError(error)) {
@@ -45,9 +57,15 @@ export const handleAsApiError = (error: Error, req: Request, res: Response, next
 /**
  * Error handler to redirect to top page on error
  */
-export const redirectToTopOnError = (error: Error, req: Request, res: Response, next: NextFunction): void => {
+export const redirectToTopOnError = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void => {
   if (error != null) {
-    return res.redirect('/');
+    res.redirect('/');
+    return;
   }
-  return next();
+  next();
 };

@@ -13,8 +13,8 @@ import { useTranslation } from 'next-i18next';
 
 import type { InputValidationResult } from '~/client/util/use-input-validator';
 import { ValidationTarget, useInputValidator } from '~/client/util/use-input-validator';
-import { EditorMode, useEditorMode } from '~/stores-universal/ui';
-import { useIsUntitledPage } from '~/stores/ui';
+import { useIsUntitledPage } from '~/states/page';
+import { EditorMode, useEditorMode } from '~/states/ui/editor';
 
 import { CopyDropdown } from '../Common/CopyDropdown';
 import { AutosizeSubmittableInput, getAdjustedMaxWidthForAutosizeInput } from '../Common/SubmittableInput';
@@ -52,10 +52,10 @@ export const PageTitleHeader = (props: Props): JSX.Element => {
 
   const editedPageTitle = nodePath.basename(editedPagePath);
 
-  const { data: editorMode } = useEditorMode();
-  const { data: isUntitledPage } = useIsUntitledPage();
+  const { editorMode } = useEditorMode();
+  const isUntitledPage = useIsUntitledPage();
 
-  const changeHandler = useCallback(async(e: ChangeEvent<HTMLInputElement>) => {
+  const changeHandler = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
     const newPageTitle = pathUtils.removeHeadingSlash(e.target.value);
     const parentPagePath = pathUtils.addTrailingSlash(nodePath.dirname(currentPage.path));
     const newPagePath = nodePath.resolve(parentPagePath, newPageTitle);
@@ -128,7 +128,7 @@ export const PageTitleHeader = (props: Props): JSX.Element => {
   return (
     <div className={`d-flex ${moduleClass} ${props.className ?? ''} position-relative`}>
       <div className="page-title-header-input me-1 d-inline-block">
-        { isRenameInputShown && (
+        {isRenameInputShown && (
           <div className="position-relative">
             <div className="position-absolute w-100">
               <AutosizeSubmittableInput
@@ -143,7 +143,7 @@ export const PageTitleHeader = (props: Props): JSX.Element => {
               />
             </div>
           </div>
-        ) }
+        )}
         <h1
           className={`mb-0 mb-sm-1 px-2 fs-4
             ${isRenameInputShown ? 'invisible' : ''} text-truncate
@@ -157,7 +157,7 @@ export const PageTitleHeader = (props: Props): JSX.Element => {
       </div>
 
       <div className={`${isRenameInputShown ? 'invisible' : ''} d-flex align-items-center gap-2`}>
-        { currentPage.wip && (
+        {currentPage.wip && (
           <span className="badge rounded-pill text-bg-secondary">WIP</span>
         )}
 

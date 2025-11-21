@@ -2,7 +2,11 @@ import { getIdStringForRef } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 
 import { Comment, CommentEvent, commentEvent } from '~/features/comment/server';
-import { SupportedAction, SupportedTargetModel, SupportedEventModel } from '~/interfaces/activity';
+import {
+  SupportedAction,
+  SupportedEventModel,
+  SupportedTargetModel,
+} from '~/interfaces/activity';
 import loggerFactory from '~/utils/logger';
 
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
@@ -13,7 +17,6 @@ import { preNotifyService } from '../service/pre-notify';
  *  tags:
  *    name: Comments
  */
-
 
 /**
  * @swagger
@@ -55,7 +58,7 @@ import { preNotifyService } from '../service/pre-notify';
  */
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = function(crowi, app) {
+module.exports = (crowi, app) => {
   const logger = loggerFactory('growi:routes:comment');
   const User = crowi.model('User');
   const Page = crowi.model('Page');
@@ -122,14 +125,16 @@ module.exports = function(crowi, app) {
    * @apiParam {String} page_id Page Id.
    * @apiParam {String} revision_id Revision Id.
    */
-  api.get = async function(req, res) {
+  api.get = async (req, res) => {
     const pageId = req.query.page_id;
     const revisionId = req.query.revision_id;
 
     // check whether accessible
     const isAccessible = await Page.isAccessiblePageByViewer(pageId, req.user);
     if (!isAccessible) {
-      return res.json(ApiResponse.error('Current user is not accessible to this page.'));
+      return res.json(
+        ApiResponse.error('Current user is not accessible to this page.'),
+      );
     }
 
     let query = null;
@@ -137,12 +142,10 @@ module.exports = function(crowi, app) {
     try {
       if (revisionId) {
         query = Comment.findCommentsByRevisionId(revisionId);
-      }
-      else {
+      } else {
         query = Comment.findCommentsByPageId(pageId);
       }
-    }
-    catch (err) {
+    } catch (err) {
       return res.json(ApiResponse.error(err));
     }
 
@@ -156,19 +159,21 @@ module.exports = function(crowi, app) {
     res.json(ApiResponse.success({ comments }));
   };
 
-  api.validators.add = function() {
+  api.validators.add = () => {
     const validator = [
       body('commentForm.page_id').exists(),
       body('commentForm.revision_id').exists(),
       body('commentForm.comment').exists(),
       body('commentForm.comment_position').isInt(),
       body('commentForm.is_markdown').isBoolean(),
-      body('commentForm.replyTo').exists().custom((value) => {
-        if (value === '') {
-          return undefined;
-        }
-        return ObjectId(value);
-      }),
+      body('commentForm.replyTo')
+        .exists()
+        .custom((value) => {
+          if (value === '') {
+            return undefined;
+          }
+          return ObjectId(value);
+        }),
 
       body('slackNotificationForm.isSlackEnabled').isBoolean().exists(),
     ];
@@ -230,7 +235,7 @@ module.exports = function(crowi, app) {
    * @apiParam {String} comment Comment body
    * @apiParam {Number} comment_position=-1 Line number of the comment
    */
-  api.add = async function(req, res) {
+  api.add = async (req, res) => {
     const { commentForm, slackNotificationForm } = req.body;
     const { validationResult } = require('express-validator');
 
@@ -248,7 +253,9 @@ module.exports = function(crowi, app) {
     // check whether accessible
     const isAccessible = await Page.isAccessiblePageByViewer(pageId, req.user);
     if (!isAccessible) {
-      return res.json(ApiResponse.error('Current user is not accessible to this page.'));
+      return res.json(
+        ApiResponse.error('Current user is not accessible to this page.'),
+      );
     }
 
     if (comment === '') {
@@ -257,10 +264,16 @@ module.exports = function(crowi, app) {
 
     let createdComment;
     try {
-      createdComment = await Comment.add(pageId, req.user._id, revisionId, comment, position, replyTo);
+      createdComment = await Comment.add(
+        pageId,
+        req.user._id,
+        revisionId,
+        comment,
+        position,
+        replyTo,
+      );
       commentEvent.emit(CommentEvent.CREATE, createdComment);
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
       return res.json(ApiResponse.error(err));
     }
@@ -282,23 +295,36 @@ module.exports = function(crowi, app) {
     };
 
     /** @type {import('../service/pre-notify').GetAdditionalTargetUsers} */
-    const getAdditionalTargetUsers = async(activity) => {
-      const mentionedUsers = await crowi.commentService.getMentionedUsers(activity.event);
+    const getAdditionalTargetUsers = async (activity) => {
+      const mentionedUsers = await crowi.commentService.getMentionedUsers(
+        activity.event,
+      );
 
       return mentionedUsers;
     };
 
-    activityEvent.emit('update', res.locals.activity._id, parameters, page, preNotifyService.generatePreNotify, getAdditionalTargetUsers);
+    activityEvent.emit(
+      'update',
+      res.locals.activity._id,
+      parameters,
+      page,
+      preNotifyService.generatePreNotify,
+      getAdditionalTargetUsers,
+    );
 
     res.json(ApiResponse.success({ comment: createdComment }));
 
     // global notification
     try {
-      await globalNotificationService.fire(GlobalNotificationSettingEvent.COMMENT, page, req.user, {
-        comment: createdComment,
-      });
-    }
-    catch (err) {
+      await globalNotificationService.fire(
+        GlobalNotificationSettingEvent.COMMENT,
+        page,
+        req.user,
+        {
+          comment: createdComment,
+        },
+      );
+    } catch (err) {
       logger.error('Comment notification　failed', err);
     }
 
@@ -307,14 +333,20 @@ module.exports = function(crowi, app) {
       const { slackChannels } = slackNotificationForm;
 
       try {
-        const results = await userNotificationService.fire(page, req.user, slackChannels, 'comment', {}, createdComment);
+        const results = await userNotificationService.fire(
+          page,
+          req.user,
+          slackChannels,
+          'comment',
+          {},
+          createdComment,
+        );
         results.forEach((result) => {
           if (result.status === 'rejected') {
             logger.error('Create user notification failed', result.reason);
           }
         });
-      }
-      catch (err) {
+      } catch (err) {
         logger.error('Create user notification failed', err);
       }
     }
@@ -373,7 +405,7 @@ module.exports = function(crowi, app) {
    * @apiName UpdateComment
    * @apiGroup Comment
    */
-  api.update = async function(req, res) {
+  api.update = async (req, res) => {
     const { commentForm } = req.body;
 
     const commentStr = commentForm?.comment;
@@ -385,7 +417,7 @@ module.exports = function(crowi, app) {
     }
 
     if (commentId == null) {
-      return res.json(ApiResponse.error('\'comment_id\' is undefined'));
+      return res.json(ApiResponse.error("'comment_id' is undefined"));
     }
 
     let updatedComment;
@@ -398,7 +430,10 @@ module.exports = function(crowi, app) {
 
       // check whether accessible
       const pageId = comment.page;
-      const isAccessible = await Page.isAccessiblePageByViewer(pageId, req.user);
+      const isAccessible = await Page.isAccessiblePageByViewer(
+        pageId,
+        req.user,
+      );
       if (!isAccessible) {
         throw new Error('Current user is not accessible to this page.');
       }
@@ -411,8 +446,7 @@ module.exports = function(crowi, app) {
         { $set: { comment: commentStr, revision } },
       );
       commentEvent.emit(CommentEvent.UPDATE, updatedComment);
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
       return res.json(ApiResponse.error(err));
     }
@@ -462,10 +496,12 @@ module.exports = function(crowi, app) {
    *
    * @apiParam {String} comment_id Comment Id.
    */
-  api.remove = async function(req, res) {
+  api.remove = async (req, res) => {
     const commentId = req.body.comment_id;
     if (!commentId) {
-      return Promise.resolve(res.json(ApiResponse.error('\'comment_id\' is undefined')));
+      return Promise.resolve(
+        res.json(ApiResponse.error("'comment_id' is undefined")),
+      );
     }
 
     try {
@@ -478,7 +514,10 @@ module.exports = function(crowi, app) {
 
       // check whether accessible
       const pageId = getIdStringForRef(comment.page);
-      const isAccessible = await Page.isAccessiblePageByViewer(pageId, req.user);
+      const isAccessible = await Page.isAccessiblePageByViewer(
+        pageId,
+        req.user,
+      );
       if (!isAccessible) {
         throw new Error('Current user is not accessible to this page.');
       }
@@ -489,8 +528,7 @@ module.exports = function(crowi, app) {
       await Comment.removeWithReplies(comment);
       await Page.updateCommentCount(comment.page);
       commentEvent.emit(CommentEvent.DELETE, comment);
-    }
-    catch (err) {
+    } catch (err) {
       return res.json(ApiResponse.error(err));
     }
 

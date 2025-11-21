@@ -4,6 +4,7 @@ import React, { useState, useCallback } from 'react';
 import {
   GroupType, getIdForRef, type IGrantedGroup, type IUserGroup, type IUserGroupHasId,
 } from '@growi/core';
+import { useAtomValue } from 'jotai';
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
 
@@ -12,7 +13,7 @@ import { toastSuccess, toastError } from '~/client/util/toastr';
 import { ExternalGroupManagement } from '~/features/external-user-group/client/components/ExternalUserGroup/ExternalUserGroupManagement';
 import { useSWRxExternalUserGroupList } from '~/features/external-user-group/client/stores/external-user-group';
 import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
-import { useIsAclEnabled } from '~/stores-universal/context';
+import { isAclEnabledAtom } from '~/states/server-configurations';
 import { useSWRxUserGroupList, useSWRxChildUserGroupList, useSWRxUserGroupRelationList } from '~/stores/user-group';
 
 
@@ -23,7 +24,7 @@ const UserGroupTable = dynamic(() => import('./UserGroupTable').then(mod => mod.
 export const UserGroupPage: FC = () => {
   const { t } = useTranslation();
 
-  const { data: isAclEnabled } = useIsAclEnabled();
+  const isAclEnabled = useAtomValue(isAclEnabledAtom);
 
   /*
    * Fetch

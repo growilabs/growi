@@ -7,7 +7,7 @@ import { Card, CardBody } from 'reactstrap';
 
 import { apiv3Put } from '~/client/util/apiv3-client';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useCustomizeTitle } from '~/stores-universal/context';
+import { useCustomTitleTemplate } from '~/states/global';
 
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 
@@ -15,7 +15,7 @@ export const CustomizeTitle: FC = () => {
 
   const { t } = useTranslation('admin');
 
-  const { data: customizeTitle } = useCustomizeTitle();
+  const customTitleTemplate = useCustomTitleTemplate();
 
   const {
     register,
@@ -26,9 +26,9 @@ export const CustomizeTitle: FC = () => {
   // Sync form with store data
   useEffect(() => {
     reset({
-      customizeTitle: customizeTitle ?? '',
+      customizeTitle: customTitleTemplate ?? '',
     });
-  }, [customizeTitle, reset]);
+  }, [customTitleTemplate, reset]);
 
   const onSubmit = useCallback(async(data) => {
     try {

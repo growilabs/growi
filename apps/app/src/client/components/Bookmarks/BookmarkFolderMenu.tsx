@@ -7,7 +7,7 @@ import { DropdownItem, DropdownMenu, UncontrolledDropdown } from 'reactstrap';
 
 import { addBookmarkToFolder, toggleBookmark } from '~/client/util/bookmark-utils';
 import { toastError } from '~/client/util/toastr';
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 import { useSWRMUTxCurrentUserBookmarks } from '~/stores/bookmark';
 import { useSWRxBookmarkFolderAndChild } from '~/stores/bookmark-folder';
 import { useSWRMUTxPageInfo } from '~/stores/page';
@@ -34,7 +34,7 @@ export const BookmarkFolderMenu = (props: BookmarkFolderMenuProps): JSX.Element 
 
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
 
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser();
   const { data: bookmarkFolders, mutate: mutateBookmarkFolders } = useSWRxBookmarkFolderAndChild(currentUser?._id);
 
   const { trigger: mutateCurrentUserBookmarks } = useSWRMUTxCurrentUserBookmarks();

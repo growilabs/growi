@@ -4,7 +4,7 @@ import type { Scope } from '@growi/core/dist/interfaces';
 import { useTranslation } from 'next-i18next';
 import type { UseFormRegisterReturn } from 'react-hook-form';
 
-import { useIsDeviceLargerThanMd } from '~/stores/ui';
+import { useDeviceLargerThanMd } from '~/states/ui/device';
 
 
 import styles from './AccessTokenScopeList.module.scss';
@@ -32,7 +32,7 @@ export const AccessTokenScopeList: React.FC<AccessTokenScopeListProps> = ({
   level = 1,
 }) => {
 
-  const { data: isDeviceLargerThanMd } = useIsDeviceLargerThanMd();
+  const [isDeviceLargerThanMd] = useDeviceLargerThanMd();
 
   // Convert object into an array to determine "first vs. non-first" elements
   const entries = Object.entries(scopeObject);

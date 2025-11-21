@@ -11,9 +11,9 @@ import { useTranslation } from 'react-i18next';
 
 import FormattedDistanceDate from '~/client/components/FormattedDistanceDate';
 import InfiniteScroll from '~/client/components/InfiniteScroll';
-import { useKeywordManager } from '~/client/services/search-operation';
 import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink';
 import LinkedPagePath from '~/models/linked-page-path';
+import { useSetSearchKeyword } from '~/states/search';
 import { useSWRINFxRecentlyUpdated } from '~/stores/page-listing';
 import loggerFactory from '~/utils/logger';
 
@@ -236,7 +236,7 @@ export const RecentChangesContent = ({ isSmall, isWipPageShown }: ContentProps):
   const swrInifinitexRecentlyUpdated = useSWRINFxRecentlyUpdated(isWipPageShown, { suspense: true });
   const { data } = swrInifinitexRecentlyUpdated;
 
-  const { pushState } = useKeywordManager();
+  const setSearchKeyword = useSetSearchKeyword();
   const isEmpty = data?.[0]?.pages.length === 0;
   const lastPageIndex = data?.length ? data.length - 1 : 0;
   const isReachingEnd = isEmpty || (data != null && lastPageIndex > 0 && data[lastPageIndex]?.pages.length < data[lastPageIndex - 1]?.pages.length);
@@ -249,7 +249,7 @@ export const RecentChangesContent = ({ isSmall, isWipPageShown }: ContentProps):
         >
           { data != null && data.map(apiResult => apiResult.pages).flat()
             .map(page => (
-              <PageItem key={page._id} page={page} isSmall={isSmall} onClickTag={tagName => pushState(`tag:${tagName}`)} />
+              <PageItem key={page._id} page={page} isSmall={isSmall} onClickTag={tagName => setSearchKeyword(`tag:${tagName}`)} />
             ))
           }
         </InfiniteScroll>

@@ -83,17 +83,26 @@ export type PageStatus = (typeof PageStatus)[keyof typeof PageStatus];
 
 export type IPageHasId = IPage & HasObjectId;
 
+export type IPageNotFoundInfo = {
+  isNotFound: true;
+  isForbidden: boolean;
+  isEmpty?: true;
+};
+
 export type IPageInfo = {
+  isNotFound: boolean;
   isV5Compatible: boolean;
   isEmpty: boolean;
   isMovable: boolean;
   isDeletable: boolean;
   isAbleToDeleteCompletely: boolean;
   isRevertible: boolean;
+  bookmarkCount: number;
 };
 
-export type IPageInfoForEntity = IPageInfo & {
-  bookmarkCount: number;
+export type IPageInfoForEntity = Omit<IPageInfo, 'isNotFound' | 'isEmpty'> & {
+  isNotFound: false;
+  isEmpty: false;
   sumOfLikers: number;
   likerIds: string[];
   sumOfSeenUsers: number;
@@ -101,6 +110,7 @@ export type IPageInfoForEntity = IPageInfo & {
   contentAge: number;
   descendantCount: number;
   commentCount: number;
+  latestRevisionId: Ref<IRevision>;
 };
 
 export type IPageInfoForOperation = IPageInfoForEntity & {
@@ -111,11 +121,22 @@ export type IPageInfoForOperation = IPageInfoForEntity & {
 
 export type IPageInfoForListing = IPageInfoForEntity & HasRevisionShortbody;
 
-export type IPageInfoAll =
+export type IPageInfoExt =
   | IPageInfo
   | IPageInfoForEntity
   | IPageInfoForOperation
   | IPageInfoForListing;
+
+export const isIPageNotFoundInfo = (
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
+  pageInfo: any | undefined,
+): pageInfo is IPageNotFoundInfo => {
+  return (
+    pageInfo != null &&
+    pageInfo instanceof Object &&
+    pageInfo.isNotFound === true
+  );
+};
 
 export const isIPageInfo = (
   // biome-ignore lint/suspicious/noExplicitAny: ignore
@@ -152,28 +173,16 @@ export const isIPageInfoForListing = (
   return isIPageInfoForEntity(pageInfo) && 'revisionShortBody' in pageInfo;
 };
 
-// export type IPageInfoTypeResolver<T extends IPageInfo> =
-//   T extends HasRevisionShortbody ? IPageInfoForListing :
-//   T extends { isBookmarked?: boolean } | { isLiked?: boolean } | { subscriptionStatus?: SubscriptionStatusType } ? IPageInfoForOperation :
-//   T extends { bookmarkCount: number } ? IPageInfoForEntity :
-//   T extends { isEmpty: number } ? IPageInfo :
-//   T;
-
-/**
- * Union Distribution
- * @param pageInfo
- * @returns
- */
-// export const resolvePageInfo = <T extends IPageInfo>(pageInfo: T | undefined): IPageInfoTypeResolver<T> => {
-//   return <IPageInfoTypeResolver<T>>pageInfo;
-// };
-
 export type IDataWithMeta<D = unknown, M = unknown> = {
   data: D;
   meta?: M;
 };
+export type IDataWithRequiredMeta<D = unknown, M = unknown> = IDataWithMeta<
+  D,
+  M
+> & { meta: M };
 
-export type IPageWithMeta<M = IPageInfoAll> = IDataWithMeta<IPageHasId, M>;
+export type IPageWithMeta<M = IPageInfoExt> = IDataWithMeta<IPageHasId, M>;
 
 export type IPageToDeleteWithMeta<T = IPageInfoForEntity | unknown> =
   IDataWithMeta<

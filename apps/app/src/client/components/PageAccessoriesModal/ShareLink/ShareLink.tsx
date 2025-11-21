@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { apiv3Delete } from '~/client/util/apiv3-client';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useCurrentPageId } from '~/stores/page';
+import { useCurrentPageId } from '~/states/page';
 import { useSWRxSharelink } from '~/stores/share-link';
 
 import { ShareLinkForm } from './ShareLinkForm';
@@ -14,7 +14,7 @@ export const ShareLink = (): JSX.Element => {
   const { t } = useTranslation();
   const [isOpenShareLinkForm, setIsOpenShareLinkForm] = useState<boolean>(false);
 
-  const { data: currentPageId } = useCurrentPageId();
+  const currentPageId = useCurrentPageId();
 
   const { data: currentShareLinks, mutate } = useSWRxSharelink(currentPageId);
 

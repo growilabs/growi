@@ -1,10 +1,12 @@
 import React, { memo, useMemo } from 'react';
 
+import { useAtomValue } from 'jotai';
+
 import { AiAssistant } from '~/features/openai/client/components/AiAssistant/Sidebar/AiAssistant';
 import { SidebarContentsType } from '~/interfaces/ui';
-import { useIsAiEnabled, useIsGuestUser } from '~/stores-universal/context';
-import { useCollapsedContentsOpened, useCurrentSidebarContents, useSidebarMode } from '~/stores/ui';
-
+import { useIsGuestUser } from '~/states/context';
+import { aiEnabledAtom } from '~/states/server-configurations';
+import { useSidebarMode, useCollapsedContentsOpened, useCurrentSidebarContents } from '~/states/ui/sidebar';
 
 import { Bookmarks } from './Bookmarks';
 import { CustomSidebar } from './Custom';
@@ -18,11 +20,11 @@ import styles from './SidebarContents.module.scss';
 
 export const SidebarContents = memo(() => {
   const { isCollapsedMode } = useSidebarMode();
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isAiEnabled } = useIsAiEnabled();
+  const isGuestUser = useIsGuestUser();
+  const isAiEnabled = useAtomValue(aiEnabledAtom);
 
-  const { data: isCollapsedContentsOpened } = useCollapsedContentsOpened();
-  const { data: currentSidebarContents } = useCurrentSidebarContents();
+  const [isCollapsedContentsOpened] = useCollapsedContentsOpened();
+  const [currentSidebarContents] = useCurrentSidebarContents();
 
   const Contents = useMemo(() => {
     switch (currentSidebarContents) {
