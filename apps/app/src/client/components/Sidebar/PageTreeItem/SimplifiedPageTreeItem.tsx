@@ -15,10 +15,10 @@ import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate';
 
 import type { TreeItemProps } from '../../TreeItem';
 import { TreeItemLayout } from '../../TreeItem';
+import { NewPageCreateButton } from '../../TreeItem/NewPageInput/NewPageCreateButton';
 
 import { CountBadgeForPageTreeItem } from './CountBadgeForPageTreeItem';
 import { usePageItemControl } from './use-page-item-control';
-import { useSimplifiedPageCreate } from './use-simplified-page-create';
 
 import styles from './PageTreeItem.module.scss';
 
@@ -37,6 +37,9 @@ export const SimplifiedPageTreeItem: FC<TreeItemProps> = ({
   isWipPageShown,
   isEnableActions = false,
   isReadOnlyUser = false,
+  isRenaming,
+  renameInputProps,
+  onStartCreatePage,
   onToggle,
 }) => {
   const router = useRouter();
@@ -66,7 +69,6 @@ export const SimplifiedPageTreeItem: FC<TreeItemProps> = ({
   }, [openDeleteModal, item.parent, notifyUpdateItems]);
 
   const { Control } = usePageItemControl();
-  const { CreateButton } = useSimplifiedPageCreate(onToggle, isExpanded);
 
   const itemSelectedHandler = useCallback((page: IPageForItem) => {
     if (page.path == null || page._id == null) return;
@@ -93,13 +95,16 @@ export const SimplifiedPageTreeItem: FC<TreeItemProps> = ({
       isWipPageShown={isWipPageShown}
       isEnableActions={isEnableActions}
       isReadOnlyUser={isReadOnlyUser}
+      isRenaming={isRenaming}
+      renameInputProps={renameInputProps}
       onClick={itemSelectedHandler}
       onWheelClick={itemSelectedByWheelClickHandler}
       onToggle={onToggle}
       onClickDuplicateMenuItem={onClickDuplicateMenuItem}
       onClickDeleteMenuItem={onClickDeleteMenuItem}
+      onStartCreatePage={onStartCreatePage}
       customEndComponents={[CountBadgeForPageTreeItem]}
-      customHoveredEndComponents={[Control, CreateButton]}
+      customHoveredEndComponents={[Control, NewPageCreateButton]}
     />
   );
 };

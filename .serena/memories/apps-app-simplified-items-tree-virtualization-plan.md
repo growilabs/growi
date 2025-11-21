@@ -186,11 +186,14 @@ src/client/components/Common/SimplifiedItemsTree/
 
 **実装方針**: 既存実装よりも @headless-tree の機能を使って新規実装、APIは既存を使用
 
-6. **Create** - ⏸️ 実装中
-   - @headless-tree/core の renameFeature を活用
-   - 仮のノードを追加してから renameFeature によりページ名を入力、確定したら API を呼び出してページの実態を作成する
+6. **Create** - ✅ 完了
+   - @headless-tree/core の renameFeature を活用して実装
+   - 一時的なノードを追加してrenameFeatureによりページ名を入力
+   - 確定したら API を呼び出してページの実態を作成
    - NewPageCreateButton を customHoveredEndComponents として表示
-   - AutosizeSubmittableInput を使用してページ名を入力
+   - usePageTreeDataLoader で一時ページをサポート
+   - SimplifiedItemsTree で renameFeature を統合
+   - TreeItemLayout で rename input をレンダリング
 
 7. **Drag and Drop** - ⏸️ 未着手
    - @headless-tree/core の dragAndDropFeature を活用
@@ -259,7 +262,7 @@ src/client/components/Common/SimplifiedItemsTree/
 | **M2** 調査+API+Virtualization | 0ファイル | 2ファイル | ✅ 完了 |
 | **M3-A** UI機能移植 | 0-1ファイル | 2ファイル | 🔄 次 |
 | **M3-B** ナビゲーション機能 | 0ファイル | 1ファイル | ⏸️ 未着手 |
-| **M3-C** 操作機能 | 0ファイル | 1-2ファイル | 🔄 実装中 (Create) |
+| **M3-C** 操作機能 | 0ファイル | 1-2ファイル | ✅ Create完了 |
 | **M3-D** リアルタイム更新 | 0ファイル | 1ファイル | ⏸️ 検討中 |
 | **M4** デグレチェック | 0ファイル | 0ファイル | ⏸️ 未着手 |
 
@@ -355,33 +358,43 @@ src/client/components/Common/SimplifiedItemsTree/
 
 ---
 
-## 📊 現在の進捗状況（2025-11-20）
+## 📊 現在の進捗状況（2025-11-21）
 
-**完了**: M1 ✅、M2 ✅、M3-A ✅、M3-B ✅  
-**次のステップ**: M3-C（操作機能）のCreate実装中  
-**優先対応**: Duplicate/Delete完了を確認済み、Create機能を実装中
+**完了**: M1 ✅、M2 ✅、M3-A ✅、M3-B ✅、M3-C (Create) ✅  
+**次のステップ**: M3-C の Rename/Drag&Drop 実装、またはM4（デグレチェック）  
+**優先対応**: Duplicate/Delete/Create完了、renameFeature統合完了
 
 **実装済みコンポーネント**:
-- `SimplifiedItemsTree.tsx`: @headless-tree/react + @tanstack/react-virtual 統合済み
-- `SimplifiedPageTreeItem.tsx`: UI機能、ナビゲーション機能、Duplicate/Delete操作すべて実装済み
+- `SimplifiedItemsTree.tsx`: @headless-tree/react + @tanstack/react-virtual + renameFeature 統合済み
+- `SimplifiedPageTreeItem.tsx`: UI機能、ナビゲーション機能、Duplicate/Delete/Create操作すべて実装済み
+- `usePageTreeDataLoader.ts`: 一時ページサポート追加
+- `TreeItemLayout.tsx`: rename input レンダリング対応
 - バックエンドAPI: `/page-listing/item` エンドポイント追加済み
 
 **実装済み機能**:
 - ✅ WIPページフィルター
 - ✅ descendantCountバッジ表示
-- ✅ hover時の操作ボタン（duplicate/delete）
+- ✅ hover時の操作ボタン（duplicate/delete/create）
 - ✅ 選択ページまでの自動展開
 - ✅ 選択ページへの初期スクロール
 - ✅ Duplicate操作（use-page-item-control経由）
 - ✅ Delete操作（use-page-item-control経由）
+- ✅ Create操作（renameFeature統合、一時ノード方式）
 
-**実装中の機能**:
-- 🔄 Create操作（NewPageCreateButton + renameFeature）
+**M3-C Create実装の詳細**:
+- ✅ `@headless-tree/core` の `renameFeature` を統合
+- ✅ 一時的な placeholder ノードを追加
+- ✅ `renameFeature` により inline でページ名を入力
+- ✅ 入力確定時に API を呼び出してページを作成
+- ✅ キャンセル時は一時ノードを削除
+- ✅ 作成後に親ページを自動展開
+- ✅ headless-tree へ通知して子要素更新
 
 **既知の課題**:
 1. ~~選択ページの祖先が自動展開されない~~ → M3-B で解決済み ✅
 2. ~~まだPageTreeSubstanceで差し替えていない~~ → 実際にはPageTreeSubstanceでSimplifiedItemsTreeを使用中 ✅
 3. ~~Duplicate/Delete操作が未実装~~ → use-page-item-controlで実装済み ✅
+4. ~~Create操作が未実装~~ → renameFeature統合で実装済み ✅
 
 ---
 

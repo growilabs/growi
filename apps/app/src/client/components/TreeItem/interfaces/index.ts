@@ -17,6 +17,7 @@ export type TreeItemToolProps = TreeItemBaseProps & {
   stateHandlers?: {
     setIsOpen: React.Dispatch<React.SetStateAction<boolean>>,
   },
+  onStartCreatePage?: (parentId: string, parentPath: string) => void,
 };
 
 export type TreeItemProps = TreeItemBaseProps & {
@@ -33,4 +34,8 @@ export type TreeItemProps = TreeItemBaseProps & {
   onToggle: () => void;
   onClick?(page: IPageForItem): void,
   onWheelClick?(page: IPageForItem): void,
+  // Optional props for rename feature integration
+  isRenaming?: boolean;
+  renameInputProps?: any;
+  onStartCreatePage?: (parentId: string, parentPath: string) => void;
 };

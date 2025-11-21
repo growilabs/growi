@@ -33,8 +33,9 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
     targetPath, targetPathOrId, isExpanded = false,
     isEnableActions, isReadOnlyUser, isWipPageShown = true,
     showAlternativeContent,
+    isRenaming, renameInputProps,
     onRenamed, onClick, onClickDuplicateMenuItem, onClickDeleteMenuItem, onWheelClick,
-    onToggle,
+    onToggle, onStartCreatePage,
   } = props;
 
   const itemClickHandler = useCallback((e: MouseEvent) => {
@@ -91,6 +92,7 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
     onRenamed,
     onClickDuplicateMenuItem,
     onClickDeleteMenuItem,
+    onStartCreatePage,
   };
 
   const EndComponents = props.customEndComponents;
@@ -141,23 +143,32 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
               (<AlternativeContent key={index} {...toolProps} />)
             ))
           )
-          : (
-            <>
-              <SimpleItemContent page={page} />
-              <div className="d-hover-none">
-                {EndComponents?.map((EndComponent, index) => (
-                  // eslint-disable-next-line react/no-array-index-key
-                  (<EndComponent key={index} {...toolProps} />)
-                ))}
-              </div>
-              <div className="d-none d-hover-flex">
-                {HoveredEndComponents?.map((HoveredEndContent, index) => (
-                  // eslint-disable-next-line react/no-array-index-key
-                  (<HoveredEndContent key={index} {...toolProps} />)
-                ))}
-              </div>
-            </>
-          )
+          : isRenaming && renameInputProps
+            ? (
+              <input
+                {...renameInputProps}
+                className="form-control form-control-sm flex-fill"
+                placeholder="Enter page name"
+                autoFocus
+              />
+            )
+            : (
+              <>
+                <SimpleItemContent page={page} />
+                <div className="d-hover-none">
+                  {EndComponents?.map((EndComponent, index) => (
+                    // eslint-disable-next-line react/no-array-index-key
+                    (<EndComponent key={index} {...toolProps} />)
+                  ))}
+                </div>
+                <div className="d-none d-hover-flex">
+                  {HoveredEndComponents?.map((HoveredEndContent, index) => (
+                    // eslint-disable-next-line react/no-array-index-key
+                    (<HoveredEndContent key={index} {...toolProps} />)
+                  ))}
+                </div>
+              </>
+            )
         }
 
       </li>
