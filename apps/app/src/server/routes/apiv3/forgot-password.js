@@ -37,7 +37,7 @@ const { body } = require('express-validator');
  *           type: string
  *         error:
  *           type: string
-*/
+ */
 
 const router = express.Router();
 
@@ -55,13 +55,21 @@ module.exports = (crowi) => {
 
   const validator = {
     password: [
-      body('newPassword').isString().not().isEmpty()
+      body('newPassword')
+        .isString()
+        .not()
+        .isEmpty()
         .isLength({ min: minPasswordLength })
-        .withMessage(`password must be at least ${minPasswordLength} characters long`),
+        .withMessage(
+          `password must be at least ${minPasswordLength} characters long`,
+        ),
       // checking if password confirmation matches password
-      body('newPasswordConfirm').isString().not().isEmpty()
+      body('newPasswordConfirm')
+        .isString()
+        .not()
+        .isEmpty()
         .custom((value, { req }) => {
-          return (value === req.body.newPassword);
+          return value === req.body.newPassword;
         }),
     ],
     email: [
@@ -74,13 +82,23 @@ module.exports = (crowi) => {
     ],
   };
 
-  const checkPassportStrategyMiddleware = checkForgotPasswordEnabledMiddlewareFactory(crowi, true);
+  const checkPassportStrategyMiddleware =
+    checkForgotPasswordEnabledMiddlewareFactory(crowi, true);
 
-  async function sendPasswordResetEmail(templateFileName, locale, email, url, expiredAt) {
+  async function sendPasswordResetEmail(
+    templateFileName,
+    locale,
+    email,
+    url,
+    expiredAt,
+  ) {
     return mailService.send({
       to: email,
       subject: '[GROWI] Password Reset',
-      template: path.join(crowi.localeDir, `${locale}/notifications/${templateFileName}.ejs`),
+      template: path.join(
+        crowi.localeDir,
+        `${locale}/notifications/${templateFileName}.ejs`,
+      ),
       vars: {
         appTitle: appService.getAppTitle(),
         email,
@@ -118,39 +136,60 @@ module.exports = (crowi) => {
    *              schema:
    *                type: object
    */
-  router.post('/', checkPassportStrategyMiddleware, validator.email, apiV3FormValidator, addActivity, async(req, res) => {
-    const { email } = req.body;
-    const locale = configManager.getConfig('app:globalLang');
-    const appUrl = growiInfoService.getSiteUrl();
+  router.post(
+    '/',
+    checkPassportStrategyMiddleware,
+    validator.email,
+    apiV3FormValidator,
+    addActivity,
+    async (req, res) => {
+      const { email } = req.body;
+      const locale = configManager.getConfig('app:globalLang');
+      const appUrl = growiInfoService.getSiteUrl();
 
-    try {
-      const user = await User.findOne({ email });
+      try {
+        const user = await User.findOne({ email });
 
-      // when the user is not found or active
-      if (user == null || user.status !== 2) {
-        // Do not send emails to non GROWI user
-        // For security reason, do not use error messages like "Email does not exist"
+        // when the user is not found or active
+        if (user == null || user.status !== 2) {
+          // Do not send emails to non GROWI user
+          // For security reason, do not use error messages like "Email does not exist"
+          return res.apiv3();
+        }
+
+        const passwordResetOrderData =
+          await PasswordResetOrder.createPasswordResetOrder(email);
+        const url = new URL(
+          `/forgot-password/${passwordResetOrderData.token}`,
+          appUrl,
+        );
+        const oneTimeUrl = url.href;
+        const grwTzoffsetSec = crowi.appService.getTzoffset() * 60;
+        const expiredAt = subSeconds(
+          passwordResetOrderData.expiredAt,
+          grwTzoffsetSec,
+        );
+        const formattedExpiredAt = format(expiredAt, 'yyyy/MM/dd HH:mm');
+        await sendPasswordResetEmail(
+          'passwordReset',
+          locale,
+          email,
+          oneTimeUrl,
+          formattedExpiredAt,
+        );
+
+        activityEvent.emit('update', res.locals.activity._id, {
+          action: SupportedAction.ACTION_USER_FOGOT_PASSWORD,
+        });
+
         return res.apiv3();
+      } catch (err) {
+        const msg = 'Error occurred during password reset request procedure.';
+        logger.error(err);
+        return res.apiv3Err(`${msg} Cause: ${err}`);
       }
-
-      const passwordResetOrderData = await PasswordResetOrder.createPasswordResetOrder(email);
-      const url = new URL(`/forgot-password/${passwordResetOrderData.token}`, appUrl);
-      const oneTimeUrl = url.href;
-      const grwTzoffsetSec = crowi.appService.getTzoffset() * 60;
-      const expiredAt = subSeconds(passwordResetOrderData.expiredAt, grwTzoffsetSec);
-      const formattedExpiredAt = format(expiredAt, 'yyyy/MM/dd HH:mm');
-      await sendPasswordResetEmail('passwordReset', locale, email, oneTimeUrl, formattedExpiredAt);
-
-      activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_USER_FOGOT_PASSWORD });
-
-      return res.apiv3();
-    }
-    catch (err) {
-      const msg = 'Error occurred during password reset request procedure.';
-      logger.error(err);
-      return res.apiv3Err(`${msg} Cause: ${err}`);
-    }
-  });
+    },
+  );
 
   /**
    * @swagger
@@ -184,35 +223,44 @@ module.exports = (crowi) => {
    *                    $ref: '#/components/schemas/User'
    */
   // eslint-disable-next-line max-len
-  router.put('/', checkPassportStrategyMiddleware, injectResetOrderByTokenMiddleware, validator.password, apiV3FormValidator, addActivity, async(req, res) => {
-    const { passwordResetOrder } = req;
-    const { email } = passwordResetOrder;
-    const grobalLang = configManager.getConfig('app:globalLang');
-    const i18n = grobalLang || req.language;
-    const { newPassword } = req.body;
+  router.put(
+    '/',
+    checkPassportStrategyMiddleware,
+    injectResetOrderByTokenMiddleware,
+    validator.password,
+    apiV3FormValidator,
+    addActivity,
+    async (req, res) => {
+      const { passwordResetOrder } = req;
+      const { email } = passwordResetOrder;
+      const grobalLang = configManager.getConfig('app:globalLang');
+      const i18n = grobalLang || req.language;
+      const { newPassword } = req.body;
 
-    const user = await User.findOne({ email });
+      const user = await User.findOne({ email });
 
-    // when the user is not found or active
-    if (user == null || user.status !== 2) {
-      return res.apiv3Err('update-password-failed');
-    }
+      // when the user is not found or active
+      if (user == null || user.status !== 2) {
+        return res.apiv3Err('update-password-failed');
+      }
 
-    try {
-      const userData = await user.updatePassword(newPassword);
-      const serializedUserData = serializeUserSecurely(userData);
-      passwordResetOrder.revokeOneTimeToken();
-      await sendPasswordResetEmail('passwordResetSuccessful', i18n, email);
+      try {
+        const userData = await user.updatePassword(newPassword);
+        const serializedUserData = serializeUserSecurely(userData);
+        passwordResetOrder.revokeOneTimeToken();
+        await sendPasswordResetEmail('passwordResetSuccessful', i18n, email);
 
-      activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_USER_RESET_PASSWORD });
+        activityEvent.emit('update', res.locals.activity._id, {
+          action: SupportedAction.ACTION_USER_RESET_PASSWORD,
+        });
 
-      return res.apiv3({ userData: serializedUserData });
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err('update-password-failed');
-    }
-  });
+        return res.apiv3({ userData: serializedUserData });
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err('update-password-failed');
+      }
+    },
+  );
 
   // middleware to handle error
   router.use(httpErrorHandler);
