@@ -72,13 +72,6 @@ export default class AdminLocalSecurityContainer extends Container {
   }
 
   /**
-   * Change registration whitelist
-   */
-  changeRegistrationWhitelist(value) {
-    this.setState({ registrationWhitelist: value.split('\n') });
-  }
-
-  /**
    * Switch password reset enabled
    */
   switchIsPasswordResetEnabled() {
@@ -95,14 +88,19 @@ export default class AdminLocalSecurityContainer extends Container {
   /**
    * update local security setting
    */
-  async updateLocalSecuritySetting() {
-    const { registrationWhitelist, isPasswordResetEnabled, isEmailAuthenticationEnabled } = this.state;
-    const response = await apiv3Put('/security-setting/local-setting', {
+  async updateLocalSecuritySetting(formData) {
+    const requestParams = formData != null ? {
+      registrationMode: formData.registrationMode,
+      registrationWhitelist: formData.registrationWhitelist,
+      isPasswordResetEnabled: formData.isPasswordResetEnabled,
+      isEmailAuthenticationEnabled: formData.isEmailAuthenticationEnabled,
+    } : {
       registrationMode: this.state.registrationMode,
-      registrationWhitelist,
-      isPasswordResetEnabled,
-      isEmailAuthenticationEnabled,
-    });
+      registrationWhitelist: this.state.registrationWhitelist,
+      isPasswordResetEnabled: this.state.isPasswordResetEnabled,
+      isEmailAuthenticationEnabled: this.state.isEmailAuthenticationEnabled,
+    };
+    const response = await apiv3Put('/security-setting/local-setting', requestParams);
 
     const { localSettingParams } = response.data;
 

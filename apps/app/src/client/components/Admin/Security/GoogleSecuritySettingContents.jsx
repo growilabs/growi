@@ -34,9 +34,11 @@ const GoogleSecurityManagementContents = (props) => {
 
   const onClickSubmit = useCallback(async(data) => {
     try {
-      await adminGoogleSecurityContainer.changeGoogleClientId(data.googleClientId ?? '');
-      await adminGoogleSecurityContainer.changeGoogleClientSecret(data.googleClientSecret ?? '');
-      await adminGoogleSecurityContainer.updateGoogleSetting();
+      await adminGoogleSecurityContainer.updateGoogleSetting({
+        googleClientId: data.googleClientId ?? '',
+        googleClientSecret: data.googleClientSecret ?? '',
+        isSameEmailTreatedAsIdenticalUser: adminGoogleSecurityContainer.state.isSameEmailTreatedAsIdenticalUser,
+      });
       await adminGeneralSecurityContainer.retrieveSetupStratedies();
       toastSuccess(t('security_settings.OAuth.Google.updated_google'));
     }

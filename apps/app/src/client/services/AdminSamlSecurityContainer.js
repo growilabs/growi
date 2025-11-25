@@ -99,62 +99,6 @@ export default class AdminSamlSecurityContainer extends Container {
   }
 
   /**
-   * Change samlEntryPoint
-   */
-  changeSamlEntryPoint(inputValue) {
-    this.setState({ samlEntryPoint: inputValue });
-  }
-
-  /**
-   * Change samlIssuer
-   */
-  changeSamlIssuer(inputValue) {
-    this.setState({ samlIssuer: inputValue });
-  }
-
-  /**
-   * Change samlCert
-   */
-  changeSamlCert(inputValue) {
-    this.setState({ samlCert: inputValue });
-  }
-
-  /**
-   * Change samlAttrMapId
-   */
-  changeSamlAttrMapId(inputValue) {
-    this.setState({ samlAttrMapId: inputValue });
-  }
-
-  /**
-   * Change samlAttrMapUsername
-   */
-  changeSamlAttrMapUserName(inputValue) {
-    this.setState({ samlAttrMapUsername: inputValue });
-  }
-
-  /**
-   * Change samlAttrMapMail
-   */
-  changeSamlAttrMapMail(inputValue) {
-    this.setState({ samlAttrMapMail: inputValue });
-  }
-
-  /**
-   * Change samlAttrMapFirstName
-   */
-  changeSamlAttrMapFirstName(inputValue) {
-    this.setState({ samlAttrMapFirstName: inputValue });
-  }
-
-  /**
-   * Change samlAttrMapLastName
-   */
-  changeSamlAttrMapLastName(inputValue) {
-    this.setState({ samlAttrMapLastName: inputValue });
-  }
-
-  /**
    * Switch isSameUsernameTreatedAsIdenticalUser
    */
   switchIsSameUsernameTreatedAsIdenticalUser() {
@@ -169,18 +113,23 @@ export default class AdminSamlSecurityContainer extends Container {
   }
 
   /**
-   * Change samlABLCRule
-   */
-  changeSamlABLCRule(inputValue) {
-    this.setState({ samlABLCRule: inputValue });
-  }
-
-  /**
    * Update saml option
    */
-  async updateSamlSetting() {
+  async updateSamlSetting(formData) {
 
-    let requestParams = {
+    let requestParams = formData != null ? {
+      entryPoint: formData.samlEntryPoint,
+      issuer: formData.samlIssuer,
+      cert: formData.samlCert,
+      attrMapId: formData.samlAttrMapId,
+      attrMapUsername: formData.samlAttrMapUsername,
+      attrMapMail: formData.samlAttrMapMail,
+      attrMapFirstName: formData.samlAttrMapFirstName,
+      attrMapLastName: formData.samlAttrMapLastName,
+      isSameUsernameTreatedAsIdenticalUser: formData.isSameUsernameTreatedAsIdenticalUser,
+      isSameEmailTreatedAsIdenticalUser: formData.isSameEmailTreatedAsIdenticalUser,
+      ABLCRule: formData.samlABLCRule,
+    } : {
       entryPoint: this.state.samlEntryPoint,
       issuer: this.state.samlIssuer,
       cert: this.state.samlCert,
