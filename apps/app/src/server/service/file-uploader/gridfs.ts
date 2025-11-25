@@ -104,8 +104,48 @@ class GridfsFileUploader extends AbstractFileUploader {
   /**
    * @inheritdoc
    */
-  override deleteFiles() {
-    throw new Error('Method not implemented.');
+  override async deleteFile(attachment: IAttachmentDocument): Promise<void> {
+    const { attachmentFileModel } = initializeGridFSModels();
+    const filenameValue = attachment.fileName;
+
+    const attachmentFile = await attachmentFileModel.findOne({ filename: filenameValue });
+
+    if (attachmentFile == null) {
+      logger.warn(`Any AttachmentFile that relate to the Attachment (${attachment._id.toString()}) does not exist in GridFS`);
+      return;
+    }
+
+    return attachmentFileModel.promisifiedUnlink({ _id: attachmentFile._id });
+  }
+
+  /**
+   * @inheritdoc
+   *
+   * Bulk delete files since unlink method of mongoose-gridfs does not support bulk operation
+   */
+  override async deleteFiles(attachments: IAttachmentDocument[]): Promise<void> {
+    const { attachmentFileModel, chunkCollection } = initializeGridFSModels();
+
+    const filenameValues = attachments.map((attachment) => {
+      return attachment.fileName;
+    });
+    const fileIdObjects = await attachmentFileModel.find({ filename: { $in: filenameValues } }, { _id: 1 });
+    const idsRelatedFiles = fileIdObjects.map((obj) => { return obj._id });
+
+    await Promise.all([
+      attachmentFileModel.deleteMany({ filename: { $in: filenameValues } }),
+      chunkCollection.deleteMany({ files_id: { $in: idsRelatedFiles } }),
+    ]);
+  }
+
+  /**
+   * @inheritdoc
+   *
+   * Reference to previous implementation is
+   * {@link https://github.com/growilabs/growi/blob/798e44f14ad01544c1d75ba83d4dfb321a94aa0b/src/server/service/file-uploader/gridfs.js#L86-L88}
+   */
+  override getFileUploadTotalLimit() {
+    return configManager.getConfig('gridfs:totalLimit') ?? configManager.getConfig('app:fileUploadTotalLimit');
   }
 
   /**
@@ -156,51 +196,6 @@ module.exports = function(crowi: Crowi) {
 
   lib.isValidUploadSettings = function() {
     return true;
-  };
-
-  (lib as any).deleteFile = async function(attachment) {
-    const { attachmentFileModel } = initializeGridFSModels();
-    const filenameValue = attachment.fileName;
-
-    const attachmentFile = await attachmentFileModel.findOne({ filename: filenameValue });
-
-    if (attachmentFile == null) {
-      logger.warn(`Any AttachmentFile that relate to the Attachment (${attachment._id.toString()}) does not exist in GridFS`);
-      return;
-    }
-
-    return attachmentFileModel.promisifiedUnlink({ _id: attachmentFile._id });
-  };
-
-  /**
-   * Bulk delete files since unlink method of mongoose-gridfs does not support bulk operation
-   */
-  (lib as any).deleteFiles = async function(attachments) {
-    const { attachmentFileModel, chunkCollection } = initializeGridFSModels();
-
-    const filenameValues = attachments.map((attachment) => {
-      return attachment.fileName;
-    });
-    const fileIdObjects = await attachmentFileModel.find({ filename: { $in: filenameValues } }, { _id: 1 });
-    const idsRelatedFiles = fileIdObjects.map((obj) => { return obj._id });
-
-    return Promise.all([
-      attachmentFileModel.deleteMany({ filename: { $in: filenameValues } }),
-      chunkCollection.deleteMany({ files_id: { $in: idsRelatedFiles } }),
-    ]);
-  };
-
-  /**
-   * check the file size limit
-   *
-   * In detail, the followings are checked.
-   * - per-file size limit (specified by MAX_FILE_SIZE)
-   * - mongodb(gridfs) size limit (specified by MONGO_GRIDFS_TOTAL_LIMIT)
-   */
-  (lib as any).checkLimit = async function(uploadFileSize) {
-    const maxFileSize = configManager.getConfig('app:maxFileSize');
-    const totalLimit = lib.getFileUploadTotalLimit();
-    return lib.doCheckLimit(uploadFileSize, maxFileSize, totalLimit);
   };
 
   lib.saveFile = async function({ filePath, contentType, data }) {
