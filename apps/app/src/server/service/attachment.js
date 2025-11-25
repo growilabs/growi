@@ -12,7 +12,11 @@ const logger = loggerFactory('growi:service:AttachmentService');
 
 const createReadStream = (filePath) => {
   return fs.createReadStream(filePath, {
-    flags: 'r', encoding: null, fd: null, mode: '0666', autoClose: true,
+    flags: 'r',
+    encoding: null,
+    fd: null,
+    mode: '0666',
+    autoClose: true,
   });
 };
 
@@ -20,7 +24,6 @@ const createReadStream = (filePath) => {
  * the service class for Attachment and file-uploader
  */
 class AttachmentService {
-
   /** @type {Array<(pageId: string, attachment: Attachment, file: Express.Multer.File) => Promise<void>>} */
   attachHandlers = [];
 
@@ -35,7 +38,13 @@ class AttachmentService {
     this.crowi = crowi;
   }
 
-  async createAttachment(file, user, pageId = null, attachmentType, disposeTmpFileCallback) {
+  async createAttachment(
+    file,
+    user,
+    pageId = null,
+    attachmentType,
+    disposeTmpFileCallback,
+  ) {
     const { fileUploadService } = this.crowi;
 
     // check limit
@@ -49,8 +58,18 @@ class AttachmentService {
     let readStreamForCreateAttachmentDocument;
     try {
       readStreamForCreateAttachmentDocument = createReadStream(file.path);
-      attachment = Attachment.createWithoutSave(pageId, user, file.originalname, file.mimetype, file.size, attachmentType);
-      await fileUploadService.uploadAttachment(readStreamForCreateAttachmentDocument, attachment);
+      attachment = Attachment.createWithoutSave(
+        pageId,
+        user,
+        file.originalname,
+        file.mimetype,
+        file.size,
+        attachmentType,
+      );
+      await fileUploadService.uploadAttachment(
+        readStreamForCreateAttachmentDocument,
+        attachment,
+      );
       await attachment.save();
 
       const attachHandlerPromises = this.attachHandlers.map((handler) => {
@@ -65,13 +84,11 @@ class AttachmentService {
         .finally(() => {
           disposeTmpFileCallback?.(file);
         });
-    }
-    catch (err) {
+    } catch (err) {
       logger.error('Error while creating attachment', err);
       disposeTmpFileCallback?.(file);
       throw err;
-    }
-    finally {
+    } finally {
       readStreamForCreateAttachmentDocument.destroy();
     }
 
@@ -81,7 +98,8 @@ class AttachmentService {
   async removeAllAttachments(attachments) {
     const { fileUploadService } = this.crowi;
     const attachmentsCollection = mongoose.connection.collection('attachments');
-    const unorderAttachmentsBulkOp = attachmentsCollection.initializeUnorderedBulkOp();
+    const unorderAttachmentsBulkOp =
+      attachmentsCollection.initializeUnorderedBulkOp();
 
     if (attachments.length === 0) {
       return;
@@ -109,10 +127,9 @@ class AttachmentService {
     });
 
     // Do not await, run in background
-    Promise.all(detachedHandlerPromises)
-      .catch((err) => {
-        logger.error('Error while executing detached handler', err);
-      });
+    Promise.all(detachedHandlerPromises).catch((err) => {
+      logger.error('Error while executing detached handler', err);
+    });
 
     return;
   }
@@ -139,7 +156,6 @@ class AttachmentService {
   addDetachHandler(handler) {
     this.detachHandlers.push(handler);
   }
-
 }
 
 module.exports = AttachmentService;

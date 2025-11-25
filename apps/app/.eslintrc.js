@@ -70,6 +70,8 @@ module.exports = {
     'src/server/routes/apiv3/personal-setting/**',
     'src/server/routes/apiv3/security-settings/**',
     'src/server/routes/apiv3/*.ts',
+    'src/server/service/*.ts',
+    'src/server/service/*.js',
   ],
   settings: {
     // resolve path aliases by eslint-import-resolver-typescript

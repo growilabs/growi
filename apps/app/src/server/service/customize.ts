@@ -1,8 +1,11 @@
-import path from 'path';
-
 import type { ColorScheme } from '@growi/core';
 import { getForcedColorScheme } from '@growi/core/dist/utils';
-import { DefaultThemeMetadata, PresetThemesMetadatas, manifestPath } from '@growi/preset-themes';
+import {
+  DefaultThemeMetadata,
+  manifestPath,
+  PresetThemesMetadatas,
+} from '@growi/preset-themes';
+import path from 'path';
 import uglifycss from 'uglifycss';
 
 import { growiPluginService } from '~/features/growi-plugin/server/services';
@@ -10,20 +13,15 @@ import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
 import S2sMessage from '../models/vo/s2s-message';
-
-
 import { configManager } from './config-manager';
 import type { S2sMessageHandlable } from './s2s-messaging/handlable';
 
-
 const logger = loggerFactory('growi:service:CustomizeService');
-
 
 /**
  * the service class of CustomizeService
  */
 class CustomizeService implements S2sMessageHandlable {
-
   s2sMessagingService: any;
 
   appService: any;
@@ -54,7 +52,10 @@ class CustomizeService implements S2sMessageHandlable {
       return false;
     }
 
-    return this.lastLoadedAt == null || this.lastLoadedAt < new Date(s2sMessage.updatedAt);
+    return (
+      this.lastLoadedAt == null ||
+      this.lastLoadedAt < new Date(s2sMessage.updatedAt)
+    );
   }
 
   /**
@@ -72,13 +73,17 @@ class CustomizeService implements S2sMessageHandlable {
     const { s2sMessagingService } = this;
 
     if (s2sMessagingService != null) {
-      const s2sMessage = new S2sMessage('customizeServiceUpdated', { updatedAt: new Date() });
+      const s2sMessage = new S2sMessage('customizeServiceUpdated', {
+        updatedAt: new Date(),
+      });
 
       try {
         await s2sMessagingService.publish(s2sMessage);
-      }
-      catch (e) {
-        logger.error('Failed to publish update message with S2sMessagingService: ', e.message);
+      } catch (e) {
+        logger.error(
+          'Failed to publish update message with S2sMessagingService: ',
+          e.message,
+        );
       }
     }
   }
@@ -124,29 +129,38 @@ class CustomizeService implements S2sMessageHandlable {
 
     this.theme = theme;
 
-    const resultForThemePlugin = await growiPluginService.findThemePlugin(theme);
+    const resultForThemePlugin =
+      await growiPluginService.findThemePlugin(theme);
 
     if (resultForThemePlugin != null) {
-      this.forcedColorScheme = getForcedColorScheme(resultForThemePlugin.themeMetadata.schemeType);
+      this.forcedColorScheme = getForcedColorScheme(
+        resultForThemePlugin.themeMetadata.schemeType,
+      );
       this.themeHref = resultForThemePlugin.themeHref;
     }
     // retrieve preset theme
     else {
       // import preset-themes manifest
-      const presetThemesManifest = await import(path.join('@growi/preset-themes', manifestPath)).then(imported => imported.default);
+      const presetThemesManifest = await import(
+        path.join('@growi/preset-themes', manifestPath)
+      ).then((imported) => imported.default);
 
-      const themeMetadata = PresetThemesMetadatas.find(p => p.name === theme);
+      const themeMetadata = PresetThemesMetadatas.find((p) => p.name === theme);
       this.forcedColorScheme = getForcedColorScheme(themeMetadata?.schemeType);
 
-      const manifestKey = themeMetadata?.manifestKey ?? DefaultThemeMetadata.manifestKey;
-      if (themeMetadata == null || !(themeMetadata.manifestKey in presetThemesManifest)) {
-        logger.warn(`Use default theme because the key for '${theme} does not exist in preset-themes manifest`);
+      const manifestKey =
+        themeMetadata?.manifestKey ?? DefaultThemeMetadata.manifestKey;
+      if (
+        themeMetadata == null ||
+        !(themeMetadata.manifestKey in presetThemesManifest)
+      ) {
+        logger.warn(
+          `Use default theme because the key for '${theme} does not exist in preset-themes manifest`,
+        );
       }
       this.themeHref = `/static/preset-themes/${presetThemesManifest[manifestKey].file}`; // configured by express.static
     }
-
   }
-
 }
 
 module.exports = CustomizeService;

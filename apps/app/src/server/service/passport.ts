@@ -1,8 +1,11 @@
-import type { IncomingMessage } from 'http';
-
 import axiosRetry from 'axios-retry';
+import type { IncomingMessage } from 'http';
 import luceneQueryParser from 'lucene-query-parser';
-import { Strategy as OidcStrategy, Issuer as OIDCIssuer, custom } from 'openid-client';
+import {
+  custom,
+  Issuer as OIDCIssuer,
+  Strategy as OidcStrategy,
+} from 'openid-client';
 import pRetry from 'p-retry';
 import passport from 'passport';
 import { Strategy as GitHubStrategy } from 'passport-github';
@@ -17,14 +20,12 @@ import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provi
 import loggerFactory from '~/utils/logger';
 
 import S2sMessage from '../models/vo/s2s-message';
-
 import { configManager } from './config-manager';
 import type { ConfigKey } from './config-manager/config-definition';
 import { growiInfoService } from './growi-info';
 import type { S2sMessageHandlable } from './s2s-messaging/handlable';
 
 const logger = loggerFactory('growi:service:PassportService');
-
 
 interface IncomingMessageWithLdapAccountInfo extends IncomingMessage {
   ldapAccountInfo: any;
@@ -34,11 +35,14 @@ interface IncomingMessageWithLdapAccountInfo extends IncomingMessage {
  * the service class of Passport
  */
 class PassportService implements S2sMessageHandlable {
-
   // see '/lib/form/login.js'
-  static get USERNAME_FIELD() { return 'loginForm[username]' }
+  static get USERNAME_FIELD() {
+    return 'loginForm[username]';
+  }
 
-  static get PASSWORD_FIELD() { return 'loginForm[password]' }
+  static get PASSWORD_FIELD() {
+    return 'loginForm[password]';
+  }
 
   crowi!: any;
 
@@ -122,17 +126,23 @@ class PassportService implements S2sMessageHandlable {
     this.crowi = crowi;
   }
 
-
   /**
    * @inheritdoc
    */
   shouldHandleS2sMessage(s2sMessage) {
     const { eventName, updatedAt, strategyId } = s2sMessage;
-    if (eventName !== 'passportServiceUpdated' || updatedAt == null || strategyId == null) {
+    if (
+      eventName !== 'passportServiceUpdated' ||
+      updatedAt == null ||
+      strategyId == null
+    ) {
       return false;
     }
 
-    return this.lastLoadedAt == null || this.lastLoadedAt < new Date(s2sMessage.updatedAt);
+    return (
+      this.lastLoadedAt == null ||
+      this.lastLoadedAt < new Date(s2sMessage.updatedAt)
+    );
   }
 
   /**
@@ -158,9 +168,11 @@ class PassportService implements S2sMessageHandlable {
 
       try {
         await s2sMessagingService.publish(s2sMessage);
-      }
-      catch (e) {
-        logger.error('Failed to publish update message with S2sMessagingService: ', e.message);
+      } catch (e) {
+        logger.error(
+          'Failed to publish update message with S2sMessagingService: ',
+          e.message,
+        );
       }
     }
   }
@@ -174,12 +186,24 @@ class PassportService implements S2sMessageHandlable {
   getSetupStrategies() {
     const setupStrategies: string[] = [];
 
-    if (this.isLocalStrategySetup) { setupStrategies.push('local') }
-    if (this.isLdapStrategySetup) { setupStrategies.push('ldap') }
-    if (this.isSamlStrategySetup) { setupStrategies.push('saml') }
-    if (this.isOidcStrategySetup) { setupStrategies.push('oidc') }
-    if (this.isGoogleStrategySetup) { setupStrategies.push('google') }
-    if (this.isGitHubStrategySetup) { setupStrategies.push('github') }
+    if (this.isLocalStrategySetup) {
+      setupStrategies.push('local');
+    }
+    if (this.isLdapStrategySetup) {
+      setupStrategies.push('ldap');
+    }
+    if (this.isSamlStrategySetup) {
+      setupStrategies.push('saml');
+    }
+    if (this.isOidcStrategySetup) {
+      setupStrategies.push('oidc');
+    }
+    if (this.isGoogleStrategySetup) {
+      setupStrategies.push('google');
+    }
+    if (this.isGitHubStrategySetup) {
+      setupStrategies.push('github');
+    }
 
     return setupStrategies;
   }
@@ -202,8 +226,7 @@ class PassportService implements S2sMessageHandlable {
 
     try {
       await this[func.setup]();
-    }
-    catch (err) {
+    } catch (err) {
       logger.debug(err);
       this[func.reset]();
     }
@@ -228,12 +251,13 @@ class PassportService implements S2sMessageHandlable {
    * @memberof PassportService
    */
   setupLocalStrategy() {
-
     this.resetLocalStrategy();
 
     const { configManager } = this.crowi;
 
-    const isEnabled = configManager.getConfig('security:passport-local:isEnabled');
+    const isEnabled = configManager.getConfig(
+      'security:passport-local:isEnabled',
+    );
 
     // when disabled
     if (!isEnabled) {
@@ -244,23 +268,27 @@ class PassportService implements S2sMessageHandlable {
 
     const User = this.crowi.model('User');
 
-    passport.use(new LocalStrategy(
-      {
-        usernameField: PassportService.USERNAME_FIELD,
-        passwordField: PassportService.PASSWORD_FIELD,
-      },
-      (username, password, done) => {
-        // find user
-        User.findUserByUsernameOrEmail(username, password, (err, user) => {
-          if (err) { return done(err) }
-          // check existence and password
-          if (!user || !user.isPasswordValid(password)) {
-            return done(null, false, { message: 'Incorrect credentials.' });
-          }
-          return done(null, user);
-        });
-      },
-    ));
+    passport.use(
+      new LocalStrategy(
+        {
+          usernameField: PassportService.USERNAME_FIELD,
+          passwordField: PassportService.PASSWORD_FIELD,
+        },
+        (username, password, done) => {
+          // find user
+          User.findUserByUsernameOrEmail(username, password, (err, user) => {
+            if (err) {
+              return done(err);
+            }
+            // check existence and password
+            if (!user || !user.isPasswordValid(password)) {
+              return done(null, false, { message: 'Incorrect credentials.' });
+            }
+            return done(null, user);
+          });
+        },
+      ),
+    );
 
     this.isLocalStrategySetup = true;
     logger.debug('LocalStrategy: setup is done');
@@ -283,13 +311,14 @@ class PassportService implements S2sMessageHandlable {
    * @memberof PassportService
    */
   setupLdapStrategy() {
-
     this.resetLdapStrategy();
 
     const config = this.crowi.config;
     const { configManager } = this.crowi;
 
-    const isLdapEnabled = configManager.getConfig('security:passport-ldap:isEnabled');
+    const isLdapEnabled = configManager.getConfig(
+      'security:passport-ldap:isEnabled',
+    );
 
     // when disabled
     if (!isLdapEnabled) {
@@ -298,15 +327,20 @@ class PassportService implements S2sMessageHandlable {
 
     logger.debug('LdapStrategy: setting up..');
 
-    passport.use(new LdapStrategy(this.getLdapConfigurationFunc(config, { passReqToCallback: true }),
-      (req, ldapAccountInfo, done) => {
-        logger.debug('LDAP authentication has succeeded', ldapAccountInfo);
+    passport.use(
+      new LdapStrategy(
+        this.getLdapConfigurationFunc(config, { passReqToCallback: true }),
+        (req, ldapAccountInfo, done) => {
+          logger.debug('LDAP authentication has succeeded', ldapAccountInfo);
 
-        // store ldapAccountInfo to req
-        (req as IncomingMessageWithLdapAccountInfo).ldapAccountInfo = ldapAccountInfo;
+          // store ldapAccountInfo to req
+          (req as IncomingMessageWithLdapAccountInfo).ldapAccountInfo =
+            ldapAccountInfo;
 
-        done(null, ldapAccountInfo);
-      }));
+          done(null, ldapAccountInfo);
+        },
+      ),
+    );
 
     this.isLdapStrategySetup = true;
     logger.debug('LdapStrategy: setup is done');
@@ -319,7 +353,9 @@ class PassportService implements S2sMessageHandlable {
    * @memberof PassportService
    */
   getLdapAttrNameMappedToUsername() {
-    return configManager.getConfig('security:passport-ldap:attrMapUsername') || 'uid';
+    return (
+      configManager.getConfig('security:passport-ldap:attrMapUsername') || 'uid'
+    );
   }
 
   /**
@@ -339,7 +375,9 @@ class PassportService implements S2sMessageHandlable {
    * @memberof PassportService
    */
   getLdapAttrNameMappedToMail() {
-    return configManager.getConfig('security:passport-ldap:attrMapMail') || 'mail';
+    return (
+      configManager.getConfig('security:passport-ldap:attrMapMail') || 'mail'
+    );
   }
 
   /**
@@ -367,14 +405,28 @@ class PassportService implements S2sMessageHandlable {
     const { configManager } = this.crowi;
 
     // get configurations
-    const isUserBind        = configManager.getConfig('security:passport-ldap:isUserBind');
-    const serverUrl         = configManager.getConfig('security:passport-ldap:serverUrl');
-    const bindDN            = configManager.getConfig('security:passport-ldap:bindDN');
-    const bindCredentials   = configManager.getConfig('security:passport-ldap:bindDNPassword');
-    const searchFilter      = configManager.getConfig('security:passport-ldap:searchFilter') || '(uid={{username}})';
-    const groupSearchBase   = configManager.getConfig('security:passport-ldap:groupSearchBase');
-    const groupSearchFilter = configManager.getConfig('security:passport-ldap:groupSearchFilter');
-    const groupDnProperty   = configManager.getConfig('security:passport-ldap:groupDnProperty') || 'uid';
+    const isUserBind = configManager.getConfig(
+      'security:passport-ldap:isUserBind',
+    );
+    const serverUrl = configManager.getConfig(
+      'security:passport-ldap:serverUrl',
+    );
+    const bindDN = configManager.getConfig('security:passport-ldap:bindDN');
+    const bindCredentials = configManager.getConfig(
+      'security:passport-ldap:bindDNPassword',
+    );
+    const searchFilter =
+      configManager.getConfig('security:passport-ldap:searchFilter') ||
+      '(uid={{username}})';
+    const groupSearchBase = configManager.getConfig(
+      'security:passport-ldap:groupSearchBase',
+    );
+    const groupSearchFilter = configManager.getConfig(
+      'security:passport-ldap:groupSearchFilter',
+    );
+    const groupDnProperty =
+      configManager.getConfig('security:passport-ldap:groupDnProperty') ||
+      'uid';
     /* eslint-enable no-multi-spaces */
 
     // parse serverUrl
@@ -382,7 +434,9 @@ class PassportService implements S2sMessageHandlable {
     const match = serverUrl.match(/(ldaps?:\/\/[^/]+)\/(.*)?/);
     if (match == null || match.length < 1) {
       logger.debug('LdapStrategy: serverUrl is invalid');
-      return (req, callback) => { callback({ message: 'serverUrl is invalid' }) };
+      return (req, callback) => {
+        callback({ message: 'serverUrl is invalid' });
+      };
     }
     const url = match[1];
     const searchBase = match[2] || '';
@@ -407,10 +461,12 @@ class PassportService implements S2sMessageHandlable {
       }
 
       // user bind
-      const fixedBindDN = (isUserBind)
+      const fixedBindDN = isUserBind
         ? bindDN.replace(/{{username}}/, loginForm.username)
         : bindDN;
-      const fixedBindCredentials = (isUserBind) ? loginForm.password : bindCredentials;
+      const fixedBindCredentials = isUserBind
+        ? loginForm.password
+        : bindCredentials;
       let serverOpt = {
         url,
         bindDN: fixedBindDN,
@@ -422,15 +478,22 @@ class PassportService implements S2sMessageHandlable {
       };
 
       if (groupSearchBase && groupSearchFilter) {
-        serverOpt = Object.assign(serverOpt, { groupSearchBase, groupSearchFilter, groupDnProperty });
+        serverOpt = Object.assign(serverOpt, {
+          groupSearchBase,
+          groupSearchFilter,
+          groupDnProperty,
+        });
       }
 
       process.nextTick(() => {
-        const mergedOpts = Object.assign({
-          usernameField: PassportService.USERNAME_FIELD,
-          passwordField: PassportService.PASSWORD_FIELD,
-          server: serverOpt,
-        }, opts);
+        const mergedOpts = Object.assign(
+          {
+            usernameField: PassportService.USERNAME_FIELD,
+            passwordField: PassportService.PASSWORD_FIELD,
+            server: serverOpt,
+          },
+          opts,
+        );
         logger.debug('ldap configuration: ', mergedOpts);
 
         // store configuration to req
@@ -447,10 +510,11 @@ class PassportService implements S2sMessageHandlable {
    * @memberof PassportService
    */
   setupGoogleStrategy() {
-
     this.resetGoogleStrategy();
 
-    const isGoogleEnabled = configManager.getConfig('security:passport-google:isEnabled');
+    const isGoogleEnabled = configManager.getConfig(
+      'security:passport-google:isEnabled',
+    );
 
     // when disabled
     if (!isGoogleEnabled) {
@@ -461,11 +525,21 @@ class PassportService implements S2sMessageHandlable {
     passport.use(
       new GoogleStrategy(
         {
-          clientID: configManager.getConfig('security:passport-google:clientId'),
-          clientSecret: configManager.getConfig('security:passport-google:clientSecret'),
-          callbackURL: configManager.getConfig('app:siteUrl') != null
-            ? urljoin(growiInfoService.getSiteUrl(), '/passport/google/callback') // auto-generated with v3.2.4 and above
-            : configManager.getConfigLegacy<string>('security:passport-google:callbackUrl'), // DEPRECATED: backward compatible with v3.2.3 and below
+          clientID: configManager.getConfig(
+            'security:passport-google:clientId',
+          ),
+          clientSecret: configManager.getConfig(
+            'security:passport-google:clientSecret',
+          ),
+          callbackURL:
+            configManager.getConfig('app:siteUrl') != null
+              ? urljoin(
+                  growiInfoService.getSiteUrl(),
+                  '/passport/google/callback',
+                ) // auto-generated with v3.2.4 and above
+              : configManager.getConfigLegacy<string>(
+                  'security:passport-google:callbackUrl',
+                ), // DEPRECATED: backward compatible with v3.2.3 and below
           skipUserProfile: false,
         },
         (accessToken, refreshToken, profile, done) => {
@@ -494,10 +568,11 @@ class PassportService implements S2sMessageHandlable {
   }
 
   setupGitHubStrategy() {
-
     this.resetGitHubStrategy();
 
-    const isGitHubEnabled = configManager.getConfig('security:passport-github:isEnabled');
+    const isGitHubEnabled = configManager.getConfig(
+      'security:passport-github:isEnabled',
+    );
 
     // when disabled
     if (!isGitHubEnabled) {
@@ -508,11 +583,21 @@ class PassportService implements S2sMessageHandlable {
     passport.use(
       new GitHubStrategy(
         {
-          clientID: configManager.getConfig('security:passport-github:clientId'),
-          clientSecret: configManager.getConfig('security:passport-github:clientSecret'),
-          callbackURL: configManager.getConfig('app:siteUrl') != null
-            ? urljoin(growiInfoService.getSiteUrl(), '/passport/github/callback') // auto-generated with v3.2.4 and above
-            : configManager.getConfigLegacy('security:passport-github:callbackUrl'), // DEPRECATED: backward compatible with v3.2.3 and below
+          clientID: configManager.getConfig(
+            'security:passport-github:clientId',
+          ),
+          clientSecret: configManager.getConfig(
+            'security:passport-github:clientSecret',
+          ),
+          callbackURL:
+            configManager.getConfig('app:siteUrl') != null
+              ? urljoin(
+                  growiInfoService.getSiteUrl(),
+                  '/passport/github/callback',
+                ) // auto-generated with v3.2.4 and above
+              : configManager.getConfigLegacy(
+                  'security:passport-github:callbackUrl',
+                ), // DEPRECATED: backward compatible with v3.2.3 and below
           skipUserProfile: false,
         },
         (accessToken, refreshToken, profile, done) => {
@@ -541,10 +626,11 @@ class PassportService implements S2sMessageHandlable {
   }
 
   async setupOidcStrategy() {
-
     this.resetOidcStrategy();
 
-    const isOidcEnabled = configManager.getConfig('security:passport-oidc:isEnabled');
+    const isOidcEnabled = configManager.getConfig(
+      'security:passport-oidc:isEnabled',
+    );
 
     // when disabled
     if (!isOidcEnabled) {
@@ -555,52 +641,79 @@ class PassportService implements S2sMessageHandlable {
 
     // setup client
     // extend oidc request timeouts
-    const OIDC_ISSUER_TIMEOUT_OPTION = await configManager.getConfig('security:passport-oidc:oidcIssuerTimeoutOption');
+    const OIDC_ISSUER_TIMEOUT_OPTION = await configManager.getConfig(
+      'security:passport-oidc:oidcIssuerTimeoutOption',
+    );
     // OIDCIssuer.defaultHttpOptions = { timeout: OIDC_ISSUER_TIMEOUT_OPTION };
 
     custom.setHttpOptionsDefaults({
       timeout: OIDC_ISSUER_TIMEOUT_OPTION,
     });
 
-    const issuerHost = configManager.getConfig('security:passport-oidc:issuerHost');
+    const issuerHost = configManager.getConfig(
+      'security:passport-oidc:issuerHost',
+    );
     const clientId = configManager.getConfig('security:passport-oidc:clientId');
-    const clientSecret = configManager.getConfig('security:passport-oidc:clientSecret');
-    const redirectUri = configManager.getConfig('app:siteUrl') != null
-      ? urljoin(growiInfoService.getSiteUrl(), '/passport/oidc/callback')
-      : configManager.getConfigLegacy<string>('security:passport-oidc:callbackUrl'); // DEPRECATED: backward compatible with v3.2.3 and below
+    const clientSecret = configManager.getConfig(
+      'security:passport-oidc:clientSecret',
+    );
+    const redirectUri =
+      configManager.getConfig('app:siteUrl') != null
+        ? urljoin(growiInfoService.getSiteUrl(), '/passport/oidc/callback')
+        : configManager.getConfigLegacy<string>(
+            'security:passport-oidc:callbackUrl',
+          ); // DEPRECATED: backward compatible with v3.2.3 and below
 
     // Prevent request timeout error on app init
     const oidcIssuer = await this.getOIDCIssuerInstance(issuerHost);
     if (clientId != null && oidcIssuer != null) {
       const oidcIssuerMetadata = oidcIssuer.metadata;
 
-      logger.debug('Discovered issuer %s %O', oidcIssuer.issuer, oidcIssuer.metadata);
+      logger.debug(
+        'Discovered issuer %s %O',
+        oidcIssuer.issuer,
+        oidcIssuer.metadata,
+      );
 
-      const authorizationEndpoint = configManager.getConfig('security:passport-oidc:authorizationEndpoint');
+      const authorizationEndpoint = configManager.getConfig(
+        'security:passport-oidc:authorizationEndpoint',
+      );
       if (authorizationEndpoint) {
         oidcIssuerMetadata.authorization_endpoint = authorizationEndpoint;
       }
-      const tokenEndpoint = configManager.getConfig('security:passport-oidc:tokenEndpoint');
+      const tokenEndpoint = configManager.getConfig(
+        'security:passport-oidc:tokenEndpoint',
+      );
       if (tokenEndpoint) {
         oidcIssuerMetadata.token_endpoint = tokenEndpoint;
       }
-      const revocationEndpoint = configManager.getConfig('security:passport-oidc:revocationEndpoint');
+      const revocationEndpoint = configManager.getConfig(
+        'security:passport-oidc:revocationEndpoint',
+      );
       if (revocationEndpoint) {
         oidcIssuerMetadata.revocation_endpoint = revocationEndpoint;
       }
-      const introspectionEndpoint = configManager.getConfig('security:passport-oidc:introspectionEndpoint');
+      const introspectionEndpoint = configManager.getConfig(
+        'security:passport-oidc:introspectionEndpoint',
+      );
       if (introspectionEndpoint) {
         oidcIssuerMetadata.introspection_endpoint = introspectionEndpoint;
       }
-      const userInfoEndpoint = configManager.getConfig('security:passport-oidc:userInfoEndpoint');
+      const userInfoEndpoint = configManager.getConfig(
+        'security:passport-oidc:userInfoEndpoint',
+      );
       if (userInfoEndpoint) {
         oidcIssuerMetadata.userinfo_endpoint = userInfoEndpoint;
       }
-      const endSessionEndpoint = configManager.getConfig('security:passport-oidc:endSessionEndpoint');
+      const endSessionEndpoint = configManager.getConfig(
+        'security:passport-oidc:endSessionEndpoint',
+      );
       if (endSessionEndpoint) {
         oidcIssuerMetadata.end_session_endpoint = endSessionEndpoint;
       }
-      const registrationEndpoint = configManager.getConfig('security:passport-oidc:registrationEndpoint');
+      const registrationEndpoint = configManager.getConfig(
+        'security:passport-oidc:registrationEndpoint',
+      );
       if (registrationEndpoint) {
         oidcIssuerMetadata.registration_endpoint = registrationEndpoint;
       }
@@ -611,7 +724,11 @@ class PassportService implements S2sMessageHandlable {
 
       const newOidcIssuer = new OIDCIssuer(oidcIssuerMetadata);
 
-      logger.debug('Configured issuer %s %O', newOidcIssuer.issuer, newOidcIssuer.metadata);
+      logger.debug(
+        'Configured issuer %s %O',
+        newOidcIssuer.issuer,
+        newOidcIssuer.metadata,
+      );
 
       const client = new newOidcIssuer.Client({
         client_id: clientId,
@@ -621,26 +738,30 @@ class PassportService implements S2sMessageHandlable {
       });
       // prevent error AssertionError [ERR_ASSERTION]: id_token issued in the future
       // Doc: https://github.com/panva/node-openid-client/tree/v2.x#allow-for-system-clock-skew
-      const OIDC_CLIENT_CLOCK_TOLERANCE = await configManager.getConfig('security:passport-oidc:oidcClientClockTolerance');
+      const OIDC_CLIENT_CLOCK_TOLERANCE = await configManager.getConfig(
+        'security:passport-oidc:oidcClientClockTolerance',
+      );
       client[custom.clock_tolerance] = OIDC_CLIENT_CLOCK_TOLERANCE;
-      passport.use('oidc', new OidcStrategy(
-        {
-          client,
-          params: { scope: 'openid email profile' },
-        },
-        (tokenset, userinfo, done) => {
-          if (userinfo) {
-            return done(null, userinfo);
-          }
+      passport.use(
+        'oidc',
+        new OidcStrategy(
+          {
+            client,
+            params: { scope: 'openid email profile' },
+          },
+          (tokenset, userinfo, done) => {
+            if (userinfo) {
+              return done(null, userinfo);
+            }
 
-          return done(null, false);
-        },
-      ));
+            return done(null, false);
+          },
+        ),
+      );
 
       this.isOidcStrategySetup = true;
       logger.debug('OidcStrategy: setup is done');
     }
-
   }
 
   /**
@@ -663,7 +784,7 @@ class PassportService implements S2sMessageHandlable {
    * @param issuerHost string
    * @returns string URL/.well-known/openid-configuration
    */
-  getOIDCMetadataURL(issuerHost: string) : string {
+  getOIDCMetadataURL(issuerHost: string): string {
     const protocol = 'https://';
     const pattern = /^https?:\/\//i;
     const metadataPath = '/.well-known/openid-configuration';
@@ -672,20 +793,22 @@ class PassportService implements S2sMessageHandlable {
       return issuerHost;
     }
     // Set protocol if not available on url
-    const absUrl = !pattern.test(issuerHost) ? `${protocol}${issuerHost}` : issuerHost;
+    const absUrl = !pattern.test(issuerHost)
+      ? `${protocol}${issuerHost}`
+      : issuerHost;
     const url = new URL(absUrl).href;
     // Remove trailing slash if exists
     return `${url.replace(/\/+$/, '')}${metadataPath}`;
   }
 
   /**
- *
- * Check and initialize connection to OIDC issuer host
- * Prevent request timeout error on app init
- *
- * @param issuerHost string
- * @returns boolean
- */
+   *
+   * Check and initialize connection to OIDC issuer host
+   * Prevent request timeout error on app init
+   *
+   * @param issuerHost string
+   * @returns boolean
+   */
   async isOidcHostReachable(issuerHost: string): Promise<boolean | undefined> {
     try {
       const metadataUrl = this.getOIDCMetadataURL(issuerHost);
@@ -700,8 +823,7 @@ class PassportService implements S2sMessageHandlable {
         return false;
       }
       return true;
-    }
-    catch (err) {
+    } catch (err) {
       logger.error('OidcStrategy: issuer host unreachable:', err.code);
     }
   }
@@ -713,11 +835,20 @@ class PassportService implements S2sMessageHandlable {
    * @param issuerHost string
    * @returns instance of OIDCIssuer
    */
-  async getOIDCIssuerInstance(issuerHost: string | undefined): Promise<void | OIDCIssuer> {
-    const OIDC_TIMEOUT_MULTIPLIER = configManager.getConfig('security:passport-oidc:timeoutMultiplier');
-    const OIDC_DISCOVERY_RETRIES = configManager.getConfig('security:passport-oidc:discoveryRetries');
-    const OIDC_ISSUER_TIMEOUT_OPTION = configManager.getConfig('security:passport-oidc:oidcIssuerTimeoutOption');
-    const oidcIssuerHostReady = issuerHost != null && this.isOidcHostReachable(issuerHost);
+  async getOIDCIssuerInstance(
+    issuerHost: string | undefined,
+  ): Promise<void | OIDCIssuer> {
+    const OIDC_TIMEOUT_MULTIPLIER = configManager.getConfig(
+      'security:passport-oidc:timeoutMultiplier',
+    );
+    const OIDC_DISCOVERY_RETRIES = configManager.getConfig(
+      'security:passport-oidc:discoveryRetries',
+    );
+    const OIDC_ISSUER_TIMEOUT_OPTION = configManager.getConfig(
+      'security:passport-oidc:oidcIssuerTimeoutOption',
+    );
+    const oidcIssuerHostReady =
+      issuerHost != null && this.isOidcHostReachable(issuerHost);
 
     if (!oidcIssuerHostReady) {
       logger.error('OidcStrategy: setup failed');
@@ -725,33 +856,39 @@ class PassportService implements S2sMessageHandlable {
     }
 
     const metadataURL = this.getOIDCMetadataURL(issuerHost);
-    const oidcIssuer = await pRetry(async() => {
-      return OIDCIssuer.discover(metadataURL);
-    }, {
-      onFailedAttempt: (error) => {
-        // get current OIDCIssuer timeout options
-        OIDCIssuer[custom.http_options] = (url, options) => {
-          const timeout = options.timeout
-            ? options.timeout * OIDC_TIMEOUT_MULTIPLIER
-            : OIDC_ISSUER_TIMEOUT_OPTION * OIDC_TIMEOUT_MULTIPLIER;
-          custom.setHttpOptionsDefaults({ timeout });
-          return { timeout };
-        };
-
-        logger.debug(`OidcStrategy: setup attempt ${error.attemptNumber} failed with error: ${error}. Retrying ...`);
+    const oidcIssuer = await pRetry(
+      async () => {
+        return OIDCIssuer.discover(metadataURL);
       },
-      retries: OIDC_DISCOVERY_RETRIES,
-    }).catch((error) => {
+      {
+        onFailedAttempt: (error) => {
+          // get current OIDCIssuer timeout options
+          OIDCIssuer[custom.http_options] = (url, options) => {
+            const timeout = options.timeout
+              ? options.timeout * OIDC_TIMEOUT_MULTIPLIER
+              : OIDC_ISSUER_TIMEOUT_OPTION * OIDC_TIMEOUT_MULTIPLIER;
+            custom.setHttpOptionsDefaults({ timeout });
+            return { timeout };
+          };
+
+          logger.debug(
+            `OidcStrategy: setup attempt ${error.attemptNumber} failed with error: ${error}. Retrying ...`,
+          );
+        },
+        retries: OIDC_DISCOVERY_RETRIES,
+      },
+    ).catch((error) => {
       logger.error(`OidcStrategy: setup failed with error: ${error} `);
     });
     return oidcIssuer;
   }
 
   setupSamlStrategy(): void {
-
     this.resetSamlStrategy();
 
-    const isSamlEnabled = configManager.getConfig('security:passport-saml:isEnabled');
+    const isSamlEnabled = configManager.getConfig(
+      'security:passport-saml:isEnabled',
+    );
 
     // when disabled
     if (!isSamlEnabled) {
@@ -769,10 +906,16 @@ class PassportService implements S2sMessageHandlable {
     passport.use(
       new SamlStrategy(
         {
-          entryPoint: configManager.getConfig('security:passport-saml:entryPoint'),
-          callbackUrl: configManager.getConfig('app:siteUrl') != null
-            ? urljoin(growiInfoService.getSiteUrl(), '/passport/saml/callback') // auto-generated with v3.2.4 and above
-            : configManager.getConfig('security:passport-saml:callbackUrl'), // DEPRECATED: backward compatible with v3.2.3 and below
+          entryPoint: configManager.getConfig(
+            'security:passport-saml:entryPoint',
+          ),
+          callbackUrl:
+            configManager.getConfig('app:siteUrl') != null
+              ? urljoin(
+                  growiInfoService.getSiteUrl(),
+                  '/passport/saml/callback',
+                ) // auto-generated with v3.2.4 and above
+              : configManager.getConfig('security:passport-saml:callbackUrl'), // DEPRECATED: backward compatible with v3.2.3 and below
           issuer: configManager.getConfig('security:passport-saml:issuer'),
           cert,
           disableRequestedAuthnContext: true,
@@ -841,7 +984,9 @@ class PassportService implements S2sMessageHandlable {
     logger.debug({ 'Parsed Rule': JSON.stringify(luceneRule, null, 2) });
 
     const attributes = this.extractAttributesFromSAMLResponse(response);
-    logger.debug({ 'Extracted Attributes': JSON.stringify(attributes, null, 2) });
+    logger.debug({
+      'Extracted Attributes': JSON.stringify(attributes, null, 2),
+    });
 
     return this.evaluateRuleForSamlAttributes(attributes, luceneRule);
   }
@@ -858,7 +1003,12 @@ class PassportService implements S2sMessageHandlable {
 
     // when combined rules
     if (right != null) {
-      return this.evaluateCombinedRulesForSamlAttributes(attributes, left, right, operator);
+      return this.evaluateCombinedRulesForSamlAttributes(
+        attributes,
+        left,
+        right,
+        operator,
+      );
     }
     if (left != null) {
       return this.evaluateRuleForSamlAttributes(attributes, left);
@@ -891,15 +1041,29 @@ class PassportService implements S2sMessageHandlable {
    * @param {string} luceneOperator operator string expression
    * @see https://github.com/thoward/lucene-query-parser.js/wiki
    */
-  evaluateCombinedRulesForSamlAttributes(attributes, luceneRuleLeft, luceneRuleRight, luceneOperator) {
+  evaluateCombinedRulesForSamlAttributes(
+    attributes,
+    luceneRuleLeft,
+    luceneRuleRight,
+    luceneOperator,
+  ) {
     if (luceneOperator === 'OR') {
-      return this.evaluateRuleForSamlAttributes(attributes, luceneRuleLeft) || this.evaluateRuleForSamlAttributes(attributes, luceneRuleRight);
+      return (
+        this.evaluateRuleForSamlAttributes(attributes, luceneRuleLeft) ||
+        this.evaluateRuleForSamlAttributes(attributes, luceneRuleRight)
+      );
     }
     if (luceneOperator === 'AND') {
-      return this.evaluateRuleForSamlAttributes(attributes, luceneRuleLeft) && this.evaluateRuleForSamlAttributes(attributes, luceneRuleRight);
+      return (
+        this.evaluateRuleForSamlAttributes(attributes, luceneRuleLeft) &&
+        this.evaluateRuleForSamlAttributes(attributes, luceneRuleRight)
+      );
     }
     if (luceneOperator === 'NOT') {
-      return this.evaluateRuleForSamlAttributes(attributes, luceneRuleLeft) && !this.evaluateRuleForSamlAttributes(attributes, luceneRuleRight);
+      return (
+        this.evaluateRuleForSamlAttributes(attributes, luceneRuleLeft) &&
+        !this.evaluateRuleForSamlAttributes(attributes, luceneRuleRight)
+      );
     }
 
     throw new Error(`Unsupported operator: ${luceneOperator}`);
@@ -917,7 +1081,8 @@ class PassportService implements S2sMessageHandlable {
    * }
    */
   extractAttributesFromSAMLResponse(response) {
-    const attributeStatement = response.getAssertion().Assertion.AttributeStatement;
+    const attributeStatement =
+      response.getAssertion().Assertion.AttributeStatement;
     if (attributeStatement == null || attributeStatement[0] == null) {
       return {};
     }
@@ -930,11 +1095,10 @@ class PassportService implements S2sMessageHandlable {
     const result = {};
     for (const attribute of attributes) {
       const name = attribute.$.Name;
-      const attributeValues = attribute.AttributeValue.map(v => v._);
+      const attributeValues = attribute.AttributeValue.map((v) => v._);
       if (result[name] == null) {
         result[name] = attributeValues;
-      }
-      else {
+      } else {
         result[name] = result[name].concat(attributeValues);
       }
     }
@@ -961,7 +1125,7 @@ class PassportService implements S2sMessageHandlable {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       done(null, (user as any).id);
     });
-    passport.deserializeUser(async(id, done) => {
+    passport.deserializeUser(async (id, done) => {
       try {
         const user = await User.findById(id);
         if (user == null) {
@@ -972,8 +1136,7 @@ class PassportService implements S2sMessageHandlable {
           await user.save();
         }
         done(null, user);
-      }
-      catch (err) {
+      } catch (err) {
         done(err);
       }
     });
@@ -981,12 +1144,20 @@ class PassportService implements S2sMessageHandlable {
     this.isSerializerSetup = true;
   }
 
-  isSameUsernameTreatedAsIdenticalUser(providerType: IExternalAuthProviderType): boolean {
-    return configManager.getConfig(`security:passport-${providerType}:isSameUsernameTreatedAsIdenticalUser`);
+  isSameUsernameTreatedAsIdenticalUser(
+    providerType: IExternalAuthProviderType,
+  ): boolean {
+    return configManager.getConfig(
+      `security:passport-${providerType}:isSameUsernameTreatedAsIdenticalUser`,
+    );
   }
 
-  isSameEmailTreatedAsIdenticalUser(providerType: Exclude<IExternalAuthProviderType, 'ldap'>): boolean {
-    return configManager.getConfig(`security:passport-${providerType}:isSameEmailTreatedAsIdenticalUser`);
+  isSameEmailTreatedAsIdenticalUser(
+    providerType: Exclude<IExternalAuthProviderType, 'ldap'>,
+  ): boolean {
+    return configManager.getConfig(
+      `security:passport-${providerType}:isSameEmailTreatedAsIdenticalUser`,
+    );
   }
 
   literalUnescape(string: string) {
@@ -1000,7 +1171,6 @@ class PassportService implements S2sMessageHandlable {
       .replace(/\\n/g, '\n')
       .replace(/\\r/g, '\r');
   }
-
 }
 
 export default PassportService;
