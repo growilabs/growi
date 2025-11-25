@@ -62,20 +62,6 @@ export default class AdminGitHubSecurityContainer extends Container {
   }
 
   /**
-   * Change githubClientId
-   */
-  changeGitHubClientId(value) {
-    this.setState({ githubClientId: value });
-  }
-
-  /**
-   * Change githubClientSecret
-   */
-  changeGitHubClientSecret(value) {
-    this.setState({ githubClientSecret: value });
-  }
-
-  /**
    * Switch isSameUsernameTreatedAsIdenticalUser
    */
   switchIsSameUsernameTreatedAsIdenticalUser() {
@@ -85,10 +71,16 @@ export default class AdminGitHubSecurityContainer extends Container {
   /**
    * Update githubSetting
    */
-  async updateGitHubSetting() {
-    const { githubClientId, githubClientSecret, isSameUsernameTreatedAsIdenticalUser } = this.state;
-
-    let requestParams = { githubClientId, githubClientSecret, isSameUsernameTreatedAsIdenticalUser };
+  async updateGitHubSetting(formData) {
+    let requestParams = formData != null ? {
+      githubClientId: formData.githubClientId,
+      githubClientSecret: formData.githubClientSecret,
+      isSameUsernameTreatedAsIdenticalUser: formData.isSameUsernameTreatedAsIdenticalUser,
+    } : {
+      githubClientId: this.state.githubClientId,
+      githubClientSecret: this.state.githubClientSecret,
+      isSameUsernameTreatedAsIdenticalUser: this.state.isSameUsernameTreatedAsIdenticalUser,
+    };
 
     requestParams = await removeNullPropertyFromObject(requestParams);
     const response = await apiv3Put('/security-setting/github-oauth', requestParams);

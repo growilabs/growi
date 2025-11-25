@@ -68,23 +68,26 @@ const OidcSecurityManagementContents = (props: Props) => {
 
   const onSubmit = useCallback(async(data) => {
     try {
-      await adminOidcSecurityContainer.changeOidcProviderName(data.oidcProviderName);
-      await adminOidcSecurityContainer.changeOidcIssuerHost(data.oidcIssuerHost);
-      await adminOidcSecurityContainer.changeOidcClientId(data.oidcClientId);
-      await adminOidcSecurityContainer.changeOidcClientSecret(data.oidcClientSecret);
-      await adminOidcSecurityContainer.changeOidcAuthorizationEndpoint(data.oidcAuthorizationEndpoint);
-      await adminOidcSecurityContainer.changeOidcTokenEndpoint(data.oidcTokenEndpoint);
-      await adminOidcSecurityContainer.changeOidcRevocationEndpoint(data.oidcRevocationEndpoint);
-      await adminOidcSecurityContainer.changeOidcIntrospectionEndpoint(data.oidcIntrospectionEndpoint);
-      await adminOidcSecurityContainer.changeOidcUserInfoEndpoint(data.oidcUserInfoEndpoint);
-      await adminOidcSecurityContainer.changeOidcEndSessionEndpoint(data.oidcEndSessionEndpoint);
-      await adminOidcSecurityContainer.changeOidcRegistrationEndpoint(data.oidcRegistrationEndpoint);
-      await adminOidcSecurityContainer.changeOidcJWKSUri(data.oidcJWKSUri);
-      await adminOidcSecurityContainer.changeOidcAttrMapId(data.oidcAttrMapId);
-      await adminOidcSecurityContainer.changeOidcAttrMapUserName(data.oidcAttrMapUserName);
-      await adminOidcSecurityContainer.changeOidcAttrMapName(data.oidcAttrMapName);
-      await adminOidcSecurityContainer.changeOidcAttrMapEmail(data.oidcAttrMapEmail);
-      await adminOidcSecurityContainer.updateOidcSetting();
+      await adminOidcSecurityContainer.updateOidcSetting({
+        oidcProviderName: data.oidcProviderName,
+        oidcIssuerHost: data.oidcIssuerHost,
+        oidcClientId: data.oidcClientId,
+        oidcClientSecret: data.oidcClientSecret,
+        oidcAuthorizationEndpoint: data.oidcAuthorizationEndpoint,
+        oidcTokenEndpoint: data.oidcTokenEndpoint,
+        oidcRevocationEndpoint: data.oidcRevocationEndpoint,
+        oidcIntrospectionEndpoint: data.oidcIntrospectionEndpoint,
+        oidcUserInfoEndpoint: data.oidcUserInfoEndpoint,
+        oidcEndSessionEndpoint: data.oidcEndSessionEndpoint,
+        oidcRegistrationEndpoint: data.oidcRegistrationEndpoint,
+        oidcJWKSUri: data.oidcJWKSUri,
+        oidcAttrMapId: data.oidcAttrMapId,
+        oidcAttrMapUserName: data.oidcAttrMapUserName,
+        oidcAttrMapName: data.oidcAttrMapName,
+        oidcAttrMapEmail: data.oidcAttrMapEmail,
+        isSameUsernameTreatedAsIdenticalUser: adminOidcSecurityContainer.state.isSameUsernameTreatedAsIdenticalUser,
+        isSameEmailTreatedAsIdenticalUser: adminOidcSecurityContainer.state.isSameEmailTreatedAsIdenticalUser,
+      });
       await adminGeneralSecurityContainer.retrieveSetupStratedies();
       toastSuccess(t('security_settings.OAuth.OIDC.updated_oidc'));
     }

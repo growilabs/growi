@@ -239,9 +239,22 @@ export default class AdminGeneralSecurityContainer extends Container {
    * @memberOf AdminGeneralSecuritySContainer
    * @return {string} Appearance
    */
-  async updateGeneralSecuritySetting() {
+  async updateGeneralSecuritySetting(formData) {
 
-    let requestParams = {
+    let requestParams = formData != null ? {
+      sessionMaxAge: formData.sessionMaxAge,
+      restrictGuestMode: formData.restrictGuestMode,
+      pageDeletionAuthority: formData.pageDeletionAuthority,
+      pageCompleteDeletionAuthority: formData.pageCompleteDeletionAuthority,
+      pageRecursiveDeletionAuthority: formData.pageRecursiveDeletionAuthority,
+      pageRecursiveCompleteDeletionAuthority: formData.pageRecursiveCompleteDeletionAuthority,
+      isAllGroupMembershipRequiredForPageCompleteDeletion: formData.isAllGroupMembershipRequiredForPageCompleteDeletion,
+      hideRestrictedByGroup: formData.hideRestrictedByGroup,
+      hideRestrictedByOwner: formData.hideRestrictedByOwner,
+      isUsersHomepageDeletionEnabled: formData.isUsersHomepageDeletionEnabled,
+      isForceDeleteUserHomepageOnUserDeletion: formData.isForceDeleteUserHomepageOnUserDeletion,
+      isRomUserAllowedToComment: formData.isRomUserAllowedToComment,
+    } : {
       sessionMaxAge: this.state.sessionMaxAge,
       restrictGuestMode: this.state.currentRestrictGuestMode,
       pageDeletionAuthority: this.state.currentPageDeletionAuthority,
