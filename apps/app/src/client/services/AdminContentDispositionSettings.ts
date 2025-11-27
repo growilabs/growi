@@ -6,7 +6,7 @@ import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
 
 import { apiv3Get, apiv3Put } from '../util/apiv3-client';
 
-interface ContentDispositionSettings {
+export interface ContentDispositionSettings {
   inlineMimeTypes: string[];
   attachmentMimeTypes: string[];
 }
@@ -48,59 +48,53 @@ export const useSWRMUTxContentDispositionSettings = (): SWRMutationResponse<
   );
 };
 
+// --- REFACTORED HOOK ---
 export const useContentDisposition = (): {
   currentSettings: ContentDispositionSettings | undefined;
-  setInline: (mimeType: string) => Promise<void>;
-  setAttachment: (mimeType: string) => Promise<void>;
+  isLoading: boolean;
+  isUpdating: boolean;
+  updateSettings: (newSettings: ContentDispositionSettings) => Promise<ContentDispositionSettings>;
 } => {
-  const { data, mutate } = useSWRxContentDispositionSettings();
-  const { trigger } = useSWRMUTxContentDispositionSettings();
+  const {
+    data, isLoading, mutate, error,
+  } = useSWRxContentDispositionSettings();
+  const { trigger, isMutating } = useSWRMUTxContentDispositionSettings();
 
   const inlineMimeTypesStr = data?.inlineMimeTypes?.join(',');
   const attachmentMimeTypesStr = data?.attachmentMimeTypes?.join(',');
+
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally using array contents instead of data object reference
   const memoizedData = useMemo(() => data, [inlineMimeTypesStr, attachmentMimeTypesStr]);
   const currentSettings = memoizedData;
 
-  const setInline = useCallback(async(mimeType: string): Promise<void> => {
-    if (!memoizedData) return;
+  // New unified update function
+  const updateSettings = useCallback(async(newSettings: ContentDispositionSettings): Promise<ContentDispositionSettings> => {
 
-    const newInlineMimeTypes = [...memoizedData.inlineMimeTypes];
-    const newAttachmentMimeTypes = memoizedData.attachmentMimeTypes.filter(m => m !== mimeType);
+    // Create the request object matching the backend API
+    const request: ContentDispositionUpdateRequest = {
+      newInlineMimeTypes: newSettings.inlineMimeTypes,
+      newAttachmentMimeTypes: newSettings.attachmentMimeTypes,
+    };
 
-    if (!newInlineMimeTypes.includes(mimeType)) {
-      newInlineMimeTypes.push(mimeType);
-    }
+    // 1. Trigger the mutation
+    const updatedData = await trigger(request);
 
-    await trigger({
-      newInlineMimeTypes,
-      newAttachmentMimeTypes,
-    });
+    // 2. Optimistically update SWR cache with the response from the server,
+    //    or simply re-validate by calling mutate(). Since 'trigger' returns the
+    //    new data, we can use that to update the local cache immediately.
+    //    We don't need to await the full re-fetch from the network.
+    mutate(updatedData, { revalidate: true });
 
-    mutate();
-  }, [memoizedData, trigger, mutate]);
+    return updatedData;
+  }, [trigger, mutate]);
 
-  const setAttachment = useCallback(async(mimeType: string): Promise<void> => {
-    if (!memoizedData) return;
-
-    const newInlineMimeTypes = memoizedData.inlineMimeTypes.filter(m => m !== mimeType);
-    const newAttachmentMimeTypes = [...memoizedData.attachmentMimeTypes];
-
-    if (!newAttachmentMimeTypes.includes(mimeType)) {
-      newAttachmentMimeTypes.push(mimeType);
-    }
-
-    await trigger({
-      newInlineMimeTypes,
-      newAttachmentMimeTypes,
-    });
-
-    mutate();
-  }, [memoizedData, trigger, mutate]);
 
   return {
     currentSettings,
-    setInline,
-    setAttachment,
+    isLoading,
+    isUpdating: isMutating,
+    updateSettings,
+    // Note: If you need a function to force a fresh data fetch (for a hard "Reset"),
+    // you can expose `mutate` from useSWRxContentDispositionSettings() as `fetchSettings`
   };
 };

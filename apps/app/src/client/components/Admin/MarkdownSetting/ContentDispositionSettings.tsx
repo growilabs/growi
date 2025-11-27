@@ -1,136 +1,238 @@
-import React, { useState, useCallback } from 'react';
+import React, {
+  useState, useCallback, useEffect, useMemo,
+} from 'react';
 
-import { useContentDisposition } from '../../../services/AdminContentDispositionSettings';
-
+// Use the refactored hook and its exported type
+import { useContentDisposition, type ContentDispositionSettings } from '../../../services/AdminContentDispositionSettings';
 
 /**
  * Helper function to ensure the mime type is normalized / clean before use.
  */
 const normalizeMimeType = (mimeType: string): string => mimeType.trim().toLowerCase();
 
-// REMINDER: Change so it sets the settings using an "Update" button, like the other settings do.
-// Add remove button and reset button.
-// Fix error handling, currently just logging.
-// Make sure that the component is in the correct place (markdown settings?).
+// Helper to remove a mimeType from an array
+const removeMimeTypeFromArray = (array: string[], mimeType: string): string[] => (
+  array.filter(m => m !== mimeType)
+);
 
 const ContentDispositionSettings: React.FC = () => {
 
+  // 1. Updated destructuring from the refactored hook
   const {
     currentSettings,
-    setInline,
-    setAttachment,
+    isLoading,
+    isUpdating,
+    updateSettings,
   } = useContentDisposition();
 
-
+  // 2. State for pending changes and input
+  const [pendingSettings, setPendingSettings] = useState<ContentDispositionSettings | null>(null);
   const [currentInput, setCurrentInput] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
 
-
-  const handleSetInline = useCallback(async(): Promise<void> => {
-    const mimeType = normalizeMimeType(currentInput);
-    if (mimeType) {
-      try {
-        await setInline(mimeType);
-        setCurrentInput('');
-      }
-      catch (err) {
-        console.error('Failed to set inline disposition:', err);
-      }
+  useEffect(() => {
+    if (currentSettings) {
+      // Deep copy to prevent mutating the original settings object
+      setPendingSettings({
+        inlineMimeTypes: [...currentSettings.inlineMimeTypes],
+        attachmentMimeTypes: [...currentSettings.attachmentMimeTypes],
+      });
+      setError(null);
     }
-  }, [currentInput, setInline]);
+  }, [currentSettings]);
+
+  // Use the pending settings for display, falling back to an empty object if not loaded yet
+  const displaySettings = pendingSettings ?? { inlineMimeTypes: [], attachmentMimeTypes: [] };
+
+  // Calculate if there are differences between saved and pending state
+  const hasPendingChanges = useMemo(() => {
+    if (!currentSettings || !pendingSettings) return false;
+    // Check if the mime type lists have changed
+    return JSON.stringify(currentSettings.inlineMimeTypes.sort()) !== JSON.stringify(pendingSettings.inlineMimeTypes.sort())
+           || JSON.stringify(currentSettings.attachmentMimeTypes.sort()) !== JSON.stringify(pendingSettings.attachmentMimeTypes.sort());
+  }, [currentSettings, pendingSettings]);
 
 
-  const handleSetAttachment = useCallback(async(): Promise<void> => {
+  // 3. Handlers for setting (adding to pending state)
+  const handleSetMimeType = useCallback((disposition: 'inline' | 'attachment') => {
     const mimeType = normalizeMimeType(currentInput);
-    if (mimeType) {
-      try {
-        await setAttachment(mimeType);
-        setCurrentInput('');
+    if (!mimeType) return;
+
+    setError(null);
+    setPendingSettings((prev) => {
+      if (!prev) return null;
+
+      const newSettings = { ...prev };
+      const otherDisposition = disposition === 'inline' ? 'attachment' : 'inline';
+
+      // 1. Add to the target list (if not already present)
+      const targetKey = `${disposition}MimeTypes` as keyof ContentDispositionSettings;
+      if (!newSettings[targetKey].includes(mimeType)) {
+        newSettings[targetKey] = [...newSettings[targetKey], mimeType];
       }
-      catch (err) {
-        console.error('Failed to set attachment disposition:', err);
-      }
+
+      // 2. Remove from the other list
+      const otherKey = `${otherDisposition}MimeTypes` as keyof ContentDispositionSettings;
+      newSettings[otherKey] = removeMimeTypeFromArray(newSettings[otherKey], mimeType);
+
+      return newSettings;
+    });
+    setCurrentInput('');
+  }, [currentInput]);
+
+  const handleSetInline = useCallback(() => handleSetMimeType('inline'), [handleSetMimeType]);
+  const handleSetAttachment = useCallback(() => handleSetMimeType('attachment'), [handleSetMimeType]);
+
+  // Handler for removing from pending state
+  const handleRemove = useCallback((mimeType: string, disposition: 'inline' | 'attachment') => {
+    setError(null);
+    setPendingSettings((prev) => {
+      if (!prev) return null;
+      const key = `${disposition}MimeTypes` as keyof ContentDispositionSettings;
+      return {
+        ...prev,
+        [key]: removeMimeTypeFromArray(prev[key], mimeType),
+      };
+    });
+  }, []);
+
+  // Handler for resetting to the last saved settings
+  const handleReset = useCallback(() => {
+    setError(null);
+    if (currentSettings) {
+      // Revert pending changes to the last fetched/saved state
+      setPendingSettings({
+        inlineMimeTypes: [...currentSettings.inlineMimeTypes],
+        attachmentMimeTypes: [...currentSettings.attachmentMimeTypes],
+      });
     }
-  }, [currentInput, setAttachment]);
+  }, [currentSettings]);
 
-  const inlineMimeTypes = currentSettings?.inlineMimeTypes ?? [];
-  const attachmentMimeTypes = currentSettings?.attachmentMimeTypes ?? [];
-  const renderInlineMimeTypes = inlineMimeTypes || [];
-  const renderAttachmentMimeTypes = attachmentMimeTypes || [];
 
+  // 4. Handler for updating (saving to server)
+  const handleUpdate = useCallback(async(): Promise<void> => {
+    if (!pendingSettings || !hasPendingChanges || isUpdating) return;
+
+    setError(null);
+    try {
+      await updateSettings(pendingSettings);
+    }
+    catch (err) {
+      const errorMessage = (err instanceof Error) ? err.message : 'An unknown error occurred during update.';
+      setError(`Failed to update settings: ${errorMessage}`);
+      console.error('Failed to update settings:', err);
+    }
+  }, [pendingSettings, hasPendingChanges, isUpdating, updateSettings]);
+
+  if (isLoading && !currentSettings) {
+    return <div>Loading content disposition settings...</div>;
+  }
+
+  const renderInlineMimeTypes = displaySettings.inlineMimeTypes;
+  const renderAttachmentMimeTypes = displaySettings.attachmentMimeTypes;
+
+  // 5. Render logic
   return (
-    <div style={{
-      padding: '20px', border: '1px solid #ccc', borderRadius: '5px', maxWidth: '800px', margin: 'auto',
-    }}
-    >
+    <div>
       <h2>Content-Disposition Mime Type Settings ⚙️</h2>
 
-      <div style={{ marginBottom: '20px' }}>
+      {/* Input and Add Buttons */}
+      <div>
         <input
           type="text"
           value={currentInput}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCurrentInput(e.target.value)}
           placeholder="e.g., image/png"
-          style={{
-            padding: '10px', marginRight: '10px', width: '250px', border: '1px solid #ddd',
-          }}
         />
         <button
           type="button"
           onClick={handleSetInline}
-          style={{
-            marginRight: '5px', background: '#4CAF50', color: 'white', border: 'none', padding: '10px 18px', cursor: 'pointer',
-          }}
+          disabled={!currentInput.trim() || isUpdating}
         >
-          Set Inline
+          Add Inline
         </button>
         <button
           type="button"
           onClick={handleSetAttachment}
-          style={{
-            background: '#008CBA', color: 'white', border: 'none', padding: '10px 18px', cursor: 'pointer',
-          }}
+          disabled={!currentInput.trim() || isUpdating}
         >
-          Set Attachment
+          Add Attachment
         </button>
       </div>
 
       <p style={{ fontSize: '12px', color: '#666' }}>
-        Note: Setting a mime type will **automatically remove it** from the other list via the container logic.
+        Note: Adding a mime type will **automatically remove it** from the other list if it exists there.
       </p>
 
-      <hr style={{ margin: '20px 0' }} />
+      {/* Error Display */}
+      {error && (
+        <div>
+          **Error:** {error}
+        </div>
+      )}
+
+      {/* Update and Reset Buttons */}
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+        <button
+          type="button"
+          onClick={handleUpdate}
+          disabled={!hasPendingChanges || isUpdating}
+        >
+          {isUpdating ? 'Updating...' : 'Update Settings'}
+        </button>
+        <button
+          type="button"
+          onClick={handleReset}
+          disabled={!hasPendingChanges || isUpdating}
+        >
+          Reset Changes
+        </button>
+      </div>
+
+
+      <hr />
 
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
 
         {/* INLINE List */}
-        <div style={{ width: '48%' }}>
+        <div>
           <h3>Inline Mime Types (Viewable)</h3>
-          <ul style={{ listStyle: 'none', padding: 0 }}>
+          <ul>
+            {renderInlineMimeTypes.length === 0 && <li>No inline mime types set.</li>}
             {renderInlineMimeTypes.map((mimeType: string) => (
               <li
                 key={mimeType}
-                style={{
-                  background: '#e0ffe0', padding: '8px', margin: '5px 0', borderRadius: '3px', borderLeft: '3px solid #4CAF50',
-                }}
               >
                 {mimeType}
+                <button
+                  type="button"
+                  onClick={() => handleRemove(mimeType, 'inline')}
+                  disabled={isUpdating}
+                >
+                  Remove
+                </button>
               </li>
             ))}
           </ul>
         </div>
 
         {/* ATTACHMENT List */}
-        <div style={{ width: '48%' }}>
+        <div>
           <h3>Attachment Mime Types (Forces Download)</h3>
-          <ul style={{ listStyle: 'none', padding: 0 }}>
+          <ul>
+            {renderAttachmentMimeTypes.length === 0 && <li>No attachment mime types set.</li>}
             {renderAttachmentMimeTypes.map((mimeType: string) => (
               <li
                 key={mimeType}
-                style={{
-                  background: '#e0f7ff', padding: '8px', margin: '5px 0', borderRadius: '3px', borderLeft: '3px solid #008CBA',
-                }}
               >
                 {mimeType}
+                <button
+                  type="button"
+                  onClick={() => handleRemove(mimeType, 'attachment')}
+                  disabled={isUpdating}
+                >
+                  Remove
+                </button>
               </li>
             ))}
           </ul>
