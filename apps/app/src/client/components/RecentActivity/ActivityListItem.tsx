@@ -58,6 +58,35 @@ const calculateTimePassed = (date: Date, locale: Locale): string => {
   return timePassed;
 };
 
+type AllowPageDisplayPayload = {
+  grant: number | undefined,
+  status: string,
+  wip: boolean,
+  deletedAt?: Date,
+  path: string,
+}
+
+const pageAllowedForDisplay = (allowDisplayPayload: AllowPageDisplayPayload): boolean => {
+  const {
+    grant, status, wip, deletedAt,
+  } = allowDisplayPayload;
+  if (grant !== 1) return false;
+
+  if (status !== 'published') return false;
+
+  if (wip) return false;
+
+  if (deletedAt) return false;
+
+  return true;
+};
+
+const setPath = (path: string, allowed: boolean): string => {
+  if (allowed) return path;
+
+  return '';
+};
+
 
 export const ActivityListItem = ({ props }: { props: ActivityListItemProps }): JSX.Element => {
   const { t, i18n } = useTranslation();
@@ -65,7 +94,21 @@ export const ActivityListItem = ({ props }: { props: ActivityListItemProps }): J
   const dateFnsLocale = getLocale(currentLangCode);
 
   const { activity } = props;
-  const targetPagePath = activity.target.path;
+
+  const {
+    path, grant, status, wip, deletedAt,
+  } = activity.target;
+
+
+  const allowDisplayPayload: AllowPageDisplayPayload = {
+    grant,
+    status,
+    wip,
+    deletedAt,
+    path,
+  };
+
+  const isPageAllowed = pageAllowedForDisplay(allowDisplayPayload);
 
   const action = activity.action as SupportedActivityActionType;
   const keyToTranslate = translateAction(action);
@@ -81,11 +124,11 @@ export const ActivityListItem = ({ props }: { props: ActivityListItemProps }): J
         <div className="flex-grow-1 ms-2">
           <div className="activity-path-line mb-0">
             <a
-              href={targetPagePath}
+              href={setPath(path, isPageAllowed)}
               className="activity-target-link fw-bold text-wrap d-block"
             >
               <span>
-                {targetPagePath}
+                {setPath(path, isPageAllowed)}
               </span>
             </a>
           </div>
