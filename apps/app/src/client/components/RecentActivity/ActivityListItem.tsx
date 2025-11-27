@@ -41,6 +41,14 @@ type ActivityListItemProps = {
   activity: ActivityHasTargetPage,
 }
 
+type AllowPageDisplayPayload = {
+  grant: number | undefined,
+  status: string,
+  wip: boolean,
+  deletedAt?: Date,
+  path: string,
+}
+
 const translateAction = (action: SupportedActivityActionType): string => {
   return ActivityActionTranslationMap[action] || 'unknown_action';
 };
@@ -57,14 +65,6 @@ const calculateTimePassed = (date: Date, locale: Locale): string => {
 
   return timePassed;
 };
-
-type AllowPageDisplayPayload = {
-  grant: number | undefined,
-  status: string,
-  wip: boolean,
-  deletedAt?: Date,
-  path: string,
-}
 
 const pageAllowedForDisplay = (allowDisplayPayload: AllowPageDisplayPayload): boolean => {
   const {
