@@ -58,6 +58,7 @@ const getTranspilePackages = () => {
     'github-slugger',
     'html-url-attributes',
     'estree-util-is-identifier-name',
+    'superjson',
     ...listPrefixedPackages([
       'remark-',
       'rehype-',

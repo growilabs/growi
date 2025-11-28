@@ -1,8 +1,23 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.3.4...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.3.5...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.3.5](https://github.com/growilabs/compare/v7.3.4...v7.3.5) - 2025-11-10
+
+### 💎 Features
+
+* feat: Activity Log on the user page for viewing recent activity (#10487) @arvid-e
+
+### 🐛 Bug Fixes
+
+* fix: PDF-converter major/minor tags not updated on release (#10476) @arafubeatbox
+
+### 🧰 Maintenance
+
+* support: Configure biome for app/src/server/models dir (#10419) @arafubeatbox
+* support: Playwright tests biome migration (#10248) @arafubeatbox
 
 ## [v7.3.4](https://github.com/growilabs/compare/v7.3.3...v7.3.4) - 2025-11-04
 

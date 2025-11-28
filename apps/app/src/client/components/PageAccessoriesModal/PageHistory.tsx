@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { useCurrentPagePath, useCurrentPageId } from '~/stores/page';
+import { useCurrentPagePath, useCurrentPageId } from '~/states/page';
 import loggerFactory from '~/utils/logger';
 
 import { PageRevisionTable } from '../PageHistory/PageRevisionTable';
@@ -16,8 +16,8 @@ type PageHistoryProps = {
 export const PageHistory: React.FC<PageHistoryProps> = (props: PageHistoryProps) => {
   const { onClose } = props;
 
-  const { data: currentPageId } = useCurrentPageId();
-  const { data: currentPagePath } = useCurrentPagePath();
+  const currentPageId = useCurrentPageId();
+  const currentPagePath = useCurrentPagePath();
 
   const comparingRevisions = useAutoComparingRevisionsByQueryParam();
 

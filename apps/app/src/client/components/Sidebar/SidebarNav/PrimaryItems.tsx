@@ -1,14 +1,17 @@
 import { memo } from 'react';
 
+import { useAtomValue } from 'jotai';
 import dynamic from 'next/dynamic';
 
 import { SidebarContentsType } from '~/interfaces/ui';
-import { useIsAiEnabled, useIsGuestUser } from '~/stores-universal/context';
-import { useSidebarMode } from '~/stores/ui';
+import { useIsGuestUser } from '~/states/context';
+import { aiEnabledAtom } from '~/states/server-configurations';
+import { useSidebarMode } from '~/states/ui/sidebar';
 
 import { PrimaryItem } from './PrimaryItem';
 
 import styles from './PrimaryItems.module.scss';
+
 
 // Do not SSR Socket.io to make it work
 const PrimaryItemForNotification = dynamic(
@@ -22,9 +25,9 @@ type Props = {
 export const PrimaryItems = memo((props: Props) => {
   const { onItemHover } = props;
 
-  const { data: sidebarMode } = useSidebarMode();
-  const { data: isAiEnabled } = useIsAiEnabled();
-  const { data: isGuestUser } = useIsGuestUser();
+  const { sidebarMode } = useSidebarMode();
+  const isAiEnabled = useAtomValue(aiEnabledAtom);
+  const isGuestUser = useIsGuestUser();
 
   if (sidebarMode == null) {
     return <></>;

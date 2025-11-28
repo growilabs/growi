@@ -6,10 +6,10 @@ import { DevidedPagePath } from '@growi/core/dist/models';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import Sticky from 'react-stickynode';
 
+import { usePrintMode } from '~/client/services/use-print-mode';
 import LinkedPagePath from '~/models/linked-page-path';
-import {
-  usePageControlsX, useCurrentProductNavWidth, useSidebarMode,
-} from '~/stores/ui';
+import { usePageControlsX } from '~/states/ui/page';
+import { useSidebarMode, useCurrentProductNavWidth } from '~/states/ui/sidebar';
 
 import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink';
 import type { PagePathNavLayoutProps } from '../../../components/Common/PagePathNav';
@@ -27,9 +27,11 @@ const { isTrashPage } = pagePathUtils;
 export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element => {
   const { pagePath } = props;
 
-  const { data: pageControlsX } = usePageControlsX();
-  const { data: sidebarWidth } = useCurrentProductNavWidth();
-  const { data: sidebarMode } = useSidebarMode();
+  const isPrinting = usePrintMode();
+
+  const pageControlsX = usePageControlsX();
+  const [sidebarWidth] = useCurrentProductNavWidth();
+  const { sidebarMode } = useSidebarMode();
   const pagePathNavRef = useRef<HTMLDivElement>(null);
 
   const [navMaxWidth, setNavMaxWidth] = useState<number | undefined>();
@@ -82,7 +84,7 @@ export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element =>
     // Controlling pointer-events
     //  1. disable pointer-events with 'pe-none'
     <div ref={pagePathNavRef}>
-      <Sticky className={`${moduleClass} mb-4`} innerClass="pe-none" innerActiveClass="active mt-1">
+      <Sticky className={moduleClass} enabled={!isPrinting} innerClass="pe-none" innerActiveClass="active mt-1">
         {({ status }) => {
           const isParentsCollapsed = status === Sticky.STATUS_FIXED;
 

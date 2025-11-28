@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 
 import {
-  type IPageInfoAll, isIPageInfoForOperation,
+  type IPageInfoExt, isIPageInfoForOperation,
 } from '@growi/core/dist/interfaces';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
@@ -33,18 +33,18 @@ export type MenuItemType = typeof MenuItemType[keyof typeof MenuItemType];
 
 export type ForceHideMenuItems = MenuItemType[];
 
-export type AdditionalMenuItemsRendererProps = { pageInfo: IPageInfoAll };
+export type AdditionalMenuItemsRendererProps = { pageInfo: IPageInfoExt };
 
 type CommonProps = {
-  pageInfo?: IPageInfoAll,
+  pageInfo?: IPageInfoExt,
   isEnableActions?: boolean,
   isReadOnlyUser?: boolean,
   forceHideMenuItems?: ForceHideMenuItems,
 
   onClickBookmarkMenuItem?: (pageId: string, newValue?: boolean) => Promise<void>,
-  onClickRenameMenuItem?: (pageId: string, pageInfo: IPageInfoAll | undefined) => Promise<void> | void,
+  onClickRenameMenuItem?: (pageId: string, pageInfo: IPageInfoExt | undefined) => Promise<void> | void,
   onClickDuplicateMenuItem?: (pageId: string) => Promise<void> | void,
-  onClickDeleteMenuItem?: (pageId: string, pageInfo: IPageInfoAll | undefined) => Promise<void> | void,
+  onClickDeleteMenuItem?: (pageId: string, pageInfo: IPageInfoExt | undefined) => Promise<void> | void,
   onClickRevertMenuItem?: (pageId: string) => Promise<void> | void,
   onClickPathRecoveryMenuItem?: (pageId: string) => Promise<void> | void,
 
@@ -86,7 +86,7 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
     if (onClickRenameMenuItem == null) {
       return;
     }
-    if (!pageInfo?.isMovable) {
+    if (!isIPageInfoForOperation(pageInfo) || !pageInfo?.isMovable) {
       logger.warn('This page could not be renamed.');
       return;
     }
@@ -113,7 +113,7 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
     if (pageInfo == null || onClickDeleteMenuItem == null) {
       return;
     }
-    if (!pageInfo.isDeletable) {
+    if (!isIPageInfoForOperation(pageInfo) || !pageInfo?.isDeletable) {
       logger.warn('This page could not be deleted.');
       return;
     }
@@ -176,7 +176,8 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
         ) }
 
         {/* Move/Rename */}
-        { !forceHideMenuItems?.includes(MenuItemType.RENAME) && isEnableActions && !isReadOnlyUser && pageInfo.isMovable && (
+        { !forceHideMenuItems?.includes(MenuItemType.RENAME) && isEnableActions && !isReadOnlyUser
+          && isIPageInfoForOperation(pageInfo) && pageInfo.isMovable && (
           <DropdownItem
             onClick={renameItemClickedHandler}
             data-testid="rename-page-btn"
@@ -200,7 +201,8 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
         ) }
 
         {/* Revert */}
-        { !forceHideMenuItems?.includes(MenuItemType.REVERT) && isEnableActions && !isReadOnlyUser && pageInfo.isRevertible && (
+        { !forceHideMenuItems?.includes(MenuItemType.REVERT) && isEnableActions && !isReadOnlyUser
+          && isIPageInfoForOperation(pageInfo) && pageInfo.isRevertible && (
           <DropdownItem
             onClick={revertItemClickedHandler}
             className="grw-page-control-dropdown-item"
@@ -230,7 +232,8 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
 
         {/* divider */}
         {/* Delete */}
-        { !forceHideMenuItems?.includes(MenuItemType.DELETE) && isEnableActions && !isReadOnlyUser && pageInfo.isDeletable && (
+        { !forceHideMenuItems?.includes(MenuItemType.DELETE) && isEnableActions && !isReadOnlyUser
+          && isIPageInfoForOperation(pageInfo) && pageInfo.isDeletable && (
           <>
             { showDeviderBeforeDelete && <DropdownItem divider /> }
             <DropdownItem

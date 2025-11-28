@@ -5,7 +5,7 @@ import { useTranslation } from 'next-i18next';
 
 import AdminUsersContainer from '~/client/services/AdminUsersContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -17,7 +17,7 @@ type RevokeAdminButtonProps = {
 const RevokeAdminButton = (props: RevokeAdminButtonProps): JSX.Element => {
 
   const { t } = useTranslation('admin');
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser(); // hook returns single value now
   const { adminUsersContainer, user } = props;
 
   const onClickRevokeAdminBtnHandler = useCallback(async() => {

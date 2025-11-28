@@ -1,22 +1,21 @@
 import type { FC } from 'react';
 import React, { useState } from 'react';
 
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Collapse } from 'reactstrap';
 
 import { AllSupportedActions } from '~/interfaces/activity';
-import { useActivityExpirationSeconds, useAuditLogAvailableActions } from '~/stores-universal/context';
+import { activityExpirationSecondsAtom, auditLogAvailableActionsAtom } from '~/states/server-configurations';
 
 export const AuditLogSettings: FC = () => {
   const { t } = useTranslation();
 
   const [isExpandActionList, setIsExpandActionList] = useState(false);
 
-  const { data: activityExpirationSecondsData } = useActivityExpirationSeconds();
-  const activityExpirationSeconds = activityExpirationSecondsData != null ? activityExpirationSecondsData : 2592000;
+  const activityExpirationSeconds = useAtomValue(activityExpirationSecondsAtom) || 2592000;
 
-  const { data: availableActionsData } = useAuditLogAvailableActions();
-  const availableActions = availableActionsData != null ? availableActionsData : [];
+  const availableActions = useAtomValue(auditLogAvailableActionsAtom);
 
   return (
     <>

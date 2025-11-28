@@ -1,22 +1,22 @@
 import React, { useCallback, type JSX } from 'react';
 
 import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar';
-import { useSearchModal } from '~/features/search/client/stores/search';
-import { useIsSearchPage } from '~/stores-universal/context';
-import { usePageCreateModal } from '~/stores/modal';
-import { useCurrentPagePath } from '~/stores/page';
-import { useDrawerOpened } from '~/stores/ui';
+import { useSearchModalActions } from '~/features/search/client/states/modal/search';
+import { useIsSearchPage } from '~/states/context';
+import { useCurrentPagePath } from '~/states/page';
+import { usePageCreateModalActions } from '~/states/ui/modal/page-create';
+import { useDrawerOpened } from '~/states/ui/sidebar';
 
 import styles from './GrowiNavbarBottom.module.scss';
 
 
 export const GrowiNavbarBottom = (): JSX.Element => {
 
-  const { data: isDrawerOpened, mutate: mutateDrawerOpened } = useDrawerOpened();
-  const { open: openCreateModal } = usePageCreateModal();
-  const { data: currentPagePath } = useCurrentPagePath();
-  const { data: isSearchPage } = useIsSearchPage();
-  const { open: openSearchModal } = useSearchModal();
+  const [isDrawerOpened, setIsDrawerOpened] = useDrawerOpened();
+  const { open: openCreateModal } = usePageCreateModalActions();
+  const currentPagePath = useCurrentPagePath();
+  const isSearchPage = useIsSearchPage();
+  const { open: openSearchModal } = useSearchModalActions();
 
   const searchButtonClickHandler = useCallback(() => {
     openSearchModal();
@@ -35,7 +35,7 @@ export const GrowiNavbarBottom = (): JSX.Element => {
             <a
               role="button"
               className="nav-link btn-lg"
-              onClick={() => mutateDrawerOpened(true)}
+              onClick={() => setIsDrawerOpened(true)}
             >
               <span className="material-symbols-outlined fs-2">reorder</span>
             </a>
