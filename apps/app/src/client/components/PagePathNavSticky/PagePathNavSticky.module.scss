@@ -13,11 +13,3 @@
     }
   }
 }
-
-@media print {
-  .grw-page-path-nav-sticky :global {
-    .sticky-inner-wrapper {
-      position: static !important;
-    }
-  }
-}

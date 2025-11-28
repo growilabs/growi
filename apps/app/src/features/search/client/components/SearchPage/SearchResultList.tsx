@@ -1,4 +1,8 @@
-import type { ForwardRefRenderFunction } from 'react';
+import type {
+  ForwardRefExoticComponent,
+  ForwardRefRenderFunction,
+  RefAttributes,
+} from 'react';
 import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
 import {
   type IPageInfoForListing,
@@ -184,4 +188,6 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
   );
 };
 
-export const SearchResultList = forwardRef(SearchResultListSubstance);
+export const SearchResultList: ForwardRefExoticComponent<
+  Props & RefAttributes<ISelectableAll>
+> = forwardRef<ISelectableAll, Props>(SearchResultListSubstance);

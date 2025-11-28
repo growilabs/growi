@@ -6,8 +6,7 @@ import { Revision } from '../models/revision';
 import ApiResponse from '../util/apiResponse';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = function(crowi, app) {
-
+module.exports = (crowi, app) => {
   const activityEvent = crowi.event('activity');
   const actions = {};
   const api = {};
@@ -56,14 +55,18 @@ module.exports = function(crowi, app) {
    *
    * @apiParam {String} q keyword
    */
-  api.search = async function(req, res) {
+  api.search = async (req, res) => {
     // https://regex101.com/r/J1cN6O/1
     // prevent from unexpecting attack doing regular expression on tag search (DoS attack)
     // Search for regular expressions as normal characters
     // e.g. user*$ -> user\*\$ (escape a regular expression)
     const escapeRegExp = req.query.q.replace(/[\\^$/.*+?()[\]{}|]/g, '\\$&');
-    let tags = await Tag.find({ name: new RegExp(`^${escapeRegExp}`) }).select('_id name');
-    tags = tags.map((tag) => { return tag.name });
+    let tags = await Tag.find({ name: new RegExp(`^${escapeRegExp}`) }).select(
+      '_id name',
+    );
+    tags = tags.map((tag) => {
+      return tag.name;
+    });
     return res.json(ApiResponse.success({ tags }));
   };
 
@@ -113,7 +116,7 @@ module.exports = function(crowi, app) {
    * @apiParam {String} PageId
    * @apiParam {array} tags
    */
-  api.update = async function(req, res) {
+  api.update = async (req, res) => {
     const Page = crowi.model('Page');
     const User = crowi.model('User');
     const tagEvent = crowi.event('tag');
@@ -128,22 +131,30 @@ module.exports = function(crowi, app) {
       const page = await Page.findById(pageId);
       const user = await User.findById(userId);
 
-      if (!await Page.isAccessiblePageByViewer(page._id, user)) {
-        return res.json(ApiResponse.error("You don't have permission to update this page."));
+      if (!(await Page.isAccessiblePageByViewer(page._id, user))) {
+        return res.json(
+          ApiResponse.error("You don't have permission to update this page."),
+        );
       }
 
       const previousRevision = await Revision.findById(revisionId);
-      result.savedPage = await crowi.pageService.updatePage(page, previousRevision.body, previousRevision.body, req.user);
+      result.savedPage = await crowi.pageService.updatePage(
+        page,
+        previousRevision.body,
+        previousRevision.body,
+        req.user,
+      );
       await PageTagRelation.updatePageTags(pageId, tags);
       result.tags = await PageTagRelation.listTagNamesByPage(pageId);
 
       tagEvent.emit('update', page, tags);
-    }
-    catch (err) {
+    } catch (err) {
       return res.json(ApiResponse.error(err));
     }
 
-    activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_TAG_UPDATE });
+    activityEvent.emit('update', res.locals.activity._id, {
+      action: SupportedAction.ACTION_TAG_UPDATE,
+    });
 
     return res.json(ApiResponse.success(result));
   };
@@ -194,7 +205,7 @@ module.exports = function(crowi, app) {
    * @apiParam {Number} limit
    * @apiParam {Number} offset
    */
-  api.list = async function(req, res) {
+  api.list = async (req, res) => {
     const limit = +req.query.limit || 50;
     const offset = +req.query.offset || 0;
     const sortOpt = { count: -1, _id: -1 };
@@ -202,15 +213,14 @@ module.exports = function(crowi, app) {
 
     try {
       // get tag list contains id name and count properties
-      const tagsWithCount = await PageTagRelation.createTagListWithCount(queryOptions);
+      const tagsWithCount =
+        await PageTagRelation.createTagListWithCount(queryOptions);
 
       return res.json(ApiResponse.success(tagsWithCount));
-    }
-    catch (err) {
+    } catch (err) {
       return res.json(ApiResponse.error(err));
     }
   };
-
 
   return actions;
 };

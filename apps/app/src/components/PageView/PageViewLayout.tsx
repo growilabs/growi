@@ -1,5 +1,8 @@
 import type { JSX, ReactNode } from 'react';
 
+// biome-ignore lint/style/noRestrictedImports: ignore
+import { usePrintMode } from '~/client/services/use-print-mode';
+
 import styles from './PageViewLayout.module.scss';
 
 const pageViewLayoutClass = styles['page-view-layout'] ?? '';
@@ -24,6 +27,8 @@ export const PageViewLayout = (props: Props): JSX.Element => {
     expandContentWidth,
   } = props;
 
+  const isPrinting = usePrintMode();
+
   const fluidLayoutClass = expandContentWidth ? _fluidLayoutClass : '';
 
   return (
@@ -33,13 +38,13 @@ export const PageViewLayout = (props: Props): JSX.Element => {
       >
         <div className="container-lg wide-gutter-x-lg grw-container-convertible flex-expand-vert">
           {headerContents != null && headerContents}
-          {sideContents != null ? (
+          {!isPrinting && sideContents != null ? (
             <div className="flex-expand-horiz gap-3 z-0">
               <div className="flex-expand-vert flex-basis-0 mw-0">
                 {children}
               </div>
               <div
-                className="grw-side-contents-container col-lg-3  d-edit-none d-print-none"
+                className="grw-side-contents-container col-lg-3 d-edit-none"
                 data-vrt-blackout-side-contents
               >
                 <div className="grw-side-contents-sticky-container">

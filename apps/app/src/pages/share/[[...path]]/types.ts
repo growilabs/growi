@@ -1,8 +1,14 @@
-import type { IPagePopulatedToShowRevision } from '@growi/core/dist/interfaces';
+import type {
+  IDataWithRequiredMeta,
+  IPageNotFoundInfo,
+} from '@growi/core/dist/interfaces';
 
 import type { IShareLinkHasId } from '~/interfaces/share-link';
 import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props';
-import type { GeneralPageInitialProps } from '~/pages/general-page';
+import type {
+  GeneralPageInitialProps,
+  IPageToShowRevisionWithMeta,
+} from '~/pages/general-page';
 
 export type ShareLinkPageStatesProps = Pick<
   GeneralPageInitialProps,
@@ -10,19 +16,22 @@ export type ShareLinkPageStatesProps = Pick<
 > &
   (
     | {
-        page: null;
+        // not found case
+        pageWithMeta: IDataWithRequiredMeta<null, IPageNotFoundInfo>;
         isNotFound: true;
         isExpired: undefined;
         shareLink: undefined;
       }
     | {
-        page: null;
+        // expired case
+        pageWithMeta: IPageToShowRevisionWithMeta;
         isNotFound: false;
         isExpired: true;
         shareLink: IShareLinkHasId;
       }
     | {
-        page: IPagePopulatedToShowRevision;
+        // normal case
+        pageWithMeta: IPageToShowRevisionWithMeta;
         isNotFound: false;
         isExpired: false;
         shareLink: IShareLinkHasId;

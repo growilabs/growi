@@ -2,7 +2,7 @@ import React, {
   useState, useCallback, useMemo, type JSX,
 } from 'react';
 
-import { MarkdownTable, useHandsontableModalForEditorStatus } from '@growi/editor';
+import { MarkdownTable, useHandsontableModalForEditorStatus, useHandsontableModalForEditorActions } from '@growi/editor';
 import { HotTable } from '@handsontable/react';
 import type Handsontable from 'handsontable';
 import { useTranslation } from 'next-i18next';
@@ -36,6 +36,7 @@ export const HandsontableModalSubstance = (): JSX.Element => {
   const handsontableModalData = useHandsontableModalStatus();
   const { close: closeHandsontableModal } = useHandsontableModalActions();
   const handsontableModalForEditorData = useHandsontableModalForEditorStatus();
+  const { close: closeHandsontableModalForEditor } = useHandsontableModalForEditorActions();
 
   const isOpened = handsontableModalData?.isOpened ?? false;
   const isOpendInEditor = handsontableModalForEditorData?.isOpened ?? false;
@@ -155,6 +156,7 @@ export const HandsontableModalSubstance = (): JSX.Element => {
 
   const cancel = () => {
     closeHandsontableModal();
+    closeHandsontableModalForEditor();
     setIsDataImportAreaExpanded(false);
     setIsWindowExpanded(false);
   };

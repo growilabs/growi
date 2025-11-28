@@ -1,9 +1,9 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { body } from 'express-validator';
 import type { Types } from 'mongoose';
 
 import type { BookmarkFolderItems } from '~/interfaces/bookmark-info';
-import { SCOPE } from '@growi/core/dist/interfaces';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { InvalidParentBookmarkFolderError } from '~/server/models/errors';
@@ -99,29 +99,44 @@ const router = express.Router();
 const validator = {
   bookmarkFolder: [
     body('name').isString().withMessage('name must be a string'),
-    body('parent').isMongoId().optional({ nullable: true })
-      .custom(async(parent: string) => {
+    body('parent')
+      .isMongoId()
+      .optional({ nullable: true })
+      .custom(async (parent: string) => {
         const parentFolder = await BookmarkFolder.findById(parent);
         if (parentFolder == null || parentFolder.parent != null) {
           throw new Error('Maximum folder hierarchy of 2 levels');
         }
       }),
-    body('childFolder').optional().isArray().withMessage('Children must be an array'),
-    body('bookmarkFolderId').optional().isMongoId().withMessage('Bookark Folder ID must be a valid mongo ID'),
+    body('childFolder')
+      .optional()
+      .isArray()
+      .withMessage('Children must be an array'),
+    body('bookmarkFolderId')
+      .optional()
+      .isMongoId()
+      .withMessage('Bookark Folder ID must be a valid mongo ID'),
   ],
   bookmarkPage: [
     body('pageId').isMongoId().withMessage('Page ID must be a valid mongo ID'),
-    body('folderId').optional({ nullable: true }).isMongoId().withMessage('Folder ID must be a valid mongo ID'),
+    body('folderId')
+      .optional({ nullable: true })
+      .isMongoId()
+      .withMessage('Folder ID must be a valid mongo ID'),
   ],
   bookmark: [
     body('pageId').isMongoId().withMessage('Page ID must be a valid mongo ID'),
-    body('status').isBoolean().withMessage('status must be one of true or false'),
+    body('status')
+      .isBoolean()
+      .withMessage('status must be one of true or false'),
   ],
 };
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(crowi);
+  const loginRequiredStrictly = require('../../middlewares/login-required')(
+    crowi,
+  );
 
   /**
    * @swagger
@@ -157,28 +172,36 @@ module.exports = (crowi) => {
    *                      type: object
    *                      $ref: '#/components/schemas/BookmarkFolder'
    */
-  router.post('/',
+  router.post(
+    '/',
     accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }),
-    loginRequiredStrictly, validator.bookmarkFolder, apiV3FormValidator, async(req, res) => {
+    loginRequiredStrictly,
+    validator.bookmarkFolder,
+    apiV3FormValidator,
+    async (req, res) => {
       const owner = req.user?._id;
       const { name, parent } = req.body;
       const params = {
-        name, owner, parent,
+        name,
+        owner,
+        parent,
       };
 
       try {
         const bookmarkFolder = await BookmarkFolder.createByParameters(params);
         logger.debug('bookmark folder created', bookmarkFolder);
         return res.apiv3({ bookmarkFolder });
-      }
-      catch (err) {
+      } catch (err) {
         logger.error(err);
         if (err instanceof InvalidParentBookmarkFolderError) {
-          return res.apiv3Err(new ErrorV3(err.message, 'failed_to_create_bookmark_folder'));
+          return res.apiv3Err(
+            new ErrorV3(err.message, 'failed_to_create_bookmark_folder'),
+          );
         }
         return res.apiv3Err(err, 500);
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -211,63 +234,75 @@ module.exports = (crowi) => {
    *                        type: object
    *                        $ref: '#/components/schemas/BookmarkFolder'
    */
-  router.get('/list/:userId', accessTokenParser([SCOPE.READ.FEATURES.BOOKMARK], { acceptLegacy: true }), loginRequiredStrictly, async(req, res) => {
-    const { userId } = req.params;
+  router.get(
+    '/list/:userId',
+    accessTokenParser([SCOPE.READ.FEATURES.BOOKMARK], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    async (req, res) => {
+      const { userId } = req.params;
 
-    const getBookmarkFolders = async(
+      const getBookmarkFolders = async (
         userId: Types.ObjectId | string,
         parentFolderId?: Types.ObjectId | string,
-    ) => {
-      const folders = await BookmarkFolder.find({ owner: userId, parent: parentFolderId })
-        .populate('childFolder')
-        .populate({
-          path: 'bookmarks',
-          model: 'Bookmark',
-          populate: {
-            path: 'page',
-            model: 'Page',
+      ) => {
+        const folders = (await BookmarkFolder.find({
+          owner: userId,
+          parent: parentFolderId,
+        })
+          .populate('childFolder')
+          .populate({
+            path: 'bookmarks',
+            model: 'Bookmark',
             populate: {
-              path: 'lastUpdateUser',
-              model: 'User',
+              path: 'page',
+              model: 'Page',
+              populate: {
+                path: 'lastUpdateUser',
+                model: 'User',
+              },
             },
-          },
-        }).exec() as never as BookmarkFolderItems[];
+          })
+          .exec()) as never as BookmarkFolderItems[];
 
-      const returnValue: BookmarkFolderItems[] = [];
+        const returnValue: BookmarkFolderItems[] = [];
 
-      const promises = folders.map(async(folder: BookmarkFolderItems) => {
-        const childFolder = await getBookmarkFolders(userId, folder._id);
+        const promises = folders.map(async (folder: BookmarkFolderItems) => {
+          const childFolder = await getBookmarkFolders(userId, folder._id);
 
-        // !! DO NOT THIS SERIALIZING OUTSIDE OF PROMISES !! -- 05.23.2023 ryoji-s
-        // Serializing outside of promises will cause not populated.
-        const bookmarks = folder.bookmarks.map(bookmark => serializeBookmarkSecurely(bookmark));
+          // !! DO NOT THIS SERIALIZING OUTSIDE OF PROMISES !! -- 05.23.2023 ryoji-s
+          // Serializing outside of promises will cause not populated.
+          const bookmarks = folder.bookmarks.map((bookmark) =>
+            serializeBookmarkSecurely(bookmark),
+          );
 
-        const res = {
-          _id: folder._id.toString(),
-          name: folder.name,
-          owner: folder.owner,
-          bookmarks,
-          childFolder,
-          parent: folder.parent,
-        };
-        return res;
-      });
+          const res = {
+            _id: folder._id.toString(),
+            name: folder.name,
+            owner: folder.owner,
+            bookmarks,
+            childFolder,
+            parent: folder.parent,
+          };
+          return res;
+        });
 
-      const results = await Promise.all(promises) as unknown as BookmarkFolderItems[];
-      returnValue.push(...results);
-      return returnValue;
-    };
+        const results = (await Promise.all(
+          promises,
+        )) as unknown as BookmarkFolderItems[];
+        returnValue.push(...results);
+        return returnValue;
+      };
 
-    try {
-      const bookmarkFolderItems = await getBookmarkFolders(userId, undefined);
+      try {
+        const bookmarkFolderItems = await getBookmarkFolders(userId, undefined);
 
-      return res.apiv3({ bookmarkFolderItems });
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err(err, 500);
-    }
-  });
+        return res.apiv3({ bookmarkFolderItems });
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err(err, 500);
+      }
+    },
+  );
 
   /**
    * @swagger
@@ -299,18 +334,22 @@ module.exports = (crowi) => {
    *                      description: Number of deleted folders
    *                      example: 1
    */
-  router.delete('/:id', accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }), loginRequiredStrictly, async(req, res) => {
-    const { id } = req.params;
-    try {
-      const result = await BookmarkFolder.deleteFolderAndChildren(id);
-      const { deletedCount } = result;
-      return res.apiv3({ deletedCount });
-    }
-    catch (err) {
-      logger.error(err);
-      return res.apiv3Err(err, 500);
-    }
-  });
+  router.delete(
+    '/:id',
+    accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    async (req, res) => {
+      const { id } = req.params;
+      try {
+        const result = await BookmarkFolder.deleteFolderAndChildren(id);
+        const { deletedCount } = result;
+        return res.apiv3({ deletedCount });
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err(err, 500);
+      }
+    },
+  );
 
   /**
    * @swagger
@@ -355,20 +394,27 @@ module.exports = (crowi) => {
    *                      type: object
    *                      $ref: '#/components/schemas/BookmarkFolder'
    */
-  router.put('/',
-    accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }), loginRequiredStrictly, validator.bookmarkFolder, async(req, res) => {
-      const {
-        bookmarkFolderId, name, parent, childFolder,
-      } = req.body;
+  router.put(
+    '/',
+    accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    validator.bookmarkFolder,
+    async (req, res) => {
+      const { bookmarkFolderId, name, parent, childFolder } = req.body;
       try {
-        const bookmarkFolder = await BookmarkFolder.updateBookmarkFolder(bookmarkFolderId, name, parent, childFolder);
+        const bookmarkFolder = await BookmarkFolder.updateBookmarkFolder(
+          bookmarkFolderId,
+          name,
+          parent,
+          childFolder,
+        );
         return res.apiv3({ bookmarkFolder });
-      }
-      catch (err) {
+      } catch (err) {
         logger.error(err);
         return res.apiv3Err(err, 500);
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -405,22 +451,31 @@ module.exports = (crowi) => {
    *                      type: object
    *                      $ref: '#/components/schemas/BookmarkFolder'
    */
-  router.post('/add-bookmark-to-folder',
-    accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }), loginRequiredStrictly, validator.bookmarkPage, apiV3FormValidator,
-    async(req, res) => {
+  router.post(
+    '/add-bookmark-to-folder',
+    accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    validator.bookmarkPage,
+    apiV3FormValidator,
+    async (req, res) => {
       const userId = req.user?._id;
       const { pageId, folderId } = req.body;
 
       try {
-        const bookmarkFolder = await BookmarkFolder.insertOrUpdateBookmarkedPage(pageId, userId, folderId);
+        const bookmarkFolder =
+          await BookmarkFolder.insertOrUpdateBookmarkedPage(
+            pageId,
+            userId,
+            folderId,
+          );
         logger.debug('bookmark added to folder', bookmarkFolder);
         return res.apiv3({ bookmarkFolder });
-      }
-      catch (err) {
+      } catch (err) {
         logger.error(err);
         return res.apiv3Err(err, 500);
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -456,18 +511,26 @@ module.exports = (crowi) => {
    *                      type: object
    *                      $ref: '#/components/schemas/BookmarkFolder'
    */
-  router.put('/update-bookmark',
-    accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }), loginRequiredStrictly, validator.bookmark, async(req, res) => {
+  router.put(
+    '/update-bookmark',
+    accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    validator.bookmark,
+    async (req, res) => {
       const { pageId, status } = req.body;
       const userId = req.user?._id;
       try {
-        const bookmarkFolder = await BookmarkFolder.updateBookmark(pageId, status, userId);
+        const bookmarkFolder = await BookmarkFolder.updateBookmark(
+          pageId,
+          status,
+          userId,
+        );
         return res.apiv3({ bookmarkFolder });
-      }
-      catch (err) {
+      } catch (err) {
         logger.error(err);
         return res.apiv3Err(err, 500);
       }
-    });
+    },
+  );
   return router;
 };

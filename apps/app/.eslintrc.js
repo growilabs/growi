@@ -60,6 +60,16 @@ module.exports = {
     'src/server/util/**',
     'src/server/app.ts',
     'src/server/repl.ts',
+    'src/server/middlewares/**',
+    'src/server/routes/*.js',
+    'src/server/routes/*.ts',
+    'src/server/routes/attachment/**',
+    'src/server/routes/apiv3/interfaces/**',
+    'src/server/routes/apiv3/pages/**',
+    'src/server/routes/apiv3/user/**',
+    'src/server/routes/apiv3/personal-setting/**',
+    'src/server/routes/apiv3/security-settings/**',
+    'src/server/routes/apiv3/*.ts',
   ],
   settings: {
     // resolve path aliases by eslint-import-resolver-typescript

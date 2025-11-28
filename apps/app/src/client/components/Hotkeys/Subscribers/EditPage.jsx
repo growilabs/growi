@@ -7,7 +7,7 @@ import { EditorMode, useEditorMode } from '~/states/ui/editor';
 
 const EditPage = (props) => {
   const isEditable = useIsEditable();
-  const { mutate: mutateEditorMode } = useEditorMode();
+  const { setEditorMode } = useEditorMode();
 
   // setup effect
   useEffect(() => {
@@ -20,11 +20,11 @@ const EditPage = (props) => {
       return;
     }
 
-    mutateEditorMode(EditorMode.Editor);
+    setEditorMode(EditorMode.Editor);
 
     // remove this
     props.onDeleteRender(this);
-  }, [isEditable, mutateEditorMode, props]);
+  }, [isEditable, props, setEditorMode]);
 
   return null;
 };

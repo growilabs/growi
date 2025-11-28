@@ -25,8 +25,6 @@ import TableOfContents from '../TableOfContents';
 
 import { PageAccessoriesControl } from './PageAccessoriesControl';
 
-import styles from './PageSideContents.module.scss';
-
 
 const { isTopPage, isUsersHomepage, isTrashPage } = pagePathUtils;
 
@@ -123,7 +121,7 @@ export const PageSideContents = (props: PageSideContentsProps): JSX.Element => {
         </div>
       )}
 
-      <div className={`${styles['grw-page-accessories-controls']} d-flex flex-column gap-2`}>
+      <div className=" d-flex flex-column gap-2">
         {/* Page list */}
         {!isSharedUser && (
           <div className="d-flex" data-testid="pageListButton">
