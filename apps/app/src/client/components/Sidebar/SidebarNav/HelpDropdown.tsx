@@ -15,7 +15,7 @@ import styles from './HelpDropdown.module.scss';
 
 
 export const HelpDropdown: FC = memo(() => {
-  const { t } = useTranslation('commons');
+  const { t } = useTranslation();
   const growiVersion = useGrowiVersion();
   const { open: openShortcutsModal } = useShortcutsModalActions();
 
@@ -68,7 +68,7 @@ export const HelpDropdown: FC = memo(() => {
           data-testid="growi-cloud-help-link"
         >
           <span className="d-flex align-items-center">
-            GROWI.cloud {t('Help')}
+            {t('help_dropdown.growi_cloud_help')}
             <span className="material-symbols-outlined ms-1 fs-6">open_in_new</span>
           </span>
         </DropdownItem>
@@ -77,7 +77,7 @@ export const HelpDropdown: FC = memo(() => {
           onClick={() => openShortcutsModal()}
         >
           <span className="d-flex align-items-center">
-            <span className="flex-grow-1">{t('Shortcuts')}</span>
+            <span className="flex-grow-1">{t('help_dropdown.show_shortcuts')}</span>
             <span className="text-secondary">
               <span className={`cmd-key ${os}`} />&nbsp;+ /
             </span>
@@ -88,7 +88,7 @@ export const HelpDropdown: FC = memo(() => {
 
         <DropdownItem header className="py-1">
           <span className="d-flex text-secondary">
-            <span className="flex-grow-1 ">GROWI Version</span>
+            <span className="flex-grow-1"> {t('help_dropdown.growi_version')}</span>
             {growiVersion}
           </span>
         </DropdownItem>
