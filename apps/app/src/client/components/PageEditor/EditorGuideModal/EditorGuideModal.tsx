@@ -1,12 +1,21 @@
-import { useState, useEffect, type JSX } from 'react';
+import {
+  useState, useEffect, type JSX, type CSSProperties,
+} from 'react';
 
 import { useEditorGuideModalStatus, useEditorGuideModalActions } from '@growi/editor/dist/states/modal/editor-guide';
+import { createPortal } from 'react-dom';
+
+type SubstanceProps = {
+  rect: DOMRectReadOnly,
+  close: () => void,
+};
 
 /**
  * EditorGuideModalSubstance - The actual modal content
- * Only rendered when isOpened is true
+ * Renders backdrop and modal content over the specified area
+ * Uses position:fixed to prevent scrolling with the container
  */
-const EditorGuideModalSubstance = ({ close }: { close: () => void }): JSX.Element => {
+const EditorGuideModalSubstance = ({ rect, close }: SubstanceProps): JSX.Element => {
   const [isShown, setIsShown] = useState(false);
 
   // Trigger fade-in after mount
@@ -18,20 +27,31 @@ const EditorGuideModalSubstance = ({ close }: { close: () => void }): JSX.Elemen
     return () => cancelAnimationFrame(frameId);
   }, []);
 
-  return (
+  // Fixed positioning style based on container's viewport position
+  const fixedStyle: CSSProperties = {
+    position: 'fixed',
+    top: rect.top,
+    left: rect.left,
+    width: rect.width,
+    height: rect.height,
+  };
+
+  return createPortal(
     <>
       {/* Editor Guide Modal Overlay - covers only the preview area */}
       <div
-        className={`position-absolute w-100 h-100 modal-backdrop fade z-2 ${isShown ? 'show' : ''}`}
+        className={`modal-backdrop fade z-2 ${isShown ? 'show' : ''}`}
+        style={fixedStyle}
         onClick={close}
         aria-hidden="true"
       />
 
       {/* Editor Guide Modal Content */}
       <div
-        className={`position-fixed top-0 bottom-0 start-50 end-0 d-flex align-items-center justify-content-center z-3 pe-none fade ${isShown ? 'show' : ''}`}
+        className={`d-flex align-items-center justify-content-center z-3 pe-none fade ${isShown ? 'show' : ''}`}
+        style={fixedStyle}
       >
-        <div className="px-3">
+        <div className="px-3 pe-auto">
           <div className="card shadow-lg">
             <div className="card-header d-flex justify-content-between align-items-center">
               <h5 className="mb-0">Editor Guide</h5>
@@ -51,26 +71,28 @@ const EditorGuideModalSubstance = ({ close }: { close: () => void }): JSX.Elemen
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
+};
+
+type Props = {
+  rect: DOMRectReadOnly,
 };
 
 /**
  * EditorGuideModal (Container)
  *
- * This modal is rendered within the Preview component and overlays only the preview area,
- * not the entire screen. The backdrop covers the preview area only.
- *
- * The container div is always rendered (for fade transitions),
- * but the actual content (Substance) is only rendered when isOpened is true.
+ * This modal overlays only the preview area (specified by rect),
+ * not the entire screen. Uses createPortal to render into document.body.
  */
-export const EditorGuideModal = (): JSX.Element => {
+export const EditorGuideModal = ({ rect }: Props): JSX.Element => {
   const { isOpened } = useEditorGuideModalStatus();
   const { close } = useEditorGuideModalActions();
 
-  return (
-    <div className={`${isOpened ? 'show' : ''}`}>
-      {isOpened && <EditorGuideModalSubstance close={close} />}
-    </div>
-  );
+  if (!isOpened) {
+    return <></>;
+  }
+
+  return <EditorGuideModalSubstance rect={rect} close={close} />;
 };

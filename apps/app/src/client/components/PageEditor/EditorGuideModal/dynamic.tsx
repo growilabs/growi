@@ -4,7 +4,11 @@ import { useEditorGuideModalStatus } from '@growi/editor/dist/states/modal/edito
 
 import { useLazyLoader } from '~/components/utils/use-lazy-loader';
 
-export const EditorGuideModalLazyLoaded = (): JSX.Element => {
+type Props = {
+  rect: DOMRectReadOnly | undefined,
+};
+
+export const EditorGuideModalLazyLoaded = ({ rect }: Props): JSX.Element => {
   const { isOpened } = useEditorGuideModalStatus();
 
   const EditorGuideModal = useLazyLoader(
@@ -13,5 +17,7 @@ export const EditorGuideModalLazyLoaded = (): JSX.Element => {
     isOpened,
   );
 
-  return EditorGuideModal ? <EditorGuideModal /> : <></>;
+  return (EditorGuideModal != null && rect != null)
+    ? <EditorGuideModal rect={rect} />
+    : <></>;
 };
