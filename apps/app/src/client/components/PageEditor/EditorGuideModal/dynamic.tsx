@@ -1,14 +1,14 @@
-import type { JSX } from 'react';
+import type { JSX, RefObject } from 'react';
 
 import { useEditorGuideModalStatus } from '@growi/editor/dist/states/modal/editor-guide';
 
 import { useLazyLoader } from '~/components/utils/use-lazy-loader';
 
 type Props = {
-  rect: DOMRectReadOnly | undefined,
+  containerRef: RefObject<HTMLDivElement | null>,
 };
 
-export const EditorGuideModalLazyLoaded = ({ rect }: Props): JSX.Element => {
+export const EditorGuideModalLazyLoaded = ({ containerRef }: Props): JSX.Element => {
   const { isOpened } = useEditorGuideModalStatus();
 
   const EditorGuideModal = useLazyLoader(
@@ -17,7 +17,7 @@ export const EditorGuideModalLazyLoaded = ({ rect }: Props): JSX.Element => {
     isOpened,
   );
 
-  return (EditorGuideModal != null && rect != null)
-    ? <EditorGuideModal rect={rect} />
+  return (EditorGuideModal != null)
+    ? <EditorGuideModal containerRef={containerRef} />
     : <></>;
 };

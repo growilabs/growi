@@ -404,7 +404,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
           />
         </div>
       </div>
-      <EditorGuideModalLazyLoaded rect={previewRect} />
+      <EditorGuideModalLazyLoaded containerRef={previewRef} />
     </>
   );
 };

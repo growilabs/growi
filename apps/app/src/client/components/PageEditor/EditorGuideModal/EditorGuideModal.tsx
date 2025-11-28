@@ -1,12 +1,12 @@
 import {
-  useState, useEffect, type JSX, type CSSProperties,
+  useState, useEffect, type JSX, type CSSProperties, type RefObject,
 } from 'react';
 
 import { useEditorGuideModalStatus, useEditorGuideModalActions } from '@growi/editor/dist/states/modal/editor-guide';
 import { createPortal } from 'react-dom';
 
 type SubstanceProps = {
-  rect: DOMRectReadOnly,
+  containerRef: RefObject<HTMLDivElement | null>,
   close: () => void,
 };
 
@@ -15,8 +15,23 @@ type SubstanceProps = {
  * Renders backdrop and modal content over the specified area
  * Uses position:fixed to prevent scrolling with the container
  */
-const EditorGuideModalSubstance = ({ rect, close }: SubstanceProps): JSX.Element => {
+const EditorGuideModalSubstance = ({ containerRef, close }: SubstanceProps): JSX.Element => {
   const [isShown, setIsShown] = useState(false);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+
+  // Get rect on mount and on resize
+  useEffect(() => {
+    const updateRect = () => {
+      if (containerRef.current != null) {
+        setRect(containerRef.current.getBoundingClientRect());
+      }
+    };
+
+    updateRect();
+    window.addEventListener('resize', updateRect);
+
+    return () => window.removeEventListener('resize', updateRect);
+  }, [containerRef]);
 
   // Trigger fade-in after mount
   useEffect(() => {
@@ -30,10 +45,10 @@ const EditorGuideModalSubstance = ({ rect, close }: SubstanceProps): JSX.Element
   // Fixed positioning style based on container's viewport position
   const fixedStyle: CSSProperties = {
     position: 'fixed',
-    top: rect.top,
-    left: rect.left,
-    width: rect.width,
-    height: rect.height,
+    top: rect?.top,
+    left: rect?.left,
+    width: rect?.width,
+    height: rect?.height,
   };
 
   return createPortal(
@@ -77,22 +92,22 @@ const EditorGuideModalSubstance = ({ rect, close }: SubstanceProps): JSX.Element
 };
 
 type Props = {
-  rect: DOMRectReadOnly,
+  containerRef: RefObject<HTMLDivElement | null>,
 };
 
 /**
  * EditorGuideModal (Container)
  *
- * This modal overlays only the preview area (specified by rect),
+ * This modal overlays only the preview area (specified by containerRef),
  * not the entire screen. Uses createPortal to render into document.body.
  */
-export const EditorGuideModal = ({ rect }: Props): JSX.Element => {
+export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
   const { isOpened } = useEditorGuideModalStatus();
   const { close } = useEditorGuideModalActions();
 
-  if (!isOpened) {
+  if (!isOpened || containerRef == null) {
     return <></>;
   }
 
-  return <EditorGuideModalSubstance rect={rect} close={close} />;
+  return <EditorGuideModalSubstance containerRef={containerRef} close={close} />;
 };
