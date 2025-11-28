@@ -1,26 +1,35 @@
-import type { JSX } from 'react';
+import { useState, useEffect, type JSX } from 'react';
 
 import { useEditorGuideModalStatus, useEditorGuideModalActions } from '@growi/editor/dist/states/modal/editor-guide';
 
-export const EditorGuideModal = (): JSX.Element => {
-  const { isOpened } = useEditorGuideModalStatus();
-  const { close } = useEditorGuideModalActions();
+/**
+ * EditorGuideModalSubstance - The actual modal content
+ * Only rendered when isOpened is true
+ */
+const EditorGuideModalSubstance = ({ close }: { close: () => void }): JSX.Element => {
+  const [isShown, setIsShown] = useState(false);
 
-  if (!isOpened) {
-    return <></>;
-  }
+  // Trigger fade-in after mount
+  useEffect(() => {
+    // Use requestAnimationFrame to ensure the DOM has been painted before adding 'show' class
+    const frameId = requestAnimationFrame(() => {
+      setIsShown(true);
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, []);
 
   return (
     <>
-      {/* Editor Guide Modal Overlay */}
+      {/* Editor Guide Modal Overlay - covers only the preview area */}
       <div
-        className="position-absolute w-100 h-100 modal-backdrop fade show z-2"
+        className={`position-absolute w-100 h-100 modal-backdrop fade z-2 ${isShown ? 'show' : ''}`}
         onClick={close}
+        aria-hidden="true"
       />
 
-      {/* Editor Guide Modal */}
+      {/* Editor Guide Modal Content */}
       <div
-        className="position-fixed top-0 bottom-0 start-50 end-0 d-flex align-items-center justify-content-center z-3 pe-none"
+        className={`position-fixed top-0 bottom-0 start-50 end-0 d-flex align-items-center justify-content-center z-3 pe-none fade ${isShown ? 'show' : ''}`}
       >
         <div className="px-3">
           <div className="card shadow-lg">
@@ -43,5 +52,25 @@ export const EditorGuideModal = (): JSX.Element => {
         </div>
       </div>
     </>
+  );
+};
+
+/**
+ * EditorGuideModal (Container)
+ *
+ * This modal is rendered within the Preview component and overlays only the preview area,
+ * not the entire screen. The backdrop covers the preview area only.
+ *
+ * The container div is always rendered (for fade transitions),
+ * but the actual content (Substance) is only rendered when isOpened is true.
+ */
+export const EditorGuideModal = (): JSX.Element => {
+  const { isOpened } = useEditorGuideModalStatus();
+  const { close } = useEditorGuideModalActions();
+
+  return (
+    <div className={`${isOpened ? 'show' : ''}`}>
+      {isOpened && <EditorGuideModalSubstance close={close} />}
+    </div>
   );
 };
