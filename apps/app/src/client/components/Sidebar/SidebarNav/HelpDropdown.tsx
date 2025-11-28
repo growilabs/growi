@@ -87,9 +87,8 @@ export const HelpDropdown: FC = memo(() => {
         <DropdownItem divider className="my-2" />
 
         <DropdownItem header className="py-1">
-          <span className="d-flex">
-            <a href="https://growi.org" target="_blank" rel="noopener noreferrer" className="flex-grow-1 text-secondary">GROWI Version</a>
-            {' '}
+          <span className="d-flex text-secondary">
+            <span className="flex-grow-1 ">GROWI Version</span>
             {growiVersion}
           </span>
         </DropdownItem>
