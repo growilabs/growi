@@ -38,8 +38,12 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
 
   const onSubmit = useCallback(async(data) => {
     try {
-      await adminLocalSecurityContainer.changeRegistrationWhitelist(data.registrationWhitelist);
-      await adminLocalSecurityContainer.updateLocalSecuritySetting();
+      await adminLocalSecurityContainer.updateLocalSecuritySetting({
+        registrationMode: adminLocalSecurityContainer.state.registrationMode,
+        registrationWhitelist: data.registrationWhitelist.split('\n'),
+        isPasswordResetEnabled: adminLocalSecurityContainer.state.isPasswordResetEnabled,
+        isEmailAuthenticationEnabled: adminLocalSecurityContainer.state.isEmailAuthenticationEnabled,
+      });
       await adminGeneralSecurityContainer.retrieveSetupStratedies();
       toastSuccess(t('security_settings.updated_general_security_setting'));
     }

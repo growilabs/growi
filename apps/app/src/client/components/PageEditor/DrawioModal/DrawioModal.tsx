@@ -4,6 +4,7 @@ import React, {
 
 import { Lang } from '@growi/core';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
+import { useDrawioModalForEditorStatus, useDrawioModalForEditorActions } from '@growi/editor/dist/states/modal/drawio-for-editor';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import {
   Modal,
@@ -13,7 +14,6 @@ import {
 import { replaceFocusedDrawioWithEditor, getMarkdownDrawioMxfile } from '~/client/components/PageEditor/markdown-drawio-util-for-editor';
 import { useRendererConfig } from '~/states/server-configurations';
 import { useDrawioModalActions, useDrawioModalStatus } from '~/states/ui/modal/drawio';
-import { useDrawioModalForEditorStatus, useDrawioModalForEditorActions } from '~/states/ui/modal/drawio-for-editor';
 import { useSWRxPersonalSettings } from '~/stores/personal-settings';
 import loggerFactory from '~/utils/logger';
 

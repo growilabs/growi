@@ -63,20 +63,6 @@ export default class AdminGoogleSecurityContainer extends Container {
   }
 
   /**
-   * Change googleClientId
-   */
-  changeGoogleClientId(value) {
-    this.setState({ googleClientId: value });
-  }
-
-  /**
-   * Change googleClientSecret
-   */
-  changeGoogleClientSecret(value) {
-    this.setState({ googleClientSecret: value });
-  }
-
-  /**
    * Switch isSameEmailTreatedAsIdenticalUser
    */
   switchIsSameEmailTreatedAsIdenticalUser() {
@@ -87,11 +73,15 @@ export default class AdminGoogleSecurityContainer extends Container {
   /**
    * Update googleSetting
    */
-  async updateGoogleSetting() {
-    const { googleClientId, googleClientSecret, isSameEmailTreatedAsIdenticalUser } = this.state;
-
-    let requestParams = {
-      googleClientId, googleClientSecret, isSameEmailTreatedAsIdenticalUser,
+  async updateGoogleSetting(formData) {
+    let requestParams = formData != null ? {
+      googleClientId: formData.googleClientId,
+      googleClientSecret: formData.googleClientSecret,
+      isSameEmailTreatedAsIdenticalUser: formData.isSameEmailTreatedAsIdenticalUser,
+    } : {
+      googleClientId: this.state.googleClientId,
+      googleClientSecret: this.state.googleClientSecret,
+      isSameEmailTreatedAsIdenticalUser: this.state.isSameEmailTreatedAsIdenticalUser,
     };
 
     requestParams = await removeNullPropertyFromObject(requestParams);

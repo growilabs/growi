@@ -56,17 +56,20 @@ const LdapSecuritySettingContents = (props: Props) => {
 
   const onSubmit = useCallback(async(data) => {
     try {
-      await adminLdapSecurityContainer.changeServerUrl(data.serverUrl);
-      await adminLdapSecurityContainer.changeBindDN(data.ldapBindDN);
-      await adminLdapSecurityContainer.changeBindDNPassword(data.ldapBindDNPassword);
-      await adminLdapSecurityContainer.changeSearchFilter(data.ldapSearchFilter);
-      await adminLdapSecurityContainer.changeAttrMapUsername(data.ldapAttrMapUsername);
-      await adminLdapSecurityContainer.changeAttrMapMail(data.ldapAttrMapMail);
-      await adminLdapSecurityContainer.changeAttrMapName(data.ldapAttrMapName);
-      await adminLdapSecurityContainer.changeGroupSearchBase(data.ldapGroupSearchBase);
-      await adminLdapSecurityContainer.changeGroupSearchFilter(data.ldapGroupSearchFilter);
-      await adminLdapSecurityContainer.changeGroupDnProperty(data.ldapGroupDnProperty);
-      await adminLdapSecurityContainer.updateLdapSetting();
+      await adminLdapSecurityContainer.updateLdapSetting({
+        serverUrl: data.serverUrl,
+        isUserBind: adminLdapSecurityContainer.state.isUserBind,
+        ldapBindDN: data.ldapBindDN,
+        ldapBindDNPassword: data.ldapBindDNPassword,
+        ldapSearchFilter: data.ldapSearchFilter,
+        ldapAttrMapUsername: data.ldapAttrMapUsername,
+        isSameUsernameTreatedAsIdenticalUser: adminLdapSecurityContainer.state.isSameUsernameTreatedAsIdenticalUser,
+        ldapAttrMapMail: data.ldapAttrMapMail,
+        ldapAttrMapName: data.ldapAttrMapName,
+        ldapGroupSearchBase: data.ldapGroupSearchBase,
+        ldapGroupSearchFilter: data.ldapGroupSearchFilter,
+        ldapGroupDnProperty: data.ldapGroupDnProperty,
+      });
       await adminGeneralSecurityContainer.retrieveSetupStratedies();
       toastSuccess(t('security_settings.ldap.updated_ldap'));
     }

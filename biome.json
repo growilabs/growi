@@ -30,7 +30,9 @@
       "!packages/pdf-converter-client/specs",
       "!apps/app/src/client",
       "!apps/app/src/server/middlewares",
-      "!apps/app/src/server/routes",
+      "!apps/app/src/server/routes/apiv3/app-settings",
+      "!apps/app/src/server/routes/apiv3/page",
+      "!apps/app/src/server/routes/apiv3/*.js",
       "!apps/app/src/server/service"
     ]
   },

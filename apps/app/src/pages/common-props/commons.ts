@@ -153,7 +153,12 @@ export const getServerSideCommonEachProps = async (
 
   let currentUser: IUserHasId | undefined;
   if (user != null) {
-    currentUser = user.toObject();
+    const User = crowi.model('User');
+    const userData = await User.findById(user.id).populate({
+      path: 'imageAttachment',
+      select: 'filePathProxied',
+    });
+    currentUser = userData.toObject();
   }
 
   // Redirect destination for page transition by next/link

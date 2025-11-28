@@ -1,5 +1,4 @@
 import type { JSX, ReactNode } from 'react';
-import React from 'react';
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
@@ -50,11 +49,12 @@ const isInitialProps = (props: Props): props is InitialProps => {
 
 const SharedPage: NextPageWithLayout<Props> = (props: Props) => {
   // Initialize Jotai atoms with initial data - must be called unconditionally
-  const pageData = isInitialProps(props) ? props.page : undefined;
+  const pageData = isInitialProps(props) ? props.pageWithMeta?.data : undefined;
+  const pageMeta = isInitialProps(props) ? props.pageWithMeta?.meta : undefined;
   const shareLink = isInitialProps(props) ? props.shareLink : undefined;
   const isExpired = isInitialProps(props) ? props.isExpired : undefined;
 
-  useHydratePageAtoms(pageData, undefined, {
+  useHydratePageAtoms(pageData, pageMeta, {
     shareLinkId: shareLink?._id,
   });
 
@@ -156,17 +156,6 @@ export const getServerSideProps: GetServerSideProps<Props> = async (
     'notFound' in commonEachPropsResult
   ) {
     return commonEachPropsResult;
-  }
-  const commonEachProps = await commonEachPropsResult.props;
-
-  // Handle redirect destination from common props
-  if (commonEachProps.redirectDestination != null) {
-    return {
-      redirect: {
-        permanent: false,
-        destination: commonEachProps.redirectDestination,
-      },
-    };
   }
 
   //

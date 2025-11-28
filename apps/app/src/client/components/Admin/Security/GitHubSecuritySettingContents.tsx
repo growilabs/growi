@@ -43,9 +43,11 @@ const GitHubSecurityManagementContents = (props: Props) => {
 
   const onClickSubmit = useCallback(async(data) => {
     try {
-      await adminGitHubSecurityContainer.changeGitHubClientId(data.githubClientId ?? '');
-      await adminGitHubSecurityContainer.changeGitHubClientSecret(data.githubClientSecret ?? '');
-      await adminGitHubSecurityContainer.updateGitHubSetting();
+      await adminGitHubSecurityContainer.updateGitHubSetting({
+        githubClientId: data.githubClientId ?? '',
+        githubClientSecret: data.githubClientSecret ?? '',
+        isSameUsernameTreatedAsIdenticalUser: adminGitHubSecurityContainer.state.isSameUsernameTreatedAsIdenticalUser,
+      });
       await adminGeneralSecurityContainer.retrieveSetupStratedies();
       toastSuccess(t('security_settings.OAuth.GitHub.updated_github'));
     }

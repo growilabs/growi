@@ -1,4 +1,4 @@
-import { type JSX, memo, useCallback } from 'react';
+import { type FC, type JSX, memo, useCallback } from 'react';
 import Link from 'next/link';
 import urljoin from 'url-join';
 
@@ -17,7 +17,7 @@ type PagePathHierarchicalLinkProps = {
   isInnerElem?: boolean;
 };
 
-export const PagePathHierarchicalLink = memo(
+export const PagePathHierarchicalLink: FC<PagePathHierarchicalLinkProps> = memo(
   (props: PagePathHierarchicalLinkProps): JSX.Element => {
     const {
       linkedPagePath,
