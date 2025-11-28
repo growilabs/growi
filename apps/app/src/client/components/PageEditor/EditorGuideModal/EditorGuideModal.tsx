@@ -1,81 +1,61 @@
 import {
-  useState, useEffect, type JSX, type CSSProperties, type RefObject,
+  useState, useEffect, useLayoutEffect, type JSX, type RefObject,
 } from 'react';
 
 import { useEditorGuideModalStatus, useEditorGuideModalActions } from '@growi/editor/dist/states/modal/editor-guide';
 import { createPortal } from 'react-dom';
 
-type SubstanceProps = {
+type Props = {
   containerRef: RefObject<HTMLDivElement | null>,
-  close: () => void,
 };
 
 /**
- * EditorGuideModalSubstance - The actual modal content
- * Renders backdrop and modal content over the specified area
- * Uses position:fixed to prevent scrolling with the container
+ * EditorGuideModal
+ *
+ * This modal overlays only the preview area (specified by containerRef),
+ * not the entire screen. Uses createPortal to render into document.body.
  */
-const EditorGuideModalSubstance = ({ containerRef, close }: SubstanceProps): JSX.Element => {
+export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
+  const { isOpened } = useEditorGuideModalStatus();
+  const { close } = useEditorGuideModalActions();
   const [isShown, setIsShown] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
 
-  // Get rect on mount and on resize
-  useEffect(() => {
-    const updateRect = () => {
-      if (containerRef.current != null) {
-        setRect(containerRef.current.getBoundingClientRect());
-      }
-    };
+  // Get rect on open and on resize
+  useLayoutEffect(() => {
+    if (!isOpened || containerRef.current == null) return;
 
+    const updateRect = () => setRect(containerRef.current?.getBoundingClientRect() ?? null);
     updateRect();
     window.addEventListener('resize', updateRect);
-
     return () => window.removeEventListener('resize', updateRect);
-  }, [containerRef]);
+  }, [isOpened, containerRef]);
 
   // Trigger fade-in after mount
   useEffect(() => {
-    // Use requestAnimationFrame to ensure the DOM has been painted before adding 'show' class
-    const frameId = requestAnimationFrame(() => {
-      setIsShown(true);
-    });
-    return () => cancelAnimationFrame(frameId);
-  }, []);
+    if (!isOpened) {
+      setIsShown(false);
+      return;
+    }
+    const id = requestAnimationFrame(() => setIsShown(true));
+    return () => cancelAnimationFrame(id);
+  }, [isOpened]);
 
-  // Fixed positioning style based on container's viewport position
-  const fixedStyle: CSSProperties = {
-    position: 'fixed',
-    top: rect?.top,
-    left: rect?.left,
-    width: rect?.width,
-    height: rect?.height,
+  if (!isOpened || rect == null) return <></>;
+
+  const style = {
+    position: 'fixed' as const, top: rect.top, left: rect.left, width: rect.width, height: rect.height,
   };
 
   return createPortal(
     <>
-      {/* Editor Guide Modal Overlay - covers only the preview area */}
-      <div
-        className={`modal-backdrop fade z-2 ${isShown ? 'show' : ''}`}
-        style={fixedStyle}
-        onClick={close}
-        aria-hidden="true"
-      />
-
-      {/* Editor Guide Modal Content */}
-      <div
-        className={`d-flex align-items-center justify-content-center z-3 pe-none fade ${isShown ? 'show' : ''}`}
-        style={fixedStyle}
-      >
+      <div className={`modal-backdrop fade z-2 ${isShown ? 'show' : ''}`} style={style} onClick={close} aria-hidden="true" />
+      <div className={`d-flex align-items-center justify-content-center z-3 pe-none fade ${isShown ? 'show' : ''}`} style={style}>
         <div className="px-3 pe-auto">
           <div className="card shadow-lg">
             <div className="card-header d-flex justify-content-between align-items-center">
               <h5 className="mb-0">Editor Guide</h5>
-              <button
-                type="button"
-                className="btn-close"
-                onClick={close}
-                aria-label="Close"
-              />
+              <button type="button" className="btn-close" onClick={close} aria-label="Close" />
             </div>
             <div className="card-body overflow-auto">
               <p>This is a test modal.</p>
@@ -89,25 +69,4 @@ const EditorGuideModalSubstance = ({ containerRef, close }: SubstanceProps): JSX
     </>,
     document.body,
   );
-};
-
-type Props = {
-  containerRef: RefObject<HTMLDivElement | null>,
-};
-
-/**
- * EditorGuideModal (Container)
- *
- * This modal overlays only the preview area (specified by containerRef),
- * not the entire screen. Uses createPortal to render into document.body.
- */
-export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
-  const { isOpened } = useEditorGuideModalStatus();
-  const { close } = useEditorGuideModalActions();
-
-  if (!isOpened || containerRef == null) {
-    return <></>;
-  }
-
-  return <EditorGuideModalSubstance containerRef={containerRef} close={close} />;
 };
