@@ -43,10 +43,6 @@ const GrowiNavbarBottom = dynamic(
     ),
   { ssr: false },
 );
-const SystemVersion = dynamic(
-  () => import('~/client/components/SystemVersion'),
-  { ssr: false },
-);
 // Page modals
 const PageCreateModal = dynamic(
   () => import('~/client/components/PageCreateModal'),
@@ -100,7 +96,6 @@ export const BasicLayout = ({ children, className }: Props): JSX.Element => {
       <ShortcutsModalLazyLoaded />
       <PageBulkExportSelectModalLazyLoaded />
       <GrantedGroupsInheritanceSelectModalLazyLoaded />
-      <SystemVersion showShortcutsButton />
     </RawLayout>
   );
 };
