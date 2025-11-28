@@ -40,15 +40,11 @@ export const HelpDropdown: FC = memo(() => {
       <DropdownMenu
         container="body"
         data-testid="help-dropdown-menu"
-        style={{ minWidth: '280px', fontSize: '14px' }}
         className={styles['help-dropdown-menu']}
       >
-        <DropdownItem header className="fw-semibold pt-3 pb-3" style={{ fontSize: '16px' }}>
+        <DropdownItem header className="text-secondary py-1">
           {t('Help')}
         </DropdownItem>
-
-        <DropdownItem divider />
-
         <DropdownItem
           tag="a"
           href="https://docs.growi.org"
@@ -58,8 +54,8 @@ export const HelpDropdown: FC = memo(() => {
           data-testid="growi-docs-link"
         >
           <span className="d-flex align-items-center">
-            <span className="flex-grow-1">GROWI Docs</span>
-            <span className="material-symbols-outlined ms-1 fs-6 opacity-50">open_in_new</span>
+            GROWI Docs
+            <span className="material-symbols-outlined ms-1 fs-6">open_in_new</span>
           </span>
         </DropdownItem>
 
@@ -72,29 +68,27 @@ export const HelpDropdown: FC = memo(() => {
           data-testid="growi-cloud-help-link"
         >
           <span className="d-flex align-items-center">
-            <span className="flex-grow-1">GROWI.cloud {t('Help')}</span>
-            <span className="material-symbols-outlined ms-1 fs-6 opacity-50">open_in_new</span>
+            GROWI.cloud {t('Help')}
+            <span className="material-symbols-outlined ms-1 fs-6">open_in_new</span>
           </span>
         </DropdownItem>
-
-        <DropdownItem divider className="my-2" />
-
         <DropdownItem
           className="my-1"
           onClick={() => openShortcutsModal()}
         >
           <span className="d-flex align-items-center">
-            <span className="material-symbols-outlined me-2 fs-6">keyboard</span>
             <span className="flex-grow-1">{t('Shortcuts')}</span>
-            <span className={`cmd-key ${os}`}></span>&nbsp;-/
+            <span className="text-secondary">
+              <span className={`cmd-key ${os}`} />&nbsp;+ /
+            </span>
           </span>
         </DropdownItem>
 
         <DropdownItem divider className="my-2" />
 
-        <DropdownItem header className="opacity-75" style={{ fontSize: '12px', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
-          <span>
-            <a href="https://growi.org" target="_blank" rel="noopener noreferrer" className="text-decoration-none">GROWI</a>
+        <DropdownItem header className="py-1">
+          <span className="d-flex">
+            <a href="https://growi.org" target="_blank" rel="noopener noreferrer" className="flex-grow-1 text-secondary">GROWI Version</a>
             {' '}
             {growiVersion}
           </span>

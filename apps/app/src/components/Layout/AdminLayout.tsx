@@ -55,7 +55,6 @@ const AdminLayout = ({ children, componentTitle }: Props): JSX.Element => {
         </div>
 
         <PageCreateModal />
-        <SystemVersion />
       </div>
 
       <HotkeysManager />
