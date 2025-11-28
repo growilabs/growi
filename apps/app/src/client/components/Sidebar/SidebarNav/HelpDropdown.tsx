@@ -6,8 +6,8 @@ import {
   UncontrolledDropdown, DropdownToggle, DropdownMenu, DropdownItem,
 } from 'reactstrap';
 
-import { useGrowiVersion } from '~/stores-universal/context';
-import { useShortcutsModal } from '~/stores/modal';
+import { useGrowiVersion } from '~/states/global';
+import { useShortcutsModalActions } from '~/states/ui/modal/shortcuts';
 
 import { SkeletonItem } from './SkeletonItem';
 
@@ -16,8 +16,8 @@ import styles from './HelpDropdown.module.scss';
 
 export const HelpDropdown: FC = memo(() => {
   const { t } = useTranslation('commons');
-  const { data: growiVersion } = useGrowiVersion();
-  const { open: openShortcutsModal } = useShortcutsModal();
+  const growiVersion = useGrowiVersion();
+  const { open: openShortcutsModal } = useShortcutsModalActions();
 
   if (growiVersion == null) {
     return <SkeletonItem />;
