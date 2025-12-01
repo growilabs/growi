@@ -115,7 +115,7 @@ export const CONFIG_KEYS = [
   'security:pageRecursiveDeletionAuthority',
   'security:pageRecursiveCompleteDeletionAuthority',
   'security:isAllGroupMembershipRequiredForPageCompleteDeletion',
-  'security:user-pages:areHidden',
+  'security:user-pages:isHidden',
   'security:user-homepage-deletion:isEnabled',
   'security:user-homepage-deletion:isForceDeleteUserHomepageOnUserDeletion',
   'security:isRomUserAllowedToComment',
