@@ -36,10 +36,21 @@ const SecuritySettingComponent: React.FC<Props> = ({ adminGeneralSecurityContain
 
   const onSubmit = useCallback(async(data: FormData) => {
     try {
-      // Update sessionMaxAge from form data
-      await adminGeneralSecurityContainer.setSessionMaxAge(data.sessionMaxAge);
-      // Save all security settings
-      await adminGeneralSecurityContainer.updateGeneralSecuritySetting();
+      // Save all security settings with form data
+      await adminGeneralSecurityContainer.updateGeneralSecuritySetting({
+        sessionMaxAge: data.sessionMaxAge,
+        restrictGuestMode: adminGeneralSecurityContainer.state.currentRestrictGuestMode,
+        pageDeletionAuthority: adminGeneralSecurityContainer.state.currentPageDeletionAuthority,
+        pageCompleteDeletionAuthority: adminGeneralSecurityContainer.state.currentPageCompleteDeletionAuthority,
+        pageRecursiveDeletionAuthority: adminGeneralSecurityContainer.state.currentPageRecursiveDeletionAuthority,
+        pageRecursiveCompleteDeletionAuthority: adminGeneralSecurityContainer.state.currentPageRecursiveCompleteDeletionAuthority,
+        isAllGroupMembershipRequiredForPageCompleteDeletion: adminGeneralSecurityContainer.state.isAllGroupMembershipRequiredForPageCompleteDeletion,
+        hideRestrictedByGroup: adminGeneralSecurityContainer.state.currentGroupRestrictionDisplayMode === 'Hidden',
+        hideRestrictedByOwner: adminGeneralSecurityContainer.state.currentOwnerRestrictionDisplayMode === 'Hidden',
+        isUsersHomepageDeletionEnabled: adminGeneralSecurityContainer.state.isUsersHomepageDeletionEnabled,
+        isForceDeleteUserHomepageOnUserDeletion: adminGeneralSecurityContainer.state.isForceDeleteUserHomepageOnUserDeletion,
+        isRomUserAllowedToComment: adminGeneralSecurityContainer.state.isRomUserAllowedToComment,
+      });
       toastSuccess(t('security_settings.updated_general_security_setting'));
     }
     catch (err) {

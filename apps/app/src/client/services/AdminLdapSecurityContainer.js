@@ -79,46 +79,11 @@ export default class AdminLdapSecurityContainer extends Container {
   }
 
   /**
-   * Change serverUrl
-   */
-  changeServerUrl(serverUrl) {
-    this.setState({ serverUrl });
-  }
-
-  /**
    * Change ldapBindMode
    * @param {boolean} isUserBind true: User Bind, false: Admin Bind
    */
   changeLdapBindMode(isUserBind) {
     this.setState({ isUserBind });
-  }
-
-  /**
-   * Change bindDN
-   */
-  changeBindDN(ldapBindDN) {
-    this.setState({ ldapBindDN });
-  }
-
-  /**
-   * Change bindDNPassword
-   */
-  changeBindDNPassword(ldapBindDNPassword) {
-    this.setState({ ldapBindDNPassword });
-  }
-
-  /**
-   * Change ldapSearchFilter
-   */
-  changeSearchFilter(ldapSearchFilter) {
-    this.setState({ ldapSearchFilter });
-  }
-
-  /**
-   * Change ldapAttrMapUsername
-   */
-  changeAttrMapUsername(ldapAttrMapUsername) {
-    this.setState({ ldapAttrMapUsername });
   }
 
   /**
@@ -129,62 +94,35 @@ export default class AdminLdapSecurityContainer extends Container {
   }
 
   /**
-   * Change ldapAttrMapMail
-   */
-  changeAttrMapMail(ldapAttrMapMail) {
-    this.setState({ ldapAttrMapMail });
-  }
-
-  /**
-   * Change ldapAttrMapName
-   */
-  changeAttrMapName(ldapAttrMapName) {
-    this.setState({ ldapAttrMapName });
-  }
-
-  /**
-   * Change ldapGroupSearchBase
-   */
-  changeGroupSearchBase(ldapGroupSearchBase) {
-    this.setState({ ldapGroupSearchBase });
-  }
-
-  /**
-   * Change ldapGroupSearchFilter
-   */
-  changeGroupSearchFilter(ldapGroupSearchFilter) {
-    this.setState({ ldapGroupSearchFilter });
-  }
-
-  /**
-   * Change ldapGroupDnProperty
-   */
-  changeGroupDnProperty(ldapGroupDnProperty) {
-    this.setState({ ldapGroupDnProperty });
-  }
-
-  /**
    * Update ldap option
    */
-  async updateLdapSetting() {
-    const {
-      serverUrl, isUserBind, ldapBindDN, ldapBindDNPassword, ldapSearchFilter, ldapAttrMapUsername, isSameUsernameTreatedAsIdenticalUser,
-      ldapAttrMapMail, ldapAttrMapName, ldapGroupSearchBase, ldapGroupSearchFilter, ldapGroupDnProperty,
-    } = this.state;
-
-    let requestParams = {
-      serverUrl,
-      isUserBind,
-      ldapBindDN,
-      ldapBindDNPassword,
-      ldapSearchFilter,
-      ldapAttrMapUsername,
-      isSameUsernameTreatedAsIdenticalUser,
-      ldapAttrMapMail,
-      ldapAttrMapName,
-      ldapGroupSearchBase,
-      ldapGroupSearchFilter,
-      ldapGroupDnProperty,
+  async updateLdapSetting(formData) {
+    let requestParams = formData != null ? {
+      serverUrl: formData.serverUrl,
+      isUserBind: formData.isUserBind,
+      ldapBindDN: formData.ldapBindDN,
+      ldapBindDNPassword: formData.ldapBindDNPassword,
+      ldapSearchFilter: formData.ldapSearchFilter,
+      ldapAttrMapUsername: formData.ldapAttrMapUsername,
+      isSameUsernameTreatedAsIdenticalUser: formData.isSameUsernameTreatedAsIdenticalUser,
+      ldapAttrMapMail: formData.ldapAttrMapMail,
+      ldapAttrMapName: formData.ldapAttrMapName,
+      ldapGroupSearchBase: formData.ldapGroupSearchBase,
+      ldapGroupSearchFilter: formData.ldapGroupSearchFilter,
+      ldapGroupDnProperty: formData.ldapGroupDnProperty,
+    } : {
+      serverUrl: this.state.serverUrl,
+      isUserBind: this.state.isUserBind,
+      ldapBindDN: this.state.ldapBindDN,
+      ldapBindDNPassword: this.state.ldapBindDNPassword,
+      ldapSearchFilter: this.state.ldapSearchFilter,
+      ldapAttrMapUsername: this.state.ldapAttrMapUsername,
+      isSameUsernameTreatedAsIdenticalUser: this.state.isSameUsernameTreatedAsIdenticalUser,
+      ldapAttrMapMail: this.state.ldapAttrMapMail,
+      ldapAttrMapName: this.state.ldapAttrMapName,
+      ldapGroupSearchBase: this.state.ldapGroupSearchBase,
+      ldapGroupSearchFilter: this.state.ldapGroupSearchFilter,
+      ldapGroupDnProperty: this.state.ldapGroupDnProperty,
     };
 
     requestParams = await removeNullPropertyFromObject(requestParams);

@@ -1,8 +1,29 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.3.5...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.3.7...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.3.7](https://github.com/growilabs/compare/v7.3.6...v7.3.7) - 2025-11-25
+
+### 💎 Features
+
+* feat(pdf-converter): Enable puppeteer-cluster config of pdf-converter from env var (#10516) @arafubeatbox
+
+### 🐛 Bug Fixes
+
+* fix: Admin form degradation (#10540) @yuki-takei
+
+## [v7.3.6](https://github.com/growilabs/compare/v7.3.5...v7.3.6) - 2025-11-18
+
+### 🐛 Bug Fixes
+
+* fix: Printing styles (#10505) @yuki-takei
+
+### 🧰 Maintenance
+
+* ci(deps): bump js-yaml from 4.1.0 to 4.1.1 (#10511) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Configure biome for app routes excluding apiv3 (#10496) @arafubeatbox
 
 ## [v7.3.5](https://github.com/growilabs/compare/v7.3.4...v7.3.5) - 2025-11-10
 

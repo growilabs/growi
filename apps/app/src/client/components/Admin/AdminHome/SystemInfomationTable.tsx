@@ -1,5 +1,7 @@
 import React from 'react';
 
+import { LoadingSpinner } from '@growi/ui/dist/components';
+
 import AdminHomeContainer from '~/client/services/AdminHomeContainer';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
@@ -17,7 +19,7 @@ const SystemInformationTable = (props: Props) => {
   } = adminHomeContainer.state;
 
   if (growiVersion == null || nodeVersion == null || npmVersion == null || pnpmVersion == null) {
-    return <></>;
+    return <LoadingSpinner />;
   }
 
   return (

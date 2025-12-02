@@ -46,18 +46,20 @@ const SamlSecurityManagementContents = (props: Props) => {
   }, [adminSamlSecurityContainer.state, reset]);
 
   const onSubmit = useCallback(async(data) => {
-    adminSamlSecurityContainer.changeSamlEntryPoint(data.samlEntryPoint);
-    adminSamlSecurityContainer.changeSamlIssuer(data.samlIssuer);
-    adminSamlSecurityContainer.changeSamlCert(data.samlCert);
-    adminSamlSecurityContainer.changeSamlAttrMapId(data.samlAttrMapId);
-    adminSamlSecurityContainer.changeSamlAttrMapUserName(data.samlAttrMapUsername);
-    adminSamlSecurityContainer.changeSamlAttrMapMail(data.samlAttrMapMail);
-    adminSamlSecurityContainer.changeSamlAttrMapFirstName(data.samlAttrMapFirstName);
-    adminSamlSecurityContainer.changeSamlAttrMapLastName(data.samlAttrMapLastName);
-    adminSamlSecurityContainer.changeSamlABLCRule(data.samlABLCRule);
-
     try {
-      await adminSamlSecurityContainer.updateSamlSetting();
+      await adminSamlSecurityContainer.updateSamlSetting({
+        samlEntryPoint: data.samlEntryPoint,
+        samlIssuer: data.samlIssuer,
+        samlCert: data.samlCert,
+        samlAttrMapId: data.samlAttrMapId,
+        samlAttrMapUsername: data.samlAttrMapUsername,
+        samlAttrMapMail: data.samlAttrMapMail,
+        samlAttrMapFirstName: data.samlAttrMapFirstName,
+        samlAttrMapLastName: data.samlAttrMapLastName,
+        isSameUsernameTreatedAsIdenticalUser: adminSamlSecurityContainer.state.isSameUsernameTreatedAsIdenticalUser,
+        isSameEmailTreatedAsIdenticalUser: adminSamlSecurityContainer.state.isSameEmailTreatedAsIdenticalUser,
+        samlABLCRule: data.samlABLCRule,
+      });
       toastSuccess(t('security_settings.SAML.updated_saml'));
     }
     catch (err) {
