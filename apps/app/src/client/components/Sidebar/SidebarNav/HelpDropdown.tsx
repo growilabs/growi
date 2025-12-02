@@ -6,7 +6,7 @@ import {
   UncontrolledDropdown, DropdownToggle, DropdownMenu, DropdownItem,
 } from 'reactstrap';
 
-import { useGrowiVersion } from '~/states/global';
+import { useGrowiVersion, useGrowiCloudUri } from '~/states/global';
 import { useShortcutsModalActions } from '~/states/ui/modal/shortcuts';
 
 import { SkeletonItem } from './SkeletonItem';
@@ -18,6 +18,7 @@ export const HelpDropdown: FC = memo(() => {
   const { t } = useTranslation();
   const growiVersion = useGrowiVersion();
   const { open: openShortcutsModal } = useShortcutsModalActions();
+  const growiCloudUri = useGrowiCloudUri();
 
   if (growiVersion == null) {
     return <SkeletonItem />;
@@ -27,6 +28,11 @@ export const HelpDropdown: FC = memo(() => {
   const platform = window.navigator.platform.toLowerCase();
   const isMac = (platform.indexOf('mac') > -1);
   const os = isMac ? 'mac' : 'win';
+
+  // Cloud users see Help, others see Docs
+  const isCloudUser = growiCloudUri != null;
+  const helpUrl = isCloudUser ? 'https://growi.cloud/help/' : 'https://docs.growi.org';
+  const helpLabel = isCloudUser ? t('Help') : 'GROWI Docs';
 
   return (
     <UncontrolledDropdown direction="end" className={styles['help-dropdown']}>
@@ -47,31 +53,18 @@ export const HelpDropdown: FC = memo(() => {
         </DropdownItem>
         <DropdownItem
           tag="a"
-          href="https://docs.growi.org"
+          href={helpUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="my-1"
-          data-testid="growi-docs-link"
+          data-testid="help-link"
         >
           <span className="d-flex align-items-center">
-            GROWI Docs
-            <span className="material-symbols-outlined ms-1 fs-6">open_in_new</span>
+            {helpLabel}
+            <span className="growi-custom-icons ms-1 small">external_link</span>
           </span>
         </DropdownItem>
 
-        <DropdownItem
-          tag="a"
-          href="https://growi.cloud/help/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="my-1"
-          data-testid="growi-cloud-help-link"
-        >
-          <span className="d-flex align-items-center">
-            {t('help_dropdown.growi_cloud_help')}
-            <span className="material-symbols-outlined ms-1 fs-6">open_in_new</span>
-          </span>
-        </DropdownItem>
         <DropdownItem
           className="my-1"
           onClick={() => openShortcutsModal()}

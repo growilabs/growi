@@ -5,19 +5,14 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
 import { useIsAdmin, useIsGuestUser } from '~/states/context';
-import { useGrowiCloudUri } from '~/states/global';
 
+import { HelpDropdown } from './HelpDropdown';
 import { SkeletonItem } from './SkeletonItem';
 
 import styles from './SecondaryItems.module.scss';
 
 
 const PersonalDropdown = dynamic(() => import('./PersonalDropdown').then(mod => mod.PersonalDropdown), {
-  ssr: false,
-  loading: () => <SkeletonItem />,
-});
-
-const HelpDropdown = dynamic(() => import('./HelpDropdown').then(mod => mod.HelpDropdown), {
   ssr: false,
   loading: () => <SkeletonItem />,
 });
@@ -48,7 +43,6 @@ const SecondaryItem: FC<SecondaryItemProps> = (props: SecondaryItemProps) => {
 export const SecondaryItems: FC = memo(() => {
 
   const isAdmin = useIsAdmin();
-  const growiCloudUri = useGrowiCloudUri();
   const isGuestUser = useIsGuestUser();
 
   return (
