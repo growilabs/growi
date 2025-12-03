@@ -24,6 +24,8 @@ export const revisionIdFromUrlAtom = atom<string | undefined>(undefined);
 export const pageLoadingAtom = atom(false);
 export const pageErrorAtom = atom<Error | null>(null);
 
+export const isLatestRevisionAtom = atom<boolean | undefined>(undefined);
+
 // Template data atoms (internal)
 export const templateTagsAtom = atom<string[]>([]);
 export const templateBodyAtom = atom<string>('');

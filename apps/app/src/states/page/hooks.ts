@@ -14,6 +14,7 @@ import {
   currentPagePathAtom,
   isForbiddenAtom,
   isIdenticalPathAtom,
+  isLatestRevisionAtom,
   isTrashPageAtom,
   isUntitledPageAtom,
   pageNotFoundAtom,
@@ -68,6 +69,10 @@ export const useRemoteRevisionLastUpdatedAt = () =>
   useAtomValue(remoteRevisionLastUpdatedAtAtom);
 
 export const useRedirectFrom = () => useAtomValue(redirectFromAtom);
+
+export const useIsLatestRevision = () => useAtomValue(isLatestRevisionAtom);
+
+export const useSetIsLatestRevision = () => useSetAtom(isLatestRevisionAtom);
 
 // Enhanced computed hooks (pure Jotai - no SWR needed)
 

@@ -114,6 +114,7 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
     redirectFrom: props.redirectFrom ?? undefined,
     templateTags: props.templateTagData,
     templateBody: props.templateBodyData,
+    isLatestRevision: props.isLatestRevision,
   });
 
   const currentPage = useCurrentPageData();

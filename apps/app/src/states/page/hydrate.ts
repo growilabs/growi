@@ -11,6 +11,7 @@ import {
   currentPageDataAtom,
   currentPageIdAtom,
   isForbiddenAtom,
+  isLatestRevisionAtom,
   pageNotFoundAtom,
   redirectFromAtom,
   remoteRevisionBodyAtom,
@@ -50,6 +51,7 @@ export const useHydratePageAtoms = (
     redirectFrom?: string;
     templateTags?: string[];
     templateBody?: string;
+    isLatestRevision?: boolean;
   },
 ): void => {
   useHydrateAtoms([
@@ -82,6 +84,9 @@ export const useHydratePageAtoms = (
       // Template data - from options (not auto-extracted from page)
       [templateTagsAtom, options?.templateTags ?? []],
       [templateBodyAtom, options?.templateBody ?? ''],
+
+      // isLatestRevision from page.isLatestRevision() (SSR)
+      [isLatestRevisionAtom, options?.isLatestRevision],
     ],
     { dangerouslyForceHydrate: true },
   );

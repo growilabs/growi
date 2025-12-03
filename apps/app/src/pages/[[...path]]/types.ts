@@ -10,6 +10,8 @@ type PageEachProps = {
 
   isIdenticalPathPage: boolean;
 
+  isLatestRevision?: boolean;
+
   templateTagData?: string[];
   templateBodyData?: string;
 };

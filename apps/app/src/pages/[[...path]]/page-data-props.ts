@@ -117,7 +117,10 @@ export async function getPageDataForInitial(
     Pick<GeneralPageInitialProps, 'pageWithMeta' | 'skipSSR'> &
       Pick<
         EachProps,
-        'currentPathname' | 'isIdenticalPathPage' | 'redirectFrom'
+        | 'currentPathname'
+        | 'isIdenticalPathPage'
+        | 'isLatestRevision'
+        | 'redirectFrom'
       >
   >
 > {
@@ -200,6 +203,7 @@ export async function getPageDataForInitial(
 
     // Handle existing page with valid meta that is not IPageNotFoundInfo
     page.initLatestRevisionField(revisionId);
+    const isLatestRevision = page.isLatestRevision();
     const ssrMaxRevisionBodyLength = configManager.getConfig(
       'app:ssrMaxRevisionBodyLength',
     );
@@ -216,6 +220,7 @@ export async function getPageDataForInitial(
       props: {
         currentPathname,
         isIdenticalPathPage: false,
+        isLatestRevision,
         pageWithMeta: {
           data: populatedPage,
           meta,

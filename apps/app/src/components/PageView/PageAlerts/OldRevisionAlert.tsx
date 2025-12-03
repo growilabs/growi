@@ -4,13 +4,13 @@ import { returnPathForURL } from '@growi/core/dist/utils/path-utils';
 import { useTranslation } from 'react-i18next';
 
 import { useCurrentPageData, useFetchCurrentPage } from '~/states/page';
-import { useSWRxIsLatestRevision } from '~/stores/page';
+import { useIsLatestRevision } from '~/states/page/hooks';
 
 export const OldRevisionAlert = (): JSX.Element => {
   const router = useRouter();
   const { t } = useTranslation();
 
-  const { data: isLatestRevision } = useSWRxIsLatestRevision();
+  const isLatestRevision = useIsLatestRevision();
   const page = useCurrentPageData();
   const { fetchCurrentPage } = useFetchCurrentPage();
 
