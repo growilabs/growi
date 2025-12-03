@@ -85,7 +85,6 @@ export const useHydratePageAtoms = (
       [templateTagsAtom, options?.templateTags ?? []],
       [templateBodyAtom, options?.templateBody ?? ''],
 
-      // isLatestRevision from page.isLatestRevision() (SSR)
       [isLatestRevisionAtom, options?.isLatestRevision],
     ],
     { dangerouslyForceHydrate: true },
