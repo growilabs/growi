@@ -5,8 +5,7 @@ import { CodeMirrorEditorReadOnly } from '@growi/editor/dist/client/components/C
 import { throttle } from 'throttle-debounce';
 
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
-import { useCurrentPageData } from '~/states/page';
-import { useSWRxIsLatestRevision } from '~/stores/page';
+import { useCurrentPageData, useIsLatestRevision } from '~/states/page';
 import { usePreviewOptions } from '~/stores/renderer';
 
 import { EditorNavbar } from './EditorNavbar';
@@ -22,7 +21,7 @@ export const PageEditorReadOnly = react.memo(({ visibility }: Props): JSX.Elemen
 
   const currentPage = useCurrentPageData();
   const { data: rendererOptions } = usePreviewOptions();
-  const { data: isLatestRevision } = useSWRxIsLatestRevision();
+  const isLatestRevision = useIsLatestRevision();
   const shouldExpandContent = useShouldExpandContent(currentPage);
 
   const { scrollEditorHandler, scrollPreviewHandler } = useScrollSync(GlobalCodeMirrorEditorKey.READONLY, previewRef);
