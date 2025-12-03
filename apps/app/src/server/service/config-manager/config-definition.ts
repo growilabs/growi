@@ -200,6 +200,7 @@ export const CONFIG_KEYS = [
 
   // Customize Settings
   'customize:isEmailPublishedForNewUser',
+  'customize:isReadOnlyForNewUser',
   'customize:css',
   'customize:script',
   'customize:noscript',
@@ -917,6 +918,10 @@ export const CONFIG_DEFINITIONS = {
   'customize:isEmailPublishedForNewUser': defineConfig<boolean>({
     envVarName: 'DEFAULT_EMAIL_PUBLISHED',
     defaultValue: true,
+  }),
+  'customize:isReadOnlyForNewUser': defineConfig<boolean>({
+    envVarName: 'DEFAULT_USER_READONLY',
+    defaultValue: false,
   }),
   'customize:css': defineConfig<string | undefined>({
     defaultValue: undefined,
