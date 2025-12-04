@@ -28,15 +28,21 @@ const CustomizeLogoSetting = (): JSX.Element => {
   const [isImageCropModalShow, setIsImageCropModalShow] = useState<boolean>(false);
   const [isDefaultLogoSelected, setIsDefaultLogoSelected] = useState<boolean>(isDefaultLogo ?? true);
   const [retrieveError, setRetrieveError] = useState<any>();
+  const [isFileSelected, setIsFileSelected] = useState<boolean>(false)
 
   const onSelectFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files != null && e.target.files.length > 0) {
+    const files = e.target.files;
+    const hasFile = files != null && files.length > 0;
+
+    setIsFileSelected(hasFile);
+
+    if (hasFile) {
       const reader = new FileReader();
       reader.addEventListener('load', () => setUploadLogoSrc(reader.result));
-      reader.readAsDataURL(e.target.files[0]);
+      reader.readAsDataURL(files[0]);
       setIsImageCropModalShow(true);
     }
-  }, []);
+  }, [setIsFileSelected, setUploadLogoSrc, setIsImageCropModalShow]);
 
   const onClickSubmit = useCallback(async () => {
     try {
@@ -147,7 +153,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
                 </div>
               </div>
             </div>
-            <AdminUpdateButtonRow onClick={onClickSubmit} disabled={retrieveError != null} />
+            <AdminUpdateButtonRow onClick={onClickSubmit} disabled={retrieveError != null || (!isDefaultLogoSelected && !isFileSelected)} />
           </div>
         </div>
       </div>
