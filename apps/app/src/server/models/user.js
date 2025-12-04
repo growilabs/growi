@@ -294,7 +294,7 @@ const factory = (crowi) => {
     this.isEmailPublished = configManager.getConfig(
       'customize:isEmailPublishedForNewUser',
     );
-    this.readOnly = configManager.getConfig('customize:isReadOnlyForNewUser');
+    this.readOnly = configManager.getConfig('app:isReadOnlyForNewUser');
 
     this.save((err, userData) => {
       userEvent.emit('activated', userData);
@@ -615,7 +615,7 @@ const factory = (crowi) => {
     }
 
     newUser.readOnly =
-      configManager.getConfig('customize:isReadOnlyForNewUser') ?? false;
+      configManager.getConfig('app:isReadOnlyForNewUser');
 
     try {
       const newUserData = await newUser.save();
@@ -708,7 +708,7 @@ const factory = (crowi) => {
     );
 
     newUser.readOnly =
-      configManager.getConfig('customize:isReadOnlyForNewUser') ?? false;
+      configManager.getConfig('app:isReadOnlyForNewUser');
 
     const globalLang = configManager.getConfig('app:globalLang');
     if (globalLang != null) {
