@@ -386,6 +386,7 @@ module.exports = (crowi) => {
       confidential: configManager.getConfig('app:confidential'),
       globalLang: configManager.getConfig('app:globalLang'),
       isEmailPublishedForNewUser: configManager.getConfig('customize:isEmailPublishedForNewUser'),
+      isReadOnlyForNewUser: configManager.getConfig('app:isReadOnlyForNewUser'),
       fileUpload: configManager.getConfig('app:fileUpload'),
       useOnlyEnvVarsForIsBulkExportPagesEnabled: configManager.getConfig('env:useOnlyEnvVars:app:isBulkExportPagesEnabled'),
       isV5Compatible: configManager.getConfig('app:isV5Compatible'),
@@ -485,6 +486,7 @@ module.exports = (crowi) => {
         'app:confidential': req.body.confidential,
         'app:globalLang': req.body.globalLang,
         'customize:isEmailPublishedForNewUser': req.body.isEmailPublishedForNewUser,
+        'app:isReadOnlyForNewUser': req.body.isReadOnlyForNewUser,
         'app:fileUpload': req.body.fileUpload,
       };
 
@@ -495,6 +497,7 @@ module.exports = (crowi) => {
           confidential: configManager.getConfig('app:confidential'),
           globalLang: configManager.getConfig('app:globalLang'),
           isEmailPublishedForNewUser: configManager.getConfig('customize:isEmailPublishedForNewUser'),
+          isReadOnlyForNewUser: configManager.getConfig('app:isReadOnlyForNewUser'),
           fileUpload: configManager.getConfig('app:fileUpload'),
         };
 
