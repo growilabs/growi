@@ -348,7 +348,7 @@
     "supplymentary_message_to_start": "至于API，只有管理员的API将是有效的。",
     "start_maintenance_mode": "启动维护模式",
     "end_maintenance_mode": "结束维护模式",
-    "description": "维护模式限制了所有的用户操作。 在执行 \"数据导入 \"和 \"升级到V5 \"之前，务必启动维护模式。 要退出，进入 \"安全设置\">\"维护模式\"。"
+    "description": "维护模式限制了所有的用户操作。 在执行 \"数据导入 \"和 \"升级到V5 \"之前，务必启动维护模式。 要退出，进入 \"系统设置\">\"维护模式\"。"
   },
   "app_setting": {
     "site_name": "网站名称 ",

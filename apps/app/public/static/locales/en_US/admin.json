@@ -339,7 +339,7 @@
     "supplymentary_message_to_start": "As for the API, only the administrator API will be functional.",
     "start_maintenance_mode": "Start maintenance mode",
     "end_maintenance_mode": "End maintenance mode",
-    "description": "Maintenance mode restricts all user operations. Always start the maintenance mode before \"importing data\" and \"upgrading to V5\". To exit, go to \"Security Settings\" > \"Maintenance Mode\"."
+    "description": "Maintenance mode restricts all user operations. Always start the maintenance mode before \"importing data\" and \"upgrading to V5\". To exit, go to \"App Settings\" > \"Maintenance Mode\"."
   },
   "app_setting": {
     "site_name": "Site name",

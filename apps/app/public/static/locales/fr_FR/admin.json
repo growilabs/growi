@@ -339,7 +339,7 @@
     "supplymentary_message_to_start": "Seul l'API d'administration sera actif.",
     "start_maintenance_mode": "Activer le mode maitenance",
     "end_maintenance_mode": "Désactiver le mode maitenance",
-    "description": "Le mode maintenance restreint l'utilisation de GROWI. Toujours démarrer le mode maintenance avant l'\"import de données\" et la \"conversion vers la V5\"."
+    "description": "Le mode maintenance restreint l'utilisation de GROWI. Toujours démarrer le mode maintenance avant l'\"import de données\" et la \"conversion vers la V5\".Pour quitter ce mode, veuillez vous rendre dans « Paramètres de l'application » > « Mode maintenance »."
   },
   "app_setting": {
     "site_name": "Nom",
