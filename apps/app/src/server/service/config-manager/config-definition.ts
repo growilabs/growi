@@ -529,7 +529,7 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:isReadOnlyForNewUser': defineConfig<boolean>({
     envVarName: 'DEFAULT_USER_READONLY',
-    defaultValue: true,
+    defaultValue: false,
   }),
 
   // Security Settings
