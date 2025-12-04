@@ -1,6 +1,6 @@
 {
   "name": "@growi/app",
-  "version": "7.3.7",
+  "version": "7.3.8-RC.0",
   "license": "MIT",
   "private": "true",
   "scripts": {
@@ -246,7 +246,7 @@
     "url-join": "^4.0.0",
     "usehooks-ts": "^2.6.0",
     "uuid": "^11.0.3",
-    "validator": "^13.15.20",
+    "validator": "^13.15.22",
     "ws": "^8.17.1",
     "xss": "^1.0.15",
     "y-mongodb-provider": "^0.2.0",

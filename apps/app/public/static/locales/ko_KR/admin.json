@@ -796,7 +796,11 @@
     "unset": "아니요",
     "related_username": "관련 사용자 ",
     "cannot_invite_maximum_users": "최대 사용자 수 이상을 초대할 수 없습니다.",
-    "current_users": "현재 사용자:"
+    "user_statistics": {
+      "total": "총 사용자",
+      "active": "활성",
+      "inactive": "비활성"
+    }
   },
   "user_group_management": {
     "user_group_management": "사용자 그룹 관리",

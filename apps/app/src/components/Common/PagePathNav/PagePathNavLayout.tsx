@@ -3,7 +3,7 @@ import dynamic from 'next/dynamic';
 
 import { useIsNotFound } from '~/stores/page';
 
-import styles from './PagePathNav.module.scss';
+import styles from './PagePathNavLayout.module.scss';
 
 const moduleClass = styles['grw-page-path-nav-layout'] ?? '';
 
