@@ -22,7 +22,7 @@ export const TableButton = (props: Props): JSX.Element => {
       className="btn btn-toolbar-button"
       onClick={onClickTableButton}
     >
-      <span className="material-symbols-outlined fs-5">table_chart</span>
+      <span className="material-symbols-outlined fs-5">table</span>
     </button>
   );
 };

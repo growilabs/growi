@@ -1,5 +1,5 @@
 import React, {
-  useState, useCallback, useMemo, type JSX,
+  useState, useCallback, useMemo, useEffect, type JSX,
 } from 'react';
 
 import { MarkdownTable, useHandsontableModalForEditorStatus, useHandsontableModalForEditorActions } from '@growi/editor';
@@ -11,7 +11,6 @@ import {
   Modal, ModalHeader, ModalBody, ModalFooter,
 } from 'reactstrap';
 import { debounce } from 'throttle-debounce';
-
 
 import { replaceFocusedMarkdownTableWithEditor, getMarkdownTable } from '~/client/components/PageEditor/markdown-table-util-for-editor';
 import { useHandsontableModalActions, useHandsontableModalStatus } from '~/states/ui/modal/handsontable';
@@ -30,22 +29,33 @@ const MARKDOWNTABLE_TO_HANDSONTABLE_ALIGNMENT_SYMBOL_MAPPING = {
   '': '',
 };
 
-export const HandsontableModalSubstance = (): JSX.Element => {
+type HandsontableModalSubstanceProps = {
+  initialTable: MarkdownTable | undefined;
+  autoFormatMarkdownTable: boolean;
+  isWindowExpanded: boolean;
+  onSave: (table: MarkdownTable) => void;
+  onCancel: () => void;
+  expandWindow: () => void;
+  contractWindow: () => void;
+};
+
+/**
+ * HandsontableModalSubstance - Presentation component (heavy logic, rendered only when isOpen)
+ */
+const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX.Element => {
+  const {
+    initialTable,
+    autoFormatMarkdownTable,
+    isWindowExpanded,
+
+    // Handlers
+    onSave,
+    onCancel,
+    expandWindow,
+    contractWindow,
+  } = props;
 
   const { t } = useTranslation('commons');
-  const handsontableModalData = useHandsontableModalStatus();
-  const { close: closeHandsontableModal } = useHandsontableModalActions();
-  const handsontableModalForEditorData = useHandsontableModalForEditorStatus();
-  const { close: closeHandsontableModalForEditor } = useHandsontableModalForEditorActions();
-
-  const isOpened = handsontableModalData?.isOpened ?? false;
-  const isOpendInEditor = handsontableModalForEditorData?.isOpened ?? false;
-  const table = handsontableModalData?.table;
-  const autoFormatMarkdownTable = handsontableModalData?.autoFormatMarkdownTable ?? false;
-  const editor = handsontableModalForEditorData?.editor;
-  const onSave = handsontableModalData?.onSave;
-
-  // Memoize default table creation
   const defaultMarkdownTable = useMemo(() => {
     return new MarkdownTable(
       [
@@ -91,7 +101,6 @@ export const HandsontableModalSubstance = (): JSX.Element => {
   const [hotTable, setHotTable] = useState<HotTable | null>();
   const [hotTableContainer, setHotTableContainer] = useState<HTMLDivElement | null>();
   const [isDataImportAreaExpanded, setIsDataImportAreaExpanded] = useState<boolean>(false);
-  const [isWindowExpanded, setIsWindowExpanded] = useState<boolean>(false);
   const [markdownTable, setMarkdownTable] = useState<MarkdownTable>(defaultMarkdownTable);
   const [markdownTableOnInit, setMarkdownTableOnInit] = useState<MarkdownTable>(defaultMarkdownTable);
   const [handsontableHeight, setHandsontableHeight] = useState<number>(DEFAULT_HOT_HEIGHT);
@@ -112,36 +121,22 @@ export const HandsontableModalSubstance = (): JSX.Element => {
     debounce(100, handleWindowExpandedChange)
   ), [handleWindowExpandedChange]);
 
-  // Memoize modal open handler
-  const handleModalOpen = useCallback(() => {
-    const markdownTableState = table == null && editor != null ? getMarkdownTable(editor) : table;
-    const initTableInstance = markdownTableState == null ? defaultMarkdownTable : markdownTableState.clone();
-    setMarkdownTable(markdownTableState ?? defaultMarkdownTable);
+  // Initialize table data when component mounts (modal opens)
+  useEffect(() => {
+    const initTableInstance = initialTable == null ? defaultMarkdownTable : initialTable.clone();
+    setMarkdownTable(initialTable ?? defaultMarkdownTable);
     setMarkdownTableOnInit(initTableInstance);
     debouncedHandleWindowExpandedChange();
-  }, [table, editor, defaultMarkdownTable, debouncedHandleWindowExpandedChange]);
+  }, [debouncedHandleWindowExpandedChange, defaultMarkdownTable, initialTable]); // Run only on mount
 
-  // Memoize expand/contract handlers
-  const expandWindow = useCallback(() => {
-    setIsWindowExpanded(true);
+  // Update handsontable size when window expansion changes
+  useEffect(() => {
+    if (!isWindowExpanded) {
+      // Reset height to default when contracted
+      setHandsontableHeight(DEFAULT_HOT_HEIGHT);
+    }
     debouncedHandleWindowExpandedChange();
-  }, [debouncedHandleWindowExpandedChange]);
-
-  const contractWindow = useCallback(() => {
-    setIsWindowExpanded(false);
-    // Set the height to the default value
-    setHandsontableHeight(DEFAULT_HOT_HEIGHT);
-    debouncedHandleWindowExpandedChange();
-  }, [debouncedHandleWindowExpandedChange]);
-
-  const markdownTableOption = {
-    get latest() {
-      return {
-        align: [].concat(markdownTable.options.align),
-        pad: autoFormatMarkdownTable !== false,
-      };
-    },
-  };
+  }, [isWindowExpanded, debouncedHandleWindowExpandedChange]);
 
   /**
    * Reset table data to initial value
@@ -154,36 +149,30 @@ export const HandsontableModalSubstance = (): JSX.Element => {
     setMarkdownTable(markdownTableOnInit.clone());
   };
 
-  const cancel = () => {
-    closeHandsontableModal();
-    closeHandsontableModalForEditor();
+  const cancel = useCallback(() => {
     setIsDataImportAreaExpanded(false);
-    setIsWindowExpanded(false);
-  };
+    contractWindow();
+    onCancel();
+  }, [contractWindow, onCancel]);
 
-  const save = () => {
+  const save = useCallback(() => {
     if (hotTable == null) {
       return;
     }
 
+    const markdownTableOption = {
+      align: [].concat(markdownTable.options.align),
+      pad: autoFormatMarkdownTable !== false,
+    };
+
     const newMarkdownTable = new MarkdownTable(
       hotTable.hotInstance.getData(),
-      markdownTableOption.latest,
+      markdownTableOption,
     ).normalizeCells();
 
-    // onSave is passed only when editing table directly from the page.
-    if (onSave != null) {
-      onSave(newMarkdownTable);
-      cancel();
-      return;
-    }
-
-    if (editor == null) {
-      return;
-    }
-    replaceFocusedMarkdownTableWithEditor(editor, newMarkdownTable);
+    onSave(newMarkdownTable);
     cancel();
-  };
+  }, [hotTable, markdownTable.options.align, autoFormatMarkdownTable, onSave, cancel]);
 
   const beforeColumnResizeHandler = (currentColumn) => {
     /*
@@ -458,16 +447,7 @@ export const HandsontableModalSubstance = (): JSX.Element => {
   );
 
   return (
-    <Modal
-      isOpen={isOpened || isOpendInEditor}
-      toggle={cancel}
-      backdrop="static"
-      keyboard={false}
-      size="lg"
-      wrapClassName={`${styles['grw-handsontable']}`}
-      className={`handsontable-modal ${isWindowExpanded && 'grw-modal-expanded'}`}
-      onOpened={handleModalOpen}
-    >
+    <>
       <ModalHeader tag="h4" toggle={cancel} close={closeButton}>
         {t('handsontable_modal.title')}
       </ModalHeader>
@@ -531,10 +511,89 @@ export const HandsontableModalSubstance = (): JSX.Element => {
           <button type="button" className="btn btn-primary" onClick={save}>{t('handsontable_modal.done')}</button>
         </div>
       </ModalFooter>
-    </Modal>
+    </>
   );
 };
 
+/**
+ * HandsontableModal - Container component (lightweight, always rendered)
+ * Handles both View and Editor modes
+ */
 export const HandsontableModal = (): JSX.Element => {
-  return <HandsontableModalSubstance />;
+  // for View
+  const handsontableModalData = useHandsontableModalStatus();
+  const { close: closeHandsontableModal } = useHandsontableModalActions();
+
+  // for Editor
+  const handsontableModalForEditorData = useHandsontableModalForEditorStatus();
+  const { close: closeHandsontableModalForEditor } = useHandsontableModalForEditorActions();
+
+  const isOpenedForView = handsontableModalData.isOpened;
+  const isOpenedForEditor = handsontableModalForEditorData.isOpened;
+  const isOpened = isOpenedForView || isOpenedForEditor;
+
+  const [isWindowExpanded, setIsWindowExpanded] = useState<boolean>(false);
+
+  // Determine initial table based on mode
+  const initialTable = useMemo(() => {
+    if (isOpenedForEditor) {
+      const editor = handsontableModalForEditorData.editor;
+      return editor != null ? getMarkdownTable(editor) : undefined;
+    }
+    return handsontableModalData.table;
+  }, [isOpenedForEditor, handsontableModalForEditorData.editor, handsontableModalData.table]);
+
+  // Determine autoFormatMarkdownTable based on mode
+  const autoFormatMarkdownTable = handsontableModalData.autoFormatMarkdownTable ?? false;
+
+  const toggle = useCallback(() => {
+    closeHandsontableModal();
+    closeHandsontableModalForEditor();
+    setIsWindowExpanded(false);
+  }, [closeHandsontableModal, closeHandsontableModalForEditor]);
+
+  const expandWindow = useCallback(() => {
+    setIsWindowExpanded(true);
+  }, []);
+
+  const contractWindow = useCallback(() => {
+    setIsWindowExpanded(false);
+  }, []);
+
+  // Create save handler based on mode
+  const handleSave = useCallback((newMarkdownTable: MarkdownTable) => {
+    if (isOpenedForEditor) {
+      const editor = handsontableModalForEditorData.editor;
+      if (editor != null) {
+        replaceFocusedMarkdownTableWithEditor(editor, newMarkdownTable);
+      }
+    }
+    else {
+      handsontableModalData.onSave?.(newMarkdownTable);
+    }
+  }, [isOpenedForEditor, handsontableModalForEditorData.editor, handsontableModalData]);
+
+  return (
+    <Modal
+      isOpen={isOpened}
+      toggle={toggle}
+      backdrop="static"
+      keyboard={false}
+      size="lg"
+      wrapClassName={`${styles['grw-handsontable']}`}
+      className={`handsontable-modal ${isWindowExpanded ? 'grw-modal-expanded' : ''}`}
+    >
+      {isOpened && (
+        <HandsontableModalSubstance
+          initialTable={initialTable}
+          autoFormatMarkdownTable={autoFormatMarkdownTable}
+          onSave={handleSave}
+          onCancel={toggle}
+          isWindowExpanded={isWindowExpanded}
+          expandWindow={expandWindow}
+          contractWindow={contractWindow}
+        />
+      )}
+    </Modal>
+  );
 };
