@@ -1,36 +1,36 @@
 import { allOrigin } from '@growi/core';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import type {
   IPage, IUser, IUserHasId,
 } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { isCreatablePage, isUserPage, isUsersHomepage } from '@growi/core/dist/utils/page-path-utils';
-import { attachTitleHeader, normalizePath } from '@growi/core/dist/utils/path-utils';
+import { normalizePath } from '@growi/core/dist/utils/path-utils';
 import type { Request, RequestHandler } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { isAiEnabled } from '~/features/openai/server/services';
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IApiv3PageCreateParams } from '~/interfaces/apiv3';
-import { subscribeRuleNames } from '~/interfaces/in-app-notification';
 import type { IOptionsForCreate } from '~/interfaces/page';
-import { SCOPE } from '@growi/core/dist/interfaces';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
-import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
-import type { PageDocument, PageModel } from '~/server/models/page';
-import PageTagRelation from '~/server/models/page-tag-relation';
+import type { PageDocument } from '~/server/models/page';
 import { serializePageSecurely, serializeRevisionSecurely } from '~/server/models/serializers';
-import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
+
+import {
+  determineBodyAndTags,
+  saveTags,
+  postAction,
+} from './create-page-helpers';
 
 
 const logger = loggerFactory('growi:routes:apiv3:page:create-page');
@@ -100,7 +100,6 @@ interface CreatePageRequest extends Request<undefined, ApiV3Response, ReqBody> {
 type CreatePageHandlersFactory = (crowi: Crowi) => RequestHandler[];
 
 export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
-  const Page = mongoose.model<IPage, PageModel>('Page');
   const User = mongoose.model<IUser, { isExistUserByUserPagePath: any }>('User');
 
   const loginRequiredStrictly = require('../../../middlewares/login-required')(crowi);
@@ -125,95 +124,6 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
     body('wip').optional().isBoolean().withMessage('wip must be boolean'),
     body('origin').optional().isIn(allOrigin).withMessage('origin must be "view" or "editor"'),
   ];
-
-
-  async function determineBodyAndTags(
-      path: string,
-      _body: string | null | undefined, _tags: string[] | null | undefined,
-  ): Promise<{ body: string, tags: string[] }> {
-
-    let body: string = _body ?? '';
-    let tags: string[] = _tags ?? [];
-
-    if (_body == null) {
-      const isEnabledAttachTitleHeader = await configManager.getConfig('customize:isEnabledAttachTitleHeader');
-      if (isEnabledAttachTitleHeader) {
-        body += `${attachTitleHeader(path)}\n`;
-      }
-
-      const templateData = await Page.findTemplate(path);
-      if (templateData.templateTags != null) {
-        tags = templateData.templateTags;
-      }
-      if (templateData.templateBody != null) {
-        body += `${templateData.templateBody}\n`;
-      }
-    }
-
-    return { body, tags };
-  }
-
-  async function saveTags({ createdPage, pageTags }: { createdPage: PageDocument, pageTags: string[] }) {
-    const tagEvent = crowi.event('tag');
-    await PageTagRelation.updatePageTags(createdPage.id, pageTags);
-    tagEvent.emit('update', createdPage, pageTags);
-    return PageTagRelation.listTagNamesByPage(createdPage.id);
-  }
-
-  async function postAction(req: CreatePageRequest, res: ApiV3Response, createdPage: HydratedDocument<PageDocument>) {
-    // persist activity
-    const parameters = {
-      targetModel: SupportedTargetModel.MODEL_PAGE,
-      target: createdPage,
-      action: SupportedAction.ACTION_PAGE_CREATE,
-    };
-    const activityEvent = crowi.event('activity');
-    activityEvent.emit('update', res.locals.activity._id, parameters);
-
-    // global notification
-    try {
-      await crowi.globalNotificationService.fire(GlobalNotificationSettingEvent.PAGE_CREATE, createdPage, req.user);
-    }
-    catch (err) {
-      logger.error('Create grobal notification failed', err);
-    }
-
-    // user notification
-    const { isSlackEnabled, slackChannels } = req.body;
-    if (isSlackEnabled) {
-      try {
-        const results = await crowi.userNotificationService.fire(createdPage, req.user, slackChannels, 'create');
-        results.forEach((result) => {
-          if (result.status === 'rejected') {
-            logger.error('Create user notification failed', result.reason);
-          }
-        });
-      }
-      catch (err) {
-        logger.error('Create user notification failed', err);
-      }
-    }
-
-    // create subscription
-    try {
-      await crowi.inAppNotificationService.createSubscription(req.user._id, createdPage._id, subscribeRuleNames.PAGE_CREATE);
-    }
-    catch (err) {
-      logger.error('Failed to create subscription document', err);
-    }
-
-    // Rebuild vector store file
-    if (isAiEnabled()) {
-      const { getOpenaiService } = await import('~/features/openai/server/services/openai');
-      try {
-        const openaiService = getOpenaiService();
-        await openaiService?.createVectorStoreFileOnPageCreate([createdPage]);
-      }
-      catch (err) {
-        logger.error('Rebuild vector store failed', err);
-      }
-    }
-  }
 
   const addActivity = generateAddActivityMiddleware();
 
@@ -268,7 +178,7 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
         return res.apiv3Err(err);
       }
 
-      const savedTags = await saveTags({ createdPage, pageTags: tags });
+      const savedTags = await saveTags({ createdPage, pageTags: tags }, crowi);
 
       const result = {
         page: serializePageSecurely(createdPage),
@@ -278,7 +188,7 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
 
       res.apiv3(result, 201);
 
-      postAction(req, res, createdPage);
+      postAction(req, res, createdPage, crowi);
     },
   ];
 };
