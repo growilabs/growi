@@ -2,8 +2,8 @@ import { useCallback, useEffect } from 'react';
 
 import { useRouter } from 'next/router';
 
-import { useIsEditable } from '~/stores-universal/context';
-import { useEditorMode, determineEditorModeByHash } from '~/stores-universal/ui';
+import { useIsEditable } from '~/states/page';
+import { useEditorMode, determineEditorModeByHash } from '~/states/ui/editor';
 
 /**
  * Change editorMode by browser forward/back operation
@@ -11,16 +11,16 @@ import { useEditorMode, determineEditorModeByHash } from '~/stores-universal/ui'
 export const useHashChangedEffect = (): void => {
   const router = useRouter();
 
-  const { data: isEditable } = useIsEditable();
-  const { data: editorMode, mutate: mutateEditorMode } = useEditorMode();
+  const isEditable = useIsEditable();
+  const { editorMode, setEditorMode } = useEditorMode();
 
   const hashchangeHandler = useCallback(() => {
     const newEditorMode = determineEditorModeByHash();
 
     if (editorMode !== newEditorMode) {
-      mutateEditorMode(newEditorMode);
+      setEditorMode(newEditorMode);
     }
-  }, [editorMode, mutateEditorMode]);
+  }, [editorMode, setEditorMode]);
 
   // setup effect
   useEffect(() => {

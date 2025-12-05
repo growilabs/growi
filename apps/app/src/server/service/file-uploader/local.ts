@@ -56,11 +56,34 @@ class LocalFileUploader extends AbstractFileUploader {
   /**
    * @inheritdoc
    */
-  override deleteFiles() {
-    throw new Error('Method not implemented.');
+  override async deleteFile(attachment: IAttachmentDocument): Promise<void> {
+    const filePath = this.getFilePathOnStorage(attachment);
+    return this.deleteFileByFilePath(filePath);
   }
 
-  deleteFileByFilePath(filePath: string): void {
+  /**
+   * @inheritdoc
+   */
+  override async deleteFiles(attachments: IAttachmentDocument[]): Promise<void> {
+    await Promise.all(attachments.map((attachment) => {
+      return this.deleteFile(attachment);
+    }));
+  }
+
+  private async deleteFileByFilePath(filePath: string): Promise<void> {
+    // check file exists
+    try {
+      fs.statSync(filePath);
+    }
+    catch (err) {
+      logger.warn(`Any AttachmentFile which path is '${filePath}' does not exist in local fs`);
+      return;
+    }
+
+    return fs.unlinkSync(filePath);
+  }
+
+  getFilePathOnStorage(_attachment: IAttachmentDocument): string {
     throw new Error('Method not implemented.');
   }
 
@@ -108,14 +131,14 @@ module.exports = function(crowi: Crowi) {
 
   const basePath = path.posix.join(crowi.publicDir, 'uploads');
 
-  function getFilePathOnStorage(attachment: IAttachmentDocument) {
+  lib.getFilePathOnStorage = function(attachment: IAttachmentDocument) {
     const dirName = (attachment.page != null)
       ? FilePathOnStoragePrefix.attachment
       : FilePathOnStoragePrefix.user;
     const filePath = path.posix.join(basePath, dirName, attachment.fileName);
 
     return filePath;
-  }
+  };
 
   async function readdirRecursively(dirPath) {
     const directories = await fsPromises.readdir(dirPath, { withFileTypes: true });
@@ -131,34 +154,10 @@ module.exports = function(crowi: Crowi) {
     return true;
   };
 
-  (lib as any).deleteFile = async function(attachment) {
-    const filePath = getFilePathOnStorage(attachment);
-    return lib.deleteFileByFilePath(filePath);
-  };
-
-  (lib as any).deleteFiles = async function(attachments) {
-    attachments.map((attachment) => {
-      return (lib as any).deleteFile(attachment);
-    });
-  };
-
-  lib.deleteFileByFilePath = async function(filePath) {
-    // check file exists
-    try {
-      fs.statSync(filePath);
-    }
-    catch (err) {
-      logger.warn(`Any AttachmentFile which path is '${filePath}' does not exist in local fs`);
-      return;
-    }
-
-    return fs.unlinkSync(filePath);
-  };
-
   lib.uploadAttachment = async function(fileStream, attachment) {
     logger.debug(`File uploading: fileName=${attachment.fileName}`);
 
-    const filePath = getFilePathOnStorage(attachment);
+    const filePath = lib.getFilePathOnStorage(attachment);
     const dirpath = path.posix.dirname(filePath);
 
     // mkdir -p
@@ -211,7 +210,7 @@ module.exports = function(crowi: Crowi) {
    * @return {stream.Readable} readable stream
    */
   lib.findDeliveryFile = async function(attachment) {
-    const filePath = getFilePathOnStorage(attachment);
+    const filePath = lib.getFilePathOnStorage(attachment);
 
     // check file exists
     try {
@@ -226,25 +225,13 @@ module.exports = function(crowi: Crowi) {
   };
 
   /**
-   * check the file size limit
-   *
-   * In detail, the followings are checked.
-   * - per-file size limit (specified by MAX_FILE_SIZE)
-   */
-  (lib as any).checkLimit = async function(uploadFileSize) {
-    const maxFileSize = configManager.getConfig('app:maxFileSize');
-    const totalLimit = configManager.getConfig('app:fileUploadTotalLimit');
-    return lib.doCheckLimit(uploadFileSize, maxFileSize, totalLimit);
-  };
-
-  /**
    * Respond to the HTTP request.
    * @param {Response} res
    * @param {Response} attachment
    */
   lib.respond = function(res, attachment, opts) {
     // Responce using internal redirect of nginx or Apache.
-    const storagePath = getFilePathOnStorage(attachment);
+    const storagePath = lib.getFilePathOnStorage(attachment);
     const relativePath = path.relative(crowi.publicDir, storagePath);
     const internalPathRoot = configManager.getConfig('fileUpload:local:internalRedirectPath');
     const internalPath = urljoin(internalPathRoot, relativePath);

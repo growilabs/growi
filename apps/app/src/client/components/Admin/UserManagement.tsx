@@ -13,6 +13,7 @@ import { withUnstatedContainers } from '../UnstatedUtils';
 
 import InviteUserControl from './Users/InviteUserControl';
 import PasswordResetModal from './Users/PasswordResetModal';
+import UserStatisticsTable from './Users/UserStatisticsTable';
 import UserTable from './Users/UserTable';
 
 import styles from './UserManagement.module.scss';
@@ -40,7 +41,8 @@ const UserManagement = (props: UserManagementProps) => {
   // for Next routing
   useEffect(() => {
     pagingHandler(1);
-  }, [pagingHandler]);
+    adminUsersContainer.retrieveUserStatistics();
+  }, [pagingHandler, adminUsersContainer]);
 
   const validateToggleStatus = (statusType: string) => {
     return (adminUsersContainer.isSelected(statusType)) ? (
@@ -134,6 +136,9 @@ const UserManagement = (props: UserManagementProps) => {
       </p>
 
       <h2>{t('user_management.user_management')}</h2>
+      <UserStatisticsTable
+        userStatistics={adminUsersContainer.state.userStatistics}
+      />
       <div className="border-top border-bottom">
 
         <div className="row d-flex justify-content-start align-items-center my-2">

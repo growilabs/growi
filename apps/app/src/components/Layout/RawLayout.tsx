@@ -29,9 +29,23 @@ type Props = {
 
 export const RawLayout = ({ children, className }: Props): JSX.Element => {
   const classNames: string[] = ['layout-root', 'growi'];
-  if (className != null) {
-    classNames.push(className);
+
+  // Use state to handle SSR/CSR className mismatch
+  // Using state ensures React properly updates the DOM after hydration
+  const [dynamicClassName, setDynamicClassName] = useState<string | undefined>(
+    undefined,
+  );
+
+  useIsomorphicLayoutEffect(() => {
+    if (className !== dynamicClassName) {
+      setDynamicClassName(className);
+    }
+  }, [className, dynamicClassName]);
+
+  if (dynamicClassName != null) {
+    classNames.push(dynamicClassName);
   }
+
   // get color scheme from next-themes
   const { resolvedTheme, resolvedThemeByAttributes } = useNextThemes();
 

@@ -34,6 +34,7 @@ export default class AdminUsersContainer extends Container {
       pagingLimit: Infinity,
       selectedStatusList: new Set(['all']),
       searchText: '',
+      userStatistics: null,
     };
 
     this.showPasswordResetModal = this.showPasswordResetModal.bind(this);
@@ -156,6 +157,15 @@ export default class AdminUsersContainer extends Container {
       activePage: selectedPage,
     });
 
+  }
+
+  /**
+ * retrieve user statistics
+ */
+  async retrieveUserStatistics() {
+    const statsRes = await apiv3Get('/statistics/user');
+    const userStatistics = statsRes.data.data;
+    this.setState({ userStatistics });
   }
 
   /**

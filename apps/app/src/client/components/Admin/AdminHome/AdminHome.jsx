@@ -17,6 +17,7 @@ import { withUnstatedContainers } from '../../UnstatedUtils';
 import { EnvVarsTable } from './EnvVarsTable';
 import SystemInfomationTable from './SystemInfomationTable';
 
+
 const logger = loggerFactory('growi:admin');
 
 const AdminHome = (props) => {
@@ -59,7 +60,7 @@ const AdminHome = (props) => {
         )
       }
       {
-      // Alert message will be displayed in case that V5 migration has not been compleated
+        // Alert message will be displayed in case that V5 migration has not been compleated
         (migrationStatus != null && !migrationStatus.isV5Compatible)
         && (
           <div className={`alert ${migrationStatus.isV5Compatible == null ? 'alert-warning' : 'alert-info'}`}>
@@ -90,7 +91,7 @@ const AdminHome = (props) => {
           <p>{t('admin:admin_top.env_var_priority')}</p>
           {/* eslint-disable-next-line react/no-danger */}
           <p dangerouslySetInnerHTML={{ __html: t('admin:admin_top.about_security') }} />
-          {adminHomeContainer.state.envVars && <EnvVarsTable envVars={adminHomeContainer.state.envVars} />}
+          <EnvVarsTable envVars={adminHomeContainer.state.envVars} />
         </div>
       </div>
 

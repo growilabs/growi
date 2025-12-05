@@ -5,7 +5,7 @@ import { useTranslation } from 'next-i18next';
 
 import AdminUsersContainer from '~/client/services/AdminUsersContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -33,7 +33,7 @@ const RevokeAdminMenuItem = (props: Props): JSX.Element => {
 
   const { adminUsersContainer, user } = props;
 
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser();
 
   const clickRevokeAdminBtnHandler = useCallback(async() => {
     try {

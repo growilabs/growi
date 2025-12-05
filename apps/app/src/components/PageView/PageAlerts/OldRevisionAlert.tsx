@@ -1,21 +1,21 @@
-import React, { type JSX, useCallback } from 'react';
+import { type JSX, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { returnPathForURL } from '@growi/core/dist/utils/path-utils';
 import { useTranslation } from 'react-i18next';
 
 import {
-  useIsLatestRevision,
-  useSWRMUTxCurrentPage,
-  useSWRxCurrentPage,
-} from '~/stores/page';
+  useCurrentPageData,
+  useFetchCurrentPage,
+  useRevisionIdFromUrl,
+} from '~/states/page';
 
 export const OldRevisionAlert = (): JSX.Element => {
   const router = useRouter();
   const { t } = useTranslation();
 
-  const { data: isOldRevisionPage } = useIsLatestRevision();
-  const { data: page } = useSWRxCurrentPage();
-  const { trigger: mutateCurrentPage } = useSWRMUTxCurrentPage();
+  const revisionIdFromUrl = useRevisionIdFromUrl();
+  const page = useCurrentPageData();
+  const { fetchCurrentPage } = useFetchCurrentPage();
 
   const onClickShowLatestButton = useCallback(async () => {
     if (page == null) {
@@ -24,10 +24,12 @@ export const OldRevisionAlert = (): JSX.Element => {
 
     const url = returnPathForURL(page.path, page._id);
     await router.push(url);
-    mutateCurrentPage();
-  }, [mutateCurrentPage, page, router]);
+    fetchCurrentPage({ force: true });
+  }, [fetchCurrentPage, page, router]);
 
-  if (page == null || isOldRevisionPage) {
+  // Show alert only when intentionally viewing a specific (past) revision (revisionIdFromUrl != null)
+  if (revisionIdFromUrl == null) {
+    // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }
 

@@ -5,13 +5,10 @@ import { SubscriptionStatusType } from '@growi/core';
 import urljoin from 'url-join';
 
 import type { SyncLatestRevisionBody } from '~/interfaces/yjs';
-import { useIsGuestUser } from '~/stores-universal/context';
-import { useEditingMarkdown, usePageTagsForEditors } from '~/stores/editor';
-import {
-  useCurrentPageId, useSWRMUTxCurrentPage, useSWRxApplicableGrant, useSWRxTagsInfo,
-  useSWRxCurrentGrantData,
-} from '~/stores/page';
-import { useSetRemoteLatestPageData } from '~/stores/remote-latest-page';
+import { useIsGuestUser } from '~/states/context';
+import { useFetchCurrentPage, useSetRemoteLatestPageData } from '~/states/page';
+import { useSetEditingMarkdown } from '~/states/ui/editor';
+import { useSWRxApplicableGrant, useSWRxCurrentGrantData } from '~/stores/page';
 import loggerFactory from '~/utils/logger';
 
 import { apiPost } from '../util/apiv1-client';
@@ -98,13 +95,11 @@ export type UpdateStateAfterSaveOption = {
 }
 
 export const useUpdateStateAfterSave = (pageId: string|undefined|null, opts?: UpdateStateAfterSaveOption): (() => Promise<void>) | undefined => {
-  const { mutate: mutateCurrentPageId } = useCurrentPageId();
-  const { trigger: mutateCurrentPage } = useSWRMUTxCurrentPage();
-  const { setRemoteLatestPageData } = useSetRemoteLatestPageData();
-  const { mutate: mutateTagsInfo } = useSWRxTagsInfo(pageId);
-  const { sync: syncTagsInfoForEditor } = usePageTagsForEditors(pageId);
-  const { mutate: mutateEditingMarkdown } = useEditingMarkdown();
-  const { data: isGuestUser } = useIsGuestUser();
+  const isGuestUser = useIsGuestUser();
+  const { fetchCurrentPage } = useFetchCurrentPage();
+  const setRemoteLatestPageData = useSetRemoteLatestPageData();
+
+  const setEditingMarkdown = useSetEditingMarkdown();
   const { mutate: mutateCurrentGrantData } = useSWRxCurrentGrantData(isGuestUser ? null : pageId);
   const { mutate: mutateApplicableGrant } = useSWRxApplicableGrant(isGuestUser ? null : pageId);
 
@@ -112,13 +107,7 @@ export const useUpdateStateAfterSave = (pageId: string|undefined|null, opts?: Up
   return useCallback(async() => {
     if (pageId == null) { return }
 
-    // update tag before page: https://github.com/growilabs/growi/pull/7158
-    // !! DO NOT CHANGE THE ORDERS OF THE MUTATIONS !! -- 12.26 yuken-t
-    await mutateTagsInfo(); // get from DB
-    syncTagsInfoForEditor(); // sync global state for client
-
-    await mutateCurrentPageId(pageId);
-    const updatedPage = await mutateCurrentPage();
+    const updatedPage = await fetchCurrentPage({ pageId, force: true });
 
     if (updatedPage == null || updatedPage.revision == null) { return }
 
@@ -126,7 +115,7 @@ export const useUpdateStateAfterSave = (pageId: string|undefined|null, opts?: Up
     // and see: https://github.com/growilabs/growi/pull/7118
     const supressEditingMarkdownMutation = opts?.supressEditingMarkdownMutation ?? false;
     if (!supressEditingMarkdownMutation) {
-      mutateEditingMarkdown(updatedPage.revision.body);
+      setEditingMarkdown(updatedPage.revision.body);
     }
 
     mutateCurrentGrantData();
@@ -141,8 +130,7 @@ export const useUpdateStateAfterSave = (pageId: string|undefined|null, opts?: Up
 
     setRemoteLatestPageData(remoterevisionData);
   },
-  // eslint-disable-next-line max-len
-  [pageId, mutateTagsInfo, syncTagsInfoForEditor, mutateCurrentPageId, mutateCurrentPage, opts?.supressEditingMarkdownMutation, mutateCurrentGrantData, mutateApplicableGrant, setRemoteLatestPageData, mutateEditingMarkdown]);
+  [pageId, fetchCurrentPage, opts?.supressEditingMarkdownMutation, mutateCurrentGrantData, mutateApplicableGrant, setRemoteLatestPageData, setEditingMarkdown]);
 };
 
 export const unlink = async(path: string): Promise<void> => {

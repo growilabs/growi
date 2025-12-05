@@ -8,4 +8,13 @@
   --font-family-sans-serif: -apple-system, blinkmacsystemfont, 'Hiragino Kaku Gothic ProN', meiryo, sans-serif;
   --font-family-serif: georgia, 'Times New Roman', times, serif;
   --font-family-monospace: Menlo, Consolas, DejaVu Sans Mono, monospace;
+  --grw-font-family-custom-icon: 'growi-custom-icons';
+}
+
+.growi-custom-icons {
+  font-family: var(--grw-font-family-custom-icon);
+  font-size: 0.8em;
+  font-style: normal;
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
 }

@@ -1,11 +1,11 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
-import { parseISO, addMinutes, isValid } from 'date-fns';
+import { addMinutes, isValid, parseISO } from 'date-fns';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
 
 import type { IActivity, ISearchFilter } from '~/interfaces/activity';
-import { SCOPE } from '@growi/core/dist/interfaces';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
@@ -13,18 +13,21 @@ import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-
 import type { ApiV3Response } from './interfaces/apiv3-response';
-
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
 
-
 const validator = {
   list: [
-    query('limit').optional().isInt({ max: 100 }).withMessage('limit must be a number less than or equal to 100'),
+    query('limit')
+      .optional()
+      .isInt({ max: 100 })
+      .withMessage('limit must be a number less than or equal to 100'),
     query('offset').optional().isInt().withMessage('page must be a number'),
-    query('searchFilter').optional().isString().withMessage('query must be a string'),
+    query('searchFilter')
+      .optional()
+      .isString()
+      .withMessage('query must be a string'),
   ],
 };
 
@@ -171,7 +174,9 @@ const validator = {
 
 module.exports = (crowi: Crowi): Router => {
   const adminRequired = require('../../middlewares/admin-required')(crowi);
-  const loginRequiredStrictly = require('../../middlewares/login-required')(crowi);
+  const loginRequiredStrictly = require('../../middlewares/login-required')(
+    crowi,
+  );
 
   const router = express.Router();
 
@@ -209,9 +214,14 @@ module.exports = (crowi: Crowi): Router => {
    *             schema:
    *               $ref: '#/components/schemas/ActivityResponse'
    */
-  router.get('/',
+  router.get(
+    '/',
     accessTokenParser([SCOPE.READ.ADMIN.AUDIT_LOG], { acceptLegacy: true }),
-    loginRequiredStrictly, adminRequired, validator.list, apiV3FormValidator, async(req: Request, res: ApiV3Response) => {
+    loginRequiredStrictly,
+    adminRequired,
+    validator.list,
+    apiV3FormValidator,
+    async (req: Request, res: ApiV3Response) => {
       const auditLogEnabled = configManager.getConfig('app:auditLogEnabled');
       if (!auditLogEnabled) {
         const msg = 'AuditLog is not enabled';
@@ -219,28 +229,36 @@ module.exports = (crowi: Crowi): Router => {
         return res.apiv3Err(msg, 405);
       }
 
-      const limit = req.query.limit || configManager.getConfig('customize:showPageLimitationS');
+      const limit =
+        req.query.limit ||
+        configManager.getConfig('customize:showPageLimitationS');
       const offset = req.query.offset || 1;
 
       const query = {};
 
       try {
-        const parsedSearchFilter = JSON.parse(req.query.searchFilter as string) as ISearchFilter;
+        const parsedSearchFilter = JSON.parse(
+          req.query.searchFilter as string,
+        ) as ISearchFilter;
 
         // add username to query
-        const canContainUsernameFilterToQuery = (
-          parsedSearchFilter.usernames != null
-        && parsedSearchFilter.usernames.length > 0
-        && parsedSearchFilter.usernames.every(u => typeof u === 'string')
-        );
+        const canContainUsernameFilterToQuery =
+          parsedSearchFilter.usernames != null &&
+          parsedSearchFilter.usernames.length > 0 &&
+          parsedSearchFilter.usernames.every((u) => typeof u === 'string');
         if (canContainUsernameFilterToQuery) {
-          Object.assign(query, { 'snapshot.username': parsedSearchFilter.usernames });
+          Object.assign(query, {
+            'snapshot.username': parsedSearchFilter.usernames,
+          });
         }
 
         // add action to query
         if (parsedSearchFilter.actions != null) {
-          const availableActions = crowi.activityService.getAvailableActions(false);
-          const searchableActions = parsedSearchFilter.actions.filter(action => availableActions.includes(action));
+          const availableActions =
+            crowi.activityService.getAvailableActions(false);
+          const searchableActions = parsedSearchFilter.actions.filter(
+            (action) => availableActions.includes(action),
+          );
           Object.assign(query, { action: searchableActions });
         }
 
@@ -255,8 +273,7 @@ module.exports = (crowi: Crowi): Router => {
               $lt: addMinutes(endDate, 1439),
             },
           });
-        }
-        else if (isValid(startDate) && !isValid(endDate)) {
+        } else if (isValid(startDate) && !isValid(endDate)) {
           Object.assign(query, {
             createdAt: {
               $gte: startDate,
@@ -265,23 +282,19 @@ module.exports = (crowi: Crowi): Router => {
             },
           });
         }
-      }
-      catch (err) {
+      } catch (err) {
         logger.error('Invalid value', err);
         return res.apiv3Err(err, 400);
       }
 
       try {
-        const paginateResult = await Activity.paginate(
-          query,
-          {
-            lean: true,
-            limit,
-            offset,
-            sort: { createdAt: -1 },
-            populate: 'user',
-          },
-        );
+        const paginateResult = await Activity.paginate(query, {
+          lean: true,
+          limit,
+          offset,
+          sort: { createdAt: -1 },
+          populate: 'user',
+        });
 
         const serializedDocs = paginateResult.docs.map((doc: IActivity) => {
           const { user, ...rest } = doc;
@@ -297,12 +310,12 @@ module.exports = (crowi: Crowi): Router => {
         };
 
         return res.apiv3({ serializedPaginationResult });
-      }
-      catch (err) {
+      } catch (err) {
         logger.error('Failed to get paginated activity', err);
         return res.apiv3Err(err, 500);
       }
-    });
+    },
+  );
 
   return router;
 };

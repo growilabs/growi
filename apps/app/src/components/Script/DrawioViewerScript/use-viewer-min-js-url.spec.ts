@@ -1,6 +1,6 @@
-import { useViewerMinJsUrl } from './use-viewer-min-js-url';
+import { generateViewerMinJsUrl } from './use-viewer-min-js-url';
 
-describe('useViewerMinJsUrl', () => {
+describe('generateViewerMinJsUrl', () => {
   it.each`
     drawioUri                                  | expected
     ${'http://localhost:8080'}                 | ${'http://localhost:8080/js/viewer-static.min.js'}
@@ -11,7 +11,7 @@ describe('useViewerMinJsUrl', () => {
     'should return the expected URL "$expected" when drawioUri is "$drawioUrk"',
     ({ drawioUri, expected }: { drawioUri: string; expected: string }) => {
       // Act
-      const url = useViewerMinJsUrl(drawioUri);
+      const url = generateViewerMinJsUrl(drawioUri);
 
       // Assert
       expect(url).toBe(expected);

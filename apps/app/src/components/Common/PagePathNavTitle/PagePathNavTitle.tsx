@@ -14,6 +14,7 @@ const PagePathNavSticky = withLoadingProps<PagePathNavLayoutProps>(
   (useLoadingProps) =>
     dynamic(
       () =>
+        // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
         import('~/client/components/PagePathNavSticky').then(
           (mod) => mod.PagePathNavSticky,
         ),
@@ -41,17 +42,15 @@ export const PagePathNavTitle = (
     setClient(true);
   }, []);
 
+  const className = `${moduleClass} mb-4`;
+
   return isClient ? (
     <PagePathNavSticky
       {...props}
-      className={moduleClass}
+      className={className}
       latterLinkClassName="fs-2"
     />
   ) : (
-    <PagePathNav
-      {...props}
-      className={moduleClass}
-      latterLinkClassName="fs-2"
-    />
+    <PagePathNav {...props} className={className} latterLinkClassName="fs-2" />
   );
 };

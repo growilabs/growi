@@ -1,9 +1,9 @@
 import type { JSX, ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 
-import { useIsNotFound } from '~/stores/page';
+import { usePageNotFound } from '~/states/page';
 
-import styles from './PagePathNav.module.scss';
+import styles from './PagePathNavLayout.module.scss';
 
 const moduleClass = styles['grw-page-path-nav-layout'] ?? '';
 
@@ -25,6 +25,7 @@ type Props = PagePathNavLayoutProps & {
 
 const CopyDropdown = dynamic(
   () =>
+    // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
     import('~/client/components/Common/CopyDropdown').then(
       (mod) => mod.CopyDropdown,
     ),
@@ -45,7 +46,7 @@ export const PagePathNavLayout = (props: Props): JSX.Element => {
     maxWidth,
   } = props;
 
-  const { data: isNotFound } = useIsNotFound();
+  const isNotFound = usePageNotFound();
 
   const copyDropdownId = `copydropdown-in-pagepathnavlayout-${pageId}`;
 

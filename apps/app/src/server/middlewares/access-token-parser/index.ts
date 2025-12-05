@@ -9,11 +9,17 @@ import type { AccessTokenParserReq } from './interfaces';
 
 const logger = loggerFactory('growi:middleware:access-token-parser');
 
-export type AccessTokenParser = (scopes?: Scope[], opts?: {acceptLegacy: boolean})
-  => (req: AccessTokenParserReq, res: Response, next: NextFunction) => Promise<void>
+export type AccessTokenParser = (
+  scopes?: Scope[],
+  opts?: { acceptLegacy: boolean },
+) => (
+  req: AccessTokenParserReq,
+  res: Response,
+  next: NextFunction,
+) => Promise<void>;
 
 export const accessTokenParser: AccessTokenParser = (scopes, opts) => {
-  return async(req, res, next): Promise<void> => {
+  return async (req, res, next): Promise<void> => {
     if (scopes == null || scopes.length === 0) {
       logger.warn('scopes is empty');
       return next();

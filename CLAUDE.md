@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Language
 
-If it is detected at the start or during a session that the user's primary language is not English, always respond in that language from then on. However, technical terms may remain in English as needed.
+If we detect at the beginning of a conversation that the user's primary language is not English, we will always respond in that language. However, we may retain technical terms in English if necessary.
+
+When generating source code, all comments and explanations within the code will be written in English.
 
 ## Project Overview
 

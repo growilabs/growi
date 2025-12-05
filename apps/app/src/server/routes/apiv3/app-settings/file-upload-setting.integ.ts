@@ -17,25 +17,34 @@ const mockActivityId = '507f1f77bcf86cd799439011';
 mockRequire.stopAll();
 
 mockRequire('~/server/middlewares/access-token-parser', {
-  accessTokenParser: () => (_req: Request, _res: ApiV3Response, next: () => void) => next(),
+  accessTokenParser:
+    () => (_req: Request, _res: ApiV3Response, next: () => void) =>
+      next(),
 });
 
-mockRequire('../../../middlewares/login-required', () => (_req: Request, _res: ApiV3Response, next: () => void) => next());
-mockRequire('../../../middlewares/admin-required', () => (_req: Request, _res: ApiV3Response, next: () => void) => next());
+mockRequire(
+  '../../../middlewares/login-required',
+  () => (_req: Request, _res: ApiV3Response, next: () => void) => next(),
+);
+mockRequire(
+  '../../../middlewares/admin-required',
+  () => (_req: Request, _res: ApiV3Response, next: () => void) => next(),
+);
 
 mockRequire('../../../middlewares/add-activity', {
-  generateAddActivityMiddleware: () => (_req: Request, res: ApiV3Response, next: () => void) => {
-    res.locals = res.locals || {};
-    res.locals.activity = { _id: mockActivityId };
-    next();
-  },
+  generateAddActivityMiddleware:
+    () => (_req: Request, res: ApiV3Response, next: () => void) => {
+      res.locals = res.locals || {};
+      res.locals.activity = { _id: mockActivityId };
+      next();
+    },
 });
 
 describe('file-upload-setting route', () => {
   let app: express.Application;
   let crowiMock: Crowi;
 
-  beforeEach(async() => {
+  beforeEach(async () => {
     // Initialize configManager for each test
     const s2sMessagingServiceMock = mock<S2sMessagingService>();
     configManager.setS2sMessagingService(s2sMessagingServiceMock);
@@ -59,14 +68,16 @@ describe('file-upload-setting route', () => {
     // Mock apiv3 response methods
     app.use((_req, res, next) => {
       const apiRes = res as ApiV3Response;
-      apiRes.apiv3 = data => res.json(data);
-      apiRes.apiv3Err = (error, statusCode = 500) => res.status(statusCode).json({ error });
+      apiRes.apiv3 = (data) => res.json(data);
+      apiRes.apiv3Err = (error, statusCode = 500) =>
+        res.status(statusCode).json({ error });
       next();
     });
 
     // Import and mount the actual router using dynamic import
     const fileUploadSettingModule = await import('./file-upload-setting');
-    const fileUploadSettingRouterFactory = (fileUploadSettingModule as any).default || fileUploadSettingModule;
+    const fileUploadSettingRouterFactory =
+      (fileUploadSettingModule as any).default || fileUploadSettingModule;
     const fileUploadSettingRouter = fileUploadSettingRouterFactory(crowiMock);
     app.use('/', fileUploadSettingRouter);
   });
@@ -75,7 +86,7 @@ describe('file-upload-setting route', () => {
     mockRequire.stopAll();
   });
 
-  it('should update file upload type to local', async() => {
+  it('should update file upload type to local', async () => {
     const response = await request(app)
       .put('/')
       .send({
@@ -89,7 +100,7 @@ describe('file-upload-setting route', () => {
   });
 
   describe('AWS settings', () => {
-    const setupAwsSecret = async(secret: string) => {
+    const setupAwsSecret = async (secret: string) => {
       await configManager.updateConfigs({
         'app:fileUploadType': 'aws',
         'aws:s3SecretAccessKey': toNonBlankString(secret),
@@ -99,11 +110,13 @@ describe('file-upload-setting route', () => {
       await configManager.loadConfigs();
     };
 
-    it('should preserve existing s3SecretAccessKey when not included in request', async() => {
+    it('should preserve existing s3SecretAccessKey when not included in request', async () => {
       const existingSecret = 'existing-secret-key-12345';
       await setupAwsSecret(existingSecret);
 
-      expect(configManager.getConfig('aws:s3SecretAccessKey')).toBe(existingSecret);
+      expect(configManager.getConfig('aws:s3SecretAccessKey')).toBe(
+        existingSecret,
+      );
 
       const response = await request(app)
         .put('/')
@@ -117,15 +130,19 @@ describe('file-upload-setting route', () => {
 
       await configManager.loadConfigs();
 
-      expect(configManager.getConfig('aws:s3SecretAccessKey')).toBe(existingSecret);
+      expect(configManager.getConfig('aws:s3SecretAccessKey')).toBe(
+        existingSecret,
+      );
       expect(response.body.responseParams.fileUploadType).toBe('aws');
     });
 
-    it('should update s3SecretAccessKey when new value is provided in request', async() => {
+    it('should update s3SecretAccessKey when new value is provided in request', async () => {
       const existingSecret = 'existing-secret-key-12345';
       await setupAwsSecret(existingSecret);
 
-      expect(configManager.getConfig('aws:s3SecretAccessKey')).toBe(existingSecret);
+      expect(configManager.getConfig('aws:s3SecretAccessKey')).toBe(
+        existingSecret,
+      );
 
       const newSecret = 'new-secret-key-67890';
       const response = await request(app)
@@ -145,11 +162,13 @@ describe('file-upload-setting route', () => {
       expect(response.body.responseParams.fileUploadType).toBe('aws');
     });
 
-    it('should remove s3SecretAccessKey when empty string is provided in request', async() => {
+    it('should remove s3SecretAccessKey when empty string is provided in request', async () => {
       const existingSecret = 'existing-secret-key-12345';
       await setupAwsSecret(existingSecret);
 
-      expect(configManager.getConfig('aws:s3SecretAccessKey')).toBe(existingSecret);
+      expect(configManager.getConfig('aws:s3SecretAccessKey')).toBe(
+        existingSecret,
+      );
 
       const response = await request(app)
         .put('/')
@@ -170,7 +189,7 @@ describe('file-upload-setting route', () => {
   });
 
   describe('GCS settings', () => {
-    const setupGcsSecret = async(apiKeyPath: string) => {
+    const setupGcsSecret = async (apiKeyPath: string) => {
       await configManager.updateConfigs({
         'app:fileUploadType': 'gcs',
         'gcs:apiKeyJsonPath': toNonBlankString(apiKeyPath),
@@ -179,11 +198,13 @@ describe('file-upload-setting route', () => {
       await configManager.loadConfigs();
     };
 
-    it('should preserve existing gcsApiKeyJsonPath when not included in request', async() => {
+    it('should preserve existing gcsApiKeyJsonPath when not included in request', async () => {
       const existingApiKeyPath = '/path/to/existing-api-key.json';
       await setupGcsSecret(existingApiKeyPath);
 
-      expect(configManager.getConfig('gcs:apiKeyJsonPath')).toBe(existingApiKeyPath);
+      expect(configManager.getConfig('gcs:apiKeyJsonPath')).toBe(
+        existingApiKeyPath,
+      );
 
       const response = await request(app)
         .put('/')
@@ -196,15 +217,19 @@ describe('file-upload-setting route', () => {
 
       await configManager.loadConfigs();
 
-      expect(configManager.getConfig('gcs:apiKeyJsonPath')).toBe(existingApiKeyPath);
+      expect(configManager.getConfig('gcs:apiKeyJsonPath')).toBe(
+        existingApiKeyPath,
+      );
       expect(response.body.responseParams.fileUploadType).toBe('gcs');
     });
 
-    it('should update gcsApiKeyJsonPath when new value is provided in request', async() => {
+    it('should update gcsApiKeyJsonPath when new value is provided in request', async () => {
       const existingApiKeyPath = '/path/to/existing-api-key.json';
       await setupGcsSecret(existingApiKeyPath);
 
-      expect(configManager.getConfig('gcs:apiKeyJsonPath')).toBe(existingApiKeyPath);
+      expect(configManager.getConfig('gcs:apiKeyJsonPath')).toBe(
+        existingApiKeyPath,
+      );
 
       const newApiKeyPath = '/path/to/new-api-key.json';
       const response = await request(app)
@@ -223,11 +248,13 @@ describe('file-upload-setting route', () => {
       expect(response.body.responseParams.fileUploadType).toBe('gcs');
     });
 
-    it('should remove gcsApiKeyJsonPath when empty string is provided in request', async() => {
+    it('should remove gcsApiKeyJsonPath when empty string is provided in request', async () => {
       const existingApiKeyPath = '/path/to/existing-api-key.json';
       await setupGcsSecret(existingApiKeyPath);
 
-      expect(configManager.getConfig('gcs:apiKeyJsonPath')).toBe(existingApiKeyPath);
+      expect(configManager.getConfig('gcs:apiKeyJsonPath')).toBe(
+        existingApiKeyPath,
+      );
 
       const response = await request(app)
         .put('/')
@@ -247,7 +274,7 @@ describe('file-upload-setting route', () => {
   });
 
   describe('Azure settings', () => {
-    const setupAzureSecret = async(secret: string) => {
+    const setupAzureSecret = async (secret: string) => {
       await configManager.updateConfigs({
         'app:fileUploadType': 'azure',
         'azure:clientSecret': toNonBlankString(secret),
@@ -259,11 +286,13 @@ describe('file-upload-setting route', () => {
       await configManager.loadConfigs();
     };
 
-    it('should preserve existing azureClientSecret when not included in request', async() => {
+    it('should preserve existing azureClientSecret when not included in request', async () => {
       const existingSecret = 'existing-azure-secret-12345';
       await setupAzureSecret(existingSecret);
 
-      expect(configManager.getConfig('azure:clientSecret')).toBe(existingSecret);
+      expect(configManager.getConfig('azure:clientSecret')).toBe(
+        existingSecret,
+      );
 
       const response = await request(app)
         .put('/')
@@ -279,15 +308,19 @@ describe('file-upload-setting route', () => {
 
       await configManager.loadConfigs();
 
-      expect(configManager.getConfig('azure:clientSecret')).toBe(existingSecret);
+      expect(configManager.getConfig('azure:clientSecret')).toBe(
+        existingSecret,
+      );
       expect(response.body.responseParams.fileUploadType).toBe('azure');
     });
 
-    it('should update azureClientSecret when new value is provided in request', async() => {
+    it('should update azureClientSecret when new value is provided in request', async () => {
       const existingSecret = 'existing-azure-secret-12345';
       await setupAzureSecret(existingSecret);
 
-      expect(configManager.getConfig('azure:clientSecret')).toBe(existingSecret);
+      expect(configManager.getConfig('azure:clientSecret')).toBe(
+        existingSecret,
+      );
 
       const newSecret = 'new-azure-secret-67890';
       const response = await request(app)
@@ -309,11 +342,13 @@ describe('file-upload-setting route', () => {
       expect(response.body.responseParams.fileUploadType).toBe('azure');
     });
 
-    it('should remove azureClientSecret when empty string is provided in request', async() => {
+    it('should remove azureClientSecret when empty string is provided in request', async () => {
       const existingSecret = 'existing-azure-secret-12345';
       await setupAzureSecret(existingSecret);
 
-      expect(configManager.getConfig('azure:clientSecret')).toBe(existingSecret);
+      expect(configManager.getConfig('azure:clientSecret')).toBe(
+        existingSecret,
+      );
 
       const response = await request(app)
         .put('/')

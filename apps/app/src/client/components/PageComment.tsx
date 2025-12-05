@@ -23,7 +23,7 @@ import { NotAvailableForGuest } from './NotAvailableForGuest';
 import { NotAvailableIfReadOnlyUserNotAllowedToComment } from './NotAvailableForReadOnlyUser';
 import { Comment } from './PageComment/Comment';
 import { CommentEditor } from './PageComment/CommentEditor';
-import { DeleteCommentModal } from './PageComment/DeleteCommentModal';
+import { DeleteCommentModalLazyLoaded } from './PageComment/DeleteCommentModal';
 import { ReplyComments } from './PageComment/ReplyComments';
 
 import styles from './PageComment.module.scss';
@@ -218,7 +218,7 @@ export const PageComment: FC<PageCommentProps> = memo((props: PageCommentProps):
       </div>
 
       {!isReadOnly && (
-        <DeleteCommentModal
+        <DeleteCommentModalLazyLoaded
           isShown={isDeleteConfirmModalShown}
           comment={commentToBeDeleted}
           errorMessage={errorMessageOnDelete}

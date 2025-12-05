@@ -6,10 +6,9 @@ import { useTranslation } from 'react-i18next';
 import { exist, getIsNonUserRelatedGroupsGranted } from '~/client/services/page-operation';
 import { toastWarning } from '~/client/util/toastr';
 import type { IApiv3PageCreateParams } from '~/interfaces/apiv3';
-import { EditorMode, useEditorMode } from '~/stores-universal/ui';
-import { useGrantedGroupsInheritanceSelectModal } from '~/stores/modal';
-import { useCurrentPagePath } from '~/stores/page';
-import { useIsUntitledPage } from '~/stores/ui';
+import { useCurrentPagePath, useSetIsUntitledPage } from '~/states/page';
+import { useEditorMode, EditorMode } from '~/states/ui/editor';
+import { useGrantedGroupsInheritanceSelectModalActions } from '~/states/ui/modal/granted-groups-inheritance-select';
 
 import { createPage } from './create-page';
 
@@ -50,14 +49,14 @@ export const useCreatePage: UseCreatePage = () => {
   const router = useRouter();
   const { t } = useTranslation();
 
-  const { data: currentPagePath } = useCurrentPagePath();
-  const { mutate: mutateEditorMode } = useEditorMode();
-  const { mutate: mutateIsUntitledPage } = useIsUntitledPage();
-  const { open: openGrantedGroupsInheritanceSelectModal, close: closeGrantedGroupsInheritanceSelectModal } = useGrantedGroupsInheritanceSelectModal();
+  const currentPagePath = useCurrentPagePath();
+  const { setEditorMode } = useEditorMode();
+  const setIsUntitledPage = useSetIsUntitledPage();
+  const { open: openGrantedGroupsInheritanceSelectModal, close: closeGrantedGroupsInheritanceSelectModal } = useGrantedGroupsInheritanceSelectModalActions();
 
   const [isCreating, setCreating] = useState(false);
 
-  const create: CreatePage = useCallback(async(params, opts = {}) => {
+  const create: CreatePage = useCallback(async (params, opts = {}) => {
     const {
       onCreationStart, onCreated, onAborted, onTerminated,
     } = opts;
@@ -77,7 +76,7 @@ export const useCreatePage: UseCreatePage = () => {
             if (pagePath !== currentPagePath) {
               await router.push(`${pagePath}#edit`);
             }
-            mutateEditorMode(EditorMode.Editor);
+            setEditorMode(EditorMode.Editor);
           }
           else {
             toastWarning(t('duplicated_page_alert.same_page_name_exists', { pageName: pagePath }));
@@ -94,7 +93,7 @@ export const useCreatePage: UseCreatePage = () => {
       }
     }
 
-    const _create = async(onlyInheritUserRelatedGrantedGroups?: boolean) => {
+    const _create = async (onlyInheritUserRelatedGrantedGroups?: boolean) => {
       try {
         setCreating(true);
         onCreationStart?.();
@@ -106,11 +105,11 @@ export const useCreatePage: UseCreatePage = () => {
 
         if (!skipTransition) {
           await router.push(`/${response.page._id}#edit`);
-          mutateEditorMode(EditorMode.Editor);
+          setEditorMode(EditorMode.Editor);
         }
 
         if (params.path == null) {
-          mutateIsUntitledPage(true);
+          setIsUntitledPage(true);
         }
 
         onCreated?.();
@@ -135,7 +134,7 @@ export const useCreatePage: UseCreatePage = () => {
     }
 
     await _create();
-  }, [currentPagePath, mutateEditorMode, router, t, closeGrantedGroupsInheritanceSelectModal, mutateIsUntitledPage, openGrantedGroupsInheritanceSelectModal]);
+  }, [currentPagePath, setEditorMode, router, t, closeGrantedGroupsInheritanceSelectModal, setIsUntitledPage, openGrantedGroupsInheritanceSelectModal]);
 
   return {
     isCreating,
