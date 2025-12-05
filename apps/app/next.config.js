@@ -160,8 +160,10 @@ module.exports = async (phase) => {
   };
 
   // production server
+  // Skip withSuperjson() in production server phase because the pages directory
+  // doesn't exist in the production build and withSuperjson() tries to find it
   if (phase === PHASE_PRODUCTION_SERVER) {
-    return withSuperjson()(nextConfig);
+    return nextConfig;
   }
 
   const withBundleAnalyzer = require('@next/bundle-analyzer')({
