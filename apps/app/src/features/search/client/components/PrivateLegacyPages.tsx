@@ -281,6 +281,11 @@ const PrivateLegacyPages = (): JSX.Element => {
     (ISelectableAll & IReturnSelectedPageIds) | null
   >(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only run on mount
+  useEffect(() => {
+    setSearchKeyword(initQ);
+  }, []);
+
   const { data, conditions, mutate } = useSWRxSearch(
     keyword,
     'PrivateLegacyPages',
