@@ -48,6 +48,7 @@ const SecuritySettingComponent: React.FC<Props> = ({ adminGeneralSecurityContain
         hideRestrictedByGroup: adminGeneralSecurityContainer.state.currentGroupRestrictionDisplayMode === 'Hidden',
         hideRestrictedByOwner: adminGeneralSecurityContainer.state.currentOwnerRestrictionDisplayMode === 'Hidden',
         isUsersHomepageDeletionEnabled: adminGeneralSecurityContainer.state.isUsersHomepageDeletionEnabled,
+        isUserPageVisible: adminGeneralSecurityContainer.state.isUserPageVisible,
         isForceDeleteUserHomepageOnUserDeletion: adminGeneralSecurityContainer.state.isForceDeleteUserHomepageOnUserDeletion,
         isRomUserAllowedToComment: adminGeneralSecurityContainer.state.isRomUserAllowedToComment,
       });
