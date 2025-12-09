@@ -1,4 +1,5 @@
 function getAxios(team, token) {
+  // biome-ignore lint/style/noRestrictedImports: TODO: check effects of using custom axios
   return require('axios').create({
     baseURL: `https://${team}.qiita.com/api/v2`,
     headers: {
@@ -16,7 +17,6 @@ function getAxios(team, token) {
  */
 
 class RestQiitaAPIService {
-
   /** @type {import('~/server/crowi').default} Crowi instance */
   crowi;
 
@@ -46,13 +46,12 @@ class RestQiitaAPIService {
    * @param {string} path
    */
   async restAPI(path) {
-    return this.axios.get(path)
-      .then((res) => {
-        const data = res.data;
-        const total = res.headers['total-count'];
+    return this.axios.get(path).then((res) => {
+      const data = res.data;
+      const total = res.headers['total-count'];
 
-        return { data, total };
-      });
+      return { data, total };
+    });
   }
 
   /**
@@ -68,7 +67,6 @@ class RestQiitaAPIService {
     }
   }
 
-
   /**
    * get Qiita pages
    * @memberof RestQiitaAPI
@@ -76,7 +74,9 @@ class RestQiitaAPIService {
    * @param {string} perPage
    */
   async getQiitaPages(pageNum, perPage) {
-    const res = await this.restAPI(`/items?page=${pageNum}&per_page=${perPage}`);
+    const res = await this.restAPI(
+      `/items?page=${pageNum}&per_page=${perPage}`,
+    );
     const pages = res.data;
     const total = res.total;
 
@@ -84,7 +84,6 @@ class RestQiitaAPIService {
       return { pages, total };
     }
   }
-
 }
 
 module.exports = RestQiitaAPIService;

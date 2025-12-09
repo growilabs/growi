@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 
-import { useFetchCurrentPage } from '~/states/page';
+import { useFetchCurrentPage, useIsIdenticalPath } from '~/states/page';
 import { useSetEditingMarkdown } from '~/states/ui/editor';
 
 /**
@@ -12,11 +12,16 @@ import { useSetEditingMarkdown } from '~/states/ui/editor';
  */
 export const useSameRouteNavigation = (): void => {
   const router = useRouter();
+
+  const isIdenticalPath = useIsIdenticalPath();
   const { fetchCurrentPage } = useFetchCurrentPage();
   const setEditingMarkdown = useSetEditingMarkdown();
 
   // useEffect to trigger data fetching when the path changes
   useEffect(() => {
+    // If the path is identical, do not fetch
+    if (isIdenticalPath) return;
+
     const fetch = async () => {
       const pageData = await fetchCurrentPage({ path: router.asPath });
       if (pageData?.revision?.body != null) {
@@ -24,5 +29,5 @@ export const useSameRouteNavigation = (): void => {
       }
     };
     fetch();
-  }, [router.asPath, fetchCurrentPage, setEditingMarkdown]);
+  }, [router.asPath, isIdenticalPath, fetchCurrentPage, setEditingMarkdown]);
 };

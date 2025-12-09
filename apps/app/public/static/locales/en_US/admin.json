@@ -796,7 +796,11 @@
     "unset": "No",
     "related_username": "Related user's ",
     "cannot_invite_maximum_users": "Can not invite more than the maximum number of users.",
-    "current_users": "Current users:"
+    "user_statistics": {
+      "total": "Total Users",
+      "active": "Active",
+      "inactive": "Inactive"
+    }
   },
   "user_group_management": {
     "user_group_management": "User Group Management",

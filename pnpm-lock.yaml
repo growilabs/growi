@@ -767,8 +767,8 @@ importers:
         specifier: ^11.0.3
         version: 11.1.0
       validator:
-        specifier: ^13.15.20
-        version: 13.15.20
+        specifier: ^13.15.22
+        version: 13.15.23
       ws:
         specifier: ^8.17.1
         version: 8.18.0
@@ -14937,8 +14937,8 @@ packages:
     resolution: {integrity: sha512-OljLrQ9SQdOUqTaQxqL5dEfZWrXExyyWsozYlAWFawPVNuD83igl7uJD2RTkNMbniIYgt8l81eCJGIdQF7avLQ==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
 
-  validator@13.15.20:
-    resolution: {integrity: sha512-KxPOq3V2LmfQPP4eqf3Mq/zrT0Dqp2Vmx2Bn285LwVahLc+CsxOM0crBHczm8ijlcjZ0Q5Xd6LW3z3odTPnlrw==}
+  validator@13.15.23:
+    resolution: {integrity: sha512-4yoz1kEWqUjzi5zsPbAS/903QXSYp0UOtHsPpp7p9rHAw/W+dkInskAE386Fat3oKRROwO98d9ZB0G4cObgUyw==}
     engines: {node: '>= 0.10'}
 
   vary@1.1.2:
@@ -17765,7 +17765,7 @@ snapshots:
       loglevel: 1.9.2
       loglevel-plugin-prefix: 0.8.4
       minimatch: 6.2.0
-      validator: 13.15.20
+      validator: 13.15.23
     transitivePeerDependencies:
       - encoding
 
@@ -24934,7 +24934,7 @@ snapshots:
   express-validator@6.15.0:
     dependencies:
       lodash: 4.17.21
-      validator: 13.15.20
+      validator: 13.15.23
 
   express@4.21.0:
     dependencies:
@@ -28265,7 +28265,7 @@ snapshots:
       '@lykmapipo/phone': 0.7.16
       lodash: 4.17.21
       mongoose: 6.13.8(@aws-sdk/client-sso-oidc@3.600.0)
-      validator: 13.15.20
+      validator: 13.15.23
 
   mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0):
     dependencies:
@@ -32214,7 +32214,7 @@ snapshots:
 
   validate-npm-package-name@5.0.1: {}
 
-  validator@13.15.20: {}
+  validator@13.15.23: {}
 
   vary@1.1.2: {}
 
@@ -32837,7 +32837,7 @@ snapshots:
     dependencies:
       lodash.get: 4.4.2
       lodash.isequal: 4.5.0
-      validator: 13.15.20
+      validator: 13.15.23
     optionalDependencies:
       commander: 10.0.1
 

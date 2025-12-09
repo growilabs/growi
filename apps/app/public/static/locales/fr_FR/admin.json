@@ -796,7 +796,11 @@
     "unset": "Non",
     "related_username": "Utilisateur ",
     "cannot_invite_maximum_users": "La limite maximale d'utilisateurs invitables est atteinte.",
-    "current_users": "Utilisateurs:"
+    "user_statistics": {
+      "total": "Utilisateurs totaux",
+      "active": "Actifs",
+      "inactive": "Inactifs"
+    }
   },
   "user_group_management": {
     "user_group_management": "Gestion des groupes",

@@ -3,14 +3,17 @@ import { useRouter } from 'next/router';
 import { returnPathForURL } from '@growi/core/dist/utils/path-utils';
 import { useTranslation } from 'react-i18next';
 
-import { useCurrentPageData, useFetchCurrentPage } from '~/states/page';
-import { useSWRxIsLatestRevision } from '~/stores/page';
+import {
+  useCurrentPageData,
+  useFetchCurrentPage,
+  useRevisionIdFromUrl,
+} from '~/states/page';
 
 export const OldRevisionAlert = (): JSX.Element => {
   const router = useRouter();
   const { t } = useTranslation();
 
-  const { data: isLatestRevision } = useSWRxIsLatestRevision();
+  const revisionIdFromUrl = useRevisionIdFromUrl();
   const page = useCurrentPageData();
   const { fetchCurrentPage } = useFetchCurrentPage();
 
@@ -24,8 +27,8 @@ export const OldRevisionAlert = (): JSX.Element => {
     fetchCurrentPage({ force: true });
   }, [fetchCurrentPage, page, router]);
 
-  // Show alert only when viewing an old revision (isLatestRevision === false)
-  if (isLatestRevision !== false) {
+  // Show alert only when intentionally viewing a specific (past) revision (revisionIdFromUrl != null)
+  if (revisionIdFromUrl == null) {
     // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;
   }

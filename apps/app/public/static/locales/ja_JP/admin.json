@@ -805,8 +805,13 @@
     "unset": "未設定",
     "related_username": "関連付けられているユーザーの ",
     "cannot_invite_maximum_users": "ユーザーが上限に達したため招待できません。",
-    "current_users": "現在のユーザー数："
+    "user_statistics": {
+      "total": "総ユーザー数",
+      "active": "アクティブ",
+      "inactive": "非アクティブ"
+    }
   },
+
   "user_group_management": {
     "user_group_management": "グループ管理",
     "create_group": "新規グループの作成",

@@ -11,6 +11,7 @@ import {
   currentPageDataAtom,
   currentPageIdAtom,
   isForbiddenAtom,
+  isIdenticalPathAtom,
   pageNotFoundAtom,
   redirectFromAtom,
   remoteRevisionBodyAtom,
@@ -50,6 +51,7 @@ export const useHydratePageAtoms = (
     redirectFrom?: string;
     templateTags?: string[];
     templateBody?: string;
+    isIdenticalPath?: boolean;
   },
 ): void => {
   useHydrateAtoms([
@@ -78,6 +80,7 @@ export const useHydratePageAtoms = (
       [shareLinkIdAtom, options?.shareLinkId],
 
       [redirectFromAtom, options?.redirectFrom ?? undefined],
+      [isIdenticalPathAtom, options?.isIdenticalPath ?? false],
 
       // Template data - from options (not auto-extracted from page)
       [templateTagsAtom, options?.templateTags ?? []],

@@ -21,6 +21,12 @@ const SearchResultLayout = dynamic(
   { ssr: false },
 );
 
+const PrivateLegacyPages = dynamic(
+  // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
+  () => import('~/features/search/client/components/PrivateLegacyPages'),
+  { ssr: false },
+);
+
 type Props = CommonInitialProps &
   CommonEachProps &
   BasicLayoutConfigurationProps &
@@ -29,12 +35,6 @@ type Props = CommonInitialProps &
 
 const PrivateLegacyPage: NextPage<Props> = (props: Props) => {
   const { t } = useTranslation();
-
-  const PrivateLegacyPages = dynamic(
-    // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    () => import('~/features/search/client/components/PrivateLegacyPages'),
-    { ssr: false },
-  );
 
   // clear the cache for the current page
   //  in order to fix https://redmine.weseek.co.jp/issues/135811

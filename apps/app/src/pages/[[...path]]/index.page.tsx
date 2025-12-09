@@ -111,7 +111,8 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
   const pageMeta = isInitialProps(props) ? props.pageWithMeta?.meta : undefined;
 
   useHydratePageAtoms(pageData, pageMeta, {
-    redirectFrom: props.redirectFrom ?? undefined,
+    redirectFrom: props.redirectFrom,
+    isIdenticalPath: props.isIdenticalPathPage,
     templateTags: props.templateTagData,
     templateBody: props.templateBodyData,
   });
