@@ -13,6 +13,7 @@ import { PageDeleteRightsSettings } from './PageDeleteRightsSettings';
 import { PageListDisplaySettings } from './PageListDisplaySettings';
 import { SessionMaxAgeSettings } from './SessionMaxAgeSettings';
 import { UserHomepageDeletionSettings } from './UserHomepageDeletionSettings';
+import { UserPageVisibilitySettings } from './UserPageVisibilitySettings';
 
 type FormData = {
   sessionMaxAge: string;
@@ -115,6 +116,9 @@ const SecuritySettingComponent: React.FC<Props> = ({
           <UserHomepageDeletionSettings
             adminGeneralSecurityContainer={adminGeneralSecurityContainer}
             t={t}
+          />
+          <UserPageVisibilitySettings
+            adminGeneralSecurityContainer={adminGeneralSecurityContainer} t={t}
           />
           <CommentManageRightsSettings
             adminGeneralSecurityContainer={adminGeneralSecurityContainer}
