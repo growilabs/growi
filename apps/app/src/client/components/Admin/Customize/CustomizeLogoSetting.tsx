@@ -29,12 +29,16 @@ const CustomizeLogoSetting = (): JSX.Element => {
   const [isDefaultLogoSelected, setIsDefaultLogoSelected] = useState<boolean>(isDefaultLogo ?? true);
   const [retrieveError, setRetrieveError] = useState<any>();
   const [isFileSelected, setIsFileSelected] = useState<boolean>(false)
+  const [isImageCropped, setIsImageCropped] = useState<boolean>(false);
+  const [fileInputKey, setFileInputKey] = useState<string>(Date.now().toString());
 
   const onSelectFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     const hasFile = files != null && files.length > 0;
 
     setIsFileSelected(hasFile);
+    console.log('1. ファイル選択時 - isFileSelected:', hasFile);
+    setIsImageCropped(false);
 
     if (hasFile) {
       const reader = new FileReader();
@@ -42,7 +46,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
       reader.readAsDataURL(files[0]);
       setIsImageCropModalShow(true);
     }
-  }, [setIsFileSelected, setUploadLogoSrc, setIsImageCropModalShow]);
+  }, [setIsFileSelected, setUploadLogoSrc, setIsImageCropModalShow, setIsImageCropped]);
 
   const onClickSubmit = useCallback(async () => {
     try {
@@ -67,21 +71,31 @@ const CustomizeLogoSetting = (): JSX.Element => {
     }
   }, [setIsCustomizedLogoUploaded, t]);
 
+  const resetFileInput = useCallback(() => {
+    setFileInputKey(Date.now().toString());
+}, []);
 
   const processImageCompletedHandler = useCallback(async (croppedImage) => {
     try {
       const formData = new FormData();
       formData.append('file', croppedImage);
       await apiv3PostForm('/customize-setting/upload-brand-logo', formData);
+      setIsImageCropped(true);
       setIsCustomizedLogoUploaded(true);
+      setIsFileSelected(true)
+      console.log('2. アップロード成功時 - isImageCropped:', true);
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.current_logo'), ns: 'commons' }));
+      resetFileInput();
     }
     catch (err) {
       toastError(err);
       setRetrieveError(err);
+      setIsFileSelected(false); // エラー時はリセット
+      resetFileInput(); // 失敗時もファイル入力をリセット
+      console.log('2. アップロード失敗時 - isImageCropped:', false);
       throw new Error('Failed to upload brand logo');
     }
-  }, [setIsCustomizedLogoUploaded, t]);
+  }, [setIsCustomizedLogoUploaded, t, resetFileInput, setIsFileSelected]);
 
   return (
     <React.Fragment>
@@ -148,7 +162,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
                     {t('admin:customize_settings.upload_new_logo')}
                   </label>
                   <div className="col-sm-8 col-12">
-                    <input type="file" onChange={onSelectFile} name="brandLogo" accept="image/*" />
+                    <input key={fileInputKey} type="file" onChange={onSelectFile} name="brandLogo" accept="image/*" />
                   </div>
                 </div>
               </div>
@@ -161,7 +175,18 @@ const CustomizeLogoSetting = (): JSX.Element => {
       <ImageCropModal
         isShow={isImageCropModalShow}
         src={uploadLogoSrc}
-        onModalClose={() => setIsImageCropModalShow(false)}
+        onModalClose={() => {
+          setIsImageCropModalShow(false)
+          console.log('3. モーダルクローズ時 - isImageCropped (OLD):', isImageCropped);
+          if(!isImageCropped){
+            console.log('3. モーダルクローズ時 - 処理: キャンセル/エラーとしてリセット実行');
+            setIsFileSelected(false)
+            resetFileInput();
+          } else {
+            console.log('3. モーダルクローズ時 - 処理: アップロード成功としてリセット処理をスキップ');
+          }
+          setIsImageCropped(false);
+        }}
         onImageProcessCompleted={processImageCompletedHandler}
         isCircular={false}
         showCropOption={false}
