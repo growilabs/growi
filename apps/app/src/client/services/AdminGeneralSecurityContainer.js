@@ -41,7 +41,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       expandOtherOptionsForCompleteDeletion: false,
       isShowRestrictedByOwner: false,
       isUsersHomepageDeletionEnabled: false,
-      isUserPagesVisible: true,
+      isUserPagesVisible: false,
       isForceDeleteUserHomepageOnUserDeletion: false,
       isRomUserAllowedToComment: false,
       isLocalEnabled: false,
