@@ -41,6 +41,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       expandOtherOptionsForCompleteDeletion: false,
       isShowRestrictedByOwner: false,
       isUsersHomepageDeletionEnabled: false,
+      isUserPagesVisible: true,
       isForceDeleteUserHomepageOnUserDeletion: false,
       isRomUserAllowedToComment: false,
       isLocalEnabled: false,
@@ -60,6 +61,7 @@ export default class AdminGeneralSecurityContainer extends Container {
     this.changeOwnerRestrictionDisplayMode = this.changeOwnerRestrictionDisplayMode.bind(this);
     this.changeGroupRestrictionDisplayMode = this.changeGroupRestrictionDisplayMode.bind(this);
     this.changePageDeletionAuthority = this.changePageDeletionAuthority.bind(this);
+    this.changeUserPageVisibility = this.changeUserPageVisibility.bind(this);
     this.changePageCompleteDeletionAuthority = this.changePageCompleteDeletionAuthority.bind(this);
     this.changePageRecursiveDeletionAuthority = this.changePageRecursiveDeletionAuthority.bind(this);
     this.changePageRecursiveCompleteDeletionAuthority = this.changePageRecursiveCompleteDeletionAuthority.bind(this);
@@ -83,6 +85,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       currentOwnerRestrictionDisplayMode: generalSetting.hideRestrictedByOwner === false ? 'Displayed' : 'Hidden',
       currentGroupRestrictionDisplayMode: generalSetting.hideRestrictedByGroup === false ? 'Displayed' : 'Hidden',
       isUsersHomepageDeletionEnabled: generalSetting.isUsersHomepageDeletionEnabled,
+      isUserPagesVisible: generalSetting.isUserPagesVisible,
       isForceDeleteUserHomepageOnUserDeletion: generalSetting.isForceDeleteUserHomepageOnUserDeletion,
       isRomUserAllowedToComment: generalSetting.isRomUserAllowedToComment,
       sessionMaxAge: generalSetting.sessionMaxAge,
@@ -153,6 +156,10 @@ export default class AdminGeneralSecurityContainer extends Container {
    */
   changePageDeletionAuthority(val) {
     this.setState({ currentPageDeletionAuthority: val });
+  }
+
+  changeUserPageVisibility() {
+    this.setState({ isUserPagesVisible: !this.state.isUserPagesVisible });
   }
 
   /**
@@ -252,6 +259,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       hideRestrictedByGroup: formData.hideRestrictedByGroup,
       hideRestrictedByOwner: formData.hideRestrictedByOwner,
       isUsersHomepageDeletionEnabled: formData.isUsersHomepageDeletionEnabled,
+      isUserPagesVisible: formData.isUserPagesVisible,
       isForceDeleteUserHomepageOnUserDeletion: formData.isForceDeleteUserHomepageOnUserDeletion,
       isRomUserAllowedToComment: formData.isRomUserAllowedToComment,
     } : {
@@ -265,6 +273,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       hideRestrictedByGroup: this.state.currentGroupRestrictionDisplayMode === 'Hidden',
       hideRestrictedByOwner: this.state.currentOwnerRestrictionDisplayMode === 'Hidden',
       isUsersHomepageDeletionEnabled: this.state.isUsersHomepageDeletionEnabled,
+      isUserPagesVisible: this.state.isUserPagesVisible,
       isForceDeleteUserHomepageOnUserDeletion: this.state.isForceDeleteUserHomepageOnUserDeletion,
       isRomUserAllowedToComment: this.state.isRomUserAllowedToComment,
     };
