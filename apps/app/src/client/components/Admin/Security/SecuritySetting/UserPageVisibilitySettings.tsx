@@ -19,7 +19,7 @@ export const UserPageVisibilitySettings: React.FC<Props> = ({ adminGeneralSecuri
               type="checkbox"
               className="form-check-input"
               id="is-user-pages-visible"
-              checked={adminGeneralSecurityContainer.state.isUserPageVisible}
+              checked={adminGeneralSecurityContainer.state.hideUserPages}
               onChange={() => { adminGeneralSecurityContainer.changeUserPageVisibility() }}
             />
             <label className="form-label form-check-label" htmlFor="is-user-pages-visible">
