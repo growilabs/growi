@@ -59,7 +59,7 @@
     "user_page_visibility": {
       "user_page_visibility": "User page visibility",
       "hide_user_pages": "Hide user pages",
-      "desc": "Hides all user related pages from other users"
+      "desc": "Hides all user related pages for general users"
     },
     "session": "Session",
     "max_age": "Max age (msec)",
