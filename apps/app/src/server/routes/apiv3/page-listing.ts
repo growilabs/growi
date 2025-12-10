@@ -177,152 +177,75 @@ const routerFactory = (crowi: Crowi): Router => {
   /**
    * @swagger
    *
-   * /page-listing/info:
+   * /page-listing/item:
    *   get:
    *     tags: [PageListing]
    *     security:
    *       - bearer: []
    *       - accessTokenInQuery: []
-   *     summary: /page-listing/info
-   *     description: Get summary information of pages
+   *     summary: /page-listing/item
+   *     description: Get a single page item for tree display
    *     parameters:
-   *       - name: pageIds
+   *       - name: id
    *         in: query
-   *         description: Array of page IDs to retrieve information for (One of pageIds or path is required)
-   *         schema:
-   *           type: array
-   *           items:
-   *             type: string
-   *       - name: path
-   *         in: query
-   *         description: Path of the page to retrieve information for (One of pageIds or path is required)
+   *         required: true
    *         schema:
    *           type: string
-   *       - name: attachBookmarkCount
-   *         in: query
-   *         schema:
-   *           type: boolean
-   *       - name: attachShortBody
-   *         in: query
-   *         schema:
-   *           type: boolean
    *     responses:
    *       200:
-   *         description: Get the information of a page
+   *         description: Page item data
    *         content:
    *           application/json:
    *             schema:
    *               type: object
-   *               additionalProperties:
-   *                 $ref: '#/components/schemas/PageInfoAll'
+   *               properties:
+   *                 item:
+   *                   $ref: '#/components/schemas/PageForTreeItem'
    */
   router.get(
-    '/info',
+    '/item',
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
-    validator.pageIdsOrPathRequired,
-    validator.infoParams,
+    loginRequired,
+    validator.pageIdOrPathRequired,
     apiV3FormValidator,
     async (req: AuthorizedRequest, res: ApiV3Response) => {
-      const {
-        pageIds,
-        path,
-        attachBookmarkCount: attachBookmarkCountParam,
-        attachShortBody: attachShortBodyParam,
-      } = req.query;
+      const { id } = req.query;
 
-      const attachBookmarkCount: boolean = attachBookmarkCountParam === 'true';
-      const attachShortBody: boolean = attachShortBodyParam === 'true';
-
-      const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
-        'Page',
-      );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const Bookmark = mongoose.model<any, any>('Bookmark');
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const pageService = crowi.pageService;
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const pageGrantService: IPageGrantService = crowi.pageGrantService!;
+      if (id == null) {
+        return res.apiv3Err(new ErrorV3('id parameter is required'));
+      }
 
       try {
-        const pages =
-          pageIds != null
-            ? await Page.findByIdsAndViewer(
-                pageIds as string[],
-                req.user,
-                null,
-                true,
-              )
-            : await Page.findByPathAndViewer(
-                path as string,
-                req.user,
-                null,
-                false,
-                true,
-              );
-
-        const foundIds = pages.map((page) => page._id);
-
-        let shortBodiesMap: Record<string, string | null> | undefined;
-        if (attachShortBody) {
-          shortBodiesMap = await pageService.shortBodiesMapByPageIds(
-            foundIds,
-            req.user,
-          );
-        }
-
-        let bookmarkCountMap: Record<string, number> | undefined;
-        if (attachBookmarkCount) {
-          bookmarkCountMap = (await Bookmark.getPageIdToCountMap(
-            foundIds,
-          )) as Record<string, number>;
-        }
-
-        const idToPageInfoMap: Record<string, IPageInfo | IPageInfoForListing> =
-          {};
-
-        const isGuestUser = req.user == null;
-
-        const userRelatedGroups = await pageGrantService.getUserRelatedGroups(
+        const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
+          'Page',
+        );
+        const page = await Page.findByIdAndViewer(
+          id as string,
           req.user,
+          null,
+          true,
         );
 
-        for (const page of pages) {
-          const basicPageInfo = {
-            ...pageService.constructBasicPageInfo(page, isGuestUser),
-            bookmarkCount:
-              bookmarkCountMap != null
-                ? (bookmarkCountMap[page._id.toString()] ?? 0)
-                : 0,
-          };
-
-          // TODO: use pageService.getCreatorIdForCanDelete to get creatorId (https://redmine.weseek.co.jp/issues/140574)
-          const canDeleteCompletely = pageService.canDeleteCompletely(
-            page,
-            page.creator == null ? null : getIdForRef(page.creator),
-            req.user,
-            false,
-            userRelatedGroups,
-          ); // use normal delete config
-
-          const pageInfo = !isIPageInfoForEntity(basicPageInfo)
-            ? basicPageInfo
-            : ({
-                ...basicPageInfo,
-                isAbleToDeleteCompletely: canDeleteCompletely,
-                revisionShortBody:
-                  shortBodiesMap != null
-                    ? (shortBodiesMap[page._id.toString()] ?? undefined)
-                    : undefined,
-              } satisfies IPageInfoForListing);
-
-          idToPageInfoMap[page._id.toString()] = pageInfo;
+        if (page == null) {
+          return res.apiv3Err(new ErrorV3('Page not found'), 404);
         }
 
-        return res.apiv3(idToPageInfoMap);
+        const item: IPageForTreeItem = {
+          _id: page._id.toString(),
+          path: page.path,
+          parent: page.parent,
+          revision: page.revision, // required to create an IPageToDeleteWithMeta instance
+          descendantCount: page.descendantCount,
+          grant: page.grant,
+          isEmpty: page.isEmpty,
+          wip: page.wip ?? false,
+        };
+
+        return res.apiv3({ item });
       } catch (err) {
-        logger.error('Error occurred while fetching page informations.', err);
+        logger.error('Error occurred while fetching page item.', err);
         return res.apiv3Err(
-          new ErrorV3('Error occurred while fetching page informations.'),
+          new ErrorV3('Error occurred while fetching page item.'),
         );
       }
     },

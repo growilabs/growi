@@ -366,7 +366,6 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
               <li
                 key={ancestorUserGroup._id}
                 className={`breadcrumb-item ${ancestorUserGroup._id === currentUserGroupId ? 'active' : ''}`}
-                aria-current="page"
               >
                 { ancestorUserGroup._id === currentUserGroupId ? (
                   <span>{ancestorUserGroup.name}</span>

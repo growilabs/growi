@@ -177,7 +177,6 @@ export const useFetchCurrentPage = (): {
   error: Error | null;
 } => {
   const shareLinkId = useAtomValue(shareLinkIdAtom);
-  const revisionIdFromUrl = useAtomValue(revisionIdFromUrlAtom);
   const currentPageId = useAtomValue(currentPageIdAtom);
 
   const isLoading = useAtomValue(pageLoadingAtom);
@@ -197,6 +196,7 @@ export const useFetchCurrentPage = (): {
       ): Promise<IPagePopulatedToShowRevision | null> => {
         const currentPageId = get(currentPageIdAtom);
         const currentPageData = get(currentPageDataAtom);
+        const revisionIdFromUrl = get(revisionIdFromUrlAtom);
 
         // Process path first to handle permalinks and strip hash fragments
         const decodedPathname = decodeAndRemoveFragment(args?.path);
@@ -270,7 +270,7 @@ export const useFetchCurrentPage = (): {
 
         return null;
       },
-      [shareLinkId, revisionIdFromUrl, mutatePageInfo],
+      [shareLinkId, mutatePageInfo],
     ),
   );
 

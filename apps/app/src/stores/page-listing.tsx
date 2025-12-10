@@ -190,12 +190,20 @@ export const useSWRxPageInfoForList = (
   };
 };
 
+const MUTATION_ID_FOR_PAGETREE = 'pageTree';
+const keyMatcherForPageTree = (key: Arguments): boolean => {
+  return Array.isArray(key) && key[0] === MUTATION_ID_FOR_PAGETREE;
+};
+export const mutatePageTree = async (): Promise<undefined[]> => {
+  return mutate(keyMatcherForPageTree);
+};
+
 export const useSWRxRootPage = (
   config?: SWRConfiguration,
 ): SWRResponse<RootPageResult, Error> => {
   return useSWR(
-    '/page-listing/root',
-    (endpoint) =>
+    [MUTATION_ID_FOR_PAGETREE, '/page-listing/root'],
+    ([, endpoint]) =>
       apiv3Get(endpoint).then((response) => {
         return {
           rootPage: response.data.rootPage,
@@ -208,14 +216,6 @@ export const useSWRxRootPage = (
       revalidateOnReconnect: false,
     },
   );
-};
-
-const MUTATION_ID_FOR_PAGETREE = 'pageTree';
-const keyMatcherForPageTree = (key: Arguments): boolean => {
-  return Array.isArray(key) && key[0] === MUTATION_ID_FOR_PAGETREE;
-};
-export const mutatePageTree = async (): Promise<undefined[]> => {
-  return mutate(keyMatcherForPageTree);
 };
 
 export const useSWRxPageChildren = (

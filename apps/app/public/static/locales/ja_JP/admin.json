@@ -348,7 +348,7 @@
     "supplymentary_message_to_start": "API についても管理者用 API しか機能しなくなります。",
     "start_maintenance_mode": "メンテナンスモードを開始する",
     "end_maintenance_mode": "メンテナンスモードを終了する",
-    "description": "メンテナンスモードでは、ユーザーのあらゆる操作を制限します。「データのインポート」および「V5 へのアップグレード」の際には必ずメンテナンスモードを開始してから行ってください。終了するには「セキュリティ設定」>「メンテナンスモード」から操作してください。"
+    "description": "メンテナンスモードでは、ユーザーのあらゆる操作を制限します。「データのインポート」および「V5 へのアップグレード」の際には必ずメンテナンスモードを開始してから行ってください。終了するには「アプリ設定」>「メンテナンスモード」から操作してください。"
   },
   "app_setting": {
     "site_name": "サイト名",
@@ -540,7 +540,7 @@
     "page_path": "ページパス",
     "beta_warning": "この機能はベータ版です",
     "import_from": "{{from}} からインポート",
-    "import_growi_archive": "GROWI アーカイブをインポート",
+    "import_growi_archive": "データインポート",
     "error": {
       "only_upsert_available": "pages コレクションには 'Upsert' オプションのみ対応しています"
     },
@@ -586,23 +586,11 @@
         }
       }
     },
-    "esa_settings": {
-      "team_name": "チーム名",
-      "access_token": "アクセストークン",
-      "test_connection": "接続テスト"
-    },
-    "qiita_settings": {
-      "team_name": "チーム名",
-      "access_token": "アクセストークン",
-      "test_connection": "接続テスト"
-    },
     "import": "インポート",
     "skip_username_and_email_when_overlapped": "ユーザー名またはメールアドレスが同じ場合、その部分がスキップされます。",
     "prepare_new_account_for_migration": "移行用のアカウントを新環境で用意してください。",
     "archive_data_import_detail": "参考： GROWI Docs - データのインポート",
-    "admin_archive_data_import_guide_url": "https://docs.growi.org/ja/admin-guide/management-cookbook/import.html#growi-%E3%82%A2%E3%83%BC%E3%82%AB%E3%82%A4%E3%83%96%E3%83%87%E3%83%BC%E3%82%BF%E3%82%A4%E3%83%B3%E3%83%9D%E3%83%BC%E3%83%88",
-    "page_skip": "既に GROWI 側に同名のページが存在する場合、そのページはスキップされます",
-    "Directory_hierarchy_tag": "ディレクトリ階層タグ"
+    "admin_archive_data_import_guide_url": "https://docs.growi.org/ja/admin-guide/management-cookbook/import.html#growi-%E3%82%A2%E3%83%BC%E3%82%AB%E3%82%A4%E3%83%96%E3%83%87%E3%83%BC%E3%82%BF%E3%82%A4%E3%83%B3%E3%83%9D%E3%83%BC%E3%83%88"
   },
   "export_management": {
     "export_archive_data": "データアーカイブ",
@@ -811,7 +799,6 @@
       "inactive": "非アクティブ"
     }
   },
-
   "user_group_management": {
     "user_group_management": "グループ管理",
     "create_group": "新規グループの作成",
@@ -1025,12 +1012,6 @@
     "ADMIN_ARCHIVE_DATA_UPLOAD": "アーカイブデータのアップロード",
     "ADMIN_GROWI_DATA_IMPORTED": "アーカイブデータのインポート",
     "ADMIN_UPLOADED_GROWI_DATA_DISCARDED": "アーカイブデータの破棄",
-    "ADMIN_ESA_DATA_IMPORTED": "esa.io からインポート",
-    "ADMIN_ESA_DATA_UPDATED": "esa.io のインポート設定の更新",
-    "ADMIN_CONNECTION_TEST_OF_ESA_DATA": "esa.io の接続テスト",
-    "ADMIN_QIITA_DATA_IMPORTED": "Qiita:Team からのインポート",
-    "ADMIN_QIITA_DATA_UPDATED": "Qiita:Team のインポート設定の更新",
-    "ADMIN_CONNECTION_TEST_OF_QIITA_DATA": "Qiita:Team の接続テスト",
     "ADMIN_ARCHIVE_DATA_CREATE": "アーカイブデータの作成",
     "ADMIN_ARCHIVE_DATA_DOWNLOAD": "アーカイブデータのダウンロード",
     "ADMIN_ARCHIVE_DATA_DELETE": "アーカイブデータの削除",

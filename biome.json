@@ -31,8 +31,6 @@
       "!apps/app/src/client",
       "!apps/app/src/server/middlewares",
       "!apps/app/src/server/routes/apiv3/*.js",
-      "!apps/app/src/server/service/access-token",
-      "!apps/app/src/server/service/config-manager",
       "!apps/app/src/server/service/file-uploader",
       "!apps/app/src/server/service/global-notification",
       "!apps/app/src/server/service/growi-bridge",
@@ -41,18 +39,7 @@
       "!apps/app/src/server/service/in-app-notification",
       "!apps/app/src/server/service/interfaces",
       "!apps/app/src/server/service/normalize-data",
-      "!apps/app/src/server/service/page",
-      "!apps/app/src/server/service/page-listing",
-      "!apps/app/src/server/service/revision",
-      "!apps/app/src/server/service/s2s-messaging",
-      "!apps/app/src/server/service/search-delegator",
-      "!apps/app/src/server/service/search-reconnect-context",
-      "!apps/app/src/server/service/slack-command-handler",
-      "!apps/app/src/server/service/slack-event-handler",
-      "!apps/app/src/server/service/socket-io",
-      "!apps/app/src/server/service/system-events",
-      "!apps/app/src/server/service/user-notification",
-      "!apps/app/src/server/service/yjs"
+      "!apps/app/src/server/service/page"
     ]
   },
   "formatter": {

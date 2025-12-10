@@ -61,9 +61,6 @@ importers:
       '@types/node':
         specifier: ^20.18.3
         version: 20.19.17
-      '@types/path-browserify':
-        specifier: ^1.0.0
-        version: 1.0.0
       '@typescript-eslint/eslint-plugin':
         specifier: ^5.59.7
         version: 5.59.7(@typescript-eslint/parser@5.59.7(eslint@8.41.0)(typescript@5.0.4))(eslint@8.41.0)(typescript@5.0.4)
@@ -130,9 +127,9 @@ importers:
       npm-run-all:
         specifier: ^4.1.5
         version: 4.1.5
-      path-browserify:
-        specifier: ^1.0.1
-        version: 1.0.1
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       reg-keygen-git-hash-plugin:
         specifier: ^0.11.1
         version: 0.11.1
@@ -403,9 +400,6 @@ importers:
       ejs:
         specifier: ^3.1.10
         version: 3.1.10
-      esa-node:
-        specifier: ^0.2.2
-        version: 0.2.2
       escape-string-regexp:
         specifier: ^4.0.0
         version: 4.0.0
@@ -812,6 +806,12 @@ importers:
       '@handsontable/react':
         specifier: '=2.1.0'
         version: 2.1.0(handsontable@6.2.2)
+      '@headless-tree/core':
+        specifier: ^1.5.1
+        version: 1.5.1
+      '@headless-tree/react':
+        specifier: ^1.5.1
+        version: 1.5.1(@headless-tree/core@1.5.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@next/bundle-analyzer':
         specifier: ^14.1.3
         version: 14.2.4
@@ -824,6 +824,9 @@ importers:
       '@swc/jest':
         specifier: ^0.2.36
         version: 0.2.36(@swc/core@1.10.7(@swc/helpers@0.5.15))
+      '@tanstack/react-virtual':
+        specifier: ^3.13.12
+        version: 3.13.12(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@testing-library/jest-dom':
         specifier: ^6.5.0
         version: 6.5.0
@@ -3226,6 +3229,16 @@ packages:
     peerDependencies:
       handsontable: '>=6.0.0'
 
+  '@headless-tree/core@1.5.1':
+    resolution: {integrity: sha512-uPoFcjPYdnXwuEDJd2oCMY8a4nnsMKyx6P0G1+is6dIGFpUsoV0qjtJN6ykJtOgTHVhBRR11zRmletER6Qgj/Q==}
+
+  '@headless-tree/react@1.5.1':
+    resolution: {integrity: sha512-8r34ug5g25peTDgyGoCZf5Ohy4O0FMhdhUNyiaXzGn/1nwUDpmmwsrqh64DVNPereSA9uhY0s39uRibfvdmTqw==}
+    peerDependencies:
+      '@headless-tree/core': '*'
+      react: '*'
+      react-dom: '*'
+
   '@humanwhocodes/config-array@0.11.8':
     resolution: {integrity: sha512-UybHIJzJnR5Qc/MsD9Kr+RpO2h+/P1GhOwdiLPXK5TWk5sgTdu88bTD9UP+CKbPPh5Rni1u0GjAdYQLemG8g+g==}
     engines: {node: '>=10.10.0'}
@@ -5234,6 +5247,15 @@ packages:
   '@swc/types@0.1.17':
     resolution: {integrity: sha512-V5gRru+aD8YVyCOMAjMpWR1Ui577DD5KSJsHP8RAxopAH22jFz6GZd/qxqjO6MJHQhcsjvjOFXyDhyLQUnMveQ==}
 
+  '@tanstack/react-virtual@3.13.12':
+    resolution: {integrity: sha512-Gd13QdxPSukP8ZrkbgS2RwoZseTTbQPLnQEn7HY/rqtM+8Zt95f7xKC7N0EsKs7aoz0WzZ+fditZux+F8EzYxA==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  '@tanstack/virtual-core@3.13.12':
+    resolution: {integrity: sha512-1YBOJfRHV4sXUmWsFSf5rQor4Ss82G8dQWLRbnk3GA4jeP8hQt1hxXh0tmflpC0dz3VgEv/1+qwPyLeWkQuPFA==}
+
   '@testing-library/dom@10.4.0':
     resolution: {integrity: sha512-pemlzrSESWbdAloYml3bAJMEfNh1Z7EduzqPKprCH5S341frlpYnUEW0H72dLxa6IsYr+mPno20GiSm+h9dEdQ==}
     engines: {node: '>=18'}
@@ -5838,9 +5860,6 @@ packages:
 
   '@types/oracledb@6.5.2':
     resolution: {integrity: sha512-kK1eBS/Adeyis+3OlBDMeQQuasIDLUYXsi2T15ccNJ0iyUpQ4xDF7svFu3+bGVrI0CMBUclPciz+lsQR3JX3TQ==}
-
-  '@types/path-browserify@1.0.0':
-    resolution: {integrity: sha512-XMCcyhSvxcch8b7rZAtFAaierBYdeHXVvg2iYnxOV0MCQHmPuRRmGZPFDRzPayxcGiiSL1Te9UIO+f3cuj0tfw==}
 
   '@types/pg-pool@2.0.6':
     resolution: {integrity: sha512-TaAUE5rq2VQYxab5Ts7WZhKNmuN78Q6PiFonTDdpbx8a1H0M1vhy3rhiMjl+e2iHmogyMw7jZF4FrE6eJUy5HQ==}
@@ -6583,10 +6602,6 @@ packages:
 
   axios-retry@3.9.1:
     resolution: {integrity: sha512-8PJDLJv7qTTMMwdnbMvrLYuvB47M81wRtxQmEdV5w4rgbTXTt+vtPkXwajOfOdSyv/wZICJOC+/UhXH4aQ/R+w==}
-
-  axios@0.18.1:
-    resolution: {integrity: sha512-0BfJq4NSfQXd+SkFdrvFbG7addhYSBA2mQwISr46pD6E5iqkWg02RAs8vyTT/j0RTnoYmeXauBuSv1qKwR179g==}
-    deprecated: Critical security vulnerability fixed in v0.21.1. For more information, see https://github.com/axios/axios/pull/3410
 
   axios@0.21.4:
     resolution: {integrity: sha512-ut5vewkiu8jjGBdqpM44XxjuCjq9LAKeHVmoVfHVzy8eHgxxq8SbAVQNovDA8mVi05kP0Ea/n/UzcSHcTJQfNg==}
@@ -8597,9 +8612,6 @@ packages:
   es6-promise@3.3.1:
     resolution: {integrity: sha512-SOp9Phqvqn7jtEUxPWdWfWoLmyt2VaJ6MpvP9Comy1MceMXqE6bxvaTu4iaxpYYPzhny28Lc+M87/c2cPK6lDg==}
 
-  esa-node@0.2.2:
-    resolution: {integrity: sha512-QIwO62/WezCVKzKBY0chpPOreI//rqdeZyfPbg7bFLqaQKcVxYLoq84KhsXgjmfypOUtjUPXa2BE5cf3yqlnhQ==}
-
   esbuild@0.21.5:
     resolution: {integrity: sha512-mg3OPMV4hXywwpoDxu3Qda5xCKQi+vCTZq8S9J/EpkhB2HzKXq4SNFZE3+NK93JYxc8VMSep+lOUSC/RVKaBqw==}
     engines: {node: '>=12'}
@@ -9156,10 +9168,6 @@ packages:
     peerDependenciesMeta:
       debug:
         optional: true
-
-  follow-redirects@1.5.10:
-    resolution: {integrity: sha512-0V5l4Cizzvqt5D44aTXbFZz+FtyXV1vrDN6qrelxtfYQKW0KO0W2T/hkE8xvGa/540LkZlkaUjO4ailYTFtHVQ==}
-    engines: {node: '>=4.0'}
 
   for-each@0.3.3:
     resolution: {integrity: sha512-jqYfLp7mo9vIyQf8ykW2v7A+2N4QjeCeI5+Dz9XraiO1ign81wjiH7Fb9vSOWvQfNtmSa4H2RoQTrrXivdUZmw==}
@@ -17740,6 +17748,14 @@ snapshots:
     dependencies:
       handsontable: 6.2.2
 
+  '@headless-tree/core@1.5.1': {}
+
+  '@headless-tree/react@1.5.1(@headless-tree/core@1.5.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
+    dependencies:
+      '@headless-tree/core': 1.5.1
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+
   '@humanwhocodes/config-array@0.11.8':
     dependencies:
       '@humanwhocodes/object-schema': 1.2.1
@@ -20595,6 +20611,14 @@ snapshots:
     dependencies:
       '@swc/counter': 0.1.3
 
+  '@tanstack/react-virtual@3.13.12(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
+    dependencies:
+      '@tanstack/virtual-core': 3.13.12
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+
+  '@tanstack/virtual-core@3.13.12': {}
+
   '@testing-library/dom@10.4.0':
     dependencies:
       '@babel/code-frame': 7.27.1
@@ -21486,8 +21510,6 @@ snapshots:
   '@types/oracledb@6.5.2':
     dependencies:
       '@types/node': 20.19.17
-
-  '@types/path-browserify@1.0.0': {}
 
   '@types/pg-pool@2.0.6':
     dependencies:
@@ -22472,13 +22494,6 @@ snapshots:
     dependencies:
       '@babel/runtime': 7.25.4
       is-retry-allowed: 2.2.0
-
-  axios@0.18.1:
-    dependencies:
-      follow-redirects: 1.5.10
-      is-buffer: 2.0.5
-    transitivePeerDependencies:
-      - supports-color
 
   axios@0.21.4:
     dependencies:
@@ -24422,12 +24437,6 @@ snapshots:
 
   es6-promise@3.3.1: {}
 
-  esa-node@0.2.2:
-    dependencies:
-      axios: 0.18.1
-    transitivePeerDependencies:
-      - supports-color
-
   esbuild@0.21.5:
     optionalDependencies:
       '@esbuild/aix-ppc64': 0.21.5
@@ -25182,12 +25191,6 @@ snapshots:
   follow-redirects@1.15.9(debug@4.4.1):
     optionalDependencies:
       debug: 4.4.1(supports-color@5.5.0)
-
-  follow-redirects@1.5.10:
-    dependencies:
-      debug: 3.1.0
-    transitivePeerDependencies:
-      - supports-color
 
   for-each@0.3.3:
     dependencies:

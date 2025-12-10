@@ -277,9 +277,9 @@ export const getServerSideProps: GetServerSideProps<Props> = async (
   // Merge all results in a type-safe manner (using sequential merging)
   return mergeGetServerSidePropsResults(
     commonEachPropsResult,
-    nextjsRoutingType === NextjsRoutingType.INITIAL
-      ? await getServerSidePropsForInitial(context)
-      : await getServerSidePropsForSameRoute(context),
+    nextjsRoutingType === NextjsRoutingType.SAME_ROUTE
+      ? await getServerSidePropsForSameRoute(context)
+      : await getServerSidePropsForInitial(context),
   );
 };
 

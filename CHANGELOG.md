@@ -1,8 +1,29 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.3.7...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.3.9...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.3.9](https://github.com/growilabs/compare/v7.3.8...v7.3.9) - 2025-12-09
+
+### 🐛 Bug Fixes
+
+* fix: Change the name of maintenance mode. (#10559) @hikaru-n-cpu
+
+### 🧰 Maintenance
+
+* support: Add new intern names to staff credits (#10556) @riona-k
+
+## [v7.3.8](https://github.com/growilabs/compare/v7.3.7...v7.3.8) - 2025-12-04
+
+### 💎 Features
+
+* feat: Enable page bulk export for GROWI.cloud (#10292) @arafubeatbox
+* feat: Users statistics table for admin (#10539) @riona-k
+
+### 🧰 Maintenance
+
+* ci(deps): bump validator from 13.15.20 to 13.15.22 (#10560) @[dependabot[bot]](https://github.com/apps/dependabot)
 
 ## [v7.3.7](https://github.com/growilabs/compare/v7.3.6...v7.3.7) - 2025-11-25
 

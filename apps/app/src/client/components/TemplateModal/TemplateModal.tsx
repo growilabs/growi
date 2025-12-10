@@ -67,7 +67,6 @@ const TemplateListGroupItem: React.FC<TemplateSummaryItemProps> = ({
     <a
       className={`list-group-item list-group-item-action ${isSelected ? 'active' : ''}`}
       onClick={onClick}
-      aria-current="true"
     >
       <h4 className="mb-1 d-flex">
         <span className="d-inline-block text-truncate">{localizedTemplate.title}</span>

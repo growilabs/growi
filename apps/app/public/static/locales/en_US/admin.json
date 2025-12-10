@@ -339,7 +339,7 @@
     "supplymentary_message_to_start": "As for the API, only the administrator API will be functional.",
     "start_maintenance_mode": "Start maintenance mode",
     "end_maintenance_mode": "End maintenance mode",
-    "description": "Maintenance mode restricts all user operations. Always start the maintenance mode before \"importing data\" and \"upgrading to V5\". To exit, go to \"Security Settings\" > \"Maintenance Mode\"."
+    "description": "Maintenance mode restricts all user operations. Always start the maintenance mode before \"importing data\" and \"upgrading to V5\". To exit, go to \"App Settings\" > \"Maintenance Mode\"."
   },
   "app_setting": {
     "site_name": "Site name",
@@ -531,7 +531,7 @@
     "page_path": "Page Path",
     "beta_warning": "This function is Beta.",
     "import_from": "Import from {{from}}",
-    "import_growi_archive": "Import GROWI archive",
+    "import_growi_archive": "Import Archive Data",
     "error": {
       "only_upsert_available": "Only 'Upsert' option is available for pages collection."
     },
@@ -577,23 +577,11 @@
         }
       }
     },
-    "esa_settings": {
-      "team_name": "Team name",
-      "access_token": "Access token",
-      "test_connection": "Test connection to esa"
-    },
-    "qiita_settings": {
-      "team_name": "Team name",
-      "access_token": "Access token",
-      "test_connection": "Test connection to qiita:team"
-    },
     "import": "Import",
     "skip_username_and_email_when_overlapped": "Skip username and email using same username and email in new environment",
     "prepare_new_account_for_migration": "Prepare new account for migration",
     "archive_data_import_detail": "More Details? Ckick here.",
-    "admin_archive_data_import_guide_url": "https://docs.growi.org/en/admin-guide/management-cookbook/import.html",
-    "page_skip": "Pages with a name that already exists on GROWI are not imported",
-    "Directory_hierarchy_tag": "Directory hierarchy tag"
+    "admin_archive_data_import_guide_url": "https://docs.growi.org/en/admin-guide/management-cookbook/import.html"
   },
   "export_management": {
     "export_archive_data": "Export Archive Data",
@@ -1015,12 +1003,6 @@
     "ADMIN_ARCHIVE_DATA_UPLOAD": "Upload Archived Data",
     "ADMIN_GROWI_DATA_IMPORTED": "Import Archived Data",
     "ADMIN_UPLOADED_GROWI_DATA_DISCARDED": "Discard Archived Data",
-    "ADMIN_ESA_DATA_IMPORTED": "Import from esa.io",
-    "ADMIN_ESA_DATA_UPDATED": "Update esa.io import settings",
-    "ADMIN_CONNECTION_TEST_OF_ESA_DATA": "Test connection to esa",
-    "ADMIN_QIITA_DATA_IMPORTED": "Import from Qiita:Team",
-    "ADMIN_QIITA_DATA_UPDATED": "Update Qiita:Team import settings",
-    "ADMIN_CONNECTION_TEST_OF_QIITA_DATA": "Test connection to Qiita:Team",
     "ADMIN_ARCHIVE_DATA_CREATE": "Create Archived Data",
     "ADMIN_ARCHIVE_DATA_DOWNLOAD": "Download Archive Data",
     "ADMIN_ARCHIVE_DATA_DELETE": "Delete Archive Data",
