@@ -45,7 +45,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       expandOtherOptionsForCompleteDeletion: false,
       isShowRestrictedByOwner: false,
       isUsersHomepageDeletionEnabled: false,
-      isUserPagesVisible: false,
+      hideUserPages: false,
       isForceDeleteUserHomepageOnUserDeletion: false,
       isRomUserAllowedToComment: false,
       isLocalEnabled: false,
@@ -180,7 +180,7 @@ export default class AdminGeneralSecurityContainer extends Container {
   }
 
   changeUserPageVisibility() {
-    this.setState({ isUserPagesVisible: !this.state.isUserPagesVisible });
+    this.setState({ hideUserPages: !this.state.hideUserPages });
   }
 
   /**
