@@ -1,12 +1,9 @@
-import type React from 'react';
 import type { JSX, ReactNode } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
-import EventEmitter from 'node:events';
 import { isIPageInfo } from '@growi/core';
-import { isClient } from '@growi/core/dist/utils';
 
 // biome-ignore-start lint/style/noRestrictedImports: no-problem lazy loaded components
 import { DescendantsPageListModalLazyLoaded } from '~/client/components/DescendantsPageListModal';
@@ -153,7 +150,11 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
 
   // If the data on the page changes without router.push, pageWithMeta remains old because getServerSideProps() is not executed
   // So preferentially take page data from useSWRxCurrentPage
-  const pagePath = currentPagePath ?? props.currentPathname;
+  // Note: Memoize to prevent unnecessary re-renders of PageView
+  const pagePath = useMemo(
+    () => currentPagePath ?? props.currentPathname,
+    [currentPagePath, props.currentPathname],
+  );
 
   const title = useCustomTitleForPage(pagePath);
 

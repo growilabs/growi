@@ -567,7 +567,7 @@ module.exports = (crowi: Crowi) => {
    *            content:
    *              application/json:
    *                schema:
-   *                  $ref: '#/components/schemas/PageInfoAll'
+   *                  $ref: '#/components/schemas/PageInfoExt'
    *          500:
    *            description: Internal server error.
    */
@@ -591,7 +591,20 @@ module.exports = (crowi: Crowi) => {
         );
 
         if (isIPageNotFoundInfo(meta)) {
-          return res.apiv3Err(`Page '${pageId}' is not found or forbidden`);
+          // Return error only when the page is forbidden
+          // Empty pages (isEmpty: true) should return page info for UI operations
+          if (meta.isForbidden) {
+            return res.apiv3Err(
+              new ErrorV3(
+                'Page is forbidden',
+                'page-is-forbidden',
+                undefined,
+                meta,
+              ),
+              403,
+            );
+          }
+          // For not found but not forbidden pages (isEmpty: true), return the meta info
         }
 
         return res.apiv3(meta);

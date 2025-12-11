@@ -5,7 +5,8 @@ import React, {
   type JSX,
 } from 'react';
 
-import type { IPagePopulatedToShowRevision, IPageInfoForOperation } from '@growi/core';
+import type { IPagePopulatedToShowRevision } from '@growi/core';
+import { isIPageInfoForOperation } from '@growi/core/dist/interfaces';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
@@ -129,7 +130,7 @@ export const PageSideContents = (props: PageSideContentsProps): JSX.Element => {
               icon={<span className="material-symbols-outlined">subject</span>}
               label={t('page_list')}
               // Do not display CountBadge if '/trash/*': https://github.com/growilabs/growi/pull/7600
-              count={!isTrash && pageInfo != null ? (pageInfo as IPageInfoForOperation).descendantCount : undefined}
+              count={!isTrash && isIPageInfoForOperation(pageInfo) ? pageInfo.descendantCount : undefined}
               offset={1}
               onClick={() => openDescendantPageListModal(pagePath)}
             />
@@ -142,7 +143,7 @@ export const PageSideContents = (props: PageSideContentsProps): JSX.Element => {
             <PageAccessoriesControl
               icon={<span className="material-symbols-outlined">chat</span>}
               label={t('comments')}
-              count={pageInfo != null ? (pageInfo as IPageInfoForOperation).commentCount : undefined}
+              count={isIPageInfoForOperation(pageInfo) ? pageInfo.commentCount : undefined}
               onClick={() => scroller.scrollTo('comments-container', { smooth: false, offset: -120 })}
             />
           </div>

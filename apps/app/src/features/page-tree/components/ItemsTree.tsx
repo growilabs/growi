@@ -168,18 +168,40 @@ export const ItemsTree: FC<Props> = (props: Props) => {
     onExpanded: triggerTreeRebuild,
   });
 
+  const getScrollElement = useCallback(
+    () => scrollerElem ?? null,
+    [scrollerElem],
+  );
+
+  const stableEstimateSize = useCallback(() => {
+    return estimateTreeItemSize();
+  }, [estimateTreeItemSize]);
+
+  const measureElement = useCallback(
+    (element: Element | null) => {
+      // Return consistent height measurement
+      return element?.getBoundingClientRect().height ?? stableEstimateSize();
+    },
+    [stableEstimateSize],
+  );
+
   const virtualizer = useVirtualizer({
     count: items.length,
-    getScrollElement: () => scrollerElem ?? null,
-    estimateSize: estimateTreeItemSize,
+    getScrollElement,
+    estimateSize: stableEstimateSize,
     overscan: 5,
+    measureElement,
   });
 
   // Scroll to selected item on mount or when targetPathOrId changes
   useScrollToSelectedItem({ targetPathOrId, items, virtualizer });
 
   return (
-    <div {...tree.getContainerProps()} className="list-group">
+    <div
+      {...tree.getContainerProps()}
+      className="list-group position-relative"
+      style={{ height: `${virtualizer.getTotalSize()}px` }}
+    >
       {virtualizer.getVirtualItems().map((virtualItem) => {
         const item = items[virtualItem.index];
         const itemData = item.getItemData();
@@ -202,8 +224,14 @@ export const ItemsTree: FC<Props> = (props: Props) => {
           <div
             key={virtualItem.key}
             data-index={virtualItem.index}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              transform: `translateY(${virtualItem.start}px)`,
+            }}
             ref={(node) => {
-              virtualizer.measureElement(node);
               if (node && itemRef) {
                 (itemRef as (node: HTMLElement) => void)(node);
               }

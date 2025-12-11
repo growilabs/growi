@@ -58,6 +58,7 @@ type CommonProps = {
 type DropdownMenuProps = CommonProps & {
   pageId: string,
   isLoading?: boolean,
+  isDataUnavailable?: boolean,
   operationProcessData?: IPageOperationProcessData,
 }
 
@@ -65,7 +66,7 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
   const { t } = useTranslation('');
 
   const {
-    pageId, isLoading, pageInfo, isEnableActions, isReadOnlyUser, forceHideMenuItems, operationProcessData,
+    pageId, isLoading, isDataUnavailable, pageInfo, isEnableActions, isReadOnlyUser, forceHideMenuItems, operationProcessData,
     onClickBookmarkMenuItem, onClickRenameMenuItem, onClickDuplicateMenuItem, onClickDeleteMenuItem,
     onClickRevertMenuItem, onClickPathRecoveryMenuItem,
     additionalMenuItemOnTopRenderer: AdditionalMenuItemsOnTop,
@@ -130,7 +131,15 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
 
   let contents = <></>;
 
-  if (isLoading) {
+  if (isDataUnavailable) {
+    // Show message when data is not available (e.g., fetch error)
+    contents = (
+      <div className="text-warning text-center px-3">
+        <span className="material-symbols-outlined">error_outline</span> No data available
+      </div>
+    );
+  }
+  else if (isLoading) {
     contents = (
       <div className="text-muted text-center my-2">
         <LoadingSpinner />
@@ -284,7 +293,7 @@ export const PageItemControlSubstance = (props: PageItemControlSubstanceProps): 
   const [isOpen, setIsOpen] = useState(false);
   const [shouldFetch, setShouldFetch] = useState(false);
 
-  const { data: fetchedPageInfo, mutate: mutatePageInfo } = useSWRxPageInfo(shouldFetch ? pageId : null);
+  const { data: fetchedPageInfo, error: fetchError, mutate: mutatePageInfo } = useSWRxPageInfo(shouldFetch ? pageId : null);
 
   // update shouldFetch (and will never be false)
   useEffect(() => {
@@ -307,7 +316,9 @@ export const PageItemControlSubstance = (props: PageItemControlSubstanceProps): 
     }
   }, [mutatePageInfo, onClickBookmarkMenuItem, shouldFetch]);
 
-  const isLoading = shouldFetch && fetchedPageInfo == null;
+  // isLoading should be true only when fetching is in progress (data and error are both undefined)
+  const isLoading = shouldFetch && fetchedPageInfo == null && fetchError == null;
+  const isDataUnavailable = !isLoading && fetchedPageInfo == null && presetPageInfo == null;
 
   const renameMenuItemClickHandler = useCallback(async() => {
     if (onClickRenameMenuItem == null) {
@@ -350,6 +361,7 @@ export const PageItemControlSubstance = (props: PageItemControlSubstanceProps): 
           <PageItemControlDropdownMenu
             {...props}
             isLoading={isLoading}
+            isDataUnavailable={isDataUnavailable}
             pageInfo={fetchedPageInfo ?? presetPageInfo}
             onClickBookmarkMenuItem={bookmarkMenuItemClickHandler}
             onClickRenameMenuItem={renameMenuItemClickHandler}

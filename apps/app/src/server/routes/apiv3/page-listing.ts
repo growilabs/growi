@@ -177,6 +177,158 @@ const routerFactory = (crowi: Crowi): Router => {
   /**
    * @swagger
    *
+   * /page-listing/info:
+   *   get:
+   *     tags: [PageListing]
+   *     security:
+   *       - bearer: []
+   *       - accessTokenInQuery: []
+   *     summary: /page-listing/info
+   *     description: Get summary information of pages
+   *     parameters:
+   *       - name: pageIds
+   *         in: query
+   *         description: Array of page IDs to retrieve information for (One of pageIds or path is required)
+   *         schema:
+   *           type: array
+   *           items:
+   *             type: string
+   *       - name: path
+   *         in: query
+   *         description: Path of the page to retrieve information for (One of pageIds or path is required)
+   *         schema:
+   *           type: string
+   *       - name: attachBookmarkCount
+   *         in: query
+   *         schema:
+   *           type: boolean
+   *       - name: attachShortBody
+   *         in: query
+   *         schema:
+   *           type: boolean
+   *     responses:
+   *       200:
+   *         description: Get the information of a page
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               additionalProperties:
+   *                 $ref: '#/components/schemas/PageInfoExt'
+   */
+  router.get(
+    '/info',
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    validator.pageIdsOrPathRequired,
+    validator.infoParams,
+    apiV3FormValidator,
+    async (req: AuthorizedRequest, res: ApiV3Response) => {
+      const {
+        pageIds,
+        path,
+        attachBookmarkCount: attachBookmarkCountParam,
+        attachShortBody: attachShortBodyParam,
+      } = req.query;
+
+      const attachBookmarkCount: boolean = attachBookmarkCountParam === 'true';
+      const attachShortBody: boolean = attachShortBodyParam === 'true';
+
+      const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
+        'Page',
+      );
+      // biome-ignore lint/suspicious/noExplicitAny: ignore
+      const Bookmark = mongoose.model<any, any>('Bookmark');
+      const pageService = crowi.pageService;
+      const pageGrantService: IPageGrantService = crowi.pageGrantService;
+
+      try {
+        const pages =
+          pageIds != null
+            ? await Page.findByIdsAndViewer(
+                pageIds as string[],
+                req.user,
+                null,
+                true,
+              )
+            : await Page.findByPathAndViewer(
+                path as string,
+                req.user,
+                null,
+                false,
+                true,
+              );
+
+        const foundIds = pages.map((page) => page._id);
+
+        let shortBodiesMap: Record<string, string | null> | undefined;
+        if (attachShortBody) {
+          shortBodiesMap = await pageService.shortBodiesMapByPageIds(
+            foundIds,
+            req.user,
+          );
+        }
+
+        let bookmarkCountMap: Record<string, number> | undefined;
+        if (attachBookmarkCount) {
+          bookmarkCountMap = (await Bookmark.getPageIdToCountMap(
+            foundIds,
+          )) as Record<string, number>;
+        }
+
+        const idToPageInfoMap: Record<string, IPageInfo | IPageInfoForListing> =
+          {};
+
+        const isGuestUser = req.user == null;
+
+        const userRelatedGroups = await pageGrantService.getUserRelatedGroups(
+          req.user,
+        );
+
+        for (const page of pages) {
+          const basicPageInfo = {
+            ...pageService.constructBasicPageInfo(page, isGuestUser),
+            bookmarkCount:
+              bookmarkCountMap != null
+                ? (bookmarkCountMap[page._id.toString()] ?? 0)
+                : 0,
+          };
+
+          // TODO: use pageService.getCreatorIdForCanDelete to get creatorId (https://redmine.weseek.co.jp/issues/140574)
+          const canDeleteCompletely = pageService.canDeleteCompletely(
+            page,
+            page.creator == null ? null : getIdForRef(page.creator),
+            req.user,
+            false,
+            userRelatedGroups,
+          ); // use normal delete config
+
+          const pageInfo = !isIPageInfoForEntity(basicPageInfo)
+            ? basicPageInfo
+            : ({
+                ...basicPageInfo,
+                isAbleToDeleteCompletely: canDeleteCompletely,
+                revisionShortBody:
+                  shortBodiesMap != null
+                    ? (shortBodiesMap[page._id.toString()] ?? undefined)
+                    : undefined,
+              } satisfies IPageInfoForListing);
+
+          idToPageInfoMap[page._id.toString()] = pageInfo;
+        }
+
+        return res.apiv3(idToPageInfoMap);
+      } catch (err) {
+        logger.error('Error occurred while fetching page informations.', err);
+        return res.apiv3Err(
+          new ErrorV3('Error occurred while fetching page informations.'),
+        );
+      }
+    },
+  );
+
+  /**
+   * @swagger
+   *
    * /page-listing/item:
    *   get:
    *     tags: [PageListing]

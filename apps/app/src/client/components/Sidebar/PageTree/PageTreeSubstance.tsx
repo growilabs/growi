@@ -4,6 +4,7 @@ import React, {
 
 import { useTranslation } from 'next-i18next';
 
+import { ItemsTree } from '~/features/page-tree/components';
 import { usePageTreeInformationUpdate } from '~/features/page-tree/states/page-tree-update';
 import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
 import { useCurrentPageId, useCurrentPagePath } from '~/states/page';
@@ -13,7 +14,6 @@ import {
 } from '~/stores/page-listing';
 import loggerFactory from '~/utils/logger';
 
-import { ItemsTree } from '~/features/page-tree/components';
 import { PageTreeItem, pageTreeItemSize } from '../PageTreeItem';
 import { SidebarHeaderReloadButton } from '../SidebarHeaderReloadButton';
 
@@ -108,6 +108,8 @@ export const PageTreeContent = memo(({ isWipPageShown }: PageTreeContentProps) =
 
   const sidebarScrollerElem = useSidebarScrollerElem();
 
+  const estimateTreeItemSize = useCallback(() => pageTreeItemSize, []);
+
   if (!migrationStatus?.isV5Compatible) {
     return <PageTreeUnavailable />;
   }
@@ -130,7 +132,7 @@ export const PageTreeContent = memo(({ isWipPageShown }: PageTreeContentProps) =
         targetPath={path}
         targetPathOrId={targetPathOrId}
         CustomTreeItem={PageTreeItem}
-        estimateTreeItemSize={() => pageTreeItemSize}
+        estimateTreeItemSize={estimateTreeItemSize}
         scrollerElem={sidebarScrollerElem}
       />
 
