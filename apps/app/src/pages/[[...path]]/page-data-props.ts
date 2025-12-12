@@ -286,6 +286,11 @@ export async function getPageDataForSameRoute(
     isPermalink ? { _id: pageId } : { path: resolvedPagePath },
   ).exec();
 
+  // Add user to seen users
+  if (user != null) {
+    await basicPageInfo?.seen(user);
+  }
+
   const currentPathname = resolveFinalizedPathname(
     resolvedPagePath,
     basicPageInfo,
