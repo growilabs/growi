@@ -36,6 +36,7 @@ module.exports = (crowi, app) => {
   // admin
   routerForAdmin.use('/admin-home', require('./admin-home')(crowi));
   routerForAdmin.use('/markdown-setting', require('./markdown-setting')(crowi));
+  routerForAdmin.use('/content-disposition-settings', require('./content-disposition-settings')(crowi));
   routerForAdmin.use('/app-settings', require('./app-settings')(crowi));
   routerForAdmin.use('/customize-setting', require('./customize-setting')(crowi));
   routerForAdmin.use('/notification-setting', require('./notification-setting')(crowi));

@@ -15,6 +15,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { NonBlankString } from '@growi/core/dist/interfaces';
 import { toNonBlankStringOrUndefined } from '@growi/core/dist/interfaces';
+import type { Response } from 'express';
 import urljoin from 'url-join';
 
 import type Crowi from '~/server/crowi';
@@ -226,10 +227,8 @@ class AwsFileUploader extends AbstractFileUploader {
     }
   }
 
-  /**
-   * @inheritdoc
-   */
-  override respond(): void {
+
+  override async respond(res: Response, attachment: IAttachmentDocument, opts?: RespondOptions): Promise<void> {
     throw new Error('AwsFileUploader does not support ResponseMode.DELEGATE.');
   }
 
@@ -321,7 +320,6 @@ class AwsFileUploader extends AbstractFileUploader {
       logger.debug(`Successfully aborted multipart upload: uploadKey=${uploadKey}, uploadId=${uploadId}`);
     }
     catch (e) {
-      // allow duplicate abort requests to ensure abortion
       if (e.response?.status !== 404) {
         logger.error(`Failed to abort multipart upload: uploadKey=${uploadKey}, uploadId=${uploadId}`, e);
         throw e;
