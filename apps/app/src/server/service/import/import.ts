@@ -1,16 +1,18 @@
-import fs from 'fs';
-import path from 'path';
-import type { EventEmitter } from 'stream';
-import { Writable, Transform } from 'stream';
-import { pipeline } from 'stream/promises';
-
-import JSONStream from 'JSONStream';
 import gc from 'expose-gc/function';
+import fs from 'fs';
 import type {
-  BulkWriteResult, MongoBulkWriteError, UnorderedBulkOperation, WriteError, BulkOperationBase,
+  BulkOperationBase,
+  BulkWriteResult,
+  MongoBulkWriteError,
+  UnorderedBulkOperation,
+  WriteError,
 } from 'mongodb';
 import type { Document } from 'mongoose';
 import mongoose from 'mongoose';
+import path from 'path';
+import type { EventEmitter } from 'stream';
+import { Transform, Writable } from 'stream';
+import { pipeline } from 'stream/promises';
 import unzipStream from 'unzip-stream';
 
 import { ImportMode } from '~/models/admin/import-mode';
@@ -23,35 +25,29 @@ import loggerFactory from '~/utils/logger';
 import CollectionProgressingStatus from '../../models/vo/collection-progressing-status';
 import { createBatchStream } from '../../util/batch-stream';
 import { configManager } from '../config-manager';
-
 import type { ConvertMap } from './construct-convert-map';
 import { constructConvertMap } from './construct-convert-map';
 import { getModelFromCollectionName } from './get-model-from-collection-name';
 import type { ImportSettings, OverwriteParams } from './import-settings';
 import { keepOriginal } from './overwrite-function';
 
+import JSONStream from 'JSONStream';
 
 const logger = loggerFactory('growi:services:ImportService'); // eslint-disable-line no-unused-vars
 
-
 const BULK_IMPORT_SIZE = 100;
 
-
 class ImportingCollectionError extends Error {
-
   collectionProgress: CollectionProgress;
 
   constructor(collectionProgress, error) {
     super(error);
     this.collectionProgress = collectionProgress;
   }
-
 }
 
-
 export class ImportService {
-
-  private modelCache: Map<string, { Model: any, schema: any }> = new Map();
+  private modelCache: Map<string, { Model: any; schema: any }> = new Map();
 
   private crowi: Crowi;
 
@@ -87,7 +83,9 @@ export class ImportService {
    * @return {object} info for zip files and whether currentProgressingStatus exists
    */
   async getStatus() {
-    const zipFiles = fs.readdirSync(this.baseDir).filter(file => path.extname(file) === '.zip');
+    const zipFiles = fs
+      .readdirSync(this.baseDir)
+      .filter((file) => path.extname(file) === '.zip');
 
     // process serially so as not to waste memory
     const zipFileStats: any[] = [];
@@ -100,10 +98,11 @@ export class ImportService {
     }
 
     // filter null object (broken zip)
-    const filtered = zipFileStats
-      .filter(zipFileStat => zipFileStat != null);
+    const filtered = zipFileStats.filter((zipFileStat) => zipFileStat != null);
     // sort with ctime("Change Time" - Time when file status was last changed (inode data modification).)
-    filtered.sort((a, b) => { return a.fileStat.ctime - b.fileStat.ctime });
+    filtered.sort((a, b) => {
+      return a.fileStat.ctime - b.fileStat.ctime;
+    });
 
     const zipFileStat = filtered.pop();
     let isTheSameVersion = false;
@@ -112,13 +111,11 @@ export class ImportService {
       try {
         this.validate(zipFileStat.meta);
         isTheSameVersion = true;
-      }
-      catch (err) {
+      } catch (err) {
         isTheSameVersion = false;
         logger.error('the versions are not met', err);
       }
     }
-
 
     return {
       isTheSameVersion,
@@ -127,7 +124,6 @@ export class ImportService {
       progressList: this.currentProgressingStatus?.progressList ?? null,
     };
   }
-
 
   async preImport() {
     await setupIndependentModels();
@@ -141,11 +137,16 @@ export class ImportService {
    * @param collections MongoDB collection name
    * @param importSettingsMap
    */
-  async import(collections: string[], importSettingsMap: Map<string, ImportSettings>): Promise<void> {
+  async import(
+    collections: string[],
+    importSettingsMap: Map<string, ImportSettings>,
+  ): Promise<void> {
     await this.preImport();
 
     // init status object
-    this.currentProgressingStatus = new CollectionProgressingStatus(collections);
+    this.currentProgressingStatus = new CollectionProgressingStatus(
+      collections,
+    );
 
     // process serially so as not to waste memory
     const promises = collections.map((collectionName) => {
@@ -158,11 +159,13 @@ export class ImportService {
     for await (const promise of promises) {
       try {
         await promise;
-      }
-      // catch ImportingCollectionError
-      catch (err) {
+      } catch (err) {
+        // catch ImportingCollectionError
         const { collectionProgress } = err;
-        logger.error(`failed to import to ${collectionProgress.collectionName}`, err);
+        logger.error(
+          `failed to import to ${collectionProgress.collectionName}`,
+          err,
+        );
         this.emitProgressEvent(collectionProgress, { message: err.message });
       }
     }
@@ -174,9 +177,11 @@ export class ImportService {
 
     const currentIsV5Compatible = configManager.getConfig('app:isV5Compatible');
     const isImportPagesCollection = collections.includes('pages');
-    const shouldNormalizePages = currentIsV5Compatible && isImportPagesCollection;
+    const shouldNormalizePages =
+      currentIsV5Compatible && isImportPagesCollection;
 
-    if (shouldNormalizePages) await this.crowi.pageService.normalizeAllPublicPages();
+    if (shouldNormalizePages)
+      await this.crowi.pageService.normalizeAllPublicPages();
 
     // Release caches after import process
     this.modelCache.clear();
@@ -188,15 +193,21 @@ export class ImportService {
    *
    * @memberOf ImportService
    */
-  protected async importCollection(collectionName: string, importSettings: ImportSettings): Promise<void> {
+  protected async importCollection(
+    collectionName: string,
+    importSettings: ImportSettings,
+  ): Promise<void> {
     if (this.currentProgressingStatus == null) {
-      throw new Error('Something went wrong: currentProgressingStatus is not initialized');
+      throw new Error(
+        'Something went wrong: currentProgressingStatus is not initialized',
+      );
     }
     // Avoid closure references by passing direct method references
     const collection = mongoose.connection.collection(collectionName);
 
     const { mode, jsonFileName, overwriteParams } = importSettings;
-    const collectionProgress = this.currentProgressingStatus.progressMap[collectionName];
+    const collectionProgress =
+      this.currentProgressingStatus.progressMap[collectionName];
 
     try {
       const jsonFile = this.getFile(jsonFileName);
@@ -210,7 +221,9 @@ export class ImportService {
       }
 
       // stream 1
-      const readStream = fs.createReadStream(jsonFile, { encoding: this.growiBridgeService.getEncoding() });
+      const readStream = fs.createReadStream(jsonFile, {
+        encoding: this.growiBridgeService.getEncoding(),
+      });
 
       // stream 2
       const jsonStream = JSONStream.parse('*');
@@ -220,12 +233,15 @@ export class ImportService {
         objectMode: true,
         transform(this: Transform, doc, encoding, callback) {
           try {
-          // Direct reference to convertDocuments
-            const converted = (importSettings as any).service.convertDocuments(collectionName, doc, overwriteParams);
+            // Direct reference to convertDocuments
+            const converted = (importSettings as any).service.convertDocuments(
+              collectionName,
+              doc,
+              overwriteParams,
+            );
             this.push(converted);
             callback();
-          }
-          catch (error) {
+          } catch (error) {
             callback(error);
           }
         },
@@ -237,33 +253,47 @@ export class ImportService {
       const batchStream = createBatchStream(BULK_IMPORT_SIZE);
       const writeStream = new Writable({
         objectMode: true,
-        write: async(batch, encoding, callback) => {
+        write: async (batch, encoding, callback) => {
           try {
             const unorderedBulkOp = collection.initializeUnorderedBulkOp();
             // documents are not persisted until unorderedBulkOp.execute()
             batch.forEach((document) => {
-              this.bulkOperate(unorderedBulkOp, collectionName, document, importSettings);
+              this.bulkOperate(
+                unorderedBulkOp,
+                collectionName,
+                document,
+                importSettings,
+              );
             });
 
             // exec
-            const { result, errors } = await this.execUnorderedBulkOpSafely(unorderedBulkOp);
+            const { result, errors } =
+              await this.execUnorderedBulkOpSafely(unorderedBulkOp);
             const {
-              insertedCount, modifiedCount, upsertedCount, matchedCount,
+              insertedCount,
+              modifiedCount,
+              upsertedCount,
+              matchedCount,
             } = result;
             const errorCount = errors?.length ?? 0;
 
             // For upsert operations, count matched documents as modified
-            const actualModifiedCount = importSettings.mode === ImportMode.upsert
-              ? (matchedCount || 0) // In upsert mode, matchedCount indicates documents that were found and potentially updated
-              : modifiedCount;
+            const actualModifiedCount =
+              importSettings.mode === ImportMode.upsert
+                ? matchedCount || 0 // In upsert mode, matchedCount indicates documents that were found and potentially updated
+                : modifiedCount;
 
-            const actualInsertedCount = importSettings.mode === ImportMode.upsert
-              ? (upsertedCount || 0) // In upsert mode, upsertedCount indicates newly created documents
-              : insertedCount;
+            const actualInsertedCount =
+              importSettings.mode === ImportMode.upsert
+                ? upsertedCount || 0 // In upsert mode, upsertedCount indicates newly created documents
+                : insertedCount;
 
-            logger.debug(`Importing ${collectionName}. Inserted: ${actualInsertedCount}. Modified: ${actualModifiedCount}. Failed: ${errorCount}.`
-              + ` (Raw: inserted=${insertedCount}, modified=${modifiedCount}, upserted=${upsertedCount}, matched=${matchedCount})`);
-            const increment = actualInsertedCount + actualModifiedCount + errorCount;
+            logger.debug(
+              `Importing ${collectionName}. Inserted: ${actualInsertedCount}. Modified: ${actualModifiedCount}. Failed: ${errorCount}.` +
+                ` (Raw: inserted=${insertedCount}, modified=${modifiedCount}, upserted=${upsertedCount}, matched=${matchedCount})`,
+            );
+            const increment =
+              actualInsertedCount + actualModifiedCount + errorCount;
             collectionProgress.currentCount += increment;
             collectionProgress.totalCount += increment;
             collectionProgress.insertedCount += actualInsertedCount;
@@ -273,13 +303,11 @@ export class ImportService {
             try {
               logger.info('global.gc() invoked.');
               gc();
-            }
-            catch (err) {
+            } catch (err) {
               logger.error('fail garbage collection: ', err);
             }
             callback();
-          }
-          catch (err) {
+          } catch (err) {
             logger.error('Error in writeStream:', err);
             callback(err);
           }
@@ -290,29 +318,41 @@ export class ImportService {
         },
       });
 
-      await pipeline(readStream, jsonStream, convertStream, batchStream, writeStream);
+      await pipeline(
+        readStream,
+        jsonStream,
+        convertStream,
+        batchStream,
+        writeStream,
+      );
 
       // Ensure final progress event is emitted even when no data was processed
       if (collectionProgress.currentCount === 0) {
-        logger.info(`No data processed for collection ${collectionName}. Emitting final progress event.`);
+        logger.info(
+          `No data processed for collection ${collectionName}. Emitting final progress event.`,
+        );
         this.emitProgressEvent(collectionProgress, null);
       }
 
       // clean up tmp directory
       fs.unlinkSync(jsonFile);
-    }
-    catch (err) {
+    } catch (err) {
       throw new ImportingCollectionError(collectionProgress, err);
     }
   }
 
-  validateImportSettings(collectionName: string, importSettings: ImportSettings): void {
+  validateImportSettings(
+    collectionName: string,
+    importSettings: ImportSettings,
+  ): void {
     const { mode } = importSettings;
 
     switch (collectionName) {
       case 'configs':
         if (mode !== ImportMode.flushAndInsert) {
-          throw new Error(`The specified mode '${mode}' is not allowed when importing to 'configs' collection.`);
+          throw new Error(
+            `The specified mode '${mode}' is not allowed when importing to 'configs' collection.`,
+          );
         }
         break;
     }
@@ -322,10 +362,10 @@ export class ImportService {
    * process bulk operation
    */
   bulkOperate(
-      bulk: UnorderedBulkOperation,
-      collectionName: string,
-      document: Record<string, unknown>,
-      importSettings: ImportSettings,
+    bulk: UnorderedBulkOperation,
+    collectionName: string,
+    document: Record<string, unknown>,
+    importSettings: ImportSettings,
   ): BulkOperationBase | void {
     // insert
     if (importSettings.mode !== ImportMode.upsert) {
@@ -346,11 +386,18 @@ export class ImportService {
    * @param {CollectionProgress} collectionProgress
    * @param {object} appendedErrors key: collection name, value: array of error object
    */
-  emitProgressEvent(collectionProgress: CollectionProgress, appendedErrors: any): void {
+  emitProgressEvent(
+    collectionProgress: CollectionProgress,
+    appendedErrors: any,
+  ): void {
     const { collectionName } = collectionProgress;
 
     // send event (in progress in global)
-    this.adminEvent.emit('onProgressForImport', { collectionName, collectionProgress, appendedErrors });
+    this.adminEvent.emit('onProgressForImport', {
+      collectionName,
+      collectionProgress,
+      appendedErrors,
+    });
   }
 
   /**
@@ -387,11 +434,12 @@ export class ImportService {
       if (fileName === this.growiBridgeService.getMetaFileName()) {
         // skip meta.json
         entry.autodrain();
-      }
-      else {
+      } else {
         const entryPromise = new Promise<string | null>((resolve) => {
           const jsonFile = path.join(this.baseDir, fileName);
-          const writeStream = fs.createWriteStream(jsonFile, { encoding: this.growiBridgeService.getEncoding() });
+          const writeStream = fs.createWriteStream(jsonFile, {
+            encoding: this.growiBridgeService.getEncoding(),
+          });
 
           pipeline(entry, writeStream)
             .then(() => resolve(jsonFile))
@@ -409,8 +457,11 @@ export class ImportService {
     const results = await Promise.allSettled(entryPromises);
 
     return results
-      .filter((result): result is PromiseFulfilledResult<string> => result.status === 'fulfilled' && result.value !== null)
-      .map(result => result.value);
+      .filter(
+        (result): result is PromiseFulfilledResult<string> =>
+          result.status === 'fulfilled' && result.value !== null,
+      )
+      .map((result) => result.value);
   }
 
   /**
@@ -418,13 +469,14 @@ export class ImportService {
    *
    * @memberOf ImportService
    */
-  async execUnorderedBulkOpSafely(unorderedBulkOp: UnorderedBulkOperation): Promise<{ result: BulkWriteResult, errors?: WriteError[] }> {
+  async execUnorderedBulkOpSafely(
+    unorderedBulkOp: UnorderedBulkOperation,
+  ): Promise<{ result: BulkWriteResult; errors?: WriteError[] }> {
     try {
       return {
         result: await unorderedBulkOp.execute(),
       };
-    }
-    catch (err) {
+    } catch (err) {
       const errTypeGuard = (err): err is MongoBulkWriteError => {
         return 'result' in err && 'writeErrors' in err;
       };
@@ -432,14 +484,21 @@ export class ImportService {
       if (errTypeGuard(err)) {
         return {
           result: err.result,
-          errors: Array.isArray(err.writeErrors) ? err.writeErrors : [err.writeErrors],
+          errors: Array.isArray(err.writeErrors)
+            ? err.writeErrors
+            : [err.writeErrors],
         };
       }
 
-      logger.error('Failed to execute unorderedBulkOp and the error could not handled.', err);
-      throw new Error('Failed to execute unorderedBulkOp and the error could not handled.', err);
+      logger.error(
+        'Failed to execute unorderedBulkOp and the error could not handled.',
+        err,
+      );
+      throw new Error(
+        'Failed to execute unorderedBulkOp and the error could not handled.',
+        err,
+      );
     }
-
   }
 
   /**
@@ -450,8 +509,12 @@ export class ImportService {
    * @param document document being imported
    * @returns document to be persisted
    */
-  convertDocuments<D extends Document>(collectionName: string, document: D, overwriteParams: OverwriteParams): D {
-  // Model and schema cache (optimization)
+  convertDocuments<D extends Document>(
+    collectionName: string,
+    document: D,
+    overwriteParams: OverwriteParams,
+  ): D {
+    // Model and schema cache (optimization)
     if (!this.modelCache) {
       this.modelCache = new Map();
     }
@@ -459,7 +522,7 @@ export class ImportService {
     let modelInfo = this.modelCache.get(collectionName);
     if (!modelInfo) {
       const Model = getModelFromCollectionName(collectionName);
-      const schema = (Model != null) ? Model.schema : undefined;
+      const schema = Model != null ? Model.schema : undefined;
       modelInfo = { Model, schema };
       this.modelCache.set(collectionName, modelInfo);
     }
@@ -468,26 +531,48 @@ export class ImportService {
     const convertMap = this.convertMap?.[collectionName];
 
     // Use shallow copy instead of structuredClone() when sufficient
-    const _document: D = (typeof document === 'object' && document !== null && !Array.isArray(document)) ? { ...document } : structuredClone(document);
+    const _document: D =
+      typeof document === 'object' &&
+      document !== null &&
+      !Array.isArray(document)
+        ? { ...document }
+        : structuredClone(document);
 
     Object.entries(document).forEach(([propertyName, value]) => {
       // Check if there's a custom convert function for this property, otherwise use keepOriginal
       const convertedValue = convertMap?.[propertyName];
-      const convertFunc = (convertedValue != null && typeof convertedValue === 'function') ? convertedValue : keepOriginal;
+      const convertFunc =
+        convertedValue != null && typeof convertedValue === 'function'
+          ? convertedValue
+          : keepOriginal;
 
-      _document[propertyName] = convertFunc(value, { document, propertyName, schema });
+      _document[propertyName] = convertFunc(value, {
+        document,
+        propertyName,
+        schema,
+      });
     });
 
     // overwrite documents with custom values
-    Object.entries(overwriteParams).forEach(([propertyName, overwriteValue]) => {
-      const value = document[propertyName];
+    Object.entries(overwriteParams).forEach(
+      ([propertyName, overwriteValue]) => {
+        const value = document[propertyName];
 
-      // distinguish between null and undefined
-      if (value !== undefined) {
-        const overwriteFunc = (typeof overwriteValue === 'function') ? overwriteValue : null;
-        _document[propertyName] = (overwriteFunc != null) ? overwriteFunc(value, { document: _document, propertyName, schema }) : overwriteValue;
-      }
-    });
+        // distinguish between null and undefined
+        if (value !== undefined) {
+          const overwriteFunc =
+            typeof overwriteValue === 'function' ? overwriteValue : null;
+          _document[propertyName] =
+            overwriteFunc != null
+              ? overwriteFunc(value, {
+                  document: _document,
+                  propertyName,
+                  schema,
+                })
+              : overwriteValue;
+        }
+      },
+    );
     return _document;
   }
 
@@ -501,7 +586,9 @@ export class ImportService {
    */
   validate(meta: any): void {
     if (meta.version !== getGrowiVersion()) {
-      throw new Error('The version of this GROWI and the uploaded GROWI data are not the same');
+      throw new Error(
+        'The version of this GROWI and the uploaded GROWI data are not the same',
+      );
     }
 
     // TODO: check if all migrations are completed
@@ -514,8 +601,9 @@ export class ImportService {
    */
   deleteAllZipFiles(): void {
     fs.readdirSync(this.baseDir)
-      .filter(file => path.extname(file) === '.zip')
-      .forEach(file => fs.unlinkSync(path.join(this.baseDir, file)));
+      .filter((file) => path.extname(file) === '.zip')
+      .forEach((file) => {
+        fs.unlinkSync(path.join(this.baseDir, file));
+      });
   }
-
 }

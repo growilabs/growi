@@ -1,11 +1,11 @@
 import React, {
-  useCallback, useEffect, useState, type JSX,
+  useCallback, useEffect, useState, useMemo, type JSX,
 } from 'react';
 
 import assert from 'assert';
 
 import type { Lang } from '@growi/core';
-import { useTemplateModal, type TemplateModalStatus } from '@growi/editor/dist/client/stores/use-template-modal';
+import { useTemplateModalStatus, useTemplateModalActions, type TemplateModalState } from '@growi/editor';
 import {
   extractSupportedLocales, getLocalizedTemplate, type TemplateSummary,
 } from '@growi/pluginkit/dist/v4';
@@ -23,7 +23,7 @@ import {
 } from 'reactstrap';
 
 import { useSWRxTemplate, useSWRxTemplates } from '~/features/templates/stores';
-import { usePersonalSettings } from '~/stores/personal-settings';
+import { useSWRxPersonalSettings } from '~/stores/personal-settings';
 import { usePreviewOptions } from '~/stores/renderer';
 import loggerFactory from '~/utils/logger';
 
@@ -67,7 +67,6 @@ const TemplateListGroupItem: React.FC<TemplateSummaryItemProps> = ({
     <a
       className={`list-group-item list-group-item-action ${isSelected ? 'active' : ''}`}
       onClick={onClick}
-      aria-current="true"
     >
       <h4 className="mb-1 d-flex">
         <span className="d-inline-block text-truncate">{localizedTemplate.title}</span>
@@ -111,7 +110,7 @@ const TemplateDropdownItem: React.FC<TemplateSummaryItemProps> = ({
 };
 
 type TemplateModalSubstanceProps = {
-  templateModalStatus: TemplateModalStatus,
+  templateModalStatus: TemplateModalState,
   close: () => void,
 }
 
@@ -120,7 +119,7 @@ const TemplateModalSubstance = (props: TemplateModalSubstanceProps): JSX.Element
 
   const { t } = useTranslation(['translation', 'commons']);
 
-  const { data: personalSettingsInfo } = usePersonalSettings();
+  const { data: personalSettingsInfo } = useSWRxPersonalSettings();
   const { data: rendererOptions } = usePreviewOptions();
   const { data: templateSummaries, isLoading } = useSWRxTemplates();
 
@@ -132,8 +131,15 @@ const TemplateModalSubstance = (props: TemplateModalSubstanceProps): JSX.Element
   const { format } = useFormatter();
 
   const usersDefaultLang = personalSettingsInfo?.lang;
-  const selectedLocalizedTemplate = getLocalizedTemplate(selectedTemplateSummary, usersDefaultLang);
-  const selectedTemplateLocales = extractSupportedLocales(selectedTemplateSummary);
+
+  // Memoize heavy calculations
+  const selectedLocalizedTemplate = useMemo(() => (
+    getLocalizedTemplate(selectedTemplateSummary, usersDefaultLang)
+  ), [selectedTemplateSummary, usersDefaultLang]);
+
+  const selectedTemplateLocales = useMemo(() => (
+    extractSupportedLocales(selectedTemplateSummary)
+  ), [selectedTemplateSummary]);
 
   const submitHandler = useCallback((markdown?: string) => {
     if (markdown == null) {
@@ -168,6 +174,16 @@ const TemplateModalSubstance = (props: TemplateModalSubstanceProps): JSX.Element
     setSelectedTemplateSummary(templateSummary);
   }, [selectedTemplateLocale, usersDefaultLang]);
 
+  // Memoize handler creator to avoid recreating onClick functions in map
+  const createOnClickHandler = useCallback((templateSummary: TemplateSummary) => () => {
+    onClickHandler(templateSummary);
+  }, [onClickHandler]);
+
+  // Memoize locale handler creator
+  const createLocaleHandler = useCallback((locale: string) => () => {
+    setSelectedTemplateLocale(locale);
+  }, []);
+
   useEffect(() => {
     if (!templateModalStatus.isOpened) {
       setSelectedTemplateSummary(undefined);
@@ -200,7 +216,7 @@ const TemplateModalSubstance = (props: TemplateModalSubstanceProps): JSX.Element
                   <TemplateListGroupItem
                     key={templateId}
                     templateSummary={templateSummary}
-                    onClick={() => onClickHandler(templateSummary)}
+                    onClick={createOnClickHandler(templateSummary)}
                     isSelected={isSelected}
                     usersDefaultLang={usersDefaultLang}
                   />
@@ -232,7 +248,7 @@ const TemplateModalSubstance = (props: TemplateModalSubstanceProps): JSX.Element
                     <TemplateDropdownItem
                       key={templateId}
                       templateSummary={templateSummary}
-                      onClick={() => onClickHandler(templateSummary)}
+                      onClick={createOnClickHandler(templateSummary)}
                       usersDefaultLang={usersDefaultLang}
                     />
                   );
@@ -263,7 +279,7 @@ const TemplateModalSubstance = (props: TemplateModalSubstanceProps): JSX.Element
                         <DropdownItem
                           data-testid="select-locale-dropdown-item"
                           key={locale}
-                          onClick={() => setSelectedTemplateLocale(locale)}
+                          onClick={createLocaleHandler(locale)}
                         >
                           <span>{locale}</span>
                         </DropdownItem>
@@ -302,7 +318,8 @@ const TemplateModalSubstance = (props: TemplateModalSubstanceProps): JSX.Element
 
 
 export const TemplateModal = (): JSX.Element => {
-  const { data: templateModalStatus, close } = useTemplateModal();
+  const templateModalStatus = useTemplateModalStatus();
+  const { close } = useTemplateModalActions();
 
   if (templateModalStatus == null) {
     return <></>;

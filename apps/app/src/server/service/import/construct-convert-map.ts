@@ -3,18 +3,20 @@ import mongoose from 'mongoose';
 import type { OverwriteFunction } from './overwrite-function';
 import { keepOriginal } from './overwrite-function';
 
-
 export type ConvertMap = {
   [collectionName: string]: {
-    [propertyName: string]: OverwriteFunction,
-  }
-}
+    [propertyName: string]: OverwriteFunction;
+  };
+};
 
 /**
  * Special conversion functions for problematic fields
  * Add entries here for fields that require custom handling during import
  */
-const SPECIAL_CONVERT_FUNCTIONS: Record<string, Record<string, OverwriteFunction>> = {
+const SPECIAL_CONVERT_FUNCTIONS: Record<
+  string,
+  Record<string, OverwriteFunction>
+> = {
   activities: {
     snapshot: (value: unknown) => value, // Skip SubdocumentPath casting to avoid Mongoose errors
   },
@@ -27,7 +29,10 @@ const SPECIAL_CONVERT_FUNCTIONS: Record<string, Record<string, OverwriteFunction
 /**
  * Get special conversion function for a specific collection.field combination
  */
-const getSpecialConvertFunction = (collectionName: string, propertyName: string): OverwriteFunction | null => {
+const getSpecialConvertFunction = (
+  collectionName: string,
+  propertyName: string,
+): OverwriteFunction | null => {
   return SPECIAL_CONVERT_FUNCTIONS[collectionName]?.[propertyName] ?? null;
 };
 

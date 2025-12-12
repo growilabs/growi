@@ -1,0 +1,43 @@
+@use './tree-item-variables';
+
+// show / hide on hover
+.tree-item-layout {
+  :global {
+    .list-group-item {
+      &:hover {
+        .d-hover-none {
+          display: none !important;
+        }
+        .d-hover-flex {
+          display: flex !important;
+        }
+      }
+
+      // Drag target state styling
+      &.drag-target {
+        background-color: var(--bs-list-group-active-bg) !important;
+        outline: 3px dashed var(--bs-list-group-active-border-color);
+        outline-offset: -4px;
+      }
+    }
+  }
+}
+
+// btn-triangle
+.tree-item-layout :global {
+  .btn-triangle-container {
+    min-width: tree-item-variables.$btn-triangle-min-width;
+  }
+
+  .btn-triangle {
+    --bs-btn-color: var(--bs-tertiary-color);
+
+    border: 0;
+    transition: all 0.2s ease-out;
+    transform: rotate(0deg);
+
+    &.open {
+      transform: rotate(90deg);
+    }
+  }
+}

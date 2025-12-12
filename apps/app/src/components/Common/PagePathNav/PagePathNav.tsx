@@ -5,20 +5,11 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 import LinkedPagePath from '~/models/linked-page-path';
 
 import { PagePathHierarchicalLink } from '../PagePathHierarchicalLink';
+import { Separator } from '.';
 import type { PagePathNavLayoutProps } from './PagePathNavLayout';
 import { PagePathNavLayout } from './PagePathNavLayout';
 
-import styles from './PagePathNav.module.scss';
-
 const { isTrashPage } = pagePathUtils;
-
-const Separator = ({ className }: { className?: string }): JSX.Element => {
-  return (
-    <span className={`separator ${className ?? ''} ${styles['grw-mx-02em']}`}>
-      /
-    </span>
-  );
-};
 
 export const PagePathNav = (props: PagePathNavLayoutProps): JSX.Element => {
   const { pagePath } = props;

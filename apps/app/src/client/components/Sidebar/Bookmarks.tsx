@@ -3,13 +3,13 @@ import React, { type JSX } from 'react';
 
 import { useTranslation } from 'react-i18next';
 
-import { useIsGuestUser } from '~/stores-universal/context';
+import { useIsGuestUser } from '~/states/context';
 
 import { BookmarkContents } from './Bookmarks/BookmarkContents';
 
 export const Bookmarks = () : JSX.Element => {
   const { t } = useTranslation();
-  const { data: isGuestUser } = useIsGuestUser();
+  const isGuestUser = useIsGuestUser();
 
   return (
     <div className="px-3">

@@ -28,7 +28,9 @@ jobs:
         images: growilabs/pdf-converter
         tags: |
           type=raw,value=latest
-          type=raw,value=${{ steps.package-json.outputs.packageVersion }}
+          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}
+          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}.{{minor}}
+          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}.{{minor}}.{{patch}}
 
     - name: Login to docker.io registry
       run: |

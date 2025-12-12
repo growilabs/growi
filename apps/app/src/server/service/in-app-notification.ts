@@ -1,9 +1,7 @@
-import type {
-  HasObjectId, IUser, IPage,
-} from '@growi/core';
+import type { HasObjectId, IPage, IUser } from '@growi/core';
 import { SubscriptionStatusType } from '@growi/core';
 import { subDays } from 'date-fns/subDays';
-import type { Types, FilterQuery, UpdateQuery } from 'mongoose';
+import type { FilterQuery, Types, UpdateQuery } from 'mongoose';
 
 import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export';
 import { AllEssentialActions } from '~/interfaces/activity';
@@ -11,27 +9,21 @@ import type { PaginateResult } from '~/interfaces/in-app-notification';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 import type { ActivityDocument } from '~/server/models/activity';
 import type { InAppNotificationDocument } from '~/server/models/in-app-notification';
-import {
-  InAppNotification,
-} from '~/server/models/in-app-notification';
+import { InAppNotification } from '~/server/models/in-app-notification';
 import InAppNotificationSettings from '~/server/models/in-app-notification-settings';
 import Subscription from '~/server/models/subscription';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
-
-
 import { generateSnapshot } from './in-app-notification/in-app-notification-utils';
-import { preNotifyService, type PreNotify } from './pre-notify';
-import { RoomPrefix, getRoomNameWithId } from './socket-io/helper';
-
+import { type PreNotify, preNotifyService } from './pre-notify';
+import { getRoomNameWithId, RoomPrefix } from './socket-io/helper';
 
 const { STATUS_UNOPENED, STATUS_OPENED } = InAppNotificationStatuses;
 
 const logger = loggerFactory('growi:service:inAppNotification');
 
 export default class InAppNotificationService {
-
   crowi!: Crowi;
 
   socketIoService!: any;
@@ -52,42 +44,58 @@ export default class InAppNotificationService {
   }
 
   initActivityEventListeners(): void {
-    this.activityEvent.on('updated', async(activity: ActivityDocument, target: IUser | IPage | IPageBulkExportJob, preNotify: PreNotify) => {
-      try {
-        const shouldNotification = activity != null && target != null && (AllEssentialActions as ReadonlyArray<string>).includes(activity.action);
-        if (shouldNotification) {
-          await this.createInAppNotification(activity, target, preNotify);
+    this.activityEvent.on(
+      'updated',
+      async (
+        activity: ActivityDocument,
+        target: IUser | IPage | IPageBulkExportJob,
+        preNotify: PreNotify,
+      ) => {
+        try {
+          const shouldNotification =
+            activity != null &&
+            target != null &&
+            (AllEssentialActions as ReadonlyArray<string>).includes(
+              activity.action,
+            );
+          if (shouldNotification) {
+            await this.createInAppNotification(activity, target, preNotify);
+          }
+        } catch (err) {
+          logger.error('Create InAppNotification failed', err);
         }
-      }
-      catch (err) {
-        logger.error('Create InAppNotification failed', err);
-      }
-    });
+      },
+    );
   }
 
-  emitSocketIo = async(targetUsers) => {
+  emitSocketIo = async (targetUsers) => {
     if (this.socketIoService.isInitialized) {
-      targetUsers.forEach(async(userId) => {
-
+      targetUsers.forEach(async (userId) => {
         // emit to the room for each user
-        await this.socketIoService.getDefaultSocket()
+        await this.socketIoService
+          .getDefaultSocket()
           .in(getRoomNameWithId(RoomPrefix.USER, userId))
           .emit('notificationUpdated');
       });
     }
   };
 
-  upsertByActivity = async function(
-      users: Types.ObjectId[], activity: ActivityDocument, snapshot: string, createdAt?: Date | null,
-  ): Promise<void> {
-    const {
-      _id: activityId, targetModel, target, action,
-    } = activity;
+  upsertByActivity = async (
+    users: Types.ObjectId[],
+    activity: ActivityDocument,
+    snapshot: string,
+    createdAt?: Date | null,
+  ): Promise<void> => {
+    const { _id: activityId, targetModel, target, action } = activity;
     const now = createdAt || Date.now();
     const lastWeek = subDays(now, 7);
     const operations = users.map((user) => {
       const filter: FilterQuery<InAppNotificationDocument> = {
-        user, target, action, createdAt: { $gt: lastWeek }, snapshot,
+        user,
+        target,
+        action,
+        createdAt: { $gt: lastWeek },
+        snapshot,
       };
       const parameters: UpdateQuery<InAppNotificationDocument> = {
         user,
@@ -113,9 +121,13 @@ export default class InAppNotificationService {
     return;
   };
 
-  getLatestNotificationsByUser = async(
-      userId: Types.ObjectId,
-      queryOptions: {offset: number, limit: number, status?: InAppNotificationStatuses},
+  getLatestNotificationsByUser = async (
+    userId: Types.ObjectId,
+    queryOptions: {
+      offset: number;
+      limit: number;
+      status?: InAppNotificationStatuses;
+    },
   ): Promise<PaginateResult<InAppNotificationDocument>> => {
     const { limit, offset, status } = queryOptions;
 
@@ -136,9 +148,7 @@ export default class InAppNotificationService {
             { path: 'user' },
             {
               path: 'target',
-              populate: [
-                { path: 'attachment', strictPopulate: false },
-              ],
+              populate: [{ path: 'attachment', strictPopulate: false }],
             },
             { path: 'activities', populate: { path: 'user' } },
           ],
@@ -146,14 +156,16 @@ export default class InAppNotificationService {
       );
 
       return paginationResult;
-    }
-    catch (err) {
+    } catch (err) {
       logger.error('Error', err);
       throw new Error(err);
     }
   };
 
-  open = async function(user: IUser & HasObjectId, id: Types.ObjectId): Promise<void> {
+  open = async (
+    user: IUser & HasObjectId,
+    id: Types.ObjectId,
+  ): Promise<void> => {
     const query = { _id: id, user: user._id };
     const parameters = { status: STATUS_OPENED };
     const options = { new: true };
@@ -162,7 +174,9 @@ export default class InAppNotificationService {
     return;
   };
 
-  updateAllNotificationsAsOpened = async function(user: IUser & HasObjectId): Promise<void> {
+  updateAllNotificationsAsOpened = async (
+    user: IUser & HasObjectId,
+  ): Promise<void> => {
     const filter = { user: user._id, status: STATUS_UNOPENED };
     const options = { status: STATUS_OPENED };
 
@@ -170,36 +184,54 @@ export default class InAppNotificationService {
     return;
   };
 
-  getUnreadCountByUser = async function(user: Types.ObjectId): Promise<number| undefined> {
+  getUnreadCountByUser = async (
+    user: Types.ObjectId,
+  ): Promise<number | undefined> => {
     const query = { user, status: STATUS_UNOPENED };
 
     try {
       const count = await InAppNotification.countDocuments(query);
 
       return count;
-    }
-    catch (err) {
+    } catch (err) {
       logger.error('Error on getUnreadCountByUser', err);
       throw err;
     }
   };
 
-  createSubscription = async function(userId: Types.ObjectId, pageId: Types.ObjectId, targetRuleName: string): Promise<void> {
+  createSubscription = async (
+    userId: Types.ObjectId,
+    pageId: Types.ObjectId,
+    targetRuleName: string,
+  ): Promise<void> => {
     const query = { userId };
-    const inAppNotificationSettings = await InAppNotificationSettings.findOne(query);
+    const inAppNotificationSettings =
+      await InAppNotificationSettings.findOne(query);
     if (inAppNotificationSettings != null) {
-      const subscribeRule = inAppNotificationSettings.subscribeRules.find(subscribeRule => subscribeRule.name === targetRuleName);
+      const subscribeRule = inAppNotificationSettings.subscribeRules.find(
+        (subscribeRule) => subscribeRule.name === targetRuleName,
+      );
       if (subscribeRule != null && subscribeRule.isEnabled) {
-        await Subscription.subscribeByPageId(userId, pageId, SubscriptionStatusType.SUBSCRIBE);
+        await Subscription.subscribeByPageId(
+          userId,
+          pageId,
+          SubscriptionStatusType.SUBSCRIBE,
+        );
       }
     }
 
     return;
   };
 
-  createInAppNotification = async function(activity: ActivityDocument, target: IUser | IPage | IPageBulkExportJob, preNotify: PreNotify): Promise<void> {
-
-    const shouldNotification = activity != null && target != null && (AllEssentialActions as ReadonlyArray<string>).includes(activity.action);
+  createInAppNotification = async function (
+    activity: ActivityDocument,
+    target: IUser | IPage | IPageBulkExportJob,
+    preNotify: PreNotify,
+  ): Promise<void> {
+    const shouldNotification =
+      activity != null &&
+      target != null &&
+      (AllEssentialActions as ReadonlyArray<string>).includes(activity.action);
 
     const targetModel = activity.targetModel;
 
@@ -210,15 +242,17 @@ export default class InAppNotificationService {
 
       await preNotify(props);
 
-      await this.upsertByActivity(props.notificationTargetUsers, activity, snapshot);
+      await this.upsertByActivity(
+        props.notificationTargetUsers,
+        activity,
+        snapshot,
+      );
       await this.emitSocketIo(props.notificationTargetUsers);
-    }
-    else {
+    } else {
       throw Error('no activity to notify');
     }
     return;
   };
-
 }
 
 module.exports = InAppNotificationService;

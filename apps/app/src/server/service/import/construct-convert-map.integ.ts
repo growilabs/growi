@@ -1,15 +1,16 @@
 import type { EventEmitter } from 'events';
-
 import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
-import { setupIndependentModels, setupModelsDependentOnCrowi } from '~/server/crowi/setup-models';
+import {
+  setupIndependentModels,
+  setupModelsDependentOnCrowi,
+} from '~/server/crowi/setup-models';
 
 import { constructConvertMap } from './construct-convert-map';
 
 describe('constructConvertMap', () => {
-
-  beforeAll(async() => {
+  beforeAll(async () => {
     const events = {
       page: mock<EventEmitter>(),
       user: mock<EventEmitter>(),

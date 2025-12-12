@@ -7,13 +7,11 @@ import loggerFactory from '~/utils/logger';
 import { NullUsernameToBeRegisteredError } from '../models/errors';
 import type { ExternalAccountDocument } from '../models/external-account';
 import ExternalAccount from '../models/external-account';
-
 import type PassportService from './passport';
 
 const logger = loggerFactory('growi:service:external-account-service');
 
 class ExternalAccountService {
-
   passportService: PassportService;
 
   // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
@@ -22,14 +20,16 @@ class ExternalAccountService {
   }
 
   async getOrCreateUser(
-      userInfo: {id: string, username: string, name?: string, email?: string},
-      providerId: IExternalAuthProviderType,
+    userInfo: { id: string; username: string; name?: string; email?: string },
+    providerId: IExternalAuthProviderType,
   ): Promise<ExternalAccountDocument | undefined> {
     // get option
-    const isSameUsernameTreatedAsIdenticalUser = this.passportService.isSameUsernameTreatedAsIdenticalUser(providerId);
-    const isSameEmailTreatedAsIdenticalUser = providerId === 'ldap'
-      ? false
-      : this.passportService.isSameEmailTreatedAsIdenticalUser(providerId);
+    const isSameUsernameTreatedAsIdenticalUser =
+      this.passportService.isSameUsernameTreatedAsIdenticalUser(providerId);
+    const isSameEmailTreatedAsIdenticalUser =
+      providerId === 'ldap'
+        ? false
+        : this.passportService.isSameEmailTreatedAsIdenticalUser(providerId);
 
     try {
       // find or register(create) user
@@ -43,30 +43,35 @@ class ExternalAccountService {
         userInfo.email,
       );
       return externalAccount;
-    }
-    catch (err) {
+    } catch (err) {
       if (err instanceof NullUsernameToBeRegisteredError) {
         logger.error(err.message);
         throw new ErrorV3(err.message);
-      }
-      else if (err.name === 'DuplicatedUsernameException') {
-        if (isSameEmailTreatedAsIdenticalUser || isSameUsernameTreatedAsIdenticalUser) {
+      } else if (err.name === 'DuplicatedUsernameException') {
+        if (
+          isSameEmailTreatedAsIdenticalUser ||
+          isSameUsernameTreatedAsIdenticalUser
+        ) {
           // associate to existing user
-          logger.debug(`ExternalAccount '${userInfo.username}' will be created and bound to the exisiting User account`);
+          logger.debug(
+            `ExternalAccount '${userInfo.username}' will be created and bound to the exisiting User account`,
+          );
           return ExternalAccount.associate(providerId, userInfo.id, err.user);
         }
         logger.error('provider-DuplicatedUsernameException', providerId);
 
-        throw new ErrorV3('message.provider_duplicated_username_exception', LoginErrorCode.PROVIDER_DUPLICATED_USERNAME_EXCEPTION,
-          undefined, { failedProviderForDuplicatedUsernameException: providerId });
-      }
-      else if (err.name === 'UserUpperLimitException') {
+        throw new ErrorV3(
+          'message.provider_duplicated_username_exception',
+          LoginErrorCode.PROVIDER_DUPLICATED_USERNAME_EXCEPTION,
+          undefined,
+          { failedProviderForDuplicatedUsernameException: providerId },
+        );
+      } else if (err.name === 'UserUpperLimitException') {
         logger.error(err.message);
         throw new ErrorV3(err.message);
       }
     }
   }
-
 }
 
 // eslint-disable-next-line import/no-mutable-exports

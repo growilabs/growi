@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 
 import { useTranslation } from 'next-i18next';
 import {
@@ -29,53 +29,70 @@ export const DeleteSlackBotSettingsModal = React.memo((props: DeleteSlackBotSett
     onClose?.();
   }, [onClose]);
 
+  // Memoize conditional content
+  const headerContent = useMemo(() => {
+    if (isResetAll) {
+      return (
+        <>
+          <span className="material-symbols-outlined">delete_forever</span>
+          {t('admin:slack_integration.reset_all_settings')}
+        </>
+      );
+    }
+    return (
+      <>
+        <span className="material-symbols-outlined">delete</span>
+        {t('admin:slack_integration.delete_slackbot_settings')}
+      </>
+    );
+  }, [isResetAll, t]);
+
+  const bodyContent = useMemo(() => {
+    const htmlContent = isResetAll
+      ? t('admin:slack_integration.all_settings_of_the_bot_will_be_reset')
+      : t('admin:slack_integration.slackbot_settings_notice');
+    return (
+      <span
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: htmlContent }}
+      />
+    );
+  }, [isResetAll, t]);
+
+  const deleteButtonContent = useMemo(() => {
+    if (isResetAll) {
+      return (
+        <>
+          <span className="material-symbols-outlined">delete_forever</span>
+          {t('admin:slack_integration.reset')}
+        </>
+      );
+    }
+    return (
+      <>
+        <span className="material-symbols-outlined">delete</span>
+        {t('admin:slack_integration.delete')}
+      </>
+    );
+  }, [isResetAll, t]);
+
+  // Early return optimization
+  if (!isOpen) {
+    return <></>;
+  }
+
   return (
     <Modal isOpen={isOpen} toggle={closeButtonHandler} className="page-comment-delete-modal">
       <ModalHeader tag="h4" toggle={closeButtonHandler} className="text-danger">
-        <span>
-          {isResetAll && (
-            <>
-              <span className="material-symbols-outlined">delete_forever</span>
-              {t('admin:slack_integration.reset_all_settings')}
-            </>
-          )}
-          {!isResetAll && (
-            <>
-              <span className="material-symbols-outlined">delete</span>
-              {t('admin:slack_integration.delete_slackbot_settings')}
-            </>
-          )}
-        </span>
+        <span>{headerContent}</span>
       </ModalHeader>
       <ModalBody>
-        {isResetAll && (
-          <span
-            // eslint-disable-next-line react/no-danger
-            dangerouslySetInnerHTML={{ __html: t('admin:slack_integration.all_settings_of_the_bot_will_be_reset') }}
-          />
-        )}
-        {!isResetAll && (
-          <span
-            // eslint-disable-next-line react/no-danger
-            dangerouslySetInnerHTML={{ __html: t('admin:slack_integration.slackbot_settings_notice') }}
-          />
-        )}
+        {bodyContent}
       </ModalBody>
       <ModalFooter>
         <Button onClick={closeButtonHandler}>{t('Cancel')}</Button>
         <Button color="danger" onClick={deleteSlackCredentialsHandler}>
-          {isResetAll && (
-            <>
-              <span className="material-symbols-outlined">delete_forever</span>
-              {t('admin:slack_integration.reset')}
-            </>
-          )}
-          {!isResetAll && (
-            <>
-              <span className="material-symbols-outlined">delete</span>
-              {t('admin:slack_integration.delete')}
-            </>
-          )}
+          {deleteButtonContent}
         </Button>
       </ModalFooter>
     </Modal>

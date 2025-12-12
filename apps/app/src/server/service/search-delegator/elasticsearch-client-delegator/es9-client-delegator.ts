@@ -1,7 +1,10 @@
-import { Client, type ClientOptions, type estypes } from '@elastic/elasticsearch9';
+import {
+  Client,
+  type ClientOptions,
+  type estypes,
+} from '@elastic/elasticsearch9';
 
 export class ES9ClientDelegator {
-
   private client: Client;
 
   delegatorVersion = 9 as const;
@@ -15,24 +18,56 @@ export class ES9ClientDelegator {
   }
 
   cat = {
-    aliases: (params: estypes.CatAliasesRequest): Promise<estypes.CatAliasesResponse> => this.client.cat.aliases(params),
-    indices: (params: estypes.CatIndicesRequest): Promise<estypes.CatIndicesResponse> => this.client.cat.indices(params),
+    aliases: (
+      params: estypes.CatAliasesRequest,
+    ): Promise<estypes.CatAliasesResponse> => this.client.cat.aliases(params),
+    indices: (
+      params: estypes.CatIndicesRequest,
+    ): Promise<estypes.CatIndicesResponse> => this.client.cat.indices(params),
   };
 
   cluster = {
-    health: (): Promise<estypes.ClusterHealthResponse> => this.client.cluster.health(),
+    health: (): Promise<estypes.ClusterHealthResponse> =>
+      this.client.cluster.health(),
   };
 
   indices = {
-    create: (params: estypes.IndicesCreateRequest): Promise<estypes.IndicesCreateResponse> => this.client.indices.create(params),
-    delete: (params: estypes.IndicesDeleteRequest): Promise<estypes.IndicesDeleteResponse> => this.client.indices.delete(params),
-    exists: (params: estypes.IndicesExistsRequest): Promise<estypes.IndicesExistsResponse> => this.client.indices.exists(params),
-    existsAlias: (params: estypes.IndicesExistsAliasRequest): Promise<estypes.IndicesExistsAliasResponse> => this.client.indices.existsAlias(params),
-    putAlias: (params: estypes.IndicesPutAliasRequest): Promise<estypes.IndicesPutAliasResponse> => this.client.indices.putAlias(params),
-    getAlias: (params: estypes.IndicesGetAliasRequest): Promise<estypes.IndicesGetAliasResponse> => this.client.indices.getAlias(params),
-    updateAliases: (params: estypes.IndicesUpdateAliasesRequest): Promise<estypes.IndicesUpdateAliasesResponse> => this.client.indices.updateAliases(params),
-    validateQuery: (params: estypes.IndicesValidateQueryRequest): Promise<estypes.IndicesValidateQueryResponse> => this.client.indices.validateQuery(params),
-    stats: (params: estypes.IndicesStatsRequest): Promise<estypes.IndicesStatsResponse> => this.client.indices.stats(params),
+    create: (
+      params: estypes.IndicesCreateRequest,
+    ): Promise<estypes.IndicesCreateResponse> =>
+      this.client.indices.create(params),
+    delete: (
+      params: estypes.IndicesDeleteRequest,
+    ): Promise<estypes.IndicesDeleteResponse> =>
+      this.client.indices.delete(params),
+    exists: (
+      params: estypes.IndicesExistsRequest,
+    ): Promise<estypes.IndicesExistsResponse> =>
+      this.client.indices.exists(params),
+    existsAlias: (
+      params: estypes.IndicesExistsAliasRequest,
+    ): Promise<estypes.IndicesExistsAliasResponse> =>
+      this.client.indices.existsAlias(params),
+    putAlias: (
+      params: estypes.IndicesPutAliasRequest,
+    ): Promise<estypes.IndicesPutAliasResponse> =>
+      this.client.indices.putAlias(params),
+    getAlias: (
+      params: estypes.IndicesGetAliasRequest,
+    ): Promise<estypes.IndicesGetAliasResponse> =>
+      this.client.indices.getAlias(params),
+    updateAliases: (
+      params: estypes.IndicesUpdateAliasesRequest,
+    ): Promise<estypes.IndicesUpdateAliasesResponse> =>
+      this.client.indices.updateAliases(params),
+    validateQuery: (
+      params: estypes.IndicesValidateQueryRequest,
+    ): Promise<estypes.IndicesValidateQueryResponse> =>
+      this.client.indices.validateQuery(params),
+    stats: (
+      params: estypes.IndicesStatsRequest,
+    ): Promise<estypes.IndicesStatsResponse> =>
+      this.client.indices.stats(params),
   };
 
   nodes = {
@@ -43,12 +78,18 @@ export class ES9ClientDelegator {
     return this.client.ping();
   }
 
-  reindex(indexName: string, tmpIndexName: string): Promise<estypes.ReindexResponse> {
-    return this.client.reindex({ wait_for_completion: false, source: { index: indexName }, dest: { index: tmpIndexName } });
+  reindex(
+    indexName: string,
+    tmpIndexName: string,
+  ): Promise<estypes.ReindexResponse> {
+    return this.client.reindex({
+      wait_for_completion: false,
+      source: { index: indexName },
+      dest: { index: tmpIndexName },
+    });
   }
 
   search(params: estypes.SearchRequest): Promise<estypes.SearchResponse> {
     return this.client.search(params);
   }
-
 }

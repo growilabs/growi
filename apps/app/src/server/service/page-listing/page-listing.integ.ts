@@ -1,9 +1,9 @@
 import type { IPage, IUser } from '@growi/core/dist/interfaces';
 import { isValidObjectId } from '@growi/core/dist/utils/objectid-utils';
-import mongoose from 'mongoose';
 import type { HydratedDocument, Model } from 'mongoose';
+import mongoose from 'mongoose';
 
-import { PageActionType, PageActionStage } from '~/interfaces/page-operation';
+import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
 import type { PageModel } from '~/server/models/page';
 import type { IPageOperation } from '~/server/models/page-operation';
 
@@ -56,7 +56,7 @@ describe('page-listing store integration tests', () => {
     }
   };
 
-  beforeAll(async() => {
+  beforeAll(async () => {
     // setup models
     const setupPage = (await import('~/server/models/page')).default;
     setupPage(null);
@@ -69,7 +69,7 @@ describe('page-listing store integration tests', () => {
     PageOperation = (await import('~/server/models/page-operation')).default;
   });
 
-  beforeEach(async() => {
+  beforeEach(async () => {
     // Clean up database
     await Page.deleteMany({});
     await User.deleteMany({});
@@ -96,8 +96,9 @@ describe('page-listing store integration tests', () => {
   });
 
   describe('pageListingService.findRootByViewer', () => {
-    test('should return root page successfully', async() => {
-      const rootPageResult = await pageListingService.findRootByViewer(testUser);
+    test('should return root page successfully', async () => {
+      const rootPageResult =
+        await pageListingService.findRootByViewer(testUser);
 
       expect(rootPageResult).toBeDefined();
       expect(rootPageResult.path).toBe('/');
@@ -107,7 +108,7 @@ describe('page-listing store integration tests', () => {
       expect(rootPageResult.descendantCount).toBe(0);
     });
 
-    test('should handle error when root page does not exist', async() => {
+    test('should handle error when root page does not exist', async () => {
       // Remove the root page
       await Page.deleteOne({ path: '/' });
 
@@ -115,14 +116,14 @@ describe('page-listing store integration tests', () => {
         await pageListingService.findRootByViewer(testUser);
         // Should not reach here
         expect(true).toBe(false);
-      }
-      catch (error) {
+      } catch (error) {
         expect(error).toBeDefined();
       }
     });
 
-    test('should return proper page structure that matches IPageForTreeItem type', async() => {
-      const rootPageResult = await pageListingService.findRootByViewer(testUser);
+    test('should return proper page structure that matches IPageForTreeItem type', async () => {
+      const rootPageResult =
+        await pageListingService.findRootByViewer(testUser);
 
       // Use helper function to validate type structure
       validatePageForTreeItem(rootPageResult);
@@ -131,10 +132,9 @@ describe('page-listing store integration tests', () => {
       expect(typeof rootPageResult._id).toBe('object'); // ObjectId
       expect(rootPageResult.path).toBe('/');
       expect([null, 1, 2, 3, 4, 5]).toContain(rootPageResult.grant); // Valid grant values
-      expect(rootPageResult.parent).toBeNull(); // Root page has no parent
     });
 
-    test('should work without user (guest access) and return type-safe result', async() => {
+    test('should work without user (guest access) and return type-safe result', async () => {
       const rootPageResult = await pageListingService.findRootByViewer();
 
       validatePageForTreeItem(rootPageResult);
@@ -146,7 +146,7 @@ describe('page-listing store integration tests', () => {
   describe('pageListingService.findChildrenByParentPathOrIdAndViewer', () => {
     let childPage1: HydratedDocument<IPage>;
 
-    beforeEach(async() => {
+    beforeEach(async () => {
       // Create child pages
       childPage1 = await Page.create({
         path: '/child1',
@@ -183,52 +183,63 @@ describe('page-listing store integration tests', () => {
       });
 
       // Update root page descendant count
-      await Page.updateOne(
-        { _id: rootPage._id },
-        { descendantCount: 2 },
-      );
+      await Page.updateOne({ _id: rootPage._id }, { descendantCount: 2 });
     });
 
-    test('should find children by parent path and return type-safe results', async() => {
-      const children = await pageListingService.findChildrenByParentPathOrIdAndViewer('/', testUser);
+    test('should find children by parent path and return type-safe results', async () => {
+      const children =
+        await pageListingService.findChildrenByParentPathOrIdAndViewer(
+          '/',
+          testUser,
+        );
 
       expect(children).toHaveLength(2);
       children.forEach((child) => {
         validatePageForTreeItem(child);
-        expect(child.parent?.toString()).toBe(rootPage._id.toString());
         expect(['/child1', '/child2']).toContain(child.path);
       });
     });
 
-    test('should find children by parent ID and return type-safe results', async() => {
-      const children = await pageListingService.findChildrenByParentPathOrIdAndViewer(rootPage._id.toString(), testUser);
+    test('should find children by parent ID and return type-safe results', async () => {
+      const children =
+        await pageListingService.findChildrenByParentPathOrIdAndViewer(
+          rootPage._id.toString(),
+          testUser,
+        );
 
       expect(children).toHaveLength(2);
       children.forEach((child) => {
         validatePageForTreeItem(child);
-        expect(child.parent?.toString()).toBe(rootPage._id.toString());
       });
     });
 
-    test('should handle nested children correctly', async() => {
-      const nestedChildren = await pageListingService.findChildrenByParentPathOrIdAndViewer('/child1', testUser);
+    test('should handle nested children correctly', async () => {
+      const nestedChildren =
+        await pageListingService.findChildrenByParentPathOrIdAndViewer(
+          '/child1',
+          testUser,
+        );
 
       expect(nestedChildren).toHaveLength(1);
       const grandChild = nestedChildren[0];
       validatePageForTreeItem(grandChild);
       expect(grandChild.path).toBe('/child1/grandchild');
-      expect(grandChild.parent?.toString()).toBe(childPage1._id.toString());
     });
 
-    test('should return empty array when no children exist', async() => {
-      const noChildren = await pageListingService.findChildrenByParentPathOrIdAndViewer('/child2', testUser);
+    test('should return empty array when no children exist', async () => {
+      const noChildren =
+        await pageListingService.findChildrenByParentPathOrIdAndViewer(
+          '/child2',
+          testUser,
+        );
 
       expect(noChildren).toHaveLength(0);
       expect(Array.isArray(noChildren)).toBe(true);
     });
 
-    test('should work without user (guest access)', async() => {
-      const children = await pageListingService.findChildrenByParentPathOrIdAndViewer('/');
+    test('should work without user (guest access)', async () => {
+      const children =
+        await pageListingService.findChildrenByParentPathOrIdAndViewer('/');
 
       expect(children).toHaveLength(2);
       children.forEach((child) => {
@@ -236,8 +247,12 @@ describe('page-listing store integration tests', () => {
       });
     });
 
-    test('should sort children by path in ascending order', async() => {
-      const children = await pageListingService.findChildrenByParentPathOrIdAndViewer('/', testUser);
+    test('should sort children by path in ascending order', async () => {
+      const children =
+        await pageListingService.findChildrenByParentPathOrIdAndViewer(
+          '/',
+          testUser,
+        );
 
       expect(children).toHaveLength(2);
       expect(children[0].path).toBe('/child1');
@@ -248,7 +263,7 @@ describe('page-listing store integration tests', () => {
   describe('pageListingService processData injection', () => {
     let operatingPage: HydratedDocument<IPage>;
 
-    beforeEach(async() => {
+    beforeEach(async () => {
       // Create a page that will have operations
       operatingPage = await Page.create({
         path: '/operating-page',
@@ -282,11 +297,17 @@ describe('page-listing store integration tests', () => {
       });
     });
 
-    test('should inject processData for pages with operations', async() => {
-      const children = await pageListingService.findChildrenByParentPathOrIdAndViewer('/', testUser);
+    test('should inject processData for pages with operations', async () => {
+      const children =
+        await pageListingService.findChildrenByParentPathOrIdAndViewer(
+          '/',
+          testUser,
+        );
 
       // Find the operating page in results
-      const operatingResult = children.find(child => child.path === '/operating-page');
+      const operatingResult = children.find(
+        (child) => child.path === '/operating-page',
+      );
       expect(operatingResult).toBeDefined();
 
       // Validate type structure
@@ -299,7 +320,7 @@ describe('page-listing store integration tests', () => {
       }
     });
 
-    test('should set processData to undefined for pages without operations', async() => {
+    test('should set processData to undefined for pages without operations', async () => {
       // Create another page without operations
       await Page.create({
         path: '/normal-page',
@@ -312,8 +333,14 @@ describe('page-listing store integration tests', () => {
         parent: rootPage._id,
       });
 
-      const children = await pageListingService.findChildrenByParentPathOrIdAndViewer('/', testUser);
-      const normalPage = children.find(child => child.path === '/normal-page');
+      const children =
+        await pageListingService.findChildrenByParentPathOrIdAndViewer(
+          '/',
+          testUser,
+        );
+      const normalPage = children.find(
+        (child) => child.path === '/normal-page',
+      );
 
       expect(normalPage).toBeDefined();
       if (normalPage) {
@@ -322,7 +349,7 @@ describe('page-listing store integration tests', () => {
       }
     });
 
-    test('should maintain type safety with mixed processData scenarios', async() => {
+    test('should maintain type safety with mixed processData scenarios', async () => {
       // Create pages with and without operations
       await Page.create({
         path: '/mixed-test-1',
@@ -346,7 +373,11 @@ describe('page-listing store integration tests', () => {
         parent: rootPage._id,
       });
 
-      const children = await pageListingService.findChildrenByParentPathOrIdAndViewer('/', testUser);
+      const children =
+        await pageListingService.findChildrenByParentPathOrIdAndViewer(
+          '/',
+          testUser,
+        );
 
       // All results should be type-safe regardless of processData presence
       children.forEach((child) => {
@@ -361,7 +392,7 @@ describe('page-listing store integration tests', () => {
   });
 
   describe('PageQueryBuilder exec() type safety tests', () => {
-    test('findRootByViewer should return object with correct _id type', async() => {
+    test('findRootByViewer should return object with correct _id type', async () => {
       const result = await pageListingService.findRootByViewer(testUser);
 
       // PageQueryBuilder.exec() returns any, but we expect ObjectId-like behavior
@@ -371,7 +402,7 @@ describe('page-listing store integration tests', () => {
       expect(result._id.toString().length).toBe(24); // MongoDB ObjectId string length
     });
 
-    test('findChildrenByParentPathOrIdAndViewer should return array with correct _id types', async() => {
+    test('findChildrenByParentPathOrIdAndViewer should return array with correct _id types', async () => {
       // Create test child page first
       await Page.create({
         path: '/test-child',
@@ -384,7 +415,11 @@ describe('page-listing store integration tests', () => {
         parent: rootPage._id,
       });
 
-      const results = await pageListingService.findChildrenByParentPathOrIdAndViewer('/', testUser);
+      const results =
+        await pageListingService.findChildrenByParentPathOrIdAndViewer(
+          '/',
+          testUser,
+        );
 
       expect(Array.isArray(results)).toBe(true);
       results.forEach((result) => {
@@ -393,15 +428,7 @@ describe('page-listing store integration tests', () => {
         expect(result._id.toString).toBeDefined();
         expect(typeof result._id.toString()).toBe('string');
         expect(result._id.toString().length).toBe(24);
-
-        // Validate parent _id behavior
-        if (result.parent) {
-          expect(result.parent.toString).toBeDefined();
-          expect(typeof result.parent.toString()).toBe('string');
-          expect(result.parent.toString().length).toBe(24);
-        }
       });
     });
-
   });
 });

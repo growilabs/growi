@@ -1,4 +1,8 @@
-import type { IConfigManager, UpdateConfigOptions, RawConfigData } from '@growi/core/dist/interfaces';
+import type {
+  IConfigManager,
+  RawConfigData,
+  UpdateConfigOptions,
+} from '@growi/core/dist/interfaces';
 import { ConfigSource } from '@growi/core/dist/interfaces';
 import { parseISO } from 'date-fns/parseISO';
 
@@ -7,17 +11,17 @@ import loggerFactory from '~/utils/logger';
 import type S2sMessage from '../../models/vo/s2s-message';
 import type { S2sMessagingService } from '../s2s-messaging/base';
 import type { S2sMessageHandlable } from '../s2s-messaging/handlable';
-
 import type { ConfigKey, ConfigValues } from './config-definition';
 import { ENV_ONLY_GROUPS } from './config-definition';
 import { ConfigLoader } from './config-loader';
 
 const logger = loggerFactory('growi:service:ConfigManager');
 
-export type IConfigManagerForApp = IConfigManager<ConfigKey, ConfigValues>
+export type IConfigManagerForApp = IConfigManager<ConfigKey, ConfigValues>;
 
-export class ConfigManager implements IConfigManagerForApp, S2sMessageHandlable {
-
+export class ConfigManager
+  implements IConfigManagerForApp, S2sMessageHandlable
+{
   private configLoader: ConfigLoader;
 
   private s2sMessagingService?: S2sMessagingService;
@@ -48,11 +52,9 @@ export class ConfigManager implements IConfigManagerForApp, S2sMessageHandlable 
   async loadConfigs(options?: { source?: ConfigSource }): Promise<void> {
     if (options?.source === 'env') {
       this.envConfig = await this.configLoader.loadFromEnv();
-    }
-    else if (options?.source === 'db') {
+    } else if (options?.source === 'db') {
       this.dbConfig = await this.configLoader.loadFromDB();
-    }
-    else {
+    } else {
       this.envConfig = await this.configLoader.loadFromEnv();
       this.dbConfig = await this.configLoader.loadFromDB();
     }
@@ -60,7 +62,10 @@ export class ConfigManager implements IConfigManagerForApp, S2sMessageHandlable 
     this.lastLoadedAt = new Date();
   }
 
-  getConfig<K extends ConfigKey>(key: K, source?: ConfigSource): ConfigValues[K] {
+  getConfig<K extends ConfigKey>(
+    key: K,
+    source?: ConfigSource,
+  ): ConfigValues[K] {
     if (source === ConfigSource.env) {
       if (!this.envConfig) {
         throw new Error('Config is not loaded');
@@ -81,7 +86,7 @@ export class ConfigManager implements IConfigManagerForApp, S2sMessageHandlable 
     return (
       this.shouldUseEnvOnly(key)
         ? this.envConfig[key]?.value
-        : this.dbConfig[key]?.value ?? this.envConfig[key]?.value
+        : (this.dbConfig[key]?.value ?? this.envConfig[key]?.value)
     ) as ConfigValues[K];
   }
 
@@ -107,15 +112,18 @@ export class ConfigManager implements IConfigManagerForApp, S2sMessageHandlable 
     return this.envConfig[controlKey].value === true;
   }
 
-  async updateConfig<K extends ConfigKey>(key: K, value: ConfigValues[K], options?: UpdateConfigOptions): Promise<void> {
+  async updateConfig<K extends ConfigKey>(
+    key: K,
+    value: ConfigValues[K],
+    options?: UpdateConfigOptions,
+  ): Promise<void> {
     // Dynamic import to avoid loading database modules too early
     const { Config } = await import('../../models/config');
 
     if (options?.removeIfUndefined && value === undefined) {
       // remove the config if the value is undefined and removeIfUndefined is true
       await Config.deleteOne({ key });
-    }
-    else {
+    } else {
       await Config.updateOne(
         { key },
         { value: JSON.stringify(value) },
@@ -130,22 +138,25 @@ export class ConfigManager implements IConfigManagerForApp, S2sMessageHandlable 
     }
   }
 
-  async updateConfigs(updates: Partial<{ [K in ConfigKey]: ConfigValues[K] }>, options?: UpdateConfigOptions): Promise<void> {
+  async updateConfigs(
+    updates: Partial<{ [K in ConfigKey]: ConfigValues[K] }>,
+    options?: UpdateConfigOptions,
+  ): Promise<void> {
     // Dynamic import to avoid loading database modules too early
     const { Config } = await import('../../models/config');
 
     const operations = Object.entries(updates).map(([key, value]) => {
-      return (options?.removeIfUndefined && value === undefined)
-        // remove the config if the value is undefined
-        ? { deleteOne: { filter: { key } } }
-        // update
-        : {
-          updateOne: {
-            filter: { key },
-            update: { value: JSON.stringify(value) },
-            upsert: true,
-          },
-        };
+      return options?.removeIfUndefined && value === undefined
+        ? // remove the config if the value is undefined
+          { deleteOne: { filter: { key } } }
+        : // update
+          {
+            updateOne: {
+              filter: { key },
+              update: { value: JSON.stringify(value) },
+              upsert: true,
+            },
+          };
     });
 
     await Config.bulkWrite(operations);
@@ -156,11 +167,14 @@ export class ConfigManager implements IConfigManagerForApp, S2sMessageHandlable 
     }
   }
 
-  async removeConfigs(keys: ConfigKey[], options?: UpdateConfigOptions): Promise<void> {
+  async removeConfigs(
+    keys: ConfigKey[],
+    options?: UpdateConfigOptions,
+  ): Promise<void> {
     // Dynamic import to avoid loading database modules too early
     const { Config } = await import('../../models/config');
 
-    const operations = keys.map(key => ({
+    const operations = keys.map((key) => ({
       deleteOne: {
         filter: { key },
       },
@@ -214,12 +228,16 @@ export class ConfigManager implements IConfigManagerForApp, S2sMessageHandlable 
   async publishUpdateMessage(): Promise<void> {
     const { default: S2sMessage } = await import('../../models/vo/s2s-message');
 
-    const s2sMessage = new S2sMessage('configUpdated', { updatedAt: new Date() });
+    const s2sMessage = new S2sMessage('configUpdated', {
+      updatedAt: new Date(),
+    });
     try {
       await this.s2sMessagingService?.publish(s2sMessage);
-    }
-    catch (e) {
-      logger.error('Failed to publish update message with S2sMessagingService: ', e.message);
+    } catch (e) {
+      logger.error(
+        'Failed to publish update message with S2sMessagingService: ',
+        e.message,
+      );
     }
   }
 
@@ -231,9 +249,12 @@ export class ConfigManager implements IConfigManagerForApp, S2sMessageHandlable 
     if (eventName !== 'configUpdated') {
       return false;
     }
-    return this.lastLoadedAt == null // loaded for the first time
-      || !('updatedAt' in s2sMessage) // updatedAt is not included in the message
-      || (typeof s2sMessage.updatedAt === 'string' && this.lastLoadedAt < parseISO(s2sMessage.updatedAt));
+    return (
+      this.lastLoadedAt == null || // loaded for the first time
+      !('updatedAt' in s2sMessage) || // updatedAt is not included in the message
+      (typeof s2sMessage.updatedAt === 'string' &&
+        this.lastLoadedAt < parseISO(s2sMessage.updatedAt))
+    );
   }
 
   /**
@@ -243,7 +264,6 @@ export class ConfigManager implements IConfigManagerForApp, S2sMessageHandlable 
     logger.info('Reload configs by pubsub notification');
     return this.loadConfigs();
   }
-
 }
 
 // Export singleton instance

@@ -1,8 +1,8 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
-import { SCOPE } from '@growi/core/dist/interfaces';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { GlobalNotificationSettingType } from '~/server/models/GlobalNotificationSetting';
 import { configManager } from '~/server/service/config-manager';
@@ -13,10 +13,8 @@ import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import UpdatePost from '../../models/update-post';
 
-
 // eslint-disable-next-line no-unused-vars
 const logger = loggerFactory('growi:routes:apiv3:notification-setting');
-
 
 const router = express.Router();
 
@@ -28,19 +26,28 @@ const validator = {
     body('channel').isString().trim(),
   ],
   globalNotification: [
-    body('triggerPath').isString().trim().not()
-      .isEmpty(),
+    body('triggerPath').isString().trim().not().isEmpty(),
     body('notifyType').isString().trim().isIn(['mail', 'slack']),
-    body('toEmail').trim().custom((value, { req }) => {
-      return (req.body.notifyType === 'mail') ? (!!value && value.match(/.+@.+\..+/)) : true;
-    }),
-    body('slackChannels').trim().custom((value, { req }) => {
-      return (req.body.notifyType === 'slack') ? !!value : true;
-    }),
+    body('toEmail')
+      .trim()
+      .custom((value, { req }) => {
+        return req.body.notifyType === 'mail'
+          ? !!value && value.match(/.+@.+\..+/)
+          : true;
+      }),
+    body('slackChannels')
+      .trim()
+      .custom((value, { req }) => {
+        return req.body.notifyType === 'slack' ? !!value : true;
+      }),
   ],
   notifyForPageGrant: [
-    body('isNotificationForOwnerPageEnabled').if(value => value != null).isBoolean(),
-    body('isNotificationForGroupPageEnabled').if(value => value != null).isBoolean(),
+    body('isNotificationForOwnerPageEnabled')
+      .if((value) => value != null)
+      .isBoolean(),
+    body('isNotificationForGroupPageEnabled')
+      .if((value) => value != null)
+      .isBoolean(),
   ],
 };
 
@@ -184,8 +191,10 @@ module.exports = (crowi) => {
 
   const GlobalNotificationSetting = crowi.model('GlobalNotificationSetting');
 
-  const GlobalNotificationMailSetting = crowi.models.GlobalNotificationMailSetting;
-  const GlobalNotificationSlackSetting = crowi.models.GlobalNotificationSlackSetting;
+  const GlobalNotificationMailSetting =
+    crowi.models.GlobalNotificationMailSetting;
+  const GlobalNotificationSlackSetting =
+    crowi.models.GlobalNotificationSlackSetting;
 
   /**
    * @swagger
@@ -208,80 +217,106 @@ module.exports = (crowi) => {
    *                      description: notification params
    *                      $ref: '#/components/schemas/NotificationParams'
    */
-  router.get('/', accessTokenParser([SCOPE.READ.ADMIN.EXTERNAL_NOTIFICATION]), Strictly, adminRequired, async(req, res) => {
+  router.get(
+    '/',
+    accessTokenParser([SCOPE.READ.ADMIN.EXTERNAL_NOTIFICATION]),
+    Strictly,
+    adminRequired,
+    async (req, res) => {
+      const notificationParams = {
+        // status of slack intagration
+        isSlackbotConfigured:
+          crowi.slackIntegrationService.isSlackbotConfigured,
+        isSlackLegacyConfigured:
+          crowi.slackIntegrationService.isSlackLegacyConfigured,
+        currentBotType: await crowi.configManager.getConfig(
+          'slackbot:currentBotType',
+        ),
 
-    const notificationParams = {
-      // status of slack intagration
-      isSlackbotConfigured: crowi.slackIntegrationService.isSlackbotConfigured,
-      isSlackLegacyConfigured: crowi.slackIntegrationService.isSlackLegacyConfigured,
-      currentBotType: await crowi.configManager.getConfig('slackbot:currentBotType'),
-
-      userNotifications: await UpdatePost.findAll(),
-      isNotificationForOwnerPageEnabled: await crowi.configManager.getConfig('notification:owner-page:isEnabled'),
-      isNotificationForGroupPageEnabled: await crowi.configManager.getConfig('notification:group-page:isEnabled'),
-      globalNotifications: await GlobalNotificationSetting.findAll(),
-    };
-    return res.apiv3({ notificationParams });
-  });
+        userNotifications: await UpdatePost.findAll(),
+        isNotificationForOwnerPageEnabled: await crowi.configManager.getConfig(
+          'notification:owner-page:isEnabled',
+        ),
+        isNotificationForGroupPageEnabled: await crowi.configManager.getConfig(
+          'notification:group-page:isEnabled',
+        ),
+        globalNotifications: await GlobalNotificationSetting.findAll(),
+      };
+      return res.apiv3({ notificationParams });
+    },
+  );
 
   /**
-  * @swagger
-  *
-  *    /notification-setting/user-notification:
-  *      post:
-  *        tags: [NotificationSetting]
-  *        security:
-  *         - cookieAuth: []
-  *        description: add user notification setting
-  *        requestBody:
-  *          required: true
-  *          content:
-  *            application/json:
-  *              schema:
-  *                $ref: '#/components/schemas/UserNotificationParams'
-  *        responses:
-  *          200:
-  *            description: Succeeded to add user notification setting
-  *            content:
-  *              application/json:
-  *                schema:
-  *                  properties:
-  *                    responseParams:
-  *                      type: object
-  *                      description: response params
-  *                      properties:
-  *                        createdUser:
-  *                          $ref: '#/components/schemas/User'
-  *                          description: user who set notification
-  *                        userNotifications:
-  *                          type: array
-  *                          items:
-  *                            $ref: '#/components/schemas/UserNotification'
-  *                            description: user notification settings
-  */
+   * @swagger
+   *
+   *    /notification-setting/user-notification:
+   *      post:
+   *        tags: [NotificationSetting]
+   *        security:
+   *         - cookieAuth: []
+   *        description: add user notification setting
+   *        requestBody:
+   *          required: true
+   *          content:
+   *            application/json:
+   *              schema:
+   *                $ref: '#/components/schemas/UserNotificationParams'
+   *        responses:
+   *          200:
+   *            description: Succeeded to add user notification setting
+   *            content:
+   *              application/json:
+   *                schema:
+   *                  properties:
+   *                    responseParams:
+   *                      type: object
+   *                      description: response params
+   *                      properties:
+   *                        createdUser:
+   *                          $ref: '#/components/schemas/User'
+   *                          description: user who set notification
+   *                        userNotifications:
+   *                          type: array
+   *                          items:
+   *                            $ref: '#/components/schemas/UserNotification'
+   *                            description: user notification settings
+   */
   // eslint-disable-next-line max-len
-  router.post('/user-notification', accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]), Strictly, adminRequired, addActivity, validator.userNotification, apiV3FormValidator, async(req, res) => {
-    const { pathPattern, channel } = req.body;
+  router.post(
+    '/user-notification',
+    accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),
+    Strictly,
+    adminRequired,
+    addActivity,
+    validator.userNotification,
+    apiV3FormValidator,
+    async (req, res) => {
+      const { pathPattern, channel } = req.body;
 
-    try {
-      logger.info('notification.add', pathPattern, channel);
-      const responseParams = {
-        createdUser: await UpdatePost.createUpdatePost(pathPattern, channel, req.user),
-        userNotifications: await UpdatePost.findAll(),
-      };
+      try {
+        logger.info('notification.add', pathPattern, channel);
+        const responseParams = {
+          createdUser: await UpdatePost.createUpdatePost(
+            pathPattern,
+            channel,
+            req.user,
+          ),
+          userNotifications: await UpdatePost.findAll(),
+        };
 
-      const parameters = { action: SupportedAction.ACTION_ADMIN_USER_NOTIFICATION_SETTINGS_ADD };
-      activityEvent.emit('update', res.locals.activity._id, parameters);
+        const parameters = {
+          action: SupportedAction.ACTION_ADMIN_USER_NOTIFICATION_SETTINGS_ADD,
+        };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
 
-      return res.apiv3({ responseParams }, 201);
-    }
-    catch (err) {
-      const msg = 'Error occurred in updating user notification';
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(msg, 'update-userNotification-failed'));
-    }
-
-  });
+        return res.apiv3({ responseParams }, 201);
+      } catch (err) {
+        const msg = 'Error occurred in updating user notification';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-userNotification-failed'));
+      }
+    },
+  );
 
   /**
    * @swagger
@@ -307,29 +342,36 @@ module.exports = (crowi) => {
    *                schema:
    *                  $ref: '#/components/schemas/UserNotification'
    */
-  router.delete('/user-notification/:id',
+  router.delete(
+    '/user-notification/:id',
     accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),
     Strictly,
     adminRequired,
     addActivity,
-    async(req, res) => {
+    async (req, res) => {
       const { id } = req.params;
 
       try {
-        const deletedNotificaton = await UpdatePost.findOneAndRemove({ _id: id });
+        const deletedNotificaton = await UpdatePost.findOneAndRemove({
+          _id: id,
+        });
 
-        const parameters = { action: SupportedAction.ACTION_ADMIN_USER_NOTIFICATION_SETTINGS_DELETE };
+        const parameters = {
+          action:
+            SupportedAction.ACTION_ADMIN_USER_NOTIFICATION_SETTINGS_DELETE,
+        };
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
         return res.apiv3(deletedNotificaton);
-      }
-      catch (err) {
+      } catch (err) {
         const msg = 'Error occurred in delete user trigger notification';
         logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(msg, 'delete-userTriggerNotification-failed'));
+        return res.apiv3Err(
+          new ErrorV3(msg, 'delete-userTriggerNotification-failed'),
+        );
       }
-    });
-
+    },
+  );
 
   /**
    * @swagger
@@ -357,27 +399,31 @@ module.exports = (crowi) => {
    *                    globalNotification:
    *                      $ref: '#/components/schemas/GlobalNotification'
    */
-  router.get('/global-notification/:id',
+  router.get(
+    '/global-notification/:id',
     accessTokenParser([SCOPE.READ.ADMIN.EXTERNAL_NOTIFICATION]),
     Strictly,
     adminRequired,
     validator.globalNotification,
-    async(req, res) => {
-
+    async (req, res) => {
       const notificationSettingId = req.params.id;
       let globalNotification;
 
       if (notificationSettingId) {
         try {
-          globalNotification = await GlobalNotificationSetting.findOne({ _id: notificationSettingId });
-        }
-        catch (err) {
-          logger.error(`Error in finding a global notification setting with {_id: ${notificationSettingId}}`);
+          globalNotification = await GlobalNotificationSetting.findOne({
+            _id: notificationSettingId,
+          });
+        } catch (err) {
+          logger.error(
+            `Error in finding a global notification setting with {_id: ${notificationSettingId}}`,
+          );
         }
       }
 
       return res.apiv3({ globalNotification });
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -407,17 +453,17 @@ module.exports = (crowi) => {
    *                      $ref: '#/components/schemas/GlobalNotification'
    */
   // eslint-disable-next-line max-len
-  router.post('/global-notification',
+  router.post(
+    '/global-notification',
     accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),
     Strictly,
     adminRequired,
     addActivity,
     validator.globalNotification,
     apiV3FormValidator,
-    async(req, res) => {
-      const {
-        notifyType, toEmail, slackChannels, triggerPath, triggerEvents,
-      } = req.body;
+    async (req, res) => {
+      const { notifyType, toEmail, slackChannels, triggerPath, triggerEvents } =
+        req.body;
 
       let notification;
 
@@ -436,17 +482,19 @@ module.exports = (crowi) => {
       try {
         const createdNotification = await notification.save();
 
-        const parameters = { action: SupportedAction.ACTION_ADMIN_GLOBAL_NOTIFICATION_SETTINGS_ADD };
+        const parameters = {
+          action: SupportedAction.ACTION_ADMIN_GLOBAL_NOTIFICATION_SETTINGS_ADD,
+        };
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
         return res.apiv3({ createdNotification }, 201);
-      }
-      catch (err) {
+      } catch (err) {
         const msg = 'Error occurred in updating global notification';
         logger.error('Error', err);
         return res.apiv3Err(new ErrorV3(msg, 'post-globalNotification-failed'));
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -481,18 +529,18 @@ module.exports = (crowi) => {
    *                      $ref: '#/components/schemas/GlobalNotification'
    */
   // eslint-disable-next-line max-len
-  router.put('/global-notification/:id',
+  router.put(
+    '/global-notification/:id',
     accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),
     Strictly,
     adminRequired,
     addActivity,
     validator.globalNotification,
     apiV3FormValidator,
-    async(req, res) => {
+    async (req, res) => {
       const { id } = req.params;
-      const {
-        notifyType, toEmail, slackChannels, triggerPath, triggerEvents,
-      } = req.body;
+      const { notifyType, toEmail, slackChannels, triggerPath, triggerEvents } =
+        req.body;
 
       const models = {
         [GlobalNotificationSettingType.MAIL]: GlobalNotificationMailSetting,
@@ -528,19 +576,20 @@ module.exports = (crowi) => {
 
         const createdNotification = await setting.save();
 
-        const parameters = { action: SupportedAction.ACTION_ADMIN_GLOBAL_NOTIFICATION_SETTINGS_UPDATE };
+        const parameters = {
+          action:
+            SupportedAction.ACTION_ADMIN_GLOBAL_NOTIFICATION_SETTINGS_UPDATE,
+        };
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
         return res.apiv3({ createdNotification });
-      }
-      catch (err) {
+      } catch (err) {
         const msg = 'Error occurred in updating global notification';
         logger.error('Error', err);
         return res.apiv3Err(new ErrorV3(msg, 'post-globalNotification-failed'));
       }
-
-    });
-
+    },
+  );
 
   /**
    * @swagger
@@ -566,18 +615,20 @@ module.exports = (crowi) => {
    *                  $ref: '#/components/schemas/NotifyForPageGrant'
    */
   // eslint-disable-next-line max-len
-  router.put('/notify-for-page-grant',
+  router.put(
+    '/notify-for-page-grant',
     accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),
     Strictly,
     adminRequired,
     addActivity,
     validator.notifyForPageGrant,
     apiV3FormValidator,
-    async(req, res) => {
-
+    async (req, res) => {
       let requestParams = {
-        'notification:owner-page:isEnabled': req.body.isNotificationForOwnerPageEnabled,
-        'notification:group-page:isEnabled': req.body.isNotificationForGroupPageEnabled,
+        'notification:owner-page:isEnabled':
+          req.body.isNotificationForOwnerPageEnabled,
+        'notification:group-page:isEnabled':
+          req.body.isNotificationForGroupPageEnabled,
       };
 
       requestParams = removeNullPropertyFromObject(requestParams);
@@ -585,22 +636,32 @@ module.exports = (crowi) => {
       try {
         await configManager.updateConfigs(requestParams);
         const responseParams = {
-          isNotificationForOwnerPageEnabled: await crowi.configManager.getConfig('notification:owner-page:isEnabled'),
-          isNotificationForGroupPageEnabled: await crowi.configManager.getConfig('notification:group-page:isEnabled'),
+          isNotificationForOwnerPageEnabled:
+            await crowi.configManager.getConfig(
+              'notification:owner-page:isEnabled',
+            ),
+          isNotificationForGroupPageEnabled:
+            await crowi.configManager.getConfig(
+              'notification:group-page:isEnabled',
+            ),
         };
 
-        const parameters = { action: SupportedAction.ACTION_ADMIN_NOTIFICATION_GRANT_SETTINGS_UPDATE };
+        const parameters = {
+          action:
+            SupportedAction.ACTION_ADMIN_NOTIFICATION_GRANT_SETTINGS_UPDATE,
+        };
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
         return res.apiv3({ responseParams });
-      }
-      catch (err) {
+      } catch (err) {
         const msg = 'Error occurred in updating notify for page grant';
         logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(msg, 'update-notify-for-page-grant-failed'));
+        return res.apiv3Err(
+          new ErrorV3(msg, 'update-notify-for-page-grant-failed'),
+        );
       }
-
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -638,20 +699,20 @@ module.exports = (crowi) => {
    *                      type: string
    *                      description: notification id
    */
-  router.put('/global-notification/:id/enabled',
+  router.put(
+    '/global-notification/:id/enabled',
     accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),
     Strictly,
     adminRequired,
     addActivity,
-    async(req, res) => {
+    async (req, res) => {
       const { id } = req.params;
       const { isEnabled } = req.body;
 
       try {
         if (isEnabled) {
           await GlobalNotificationSetting.enable(id);
-        }
-        else {
+        } else {
           await GlobalNotificationSetting.disable(id);
         }
 
@@ -663,64 +724,70 @@ module.exports = (crowi) => {
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
         return res.apiv3({ id });
-
-      }
-      catch (err) {
+      } catch (err) {
         const msg = 'Error occurred in toggle of global notification';
         logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(msg, 'toggle-globalNotification-failed'));
+        return res.apiv3Err(
+          new ErrorV3(msg, 'toggle-globalNotification-failed'),
+        );
       }
-
-    });
+    },
+  );
 
   /**
-  * @swagger
-  *
-  *    /notification-setting/global-notification/{id}:
-  *      delete:
-  *        tags: [NotificationSetting]
-  *        security:
-  *          - cookieAuth: []
-  *        description: delete global notification pattern
-  *        parameters:
-  *          - name: id
-  *            in: path
-  *            required: true
-  *            description: id of global notification
-  *            schema:
-  *              type: string
-  *        responses:
-  *          200:
-  *            description: Succeeded to delete global notification pattern
-  *            content:
-  *              application/json:
-  *                schema:
-  *                  description: deleted notification
-  *                  $ref: '#/components/schemas/GlobalNotification'
-  */
-  router.delete('/global-notification/:id',
+   * @swagger
+   *
+   *    /notification-setting/global-notification/{id}:
+   *      delete:
+   *        tags: [NotificationSetting]
+   *        security:
+   *          - cookieAuth: []
+   *        description: delete global notification pattern
+   *        parameters:
+   *          - name: id
+   *            in: path
+   *            required: true
+   *            description: id of global notification
+   *            schema:
+   *              type: string
+   *        responses:
+   *          200:
+   *            description: Succeeded to delete global notification pattern
+   *            content:
+   *              application/json:
+   *                schema:
+   *                  description: deleted notification
+   *                  $ref: '#/components/schemas/GlobalNotification'
+   */
+  router.delete(
+    '/global-notification/:id',
     accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),
     Strictly,
     adminRequired,
     addActivity,
-    async(req, res) => {
+    async (req, res) => {
       const { id } = req.params;
 
       try {
-        const deletedNotificaton = await GlobalNotificationSetting.findOneAndRemove({ _id: id });
+        const deletedNotificaton =
+          await GlobalNotificationSetting.findOneAndRemove({ _id: id });
 
-        const parameters = { action: SupportedAction.ACTION_ADMIN_GLOBAL_NOTIFICATION_SETTINGS_DELETE };
+        const parameters = {
+          action:
+            SupportedAction.ACTION_ADMIN_GLOBAL_NOTIFICATION_SETTINGS_DELETE,
+        };
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
         return res.apiv3(deletedNotificaton);
-      }
-      catch (err) {
+      } catch (err) {
         const msg = 'Error occurred in delete global notification';
         logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(msg, 'delete-globalNotification-failed'));
+        return res.apiv3Err(
+          new ErrorV3(msg, 'delete-globalNotification-failed'),
+        );
       }
-
-    });
+    },
+  );
 
   return router;
 };

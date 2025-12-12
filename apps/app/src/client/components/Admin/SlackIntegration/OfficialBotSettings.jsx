@@ -7,7 +7,7 @@ import PropTypes from 'prop-types';
 
 import { apiv3Delete, apiv3Put } from '~/client/util/apiv3-client';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useAppTitle } from '~/stores-universal/context';
+import { useAppTitle } from '~/states/global';
 import loggerFactory from '~/utils/logger';
 
 
@@ -27,7 +27,7 @@ const OfficialBotSettings = (props) => {
   const [siteName, setSiteName] = useState('');
   const [integrationIdToDelete, setIntegrationIdToDelete] = useState(null);
   const { t } = useTranslation();
-  const { data: appTitle } = useAppTitle();
+  const appTitle = useAppTitle();
 
   const addSlackAppIntegrationHandler = async() => {
     if (onClickAddSlackWorkspaceBtn != null) {

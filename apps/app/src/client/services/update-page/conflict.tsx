@@ -1,7 +1,7 @@
 import type { ErrorV3 } from '@growi/core/dist/models';
 
 import { PageUpdateErrorCode } from '~/interfaces/apiv3';
-import { type RemoteRevisionData } from '~/stores/remote-latest-page';
+import type { RemoteRevisionData } from '~/states/page';
 
 export const extractRemoteRevisionDataFromErrorObj = (errors: Array<ErrorV3>): RemoteRevisionData | undefined => {
   for (const error of errors) {

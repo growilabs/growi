@@ -14,7 +14,6 @@ const { pathUtils } = require('@growi/core/dist/utils');
 const mongoose = require('mongoose');
 
 class CreatePageService {
-
   /** @type {import('~/server/crowi').default} Crowi instance */
   crowi;
 
@@ -23,7 +22,13 @@ class CreatePageService {
     this.crowi = crowi;
   }
 
-  async createPageInGrowi(interactionPayloadAccessor, path, contentsBody, respondUtil, user) {
+  async createPageInGrowi(
+    interactionPayloadAccessor,
+    path,
+    contentsBody,
+    respondUtil,
+    user,
+  ) {
     const reshapedContentsBody = reshapeContentsBody(contentsBody);
 
     // sanitize path
@@ -31,20 +36,27 @@ class CreatePageService {
     const normalizedPath = pathUtils.normalizePath(sanitizedPath);
 
     // Since an ObjectId is required for creating a page, if a user does not exist, a dummy user will be generated
-    const userOrDummyUser = user != null ? user : { _id: new mongoose.Types.ObjectId() };
+    const userOrDummyUser =
+      user != null ? user : { _id: new mongoose.Types.ObjectId() };
 
-    const page = await this.crowi.pageService.create(normalizedPath, reshapedContentsBody, userOrDummyUser, {});
+    const page = await this.crowi.pageService.create(
+      normalizedPath,
+      reshapedContentsBody,
+      userOrDummyUser,
+      {},
+    );
 
     // Send a message when page creation is complete
     const growiUri = growiInfoService.getSiteUrl();
     await respondUtil.respond({
       text: 'Page has been created',
       blocks: [
-        markdownSectionBlock(`The page <${decodeURI(`${growiUri}/${page._id} | ${decodeURI(growiUri + normalizedPath)}`)}> has been created.`),
+        markdownSectionBlock(
+          `The page <${decodeURI(`${growiUri}/${page._id} | ${decodeURI(growiUri + normalizedPath)}`)}> has been created.`,
+        ),
       ],
     });
   }
-
 }
 
 module.exports = CreatePageService;

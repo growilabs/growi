@@ -1,9 +1,9 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 import { query } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
-import { SCOPE } from '@growi/core/dist/interfaces';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
@@ -14,13 +14,20 @@ import loggerFactory from '~/utils/logger';
 
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 
-const logger = loggerFactory('growi:routes:apiv3:personal-setting:generate-access-tokens');
+const logger = loggerFactory(
+  'growi:routes:apiv3:personal-setting:generate-access-tokens',
+);
 
 type ReqQuery = {
-  tokenId: string,
-}
+  tokenId: string;
+};
 
-type DeleteAccessTokenRequest = Request<undefined, ApiV3Response, undefined, ReqQuery>;
+type DeleteAccessTokenRequest = Request<
+  undefined,
+  ApiV3Response,
+  undefined,
+  ReqQuery
+>;
 
 type DeleteAccessTokenHandlersFactory = (crowi: Crowi) => RequestHandler[];
 
@@ -32,34 +39,39 @@ const validator = [
     .withMessage('tokenId must be a string'),
 ];
 
-export const deleteAccessTokenHandlersFactory: DeleteAccessTokenHandlersFactory = (crowi) => {
+export const deleteAccessTokenHandlersFactory: DeleteAccessTokenHandlersFactory =
+  (crowi) => {
+    const loginRequiredStrictly =
+      require('../../../middlewares/login-required')(crowi);
+    const addActivity = generateAddActivityMiddleware();
+    const activityEvent = crowi.event('activity');
 
-  const loginRequiredStrictly = require('../../../middlewares/login-required')(crowi);
-  const addActivity = generateAddActivityMiddleware();
-  const activityEvent = crowi.event('activity');
+    return [
+      accessTokenParser([SCOPE.WRITE.USER_SETTINGS.API.ACCESS_TOKEN]),
+      loginRequiredStrictly,
+      excludeReadOnlyUser,
+      addActivity,
+      validator,
+      apiV3FormValidator,
+      async (req: DeleteAccessTokenRequest, res: ApiV3Response) => {
+        const { query } = req;
+        const { tokenId } = query;
 
-  return [
-    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.API.ACCESS_TOKEN]),
-    loginRequiredStrictly,
-    excludeReadOnlyUser,
-    addActivity,
-    validator,
-    apiV3FormValidator,
-    async(req: DeleteAccessTokenRequest, res: ApiV3Response) => {
-      const { query } = req;
-      const { tokenId } = query;
+        try {
+          await AccessToken.deleteTokenById(tokenId);
 
-      try {
-        await AccessToken.deleteTokenById(tokenId);
+          const parameters = {
+            action: SupportedAction.ACTION_USER_ACCESS_TOKEN_DELETE,
+          };
+          activityEvent.emit('update', res.locals.activity._id, parameters);
 
-        const parameters = { action: SupportedAction.ACTION_USER_ACCESS_TOKEN_DELETE };
-        activityEvent.emit('update', res.locals.activity._id, parameters);
-
-        return res.apiv3({});
-      }
-      catch (err) {
-        logger.error(err);
-        return res.apiv3Err(new ErrorV3(err.toString(), 'delete-access-token-failed'));
-      }
-    }];
-};
+          return res.apiv3({});
+        } catch (err) {
+          logger.error(err);
+          return res.apiv3Err(
+            new ErrorV3(err.toString(), 'delete-access-token-failed'),
+          );
+        }
+      },
+    ];
+  };

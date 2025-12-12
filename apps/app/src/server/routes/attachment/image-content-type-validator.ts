@@ -15,7 +15,8 @@ export const SUPPORTED_IMAGE_MIME_TYPES = [
 ] as const;
 
 // Create a type for supported MIME types
-export type SupportedImageMimeType = typeof SUPPORTED_IMAGE_MIME_TYPES[number];
+export type SupportedImageMimeType =
+  (typeof SUPPORTED_IMAGE_MIME_TYPES)[number];
 
 export interface ImageContentTypeValidatorResult {
   isValid: boolean;
@@ -28,7 +29,9 @@ export interface ImageContentTypeValidatorResult {
  * @param mimeType MIME type string
  * @returns Validation result containing isValid flag and extracted content type
  */
-export const validateImageContentType = (mimeType: string): ImageContentTypeValidatorResult => {
+export const validateImageContentType = (
+  mimeType: string,
+): ImageContentTypeValidatorResult => {
   if (typeof mimeType !== 'string') {
     return {
       isValid: false,
@@ -38,7 +41,9 @@ export const validateImageContentType = (mimeType: string): ImageContentTypeVali
   }
 
   const trimmedType = mimeType.trim();
-  const isValid = SUPPORTED_IMAGE_MIME_TYPES.includes(trimmedType as SupportedImageMimeType);
+  const isValid = SUPPORTED_IMAGE_MIME_TYPES.includes(
+    trimmedType as SupportedImageMimeType,
+  );
 
   if (!isValid) {
     const supportedFormats = 'PNG, JPEG, GIF, WebP, AVIF, HEIC/HEIF, TIFF, SVG';

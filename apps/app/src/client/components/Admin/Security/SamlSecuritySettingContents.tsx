@@ -11,7 +11,7 @@ import urljoin from 'url-join';
 import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 import AdminSamlSecurityContainer from '~/client/services/AdminSamlSecurityContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useSiteUrl } from '~/stores-universal/context';
+import { useSiteUrlWithEmptyValueWarn } from '~/states/global';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -26,7 +26,7 @@ const SamlSecurityManagementContents = (props: Props) => {
   } = props;
 
   const { t } = useTranslation('admin');
-  const { data: siteUrl } = useSiteUrl();
+  const siteUrl = useSiteUrlWithEmptyValueWarn();
 
   const [isHelpOpened, setIsHelpOpened] = useState(false);
   const { register, handleSubmit, reset } = useForm();
@@ -46,18 +46,20 @@ const SamlSecurityManagementContents = (props: Props) => {
   }, [adminSamlSecurityContainer.state, reset]);
 
   const onSubmit = useCallback(async(data) => {
-    adminSamlSecurityContainer.changeSamlEntryPoint(data.samlEntryPoint);
-    adminSamlSecurityContainer.changeSamlIssuer(data.samlIssuer);
-    adminSamlSecurityContainer.changeSamlCert(data.samlCert);
-    adminSamlSecurityContainer.changeSamlAttrMapId(data.samlAttrMapId);
-    adminSamlSecurityContainer.changeSamlAttrMapUserName(data.samlAttrMapUsername);
-    adminSamlSecurityContainer.changeSamlAttrMapMail(data.samlAttrMapMail);
-    adminSamlSecurityContainer.changeSamlAttrMapFirstName(data.samlAttrMapFirstName);
-    adminSamlSecurityContainer.changeSamlAttrMapLastName(data.samlAttrMapLastName);
-    adminSamlSecurityContainer.changeSamlABLCRule(data.samlABLCRule);
-
     try {
-      await adminSamlSecurityContainer.updateSamlSetting();
+      await adminSamlSecurityContainer.updateSamlSetting({
+        samlEntryPoint: data.samlEntryPoint,
+        samlIssuer: data.samlIssuer,
+        samlCert: data.samlCert,
+        samlAttrMapId: data.samlAttrMapId,
+        samlAttrMapUsername: data.samlAttrMapUsername,
+        samlAttrMapMail: data.samlAttrMapMail,
+        samlAttrMapFirstName: data.samlAttrMapFirstName,
+        samlAttrMapLastName: data.samlAttrMapLastName,
+        isSameUsernameTreatedAsIdenticalUser: adminSamlSecurityContainer.state.isSameUsernameTreatedAsIdenticalUser,
+        isSameEmailTreatedAsIdenticalUser: adminSamlSecurityContainer.state.isSameEmailTreatedAsIdenticalUser,
+        samlABLCRule: data.samlABLCRule,
+      });
       toastSuccess(t('security_settings.SAML.updated_saml'));
     }
     catch (err) {
@@ -75,10 +77,7 @@ const SamlSecurityManagementContents = (props: Props) => {
   const { useOnlyEnvVars } = adminSamlSecurityContainer.state;
   const { isSamlEnabled } = adminGeneralSecurityContainer.state;
 
-  const samlCallbackUrl = urljoin(
-    siteUrl == null ? '' : pathUtils.removeTrailingSlash(siteUrl),
-    '/passport/saml/callback',
-  );
+  const samlCallbackUrl = urljoin(pathUtils.removeTrailingSlash(siteUrl), '/passport/saml/callback');
 
   return (
     <React.Fragment>

@@ -6,7 +6,7 @@ export enum UploadStatus {
   BEFORE_INIT,
   IN_PROGRESS,
   COMPLETED,
-  ABORTED
+  ABORTED,
 }
 
 export interface IMultipartUploader {
@@ -23,7 +23,6 @@ export interface IMultipartUploader {
  * Each instance is equivalent to a single multipart upload, and cannot be reused once completed.
  */
 export abstract class MultipartUploader implements IMultipartUploader {
-
   protected uploadKey: string;
 
   protected _uploadId: string | undefined;
@@ -44,18 +43,19 @@ export abstract class MultipartUploader implements IMultipartUploader {
     return this._uploadId;
   }
 
-  abstract initUpload(): Promise<void>
+  abstract initUpload(): Promise<void>;
 
-  abstract uploadPart(part: Buffer, partNumber: number): Promise<void>
+  abstract uploadPart(part: Buffer, partNumber: number): Promise<void>;
 
-  abstract completeUpload(): Promise<void>
+  abstract completeUpload(): Promise<void>;
 
-  abstract abortUpload(): Promise<void>
+  abstract abortUpload(): Promise<void>;
 
-  abstract getUploadedFileSize(): Promise<number>
+  abstract getUploadedFileSize(): Promise<number>;
 
   protected validatePartSize(partSize: number): void {
-    if (partSize > this.maxPartSize) throw Error(`partSize must be less than or equal to ${this.maxPartSize}`);
+    if (partSize > this.maxPartSize)
+      throw Error(`partSize must be less than or equal to ${this.maxPartSize}`);
   }
 
   protected validateUploadStatus(desiredStatus: UploadStatus): void {
@@ -74,8 +74,7 @@ export abstract class MultipartUploader implements IMultipartUploader {
     if (this.currentStatus === UploadStatus.IN_PROGRESS) {
       if (desiredStatus === UploadStatus.BEFORE_INIT) {
         errMsg = 'Multipart upload is already in progress';
-      }
-      else {
+      } else {
         errMsg = 'Multipart upload is still in progress';
       }
     }
@@ -89,5 +88,4 @@ export abstract class MultipartUploader implements IMultipartUploader {
       throw Error(errMsg);
     }
   }
-
 }

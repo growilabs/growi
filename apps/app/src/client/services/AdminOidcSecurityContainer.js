@@ -90,118 +90,6 @@ export default class AdminOidcSecurityContainer extends Container {
   }
 
   /**
-   * Change oidcProviderName
-   */
-  changeOidcProviderName(inputValue) {
-    this.setState({ oidcProviderName: inputValue });
-  }
-
-  /**
-   * Change oidcIssuerHost
-   */
-  changeOidcIssuerHost(inputValue) {
-    this.setState({ oidcIssuerHost: inputValue });
-  }
-
-  /**
-   * Change oidcAuthorizationEndpoint
-   */
-  changeOidcAuthorizationEndpoint(inputValue) {
-    this.setState({ oidcAuthorizationEndpoint: inputValue });
-  }
-
-  /**
-   * Change oidcTokenEndpoint
-   */
-  changeOidcTokenEndpoint(inputValue) {
-    this.setState({ oidcTokenEndpoint: inputValue });
-  }
-
-  /**
-   * Change oidcRevocationEndpoint
-   */
-  changeOidcRevocationEndpoint(inputValue) {
-    this.setState({ oidcRevocationEndpoint: inputValue });
-  }
-
-  /**
-   * Change oidcIntrospectionEndpoint
-   */
-  changeOidcIntrospectionEndpoint(inputValue) {
-    this.setState({ oidcIntrospectionEndpoint: inputValue });
-  }
-
-  /**
-   * Change oidcUserInfoEndpoint
-   */
-  changeOidcUserInfoEndpoint(inputValue) {
-    this.setState({ oidcUserInfoEndpoint: inputValue });
-  }
-
-  /**
-   * Change oidcEndSessionEndpoint
-   */
-  changeOidcEndSessionEndpoint(inputValue) {
-    this.setState({ oidcEndSessionEndpoint: inputValue });
-  }
-
-  /**
-   * Change oidcRegistrationEndpoint
-   */
-  changeOidcRegistrationEndpoint(inputValue) {
-    this.setState({ oidcRegistrationEndpoint: inputValue });
-  }
-
-  /**
-   * Change oidcJWKSUri
-   */
-  changeOidcJWKSUri(inputValue) {
-    this.setState({ oidcJWKSUri: inputValue });
-  }
-
-  /**
-   * Change oidcClientId
-   */
-  changeOidcClientId(inputValue) {
-    this.setState({ oidcClientId: inputValue });
-  }
-
-  /**
-   * Change oidcClientSecret
-   */
-  changeOidcClientSecret(inputValue) {
-    this.setState({ oidcClientSecret: inputValue });
-  }
-
-  /**
-   * Change oidcAttrMapId
-   */
-  changeOidcAttrMapId(inputValue) {
-    this.setState({ oidcAttrMapId: inputValue });
-  }
-
-  /**
-   * Change oidcAttrMapUserName
-   */
-  changeOidcAttrMapUserName(inputValue) {
-    this.setState({ oidcAttrMapUserName: inputValue });
-  }
-
-  /**
-   * Change oidcAttrMapName
-   */
-  changeOidcAttrMapName(inputValue) {
-    this.setState({ oidcAttrMapName: inputValue });
-  }
-
-  /**
-   * Change oidcAttrMapEmail
-   */
-  changeOidcAttrMapEmail(inputValue) {
-    this.setState({ oidcAttrMapEmail: inputValue });
-  }
-
-  /**
    * Switch sameUsernameTreatedAsIdenticalUser
    */
   switchIsSameUsernameTreatedAsIdenticalUser() {
@@ -218,47 +106,45 @@ export default class AdminOidcSecurityContainer extends Container {
   /**
    * Update OpenID Connect
    */
-  async updateOidcSetting() {
-    const {
-      oidcProviderName,
-      oidcIssuerHost,
-      oidcAuthorizationEndpoint,
-      oidcTokenEndpoint,
-      oidcRevocationEndpoint,
-      oidcIntrospectionEndpoint,
-      oidcUserInfoEndpoint,
-      oidcEndSessionEndpoint,
-      oidcRegistrationEndpoint,
-      oidcJWKSUri,
-      oidcClientId,
-      oidcClientSecret,
-      oidcAttrMapId,
-      oidcAttrMapUserName,
-      oidcAttrMapName,
-      oidcAttrMapEmail,
-      isSameUsernameTreatedAsIdenticalUser,
-      isSameEmailTreatedAsIdenticalUser,
-    } = this.state;
-
-    let requestParams = {
-      oidcProviderName,
-      oidcIssuerHost,
-      oidcAuthorizationEndpoint,
-      oidcTokenEndpoint,
-      oidcRevocationEndpoint,
-      oidcIntrospectionEndpoint,
-      oidcUserInfoEndpoint,
-      oidcEndSessionEndpoint,
-      oidcRegistrationEndpoint,
-      oidcJWKSUri,
-      oidcClientId,
-      oidcClientSecret,
-      oidcAttrMapId,
-      oidcAttrMapUserName,
-      oidcAttrMapName,
-      oidcAttrMapEmail,
-      isSameUsernameTreatedAsIdenticalUser,
-      isSameEmailTreatedAsIdenticalUser,
+  async updateOidcSetting(formData) {
+    let requestParams = formData != null ? {
+      oidcProviderName: formData.oidcProviderName,
+      oidcIssuerHost: formData.oidcIssuerHost,
+      oidcAuthorizationEndpoint: formData.oidcAuthorizationEndpoint,
+      oidcTokenEndpoint: formData.oidcTokenEndpoint,
+      oidcRevocationEndpoint: formData.oidcRevocationEndpoint,
+      oidcIntrospectionEndpoint: formData.oidcIntrospectionEndpoint,
+      oidcUserInfoEndpoint: formData.oidcUserInfoEndpoint,
+      oidcEndSessionEndpoint: formData.oidcEndSessionEndpoint,
+      oidcRegistrationEndpoint: formData.oidcRegistrationEndpoint,
+      oidcJWKSUri: formData.oidcJWKSUri,
+      oidcClientId: formData.oidcClientId,
+      oidcClientSecret: formData.oidcClientSecret,
+      oidcAttrMapId: formData.oidcAttrMapId,
+      oidcAttrMapUserName: formData.oidcAttrMapUserName,
+      oidcAttrMapName: formData.oidcAttrMapName,
+      oidcAttrMapEmail: formData.oidcAttrMapEmail,
+      isSameUsernameTreatedAsIdenticalUser: formData.isSameUsernameTreatedAsIdenticalUser,
+      isSameEmailTreatedAsIdenticalUser: formData.isSameEmailTreatedAsIdenticalUser,
+    } : {
+      oidcProviderName: this.state.oidcProviderName,
+      oidcIssuerHost: this.state.oidcIssuerHost,
+      oidcAuthorizationEndpoint: this.state.oidcAuthorizationEndpoint,
+      oidcTokenEndpoint: this.state.oidcTokenEndpoint,
+      oidcRevocationEndpoint: this.state.oidcRevocationEndpoint,
+      oidcIntrospectionEndpoint: this.state.oidcIntrospectionEndpoint,
+      oidcUserInfoEndpoint: this.state.oidcUserInfoEndpoint,
+      oidcEndSessionEndpoint: this.state.oidcEndSessionEndpoint,
+      oidcRegistrationEndpoint: this.state.oidcRegistrationEndpoint,
+      oidcJWKSUri: this.state.oidcJWKSUri,
+      oidcClientId: this.state.oidcClientId,
+      oidcClientSecret: this.state.oidcClientSecret,
+      oidcAttrMapId: this.state.oidcAttrMapId,
+      oidcAttrMapUserName: this.state.oidcAttrMapUserName,
+      oidcAttrMapName: this.state.oidcAttrMapName,
+      oidcAttrMapEmail: this.state.oidcAttrMapEmail,
+      isSameUsernameTreatedAsIdenticalUser: this.state.isSameUsernameTreatedAsIdenticalUser,
+      isSameEmailTreatedAsIdenticalUser: this.state.isSameEmailTreatedAsIdenticalUser,
     };
 
     requestParams = await removeNullPropertyFromObject(requestParams);

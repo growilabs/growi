@@ -1,10 +1,9 @@
-import path from 'path';
-
 import type { IUser } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { format, subSeconds } from 'date-fns';
 import { body, validationResult } from 'express-validator';
 import mongoose from 'mongoose';
+import path from 'path';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { RegistrationMode } from '~/interfaces/registration-mode';
@@ -34,7 +33,9 @@ export const completeRegistrationRules = () => {
       .matches(/^[\x20-\x7F]*$/)
       .withMessage('Password has invalid character')
       .isLength({ min: PASSOWRD_MINIMUM_NUMBER })
-      .withMessage('Password minimum character should be more than 8 characters')
+      .withMessage(
+        'Password minimum character should be more than 8 characters',
+      )
       .not()
       .isEmpty()
       .withMessage('Password field is required'),
@@ -49,12 +50,19 @@ export const validateCompleteRegistration = (req, res, next) => {
   }
 
   const extractedErrors: string[] = [];
-  errors.array().map(err => extractedErrors.push(err.msg));
+  errors.array().map((err) => extractedErrors.push(err.msg));
 
   return res.apiv3Err(extractedErrors);
 };
 
-async function sendEmailToAllAdmins(userData, admins, appTitle, mailService, template, url) {
+async function sendEmailToAllAdmins(
+  userData,
+  admins,
+  appTitle,
+  mailService,
+  template,
+  url,
+) {
   admins.map((admin) => {
     return mailService.send({
       to: admin.email,
@@ -110,29 +118,47 @@ async function sendEmailToAllAdmins(userData, admins, appTitle, mailService, tem
  *                   type: string
  */
 export const completeRegistrationAction = (crowi: Crowi) => {
-  const User = mongoose.model<IUser, { isEmailValid, isRegisterable, createUserByEmailAndPassword, findAdmins }>('User');
+  const User = mongoose.model<
+    IUser,
+    { isEmailValid; isRegisterable; createUserByEmailAndPassword; findAdmins }
+  >('User');
   const activityEvent = crowi.event('activity');
-  const {
-    aclService,
-    appService,
-    mailService,
-  } = crowi;
+  const { aclService, appService, mailService } = crowi;
 
-  return async function(req, res) {
+  return async (req, res) => {
     const { t } = await getTranslation();
 
     if (req.user != null) {
-      return res.apiv3Err(new ErrorV3('You have been logged in', 'registration-failed'), 403);
+      return res.apiv3Err(
+        new ErrorV3('You have been logged in', 'registration-failed'),
+        403,
+      );
     }
 
     // error when registration is not allowed
-    if (configManager.getConfig('security:registrationMode') === aclService.labels.SECURITY_REGISTRATION_MODE_CLOSED) {
-      return res.apiv3Err(new ErrorV3('Registration closed', 'registration-failed'), 403);
+    if (
+      configManager.getConfig('security:registrationMode') ===
+      aclService.labels.SECURITY_REGISTRATION_MODE_CLOSED
+    ) {
+      return res.apiv3Err(
+        new ErrorV3('Registration closed', 'registration-failed'),
+        403,
+      );
     }
 
     // error when email authentication is disabled
-    if (configManager.getConfig('security:passport-local:isEmailAuthenticationEnabled') !== true) {
-      return res.apiv3Err(new ErrorV3('Email authentication configuration is disabled', 'registration-failed'), 403);
+    if (
+      configManager.getConfig(
+        'security:passport-local:isEmailAuthenticationEnabled',
+      ) !== true
+    ) {
+      return res.apiv3Err(
+        new ErrorV3(
+          'Email authentication configuration is disabled',
+          'registration-failed',
+        ),
+        403,
+      );
     }
 
     const { userRegistrationOrder } = req;
@@ -162,65 +188,94 @@ export const completeRegistrationAction = (crowi: Crowi) => {
         }
       }
       if (isError) {
-        return res.apiv3Err(new ErrorV3(errorMessage, 'registration-failed'), 403);
+        return res.apiv3Err(
+          new ErrorV3(errorMessage, 'registration-failed'),
+          403,
+        );
       }
 
-      User.createUserByEmailAndPassword(name, username, email, password, undefined, async(err, userData) => {
-        if (err) {
-          if (err.name === 'UserUpperLimitException') {
-            errorMessage = t('message.can_not_register_maximum_number_of_users');
-          }
-          else {
-            errorMessage = t('message.failed_to_register');
-          }
-          return res.apiv3Err(new ErrorV3(errorMessage, 'registration-failed'), 403);
-        }
-
-        const parameters = { action: SupportedAction.ACTION_USER_REGISTRATION_SUCCESS };
-        activityEvent.emit('update', res.locals.activity._id, parameters);
-
-        userRegistrationOrder.revokeOneTimeToken();
-
-        if (configManager.getConfig('security:registrationMode') === aclService.labels.SECURITY_REGISTRATION_MODE_RESTRICTED) {
-          const isMailerSetup = mailService.isMailerSetup ?? false;
-
-          if (isMailerSetup) {
-            const admins = await User.findAdmins();
-            const appTitle = appService.getAppTitle();
-            const locale = configManager.getConfig('app:globalLang');
-            const template = path.join(crowi.localeDir, `${locale}/admin/userWaitingActivation.ejs`);
-            const url = growiInfoService.getSiteUrl();
-
-            sendEmailToAllAdmins(userData, admins, appTitle, mailService, template, url);
-          }
-          // This 'completeRegistrationAction' should not be able to be called if the email settings is not set up in the first place.
-          // So this method dows not stop processing as an error, but only displays a warning. -- 2022.11.01 Yuki Takei
-          else {
-            logger.warn('E-mail Settings must be set up.');
-          }
-
-          return res.apiv3({});
-        }
-
-        req.login(userData, (err) => {
+      User.createUserByEmailAndPassword(
+        name,
+        username,
+        email,
+        password,
+        undefined,
+        async (err, userData) => {
           if (err) {
-            logger.debug(err);
-          }
-          else {
-            // update lastLoginAt
-            userData.updateLastLoginAt(new Date(), (err) => {
-              if (err) {
-                logger.error(`updateLastLoginAt dumps error: ${err}`);
-              }
-            });
+            if (err.name === 'UserUpperLimitException') {
+              errorMessage = t(
+                'message.can_not_register_maximum_number_of_users',
+              );
+            } else {
+              errorMessage = t('message.failed_to_register');
+            }
+            return res.apiv3Err(
+              new ErrorV3(errorMessage, 'registration-failed'),
+              403,
+            );
           }
 
-          // userData.password can't be empty but, prepare redirect because password property in User Model is optional
-          // https://github.com/growilabs/growi/pull/6670
-          const redirectTo = userData.password != null ? '/' : '/me#password_settings';
-          return res.apiv3({ redirectTo });
-        });
-      });
+          const parameters = {
+            action: SupportedAction.ACTION_USER_REGISTRATION_SUCCESS,
+          };
+          activityEvent.emit('update', res.locals.activity._id, parameters);
+
+          userRegistrationOrder.revokeOneTimeToken();
+
+          if (
+            configManager.getConfig('security:registrationMode') ===
+            aclService.labels.SECURITY_REGISTRATION_MODE_RESTRICTED
+          ) {
+            const isMailerSetup = mailService.isMailerSetup ?? false;
+
+            if (isMailerSetup) {
+              const admins = await User.findAdmins();
+              const appTitle = appService.getAppTitle();
+              const locale = configManager.getConfig('app:globalLang');
+              const template = path.join(
+                crowi.localeDir,
+                `${locale}/admin/userWaitingActivation.ejs`,
+              );
+              const url = growiInfoService.getSiteUrl();
+
+              sendEmailToAllAdmins(
+                userData,
+                admins,
+                appTitle,
+                mailService,
+                template,
+                url,
+              );
+            }
+            // This 'completeRegistrationAction' should not be able to be called if the email settings is not set up in the first place.
+            // So this method dows not stop processing as an error, but only displays a warning. -- 2022.11.01 Yuki Takei
+            else {
+              logger.warn('E-mail Settings must be set up.');
+            }
+
+            return res.apiv3({});
+          }
+
+          req.login(userData, (err) => {
+            if (err) {
+              logger.debug(err);
+            } else {
+              // update lastLoginAt
+              userData.updateLastLoginAt(new Date(), (err) => {
+                if (err) {
+                  logger.error(`updateLastLoginAt dumps error: ${err}`);
+                }
+              });
+            }
+
+            // userData.password can't be empty but, prepare redirect because password property in User Model is optional
+            // https://github.com/growilabs/growi/pull/6670
+            const redirectTo =
+              userData.password != null ? '/' : '/me#password_settings';
+            return res.apiv3({ redirectTo });
+          });
+        },
+      );
     });
   };
 };
@@ -244,17 +299,13 @@ export const validateRegisterForm = (req, res, next) => {
   }
 
   const extractedErrors: string[] = [];
-  errors.array().map(err => extractedErrors.push(err.msg));
+  errors.array().map((err) => extractedErrors.push(err.msg));
 
   return res.apiv3Err(extractedErrors, 400);
 };
 
 async function makeRegistrationEmailToken(email, crowi: Crowi) {
-  const {
-    mailService,
-    localeDir,
-    appService,
-  } = crowi;
+  const { mailService, localeDir, appService } = crowi;
 
   const isMailerSetup = mailService.isMailerSetup ?? false;
   if (!isMailerSetup) {
@@ -264,17 +315,24 @@ async function makeRegistrationEmailToken(email, crowi: Crowi) {
   const locale = configManager.getConfig('app:globalLang');
   const appUrl = growiInfoService.getSiteUrl();
 
-  const userRegistrationOrder = await UserRegistrationOrder.createUserRegistrationOrder(email);
+  const userRegistrationOrder =
+    await UserRegistrationOrder.createUserRegistrationOrder(email);
   const grwTzoffsetSec = crowi.appService.getTzoffset() * 60;
   const expiredAt = subSeconds(userRegistrationOrder.expiredAt, grwTzoffsetSec);
   const formattedExpiredAt = format(expiredAt, 'yyyy/MM/dd HH:mm');
-  const url = new URL(`/user-activation/${userRegistrationOrder.token}`, appUrl);
+  const url = new URL(
+    `/user-activation/${userRegistrationOrder.token}`,
+    appUrl,
+  );
   const oneTimeUrl = url.href;
 
   return mailService.send({
     to: email,
     subject: '[GROWI] User Activation',
-    template: path.join(localeDir, `${locale}/notifications/userActivation.ejs`),
+    template: path.join(
+      localeDir,
+      `${locale}/notifications/userActivation.ejs`,
+    ),
     vars: {
       appTitle: appService.getAppTitle(),
       email,
@@ -285,13 +343,17 @@ async function makeRegistrationEmailToken(email, crowi: Crowi) {
 }
 
 export const registerAction = (crowi: Crowi) => {
-  const User = mongoose.model<IUser, { isRegisterableEmail, isEmailValid }>('User');
+  const User = mongoose.model<IUser, { isRegisterableEmail; isEmailValid }>(
+    'User',
+  );
 
-  return async function(req, res) {
+  return async (req, res) => {
     const registerForm = req.body.registerForm || {};
     const email = registerForm.email;
     const isRegisterableEmail = await User.isRegisterableEmail(email);
-    const registrationMode = configManager.getConfig('security:registrationMode');
+    const registrationMode = configManager.getConfig(
+      'security:registrationMode',
+    );
     const isEmailValid = await User.isEmailValid(email);
 
     if (registrationMode === RegistrationMode.CLOSED) {
@@ -309,8 +371,7 @@ export const registerAction = (crowi: Crowi) => {
 
     try {
       await makeRegistrationEmailToken(email, crowi);
-    }
-    catch (err) {
+    } catch (err) {
       return res.apiv3Err(err);
     }
 

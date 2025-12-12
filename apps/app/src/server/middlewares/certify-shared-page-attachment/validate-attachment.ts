@@ -4,14 +4,19 @@ import type { ShareLinkDocument } from '~/server/models/share-link';
 import { getModelSafely } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
+const logger = loggerFactory(
+  'growi:middleware:certify-shared-page-attachment:validate-attachment',
+);
 
-const logger = loggerFactory('growi:middleware:certify-shared-page-attachment:validate-attachment');
-
-
-export const validateAttachment = async(fileId: string, shareLink: ShareLinkDocument): Promise<boolean> => {
+export const validateAttachment = async (
+  fileId: string,
+  shareLink: ShareLinkDocument,
+): Promise<boolean> => {
   const Attachment = getModelSafely<IAttachment>('Attachment');
   if (Attachment == null) {
-    logger.warn('Could not get Attachment model. next() will be called without processing anything.');
+    logger.warn(
+      'Could not get Attachment model. next() will be called without processing anything.',
+    );
     return false;
   }
 

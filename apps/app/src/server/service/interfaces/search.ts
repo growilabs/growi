@@ -1,4 +1,4 @@
 export type UpdateOrInsertPagesOpts = {
-  shouldEmitProgress?: boolean
-  invokeGarbageCollection?: boolean
-}
+  shouldEmitProgress?: boolean;
+  invokeGarbageCollection?: boolean;
+};

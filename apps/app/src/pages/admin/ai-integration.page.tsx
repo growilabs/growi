@@ -1,31 +1,22 @@
-import type {
-  GetServerSideProps,
-  GetServerSidePropsContext,
-  NextPage,
-} from 'next';
+import type { GetServerSideProps } from 'next';
 import dynamic from 'next/dynamic';
-import Head from 'next/head';
-import { useTranslation } from 'next-i18next';
+import { useHydrateAtoms } from 'jotai/utils';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { CommonProps } from '~/pages/utils/commons';
-import { generateCustomTitle } from '~/pages/utils/commons';
+import { aiEnabledAtom } from '~/states/server-configurations';
 
-import { retrieveServerSideProps } from '../../utils/admin-page-util';
+import type { NextPageWithLayout } from '../_app.page';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+import type { AdminCommonProps } from './_shared';
+import {
+  createAdminPageLayout,
+  getServerSideAdminCommonProps,
+} from './_shared';
 
-const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), {
-  ssr: false,
-});
-const ForbiddenPage = dynamic(
-  () =>
-    import('~/client/components/Admin/ForbiddenPage').then(
-      (mod) => mod.ForbiddenPage,
-    ),
-  { ssr: false },
-);
 const AiIntegration = dynamic(
   () =>
     import(
+      // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
       '~/features/openai/client/components/AiIntegration/AiIntegration'
     ).then((mod) => mod.AiIntegration),
   { ssr: false },
@@ -33,54 +24,38 @@ const AiIntegration = dynamic(
 const AiIntegrationDisableMode = dynamic(
   () =>
     import(
+      // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
       '~/features/openai/client/components/AiIntegration/AiIntegrationDisableMode'
     ).then((mod) => mod.AiIntegrationDisableMode),
   { ssr: false },
 );
 
-type Props = CommonProps & {
-  aiEnabled: boolean;
+type Props = AdminCommonProps & { aiEnabled: boolean };
+
+const AdminAiIntegrationPage: NextPageWithLayout<Props> = ({
+  aiEnabled,
+}: Props) => {
+  // Hydrate server-provided prop into atom (runs only on mount / hydration)
+  useHydrateAtoms([[aiEnabledAtom, aiEnabled]], {
+    dangerouslyForceHydrate: true,
+  });
+  return aiEnabled ? <AiIntegration /> : <AiIntegrationDisableMode />;
 };
 
-const AdminAiIntegrationPage: NextPage<Props> = (props: Props) => {
-  const { t } = useTranslation('admin');
+AdminAiIntegrationPage.getLayout = createAdminPageLayout<Props>({
+  title: (_p, t) => t('ai_integration.ai_integration'),
+});
 
-  const title = t('ai_integration.ai_integration');
-  const headTitle = generateCustomTitle(props, title);
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  const baseResult = await getServerSideAdminCommonProps(context);
+  if (!('props' in baseResult)) return baseResult; // redirect / notFound pass-through
 
-  if (props.isAccessDeniedForNonAdminUser) {
-    return <ForbiddenPage />;
-  }
+  const req = context.req as CrowiRequest;
+  const { configManager } = req.crowi;
+  const aiEnabled = configManager.getConfig('app:aiEnabled');
 
-  return (
-    <AdminLayout componentTitle={title}>
-      <Head>
-        <title>{headTitle}</title>
-      </Head>
-      {props.aiEnabled ? <AiIntegration /> : <AiIntegrationDisableMode />}
-    </AdminLayout>
-  );
-};
-
-const injectServerConfigurations = async (
-  context: GetServerSidePropsContext,
-  props: Props,
-): Promise<void> => {
-  const req: CrowiRequest = context.req as CrowiRequest;
-  const { crowi } = req;
-  const { configManager } = crowi;
-
-  props.aiEnabled = configManager.getConfig('app:aiEnabled');
-};
-
-export const getServerSideProps: GetServerSideProps = async (
-  context: GetServerSidePropsContext,
-) => {
-  const props = await retrieveServerSideProps(
-    context,
-    injectServerConfigurations,
-  );
-  return props;
+  const aiPropsResult = { props: { aiEnabled } } as const;
+  return mergeGetServerSidePropsResults(baseResult, aiPropsResult);
 };
 
 export default AdminAiIntegrationPage;

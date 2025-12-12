@@ -1,28 +1,24 @@
-import { promisify } from 'util';
-
 import ejs from 'ejs';
 import nodemailer from 'nodemailer';
+import { promisify } from 'util';
 
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
 import S2sMessage from '../models/vo/s2s-message';
-
 import type { IConfigManagerForApp } from './config-manager';
 import type { S2sMessageHandlable } from './s2s-messaging/handlable';
 
 const logger = loggerFactory('growi:service:mail');
 
-
 type MailConfig = {
-  to?: string,
-  from?: string,
-  text?: string,
-  subject?: string,
-}
+  to?: string;
+  from?: string;
+  text?: string;
+  subject?: string;
+};
 
 class MailService implements S2sMessageHandlable {
-
   appService!: any;
 
   configManager: IConfigManagerForApp;
@@ -57,7 +53,10 @@ class MailService implements S2sMessageHandlable {
       return false;
     }
 
-    return this.lastLoadedAt == null || this.lastLoadedAt < new Date(s2sMessage.updatedAt);
+    return (
+      this.lastLoadedAt == null ||
+      this.lastLoadedAt < new Date(s2sMessage.updatedAt)
+    );
   }
 
   /**
@@ -75,17 +74,20 @@ class MailService implements S2sMessageHandlable {
     const { s2sMessagingService } = this;
 
     if (s2sMessagingService != null) {
-      const s2sMessage = new S2sMessage('mailServiceUpdated', { updatedAt: new Date() });
+      const s2sMessage = new S2sMessage('mailServiceUpdated', {
+        updatedAt: new Date(),
+      });
 
       try {
         await s2sMessagingService.publish(s2sMessage);
-      }
-      catch (e) {
-        logger.error('Failed to publish update message with S2sMessagingService: ', e.message);
+      } catch (e) {
+        logger.error(
+          'Failed to publish update message with S2sMessagingService: ',
+          e.message,
+        );
       }
     }
   }
-
 
   initialize() {
     const { appService, configManager } = this;
@@ -97,15 +99,15 @@ class MailService implements S2sMessageHandlable {
       return;
     }
 
-    const transmissionMethod = configManager.getConfig('mail:transmissionMethod');
+    const transmissionMethod = configManager.getConfig(
+      'mail:transmissionMethod',
+    );
 
     if (transmissionMethod === 'smtp') {
       this.mailer = this.createSMTPClient();
-    }
-    else if (transmissionMethod === 'ses') {
+    } else if (transmissionMethod === 'ses') {
       this.mailer = this.createSESClient();
-    }
-    else {
+    } else {
       this.mailer = null;
     }
 
@@ -130,7 +132,8 @@ class MailService implements S2sMessageHandlable {
       if (host == null || port == null) {
         return null;
       }
-      option = { // eslint-disable-line no-param-reassign
+      option = {
+        // eslint-disable-line no-param-reassign
         host,
         port,
       };
@@ -159,11 +162,14 @@ class MailService implements S2sMessageHandlable {
 
     if (!option) {
       const accessKeyId = configManager.getConfig('mail:sesAccessKeyId');
-      const secretAccessKey = configManager.getConfig('mail:sesSecretAccessKey');
+      const secretAccessKey = configManager.getConfig(
+        'mail:sesSecretAccessKey',
+      );
       if (accessKeyId == null || secretAccessKey == null) {
         return null;
       }
-      option = { // eslint-disable-line no-param-reassign
+      option = {
+        // eslint-disable-line no-param-reassign
         accessKeyId,
         secretAccessKey,
       };
@@ -193,21 +199,21 @@ class MailService implements S2sMessageHandlable {
 
   async send(config) {
     if (this.mailer == null) {
-      throw new Error('Mailer is not completed to set up. Please set up SMTP or AWS setting.');
+      throw new Error(
+        'Mailer is not completed to set up. Please set up SMTP or AWS setting.',
+      );
     }
 
-    const renderFilePromisified = promisify<string, ejs.Data, string>(ejs.renderFile);
+    const renderFilePromisified = promisify<string, ejs.Data, string>(
+      ejs.renderFile,
+    );
 
     const templateVars = config.vars || {};
-    const output = await renderFilePromisified(
-      config.template,
-      templateVars,
-    );
+    const output = await renderFilePromisified(config.template, templateVars);
 
     config.text = output;
     return this.mailer.sendMail(this.setupMailConfig(config));
   }
-
 }
 
 module.exports = MailService;

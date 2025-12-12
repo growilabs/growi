@@ -96,7 +96,7 @@
  *              revisionShortBody:
  *                type: string
  *                description: Short body of the revision
- *      PageInfoAll:
+ *      PageInfoExt:
  *        description: Page information (union of all page info types)
  *        oneOf:
  *          - $ref: '#/components/schemas/PageInfo'

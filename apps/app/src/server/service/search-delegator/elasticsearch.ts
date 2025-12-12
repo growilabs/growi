@@ -1,10 +1,9 @@
-import { Writable, Transform } from 'stream';
-import { pipeline } from 'stream/promises';
-import { URL } from 'url';
-
 import { getIdStringForRef, type IPage } from '@growi/core';
 import gc from 'expose-gc/function';
 import mongoose from 'mongoose';
+import { Transform, Writable } from 'stream';
+import { pipeline } from 'stream/promises';
+import { URL } from 'url';
 
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
@@ -15,27 +14,34 @@ import type { SocketIoService } from '~/server/service/socket-io';
 import loggerFactory from '~/utils/logger';
 
 import type {
-  SearchDelegator, SearchableData, QueryTerms, UnavailableTermsKey, ESQueryTerms, ESTermsKey,
+  ESQueryTerms,
+  ESTermsKey,
+  QueryTerms,
+  SearchableData,
+  SearchDelegator,
+  UnavailableTermsKey,
 } from '../../interfaces/search';
 import type { PageModel } from '../../models/page';
 import { createBatchStream } from '../../util/batch-stream';
 import { configManager } from '../config-manager';
 import type { UpdateOrInsertPagesOpts } from '../interfaces/search';
-
 import { aggregatePipelineToIndex } from './aggregate-to-index';
 import type {
-  AggregatedPage, BulkWriteBody, BulkWriteCommand, BulkWriteBodyRestriction,
+  AggregatedPage,
+  BulkWriteBody,
+  BulkWriteBodyRestriction,
+  BulkWriteCommand,
 } from './bulk-write';
 import {
+  type ElasticsearchClientDelegator,
+  type ES7SearchQuery,
+  type ES8SearchQuery,
+  type ES9SearchQuery,
   getClient,
   isES7ClientDelegator,
   isES8ClientDelegator,
   isES9ClientDelegator,
   type SearchQuery,
-  type ES7SearchQuery,
-  type ES8SearchQuery,
-  type ES9SearchQuery,
-  type ElasticsearchClientDelegator,
 } from './elasticsearch-client-delegator';
 
 const logger = loggerFactory('growi:service:search-delegator:elasticsearch');
@@ -56,12 +62,22 @@ const ES_SORT_ORDER = {
   [ASC]: 'asc',
 } as const;
 
-const AVAILABLE_KEYS = ['match', 'not_match', 'phrase', 'not_phrase', 'prefix', 'not_prefix', 'tag', 'not_tag'];
+const AVAILABLE_KEYS = [
+  'match',
+  'not_match',
+  'phrase',
+  'not_phrase',
+  'prefix',
+  'not_prefix',
+  'tag',
+  'not_tag',
+];
 
 type Data = any;
 
-class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQueryTerms> {
-
+class ElasticsearchDelegator
+  implements SearchDelegator<Data, ESTermsKey, ESQueryTerms>
+{
   name!: SearchDelegatorName.DEFAULT;
 
   private socketIoService!: SocketIoService;
@@ -85,17 +101,27 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     this.name = SearchDelegatorName.DEFAULT;
     this.socketIoService = socketIoService;
 
-    const elasticsearchVersion = configManager.getConfig('app:elasticsearchVersion');
+    const elasticsearchVersion = configManager.getConfig(
+      'app:elasticsearchVersion',
+    );
 
-    if (elasticsearchVersion !== 7 && elasticsearchVersion !== 8 && elasticsearchVersion !== 9) {
-      throw new Error('Unsupported Elasticsearch version. Please specify a valid number to \'ELASTICSEARCH_VERSION\'');
+    if (
+      elasticsearchVersion !== 7 &&
+      elasticsearchVersion !== 8 &&
+      elasticsearchVersion !== 9
+    ) {
+      throw new Error(
+        "Unsupported Elasticsearch version. Please specify a valid number to 'ELASTICSEARCH_VERSION'",
+      );
     }
 
     this.isElasticsearchV7 = elasticsearchVersion === 7;
 
     this.elasticsearchVersion = elasticsearchVersion;
 
-    this.isElasticsearchReindexOnBoot = configManager.getConfig('app:elasticsearchReindexOnBoot');
+    this.isElasticsearchReindexOnBoot = configManager.getConfig(
+      'app:elasticsearchReindexOnBoot',
+    );
   }
 
   /**
@@ -125,15 +151,23 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   async initClient(): Promise<void> {
     const { host, auth, indexName } = this.getConnectionInfo();
 
-    const rejectUnauthorized = configManager.getConfig('app:elasticsearchRejectUnauthorized');
+    const rejectUnauthorized = configManager.getConfig(
+      'app:elasticsearchRejectUnauthorized',
+    );
 
     const options = {
       node: host,
       auth,
-      requestTimeout: configManager.getConfig('app:elasticsearchRequestTimeout'),
+      requestTimeout: configManager.getConfig(
+        'app:elasticsearchRequestTimeout',
+      ),
     };
 
-    this.client = await getClient({ version: this.elasticsearchVersion, options, rejectUnauthorized });
+    this.client = await getClient({
+      version: this.elasticsearchVersion,
+      options,
+      rejectUnauthorized,
+    });
     this.indexName = indexName;
   }
 
@@ -148,7 +182,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   getConnectionInfo() {
     let indexName = 'crowi';
     let host: string | undefined;
-    let auth;
+    let auth: { username: string; password: string } | undefined;
 
     const elasticsearchUri = configManager.getConfig('app:elasticsearchUri');
 
@@ -178,8 +212,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     if (this.isElasticsearchReindexOnBoot) {
       try {
         await this.rebuildIndex();
-      }
-      catch (err) {
+      } catch (err) {
         logger.error('Rebuild index on boot failed', err);
       }
       return;
@@ -245,12 +278,18 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
 
     // check existence
     const isExistsMainIndex = await client.indices.exists({ index: indexName });
-    const isExistsTmpIndex = await client.indices.exists({ index: tmpIndexName });
+    const isExistsTmpIndex = await client.indices.exists({
+      index: tmpIndexName,
+    });
 
     // create indices name list
     const existingIndices: string[] = [];
-    if (isExistsMainIndex) { existingIndices.push(indexName) }
-    if (isExistsTmpIndex) { existingIndices.push(tmpIndexName) }
+    if (isExistsMainIndex) {
+      existingIndices.push(indexName);
+    }
+    if (isExistsTmpIndex) {
+      existingIndices.push(tmpIndexName);
+    }
 
     // results when there is no indices
     if (existingIndices.length === 0) {
@@ -261,22 +300,34 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
       };
     }
 
-    const indicesStats = await client.indices.stats({ index: existingIndices, metric: ['docs', 'store', 'indexing'] });
+    const indicesStats = await client.indices.stats({
+      index: existingIndices,
+      metric: ['docs', 'store', 'indexing'],
+    });
     const { indices } = indicesStats;
 
     const aliases = await client.indices.getAlias({ index: existingIndices });
 
-    const isMainIndexHasAlias = isExistsMainIndex && aliases[indexName].aliases != null && aliases[indexName].aliases[aliasName] != null;
-    const isTmpIndexHasAlias = isExistsTmpIndex && aliases[tmpIndexName].aliases != null && aliases[tmpIndexName].aliases[aliasName] != null;
+    const isMainIndexHasAlias =
+      isExistsMainIndex &&
+      aliases[indexName].aliases != null &&
+      aliases[indexName].aliases[aliasName] != null;
+    const isTmpIndexHasAlias =
+      isExistsTmpIndex &&
+      aliases[tmpIndexName].aliases != null &&
+      aliases[tmpIndexName].aliases[aliasName] != null;
 
-    const isNormalized = isExistsMainIndex && isMainIndexHasAlias && !isExistsTmpIndex && !isTmpIndexHasAlias;
+    const isNormalized =
+      isExistsMainIndex &&
+      isMainIndexHasAlias &&
+      !isExistsTmpIndex &&
+      !isTmpIndexHasAlias;
 
     return {
       indices,
       aliases,
       isNormalized,
     };
-
   }
 
   /**
@@ -306,21 +357,18 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
       });
       await this.createIndex(indexName);
       await this.addAllPages();
-    }
-    catch (error) {
-      logger.error('An error occured while \'rebuildIndex\'.', error);
+    } catch (error) {
+      logger.error("An error occured while 'rebuildIndex'.", error);
       logger.error('error.meta.body', error?.meta?.body);
 
       const socket = this.socketIoService.getAdminSocket();
       socket.emit(SocketEventName.RebuildingFailed, { error: error.message });
 
       throw error;
-    }
-    finally {
+    } finally {
       logger.info('Normalize indices.');
       await this.normalizeIndices();
     }
-
   }
 
   async normalizeIndices(): Promise<void> {
@@ -329,7 +377,9 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     const tmpIndexName = `${indexName}-tmp`;
 
     // remove tmp index
-    const isExistsTmpIndex = await client.indices.exists({ index: tmpIndexName });
+    const isExistsTmpIndex = await client.indices.exists({
+      index: tmpIndexName,
+    });
     if (isExistsTmpIndex) {
       await client.indices.delete({ index: tmpIndexName });
     }
@@ -341,7 +391,10 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     }
 
     // create alias
-    const isExistsAlias = await client.indices.existsAlias({ name: aliasName, index: indexName });
+    const isExistsAlias = await client.indices.existsAlias({
+      name: aliasName,
+      index: indexName,
+    });
     if (!isExistsAlias) {
       await client.indices.putAlias({
         name: aliasName,
@@ -371,9 +424,10 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     }
 
     if (isES9ClientDelegator(this.client)) {
-      const { mappings } = process.env.CI == null
-        ? await import('./mappings/mappings-es9')
-        : await import('./mappings/mappings-es9-for-ci');
+      const { mappings } =
+        process.env.CI == null
+          ? await import('./mappings/mappings-es9')
+          : await import('./mappings/mappings-es9-for-ci');
 
       return this.client.indices.create({
         index,
@@ -385,9 +439,15 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   /**
    * generate object that is related to page.grant*
    */
-  generateDocContentsRelatedToRestriction(page: AggregatedPage): BulkWriteBodyRestriction {
-    const grantedUserIds = page.grantedUsers.map(user => getIdStringForRef(user));
-    const grantedGroupIds = page.grantedGroups.map(group => getIdStringForRef(group.item));
+  generateDocContentsRelatedToRestriction(
+    page: AggregatedPage,
+  ): BulkWriteBodyRestriction {
+    const grantedUserIds = page.grantedUsers.map((user) =>
+      getIdStringForRef(user),
+    );
+    const grantedGroupIds = page.grantedGroups.map((group) =>
+      getIdStringForRef(group.item),
+    );
 
     return {
       grant: page.grant,
@@ -396,8 +456,9 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     };
   }
 
-  prepareBodyForCreate(page: AggregatedPage): [BulkWriteCommand, BulkWriteBody] {
-
+  prepareBodyForCreate(
+    page: AggregatedPage,
+  ): [BulkWriteCommand, BulkWriteBody] {
     const command = {
       index: {
         _index: this.indexName,
@@ -443,7 +504,10 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
 
   addAllPages() {
     const Page = this.getPageModel();
-    return this.updateOrInsertPages(() => Page.find(), { shouldEmitProgress: true, invokeGarbageCollection: true });
+    return this.updateOrInsertPages(() => Page.find(), {
+      shouldEmitProgress: true,
+      invokeGarbageCollection: true,
+    });
   }
 
   updateOrInsertPageById(pageId) {
@@ -462,13 +526,19 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   /**
    * @param {function} queryFactory factory method to generate a Mongoose Query instance
    */
-  async updateOrInsertPages(queryFactory, option: UpdateOrInsertPagesOpts = {}): Promise<void> {
-    const { shouldEmitProgress = false, invokeGarbageCollection = false } = option;
+  async updateOrInsertPages(
+    queryFactory,
+    option: UpdateOrInsertPagesOpts = {},
+  ): Promise<void> {
+    const { shouldEmitProgress = false, invokeGarbageCollection = false } =
+      option;
 
     const Page = this.getPageModel();
     const { PageQueryBuilder } = Page;
 
-    const socket = shouldEmitProgress ? this.socketIoService.getAdminSocket() : null;
+    const socket = shouldEmitProgress
+      ? this.socketIoService.getAdminSocket()
+      : null;
 
     // prepare functions invoked from custom streams
     const prepareBodyForCreate = this.prepareBodyForCreate.bind(this);
@@ -479,26 +549,31 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     const countQuery = new PageQueryBuilder(queryFactory()).query;
     const totalCount = await countQuery.count();
 
-    const maxBodyLengthToIndex = configManager.getConfig('app:elasticsearchMaxBodyLengthToIndex');
+    const maxBodyLengthToIndex = configManager.getConfig(
+      'app:elasticsearchMaxBodyLengthToIndex',
+    );
 
     const readStream = Page.aggregate<AggregatedPage>(
       aggregatePipelineToIndex(maxBodyLengthToIndex, matchQuery),
     ).cursor();
 
-    const bulkSize: number = configManager.getConfig('app:elasticsearchReindexBulkSize');
+    const bulkSize: number = configManager.getConfig(
+      'app:elasticsearchReindexBulkSize',
+    );
     const batchStream = createBatchStream(bulkSize);
 
     const appendTagNamesStream = new Transform({
       objectMode: true,
       async transform(chunk, encoding, callback) {
-        const pageIds = chunk.map(doc => doc._id);
+        const pageIds = chunk.map((doc) => doc._id);
 
-        const idToTagNamesMap = await PageTagRelation.getIdToTagNamesMap(pageIds);
+        const idToTagNamesMap =
+          await PageTagRelation.getIdToTagNamesMap(pageIds);
         const idsHavingTagNames = Object.keys(idToTagNamesMap);
 
         // append tagNames
         chunk
-          .filter(doc => idsHavingTagNames.includes(doc._id.toString()))
+          .filter((doc) => idsHavingTagNames.includes(doc._id.toString()))
           .forEach((doc: AggregatedPage) => {
             // append tagName from idToTagNamesMap
             doc.tagNames = idToTagNamesMap[doc._id.toString()];
@@ -513,7 +588,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     const writeStream = new Writable({
       objectMode: true,
       async write(batch, encoding, callback) {
-        const body: (BulkWriteCommand|BulkWriteBody)[] = [];
+        const body: (BulkWriteCommand | BulkWriteBody)[] = [];
         batch.forEach((doc: AggregatedPage) => {
           body.push(...prepareBodyForCreate(doc));
         });
@@ -526,13 +601,17 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
 
           count += (bulkResponse.items || []).length;
 
-          logger.info(`Adding pages progressing: (count=${count}, errors=${bulkResponse.errors}, took=${bulkResponse.took}ms)`);
+          logger.info(
+            `Adding pages progressing: (count=${count}, errors=${bulkResponse.errors}, took=${bulkResponse.took}ms)`,
+          );
 
           if (shouldEmitProgress) {
-            socket?.emit(SocketEventName.AddPageProgress, { totalCount, count });
+            socket?.emit(SocketEventName.AddPageProgress, {
+              totalCount,
+              count,
+            });
           }
-        }
-        catch (err) {
+        } catch (err) {
           logger.error('addAllPages error on add anyway: ', err);
         }
 
@@ -541,8 +620,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
             // First aid to prevent unexplained memory leaks
             logger.info('global.gc() invoked.');
             gc();
-          }
-          catch (err) {
+          } catch (err) {
             logger.error('fail garbage collection: ', err);
           }
         }
@@ -559,18 +637,14 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
       },
     });
 
-
-    return pipeline(
-      readStream,
-      batchStream,
-      appendTagNamesStream,
-      writeStream,
-    );
+    return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
   }
 
   deletePages(pages) {
     const body = [];
-    pages.forEach(page => this.prepareBodyForDelete(body, page));
+    pages.forEach((page) => {
+      this.prepareBodyForDelete(body, page);
+    });
 
     logger.debug('deletePages(): Sending Request to ES', body);
     return this.client.bulk({
@@ -585,14 +659,14 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
    *   data: [ pages ...],
    * }
    */
-  async searchKeyword(query: SearchQuery): Promise<ISearchResult<ISearchResultData>> {
-
+  async searchKeyword(
+    query: SearchQuery,
+  ): Promise<ISearchResult<ISearchResultData>> {
     // for debug
     if (process.env.NODE_ENV === 'development') {
       logger.debug('query: ', JSON.stringify(query, null, 2));
 
-
-      const validateQueryResponse = await (async() => {
+      const validateQueryResponse = await (async () => {
         if (isES7ClientDelegator(this.client)) {
           const es7SearchQuery = query as ES7SearchQuery;
           return this.client.indices.validateQuery({
@@ -625,12 +699,11 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
         throw new Error('Unsupported Elasticsearch version');
       })();
 
-
       // for debug
       logger.debug('ES result: ', validateQueryResponse);
     }
 
-    const searchResponse = await (async() => {
+    const searchResponse = await (async () => {
       if (isES7ClientDelegator(this.client)) {
         return this.client.search(query as ES7SearchQuery);
       }
@@ -682,7 +755,15 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
    * @returns {object} query object
    */
   createSearchQuery(): SearchQuery {
-    const fields = ['path', 'bookmark_count', 'comment_count', 'seenUsers_count', 'updated_at', 'tag_names', 'comments'];
+    const fields = [
+      'path',
+      'bookmark_count',
+      'comment_count',
+      'seenUsers_count',
+      'updated_at',
+      'tag_names',
+      'comments',
+    ];
 
     // sort by score
     const query: SearchQuery = {
@@ -703,7 +784,11 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     query.size = size || DEFAULT_LIMIT;
   }
 
-  appendSortOrder(query: SearchQuery, sortAxis: SORT_AXIS, sortOrder: SORT_ORDER): void {
+  appendSortOrder(
+    query: SearchQuery,
+    sortAxis: SORT_AXIS,
+    sortOrder: SORT_ORDER,
+  ): void {
     if (query.body == null) {
       throw new Error('query.body is not initialized');
     }
@@ -715,7 +800,6 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     query.body.sort = {
       [sort]: { order },
     };
-
   }
 
   initializeBoolQuery(query: SearchQuery): SearchQuery {
@@ -724,7 +808,9 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
       throw new Error('query.body.query.bool is not initialized');
     }
 
-    const isInitialized = (query) => { return !!query && Array.isArray(query) };
+    const isInitialized = (query) => {
+      return !!query && Array.isArray(query);
+    };
 
     if (!isInitialized(query.body.query.bool.filter)) {
       query.body.query.bool.filter = [];
@@ -738,22 +824,34 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     return query;
   }
 
-  appendCriteriaForQueryString(query: SearchQuery, parsedKeywords: ESQueryTerms): void {
+  appendCriteriaForQueryString(
+    query: SearchQuery,
+    parsedKeywords: ESQueryTerms,
+  ): void {
     query = this.initializeBoolQuery(query); // eslint-disable-line no-param-reassign
 
     if (query.body?.query?.bool == null) {
       throw new Error('query.body.query.bool is not initialized');
     }
 
-    if (query.body?.query?.bool.must == null || !Array.isArray(query.body?.query?.bool.must)) {
+    if (
+      query.body?.query?.bool.must == null ||
+      !Array.isArray(query.body?.query?.bool.must)
+    ) {
       throw new Error('query.body.query.bool.must is not initialized');
     }
 
-    if (query.body?.query?.bool.must_not == null || !Array.isArray(query.body?.query?.bool.must_not)) {
+    if (
+      query.body?.query?.bool.must_not == null ||
+      !Array.isArray(query.body?.query?.bool.must_not)
+    ) {
       throw new Error('query.body.query.bool.must_not is not initialized');
     }
 
-    if (query.body?.query?.bool.filter == null || !Array.isArray(query.body?.query?.bool.filter)) {
+    if (
+      query.body?.query?.bool.filter == null ||
+      !Array.isArray(query.body?.query?.bool.filter)
+    ) {
       throw new Error('query.body.query.bool.filter is not initialized');
     }
 
@@ -762,7 +860,14 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
         multi_match: {
           query: parsedKeywords.match.join(' '),
           type: 'most_fields' as const,
-          fields: ['path.ja^2', 'path.en^2', 'body.ja', 'body.en', 'comments.ja', 'comments.en'],
+          fields: [
+            'path.ja^2',
+            'path.en^2',
+            'body.ja',
+            'body.en',
+            'comments.ja',
+            'comments.en',
+          ],
         },
       };
       query.body.query.bool.must.push(q);
@@ -772,7 +877,14 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
       const q = {
         multi_match: {
           query: parsedKeywords.not_match.join(' '),
-          fields: ['path.ja', 'path.en', 'body.ja', 'body.en', 'comments.ja', 'comments.en'],
+          fields: [
+            'path.ja',
+            'path.en',
+            'body.ja',
+            'body.en',
+            'comments.ja',
+            'comments.en',
+          ],
           operator: 'or' as const,
         },
       };
@@ -843,32 +955,39 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     }
   }
 
-  async filterPagesByViewer(query: SearchQuery, user, userGroups): Promise<void> {
-    const showPagesRestrictedByOwner = !configManager.getConfig('security:list-policy:hideRestrictedByOwner');
-    const showPagesRestrictedByGroup = !configManager.getConfig('security:list-policy:hideRestrictedByGroup');
+  async filterPagesByViewer(
+    query: SearchQuery,
+    user,
+    userGroups,
+  ): Promise<void> {
+    const showPagesRestrictedByOwner = !configManager.getConfig(
+      'security:list-policy:hideRestrictedByOwner',
+    );
+    const showPagesRestrictedByGroup = !configManager.getConfig(
+      'security:list-policy:hideRestrictedByGroup',
+    );
 
     query = this.initializeBoolQuery(query); // eslint-disable-line no-param-reassign
 
-    if (query.body?.query?.bool?.filter == null || !Array.isArray(query.body?.query?.bool?.filter)) {
+    if (
+      query.body?.query?.bool?.filter == null ||
+      !Array.isArray(query.body?.query?.bool?.filter)
+    ) {
       throw new Error('query.body.query.bool is not initialized');
     }
 
     const Page = this.getPageModel();
-    const {
-      GRANT_PUBLIC, GRANT_SPECIFIED, GRANT_OWNER, GRANT_USER_GROUP,
-    } = Page;
+    const { GRANT_PUBLIC, GRANT_SPECIFIED, GRANT_OWNER, GRANT_USER_GROUP } =
+      Page;
 
-    const grantConditions: any[] = [
-      { term: { grant: GRANT_PUBLIC } },
-    ];
+    const grantConditions: any[] = [{ term: { grant: GRANT_PUBLIC } }];
 
     if (showPagesRestrictedByOwner) {
       grantConditions.push(
         { term: { grant: GRANT_SPECIFIED } },
         { term: { grant: GRANT_OWNER } },
       );
-    }
-    else if (user != null) {
+    } else if (user != null) {
       grantConditions.push(
         {
           bool: {
@@ -890,22 +1009,19 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     }
 
     if (showPagesRestrictedByGroup) {
-      grantConditions.push(
-        { term: { grant: GRANT_USER_GROUP } },
-      );
-    }
-    else if (userGroups != null && userGroups.length > 0) {
-      const userGroupIds = userGroups.map((group) => { return group._id.toString() });
-      grantConditions.push(
-        {
-          bool: {
-            must: [
-              { term: { grant: GRANT_USER_GROUP } },
-              { terms: { granted_groups: userGroupIds } },
-            ],
-          },
+      grantConditions.push({ term: { grant: GRANT_USER_GROUP } });
+    } else if (userGroups != null && userGroups.length > 0) {
+      const userGroupIds = userGroups.map((group) => {
+        return group._id.toString();
+      });
+      grantConditions.push({
+        bool: {
+          must: [
+            { term: { grant: GRANT_USER_GROUP } },
+            { terms: { granted_groups: userGroupIds } },
+          ],
         },
-      );
+      });
     }
 
     query.body.query.bool.filter.push({ bool: { should: grantConditions } });
@@ -913,7 +1029,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
 
   async appendFunctionScore(query, queryString): Promise<void> {
     const User = this.getUserModel();
-    const count = await User.count({}) || 1;
+    const count = (await User.count({})) || 1;
 
     const minScore = queryString.length * 0.1 - 1; // increase with length
     logger.debug('min_score: ', minScore);
@@ -958,7 +1074,12 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     };
   }
 
-  async search(data: SearchableData<ESQueryTerms>, user, userGroups, option?): Promise<ISearchResult<ISearchResultData>> {
+  async search(
+    data: SearchableData<ESQueryTerms>,
+    user,
+    userGroups,
+    option?,
+  ): Promise<ISearchResult<ISearchResultData>> {
     const { queryString, terms } = data;
 
     if (terms == null) {
@@ -976,7 +1097,6 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
     await this.filterPagesByViewer(query, user, userGroups);
     await this.appendFunctionScore(query, queryString);
 
-
     this.appendResultSize(query, from, size);
 
     this.appendSortOrder(query, sort, order);
@@ -989,7 +1109,12 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
   isTermsNormalized(terms: Partial<QueryTerms>): terms is ESQueryTerms {
     const entries = Object.entries(terms);
 
-    return !entries.some(([key, val]) => !AVAILABLE_KEYS.includes(key) && typeof val?.length === 'number' && val.length > 0);
+    return !entries.some(
+      ([key, val]) =>
+        !AVAILABLE_KEYS.includes(key) &&
+        typeof val?.length === 'number' &&
+        val.length > 0,
+    );
   }
 
   validateTerms(terms: QueryTerms): UnavailableTermsKey<ESTermsKey>[] {
@@ -1014,8 +1139,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
       if (shoudDeletePages.length !== 0) {
         await this.deletePages(shoudDeletePages);
       }
-    }
-    catch (err) {
+    } catch (err) {
       logger.error('deletePages:ES Error', err);
     }
   }
@@ -1031,8 +1155,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
 
     try {
       return await this.deletePages(pages);
-    }
-    catch (err) {
+    } catch (err) {
       logger.error('deletePages:ES Error', err);
     }
   }
@@ -1042,8 +1165,7 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
 
     try {
       return await this.deletePages([page]);
-    }
-    catch (err) {
+    } catch (err) {
       logger.error('deletePages:ES Error', err);
     }
   }
@@ -1065,7 +1187,6 @@ class ElasticsearchDelegator implements SearchDelegator<Data, ESTermsKey, ESQuer
 
     return this.updateOrInsertPageById(page._id);
   }
-
 }
 
 export default ElasticsearchDelegator;
