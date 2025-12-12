@@ -43,6 +43,7 @@ module.exports = {
     'src/features/growi-plugin/**',
     'src/features/opentelemetry/**',
     'src/features/openai/**',
+    'src/features/ai-tools/**',
     'src/features/rate-limiter/**',
     'src/stores-universal/**',
     'src/interfaces/**',

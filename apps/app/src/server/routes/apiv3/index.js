@@ -1,3 +1,4 @@
+import { factory as aiToolsFactory } from '~/features/ai-tools/server/routes/';
 import growiPlugin from '~/features/growi-plugin/server/routes/apiv3/admin';
 import { factory as openaiRouteFactory } from '~/features/openai/server/routes';
 import { allreadyInstalledMiddleware } from '~/server/middlewares/application-not-installed';
@@ -128,6 +129,8 @@ module.exports = (crowi, app) => {
   router.use('/page-bulk-export', require('~/features/page-bulk-export/server/routes/apiv3/page-bulk-export')(crowi));
 
   router.use('/openai', openaiRouteFactory(crowi));
+
+  router.use('/ai-tools', aiToolsFactory(crowi));
 
   router.use('/user', userRouteFactory(crowi));
 
