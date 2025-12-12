@@ -30,8 +30,7 @@
       "!packages/pdf-converter-client/specs",
       "!apps/app/src/client",
       "!apps/app/src/server/middlewares",
-      "!apps/app/src/server/routes/apiv3/*.js",
-      "!apps/app/src/server/service/page"
+      "!apps/app/src/server/routes/apiv3/*.js"
     ]
   },
   "formatter": {
