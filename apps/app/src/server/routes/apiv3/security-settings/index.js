@@ -32,6 +32,7 @@ const validator = {
       'Deny', 'Readonly',
     ]),
     body('pageCompleteDeletionAuthority').if(value => value != null).isString().isIn(Object.values(PageDeleteConfigValue)),
+    body('hideUserPages').if(value => value != null).isBoolean(),
     body('hideRestrictedByOwner').if(value => value != null).isBoolean(),
     body('hideRestrictedByGroup').if(value => value != null).isBoolean(),
     body('isUsersHomepageDeletionEnabled').if(value => value != null).isBoolean(),
@@ -139,6 +140,9 @@ const validator = {
  *          pageCompleteDeletionAuthority:
  *            type: string
  *            description: type of pageDeletionAuthority
+ *          hideUserPages:
+ *            type: boolean
+ *            description: hide all user pages from general users
  *          hideRestrictedByOwner:
  *            type: boolean
  *            description: enable hide by owner
@@ -467,6 +471,7 @@ module.exports = (crowi) => {
         pageRecursiveCompleteDeletionAuthority: await configManager.getConfig('security:pageRecursiveCompleteDeletionAuthority'),
         isAllGroupMembershipRequiredForPageCompleteDeletion:
         await configManager.getConfig('security:isAllGroupMembershipRequiredForPageCompleteDeletion'),
+        hideUserPages: await configManager.getConfig('security:user-pages:isHidden'),
         hideRestrictedByOwner: await configManager.getConfig('security:list-policy:hideRestrictedByOwner'),
         hideRestrictedByGroup: await configManager.getConfig('security:list-policy:hideRestrictedByGroup'),
         isUsersHomepageDeletionEnabled: await configManager.getConfig('security:user-homepage-deletion:isEnabled'),
@@ -747,6 +752,7 @@ module.exports = (crowi) => {
         'security:pageCompleteDeletionAuthority': req.body.pageCompleteDeletionAuthority,
         'security:pageRecursiveCompleteDeletionAuthority': req.body.pageRecursiveCompleteDeletionAuthority,
         'security:isAllGroupMembershipRequiredForPageCompleteDeletion': req.body.isAllGroupMembershipRequiredForPageCompleteDeletion,
+        'security:user-pages:isHidden': req.body.hideUserPages,
         'security:list-policy:hideRestrictedByOwner': req.body.hideRestrictedByOwner,
         'security:list-policy:hideRestrictedByGroup': req.body.hideRestrictedByGroup,
         'security:user-homepage-deletion:isEnabled': req.body.isUsersHomepageDeletionEnabled,
@@ -783,6 +789,7 @@ module.exports = (crowi) => {
           pageRecursiveCompleteDeletionAuthority: await configManager.getConfig('security:pageRecursiveCompleteDeletionAuthority'),
           isAllGroupMembershipRequiredForPageCompleteDeletion:
         await configManager.getConfig('security:isAllGroupMembershipRequiredForPageCompleteDeletion'),
+          hideUserPages: await configManager.getConfig('security:user-pages:isHidden'),
           hideRestrictedByOwner: await configManager.getConfig('security:list-policy:hideRestrictedByOwner'),
           hideRestrictedByGroup: await configManager.getConfig('security:list-policy:hideRestrictedByGroup'),
           isUsersHomepageDeletionEnabled: await configManager.getConfig('security:user-homepage-deletion:isEnabled'),
