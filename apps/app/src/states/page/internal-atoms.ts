@@ -8,7 +8,8 @@ import { atom } from 'jotai';
  */
 
 // Core page state atoms (internal)
-export const currentPageIdAtom = atom<string>();
+export const currentPageEntityIdAtom = atom<string>();
+export const currentPageEmptyIdAtom = atom<string>();
 export const currentPageDataAtom = atom<IPagePopulatedToShowRevision>();
 export const pageNotFoundAtom = atom(false);
 export const isIdenticalPathAtom = atom<boolean>(false);
@@ -46,7 +47,7 @@ const untitledPageStateAtom = atom<boolean>(false);
 // Derived atom for untitled page state with currentPageId dependency
 export const isUntitledPageAtom = atom(
   (get) => {
-    const currentPageId = get(currentPageIdAtom);
+    const currentPageId = get(currentPageEntityIdAtom);
     // If no current page ID exists, return false (no page loaded)
     if (currentPageId == null) {
       return false;
@@ -55,7 +56,7 @@ export const isUntitledPageAtom = atom(
     return get(untitledPageStateAtom);
   },
   (get, set, newValue: boolean) => {
-    const currentPageId = get(currentPageIdAtom);
+    const currentPageId = get(currentPageEntityIdAtom);
     // Only update state if current page ID exists
     if (currentPageId != null) {
       set(untitledPageStateAtom, newValue);
@@ -124,7 +125,8 @@ export const _atomsForDerivedAbilities = {
   currentPagePathAtom,
   isIdenticalPathAtom,
   shareLinkIdAtom,
-  currentPageIdAtom,
+  currentPageEntityIdAtom,
+  currentPageEmptyIdAtom,
   isTrashPageAtom,
 } as const;
 

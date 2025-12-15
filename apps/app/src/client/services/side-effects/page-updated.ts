@@ -45,7 +45,7 @@ export const usePageUpdatedEffect = (): void => {
 
       // !!CAUTION!! Timing of calling openPageStatusAlert may clash with components/PageEditor/conflict.tsx
       if (isRevisionOutdated && editorMode === EditorMode.View) {
-        openPageStatusAlert({ hideEditorMode: EditorMode.Editor, onRefleshPage: fetchCurrentPage });
+        openPageStatusAlert({ hideEditorMode: EditorMode.Editor, onRefleshPage: () => fetchCurrentPage({ force: true }) });
       }
 
       // Clear cache

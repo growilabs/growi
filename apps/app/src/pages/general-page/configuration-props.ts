@@ -102,10 +102,9 @@ export const getServerSideGeneralPageProps: GetServerSideProps<
         isUploadAllFileAllowed: fileUploadService.getFileUploadEnabled(),
         isUploadEnabled: fileUploadService.getIsUploadable(),
 
-        // TODO: remove growiCloudUri condition when bulk export can be relased for GROWI.cloud (https://redmine.weseek.co.jp/issues/163220)
-        isBulkExportPagesEnabled:
-          configManager.getConfig('app:isBulkExportPagesEnabled') &&
-          configManager.getConfig('app:growiCloudUri') == null,
+        isBulkExportPagesEnabled: configManager.getConfig(
+          'app:isBulkExportPagesEnabled',
+        ),
         isPdfBulkExportEnabled:
           configManager.getConfig('app:pageBulkExportPdfConverterUri') != null,
         isLocalAccountRegistrationEnabled:

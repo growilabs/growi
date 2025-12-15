@@ -53,7 +53,7 @@
     - **3d. API通信**: `apiv3Get('/page', ...)` を実行してサーバーから新しいページデータを取得します。パラメータには、パス、ページID、リビジョンIDなどが含まれます。
 4.  **アトミックな状態更新**:
     - **API成功時**:
-        - 関連する **すべてのatomを一度に更新** します (`currentPageDataAtom`, `currentPageIdAtom`, `pageNotFoundAtom`, `pageLoadingAtom` など)。
+        - 関連する **すべてのatomを一度に更新** します (`currentPageDataAtom`, `currentPageEntityIdAtom`, `currentPageEmptyIdAtom`, `pageNotFoundAtom`, `pageLoadingAtom` など)。
         - これにより、中間的な状態（`pageId`が`undefined`になるなど）が発生することなく、データが完全に揃った状態で一度だけ状態が更新されます。
     - **APIエラー時 (例: 404 Not Found)**:
         - `pageErrorAtom` にエラーオブジェクトを設定します。

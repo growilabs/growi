@@ -11,6 +11,7 @@ import { useUpdateStateAfterSave } from '~/client/services/page-operation';
 import { apiPost } from '~/client/util/apiv1-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useTagEditModalStatus, useTagEditModalActions, type TagEditModalStatus } from '~/states/ui/modal/tag-edit';
+import { useSWRxTagsInfo } from '~/stores/page';
 
 import { TagsInput } from './TagsInput';
 
@@ -28,8 +29,8 @@ const TagEditModalSubstance: React.FC<TagEditModalSubstanceProps> = (props: TagE
   const pageId = tagEditModalData.pageId;
   const revisionId = tagEditModalData.revisionId;
   const updateStateAfterSave = useUpdateStateAfterSave(pageId);
-
-  const [tags, setTags] = useState<string[]>([]);
+  const { mutate: mutateTags } = useSWRxTagsInfo(pageId);
+  const [tags, setTags] = useState<string[]>(initTags ?? []);
 
   // use to take initTags when redirect to other page
   useEffect(() => {
@@ -46,6 +47,7 @@ const TagEditModalSubstance: React.FC<TagEditModalSubstanceProps> = (props: TagE
   const handleSubmit = useCallback(async() => {
     try {
       await apiPost('/tags.update', updateTagsData);
+      mutateTags();
       updateStateAfterSave?.();
 
       toastSuccess('updated tags successfully');
@@ -54,7 +56,7 @@ const TagEditModalSubstance: React.FC<TagEditModalSubstanceProps> = (props: TagE
     catch (err) {
       toastError(err);
     }
-  }, [closeTagEditModal, updateTagsData, updateStateAfterSave]);
+  }, [updateTagsData, mutateTags, updateStateAfterSave, closeTagEditModal]);
 
   // Memoized tags update handler
   const handleTagsUpdate = useCallback((newTags: string[]) => {
@@ -67,7 +69,7 @@ const TagEditModalSubstance: React.FC<TagEditModalSubstanceProps> = (props: TagE
         {t('tag_edit_modal.edit_tags')}
       </ModalHeader>
       <ModalBody>
-        <TagsInput tags={initTags} onTagsUpdated={handleTagsUpdate} autoFocus />
+        <TagsInput tags={tags} onTagsUpdated={handleTagsUpdate} autoFocus />
       </ModalBody>
       <ModalFooter>
         <button type="button" data-testid="tag-edit-done-btn" className="btn btn-primary" onClick={handleSubmit}>

@@ -1,5 +1,6 @@
 import { type JSX, memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import { isDeepEquals } from '@growi/core/dist/utils/is-deep-equals';
 import { isUsersHomepage } from '@growi/core/dist/utils/page-path-utils';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 
@@ -85,9 +86,13 @@ type Props = {
   className?: string;
 };
 
-export const PageView = memo((props: Props): JSX.Element => {
-  const renderStartTime = performance.now();
+// Custom comparison function for memo to prevent unnecessary re-renders
+const arePropsEqual = (prevProps: Props, nextProps: Props): boolean =>
+  prevProps.pagePath === nextProps.pagePath &&
+  prevProps.className === nextProps.className &&
+  isDeepEquals(prevProps.rendererConfig, nextProps.rendererConfig);
 
+const PageViewComponent = (props: Props): JSX.Element => {
   const commentsContainerRef = useRef<HTMLDivElement>(null);
 
   const { pagePath, rendererConfig, className } = props;
@@ -100,15 +105,6 @@ export const PageView = memo((props: Props): JSX.Element => {
 
   const page = useCurrentPageData();
   const { data: viewOptions } = useViewOptions();
-
-  // DEBUG: Log PageView render start
-  console.log('[PAGEVIEW-DEBUG] PageView render started:', {
-    pagePath,
-    currentPageId,
-    pageId: page?._id,
-    timestamp: new Date().toISOString(),
-    renderStartTime,
-  });
 
   const isNotFound = isNotFoundMeta || page == null;
   const isUsersHomepagePath = isUsersHomepage(pagePath);
@@ -123,23 +119,13 @@ export const PageView = memo((props: Props): JSX.Element => {
 
   // ***************************  Auto Scroll  ***************************
   useEffect(() => {
-    const scrollEffectStartTime = performance.now();
-    console.log('[PAGEVIEW-DEBUG] Auto scroll effect triggered:', {
-      currentPageId,
-      hash: window.location.hash,
-      timestamp: new Date().toISOString(),
-      effectStartTime: scrollEffectStartTime,
-    });
-
     if (currentPageId == null) {
-      console.log('[PAGEVIEW-DEBUG] Auto scroll skipped - no currentPageId');
       return;
     }
 
     // do nothing if hash is empty
     const { hash } = window.location;
     if (hash.length === 0) {
-      console.log('[PAGEVIEW-DEBUG] Auto scroll skipped - no hash');
       return;
     }
 
@@ -204,31 +190,13 @@ export const PageView = memo((props: Props): JSX.Element => {
     ) : null;
 
   const Contents = useCallback(() => {
-    const contentsRenderStartTime = performance.now();
-    console.log('[PAGEVIEW-DEBUG] Contents component render started:', {
-      isNotFound,
-      hasPage: page != null,
-      hasRevision: page?.revision != null,
-      pageId: page?._id,
-      timestamp: new Date().toISOString(),
-      contentsRenderStartTime,
-    });
-
     if (isNotFound || page?.revision == null) {
-      console.log('[PAGEVIEW-DEBUG] Rendering NotFoundPage');
       return <NotFoundPage path={pagePath} />;
     }
 
     const markdown = page.revision.body;
     const rendererOptions =
       viewOptions ?? generateSSRViewOptions(rendererConfig, pagePath);
-
-    console.log('[PAGEVIEW-DEBUG] Rendering page content:', {
-      markdownLength: markdown?.length,
-      hasViewOptions: viewOptions != null,
-      isSlide: isSlide != null,
-      renderDuration: performance.now() - contentsRenderStartTime,
-    });
 
     return (
       <>
@@ -268,16 +236,6 @@ export const PageView = memo((props: Props): JSX.Element => {
     page,
   ]);
 
-  // DEBUG: Log final render completion time
-  const renderEndTime = performance.now();
-  console.log('[PAGEVIEW-DEBUG] PageView render completed:', {
-    pagePath,
-    currentPageId,
-    pageId: page?._id,
-    totalRenderDuration: renderEndTime - renderStartTime,
-    timestamp: new Date().toISOString(),
-  });
-
   return (
     <PageViewLayout
       className={className}
@@ -301,4 +259,7 @@ export const PageView = memo((props: Props): JSX.Element => {
       )}
     </PageViewLayout>
   );
-});
+};
+
+export const PageView = memo(PageViewComponent, arePropsEqual);
+PageView.displayName = 'PageView';

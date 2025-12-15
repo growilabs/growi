@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 
 import {
-  type IPageInfoExt, isIPageInfoForOperation,
+  type IPageInfoExt, isIPageInfoForOperation, isIPageInfoForEmpty,
 } from '@growi/core/dist/interfaces';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
@@ -58,6 +58,7 @@ type CommonProps = {
 type DropdownMenuProps = CommonProps & {
   pageId: string,
   isLoading?: boolean,
+  isDataUnavailable?: boolean,
   operationProcessData?: IPageOperationProcessData,
 }
 
@@ -65,7 +66,7 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
   const { t } = useTranslation('');
 
   const {
-    pageId, isLoading, pageInfo, isEnableActions, isReadOnlyUser, forceHideMenuItems, operationProcessData,
+    pageId, isLoading, isDataUnavailable, pageInfo, isEnableActions, isReadOnlyUser, forceHideMenuItems, operationProcessData,
     onClickBookmarkMenuItem, onClickRenameMenuItem, onClickDuplicateMenuItem, onClickDeleteMenuItem,
     onClickRevertMenuItem, onClickPathRecoveryMenuItem,
     additionalMenuItemOnTopRenderer: AdditionalMenuItemsOnTop,
@@ -75,21 +76,24 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const bookmarkItemClickedHandler = useCallback(async() => {
-    if (!isIPageInfoForOperation(pageInfo) || onClickBookmarkMenuItem == null) {
+    if (onClickBookmarkMenuItem == null) return;
+
+    if (!isIPageInfoForEmpty(pageInfo) && !isIPageInfoForOperation(pageInfo)) {
       return;
     }
+
     await onClickBookmarkMenuItem(pageId, !pageInfo.isBookmarked);
   }, [onClickBookmarkMenuItem, pageId, pageInfo]);
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const renameItemClickedHandler = useCallback(async() => {
-    if (onClickRenameMenuItem == null) {
-      return;
-    }
-    if (!isIPageInfoForOperation(pageInfo) || !pageInfo?.isMovable) {
+    if (onClickRenameMenuItem == null) return;
+
+    if (!(isIPageInfoForEmpty(pageInfo) || isIPageInfoForOperation(pageInfo)) || !pageInfo?.isMovable) {
       logger.warn('This page could not be renamed.');
       return;
     }
+
     await onClickRenameMenuItem(pageId, pageInfo);
   }, [onClickRenameMenuItem, pageId, pageInfo]);
 
@@ -110,10 +114,9 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const deleteItemClickedHandler = useCallback(async() => {
-    if (pageInfo == null || onClickDeleteMenuItem == null) {
-      return;
-    }
-    if (!isIPageInfoForOperation(pageInfo) || !pageInfo?.isDeletable) {
+    if (onClickDeleteMenuItem == null) return;
+
+    if (!(isIPageInfoForEmpty(pageInfo) || isIPageInfoForOperation(pageInfo)) || !pageInfo?.isDeletable) {
       logger.warn('This page could not be deleted.');
       return;
     }
@@ -130,7 +133,15 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
 
   let contents = <></>;
 
-  if (isLoading) {
+  if (isDataUnavailable) {
+    // Show message when data is not available (e.g., fetch error)
+    contents = (
+      <div className="text-warning text-center px-3">
+        <span className="material-symbols-outlined">error_outline</span> No data available
+      </div>
+    );
+  }
+  else if (isLoading) {
     contents = (
       <div className="text-muted text-center my-2">
         <LoadingSpinner />
@@ -164,7 +175,7 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
         ) }
 
         {/* Bookmark */}
-        { !forceHideMenuItems?.includes(MenuItemType.BOOKMARK) && isEnableActions && isIPageInfoForOperation(pageInfo) && (
+        { !forceHideMenuItems?.includes(MenuItemType.BOOKMARK) && isEnableActions && (isIPageInfoForEmpty(pageInfo) || isIPageInfoForOperation(pageInfo)) && (
           <DropdownItem
             onClick={bookmarkItemClickedHandler}
             className="grw-page-control-dropdown-item"
@@ -177,7 +188,8 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
 
         {/* Move/Rename */}
         { !forceHideMenuItems?.includes(MenuItemType.RENAME) && isEnableActions && !isReadOnlyUser
-          && isIPageInfoForOperation(pageInfo) && pageInfo.isMovable && (
+          && (isIPageInfoForEmpty(pageInfo) || isIPageInfoForOperation(pageInfo))
+          && pageInfo.isMovable && (
           <DropdownItem
             onClick={renameItemClickedHandler}
             data-testid="rename-page-btn"
@@ -202,7 +214,8 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
 
         {/* Revert */}
         { !forceHideMenuItems?.includes(MenuItemType.REVERT) && isEnableActions && !isReadOnlyUser
-          && isIPageInfoForOperation(pageInfo) && pageInfo.isRevertible && (
+          && (isIPageInfoForEmpty(pageInfo) || isIPageInfoForOperation(pageInfo))
+          && pageInfo.isRevertible && (
           <DropdownItem
             onClick={revertItemClickedHandler}
             className="grw-page-control-dropdown-item"
@@ -233,7 +246,8 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
         {/* divider */}
         {/* Delete */}
         { !forceHideMenuItems?.includes(MenuItemType.DELETE) && isEnableActions && !isReadOnlyUser
-          && isIPageInfoForOperation(pageInfo) && pageInfo.isDeletable && (
+          && (isIPageInfoForEmpty(pageInfo) || isIPageInfoForOperation(pageInfo))
+          && pageInfo.isDeletable && (
           <>
             { showDeviderBeforeDelete && <DropdownItem divider /> }
             <DropdownItem
@@ -284,7 +298,7 @@ export const PageItemControlSubstance = (props: PageItemControlSubstanceProps): 
   const [isOpen, setIsOpen] = useState(false);
   const [shouldFetch, setShouldFetch] = useState(false);
 
-  const { data: fetchedPageInfo, mutate: mutatePageInfo } = useSWRxPageInfo(shouldFetch ? pageId : null);
+  const { data: fetchedPageInfo, error: fetchError, mutate: mutatePageInfo } = useSWRxPageInfo(shouldFetch ? pageId : null);
 
   // update shouldFetch (and will never be false)
   useEffect(() => {
@@ -307,7 +321,9 @@ export const PageItemControlSubstance = (props: PageItemControlSubstanceProps): 
     }
   }, [mutatePageInfo, onClickBookmarkMenuItem, shouldFetch]);
 
-  const isLoading = shouldFetch && fetchedPageInfo == null;
+  // isLoading should be true only when fetching is in progress (data and error are both undefined)
+  const isLoading = shouldFetch && fetchedPageInfo == null && fetchError == null;
+  const isDataUnavailable = !isLoading && fetchedPageInfo == null && presetPageInfo == null;
 
   const renameMenuItemClickHandler = useCallback(async() => {
     if (onClickRenameMenuItem == null) {
@@ -350,6 +366,7 @@ export const PageItemControlSubstance = (props: PageItemControlSubstanceProps): 
           <PageItemControlDropdownMenu
             {...props}
             isLoading={isLoading}
+            isDataUnavailable={isDataUnavailable}
             pageInfo={fetchedPageInfo ?? presetPageInfo}
             onClickBookmarkMenuItem={bookmarkMenuItemClickHandler}
             onClickRenameMenuItem={renameMenuItemClickHandler}

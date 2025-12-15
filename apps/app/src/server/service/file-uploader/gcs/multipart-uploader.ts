@@ -6,14 +6,22 @@ import urljoin from 'url-join';
 import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../../config-manager';
-import { MultipartUploader, UploadStatus, type IMultipartUploader } from '../multipart-uploader';
+import {
+  type IMultipartUploader,
+  MultipartUploader,
+  UploadStatus,
+} from '../multipart-uploader';
 
-const logger = loggerFactory('growi:services:fileUploaderGcs:multipartUploader');
+const logger = loggerFactory(
+  'growi:services:fileUploaderGcs:multipartUploader',
+);
 
-export type IGcsMultipartUploader = IMultipartUploader
+export type IGcsMultipartUploader = IMultipartUploader;
 
-export class GcsMultipartUploader extends MultipartUploader implements IGcsMultipartUploader {
-
+export class GcsMultipartUploader
+  extends MultipartUploader
+  implements IGcsMultipartUploader
+{
   private file: File;
 
   // ref: https://cloud.google.com/storage/docs/performing-resumable-uploads?hl=en#chunked-upload
@@ -43,16 +51,20 @@ export class GcsMultipartUploader extends MultipartUploader implements IGcsMulti
     // Upload the whole part in one request, or divide it in chunks and upload depending on the part size
     if (part.length === this.maxPartSize) {
       await this.uploadChunk(part);
-    }
-    else if (this.minPartSize < part.length && part.length < this.maxPartSize) {
+    } else if (
+      this.minPartSize < part.length &&
+      part.length < this.maxPartSize
+    ) {
       const numOfMinPartSize = Math.floor(part.length / this.minPartSize);
-      const minPartSizeMultiplePartChunk = part.slice(0, numOfMinPartSize * this.minPartSize);
+      const minPartSizeMultiplePartChunk = part.slice(
+        0,
+        numOfMinPartSize * this.minPartSize,
+      );
       const lastPartChunk = part.slice(numOfMinPartSize * this.minPartSize);
 
       await this.uploadChunk(minPartSizeMultiplePartChunk);
       await this.uploadChunk(lastPartChunk, true);
-    }
-    else if (part.length < this.minPartSize) {
+    } else if (part.length < this.minPartSize) {
       await this.uploadChunk(part, true);
     }
   }
@@ -75,8 +87,7 @@ export class GcsMultipartUploader extends MultipartUploader implements IGcsMulti
 
     try {
       await axios.delete(this.uploadId);
-    }
-    catch (e) {
+    } catch (e) {
       // 499 is successful response code for canceling upload
       // ref: https://cloud.google.com/storage/docs/performing-resumable-uploads#cancel-upload
       if (e.response?.status !== 499) {
@@ -95,10 +106,14 @@ export class GcsMultipartUploader extends MultipartUploader implements IGcsMulti
     return this._uploadedFileSize;
   }
 
-  private uploadChunk = async(chunk, isLastUpload = false) => {
+  private uploadChunk = async (chunk, isLastUpload = false) => {
     // If chunk size is larger than the minimal part size, it is required to be a multiple of the minimal part size
     // ref: https://cloud.google.com/storage/docs/performing-resumable-uploads?hl=en#chunked-upload
-    if (chunk.length > this.minPartSize && chunk.length % this.minPartSize !== 0) throw Error(`chunk must be a multiple of ${this.minPartSize}`);
+    if (
+      chunk.length > this.minPartSize &&
+      chunk.length % this.minPartSize !== 0
+    )
+      throw Error(`chunk must be a multiple of ${this.minPartSize}`);
 
     const range = isLastUpload
       ? `bytes ${this._uploadedFileSize}-${this._uploadedFileSize + chunk.length - 1}/${this._uploadedFileSize + chunk.length}`
@@ -110,13 +125,11 @@ export class GcsMultipartUploader extends MultipartUploader implements IGcsMulti
           'Content-Range': `${range}`,
         },
       });
-    }
-    catch (e) {
+    } catch (e) {
       if (e.response?.status !== 308) {
         throw e;
       }
     }
     this._uploadedFileSize += chunk.length;
   };
-
 }

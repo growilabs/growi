@@ -10,7 +10,8 @@ import { useIsGuestUser, useIsReadOnlyUser } from '../context';
 import { useCurrentPathname } from '../global';
 import {
   currentPageDataAtom,
-  currentPageIdAtom,
+  currentPageEmptyIdAtom,
+  currentPageEntityIdAtom,
   currentPagePathAtom,
   isForbiddenAtom,
   isIdenticalPathAtom,
@@ -33,11 +34,21 @@ import {
  */
 
 // Read-only hooks for page state
-export const useCurrentPageId = () => useAtomValue(currentPageIdAtom);
+export const useCurrentPageId = (includeEmpty: boolean = false) => {
+  const entityPageId = useAtomValue(currentPageEntityIdAtom);
+  const emptyPageId = useAtomValue(currentPageEmptyIdAtom);
+
+  return includeEmpty ? (entityPageId ?? emptyPageId) : entityPageId;
+};
 
 export const useCurrentPageData = () => useAtomValue(currentPageDataAtom);
 
-export const usePageNotFound = () => useAtomValue(pageNotFoundAtom);
+export const usePageNotFound = (includeEmpty: boolean = true) => {
+  const isPageNotFound = useAtomValue(pageNotFoundAtom);
+  const emptyPageId = useAtomValue(currentPageEmptyIdAtom);
+
+  return includeEmpty ? isPageNotFound || emptyPageId != null : isPageNotFound;
+};
 
 export const useIsIdenticalPath = () => useAtomValue(isIdenticalPathAtom);
 

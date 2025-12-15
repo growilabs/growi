@@ -1,6 +1,6 @@
-import type { IPageInfo, IPageInfoForListing, IUserHasId } from '@growi/core';
+import type { IPageInfoForListing, IUserHasId } from '@growi/core';
 import { getIdForRef, isIPageInfoForEntity } from '@growi/core';
-import { SCOPE } from '@growi/core/dist/interfaces';
+import { type IPageInfoForEmpty, SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, Router } from 'express';
 import express from 'express';
@@ -214,7 +214,7 @@ const routerFactory = (crowi: Crowi): Router => {
    *             schema:
    *               type: object
    *               additionalProperties:
-   *                 $ref: '#/components/schemas/PageInfoAll'
+   *                 $ref: '#/components/schemas/PageInfoExt'
    */
   router.get(
     '/info',
@@ -236,12 +236,10 @@ const routerFactory = (crowi: Crowi): Router => {
       const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
         'Page',
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // biome-ignore lint/suspicious/noExplicitAny: ignore
       const Bookmark = mongoose.model<any, any>('Bookmark');
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const pageService = crowi.pageService;
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const pageGrantService: IPageGrantService = crowi.pageGrantService!;
+      const pageGrantService: IPageGrantService = crowi.pageGrantService;
 
       try {
         const pages =
@@ -277,8 +275,10 @@ const routerFactory = (crowi: Crowi): Router => {
           )) as Record<string, number>;
         }
 
-        const idToPageInfoMap: Record<string, IPageInfo | IPageInfoForListing> =
-          {};
+        const idToPageInfoMap: Record<
+          string,
+          IPageInfoForEmpty | IPageInfoForListing
+        > = {};
 
         const isGuestUser = req.user == null;
 
@@ -287,16 +287,14 @@ const routerFactory = (crowi: Crowi): Router => {
         );
 
         for (const page of pages) {
-          const basicPageInfo = {
-            ...pageService.constructBasicPageInfo(page, isGuestUser),
-            bookmarkCount:
-              bookmarkCountMap != null
-                ? (bookmarkCountMap[page._id.toString()] ?? 0)
-                : 0,
-          };
-
           // TODO: use pageService.getCreatorIdForCanDelete to get creatorId (https://redmine.weseek.co.jp/issues/140574)
-          const canDeleteCompletely = pageService.canDeleteCompletely(
+          const isDeletable = pageService.canDelete(
+            page,
+            page.creator == null ? null : getIdForRef(page.creator),
+            req.user,
+            false,
+          );
+          const isAbleToDeleteCompletely = pageService.canDeleteCompletely(
             page,
             page.creator == null ? null : getIdForRef(page.creator),
             req.user,
@@ -304,11 +302,20 @@ const routerFactory = (crowi: Crowi): Router => {
             userRelatedGroups,
           ); // use normal delete config
 
+          const basicPageInfo = {
+            ...pageService.constructBasicPageInfo(page, isGuestUser),
+            isDeletable,
+            isAbleToDeleteCompletely,
+            bookmarkCount:
+              bookmarkCountMap != null
+                ? (bookmarkCountMap[page._id.toString()] ?? 0)
+                : 0,
+          };
+
           const pageInfo = !isIPageInfoForEntity(basicPageInfo)
-            ? basicPageInfo
+            ? (basicPageInfo satisfies IPageInfoForEmpty)
             : ({
                 ...basicPageInfo,
-                isAbleToDeleteCompletely: canDeleteCompletely,
                 revisionShortBody:
                   shortBodiesMap != null
                     ? (shortBodiesMap[page._id.toString()] ?? undefined)
@@ -323,6 +330,83 @@ const routerFactory = (crowi: Crowi): Router => {
         logger.error('Error occurred while fetching page informations.', err);
         return res.apiv3Err(
           new ErrorV3('Error occurred while fetching page informations.'),
+        );
+      }
+    },
+  );
+
+  /**
+   * @swagger
+   *
+   * /page-listing/item:
+   *   get:
+   *     tags: [PageListing]
+   *     security:
+   *       - bearer: []
+   *       - accessTokenInQuery: []
+   *     summary: /page-listing/item
+   *     description: Get a single page item for tree display
+   *     parameters:
+   *       - name: id
+   *         in: query
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Page item data
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 item:
+   *                   $ref: '#/components/schemas/PageForTreeItem'
+   */
+  router.get(
+    '/item',
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    loginRequired,
+    validator.pageIdOrPathRequired,
+    apiV3FormValidator,
+    async (req: AuthorizedRequest, res: ApiV3Response) => {
+      const { id } = req.query;
+
+      if (id == null) {
+        return res.apiv3Err(new ErrorV3('id parameter is required'));
+      }
+
+      try {
+        const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
+          'Page',
+        );
+        const page = await Page.findByIdAndViewer(
+          id as string,
+          req.user,
+          null,
+          true,
+        );
+
+        if (page == null) {
+          return res.apiv3Err(new ErrorV3('Page not found'), 404);
+        }
+
+        const item: IPageForTreeItem = {
+          _id: page._id.toString(),
+          path: page.path,
+          parent: page.parent,
+          revision: page.revision, // required to create an IPageToDeleteWithMeta instance
+          descendantCount: page.descendantCount,
+          grant: page.grant,
+          isEmpty: page.isEmpty,
+          wip: page.wip ?? false,
+        };
+
+        return res.apiv3({ item });
+      } catch (err) {
+        logger.error('Error occurred while fetching page item.', err);
+        return res.apiv3Err(
+          new ErrorV3('Error occurred while fetching page item.'),
         );
       }
     },

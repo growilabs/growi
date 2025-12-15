@@ -3,8 +3,7 @@ export const NotifyType = {
   SLACK: 'slack',
 } as const;
 
-export type NotifyType = typeof NotifyType[keyof typeof NotifyType]
-
+export type NotifyType = (typeof NotifyType)[keyof typeof NotifyType];
 
 export const TriggerEventType = {
   CREATE: 'pageCreate',
@@ -15,13 +14,13 @@ export const TriggerEventType = {
   POST: 'comment',
 } as const;
 
-type TriggerEventType = typeof TriggerEventType[keyof typeof TriggerEventType]
-
+type TriggerEventType =
+  (typeof TriggerEventType)[keyof typeof TriggerEventType];
 
 export type IGlobalNotification = {
-  triggerPath: string,
-  notifyType: NotifyType,
-  emailToSend: string,
-  slackChannelToSend: string,
-  triggerEvents: TriggerEventType[],
+  triggerPath: string;
+  notifyType: NotifyType;
+  emailToSend: string;
+  slackChannelToSend: string;
+  triggerEvents: TriggerEventType[];
 };

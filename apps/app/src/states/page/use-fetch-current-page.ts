@@ -1,8 +1,10 @@
 import { useCallback } from 'react';
 import {
+  type IPageNotFoundInfo,
   type IPagePopulatedToShowRevision,
+  isIPageInfoForEmpty,
   isIPageNotFoundInfo,
-} from '@growi/core';
+} from '@growi/core/dist/interfaces';
 import { isErrorV3 } from '@growi/core/dist/models';
 import { isClient } from '@growi/core/dist/utils';
 import { isPermalink } from '@growi/core/dist/utils/page-path-utils';
@@ -16,7 +18,8 @@ import loggerFactory from '~/utils/logger';
 
 import {
   currentPageDataAtom,
-  currentPageIdAtom,
+  currentPageEmptyIdAtom,
+  currentPageEntityIdAtom,
   isForbiddenAtom,
   pageErrorAtom,
   pageLoadingAtom,
@@ -35,27 +38,30 @@ type FetchPageArgs = {
   force?: true;
 };
 
+type FetchedPageResult =
+  | { page: IPagePopulatedToShowRevision; meta: unknown }
+  | { page: null; meta: IPageNotFoundInfo };
+
 /**
  * Process path to handle URL decoding and hash fragment removal
+ *
+ * Note: new URL().pathname re-encodes the path, so we decode it at the end
+ * to ensure the final result is always decoded (e.g., "/path/にほんご")
  */
 const decodeAndRemoveFragment = (pathname?: string): string | undefined => {
   if (pathname == null) return;
 
-  // Decode path
-  let decodedPathname: string;
   try {
-    decodedPathname = decodeURIComponent(pathname);
-  } catch {
-    decodedPathname = pathname;
-  }
-
-  // Strip hash fragment from path to properly detect permalinks
-  try {
-    const url = new URL(decodedPathname, 'http://example.com');
-    return url.pathname;
+    const url = new URL(pathname, 'http://example.com');
+    return decodeURIComponent(url.pathname);
   } catch {
     // Fallback to simple split if URL parsing fails
-    return decodedPathname.split('#')[0];
+    const pathOnly = pathname.split('#')[0];
+    try {
+      return decodeURIComponent(pathOnly);
+    } catch {
+      return pathOnly;
+    }
   }
 };
 
@@ -177,8 +183,7 @@ export const useFetchCurrentPage = (): {
   error: Error | null;
 } => {
   const shareLinkId = useAtomValue(shareLinkIdAtom);
-  const revisionIdFromUrl = useAtomValue(revisionIdFromUrlAtom);
-  const currentPageId = useAtomValue(currentPageIdAtom);
+  const currentPageId = useAtomValue(currentPageEntityIdAtom);
 
   const isLoading = useAtomValue(pageLoadingAtom);
   const error = useAtomValue(pageErrorAtom);
@@ -195,8 +200,9 @@ export const useFetchCurrentPage = (): {
         set,
         args?: FetchPageArgs,
       ): Promise<IPagePopulatedToShowRevision | null> => {
-        const currentPageId = get(currentPageIdAtom);
+        const currentPageId = get(currentPageEntityIdAtom);
         const currentPageData = get(currentPageDataAtom);
+        const revisionIdFromUrl = get(revisionIdFromUrlAtom);
 
         // Process path first to handle permalinks and strip hash fragments
         const decodedPathname = decodeAndRemoveFragment(args?.path);
@@ -215,6 +221,7 @@ export const useFetchCurrentPage = (): {
 
         set(pageLoadingAtom, true);
         set(pageErrorAtom, null);
+        set(pageNotFoundAtom, false);
 
         // Build API parameters
         const { params, shouldSkip } = buildApiParams({
@@ -231,15 +238,22 @@ export const useFetchCurrentPage = (): {
         }
 
         try {
-          const { data } = await apiv3Get<{
-            page: IPagePopulatedToShowRevision;
-          }>('/page', params);
-          const { page: newData } = data;
+          const { data } = await apiv3Get<FetchedPageResult>('/page', params);
+          const { page: newData, meta } = data;
 
-          set(currentPageDataAtom, newData);
-          set(currentPageIdAtom, newData._id);
-          set(pageNotFoundAtom, false);
-          set(isForbiddenAtom, false);
+          console.log('Fetched page data:', { newData, meta });
+
+          set(currentPageDataAtom, newData ?? undefined);
+          set(currentPageEntityIdAtom, newData?._id);
+          set(
+            currentPageEmptyIdAtom,
+            isIPageInfoForEmpty(meta) ? meta.emptyPageId : undefined,
+          );
+          set(pageNotFoundAtom, isIPageNotFoundInfo(meta));
+          set(
+            isForbiddenAtom,
+            isIPageNotFoundInfo(meta) ? (meta.isForbidden ?? false) : false,
+          );
 
           // Mutate PageInfo to refetch latest metadata including latestRevisionId
           mutatePageInfo();
@@ -260,7 +274,8 @@ export const useFetchCurrentPage = (): {
               set(pageNotFoundAtom, true);
               set(isForbiddenAtom, error.args.isForbidden ?? false);
               set(currentPageDataAtom, undefined);
-              set(currentPageIdAtom, undefined);
+              set(currentPageEntityIdAtom, undefined);
+              set(currentPageEmptyIdAtom, undefined);
               set(remoteRevisionBodyAtom, undefined);
             }
           }
@@ -270,7 +285,7 @@ export const useFetchCurrentPage = (): {
 
         return null;
       },
-      [shareLinkId, revisionIdFromUrl, mutatePageInfo],
+      [shareLinkId, mutatePageInfo],
     ),
   );
 

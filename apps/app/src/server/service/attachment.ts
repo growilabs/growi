@@ -1,4 +1,5 @@
 import type { IAttachment, Ref } from '@growi/core/dist/interfaces';
+import type { ReadStream } from 'fs';
 import type { HydratedDocument } from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
@@ -15,20 +16,30 @@ const mongoose = require('mongoose');
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const logger = loggerFactory('growi:service:AttachmentService');
 
-const createReadStream = (filePath) => {
+const createReadStream = (filePath: string): ReadStream => {
   return fs.createReadStream(filePath, {
-    flags: 'r', encoding: null, fd: null, mode: '0666', autoClose: true,
+    flags: 'r',
+    encoding: null,
+    fd: null,
+    mode: '0666',
+    autoClose: true,
   });
 };
 
-type AttachHandler = (pageId: string | null, attachment: IAttachmentDocument, file: Express.Multer.File) => Promise<void>;
+type AttachHandler = (
+  pageId: string | null,
+  attachment: IAttachmentDocument,
+  file: Express.Multer.File,
+) => Promise<void>;
 
 type DetachHandler = (attachmentId: string) => Promise<void>;
 
-
 type IAttachmentService = {
   createAttachment(
-    file: Express.Multer.File, user: any, pageId: string | null, attachmentType: AttachmentType,
+    file: Express.Multer.File,
+    user: any,
+    pageId: string | null,
+    attachmentType: AttachmentType,
     disposeTmpFileCallback?: (file: Express.Multer.File) => void,
   ): Promise<IAttachmentDocument>;
   removeAllAttachments(attachments: IAttachmentDocument[]): Promise<void>;
@@ -38,12 +49,10 @@ type IAttachmentService = {
   addDetachHandler(handler: DetachHandler): void;
 };
 
-
 /**
  * the service class for Attachment and file-uploader
  */
 export class AttachmentService implements IAttachmentService {
-
   attachHandlers: AttachHandler[] = [];
 
   detachHandlers: DetachHandler[] = [];
@@ -54,7 +63,13 @@ export class AttachmentService implements IAttachmentService {
     this.crowi = crowi;
   }
 
-  async createAttachment(file, user, pageId: string | null | undefined = null, attachmentType, disposeTmpFileCallback): Promise<IAttachmentDocument> {
+  async createAttachment(
+    file,
+    user,
+    pageId: string | null | undefined = null,
+    attachmentType,
+    disposeTmpFileCallback,
+  ): Promise<IAttachmentDocument> {
     const { fileUploadService } = this.crowi;
 
     // check limit
@@ -64,12 +79,22 @@ export class AttachmentService implements IAttachmentService {
     }
 
     // create an Attachment document and upload file
-    let attachment;
-    let readStreamForCreateAttachmentDocument;
+    let attachment: IAttachmentDocument;
+    let readStreamForCreateAttachmentDocument: ReadStream | null = null;
     try {
       readStreamForCreateAttachmentDocument = createReadStream(file.path);
-      attachment = Attachment.createWithoutSave(pageId, user, file.originalname, file.mimetype, file.size, attachmentType);
-      await fileUploadService.uploadAttachment(readStreamForCreateAttachmentDocument, attachment);
+      attachment = Attachment.createWithoutSave(
+        pageId,
+        user,
+        file.originalname,
+        file.mimetype,
+        file.size,
+        attachmentType,
+      );
+      await fileUploadService.uploadAttachment(
+        readStreamForCreateAttachmentDocument,
+        attachment,
+      );
       await attachment.save();
 
       const attachHandlerPromises = this.attachHandlers.map((handler) => {
@@ -84,23 +109,24 @@ export class AttachmentService implements IAttachmentService {
         .finally(() => {
           disposeTmpFileCallback?.(file);
         });
-    }
-    catch (err) {
+    } catch (err) {
       logger.error('Error while creating attachment', err);
       disposeTmpFileCallback?.(file);
       throw err;
-    }
-    finally {
-      readStreamForCreateAttachmentDocument.destroy();
+    } finally {
+      readStreamForCreateAttachmentDocument?.destroy();
     }
 
     return attachment;
   }
 
-  async removeAllAttachments(attachments: HydratedDocument<IAttachmentDocument>[]): Promise<void> {
+  async removeAllAttachments(
+    attachments: HydratedDocument<IAttachmentDocument>[],
+  ): Promise<void> {
     const { fileUploadService } = this.crowi;
     const attachmentsCollection = mongoose.connection.collection('attachments');
-    const unorderAttachmentsBulkOp = attachmentsCollection.initializeUnorderedBulkOp();
+    const unorderAttachmentsBulkOp =
+      attachmentsCollection.initializeUnorderedBulkOp();
 
     if (attachments.length === 0) {
       return;
@@ -116,7 +142,9 @@ export class AttachmentService implements IAttachmentService {
     return;
   }
 
-  async removeAttachment(attachmentId: Ref<IAttachment> | undefined): Promise<void> {
+  async removeAttachment(
+    attachmentId: Ref<IAttachment> | undefined,
+  ): Promise<void> {
     const { fileUploadService } = this.crowi;
     const attachment = await Attachment.findById(attachmentId);
 
@@ -132,10 +160,9 @@ export class AttachmentService implements IAttachmentService {
     });
 
     // Do not await, run in background
-    Promise.all(detachedHandlerPromises)
-      .catch((err) => {
-        logger.error('Error while executing detached handler', err);
-      });
+    Promise.all(detachedHandlerPromises).catch((err) => {
+      logger.error('Error while executing detached handler', err);
+    });
 
     return;
   }
@@ -162,5 +189,4 @@ export class AttachmentService implements IAttachmentService {
   addDetachHandler(handler: DetachHandler): void {
     this.detachHandlers.push(handler);
   }
-
 }

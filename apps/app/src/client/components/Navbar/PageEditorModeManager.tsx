@@ -2,19 +2,14 @@ import React, {
   type ReactNode, useCallback, useMemo, type JSX,
 } from 'react';
 
-import { Origin } from '@growi/core';
-import { getParentPath } from '@growi/core/dist/utils/path-utils';
 import { useTranslation } from 'next-i18next';
 
 import { useCreatePage } from '~/client/services/create-page';
+import { useStartEditing } from '~/client/services/use-start-editing';
 import { toastError } from '~/client/util/toastr';
 import { useCurrentPageYjsData } from '~/features/collaborative-editor/states';
-import { usePageNotFound } from '~/states/page';
 import { useDeviceLargerThanMd } from '~/states/ui/device';
 import { useEditorMode, EditorMode } from '~/states/ui/editor';
-
-import { shouldCreateWipPage } from '../../../utils/should-create-wip-page';
-
 
 import styles from './PageEditorModeManager.module.scss';
 
@@ -66,34 +61,21 @@ export const PageEditorModeManager = (props: Props): JSX.Element => {
 
   const { t } = useTranslation('commons');
 
-  const isNotFound = usePageNotFound();
   const { setEditorMode } = useEditorMode();
   const [isDeviceLargerThanMd] = useDeviceLargerThanMd();
   const currentPageYjsData = useCurrentPageYjsData();
+  const startEditing = useStartEditing();
 
-  const { isCreating, create } = useCreatePage();
+  const { isCreating } = useCreatePage();
 
   const editButtonClickedHandler = useCallback(async () => {
-    if (!isNotFound) {
-      setEditorMode(EditorMode.Editor);
-      return;
-    }
-
-    // Create a new page if it does not exist and transit to the editor mode
     try {
-      const parentPath = path != null ? getParentPath(path) : undefined; // does not have to exist
-      await create(
-        {
-          path, parentPath, wip: shouldCreateWipPage(path), origin: Origin.View,
-        },
-      );
-
-      setEditorMode(EditorMode.Editor);
+      await startEditing(path);
     }
     catch (err) {
       toastError(t('toaster.create_failed', { target: path }));
     }
-  }, [create, isNotFound, setEditorMode, path, t]);
+  }, [startEditing, path, t]);
 
   const _isBtnDisabled = isCreating || isBtnDisabled;
 

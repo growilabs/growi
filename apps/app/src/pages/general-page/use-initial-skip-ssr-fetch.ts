@@ -14,7 +14,7 @@ export const useInitialCSRFetch = (shouldFetch?: boolean): void => {
 
   useEffect(() => {
     if (shouldFetch) {
-      fetchCurrentPage();
+      fetchCurrentPage({ force: true });
     }
   }, [fetchCurrentPage, shouldFetch]);
 };

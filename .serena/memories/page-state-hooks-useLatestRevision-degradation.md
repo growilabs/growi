@@ -305,7 +305,8 @@ export const useFetchCurrentPage = () => {
       const { page: newData } = data;
 
       set(currentPageDataAtom, newData);
-      set(currentPageIdAtom, newData._id);
+      set(currentPageEntityIdAtom, newData._id);
+      set(currentPageEmptyIdAtom, undefined);
 
       // ✅ 追加: PageInfo を再フェッチ
       mutatePageInfo();  // 引数なし = revalidate (再フェッチ)

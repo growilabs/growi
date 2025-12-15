@@ -41,9 +41,6 @@ export default class AdminAppContainer extends Container {
       sesSecretAccessKey: '',
 
       isMaintenanceMode: false,
-
-      // TODO: remove this property when bulk export can be relased for cloud (https://redmine.weseek.co.jp/issues/163220)
-      isBulkExportDisabledForCloud: false,
     };
 
   }
@@ -84,9 +81,6 @@ export default class AdminAppContainer extends Container {
       sesSecretAccessKey: appSettingsParams.sesSecretAccessKey,
 
       isMaintenanceMode: appSettingsParams.isMaintenanceMode,
-
-      // TODO: remove this property when bulk export can be relased for cloud (https://redmine.weseek.co.jp/issues/163220)
-      isBulkExportDisabledForCloud: appSettingsParams.isBulkExportDisabledForCloud,
     });
   }
 

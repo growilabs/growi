@@ -107,9 +107,6 @@ class Crowi {
   /** @type {PassportService} */
   passportService;
 
-  /** @type {import('../service/rest-qiita-API')} */
-  restQiitaAPIService;
-
   /** @type {SearchService} */
   searchService;
 
@@ -205,7 +202,6 @@ Crowi.prototype.init = async function () {
     this.setUpFileUploaderSwitchService(),
     this.setupAttachmentService(),
     this.setUpAcl(),
-    this.setUpRestQiitaAPI(),
     this.setupUserGroupService(),
     this.setupExport(),
     this.setupImport(),
@@ -699,16 +695,6 @@ Crowi.prototype.setupGrowiInfoService = async function () {
 Crowi.prototype.setupAttachmentService = async function () {
   if (this.attachmentService == null) {
     this.attachmentService = new AttachmentService(this);
-  }
-};
-
-/**
- * setup RestQiitaAPIService
- */
-Crowi.prototype.setUpRestQiitaAPI = async function () {
-  const RestQiitaAPIService = require('../service/rest-qiita-API');
-  if (this.restQiitaAPIService == null) {
-    this.restQiitaAPIService = new RestQiitaAPIService(this);
   }
 };
 
