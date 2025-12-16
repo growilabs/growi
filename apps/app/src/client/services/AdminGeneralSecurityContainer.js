@@ -41,7 +41,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       expandOtherOptionsForCompleteDeletion: false,
       isShowRestrictedByOwner: false,
       isUsersHomepageDeletionEnabled: false,
-      hideUserPages: false,
+      isHidingUserPages: false,
       isForceDeleteUserHomepageOnUserDeletion: false,
       isRomUserAllowedToComment: false,
       isLocalEnabled: false,
@@ -85,7 +85,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       currentOwnerRestrictionDisplayMode: generalSetting.hideRestrictedByOwner === false ? 'Displayed' : 'Hidden',
       currentGroupRestrictionDisplayMode: generalSetting.hideRestrictedByGroup === false ? 'Displayed' : 'Hidden',
       isUsersHomepageDeletionEnabled: generalSetting.isUsersHomepageDeletionEnabled,
-      hideUserPages: generalSetting.hideUserPages,
+      isHidingUserPages: generalSetting.isHidingUserPages,
       isForceDeleteUserHomepageOnUserDeletion: generalSetting.isForceDeleteUserHomepageOnUserDeletion,
       isRomUserAllowedToComment: generalSetting.isRomUserAllowedToComment,
       sessionMaxAge: generalSetting.sessionMaxAge,
@@ -159,7 +159,7 @@ export default class AdminGeneralSecurityContainer extends Container {
   }
 
   changeUserPageVisibility() {
-    this.setState({ hideUserPages: !this.state.hideUserPages });
+    this.setState({ isHidingUserPages: !this.state.isHidingUserPages });
   }
 
   /**
@@ -259,7 +259,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       hideRestrictedByGroup: formData.hideRestrictedByGroup,
       hideRestrictedByOwner: formData.hideRestrictedByOwner,
       isUsersHomepageDeletionEnabled: formData.isUsersHomepageDeletionEnabled,
-      hideUserPages: formData.hideUserPages,
+      isHidingUserPages: formData.isHidingUserPages,
       isForceDeleteUserHomepageOnUserDeletion: formData.isForceDeleteUserHomepageOnUserDeletion,
       isRomUserAllowedToComment: formData.isRomUserAllowedToComment,
     } : {
@@ -273,7 +273,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       hideRestrictedByGroup: this.state.currentGroupRestrictionDisplayMode === 'Hidden',
       hideRestrictedByOwner: this.state.currentOwnerRestrictionDisplayMode === 'Hidden',
       isUsersHomepageDeletionEnabled: this.state.isUsersHomepageDeletionEnabled,
-      hideUserPages: this.state.hideUserPages,
+      isHidingUserPages: this.state.isHidingUserPages,
       isForceDeleteUserHomepageOnUserDeletion: this.state.isForceDeleteUserHomepageOnUserDeletion,
       isRomUserAllowedToComment: this.state.isRomUserAllowedToComment,
     };
