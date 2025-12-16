@@ -118,19 +118,22 @@ export const ItemsTree: FC<Props> = (props: Props) => {
     [enableCheckboxes],
   );
 
-  const hotkeys = useMemo<CustomHotkeysConfig<IPageForTreeItem>>(() => ({
-    completeRenaming: {
-      hotkey: 'Enter',
-      allowWhenInputFocused: true,
-      isEnabled: (tree) => tree.isRenamingItem(),
-      handler: (e, tree) => {
-        if (e.isComposing) {
-          return;
-        }
-        tree.completeRenaming();
+  const hotkeys = useMemo<CustomHotkeysConfig<IPageForTreeItem>>(
+    () => ({
+      completeRenaming: {
+        hotkey: 'Enter',
+        allowWhenInputFocused: true,
+        isEnabled: (tree) => tree.isRenamingItem(),
+        handler: (e, tree) => {
+          if (e.isComposing) {
+            return;
+          }
+          tree.completeRenaming();
+        },
       },
-    },
-  }), []);
+    }),
+    [],
+  );
 
   const tree = useTree<IPageForTreeItem>({
     rootItemId: ROOT_PAGE_VIRTUAL_ID,
