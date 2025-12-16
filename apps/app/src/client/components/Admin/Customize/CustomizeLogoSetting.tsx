@@ -28,7 +28,6 @@ const CustomizeLogoSetting = (): JSX.Element => {
   const [isImageCropModalShow, setIsImageCropModalShow] = useState<boolean>(false);
   const [isDefaultLogoSelected, setIsDefaultLogoSelected] = useState<boolean>(isDefaultLogo ?? true);
   const [retrieveError, setRetrieveError] = useState<any>();
-  const [isFileSelected, setIsFileSelected] = useState<boolean>(false);
   const [isImageCropped, setIsImageCropped] = useState<boolean>(false);
 
 
@@ -36,7 +35,6 @@ const CustomizeLogoSetting = (): JSX.Element => {
     const files = e.target.files;
     const hasFile = files != null && files.length > 0;
 
-    setIsFileSelected(hasFile);
     setIsImageCropped(false);
 
     if (hasFile) {
@@ -45,7 +43,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
       reader.readAsDataURL(files[0]);
       setIsImageCropModalShow(true);
     }
-  }, [setIsFileSelected, setUploadLogoSrc, setIsImageCropModalShow, setIsImageCropped]);
+  }, [setUploadLogoSrc, setIsImageCropModalShow, setIsImageCropped]);
 
   const onClickSubmit = useCallback(async () => {
     try {
@@ -62,7 +60,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
       await apiv3Delete('/customize-setting/delete-brand-logo');
       setIsCustomizedLogoUploaded(false);
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.current_logo'), ns: 'commons' }));
-      setIsFileSelected(false);
+      setUploadLogoSrc(null);
     }
     catch (err) {
       toastError(err);
@@ -78,16 +76,14 @@ const CustomizeLogoSetting = (): JSX.Element => {
       await apiv3PostForm('/customize-setting/upload-brand-logo', formData);
       setIsImageCropped(true);
       setIsCustomizedLogoUploaded(true);
-      setIsFileSelected(true);
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.current_logo'), ns: 'commons' }));
     }
     catch (err) {
       toastError(err);
       setRetrieveError(err);
-      setIsFileSelected(false);
       throw new Error('Failed to upload brand logo');
     }
-  }, [setIsCustomizedLogoUploaded, t, setIsFileSelected]);
+  }, [setIsCustomizedLogoUploaded, t, setUploadLogoSrc]);
 
   return (
     <React.Fragment>
@@ -159,7 +155,11 @@ const CustomizeLogoSetting = (): JSX.Element => {
                 </div>
               </div>
             </div>
-            <AdminUpdateButtonRow onClick={onClickSubmit} disabled={retrieveError != null || (!isDefaultLogoSelected && !isFileSelected)} />
+            <AdminUpdateButtonRow
+              onClick={onClickSubmit}
+              disabled={retrieveError != null
+              || (!isDefaultLogoSelected && uploadLogoSrc == null && !isCustomizedLogoUploaded)}
+            />
           </div>
         </div>
       </div>
@@ -170,7 +170,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
         onModalClose={() => {
           setIsImageCropModalShow(false);
           if (!isImageCropped) {
-            setIsFileSelected(false);
+            setUploadLogoSrc(null);
           }
           setIsImageCropped(false);
         }}
