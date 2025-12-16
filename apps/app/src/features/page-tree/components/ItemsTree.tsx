@@ -125,6 +125,7 @@ export const ItemsTree: FC<Props> = (props: Props) => {
         allowWhenInputFocused: true,
         isEnabled: (tree) => tree.isRenamingItem(),
         handler: (e, tree) => {
+          // Disable rename during IME composition
           if (e.isComposing) {
             return;
           }
