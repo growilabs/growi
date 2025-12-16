@@ -6,8 +6,12 @@ import { apiv3Put } from '~/client/util/apiv3-client';
 import type { IUserUISettings } from '~/interfaces/user-ui-settings';
 
 let settingsForBulk: Partial<IUserUISettings> = {};
-const _putUserUISettingsInBulk = (): Promise<AxiosResponse<IUserUISettings>> => {
-  const result = apiv3Put<IUserUISettings>('/user-ui-settings', { settings: settingsForBulk });
+const _putUserUISettingsInBulk = (): Promise<
+  AxiosResponse<IUserUISettings>
+> => {
+  const result = apiv3Put<IUserUISettings>('/user-ui-settings', {
+    settings: settingsForBulk,
+  });
 
   // clear partial
   settingsForBulk = {};
@@ -15,7 +19,10 @@ const _putUserUISettingsInBulk = (): Promise<AxiosResponse<IUserUISettings>> => 
   return result;
 };
 
-const _putUserUISettingsInBulkDebounced = debounce(1500, _putUserUISettingsInBulk);
+const _putUserUISettingsInBulkDebounced = debounce(
+  1500,
+  _putUserUISettingsInBulk,
+);
 
 export const scheduleToPut = (settings: Partial<IUserUISettings>): void => {
   settingsForBulk = {
@@ -26,8 +33,12 @@ export const scheduleToPut = (settings: Partial<IUserUISettings>): void => {
   _putUserUISettingsInBulkDebounced();
 };
 
-export const updateUserUISettings = async(settings: Partial<IUserUISettings>): Promise<AxiosResponse<IUserUISettings>> => {
-  const result = await apiv3Put<IUserUISettings>('/user-ui-settings', { settings });
+export const updateUserUISettings = async (
+  settings: Partial<IUserUISettings>,
+): Promise<AxiosResponse<IUserUISettings>> => {
+  const result = await apiv3Put<IUserUISettings>('/user-ui-settings', {
+    settings,
+  });
 
   return result;
 };

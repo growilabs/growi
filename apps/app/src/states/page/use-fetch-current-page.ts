@@ -241,8 +241,6 @@ export const useFetchCurrentPage = (): {
           const { data } = await apiv3Get<FetchedPageResult>('/page', params);
           const { page: newData, meta } = data;
 
-          console.log('Fetched page data:', { newData, meta });
-
           set(currentPageDataAtom, newData ?? undefined);
           set(currentPageEntityIdAtom, newData?._id);
           set(

@@ -15,7 +15,7 @@ import assert from 'assert';
 import type { HydratedDocument, model } from 'mongoose';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { PageModel } from '~/server/models/page';
+import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageRedirect,
   PageRedirectModel,
@@ -193,11 +193,6 @@ export async function getPageDataForInitial(
       };
     }
 
-    // Add user to seen users
-    if (user != null) {
-      await page.seen(user);
-    }
-
     // Handle existing page with valid meta that is not IPageNotFoundInfo
     page.initLatestRevisionField(revisionId);
     const ssrMaxRevisionBodyLength = configManager.getConfig(
@@ -250,15 +245,13 @@ export async function getPageDataForInitial(
 // Page data retrieval for same-route navigation
 export async function getPageDataForSameRoute(
   context: GetServerSidePropsContext,
-): Promise<
-  GetServerSidePropsResult<
-    Pick<CommonEachProps, 'currentPathname'> &
-      Pick<
-        EachProps,
-        'currentPathname' | 'isIdenticalPathPage' | 'redirectFrom'
-      >
-  >
-> {
+): Promise<{
+  props: Pick<CommonEachProps, 'currentPathname'> &
+    Pick<EachProps, 'currentPathname' | 'isIdenticalPathPage' | 'redirectFrom'>;
+  internalProps?: {
+    pageId?: string;
+  };
+}> {
   const req: CrowiRequest = context.req as CrowiRequest;
   const { user } = req;
 
@@ -297,6 +290,9 @@ export async function getPageDataForSameRoute(
       currentPathname,
       isIdenticalPathPage: false,
       redirectFrom,
+    },
+    internalProps: {
+      pageId: basicPageInfo?._id?.toString(),
     },
   };
 }

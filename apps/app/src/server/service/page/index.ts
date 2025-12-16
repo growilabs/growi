@@ -230,6 +230,36 @@ class PageService implements IPageService {
     // createMany
     this.pageEvent.on('createMany', this.pageEvent.onCreateMany);
     this.pageEvent.on('addSeenUsers', this.pageEvent.onAddSeenUsers);
+
+    // seen - mark page as seen by user
+    this.pageEvent.on(
+      'seen',
+      async (pageId: string, user: IUserHasId): Promise<void> => {
+        if (pageId == null || user == null) {
+          logger.warn('onSeen: pageId or user is null');
+          return;
+        }
+
+        try {
+          const Page = mongoose.model<
+            HydratedDocument<PageDocument>,
+            PageModel
+          >('Page');
+
+          const page = await Page.findById(pageId);
+
+          if (page == null) {
+            logger.warn('onSeen: page not found', { pageId });
+            return;
+          }
+
+          await page.seen(user);
+          logger.debug('onSeen: successfully marked page as seen', { pageId });
+        } catch (err) {
+          logger.error('onSeen: failed to mark page as seen', err);
+        }
+      },
+    );
   }
 
   getEventEmitter(): EventEmitter {
