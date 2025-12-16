@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import { useCallback, useEffect, useMemo } from 'react';
+import type { CustomHotkeysConfig } from '@headless-tree/core';
 import { useTree } from '@headless-tree/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useTranslation } from 'next-i18next';
@@ -117,6 +118,20 @@ export const ItemsTree: FC<Props> = (props: Props) => {
     [enableCheckboxes],
   );
 
+  const hotkeys = useMemo<CustomHotkeysConfig<IPageForTreeItem>>(() => ({
+    completeRenaming: {
+      hotkey: 'Enter',
+      allowWhenInputFocused: true,
+      isEnabled: (tree) => tree.isRenamingItem(),
+      handler: (e, tree) => {
+        if (e.isComposing) {
+          return;
+        }
+        tree.completeRenaming();
+      },
+    },
+  }), []);
+
   const tree = useTree<IPageForTreeItem>({
     rootItemId: ROOT_PAGE_VIRTUAL_ID,
     getItemName,
@@ -137,6 +152,7 @@ export const ItemsTree: FC<Props> = (props: Props) => {
       onDrop: handleDrop,
       canDropInbetween: false,
     }),
+    hotkeys,
   });
 
   // Notify parent when checked items change
