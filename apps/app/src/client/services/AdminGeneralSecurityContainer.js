@@ -45,7 +45,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       expandOtherOptionsForCompleteDeletion: false,
       isShowRestrictedByOwner: false,
       isUsersHomepageDeletionEnabled: false,
-      hideUserPages: false,
+      isHidingUserPages: false,
       isForceDeleteUserHomepageOnUserDeletion: false,
       isRomUserAllowedToComment: false,
       isLocalEnabled: false,
@@ -107,7 +107,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       isForceDeleteUserHomepageOnUserDeletion:
         generalSetting.isForceDeleteUserHomepageOnUserDeletion,
       isRomUserAllowedToComment: generalSetting.isRomUserAllowedToComment,
-      isUserPagesVisible: generalSetting.isUserPagesVisible,
+      isHidingUserPages: generalSetting.isHidingUserPages,
       sessionMaxAge: generalSetting.sessionMaxAge,
       wikiMode: generalSetting.wikiMode,
       disableLinkSharing: shareLinkSetting.disableLinkSharing,
@@ -180,7 +180,7 @@ export default class AdminGeneralSecurityContainer extends Container {
   }
 
   changeUserPageVisibility() {
-    this.setState({ hideUserPages: !this.state.hideUserPages });
+    this.setState({ isHidingUserPages: !this.state.isHidingUserPages });
   }
 
   /**
@@ -291,7 +291,7 @@ export default class AdminGeneralSecurityContainer extends Container {
               formData.isAllGroupMembershipRequiredForPageCompleteDeletion,
             hideRestrictedByGroup: formData.hideRestrictedByGroup,
             hideRestrictedByOwner: formData.hideRestrictedByOwner,
-            isUserPagesVisible: formData.isUserPagesVisible,
+            isHidingUserPages: formData.isHidingUserPages,
             isUsersHomepageDeletionEnabled:
               formData.isUsersHomepageDeletionEnabled,
             isForceDeleteUserHomepageOnUserDeletion:
