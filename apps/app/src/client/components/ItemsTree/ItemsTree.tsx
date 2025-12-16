@@ -36,6 +36,7 @@ type ItemsTreeProps = {
   isEnableActions: boolean
   isReadOnlyUser: boolean
   isWipPageShown?: boolean
+  isHidingUserPages: boolean
   targetPath: string
   targetPathOrId?: string,
   CustomTreeItem: React.FunctionComponent<TreeItemProps>
