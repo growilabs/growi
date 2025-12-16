@@ -134,12 +134,30 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
     },
   };
 
+
+  const isUserPage = (path: string) => {
+
+    if (path.startsWith('/user')) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // Get current user page visibility setting
+  const hideUserPages = false;
+  let isHidingUserPages = false;
+
+  if (page.path) {
+    isHidingUserPages = isUserPage(page.path) && hideUserPages;
+  }
+
   const EndComponents = props.customEndComponents;
   const HoveredEndComponents = props.customHoveredEndComponents;
   const HeadObChildrenComponents = props.customHeadOfChildrenComponents;
   const AlternativeComponents = props.customAlternativeComponents;
 
-  if (!isWipPageShown && page.wip) {
+  if ((!isWipPageShown && page.wip) || isHidingUserPages) {
     return <></>;
   }
 
