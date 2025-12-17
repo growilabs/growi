@@ -74,7 +74,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
       setRetrieveError(err);
       throw new Error('Failed to delete logo');
     }
-  }, [setIsCustomizedLogoUploaded, t, setUploadLogoSrc, setIsImageCropped, setIsImageCropModalShow, resetFileInput]);
+  }, [setIsCustomizedLogoUploaded, t, setUploadLogoSrc, setIsImageCropped, setIsImageCropModalShow, resetFileInput, setRetrieveError]);
 
   const processImageCompletedHandler = useCallback(async (croppedImage) => {
     try {
@@ -91,7 +91,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
       setRetrieveError(err);
       throw new Error('Failed to upload brand logo');
     }
-  }, [setIsCustomizedLogoUploaded, t, setUploadLogoSrc]);
+  }, [setIsCustomizedLogoUploaded, t, setIsImageCropped, setIsImageCropModalShow, setRetrieveError]);
 
 
   return (
@@ -187,7 +187,6 @@ const CustomizeLogoSetting = (): JSX.Element => {
             resetFileInput();
             setUploadLogoSrc(null);
           }
-          setIsImageCropped(false);
           setIsImageCropModalShow(false);
         }}
         onImageProcessCompleted={processImageCompletedHandler}
