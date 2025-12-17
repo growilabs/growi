@@ -29,7 +29,8 @@ const CustomizeLogoSetting = (): JSX.Element => {
   const [isDefaultLogoSelected, setIsDefaultLogoSelected] = useState<boolean>(isDefaultLogo ?? true);
   const [retrieveError, setRetrieveError] = useState<any>();
   const [isImageCropped, setIsImageCropped] = useState<boolean>(false);
-
+  const [fileInputKey, setFileInputKey] = useState<string>(Date.now().toString());
+  const isFileInputDisabled = !isDefaultLogoSelected && isCustomizedLogoUploaded;
 
   const onSelectFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -55,25 +56,33 @@ const CustomizeLogoSetting = (): JSX.Element => {
     }
   }, [t, isDefaultLogoSelected]);
 
+  const resetFileInput = useCallback(() => {
+    setFileInputKey(Date.now().toString());
+  }, []);
+
   const onClickDeleteBtn = useCallback(async () => {
     try {
       await apiv3Delete('/customize-setting/delete-brand-logo');
       setIsCustomizedLogoUploaded(false);
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.current_logo'), ns: 'commons' }));
       setUploadLogoSrc(null);
+      setIsImageCropped(false);
+      setIsImageCropModalShow(false);
+      resetFileInput();
     }
     catch (err) {
       toastError(err);
       setRetrieveError(err);
       throw new Error('Failed to delete logo');
     }
-  }, [setIsCustomizedLogoUploaded, t]);
+  }, [setIsCustomizedLogoUploaded, t, setUploadLogoSrc, setIsImageCropped, setIsImageCropModalShow, resetFileInput]);
 
   const processImageCompletedHandler = useCallback(async (croppedImage) => {
     try {
       const formData = new FormData();
       formData.append('file', croppedImage);
       await apiv3PostForm('/customize-setting/upload-brand-logo', formData);
+      setIsImageCropModalShow(false);
       setIsImageCropped(true);
       setIsCustomizedLogoUploaded(true);
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.current_logo'), ns: 'commons' }));
@@ -84,6 +93,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
       throw new Error('Failed to upload brand logo');
     }
   }, [setIsCustomizedLogoUploaded, t, setUploadLogoSrc]);
+
 
   return (
     <React.Fragment>
@@ -150,7 +160,14 @@ const CustomizeLogoSetting = (): JSX.Element => {
                     {t('admin:customize_settings.upload_new_logo')}
                   </label>
                   <div className="col-sm-8 col-12">
-                    <input type="file" onChange={onSelectFile} name="brandLogo" accept="image/*" />
+                    <input
+                      type="file"
+                      key={fileInputKey}
+                      onChange={onSelectFile}
+                      name="brandLogo"
+                      accept="image/*"
+                      disabled={isFileInputDisabled}
+                    />
                   </div>
                 </div>
               </div>
@@ -168,11 +185,12 @@ const CustomizeLogoSetting = (): JSX.Element => {
         isShow={isImageCropModalShow}
         src={uploadLogoSrc}
         onModalClose={() => {
-          setIsImageCropModalShow(false);
           if (!isImageCropped) {
+            resetFileInput();
             setUploadLogoSrc(null);
           }
           setIsImageCropped(false);
+          setIsImageCropModalShow(false);
         }}
         onImageProcessCompleted={processImageCompletedHandler}
         isCircular={false}
