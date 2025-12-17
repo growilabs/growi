@@ -30,7 +30,6 @@ const CustomizeLogoSetting = (): JSX.Element => {
   const [retrieveError, setRetrieveError] = useState<any>();
   const [isImageCropped, setIsImageCropped] = useState<boolean>(false);
   const [fileInputKey, setFileInputKey] = useState<string>(Date.now().toString());
-  const isFileInputDisabled = !isDefaultLogoSelected && isCustomizedLogoUploaded;
 
   const onSelectFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -166,7 +165,6 @@ const CustomizeLogoSetting = (): JSX.Element => {
                       onChange={onSelectFile}
                       name="brandLogo"
                       accept="image/*"
-                      disabled={isFileInputDisabled}
                     />
                   </div>
                 </div>
