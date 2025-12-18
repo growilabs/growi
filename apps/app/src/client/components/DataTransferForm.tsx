@@ -1,5 +1,4 @@
 import React, { type JSX } from 'react';
-
 import { useTranslation } from 'next-i18next';
 
 import { useGenerateTransferKey } from '~/client/services/g2g-transfer';
@@ -15,19 +14,31 @@ const DataTransferForm = (): JSX.Element => {
   return (
     <div data-testid="installerForm" className="py-3 px-4">
       <p className="text-white fs-5 mt-2">
-        <strong>{ t('g2g_data_transfer.transfer_data_to_this_growi')}</strong>
+        <strong>{t('g2g_data_transfer.transfer_data_to_this_growi')}</strong>
       </p>
 
       <div className="row mt-3">
         <div className="col-md-12">
-          <button type="button" className="btn btn-primary w-100" onClick={generateTransferKey}>
+          <button
+            type="button"
+            className="btn btn-primary w-100"
+            onClick={generateTransferKey}
+          >
             {t('g2g_data_transfer.publish_transfer_key')}
           </button>
         </div>
         <div className="col-md-12 mt-2">
           <div className="d-flex">
-            <input className="form-control" type="text" value={transferKey} readOnly />
-            <CustomCopyToClipBoard textToBeCopied={transferKey} message="copied_to_clipboard" />
+            <input
+              className="form-control"
+              type="text"
+              value={transferKey}
+              readOnly
+            />
+            <CustomCopyToClipBoard
+              textToBeCopied={transferKey}
+              message="copied_to_clipboard"
+            />
           </div>
         </div>
       </div>
@@ -39,7 +50,9 @@ const DataTransferForm = (): JSX.Element => {
           className="mb-0"
           // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{
-            __html: t('g2g_data_transfer.transfer_to_growi_cloud', { documentationUrl }),
+            __html: t('g2g_data_transfer.transfer_to_growi_cloud', {
+              documentationUrl,
+            }),
           }}
         />
       </div>

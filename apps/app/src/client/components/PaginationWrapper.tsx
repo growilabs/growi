@@ -1,25 +1,18 @@
 import type { FC } from 'react';
-import React, {
-  memo, useCallback, useMemo, type JSX,
-} from 'react';
-
+import React, { type JSX, memo, useCallback, useMemo } from 'react';
 import { Pagination, PaginationItem, PaginationLink } from 'reactstrap';
 
-
 type Props = {
-  activePage: number,
-  changePage?: (activePage: number) => void,
-  totalItemsCount: number,
-  pagingLimit?: number,
-  align?: string,
-  size?: string,
+  activePage: number;
+  changePage?: (activePage: number) => void;
+  totalItemsCount: number;
+  pagingLimit?: number;
+  align?: string;
+  size?: string;
 };
 
-
 const PaginationWrapper: FC<Props> = memo((props: Props) => {
-  const {
-    activePage, changePage, totalItemsCount, pagingLimit, align,
-  } = props;
+  const { activePage, changePage, totalItemsCount, pagingLimit, align } = props;
 
   /**
    * various numbers used to generate pagination dom
@@ -29,7 +22,9 @@ const PaginationWrapper: FC<Props> = memo((props: Props) => {
     const limit = pagingLimit || Infinity;
 
     // calc totalPageNumber
-    const totalPage = Math.floor(totalItemsCount / limit) + (totalItemsCount % limit === 0 ? 0 : 1);
+    const totalPage =
+      Math.floor(totalItemsCount / limit) +
+      (totalItemsCount % limit === 0 ? 0 : 1);
 
     let paginationStart = activePage - 2;
     let maxViewPageNum = activePage + 2;
@@ -67,14 +62,23 @@ const PaginationWrapper: FC<Props> = memo((props: Props) => {
     if (activePage !== 1) {
       paginationItems.push(
         <PaginationItem key="painationItemFirst">
-          <PaginationLink first onClick={() => { return changePage != null && changePage(1) }} />
+          <PaginationLink
+            first
+            onClick={() => {
+              return changePage != null && changePage(1);
+            }}
+          />
         </PaginationItem>,
         <PaginationItem key="painationItemPrevious">
-          <PaginationLink previous onClick={() => { return changePage != null && changePage(activePage - 1) }} />
+          <PaginationLink
+            previous
+            onClick={() => {
+              return changePage != null && changePage(activePage - 1);
+            }}
+          />
         </PaginationItem>,
       );
-    }
-    else {
+    } else {
       paginationItems.push(
         <PaginationItem key="painationItemFirst" disabled>
           <PaginationLink first />
@@ -96,8 +100,15 @@ const PaginationWrapper: FC<Props> = memo((props: Props) => {
     const paginationItems: JSX.Element[] = [];
     for (let number = paginationStart; number <= maxViewPageNum; number++) {
       paginationItems.push(
-        <PaginationItem key={`paginationItem-${number}`} active={number === activePage}>
-          <PaginationLink onClick={() => { return changePage != null && changePage(number) }}>
+        <PaginationItem
+          key={`paginationItem-${number}`}
+          active={number === activePage}
+        >
+          <PaginationLink
+            onClick={() => {
+              return changePage != null && changePage(number);
+            }}
+          >
             {number}
           </PaginationLink>
         </PaginationItem>,
@@ -116,14 +127,23 @@ const PaginationWrapper: FC<Props> = memo((props: Props) => {
     if (totalPage !== activePage) {
       paginationItems.push(
         <PaginationItem key="painationItemNext">
-          <PaginationLink next onClick={() => { return changePage != null && changePage(activePage + 1) }} />
+          <PaginationLink
+            next
+            onClick={() => {
+              return changePage != null && changePage(activePage + 1);
+            }}
+          />
         </PaginationItem>,
         <PaginationItem key="painationItemLast">
-          <PaginationLink last onClick={() => { return changePage != null && changePage(totalPage) }} />
+          <PaginationLink
+            last
+            onClick={() => {
+              return changePage != null && changePage(totalPage);
+            }}
+          />
         </PaginationItem>,
       );
-    }
-    else {
+    } else {
       paginationItems.push(
         <PaginationItem key="painationItemNext" disabled>
           <PaginationLink next />
@@ -158,7 +178,6 @@ const PaginationWrapper: FC<Props> = memo((props: Props) => {
       </Pagination>
     </React.Fragment>
   );
-
 });
 
 PaginationWrapper.displayName = 'PaginationWrapper';

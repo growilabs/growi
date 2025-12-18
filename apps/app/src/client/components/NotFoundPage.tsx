@@ -1,5 +1,4 @@
-import React, { useMemo, type JSX } from 'react';
-
+import React, { type JSX, useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import CustomNavAndContents from './CustomNavigation/CustomNavAndContents';
@@ -7,8 +6,8 @@ import { DescendantsPageList } from './DescendantsPageList';
 import { PageTimeline } from './PageTimeline';
 
 type NotFoundPageProps = {
-  path: string,
-}
+  path: string;
+};
 
 const NotFoundPage = (props: NotFoundPageProps): JSX.Element => {
   const { t } = useTranslation();
@@ -32,7 +31,10 @@ const NotFoundPage = (props: NotFoundPageProps): JSX.Element => {
 
   return (
     <div className="d-edit-none">
-      <CustomNavAndContents navTabMapping={navTabMapping} tabContentClasses={['py-4']} />
+      <CustomNavAndContents
+        navTabMapping={navTabMapping}
+        tabContentClasses={['py-4']}
+      />
     </div>
   );
 };
