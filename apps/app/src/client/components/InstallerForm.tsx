@@ -117,7 +117,7 @@ const InstallerForm = memo((props: Props): JSX.Element => {
           <div className="col-12">
             <div className="alert alert-danger text-center">
               {registerErrors.map((err) => (
-                <span>
+                <span key={err.message}>
                   {tWithOpt(err.message, err.args)}
                   <br />
                 </span>
@@ -126,12 +126,7 @@ const InstallerForm = memo((props: Props): JSX.Element => {
           </div>
         )}
 
-        <form
-          role="form"
-          id="register-form"
-          className="ps-1"
-          onSubmit={submitHandler}
-        >
+        <form id="register-form" className="ps-1" onSubmit={submitHandler}>
           <div className="dropdown mb-3">
             <div className="input-group dropdown-with-icon">
               <span className="p-2 text-white opacity-75">
@@ -149,9 +144,9 @@ const InstallerForm = memo((props: Props): JSX.Element => {
                 <span className="float-start">{t('meta.display_name')}</span>
               </button>
               <input type="hidden" name="registerForm[app:globalLang]" />
-              <div className="dropdown-menu" aria-labelledby="dropdownLanguage">
+              <div className="dropdown-menu">
                 {i18nConfig.locales.map((locale) => {
-                  let fixedT;
+                  let fixedT: ((key: string) => string) | undefined;
                   if (i18n != null) {
                     fixedT = i18n.getFixedT(locale);
                     i18n.loadLanguages(i18nConfig.locales);

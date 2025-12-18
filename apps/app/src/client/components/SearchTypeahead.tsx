@@ -93,19 +93,19 @@ const SearchTypeahead: ForwardRefRenderFunction<IFocusable, Props> = (
 
   const typeaheadRef = useRef<TypeaheadRef>(null);
 
-  const focusToTypeahead = () => {
+  const focusToTypeahead = useCallback(() => {
     const instance = typeaheadRef.current;
     if (instance != null) {
       instance.focus();
     }
-  };
+  }, []);
 
-  const clearTypeahead = () => {
+  const clearTypeahead = useCallback(() => {
     const instance = typeaheadRef.current;
     if (instance != null) {
       instance.clear();
     }
-  };
+  }, []);
 
   // publish focus()
   useImperativeHandle(ref, () => ({
@@ -126,7 +126,7 @@ const SearchTypeahead: ForwardRefRenderFunction<IFocusable, Props> = (
         onSearch('');
       }
     },
-    [onSearch],
+    [onSearch, clearTypeahead, focusToTypeahead],
   );
 
   const searchHandler = useCallback(

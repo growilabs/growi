@@ -46,7 +46,7 @@ const IdenticalPathAlert: FC<IdenticalPathAlertProps> = (
         })}
         <br />
         <span
-          // eslint-disable-next-line react/no-danger
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML link
           dangerouslySetInnerHTML={{
             __html: t('See_more_detail_on_new_schema', {
               title: t('GROWI.5.0_new_schema'),

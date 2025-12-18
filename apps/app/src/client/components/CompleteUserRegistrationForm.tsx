@@ -121,11 +121,7 @@ export const CompleteUserRegistrationForm: React.FC<Props> = (props: Props) => {
               </p>
             )}
 
-            <form
-              role="form"
-              onSubmit={handleSubmitRegistration}
-              id="registration-form"
-            >
+            <form onSubmit={handleSubmitRegistration} id="registration-form">
               <input type="hidden" name="token" value={token} />
 
               <div className="input-group">

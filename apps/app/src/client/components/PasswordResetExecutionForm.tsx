@@ -54,7 +54,7 @@ const PasswordResetExecutionForm: FC = () => {
   };
 
   return (
-    <form role="form" onSubmit={changePassword}>
+    <form onSubmit={changePassword}>
       <div>
         <div className="input-group">
           <input

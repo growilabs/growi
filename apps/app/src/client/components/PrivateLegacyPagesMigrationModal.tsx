@@ -112,7 +112,7 @@ const PrivateLegacyPagesMigrationModalSubstance = ({
       </ModalHeader>
       <ModalBody>
         <div className="grw-scrollable-modal-body pb-1">
-          <label>{t('private_legacy_pages.modal.converting_pages')}:</label>
+          <div>{t('private_legacy_pages.modal.converting_pages')}:</div>
           <br />
           {/* Todo: change the way to show path on modal when too many pages are selected */}
           {/* https://redmine.weseek.co.jp/issues/82787 */}

@@ -86,6 +86,7 @@ export const StickyStretchableScroller = (
     [resetScrollbar],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: ignore
   useEffect(() => {
     resetScrollbarDebounced();
   }, [isSticky, resetScrollbarDebounced]);

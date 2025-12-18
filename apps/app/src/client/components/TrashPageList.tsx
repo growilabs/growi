@@ -104,6 +104,10 @@ const DescendantsPageListForTrash = (): JSX.Element => {
   );
 };
 
+const PageListIcon = () => (
+  <span className="material-symbols-outlined">subject</span>
+);
+
 export const TrashPageList = (): JSX.Element => {
   const { t } = useTranslation();
   const emptyTrashButton = useEmptyTrashButton();
@@ -111,7 +115,7 @@ export const TrashPageList = (): JSX.Element => {
   const navTabMapping = useMemo(() => {
     return {
       pagelist: {
-        Icon: () => <span className="material-symbols-outlined">subject</span>,
+        Icon: PageListIcon,
         Content: DescendantsPageListForTrash,
         i18n: t('page_list'),
       },

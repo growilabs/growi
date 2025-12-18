@@ -48,7 +48,7 @@ const DataTransferForm = (): JSX.Element => {
         <p className="mb-1">{t('g2g_data_transfer.once_transfer_key_used')}</p>
         <p
           className="mb-0"
-          // eslint-disable-next-line react/no-danger
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML link
           dangerouslySetInnerHTML={{
             __html: t('g2g_data_transfer.transfer_to_growi_cloud', {
               documentationUrl,

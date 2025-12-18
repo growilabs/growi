@@ -32,14 +32,14 @@ const TagCloudBox: FC<Props> = memo((props: Props & typeof defaultProps) => {
         : tag.name;
 
     return (
-      <a
+      <button
         key={tag.name}
         type="button"
         className="grw-tag badge me-2"
         onClick={() => setSearchKeyword(`tag:${tag.name}`)}
       >
         {tagNameFormat}
-      </a>
+      </button>
     );
   });
 

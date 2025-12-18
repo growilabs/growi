@@ -67,7 +67,7 @@ export const InvitedForm = (props: InvitedFormProps): JSX.Element => {
           <p className="alert alert-danger">
             {loginErrors.map((err) => {
               return (
-                <span>
+                <span key={err.message}>
                   {t(err.message)}
                   <br />
                 </span>
@@ -92,11 +92,7 @@ export const InvitedForm = (props: InvitedFormProps): JSX.Element => {
   return (
     <div className="nologin-dialog px-3 pb-3 mx-auto" id="nologin-dialog">
       {formNotification()}
-      <form
-        role="form"
-        onSubmit={handleSubmit(submitHandler)}
-        id="invited-form"
-      >
+      <form onSubmit={handleSubmit(submitHandler)} id="invited-form">
         {/* Email Form */}
         <div className="input-group">
           <span className="input-group-text">
