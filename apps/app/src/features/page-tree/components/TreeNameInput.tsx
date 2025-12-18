@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { debounce } from 'throttle-debounce';
 
+import { useKeyboardSubmittable } from '~/client/components/Common/SubmittableInput';
+import type { KeyboardOnlySubmittableResult } from '~/client/components/Common/SubmittableInput/types';
 import type { InputValidationResult } from '~/client/util/use-input-validator';
 import {
   useInputValidator,
@@ -20,6 +22,11 @@ type TreeNameInputProps = {
   inputProps: InputHTMLAttributes<HTMLInputElement> & {
     ref?: (r: HTMLInputElement | null) => void;
   };
+  /**
+   * Keyboard submission handlers from useKeyboardSubmittable
+   * Handles Enter/Escape keys with IME composition awareness
+   */
+  keyboardSubmittableProps: KeyboardOnlySubmittableResult;
   /**
    * Validation function for the input value
    */
@@ -40,6 +47,7 @@ type TreeNameInputProps = {
  */
 const TreeNameInputSubstance: FC<TreeNameInputProps> = ({
   inputProps,
+  keyboardSubmittableProps,
   validateName,
   placeholder,
   className,
@@ -60,6 +68,16 @@ const TreeNameInputSubstance: FC<TreeNameInputProps> = ({
         onChange={(e) => {
           inputProps.onChange?.(e);
           validate(e.target.value);
+        }}
+        onKeyDown={(e) => {
+          keyboardSubmittableProps.onKeyDown(e);
+          inputProps.onKeyDown?.(e);
+        }}
+        onCompositionStart={(e) => {
+          keyboardSubmittableProps.onCompositionStart(e);
+        }}
+        onCompositionEnd={(e) => {
+          keyboardSubmittableProps.onCompositionEnd(e);
         }}
         onBlur={(e) => {
           setValidationResult(null);
@@ -90,6 +108,13 @@ export const TreeNameInput: FC<TreeItemToolProps> = ({ item }) => {
     return inputValidator(name) ?? null;
   };
 
+  // Handle Enter/Escape keys with IME composition awareness
+  // Supports mobile virtual keyboards (Android) where e.code may be empty
+  const keyboardSubmittableProps = useKeyboardSubmittable({
+    onSubmit: () => item.getTree().completeRenaming(),
+    onCancel: () => item.getTree().abortRenaming(),
+  });
+
   // Show placeholder only for create mode
   const isCreating = item.getId() === CREATING_PAGE_VIRTUAL_ID;
   const placeholder = isCreating ? t('Input page name') : undefined;
@@ -97,6 +122,7 @@ export const TreeNameInput: FC<TreeItemToolProps> = ({ item }) => {
   return (
     <TreeNameInputSubstance
       inputProps={item.getRenameInputProps()}
+      keyboardSubmittableProps={keyboardSubmittableProps}
       validateName={validateName}
       placeholder={placeholder}
       className="flex-grow-1"
