@@ -1,39 +1,45 @@
-import {
-  useCallback, useEffect, useState, type JSX,
-} from 'react';
-
+import { type JSX, useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import { globalEventTarget } from '@growi/core/dist/utils';
 import type { Element } from 'hast';
-import { useRouter } from 'next/router';
 
 import { NextLink } from '~/components/ReactMarkdownComponents/NextLink';
-import { useCurrentPageYjsData, useCurrentPageYjsDataLoading } from '~/features/collaborative-editor/states';
-import { useIsGuestUser, useIsReadOnlyUser, useIsSharedUser } from '~/states/context';
+import {
+  useCurrentPageYjsData,
+  useCurrentPageYjsDataLoading,
+} from '~/features/collaborative-editor/states';
+import {
+  useIsGuestUser,
+  useIsReadOnlyUser,
+  useIsSharedUser,
+} from '~/states/context';
 import { useShareLinkId } from '~/states/page/hooks';
 import type { ReservedNextCaretLineEventDetail } from '~/states/ui/editor/reserved-next-caret-line';
 import loggerFactory from '~/utils/logger';
 
-
 import styles from './Header.module.scss';
-
 
 const logger = loggerFactory('growi:components:Header');
 const moduleClass = styles['revision-head'] ?? '';
 
-
 function setCaretLine(lineNumber?: number): void {
   if (lineNumber != null) {
-    globalEventTarget.dispatchEvent(new CustomEvent<ReservedNextCaretLineEventDetail>('reservedNextCaretLine', {
-      detail: {
-        lineNumber,
-      },
-    }));
+    globalEventTarget.dispatchEvent(
+      new CustomEvent<ReservedNextCaretLineEventDetail>(
+        'reservedNextCaretLine',
+        {
+          detail: {
+            lineNumber,
+          },
+        },
+      ),
+    );
   }
 }
 
 type EditLinkProps = {
-  line?: number,
-}
+  line?: number;
+};
 
 /**
  * Inner FC to display edit link icon
@@ -43,24 +49,25 @@ const EditLink = (props: EditLinkProps): JSX.Element => {
 
   return (
     <span className="revision-head-edit-button">
-      <a href="#edit" aria-disabled={isDisabled} onClick={() => setCaretLine(props.line)}>
+      <a
+        href="#edit"
+        aria-disabled={isDisabled}
+        onClick={() => setCaretLine(props.line)}
+      >
         <span className="material-symbols-outlined">edit_square</span>
       </a>
     </span>
   );
 };
 
-
 type HeaderProps = {
-  children: React.ReactNode,
-  node: Element,
-  id?: string,
-}
+  children: React.ReactNode;
+  node: Element;
+  id?: string;
+};
 
 export const Header = (props: HeaderProps): JSX.Element => {
-  const {
-    node, id, children,
-  } = props;
+  const { node, id, children } = props;
 
   const isGuestUser = useIsGuestUser();
   const isReadOnlyUser = useIsReadOnlyUser();
@@ -75,16 +82,18 @@ export const Header = (props: HeaderProps): JSX.Element => {
 
   const CustomTag = node.tagName as keyof JSX.IntrinsicElements;
 
-  const activateByHash = useCallback((url: string) => {
-    try {
-      const hash = (new URL(url, 'https://example.com')).hash.slice(1);
-      setActive(decodeURIComponent(hash) === id);
-    }
-    catch (err) {
-      logger.debug(err);
-      setActive(false);
-    }
-  }, [id]);
+  const activateByHash = useCallback(
+    (url: string) => {
+      try {
+        const hash = new URL(url, 'https://example.com').hash.slice(1);
+        setActive(decodeURIComponent(hash) === id);
+      } catch (err) {
+        logger.debug(err);
+        setActive(false);
+      }
+    },
+    [id],
+  );
 
   // init
   useEffect(() => {
@@ -117,21 +126,30 @@ export const Header = (props: HeaderProps): JSX.Element => {
   // This is because the current conditional logic cannot handle cases where the draft is an empty string.
   // It will be possible to address this TODO ySyncAnnotation become available for import.
   // Ref: https://github.com/yjs/y-codemirror.next/pull/30
-  const showEditButton = !isGuestUser && !isReadOnlyUser && !isSharedUser && shareLinkId == null
-                            && (!isLoadingCurrentPageYjsData && !currentPageYjsData?.hasYdocsNewerThanLatestRevision);
+  const showEditButton =
+    !isGuestUser &&
+    !isReadOnlyUser &&
+    !isSharedUser &&
+    shareLinkId == null &&
+    !isLoadingCurrentPageYjsData &&
+    !currentPageYjsData?.hasYdocsNewerThanLatestRevision;
 
   return (
     <>
-      <CustomTag id={id} className={`position-relative ${moduleClass} ${isActive ? styles.blink : ''} `}>
-        <NextLink href={`#${id}`} className="d-none d-md-inline revision-head-link position-absolute">
+      <CustomTag
+        id={id}
+        className={`position-relative ${moduleClass} ${isActive ? styles.blink : ''} `}
+      >
+        <NextLink
+          href={`#${id}`}
+          className="d-none d-md-inline revision-head-link position-absolute"
+        >
           #
         </NextLink>
 
         {children}
 
-        { showEditButton && (
-          <EditLink line={node.position?.start.line} />
-        ) }
+        {showEditButton && <EditLink line={node.position?.start.line} />}
       </CustomTag>
     </>
   );

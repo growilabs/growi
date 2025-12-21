@@ -1,10 +1,12 @@
 import type { DetailedHTMLProps, ImgHTMLAttributes, JSX } from 'react';
 import React, { useMemo, useState } from 'react';
-
 import FsLightbox from 'fslightbox-react';
 import { createPortal } from 'react-dom';
 
-type Props = DetailedHTMLProps<ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement>
+type Props = DetailedHTMLProps<
+  ImgHTMLAttributes<HTMLImageElement>,
+  HTMLImageElement
+>;
 
 export const LightBox = (props: Props): JSX.Element => {
   const [toggler, setToggler] = useState(false);
