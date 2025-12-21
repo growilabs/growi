@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useId } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import { ItemsTree } from '~/features/page-tree/components';
@@ -28,6 +28,7 @@ type HeaderProps = {
 export const PageTreeHeader = memo(
   ({ isWipPageShown, onWipPageShownChange }: HeaderProps) => {
     const { t } = useTranslation();
+    const wipSwitchId = useId();
 
     const { mutate: mutateRootPage } = useSWRxRootPage({ suspense: true });
     useSWRxV5MigrationStatus({ suspense: true });
@@ -58,18 +59,28 @@ export const PageTreeHeader = memo(
           </button>
 
           <ul className="dropdown-menu">
-            <li className="dropdown-item" onClick={onWipPageShownChange}>
-              <div className="form-check form-switch">
-                <input
-                  className="form-check-input pe-none"
-                  type="checkbox"
-                  checked={isWipPageShown}
-                  onChange={() => {}}
-                />
-                <label className="form-check-label pe-none">
-                  {t('sidebar_header.show_wip_page')}
-                </label>
-              </div>
+            <li>
+              <button
+                type="button"
+                className="dropdown-item"
+                onClick={onWipPageShownChange}
+              >
+                <div className="form-check form-switch">
+                  <input
+                    id={wipSwitchId}
+                    className="form-check-input pe-none"
+                    type="checkbox"
+                    checked={isWipPageShown}
+                    onChange={() => {}}
+                  />
+                  <label
+                    className="form-check-label pe-none"
+                    htmlFor={wipSwitchId}
+                  >
+                    {t('sidebar_header.show_wip_page')}
+                  </label>
+                </div>
+              </button>
             </li>
           </ul>
         </div>

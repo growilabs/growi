@@ -24,10 +24,7 @@ export const SidebarNotFound = (): JSX.Element => {
         onClick={clickCreateButtonHandler}
       >
         <span className="material-symbols-outlined">edit_note</span>
-        {/* eslint-disable-next-line react/no-danger */}
-        <span
-          dangerouslySetInnerHTML={{ __html: t('Create Sidebar Page') }}
-        ></span>
+        <span>{t('Create Sidebar Page')}</span>
       </button>
     </div>
   );

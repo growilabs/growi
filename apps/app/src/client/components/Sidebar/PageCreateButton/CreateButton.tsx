@@ -19,10 +19,7 @@ export const CreateButton = (props: Props): JSX.Element => {
       className={`${moduleClass} btn btn-primary ${props.className ?? ''}`}
     >
       <Hexagon />
-      <span
-        className="icon material-symbols-outlined position-absolute"
-        aria-label="Create"
-      >
+      <span className="icon material-symbols-outlined position-absolute">
         edit
       </span>
     </button>

@@ -6,12 +6,14 @@ import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 import { useSWRxInAppNotifications } from '~/stores/in-app-notification';
 
 type InAppNotificationFormsProps = {
+  isUnopendNotificationsVisible: boolean;
   onChangeUnopendNotificationsVisible: () => void;
 };
 export const InAppNotificationForms = (
   props: InAppNotificationFormsProps,
 ): JSX.Element => {
-  const { onChangeUnopendNotificationsVisible } = props;
+  const { isUnopendNotificationsVisible, onChangeUnopendNotificationsVisible } =
+    props;
   const { t } = useTranslation('commons');
 
   return (
@@ -25,6 +27,8 @@ export const InAppNotificationForms = (
           className="form-check-input"
           type="checkbox"
           role="switch"
+          aria-checked={isUnopendNotificationsVisible}
+          checked={isUnopendNotificationsVisible}
           onChange={onChangeUnopendNotificationsVisible}
         />
       </div>

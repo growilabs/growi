@@ -85,8 +85,10 @@ export const ResizableArea = memo((props: ResizableAreaProps): JSX.Element => {
       <div className={styles['grw-navigation-draggable']}>
         {!disabled && (
           <>
-            <div
+            <button
+              type="button"
               className="grw-navigation-draggable-hitarea"
+              aria-label="Resize sidebar"
               onMouseDown={dragableAreaMouseDownHandler}
             />
             <div className="grw-navigation-draggable-line"></div>

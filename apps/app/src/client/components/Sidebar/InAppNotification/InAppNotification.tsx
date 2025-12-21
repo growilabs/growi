@@ -26,6 +26,7 @@ export const InAppNotification = (): JSX.Element => {
       </div>
 
       <InAppNotificationForms
+        isUnopendNotificationsVisible={isUnopendNotificationsVisible}
         onChangeUnopendNotificationsVisible={() => {
           setUnopendNotificationsVisible(!isUnopendNotificationsVisible);
         }}

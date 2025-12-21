@@ -49,11 +49,12 @@ export const PageCreateButton = React.memo((): JSX.Element => {
   const toggle = () => setDropdownOpen(!dropdownOpen);
 
   return (
-    <div
-      className="d-flex flex-row mt-2"
+    <fieldset
+      className="d-flex flex-row mt-2 border-0 p-0 m-0"
       onMouseEnter={onMouseEnterHandler}
       onMouseLeave={onMouseLeaveHandler}
       data-testid="grw-page-create-button"
+      aria-label="Page create actions"
     >
       <div className="btn-group flex-grow-1">
         <CreateButton
@@ -85,6 +86,6 @@ export const PageCreateButton = React.memo((): JSX.Element => {
           />
         </Dropdown>
       )}
-    </div>
+    </fieldset>
   );
 });

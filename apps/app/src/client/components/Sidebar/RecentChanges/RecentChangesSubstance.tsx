@@ -1,4 +1,4 @@
-import React, { type JSX, memo, useCallback, useEffect } from 'react';
+import React, { type JSX, memo, useCallback, useEffect, useId } from 'react';
 import { type IPageHasId, isPopulated } from '@growi/core';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { UserPicture } from '@growi/ui/dist/components';
@@ -72,14 +72,14 @@ const PageTags = memo((props: PageTagsProps): JSX.Element => {
           return <></>;
         }
         return (
-          <a
+          <button
             key={tag.name}
             type="button"
             className="grw-tag badge me-2"
             onClick={() => onClickTag?.(tag.name)}
           >
             {tag.name}
-          </a>
+          </button>
         );
       })}
     </>
@@ -92,7 +92,7 @@ const PageItem = memo(
     const dPagePath = new DevidedPagePath(page.path, false, true);
     const linkedPagePathFormer = new LinkedPagePath(dPagePath.former);
     const linkedPagePathLatter = new LinkedPagePath(dPagePath.latter);
-    const FormerLink = () => (
+    const formerLink = (
       <div
         className={`${formerLinkClass} ${isSmall ? 'text-truncate small' : ''}`}
       >
@@ -100,7 +100,7 @@ const PageItem = memo(
       </div>
     );
 
-    let locked;
+    let locked: JSX.Element | null = null;
     if (page.grant !== 1) {
       locked = (
         <span className="material-symbols-outlined ms-2 fs-6">lock</span>
@@ -122,9 +122,7 @@ const PageItem = memo(
 
           <div className="flex-grow-1 ms-2">
             <div className={`row ${isSmall ? 'gy-0' : 'gy-1'}`}>
-              <div className="col-12">
-                {!dPagePath.isRoot && <FormerLink />}
-              </div>
+              <div className="col-12">{!dPagePath.isRoot && formerLink}</div>
 
               <h6
                 className={`col-12 d-flex align-items-center ${isSmall ? 'mb-0 text-truncate' : 'mb-0'}`}
@@ -177,6 +175,8 @@ export const RecentChangesHeader = ({
   onWipPageShownChange,
 }: HeaderProps): JSX.Element => {
   const { t } = useTranslation();
+  const resizeInputId = useId();
+  const wipInputId = useId();
 
   const { mutate } = useSWRINFxRecentlyUpdated(isWipPageShown, {
     suspense: true,
@@ -215,35 +215,55 @@ export const RecentChangesHeader = ({
         </button>
 
         <ul className="dropdown-menu">
-          <li className="dropdown-item" onClick={changeSizeHandler}>
-            <div
-              className={`${styles['grw-recent-changes-resize-button']} form-check form-switch mb-0`}
+          <li>
+            <button
+              type="button"
+              className="dropdown-item"
+              onClick={changeSizeHandler}
             >
-              <input
-                id="recentChangesResize"
-                className="form-check-input pe-none"
-                type="checkbox"
-                checked={isSmall}
-                onChange={() => {}}
-              />
-              <label className="form-check-label pe-none" aria-disabled="true">
-                {t('sidebar_header.compact_view')}
-              </label>
-            </div>
+              <div
+                className={`${styles['grw-recent-changes-resize-button']} form-check form-switch mb-0`}
+              >
+                <input
+                  id={resizeInputId}
+                  className="form-check-input pe-none"
+                  type="checkbox"
+                  checked={isSmall}
+                  onChange={() => {}}
+                />
+                <label
+                  className="form-check-label pe-none"
+                  htmlFor={resizeInputId}
+                  aria-disabled="true"
+                >
+                  {t('sidebar_header.compact_view')}
+                </label>
+              </div>
+            </button>
           </li>
 
-          <li className="dropdown-item" onClick={onWipPageShownChange}>
-            <div className="form-check form-switch mb-0">
-              <input
-                id="wipPageVisibility"
-                className="form-check-input"
-                type="checkbox"
-                checked={isWipPageShown}
-              />
-              <label className="form-check-label pe-none">
-                {t('sidebar_header.show_wip_page')}
-              </label>
-            </div>
+          <li>
+            <button
+              type="button"
+              className="dropdown-item"
+              onClick={onWipPageShownChange}
+            >
+              <div className="form-check form-switch mb-0">
+                <input
+                  id={wipInputId}
+                  className="form-check-input"
+                  type="checkbox"
+                  checked={isWipPageShown}
+                  onChange={() => {}}
+                />
+                <label
+                  className="form-check-label pe-none"
+                  htmlFor={wipInputId}
+                >
+                  {t('sidebar_header.show_wip_page')}
+                </label>
+              </div>
+            </button>
           </li>
         </ul>
       </div>

@@ -211,8 +211,8 @@ const CollapsibleContainer = memo(
       : undefined;
 
     return (
-      <div
-        className={`flex-expand-horiz ${className}`}
+      <fieldset
+        className={`flex-expand-horiz border-0 p-0 m-0 ${className}`}
         onMouseLeave={mouseLeaveHandler}
       >
         <Nav onPrimaryItemHover={primaryItemHoverHandler} />
@@ -228,7 +228,7 @@ const CollapsibleContainer = memo(
             {children}
           </SimpleBar>
         </div>
-      </div>
+      </fieldset>
     );
   },
 );
@@ -252,6 +252,9 @@ const DrawableContainer = memo((props: DrawableContainerProps): JSX.Element => {
   const [isDrawerOpened, setIsDrawerOpened] = useDrawerOpened();
 
   const openClass = `${isDrawerOpened ? 'open' : ''}`;
+  const closeDrawer = useCallback(() => {
+    setIsDrawerOpened(false);
+  }, [setIsDrawerOpened]);
 
   return (
     <>
@@ -259,9 +262,11 @@ const DrawableContainer = memo((props: DrawableContainerProps): JSX.Element => {
         {children}
       </div>
       {isDrawerOpened && (
-        <div
+        <button
+          type="button"
           className="modal-backdrop fade show"
-          onClick={() => setIsDrawerOpened(false)}
+          aria-label="Close sidebar"
+          onClick={closeDrawer}
         />
       )}
     </>
@@ -286,7 +291,7 @@ export const Sidebar = (): JSX.Element => {
   // css styles
   const grwSidebarClass = styles['grw-sidebar'];
   // eslint-disable-next-line no-nested-ternary
-  let modeClass;
+  let modeClass = '';
   switch (sidebarMode) {
     case SidebarMode.DRAWER:
       modeClass = 'grw-sidebar-drawer';
