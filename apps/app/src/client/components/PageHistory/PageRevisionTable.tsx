@@ -1,71 +1,85 @@
-import React, {
-  useEffect, useRef, useState, type JSX,
-} from 'react';
-
+import React, { type JSX, useEffect, useRef, useState } from 'react';
 import type { IRevisionHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
 import { useSWRxInfinitePageRevisions } from '~/stores/page';
 
 import { RevisionComparer } from '../RevisionComparer/RevisionComparer';
-
 import { Revision } from './Revision';
 
 import styles from './PageRevisionTable.module.scss';
 
 type PageRevisionTableProps = {
-  sourceRevisionId?: string
-  targetRevisionId?: string
-  onClose: () => void,
-  currentPageId: string
-  currentPagePath: string
-}
+  sourceRevisionId?: string;
+  targetRevisionId?: string;
+  onClose: () => void;
+  currentPageId: string;
+  currentPagePath: string;
+};
 
-export const PageRevisionTable = (props: PageRevisionTableProps): JSX.Element => {
+export const PageRevisionTable = (
+  props: PageRevisionTableProps,
+): JSX.Element => {
   const { t } = useTranslation();
 
   const REVISIONS_PER_PAGE = 10;
 
   const {
-    sourceRevisionId, targetRevisionId, onClose, currentPageId, currentPagePath,
+    sourceRevisionId,
+    targetRevisionId,
+    onClose,
+    currentPageId,
+    currentPagePath,
   } = props;
 
   // Load all data if source revision id and target revision id not null
-  const revisionPerPage = (sourceRevisionId != null && targetRevisionId != null) ? 0 : REVISIONS_PER_PAGE;
-  const swrInifiniteResponse = useSWRxInfinitePageRevisions(currentPageId, revisionPerPage);
+  const revisionPerPage =
+    sourceRevisionId != null && targetRevisionId != null
+      ? 0
+      : REVISIONS_PER_PAGE;
+  const swrInifiniteResponse = useSWRxInfinitePageRevisions(
+    currentPageId,
+    revisionPerPage,
+  );
 
-
-  const {
-    data, size, error, setSize, isValidating,
-  } = swrInifiniteResponse;
+  const { data, size, error, setSize, isValidating } = swrInifiniteResponse;
 
   const revisions = data && data[0].revisions;
   const oldestRevision = revisions && revisions[revisions.length - 1];
 
   // First load
   const isLoadingInitialData = !data && !error;
-  const isLoadingMore = isLoadingInitialData
-    || (isValidating && data != null && typeof data[size - 1] === 'undefined');
-  const isReachingEnd = (revisionPerPage === 0) || !!(data != null && data[data.length - 1]?.revisions.length < REVISIONS_PER_PAGE);
+  const isLoadingMore =
+    isLoadingInitialData ||
+    (isValidating && data != null && typeof data[size - 1] === 'undefined');
+  const isReachingEnd =
+    revisionPerPage === 0 ||
+    !!(
+      data != null &&
+      data[data.length - 1]?.revisions.length < REVISIONS_PER_PAGE
+    );
 
   const [sourceRevision, setSourceRevision] = useState<IRevisionHasId>();
   const [targetRevision, setTargetRevision] = useState<IRevisionHasId>();
 
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
 
-
   useEffect(() => {
     if (revisions != null) {
       // when both source and target are specified
       if (sourceRevisionId != null && targetRevisionId != null) {
-        const sourceRevision = revisions.filter(revision => revision._id === sourceRevisionId)[0];
-        const targetRevision = revisions.filter(revision => revision._id === targetRevisionId)[0];
+        const sourceRevision = revisions.filter(
+          (revision) => revision._id === sourceRevisionId,
+        )[0];
+        const targetRevision = revisions.filter(
+          (revision) => revision._id === targetRevisionId,
+        )[0];
         setSourceRevision(sourceRevision);
         setTargetRevision(targetRevision);
-      }
-      else {
+      } else {
         const latestRevision = revisions != null ? revisions[0] : undefined;
-        const previousRevision = revisions.length >= 2 ? revisions[1] : latestRevision;
+        const previousRevision =
+          revisions.length >= 2 ? revisions[1] : latestRevision;
         setTargetRevision(latestRevision);
         setSourceRevision(previousRevision);
       }
@@ -79,7 +93,8 @@ export const PageRevisionTable = (props: PageRevisionTableProps): JSX.Element =>
       const offset = 30; // Threshold before scroll actually reaching the end
       if (tbody) {
         // Scroll end
-        const isEnd = tbody.scrollTop + tbody.clientHeight + offset >= tbody.scrollHeight;
+        const isEnd =
+          tbody.scrollTop + tbody.clientHeight + offset >= tbody.scrollHeight;
         if (isEnd && !isLoadingMore && !isReachingEnd) {
           setSize(size + 1);
         }
@@ -95,10 +110,13 @@ export const PageRevisionTable = (props: PageRevisionTableProps): JSX.Element =>
     };
   }, [isLoadingMore, isReachingEnd, setSize, size]);
 
-
-  const renderRow = (revision: IRevisionHasId, previousRevision: IRevisionHasId, latestRevision: IRevisionHasId,
-      isOldestRevision: boolean, hasDiff: boolean) => {
-
+  const renderRow = (
+    revision: IRevisionHasId,
+    previousRevision: IRevisionHasId,
+    latestRevision: IRevisionHasId,
+    isOldestRevision: boolean,
+    hasDiff: boolean,
+  ) => {
     const revisionId = revision._id;
 
     const handleCompareLatestRevisionButton = () => {
@@ -159,7 +177,10 @@ export const PageRevisionTable = (props: PageRevisionTableProps): JSX.Element =>
                 checked={revisionId === sourceRevision?._id}
                 onChange={() => setSourceRevision(revision)}
               />
-              <label className="form-label form-check-label" htmlFor={`compareSource-${revisionId}`} />
+              <label
+                className="form-label form-check-label"
+                htmlFor={`compareSource-${revisionId}`}
+              />
             </div>
           )}
         </td>
@@ -175,7 +196,10 @@ export const PageRevisionTable = (props: PageRevisionTableProps): JSX.Element =>
                 checked={revisionId === targetRevision?._id}
                 onChange={() => setTargetRevision(revision)}
               />
-              <label className="form-label form-check-label" htmlFor={`compareTarget-${revisionId}`} />
+              <label
+                className="form-label form-check-label"
+                htmlFor={`compareTarget-${revisionId}`}
+              />
             </div>
           )}
         </td>
@@ -185,7 +209,9 @@ export const PageRevisionTable = (props: PageRevisionTableProps): JSX.Element =>
 
   return (
     <>
-      <table className={`${styles['revision-history-table']} table revision-history-table`}>
+      <table
+        className={`${styles['revision-history-table']} table revision-history-table`}
+      >
         <thead>
           <tr className="d-flex">
             <th className="col">{t('page_history.revision')}</th>
@@ -194,18 +220,27 @@ export const PageRevisionTable = (props: PageRevisionTableProps): JSX.Element =>
           </tr>
         </thead>
         <tbody className="overflow-auto d-block" ref={tbodyRef}>
-          {revisions != null && data != null && data.map(apiResult => apiResult.revisions).flat()
-            .map((revision, idx) => {
-              const previousRevision = (idx + 1 < revisions?.length) ? revisions[idx + 1] : revision;
+          {revisions != null &&
+            data != null &&
+            data
+              .flatMap((apiResult) => apiResult.revisions)
+              .map((revision, idx) => {
+                const previousRevision =
+                  idx + 1 < revisions?.length ? revisions[idx + 1] : revision;
 
-              const isOldestRevision = revision === oldestRevision;
-              const latestRevision = revisions[0];
+                const isOldestRevision = revision === oldestRevision;
+                const latestRevision = revisions[0];
 
-              // set 'true' if undefined for backward compatibility
-              const hasDiff = revision.hasDiffToPrev !== false;
-              return renderRow(revision, previousRevision, latestRevision, isOldestRevision, hasDiff);
-            })
-          }
+                // set 'true' if undefined for backward compatibility
+                const hasDiff = revision.hasDiffToPrev !== false;
+                return renderRow(
+                  revision,
+                  previousRevision,
+                  latestRevision,
+                  isOldestRevision,
+                  hasDiff,
+                );
+              })}
         </tbody>
       </table>
 
@@ -219,9 +254,7 @@ export const PageRevisionTable = (props: PageRevisionTableProps): JSX.Element =>
             onClose={onClose}
           />
         </div>
-      )
-      }
+      )}
     </>
   );
-
 };

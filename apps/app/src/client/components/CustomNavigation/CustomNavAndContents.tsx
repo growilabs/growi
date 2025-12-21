@@ -1,24 +1,32 @@
 import type { ReactNode } from 'react';
-import React, { useState, type JSX } from 'react';
+import React, { type JSX, useState } from 'react';
 
-import CustomNav, { CustomNavTab, CustomNavDropdown } from './CustomNav';
+import CustomNav, { CustomNavDropdown, CustomNavTab } from './CustomNav';
 import CustomTabContent from './CustomTabContent';
 
 type CustomNavAndContentsProps = {
-  navTabMapping: any,
-  defaultTabIndex?: number,
-  navigationMode?: 'both' | 'tab' | 'dropdown',
-  tabContentClasses?: string[],
-  breakpointToHideInactiveTabsDown?: 'xs' | 'sm' | 'md' | 'lg' | 'xl',
-  navRightElement?: ReactNode
-}
+  navTabMapping: any;
+  defaultTabIndex?: number;
+  navigationMode?: 'both' | 'tab' | 'dropdown';
+  tabContentClasses?: string[];
+  breakpointToHideInactiveTabsDown?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  navRightElement?: ReactNode;
+};
 
-
-const CustomNavAndContents = (props: CustomNavAndContentsProps): JSX.Element => {
+const CustomNavAndContents = (
+  props: CustomNavAndContentsProps,
+): JSX.Element => {
   const {
-    navTabMapping, defaultTabIndex, navigationMode = 'tab', tabContentClasses = ['p-4'], breakpointToHideInactiveTabsDown, navRightElement,
+    navTabMapping,
+    defaultTabIndex,
+    navigationMode = 'tab',
+    tabContentClasses = ['p-4'],
+    breakpointToHideInactiveTabsDown,
+    navRightElement,
   } = props;
-  const [activeTab, setActiveTab] = useState(Object.keys(props.navTabMapping)[defaultTabIndex || 0]);
+  const [activeTab, setActiveTab] = useState(
+    Object.keys(props.navTabMapping)[defaultTabIndex || 0],
+  );
 
   let SelectedNav;
   switch (navigationMode) {
@@ -42,7 +50,11 @@ const CustomNavAndContents = (props: CustomNavAndContentsProps): JSX.Element => 
         breakpointToHideInactiveTabsDown={breakpointToHideInactiveTabsDown}
         navRightElement={navRightElement}
       />
-      <CustomTabContent activeTab={activeTab} navTabMapping={navTabMapping} additionalClassNames={tabContentClasses} />
+      <CustomTabContent
+        activeTab={activeTab}
+        navTabMapping={navTabMapping}
+        additionalClassNames={tabContentClasses}
+      />
     </>
   );
 };

@@ -1,14 +1,15 @@
+import type React from 'react';
 import type { FC } from 'react';
-import React, { useState, useCallback, useMemo } from 'react';
-
+import { useCallback, useMemo, useState } from 'react';
 import type { IPageToDeleteWithMeta } from '@growi/core';
 import { useTranslation } from 'next-i18next';
-import {
-  Modal, ModalHeader, ModalBody, ModalFooter,
-} from 'reactstrap';
+import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 import { apiv3Delete } from '~/client/util/apiv3-client';
-import { useEmptyTrashModalStatus, useEmptyTrashModalActions } from '~/states/ui/modal/empty-trash';
+import {
+  useEmptyTrashModalActions,
+  useEmptyTrashModalStatus,
+} from '~/states/ui/modal/empty-trash';
 
 import ApiErrorMessageList from '../PageManagement/ApiErrorMessageList';
 
@@ -32,7 +33,7 @@ const EmptyTrashModalSubstance = ({
 
   const [errs, setErrs] = useState<Error[] | null>(null);
 
-  const emptyTrash = useCallback(async() => {
+  const emptyTrash = useCallback(async () => {
     if (pages == null) {
       return;
     }
@@ -43,22 +44,21 @@ const EmptyTrashModalSubstance = ({
         onEmptiedTrash();
       }
       closeModal();
-    }
-    catch (err) {
+    } catch (err) {
       setErrs([err]);
     }
   }, [pages, onEmptiedTrash, closeModal]);
 
-  const emptyTrashButtonHandler = useCallback(async() => {
+  const emptyTrashButtonHandler = useCallback(async () => {
     await emptyTrash();
   }, [emptyTrash]);
 
   // Memoize page paths rendering
   const renderPagePaths = useMemo(() => {
     if (pages != null) {
-      return pages.map(page => (
+      return pages.map((page) => (
         <p key={page.data._id} className="mb-1">
-          <code>{ page.data.path }</code>
+          <code>{page.data.path}</code>
         </p>
       ));
     }
@@ -73,11 +73,15 @@ const EmptyTrashModalSubstance = ({
       </ModalHeader>
       <ModalBody>
         <div className="grw-scrollable-modal-body pb-1">
-          <label className="form-label">{ t('modal_delete.deleting_page') }:</label><br />
+          <label className="form-label">
+            {t('modal_delete.deleting_page')}:
+          </label>
+          <br />
           {/* Todo: change the way to show path on modal when too many pages are selected */}
           {renderPagePaths}
         </div>
-        {!canDeleteAllPages && t('modal_empty.not_deletable_notice')}<br />
+        {!canDeleteAllPages && t('modal_empty.not_deletable_notice')}
+        <br />
         {t('modal_empty.notice')}
       </ModalBody>
       <ModalFooter>
@@ -87,7 +91,9 @@ const EmptyTrashModalSubstance = ({
           className="btn btn-danger"
           onClick={emptyTrashButtonHandler}
         >
-          <span className="material-symbols-outlined" aria-hidden="true">delete_forever</span>
+          <span className="material-symbols-outlined" aria-hidden="true">
+            delete_forever
+          </span>
           {t('modal_empty.empty_the_trash_button')}
         </button>
       </ModalFooter>
@@ -103,7 +109,12 @@ export const EmptyTrashModal: FC = () => {
   const { close: closeModal } = useEmptyTrashModalActions();
 
   return (
-    <Modal size="lg" isOpen={isOpened} toggle={closeModal} data-testid="page-delete-modal">
+    <Modal
+      size="lg"
+      isOpen={isOpened}
+      toggle={closeModal}
+      data-testid="page-delete-modal"
+    >
       {isOpened && (
         <EmptyTrashModalSubstance
           pages={pages}

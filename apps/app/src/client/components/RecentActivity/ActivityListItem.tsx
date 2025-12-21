@@ -1,10 +1,13 @@
 import { formatDistanceToNow } from 'date-fns';
+import type { Locale } from 'date-fns/locale';
 import { useTranslation } from 'next-i18next';
-import { type Locale } from 'date-fns/locale';
-import { getLocale } from '~/server/util/locale-utils';
-import type { ActivityHasUserId, SupportedActivityActionType } from '~/interfaces/activity';
-import { ActivityLogActions } from '~/interfaces/activity';
 
+import type {
+  ActivityHasUserId,
+  SupportedActivityActionType,
+} from '~/interfaces/activity';
+import { ActivityLogActions } from '~/interfaces/activity';
+import { getLocale } from '~/server/util/locale-utils';
 
 export const ActivityActionTranslationMap: Record<
   SupportedActivityActionType,
@@ -53,8 +56,11 @@ const calculateTimePassed = (date: Date, locale: Locale): string => {
   return timePassed;
 };
 
-
-export const ActivityListItem = ({ activity }: { activity: ActivityHasUserId }): JSX.Element => {
+export const ActivityListItem = ({
+  activity,
+}: {
+  activity: ActivityHasUserId;
+}): JSX.Element => {
   const { t, i18n } = useTranslation();
   const currentLangCode = i18n.language;
   const dateFnsLocale = getLocale(currentLangCode);
@@ -66,11 +72,11 @@ export const ActivityListItem = ({ activity }: { activity: ActivityHasUserId }):
   return (
     <div className="activity-row">
       <p className="mb-1">
-        <span className="material-symbols-outlined me-2">{setIcon(action)}</span>
-
-        <span className="dark:text-white">
-          {' '}{t(fullKeyPath)}
+        <span className="material-symbols-outlined me-2">
+          {setIcon(action)}
         </span>
+
+        <span className="dark:text-white"> {t(fullKeyPath)}</span>
 
         <span className="text-secondary small ms-3">
           {calculateTimePassed(activity.createdAt, dateFnsLocale)}
