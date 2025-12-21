@@ -43,13 +43,14 @@ export const Maintenance = (): JSX.Element => {
             <span className="material-symbols-outlined">
               arrow_circle_right
             </span>
-            <a
+            <button
+              type="button"
               className="btn btn-link"
               onClick={logoutHandler}
               id="maintanounse-mode-logout"
             >
               {t('maintenance_mode.logout')}
-            </a>
+            </button>
           </p>
         ) : (
           <p>

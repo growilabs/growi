@@ -71,7 +71,8 @@ const TemplateListGroupItem: React.FC<TemplateSummaryItemProps> = ({
   assert(localizedTemplate?.isValid);
 
   return (
-    <a
+    <button
+      type="button"
       className={`list-group-item list-group-item-action ${isSelected ? 'active' : ''}`}
       onClick={onClick}
     >
@@ -97,7 +98,7 @@ const TemplateListGroupItem: React.FC<TemplateSummaryItemProps> = ({
             {locale}
           </span>
         ))}
-    </a>
+    </button>
   );
 };
 

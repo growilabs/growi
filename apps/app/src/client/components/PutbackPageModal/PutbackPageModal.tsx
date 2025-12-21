@@ -94,9 +94,9 @@ const PutBackPageModalSubstance: FC<PutBackPageModalSubstanceProps> = ({
     () => (
       <>
         <div>
-          <label className="form-label">
+          <div className="form-label">
             {t('modal_putback.label.Put Back Page')}:
-          </label>
+          </div>
           <br />
           <code>{path}</code>
         </div>

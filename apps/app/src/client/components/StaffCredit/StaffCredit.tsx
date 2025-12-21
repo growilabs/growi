@@ -101,14 +101,15 @@ const StaffCredit = (props: Props): JSX.Element => {
       );
     });
     return (
-      <div
-        className="text-center staff-credit-content"
+      <button
+        type="button"
+        className="text-center staff-credit-content btn btn-link p-0 border-0"
         onClick={contentsClickedHandler}
       >
         <h1 className="staff-credit-mb-6rem">GROWI Contributors</h1>
         <div className="clearfix"></div>
         {credit}
-      </div>
+      </button>
     );
   }, [contentsClickedHandler, contributors, renderMembers]);
 

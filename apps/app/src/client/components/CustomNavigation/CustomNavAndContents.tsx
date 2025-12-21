@@ -13,6 +13,8 @@ type CustomNavAndContentsProps = {
   navRightElement?: ReactNode;
 };
 
+type CustomNavComponent = typeof CustomNavTab;
+
 const CustomNavAndContents = (
   props: CustomNavAndContentsProps,
 ): JSX.Element => {
@@ -28,7 +30,7 @@ const CustomNavAndContents = (
     Object.keys(props.navTabMapping)[defaultTabIndex || 0],
   );
 
-  let SelectedNav;
+  let SelectedNav: CustomNavComponent = CustomNavTab;
   switch (navigationMode) {
     case 'tab':
       SelectedNav = CustomNavTab;

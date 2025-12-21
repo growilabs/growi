@@ -141,6 +141,7 @@ export const RevisionDiff = (props: RevisioinDiffProps): JSX.Element => {
       {/* eslint-disable-next-line react/no-danger */}
       <div
         className="revision-history-diff pb-1"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: diff view is pre-sanitized HTML
         dangerouslySetInnerHTML={diffView}
       />
     </div>

@@ -104,11 +104,11 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
           </ModalHeader>
           <ModalBody>
             <div>
-              <label className="form-label mb-4">
+              <div className="form-label mb-4">
                 <code>{parentPath}</code>
                 <br />
                 {t('template.modal_label.Create template under')}
-              </label>
+              </div>
               <div className="row row-cols-2">
                 {renderTemplateCard('children', '_template')}
                 {renderTemplateCard('descendants', '__template')}

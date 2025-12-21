@@ -159,9 +159,9 @@ export const CustomNavTab = (props: CustomNavTabProps): JSX.Element => {
   }
 
   // Might make this dynamic for px, %, pt, em
-  function getPercentage(min, max) {
+  const getPercentage = useCallback((min: number, max: number) => {
     return (min / max) * 100;
-  }
+  }, []);
 
   useEffect(() => {
     if (activeTab == null || activeTab === '') {
@@ -189,7 +189,7 @@ export const CustomNavTab = (props: CustomNavTabProps): JSX.Element => {
 
       marginLeft += width;
     }
-  }, [activeTab, navTabRefs, navTabMapping]);
+  }, [activeTab, getPercentage, navTabRefs]);
 
   // determine inactive classes to hide NavItem
   const inactiveClassnames: string[] = [];

@@ -41,6 +41,7 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
                   <span
                     className="text-nowrap"
                     // eslint-disable-next-line react/no-danger
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n content includes markup
                     dangerouslySetInnerHTML={{
                       __html: t(
                         'modal_shortcuts.global.Open/Close shortcut help',
@@ -87,6 +88,7 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
                   <span
                     className="text-nowrap"
                     // eslint-disable-next-line react/no-danger
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n content includes markup
                     dangerouslySetInnerHTML={{
                       __html: t('modal_shortcuts.global.Show Contributors'),
                     }}
@@ -248,6 +250,7 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
                 <div className="flex-grow-1">
                   <span
                     // eslint-disable-next-line react/no-danger
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n content includes markup
                     dangerouslySetInnerHTML={{
                       __html: t('modal_shortcuts.editor.Insert Line'),
                     }}

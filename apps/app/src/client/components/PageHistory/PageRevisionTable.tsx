@@ -180,7 +180,11 @@ export const PageRevisionTable = (
               <label
                 className="form-label form-check-label"
                 htmlFor={`compareSource-${revisionId}`}
-              />
+              >
+                <span className="visually-hidden">
+                  {t('page_history.comparing_source')}
+                </span>
+              </label>
             </div>
           )}
         </td>
@@ -199,7 +203,11 @@ export const PageRevisionTable = (
               <label
                 className="form-label form-check-label"
                 htmlFor={`compareTarget-${revisionId}`}
-              />
+              >
+                <span className="visually-hidden">
+                  {t('page_history.comparing_target')}
+                </span>
+              </label>
             </div>
           )}
         </td>
