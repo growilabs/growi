@@ -37,9 +37,8 @@ const LikeButtons: FC<LikeButtonsProps> = (props: LikeButtonsProps) => {
   }, [isLiked]);
 
   return (
-    <div
+    <fieldset
       className={`btn-group btn-group-like ${styles['btn-group-like']}`}
-      role="group"
       aria-label="Like buttons"
     >
       <button
@@ -90,7 +89,7 @@ const LikeButtons: FC<LikeButtonsProps> = (props: LikeButtonsProps) => {
           </div>
         </PopoverBody>
       </Popover>
-    </div>
+    </fieldset>
   );
 };
 

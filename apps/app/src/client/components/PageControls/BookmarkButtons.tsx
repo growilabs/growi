@@ -59,9 +59,8 @@ export const BookmarkButtons: FC<Props> = (props: Props) => {
   }
 
   return (
-    <div
+    <fieldset
       className={`btn-group btn-group-bookmark ${styles['btn-group-bookmark']}`}
-      role="group"
       aria-label="Bookmark buttons"
     >
       <BookmarkFolderMenu
@@ -124,6 +123,6 @@ export const BookmarkButtons: FC<Props> = (props: Props) => {
           )}
         </PopoverBody>
       </Popover>
-    </div>
+    </fieldset>
   );
 };

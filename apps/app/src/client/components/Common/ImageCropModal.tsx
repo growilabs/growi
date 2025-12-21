@@ -184,7 +184,11 @@ const ImageCropModal: FC<Props> = (props: Props) => {
                 circularCrop={isCircular}
               />
             ) : (
-              <img style={{ maxWidth: imageRef?.width }} src={imageRef?.src} />
+              <img
+                style={{ maxWidth: imageRef?.width }}
+                src={imageRef?.src}
+                alt="Cropped preview"
+              />
             )}
           </ModalBody>
           <ModalFooter>

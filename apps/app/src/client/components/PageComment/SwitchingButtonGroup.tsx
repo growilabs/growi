@@ -42,7 +42,7 @@ export const SwitchingButtonGroup = (props: Props): JSX.Element => {
   const { showPreview, onSelected } = props;
 
   return (
-    <div className={`btn-group ${moduleClass}`} role="group">
+    <fieldset className={`btn-group ${moduleClass}`} aria-label="Comment view">
       <SwitchingButton
         active={showPreview}
         className="ps-2 pe-3"
@@ -59,6 +59,6 @@ export const SwitchingButtonGroup = (props: Props): JSX.Element => {
         <span className="material-symbols-outlined me-1">edit_square</span>
         <span className="d-none d-sm-inline">{t('page_comment.write')}</span>
       </SwitchingButton>
-    </div>
+    </fieldset>
   );
 };

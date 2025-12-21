@@ -3,6 +3,7 @@ import React, {
   memo,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
 } from 'react';
@@ -90,6 +91,7 @@ const WideViewMenuItem = (props: WideViewMenuItemProps): JSX.Element => {
   const { t } = useTranslation();
 
   const { onClick, expandContentWidth } = props;
+  const wideViewId = useId();
 
   return (
     <DropdownItem
@@ -101,10 +103,13 @@ const WideViewMenuItem = (props: WideViewMenuItemProps): JSX.Element => {
         <input
           className="form-check-input pe-none"
           type="checkbox"
+          id={wideViewId}
           checked={expandContentWidth}
           onChange={() => {}}
         />
-        <label className="form-check-label pe-none">{t('wide_view')}</label>
+        <label className="form-check-label pe-none" htmlFor={wideViewId}>
+          {t('wide_view')}
+        </label>
       </div>
     </DropdownItem>
   );

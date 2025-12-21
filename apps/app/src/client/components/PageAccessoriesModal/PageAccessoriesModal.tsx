@@ -35,6 +35,30 @@ const ShareLink = dynamic(
   { ssr: false },
 );
 
+const PageHistoryIcon = (): JSX.Element => (
+  <span className="material-symbols-outlined">history</span>
+);
+const PageAttachmentIcon = (): JSX.Element => (
+  <span className="material-symbols-outlined">attachment</span>
+);
+const ShareLinkIcon = (): JSX.Element => (
+  <span className="material-symbols-outlined">share</span>
+);
+
+const PageHistoryContent = (): JSX.Element => {
+  const { close } = usePageAccessoriesModalActions();
+
+  return <PageHistory onClose={close} />;
+};
+
+const PageAttachmentContent = (): JSX.Element => {
+  return <PageAttachment />;
+};
+
+const ShareLinkContent = (): JSX.Element => {
+  return <ShareLink />;
+};
+
 interface PageAccessoriesModalSubstanceProps {
   isWindowExpanded: boolean;
   setIsWindowExpanded: (expanded: boolean) => void;
@@ -59,27 +83,19 @@ const PageAccessoriesModalSubstance = ({
   const navTabMapping = useMemo(() => {
     return {
       [PageAccessoriesModalContents.PageHistory]: {
-        Icon: () => <span className="material-symbols-outlined">history</span>,
-        Content: () => {
-          return <PageHistory onClose={close} />;
-        },
+        Icon: PageHistoryIcon,
+        Content: PageHistoryContent,
         i18n: t('History'),
         isLinkEnabled: () => !isGuestUser && !isSharedUser,
       },
       [PageAccessoriesModalContents.Attachment]: {
-        Icon: () => (
-          <span className="material-symbols-outlined">attachment</span>
-        ),
-        Content: () => {
-          return <PageAttachment />;
-        },
+        Icon: PageAttachmentIcon,
+        Content: PageAttachmentContent,
         i18n: t('attachment_data'),
       },
       [PageAccessoriesModalContents.ShareLink]: {
-        Icon: () => <span className="material-symbols-outlined">share</span>,
-        Content: () => {
-          return <ShareLink />;
-        },
+        Icon: ShareLinkIcon,
+        Content: ShareLinkContent,
         i18n: t('share_links.share_link_management'),
         isLinkEnabled: () =>
           !isGuestUser &&
@@ -88,14 +104,7 @@ const PageAccessoriesModalSubstance = ({
           !isLinkSharingDisabled,
       },
     };
-  }, [
-    t,
-    close,
-    isGuestUser,
-    isReadOnlyUser,
-    isSharedUser,
-    isLinkSharingDisabled,
-  ]);
+  }, [t, isGuestUser, isReadOnlyUser, isSharedUser, isLinkSharingDisabled]);
 
   // Memoize expand/contract handlers
   const expandWindow = useCallback(
