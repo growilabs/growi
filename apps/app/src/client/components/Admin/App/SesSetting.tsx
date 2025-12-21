@@ -18,26 +18,34 @@ const SesSetting = (props: Props): JSX.Element => {
     <React.Fragment>
       <div id="mail-ses" className="tab-pane active">
         <div className="row">
-          <label className="text-start text-md-end col-md-3 col-form-label">
+          <label
+            className="text-start text-md-end col-md-3 col-form-label"
+            htmlFor="admin-ses-access-key-id"
+          >
             Access key ID
           </label>
           <div className="col-md-6">
             <input
               className="form-control"
               type="text"
+              id="admin-ses-access-key-id"
               {...register('sesAccessKeyId')}
             />
           </div>
         </div>
 
         <div className="row">
-          <label className="text-start text-md-end col-md-3 col-form-label">
+          <label
+            className="text-start text-md-end col-md-3 col-form-label"
+            htmlFor="admin-ses-secret-access-key"
+          >
             Secret access key
           </label>
           <div className="col-md-6">
             <input
               className="form-control"
               type="text"
+              id="admin-ses-secret-access-key"
               {...register('sesSecretAccessKey')}
             />
           </div>

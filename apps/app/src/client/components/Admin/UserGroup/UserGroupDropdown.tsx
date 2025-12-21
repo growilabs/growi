@@ -45,7 +45,7 @@ export const UserGroupDropdown: FC<Props> = (props: Props) => {
           {t('admin:user_group_management.add_child_group')}
         </button>
 
-        <div className="dropdown-menu" aria-labelledby="dropdownMenuButton">
+        <div className="dropdown-menu">
           {selectableUserGroups != null && selectableUserGroups.length > 0 && (
             <>
               {selectableUserGroups.map((userGroup) => (

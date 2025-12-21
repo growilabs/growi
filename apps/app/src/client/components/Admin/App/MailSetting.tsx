@@ -99,7 +99,10 @@ const MailSetting = (props: Props) => {
         </div>
       )}
       <div className="row mb-4">
-        <label className="col-md-3 col-form-label text-end">
+        <label
+          className="col-md-3 col-form-label text-end"
+          htmlFor="admin-mail-setting-from-address"
+        >
           {t('admin:app_setting.from_e-mail_address')}
         </label>
         <div className="col-md-6">
@@ -107,15 +110,16 @@ const MailSetting = (props: Props) => {
             className="form-control"
             type="text"
             placeholder={`${t('eg')} mail@growi.org`}
+            id="admin-mail-setting-from-address"
             {...register('fromAddress')}
           />
         </div>
       </div>
 
       <div className="row mb-2">
-        <label className="form-label text-start text-md-end col-md-3 col-form-label">
+        <span className="form-label text-start text-md-end col-md-3 col-form-label">
           {t('admin:app_setting.transmission_method')}
-        </label>
+        </span>
         <div className="col-md-6 py-2">
           {transmissionMethods.map((method) => {
             return (

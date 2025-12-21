@@ -49,6 +49,7 @@ export const DeleteSlackBotSettingsModal = React.memo(
       return (
         <span
           // eslint-disable-next-line react/no-danger
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
           dangerouslySetInnerHTML={{ __html: htmlContent }}
         />
       );

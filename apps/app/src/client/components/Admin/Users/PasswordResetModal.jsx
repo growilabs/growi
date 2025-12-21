@@ -83,8 +83,10 @@ class PasswordResetModal extends React.Component {
     return (
       <div className="d-flex col text-start ms-1 ps-0">
         {!isMailerSetup ? (
-          <label
-            className="form-label form-text text-muted"
+          <p
+            className="form-label form-text text-muted mb-0"
+            // eslint-disable-next-line react/no-danger
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
             dangerouslySetInnerHTML={{
               __html: t('admin:mailer_setup_required'),
             }}
@@ -142,12 +144,18 @@ class PasswordResetModal extends React.Component {
         <p>
           {t('user_management.reset_password_modal.new_password')}:{' '}
           <code>
-            <span
+            <button
+              type="button"
+              className="btn btn-link p-0 align-baseline"
               onMouseEnter={() => this.setState({ showPassword: true })}
               onMouseLeave={() => this.setState({ showPassword: false })}
+              aria-pressed={showPassword}
+              aria-label={t(
+                'user_management.reset_password_modal.new_password',
+              )}
             >
               {showPassword ? temporaryPassword : maskedPassword}
-            </span>
+            </button>
           </code>
           <CopyToClipboard
             text={temporaryPassword}

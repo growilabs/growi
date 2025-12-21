@@ -63,14 +63,15 @@ const ExternalAccountTable = (
             <th style={{ width: '100px' }}>
               <div className="d-flex align-items-center">
                 {t('user_management.password_setting')}
-                <span
-                  role="button"
-                  className="text-muted mx-2"
+                <button
+                  type="button"
+                  className="text-muted mx-2 btn btn-link p-0"
                   data-bs-toggle="popper"
                   data-placement="top"
                   data-trigger="hover"
                   data-html="true"
                   title={t('user_management.password_setting_help')}
+                  aria-label={t('user_management.password_setting_help')}
                 >
                   <small>
                     <span
@@ -80,7 +81,7 @@ const ExternalAccountTable = (
                       help
                     </span>
                   </small>
-                </span>
+                </button>
               </div>
             </th>
             <th style={{ width: '100px' }}>
@@ -127,14 +128,13 @@ const ExternalAccountTable = (
                         </span>{' '}
                         <span className="caret"></span>
                       </button>
-                      <ul className="dropdown-menu" role="menu">
+                      <ul className="dropdown-menu">
                         <li className="dropdown-header">
                           {t('user_management.user_table.edit_menu')}
                         </li>
                         <button
                           className="dropdown-item"
                           type="button"
-                          role="button"
                           onClick={() => removeExtenalAccount(ea._id)}
                         >
                           <span className="material-symbols-outlined text-danger">

@@ -218,7 +218,13 @@ export const SlackIntegration = (): JSX.Element => {
             href={t('admin:slack_integration.docs_url.slack_integration')}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={t(
+              'admin:slack_integration.selecting_bot_types.slack_bot',
+            )}
           >
+            <span className="visually-hidden">
+              {t('admin:slack_integration.selecting_bot_types.slack_bot')}
+            </span>
             <span className="material-symbols-outlined ms-1" aria-hidden="true">
               help
             </span>

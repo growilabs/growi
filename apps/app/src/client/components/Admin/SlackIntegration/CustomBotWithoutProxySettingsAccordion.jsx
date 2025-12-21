@@ -132,6 +132,7 @@ const CustomBotWithoutProxySettingsAccordion = (props) => {
           <img
             src="/images/slack-integration/slack-bot-install-your-app-introduction.png"
             className="border border-light img-fluid mb-5"
+            alt=""
           />
           <p>
             2.{' '}
@@ -140,11 +141,13 @@ const CustomBotWithoutProxySettingsAccordion = (props) => {
           <img
             src="/images/slack-integration/slack-bot-install-to-workspace.png"
             className="border border-light img-fluid mb-5"
+            alt=""
           />
           <p>3. {t('admin:slack_integration.accordion.click_allow')}</p>
           <img
             src="/images/slack-integration/slack-bot-install-your-app-transition-destination.png"
             className="border border-light img-fluid mb-5"
+            alt=""
           />
           <p>
             4.{' '}
@@ -153,6 +156,7 @@ const CustomBotWithoutProxySettingsAccordion = (props) => {
           <img
             src="/images/slack-integration/slack-bot-install-your-app-complete.png"
             className="border border-light img-fluid mb-5"
+            alt=""
           />
           <p>
             5. {t('admin:slack_integration.accordion.invite_bot_to_channel')}
@@ -160,10 +164,12 @@ const CustomBotWithoutProxySettingsAccordion = (props) => {
           <img
             src="/images/slack-integration/slack-bot-install-to-workspace-joined-bot.png"
             className="border border-light img-fluid mb-1"
+            alt=""
           />
           <img
             src="/images/slack-integration/slack-bot-install-your-app-introduction-to-channel.png"
             className="border border-light img-fluid"
+            alt=""
           />
         </div>
       </Accordion>
@@ -271,11 +277,11 @@ const CustomBotWithoutProxySettingsAccordion = (props) => {
         <form>
           <div className="row my-3 justify-content-center">
             <div className="slack-connection-log col-md-4">
-              <label className="form-label mb-1">
+              <div className="form-label mb-1">
                 <p className="border-info slack-connection-log-title ps-2 m-0">
                   Logs
                 </p>
-              </label>
+              </div>
               <textarea
                 className="form-control card border-info slack-connection-log-body rounded-3"
                 rows="5"

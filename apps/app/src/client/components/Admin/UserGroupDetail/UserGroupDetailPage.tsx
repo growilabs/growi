@@ -130,7 +130,7 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
     ) {
       router.push('/admin/user-groups');
     }
-  }, [currentUserGroup, currentUserGroupId, notExistsUerGroup, router]);
+  }, [currentUserGroupId, notExistsUerGroup, router]);
 
   /*
    * Fetch
@@ -348,10 +348,10 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
       }
     },
     [
-      currentUserGroup?.name,
       currentUserGroupId,
       mutateUserGroupRelationList,
       mutateUserGroupRelations,
+      currentUserGroup?.name,
     ],
   );
 
@@ -372,21 +372,18 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
         );
       }
     },
-    [currentUserGroup?.name, currentUserGroupId, mutateUserGroupRelationList],
+    [currentUserGroupId, mutateUserGroupRelationList, currentUserGroup?.name],
   );
 
-  const showUpdateModal = useCallback(
-    (group: IUserGroupHasId) => {
-      setUpdateModalShown(true);
-      setSelectedUserGroup(group);
-    },
-    [setUpdateModalShown],
-  );
+  const showUpdateModal = useCallback((group: IUserGroupHasId) => {
+    setUpdateModalShown(true);
+    setSelectedUserGroup(group);
+  }, []);
 
   const hideUpdateModal = useCallback(() => {
     setUpdateModalShown(false);
     setSelectedUserGroup(undefined);
-  }, [setUpdateModalShown]);
+  }, []);
 
   const updateChildUserGroup = useCallback(
     async (userGroupData: IUserGroupHasId) => {
@@ -424,11 +421,11 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
 
   const showCreateModal = useCallback(() => {
     setCreateModalShown(true);
-  }, [setCreateModalShown]);
+  }, []);
 
   const hideCreateModal = useCallback(() => {
     setCreateModalShown(false);
-  }, [setCreateModalShown]);
+  }, []);
 
   const createChildUserGroup = useCallback(
     async (userGroupData: IUserGroup) => {
@@ -466,18 +463,15 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
     ],
   );
 
-  const showDeleteModal = useCallback(
-    async (group: IUserGroupHasId) => {
-      setSelectedUserGroup(group);
-      setDeleteModalShown(true);
-    },
-    [setSelectedUserGroup, setDeleteModalShown],
-  );
+  const showDeleteModal = useCallback(async (group: IUserGroupHasId) => {
+    setSelectedUserGroup(group);
+    setDeleteModalShown(true);
+  }, []);
 
   const hideDeleteModal = useCallback(() => {
     setSelectedUserGroup(undefined);
     setDeleteModalShown(false);
-  }, [setSelectedUserGroup, setDeleteModalShown]);
+  }, []);
 
   const deleteChildUserGroupById = useCallback(
     async (
@@ -512,12 +506,7 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
         toastError(new Error('Unable to delete the groups'));
       }
     },
-    [
-      mutateChildUserGroups,
-      setSelectedUserGroup,
-      setDeleteModalShown,
-      isExternalGroup,
-    ],
+    [mutateChildUserGroups, isExternalGroup],
   );
 
   const removeChildUserGroup = useCallback(

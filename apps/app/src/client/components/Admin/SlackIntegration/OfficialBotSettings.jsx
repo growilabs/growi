@@ -90,15 +90,7 @@ const OfficialBotSettings = (props) => {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <span
-            className="growi-custom-icons btn-link ms-2"
-            onClick={() =>
-              window.open(
-                `${t('admin:slack_integration.docs_url.official_bot')}`,
-                '_blank',
-              )
-            }
-          >
+          <span className="growi-custom-icons btn-link ms-2">
             external_link
           </span>
         </a>

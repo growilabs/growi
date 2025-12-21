@@ -43,13 +43,19 @@ export default function MaskedInput(props: Props): JSX.Element {
         tabIndex={tabIndex}
         {...inputProps}
       />
-      <span onClick={togglePassword} className={styles.PasswordReveal}>
+      <button
+        type="button"
+        onClick={togglePassword}
+        className={styles.PasswordReveal}
+        aria-pressed={passwordShown}
+        aria-label="Toggle password visibility"
+      >
         {passwordShown ? (
           <span className="material-symbols-outlined">visibility</span>
         ) : (
           <span className="material-symbols-outlined">visibility_off</span>
         )}
-      </span>
+      </button>
     </div>
   );
 }

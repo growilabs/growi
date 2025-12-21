@@ -35,9 +35,9 @@ export const AzureSettingMolecule = (
   return (
     <>
       <div className="row form-group my-3">
-        <label className="text-left text-md-right col-md-3 col-form-label">
+        <span className="text-left text-md-right col-md-3 col-form-label">
           {t('admin:app_setting.file_delivery_method')}
-        </label>
+        </span>
 
         <div className="col-md-6">
           <div className="dropdown">
@@ -54,10 +54,7 @@ export const AzureSettingMolecule = (
               {!azureReferenceFileWithRelayMode &&
                 t('admin:app_setting.file_delivery_method_redirect')}
             </button>
-            <div
-              className="dropdown-menu"
-              aria-labelledby="ddAzureReferenceFileWithRelayMode"
-            >
+            <div className="dropdown-menu">
               <button
                 className="dropdown-item"
                 type="button"
@@ -91,6 +88,7 @@ export const AzureSettingMolecule = (
         <p
           className="alert alert-info"
           // eslint-disable-next-line react/no-danger
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: includes <br> and <code> from i18n strings
           dangerouslySetInnerHTML={{
             __html: t('admin:app_setting.azure_note_for_the_only_env_option', {
               env: 'AZURE_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
@@ -133,6 +131,8 @@ export const AzureSettingMolecule = (
               <p className="form-text text-muted">
                 {/* eslint-disable-next-line react/no-danger */}
                 <small
+                  // eslint-disable-next-line react/no-danger
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                   dangerouslySetInnerHTML={{
                     __html: t('admin:app_setting.use_env_var_if_empty', {
                       variable: 'AZURE_TENANT_ID',
@@ -161,6 +161,8 @@ export const AzureSettingMolecule = (
               <p className="form-text text-muted">
                 {/* eslint-disable-next-line react/no-danger */}
                 <small
+                  // eslint-disable-next-line react/no-danger
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                   dangerouslySetInnerHTML={{
                     __html: t('admin:app_setting.use_env_var_if_empty', {
                       variable: 'AZURE_CLIENT_ID',
@@ -189,6 +191,8 @@ export const AzureSettingMolecule = (
               <p className="form-text text-muted">
                 {/* eslint-disable-next-line react/no-danger */}
                 <small
+                  // eslint-disable-next-line react/no-danger
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                   dangerouslySetInnerHTML={{
                     __html: t('admin:app_setting.use_env_var_if_empty', {
                       variable: 'AZURE_CLIENT_SECRET',
@@ -219,6 +223,8 @@ export const AzureSettingMolecule = (
               <p className="form-text text-muted">
                 {/* eslint-disable-next-line react/no-danger */}
                 <small
+                  // eslint-disable-next-line react/no-danger
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                   dangerouslySetInnerHTML={{
                     __html: t('admin:app_setting.use_env_var_if_empty', {
                       variable: 'AZURE_STORAGE_ACCOUNT_NAME',
@@ -249,6 +255,8 @@ export const AzureSettingMolecule = (
               <p className="form-text text-muted">
                 {/* eslint-disable-next-line react/no-danger */}
                 <small
+                  // eslint-disable-next-line react/no-danger
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                   dangerouslySetInnerHTML={{
                     __html: t('admin:app_setting.use_env_var_if_empty', {
                       variable: 'AZURE_STORAGE_CONTAINER_NAME',

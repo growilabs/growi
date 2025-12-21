@@ -82,6 +82,7 @@ const CustomBotWithoutProxySecretTokenSection = (props) => {
           <p className="form-text text-muted">
             {/* eslint-disable-next-line max-len, react/no-danger */}
             <small
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
               dangerouslySetInnerHTML={{
                 __html: t('admin:slack_integration.use_env_var_if_empty', {
                   variable: 'SLACKBOT_WITHOUT_PROXY_SIGNING_SECRET',
@@ -115,6 +116,7 @@ const CustomBotWithoutProxySecretTokenSection = (props) => {
           <p className="form-text text-muted">
             {/* eslint-disable-next-line react/no-danger */}
             <small
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
               dangerouslySetInnerHTML={{
                 __html: t('admin:slack_integration.use_env_var_if_empty', {
                   variable: 'SLACKBOT_WITHOUT_PROXY_BOT_TOKEN',

@@ -30,9 +30,9 @@ export const GcsSettingMolecule = (
   return (
     <>
       <div className="row my-3">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <span className="text-start text-md-end col-md-3 col-form-label">
           {t('admin:app_setting.file_delivery_method')}
-        </label>
+        </span>
 
         <div className="col-md-6">
           <div className="dropdown">
@@ -49,10 +49,7 @@ export const GcsSettingMolecule = (
               {!gcsReferenceFileWithRelayMode &&
                 t('admin:app_setting.file_delivery_method_redirect')}
             </button>
-            <div
-              className="dropdown-menu"
-              aria-labelledby="ddGcsReferenceFileWithRelayMode"
-            >
+            <div className="dropdown-menu">
               <button
                 className="dropdown-item"
                 type="button"
@@ -86,6 +83,7 @@ export const GcsSettingMolecule = (
         <p
           className="alert alert-info"
           // eslint-disable-next-line react/no-danger
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
           dangerouslySetInnerHTML={{
             __html: t('admin:app_setting.note_for_the_only_env_option', {
               env: 'GCS_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
@@ -130,6 +128,8 @@ export const GcsSettingMolecule = (
               <p className="form-text text-muted">
                 {/* eslint-disable-next-line react/no-danger */}
                 <small
+                  // eslint-disable-next-line react/no-danger
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                   dangerouslySetInnerHTML={{
                     __html: t('admin:app_setting.use_env_var_if_empty', {
                       variable: 'GCS_API_KEY_JSON_PATH',
@@ -160,6 +160,8 @@ export const GcsSettingMolecule = (
               <p className="form-text text-muted">
                 {/* eslint-disable-next-line react/no-danger */}
                 <small
+                  // eslint-disable-next-line react/no-danger
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                   dangerouslySetInnerHTML={{
                     __html: t('admin:app_setting.use_env_var_if_empty', {
                       variable: 'GCS_BUCKET',
@@ -190,6 +192,8 @@ export const GcsSettingMolecule = (
               <p className="form-text text-muted">
                 {/* eslint-disable-next-line react/no-danger */}
                 <small
+                  // eslint-disable-next-line react/no-danger
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                   dangerouslySetInnerHTML={{
                     __html: t('admin:app_setting.use_env_var_if_empty', {
                       variable: 'GCS_UPLOAD_NAMESPACE',

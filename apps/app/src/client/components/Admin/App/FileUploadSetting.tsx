@@ -103,9 +103,9 @@ const FileUploadSetting = (): JSX.Element => {
       </p>
 
       <div className="row mb-3">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <span className="text-start text-md-end col-md-3 col-form-label">
           {t('admin:app_setting.file_upload_method')}
-        </label>
+        </span>
 
         <div className="col-md-6 py-2">
           {Object.values(FileUploadType).map((type) => {
@@ -137,6 +137,8 @@ const FileUploadSetting = (): JSX.Element => {
             <br />
             {/* eslint-disable-next-line react/no-danger */}
             <b
+              // eslint-disable-next-line react/no-danger
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
               dangerouslySetInnerHTML={{
                 __html: t('admin:app_setting.fixed_by_env_var', {
                   envKey: 'FILE_UPLOAD',

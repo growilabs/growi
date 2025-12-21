@@ -73,7 +73,10 @@ const AppSetting = (props) => {
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
       <div className="row">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <label
+          className="text-start text-md-end col-md-3 col-form-label"
+          htmlFor="admin-app-setting-site-name"
+        >
           {t('admin:app_setting.site_name')}
         </label>
         <div className="col-md-6">
@@ -81,6 +84,7 @@ const AppSetting = (props) => {
             className="form-control"
             type="text"
             placeholder="GROWI"
+            id="admin-app-setting-site-name"
             {...register('title')}
           />
           <p className="form-text text-muted">
@@ -90,7 +94,10 @@ const AppSetting = (props) => {
       </div>
 
       <div className="row mb-5">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <label
+          className="text-start text-md-end col-md-3 col-form-label"
+          htmlFor="admin-app-setting-confidential-name"
+        >
           {t('admin:app_setting.confidential_name')}
         </label>
         <div className="col-md-6">
@@ -98,6 +105,7 @@ const AppSetting = (props) => {
             className="form-control"
             type="text"
             placeholder={t('admin:app_setting.confidential_example')}
+            id="admin-app-setting-confidential-name"
             {...register('confidential')}
           />
           <p className="form-text text-muted">
@@ -107,13 +115,13 @@ const AppSetting = (props) => {
       </div>
 
       <div className="row mb-5">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <span className="text-start text-md-end col-md-3 col-form-label">
           {t('admin:app_setting.default_language')}
-        </label>
+        </span>
         <div className="col-md-6 py-2">
           {i18nConfig.locales.map((locale) => {
             if (i18n == null) {
-              return;
+              return null;
             }
             const fixedT = i18n.getFixedT(locale, 'admin');
 
@@ -139,9 +147,9 @@ const AppSetting = (props) => {
       </div>
 
       <div className="row mb-5">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <span className="text-start text-md-end col-md-3 col-form-label">
           {t('admin:app_setting.default_mail_visibility')}
-        </label>
+        </span>
         <div className="col-md-6 py-2">
           <div className="form-check form-check-inline">
             <input

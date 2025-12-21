@@ -84,24 +84,21 @@ export const UserGroupPage: FC = () => {
    */
   const showCreateModal = useCallback(() => {
     setCreateModalShown(true);
-  }, [setCreateModalShown]);
+  }, []);
 
   const hideCreateModal = useCallback(() => {
     setCreateModalShown(false);
-  }, [setCreateModalShown]);
+  }, []);
 
-  const showUpdateModal = useCallback(
-    (group: IUserGroupHasId) => {
-      setUpdateModalShown(true);
-      setSelectedUserGroup(group);
-    },
-    [setUpdateModalShown],
-  );
+  const showUpdateModal = useCallback((group: IUserGroupHasId) => {
+    setUpdateModalShown(true);
+    setSelectedUserGroup(group);
+  }, []);
 
   const hideUpdateModal = useCallback(() => {
     setUpdateModalShown(false);
     setSelectedUserGroup(undefined);
-  }, [setUpdateModalShown]);
+  }, []);
 
   const syncUserGroupAndRelations = useCallback(async () => {
     try {

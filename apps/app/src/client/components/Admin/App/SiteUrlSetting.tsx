@@ -61,6 +61,7 @@ const SiteUrlSetting = (props: Props) => {
           <p
             className="alert alert-info"
             // eslint-disable-next-line react/no-danger
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
             dangerouslySetInnerHTML={{
               __html: t('site_url.note_for_the_only_env_option', {
                 env: 'APP_SITE_URL_USES_ONLY_ENV_VARS',
@@ -97,6 +98,7 @@ const SiteUrlSetting = (props: Props) => {
                 <p className="form-text text-muted">
                   {/* eslint-disable-next-line react/no-danger */}
                   <span
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                     dangerouslySetInnerHTML={{ __html: t('site_url.help') }}
                   />
                 </p>
@@ -111,6 +113,7 @@ const SiteUrlSetting = (props: Props) => {
                 <p className="form-text text-muted">
                   {/* eslint-disable-next-line react/no-danger */}
                   <span
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                     dangerouslySetInnerHTML={{
                       __html: t('use_env_var_if_empty', {
                         variable: 'APP_SITE_URL',

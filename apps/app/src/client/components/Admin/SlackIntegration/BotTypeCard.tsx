@@ -43,11 +43,11 @@ export const BotTypeCard = (props: BotTypeCardProps): JSX.Element => {
   const isBotTypeOfficial = botType === SlackbotType.OFFICIAL;
 
   return (
-    <div
+    <button
+      type="button"
       className={`card admin-bot-card rounded border-radius-sm shadow ${isActive ? 'border-primary' : ''}`}
       onClick={() => onBotTypeSelectHandler(botDetails[botType].botType)}
-      role="button"
-      key={botType}
+      aria-pressed={isActive}
     >
       <div>
         <h3
@@ -121,7 +121,7 @@ export const BotTypeCard = (props: BotTypeCardProps): JSX.Element => {
           </div>
         </div>
       </div>
-    </div>
+    </button>
   );
 };
 

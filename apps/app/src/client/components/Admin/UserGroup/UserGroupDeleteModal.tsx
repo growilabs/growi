@@ -87,13 +87,10 @@ export const UserGroupDeleteModal: FC<Props> = (props: Props) => {
     onHide();
   }, [onHide, resetStates]);
 
-  const handleActionChange = useCallback(
-    (e) => {
-      const actionName = e.target.value;
-      setActionName(actionName);
-    },
-    [setActionName],
-  );
+  const handleActionChange = useCallback((e) => {
+    const actionName = e.target.value;
+    setActionName(actionName);
+  }, []);
 
   const handleGroupChange = useCallback(
     (e) => {

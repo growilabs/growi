@@ -82,7 +82,7 @@ const PageBulkExportSettings = (): JSX.Element => {
           </p>
 
           <div className="my-4 row">
-            <label className="text-start text-md-end col-md-3 col-form-label"></label>
+            <div className="text-start text-md-end col-md-3 col-form-label"></div>
 
             <div className="col-md-6">
               <div className="form-check form-switch form-check-info">
@@ -107,6 +107,8 @@ const PageBulkExportSettings = (): JSX.Element => {
                 <p className="form-text text-muted">
                   {/* eslint-disable-next-line react/no-danger */}
                   <b
+                    // eslint-disable-next-line react/no-danger
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                     dangerouslySetInnerHTML={{
                       __html: t('admin:app_setting.fixed_by_env_var', {
                         envKey: 'BULK_EXPORT_PAGES_ENABLED',
@@ -121,13 +123,17 @@ const PageBulkExportSettings = (): JSX.Element => {
 
           <div className="mb-4">
             <div className="row">
-              <label className="text-start text-md-end col-md-3 col-form-label">
+              <label
+                className="text-start text-md-end col-md-3 col-form-label"
+                htmlFor="admin-page-bulk-export-expiration"
+              >
                 {t('app_setting.page_bulk_export_storage_period')}
               </label>
 
               <div className="col-md-2">
                 <select
                   className="form-select"
+                  id="admin-page-bulk-export-expiration"
                   value={
                     (bulkExportDownloadExpirationSeconds ?? 0) / (24 * 60 * 60)
                   }

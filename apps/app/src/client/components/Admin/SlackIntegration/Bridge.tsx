@@ -36,6 +36,7 @@ const BridgeCore = (props: BridgeCoreProps): JSX.Element => {
           <small
             className="ms-2 d-none d-lg-inline"
             // eslint-disable-next-line react/no-danger
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
             dangerouslySetInnerHTML={{ __html: description }}
           />
         </p>
@@ -52,6 +53,7 @@ const BridgeCore = (props: BridgeCoreProps): JSX.Element => {
       >
         <small
           // eslint-disable-next-line react/no-danger
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
           dangerouslySetInnerHTML={{ __html: description }}
         />
       </UncontrolledTooltip>
@@ -68,10 +70,10 @@ export const Bridge = (props: BridgeProps): JSX.Element => {
   const { t } = useTranslation();
   const { errorCount, totalCount, withProxy } = props;
 
-  let description;
-  let iconClass;
-  let iconName;
-  let hrClass;
+  let description = '';
+  let iconClass = '';
+  let iconName = '';
+  let hrClass = '';
 
   // empty or all failed
   if (totalCount === 0 || errorCount === totalCount) {

@@ -92,6 +92,7 @@ const BotInstallProcessForCustomBotWithProxy = () => {
       <img
         src="/images/slack-integration/activate-public-dist.png"
         className="border border-light img-fluid mb-5"
+        alt=""
       />
       <p>
         3. {t('admin:slack_integration.accordion.click-add-to-slack-button')}
@@ -99,11 +100,13 @@ const BotInstallProcessForCustomBotWithProxy = () => {
       <img
         src="/images/slack-integration/click-add-to-slack.png"
         className="border border-light img-fluid mb-5"
+        alt=""
       />
       <p>4. {t('admin:slack_integration.accordion.click_allow')}</p>
       <img
         src="/images/slack-integration/slack-bot-install-your-app-transition-destination.png"
         className="border border-light img-fluid mb-5"
+        alt=""
       />
       <p>
         5. {t('admin:slack_integration.accordion.install_complete_if_checked')}
@@ -111,15 +114,18 @@ const BotInstallProcessForCustomBotWithProxy = () => {
       <img
         src="/images/slack-integration/basicinfo-all-checked.png"
         className="border border-light img-fluid mb-5"
+        alt=""
       />
       <p>6. {t('admin:slack_integration.accordion.invite_bot_to_channel')}</p>
       <img
         src="/images/slack-integration/slack-bot-install-to-workspace-joined-bot.png"
         className="border border-light img-fluid mb-1"
+        alt=""
       />
       <img
         src="/images/slack-integration/slack-bot-install-your-app-introduction-to-channel.png"
         className="border border-light img-fluid"
+        alt=""
       />
     </div>
   );
@@ -133,6 +139,7 @@ const RegisteringProxyUrlProcess = () => {
         <li>
           <p
             // eslint-disable-next-line react/no-danger
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
             dangerouslySetInnerHTML={{
               __html: t('admin:slack_integration.accordion.copy_proxy_url'),
             }}
@@ -141,12 +148,14 @@ const RegisteringProxyUrlProcess = () => {
             <img
               className="border border-light img-fluid"
               src="/images/slack-integration/growi-register-sentence.png"
+              alt=""
             />
           </p>
         </li>
         <li>
           <p
             // eslint-disable-next-line react/no-danger
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
             dangerouslySetInnerHTML={{
               __html: t(
                 'admin:slack_integration.accordion.enter_proxy_url_and_update',
@@ -157,6 +166,7 @@ const RegisteringProxyUrlProcess = () => {
             <img
               className="border border-light img-fluid"
               src="/images/slack-integration/growi-set-proxy-url.png"
+              alt=""
             />
           </p>
           <p className="text-danger">
@@ -195,7 +205,10 @@ const GeneratingTokensAndRegisteringProxyServiceProcess = (props) => {
         1. {t('admin:slack_integration.accordion.generate_access_token')}
       </p>
       <div className="row">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <label
+          className="text-start text-md-end col-md-3 col-form-label"
+          htmlFor="admin-slack-access-token-ptog"
+        >
           Access Token Proxy to GROWI
         </label>
         <div className="col-md-6">
@@ -204,6 +217,7 @@ const GeneratingTokensAndRegisteringProxyServiceProcess = (props) => {
               className="form-control"
               type="text"
               value={props.tokenPtoG || ''}
+              id="admin-slack-access-token-ptog"
               readOnly
             />
             <CustomCopyToClipBoard
@@ -214,7 +228,10 @@ const GeneratingTokensAndRegisteringProxyServiceProcess = (props) => {
         </div>
       </div>
       <div className="row">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <label
+          className="text-start text-md-end col-md-3 col-form-label"
+          htmlFor="admin-slack-access-token-gtop"
+        >
           Access Token GROWI to Proxy
         </label>
         <div className="col-md-6">
@@ -223,6 +240,7 @@ const GeneratingTokensAndRegisteringProxyServiceProcess = (props) => {
               className="form-control"
               type="text"
               value={props.tokenGtoP || ''}
+              id="admin-slack-access-token-gtop"
               readOnly
             />
             <CustomCopyToClipBoard
@@ -254,6 +272,7 @@ const GeneratingTokensAndRegisteringProxyServiceProcess = (props) => {
             <p
               className="ms-2"
               // eslint-disable-next-line react/no-danger
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
               dangerouslySetInnerHTML={{
                 __html: t(
                   'admin:slack_integration.accordion.enter_growi_register_on_slack',
@@ -267,6 +286,7 @@ const GeneratingTokensAndRegisteringProxyServiceProcess = (props) => {
               // TODO: Add dynamic link
               // TODO: Add logo
               // eslint-disable-next-line react/no-danger
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
               dangerouslySetInnerHTML={{
                 __html: t('admin:slack_integration.accordion.paste_growi_url'),
               }}
@@ -290,6 +310,7 @@ const GeneratingTokensAndRegisteringProxyServiceProcess = (props) => {
             <p
               className="ms-2"
               // eslint-disable-next-line react/no-danger
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
               dangerouslySetInnerHTML={{
                 __html: t(
                   'admin:slack_integration.accordion.enter_access_token_for_growi_and_proxy',
@@ -302,6 +323,7 @@ const GeneratingTokensAndRegisteringProxyServiceProcess = (props) => {
           className="mb-3 border border-light img-fluid"
           width={500}
           src="/images/slack-integration/growi-register-modal.png"
+          alt=""
         />
       </div>
     </div>
@@ -390,11 +412,11 @@ const TestProcess = ({
       <form>
         <div className="row my-3 justify-content-center">
           <div className="slack-connection-log col-md-4">
-            <label className="form-label mb-1">
+            <div className="form-label mb-1">
               <p className="border-info slack-connection-log-title ps-2 m-0">
                 Logs
               </p>
-            </label>
+            </div>
             <textarea
               className="form-control card border-info slack-connection-log-body rounded-3"
               rows="5"

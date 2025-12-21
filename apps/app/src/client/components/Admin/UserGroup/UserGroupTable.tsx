@@ -271,7 +271,6 @@ export const UserGroupTable: FC<Props> = ({
                         <button
                           className="dropdown-item"
                           type="button"
-                          role="button"
                           onClick={onClickEdit}
                           data-user-group-id={group._id}
                         >
@@ -284,7 +283,6 @@ export const UserGroupTable: FC<Props> = ({
                           <button
                             className="dropdown-item"
                             type="button"
-                            role="button"
                             onClick={onClickRemove}
                             data-user-group-id={group._id}
                           >
@@ -299,7 +297,6 @@ export const UserGroupTable: FC<Props> = ({
                         <button
                           className="dropdown-item"
                           type="button"
-                          role="button"
                           onClick={onClickDelete}
                           data-user-group-id={group._id}
                         >

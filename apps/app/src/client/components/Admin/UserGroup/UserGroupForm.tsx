@@ -54,7 +54,7 @@ export const UserGroupForm: FC<Props> = (props: Props) => {
         setSelectedParent(userGroup);
       }
     },
-    [selectedParent, setSelectedParent],
+    [selectedParent],
   );
 
   useEffect(() => {
@@ -146,7 +146,7 @@ export const UserGroupForm: FC<Props> = (props: Props) => {
             >
               {selectedParent?.name ?? messageAtReleaseParentGroup}
             </button>
-            <div className="dropdown-menu" aria-labelledby="dropdownMenuButton">
+            <div className="dropdown-menu">
               {isSelectableParentUserGroups && (
                 <>
                   {selectableParentUserGroups.map((userGroup) => (

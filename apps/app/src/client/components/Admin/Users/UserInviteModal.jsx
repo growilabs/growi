@@ -63,7 +63,7 @@ class UserInviteModal extends React.Component {
 
     return (
       <>
-        <label className="form-label">
+        <label className="form-label" htmlFor="admin-invite-emails">
           {t('admin:user_management.invite_modal.emails')}
         </label>
         <p>
@@ -73,6 +73,7 @@ class UserInviteModal extends React.Component {
         </p>
         <textarea
           className="form-control"
+          id="admin-invite-emails"
           placeholder="e.g.&#13;&#10;user1@growi.org&#13;&#10;user2@growi.org"
           style={{ height: '200px' }}
           value={this.state.emailInputValue}
@@ -128,6 +129,8 @@ class UserInviteModal extends React.Component {
             // eslint-disable-next-line react/no-danger
             <p
               className="form-text text-muted"
+              // eslint-disable-next-line react/no-danger
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
               dangerouslySetInnerHTML={{
                 __html: t(
                   'admin:user_management.invite_modal.mail_setting_link',
@@ -138,6 +141,7 @@ class UserInviteModal extends React.Component {
             // eslint-disable-next-line react/no-danger
             <p
               className="form-text text-muted"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
               dangerouslySetInnerHTML={{
                 __html: t('admin:mailer_setup_required'),
               }}
@@ -171,12 +175,12 @@ class UserInviteModal extends React.Component {
 
     return (
       <>
-        <label className="form-label me-3 text-start" style={{ flex: 1 }}>
+        <div className="form-label me-3 text-start" style={{ flex: 1 }}>
           <text className="text-danger">
             {t('admin:user_management.invite_modal.send_temporary_password')}
           </text>
           <text>{t('admin:user_management.invite_modal.send_email')}</text>
-        </label>
+        </div>
         <button
           type="button"
           className="btn btn-outline-secondary"

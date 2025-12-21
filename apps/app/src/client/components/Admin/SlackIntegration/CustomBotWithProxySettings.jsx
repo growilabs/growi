@@ -126,7 +126,10 @@ const CustomBotWithProxySettings = (props) => {
           />
 
           <div className="row my-4">
-            <label className="text-start text-md-end col-md-3 col-form-label mt-3">
+            <label
+              className="text-start text-md-end col-md-3 col-form-label mt-3"
+              htmlFor="admin-slack-proxy-url"
+            >
               Proxy URL
             </label>
             <div className="col-md-6 mt-3">
@@ -134,6 +137,7 @@ const CustomBotWithProxySettings = (props) => {
                 className="form-control"
                 type="text"
                 name="settingForm[proxyUrl]"
+                id="admin-slack-proxy-url"
                 value={newProxyServerUri}
                 onChange={(e) => {
                   setNewProxyServerUri(e.target.value);

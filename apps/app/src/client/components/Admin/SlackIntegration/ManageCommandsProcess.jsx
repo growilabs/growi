@@ -181,6 +181,61 @@ PermissionSettingForEachPermissionTypeComponent.propTypes = {
   permissionSettings: PropTypes.object,
 };
 
+const PermissionSettingsForEachCategoryComponent = ({
+  currentPermissionTypes,
+  usageType,
+  menuItem,
+  permissionSettings,
+}) => {
+  const {
+    title,
+    description,
+    defaultCommandsName,
+    singleCommandDescription,
+    updatePermissionsHandler,
+    updateChannelsHandler,
+    allowedChannelsDescription,
+  } = menuItem;
+
+  return (
+    <>
+      {(title || description) && (
+        <div className="row">
+          <div className="col-md-7 offset-md-2">
+            {title && <p className="fw-bold mb-1">{title}</p>}
+            {description && <p className="text-muted">{description}</p>}
+          </div>
+        </div>
+      )}
+
+      <div className="form-check">
+        <div className="row mb-5 d-block">
+          {defaultCommandsName.map((keyName) => (
+            <PermissionSettingForEachPermissionTypeComponent
+              key={`${keyName}-component`}
+              keyName={keyName}
+              usageType={usageType}
+              permissionSettings={permissionSettings}
+              currentPermissionType={currentPermissionTypes[keyName]}
+              singleCommandDescription={singleCommandDescription}
+              onUpdatePermissions={updatePermissionsHandler}
+              onUpdateChannels={updateChannelsHandler}
+              allowedChannelsDescription={allowedChannelsDescription}
+            />
+          ))}
+        </div>
+      </div>
+    </>
+  );
+};
+
+PermissionSettingsForEachCategoryComponent.propTypes = {
+  currentPermissionTypes: PropTypes.object,
+  usageType: PropTypes.string,
+  menuItem: PropTypes.object,
+  permissionSettings: PropTypes.object,
+};
+
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 const ManageCommandsProcess = ({
   slackAppIntegrationId,
@@ -307,63 +362,10 @@ const ManageCommandsProcess = ({
     }
   };
 
-  const PermissionSettingsForEachCategoryComponent = ({
-    currentPermissionTypes,
-    usageType,
-    menuItem,
-  }) => {
-    const permissionMap = {
-      broadcastUse: permissionsForBroadcastUseCommandsState,
-      singleUse: permissionsForSingleUseCommandsState,
-      linkSharing: permissionsForEventsState,
-    };
-
-    const {
-      title,
-      description,
-      defaultCommandsName,
-      singleCommandDescription,
-      updatePermissionsHandler,
-      updateChannelsHandler,
-      allowedChannelsDescription,
-    } = menuItem;
-
-    return (
-      <>
-        {(title || description) && (
-          <div className="row">
-            <div className="col-md-7 offset-md-2">
-              {title && <p className="fw-bold mb-1">{title}</p>}
-              {description && <p className="text-muted">{description}</p>}
-            </div>
-          </div>
-        )}
-
-        <div className="form-check">
-          <div className="row mb-5 d-block">
-            {defaultCommandsName.map((keyName) => (
-              <PermissionSettingForEachPermissionTypeComponent
-                key={`${keyName}-component`}
-                keyName={keyName}
-                usageType={usageType}
-                permissionSettings={permissionMap[usageType]}
-                currentPermissionType={currentPermissionTypes[keyName]}
-                singleCommandDescription={singleCommandDescription}
-                onUpdatePermissions={updatePermissionsHandler}
-                onUpdateChannels={updateChannelsHandler}
-                allowedChannelsDescription={allowedChannelsDescription}
-              />
-            ))}
-          </div>
-        </div>
-      </>
-    );
-  };
-
-  PermissionSettingsForEachCategoryComponent.propTypes = {
-    currentPermissionTypes: PropTypes.object,
-    usageType: PropTypes.string,
-    menuItem: PropTypes.object,
+  const permissionMap = {
+    broadcastUse: permissionsForBroadcastUseCommandsState,
+    singleUse: permissionsForSingleUseCommandsState,
+    linkSharing: permissionsForEventsState,
   };
 
   // Using i18n in allowedChannelsDescription will cause interpolation error
@@ -413,6 +415,7 @@ const ManageCommandsProcess = ({
               currentPermissionTypes={currentPermissionTypes}
               usageType={commandUsageType}
               menuItem={menuMap[commandUsageType]}
+              permissionSettings={permissionMap[commandUsageType]}
             />
           ))}
         </div>
@@ -427,6 +430,7 @@ const ManageCommandsProcess = ({
               currentPermissionTypes={currentPermissionTypes}
               usageType={EventType}
               menuItem={menuMap[EventType]}
+              permissionSettings={permissionMap[EventType]}
             />
           ))}
         </div>
