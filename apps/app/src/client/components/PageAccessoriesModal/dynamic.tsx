@@ -14,7 +14,10 @@ export const PageAccessoriesModalLazyLoaded = (): JSX.Element => {
 
   const PageAccessoriesModal = useLazyLoader<PageAccessoriesModalProps>(
     'page-accessories-modal',
-    () => import('./PageAccessoriesModal').then(mod => ({ default: mod.PageAccessoriesModal })),
+    () =>
+      import('./PageAccessoriesModal').then((mod) => ({
+        default: mod.PageAccessoriesModal,
+      })),
     status?.isOpened ?? false,
   );
 

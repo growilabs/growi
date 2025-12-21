@@ -1,10 +1,8 @@
 import type { FC } from 'react';
-import React, { useState, useCallback } from 'react';
-
+import React, { useCallback, useState } from 'react';
 import type { IUser } from '@growi/core';
 import { useTranslation } from 'next-i18next';
-import { UncontrolledTooltip, Popover, PopoverBody } from 'reactstrap';
-
+import { Popover, PopoverBody, UncontrolledTooltip } from 'reactstrap';
 
 import UserPictureList from '../Common/UserPictureList';
 
@@ -12,14 +10,13 @@ import styles from './LikeButtons.module.scss';
 import popoverStyles from './user-list-popover.module.scss';
 
 type LikeButtonsProps = {
+  sumOfLikers: number;
+  likers: IUser[];
 
-  sumOfLikers: number,
-  likers: IUser[],
-
-  isGuestUser?: boolean,
-  isLiked?: boolean,
-  onLikeClicked?: ()=>void,
-}
+  isGuestUser?: boolean;
+  isLiked?: boolean;
+  onLikeClicked?: () => void;
+};
 
 const LikeButtons: FC<LikeButtonsProps> = (props: LikeButtonsProps) => {
   const { t } = useTranslation();
@@ -30,12 +27,9 @@ const LikeButtons: FC<LikeButtonsProps> = (props: LikeButtonsProps) => {
     setIsPopoverOpen(!isPopoverOpen);
   };
 
-  const {
-    isGuestUser, isLiked, sumOfLikers, onLikeClicked,
-  } = props;
+  const { isGuestUser, isLiked, sumOfLikers, onLikeClicked } = props;
 
   const getTooltipMessage = useCallback(() => {
-
     if (isLiked) {
       return 'tooltip.cancel_like';
     }
@@ -43,7 +37,11 @@ const LikeButtons: FC<LikeButtonsProps> = (props: LikeButtonsProps) => {
   }, [isLiked]);
 
   return (
-    <div className={`btn-group btn-group-like ${styles['btn-group-like']}`} role="group" aria-label="Like buttons">
+    <div
+      className={`btn-group btn-group-like ${styles['btn-group-like']}`}
+      role="group"
+      aria-label="Like buttons"
+    >
       <button
         type="button"
         id="like-button"
@@ -51,10 +49,17 @@ const LikeButtons: FC<LikeButtonsProps> = (props: LikeButtonsProps) => {
         className={`btn btn-like
             ${isLiked ? 'active' : ''} ${isGuestUser ? 'disabled' : ''}`}
       >
-        <span className={`material-symbols-outlined ${isLiked ? 'fill' : ''}`}>favorite</span>
+        <span className={`material-symbols-outlined ${isLiked ? 'fill' : ''}`}>
+          favorite
+        </span>
       </button>
 
-      <UncontrolledTooltip data-testid="like-button-tooltip" target="like-button" autohide={false} fade={false}>
+      <UncontrolledTooltip
+        data-testid="like-button-tooltip"
+        target="like-button"
+        autohide={false}
+        fade={false}
+      >
         {t(getTooltipMessage())}
       </UncontrolledTooltip>
 
@@ -66,16 +71,27 @@ const LikeButtons: FC<LikeButtonsProps> = (props: LikeButtonsProps) => {
       >
         {sumOfLikers}
       </button>
-      <Popover placement="bottom" isOpen={isPopoverOpen} target="po-total-likes" toggle={togglePopover} trigger="legacy">
-        <PopoverBody className={`user-list-popover ${popoverStyles['user-list-popover']}`}>
+      <Popover
+        placement="bottom"
+        isOpen={isPopoverOpen}
+        target="po-total-likes"
+        toggle={togglePopover}
+        trigger="legacy"
+      >
+        <PopoverBody
+          className={`user-list-popover ${popoverStyles['user-list-popover']}`}
+        >
           <div className="px-2 text-end user-list-content text-truncate text-muted">
-            {props.likers?.length ? <UserPictureList users={props.likers} /> : t('No users have liked this yet.')}
+            {props.likers?.length ? (
+              <UserPictureList users={props.likers} />
+            ) : (
+              t('No users have liked this yet.')
+            )}
           </div>
         </PopoverBody>
       </Popover>
     </div>
   );
-
 };
 
 export default LikeButtons;
