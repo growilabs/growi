@@ -41,6 +41,7 @@ module.exports = {
     'src/client/components/*.jsx',
     'src/client/components/*.ts',
     'src/client/components/*.js',
+    'src/client/components/Sidebar/**',
     'src/services/**',
     'src/states/**',
     'src/stores/**',
