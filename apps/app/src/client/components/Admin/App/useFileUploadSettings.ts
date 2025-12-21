@@ -1,16 +1,21 @@
-import { useState, useEffect } from 'react';
-
+import { useEffect, useState } from 'react';
 import type { FieldNamesMarkedBoolean } from 'react-hook-form';
 
 import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
 
-import type { FileUploadSettingsData, FileUploadFormValues } from './FileUploadSetting.types';
+import type {
+  FileUploadFormValues,
+  FileUploadSettingsData,
+} from './FileUploadSetting.types';
 
 type UseFileUploadSettingsReturn = {
-  data: FileUploadSettingsData | null
-  isLoading: boolean
-  error: Error | null
-  updateSettings: (formData: FileUploadFormValues, dirtyFields: FieldNamesMarkedBoolean<FileUploadFormValues>) => Promise<void>
+  data: FileUploadSettingsData | null;
+  isLoading: boolean;
+  error: Error | null;
+  updateSettings: (
+    formData: FileUploadFormValues,
+    dirtyFields: FieldNamesMarkedBoolean<FileUploadFormValues>,
+  ) => Promise<void>;
 };
 
 export function useFileUploadSettings(): UseFileUploadSettingsReturn {
@@ -19,7 +24,7 @@ export function useFileUploadSettings(): UseFileUploadSettingsReturn {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const fetchData = async() => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
         const response = await apiv3Get('/app-settings/');
@@ -30,7 +35,8 @@ export function useFileUploadSettings(): UseFileUploadSettingsReturn {
           fileUploadType: appSettingsParams.useOnlyEnvVarForFileUploadType
             ? appSettingsParams.envFileUploadType
             : appSettingsParams.fileUploadType,
-          isFixedFileUploadByEnvVar: appSettingsParams.useOnlyEnvVarForFileUploadType || false,
+          isFixedFileUploadByEnvVar:
+            appSettingsParams.useOnlyEnvVarForFileUploadType || false,
           envFileUploadType: appSettingsParams.envFileUploadType,
 
           // AWS S3
@@ -39,13 +45,15 @@ export function useFileUploadSettings(): UseFileUploadSettingsReturn {
           s3Bucket: appSettingsParams.s3Bucket || '',
           s3AccessKeyId: appSettingsParams.s3AccessKeyId || '',
           s3SecretAccessKey: appSettingsParams.s3SecretAccessKey || '',
-          s3ReferenceFileWithRelayMode: appSettingsParams.s3ReferenceFileWithRelayMode || false,
+          s3ReferenceFileWithRelayMode:
+            appSettingsParams.s3ReferenceFileWithRelayMode || false,
 
           // GCS
           gcsApiKeyJsonPath: appSettingsParams.gcsApiKeyJsonPath || '',
           gcsBucket: appSettingsParams.gcsBucket || '',
           gcsUploadNamespace: appSettingsParams.gcsUploadNamespace || '',
-          gcsReferenceFileWithRelayMode: appSettingsParams.gcsReferenceFileWithRelayMode || false,
+          gcsReferenceFileWithRelayMode:
+            appSettingsParams.gcsReferenceFileWithRelayMode || false,
           gcsUseOnlyEnvVars: appSettingsParams.gcsUseOnlyEnvVars || false,
           envGcsApiKeyJsonPath: appSettingsParams.envGcsApiKeyJsonPath,
           envGcsBucket: appSettingsParams.envGcsBucket,
@@ -55,24 +63,29 @@ export function useFileUploadSettings(): UseFileUploadSettingsReturn {
           azureTenantId: appSettingsParams.azureTenantId || '',
           azureClientId: appSettingsParams.azureClientId || '',
           azureClientSecret: appSettingsParams.azureClientSecret || '',
-          azureStorageAccountName: appSettingsParams.azureStorageAccountName || '',
-          azureStorageContainerName: appSettingsParams.azureStorageContainerName || '',
-          azureReferenceFileWithRelayMode: appSettingsParams.azureReferenceFileWithRelayMode || false,
+          azureStorageAccountName:
+            appSettingsParams.azureStorageAccountName || '',
+          azureStorageContainerName:
+            appSettingsParams.azureStorageContainerName || '',
+          azureReferenceFileWithRelayMode:
+            appSettingsParams.azureReferenceFileWithRelayMode || false,
           azureUseOnlyEnvVars: appSettingsParams.azureUseOnlyEnvVars || false,
           envAzureTenantId: appSettingsParams.envAzureTenantId,
           envAzureClientId: appSettingsParams.envAzureClientId,
           envAzureClientSecret: appSettingsParams.envAzureClientSecret,
-          envAzureStorageAccountName: appSettingsParams.envAzureStorageAccountName,
-          envAzureStorageContainerName: appSettingsParams.envAzureStorageContainerName,
+          envAzureStorageAccountName:
+            appSettingsParams.envAzureStorageAccountName,
+          envAzureStorageContainerName:
+            appSettingsParams.envAzureStorageContainerName,
         };
 
         setData(settingsData);
         setError(null);
-      }
-      catch (err) {
-        setError(err instanceof Error ? err : new Error('Failed to fetch settings'));
-      }
-      finally {
+      } catch (err) {
+        setError(
+          err instanceof Error ? err : new Error('Failed to fetch settings'),
+        );
+      } finally {
         setIsLoading(false);
       }
     };
@@ -80,7 +93,10 @@ export function useFileUploadSettings(): UseFileUploadSettingsReturn {
     fetchData();
   }, []);
 
-  const updateSettings = async(formData: FileUploadFormValues, dirtyFields: FieldNamesMarkedBoolean<FileUploadFormValues>): Promise<void> => {
+  const updateSettings = async (
+    formData: FileUploadFormValues,
+    dirtyFields: FieldNamesMarkedBoolean<FileUploadFormValues>,
+  ): Promise<void> => {
     const { fileUploadType } = formData;
 
     const requestParams: Record<string, any> = {
@@ -97,14 +113,16 @@ export function useFileUploadSettings(): UseFileUploadSettingsReturn {
       if (dirtyFields.s3SecretAccessKey) {
         requestParams.s3SecretAccessKey = formData.s3SecretAccessKey;
       }
-      requestParams.s3ReferenceFileWithRelayMode = formData.s3ReferenceFileWithRelayMode;
+      requestParams.s3ReferenceFileWithRelayMode =
+        formData.s3ReferenceFileWithRelayMode;
     }
 
     if (fileUploadType === 'gcs') {
       requestParams.gcsApiKeyJsonPath = formData.gcsApiKeyJsonPath;
       requestParams.gcsBucket = formData.gcsBucket;
       requestParams.gcsUploadNamespace = formData.gcsUploadNamespace;
-      requestParams.gcsReferenceFileWithRelayMode = formData.gcsReferenceFileWithRelayMode;
+      requestParams.gcsReferenceFileWithRelayMode =
+        formData.gcsReferenceFileWithRelayMode;
     }
 
     if (fileUploadType === 'azure') {
@@ -119,11 +137,16 @@ export function useFileUploadSettings(): UseFileUploadSettingsReturn {
         requestParams.azureClientSecret = formData.azureClientSecret;
       }
       requestParams.azureStorageAccountName = formData.azureStorageAccountName;
-      requestParams.azureStorageContainerName = formData.azureStorageContainerName;
-      requestParams.azureReferenceFileWithRelayMode = formData.azureReferenceFileWithRelayMode;
+      requestParams.azureStorageContainerName =
+        formData.azureStorageContainerName;
+      requestParams.azureReferenceFileWithRelayMode =
+        formData.azureReferenceFileWithRelayMode;
     }
 
-    const response = await apiv3Put('/app-settings/file-upload-setting', requestParams);
+    const response = await apiv3Put(
+      '/app-settings/file-upload-setting',
+      requestParams,
+    );
     const { responseParams } = response.data;
 
     // Update local state with response
@@ -136,6 +159,9 @@ export function useFileUploadSettings(): UseFileUploadSettingsReturn {
   };
 
   return {
-    data, isLoading, error, updateSettings,
+    data,
+    isLoading,
+    error,
+    updateSettings,
   };
 }

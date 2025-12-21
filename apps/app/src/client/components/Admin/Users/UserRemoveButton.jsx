@@ -1,15 +1,13 @@
 import React from 'react';
-
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
 import AdminUsersContainer from '~/client/services/AdminUsersContainer';
-import { toastSuccess, toastError } from '~/client/util/toastr';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
 class UserRemoveButton extends React.Component {
-
   constructor(props) {
     super(props);
 
@@ -23,8 +21,7 @@ class UserRemoveButton extends React.Component {
       await this.props.adminUsersContainer.removeUser(this.props.user._id);
       const { username } = this.props.user;
       toastSuccess(t('toaster.remove_user_success', { username }));
-    }
-    catch (err) {
+    } catch (err) {
       toastError(err);
     }
   }
@@ -33,12 +30,20 @@ class UserRemoveButton extends React.Component {
     const { t } = this.props;
 
     return (
-      <button className="dropdown-item" type="button" onClick={() => { this.onClickDeleteBtn() }}>
-        <span className="material-symbols-outlined text-danger">delete_forever</span> {t('Delete')}
+      <button
+        className="dropdown-item"
+        type="button"
+        onClick={() => {
+          this.onClickDeleteBtn();
+        }}
+      >
+        <span className="material-symbols-outlined text-danger">
+          delete_forever
+        </span>{' '}
+        {t('Delete')}
       </button>
     );
   }
-
 }
 
 UserRemoveButton.propTypes = {
@@ -56,6 +61,9 @@ const UserRemoveButtonWrapperFC = (props) => {
 /**
  * Wrapper component for using unstated
  */
-const UserRemoveButtonWrapper = withUnstatedContainers(UserRemoveButtonWrapperFC, [AdminUsersContainer]);
+const UserRemoveButtonWrapper = withUnstatedContainers(
+  UserRemoveButtonWrapperFC,
+  [AdminUsersContainer],
+);
 
 export default UserRemoveButtonWrapper;
