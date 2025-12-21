@@ -17,11 +17,7 @@ type TreeItemForModalProps = TreeItemProps & {
 };
 
 export const TreeItemForModal: FC<TreeItemForModalProps> = (props) => {
-  const {
-    item,
-    targetPathOrId,
-    onToggle,
-  } = props;
+  const { item, targetPathOrId, onToggle } = props;
 
   const page = item.getItemData();
   const selectPage = useSelectPageInModal();
@@ -32,13 +28,14 @@ export const TreeItemForModal: FC<TreeItemForModalProps> = (props) => {
   }, [page._id, page.path, targetPathOrId]);
 
   // Handle click to select this page
-  const handleClick = useCallback((selectedPage: IPageForItem) => {
-    selectPage(selectedPage);
-  }, [selectPage]);
+  const handleClick = useCallback(
+    (selectedPage: IPageForItem) => {
+      selectPage(selectedPage);
+    },
+    [selectPage],
+  );
 
-  const itemClassNames = [
-    isSelected ? 'active' : '',
-  ];
+  const itemClassNames = [isSelected ? 'active' : ''];
 
   return (
     <TreeItemLayout

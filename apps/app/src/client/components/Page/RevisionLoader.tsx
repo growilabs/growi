@@ -1,6 +1,5 @@
-import React, { useState, useEffect, type JSX } from 'react';
-
-import type { Ref, IRevision, IRevisionHasId } from '@growi/core';
+import React, { type JSX, useEffect, useState } from 'react';
+import type { IRevision, IRevisionHasId, Ref } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 
@@ -8,17 +7,16 @@ import type { RendererOptions } from '~/interfaces/renderer-options';
 import { useSWRxPageRevision } from '~/stores/page';
 import loggerFactory from '~/utils/logger';
 
-
 import RevisionRenderer from '../../../components/PageView/RevisionRenderer';
 
 export const ROOT_ELEM_ID = 'revision-loader' as const;
 
 export type RevisionLoaderProps = {
-  rendererOptions: RendererOptions,
-  pageId: string,
-  revisionId: Ref<IRevision>,
-  onRevisionLoaded?: (revision: IRevisionHasId) => void,
-}
+  rendererOptions: RendererOptions;
+  pageId: string;
+  revisionId: Ref<IRevision>;
+  onRevisionLoaded?: (revision: IRevisionHasId) => void;
+};
 
 const logger = loggerFactory('growi:Page:RevisionLoader');
 
@@ -28,11 +26,13 @@ const logger = loggerFactory('growi:Page:RevisionLoader');
 export const RevisionLoader = (props: RevisionLoaderProps): JSX.Element => {
   const { t } = useTranslation();
 
-  const {
-    rendererOptions, pageId, revisionId, onRevisionLoaded,
-  } = props;
+  const { rendererOptions, pageId, revisionId, onRevisionLoaded } = props;
 
-  const { data: pageRevision, isLoading, error } = useSWRxPageRevision(pageId, revisionId);
+  const {
+    data: pageRevision,
+    isLoading,
+    error,
+  } = useSWRxPageRevision(pageId, revisionId);
 
   const [markdown, setMarkdown] = useState<string>('');
 
@@ -44,16 +44,16 @@ export const RevisionLoader = (props: RevisionLoaderProps): JSX.Element => {
         onRevisionLoaded(pageRevision);
       }
     }
-
   }, [onRevisionLoaded, pageRevision]);
 
   useEffect(() => {
     if (error != null) {
       const isForbidden = error != null && error[0].code === 'forbidden-page';
       if (isForbidden) {
-        setMarkdown(`<span className="material-symbols-outlined p-1">cancel</span>${t('not_allowed_to_see_this_page')}`);
-      }
-      else {
+        setMarkdown(
+          `<span className="material-symbols-outlined p-1">cancel</span>${t('not_allowed_to_see_this_page')}`,
+        );
+      } else {
         const errorMessages = error.map((error) => {
           return `<span className="material-symbols-outlined p-1">cancel</span><span class="text-muted"><em>${error.message}</em></span>`;
         });
@@ -73,9 +73,6 @@ export const RevisionLoader = (props: RevisionLoaderProps): JSX.Element => {
   }
 
   return (
-    <RevisionRenderer
-      rendererOptions={rendererOptions}
-      markdown={markdown}
-    />
+    <RevisionRenderer rendererOptions={rendererOptions} markdown={markdown} />
   );
 };
