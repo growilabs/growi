@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useCallback } from 'react';
 import type { HasObjectId, IExternalAccount } from '@growi/core';
-import { useTranslation } from 'next-i18next';
+import { Trans, useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
@@ -65,15 +65,12 @@ const DisassociateModalSubstance = (
         {t('personal_settings.disassociate_external_account')}
       </ModalHeader>
       <ModalBody>
-        {/* eslint-disable-next-line react/no-danger */}
-        <p
-          dangerouslySetInnerHTML={{
-            __html: t('personal_settings.disassociate_external_account_desc', {
-              providerType,
-              accountId,
-            }),
-          }}
-        />
+        <p>
+          <Trans
+            i18nKey="personal_settings.disassociate_external_account_desc"
+            values={{ providerType, accountId }}
+          />
+        </p>
       </ModalBody>
       <ModalFooter>
         <button

@@ -130,6 +130,15 @@ export const BookmarkFolderMenu = (
     },
     [pageId, mutateCurrentUserBookmarks, mutateBookmarkFolders, mutatePageInfo],
   );
+  const onMenuItemKeyDownHandler = useCallback(
+    (itemId: string) => (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onMenuItemClickHandler(event, itemId);
+      }
+    },
+    [onMenuItemClickHandler],
+  );
 
   const renderBookmarkMenuItem = () => {
     return (
@@ -152,6 +161,7 @@ export const BookmarkFolderMenu = (
                 tabIndex={0}
                 role="menuitem"
                 onClick={(e) => onMenuItemClickHandler(e, 'root')}
+                onKeyDown={onMenuItemKeyDownHandler('root')}
               >
                 <BookmarkFolderMenuItem
                   itemId="root"
@@ -167,6 +177,7 @@ export const BookmarkFolderMenu = (
                   tabIndex={0}
                   role="menuitem"
                   onClick={(e) => onMenuItemClickHandler(e, folder._id)}
+                  onKeyDown={onMenuItemKeyDownHandler(folder._id)}
                 >
                   <BookmarkFolderMenuItem
                     itemId={folder._id}
@@ -181,6 +192,7 @@ export const BookmarkFolderMenu = (
                       tabIndex={0}
                       role="menuitem"
                       onClick={(e) => onMenuItemClickHandler(e, child._id)}
+                      onKeyDown={onMenuItemKeyDownHandler(child._id)}
                     >
                       <BookmarkFolderMenuItem
                         itemId={child._id}

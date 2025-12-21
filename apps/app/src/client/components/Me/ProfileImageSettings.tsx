@@ -136,6 +136,7 @@ const ProfileImageSettings = (): JSX.Element => {
               >
                 <img
                   src={GRAVATAR_DEFAULT}
+                  alt="Gravatar"
                   className="me-1"
                   data-vrt-blackout-profile
                 />{' '}
@@ -159,6 +160,7 @@ const ProfileImageSettings = (): JSX.Element => {
           </h5>
           <img
             src={generateGravatarSrc(currentUser.email)}
+            alt="Gravatar"
             className="rounded-pill"
             width="64"
             height="64"
@@ -187,13 +189,14 @@ const ProfileImageSettings = (): JSX.Element => {
             </div>
           </h5>
           <div className="row mt-3">
-            <label className="col-md-6 col-lg-4 col-form-label text-start">
+            <span className="col-md-6 col-lg-4 col-form-label text-start">
               {t('Current Image')}
-            </label>
+            </span>
             <div className="col-md-6 col-lg-8">
               <p className="mb-0">
                 <img
                   src={uploadedPictureSrc ?? DEFAULT_IMAGE}
+                  alt={t('Current Image')}
                   width="64"
                   height="64"
                   className="rounded-circle"
@@ -212,9 +215,9 @@ const ProfileImageSettings = (): JSX.Element => {
             </div>
           </div>
           <div className="row align-items-center mt-3 mt-md-5">
-            <label className="col-md-6 col-lg-4 col-form-label text-start mt-3 mt-md-0">
+            <span className="col-md-6 col-lg-4 col-form-label text-start mt-3 mt-md-0">
               {t('Upload new image')}
-            </label>
+            </span>
             <div className="col-md-6 col-lg-8">
               <input
                 type="file"

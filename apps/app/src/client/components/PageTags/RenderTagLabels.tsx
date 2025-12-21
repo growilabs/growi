@@ -15,14 +15,14 @@ const RenderTagLabels = React.memo((props: RenderTagLabelsProps) => {
   return (
     <SimpleBar className="grw-tag-simple-bar pe-1">
       {tags.map((tag) => (
-        <a
+        <button
           key={tag}
           type="button"
           className="grw-tag badge me-1 mb-1 text-truncate mw-100"
           onClick={() => setSearchKeyword(`tag:${tag}`)}
         >
           {tag}
-        </a>
+        </button>
       ))}
     </SimpleBar>
   );

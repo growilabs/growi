@@ -46,11 +46,11 @@ export const AccessTokenScopeList: React.FC<AccessTokenScopeListProps> = ({
               {showHr && <hr className="my-1" />}
               <div className="my-1 row">
                 <div className="col-md-5 ">
-                  <label
+                  <span
                     className={`form-check-label fw-bold indentation indentation-level-${level}`}
                   >
                     {scopeKey}
-                  </label>
+                  </span>
                 </div>
               </div>
 

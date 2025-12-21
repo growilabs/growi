@@ -10,56 +10,82 @@ import OtherSettings from './OtherSettings';
 import PasswordSettings from './PasswordSettings';
 import UserSettings from './UserSettings';
 
+const UserInformationIcon = () => (
+  <span
+    data-testid="user-infomation-tab-button"
+    className="material-symbols-outlined"
+  >
+    person
+  </span>
+);
+
+const ExternalAccountsIcon = () => (
+  <span
+    data-testid="external-accounts-tab-button"
+    className="material-symbols-outlined"
+  >
+    ungroup
+  </span>
+);
+
+const PasswordSettingsIcon = () => (
+  <span
+    data-testid="password-settings-tab-button"
+    className="material-symbols-outlined"
+  >
+    password
+  </span>
+);
+
+const ApiSettingsIcon = () => (
+  <span
+    data-testid="api-settings-tab-button"
+    className="material-symbols-outlined"
+  >
+    api
+  </span>
+);
+
+const InAppNotificationSettingsIcon = () => (
+  <span
+    data-testid="in-app-notification-settings-tab-button"
+    className="material-symbols-outlined"
+  >
+    notifications
+  </span>
+);
+
+const OtherSettingsIcon = () => (
+  <span
+    data-testid="other-settings-tab-button"
+    className="material-symbols-outlined"
+  >
+    settings
+  </span>
+);
+
 const PersonalSettings = () => {
   const { t } = useTranslation();
 
   const navTabMapping = useMemo(() => {
     return {
       user_infomation: {
-        Icon: () => (
-          <span
-            data-testid="user-infomation-tab-button"
-            className="material-symbols-outlined"
-          >
-            person
-          </span>
-        ),
+        Icon: UserInformationIcon,
         Content: UserSettings,
         i18n: t('User Information'),
       },
       external_accounts: {
-        Icon: () => (
-          <span
-            data-testid="external-accounts-tab-button"
-            className="material-symbols-outlined"
-          >
-            ungroup
-          </span>
-        ),
+        Icon: ExternalAccountsIcon,
         Content: ExternalAccountLinkedMe,
         i18n: t('admin:user_management.external_accounts'),
       },
       password_settings: {
-        Icon: () => (
-          <span
-            data-testid="password-settings-tab-button"
-            className="material-symbols-outlined"
-          >
-            password
-          </span>
-        ),
+        Icon: PasswordSettingsIcon,
         Content: PasswordSettings,
         i18n: t('Password Settings'),
       },
       api_settings: {
-        Icon: () => (
-          <span
-            data-testid="api-settings-tab-button"
-            className="material-symbols-outlined"
-          >
-            api
-          </span>
-        ),
+        Icon: ApiSettingsIcon,
         Content: ApiSettings,
         i18n: t('API Settings'),
       },
@@ -69,26 +95,12 @@ const PersonalSettings = () => {
       //   i18n: t('editor_settings.editor_settings'),
       // },
       in_app_notification_settings: {
-        Icon: () => (
-          <span
-            data-testid="in-app-notification-settings-tab-button"
-            className="material-symbols-outlined"
-          >
-            notifications
-          </span>
-        ),
+        Icon: InAppNotificationSettingsIcon,
         Content: InAppNotificationSettings,
         i18n: t('in_app_notification_settings.in_app_notification_settings'),
       },
       other_settings: {
-        Icon: () => (
-          <span
-            data-testid="other-settings-tab-button"
-            className="material-symbols-outlined"
-          >
-            settings
-          </span>
-        ),
+        Icon: OtherSettingsIcon,
         Content: OtherSettings,
         i18n: t('Other Settings'),
       },

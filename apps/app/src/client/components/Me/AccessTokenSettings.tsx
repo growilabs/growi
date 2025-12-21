@@ -110,7 +110,7 @@ export const AccessTokenSettings = React.memo((): JSX.Element => {
         toastError(err);
       }
     },
-    [t, generateAccessToken, mutate, setIsFormOpen],
+    [t, generateAccessToken, mutate],
   );
 
   const deleteHandler = useCallback(

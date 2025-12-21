@@ -86,7 +86,11 @@ export const UISettings = (): JSX.Element => {
               <label
                 className="form-label form-check-label"
                 htmlFor="swSidebarMode"
-              ></label>
+              >
+                <span className="visually-hidden">
+                  {t('ui_settings.side_bar_mode.side_bar_mode_setting')}
+                </span>
+              </label>
             </div>
             <IconWithTooltip
               id="iwt-sidebar-dock"

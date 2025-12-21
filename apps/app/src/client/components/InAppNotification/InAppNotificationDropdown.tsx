@@ -65,19 +65,13 @@ export const InAppNotificationDropdown = (): JSX.Element => {
     setIsOpen(newIsOpenState);
   };
 
-  let badge;
-  if (
+  const badge =
     inAppNotificationUnreadStatusCount != null &&
-    inAppNotificationUnreadStatusCount > 0
-  ) {
-    badge = (
+    inAppNotificationUnreadStatusCount > 0 ? (
       <span className="badge rounded-pill bg-danger grw-notification-badge">
         {inAppNotificationUnreadStatusCount}
       </span>
-    );
-  } else {
-    badge = '';
-  }
+    ) : null;
 
   return (
     <Dropdown

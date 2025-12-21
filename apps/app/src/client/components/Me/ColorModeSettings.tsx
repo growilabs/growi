@@ -1,5 +1,5 @@
 import React, { type JSX, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { Themes, useNextThemes } from '~/stores-universal/use-next-themes';
 
@@ -81,12 +81,7 @@ export const ColorModeSettings = (): JSX.Element => {
         </div>
 
         <div className="mt-3 text-muted small">
-          {/* eslint-disable-next-line react/no-danger */}
-          <span
-            dangerouslySetInnerHTML={{
-              __html: t('color_mode_settings.description'),
-            }}
-          />
+          <Trans i18nKey="color_mode_settings.description" />
         </div>
       </div>
     </div>

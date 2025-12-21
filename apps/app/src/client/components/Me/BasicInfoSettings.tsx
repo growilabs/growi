@@ -118,9 +118,9 @@ export const BasicInfoSettings = (): JSX.Element => {
       </div>
 
       <div className="row mt-3">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <span className="text-start text-md-end col-md-3 col-form-label">
           {t('Disclose E-mail')}
-        </label>
+        </span>
         <div className="col-md-6 my-auto">
           <div className="form-check form-check-inline me-4">
             <input
@@ -162,13 +162,13 @@ export const BasicInfoSettings = (): JSX.Element => {
       </div>
 
       <div className="row mt-3">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <span className="text-start text-md-end col-md-3 col-form-label">
           {t('Language')}
-        </label>
+        </span>
         <div className="col-md-6 my-auto">
           {i18nConfig.locales.map((locale) => {
             if (i18n == null) {
-              return;
+              return null;
             }
             const fixedT = i18n.getFixedT(locale);
 

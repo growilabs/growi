@@ -49,13 +49,14 @@ const EditLink = (props: EditLinkProps): JSX.Element => {
 
   return (
     <span className="revision-head-edit-button">
-      <a
-        href="#edit"
-        aria-disabled={isDisabled}
+      <button
+        type="button"
+        className="border-0 bg-transparent p-0"
+        disabled={isDisabled}
         onClick={() => setCaretLine(props.line)}
       >
         <span className="material-symbols-outlined">edit_square</span>
-      </a>
+      </button>
     </span>
   );
 };
@@ -120,7 +121,7 @@ export const Header = (props: HeaderProps): JSX.Element => {
     return () => {
       window.removeEventListener('hashchange', activeByHashWrapper);
     };
-  }, [activateByHash, router.events]);
+  }, [activateByHash]);
 
   // TODO: currentPageYjsData?.hasYdocsNewerThanLatestRevision === false make to hide the edit button when a Yjs draft exists
   // This is because the current conditional logic cannot handle cases where the draft is an empty string.

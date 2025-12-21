@@ -106,13 +106,13 @@ export const RichAttachment = React.memo((props: RichAttachmentProps) => {
               </a>
 
               {showTrashButton && (
-                <a
-                  className="ml-2 text-danger attachment-delete d-share-link-none"
+                <button
                   type="button"
+                  className="ml-2 text-danger attachment-delete d-share-link-none"
                   onClick={onClickTrashButtonHandler}
                 >
                   <span className="material-symbols-outlined">delete</span>
-                </a>
+                </button>
               )}
             </div>
             <div className="d-flex align-items-center">

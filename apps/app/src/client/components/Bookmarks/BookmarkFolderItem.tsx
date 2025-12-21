@@ -304,7 +304,6 @@ export const BookmarkFolderItem: FC<BookmarkFolderItemProps> = (
       bookmarkFolder.name,
       bookmarkFolderTreeMutation,
     ]);
-
   return (
     <div
       id={`grw-bookmark-folder-item-${folderId}`}
@@ -321,25 +320,8 @@ export const BookmarkFolderItem: FC<BookmarkFolderItemProps> = (
       >
         <li
           className="list-group-item list-group-item-action border-0 py-2 d-flex align-items-center rounded-1"
-          onClick={loadChildFolder}
           style={{ paddingLeft }}
         >
-          <div className="grw-triangle-container d-flex justify-content-center">
-            <button
-              type="button"
-              className={triangleBtnClassName(isOpen, childrenExists)}
-              onClick={loadChildFolder}
-            >
-              <div className="d-flex justify-content-center">
-                <span className="material-symbols-outlined fs-5">
-                  arrow_right
-                </span>
-              </div>
-            </button>
-          </div>
-          <div>
-            <FolderIcon isOpen={isOpen} />
-          </div>
           {isRenameAction ? (
             <div className="flex-fill">
               <BookmarkFolderNameInput
@@ -349,11 +331,25 @@ export const BookmarkFolderItem: FC<BookmarkFolderItemProps> = (
               />
             </div>
           ) : (
-            <>
+            <button
+              type="button"
+              className="d-flex align-items-center flex-fill border-0 bg-transparent p-0 text-start"
+              onClick={loadChildFolder}
+            >
+              <div className="grw-triangle-container d-flex justify-content-center">
+                <span className={triangleBtnClassName(isOpen, childrenExists)}>
+                  <span className="material-symbols-outlined fs-5">
+                    arrow_right
+                  </span>
+                </span>
+              </div>
+              <div>
+                <FolderIcon isOpen={isOpen} />
+              </div>
               <div className="grw-foldertree-title-anchor ps-1">
                 <p className="text-truncate m-auto">{name}</p>
               </div>
-            </>
+            </button>
           )}
           {isOperable && (
             <div className="grw-foldertree-control d-flex">
@@ -366,14 +362,15 @@ export const BookmarkFolderItem: FC<BookmarkFolderItemProps> = (
                     : undefined
                 }
               >
-                <div onClick={(e) => e.stopPropagation()}>
-                  <DropdownToggle
-                    color="transparent"
-                    className="border-0 rounded btn-page-item-control p-0 grw-visible-on-hover me-1"
-                  >
-                    <span className="material-symbols-outlined">more_vert</span>
-                  </DropdownToggle>
-                </div>
+                <DropdownToggle
+                  color="transparent"
+                  className="border-0 rounded btn-page-item-control p-0 grw-visible-on-hover me-1"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                >
+                  <span className="material-symbols-outlined">more_vert</span>
+                </DropdownToggle>
               </BookmarkFolderItemControl>
               {/* Maximum folder hierarchy of 2 levels */}
               {!(bookmarkFolder.parent != null) && (

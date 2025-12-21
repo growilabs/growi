@@ -74,7 +74,7 @@ const InAppNotificationSettings: FC = () => {
     } catch (err) {
       toastError(err);
     }
-  }, [subscribeRules, setSubscribeRules, t]);
+  }, [subscribeRules, t]);
 
   useEffect(() => {
     initializeInAppNotificationSettings();
