@@ -1,6 +1,4 @@
-
 import React from 'react';
-
 import type { UseFormRegister } from 'react-hook-form';
 
 import AdminAppContainer from '~/client/services/AdminAppContainer';
@@ -8,10 +6,10 @@ import AdminAppContainer from '~/client/services/AdminAppContainer';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
 type Props = {
-  adminAppContainer?: AdminAppContainer,
+  adminAppContainer?: AdminAppContainer;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  register: UseFormRegister<any>,
-}
+  register: UseFormRegister<any>;
+};
 
 const SesSetting = (props: Props): JSX.Element => {
   const { register } = props;
@@ -19,7 +17,6 @@ const SesSetting = (props: Props): JSX.Element => {
   return (
     <React.Fragment>
       <div id="mail-ses" className="tab-pane active">
-
         <div className="row">
           <label className="text-start text-md-end col-md-3 col-form-label">
             Access key ID
@@ -46,7 +43,6 @@ const SesSetting = (props: Props): JSX.Element => {
           </div>
         </div>
       </div>
-
     </React.Fragment>
   );
 };
@@ -56,6 +52,8 @@ export { SesSetting };
 /**
  * Wrapper component for using unstated
  */
-const SesSettingWrapper = withUnstatedContainers(SesSetting, [AdminAppContainer]);
+const SesSettingWrapper = withUnstatedContainers(SesSetting, [
+  AdminAppContainer,
+]);
 
 export default SesSettingWrapper;

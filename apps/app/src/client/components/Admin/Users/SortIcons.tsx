@@ -1,13 +1,12 @@
 import React, { type JSX } from 'react';
 
 type SortIconsProps = {
-  onClick: (sortOrder: string) => void,
-  isSelected: boolean,
-  isAsc: boolean,
-}
+  onClick: (sortOrder: string) => void;
+  isSelected: boolean;
+  isAsc: boolean;
+};
 
 export const SortIcons = (props: SortIconsProps): JSX.Element => {
-
   const { onClick, isSelected, isAsc } = props;
 
   return (

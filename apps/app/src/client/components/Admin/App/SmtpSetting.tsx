@@ -1,6 +1,4 @@
-
 import React from 'react';
-
 import { useTranslation } from 'next-i18next';
 import type { UseFormRegister } from 'react-hook-form';
 
@@ -8,12 +6,11 @@ import AdminAppContainer from '~/client/services/AdminAppContainer';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
-
 type Props = {
-  adminAppContainer?: AdminAppContainer,
+  adminAppContainer?: AdminAppContainer;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  register: UseFormRegister<any>,
-}
+  register: UseFormRegister<any>;
+};
 
 const SmtpSetting = (props: Props): JSX.Element => {
   const { t } = useTranslation();
@@ -40,10 +37,7 @@ const SmtpSetting = (props: Props): JSX.Element => {
             {t('admin:app_setting.port')}
           </label>
           <div className="col-md-6">
-            <input
-              className="form-control"
-              {...register('smtpPort')}
-            />
+            <input className="form-control" {...register('smtpPort')} />
           </div>
         </div>
 
@@ -82,5 +76,7 @@ export { SmtpSetting };
 /**
  * Wrapper component for using unstated
  */
-const SmtpSettingWrapper = withUnstatedContainers(SmtpSetting, [AdminAppContainer]);
+const SmtpSettingWrapper = withUnstatedContainers(SmtpSetting, [
+  AdminAppContainer,
+]);
 export default SmtpSettingWrapper;

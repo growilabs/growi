@@ -1,17 +1,18 @@
 import type { JSX } from 'react';
-
 import { useTranslation } from 'next-i18next';
 import type { UseFormRegister } from 'react-hook-form';
 
 import type { FileUploadFormValues } from './FileUploadSetting.types';
 
 export type AwsSettingMoleculeProps = {
-  register: UseFormRegister<FileUploadFormValues>
-  s3ReferenceFileWithRelayMode: boolean
-  onChangeS3ReferenceFileWithRelayMode: (val: boolean) => void
+  register: UseFormRegister<FileUploadFormValues>;
+  s3ReferenceFileWithRelayMode: boolean;
+  onChangeS3ReferenceFileWithRelayMode: (val: boolean) => void;
 };
 
-export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element => {
+export const AwsSettingMolecule = (
+  props: AwsSettingMoleculeProps,
+): JSX.Element => {
   const { t } = useTranslation();
 
   return (
@@ -31,21 +32,30 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
               aria-haspopup="true"
               aria-expanded="true"
             >
-              {props.s3ReferenceFileWithRelayMode && t('admin:app_setting.file_delivery_method_relay')}
-              {!props.s3ReferenceFileWithRelayMode && t('admin:app_setting.file_delivery_method_redirect')}
+              {props.s3ReferenceFileWithRelayMode &&
+                t('admin:app_setting.file_delivery_method_relay')}
+              {!props.s3ReferenceFileWithRelayMode &&
+                t('admin:app_setting.file_delivery_method_redirect')}
             </button>
-            <div className="dropdown-menu" aria-labelledby="ddS3ReferenceFileWithRelayMode">
+            <div
+              className="dropdown-menu"
+              aria-labelledby="ddS3ReferenceFileWithRelayMode"
+            >
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props.onChangeS3ReferenceFileWithRelayMode(true) }}
+                onClick={() => {
+                  props.onChangeS3ReferenceFileWithRelayMode(true);
+                }}
               >
                 {t('admin:app_setting.file_delivery_method_relay')}
               </button>
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props.onChangeS3ReferenceFileWithRelayMode(false) }}
+                onClick={() => {
+                  props.onChangeS3ReferenceFileWithRelayMode(false);
+                }}
               >
                 {t('admin:app_setting.file_delivery_method_redirect')}
               </button>
@@ -84,7 +94,9 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
             placeholder={`${t('eg')} http://localhost:9000`}
             {...props.register('s3CustomEndpoint')}
           />
-          <p className="form-text text-muted">{t('admin:app_setting.custom_endpoint_change')}</p>
+          <p className="form-text text-muted">
+            {t('admin:app_setting.custom_endpoint_change')}
+          </p>
         </div>
       </div>
 
@@ -125,7 +137,9 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
             type="text"
             {...props.register('s3SecretAccessKey')}
           />
-          <p className="form-text text-muted">{t('admin:app_setting.s3_secret_access_key_input_description')}</p>
+          <p className="form-text text-muted">
+            {t('admin:app_setting.s3_secret_access_key_input_description')}
+          </p>
         </div>
       </div>
     </>
