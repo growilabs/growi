@@ -147,10 +147,12 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
       if (errors == null || errors.length === 0) return <></>;
       return (
         <div className="alert alert-danger">
-          {errors.map((err) => {
+          {errors.map((err, index) => {
             // eslint-disable-next-line react/no-danger
             return (
               <small
+                key={`${err.code}-${index}`}
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: rendered HTML from translations
                 dangerouslySetInnerHTML={{
                   __html: tWithOpt(err.message, err.args),
                 }}
@@ -170,7 +172,10 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
       return (
         <ul className="alert alert-danger">
           {errors.map((err, index) => (
-            <small className={index > 0 ? 'mt-1' : ''}>
+            <small
+              key={`${err.message}-${index}`}
+              className={index > 0 ? 'mt-1' : ''}
+            >
               {tWithOpt(err.message, err.args)}
             </small>
           ))}
@@ -200,6 +205,7 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
             <br />
             {/* eslint-disable-next-line react/no-danger */}
             <span
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: rendered HTML from translations
               dangerouslySetInnerHTML={{
                 __html: t('login.set_env_var_for_logs'),
               }}
@@ -207,16 +213,13 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
           </div>
         )}
 
-        <form role="form" onSubmit={handleLoginWithLocalSubmit} id="login-form">
+        <form onSubmit={handleLoginWithLocalSubmit} id="login-form">
           <div className="input-group">
             <label
               className="text-white opacity-75 d-flex align-items-center"
               htmlFor="tiUsernameForLogin"
             >
-              <span
-                className="material-symbols-outlined"
-                aria-label="Username or E-mail"
-              >
+              <span className="material-symbols-outlined" aria-hidden="true">
                 person
               </span>
             </label>
@@ -244,7 +247,7 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
               className="text-white opacity-75 d-flex align-items-center"
               htmlFor="tiPasswordForLogin"
             >
-              <span className="material-symbols-outlined" aria-label="Password">
+              <span className="material-symbols-outlined" aria-hidden="true">
                 lock
               </span>
             </label>
@@ -274,7 +277,7 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
                 ) : (
                   <span
                     className="material-symbols-outlined"
-                    aria-label="Login"
+                    aria-hidden="true"
                   >
                     login
                   </span>
@@ -299,7 +302,7 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
       <>
         <div className="mt-2">
           {enabledExternalAuthType.map((authType) => (
-            <ExternalAuthButton authType={authType} />
+            <ExternalAuthButton key={authType} authType={authType} />
           ))}
         </div>
       </>
@@ -392,8 +395,8 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
 
         {registerErrors != null && registerErrors.length > 0 && (
           <p className="alert alert-danger">
-            {registerErrors.map((err) => (
-              <span>
+            {registerErrors.map((err, index) => (
+              <span key={`${err.message}-${index}`}>
                 {tWithOpt(err.message, err.args)}
                 <br />
               </span>
@@ -412,7 +415,6 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
         )}
 
         <form
-          role="form"
           onSubmit={(e) => handleRegisterFormSubmit(e, registerAction)}
           id="register-form"
         >
@@ -537,15 +539,15 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
 
         <div className="row">
           <div className="text-end col-12 mb-5">
-            <a
-              href="#login"
+            <button
+              type="button"
               className="btn btn-sm btn-secondary btn-function col-10 col-sm-9 mx-auto py-1 d-flex"
               style={{ pointerEvents: isLoading ? 'none' : undefined }}
               onClick={switchForm}
             >
               <span className="material-symbols-outlined fs-5">login</span>
               <span className="flex-grow-1">{t('Sign in is here')}</span>
-            </a>
+            </button>
           </div>
         </div>
       </React.Fragment>
@@ -647,8 +649,8 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
                 {/* Sign up link */}
                 {isRegistrationEnabled && (
                   <div className="mt-2">
-                    <a
-                      href="#register"
+                    <button
+                      type="button"
                       className="btn btn-sm btn-secondary btn-function col-10 col-sm-9 mx-auto py-1 d-flex"
                       style={{ pointerEvents: isLoading ? 'none' : 'auto' }}
                       onClick={switchForm}
@@ -659,7 +661,7 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
                       <span className="flex-grow-1">
                         {t('Sign up is here')}
                       </span>
-                    </a>
+                    </button>
                   </div>
                 )}
               </div>

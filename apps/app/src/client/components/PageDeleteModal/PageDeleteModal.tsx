@@ -58,6 +58,7 @@ export const PageDeleteModal: FC = () => {
   const pageIds = useMemo(() => pages?.map((p) => p.data._id) ?? [], [pages]);
   const pagesLength = pages?.length ?? 0;
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keep optimized deps
   const notOperatablePages: IPageToDeleteWithMeta[] = useMemo(
     () =>
       (pages ?? []).filter((p) => !isIPageInfoForEntityForDeleteModal(p.meta)),
@@ -74,6 +75,7 @@ export const PageDeleteModal: FC = () => {
   const { injectTo } = useSWRxPageInfoForList(notOperatablePageIds);
 
   // inject IPageInfo to operate
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keep optimized deps
   const injectedPages = useMemo(
     () => {
       if (pages != null) {
@@ -101,6 +103,7 @@ export const PageDeleteModal: FC = () => {
   }, [injectedPages]);
 
   // Optimize deps: use page paths for trash detection
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keep optimized deps
   const pagePaths = useMemo(
     () => pages?.map((p) => p.data?.path ?? '') ?? [],
     // Optimization: Use pageIds and pagesLength instead of pages array reference to avoid unnecessary re-computation
@@ -151,6 +154,7 @@ export const PageDeleteModal: FC = () => {
     setIsDeleteCompletely(!isDeleteCompletely);
   }, [forceDeleteCompletelyMode, isDeleteCompletely]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keep optimized deps
   const deletePage = useCallback(
     async () => {
       if (pages == null) {
@@ -193,9 +197,9 @@ export const PageDeleteModal: FC = () => {
           setErrs([err]);
         }
       } else {
-      /*
-       * When single page
-       */
+        /*
+         * When single page
+         */
         try {
           const recursively = isDeleteRecursively === true ? true : undefined;
           const completely =
@@ -325,6 +329,7 @@ export const PageDeleteModal: FC = () => {
     );
   }, [isOpened, deleteMode, t]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keep optimized deps
   const bodyContent = useMemo(() => {
     if (!isOpened) {
       return <></>;
@@ -352,9 +357,7 @@ export const PageDeleteModal: FC = () => {
     return (
       <>
         <div className="grw-scrollable-modal-body pb-1">
-          <label className="form-label">
-            {t('modal_delete.deleting_page')}:
-          </label>
+          <span className="form-label">{t('modal_delete.deleting_page')}:</span>
           <br />
           {/* Todo: change the way to show path on modal when too many pages are selected */}
           {pagePathsElements}

@@ -211,7 +211,6 @@ const PageRenameModalSubstance: React.FC = () => {
   }, [
     isOpened,
     pageNameInput,
-    subordinatedPages,
     checkExistPathsDebounce,
     page,
     checkIsUsersHomepageDebounce,
@@ -259,9 +258,9 @@ const PageRenameModalSubstance: React.FC = () => {
     return (
       <>
         <div className="mb-3">
-          <label className="form-label w-100">
+          <span className="form-label w-100">
             {t('modal_rename.label.Current page name')}
-          </label>
+          </span>
           <code className="fs-6">{path}</code>
         </div>
         <div className="mb-3">
@@ -284,7 +283,6 @@ const PageRenameModalSubstance: React.FC = () => {
                   initializedPath={path}
                   onSubmit={rename}
                   onInputChange={ppacInputChangeHandler}
-                  autoFocus
                 />
               ) : (
                 <input
@@ -293,7 +291,6 @@ const PageRenameModalSubstance: React.FC = () => {
                   className="form-control"
                   onChange={(e) => inputChangeHandler(e.target.value)}
                   required
-                  autoFocus
                 />
               )}
             </form>

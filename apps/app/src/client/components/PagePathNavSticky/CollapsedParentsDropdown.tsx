@@ -48,7 +48,9 @@ export const CollapsedParentsDropdown = (props: Props): JSX.Element => {
         {ancestorPathAndPathNames.map((data) => (
           <DropdownItem key={data.path}>
             <Link href={data.path} legacyBehavior>
-              <a role="menuitem">{data.pathName}</a>
+              <a role="menuitem" href={data.path}>
+                {data.pathName}
+              </a>
             </Link>
           </DropdownItem>
         ))}

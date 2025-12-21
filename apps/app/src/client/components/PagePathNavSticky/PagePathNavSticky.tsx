@@ -48,7 +48,7 @@ export const PagePathNavSticky = (
     setNavMaxWidth(
       pageControlsX - pagePathNavRef.current.getBoundingClientRect().x - 10,
     );
-  }, [pageControlsX, pagePathNavRef, sidebarWidth]);
+  }, [pageControlsX, sidebarWidth]);
 
   useEffect(() => {
     // wait for the end of the animation of the opening and closing of the sidebar
@@ -67,7 +67,7 @@ export const PagePathNavSticky = (
     return () => {
       clearTimeout(timeout);
     };
-  }, [pageControlsX, pagePathNavRef, sidebarMode]);
+  }, [pageControlsX, sidebarMode]);
 
   const latterLink = useMemo(() => {
     const dPagePath = new DevidedPagePath(pagePath, false, true);

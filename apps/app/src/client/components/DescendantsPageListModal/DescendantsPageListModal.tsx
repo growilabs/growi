@@ -29,6 +29,29 @@ const PageTimeline = dynamic(
   { ssr: false },
 );
 
+const PageListTabIcon = (): React.JSX.Element => (
+  <span className="material-symbols-outlined">subject</span>
+);
+
+const PageListTabContent = (): React.JSX.Element | null => {
+  const status = useDescendantsPageListModalStatus();
+  const path = status?.path;
+
+  if (path == null) {
+    return null;
+  }
+
+  return <DescendantsPageList path={path} />;
+};
+
+const TimelineTabIcon = (): React.JSX.Element => (
+  <span data-testid="timeline-tab-button" className="material-symbols-outlined">
+    timeline
+  </span>
+);
+
+const TimelineTabContent = (): React.JSX.Element => <PageTimeline />;
+
 /**
  * DescendantsPageListModalSubstance - Presentation component (all logic here)
  */
@@ -62,33 +85,19 @@ const DescendantsPageListModalSubstance = ({
   const navTabMapping = useMemo(() => {
     return {
       pagelist: {
-        Icon: () => <span className="material-symbols-outlined">subject</span>,
-        Content: () => {
-          if (path == null) {
-            return <></>;
-          }
-          return <DescendantsPageList path={path} />;
-        },
+        Icon: PageListTabIcon,
+        Content: PageListTabContent,
         i18n: t('page_list'),
         isLinkEnabled: () => !isSharedUser,
       },
       timeline: {
-        Icon: () => (
-          <span
-            data-testid="timeline-tab-button"
-            className="material-symbols-outlined"
-          >
-            timeline
-          </span>
-        ),
-        Content: () => {
-          return <PageTimeline />;
-        },
+        Icon: TimelineTabIcon,
+        Content: TimelineTabContent,
         i18n: t('Timeline View'),
         isLinkEnabled: () => !isSharedUser,
       },
     };
-  }, [isSharedUser, path, t]);
+  }, [isSharedUser, t]);
 
   // Memoize event handlers
   const expandWindow = useCallback(() => {

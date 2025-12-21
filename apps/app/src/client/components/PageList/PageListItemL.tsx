@@ -240,134 +240,144 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
   const hasBrowsingRights = canRenderESSnippet || canRenderRevisionSnippet;
 
   return (
-    <li
-      key={pageData._id}
-      className={`list-group-item d-flex align-items-center px-3 px-md-1 ${styleListGroupItem} ${styleActive}`}
-      data-testid="page-list-item-L"
-      onClick={clickHandler}
-    >
-      <div className="text-break w-100">
-        <div className="d-flex">
-          {/* checkbox */}
-          {onCheckboxChanged != null && (
-            <div className="d-flex align-items-center justify-content-center">
-              <Input
-                type="checkbox"
-                id={`cbSelect-${pageData._id}`}
-                data-testid="cb-select"
-                innerRef={inputRef}
-                onChange={(e) => {
-                  onCheckboxChanged(e.target.checked, pageData._id);
-                }}
-              />
-            </div>
-          )}
-
-          <div className="flex-grow-1 px-2 px-md-4">
-            <div className="d-flex justify-content-between">
-              {/* page path */}
-              <PagePathHierarchicalLink
-                linkedPagePath={linkedPagePathFormer}
-                linkedPagePathByHtml={linkedPagePathHighlightedFormer}
-              />
-              {showPageUpdatedTime && (
-                <span className="page-list-updated-at text-muted">
-                  Last update: {lastUpdateDate}
-                </span>
-              )}
-            </div>
-            <div className="d-flex align-items-center mb-1">
-              {/* Picture */}
-              <span className="me-2 d-none d-md-block">
-                <UserPicture user={pageData.lastUpdateUser} size="md" />
-              </span>
-              {/* page title */}
-              <Clamp lines={1}>
-                <span className="h5 mb-0">
-                  {/* Use permanent links to care for pages with the same name (Cannot use page path url) */}
-                  <span className="text-break">
-                    <Link
-                      legacyBehavior
-                      href={returnPathForURL(pageData.path, pageData._id)}
-                      prefetch={false}
-                    >
-                      {shouldDangerouslySetInnerHTMLForPaths ? (
-                        <a
-                          className="page-segment"
-                          // eslint-disable-next-line react/no-danger
-                          dangerouslySetInnerHTML={{
-                            __html: linkedPagePathHighlightedLatter.pathName,
-                          }}
-                        ></a>
-                      ) : (
-                        <a className="page-segment">
-                          {linkedPagePathHighlightedLatter.pathName}
-                        </a>
-                      )}
-                    </Link>
-                  </span>
-                </span>
-              </Clamp>
-
-              {/* page meta */}
-              <div className="d-none d-md-flex py-0 px-1 ms-2 text-nowrap">
-                <PageListMeta
-                  page={pageData}
-                  likerCount={likerCount}
-                  bookmarkCount={bookmarkCount}
-                  shouldSpaceOutIcon
+    <li key={pageData._id}>
+      <button
+        type="button"
+        className={`list-group-item d-flex align-items-center px-3 px-md-1 text-start w-100 ${styleListGroupItem} ${styleActive}`}
+        data-testid="page-list-item-L"
+        onClick={clickHandler}
+      >
+        <div className="text-break w-100">
+          <div className="d-flex">
+            {/* checkbox */}
+            {onCheckboxChanged != null && (
+              <div className="d-flex align-items-center justify-content-center">
+                <Input
+                  type="checkbox"
+                  id={`cbSelect-${pageData._id}`}
+                  data-testid="cb-select"
+                  innerRef={inputRef}
+                  onChange={(e) => {
+                    onCheckboxChanged(e.target.checked, pageData._id);
+                  }}
                 />
               </div>
+            )}
 
-              {/* doropdown icon includes page control buttons */}
-              {hasBrowsingRights && (
-                <div className="ms-auto">
-                  <PageItemControl
-                    alignEnd
-                    pageId={pageData._id}
-                    pageInfo={
-                      isIPageInfoForListing(pageMeta) ? pageMeta : undefined
-                    }
-                    isEnableActions={isEnableActions}
-                    isReadOnlyUser={isReadOnlyUser}
-                    forceHideMenuItems={forceHideMenuItems}
-                    onClickBookmarkMenuItem={bookmarkMenuItemClickHandler}
-                    onClickRenameMenuItem={renameMenuItemClickHandler}
-                    onClickDuplicateMenuItem={duplicateMenuItemClickHandler}
-                    onClickDeleteMenuItem={deleteMenuItemClickHandler}
-                    onClickRevertMenuItem={revertMenuItemClickHandler}
+            <div className="flex-grow-1 px-2 px-md-4">
+              <div className="d-flex justify-content-between">
+                {/* page path */}
+                <PagePathHierarchicalLink
+                  linkedPagePath={linkedPagePathFormer}
+                  linkedPagePathByHtml={linkedPagePathHighlightedFormer}
+                />
+                {showPageUpdatedTime && (
+                  <span className="page-list-updated-at text-muted">
+                    Last update: {lastUpdateDate}
+                  </span>
+                )}
+              </div>
+              <div className="d-flex align-items-center mb-1">
+                {/* Picture */}
+                <span className="me-2 d-none d-md-block">
+                  <UserPicture user={pageData.lastUpdateUser} size="md" />
+                </span>
+                {/* page title */}
+                <Clamp lines={1}>
+                  <span className="h5 mb-0">
+                    {/* Use permanent links to care for pages with the same name (Cannot use page path url) */}
+                    <span className="text-break">
+                      <Link
+                        legacyBehavior
+                        href={returnPathForURL(pageData.path, pageData._id)}
+                        prefetch={false}
+                      >
+                        {shouldDangerouslySetInnerHTMLForPaths ? (
+                          <a
+                            className="page-segment"
+                            href={returnPathForURL(pageData.path, pageData._id)}
+                            // eslint-disable-next-line react/no-danger
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight markup is sanitized
+                            dangerouslySetInnerHTML={{
+                              __html: linkedPagePathHighlightedLatter.pathName,
+                            }}
+                          ></a>
+                        ) : (
+                          <a
+                            className="page-segment"
+                            href={returnPathForURL(pageData.path, pageData._id)}
+                          >
+                            {linkedPagePathHighlightedLatter.pathName}
+                          </a>
+                        )}
+                      </Link>
+                    </span>
+                  </span>
+                </Clamp>
+
+                {/* page meta */}
+                <div className="d-none d-md-flex py-0 px-1 ms-2 text-nowrap">
+                  <PageListMeta
+                    page={pageData}
+                    likerCount={likerCount}
+                    bookmarkCount={bookmarkCount}
+                    shouldSpaceOutIcon
                   />
                 </div>
-              )}
-            </div>
-            <div className="page-list-snippet py-1">
-              <Clamp lines={2}>
-                {elasticSearchResult != null &&
-                  elasticSearchResult.snippet != null && (
-                    // eslint-disable-next-line react/no-danger
-                    <div
-                      dangerouslySetInnerHTML={{
-                        __html: elasticSearchResult.snippet,
-                      }}
-                    ></div>
-                  )}
-                {revisionShortBody != null && (
-                  <div data-testid="revision-short-body-in-page-list-item-L">
-                    {revisionShortBody}
+
+                {/* doropdown icon includes page control buttons */}
+                {hasBrowsingRights && (
+                  <div className="ms-auto">
+                    <PageItemControl
+                      alignEnd
+                      pageId={pageData._id}
+                      pageInfo={
+                        isIPageInfoForListing(pageMeta) ? pageMeta : undefined
+                      }
+                      isEnableActions={isEnableActions}
+                      isReadOnlyUser={isReadOnlyUser}
+                      forceHideMenuItems={forceHideMenuItems}
+                      onClickBookmarkMenuItem={bookmarkMenuItemClickHandler}
+                      onClickRenameMenuItem={renameMenuItemClickHandler}
+                      onClickDuplicateMenuItem={duplicateMenuItemClickHandler}
+                      onClickDeleteMenuItem={deleteMenuItemClickHandler}
+                      onClickRevertMenuItem={revertMenuItemClickHandler}
+                    />
                   </div>
                 )}
-                {!hasBrowsingRights && (
-                  <>
-                    <span className="material-symbols-outlined p-1">error</span>
-                    {t('not_allowed_to_see_this_page')}
-                  </>
-                )}
-              </Clamp>
+              </div>
+              <div className="page-list-snippet py-1">
+                <Clamp lines={2}>
+                  {elasticSearchResult != null &&
+                    elasticSearchResult.snippet != null && (
+                      // eslint-disable-next-line react/no-danger
+                      <div
+                        // biome-ignore lint/security/noDangerouslySetInnerHtml: snippet markup is sanitized
+                        dangerouslySetInnerHTML={{
+                          __html: elasticSearchResult.snippet,
+                        }}
+                      ></div>
+                    )}
+                  {revisionShortBody != null && (
+                    <div data-testid="revision-short-body-in-page-list-item-L">
+                      {revisionShortBody}
+                    </div>
+                  )}
+                  {!hasBrowsingRights && (
+                    <>
+                      <span className="material-symbols-outlined p-1">
+                        error
+                      </span>
+                      {t('not_allowed_to_see_this_page')}
+                    </>
+                  )}
+                </Clamp>
+              </div>
             </div>
           </div>
         </div>
         {/* TODO: adjust snippet position */}
-      </div>
+      </button>
     </li>
   );
 };

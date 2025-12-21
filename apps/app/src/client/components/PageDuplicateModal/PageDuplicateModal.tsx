@@ -106,13 +106,7 @@ const PageDuplicateModalSubstance: React.FC = () => {
     if (isOpened && page != null && pageNameInput !== page.path) {
       checkExistPathsDebounce(page.path, pageNameInput);
     }
-  }, [
-    isOpened,
-    pageNameInput,
-    subordinatedPages,
-    checkExistPathsDebounce,
-    page,
-  ]);
+  }, [isOpened, pageNameInput, checkExistPathsDebounce, page]);
 
   const ppacInputChangeHandler = useCallback((value: string) => {
     setErrs(null);
@@ -200,9 +194,9 @@ const PageDuplicateModalSubstance: React.FC = () => {
     return (
       <>
         <div className="mt-3">
-          <label className="form-label">
+          <span className="form-label">
             {t('modal_duplicate.label.Current page name')}
-          </label>
+          </span>
           <br />
           <code>{path}</code>
         </div>

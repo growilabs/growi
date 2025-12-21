@@ -55,12 +55,12 @@ const ApiErrorMessage = (props) => {
               <span className="material-symbols-outlined me-1">lightbulb</span>{' '}
               {t('page_api_error.outdated')}
             </strong>
-            <a className="btn-link" onClick={reload}>
+            <button type="button" className="btn-link" onClick={reload}>
               <span className="material-symbols-outlined">
                 keyboard_double_arrow_right
               </span>{' '}
               {t('Load latest')}
-            </a>
+            </button>
           </>
         );
       case 'invalid_path':
