@@ -129,11 +129,14 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
       : undefined;
 
   return (
-    <div
+    <fieldset
       id="page-path-header"
-      className={`d-flex ${moduleClass} ${className ?? ''} small position-relative ms-2`}
+      className={`d-flex ${moduleClass} ${className ?? ''} small position-relative ms-2 border-0 p-0 m-0`}
+      aria-label="Page path header"
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      onFocus={() => setHover(true)}
+      onBlur={() => setHover(false)}
     >
       <div
         className="page-path-header-input d-inline-block"
@@ -181,6 +184,6 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
           <span className="material-symbols-outlined fs-6">account_tree</span>
         </button>
       </div>
-    </div>
+    </fieldset>
   );
 });

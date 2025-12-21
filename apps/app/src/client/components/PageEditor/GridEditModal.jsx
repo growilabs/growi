@@ -240,6 +240,7 @@ class GridEditModal extends React.Component {
                     </button>
                     <div
                       className="dropdown-menu grid-division-menu"
+                      role="menu"
                       aria-labelledby="dropdownMenuButton"
                     >
                       {this.renderGridDivisionMenu()}

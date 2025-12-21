@@ -30,43 +30,48 @@ export const GrowiNavbarBottom = (): JSX.Element => {
       <div className="navbar navbar-expand px-4 px-sm-5">
         <ul className="navbar-nav flex-grow-1 d-flex align-items-center justify-content-between">
           <li className="nav-item">
-            <a
-              role="button"
+            <button
+              type="button"
               className="nav-link btn-lg"
               onClick={() => setIsDrawerOpened(true)}
             >
               <span className="material-symbols-outlined fs-2">reorder</span>
-            </a>
+            </button>
           </li>
 
           <li className="nav-item">
-            <a
-              role="button"
+            <button
+              type="button"
               className="nav-link btn-lg"
               onClick={() => openCreateModal(currentPagePath || '')}
             >
               <span className="material-symbols-outlined fs-2">edit</span>
-            </a>
+            </button>
           </li>
 
           {!isSearchPage && (
             <li className="nav-item">
-              <a
-                role="button"
+              <button
+                type="button"
                 className="nav-link btn-lg"
                 onClick={searchButtonClickHandler}
               >
                 <span className="material-symbols-outlined fs-2">search</span>
-              </a>
+              </button>
             </li>
           )}
 
           <li className="nav-item">
-            <a role="button" className="nav-link btn-lg" onClick={() => {}}>
+            <button
+              type="button"
+              className="nav-link btn-lg"
+              onClick={() => {}}
+              aria-label="Notifications"
+            >
               <span className="material-symbols-outlined fs-2">
                 notifications
               </span>
-            </a>
+            </button>
           </li>
         </ul>
       </div>

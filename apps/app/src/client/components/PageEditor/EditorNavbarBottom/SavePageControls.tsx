@@ -191,7 +191,7 @@ const SavePageButton = (props: {
                   className="btn btn-outline-neutral-secondary mx-auto mt-1"
                   onClick={() => setIsSavePageModalShown(false)}
                 >
-                  <label className="mx-2">{t('Cancel')}</label>
+                  <span className="mx-2">{t('Cancel')}</span>
                 </button>
               </div>
             </Modal>

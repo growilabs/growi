@@ -105,9 +105,9 @@ export const isEndOfLine = (editor: EditorView): boolean => {
 export const addRowToMarkdownTable = (mdtable: MarkdownTable): any => {
   const numCol = mdtable.table.length > 0 ? mdtable.table[0].length : 1;
   const newRow: string[] = [];
-  new Array(numCol).forEach(() => {
-    return newRow.push('');
-  }); // create cols
+  for (let index = 0; index < numCol; index += 1) {
+    newRow.push('');
+  } // create cols
   mdtable.table.push(newRow);
 };
 

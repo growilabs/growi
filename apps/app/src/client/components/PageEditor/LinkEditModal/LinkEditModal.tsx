@@ -74,9 +74,9 @@ const LinkEditModalSubstance: React.FC = () => {
       // ex-2. link = 'hoge' -> url = 'http://example.com/hoge' (case-2,3,5)
       let isFqcn = false;
       let isUseRelativePath = false;
-      let url;
+      let url: URL | undefined;
       try {
-        const url = new URL(link, 'http://example.com');
+        url = new URL(link, 'http://example.com');
         isFqcn = url.origin !== 'http://example.com';
       } catch (err) {
         logger.debug(err);
@@ -357,9 +357,9 @@ const LinkEditModalSubstance: React.FC = () => {
       <div className="card custom-card pt-3">
         <form className="mb-0">
           <div className="mb-0 row">
-            <label className="form-label col-sm-3">
+            <span className="form-label col-sm-3">
               {t('link_edit.path_format')}
-            </label>
+            </span>
             <div className="col-sm-9">
               <div className="form-check form-check-info form-check-inline">
                 <input

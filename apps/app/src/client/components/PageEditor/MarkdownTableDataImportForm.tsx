@@ -22,7 +22,7 @@ export const MarkdownTableDataImportForm = (
   const [parserErrorMessage, setParserErrorMessage] = useState(null);
 
   const convertFormDataToMarkdownTable = () => {
-    let result;
+    let result: MarkdownTable;
     switch (dataFormat) {
       case 'csv':
         result = MarkdownTable.fromDSV(data, ',');
@@ -33,6 +33,8 @@ export const MarkdownTableDataImportForm = (
       case 'html':
         result = MarkdownTable.fromHTMLTableTag(data);
         break;
+      default:
+        throw new Error(`Unsupported format: ${dataFormat}`);
     }
     return result.normalizeCells();
   };

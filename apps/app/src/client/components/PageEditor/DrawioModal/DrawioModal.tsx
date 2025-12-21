@@ -84,7 +84,7 @@ const DrawioModalSubstance = (): JSX.Element => {
       return undefined;
     }
 
-    let url;
+    let url: URL;
     try {
       url = new URL(drawioUri);
     } catch (err) {
@@ -192,6 +192,7 @@ const DrawioModalSubstance = (): JSX.Element => {
               <iframe
                 src={drawioUriWithParams.href}
                 className="border-0 flex-grow-1"
+                title="Draw.io editor"
               ></iframe>
             )}
           </div>

@@ -93,6 +93,7 @@ const ConflictDiffModalSubstance = (
   }, [codeMirrorEditor, conflictDiffModalStatus]);
 
   useEffect(() => {
+    void revisionSelectedToggler;
     codeMirrorEditor?.initDoc(resolvedRevision);
     // Enable selecting the same revision after editing by including revisionSelectedToggler in the dependency array of useEffect
   }, [codeMirrorEditor, resolvedRevision, revisionSelectedToggler]);

@@ -234,7 +234,7 @@ export const useScrollSync = (
 
     isOriginOfScrollSyncEditor.current = true;
     scrollEditor(codeMirrorEditor.view.scrollDOM, previewRef.current);
-  }, [codeMirrorEditor, isOriginOfScrollSyncPreview, previewRef]);
+  }, [codeMirrorEditor, previewRef]);
 
   const scrollPreviewHandler = useCallback(() => {
     if (
@@ -251,7 +251,7 @@ export const useScrollSync = (
 
     isOriginOfScrollSyncPreview.current = true;
     scrollPreview(codeMirrorEditor.view.scrollDOM, previewRef.current);
-  }, [codeMirrorEditor, isOriginOfScrollSyncEditor, previewRef]);
+  }, [codeMirrorEditor, previewRef]);
 
   return { scrollEditorHandler, scrollPreviewHandler };
 };

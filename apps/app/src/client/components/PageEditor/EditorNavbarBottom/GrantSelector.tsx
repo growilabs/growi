@@ -1,4 +1,10 @@
-import React, { type JSX, useCallback, useEffect, useState } from 'react';
+import React, {
+  type JSX,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
 import { GroupType, getIdForRef, PageGrant } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
@@ -153,8 +159,8 @@ export const GrantSelector = (props: Props): JSX.Element => {
    * Render grant selector DOM.
    */
   const renderGrantSelector = useCallback(() => {
-    let dropdownToggleBtnColor;
-    let dropdownToggleLabelElm;
+    let dropdownToggleBtnColor: string | undefined;
+    let dropdownToggleLabelElm: ReactNode | undefined;
 
     const userRelatedGrantedGroups =
       groupGrantData?.userRelatedGroups.filter((group) => {
@@ -377,7 +383,7 @@ export const GrantSelector = (props: Props): JSX.Element => {
         <span className="material-symbols-outlined">close</span>
       </button>
     );
-  }, [setIsSelectGroupModalShown]);
+  }, []);
 
   return (
     <>

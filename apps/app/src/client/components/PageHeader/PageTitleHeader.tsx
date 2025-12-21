@@ -1,4 +1,4 @@
-import type { ChangeEvent, JSX } from 'react';
+import type { ChangeEvent, JSX, KeyboardEvent } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { IPagePopulatedToShowRevision } from '@growi/core';
 import { DevidedPagePath } from '@growi/core/dist/models';
@@ -104,12 +104,26 @@ export const PageTitleHeader = (props: Props): JSX.Element => {
     setRenameInputShown(true);
   }, [currentPagePath, isMovable]);
 
+  const onKeyDownPageTitle = useCallback(
+    (event: KeyboardEvent<HTMLHeadingElement>) => {
+      if (!isMovable) {
+        return;
+      }
+
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onClickPageTitle();
+      }
+    },
+    [isMovable, onClickPageTitle],
+  );
+
   useEffect(() => {
     setEditedPagePath(currentPagePath);
     if (isUntitledPage != null) {
       setRenameInputShown(isUntitledPage && editorMode === EditorMode.Editor);
     }
-  }, [currentPage._id, currentPagePath, editorMode, isUntitledPage]);
+  }, [currentPagePath, editorMode, isUntitledPage]);
 
   const isInvalid = validationResult != null;
 
@@ -170,6 +184,9 @@ export const PageTitleHeader = (props: Props): JSX.Element => {
           `}
           style={{ maxWidth: h1MaxWidth }}
           onClick={onClickPageTitle}
+          onKeyDown={onKeyDownPageTitle}
+          role={isMovable ? 'button' : undefined}
+          tabIndex={isMovable ? 0 : -1}
         >
           {pageTitle}
         </h1>

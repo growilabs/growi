@@ -523,7 +523,7 @@ const HandsontableModalSubstance = (
               {isDataImportAreaExpanded ? 'expand_less' : 'expand_more'}
             </span>
           </button>
-          <div role="group" className="btn-group">
+          <fieldset className="btn-group border-0 m-0 p-0">
             <button
               type="button"
               className="btn btn-outline-neutral-secondary"
@@ -557,7 +557,7 @@ const HandsontableModalSubstance = (
                 format_align_right
               </span>
             </button>
-          </div>
+          </fieldset>
           <Collapse isOpen={isDataImportAreaExpanded}>
             <div className="py-3 border-bottom">
               <MarkdownTableDataImportForm

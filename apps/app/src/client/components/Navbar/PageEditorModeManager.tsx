@@ -83,9 +83,8 @@ export const PageEditorModeManager = (props: Props): JSX.Element => {
 
   return (
     <>
-      <div
+      <fieldset
         className={`btn-group grw-page-editor-mode-manager ${styles['grw-page-editor-mode-manager']}`}
-        role="group"
         aria-label="page-editor-mode-manager"
         id="grw-page-editor-mode-manager"
         data-testid="grw-page-editor-mode-manager"
@@ -119,7 +118,7 @@ export const PageEditorModeManager = (props: Props): JSX.Element => {
             )}
           </PageEditorModeButton>
         )}
-      </div>
+      </fieldset>
     </>
   );
 };

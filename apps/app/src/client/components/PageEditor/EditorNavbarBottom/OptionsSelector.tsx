@@ -75,7 +75,7 @@ const Selector = (props: SelectorProps): JSX.Element => {
         <span className="material-symbols-outlined fs-5 py-0 me-1">
           navigate_before
         </span>
-        <label>{header}</label>
+        <span>{header}</span>
       </button>
       <hr className="my-1" />
       <ul className="list-group d-flex ms-2">{items}</ul>
@@ -114,6 +114,7 @@ const ThemeSelector = memo(
               const themeLabel = EDITORTHEME_LABEL_MAP[theme];
               return (
                 <RadioListItem
+                  key={theme}
                   onClick={() => update({ theme })}
                   text={themeLabel}
                   checked={theme === selectedTheme}
@@ -171,6 +172,7 @@ const KeymapSelector = memo(
               ) : null;
             return (
               <RadioListItem
+                key={keymapMode}
                 onClick={() => update({ keymapMode })}
                 icon={icon}
                 text={keymapLabel}
@@ -208,6 +210,7 @@ const IndentSizeSelector = memo(
           {TYPICAL_INDENT_SIZE.map((indent) => {
             return (
               <RadioListItem
+                key={indent}
                 onClick={() => mutateCurrentIndentSize(indent)}
                 text={indent.toString()}
                 checked={indent === currentIndentSize}
@@ -242,6 +245,7 @@ const PasteSelector = memo(
           {AllPasteMode.map((pasteMode) => {
             return (
               <RadioListItem
+                key={pasteMode}
                 onClick={() => update({ pasteMode })}
                 text={t(`page_edit.paste.${pasteMode}`) ?? ''}
                 checked={pasteMode === selectedPasteMode}
@@ -343,13 +347,13 @@ const ChangeStateButton = memo((props: ChangeStateButtonProps): JSX.Element => {
       disabled={disabled}
       onClick={onClick}
     >
-      <label className="ms-2 me-auto">{header}</label>
-      <label className="text-muted d-flex align-items-center ms-2 me-1">
+      <span className="ms-2 me-auto">{header}</span>
+      <span className="text-muted d-flex align-items-center ms-2 me-1">
         {data}
         <span className="material-symbols-outlined fs-5 py-0">
           navigate_next
         </span>
-      </label>
+      </span>
     </button>
   );
 });
@@ -400,7 +404,7 @@ export const OptionsSelector = (): JSX.Element => {
       >
         <span className="material-symbols-outlined py-0 fs-5"> settings </span>
         {isDeviceLargerThanMd ? (
-          <label className="ms-1 me-1">{t('page_edit.editor_config')}</label>
+          <span className="ms-1 me-1">{t('page_edit.editor_config')}</span>
         ) : (
           <></>
         )}
@@ -408,9 +412,9 @@ export const OptionsSelector = (): JSX.Element => {
       <DropdownMenu container="body">
         {status === OptionsStatus.Home && (
           <div className="d-flex flex-column">
-            <label className="text-muted ms-3">
+            <span className="text-muted ms-3">
               {t('page_edit.editor_config')}
-            </label>
+            </span>
             <hr className="my-1" />
             <ChangeStateButton
               onClick={() => setStatus(OptionsStatus.Theme)}

@@ -27,7 +27,9 @@ SUPPORTED_COMPONENTS.forEach((comp) => {
 
   strokes.forEach((stroke) => {
     // register key
-    stroke.forEach((key) => KEY_SET.add(key));
+    stroke.forEach((key) => {
+      KEY_SET.add(key);
+    });
     // register stroke
     STROKE_SET.add(stroke);
     // register component

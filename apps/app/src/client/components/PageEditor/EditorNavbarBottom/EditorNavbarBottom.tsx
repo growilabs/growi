@@ -29,13 +29,13 @@ export const EditorNavbarBottom = (): JSX.Element => {
       <div
         className={`flex-expand-horiz align-items-center p-2 ps-md-3 pe-md-4 ${moduleClass}`}
       >
-        <a
-          role="button"
+        <button
+          type="button"
           className="nav-link btn-lg p-2 d-md-none me-3 opacity-50"
           onClick={() => setIsDrawerOpened(true)}
         >
           <span className="material-symbols-outlined fs-2">reorder</span>
-        </a>
+        </button>
         <form className="me-auto d-flex gap-2">
           <OptionsSelector />
           {isAiEnabled && <EditorAssistantToggleButton />}
