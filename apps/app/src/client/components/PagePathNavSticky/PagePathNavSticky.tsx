@@ -1,7 +1,4 @@
-import {
-  useEffect, useMemo, useRef, useState, type JSX,
-} from 'react';
-
+import { type JSX, useEffect, useMemo, useRef, useState } from 'react';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import Sticky from 'react-stickynode';
@@ -9,12 +6,15 @@ import Sticky from 'react-stickynode';
 import { usePrintMode } from '~/client/services/use-print-mode';
 import LinkedPagePath from '~/models/linked-page-path';
 import { usePageControlsX } from '~/states/ui/page';
-import { useSidebarMode, useCurrentProductNavWidth } from '~/states/ui/sidebar';
+import { useCurrentProductNavWidth, useSidebarMode } from '~/states/ui/sidebar';
 
 import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink';
 import type { PagePathNavLayoutProps } from '../../../components/Common/PagePathNav';
-import { PagePathNav, PagePathNavLayout, Separator } from '../../../components/Common/PagePathNav';
-
+import {
+  PagePathNav,
+  PagePathNavLayout,
+  Separator,
+} from '../../../components/Common/PagePathNav';
 import { CollapsedParentsDropdown } from './CollapsedParentsDropdown';
 
 import styles from './PagePathNavSticky.module.scss';
@@ -23,8 +23,9 @@ const moduleClass = styles['grw-page-path-nav-sticky'];
 
 const { isTrashPage } = pagePathUtils;
 
-
-export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element => {
+export const PagePathNavSticky = (
+  props: PagePathNavLayoutProps,
+): JSX.Element => {
   const { pagePath } = props;
 
   const isPrinting = usePrintMode();
@@ -37,19 +38,31 @@ export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element =>
   const [navMaxWidth, setNavMaxWidth] = useState<number | undefined>();
 
   useEffect(() => {
-    if (pageControlsX == null || pagePathNavRef.current == null || sidebarWidth == null) {
+    if (
+      pageControlsX == null ||
+      pagePathNavRef.current == null ||
+      sidebarWidth == null
+    ) {
       return;
     }
-    setNavMaxWidth(pageControlsX - pagePathNavRef.current.getBoundingClientRect().x - 10);
+    setNavMaxWidth(
+      pageControlsX - pagePathNavRef.current.getBoundingClientRect().x - 10,
+    );
   }, [pageControlsX, pagePathNavRef, sidebarWidth]);
 
   useEffect(() => {
     // wait for the end of the animation of the opening and closing of the sidebar
     const timeout = setTimeout(() => {
-      if (pageControlsX == null || pagePathNavRef.current == null || sidebarMode == null) {
+      if (
+        pageControlsX == null ||
+        pagePathNavRef.current == null ||
+        sidebarMode == null
+      ) {
         return;
       }
-      setNavMaxWidth(pageControlsX - pagePathNavRef.current.getBoundingClientRect().x - 10);
+      setNavMaxWidth(
+        pageControlsX - pagePathNavRef.current.getBoundingClientRect().x - 10,
+      );
     }, 200);
     return () => {
       clearTimeout(timeout);
@@ -67,7 +80,12 @@ export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element =>
     // not collapsed
     if (dPagePath.isRoot || dPagePath.isFormerRoot) {
       const linkedPagePath = new LinkedPagePath(pagePath);
-      return <PagePathHierarchicalLink linkedPagePath={linkedPagePath} isInTrash={isInTrash} />;
+      return (
+        <PagePathHierarchicalLink
+          linkedPagePath={linkedPagePath}
+          isInTrash={isInTrash}
+        />
+      );
     }
 
     // collapsed
@@ -75,7 +93,11 @@ export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element =>
       <>
         <CollapsedParentsDropdown linkedPagePath={linkedPagePathFormer} />
         <Separator />
-        <PagePathHierarchicalLink linkedPagePath={linkedPagePathLatter} basePath={dPagePath.former} isInTrash={isInTrash} />
+        <PagePathHierarchicalLink
+          linkedPagePath={linkedPagePathLatter}
+          basePath={dPagePath.former}
+          isInTrash={isInTrash}
+        />
       </>
     );
   }, [pagePath]);
@@ -84,7 +106,12 @@ export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element =>
     // Controlling pointer-events
     //  1. disable pointer-events with 'pe-none'
     <div ref={pagePathNavRef}>
-      <Sticky className={moduleClass} enabled={!isPrinting} innerClass="pe-none" innerActiveClass="active mt-1">
+      <Sticky
+        className={moduleClass}
+        enabled={!isPrinting}
+        innerClass="pe-none"
+        innerActiveClass="active mt-1"
+      >
         {({ status }) => {
           const isParentsCollapsed = status === Sticky.STATUS_FIXED;
 

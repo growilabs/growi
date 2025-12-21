@@ -1,18 +1,16 @@
-
-import React, {
-  useState, useMemo, useEffect, useCallback,
-} from 'react';
-
-import { useTranslation } from 'next-i18next';
+import type React from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
-import {
-  Modal, ModalHeader, ModalBody,
-} from 'reactstrap';
+import { useTranslation } from 'next-i18next';
+import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import { useIsSharedUser } from '~/states/context';
 import { useDeviceLargerThanLg } from '~/states/ui/device';
-import { useDescendantsPageListModalActions, useDescendantsPageListModalStatus } from '~/states/ui/modal/descendants-page-list';
+import {
+  useDescendantsPageListModalActions,
+  useDescendantsPageListModalStatus,
+} from '~/states/ui/modal/descendants-page-list';
 
 import { CustomNavDropdown, CustomNavTab } from '../CustomNavigation/CustomNav';
 import CustomTabContent from '../CustomNavigation/CustomTabContent';
@@ -21,9 +19,15 @@ import ExpandOrContractButton from '../ExpandOrContractButton';
 
 import styles from './DescendantsPageListModal.module.scss';
 
-const DescendantsPageList = dynamic<DescendantsPageListProps>(() => import('../DescendantsPageList').then(mod => mod.DescendantsPageList), { ssr: false });
+const DescendantsPageList = dynamic<DescendantsPageListProps>(
+  () => import('../DescendantsPageList').then((mod) => mod.DescendantsPageList),
+  { ssr: false },
+);
 
-const PageTimeline = dynamic(() => import('../PageTimeline').then(mod => mod.PageTimeline), { ssr: false });
+const PageTimeline = dynamic(
+  () => import('../PageTimeline').then((mod) => mod.PageTimeline),
+  { ssr: false },
+);
 
 /**
  * DescendantsPageListModalSubstance - Presentation component (all logic here)
@@ -69,7 +73,14 @@ const DescendantsPageListModalSubstance = ({
         isLinkEnabled: () => !isSharedUser,
       },
       timeline: {
-        Icon: () => <span data-testid="timeline-tab-button" className="material-symbols-outlined">timeline</span>,
+        Icon: () => (
+          <span
+            data-testid="timeline-tab-button"
+            className="material-symbols-outlined"
+          >
+            timeline
+          </span>
+        ),
         Content: () => {
           return <PageTimeline />;
         },
@@ -90,20 +101,32 @@ const DescendantsPageListModalSubstance = ({
   }, [onExpandedChange]);
   const onNavSelected = useCallback((v: string) => setActiveTab(v), []);
 
-  const buttons = useMemo(() => (
-    <span className="me-3">
-      <ExpandOrContractButton
-        isWindowExpanded={isWindowExpanded}
-        expandWindow={expandWindow}
-        contractWindow={contractWindow}
-      />
-      <button type="button" className="btn btn-close ms-2" onClick={closeModal} aria-label="Close"></button>
-    </span>
-  ), [closeModal, isWindowExpanded, expandWindow, contractWindow]);
+  const buttons = useMemo(
+    () => (
+      <span className="me-3">
+        <ExpandOrContractButton
+          isWindowExpanded={isWindowExpanded}
+          expandWindow={expandWindow}
+          contractWindow={contractWindow}
+        />
+        <button
+          type="button"
+          className="btn btn-close ms-2"
+          onClick={closeModal}
+          aria-label="Close"
+        ></button>
+      </span>
+    ),
+    [closeModal, isWindowExpanded, expandWindow, contractWindow],
+  );
 
   return (
     <div>
-      <ModalHeader className={isDeviceLargerThanLg ? 'p-0' : ''} toggle={closeModal} close={buttons}>
+      <ModalHeader
+        className={isDeviceLargerThanLg ? 'p-0' : ''}
+        toggle={closeModal}
+        close={buttons}
+      >
         {isDeviceLargerThanLg && (
           <CustomNavTab
             activeTab={activeTab}
@@ -125,7 +148,11 @@ const DescendantsPageListModalSubstance = ({
         <CustomTabContent
           activeTab={activeTab}
           navTabMapping={navTabMapping}
-          additionalClassNames={!isDeviceLargerThanLg ? ['grw-tab-content-style-md-down'] : undefined}
+          additionalClassNames={
+            !isDeviceLargerThanLg
+              ? ['grw-tab-content-style-md-down']
+              : undefined
+          }
         />
       </ModalBody>
     </div>

@@ -1,13 +1,15 @@
-import React, {
-  useState, useEffect, useCallback, useMemo,
-} from 'react';
-
+import type React from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { isIPageInfoForEntity } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import {
-  Collapse, Modal, ModalHeader, ModalBody, ModalFooter,
+  Collapse,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
 } from 'reactstrap';
 import { debounce } from 'throttle-debounce';
 
@@ -15,7 +17,10 @@ import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
 import { toastError } from '~/client/util/toastr';
 import { useSiteUrl } from '~/states/global';
 import { isSearchServiceReachableAtom } from '~/states/server-configurations';
-import { usePageRenameModalStatus, usePageRenameModalActions } from '~/states/ui/modal/page-rename';
+import {
+  usePageRenameModalActions,
+  usePageRenameModalStatus,
+} from '~/states/ui/modal/page-rename';
 import { useSWRxPageInfo } from '~/stores/page';
 
 import DuplicatedPathsTable from '../DuplicatedPathsTable';
@@ -38,8 +43,11 @@ const PageRenameModalSubstance: React.FC = () => {
   const { close: closeRenameModal } = usePageRenameModalActions();
   const isReachable = useAtomValue(isSearchServiceReachableAtom);
 
-  const shouldFetch = isOpened && page != null && !isIPageInfoForEntity(page.meta);
-  const { data: pageInfo } = useSWRxPageInfo(shouldFetch ? page?.data._id : null);
+  const shouldFetch =
+    isOpened && page != null && !isIPageInfoForEntity(page.meta);
+  const { data: pageInfo } = useSWRxPageInfo(
+    shouldFetch ? page?.data._id : null,
+  );
 
   if (page != null && pageInfo != null) {
     page.meta = pageInfo;
@@ -56,9 +64,10 @@ const PageRenameModalSubstance: React.FC = () => {
   const [isRemainMetadata, setIsRemainMetadata] = useState(false);
   const [expandOtherOptions, setExpandOtherOptions] = useState(false);
   const [subordinatedError] = useState(null);
-  const [isMatchedWithUserHomepagePath, setIsMatchedWithUserHomepagePath] = useState(false);
+  const [isMatchedWithUserHomepagePath, setIsMatchedWithUserHomepagePath] =
+    useState(false);
 
-  const updateSubordinatedList = useCallback(async() => {
+  const updateSubordinatedList = useCallback(async () => {
     if (page == null) {
       return;
     }
@@ -67,8 +76,7 @@ const PageRenameModalSubstance: React.FC = () => {
     try {
       const res = await apiv3Get('/pages/subordinated-list', { path });
       setSubordinatedPages(res.data.subordinatedPages);
-    }
-    catch (err) {
+    } catch (err) {
       setErrs(err);
       toastError(t('modal_rename.label.Failed to get subordinated pages'));
     }
@@ -82,20 +90,37 @@ const PageRenameModalSubstance: React.FC = () => {
   }, [isOpened, page, updateSubordinatedList]);
 
   // Memoize computed values
-  const isTargetPageDuplicate = useMemo(() => existingPaths.includes(pageNameInput), [existingPaths, pageNameInput]);
-  const isV5CompatiblePage = useMemo(() => (page != null ? isV5Compatible(page.meta) : true), [page]);
+  const isTargetPageDuplicate = useMemo(
+    () => existingPaths.includes(pageNameInput),
+    [existingPaths, pageNameInput],
+  );
+  const isV5CompatiblePage = useMemo(
+    () => (page != null ? isV5Compatible(page.meta) : true),
+    [page],
+  );
 
   const canRename = useMemo(() => {
-    if (page == null || isMatchedWithUserHomepagePath || page.data.path === pageNameInput) {
+    if (
+      page == null ||
+      isMatchedWithUserHomepagePath ||
+      page.data.path === pageNameInput
+    ) {
       return false;
     }
     if (isV5CompatiblePage) {
       return existingPaths.length === 0; // v5 data
     }
     return isRenameRecursively; // v4 data
-  }, [existingPaths.length, isMatchedWithUserHomepagePath, isRenameRecursively, page, pageNameInput, isV5CompatiblePage]);
+  }, [
+    existingPaths.length,
+    isMatchedWithUserHomepagePath,
+    isRenameRecursively,
+    page,
+    pageNameInput,
+    isV5CompatiblePage,
+  ]);
 
-  const rename = useCallback(async() => {
+  const rename = useCallback(async () => {
     if (page == null || !canRename) {
       return;
     }
@@ -127,31 +152,44 @@ const PageRenameModalSubstance: React.FC = () => {
         onRenamed(path);
       }
       closeRenameModal();
-    }
-    catch (err) {
+    } catch (err) {
       setErrs(err);
     }
-  }, [closeRenameModal, canRename, isRemainMetadata, isRenameRecursively, isRenameRedirect, page, pageNameInput, opts?.onRenamed]);
+  }, [
+    closeRenameModal,
+    canRename,
+    isRemainMetadata,
+    isRenameRecursively,
+    isRenameRedirect,
+    page,
+    pageNameInput,
+    opts?.onRenamed,
+  ]);
 
-  const checkExistPaths = useCallback(async(fromPath, toPath) => {
-    if (page == null) {
-      return;
-    }
-
-    try {
-      const res = await apiv3Get<{ existPaths: string[]}>('/page/exist-paths', { fromPath, toPath });
-      const { existPaths } = res.data;
-      setExistingPaths(existPaths);
-    }
-    catch (err) {
-      // Do not toast in case of this error because debounce process may be executed after the renaming process is completed.
-      if (err.length === 1 && err[0].code === 'from-page-is-not-exist') {
+  const checkExistPaths = useCallback(
+    async (fromPath, toPath) => {
+      if (page == null) {
         return;
       }
-      setErrs(err);
-      toastError(t('modal_rename.label.Failed to get exist path'));
-    }
-  }, [page, t]);
+
+      try {
+        const res = await apiv3Get<{ existPaths: string[] }>(
+          '/page/exist-paths',
+          { fromPath, toPath },
+        );
+        const { existPaths } = res.data;
+        setExistingPaths(existPaths);
+      } catch (err) {
+        // Do not toast in case of this error because debounce process may be executed after the renaming process is completed.
+        if (err.length === 1 && err[0].code === 'from-page-is-not-exist') {
+          return;
+        }
+        setErrs(err);
+        toastError(t('modal_rename.label.Failed to get exist path'));
+      }
+    },
+    [page, t],
+  );
 
   const checkExistPathsDebounce = useMemo(() => {
     return debounce(1000, checkExistPaths);
@@ -170,7 +208,14 @@ const PageRenameModalSubstance: React.FC = () => {
       checkExistPathsDebounce(page.data.path, pageNameInput);
       checkIsUsersHomepageDebounce(pageNameInput);
     }
-  }, [isOpened, pageNameInput, subordinatedPages, checkExistPathsDebounce, page, checkIsUsersHomepageDebounce]);
+  }, [
+    isOpened,
+    pageNameInput,
+    subordinatedPages,
+    checkExistPathsDebounce,
+    page,
+    checkIsUsersHomepageDebounce,
+  ]);
 
   const ppacInputChangeHandler = useCallback((value: string) => {
     setErrs(null);
@@ -202,7 +247,6 @@ const PageRenameModalSubstance: React.FC = () => {
       setIsRemainMetadata(false);
       setExpandOtherOptions(false);
     }, 1000);
-
   }, [isOpened, page]);
 
   const bodyContent = () => {
@@ -215,46 +259,56 @@ const PageRenameModalSubstance: React.FC = () => {
     return (
       <>
         <div className="mb-3">
-          <label className="form-label w-100">{ t('modal_rename.label.Current page name') }</label>
-          <code className="fs-6">{ path }</code>
+          <label className="form-label w-100">
+            {t('modal_rename.label.Current page name')}
+          </label>
+          <code className="fs-6">{path}</code>
         </div>
         <div className="mb-3">
-          <label htmlFor="newPageName" className="form-label w-100">{ t('modal_rename.label.New page name') }</label>
+          <label htmlFor="newPageName" className="form-label w-100">
+            {t('modal_rename.label.New page name')}
+          </label>
           <div className="input-group">
             <div>
               <span className="input-group-text">{siteUrl}</span>
             </div>
-            <form className="flex-fill" onSubmit={(e) => { e.preventDefault(); rename() }}>
-              {isReachable
-                ? (
-                  <PagePathAutoComplete
-                    initializedPath={path}
-                    onSubmit={rename}
-                    onInputChange={ppacInputChangeHandler}
-                    autoFocus
-                  />
-                )
-                : (
-                  <input
-                    type="text"
-                    value={pageNameInput}
-                    className="form-control"
-                    onChange={e => inputChangeHandler(e.target.value)}
-                    required
-                    autoFocus
-                  />
-                )}
+            <form
+              className="flex-fill"
+              onSubmit={(e) => {
+                e.preventDefault();
+                rename();
+              }}
+            >
+              {isReachable ? (
+                <PagePathAutoComplete
+                  initializedPath={path}
+                  onSubmit={rename}
+                  onInputChange={ppacInputChangeHandler}
+                  autoFocus
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={pageNameInput}
+                  className="form-control"
+                  onChange={(e) => inputChangeHandler(e.target.value)}
+                  required
+                  autoFocus
+                />
+              )}
             </form>
           </div>
-          { isTargetPageDuplicate && (
+          {isTargetPageDuplicate && (
             <p className="text-danger">Error: Target path is duplicated.</p>
-          ) }
-          { isMatchedWithUserHomepagePath && (
-            <p className="text-danger">Error: Cannot move to directory under /user page.</p>
-          ) }
+          )}
+          {isMatchedWithUserHomepagePath && (
+            <p className="text-danger">
+              Error: Cannot move to directory under /user page.
+            </p>
+          )}
         </div>
 
-        { !isV5Compatible(page.meta) && (
+        {!isV5Compatible(page.meta) && (
           <>
             <div className="form-check form-check-warning">
               <input
@@ -265,8 +319,11 @@ const PageRenameModalSubstance: React.FC = () => {
                 checked={!isRenameRecursively}
                 onChange={() => setIsRenameRecursively(!isRenameRecursively)}
               />
-              <label className="form-label form-check-label" htmlFor="cbRenameThisPageOnly">
-                { t('modal_rename.label.Rename this page only') }
+              <label
+                className="form-label form-check-label"
+                htmlFor="cbRenameThisPageOnly"
+              >
+                {t('modal_rename.label.Rename this page only')}
               </label>
             </div>
             <div className="form-check form-check-warning mt-1">
@@ -278,21 +335,39 @@ const PageRenameModalSubstance: React.FC = () => {
                 checked={isRenameRecursively}
                 onChange={() => setIsRenameRecursively(!isRenameRecursively)}
               />
-              <label className="form-label form-check-label" htmlFor="cbForceRenameRecursively">
-                { t('modal_rename.label.Force rename all child pages') }
-                <p className="form-text text-muted mt-0">{ t('modal_rename.help.recursive') }</p>
+              <label
+                className="form-label form-check-label"
+                htmlFor="cbForceRenameRecursively"
+              >
+                {t('modal_rename.label.Force rename all child pages')}
+                <p className="form-text text-muted mt-0">
+                  {t('modal_rename.help.recursive')}
+                </p>
               </label>
               {isRenameRecursively && existingPaths.length !== 0 && (
-                <DuplicatedPathsTable existingPaths={existingPaths} fromPath={path} toPath={pageNameInput} />
-              ) }
+                <DuplicatedPathsTable
+                  existingPaths={existingPaths}
+                  fromPath={path}
+                  toPath={pageNameInput}
+                />
+              )}
             </div>
           </>
-        ) }
+        )}
 
         <p className="mt-2">
-          <button type="button" className="btn btn-link mt-2 p-0" aria-expanded="false" onClick={() => setExpandOtherOptions(!expandOtherOptions)}>
-            <span className={`material-symbols-outlined me-1 ${expandOtherOptions ? 'rotate-90' : ''}`}>navigate_next</span>
-            { t('modal_rename.label.Other options') }
+          <button
+            type="button"
+            className="btn btn-link mt-2 p-0"
+            aria-expanded="false"
+            onClick={() => setExpandOtherOptions(!expandOtherOptions)}
+          >
+            <span
+              className={`material-symbols-outlined me-1 ${expandOtherOptions ? 'rotate-90' : ''}`}
+            >
+              navigate_next
+            </span>
+            {t('modal_rename.label.Other options')}
           </button>
         </p>
         <Collapse isOpen={expandOtherOptions}>
@@ -305,9 +380,14 @@ const PageRenameModalSubstance: React.FC = () => {
               checked={isRenameRedirect}
               onChange={() => setIsRenameRedirect(!isRenameRedirect)}
             />
-            <label className="form-label form-check-label" htmlFor="cbRenameRedirect">
-              { t('modal_rename.label.Redirect') }
-              <p className="form-text text-muted mt-0">{ t('modal_rename.help.redirect') }</p>
+            <label
+              className="form-label form-check-label"
+              htmlFor="cbRenameRedirect"
+            >
+              {t('modal_rename.label.Redirect')}
+              <p className="form-text text-muted mt-0">
+                {t('modal_rename.help.redirect')}
+              </p>
             </label>
           </div>
 
@@ -320,9 +400,14 @@ const PageRenameModalSubstance: React.FC = () => {
               checked={isRemainMetadata}
               onChange={() => setIsRemainMetadata(!isRemainMetadata)}
             />
-            <label className="form-label form-check-label" htmlFor="cbRemainMetadata">
-              { t('modal_rename.label.Do not update metadata') }
-              <p className="form-text text-muted mt-0">{ t('modal_rename.help.metadata') }</p>
+            <label
+              className="form-label form-check-label"
+              htmlFor="cbRemainMetadata"
+            >
+              {t('modal_rename.label.Do not update metadata')}
+              <p className="form-text text-muted mt-0">
+                {t('modal_rename.help.metadata')}
+              </p>
             </label>
           </div>
           <div> {subordinatedError} </div>
@@ -347,7 +432,8 @@ const PageRenameModalSubstance: React.FC = () => {
           className="btn btn-primary"
           onClick={rename}
           disabled={submitButtonDisabled}
-        >Rename
+        >
+          Rename
         </button>
       </>
     );
@@ -356,14 +442,10 @@ const PageRenameModalSubstance: React.FC = () => {
   return (
     <>
       <ModalHeader tag="h4" toggle={closeRenameModal}>
-        { t('modal_rename.label.Move/Rename page') }
+        {t('modal_rename.label.Move/Rename page')}
       </ModalHeader>
-      <ModalBody>
-        {bodyContent()}
-      </ModalBody>
-      <ModalFooter>
-        {footerContent()}
-      </ModalFooter>
+      <ModalBody>{bodyContent()}</ModalBody>
+      <ModalFooter>{footerContent()}</ModalFooter>
     </>
   );
 };
@@ -376,7 +458,13 @@ export const PageRenameModal = (): React.JSX.Element => {
   const { close: closeRenameModal } = usePageRenameModalActions();
 
   return (
-    <Modal size="lg" isOpen={isOpened} toggle={closeRenameModal} data-testid="page-rename-modal" autoFocus={false}>
+    <Modal
+      size="lg"
+      isOpen={isOpened}
+      toggle={closeRenameModal}
+      data-testid="page-rename-modal"
+      autoFocus={false}
+    >
       {isOpened && <PageRenameModalSubstance />}
     </Modal>
   );
