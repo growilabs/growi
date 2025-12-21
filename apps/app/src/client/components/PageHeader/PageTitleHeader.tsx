@@ -1,23 +1,25 @@
 import type { ChangeEvent, JSX } from 'react';
-import {
-  useState, useCallback, useEffect, useMemo,
-} from 'react';
-
-import nodePath from 'path';
-
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { IPagePopulatedToShowRevision } from '@growi/core';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { pathUtils } from '@growi/core/dist/utils';
 import { isMovablePage } from '@growi/core/dist/utils/page-path-utils';
 import { useTranslation } from 'next-i18next';
+import nodePath from 'path';
 
 import type { InputValidationResult } from '~/client/util/use-input-validator';
-import { ValidationTarget, useInputValidator } from '~/client/util/use-input-validator';
+import {
+  useInputValidator,
+  ValidationTarget,
+} from '~/client/util/use-input-validator';
 import { useIsUntitledPage } from '~/states/page';
 import { EditorMode, useEditorMode } from '~/states/ui/editor';
 
 import { CopyDropdown } from '../Common/CopyDropdown';
-import { AutosizeSubmittableInput, getAdjustedMaxWidthForAutosizeInput } from '../Common/SubmittableInput';
+import {
+  AutosizeSubmittableInput,
+  getAdjustedMaxWidthForAutosizeInput,
+} from '../Common/SubmittableInput';
 import { usePagePathRenameHandler } from '../PageEditor/page-path-rename-utils';
 
 import styles from './PageTitleHeader.module.scss';
@@ -26,10 +28,10 @@ const moduleClass = styles['page-title-header'] ?? '';
 const borderColorClass = styles['page-title-header-border-color'] ?? '';
 
 type Props = {
-  currentPage: IPagePopulatedToShowRevision,
-  className?: string,
-  maxWidth?: number,
-  onMoveTerminated?: () => void,
+  currentPage: IPagePopulatedToShowRevision;
+  className?: string;
+  maxWidth?: number;
+  onMoveTerminated?: () => void;
 };
 
 export const PageTitleHeader = (props: Props): JSX.Element => {
@@ -45,7 +47,8 @@ export const PageTitleHeader = (props: Props): JSX.Element => {
 
   const [isRenameInputShown, setRenameInputShown] = useState(false);
   const [editedPagePath, setEditedPagePath] = useState(currentPagePath);
-  const [validationResult, setValidationResult] = useState<InputValidationResult>();
+  const [validationResult, setValidationResult] =
+    useState<InputValidationResult>();
 
   const pagePathRenameHandler = usePagePathRenameHandler(currentPage);
   const inputValidator = useInputValidator(ValidationTarget.PAGE);
@@ -55,20 +58,26 @@ export const PageTitleHeader = (props: Props): JSX.Element => {
   const { editorMode } = useEditorMode();
   const isUntitledPage = useIsUntitledPage();
 
-  const changeHandler = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
-    const newPageTitle = pathUtils.removeHeadingSlash(e.target.value);
-    const parentPagePath = pathUtils.addTrailingSlash(nodePath.dirname(currentPage.path));
-    const newPagePath = nodePath.resolve(parentPagePath, newPageTitle);
+  const changeHandler = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const newPageTitle = pathUtils.removeHeadingSlash(e.target.value);
+      const parentPagePath = pathUtils.addTrailingSlash(
+        nodePath.dirname(currentPage.path),
+      );
+      const newPagePath = nodePath.resolve(parentPagePath, newPageTitle);
 
-    setEditedPagePath(newPagePath);
+      setEditedPagePath(newPagePath);
 
-    // validation
-    const validationResult = inputValidator(e.target.value);
-    setValidationResult(validationResult ?? undefined);
-  }, [currentPage.path, inputValidator]);
+      // validation
+      const validationResult = inputValidator(e.target.value);
+      setValidationResult(validationResult ?? undefined);
+    },
+    [currentPage.path, inputValidator],
+  );
 
   const rename = useCallback(() => {
-    pagePathRenameHandler(editedPagePath,
+    pagePathRenameHandler(
+      editedPagePath,
       () => {
         setRenameInputShown(false);
         setValidationResult(undefined);
@@ -76,7 +85,8 @@ export const PageTitleHeader = (props: Props): JSX.Element => {
       },
       () => {
         setRenameInputShown(true);
-      });
+      },
+    );
   }, [editedPagePath, onMoveTerminated, pagePathRenameHandler]);
 
   const cancel = useCallback(() => {
@@ -109,11 +119,18 @@ export const PageTitleHeader = (props: Props): JSX.Element => {
       return undefined;
     }
 
-    const wipBadgeAndCopyDropdownWidth = 4 // me-1
-      + (currentPage.wip ? 49 : 0) // WIP badge + gap
-      + 24; // CopyDropdown
+    const wipBadgeAndCopyDropdownWidth =
+      4 + // me-1
+      (currentPage.wip ? 49 : 0) + // WIP badge + gap
+      24; // CopyDropdown
 
-    return getAdjustedMaxWidthForAutosizeInput(maxWidth, 'md', validationResult != null ? false : undefined) - wipBadgeAndCopyDropdownWidth;
+    return (
+      getAdjustedMaxWidthForAutosizeInput(
+        maxWidth,
+        'md',
+        validationResult != null ? false : undefined,
+      ) - wipBadgeAndCopyDropdownWidth
+    );
   }, [currentPage.wip, maxWidth, validationResult]);
 
   // calculate h1MaxWidth as the inputMaxWidth plus padding
@@ -126,7 +143,9 @@ export const PageTitleHeader = (props: Props): JSX.Element => {
   }, [inputMaxWidth]);
 
   return (
-    <div className={`d-flex ${moduleClass} ${props.className ?? ''} position-relative`}>
+    <div
+      className={`d-flex ${moduleClass} ${props.className ?? ''} position-relative`}
+    >
       <div className="page-title-header-input me-1 d-inline-block">
         {isRenameInputShown && (
           <div className="position-relative">
@@ -156,7 +175,9 @@ export const PageTitleHeader = (props: Props): JSX.Element => {
         </h1>
       </div>
 
-      <div className={`${isRenameInputShown ? 'invisible' : ''} d-flex align-items-center gap-2`}>
+      <div
+        className={`${isRenameInputShown ? 'invisible' : ''} d-flex align-items-center gap-2`}
+      >
         {currentPage.wip && (
           <span className="badge rounded-pill text-bg-secondary">WIP</span>
         )}

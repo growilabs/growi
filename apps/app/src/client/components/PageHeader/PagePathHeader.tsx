@@ -1,43 +1,42 @@
 import type { ChangeEvent, JSX } from 'react';
-import {
-  useState, useCallback, memo,
-} from 'react';
-
-import nodePath from 'path';
-
+import { memo, useCallback, useState } from 'react';
 import type { IPagePopulatedToShowRevision } from '@growi/core';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { normalizePath } from '@growi/core/dist/utils/path-utils';
 import { useTranslation } from 'next-i18next';
+import nodePath from 'path';
 import { debounce } from 'throttle-debounce';
 
 import type { InputValidationResult } from '~/client/util/use-input-validator';
-import { ValidationTarget, useInputValidator } from '~/client/util/use-input-validator';
+import {
+  useInputValidator,
+  ValidationTarget,
+} from '~/client/util/use-input-validator';
 import type { IPageForItem } from '~/interfaces/page';
 import LinkedPagePath from '~/models/linked-page-path';
 import { usePageSelectModalActions } from '~/states/ui/modal/page-select';
 
 import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink';
-import { AutosizeSubmittableInput, getAdjustedMaxWidthForAutosizeInput } from '../Common/SubmittableInput';
+import {
+  AutosizeSubmittableInput,
+  getAdjustedMaxWidthForAutosizeInput,
+} from '../Common/SubmittableInput';
 import { usePagePathRenameHandler } from '../PageEditor/page-path-rename-utils';
 
 import styles from './PagePathHeader.module.scss';
 
 const moduleClass = styles['page-path-header'];
 
-
 type Props = {
-  currentPage: IPagePopulatedToShowRevision,
-  className?: string,
-  maxWidth?: number,
-  onRenameTerminated?: () => void,
-}
+  currentPage: IPagePopulatedToShowRevision;
+  className?: string;
+  maxWidth?: number;
+  onRenameTerminated?: () => void;
+};
 
 export const PagePathHeader = memo((props: Props): JSX.Element => {
   const { t } = useTranslation();
-  const {
-    currentPage, className, maxWidth, onRenameTerminated,
-  } = props;
+  const { currentPage, className, maxWidth, onRenameTerminated } = props;
 
   const dPagePath = new DevidedPagePath(currentPage.path, true);
   const parentPagePath = dPagePath.former;
@@ -49,16 +48,19 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
 
   const { open: openPageSelectModal } = usePageSelectModalActions();
 
-  const [validationResult, setValidationResult] = useState<InputValidationResult>();
+  const [validationResult, setValidationResult] =
+    useState<InputValidationResult>();
 
   const inputValidator = useInputValidator(ValidationTarget.PAGE);
 
-  const changeHandler = useCallback(async(e: ChangeEvent<HTMLInputElement>) => {
-    const validationResult = inputValidator(e.target.value);
-    setValidationResult(validationResult ?? undefined);
-  }, [inputValidator]);
+  const changeHandler = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const validationResult = inputValidator(e.target.value);
+      setValidationResult(validationResult ?? undefined);
+    },
+    [inputValidator],
+  );
   const changeHandlerDebounced = debounce(300, changeHandler);
-
 
   const pagePathRenameHandler = usePagePathRenameHandler(currentPage);
 
@@ -68,7 +70,8 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
         return;
       }
 
-      const currentPageTitle = nodePath.basename(currentPage?.path ?? '') || '/';
+      const currentPageTitle =
+        nodePath.basename(currentPage?.path ?? '') || '/';
       const newPagePath = nodePath.resolve(page.path, currentPageTitle);
 
       pagePathRenameHandler(newPagePath);
@@ -77,18 +80,23 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
     openPageSelectModal({ onSelected });
   }, [currentPage?.path, openPageSelectModal, pagePathRenameHandler]);
 
-  const rename = useCallback((inputText) => {
-    const pathToRename = normalizePath(`${inputText}/${dPagePath.latter}`);
-    pagePathRenameHandler(pathToRename,
-      () => {
-        setRenameInputShown(false);
-        setValidationResult(undefined);
-        onRenameTerminated?.();
-      },
-      () => {
-        setRenameInputShown(true);
-      });
-  }, [dPagePath.latter, pagePathRenameHandler, onRenameTerminated]);
+  const rename = useCallback(
+    (inputText) => {
+      const pathToRename = normalizePath(`${inputText}/${dPagePath.latter}`);
+      pagePathRenameHandler(
+        pathToRename,
+        () => {
+          setRenameInputShown(false);
+          setValidationResult(undefined);
+          onRenameTerminated?.();
+        },
+        () => {
+          setRenameInputShown(true);
+        },
+      );
+    },
+    [dPagePath.latter, pagePathRenameHandler, onRenameTerminated],
+  );
 
   const cancel = useCallback(() => {
     // reset
@@ -105,15 +113,20 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
     return <></>;
   }
 
-
   const isInvalid = validationResult != null;
 
-  const fixedMaxWidth = maxWidth != null
-    ? maxWidth - 60 // 60px is the width of the buttons
-    : undefined;
-  const inputMaxWidth = maxWidth != null
-    ? getAdjustedMaxWidthForAutosizeInput(maxWidth, 'sm', validationResult != null ? false : undefined) - 16
-    : undefined;
+  const fixedMaxWidth =
+    maxWidth != null
+      ? maxWidth - 60 // 60px is the width of the buttons
+      : undefined;
+  const inputMaxWidth =
+    maxWidth != null
+      ? getAdjustedMaxWidthForAutosizeInput(
+          maxWidth,
+          'sm',
+          validationResult != null ? false : undefined,
+        ) - 16
+      : undefined;
 
   return (
     <div
@@ -126,7 +139,7 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
         className="page-path-header-input d-inline-block"
         style={{ maxWidth: fixedMaxWidth }}
       >
-        { isRenameInputShown && (
+        {isRenameInputShown && (
           <div className="position-relative">
             <div className="position-absolute w-100">
               <AutosizeSubmittableInput
@@ -141,11 +154,11 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
               />
             </div>
           </div>
-        ) }
-        <div className={`${isRenameInputShown ? 'invisible' : ''} text-truncate`}>
-          <PagePathHierarchicalLink
-            linkedPagePath={linkedPagePath}
-          />
+        )}
+        <div
+          className={`${isRenameInputShown ? 'invisible' : ''} text-truncate`}
+        >
+          <PagePathHierarchicalLink linkedPagePath={linkedPagePath} />
         </div>
       </div>
 

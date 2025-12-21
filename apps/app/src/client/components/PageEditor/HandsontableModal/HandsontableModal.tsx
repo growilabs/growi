@@ -1,19 +1,35 @@
 import React, {
-  useState, useCallback, useMemo, useEffect, type JSX,
+  type JSX,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
 } from 'react';
-
-import { MarkdownTable, useHandsontableModalForEditorStatus, useHandsontableModalForEditorActions } from '@growi/editor';
+import {
+  MarkdownTable,
+  useHandsontableModalForEditorActions,
+  useHandsontableModalForEditorStatus,
+} from '@growi/editor';
 import { HotTable } from '@handsontable/react';
 import type Handsontable from 'handsontable';
 import { useTranslation } from 'next-i18next';
 import {
   Collapse,
-  Modal, ModalHeader, ModalBody, ModalFooter,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
 } from 'reactstrap';
 import { debounce } from 'throttle-debounce';
 
-import { replaceFocusedMarkdownTableWithEditor, getMarkdownTable } from '~/client/components/PageEditor/markdown-table-util-for-editor';
-import { useHandsontableModalActions, useHandsontableModalStatus } from '~/states/ui/modal/handsontable';
+import {
+  getMarkdownTable,
+  replaceFocusedMarkdownTableWithEditor,
+} from '~/client/components/PageEditor/markdown-table-util-for-editor';
+import {
+  useHandsontableModalActions,
+  useHandsontableModalStatus,
+} from '~/states/ui/modal/handsontable';
 
 import ExpandOrContractButton from '../../ExpandOrContractButton';
 import { MarkdownTableDataImportForm } from '../MarkdownTableDataImportForm';
@@ -42,7 +58,9 @@ type HandsontableModalSubstanceProps = {
 /**
  * HandsontableModalSubstance - Presentation component (heavy logic, rendered only when isOpen)
  */
-const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX.Element => {
+const HandsontableModalSubstance = (
+  props: HandsontableModalSubstanceProps,
+): JSX.Element => {
   const {
     initialTable,
     autoFormatMarkdownTable,
@@ -99,11 +117,16 @@ const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX
    * However, all operations are reflected in the data to be saved because the HotTable data is used when the save method is called.
    */
   const [hotTable, setHotTable] = useState<HotTable | null>();
-  const [hotTableContainer, setHotTableContainer] = useState<HTMLDivElement | null>();
-  const [isDataImportAreaExpanded, setIsDataImportAreaExpanded] = useState<boolean>(false);
-  const [markdownTable, setMarkdownTable] = useState<MarkdownTable>(defaultMarkdownTable);
-  const [markdownTableOnInit, setMarkdownTableOnInit] = useState<MarkdownTable>(defaultMarkdownTable);
-  const [handsontableHeight, setHandsontableHeight] = useState<number>(DEFAULT_HOT_HEIGHT);
+  const [hotTableContainer, setHotTableContainer] =
+    useState<HTMLDivElement | null>();
+  const [isDataImportAreaExpanded, setIsDataImportAreaExpanded] =
+    useState<boolean>(false);
+  const [markdownTable, setMarkdownTable] =
+    useState<MarkdownTable>(defaultMarkdownTable);
+  const [markdownTableOnInit, setMarkdownTableOnInit] =
+    useState<MarkdownTable>(defaultMarkdownTable);
+  const [handsontableHeight, setHandsontableHeight] =
+    useState<number>(DEFAULT_HOT_HEIGHT);
   const [handsontableWidth, setHandsontableWidth] = useState<number>(0);
 
   // Memoize window resize handler
@@ -117,13 +140,15 @@ const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX
   }, [hotTableContainer]);
 
   // Memoize debounced handler
-  const debouncedHandleWindowExpandedChange = useMemo(() => (
-    debounce(100, handleWindowExpandedChange)
-  ), [handleWindowExpandedChange]);
+  const debouncedHandleWindowExpandedChange = useMemo(
+    () => debounce(100, handleWindowExpandedChange),
+    [handleWindowExpandedChange],
+  );
 
   // Initialize table data when component mounts (modal opens)
   useEffect(() => {
-    const initTableInstance = initialTable == null ? defaultMarkdownTable : initialTable.clone();
+    const initTableInstance =
+      initialTable == null ? defaultMarkdownTable : initialTable.clone();
     setMarkdownTable(initialTable ?? defaultMarkdownTable);
     setMarkdownTableOnInit(initTableInstance);
     debouncedHandleWindowExpandedChange();
@@ -172,7 +197,13 @@ const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX
 
     onSave(newMarkdownTable);
     cancel();
-  }, [hotTable, markdownTable.options.align, autoFormatMarkdownTable, onSave, cancel]);
+  }, [
+    hotTable,
+    markdownTable.options.align,
+    autoFormatMarkdownTable,
+    onSave,
+    cancel,
+  ]);
 
   const beforeColumnResizeHandler = (currentColumn) => {
     /*
@@ -181,7 +212,6 @@ const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX
      *
      * At the moment, using 'afterColumnResizeHandler' instead.
      */
-
     // store column index
     // this.manuallyResizedColumnIndicesSet.add(currentColumn);
   };
@@ -236,7 +266,12 @@ const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX
 
     for (let i = 0; i < align.length; i++) {
       for (let j = 0; j < hotInstance.countRows(); j++) {
-        hotInstance.setCellMeta(j, i, 'className', MARKDOWNTABLE_TO_HANDSONTABLE_ALIGNMENT_SYMBOL_MAPPING[align[i]]);
+        hotInstance.setCellMeta(
+          j,
+          i,
+          'className',
+          MARKDOWNTABLE_TO_HANDSONTABLE_ALIGNMENT_SYMBOL_MAPPING[align[i]],
+        );
       }
     }
     hotInstance.render();
@@ -282,49 +317,48 @@ const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX
     const removed = align.splice(columns[0], columns.length);
 
     /*
-      * The following is a description of the algorithm for the alignment synchronization.
-      *
-      * Consider the case where the target is X and the columns are [2,3] and data is as follows.
-      *
-      * 0 1 2 3 4 5 (insert position number)
-      * +-+-+-+-+-+
-      * | | | | | |
-      * +-+-+-+-+-+
-      *  0 1 2 3 4  (column index number)
-      *
-      * At first, remove columns by the splice.
-      *
-      * 0 1 2   4 5
-      * +-+-+   +-+
-      * | | |   | |
-      * +-+-+   +-+
-      *  0 1     4
-      *
-      * Next, insert those columns into a new position.
-      * However the target number is a insert position number before deletion, it may be changed.
-      * These are changed as follows.
-      *
-      * Before:
-      * 0 1 2   4 5
-      * +-+-+   +-+
-      * | | |   | |
-      * +-+-+   +-+
-      *
-      * After:
-      * 0 1 2   2 3
-      * +-+-+   +-+
-      * | | |   | |
-      * +-+-+   +-+
-      *
-      * If X is 0, 1 or 2, that is, lower than columns[0], the target number is not changed.
-      * If X is 4 or 5, that is, higher than columns[columns.length - 1], the target number is modified to the original value minus columns.length.
-      *
-      */
+     * The following is a description of the algorithm for the alignment synchronization.
+     *
+     * Consider the case where the target is X and the columns are [2,3] and data is as follows.
+     *
+     * 0 1 2 3 4 5 (insert position number)
+     * +-+-+-+-+-+
+     * | | | | | |
+     * +-+-+-+-+-+
+     *  0 1 2 3 4  (column index number)
+     *
+     * At first, remove columns by the splice.
+     *
+     * 0 1 2   4 5
+     * +-+-+   +-+
+     * | | |   | |
+     * +-+-+   +-+
+     *  0 1     4
+     *
+     * Next, insert those columns into a new position.
+     * However the target number is a insert position number before deletion, it may be changed.
+     * These are changed as follows.
+     *
+     * Before:
+     * 0 1 2   4 5
+     * +-+-+   +-+
+     * | | |   | |
+     * +-+-+   +-+
+     *
+     * After:
+     * 0 1 2   2 3
+     * +-+-+   +-+
+     * | | |   | |
+     * +-+-+   +-+
+     *
+     * If X is 0, 1 or 2, that is, lower than columns[0], the target number is not changed.
+     * If X is 4 or 5, that is, higher than columns[columns.length - 1], the target number is modified to the original value minus columns.length.
+     *
+     */
     let insertPosition = 0;
     if (target <= columns[0]) {
       insertPosition = target;
-    }
-    else if (columns[columns.length - 1] < target) {
+    } else if (columns[columns.length - 1] < target) {
       insertPosition = target - columns.length;
     }
 
@@ -334,7 +368,9 @@ const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX
 
     setMarkdownTable((prevMarkdownTable) => {
       // change only align info, so share table data to avoid redundant copy
-      const newMarkdownTable = new MarkdownTable(prevMarkdownTable.table, { align });
+      const newMarkdownTable = new MarkdownTable(prevMarkdownTable.table, {
+        align,
+      });
       return newMarkdownTable;
     });
 
@@ -347,7 +383,9 @@ const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX
   const align = (direction: string, startCol: number, endCol: number) => {
     setMarkdownTable((prevMarkdownTable) => {
       // change only align info, so share table data to avoid redundant copy
-      const newMarkdownTable = new MarkdownTable(prevMarkdownTable.table, { align: [].concat(prevMarkdownTable.options.align) });
+      const newMarkdownTable = new MarkdownTable(prevMarkdownTable.table, {
+        align: [].concat(prevMarkdownTable.options.align),
+      });
       for (let i = startCol; i <= endCol; i++) {
         newMarkdownTable.options.align[i] = direction;
       }
@@ -365,8 +403,14 @@ const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX
     const selectedRange = hotTable.hotInstance.getSelectedRange();
     if (selectedRange == null) return;
 
-    const startCol = selectedRange[0].from.col < selectedRange[0].to.col ? selectedRange[0].from.col : selectedRange[0].to.col;
-    const endCol = selectedRange[0].from.col < selectedRange[0].to.col ? selectedRange[0].to.col : selectedRange[0].from.col;
+    const startCol =
+      selectedRange[0].from.col < selectedRange[0].to.col
+        ? selectedRange[0].from.col
+        : selectedRange[0].to.col;
+    const endCol =
+      selectedRange[0].from.col < selectedRange[0].to.col
+        ? selectedRange[0].to.col
+        : selectedRange[0].from.col;
 
     align(direction, startCol, endCol);
   };
@@ -413,15 +457,23 @@ const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX
               {
                 name: 'Left',
                 key: 'align_columns:1',
-                callback: (key, selection) => { align('l', selection[0].start.col, selection[0].end.col) },
-              }, {
+                callback: (key, selection) => {
+                  align('l', selection[0].start.col, selection[0].end.col);
+                },
+              },
+              {
                 name: 'Center',
                 key: 'align_columns:2',
-                callback: (key, selection) => { align('c', selection[0].start.col, selection[0].end.col) },
-              }, {
+                callback: (key, selection) => {
+                  align('c', selection[0].start.col, selection[0].end.col);
+                },
+              },
+              {
                 name: 'Right',
                 key: 'align_columns:3',
-                callback: (key, selection) => { align('r', selection[0].start.col, selection[0].end.col) },
+                callback: (key, selection) => {
+                  align('r', selection[0].start.col, selection[0].end.col);
+                },
               },
             ],
           },
@@ -442,7 +494,12 @@ const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX
         contractWindow={contractWindow}
         expandWindow={expandWindow}
       />
-      <button type="button" className="btn btn-close ms-2" onClick={cancel} aria-label="Close"></button>
+      <button
+        type="button"
+        className="btn btn-close ms-2"
+        onClick={cancel}
+        aria-label="Close"
+      ></button>
     </span>
   );
 
@@ -462,22 +519,51 @@ const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX
             onClick={toggleDataImportArea}
           >
             <span className="me-3">{t('handsontable_modal.data_import')}</span>
-            <span className="material-symbols-outlined">{isDataImportAreaExpanded ? 'expand_less' : 'expand_more'}</span>
+            <span className="material-symbols-outlined">
+              {isDataImportAreaExpanded ? 'expand_less' : 'expand_more'}
+            </span>
           </button>
           <div role="group" className="btn-group">
-            <button type="button" className="btn btn-outline-neutral-secondary" onClick={() => { alignButtonHandler('l') }}>
-              <span className="material-symbols-outlined">format_align_left</span>
+            <button
+              type="button"
+              className="btn btn-outline-neutral-secondary"
+              onClick={() => {
+                alignButtonHandler('l');
+              }}
+            >
+              <span className="material-symbols-outlined">
+                format_align_left
+              </span>
             </button>
-            <button type="button" className="btn btn-outline-neutral-secondary" onClick={() => { alignButtonHandler('c') }}>
-              <span className="material-symbols-outlined">format_align_center</span>
+            <button
+              type="button"
+              className="btn btn-outline-neutral-secondary"
+              onClick={() => {
+                alignButtonHandler('c');
+              }}
+            >
+              <span className="material-symbols-outlined">
+                format_align_center
+              </span>
             </button>
-            <button type="button" className="btn btn-outline-neutral-secondary" onClick={() => { alignButtonHandler('r') }}>
-              <span className="material-symbols-outlined">format_align_right</span>
+            <button
+              type="button"
+              className="btn btn-outline-neutral-secondary"
+              onClick={() => {
+                alignButtonHandler('r');
+              }}
+            >
+              <span className="material-symbols-outlined">
+                format_align_right
+              </span>
             </button>
           </div>
           <Collapse isOpen={isDataImportAreaExpanded}>
             <div className="py-3 border-bottom">
-              <MarkdownTableDataImportForm onCancel={toggleDataImportArea} onImport={importData} />
+              <MarkdownTableDataImportForm
+                onCancel={toggleDataImportArea}
+                onImport={importData}
+              />
             </div>
           </Collapse>
         </div>
@@ -505,10 +591,24 @@ const HandsontableModalSubstance = (props: HandsontableModalSubstanceProps): JSX
         </div>
       </ModalBody>
       <ModalFooter className="grw-modal-footer">
-        <button type="button" className="btn btn-outline-danger" onClick={reset}>{t('commons:Reset')}</button>
+        <button
+          type="button"
+          className="btn btn-outline-danger"
+          onClick={reset}
+        >
+          {t('commons:Reset')}
+        </button>
         <div className="ms-auto">
-          <button type="button" className="me-2 btn btn-outline-neutral-secondary" onClick={cancel}>{t('handsontable_modal.cancel')}</button>
-          <button type="button" className="btn btn-primary" onClick={save}>{t('handsontable_modal.done')}</button>
+          <button
+            type="button"
+            className="me-2 btn btn-outline-neutral-secondary"
+            onClick={cancel}
+          >
+            {t('handsontable_modal.cancel')}
+          </button>
+          <button type="button" className="btn btn-primary" onClick={save}>
+            {t('handsontable_modal.done')}
+          </button>
         </div>
       </ModalFooter>
     </>
@@ -526,7 +626,8 @@ export const HandsontableModal = (): JSX.Element => {
 
   // for Editor
   const handsontableModalForEditorData = useHandsontableModalForEditorStatus();
-  const { close: closeHandsontableModalForEditor } = useHandsontableModalForEditorActions();
+  const { close: closeHandsontableModalForEditor } =
+    useHandsontableModalForEditorActions();
 
   const isOpenedForView = handsontableModalData.isOpened;
   const isOpenedForEditor = handsontableModalForEditorData.isOpened;
@@ -541,10 +642,15 @@ export const HandsontableModal = (): JSX.Element => {
       return editor != null ? getMarkdownTable(editor) : undefined;
     }
     return handsontableModalData.table;
-  }, [isOpenedForEditor, handsontableModalForEditorData.editor, handsontableModalData.table]);
+  }, [
+    isOpenedForEditor,
+    handsontableModalForEditorData.editor,
+    handsontableModalData.table,
+  ]);
 
   // Determine autoFormatMarkdownTable based on mode
-  const autoFormatMarkdownTable = handsontableModalData.autoFormatMarkdownTable ?? false;
+  const autoFormatMarkdownTable =
+    handsontableModalData.autoFormatMarkdownTable ?? false;
 
   const toggle = useCallback(() => {
     closeHandsontableModal();
@@ -561,17 +667,23 @@ export const HandsontableModal = (): JSX.Element => {
   }, []);
 
   // Create save handler based on mode
-  const handleSave = useCallback((newMarkdownTable: MarkdownTable) => {
-    if (isOpenedForEditor) {
-      const editor = handsontableModalForEditorData.editor;
-      if (editor != null) {
-        replaceFocusedMarkdownTableWithEditor(editor, newMarkdownTable);
+  const handleSave = useCallback(
+    (newMarkdownTable: MarkdownTable) => {
+      if (isOpenedForEditor) {
+        const editor = handsontableModalForEditorData.editor;
+        if (editor != null) {
+          replaceFocusedMarkdownTableWithEditor(editor, newMarkdownTable);
+        }
+      } else {
+        handsontableModalData.onSave?.(newMarkdownTable);
       }
-    }
-    else {
-      handsontableModalData.onSave?.(newMarkdownTable);
-    }
-  }, [isOpenedForEditor, handsontableModalForEditorData.editor, handsontableModalData]);
+    },
+    [
+      isOpenedForEditor,
+      handsontableModalForEditorData.editor,
+      handsontableModalData,
+    ],
+  );
 
   return (
     <Modal
