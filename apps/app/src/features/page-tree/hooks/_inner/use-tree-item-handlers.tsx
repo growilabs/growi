@@ -11,7 +11,8 @@ import { useCreatingParentId } from '../../states/_inner';
 import { usePageCreate } from '../use-page-create';
 import { usePageRename } from '../use-page-rename';
 
-type completeRenamingHotkey = CustomHotkeysConfig<IPageForTreeItem>['completeRenaming'];
+type completeRenamingHotkey =
+  CustomHotkeysConfig<IPageForTreeItem>['completeRenaming'];
 
 
 type UseTreeItemHandlersReturn = {
@@ -40,8 +41,6 @@ type UseTreeItemHandlersReturn = {
    * Hotkeys config to complete renaming
    */
   completeRenamingHotkey: completeRenamingHotkey;
-
-
 };
 
 /**
@@ -147,7 +146,7 @@ export const useTreeItemHandlers = (
         tree.completeRenaming();
       },
     }),
-    []
+    [],
   );
 
   return {
