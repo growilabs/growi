@@ -746,6 +746,11 @@
       "updatedAt": "마지막 업데이트일"
     }
   },
+  "help_dropdown": {
+    "show_shortcuts": "단축키 표시",
+    "growi_cloud_help": "GROWI.cloud 도움말",
+    "growi_version": "GROWI 버전"
+  },
   "private_legacy_pages": {
     "title": "비공개 레거시 페이지",
     "bulk_operation": "대량 작업",
