@@ -130,19 +130,21 @@ export const useTreeItemHandlers = (
     [],
   );
 
-  const completeRenamingHotkey: completeRenamingHotkey = useMemo(() => ({
-    hotkey: 'Enter',
-    allowWhenInputFocused: true,
-    isEnabled: (tree) => tree.isRenamingItem(),
-    handler: (e, tree) => {
-      // Disable rename during IME composition
-      if (e.isComposing) {
-        return;
-      }
-
-      tree.completeRenaming();
-    },
-  }), []);
+  const completeRenamingHotkey: completeRenamingHotkey = useMemo(
+    () => ({
+      hotkey: 'Enter',
+      allowWhenInputFocused: true,
+      isEnabled: (tree) => tree.isRenamingItem(),
+      handler: (e, tree) => {
+        // Disable rename during IME composition
+        if (e.isComposing) {
+          return;
+        }
+        tree.completeRenaming();
+      },
+    }),
+    []
+  );
 
   return {
     getItemName,
