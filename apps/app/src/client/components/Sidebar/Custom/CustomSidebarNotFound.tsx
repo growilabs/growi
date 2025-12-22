@@ -24,7 +24,10 @@ export const SidebarNotFound = (): JSX.Element => {
         onClick={clickCreateButtonHandler}
       >
         <span className="material-symbols-outlined">edit_note</span>
-        <span>{t('Create Sidebar Page')}</span>
+        <span
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: ignore
+          dangerouslySetInnerHTML={{ __html: t('Create Sidebar Page') }}
+        ></span>
       </button>
     </div>
   );
