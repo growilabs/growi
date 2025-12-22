@@ -130,6 +130,10 @@ export const useTreeItemHandlers = (
     [],
   );
 
+  // When using IME (e.g., Japanese input), pressing Enter to confirm
+  // the conversion would also trigger this hotkey, completing the rename
+  // prematurely. We check `isComposing` to ignore Enter presses during
+  // IME composition.
   const completeRenamingHotkey: completeRenamingHotkey = useMemo(
     () => ({
       hotkey: 'Enter',
