@@ -14,7 +14,6 @@ import { usePageRename } from '../use-page-rename';
 type completeRenamingHotkey =
   CustomHotkeysConfig<IPageForTreeItem>['completeRenaming'];
 
-
 type UseTreeItemHandlersReturn = {
   /**
    * Stable callback for headless-tree getItemName config
