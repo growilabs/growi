@@ -1041,7 +1041,7 @@ module.exports = (crowi: Crowi) => {
         return res.apiv3Err(err, 500);
       }
 
-      // Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js'
+      // Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js' provided by v6.1.0 - v7.0.15
       try {
         await normalizeLatestRevisionIfBroken(pageId);
       } catch (err) {

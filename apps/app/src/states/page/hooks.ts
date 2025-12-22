@@ -121,24 +121,24 @@ export const useIsEditable = () => {
   const isGuestUser = useIsGuestUser();
   const isReadOnlyUser = useIsReadOnlyUser();
   const isNotCreatable = useIsNotCreatable();
-
-  const getCombinedConditions = useAtomCallback(
-    useCallback((get) => {
-      const isForbidden = get(isForbiddenAtom);
-      const isIdenticalPath = get(isIdenticalPathAtom);
-
-      return !isForbidden && !isIdenticalPath;
-    }, []),
-  );
+  const isForbidden = useAtomValue(isForbiddenAtom);
+  const isIdenticalPath = useAtomValue(isIdenticalPathAtom);
 
   return useMemo(() => {
     return (
       !isGuestUser &&
       !isReadOnlyUser &&
       !isNotCreatable &&
-      getCombinedConditions()
+      !isForbidden &&
+      !isIdenticalPath
     );
-  }, [getCombinedConditions, isGuestUser, isReadOnlyUser, isNotCreatable]);
+  }, [
+    isGuestUser,
+    isReadOnlyUser,
+    isNotCreatable,
+    isForbidden,
+    isIdenticalPath,
+  ]);
 };
 
 /**

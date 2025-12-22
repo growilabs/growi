@@ -191,6 +191,7 @@
     "passport-ldapauth": "^3.0.1",
     "passport-local": "^1.0.0",
     "passport-saml": "^3.2.0",
+    "pathe": "^2.0.3",
     "prop-types": "^15.8.1",
     "qs": "^6.11.1",
     "rate-limiter-flexible": "^2.3.7",

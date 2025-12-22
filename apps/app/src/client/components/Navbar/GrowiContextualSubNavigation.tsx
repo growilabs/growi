@@ -292,8 +292,6 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
   const [isStickyActive, setStickyActive] = useState(false);
 
   const path = currentPage?.path ?? currentPathname;
-  // const grant = currentPage?.grant ?? grantData?.grant;
-  // const grantUserGroupId = currentPage?.grantedGroup?._id ?? grantData?.grantedGroup?.id;
 
   const [isPageTemplateModalShown, setIsPageTempleteModalShown] = useState(false);
 
@@ -425,8 +423,6 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
                 editorMode={editorMode}
                 isBtnDisabled={!!isGuestUser || !!isReadOnlyUser}
                 path={path}
-              // grant={grant}
-              // grantUserGroupId={grantUserGroupId}
               />
             )}
 

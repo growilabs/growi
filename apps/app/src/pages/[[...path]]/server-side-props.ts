@@ -1,5 +1,7 @@
 import type { GetServerSidePropsContext, GetServerSidePropsResult } from 'next';
 
+import type { CrowiRequest } from '~/interfaces/crowi-request';
+
 import { getServerSideBasicLayoutProps } from '../basic-layout-page';
 import {
   getServerSideCommonInitialProps,
@@ -25,6 +27,30 @@ const nextjsRoutingProps = {
     nextjsRoutingPage: NEXT_JS_ROUTING_PAGE,
   },
 };
+
+/**
+ * Emit page seen event
+ * @param context - Next.js server-side context
+ * @param pageId - Page ID to mark as seen
+ */
+function emitPageSeenEvent(
+  context: GetServerSidePropsContext,
+  pageId?: string,
+): void {
+  if (pageId == null) {
+    return;
+  }
+
+  const req = context.req as CrowiRequest;
+  const { user, crowi } = req;
+
+  if (user == null) {
+    return;
+  }
+
+  const pageEvent = crowi.event('page');
+  pageEvent.emit('seen', pageId, user);
+}
 
 export async function getServerSidePropsForInitial(
   context: GetServerSidePropsContext,
@@ -75,6 +101,9 @@ export async function getServerSidePropsForInitial(
     throw new Error('Invalid merged props structure');
   }
 
+  // Add user to seen users
+  emitPageSeenEvent(context, mergedProps.pageWithMeta?.data?._id);
+
   // -- TODO: persist activity
   // await addActivity(context, getActivityAction(mergedProps));
   return mergedResult;
@@ -85,16 +114,21 @@ export async function getServerSidePropsForSameRoute(
 ): Promise<GetServerSidePropsResult<Stage2EachProps>> {
   // -- TODO: ：https://redmine.weseek.co.jp/issues/174725
   // Remove getServerSideI18nProps from getServerSidePropsForSameRoute for performance improvement
-  const [i18nPropsResult, pageDataResult] = await Promise.all([
+  const [i18nPropsResult, pageDataForSameRouteResult] = await Promise.all([
     getServerSideI18nProps(context, ['translation']),
     getPageDataForSameRoute(context),
   ]);
+
+  const { props: pageDataProps, internalProps } = pageDataForSameRouteResult;
+
+  // Add user to seen users
+  emitPageSeenEvent(context, internalProps?.pageId);
 
   // -- TODO: persist activity
   // const mergedProps = await mergedResult.props;
   // await addActivity(context, getActivityAction(mergedProps));
   const mergedResult = mergeGetServerSidePropsResults(
-    pageDataResult,
+    { props: pageDataProps },
     i18nPropsResult,
   );
 

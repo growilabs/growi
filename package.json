@@ -80,7 +80,6 @@
     "mock-require": "^3.0.3",
     "nodemon": "^3.1.3",
     "npm-run-all": "^4.1.5",
-    "pathe": "^2.0.3",
     "reg-keygen-git-hash-plugin": "^0.11.1",
     "reg-notify-github-plugin": "^0.11.1",
     "reg-notify-slack-plugin": "^0.11.0",

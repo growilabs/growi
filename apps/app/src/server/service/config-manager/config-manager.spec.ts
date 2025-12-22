@@ -303,13 +303,11 @@ describe('ConfigManager test', () => {
       const dbConfig: Partial<TestConfigData> = {
         'app:title': { value: undefined }, // db value is explicitly undefined
         'app:siteUrl': { value: undefined }, // another undefined value
-        'app:fileUpload': undefined, // db config entry itself is undefined
         'app:fileUploadType': { value: 'gridfs' }, // db has valid value
       };
       const envConfig: Partial<TestConfigData> = {
         'app:title': { value: 'GROWI' },
         'app:siteUrl': { value: 'https://example.com' },
-        'app:fileUpload': { value: true },
         'app:fileUploadType': { value: 'aws' },
         // Add control flags for env vars
         'env:useOnlyEnvVars:app:siteUrl': { value: false },
@@ -322,7 +320,6 @@ describe('ConfigManager test', () => {
       expect(configManager.getConfig('app:siteUrl')).toBe(
         'https://example.com',
       ); // Should fallback to env when db value is undefined
-      expect(configManager.getConfig('app:fileUpload')).toBe(true); // Should fallback to env when db config is undefined
       expect(configManager.getConfig('app:fileUploadType')).toBe('gridfs'); // Should use db value when valid
     });
   });

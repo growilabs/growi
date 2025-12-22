@@ -327,7 +327,6 @@ module.exports = (crowi) => {
       body('confidential'),
       body('globalLang').isIn(i18n.locales),
       body('isEmailPublishedForNewUser').isBoolean(),
-      body('fileUpload').isBoolean(),
     ],
     siteUrlSetting: [
       // https://regex101.com/r/5Xef8V/1
@@ -401,7 +400,9 @@ module.exports = (crowi) => {
         isEmailPublishedForNewUser: configManager.getConfig(
           'customize:isEmailPublishedForNewUser',
         ),
-        fileUpload: configManager.getConfig('app:fileUpload'),
+        isReadOnlyForNewUser: configManager.getConfig(
+          'app:isReadOnlyForNewUser',
+        ),
         useOnlyEnvVarsForIsBulkExportPagesEnabled: configManager.getConfig(
           'env:useOnlyEnvVars:app:isBulkExportPagesEnabled',
         ),
@@ -564,7 +565,7 @@ module.exports = (crowi) => {
         'app:globalLang': req.body.globalLang,
         'customize:isEmailPublishedForNewUser':
           req.body.isEmailPublishedForNewUser,
-        'app:fileUpload': req.body.fileUpload,
+        'app:isReadOnlyForNewUser': req.body.isReadOnlyForNewUser,
       };
 
       try {
@@ -576,7 +577,9 @@ module.exports = (crowi) => {
           isEmailPublishedForNewUser: configManager.getConfig(
             'customize:isEmailPublishedForNewUser',
           ),
-          fileUpload: configManager.getConfig('app:fileUpload'),
+          isReadOnlyForNewUser: configManager.getConfig(
+            'app:isReadOnlyForNewUser',
+          ),
         };
 
         const parameters = {

@@ -89,6 +89,7 @@ import type { IPageGrantService } from '../page-grant';
 import { preNotifyService } from '../pre-notify';
 import { getYjsService } from '../yjs';
 import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts';
+import { onSeen } from './events/seen';
 import type { IPageService } from './page-service';
 import { shouldUseV4Process } from './should-use-v4-process';
 
@@ -230,6 +231,9 @@ class PageService implements IPageService {
     // createMany
     this.pageEvent.on('createMany', this.pageEvent.onCreateMany);
     this.pageEvent.on('addSeenUsers', this.pageEvent.onAddSeenUsers);
+
+    // seen - mark page as seen by user
+    this.pageEvent.on('seen', onSeen);
   }
 
   getEventEmitter(): EventEmitter {
@@ -613,14 +617,26 @@ class PageService implements IPageService {
     const userRelatedGroups =
       await this.pageGrantService.getUserRelatedGroups(user);
 
-    const isDeletable = this.canDelete(page, creatorId, user, false);
-    const isAbleToDeleteCompletely = this.canDeleteCompletely(
-      page,
-      creatorId,
-      user,
-      false,
-      userRelatedGroups,
-    ); // use normal delete config
+    const canDeleteUserHomepage = await (async () => {
+      // Not a user homepage
+      if (!pagePathUtils.isUsersHomepage(page.path)) {
+        return true;
+      }
+
+      if (!this.canDeleteUserHomepageByConfig()) {
+        return false;
+      }
+
+      return await this.isUsersHomepageOwnerAbsent(page.path);
+    })();
+
+    const isDeletable =
+      canDeleteUserHomepage && this.canDelete(page, creatorId, user, false);
+
+    const isAbleToDeleteCompletely =
+      canDeleteUserHomepage &&
+      this.canDeleteCompletely(page, creatorId, user, false, userRelatedGroups); // use normal delete config
+
     const isBookmarked: boolean = isGuestUser
       ? false
       : (await Bookmark.findByPageIdAndUserId(pageId, user._id)) != null;

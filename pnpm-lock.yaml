@@ -127,9 +127,6 @@ importers:
       npm-run-all:
         specifier: ^4.1.5
         version: 4.1.5
-      pathe:
-        specifier: ^2.0.3
-        version: 2.0.3
       reg-keygen-git-hash-plugin:
         specifier: ^0.11.1
         version: 0.11.1
@@ -592,6 +589,9 @@ importers:
       passport-saml:
         specifier: ^3.2.0
         version: 3.2.4
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       prop-types:
         specifier: ^15.8.1
         version: 15.8.1
@@ -11727,6 +11727,7 @@ packages:
   next@14.2.32:
     resolution: {integrity: sha512-fg5g0GZ7/nFc09X8wLe6pNSU8cLWbLRG3TZzPJ1BJvi2s9m7eF991se67wliM9kR5yLHRkyGKU49MMx58s3LJg==}
     engines: {node: '>=18.17.0'}
+    deprecated: This version has a security vulnerability. Please upgrade to a patched version. See https://nextjs.org/blog/security-update-2025-12-11 for more details.
     hasBin: true
     peerDependencies:
       '@opentelemetry/api': ^1.1.0

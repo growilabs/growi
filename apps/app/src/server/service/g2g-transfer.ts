@@ -618,9 +618,8 @@ export class G2GTransferReceiverService implements Receiver {
     const { fileUploadService } = this.crowi;
     const version = getGrowiVersion();
     const userUpperLimit = configManager.getConfig('security:userUpperLimit');
-    const fileUploadDisabled = configManager.getConfig(
-      'app:fileUploadDisabled',
-    );
+    const fileUploadDisabled =
+      configManager.getConfig('app:fileUploadType') === 'none';
     const fileUploadTotalLimit = fileUploadService.getFileUploadTotalLimit();
     const isWritable = await fileUploadService.isWritable();
 

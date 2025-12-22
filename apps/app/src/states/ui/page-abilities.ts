@@ -110,12 +110,7 @@ export const useIsAbleToChangeEditorMode = (): boolean => {
   const isEditable = useIsEditable();
   const isSharedUser = useIsSharedUser();
 
-  const includesUndefined = [isEditable, isSharedUser].some(
-    (v) => v === undefined,
-  );
-  if (includesUndefined) return false;
-
-  return !!isEditable && !isSharedUser;
+  return isEditable && !isSharedUser;
 };
 
 /**
