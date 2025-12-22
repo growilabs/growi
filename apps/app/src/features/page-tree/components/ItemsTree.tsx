@@ -83,7 +83,7 @@ export const ItemsTree: FC<Props> = (props: Props) => {
     isItemFolder,
     handleRename,
     creatingParentId,
-    completeRenamingHotkey
+    completeRenamingHotkey,
   } = useTreeItemHandlers(triggerTreeRebuild);
 
   // Configure tree features and get checkbox state and D&D handlers
@@ -143,7 +143,7 @@ export const ItemsTree: FC<Props> = (props: Props) => {
       canDropInbetween: false,
     }),
     hotkeys: {
-      completeRenaming: completeRenamingHotkey
+      completeRenaming: completeRenamingHotkey,
     },
   });
 
