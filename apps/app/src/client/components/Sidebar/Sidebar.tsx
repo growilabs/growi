@@ -252,9 +252,6 @@ const DrawableContainer = memo((props: DrawableContainerProps): JSX.Element => {
   const [isDrawerOpened, setIsDrawerOpened] = useDrawerOpened();
 
   const openClass = `${isDrawerOpened ? 'open' : ''}`;
-  const closeDrawer = useCallback(() => {
-    setIsDrawerOpened(false);
-  }, [setIsDrawerOpened]);
 
   return (
     <>
@@ -265,8 +262,7 @@ const DrawableContainer = memo((props: DrawableContainerProps): JSX.Element => {
         <button
           type="button"
           className="modal-backdrop fade show"
-          aria-label="Close sidebar"
-          onClick={closeDrawer}
+          onClick={() => setIsDrawerOpened(false)}
         />
       )}
     </>
