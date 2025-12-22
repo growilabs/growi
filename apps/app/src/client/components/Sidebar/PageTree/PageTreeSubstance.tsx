@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useId } from 'react';
+import React, { memo, useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import { ItemsTree } from '~/features/page-tree/components';
@@ -28,7 +28,6 @@ type HeaderProps = {
 export const PageTreeHeader = memo(
   ({ isWipPageShown, onWipPageShownChange }: HeaderProps) => {
     const { t } = useTranslation();
-    const wipSwitchId = useId();
 
     const { mutate: mutateRootPage } = useSWRxRootPage({ suspense: true });
     useSWRxV5MigrationStatus({ suspense: true });
@@ -67,7 +66,7 @@ export const PageTreeHeader = memo(
               >
                 <div className="form-check form-switch">
                   <input
-                    id={wipSwitchId}
+                    id="page-tree-wip-toggle"
                     className="form-check-input pe-none"
                     type="checkbox"
                     checked={isWipPageShown}
@@ -75,7 +74,7 @@ export const PageTreeHeader = memo(
                   />
                   <label
                     className="form-check-label pe-none"
-                    htmlFor={wipSwitchId}
+                    htmlFor="page-tree-wip-toggle"
                   >
                     {t('sidebar_header.show_wip_page')}
                   </label>

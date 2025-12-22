@@ -12,7 +12,7 @@ export const Hexagon = React.memo(
       height="36px"
       className={props.className}
     >
-      <title>Hexagon</title>
+      <title>Create</title>
       <g className="background" transform="translate(0 0)">
         <path
           d="M20.768,0l6.923,12L20.768,24H6.923L0,12,6.923,0Z"

@@ -1,4 +1,4 @@
-import React, { type JSX, memo, useCallback, useEffect, useId } from 'react';
+import React, { type JSX, memo, useCallback, useEffect } from 'react';
 import { type IPageHasId, isPopulated } from '@growi/core';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { UserPicture } from '@growi/ui/dist/components';
@@ -175,8 +175,6 @@ export const RecentChangesHeader = ({
   onWipPageShownChange,
 }: HeaderProps): JSX.Element => {
   const { t } = useTranslation();
-  const resizeInputId = useId();
-  const wipInputId = useId();
 
   const { mutate } = useSWRINFxRecentlyUpdated(isWipPageShown, {
     suspense: true,
@@ -225,7 +223,7 @@ export const RecentChangesHeader = ({
                 className={`${styles['grw-recent-changes-resize-button']} form-check form-switch mb-0`}
               >
                 <input
-                  id={resizeInputId}
+                  id="recent-changes-resize-toggle"
                   className="form-check-input pe-none"
                   type="checkbox"
                   checked={isSmall}
@@ -233,7 +231,7 @@ export const RecentChangesHeader = ({
                 />
                 <label
                   className="form-check-label pe-none"
-                  htmlFor={resizeInputId}
+                  htmlFor="recent-changes-resize-toggle"
                   aria-disabled="true"
                 >
                   {t('sidebar_header.compact_view')}
@@ -250,7 +248,7 @@ export const RecentChangesHeader = ({
             >
               <div className="form-check form-switch mb-0">
                 <input
-                  id={wipInputId}
+                  id="recent-changes-wip-toggle"
                   className="form-check-input"
                   type="checkbox"
                   checked={isWipPageShown}
@@ -258,7 +256,7 @@ export const RecentChangesHeader = ({
                 />
                 <label
                   className="form-check-label pe-none"
-                  htmlFor={wipInputId}
+                  htmlFor="recent-changes-wip-toggle"
                 >
                   {t('sidebar_header.show_wip_page')}
                 </label>
