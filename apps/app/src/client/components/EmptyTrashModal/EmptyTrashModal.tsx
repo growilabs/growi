@@ -73,7 +73,7 @@ const EmptyTrashModalSubstance = ({
       </ModalHeader>
       <ModalBody>
         <div className="grw-scrollable-modal-body pb-1">
-          <div className="form-label">{t('modal_delete.deleting_page')}:</div>
+          <span className="form-label">{t('modal_delete.deleting_page')}:</span>
           <br />
           {/* Todo: change the way to show path on modal when too many pages are selected */}
           {renderPagePaths}

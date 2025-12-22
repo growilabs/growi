@@ -52,9 +52,9 @@ const DeleteBookmarkFolderModalSubstance = ({
       </ModalHeader>
       <ModalBody>
         <div className="pb-1 text-break">
-          <div className="form-label">
+          <span className="form-label">
             {t('bookmark_folder.delete_modal.modal_body_description')}:
-          </div>
+          </span>
           <br />
           <FolderIcon isOpen={false} /> {bookmarkFolder?.name}
         </div>
