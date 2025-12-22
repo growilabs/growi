@@ -68,10 +68,6 @@ const TreeNameInputSubstance: FC<TreeNameInputProps> = ({
         type="text"
         placeholder={placeholder}
         className={`form-control form-control-sm ${isInvalid ? 'is-invalid' : ''}`}
-
-        onKeyDown={(e) => {
-          console.log('TreeNameInputSubstance onKeyDown', e.key);
-        }}
       />
       {isInvalid && (
         <div className="invalid-feedback d-block my-1">
