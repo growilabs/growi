@@ -5,7 +5,7 @@ import React, {
 import { useTranslation } from 'next-i18next';
 import { debounce } from 'throttle-debounce';
 
-import { useIsGuestUser, useIsReadOnlyUser, useHideUserPages } from '~/stores-universal/context';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/stores-universal/context';
 import { useCurrentPagePath, useCurrentPageId } from '~/stores/page';
 import {
   mutatePageTree, mutateRecentlyUpdated, useSWRxRootPage, useSWRxV5MigrationStatus,
@@ -97,7 +97,6 @@ export const PageTreeContent = memo(({ isWipPageShown }: PageTreeContentProps) =
 
   const { data: isGuestUser } = useIsGuestUser();
   const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { data: isHidingUserPages } = useHideUserPages();
   const { data: currentPath } = useCurrentPagePath();
   const { data: targetId } = useCurrentPageId();
 
@@ -186,7 +185,6 @@ export const PageTreeContent = memo(({ isWipPageShown }: PageTreeContentProps) =
         isEnableActions={!isGuestUser}
         isReadOnlyUser={!!isReadOnlyUser}
         isWipPageShown={isWipPageShown}
-        isHidingUserPages={!!isHidingUserPages}
         targetPath={path}
         targetPathOrId={targetPathOrId}
         CustomTreeItem={PageTreeItem}

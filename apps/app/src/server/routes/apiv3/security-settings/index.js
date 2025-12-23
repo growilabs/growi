@@ -470,7 +470,7 @@ module.exports = (crowi) => {
         pageRecursiveCompleteDeletionAuthority: await configManager.getConfig('security:pageRecursiveCompleteDeletionAuthority'),
         isAllGroupMembershipRequiredForPageCompleteDeletion:
         await configManager.getConfig('security:isAllGroupMembershipRequiredForPageCompleteDeletion'),
-        isHidingUserPages: await configManager.getConfig('security:user-pages:isHidden'),
+        isHidingUserPages: await configManager.getConfig('security:isHidingUserPages'),
         hideRestrictedByOwner: await configManager.getConfig('security:list-policy:hideRestrictedByOwner'),
         hideRestrictedByGroup: await configManager.getConfig('security:list-policy:hideRestrictedByGroup'),
         isUsersHomepageDeletionEnabled: await configManager.getConfig('security:user-homepage-deletion:isEnabled'),
@@ -751,7 +751,7 @@ module.exports = (crowi) => {
         'security:pageCompleteDeletionAuthority': req.body.pageCompleteDeletionAuthority,
         'security:pageRecursiveCompleteDeletionAuthority': req.body.pageRecursiveCompleteDeletionAuthority,
         'security:isAllGroupMembershipRequiredForPageCompleteDeletion': req.body.isAllGroupMembershipRequiredForPageCompleteDeletion,
-        'security:user-pages:isHidden': req.body.isHidingUserPages,
+        'security:isHidingUserPages': req.body.isHidingUserPages,
         'security:list-policy:hideRestrictedByOwner': req.body.hideRestrictedByOwner,
         'security:list-policy:hideRestrictedByGroup': req.body.hideRestrictedByGroup,
         'security:user-homepage-deletion:isEnabled': req.body.isUsersHomepageDeletionEnabled,
@@ -788,7 +788,7 @@ module.exports = (crowi) => {
           pageRecursiveCompleteDeletionAuthority: await configManager.getConfig('security:pageRecursiveCompleteDeletionAuthority'),
           isAllGroupMembershipRequiredForPageCompleteDeletion:
         await configManager.getConfig('security:isAllGroupMembershipRequiredForPageCompleteDeletion'),
-          isHidingUserPages: await configManager.getConfig('security:user-pages:isHidden'),
+          isHidingUserPages: await configManager.getConfig('security:isHidingUserPages'),
           hideRestrictedByOwner: await configManager.getConfig('security:list-policy:hideRestrictedByOwner'),
           hideRestrictedByGroup: await configManager.getConfig('security:list-policy:hideRestrictedByGroup'),
           isUsersHomepageDeletionEnabled: await configManager.getConfig('security:user-homepage-deletion:isEnabled'),

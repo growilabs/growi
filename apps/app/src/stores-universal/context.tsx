@@ -359,12 +359,6 @@ export const useIsUsersHomepageDeletionEnabled = (
   return useContextSWR('isUsersHomepageDeletionEnabled', initialData);
 };
 
-export const useIsHidingUserPages = (
-  initialData?: boolean,
-): SWRResponse<boolean, Error> => {
-  return useContextSWR('isHidingUserPages', initialData);
-};
-
 export const useIsEnableUnifiedMergeView = (
   initialData?: boolean,
 ): SWRResponse<boolean, Error> => {
