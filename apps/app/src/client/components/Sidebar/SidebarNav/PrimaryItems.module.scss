@@ -2,44 +2,8 @@
 @use '../button-styles';
 @use '../variables' as sidebarVar;
 
-.grw-primary-items :global {
-  .btn {
-    @extend %btn-basis;
-
-    i {
-      opacity: 0.7;
-
-      &:hover,
-      &:focus {
-        opacity: 0.8;
-      }
-    }
-  }
-}
-
 // Add indicator
 .grw-primary-items :global {
-  $btn-height: sidebarVar.$grw-sidebar-button-height;
-  $btn-active-indicator-height: 34px;
-
-  .btn {
-    &.active {
-      position: relative;
-
-      // indicator
-      &::after {
-        position: absolute;
-        top: 0;
-        left: 0;
-        display: block;
-        width: 3px;
-        height: $btn-active-indicator-height;
-        content: '';
-        background-color: var(--bs-primary);
-        transform: translateY(#{($btn-height - $btn-active-indicator-height) * 0.5});
-      }
-    }
-  }
 
   .badge :global {
     left: 26px;
