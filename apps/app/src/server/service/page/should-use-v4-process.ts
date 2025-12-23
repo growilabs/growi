@@ -14,7 +14,9 @@ export const shouldUseV4Process = (page: IPage): boolean => {
   const isRoot = isTopPage(page.path);
   const isPageRestricted = page.grant === Page.GRANT_RESTRICTED;
 
-  const shouldUseV4Process = !isRoot && (!isV5Compatible || !isPageMigrated || isTrashPage || isPageRestricted);
+  const shouldUseV4Process =
+    !isRoot &&
+    (!isV5Compatible || !isPageMigrated || isTrashPage || isPageRestricted);
 
   return shouldUseV4Process;
 };

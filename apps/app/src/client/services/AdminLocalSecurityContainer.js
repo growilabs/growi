@@ -12,7 +12,6 @@ const logger = loggerFactory('growi:services:AdminLocalSecurityContainer');
  * @extends {Container} unstated Container
  */
 export default class AdminLocalSecurityContainer extends Container {
-
   constructor(appContainer) {
     super();
 
@@ -33,7 +32,6 @@ export default class AdminLocalSecurityContainer extends Container {
       isPasswordResetEnabled: false,
       isEmailAuthenticationEnabled: false,
     };
-
   }
 
   async retrieveSecurityData() {
@@ -47,13 +45,11 @@ export default class AdminLocalSecurityContainer extends Container {
         isPasswordResetEnabled: localSetting.isPasswordResetEnabled,
         isEmailAuthenticationEnabled: localSetting.isEmailAuthenticationEnabled,
       });
-    }
-    catch (err) {
+    } catch (err) {
       this.setState({ retrieveError: err });
       logger.error(err);
       throw new Error('Failed to fetch data');
     }
-
   }
 
   /**
@@ -63,7 +59,6 @@ export default class AdminLocalSecurityContainer extends Container {
     return 'AdminLocalSecurityContainer';
   }
 
-
   /**
    * Change registration mode
    */
@@ -72,37 +67,46 @@ export default class AdminLocalSecurityContainer extends Container {
   }
 
   /**
-   * Change registration whitelist
-   */
-  changeRegistrationWhitelist(value) {
-    this.setState({ registrationWhitelist: value.split('\n') });
-  }
-
-  /**
    * Switch password reset enabled
    */
   switchIsPasswordResetEnabled() {
-    this.setState({ isPasswordResetEnabled: !this.state.isPasswordResetEnabled });
+    this.setState({
+      isPasswordResetEnabled: !this.state.isPasswordResetEnabled,
+    });
   }
 
   /**
    * Switch email authentication enabled
    */
   switchIsEmailAuthenticationEnabled() {
-    this.setState({ isEmailAuthenticationEnabled: !this.state.isEmailAuthenticationEnabled });
+    this.setState({
+      isEmailAuthenticationEnabled: !this.state.isEmailAuthenticationEnabled,
+    });
   }
 
   /**
    * update local security setting
    */
-  async updateLocalSecuritySetting() {
-    const { registrationWhitelist, isPasswordResetEnabled, isEmailAuthenticationEnabled } = this.state;
-    const response = await apiv3Put('/security-setting/local-setting', {
-      registrationMode: this.state.registrationMode,
-      registrationWhitelist,
-      isPasswordResetEnabled,
-      isEmailAuthenticationEnabled,
-    });
+  async updateLocalSecuritySetting(formData) {
+    const requestParams =
+      formData != null
+        ? {
+            registrationMode: formData.registrationMode,
+            registrationWhitelist: formData.registrationWhitelist,
+            isPasswordResetEnabled: formData.isPasswordResetEnabled,
+            isEmailAuthenticationEnabled: formData.isEmailAuthenticationEnabled,
+          }
+        : {
+            registrationMode: this.state.registrationMode,
+            registrationWhitelist: this.state.registrationWhitelist,
+            isPasswordResetEnabled: this.state.isPasswordResetEnabled,
+            isEmailAuthenticationEnabled:
+              this.state.isEmailAuthenticationEnabled,
+          };
+    const response = await apiv3Put(
+      '/security-setting/local-setting',
+      requestParams,
+    );
 
     const { localSettingParams } = response.data;
 
@@ -110,11 +114,10 @@ export default class AdminLocalSecurityContainer extends Container {
       registrationMode: localSettingParams.registrationMode,
       registrationWhitelist: localSettingParams.registrationWhitelist,
       isPasswordResetEnabled: localSettingParams.isPasswordResetEnabled,
-      isEmailAuthenticationEnabled: localSettingParams.isEmailAuthenticationEnabled,
+      isEmailAuthenticationEnabled:
+        localSettingParams.isEmailAuthenticationEnabled,
     });
 
     return localSettingParams;
   }
-
-
 }

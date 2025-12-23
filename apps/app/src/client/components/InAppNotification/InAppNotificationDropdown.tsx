@@ -8,8 +8,8 @@ import {
   Dropdown, DropdownToggle, DropdownMenu, DropdownItem,
 } from 'reactstrap';
 
+import { useGlobalSocket } from '~/states/socket-io';
 import { useSWRxInAppNotifications, useSWRxInAppNotificationStatus } from '~/stores/in-app-notification';
-import { useDefaultSocket } from '~/stores/socket-io';
 
 import InAppNotificationList from './InAppNotificationList';
 
@@ -19,7 +19,7 @@ export const InAppNotificationDropdown = (): JSX.Element => {
   const [isOpen, setIsOpen] = useState(false);
   const limit = 6;
 
-  const { data: socket } = useDefaultSocket();
+  const socket = useGlobalSocket();
   const { data: inAppNotificationData, mutate: mutateInAppNotificationData } = useSWRxInAppNotifications(
     limit, undefined, undefined,
     { revalidateOnFocus: isOpen },

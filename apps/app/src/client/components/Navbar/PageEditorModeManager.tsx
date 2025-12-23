@@ -2,19 +2,14 @@ import React, {
   type ReactNode, useCallback, useMemo, type JSX,
 } from 'react';
 
-import { Origin } from '@growi/core';
-import { getParentPath } from '@growi/core/dist/utils/path-utils';
 import { useTranslation } from 'next-i18next';
 
 import { useCreatePage } from '~/client/services/create-page';
+import { useStartEditing } from '~/client/services/use-start-editing';
 import { toastError } from '~/client/util/toastr';
-import { EditorMode, useEditorMode } from '~/stores-universal/ui';
-import { useIsNotFound } from '~/stores/page';
-import { useIsDeviceLargerThanMd } from '~/stores/ui';
-import { useCurrentPageYjsData } from '~/stores/yjs';
-
-import { shouldCreateWipPage } from '../../../utils/should-create-wip-page';
-
+import { useCurrentPageYjsData } from '~/features/collaborative-editor/states';
+import { useDeviceLargerThanMd } from '~/states/ui/device';
+import { useEditorMode, EditorMode } from '~/states/ui/editor';
 
 import styles from './PageEditorModeManager.module.scss';
 
@@ -66,31 +61,21 @@ export const PageEditorModeManager = (props: Props): JSX.Element => {
 
   const { t } = useTranslation('commons');
 
-  const { data: isNotFound } = useIsNotFound();
-  const { mutate: mutateEditorMode } = useEditorMode();
-  const { data: isDeviceLargerThanMd } = useIsDeviceLargerThanMd();
-  const { data: currentPageYjsData } = useCurrentPageYjsData();
+  const { setEditorMode } = useEditorMode();
+  const [isDeviceLargerThanMd] = useDeviceLargerThanMd();
+  const currentPageYjsData = useCurrentPageYjsData();
+  const startEditing = useStartEditing();
 
-  const { isCreating, create } = useCreatePage();
+  const { isCreating } = useCreatePage();
 
-  const editButtonClickedHandler = useCallback(async() => {
-    if (isNotFound == null || isNotFound === false) {
-      mutateEditorMode(EditorMode.Editor);
-      return;
-    }
-
+  const editButtonClickedHandler = useCallback(async () => {
     try {
-      const parentPath = path != null ? getParentPath(path) : undefined; // does not have to exist
-      await create(
-        {
-          path, parentPath, wip: shouldCreateWipPage(path), origin: Origin.View,
-        },
-      );
+      await startEditing(path);
     }
     catch (err) {
       toastError(t('toaster.create_failed', { target: path }));
     }
-  }, [create, isNotFound, mutateEditorMode, path, t]);
+  }, [startEditing, path, t]);
 
   const _isBtnDisabled = isCreating || isBtnDisabled;
 
@@ -118,7 +103,7 @@ export const PageEditorModeManager = (props: Props): JSX.Element => {
             currentEditorMode={editorMode}
             editorMode={EditorMode.View}
             isBtnDisabled={_isBtnDisabled}
-            onClick={() => mutateEditorMode(EditorMode.View)}
+            onClick={() => setEditorMode(EditorMode.View)}
           >
             <span className="material-symbols-outlined fs-4">play_arrow</span>{t('View')}
           </PageEditorModeButton>
@@ -131,7 +116,7 @@ export const PageEditorModeManager = (props: Props): JSX.Element => {
             onClick={editButtonClickedHandler}
           >
             <span className="material-symbols-outlined me-1 fs-5">edit_square</span>{t('Edit')}
-            { circleColor != null && <span className={`position-absolute top-0 start-100 translate-middle p-1 rounded-circle ${circleColor}`} />}
+            {circleColor != null && <span className={`position-absolute top-0 start-100 translate-middle p-1 rounded-circle ${circleColor}`} />}
           </PageEditorModeButton>
         )}
       </div>

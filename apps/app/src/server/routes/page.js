@@ -3,8 +3,8 @@ import mongoose from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
 
-import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
 import { PathAlreadyExistsError } from '../models/errors';
+import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
 import PageTagRelation from '../models/page-tag-relation';
 import UpdatePost from '../models/update-post';
 
@@ -16,7 +16,7 @@ import UpdatePost from '../models/update-post';
 
 /* eslint-disable no-use-before-define */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = function(crowi, app) {
+module.exports = (crowi, app) => {
   const logger = loggerFactory('growi:routes:page');
 
   const { pagePathUtils } = require('@growi/core/dist/utils');
@@ -66,7 +66,6 @@ module.exports = function(crowi, app) {
   //   return res.render('page_presentation', renderVars);
   // }
 
-
   /**
    * switch action
    *   - presentation mode
@@ -80,7 +79,6 @@ module.exports = function(crowi, app) {
   //   // delegate to showPageForGrowiBehavior
   //   return showPageForGrowiBehavior(req, res, next);
   // };
-
 
   const api = {};
   const validator = {};
@@ -145,12 +143,11 @@ module.exports = function(crowi, app) {
    *
    * @apiParam {String} pageId
    */
-  api.getPageTag = async function(req, res) {
+  api.getPageTag = async (req, res) => {
     const result = {};
     try {
       result.tags = await PageTagRelation.listTagNamesByPage(req.query.pageId);
-    }
-    catch (err) {
+    } catch (err) {
       return res.json(ApiResponse.error(err));
     }
     return res.json(ApiResponse.success(result));
@@ -219,7 +216,7 @@ module.exports = function(crowi, app) {
    *
    * @apiParam {String} path
    */
-  api.getUpdatePost = function(req, res) {
+  api.getUpdatePost = (req, res) => {
     const path = req.query.path;
 
     if (!path) {
@@ -244,11 +241,15 @@ module.exports = function(crowi, app) {
 
   validator.remove = [
     body('completely')
-      .custom(v => v === 'true' || v === true || v == null)
-      .withMessage('The body property "completely" must be "true" or true. (Omit param for false)'),
+      .custom((v) => v === 'true' || v === true || v == null)
+      .withMessage(
+        'The body property "completely" must be "true" or true. (Omit param for false)',
+      ),
     body('recursively')
-      .custom(v => v === 'true' || v === true || v == null)
-      .withMessage('The body property "recursively" must be "true" or true. (Omit param for false)'),
+      .custom((v) => v === 'true' || v === true || v == null)
+      .withMessage(
+        'The body property "recursively" must be "true" or true. (Omit param for false)',
+      ),
   ];
 
   /**
@@ -349,7 +350,7 @@ module.exports = function(crowi, app) {
    *       500:
    *         $ref: '#/components/responses/InternalServerError'
    */
-  api.remove = async function(req, res) {
+  api.remove = async (req, res) => {
     const pageId = req.body.page_id;
     const previousRevision = req.body.revision_id || null;
 
@@ -366,11 +367,21 @@ module.exports = function(crowi, app) {
     const page = await Page.findByIdAndViewer(pageId, req.user, null, true);
 
     if (page == null) {
-      return res.json(ApiResponse.error(`Page '${pageId}' is not found or forbidden`, 'notfound_or_forbidden'));
+      return res.json(
+        ApiResponse.error(
+          `Page '${pageId}' is not found or forbidden`,
+          'notfound_or_forbidden',
+        ),
+      );
     }
 
     if (page.isEmpty && !isRecursively) {
-      return res.json(ApiResponse.error('Empty pages cannot be single deleted', 'single_deletion_empty_pages'));
+      return res.json(
+        ApiResponse.error(
+          'Empty pages cannot be single deleted',
+          'single_deletion_empty_pages',
+        ),
+      );
     }
 
     const creatorId = await crowi.pageService.getCreatorIdForCanDelete(page);
@@ -379,51 +390,97 @@ module.exports = function(crowi, app) {
 
     try {
       if (isCompletely) {
-        const userRelatedGroups = await crowi.pageGrantService.getUserRelatedGroups(req.user);
-        const canDeleteCompletely = crowi.pageService.canDeleteCompletely(page, creatorId, req.user, isRecursively, userRelatedGroups);
+        const userRelatedGroups =
+          await crowi.pageGrantService.getUserRelatedGroups(req.user);
+        const canDeleteCompletely = crowi.pageService.canDeleteCompletely(
+          page,
+          creatorId,
+          req.user,
+          isRecursively,
+          userRelatedGroups,
+        );
         if (!canDeleteCompletely) {
-          return res.json(ApiResponse.error('You cannot delete this page completely', 'complete_deletion_not_allowed_for_user'));
+          return res.json(
+            ApiResponse.error(
+              'You cannot delete this page completely',
+              'complete_deletion_not_allowed_for_user',
+            ),
+          );
         }
 
         if (pagePathUtils.isUsersHomepage(page.path)) {
           if (!crowi.pageService.canDeleteUserHomepageByConfig()) {
-            return res.json(ApiResponse.error('Could not delete user homepage'));
+            return res.json(
+              ApiResponse.error('Could not delete user homepage'),
+            );
           }
-          if (!await crowi.pageService.isUsersHomepageOwnerAbsent(page.path)) {
-            return res.json(ApiResponse.error('Could not delete user homepage'));
+          if (
+            !(await crowi.pageService.isUsersHomepageOwnerAbsent(page.path))
+          ) {
+            return res.json(
+              ApiResponse.error('Could not delete user homepage'),
+            );
           }
         }
 
-        await crowi.pageService.deleteCompletely(page, req.user, options, isRecursively, false, activityParameters);
-      }
-      else {
+        await crowi.pageService.deleteCompletely(
+          page,
+          req.user,
+          options,
+          isRecursively,
+          false,
+          activityParameters,
+        );
+      } else {
         // behave like not found
         const notRecursivelyAndEmpty = page.isEmpty && !isRecursively;
         if (notRecursivelyAndEmpty) {
-          return res.json(ApiResponse.error(`Page '${pageId}' is not found.`, 'notfound'));
+          return res.json(
+            ApiResponse.error(`Page '${pageId}' is not found.`, 'notfound'),
+          );
         }
 
         if (!page.isEmpty && !page.isUpdatable(previousRevision)) {
-          return res.json(ApiResponse.error('Someone could update this page, so couldn\'t delete.', 'outdated'));
+          return res.json(
+            ApiResponse.error(
+              "Someone could update this page, so couldn't delete.",
+              'outdated',
+            ),
+          );
         }
 
-        if (!crowi.pageService.canDelete(page, creatorId, req.user, isRecursively)) {
-          return res.json(ApiResponse.error('You cannot delete this page', 'user_not_admin'));
+        if (
+          !crowi.pageService.canDelete(page, creatorId, req.user, isRecursively)
+        ) {
+          return res.json(
+            ApiResponse.error('You cannot delete this page', 'user_not_admin'),
+          );
         }
 
         if (pagePathUtils.isUsersHomepage(page.path)) {
           if (!crowi.pageService.canDeleteUserHomepageByConfig()) {
-            return res.json(ApiResponse.error('Could not delete user homepage'));
+            return res.json(
+              ApiResponse.error('Could not delete user homepage'),
+            );
           }
-          if (!await crowi.pageService.isUsersHomepageOwnerAbsent(page.path)) {
-            return res.json(ApiResponse.error('Could not delete user homepage'));
+          if (
+            !(await crowi.pageService.isUsersHomepageOwnerAbsent(page.path))
+          ) {
+            return res.json(
+              ApiResponse.error('Could not delete user homepage'),
+            );
           }
         }
 
-        await crowi.pageService.deletePage(page, req.user, options, isRecursively, activityParameters);
+        await crowi.pageService.deletePage(
+          page,
+          req.user,
+          options,
+          isRecursively,
+          activityParameters,
+        );
       }
-    }
-    catch (err) {
+    } catch (err) {
       logger.error('Error occured while get setting', err);
       return res.json(ApiResponse.error('Failed to delete page.', err.message));
     }
@@ -438,9 +495,12 @@ module.exports = function(crowi, app) {
 
     try {
       // global notification
-      await globalNotificationService.fire(GlobalNotificationSettingEvent.PAGE_DELETE, page, req.user);
-    }
-    catch (err) {
+      await globalNotificationService.fire(
+        GlobalNotificationSettingEvent.PAGE_DELETE,
+        page,
+        req.user,
+      );
+    } catch (err) {
       logger.error('Delete notification failed', err);
     }
   };
@@ -448,8 +508,10 @@ module.exports = function(crowi, app) {
   validator.revertRemove = [
     body('recursively')
       .optional()
-      .custom(v => v === 'true' || v === true || v == null)
-      .withMessage('The body property "recursively" must be "true" or true. (Omit param for false)'),
+      .custom((v) => v === 'true' || v === true || v == null)
+      .withMessage(
+        'The body property "recursively" must be "true" or true. (Omit param for false)',
+      ),
   ];
 
   /**
@@ -537,7 +599,7 @@ module.exports = function(crowi, app) {
    *       500:
    *         $ref: '#/components/responses/InternalServerError'
    */
-  api.revertRemove = async function(req, res, options) {
+  api.revertRemove = async (req, res, options) => {
     const pageId = req.body.page_id;
 
     // get recursively flag
@@ -552,14 +614,24 @@ module.exports = function(crowi, app) {
     try {
       page = await Page.findByIdAndViewer(pageId, req.user);
       if (page == null) {
-        throw new Error(`Page '${pageId}' is not found or forbidden`, 'notfound_or_forbidden');
+        throw new Error(
+          `Page '${pageId}' is not found or forbidden`,
+          'notfound_or_forbidden',
+        );
       }
-      page = await crowi.pageService.revertDeletedPage(page, req.user, {}, isRecursively, activityParameters);
-    }
-    catch (err) {
+      page = await crowi.pageService.revertDeletedPage(
+        page,
+        req.user,
+        {},
+        isRecursively,
+        activityParameters,
+      );
+    } catch (err) {
       if (err instanceof PathAlreadyExistsError) {
         logger.error('Path already exists', err);
-        return res.json(ApiResponse.error(err, 'already_exists', err.targetPath));
+        return res.json(
+          ApiResponse.error(err, 'already_exists', err.targetPath),
+        );
       }
       logger.error('Error occured while get setting', err);
       return res.json(ApiResponse.error(err));
@@ -628,14 +700,13 @@ module.exports = function(crowi, app) {
    *       500:
    *         $ref: '#/components/responses/InternalServerError'
    */
-  api.unlink = async function(req, res) {
+  api.unlink = async (req, res) => {
     const path = req.body.path;
 
     try {
       await PageRedirect.removePageRedirectsByToPath(path);
       logger.debug('Redirect Page deleted', path);
-    }
-    catch (err) {
+    } catch (err) {
       logger.error('Error occured while get setting', err);
       return res.json(ApiResponse.error('Failed to delete redirect page.'));
     }

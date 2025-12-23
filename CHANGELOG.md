@@ -1,8 +1,65 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.3.4...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.3.9...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.3.9](https://github.com/growilabs/compare/v7.3.8...v7.3.9) - 2025-12-09
+
+### 🐛 Bug Fixes
+
+* fix: Change the name of maintenance mode. (#10559) @hikaru-n-cpu
+
+### 🧰 Maintenance
+
+* support: Add new intern names to staff credits (#10556) @riona-k
+
+## [v7.3.8](https://github.com/growilabs/compare/v7.3.7...v7.3.8) - 2025-12-04
+
+### 💎 Features
+
+* feat: Enable page bulk export for GROWI.cloud (#10292) @arafubeatbox
+* feat: Users statistics table for admin (#10539) @riona-k
+
+### 🧰 Maintenance
+
+* ci(deps): bump validator from 13.15.20 to 13.15.22 (#10560) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.3.7](https://github.com/growilabs/compare/v7.3.6...v7.3.7) - 2025-11-25
+
+### 💎 Features
+
+* feat(pdf-converter): Enable puppeteer-cluster config of pdf-converter from env var (#10516) @arafubeatbox
+
+### 🐛 Bug Fixes
+
+* fix: Admin form degradation (#10540) @yuki-takei
+
+## [v7.3.6](https://github.com/growilabs/compare/v7.3.5...v7.3.6) - 2025-11-18
+
+### 🐛 Bug Fixes
+
+* fix: Printing styles (#10505) @yuki-takei
+
+### 🧰 Maintenance
+
+* ci(deps): bump js-yaml from 4.1.0 to 4.1.1 (#10511) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Configure biome for app routes excluding apiv3 (#10496) @arafubeatbox
+
+## [v7.3.5](https://github.com/growilabs/compare/v7.3.4...v7.3.5) - 2025-11-10
+
+### 💎 Features
+
+* feat: Activity Log on the user page for viewing recent activity (#10487) @arvid-e
+
+### 🐛 Bug Fixes
+
+* fix: PDF-converter major/minor tags not updated on release (#10476) @arafubeatbox
+
+### 🧰 Maintenance
+
+* support: Configure biome for app/src/server/models dir (#10419) @arafubeatbox
+* support: Playwright tests biome migration (#10248) @arafubeatbox
 
 ## [v7.3.4](https://github.com/growilabs/compare/v7.3.3...v7.3.4) - 2025-11-04
 

@@ -1,14 +1,18 @@
 import { GrowiDeploymentType, GrowiServiceType } from '@growi/core/dist/consts';
-import type { ConfigDefinition, Lang, NonBlankString } from '@growi/core/dist/interfaces';
-import {
-  toNonBlankString,
-  defineConfig,
+import type {
+  ConfigDefinition,
+  Lang,
+  NonBlankString,
 } from '@growi/core/dist/interfaces';
+import { defineConfig, toNonBlankString } from '@growi/core/dist/interfaces';
 import type OpenAI from 'openai';
 
 import { ActionGroupSize } from '~/interfaces/activity';
 import { AttachmentMethodType } from '~/interfaces/attachment';
-import type { IPageDeleteConfigValue, IPageDeleteConfigValueToProcessValidation } from '~/interfaces/page-delete-config';
+import type {
+  IPageDeleteConfigValue,
+  IPageDeleteConfigValueToProcessValidation,
+} from '~/interfaces/page-delete-config';
 import type { RegistrationMode } from '~/interfaces/registration-mode';
 import { RehypeSanitizeType } from '~/interfaces/services/rehype-sanitize';
 
@@ -41,7 +45,6 @@ export const CONFIG_KEYS = [
   'app:title',
   'app:timezone',
   'app:globalLang',
-  'app:fileUpload',
   'app:fileUploadType',
   'app:plantumlUri',
   'app:drawioUri',
@@ -52,7 +55,6 @@ export const CONFIG_KEYS = [
   'app:maxFileSize',
   'app:fileUploadTimeout',
   'app:fileUploadTotalLimit',
-  'app:fileUploadDisabled',
   'app:elasticsearchVersion',
   'app:elasticsearchUri',
   'app:elasticsearchRequestTimeout',
@@ -75,6 +77,7 @@ export const CONFIG_KEYS = [
   'app:wipPageExpirationSeconds',
   'app:openaiThreadDeletionCronMaxMinutesUntilRequest',
   'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest',
+  'app:isReadOnlyForNewUser',
 
   // Security Settings
   'security:wikiMode',
@@ -221,7 +224,6 @@ export const CONFIG_KEYS = [
   'customize:showPageSideAuthors',
   'customize:isEnabledMarp',
   'customize:isSidebarCollapsedMode',
-  'customize:isSidebarClosedAtDockMode',
 
   // Markdown Settings
   'markdown:xss:tagWhitelist',
@@ -284,12 +286,6 @@ export const CONFIG_KEYS = [
   'notification:owner-page:isEnabled',
   'notification:group-page:isEnabled',
 
-  // Importer Settings
-  'importer:esa:team_name',
-  'importer:esa:access_token',
-  'importer:qiita:team_name',
-  'importer:qiita:access_token',
-
   // External User Group Settings
   'external-user-group:ldap:groupMembershipAttributeType',
   'external-user-group:ldap:groupSearchBase',
@@ -331,9 +327,7 @@ export const CONFIG_KEYS = [
   'accessToken:deletionCronExpression',
 ] as const;
 
-
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
-
 
 export const CONFIG_DEFINITIONS = {
   // Auto Install Settings
@@ -392,12 +386,6 @@ export const CONFIG_DEFINITIONS = {
   'app:globalLang': defineConfig<string>({
     defaultValue: 'en_US',
   }),
-  'app:fileUpload': defineConfig<boolean>({
-    defaultValue: false,
-  }),
-  'app:fileUploadDisabled': defineConfig<boolean>({
-    defaultValue: false,
-  }),
   'app:fileUploadType': defineConfig<AttachmentMethodType>({
     envVarName: 'FILE_UPLOAD',
     defaultValue: AttachmentMethodType.aws,
@@ -438,7 +426,7 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'FILE_UPLOAD_TOTAL_LIMIT',
     defaultValue: Infinity,
   }),
-  'app:elasticsearchVersion': defineConfig<7|8|9>({
+  'app:elasticsearchVersion': defineConfig<7 | 8 | 9>({
     envVarName: 'ELASTICSEARCH_VERSION',
     defaultValue: 9,
   }),
@@ -522,9 +510,15 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'OPENAI_THREAD_DELETION_CRON_MAX_MINUTES_UNTIL_REQUEST',
     defaultValue: 30,
   }),
-  'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest': defineConfig<number>({
-    envVarName: 'OPENAI_VECTOR_STORE_FILE_DELETION_CRON_MAX_MINUTES_UNTIL_REQUEST',
-    defaultValue: 30,
+  'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest':
+    defineConfig<number>({
+      envVarName:
+        'OPENAI_VECTOR_STORE_FILE_DELETION_CRON_MAX_MINUTES_UNTIL_REQUEST',
+      defaultValue: 30,
+    }),
+  'app:isReadOnlyForNewUser': defineConfig<boolean>({
+    envVarName: 'DEFAULT_USER_READONLY',
+    defaultValue: false,
   }),
 
   // Security Settings
@@ -564,10 +558,12 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'LOCAL_STRATEGY_PASSWORD_RESET_ENABLED',
     defaultValue: true,
   }),
-  'security:passport-local:isEmailAuthenticationEnabled': defineConfig<boolean>({
-    envVarName: 'LOCAL_STRATEGY_EMAIL_AUTHENTICATION_ENABLED',
-    defaultValue: false,
-  }),
+  'security:passport-local:isEmailAuthenticationEnabled': defineConfig<boolean>(
+    {
+      envVarName: 'LOCAL_STRATEGY_EMAIL_AUTHENTICATION_ENABLED',
+      defaultValue: false,
+    },
+  ),
   'security:passport-saml:isEnabled': defineConfig<boolean>({
     envVarName: 'SAML_ENABLED',
     defaultValue: false,
@@ -646,27 +642,37 @@ export const CONFIG_DEFINITIONS = {
   'security:list-policy:hideRestrictedByGroup': defineConfig<boolean>({
     defaultValue: false,
   }),
-  'security:pageDeletionAuthority': defineConfig<IPageDeleteConfigValueToProcessValidation | undefined>({
+  'security:pageDeletionAuthority': defineConfig<
+    IPageDeleteConfigValueToProcessValidation | undefined
+  >({
     defaultValue: undefined,
   }),
-  'security:pageCompleteDeletionAuthority': defineConfig<IPageDeleteConfigValueToProcessValidation | undefined>({
+  'security:pageCompleteDeletionAuthority': defineConfig<
+    IPageDeleteConfigValueToProcessValidation | undefined
+  >({
     defaultValue: undefined,
   }),
-  'security:pageRecursiveDeletionAuthority': defineConfig<IPageDeleteConfigValue | undefined>({
+  'security:pageRecursiveDeletionAuthority': defineConfig<
+    IPageDeleteConfigValue | undefined
+  >({
     defaultValue: undefined,
   }),
-  'security:pageRecursiveCompleteDeletionAuthority': defineConfig<IPageDeleteConfigValue | undefined>({
+  'security:pageRecursiveCompleteDeletionAuthority': defineConfig<
+    IPageDeleteConfigValue | undefined
+  >({
     defaultValue: undefined,
   }),
-  'security:isAllGroupMembershipRequiredForPageCompleteDeletion': defineConfig<boolean>({
-    defaultValue: true,
-  }),
+  'security:isAllGroupMembershipRequiredForPageCompleteDeletion':
+    defineConfig<boolean>({
+      defaultValue: true,
+    }),
   'security:user-homepage-deletion:isEnabled': defineConfig<boolean>({
     defaultValue: false,
   }),
-  'security:user-homepage-deletion:isForceDeleteUserHomepageOnUserDeletion': defineConfig<boolean>({
-    defaultValue: false,
-  }),
+  'security:user-homepage-deletion:isForceDeleteUserHomepageOnUserDeletion':
+    defineConfig<boolean>({
+      defaultValue: false,
+    }),
   'security:isRomUserAllowedToComment': defineConfig<boolean>({
     defaultValue: false,
   }),
@@ -706,30 +712,39 @@ export const CONFIG_DEFINITIONS = {
   'security:passport-ldap:groupDnProperty': defineConfig<string | undefined>({
     defaultValue: undefined,
   }),
-  'security:passport-ldap:isSameUsernameTreatedAsIdenticalUser': defineConfig<boolean>({
-    defaultValue: false,
-  }),
-  'security:passport-saml:isSameEmailTreatedAsIdenticalUser': defineConfig<boolean>({
-    defaultValue: false,
-  }),
-  'security:passport-saml:isSameUsernameTreatedAsIdenticalUser': defineConfig<boolean>({
-    defaultValue: false,
-  }),
+  'security:passport-ldap:isSameUsernameTreatedAsIdenticalUser':
+    defineConfig<boolean>({
+      defaultValue: false,
+    }),
+  'security:passport-saml:isSameEmailTreatedAsIdenticalUser':
+    defineConfig<boolean>({
+      defaultValue: false,
+    }),
+  'security:passport-saml:isSameUsernameTreatedAsIdenticalUser':
+    defineConfig<boolean>({
+      defaultValue: false,
+    }),
   'security:passport-google:isEnabled': defineConfig<boolean>({
     defaultValue: false,
   }),
-  'security:passport-google:clientId': defineConfig<NonBlankString | undefined>({
+  'security:passport-google:clientId': defineConfig<NonBlankString | undefined>(
+    {
+      defaultValue: undefined,
+    },
+  ),
+  'security:passport-google:clientSecret': defineConfig<
+    NonBlankString | undefined
+  >({
     defaultValue: undefined,
   }),
-  'security:passport-google:clientSecret': defineConfig<NonBlankString | undefined>({
-    defaultValue: undefined,
-  }),
-  'security:passport-google:isSameUsernameTreatedAsIdenticalUser': defineConfig<boolean>({
-    defaultValue: false,
-  }),
-  'security:passport-google:isSameEmailTreatedAsIdenticalUser': defineConfig<boolean>({
-    defaultValue: false,
-  }),
+  'security:passport-google:isSameUsernameTreatedAsIdenticalUser':
+    defineConfig<boolean>({
+      defaultValue: false,
+    }),
+  'security:passport-google:isSameEmailTreatedAsIdenticalUser':
+    defineConfig<boolean>({
+      defaultValue: false,
+    }),
   'security:passport-github:isEnabled': defineConfig<boolean>({
     defaultValue: false,
   }),
@@ -739,12 +754,14 @@ export const CONFIG_DEFINITIONS = {
   'security:passport-github:clientSecret': defineConfig<string | undefined>({
     defaultValue: undefined,
   }),
-  'security:passport-github:isSameUsernameTreatedAsIdenticalUser': defineConfig<boolean>({
-    defaultValue: false,
-  }),
-  'security:passport-github:isSameEmailTreatedAsIdenticalUser': defineConfig<boolean>({
-    defaultValue: false,
-  }),
+  'security:passport-github:isSameUsernameTreatedAsIdenticalUser':
+    defineConfig<boolean>({
+      defaultValue: false,
+    }),
+  'security:passport-github:isSameEmailTreatedAsIdenticalUser':
+    defineConfig<boolean>({
+      defaultValue: false,
+    }),
   'security:passport-oidc:clientId': defineConfig<string | undefined>({
     defaultValue: undefined,
   }),
@@ -757,36 +774,48 @@ export const CONFIG_DEFINITIONS = {
   'security:passport-oidc:issuerHost': defineConfig<string | undefined>({
     defaultValue: undefined,
   }),
-  'security:passport-oidc:authorizationEndpoint': defineConfig<string | undefined>({
+  'security:passport-oidc:authorizationEndpoint': defineConfig<
+    string | undefined
+  >({
     defaultValue: undefined,
   }),
   'security:passport-oidc:tokenEndpoint': defineConfig<string | undefined>({
     defaultValue: undefined,
   }),
-  'security:passport-oidc:revocationEndpoint': defineConfig<string | undefined>({
-    defaultValue: undefined,
-  }),
-  'security:passport-oidc:introspectionEndpoint': defineConfig<string | undefined>({
+  'security:passport-oidc:revocationEndpoint': defineConfig<string | undefined>(
+    {
+      defaultValue: undefined,
+    },
+  ),
+  'security:passport-oidc:introspectionEndpoint': defineConfig<
+    string | undefined
+  >({
     defaultValue: undefined,
   }),
   'security:passport-oidc:userInfoEndpoint': defineConfig<string | undefined>({
     defaultValue: undefined,
   }),
-  'security:passport-oidc:endSessionEndpoint': defineConfig<string | undefined>({
-    defaultValue: undefined,
-  }),
-  'security:passport-oidc:registrationEndpoint': defineConfig<string | undefined>({
+  'security:passport-oidc:endSessionEndpoint': defineConfig<string | undefined>(
+    {
+      defaultValue: undefined,
+    },
+  ),
+  'security:passport-oidc:registrationEndpoint': defineConfig<
+    string | undefined
+  >({
     defaultValue: undefined,
   }),
   'security:passport-oidc:jwksUri': defineConfig<string | undefined>({
     defaultValue: undefined,
   }),
-  'security:passport-oidc:isSameUsernameTreatedAsIdenticalUser': defineConfig<boolean>({
-    defaultValue: false,
-  }),
-  'security:passport-oidc:isSameEmailTreatedAsIdenticalUser': defineConfig<boolean>({
-    defaultValue: false,
-  }),
+  'security:passport-oidc:isSameUsernameTreatedAsIdenticalUser':
+    defineConfig<boolean>({
+      defaultValue: false,
+    }),
+  'security:passport-oidc:isSameEmailTreatedAsIdenticalUser':
+    defineConfig<boolean>({
+      defaultValue: false,
+    }),
 
   // File Upload Settings
   'fileUpload:local:useInternalRedirect': defineConfig<boolean>({
@@ -981,10 +1010,6 @@ export const CONFIG_DEFINITIONS = {
   'customize:isSidebarCollapsedMode': defineConfig<boolean>({
     defaultValue: false,
   }),
-  'customize:isSidebarClosedAtDockMode': defineConfig<boolean>({
-    defaultValue: false,
-  }),
-
   // Markdown Settings
   'markdown:xss:tagWhitelist': defineConfig<string[]>({
     defaultValue: [],
@@ -1051,7 +1076,9 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'SLACKBOT_WITHOUT_PROXY_COMMAND_PERMISSION',
     defaultValue: undefined,
   }),
-  'slackbot:withoutProxy:eventActionsPermission': defineConfig<string | undefined>({
+  'slackbot:withoutProxy:eventActionsPermission': defineConfig<
+    string | undefined
+  >({
     envVarName: 'SLACKBOT_WITHOUT_PROXY_EVENT_ACTIONS_PERMISSION',
     defaultValue: undefined,
   }),
@@ -1171,43 +1198,41 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: false,
   }),
 
-  // Importer Settings
-  'importer:esa:team_name': defineConfig<string | undefined>({
-    defaultValue: undefined,
-  }),
-  'importer:esa:access_token': defineConfig<string | undefined>({
-    defaultValue: undefined,
-  }),
-  'importer:qiita:team_name': defineConfig<string | undefined>({
-    defaultValue: undefined,
-  }),
-  'importer:qiita:access_token': defineConfig<string | undefined>({
-    defaultValue: undefined,
-  }),
-
   // External User Group Settings
-  'external-user-group:ldap:groupMembershipAttributeType': defineConfig<string>({
-    defaultValue: 'DN',
-  }),
+  'external-user-group:ldap:groupMembershipAttributeType': defineConfig<string>(
+    {
+      defaultValue: 'DN',
+    },
+  ),
   'external-user-group:ldap:groupSearchBase': defineConfig<string | undefined>({
     defaultValue: undefined,
   }),
-  'external-user-group:ldap:groupMembershipAttribute': defineConfig<string | undefined>({
+  'external-user-group:ldap:groupMembershipAttribute': defineConfig<
+    string | undefined
+  >({
     defaultValue: undefined,
   }),
-  'external-user-group:ldap:groupChildGroupAttribute': defineConfig<string | undefined>({
+  'external-user-group:ldap:groupChildGroupAttribute': defineConfig<
+    string | undefined
+  >({
     defaultValue: undefined,
   }),
-  'external-user-group:ldap:autoGenerateUserOnGroupSync': defineConfig<boolean>({
-    defaultValue: false,
-  }),
+  'external-user-group:ldap:autoGenerateUserOnGroupSync': defineConfig<boolean>(
+    {
+      defaultValue: false,
+    },
+  ),
   'external-user-group:ldap:preserveDeletedGroups': defineConfig<boolean>({
     defaultValue: false,
   }),
-  'external-user-group:ldap:groupNameAttribute': defineConfig<string | undefined>({
+  'external-user-group:ldap:groupNameAttribute': defineConfig<
+    string | undefined
+  >({
     defaultValue: undefined,
   }),
-  'external-user-group:ldap:groupDescriptionAttribute': defineConfig<string | undefined>({
+  'external-user-group:ldap:groupDescriptionAttribute': defineConfig<
+    string | undefined
+  >({
     defaultValue: undefined,
   }),
   'external-user-group:keycloak:host': defineConfig<string | undefined>({
@@ -1216,23 +1241,32 @@ export const CONFIG_DEFINITIONS = {
   'external-user-group:keycloak:groupRealm': defineConfig<string | undefined>({
     defaultValue: undefined,
   }),
-  'external-user-group:keycloak:groupSyncClientRealm': defineConfig<string | undefined>({
+  'external-user-group:keycloak:groupSyncClientRealm': defineConfig<
+    string | undefined
+  >({
     defaultValue: undefined,
   }),
-  'external-user-group:keycloak:groupSyncClientID': defineConfig<string | undefined>({
+  'external-user-group:keycloak:groupSyncClientID': defineConfig<
+    string | undefined
+  >({
     defaultValue: undefined,
   }),
-  'external-user-group:keycloak:groupSyncClientSecret': defineConfig<string | undefined>({
+  'external-user-group:keycloak:groupSyncClientSecret': defineConfig<
+    string | undefined
+  >({
     defaultValue: undefined,
     isSecret: true,
   }),
-  'external-user-group:keycloak:autoGenerateUserOnGroupSync': defineConfig<boolean>({
-    defaultValue: false,
-  }),
+  'external-user-group:keycloak:autoGenerateUserOnGroupSync':
+    defineConfig<boolean>({
+      defaultValue: false,
+    }),
   'external-user-group:keycloak:preserveDeletedGroups': defineConfig<boolean>({
     defaultValue: false,
   }),
-  'external-user-group:keycloak:groupDescriptionAttribute': defineConfig<string | undefined>({
+  'external-user-group:keycloak:groupDescriptionAttribute': defineConfig<
+    string | undefined
+  >({
     defaultValue: undefined,
   }),
 
@@ -1306,7 +1340,11 @@ export const CONFIG_DEFINITIONS = {
 } as const;
 
 export type ConfigValues = {
-  [K in ConfigKey]: (typeof CONFIG_DEFINITIONS)[K] extends ConfigDefinition<infer T> ? T : never;
+  [K in ConfigKey]: (typeof CONFIG_DEFINITIONS)[K] extends ConfigDefinition<
+    infer T
+  >
+    ? T
+    : never;
 };
 
 // Define groups of settings that use only environment variables
@@ -1339,11 +1377,7 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
   },
   {
     controlKey: 'env:useOnlyEnvVars:gcs',
-    targetKeys: [
-      'gcs:apiKeyJsonPath',
-      'gcs:bucket',
-      'gcs:uploadNamespace',
-    ],
+    targetKeys: ['gcs:apiKeyJsonPath', 'gcs:bucket', 'gcs:uploadNamespace'],
   },
   {
     controlKey: 'env:useOnlyEnvVars:azure',

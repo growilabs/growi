@@ -13,10 +13,13 @@ const logger = loggerFactory('growi:routes:apiv3:user-ui-settings');
 const router = express.Router();
 
 module.exports = () => {
-
   const validatorForPut = [
-    body('settings').exists().withMessage('The body param \'settings\' is required'),
-    body('settings.currentSidebarContents').optional().isIn(AllSidebarContentsType),
+    body('settings')
+      .exists()
+      .withMessage("The body param 'settings' is required"),
+    body('settings.currentSidebarContents')
+      .optional()
+      .isIn(AllSidebarContentsType),
     body('settings.currentProductNavWidth').optional().isNumeric(),
     body('settings.preferCollapsedModeByUser').optional().isBoolean(),
   ];
@@ -67,55 +70,58 @@ module.exports = () => {
    *                   type: boolean
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  router.put('/', validatorForPut, apiV3FormValidator, async(req: any, res: any) => {
-    const { user } = req;
-    const { settings } = req.body;
+  router.put(
+    '/',
+    validatorForPut,
+    apiV3FormValidator,
+    async (req: any, res: any) => {
+      const { user } = req;
+      const { settings } = req.body;
 
-    // extract only necessary params
-    const updateData = {
-      currentSidebarContents: settings.currentSidebarContents,
-      currentProductNavWidth: settings.currentProductNavWidth,
-      preferCollapsedModeByUser: settings.preferCollapsedModeByUser,
-    };
+      // extract only necessary params
+      const updateData = {
+        currentSidebarContents: settings.currentSidebarContents,
+        currentProductNavWidth: settings.currentProductNavWidth,
+        preferCollapsedModeByUser: settings.preferCollapsedModeByUser,
+      };
 
-    if (user == null) {
-      if (req.session.uiSettings == null) {
-        req.session.uiSettings = {};
+      if (user == null) {
+        if (req.session.uiSettings == null) {
+          req.session.uiSettings = {};
+        }
+        Object.keys(updateData).forEach((setting) => {
+          if (updateData[setting] != null) {
+            req.session.uiSettings[setting] = updateData[setting];
+          }
+        });
+        return res.apiv3(updateData);
       }
-      Object.keys(updateData).forEach((setting) => {
-        if (updateData[setting] != null) {
-          req.session.uiSettings[setting] = updateData[setting];
+
+      // remove the keys that have null value
+      Object.keys(updateData).forEach((key) => {
+        if (updateData[key] == null) {
+          delete updateData[key];
         }
       });
-      return res.apiv3(updateData);
-    }
 
-
-    // remove the keys that have null value
-    Object.keys(updateData).forEach((key) => {
-      if (updateData[key] == null) {
-        delete updateData[key];
-      }
-    });
-
-    try {
-      const updatedSettings = await UserUISettings.findOneAndUpdate(
-        { user: user._id },
-        {
-          $set: {
-            user: user._id,
-            ...updateData,
+      try {
+        const updatedSettings = await UserUISettings.findOneAndUpdate(
+          { user: user._id },
+          {
+            $set: {
+              user: user._id,
+              ...updateData,
+            },
           },
-        },
-        { upsert: true, new: true },
-      );
-      return res.apiv3(updatedSettings);
-    }
-    catch (err) {
-      logger.error('Error', err);
-      return res.apiv3Err(new ErrorV3(err));
-    }
-  });
+          { upsert: true, new: true },
+        );
+        return res.apiv3(updatedSettings);
+      } catch (err) {
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(err));
+      }
+    },
+  );
 
   return router;
 };

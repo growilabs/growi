@@ -348,7 +348,7 @@
     "supplymentary_message_to_start": "至于API，只有管理员的API将是有效的。",
     "start_maintenance_mode": "启动维护模式",
     "end_maintenance_mode": "结束维护模式",
-    "description": "维护模式限制了所有的用户操作。 在执行 \"数据导入 \"和 \"升级到V5 \"之前，务必启动维护模式。 要退出，进入 \"安全设置\">\"维护模式\"。"
+    "description": "维护模式限制了所有的用户操作。 在执行 \"数据导入 \"和 \"升级到V5 \"之前，务必启动维护模式。 要退出，进入 \"系统设置\">\"维护模式\"。"
   },
   "app_setting": {
     "site_name": "网站名称 ",
@@ -365,9 +365,9 @@
     "confidential_example": "ex）：仅供内部使用",
     "default_language": "新用户的默认语言",
     "default_mail_visibility": "新用户的默认电子邮件可见性",
+    "default_read_only_for_new_user": "新用戶編輯限制",
+    "set_read_only_for_new_user": "將新用戶設為僅限瀏覽",
     "file_uploading": "文件上传",
-    "enable_files_except_image": "启用此选项将允许上传任何文件类型。如果没有此选项，则仅支持图像文件上载。",
-    "attach_enable": "如果启用此选项，则可以附加图像文件以外的文件。",
     "page_bulk_export_settings": "页面批量导出设置",
     "enable_page_bulk_export": "启用批量导出",
     "page_bulk_export_explanation": "启用一项功能，允许所有用户一次性导出从页面菜单中选择的所有页面及其下级页面。保留期限过后，导出的数据将自动删除。",
@@ -457,10 +457,7 @@
     "customize_settings": "页面定制",
     "default_sidebar_mode": {
       "title": "默认的侧边栏模式",
-      "desc": "你可以为新用户和访问该网页的客人设置侧边栏模式。",
-      "dock_mode_default_desc": "当选择Dock模式时，可以设置侧边栏的初始状态。",
-      "dock_mode_default_open": "从头开始翻页",
-      "dock_mode_default_close": "从头开始打开关闭的页面"
+      "desc": "你可以为新用户和访问该网页的客人设置侧边栏模式。"
     },
     "layout": "布局",
     "layout_options": {
@@ -540,7 +537,7 @@
     "page_path": "相对路径",
     "beta_warning": "这个函数是Beta。",
     "import_from": "Import from {{from}}",
-    "import_growi_archive": "Import GROWI archive",
+    "import_archive_data": "导入存档数据",
     "error": {
       "only_upsert_available": "Only 'Upsert' option is available for pages collection."
     },
@@ -586,23 +583,11 @@
         }
       }
     },
-    "esa_settings": {
-      "team_name": "Team name",
-      "access_token": "Access token",
-      "test_connection": "Test connection to esa"
-    },
-    "qiita_settings": {
-      "team_name": "Team name",
-      "access_token": "Access token",
-      "test_connection": "Test connection to qiita:team"
-    },
     "import": "Import",
     "skip_username_and_email_when_overlapped": "Skip username and email using same username and email in new environment",
     "prepare_new_account_for_migration": "Prepare new account for migration",
     "archive_data_import_detail": "More details? Click here.",
-    "admin_archive_data_import_guide_url": "https://docs.growi.org/en/admin-guide/management-cookbook/import.html",
-    "page_skip": "Pages with a name that already exists on GROWI are not imported",
-    "Directory_hierarchy_tag": "Directory hierarchy tag"
+    "admin_archive_data_import_guide_url": "https://docs.growi.org/en/admin-guide/management-cookbook/import.html"
   },
   "export_management": {
     "export_archive_data": "导出主题数据",
@@ -805,7 +790,11 @@
     "unset": "否",
     "related_username": "相关用户的",
     "cannot_invite_maximum_users": "邀请的用户数不能超过最大值。",
-    "current_users": "当前用户:"
+    "user_statistics": {
+      "total": "用户总数",
+      "active": "活跃",
+      "inactive": "非活跃"
+    }
   },
   "user_group_management": {
     "user_group_management": "用户组管理",
@@ -1020,12 +1009,6 @@
     "ADMIN_ARCHIVE_DATA_UPLOAD": "上传存档数据",
     "ADMIN_GROWI_DATA_IMPORTED": "导入存档数据",
     "ADMIN_UPLOADED_GROWI_DATA_DISCARDED": "丢弃存档数据",
-    "ADMIN_ESA_DATA_IMPORTED": "从 esa.io 导入",
-    "ADMIN_ESA_DATA_UPDATED": "更新 esa.io 导入设置",
-    "ADMIN_CONNECTION_TEST_OF_ESA_DATA": "测试与 esa 的连接",
-    "ADMIN_QIITA_DATA_IMPORTED": "从 Qiita:Team 导入",
-    "ADMIN_QIITA_DATA_UPDATED": "更新 Qiita：团队导入设置",
-    "ADMIN_CONNECTION_TEST_OF_QIITA_DATA": "测试与 Qiita:Team 的连接",
     "ADMIN_ARCHIVE_DATA_CREATE": "创建归档数据",
     "ADMIN_ARCHIVE_DATA_DOWNLOAD": "下载存档数据",
     "ADMIN_ARCHIVE_DATA_DELETE": "删除存档数据",

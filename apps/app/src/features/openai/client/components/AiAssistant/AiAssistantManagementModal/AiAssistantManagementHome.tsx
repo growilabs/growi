@@ -6,6 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Input, ModalBody, ModalFooter } from 'reactstrap';
 
@@ -14,17 +15,15 @@ import {
   AiAssistantShareScope,
 } from '~/features/openai/interfaces/ai-assistant';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
-import {
-  useCurrentUser,
-  useLimitLearnablePageCountPerAssistant,
-} from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
+import { limitLearnablePageCountPerAssistantAtom } from '~/states/server-configurations';
 
 import type { SelectablePage } from '../../../../interfaces/selectable-page';
 import { determineShareScope } from '../../../../utils/determine-share-scope';
 import {
   AiAssistantManagementModalPageMode,
-  useAiAssistantManagementModal,
-} from '../../../stores/ai-assistant';
+  useAiAssistantManagementModalActions,
+} from '../../../states/modal/ai-assistant-management';
 import { AiAssistantManagementHeader } from './AiAssistantManagementHeader';
 import { ShareScopeWarningModal } from './ShareScopeWarningModal';
 
@@ -62,11 +61,12 @@ export const AiAssistantManagementHome = (props: Props): JSX.Element => {
   } = props;
 
   const { t } = useTranslation();
-  const { data: currentUser } = useCurrentUser();
-  const { data: limitLearnablePageCountPerAssistant } =
-    useLimitLearnablePageCountPerAssistant();
+  const currentUser = useCurrentUser();
+  const limitLearnablePageCountPerAssistant = useAtomValue(
+    limitLearnablePageCountPerAssistantAtom,
+  );
   const { close: closeAiAssistantManagementModal, changePageMode } =
-    useAiAssistantManagementModal();
+    useAiAssistantManagementModalActions();
 
   const [isShareScopeWarningModalOpen, setIsShareScopeWarningModalOpen] =
     useState(false);

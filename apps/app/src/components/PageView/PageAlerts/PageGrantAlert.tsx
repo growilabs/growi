@@ -1,12 +1,12 @@
-import React, { type JSX } from 'react';
+import type { JSX } from 'react';
 import { isPopulated } from '@growi/core';
 import { useTranslation } from 'react-i18next';
 
-import { useSWRxCurrentPage } from '~/stores/page';
+import { useCurrentPageData } from '~/states/page';
 
 export const PageGrantAlert = (): JSX.Element => {
   const { t } = useTranslation();
-  const { data: pageData } = useSWRxCurrentPage();
+  const pageData = useCurrentPageData();
 
   if (pageData == null || pageData.grant == null || pageData.grant === 1) {
     return <></>;

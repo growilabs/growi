@@ -1,20 +1,22 @@
 import { useCallback, useEffect } from 'react';
 
 import { Origin } from '@growi/core';
-import { useGlobalSocket } from '@growi/core/dist/swr';
 import { GlobalCodeMirrorEditorKey } from '@growi/editor';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
 import { useTranslation } from 'react-i18next';
 
-import type { Save, SaveOptions } from '~/client/components/PageEditor/PageEditor';
-import { useUpdateStateAfterSave } from '~/client/services/page-operation';
-import { toastSuccess } from '~/client/util/toastr';
 import { SocketEventName } from '~/interfaces/websocket';
-import { EditorMode, useEditorMode } from '~/stores-universal/ui';
-import { usePageStatusAlert } from '~/stores/alert';
-import { useConflictDiffModal } from '~/stores/modal';
-import { useCurrentPageId, useSWRxCurrentPage } from '~/stores/page';
-import { type RemoteRevisionData, useSetRemoteLatestPageData } from '~/stores/remote-latest-page';
+import type { RemoteRevisionData } from '~/states/page';
+import { useCurrentPageData, useCurrentPageId, useSetRemoteLatestPageData } from '~/states/page';
+import { useGlobalSocket } from '~/states/socket-io';
+import { EditorMode, useEditorMode } from '~/states/ui/editor';
+import { useConflictDiffModalActions } from '~/states/ui/modal/conflict-diff';
+import { usePageStatusAlertActions } from '~/states/ui/modal/page-status-alert';
+
+import { useUpdateStateAfterSave } from '../../services/page-operation';
+import { toastSuccess } from '../../util/toastr';
+
+import type { Save, SaveOptions } from './PageEditor';
 
 
 export type ConflictHandler = (
@@ -34,14 +36,14 @@ type GenerateResolveConflicthandler = () => (
 const useGenerateResolveConflictHandler: GenerateResolveConflicthandler = () => {
   const { t } = useTranslation();
 
-  const { data: pageId } = useCurrentPageId();
-  const { close: closePageStatusAlert } = usePageStatusAlert();
-  const { close: closeConflictDiffModal } = useConflictDiffModal();
+  const pageId = useCurrentPageId();
+  const { close: closePageStatusAlert } = usePageStatusAlertActions();
+  const { close: closeConflictDiffModal } = useConflictDiffModalActions();
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.MAIN);
   const updateStateAfterSave = useUpdateStateAfterSave(pageId, { supressEditingMarkdownMutation: true });
 
   return useCallback((revisionId, save, saveOptions, onConflict) => {
-    return async(newMarkdown) => {
+    return async (newMarkdown) => {
       const page = await save(revisionId, newMarkdown, saveOptions, onConflict);
       if (page == null) {
         return;
@@ -63,9 +65,9 @@ const useGenerateResolveConflictHandler: GenerateResolveConflicthandler = () => 
 type ConflictResolver = () => ConflictHandler;
 
 export const useConflictResolver: ConflictResolver = () => {
-  const { open: openPageStatusAlert } = usePageStatusAlert();
-  const { open: openConflictDiffModal } = useConflictDiffModal();
-  const { setRemoteLatestPageData } = useSetRemoteLatestPageData();
+  const { open: openPageStatusAlert } = usePageStatusAlertActions();
+  const { open: openConflictDiffModal } = useConflictDiffModalActions();
+  const setRemoteLatestPageData = useSetRemoteLatestPageData();
   const generateResolveConflictHandler = useGenerateResolveConflictHandler();
 
   return useCallback((remoteRevidsionData, requestMarkdown, save, saveOptions) => {
@@ -80,14 +82,12 @@ export const useConflictResolver: ConflictResolver = () => {
 };
 
 export const useConflictEffect = (): void => {
-  const { data: currentPage } = useSWRxCurrentPage();
-  const { close: closePageStatusAlert } = usePageStatusAlert();
-  const { close: closeConflictDiffModal } = useConflictDiffModal();
+  const currentPage = useCurrentPageData();
+  const { close: closePageStatusAlert, open: openPageStatusAlert } = usePageStatusAlertActions();
+  const { close: closeConflictDiffModal, open: openConflictDiffModal } = useConflictDiffModalActions();
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.MAIN);
-  const { open: openPageStatusAlert } = usePageStatusAlert();
-  const { open: openConflictDiffModal } = useConflictDiffModal();
-  const { data: socket } = useGlobalSocket();
-  const { data: editorMode } = useEditorMode();
+  const socket = useGlobalSocket();
+  const { editorMode } = useEditorMode();
 
   const conflictHandler = useCallback(() => {
     const onResolveConflict = () => {

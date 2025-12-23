@@ -3,8 +3,8 @@ import React from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
+import { useAdminSocket } from '~/features/admin/states/socket-io';
 import { SocketEventName } from '~/interfaces/websocket';
-import { useAdminSocket } from '~/stores/socket-io';
 
 import LabeledProgressBar from '../Common/LabeledProgressBar';
 
@@ -99,7 +99,7 @@ class RebuildIndexControls extends React.Component {
 
 const RebuildIndexControlsFC = (props) => {
   const { t } = useTranslation('admin');
-  const { data: socket } = useAdminSocket();
+  const socket = useAdminSocket();
   return <RebuildIndexControls t={t} socket={socket} {...props} />;
 };
 

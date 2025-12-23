@@ -13,7 +13,6 @@ const logger = loggerFactory('growi:services:AdminHomeContainer');
  * @extends {Container} unstated Container
  */
 export default class AdminHomeContainer extends Container {
-
   constructor() {
     super();
 
@@ -37,7 +36,6 @@ export default class AdminHomeContainer extends Container {
       isV5Compatible: null,
       isMaintenanceMode: null,
     };
-
   }
 
   /**
@@ -59,7 +57,7 @@ export default class AdminHomeContainer extends Container {
       const response = await apiv3Get('/admin-home/');
       const { adminHomeParams } = response.data;
 
-      this.setState(prevState => ({
+      this.setState((prevState) => ({
         ...prevState,
         growiVersion: adminHomeParams.growiVersion,
         nodeVersion: adminHomeParams.nodeVersion,
@@ -69,8 +67,7 @@ export default class AdminHomeContainer extends Container {
         isV5Compatible: adminHomeParams.isV5Compatible,
         isMaintenanceMode: adminHomeParams.isMaintenanceMode,
       }));
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
       throw new Error('Failed to retrive AdminHome data');
     }
@@ -80,13 +77,13 @@ export default class AdminHomeContainer extends Container {
    * sets button text when copying system information
    */
   onCopyPrefilledHostInformation() {
-    this.setState(prevState => ({
+    this.setState((prevState) => ({
       ...prevState,
       copyState: this.copyStateValues.DONE,
     }));
 
     this.timer = setTimeout(() => {
-      this.setState(prevState => ({
+      this.setState((prevState) => ({
         ...prevState,
         copyState: this.copyStateValues.DEFAULT,
       }));
@@ -111,5 +108,4 @@ export default class AdminHomeContainer extends Container {
 
 *(Accessing https://{GROWI_HOST}/admin helps you to fill in above versions)*`;
   }
-
 }
