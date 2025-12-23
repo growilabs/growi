@@ -139,7 +139,7 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
   const HeadObChildrenComponents = props.customHeadOfChildrenComponents;
   const AlternativeComponents = props.customAlternativeComponents;
 
-  if ((!isWipPageShown && page.wip)) {
+  if (!isWipPageShown && page.wip) {
     return <></>;
   }
 
