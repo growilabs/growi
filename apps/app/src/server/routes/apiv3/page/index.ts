@@ -263,14 +263,12 @@ module.exports = (crowi: Crowi) => {
             return res.apiv3Err('ShareLink is not found', 404);
           }
           return respondWithSinglePage(
-            await findPageAndMetaDataByViewer(
-              pageService,
-              pageGrantService,
-              getIdStringForRef(shareLink.relatedPage),
+            await findPageAndMetaDataByViewer(pageService, pageGrantService, {
+              pageId: getIdStringForRef(shareLink.relatedPage),
               path,
               user,
-              true,
-            ),
+              isSharedPage: true,
+            }),
           );
         }
 
@@ -293,13 +291,11 @@ module.exports = (crowi: Crowi) => {
         }
 
         return respondWithSinglePage(
-          await findPageAndMetaDataByViewer(
-            pageService,
-            pageGrantService,
+          await findPageAndMetaDataByViewer(pageService, pageGrantService, {
             pageId,
             path,
             user,
-          ),
+          }),
         );
       } catch (err) {
         logger.error('get-page-failed', err);
@@ -595,10 +591,7 @@ module.exports = (crowi: Crowi) => {
         const { meta } = await findPageAndMetaDataByViewer(
           pageService,
           pageGrantService,
-          pageId,
-          null,
-          user,
-          isSharedPage,
+          { pageId, path: null, user, isSharedPage },
         );
 
         if (isIPageNotFoundInfo(meta)) {

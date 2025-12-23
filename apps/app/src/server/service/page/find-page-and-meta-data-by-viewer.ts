@@ -25,11 +25,13 @@ import type { IPageService } from './page-service';
 export async function findPageAndMetaDataByViewer(
   pageService: IPageService,
   pageGrantService: IPageGrantService,
-  pageId: string | null,
-  path: string | null,
-  user: HydratedDocument<IUser> | undefined,
-  isSharedPage: boolean,
-  basicOnly: true,
+  opts: {
+    pageId: string | null; // either pageId or path must be specified
+    path: string | null; // either pageId or path must be specified
+    user?: HydratedDocument<IUser>;
+    isSharedPage?: boolean;
+    basicOnly: true;
+  },
 ): Promise<
   | IDataWithRequiredMeta<HydratedDocument<PageDocument>, IPageInfoBasic>
   | IDataWithRequiredMeta<null, IPageNotFoundInfo>
@@ -39,11 +41,12 @@ export async function findPageAndMetaDataByViewer(
 export async function findPageAndMetaDataByViewer(
   pageService: IPageService,
   pageGrantService: IPageGrantService,
-  pageId: string | null,
-  path: string | null,
-  user?: HydratedDocument<IUser>,
-  isSharedPage?: boolean,
-  basicOnly?: false,
+  opts: {
+    pageId: string | null; // either pageId or path must be specified
+    path: string | null; // either pageId or path must be specified
+    user?: HydratedDocument<IUser>;
+    isSharedPage?: boolean;
+  },
 ): Promise<
   | IDataWithRequiredMeta<HydratedDocument<PageDocument>, IPageInfoExt>
   | IDataWithRequiredMeta<null, IPageNotFoundInfo>
@@ -53,12 +56,13 @@ export async function findPageAndMetaDataByViewer(
 export async function findPageAndMetaDataByViewer(
   pageService: IPageService,
   pageGrantService: IPageGrantService,
-
-  pageId: string | null, // either pageId or path must be specified
-  path: string | null, // either pageId or path must be specified
-  user?: HydratedDocument<IUser>,
-  isSharedPage = false,
-  basicOnly = false,
+  opts: {
+    pageId: string | null; // either pageId or path must be specified
+    path: string | null; // either pageId or path must be specified
+    user?: HydratedDocument<IUser>;
+    isSharedPage?: boolean;
+    basicOnly?: boolean;
+  },
 ): Promise<
   | IDataWithRequiredMeta<
       HydratedDocument<PageDocument>,
@@ -66,6 +70,8 @@ export async function findPageAndMetaDataByViewer(
     >
   | IDataWithRequiredMeta<null, IPageNotFoundInfo>
 > {
+  const { pageId, path, user, isSharedPage = false, basicOnly = false } = opts;
+
   assert(pageId != null || path != null);
 
   const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
