@@ -2,12 +2,17 @@
 @use '../button-styles';
 @use '../variables' as sidebarVar;
 
-// Add indicator
+// == Sizes
 .grw-primary-items :global {
-
   .badge :global {
     left: 26px;
     font-size: 8px;
+  }
+  .btn {
+    @extend %btn-basis;
+
+    width: 40px;
+    height: 40px;
   }
 }
 
@@ -15,8 +20,6 @@
 .grw-primary-items :global {
   .btn.btn-primary {
     @extend %btn-primary-color-vars;
-    width: 40px;
-    height: 40px;
   }
 }
 
