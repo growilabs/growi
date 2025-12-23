@@ -63,13 +63,10 @@ export async function findPageAndMetaDataByViewer(
     isSharedPage?: boolean;
     basicOnly?: boolean;
   },
-): Promise<
-  | IDataWithRequiredMeta<
-      HydratedDocument<PageDocument>,
-      IPageInfoExt | IPageInfoBasic
-    >
-  | IDataWithRequiredMeta<null, IPageNotFoundInfo>
-> {
+): Promise<IDataWithRequiredMeta<
+  HydratedDocument<PageDocument> | null,
+  IPageInfoExt | IPageInfoBasic | IPageNotFoundInfo
+>> {
   const { pageId, path, user, isSharedPage = false, basicOnly = false } = opts;
 
   assert(pageId != null || path != null);
