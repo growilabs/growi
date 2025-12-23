@@ -108,7 +108,7 @@ export const ShareLinkForm: FC<Props> = (props: Props) => {
   }, [onCloseForm]);
 
   const handleIssueShareLink = useCallback(async () => {
-    let expiredAt: Date | null;
+    let expiredAt: Date | null | undefined;
 
     try {
       expiredAt = generateExpired();
