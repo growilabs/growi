@@ -1,11 +1,12 @@
 import { pagePathUtils } from '@growi/core/dist/utils';
 
-import { GlobalNotificationSettingEvent, GlobalNotificationSettingType } from '~/server/models/GlobalNotificationSetting';
+import {
+  GlobalNotificationSettingEvent,
+  GlobalNotificationSettingType,
+} from '~/server/models/GlobalNotificationSetting';
 import loggerFactory from '~/utils/logger';
 
-import {
-  prepareSlackMessageForGlobalNotification,
-} from '../../util/slack';
+import { prepareSlackMessageForGlobalNotification } from '../../util/slack';
 import { growiInfoService } from '../growi-info';
 
 const logger = loggerFactory('growi:service:GlobalNotificationSlackService'); // eslint-disable-line no-unused-vars
@@ -17,7 +18,6 @@ const { encodeSpaces } = pagePathUtils;
  * sub service class of GlobalNotificationSetting
  */
 class GlobalNotificationSlackService {
-
   /** @type {import('~/server/crowi').default} Crowi instance */
   crowi;
 
@@ -41,18 +41,40 @@ class GlobalNotificationSlackService {
     const { appService, slackIntegrationService } = this.crowi;
 
     const GlobalNotification = this.crowi.model('GlobalNotificationSetting');
-    const notifications = await GlobalNotification.findSettingByPathAndEvent(event, path, GlobalNotificationSettingType.SLACK);
+    const notifications = await GlobalNotification.findSettingByPathAndEvent(
+      event,
+      path,
+      GlobalNotificationSettingType.SLACK,
+    );
 
-    const messageBody = this.generateMessageBody(event, id, path, triggeredBy, vars);
-    const attachmentBody = this.generateAttachmentBody(event, id, path, triggeredBy, vars);
+    const messageBody = this.generateMessageBody(
+      event,
+      id,
+      path,
+      triggeredBy,
+      vars,
+    );
+    const attachmentBody = this.generateAttachmentBody(
+      event,
+      id,
+      path,
+      triggeredBy,
+      vars,
+    );
 
     const appTitle = appService.getAppTitle();
 
-    await Promise.all(notifications.map((notification) => {
-      const messageObj = prepareSlackMessageForGlobalNotification(messageBody, attachmentBody, appTitle, notification.slackChannels);
-      return slackIntegrationService.postMessage(messageObj);
-    }));
-
+    await Promise.all(
+      notifications.map((notification) => {
+        const messageObj = prepareSlackMessageForGlobalNotification(
+          messageBody,
+          attachmentBody,
+          appTitle,
+          notification.slackChannels,
+        );
+        return slackIntegrationService.postMessage(messageObj);
+      }),
+    );
   }
 
   /**
@@ -88,7 +110,9 @@ class GlobalNotificationSlackService {
       case GlobalNotificationSettingEvent.PAGE_MOVE:
         // validate for page move
         if (oldPath == null) {
-          throw new Error(`invalid vars supplied to GlobalNotificationSlackService.generateOption for event ${event}`);
+          throw new Error(
+            `invalid vars supplied to GlobalNotificationSlackService.generateOption for event ${event}`,
+          );
         }
         // eslint-disable-next-line no-case-declarations
         messageBody = `:bell: ${username} moved ${oldPath} to ${parmaLink}`;
@@ -99,7 +123,9 @@ class GlobalNotificationSlackService {
       case GlobalNotificationSettingEvent.COMMENT:
         // validate for comment
         if (comment == null) {
-          throw new Error(`invalid vars supplied to GlobalNotificationSlackService.generateOption for event ${event}`);
+          throw new Error(
+            `invalid vars supplied to GlobalNotificationSlackService.generateOption for event ${event}`,
+          );
         }
         messageBody = `:bell: ${username} commented on ${parmaLink}`;
         break;
@@ -148,7 +174,6 @@ class GlobalNotificationSlackService {
 
     return attachmentBody;
   }
-
 }
 
 module.exports = GlobalNotificationSlackService;

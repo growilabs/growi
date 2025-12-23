@@ -1,5 +1,17 @@
 # @growi/core
 
+## 2.0.0
+
+### Major Changes
+
+- [#10474](https://github.com/growilabs/growi/pull/10474) [`3de6953`](https://github.com/growilabs/growi/commit/3de6953c5cf049d8bb070f8cc8c59a85b160a6df) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Remove global socket management and useSWRStatic
+
+- [#10474](https://github.com/growilabs/growi/pull/10474) [`3de6953`](https://github.com/growilabs/growi/commit/3de6953c5cf049d8bb070f8cc8c59a85b160a6df) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Update IPage interfaces family
+
+### Minor Changes
+
+- [#10472](https://github.com/growilabs/growi/pull/10472) [`22fae03`](https://github.com/growilabs/growi/commit/22fae03ce3bc7a530b0d7219c300f9c13f1d65c6) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Add global EventTarget instance provider
+
 ## 1.6.0
 
 ### Minor Changes

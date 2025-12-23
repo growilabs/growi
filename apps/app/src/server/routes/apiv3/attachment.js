@@ -9,7 +9,10 @@ import { SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { Attachment } from '~/server/models/attachment';
-import { serializePageSecurely, serializeRevisionSecurely } from '~/server/models/serializers';
+import {
+  serializePageSecurely,
+  serializeRevisionSecurely,
+} from '~/server/models/serializers';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
@@ -17,14 +20,10 @@ import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
 import { excludeReadOnlyUser } from '../../middlewares/exclude-read-only-user';
 
-
 const logger = loggerFactory('growi:routes:apiv3:attachment'); // eslint-disable-line no-unused-vars
 
 const router = express.Router();
-const {
-  query, param, body,
-} = require('express-validator');
-
+const { query, param, body } = require('express-validator');
 
 /**
  * @swagger
@@ -135,8 +134,13 @@ const {
  */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequired = require('../../middlewares/login-required')(crowi, true);
-  const loginRequiredStrictly = require('../../middlewares/login-required')(crowi);
+  const loginRequired = require('../../middlewares/login-required')(
+    crowi,
+    true,
+  );
+  const loginRequiredStrictly = require('../../middlewares/login-required')(
+    crowi,
+  );
   const Page = crowi.model('Page');
   const User = crowi.model('User');
   const { attachmentService } = crowi;
@@ -151,14 +155,26 @@ module.exports = (crowi) => {
     ],
     retrieveAttachments: [
       query('pageId').isMongoId().withMessage('pageId is required'),
-      query('pageNumber').optional().isInt().withMessage('pageNumber must be a number'),
-      query('limit').optional().isInt({ max: 100 }).withMessage('You should set less than 100 or not to set limit.'),
+      query('pageNumber')
+        .optional()
+        .isInt()
+        .withMessage('pageNumber must be a number'),
+      query('limit')
+        .optional()
+        .isInt({ max: 100 })
+        .withMessage('You should set less than 100 or not to set limit.'),
     ],
     retrieveFileLimit: [
-      query('fileSize').isNumeric().exists({ checkNull: true }).withMessage('fileSize is required'),
+      query('fileSize')
+        .isNumeric()
+        .exists({ checkNull: true })
+        .withMessage('fileSize is required'),
     ],
     retrieveAddAttachment: [
-      body('page_id').isMongoId().exists({ checkNull: true }).withMessage('page_id is required'),
+      body('page_id')
+        .isMongoId()
+        .exists({ checkNull: true })
+        .withMessage('page_id is required'),
     ],
   };
 
@@ -199,18 +215,29 @@ module.exports = (crowi) => {
    *                  type: object
    *                  $ref: '#/components/schemas/AttachmentPaginateResult'
    */
-  router.get('/list',
-    accessTokenParser([SCOPE.READ.FEATURES.ATTACHMENT], { acceptLegacy: true }), loginRequired, validator.retrieveAttachments, apiV3FormValidator,
-    async(req, res) => {
-
-      const limit = req.query.limit || await crowi.configManager.getConfig('customize:showPageLimitationS') || 10;
+  router.get(
+    '/list',
+    accessTokenParser([SCOPE.READ.FEATURES.ATTACHMENT], { acceptLegacy: true }),
+    loginRequired,
+    validator.retrieveAttachments,
+    apiV3FormValidator,
+    async (req, res) => {
+      const limit =
+        req.query.limit ||
+        (await crowi.configManager.getConfig(
+          'customize:showPageLimitationS',
+        )) ||
+        10;
       const pageNumber = req.query.pageNumber || 1;
       const offset = (pageNumber - 1) * limit;
 
       try {
         const pageId = req.query.pageId;
         // check whether accessible
-        const isAccessible = await Page.isAccessiblePageByViewer(pageId, req.user);
+        const isAccessible = await Page.isAccessiblePageByViewer(
+          pageId,
+          req.user,
+        );
         if (!isAccessible) {
           const msg = 'Current user is not accessible to this page.';
           return res.apiv3Err(new ErrorV3(msg, 'attachment-list-failed'), 403);
@@ -234,13 +261,12 @@ module.exports = (crowi) => {
         });
 
         return res.apiv3({ paginateResult });
-      }
-      catch (err) {
+      } catch (err) {
         logger.error('Attachment not found', err);
         return res.apiv3Err(err, 500);
       }
-    });
-
+    },
+  );
 
   /**
    * @swagger
@@ -274,19 +300,23 @@ module.exports = (crowi) => {
    *          500:
    *            $ref: '#/components/responses/InternalServerError'
    */
-  router.get('/limit',
-    accessTokenParser([SCOPE.READ.FEATURES.ATTACHMENT], { acceptLegacy: true }), loginRequiredStrictly, validator.retrieveFileLimit, apiV3FormValidator,
-    async(req, res) => {
+  router.get(
+    '/limit',
+    accessTokenParser([SCOPE.READ.FEATURES.ATTACHMENT], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    validator.retrieveFileLimit,
+    apiV3FormValidator,
+    async (req, res) => {
       const { fileUploadService } = crowi;
       const fileSize = Number(req.query.fileSize);
       try {
         return res.apiv3(await fileUploadService.checkLimit(fileSize));
-      }
-      catch (err) {
+      } catch (err) {
         logger.error('File limit retrieval failed', err);
         return res.apiv3Err(err, 500);
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -342,11 +372,19 @@ module.exports = (crowi) => {
    *          500:
    *            $ref: '#/components/responses/InternalServerError'
    */
-  router.post('/', uploads.single('file'), accessTokenParser([SCOPE.WRITE.FEATURES.ATTACHMENT], { acceptLegacy: true }),
-    loginRequiredStrictly, excludeReadOnlyUser, validator.retrieveAddAttachment, apiV3FormValidator, addActivity,
+  router.post(
+    '/',
+    uploads.single('file'),
+    accessTokenParser([SCOPE.WRITE.FEATURES.ATTACHMENT], {
+      acceptLegacy: true,
+    }),
+    loginRequiredStrictly,
+    excludeReadOnlyUser,
+    validator.retrieveAddAttachment,
+    apiV3FormValidator,
+    addActivity,
     // Removed autoReap middleware to use file data in asynchronous processes. Instead, implemented file deletion after asynchronous processes complete
-    async(req, res) => {
-
+    async (req, res) => {
       const pageId = req.body.page_id;
 
       // check params
@@ -359,12 +397,21 @@ module.exports = (crowi) => {
         const page = await Page.findOne({ _id: { $eq: pageId } });
 
         // check the user is accessible
-        const isAccessible = await Page.isAccessiblePageByViewer(page.id, req.user);
+        const isAccessible = await Page.isAccessiblePageByViewer(
+          page.id,
+          req.user,
+        );
         if (!isAccessible) {
           return res.apiv3Err(`Forbidden to access to the page '${page.id}'`);
         }
 
-        const attachment = await attachmentService.createAttachment(file, req.user, pageId, AttachmentType.WIKI_PAGE, () => autoReap(req, res, () => {}));
+        const attachment = await attachmentService.createAttachment(
+          file,
+          req.user,
+          pageId,
+          AttachmentType.WIKI_PAGE,
+          () => autoReap(req, res, () => {}),
+        );
 
         const result = {
           page: serializePageSecurely(page),
@@ -372,15 +419,17 @@ module.exports = (crowi) => {
           attachment: attachment.toObject({ virtuals: true }),
         };
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ATTACHMENT_ADD });
+        activityEvent.emit('update', res.locals.activity._id, {
+          action: SupportedAction.ACTION_ATTACHMENT_ADD,
+        });
 
         res.apiv3(result);
-      }
-      catch (err) {
+      } catch (err) {
         logger.error(err);
         return res.apiv3Err(err.message);
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -407,13 +456,20 @@ module.exports = (crowi) => {
    *            schema:
    *              type: string
    */
-  router.get('/:id', accessTokenParser([SCOPE.READ.FEATURES.ATTACHMENT], { acceptLegacy: true }), certifySharedPageAttachmentMiddleware, loginRequired,
-    validator.retrieveAttachment, apiV3FormValidator,
-    async(req, res) => {
+  router.get(
+    '/:id',
+    accessTokenParser([SCOPE.READ.FEATURES.ATTACHMENT], { acceptLegacy: true }),
+    certifySharedPageAttachmentMiddleware,
+    loginRequired,
+    validator.retrieveAttachment,
+    apiV3FormValidator,
+    async (req, res) => {
       try {
         const attachmentId = req.params.id;
 
-        const attachment = await Attachment.findById(attachmentId).populate('creator').exec();
+        const attachment = await Attachment.findById(attachmentId)
+          .populate('creator')
+          .exec();
 
         if (attachment == null) {
           const message = 'Attachment not found';
@@ -425,12 +481,12 @@ module.exports = (crowi) => {
         }
 
         return res.apiv3({ attachment });
-      }
-      catch (err) {
+      } catch (err) {
         logger.error('Attachment retrieval failed', err);
         return res.apiv3Err(err, 500);
       }
-    });
+    },
+  );
 
   return router;
 };

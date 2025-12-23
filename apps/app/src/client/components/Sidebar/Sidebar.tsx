@@ -8,18 +8,17 @@ import SimpleBar from 'simplebar-react';
 import { useIsomorphicLayoutEffect } from 'usehooks-ts';
 
 import { SidebarMode } from '~/interfaces/ui';
-import { useIsSearchPage } from '~/stores-universal/context';
-import { EditorMode, useEditorMode } from '~/stores-universal/ui';
+import { useIsSearchPage } from '~/states/context';
+import { useDeviceLargerThanXl, useDeviceLargerThanMd } from '~/states/ui/device';
+import { EditorMode, useEditorMode } from '~/states/ui/editor';
 import {
   useDrawerOpened,
+  useSetPreferCollapsedMode,
+  useSidebarMode,
   useCollapsedContentsOpened,
   useCurrentProductNavWidth,
-  usePreferCollapsedMode,
-  useSidebarMode,
-  useSidebarScrollerRef,
-  useIsDeviceLargerThanMd,
-  useIsDeviceLargerThanXl,
-} from '~/stores/ui';
+  useSetSidebarScrollerRef,
+} from '~/states/ui/sidebar';
 
 import { DrawerToggler } from '../Common/DrawerToggler';
 
@@ -70,13 +69,13 @@ const ResizableContainer = memo((props: ResizableContainerProps): JSX.Element =>
   const { children } = props;
 
   const { isDrawerMode, isCollapsedMode, isDockMode } = useSidebarMode();
-  const { mutate: mutateDrawerOpened } = useDrawerOpened();
-  const { data: currentProductNavWidth, mutateAndSave: mutateProductNavWidth } = useCurrentProductNavWidth();
-  const { mutateAndSave: mutatePreferCollapsedMode } = usePreferCollapsedMode();
-  const { mutate: mutateCollapsedContentsOpened } = useCollapsedContentsOpened();
+  const [, setIsDrawerOpened] = useDrawerOpened();
+  const [currentProductNavWidth, setCurrentProductNavWidth] = useCurrentProductNavWidth();
+  const setPreferCollapsedMode = useSetPreferCollapsedMode();
+  const [, setCollapsedContentsOpened] = useCollapsedContentsOpened();
 
   const [isClient, setClient] = useState(false);
-  const [resizableAreaWidth, setResizableAreaWidth] = useState<number|undefined>(
+  const [resizableAreaWidth, setResizableAreaWidth] = useState<number | undefined>(
     getWidthByMode(isDrawerMode(), isCollapsedMode(), currentProductNavWidth),
   );
 
@@ -85,13 +84,13 @@ const ResizableContainer = memo((props: ResizableContainerProps): JSX.Element =>
   }, []);
 
   const resizeDoneHandler = useCallback((newWidth: number) => {
-    mutateProductNavWidth(newWidth, false);
-  }, [mutateProductNavWidth]);
+    setCurrentProductNavWidth(newWidth);
+  }, [setCurrentProductNavWidth]);
 
   const collapsedByResizableAreaHandler = useCallback(() => {
-    mutatePreferCollapsedMode(true);
-    mutateCollapsedContentsOpened(false);
-  }, [mutateCollapsedContentsOpened, mutatePreferCollapsedMode]);
+    setPreferCollapsedMode(true);
+    setCollapsedContentsOpened(false);
+  }, [setCollapsedContentsOpened, setPreferCollapsedMode]);
 
   useIsomorphicLayoutEffect(() => {
     setClient(true);
@@ -100,8 +99,8 @@ const ResizableContainer = memo((props: ResizableContainerProps): JSX.Element =>
   // open/close resizable container when drawer mode
   useEffect(() => {
     setResizableAreaWidth(getWidthByMode(isDrawerMode(), isCollapsedMode(), currentProductNavWidth));
-    mutateDrawerOpened(false);
-  }, [currentProductNavWidth, isCollapsedMode, isDrawerMode, mutateDrawerOpened]);
+    setIsDrawerOpened(false);
+  }, [currentProductNavWidth, isCollapsedMode, isDrawerMode, setIsDrawerOpened]);
 
   return !isClient
     ? (
@@ -140,12 +139,16 @@ const CollapsibleContainer = memo((props: CollapsibleContainerProps): JSX.Elemen
   const { Nav, className, children } = props;
 
   const { isCollapsedMode } = useSidebarMode();
-  const { data: currentProductNavWidth } = useCurrentProductNavWidth();
-  const { data: isCollapsedContentsOpened, mutate: mutateCollapsedContentsOpened } = useCollapsedContentsOpened();
+  const [currentProductNavWidth] = useCurrentProductNavWidth();
+  const [isCollapsedContentsOpened, setCollapsedContentsOpened] = useCollapsedContentsOpened();
 
   const sidebarScrollerRef = useRef<HTMLDivElement>(null);
-  const { mutate: mutateSidebarScroller } = useSidebarScrollerRef();
-  mutateSidebarScroller(sidebarScrollerRef);
+  const setSidebarScrollerRef = useSetSidebarScrollerRef();
+
+  // Set the ref once on mount
+  useEffect(() => {
+    setSidebarScrollerRef(sidebarScrollerRef);
+  }, [setSidebarScrollerRef]);
 
 
   // open menu when collapsed mode
@@ -155,8 +158,8 @@ const CollapsibleContainer = memo((props: CollapsibleContainerProps): JSX.Elemen
       return;
     }
 
-    mutateCollapsedContentsOpened(true);
-  }, [isCollapsedMode, mutateCollapsedContentsOpened]);
+    setCollapsedContentsOpened(true);
+  }, [isCollapsedMode, setCollapsedContentsOpened]);
 
   // close menu when collapsed mode
   const mouseLeaveHandler = useCallback(() => {
@@ -165,8 +168,8 @@ const CollapsibleContainer = memo((props: CollapsibleContainerProps): JSX.Elemen
       return;
     }
 
-    mutateCollapsedContentsOpened(false);
-  }, [isCollapsedMode, mutateCollapsedContentsOpened]);
+    setCollapsedContentsOpened(false);
+  }, [isCollapsedMode, setCollapsedContentsOpened]);
 
   const closedClass = isCollapsedMode() && !isCollapsedContentsOpened ? 'd-none' : '';
   const openedClass = isCollapsedMode() && isCollapsedContentsOpened ? 'open' : '';
@@ -206,7 +209,7 @@ const DrawableContainer = memo((props: DrawableContainerProps): JSX.Element => {
 
   const { divProps, className, children } = props;
 
-  const { data: isDrawerOpened, mutate } = useDrawerOpened();
+  const [isDrawerOpened, setIsDrawerOpened] = useDrawerOpened();
 
   const openClass = `${isDrawerOpened ? 'open' : ''}`;
 
@@ -215,9 +218,9 @@ const DrawableContainer = memo((props: DrawableContainerProps): JSX.Element => {
       <div {...divProps} className={`${className} ${openClass}`}>
         {children}
       </div>
-      { isDrawerOpened && (
-        <div className="modal-backdrop fade show" onClick={() => mutate(false)} />
-      ) }
+      {isDrawerOpened && (
+        <div className="modal-backdrop fade show" onClick={() => setIsDrawerOpened(false)} />
+      )}
     </>
   );
 });
@@ -226,14 +229,14 @@ const DrawableContainer = memo((props: DrawableContainerProps): JSX.Element => {
 export const Sidebar = (): JSX.Element => {
 
   const {
-    data: sidebarMode,
+    sidebarMode,
     isDrawerMode, isCollapsedMode, isDockMode,
   } = useSidebarMode();
 
-  const { data: isSearchPage } = useIsSearchPage();
-  const { data: editorMode } = useEditorMode();
-  const { data: isMdSize } = useIsDeviceLargerThanMd();
-  const { data: isXlSize } = useIsDeviceLargerThanXl();
+  const isSearchPage = useIsSearchPage();
+  const { editorMode } = useEditorMode();
+  const [isMdSize] = useDeviceLargerThanMd();
+  const [isXlSize] = useDeviceLargerThanXl();
 
   const isEditorMode = editorMode === EditorMode.Editor;
   const shouldHideSiteName = isEditorMode && isXlSize;
@@ -258,17 +261,17 @@ export const Sidebar = (): JSX.Element => {
 
   return (
     <>
-      { sidebarMode != null && isDrawerMode() && (
+      {sidebarMode != null && isDrawerMode() && (
         <DrawerToggler className="position-fixed d-none d-md-block">
           <span className="material-symbols-outlined">reorder</span>
         </DrawerToggler>
       )}
-      { sidebarMode != null && !isDockMode() && !isSearchPage && !shouldHideSubnavAppTitle && (
+      {sidebarMode != null && !isDockMode() && !isSearchPage && !shouldHideSubnavAppTitle && (
         <AppTitleOnSubnavigation />
       )}
       <DrawableContainer className={`${grwSidebarClass} ${modeClass} border-end flex-expand-vh-100`} divProps={{ 'data-testid': 'grw-sidebar' }}>
         <ResizableContainer>
-          { sidebarMode != null && !isCollapsedMode() && (
+          {sidebarMode != null && !isCollapsedMode() && (
             <AppTitleOnSidebarHead hideAppTitle={shouldHideSiteName} />
           )}
           {shouldShowEditorSidebarHead ? <AppTitleOnEditorSidebarHead /> : <SidebarHead />}

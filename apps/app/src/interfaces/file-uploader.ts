@@ -13,6 +13,7 @@ export type FileUploadType =
 // file upload type strings you can specify in the env variable
 export const FileUploadTypeForEnvVar = {
   ...FileUploadType,
+  none: 'none',
   mongo: 'mongo',
   mongodb: 'mongodb',
   gcp: 'gcp',

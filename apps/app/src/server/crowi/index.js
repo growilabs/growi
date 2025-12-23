@@ -26,7 +26,7 @@ import UserEvent from '../events/user';
 import { accessTokenParser } from '../middlewares/access-token-parser';
 import { aclService as aclServiceSingletonInstance } from '../service/acl';
 import AppService from '../service/app';
-import AttachmentService from '../service/attachment';
+import { AttachmentService } from '../service/attachment';
 import { configManager as configManagerSingletonInstance } from '../service/config-manager';
 import instanciateExportService from '../service/export';
 import instanciateExternalAccountService from '../service/external-account';
@@ -74,6 +74,9 @@ class Crowi {
   /** @type {import('../service/config-manager').IConfigManagerForApp} */
   configManager;
 
+  /** @type {AttachmentService} */
+  attachmentService;
+
   /** @type {import('../service/acl').AclService} */
   aclService;
 
@@ -98,11 +101,11 @@ class Crowi {
   /** @type {import('../service/page-operation').IPageOperationService} */
   pageOperationService;
 
+  /** @type {import('../service/customize').CustomizeService} */
+  customizeService;
+
   /** @type {PassportService} */
   passportService;
-
-  /** @type {import('../service/rest-qiita-API')} */
-  restQiitaAPIService;
 
   /** @type {SearchService} */
   searchService;
@@ -199,7 +202,6 @@ Crowi.prototype.init = async function () {
     this.setUpFileUploaderSwitchService(),
     this.setupAttachmentService(),
     this.setUpAcl(),
-    this.setUpRestQiitaAPI(),
     this.setupUserGroupService(),
     this.setupExport(),
     this.setupImport(),
@@ -632,7 +634,7 @@ Crowi.prototype.setUpAcl = async function () {
  * setup CustomizeService
  */
 Crowi.prototype.setUpCustomize = async function () {
-  const CustomizeService = require('../service/customize');
+  const { CustomizeService } = await import('../service/customize');
   if (this.customizeService == null) {
     this.customizeService = new CustomizeService(this);
     this.customizeService.initCustomCss();
@@ -693,16 +695,6 @@ Crowi.prototype.setupGrowiInfoService = async function () {
 Crowi.prototype.setupAttachmentService = async function () {
   if (this.attachmentService == null) {
     this.attachmentService = new AttachmentService(this);
-  }
-};
-
-/**
- * setup RestQiitaAPIService
- */
-Crowi.prototype.setUpRestQiitaAPI = async function () {
-  const RestQiitaAPIService = require('../service/rest-qiita-API');
-  if (this.restQiitaAPIService == null) {
-    this.restQiitaAPIService = new RestQiitaAPIService(this);
   }
 };
 

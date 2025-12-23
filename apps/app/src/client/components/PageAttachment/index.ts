@@ -1,0 +1,1 @@
+export { DeleteAttachmentModalLazyLoaded } from './dynamic';

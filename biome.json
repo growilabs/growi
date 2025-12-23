@@ -24,13 +24,11 @@
       "!**/package.json",
       "!apps/app/src/styles/prebuilt",
       "!apps/app/tmp",
+      "!apps/pdf-converter/specs",
       "!apps/slackbot-proxy/src/public/bootstrap",
       "!packages/pdf-converter-client/src/index.ts",
       "!packages/pdf-converter-client/specs",
-      "!apps/app/src/client",
-      "!apps/app/src/server/middlewares",
-      "!apps/app/src/server/routes/apiv3",
-      "!apps/app/src/server/service"
+      "!apps/app/src/client/components"
     ]
   },
   "formatter": {
@@ -127,7 +125,7 @@
                 },
                 "patterns": [
                   {
-                    "group": ["~/client/*", "client/*"],
+                    "group": ["~/client/**", "**/client/**", "client/**"],
                     "message": "Importing from client/ directories is restricted."
                   }
                 ]
