@@ -1,6 +1,4 @@
-import type {
-  IUserHasId, Scope,
-} from '@growi/core/dist/interfaces';
+import type { IUserHasId, Scope } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 import { body } from 'express-validator';
@@ -16,16 +14,19 @@ import loggerFactory from '~/utils/logger';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 
-const logger = loggerFactory('growi:routes:apiv3:personal-setting:generate-access-tokens');
+const logger = loggerFactory(
+  'growi:routes:apiv3:personal-setting:generate-access-tokens',
+);
 
 type ReqBody = {
-  expiredAt: Date,
-  description?: string,
-  scopes?: Scope[],
-}
+  expiredAt: Date;
+  description?: string;
+  scopes?: Scope[];
+};
 
-interface GenerateAccessTokenRequest extends Request<undefined, ApiV3Response, ReqBody> {
-  user: IUserHasId,
+interface GenerateAccessTokenRequest
+  extends Request<undefined, ApiV3Response, ReqBody> {
+  user: IUserHasId;
 }
 
 type GenerateAccessTokenHandlerFactory = (crowi: Crowi) => RequestHandler[];
@@ -73,35 +74,43 @@ const validator = [
     .withMessage('Invalid scope'),
 ];
 
-export const generateAccessTokenHandlerFactory: GenerateAccessTokenHandlerFactory = (crowi) => {
+export const generateAccessTokenHandlerFactory: GenerateAccessTokenHandlerFactory =
+  (crowi) => {
+    const loginRequiredStrictly =
+      require('../../../middlewares/login-required')(crowi);
+    const activityEvent = crowi.event('activity');
+    const addActivity = generateAddActivityMiddleware();
 
-  const loginRequiredStrictly = require('../../../middlewares/login-required')(crowi);
-  const activityEvent = crowi.event('activity');
-  const addActivity = generateAddActivityMiddleware();
+    return [
+      loginRequiredStrictly,
+      excludeReadOnlyUser,
+      addActivity,
+      validator,
+      apiV3FormValidator,
+      async (req: GenerateAccessTokenRequest, res: ApiV3Response) => {
+        const { user, body } = req;
+        const { expiredAt, description, scopes } = body;
 
-  return [
-    loginRequiredStrictly,
-    excludeReadOnlyUser,
-    addActivity,
-    validator,
-    apiV3FormValidator,
-    async(req: GenerateAccessTokenRequest, res: ApiV3Response) => {
+        try {
+          const tokenData = await AccessToken.generateToken(
+            user._id,
+            expiredAt,
+            scopes,
+            description,
+          );
 
-      const { user, body } = req;
-      const { expiredAt, description, scopes } = body;
+          const parameters = {
+            action: SupportedAction.ACTION_USER_ACCESS_TOKEN_CREATE,
+          };
+          activityEvent.emit('update', res.locals.activity._id, parameters);
 
-      try {
-        const tokenData = await AccessToken.generateToken(user._id, expiredAt, scopes, description);
-
-        const parameters = { action: SupportedAction.ACTION_USER_ACCESS_TOKEN_CREATE };
-        activityEvent.emit('update', res.locals.activity._id, parameters);
-
-        return res.apiv3(tokenData);
-      }
-      catch (err) {
-        logger.error(err);
-        return res.apiv3Err(new ErrorV3(err.toString(), 'generate-access-token-failed'));
-      }
-    },
-  ];
-};
+          return res.apiv3(tokenData);
+        } catch (err) {
+          logger.error(err);
+          return res.apiv3Err(
+            new ErrorV3(err.toString(), 'generate-access-token-failed'),
+          );
+        }
+      },
+    ];
+  };

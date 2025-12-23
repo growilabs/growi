@@ -2,8 +2,10 @@ import { isServer } from '@growi/core/dist/utils';
 import { Container } from 'unstated';
 
 import {
-  PageSingleDeleteConfigValue, PageSingleDeleteCompConfigValue,
-  PageRecursiveDeleteConfigValue, PageRecursiveDeleteCompConfigValue,
+  PageRecursiveDeleteCompConfigValue,
+  PageRecursiveDeleteConfigValue,
+  PageSingleDeleteCompConfigValue,
+  PageSingleDeleteConfigValue,
 } from '~/interfaces/page-delete-config';
 import { removeNullPropertyFromObject } from '~/utils/object-utils';
 
@@ -15,7 +17,6 @@ import { toastError } from '../util/toastr';
  * @extends {Container} unstated Container
  */
 export default class AdminGeneralSecurityContainer extends Container {
-
   constructor(appContainer) {
     super();
 
@@ -29,9 +30,12 @@ export default class AdminGeneralSecurityContainer extends Container {
       wikiMode: '',
       currentRestrictGuestMode: '',
       currentPageDeletionAuthority: PageSingleDeleteConfigValue.AdminOnly,
-      currentPageRecursiveDeletionAuthority: PageRecursiveDeleteConfigValue.Inherit,
-      currentPageCompleteDeletionAuthority: PageSingleDeleteCompConfigValue.AdminOnly,
-      currentPageRecursiveCompleteDeletionAuthority: PageRecursiveDeleteCompConfigValue.Inherit,
+      currentPageRecursiveDeletionAuthority:
+        PageRecursiveDeleteConfigValue.Inherit,
+      currentPageCompleteDeletionAuthority:
+        PageSingleDeleteCompConfigValue.AdminOnly,
+      currentPageRecursiveCompleteDeletionAuthority:
+        PageRecursiveDeleteCompConfigValue.Inherit,
       currentGroupRestrictionDisplayMode: 'Hidden',
       currentOwnerRestrictionDisplayMode: 'Hidden',
       isAllGroupMembershipRequiredForPageCompleteDeletion: true,
@@ -57,33 +61,49 @@ export default class AdminGeneralSecurityContainer extends Container {
       shareLinksActivePage: 1,
     };
 
-    this.changeOwnerRestrictionDisplayMode = this.changeOwnerRestrictionDisplayMode.bind(this);
-    this.changeGroupRestrictionDisplayMode = this.changeGroupRestrictionDisplayMode.bind(this);
-    this.changePageDeletionAuthority = this.changePageDeletionAuthority.bind(this);
-    this.changePageCompleteDeletionAuthority = this.changePageCompleteDeletionAuthority.bind(this);
-    this.changePageRecursiveDeletionAuthority = this.changePageRecursiveDeletionAuthority.bind(this);
-    this.changePageRecursiveCompleteDeletionAuthority = this.changePageRecursiveCompleteDeletionAuthority.bind(this);
-    this.changePreviousPageRecursiveDeletionAuthority = this.changePreviousPageRecursiveDeletionAuthority.bind(this);
-    this.changePreviousPageRecursiveCompleteDeletionAuthority = this.changePreviousPageRecursiveCompleteDeletionAuthority.bind(this);
-
+    this.changeOwnerRestrictionDisplayMode =
+      this.changeOwnerRestrictionDisplayMode.bind(this);
+    this.changeGroupRestrictionDisplayMode =
+      this.changeGroupRestrictionDisplayMode.bind(this);
+    this.changePageDeletionAuthority =
+      this.changePageDeletionAuthority.bind(this);
+    this.changePageCompleteDeletionAuthority =
+      this.changePageCompleteDeletionAuthority.bind(this);
+    this.changePageRecursiveDeletionAuthority =
+      this.changePageRecursiveDeletionAuthority.bind(this);
+    this.changePageRecursiveCompleteDeletionAuthority =
+      this.changePageRecursiveCompleteDeletionAuthority.bind(this);
+    this.changePreviousPageRecursiveDeletionAuthority =
+      this.changePreviousPageRecursiveDeletionAuthority.bind(this);
+    this.changePreviousPageRecursiveCompleteDeletionAuthority =
+      this.changePreviousPageRecursiveCompleteDeletionAuthority.bind(this);
   }
 
   async retrieveSecurityData() {
     await this.retrieveSetupStratedies();
     const response = await apiv3Get('/security-setting/');
-    const { generalSetting, shareLinkSetting, generalAuth } = response.data.securityParams;
+    const { generalSetting, shareLinkSetting, generalAuth } =
+      response.data.securityParams;
     this.setState({
       currentRestrictGuestMode: generalSetting.restrictGuestMode,
       currentPageDeletionAuthority: generalSetting.pageDeletionAuthority,
-      currentPageCompleteDeletionAuthority: generalSetting.pageCompleteDeletionAuthority,
-      currentPageRecursiveDeletionAuthority: generalSetting.pageRecursiveDeletionAuthority,
-      currentPageRecursiveCompleteDeletionAuthority: generalSetting.pageRecursiveCompleteDeletionAuthority,
-      isAllGroupMembershipRequiredForPageCompleteDeletion: generalSetting.isAllGroupMembershipRequiredForPageCompleteDeletion,
+      currentPageCompleteDeletionAuthority:
+        generalSetting.pageCompleteDeletionAuthority,
+      currentPageRecursiveDeletionAuthority:
+        generalSetting.pageRecursiveDeletionAuthority,
+      currentPageRecursiveCompleteDeletionAuthority:
+        generalSetting.pageRecursiveCompleteDeletionAuthority,
+      isAllGroupMembershipRequiredForPageCompleteDeletion:
+        generalSetting.isAllGroupMembershipRequiredForPageCompleteDeletion,
       // Set display to 'Hidden' if hideRestrictedByOwner is anything but false.
-      currentOwnerRestrictionDisplayMode: generalSetting.hideRestrictedByOwner === false ? 'Displayed' : 'Hidden',
-      currentGroupRestrictionDisplayMode: generalSetting.hideRestrictedByGroup === false ? 'Displayed' : 'Hidden',
-      isUsersHomepageDeletionEnabled: generalSetting.isUsersHomepageDeletionEnabled,
-      isForceDeleteUserHomepageOnUserDeletion: generalSetting.isForceDeleteUserHomepageOnUserDeletion,
+      currentOwnerRestrictionDisplayMode:
+        generalSetting.hideRestrictedByOwner === false ? 'Displayed' : 'Hidden',
+      currentGroupRestrictionDisplayMode:
+        generalSetting.hideRestrictedByGroup === false ? 'Displayed' : 'Hidden',
+      isUsersHomepageDeletionEnabled:
+        generalSetting.isUsersHomepageDeletionEnabled,
+      isForceDeleteUserHomepageOnUserDeletion:
+        generalSetting.isForceDeleteUserHomepageOnUserDeletion,
       isRomUserAllowedToComment: generalSetting.isRomUserAllowedToComment,
       sessionMaxAge: generalSetting.sessionMaxAge,
       wikiMode: generalSetting.wikiMode,
@@ -97,7 +117,6 @@ export default class AdminGeneralSecurityContainer extends Container {
     });
   }
 
-
   /**
    * Workaround for the mangling in production build to break constructor.name
    */
@@ -110,7 +129,9 @@ export default class AdminGeneralSecurityContainer extends Container {
    * @return {bool} isWikiModeForced
    */
   get isWikiModeForced() {
-    return this.state.wikiMode === 'public' || this.state.wikiMode === 'private';
+    return (
+      this.state.wikiMode === 'public' || this.state.wikiMode === 'private'
+    );
   }
 
   /**
@@ -180,7 +201,10 @@ export default class AdminGeneralSecurityContainer extends Container {
    * Switch isAllGroupMembershipRequiredForPageCompleteDeletion
    */
   switchIsAllGroupMembershipRequiredForPageCompleteDeletion() {
-    this.setState({ isAllGroupMembershipRequiredForPageCompleteDeletion: !this.state.isAllGroupMembershipRequiredForPageCompleteDeletion });
+    this.setState({
+      isAllGroupMembershipRequiredForPageCompleteDeletion:
+        !this.state.isAllGroupMembershipRequiredForPageCompleteDeletion,
+    });
   }
 
   /**
@@ -189,7 +213,6 @@ export default class AdminGeneralSecurityContainer extends Container {
   changePreviousPageRecursiveDeletionAuthority(val) {
     this.setState({ previousPageRecursiveDeletionAuthority: val });
   }
-
 
   /**
    * Change previousPageRecursiveCompleteDeletionAuthority
@@ -216,14 +239,20 @@ export default class AdminGeneralSecurityContainer extends Container {
    * Switch isUsersHomepageDeletionEnabled
    */
   switchIsUsersHomepageDeletionEnabled() {
-    this.setState({ isUsersHomepageDeletionEnabled: !this.state.isUsersHomepageDeletionEnabled });
+    this.setState({
+      isUsersHomepageDeletionEnabled:
+        !this.state.isUsersHomepageDeletionEnabled,
+    });
   }
 
   /**
    * Switch isForceDeleteUserHomepageOnUserDeletion
    */
   switchIsForceDeleteUserHomepageOnUserDeletion() {
-    this.setState({ isForceDeleteUserHomepageOnUserDeletion: !this.state.isForceDeleteUserHomepageOnUserDeletion });
+    this.setState({
+      isForceDeleteUserHomepageOnUserDeletion:
+        !this.state.isForceDeleteUserHomepageOnUserDeletion,
+    });
   }
 
   /**
@@ -233,44 +262,62 @@ export default class AdminGeneralSecurityContainer extends Container {
     this.setState({ isRomUserAllowedToComment: bool });
   }
 
-
   /**
    * Update restrictGuestMode
    * @memberOf AdminGeneralSecuritySContainer
    * @return {string} Appearance
    */
   async updateGeneralSecuritySetting(formData) {
-
-    let requestParams = formData != null ? {
-      sessionMaxAge: formData.sessionMaxAge,
-      restrictGuestMode: formData.restrictGuestMode,
-      pageDeletionAuthority: formData.pageDeletionAuthority,
-      pageCompleteDeletionAuthority: formData.pageCompleteDeletionAuthority,
-      pageRecursiveDeletionAuthority: formData.pageRecursiveDeletionAuthority,
-      pageRecursiveCompleteDeletionAuthority: formData.pageRecursiveCompleteDeletionAuthority,
-      isAllGroupMembershipRequiredForPageCompleteDeletion: formData.isAllGroupMembershipRequiredForPageCompleteDeletion,
-      hideRestrictedByGroup: formData.hideRestrictedByGroup,
-      hideRestrictedByOwner: formData.hideRestrictedByOwner,
-      isUsersHomepageDeletionEnabled: formData.isUsersHomepageDeletionEnabled,
-      isForceDeleteUserHomepageOnUserDeletion: formData.isForceDeleteUserHomepageOnUserDeletion,
-      isRomUserAllowedToComment: formData.isRomUserAllowedToComment,
-    } : {
-      sessionMaxAge: this.state.sessionMaxAge,
-      restrictGuestMode: this.state.currentRestrictGuestMode,
-      pageDeletionAuthority: this.state.currentPageDeletionAuthority,
-      pageCompleteDeletionAuthority: this.state.currentPageCompleteDeletionAuthority,
-      pageRecursiveDeletionAuthority: this.state.currentPageRecursiveDeletionAuthority,
-      pageRecursiveCompleteDeletionAuthority: this.state.currentPageRecursiveCompleteDeletionAuthority,
-      isAllGroupMembershipRequiredForPageCompleteDeletion: this.state.isAllGroupMembershipRequiredForPageCompleteDeletion,
-      hideRestrictedByGroup: this.state.currentGroupRestrictionDisplayMode === 'Hidden',
-      hideRestrictedByOwner: this.state.currentOwnerRestrictionDisplayMode === 'Hidden',
-      isUsersHomepageDeletionEnabled: this.state.isUsersHomepageDeletionEnabled,
-      isForceDeleteUserHomepageOnUserDeletion: this.state.isForceDeleteUserHomepageOnUserDeletion,
-      isRomUserAllowedToComment: this.state.isRomUserAllowedToComment,
-    };
+    let requestParams =
+      formData != null
+        ? {
+            sessionMaxAge: formData.sessionMaxAge,
+            restrictGuestMode: formData.restrictGuestMode,
+            pageDeletionAuthority: formData.pageDeletionAuthority,
+            pageCompleteDeletionAuthority:
+              formData.pageCompleteDeletionAuthority,
+            pageRecursiveDeletionAuthority:
+              formData.pageRecursiveDeletionAuthority,
+            pageRecursiveCompleteDeletionAuthority:
+              formData.pageRecursiveCompleteDeletionAuthority,
+            isAllGroupMembershipRequiredForPageCompleteDeletion:
+              formData.isAllGroupMembershipRequiredForPageCompleteDeletion,
+            hideRestrictedByGroup: formData.hideRestrictedByGroup,
+            hideRestrictedByOwner: formData.hideRestrictedByOwner,
+            isUsersHomepageDeletionEnabled:
+              formData.isUsersHomepageDeletionEnabled,
+            isForceDeleteUserHomepageOnUserDeletion:
+              formData.isForceDeleteUserHomepageOnUserDeletion,
+            isRomUserAllowedToComment: formData.isRomUserAllowedToComment,
+          }
+        : {
+            sessionMaxAge: this.state.sessionMaxAge,
+            restrictGuestMode: this.state.currentRestrictGuestMode,
+            pageDeletionAuthority: this.state.currentPageDeletionAuthority,
+            pageCompleteDeletionAuthority:
+              this.state.currentPageCompleteDeletionAuthority,
+            pageRecursiveDeletionAuthority:
+              this.state.currentPageRecursiveDeletionAuthority,
+            pageRecursiveCompleteDeletionAuthority:
+              this.state.currentPageRecursiveCompleteDeletionAuthority,
+            isAllGroupMembershipRequiredForPageCompleteDeletion:
+              this.state.isAllGroupMembershipRequiredForPageCompleteDeletion,
+            hideRestrictedByGroup:
+              this.state.currentGroupRestrictionDisplayMode === 'Hidden',
+            hideRestrictedByOwner:
+              this.state.currentOwnerRestrictionDisplayMode === 'Hidden',
+            isUsersHomepageDeletionEnabled:
+              this.state.isUsersHomepageDeletionEnabled,
+            isForceDeleteUserHomepageOnUserDeletion:
+              this.state.isForceDeleteUserHomepageOnUserDeletion,
+            isRomUserAllowedToComment: this.state.isRomUserAllowedToComment,
+          };
 
     requestParams = await removeNullPropertyFromObject(requestParams);
-    const response = await apiv3Put('/security-setting/general-setting', requestParams);
+    const response = await apiv3Put(
+      '/security-setting/general-setting',
+      requestParams,
+    );
     const { securitySettingParams } = response.data;
     return securitySettingParams;
   }
@@ -282,7 +329,10 @@ export default class AdminGeneralSecurityContainer extends Container {
     const requestParams = {
       disableLinkSharing: !this.state.disableLinkSharing,
     };
-    const response = await apiv3Put('/security-setting/share-link-setting', requestParams);
+    const response = await apiv3Put(
+      '/security-setting/share-link-setting',
+      requestParams,
+    );
     this.setDisableLinkSharing(!this.state.disableLinkSharing);
     return response;
   }
@@ -299,8 +349,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       });
       await this.retrieveSetupStratedies();
       this.setState({ [stateVariableName]: isEnabled });
-    }
-    catch (err) {
+    } catch (err) {
       toastError(err);
     }
   }
@@ -313,8 +362,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       const response = await apiv3Get('/security-setting/authentication');
       const { setupStrategies } = response.data;
       this.setState({ setupStrategies });
-    }
-    catch (err) {
+    } catch (err) {
       toastError(err);
     }
   }
@@ -323,18 +371,24 @@ export default class AdminGeneralSecurityContainer extends Container {
    * Retrieve All Sharelinks
    */
   async retrieveShareLinksByPagingNum(page) {
-
     const params = {
       page,
     };
 
-    const { data } = await apiv3Get('/security-setting/all-share-links', params);
+    const { data } = await apiv3Get(
+      '/security-setting/all-share-links',
+      params,
+    );
 
     if (data.paginateResult == null) {
-      throw new Error('data must conclude \'paginateResult\' property.');
+      throw new Error("data must conclude 'paginateResult' property.");
     }
 
-    const { docs: shareLinks, totalDocs: totalshareLinks, limit: shareLinksPagingLimit } = data.paginateResult;
+    const {
+      docs: shareLinks,
+      totalDocs: totalshareLinks,
+      limit: shareLinksPagingLimit,
+    } = data.paginateResult;
 
     this.setState({
       shareLinks,
@@ -385,5 +439,4 @@ export default class AdminGeneralSecurityContainer extends Container {
   async switchIsGitHubOAuthEnabled() {
     this.switchAuthentication('isGitHubEnabled', 'github');
   }
-
 }

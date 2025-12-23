@@ -1,0 +1,1 @@
+export { AiAssistantManagementModalLazyLoaded } from './dynamic';

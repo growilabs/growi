@@ -2,7 +2,7 @@ import React from 'react';
 
 import { useTranslation } from 'next-i18next';
 
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 
 import { AccessTokenSettings } from './AccessTokenSettings';
 import { ApiTokenSettings } from './ApiTokenSettings';
@@ -11,9 +11,9 @@ import { ApiTokenSettings } from './ApiTokenSettings';
 const ApiSettings = React.memo((): JSX.Element => {
 
   const { t } = useTranslation();
-  const { data: currentUser, isLoading: isLoadingCurrentUserData } = useCurrentUser();
+  const currentUser = useCurrentUser();
 
-  const shouldHideAccessTokenSettings = isLoadingCurrentUserData || !currentUser?.readOnly;
+  const shouldHideAccessTokenSettings = currentUser == null || !currentUser?.readOnly;
 
   return (
     <>

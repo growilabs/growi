@@ -12,11 +12,11 @@ const CustomizeSidebarsetting = (): JSX.Element => {
   const { t } = useTranslation(['admin', 'commons']);
 
   const {
-    data, update, setIsSidebarCollapsedMode, setIsSidebarClosedAtDockMode,
+    data, update, setIsSidebarCollapsedMode,
   } = useSWRxSidebarConfig();
 
   const { resolvedTheme } = useNextThemes();
-  const drawerIconFileName = `/images/customize-settings/drawer-${resolvedTheme}.svg`;
+  const collapsedIconFileName = `/images/customize-settings/collapsed-${resolvedTheme}.svg`;
   const dockIconFileName = `/images/customize-settings/dock-${resolvedTheme}.svg`;
 
   const onClickSubmit = useCallback(async() => {
@@ -33,7 +33,7 @@ const CustomizeSidebarsetting = (): JSX.Element => {
     return <LoadingSpinner />;
   }
 
-  const { isSidebarCollapsedMode, isSidebarClosedAtDockMode } = data;
+  const { isSidebarCollapsedMode } = data;
 
   return (
     <React.Fragment>
@@ -57,9 +57,9 @@ const CustomizeSidebarsetting = (): JSX.Element => {
                   role="button"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={drawerIconFileName} alt="Drawer Mode" />
+                  <img src={collapsedIconFileName} alt="Collapsed Mode" />
                   <div className="card-body text-center">
-                    Drawer Mode
+                    Collapsed Mode
                   </div>
                 </div>
               </div>
@@ -76,41 +76,6 @@ const CustomizeSidebarsetting = (): JSX.Element => {
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <Card className="card custom-card bg-body-tertiary my-5">
-            <CardBody className="px-0 py-2">
-              {t('customize_settings.default_sidebar_mode.dock_mode_default_desc')}
-            </CardBody>
-          </Card>
-
-          <div className="px-3">
-            <div className="form-check my-3">
-              <input
-                type="radio"
-                id="is-open"
-                className="form-check-input"
-                checked={isSidebarCollapsedMode === false && isSidebarClosedAtDockMode === false}
-                disabled={isSidebarCollapsedMode}
-                onChange={() => setIsSidebarClosedAtDockMode(false)}
-              />
-              <label className="form-label form-check-label" htmlFor="is-open">
-                {t('customize_settings.default_sidebar_mode.dock_mode_default_open')}
-              </label>
-            </div>
-            <div className="form-check my-3">
-              <input
-                type="radio"
-                id="is-closed"
-                className="form-check-input"
-                checked={isSidebarCollapsedMode === false && isSidebarClosedAtDockMode === true}
-                disabled={isSidebarCollapsedMode}
-                onChange={() => setIsSidebarClosedAtDockMode(true)}
-              />
-              <label className="form-label form-check-label" htmlFor="is-closed">
-                {t('customize_settings.default_sidebar_mode.dock_mode_default_close')}
-              </label>
             </div>
           </div>
 

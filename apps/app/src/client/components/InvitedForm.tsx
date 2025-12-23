@@ -3,42 +3,49 @@ import React, { useCallback, useState, type JSX } from 'react';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import { useRouter } from 'next/router';
+import { useForm } from 'react-hook-form';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
-import { useCurrentUser } from '~/stores-universal/context';
-
+import { useCurrentUser } from '~/states/global';
 
 type InvitedFormProps = {
   invitedFormUsername: string,
   invitedFormName: string,
 }
 
-export const InvitedForm = (props: InvitedFormProps): JSX.Element => {
+type InvitedFormValues = {
+  name: string,
+  username: string,
+  password: string,
+};
 
+export const InvitedForm = (props: InvitedFormProps): JSX.Element => {
   const { t } = useTranslation();
   const router = useRouter();
-  const { data: user } = useCurrentUser();
+  const user = useCurrentUser();
   const [loginErrors, setLoginErrors] = useState<Error[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const { invitedFormUsername, invitedFormName } = props;
 
-  const submitHandler = useCallback(async(e) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { isSubmitting },
+  } = useForm<InvitedFormValues>({
+    defaultValues: {
+      name: invitedFormName,
+      username: invitedFormUsername,
+    },
+  });
+
+  const submitHandler = useCallback(async(values: InvitedFormValues) => {
     setIsLoading(true);
 
-    const formData = e.target.elements;
-
-    const {
-      'invitedForm[name]': { value: name },
-      'invitedForm[password]': { value: password },
-      'invitedForm[username]': { value: username },
-    } = formData;
-
     const invitedForm = {
-      name,
-      password,
-      username,
+      name: values.name,
+      username: values.username,
+      password: values.password,
     };
 
     try {
@@ -79,7 +86,7 @@ export const InvitedForm = (props: InvitedFormProps): JSX.Element => {
   return (
     <div className="nologin-dialog px-3 pb-3 mx-auto" id="nologin-dialog">
       { formNotification() }
-      <form role="form" onSubmit={submitHandler} id="invited-form">
+      <form role="form" onSubmit={handleSubmit(submitHandler)} id="invited-form">
         {/* Email Form */}
         <div className="input-group">
           <span className="input-group-text">
@@ -104,9 +111,8 @@ export const InvitedForm = (props: InvitedFormProps): JSX.Element => {
             type="text"
             className="form-control"
             placeholder={t('User ID')}
-            name="invitedForm[username]"
-            value={invitedFormUsername}
             required
+            {...register('username', { required: true })}
           />
         </div>
         {/* Name Form */}
@@ -118,9 +124,8 @@ export const InvitedForm = (props: InvitedFormProps): JSX.Element => {
             type="text"
             className="form-control"
             placeholder={t('Name')}
-            name="invitedForm[name]"
-            value={invitedFormName}
             required
+            {...register('name', { required: true })}
           />
         </div>
         {/* Password Form */}
@@ -132,14 +137,14 @@ export const InvitedForm = (props: InvitedFormProps): JSX.Element => {
             type="password"
             className="form-control"
             placeholder={t('Password')}
-            name="invitedForm[password]"
             required
             minLength={6}
+            {...register('password', { required: true, minLength: 6 })}
           />
         </div>
         {/* Create Button */}
         <div className="input-group justify-content-center d-flex mt-4">
-          <button type="submit" className="btn btn-fill" id="register" disabled={isLoading}>
+          <button type="submit" className="btn btn-fill" id="register" disabled={isLoading || isSubmitting}>
             <span className="btn-label">
               {isLoading ? (
                 <LoadingSpinner />

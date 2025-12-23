@@ -1,17 +1,24 @@
 import React, {
-  Suspense, useCallback, useRef, type JSX,
+  Suspense,
+  useCallback,
+  useRef,
+  type JSX,
 } from 'react';
 
-import type { IPagePopulatedToShowRevision, IPageInfoForOperation } from '@growi/core';
+import type { IPagePopulatedToShowRevision } from '@growi/core';
+import { isIPageInfoForOperation } from '@growi/core/dist/interfaces';
 import { pagePathUtils } from '@growi/core/dist/utils';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import dynamic from 'next/dynamic';
 import { scroller } from 'react-scroll';
 
-import { useIsGuestUser, useIsReadOnlyUser, useShowPageSideAuthors } from '~/stores-universal/context';
-import { useDescendantsPageListModal, useTagEditModal } from '~/stores/modal';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
+import { showPageSideAuthorsAtom } from '~/states/server-configurations';
+import { useDescendantsPageListModalActions } from '~/states/ui/modal/descendants-page-list';
+import { useTagEditModalActions } from '~/states/ui/modal/tag-edit';
+import { useIsAbleToShowTagLabel } from '~/states/ui/page-abilities';
 import { useSWRxPageInfo, useSWRxTagsInfo } from '~/stores/page';
-import { useIsAbleToShowTagLabel } from '~/stores/ui';
 
 import { ContentLinkButtons } from '../ContentLinkButtons';
 import { PageTagsSkeleton } from '../PageTags';
@@ -40,10 +47,10 @@ const Tags = (props: TagsProps): JSX.Element => {
 
   const { data: tagsInfoData } = useSWRxTagsInfo(pageId, { suspense: true });
 
-  const { data: showTagLabel } = useIsAbleToShowTagLabel();
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { open: openTagEditModal } = useTagEditModal();
+  const showTagLabel = useIsAbleToShowTagLabel();
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const { open: openTagEditModal } = useTagEditModalActions();
 
   const onClickEditTagsButton = useCallback(() => {
     if (tagsInfoData == null) {
@@ -78,14 +85,14 @@ type PageSideContentsProps = {
 export const PageSideContents = (props: PageSideContentsProps): JSX.Element => {
   const { t } = useTranslation();
 
-  const { open: openDescendantPageListModal } = useDescendantsPageListModal();
+  const { open: openDescendantPageListModal } = useDescendantsPageListModalActions();
 
   const { page, isSharedUser } = props;
 
   const tagsRef = useRef<HTMLDivElement>(null);
 
   const { data: pageInfo } = useSWRxPageInfo(page._id);
-  const { data: showPageSideAuthors } = useShowPageSideAuthors();
+  const showPageSideAuthors = useAtomValue(showPageSideAuthorsAtom);
 
   const {
     creator, lastUpdateUser, createdAt, updatedAt,
@@ -123,7 +130,7 @@ export const PageSideContents = (props: PageSideContentsProps): JSX.Element => {
               icon={<span className="material-symbols-outlined">subject</span>}
               label={t('page_list')}
               // Do not display CountBadge if '/trash/*': https://github.com/growilabs/growi/pull/7600
-              count={!isTrash && pageInfo != null ? (pageInfo as IPageInfoForOperation).descendantCount : undefined}
+              count={!isTrash && isIPageInfoForOperation(pageInfo) ? pageInfo.descendantCount : undefined}
               offset={1}
               onClick={() => openDescendantPageListModal(pagePath)}
             />
@@ -136,7 +143,7 @@ export const PageSideContents = (props: PageSideContentsProps): JSX.Element => {
             <PageAccessoriesControl
               icon={<span className="material-symbols-outlined">chat</span>}
               label={t('comments')}
-              count={pageInfo != null ? (pageInfo as IPageInfoForOperation).commentCount : undefined}
+              count={isIPageInfoForOperation(pageInfo) ? pageInfo.commentCount : undefined}
               onClick={() => scroller.scrollTo('comments-container', { smooth: false, offset: -120 })}
             />
           </div>

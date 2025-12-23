@@ -182,58 +182,6 @@ module.exports = (crowi, app) => {
     loginPassport.testLdapCredentials,
   );
 
-  // importer management for admin
-  app.post(
-    '/_api/admin/settings/importerEsa',
-    accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]),
-    loginRequiredStrictly,
-    adminRequired,
-    addActivity,
-    admin.importer.api.validators.importer.esa(),
-    admin.api.importerSettingEsa,
-  );
-  app.post(
-    '/_api/admin/settings/importerQiita',
-    accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]),
-    loginRequiredStrictly,
-    adminRequired,
-    addActivity,
-    admin.importer.api.validators.importer.qiita(),
-    admin.api.importerSettingQiita,
-  );
-  app.post(
-    '/_api/admin/import/esa',
-    accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]),
-    loginRequiredStrictly,
-    adminRequired,
-    addActivity,
-    admin.api.importDataFromEsa,
-  );
-  app.post(
-    '/_api/admin/import/testEsaAPI',
-    accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]),
-    loginRequiredStrictly,
-    adminRequired,
-    addActivity,
-    admin.api.testEsaAPI,
-  );
-  app.post(
-    '/_api/admin/import/qiita',
-    accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]),
-    loginRequiredStrictly,
-    adminRequired,
-    addActivity,
-    admin.api.importDataFromQiita,
-  );
-  app.post(
-    '/_api/admin/import/testQiitaAPI',
-    accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA]),
-    loginRequiredStrictly,
-    adminRequired,
-    addActivity,
-    admin.api.testQiitaAPI,
-  );
-
   // brand logo
   app.use('/attachment', attachment.getBrandLogoRouterFactory(crowi));
 
