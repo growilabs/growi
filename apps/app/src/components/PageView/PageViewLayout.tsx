@@ -1,5 +1,6 @@
 import type { JSX, ReactNode } from 'react';
 
+// biome-ignore lint/style/noRestrictedImports: ignore
 import { usePrintMode } from '~/client/services/use-print-mode';
 
 import styles from './PageViewLayout.module.scss';

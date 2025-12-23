@@ -279,7 +279,7 @@ module.exports = (crowi, app) => {
     }
     // update page
     const page = await Page.findOneAndUpdate(
-      { _id: pageId },
+      { _id: { $eq: pageId } },
       {
         lastUpdateUser: req.user,
         updatedAt: new Date(),
@@ -422,7 +422,7 @@ module.exports = (crowi, app) => {
 
     let updatedComment;
     try {
-      const comment = await Comment.findById(commentId).exec();
+      const comment = await Comment.findOne({ _id: { $eq: commentId } }).exec();
 
       if (comment == null) {
         throw new Error('This comment does not exist.');
@@ -442,7 +442,7 @@ module.exports = (crowi, app) => {
       }
 
       updatedComment = await Comment.findOneAndUpdate(
-        { _id: commentId },
+        { _id: { $eq: commentId } },
         { $set: { comment: commentStr, revision } },
       );
       commentEvent.emit(CommentEvent.UPDATE, updatedComment);
@@ -506,7 +506,7 @@ module.exports = (crowi, app) => {
 
     try {
       /** @type {import('mongoose').HydratedDocument<import('~/interfaces/comment').IComment>} */
-      const comment = await Comment.findById(commentId).exec();
+      const comment = await Comment.findOne({ _id: { $eq: commentId } }).exec();
 
       if (comment == null) {
         throw new Error('This comment does not exist.');

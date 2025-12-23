@@ -1,6 +1,9 @@
 import nodePath from 'path';
 
-import { GlobalNotificationSettingEvent, GlobalNotificationSettingType } from '~/server/models/GlobalNotificationSetting';
+import {
+  GlobalNotificationSettingEvent,
+  GlobalNotificationSettingType,
+} from '~/server/models/GlobalNotificationSetting';
 import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
@@ -11,7 +14,6 @@ const logger = loggerFactory('growi:service:GlobalNotificationMailService'); // 
  * sub service class of GlobalNotificationSetting
  */
 class GlobalNotificationMailService {
-
   /** @type {import('~/server/crowi').default} Crowi instance */
   crowi;
 
@@ -34,13 +36,19 @@ class GlobalNotificationMailService {
     const { mailService } = this.crowi;
 
     const GlobalNotification = this.crowi.model('GlobalNotificationSetting');
-    const notifications = await GlobalNotification.findSettingByPathAndEvent(event, page.path, GlobalNotificationSettingType.MAIL);
+    const notifications = await GlobalNotification.findSettingByPathAndEvent(
+      event,
+      page.path,
+      GlobalNotificationSettingType.MAIL,
+    );
 
     const option = this.generateOption(event, page, triggeredBy, vars);
 
-    await Promise.all(notifications.map((notification) => {
-      return mailService.send({ ...option, to: notification.toEmail });
-    }));
+    await Promise.all(
+      notifications.map((notification) => {
+        return mailService.send({ ...option, to: notification.toEmail });
+      }),
+    );
   }
 
   /**
@@ -59,10 +67,15 @@ class GlobalNotificationMailService {
     const locale = configManager.getConfig('app:globalLang');
     // validate for all events
     if (event == null || page == null || triggeredBy == null) {
-      throw new Error(`invalid vars supplied to GlobalNotificationMailService.generateOption for event ${event}`);
+      throw new Error(
+        `invalid vars supplied to GlobalNotificationMailService.generateOption for event ${event}`,
+      );
     }
 
-    const template = nodePath.join(this.crowi.localeDir, `${locale}/notifications/${event}.ejs`);
+    const template = nodePath.join(
+      this.crowi.localeDir,
+      `${locale}/notifications/${event}.ejs`,
+    );
 
     const path = page.path;
     const appTitle = this.crowi.appService.getAppTitle();
@@ -93,7 +106,9 @@ class GlobalNotificationMailService {
       case GlobalNotificationSettingEvent.PAGE_MOVE:
         // validate for page move
         if (oldPath == null) {
-          throw new Error(`invalid vars supplied to GlobalNotificationMailService.generateOption for event ${event}`);
+          throw new Error(
+            `invalid vars supplied to GlobalNotificationMailService.generateOption for event ${event}`,
+          );
         }
 
         subject = `#${event} - ${triggeredBy.username} moved ${oldPath} to ${path} at URL: ${pageUrl}`;
@@ -111,7 +126,9 @@ class GlobalNotificationMailService {
       case GlobalNotificationSettingEvent.COMMENT:
         // validate for comment
         if (comment == null) {
-          throw new Error(`invalid vars supplied to GlobalNotificationMailService.generateOption for event ${event}`);
+          throw new Error(
+            `invalid vars supplied to GlobalNotificationMailService.generateOption for event ${event}`,
+          );
         }
 
         subject = `#${event} - ${triggeredBy.username} commented on ${path} at URL: ${pageUrl}`;
@@ -131,7 +148,6 @@ class GlobalNotificationMailService {
       vars,
     };
   }
-
 }
 
 module.exports = GlobalNotificationMailService;

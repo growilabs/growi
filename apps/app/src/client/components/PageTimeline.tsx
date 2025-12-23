@@ -4,7 +4,7 @@ import type { IPageHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 import Link from 'next/link';
 
-import { useCurrentPagePath } from '~/stores/page';
+import { useCurrentPagePath } from '~/states/page';
 import { useSWRINFxPageTimeline } from '~/stores/page-timeline';
 import { useTimelineOptions } from '~/stores/renderer';
 
@@ -46,9 +46,9 @@ export const PageTimeline = (): JSX.Element => {
 
   const PER_PAGE = 3;
   const { t } = useTranslation();
-  const { data: currentPagePath } = useCurrentPagePath();
+  const currentPagePath = useCurrentPagePath();
 
-  const swrInfinitexPageTimeline = useSWRINFxPageTimeline(currentPagePath, PER_PAGE);
+  const swrInfinitexPageTimeline = useSWRINFxPageTimeline(currentPagePath ?? undefined, PER_PAGE);
   const { data } = swrInfinitexPageTimeline;
 
   const isEmpty = data?.[0]?.pages.length === 0;

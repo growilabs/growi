@@ -1,20 +1,20 @@
 import React, {
-  memo, useCallback, useEffect, useMemo, useRef, useState,
+  memo, useCallback,
 } from 'react';
 
 import { useTranslation } from 'next-i18next';
-import { debounce } from 'throttle-debounce';
 
-import { useIsGuestUser, useIsReadOnlyUser } from '~/stores-universal/context';
-import { useCurrentPagePath, useCurrentPageId } from '~/stores/page';
+import { ItemsTree } from '~/features/page-tree/components';
+import { usePageTreeInformationUpdate } from '~/features/page-tree/states/page-tree-update';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
+import { useCurrentPageId, useCurrentPagePath } from '~/states/page';
+import { useSidebarScrollerElem } from '~/states/ui/sidebar';
 import {
   mutatePageTree, mutateRecentlyUpdated, useSWRxRootPage, useSWRxV5MigrationStatus,
 } from '~/stores/page-listing';
-import { useSidebarScrollerRef } from '~/stores/ui';
 import loggerFactory from '~/utils/logger';
 
-import { ItemsTree } from '../../ItemsTree/ItemsTree';
-import { PageTreeItem } from '../PageTreeItem';
+import { PageTreeItem, pageTreeItemSize } from '../PageTreeItem';
 import { SidebarHeaderReloadButton } from '../SidebarHeaderReloadButton';
 
 import { PrivateLegacyPagesLink } from './PrivateLegacyPagesLink';
@@ -31,12 +31,15 @@ export const PageTreeHeader = memo(({ isWipPageShown, onWipPageShownChange }: He
 
   const { mutate: mutateRootPage } = useSWRxRootPage({ suspense: true });
   useSWRxV5MigrationStatus({ suspense: true });
+  const { notifyUpdateAllTrees } = usePageTreeInformationUpdate();
 
   const mutate = useCallback(() => {
     mutateRootPage();
     mutatePageTree();
     mutateRecentlyUpdated();
-  }, [mutateRootPage]);
+    // Notify headless-tree to rebuild with fresh data
+    notifyUpdateAllTrees();
+  }, [mutateRootPage, notifyUpdateAllTrees]);
 
   return (
     <>
@@ -61,7 +64,7 @@ export const PageTreeHeader = memo(({ isWipPageShown, onWipPageShownChange }: He
                 className="form-check-input pe-none"
                 type="checkbox"
                 checked={isWipPageShown}
-                onChange={() => {}}
+                onChange={() => { }}
               />
               <label className="form-check-label pe-none">
                 {t('sidebar_header.show_wip_page')}
@@ -79,8 +82,6 @@ PageTreeHeader.displayName = 'PageTreeHeader';
 const PageTreeUnavailable = () => {
   const { t } = useTranslation();
 
-  // TODO : improve design
-  // Story : https://redmine.weseek.co.jp/issues/83755
   return (
     <div className="mt-5 mx-2 text-center">
       <h3 className="text-gray">{t('v5_page_migration.page_tree_not_avaliable')}</h3>
@@ -95,78 +96,19 @@ type PageTreeContentProps = {
 
 export const PageTreeContent = memo(({ isWipPageShown }: PageTreeContentProps) => {
 
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { data: currentPath } = useCurrentPagePath();
-  const { data: targetId } = useCurrentPageId();
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const currentPath = useCurrentPagePath();
+  const targetId = useCurrentPageId();
 
   const { data: migrationStatus } = useSWRxV5MigrationStatus({ suspense: true });
 
   const targetPathOrId = targetId || currentPath;
   const path = currentPath || '/';
 
-  const { data: rootPageResult } = useSWRxRootPage({ suspense: true });
-  const { data: sidebarScrollerRef } = useSidebarScrollerRef();
-  const [isInitialScrollCompleted, setIsInitialScrollCompleted] = useState(false);
+  const sidebarScrollerElem = useSidebarScrollerElem();
 
-  const rootElemRef = useRef<HTMLDivElement>(null);
-
-  // ***************************  Scroll on init ***************************
-  const scrollOnInit = useCallback(() => {
-    const rootElement = rootElemRef.current;
-    const scrollElement = sidebarScrollerRef?.current;
-
-    if (rootElement == null || scrollElement == null) {
-      return;
-    }
-
-    const scrollTargetElement = rootElement.querySelector<HTMLElement>('[aria-current]');
-
-    if (scrollTargetElement == null) {
-      return;
-    }
-
-    logger.debug('scrollOnInit has invoked');
-
-
-    // NOTE: could not use scrollIntoView
-    //  https://stackoverflow.com/questions/11039885/scrollintoview-causing-the-whole-page-to-move
-
-    // calculate the center point
-    const scrollTop = scrollTargetElement.offsetTop - scrollElement.getBoundingClientRect().height / 2;
-    scrollElement.scrollTo({ top: scrollTop });
-
-    setIsInitialScrollCompleted(true);
-  }, [sidebarScrollerRef]);
-
-  const scrollOnInitDebounced = useMemo(() => debounce(500, scrollOnInit), [scrollOnInit]);
-
-  useEffect(() => {
-    if (isInitialScrollCompleted || rootPageResult == null) {
-      return;
-    }
-
-    const rootElement = rootElemRef.current as HTMLElement | null;
-    if (rootElement == null) {
-      return;
-    }
-
-    const observerCallback = (mutationRecords: MutationRecord[]) => {
-      mutationRecords.forEach(() => scrollOnInitDebounced());
-    };
-
-    const observer = new MutationObserver(observerCallback);
-    observer.observe(rootElement, { childList: true, subtree: true });
-
-    // first call for the situation that all rendering is complete at this point
-    scrollOnInitDebounced();
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [isInitialScrollCompleted, scrollOnInitDebounced, rootPageResult]);
-  // *******************************  end  *******************************
-
+  const estimateTreeItemSize = useCallback(() => pageTreeItemSize, []);
 
   if (!migrationStatus?.isV5Compatible) {
     return <PageTreeUnavailable />;
@@ -180,14 +122,18 @@ export const PageTreeContent = memo(({ isWipPageShown }: PageTreeContentProps) =
   }
 
   return (
-    <div ref={rootElemRef} className="pt-4">
+    <div className="pt-4">
       <ItemsTree
+        enableRenaming
+        enableDragAndDrop
         isEnableActions={!isGuestUser}
         isReadOnlyUser={!!isReadOnlyUser}
         isWipPageShown={isWipPageShown}
         targetPath={path}
         targetPathOrId={targetPathOrId}
         CustomTreeItem={PageTreeItem}
+        estimateTreeItemSize={estimateTreeItemSize}
+        scrollerElem={sidebarScrollerElem}
       />
 
       {!isGuestUser && !isReadOnlyUser && migrationStatus?.migratablePagesCount != null && migrationStatus.migratablePagesCount !== 0 && (

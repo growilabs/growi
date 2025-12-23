@@ -9,13 +9,14 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 
 import { toastSuccess } from '~/client/util/toastr';
 import type { OnDeletedFunction } from '~/interfaces/ui';
-import { useIsReadOnlyUser } from '~/stores-universal/context';
+import { useIsReadOnlyUser } from '~/states/context';
+import { useCurrentPageData } from '~/states/page';
+import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
 import {
   useSWRxUserBookmarks, useSWRMUTxCurrentUserBookmarks,
 } from '~/stores/bookmark';
 import { useSWRxBookmarkFolderAndChild } from '~/stores/bookmark-folder';
-import { usePageDeleteModal } from '~/stores/modal';
-import { mutateAllPageInfo, useSWRMUTxPageInfo, useSWRxCurrentPage } from '~/stores/page';
+import { mutateAllPageInfo, useSWRMUTxPageInfo } from '~/stores/page';
 
 import { BookmarkFolderItem } from './BookmarkFolderItem';
 import { BookmarkItem } from './BookmarkItem';
@@ -41,13 +42,13 @@ export const BookmarkFolderTree: React.FC<Props> = (props: Props) => {
   const { t } = useTranslation();
   const router = useRouter();
 
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { data: currentPage } = useSWRxCurrentPage();
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const currentPage = useCurrentPageData();
   const { data: bookmarkFolders, mutate: mutateBookmarkFolders } = useSWRxBookmarkFolderAndChild(userId);
   const { data: userBookmarks, mutate: mutateUserBookmarks } = useSWRxUserBookmarks(userId ?? null);
   const { trigger: mutatePageInfo } = useSWRMUTxPageInfo(currentPage?._id ?? null);
   const { trigger: mutateCurrentUserBookmarks } = useSWRMUTxCurrentUserBookmarks();
-  const { open: openDeleteModal } = usePageDeleteModal();
+  const { open: openDeleteModal } = usePageDeleteModalActions();
 
   const bookmarkFolderTreeMutation = useCallback(() => {
     mutateUserBookmarks();

@@ -1,8 +1,11 @@
-import React, { useCallback, useState, type JSX } from 'react';
+import React, {
+  useCallback, useMemo, useState, type JSX,
+} from 'react';
 
 import nodePath from 'path';
 
-import type { IPageHasId, IPageInfoAll, IPageToDeleteWithMeta } from '@growi/core';
+import type { IPageHasId, IPageInfoExt, IPageToDeleteWithMeta } from '@growi/core';
+import { getIdStringForRef } from '@growi/core';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { pathUtils } from '@growi/core/dist/utils';
 import { useRouter } from 'next/router';
@@ -15,8 +18,9 @@ import { addBookmarkToFolder, renamePage } from '~/client/util/bookmark-utils';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import type { BookmarkFolderItems, DragItemDataType } from '~/interfaces/bookmark-info';
 import { DRAG_ITEM_TYPE } from '~/interfaces/bookmark-info';
-import { usePutBackPageModal } from '~/stores/modal';
-import { mutateAllPageInfo, useSWRMUTxCurrentPage, useSWRxPageInfo } from '~/stores/page';
+import { useFetchCurrentPage } from '~/states/page';
+import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page';
+import { mutateAllPageInfo, useSWRxPageInfo } from '~/stores/page';
 
 import { MenuItemType, PageItemControl } from '../Common/Dropdown/PageItemControl';
 import { PageListItemS } from '../PageList/PageListItemS';
@@ -47,28 +51,32 @@ export const BookmarkItem = (props: Props): JSX.Element => {
     isReadOnlyUser, isOperable, bookmarkedPage, onClickDeleteMenuItemHandler,
     parentFolder, level, canMoveToRoot, bookmarkFolderTreeMutation,
   } = props;
-  const { open: openPutBackPageModal } = usePutBackPageModal();
+  const { open: openPutBackPageModal } = usePutBackPageModalActions();
   const [isRenameInputShown, setRenameInputShown] = useState(false);
 
   const { data: pageInfo, mutate: mutatePageInfo } = useSWRxPageInfo(bookmarkedPage?._id);
-  const { trigger: mutateCurrentPage } = useSWRMUTxCurrentPage();
+  const { fetchCurrentPage } = useFetchCurrentPage();
 
   const paddingLeft = BASE_BOOKMARK_PADDING + (BASE_FOLDER_PADDING * (level));
   const dragItem: Partial<DragItemDataType> = {
     ...bookmarkedPage, parentFolder,
   };
 
+  const bookmarkedPageId = bookmarkedPage?._id;
+  const bookmarkedPagePath = bookmarkedPage?.path;
+  const bookmarkedPageRevision = bookmarkedPage?.revision;
+
   const onClickMoveToRootHandler = useCallback(async() => {
-    if (bookmarkedPage == null) return;
+    if (bookmarkedPageId == null) return;
 
     try {
-      await addBookmarkToFolder(bookmarkedPage._id, null);
+      await addBookmarkToFolder(bookmarkedPageId, null);
       bookmarkFolderTreeMutation();
     }
     catch (err) {
       toastError(err);
     }
-  }, [bookmarkFolderTreeMutation, bookmarkedPage]);
+  }, [bookmarkFolderTreeMutation, bookmarkedPageId]);
 
   const bookmarkMenuItemClickHandler = useCallback(async(pageId: string, shouldBookmark: boolean) => {
     if (shouldBookmark) {
@@ -90,23 +98,23 @@ export const BookmarkItem = (props: Props): JSX.Element => {
   }, []);
 
   const rename = useCallback(async(inputText: string) => {
-    if (bookmarkedPage == null) return;
+    if (bookmarkedPageId == null) return;
 
 
     if (inputText.trim() === '') {
       return cancel();
     }
 
-    const parentPath = pathUtils.addTrailingSlash(nodePath.dirname(bookmarkedPage.path ?? ''));
+    const parentPath = pathUtils.addTrailingSlash(nodePath.dirname(bookmarkedPagePath ?? ''));
     const newPagePath = nodePath.resolve(parentPath, inputText.trim());
-    if (newPagePath === bookmarkedPage.path) {
+    if (newPagePath === bookmarkedPagePath) {
       setRenameInputShown(false);
       return;
     }
 
     try {
       setRenameInputShown(false);
-      await renamePage(bookmarkedPage._id, bookmarkedPage.revision, newPagePath);
+      await renamePage(bookmarkedPageId, bookmarkedPageRevision, newPagePath);
       bookmarkFolderTreeMutation();
       mutatePageInfo();
     }
@@ -114,26 +122,26 @@ export const BookmarkItem = (props: Props): JSX.Element => {
       setRenameInputShown(true);
       toastError(err);
     }
-  }, [bookmarkedPage, cancel, bookmarkFolderTreeMutation, mutatePageInfo]);
+  }, [bookmarkedPageId, bookmarkedPagePath, bookmarkedPageRevision, cancel, bookmarkFolderTreeMutation, mutatePageInfo]);
 
-  const deleteMenuItemClickHandler = useCallback(async(_pageId: string, pageInfo: IPageInfoAll | undefined): Promise<void> => {
-    if (bookmarkedPage == null) return;
+  const deleteMenuItemClickHandler = useCallback(async(_pageId: string, pageInfo: IPageInfoExt | undefined): Promise<void> => {
+    if (bookmarkedPageId == null) return;
 
-    if (bookmarkedPage._id == null || bookmarkedPage.path == null) {
+    if (bookmarkedPageId == null || bookmarkedPagePath == null) {
       throw Error('_id and path must not be null.');
     }
 
     const pageToDelete: IPageToDeleteWithMeta = {
       data: {
-        _id: bookmarkedPage._id,
-        revision: bookmarkedPage.revision as string,
-        path: bookmarkedPage.path,
+        _id: bookmarkedPageId,
+        revision: bookmarkedPageRevision == null ? null : getIdStringForRef(bookmarkedPageRevision),
+        path: bookmarkedPagePath,
       },
       meta: pageInfo,
     };
 
     onClickDeleteMenuItemHandler(pageToDelete);
-  }, [bookmarkedPage, onClickDeleteMenuItemHandler]);
+  }, [bookmarkedPageId, bookmarkedPagePath, bookmarkedPageRevision, onClickDeleteMenuItemHandler]);
 
   const putBackClickHandler = useCallback(() => {
     if (bookmarkedPage == null) return;
@@ -145,7 +153,7 @@ export const BookmarkItem = (props: Props): JSX.Element => {
         mutateAllPageInfo();
         bookmarkFolderTreeMutation();
         router.push(`/${pageId}`);
-        mutateCurrentPage();
+        fetchCurrentPage({ force: true });
         toastSuccess(t('page_has_been_reverted', { path }));
       }
       catch (err) {
@@ -153,16 +161,34 @@ export const BookmarkItem = (props: Props): JSX.Element => {
       }
     };
     openPutBackPageModal({ pageId, path }, { onPutBacked: putBackedHandler });
-  }, [bookmarkedPage, openPutBackPageModal, bookmarkFolderTreeMutation, router, mutateCurrentPage, t]);
+  }, [bookmarkedPage, openPutBackPageModal, bookmarkFolderTreeMutation, router, fetchCurrentPage, t]);
+
+  const {
+    pageTitle, formerPagePath, isFormerRoot, bookmarkItemId,
+  } = useMemo(() => {
+    const bookmarkItemId = `bookmark-item-${bookmarkedPageId}`;
+
+    if (bookmarkedPagePath == null) {
+      return {
+        pageTitle: '',
+        formerPagePath: '',
+        isFormerRoot: false,
+        bookmarkItemId,
+      };
+    }
+
+    const dPagePath = new DevidedPagePath(bookmarkedPagePath, false, true);
+    return {
+      pageTitle: dPagePath.latter,
+      formerPagePath: dPagePath.former,
+      isFormerRoot: dPagePath.isFormerRoot,
+      bookmarkItemId,
+    };
+  }, [bookmarkedPagePath, bookmarkedPageId]);
 
   if (bookmarkedPage == null) {
     return <></>;
   }
-
-  const dPagePath = new DevidedPagePath(bookmarkedPage.path, false, true);
-  const { latter: pageTitle, former: formerPagePath } = dPagePath;
-
-  const bookmarkItemId = `bookmark-item-${bookmarkedPage._id}`;
 
   return (
     <DragAndDropWrapper
@@ -214,7 +240,7 @@ export const BookmarkItem = (props: Props): JSX.Element => {
           target={bookmarkItemId}
           fade={false}
         >
-          {dPagePath.isFormerRoot ? '/' : `${formerPagePath}/`}
+          {isFormerRoot ? '/' : `${formerPagePath}/`}
         </UncontrolledTooltip>
       </li>
     </DragAndDropWrapper>

@@ -16,9 +16,10 @@ import {
 
 import type { UserRelatedGroupsData } from '~/interfaces/page';
 import { UserGroupPageGrantStatus } from '~/interfaces/page';
-import { useCurrentUser } from '~/stores-universal/context';
-import { useCurrentPageId, useSWRxCurrentGrantData } from '~/stores/page';
-import { useSelectedGrant } from '~/stores/ui';
+import { useCurrentUser } from '~/states/global';
+import { useCurrentPageId } from '~/states/page';
+import { useSelectedGrant } from '~/states/ui/editor';
+import { useSWRxCurrentGrantData } from '~/stores/page';
 
 
 const AVAILABLE_GRANTS = [
@@ -61,11 +62,11 @@ export const GrantSelector = (props: Props): JSX.Element => {
 
   const [isSelectGroupModalShown, setIsSelectGroupModalShown] = useState(false);
 
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser();
 
   const shouldFetch = isSelectGroupModalShown;
-  const { data: selectedGrant, mutate: mutateSelectedGrant } = useSelectedGrant();
-  const { data: currentPageId } = useCurrentPageId();
+  const [selectedGrant, setSelectedGrant] = useSelectedGrant();
+  const currentPageId = useCurrentPageId();
   const { data: grantData } = useSWRxCurrentGrantData(currentPageId);
 
   const currentPageGrantData = grantData?.grantData.currentPageGrant;
@@ -79,11 +80,11 @@ export const GrantSelector = (props: Props): JSX.Element => {
       ?.userRelatedGroups.filter(group => group.status === UserGroupPageGrantStatus.isGranted)?.map((group) => {
         return { item: group.id, type: group.type };
       }) ?? [];
-    mutateSelectedGrant({
+    setSelectedGrant({
       grant: currentPageGrant.grant,
       userRelatedGrantedGroups,
     });
-  }, [grantData?.grantData.currentPageGrant, mutateSelectedGrant]);
+  }, [grantData?.grantData.currentPageGrant, setSelectedGrant]);
 
   // sync grant data
   useEffect(() => {
@@ -105,8 +106,8 @@ export const GrantSelector = (props: Props): JSX.Element => {
       return;
     }
 
-    mutateSelectedGrant({ grant, userRelatedGrantedGroups: undefined });
-  }, [mutateSelectedGrant, showSelectGroupModal, applyCurrentPageGrantToSelectedGrant, selectedGrant?.grant]);
+    setSelectedGrant({ grant, userRelatedGrantedGroups: undefined });
+  }, [setSelectedGrant, showSelectGroupModal, applyCurrentPageGrantToSelectedGrant, selectedGrant?.grant]);
 
   const groupListItemClickHandler = useCallback((clickedGroup: UserRelatedGroupsData) => {
     const userRelatedGrantedGroups = selectedGrant?.userRelatedGrantedGroups ?? [];
@@ -119,8 +120,8 @@ export const GrantSelector = (props: Props): JSX.Element => {
     else {
       userRelatedGrantedGroupsCopy = userRelatedGrantedGroupsCopy.filter(group => getIdForRef(group.item) !== clickedGroup.id);
     }
-    mutateSelectedGrant({ grant: 5, userRelatedGrantedGroups: userRelatedGrantedGroupsCopy });
-  }, [mutateSelectedGrant, selectedGrant?.userRelatedGrantedGroups]);
+    setSelectedGrant({ grant: 5, userRelatedGrantedGroups: userRelatedGrantedGroupsCopy });
+  }, [setSelectedGrant, selectedGrant?.userRelatedGrantedGroups]);
 
   /**
    * Render grant selector DOM.

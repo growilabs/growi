@@ -4,7 +4,7 @@ import React from 'react';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { useTranslation } from 'next-i18next';
 
-import { useCurrentPathname } from '~/stores-universal/context';
+import { useCurrentPathname } from '~/states/global';
 import { useSWRxPageInfoForList, useSWRxPagesByPath } from '~/stores/page-listing';
 
 import { PageListItemL } from './PageList/PageListItemL';
@@ -50,7 +50,7 @@ const IdenticalPathAlert : FC<IdenticalPathAlertProps> = (props: IdenticalPathAl
 
 export const IdenticalPathPage = (): JSX.Element => {
 
-  const { data: currentPath } = useCurrentPathname();
+  const currentPath = useCurrentPathname();
 
   const { data: pages } = useSWRxPagesByPath(currentPath);
   const { injectTo } = useSWRxPageInfoForList(null, currentPath, true, true);

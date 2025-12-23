@@ -6,7 +6,7 @@ import { useTranslation } from 'next-i18next';
 import { withUnstatedContainers } from '~/client/components/UnstatedUtils';
 import AdminUsersContainer from '~/client/services/AdminUsersContainer';
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 
 
 const SuspendAlert = React.memo((): JSX.Element => {
@@ -32,7 +32,7 @@ const StatusSuspendMenuItem = (props: Props): JSX.Element => {
 
   const { adminUsersContainer, user } = props;
 
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser(); // custom hook now returns single value
 
   const clickDeactiveBtnHandler = useCallback(async() => {
     try {

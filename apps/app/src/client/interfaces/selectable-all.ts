@@ -1,13 +1,13 @@
 export interface ISelectable {
-  select: () => void,
-  deselect: () => void,
+  select: () => void;
+  deselect: () => void;
 }
 
 export interface ISelectableAndIndeterminatable extends ISelectable {
-  setIndeterminate: () => void,
+  setIndeterminate: () => void;
 }
 
 export interface ISelectableAll {
-  selectAll: () => void,
-  deselectAll: () => void,
+  selectAll: () => void;
+  deselectAll: () => void;
 }
