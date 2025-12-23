@@ -15,6 +15,8 @@
 .grw-primary-items :global {
   .btn.btn-primary {
     @extend %btn-primary-color-vars;
+    width: 40px;
+    height: 40px;
   }
 }
 

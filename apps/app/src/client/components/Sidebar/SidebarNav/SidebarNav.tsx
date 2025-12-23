@@ -42,7 +42,7 @@ export const SidebarNav = memo((props: SidebarNavProps) => {
 
       {renderedPageCreateButton}
 
-      <div className="grw-sidebar-nav-primary-container" data-vrt-blackout-sidebar-nav>
+      <div className="grw-sidebar-nav-primary-container text-center mt-2" data-vrt-blackout-sidebar-nav>
         <PrimaryItems onItemHover={onPrimaryItemHover} />
       </div>
 

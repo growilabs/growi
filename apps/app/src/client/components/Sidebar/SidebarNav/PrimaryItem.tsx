@@ -73,12 +73,12 @@ export const PrimaryItem = (props: PrimaryItemProps): JSX.Element => {
       <button
         type="button"
         data-testid={`grw-sidebar-nav-primary-${labelForTestId}`}
-        className={`btn btn-primary ${indicatorClass}`}
+        className={`btn btn-primary border-0 ${indicatorClass}`}
         onClick={itemClickedHandler}
         onMouseEnter={mouseEnteredHandler}
         id={labelForTestId}
       >
-        <div className="position-relative">
+        <div className="d-flex justify-content-center align-items-center position-relative">
           {badgeContents != null && (
             <span className="position-absolute badge rounded-pill bg-primary">{badgeContents}</span>
           )}
