@@ -1,13 +1,15 @@
 import React, { useMemo, useCallback, type JSX } from 'react';
 
 import type { IPageHasId } from '@growi/core';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import dynamic from 'next/dynamic';
 
 import { toastSuccess } from '~/client/util/toastr';
 import type { IPagingResult } from '~/interfaces/paging-result';
-import { useIsReadOnlyUser, useShowPageLimitationXL } from '~/stores-universal/context';
-import { useEmptyTrashModal } from '~/stores/modal';
+import { useIsReadOnlyUser } from '~/states/context';
+import { showPageLimitationXLAtom } from '~/states/server-configurations';
+import { useEmptyTrashModalActions } from '~/states/ui/modal/empty-trash';
 import { useSWRxPageInfoForList, useSWRxPageList } from '~/stores/page-listing';
 
 import { MenuItemType } from './Common/Dropdown/PageItemControl';
@@ -25,10 +27,10 @@ const convertToIDataWithMeta = (page) => {
 const useEmptyTrashButton = () => {
 
   const { t } = useTranslation();
-  const { data: limit } = useShowPageLimitationXL();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
+  const limit = useAtomValue(showPageLimitationXLAtom);
+  const isReadOnlyUser = useIsReadOnlyUser();
   const { data: pagingResult, mutate: mutatePageLists } = useSWRxPageList('/trash', 1, limit);
-  const { open: openEmptyTrashModal } = useEmptyTrashModal();
+  const { open: openEmptyTrashModal } = useEmptyTrashModalActions();
 
   const pageIds = pagingResult?.items?.map(page => page._id);
   const { injectTo } = useSWRxPageInfoForList(pageIds, null, true, true);
@@ -63,7 +65,7 @@ const useEmptyTrashButton = () => {
 };
 
 const DescendantsPageListForTrash = (): JSX.Element => {
-  const { data: limit } = useShowPageLimitationXL();
+  const limit = useAtomValue(showPageLimitationXLAtom);
 
   return (
     <DescendantsPageList

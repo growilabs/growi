@@ -1,10 +1,9 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { parseScopes, getDisabledScopes, extractScopes } from './scope-util';
+import { extractScopes, getDisabledScopes, parseScopes } from './scope-util';
 
 describe('scope-util', () => {
-
   const mockScopes = {
     READ: {
       USER: 'read:user',
@@ -45,8 +44,12 @@ describe('scope-util', () => {
     expect(result.ALL).toBeDefined();
 
     // Check admin settings
-    expect(result.ADMIN['admin:setting']['read:admin:setting']).toBe('read:admin:setting');
-    expect(result.ADMIN['admin:setting']['write:admin:setting']).toBe('write:admin:setting');
+    expect(result.ADMIN['admin:setting']['read:admin:setting']).toBe(
+      'read:admin:setting',
+    );
+    expect(result.ADMIN['admin:setting']['write:admin:setting']).toBe(
+      'write:admin:setting',
+    );
 
     // Check ALL category
     expect(result.ALL['read:all']).toBe('read:all');
@@ -79,8 +82,12 @@ describe('scope-util', () => {
   it('should handle multiple wildcard selections', () => {
     const selectedScopes = [SCOPE.READ.ALL, SCOPE.WRITE.ALL];
     const availableScopes = [
-      SCOPE.READ.FEATURES.PAGE, SCOPE.READ.FEATURES.ATTACHMENT, SCOPE.READ.ALL,
-      SCOPE.WRITE.FEATURES.PAGE, SCOPE.WRITE.FEATURES.ATTACHMENT, SCOPE.WRITE.ALL,
+      SCOPE.READ.FEATURES.PAGE,
+      SCOPE.READ.FEATURES.ATTACHMENT,
+      SCOPE.READ.ALL,
+      SCOPE.WRITE.FEATURES.PAGE,
+      SCOPE.WRITE.FEATURES.ATTACHMENT,
+      SCOPE.WRITE.ALL,
     ];
 
     const result = getDisabledScopes(selectedScopes, availableScopes);

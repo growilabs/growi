@@ -9,12 +9,14 @@ import {
 
 // see: https://api.slack.com/reference/interaction-payloads/views
 type ViewElement = TypedBlock & {
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
   private_metadata?: any;
 };
 
 // see: https://api.slack.com/reference/interaction-payloads/views
 type ViewInteractionPayload = TypedBlock & {
   view: {
+    // biome-ignore lint/suspicious/noExplicitAny: ignore
     private_metadata?: any;
   };
 };

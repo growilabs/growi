@@ -318,7 +318,7 @@ export const routesFactory = (crowi) => {
   api.remove = async (req, res) => {
     const id = req.body.attachment_id;
 
-    const attachment = await Attachment.findById(id);
+    const attachment = await Attachment.findOne({ _id: { $eq: id } });
 
     if (attachment == null) {
       return res.json(ApiResponse.error('attachment not found'));

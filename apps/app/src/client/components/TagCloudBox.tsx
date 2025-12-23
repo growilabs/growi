@@ -1,8 +1,8 @@
 import type { FC } from 'react';
 import React, { memo } from 'react';
 
-import { useKeywordManager } from '~/client/services/search-operation';
 import type { IDataTagCount } from '~/interfaces/tag';
+import { useSetSearchKeyword } from '~/states/search';
 
 
 type Props = {
@@ -23,7 +23,7 @@ const TagCloudBox: FC<Props> = memo((props:(Props & typeof defaultProps)) => {
   const { tags } = props;
   const maxTagTextLength: number = props.maxTagTextLength ?? MAX_TAG_TEXT_LENGTH;
 
-  const { pushState } = useKeywordManager();
+  const setSearchKeyword = useSetSearchKeyword();
 
   const tagElements = tags.map((tag:IDataTagCount) => {
     const tagNameFormat = (tag.name).length > maxTagTextLength ? `${(tag.name).slice(0, maxTagTextLength)}...` : tag.name;
@@ -33,7 +33,7 @@ const TagCloudBox: FC<Props> = memo((props:(Props & typeof defaultProps)) => {
         key={tag.name}
         type="button"
         className="grw-tag badge me-2"
-        onClick={() => pushState(`tag:${tag.name}`)}
+        onClick={() => setSearchKeyword(`tag:${tag.name}`)}
       >
         {tagNameFormat}
       </a>

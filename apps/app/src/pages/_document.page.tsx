@@ -8,7 +8,7 @@ import type { GrowiPluginResourceEntries } from '~/features/growi-plugin/server/
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import loggerFactory from '~/utils/logger';
 
-import { getLocaleAtServerSide } from './utils/commons';
+import { getLocaleAtServerSide } from './utils/locale';
 
 const logger = loggerFactory('growi:page:_document');
 
@@ -42,10 +42,10 @@ const HeadersForGrowiPlugin = (
 };
 
 interface GrowiDocumentProps {
-  themeHref: string;
-  customScript: string | null;
-  customCss: string | null;
-  customNoscript: string | null;
+  themeHref: string | undefined;
+  customScript: string | undefined;
+  customCss: string | undefined;
+  customNoscript: string | undefined;
   pluginResourceEntries: GrowiPluginResourceEntries;
   locale: Locale;
 }
@@ -63,9 +63,10 @@ class GrowiDocument extends Document<GrowiDocumentInitialProps> {
     const { customizeService } = crowi;
 
     const { themeHref } = customizeService;
-    const customScript: string | null = customizeService.getCustomScript();
-    const customCss: string | null = customizeService.getCustomCss();
-    const customNoscript: string | null = customizeService.getCustomNoscript();
+    const customScript: string | undefined = customizeService.getCustomScript();
+    const customCss: string | undefined = customizeService.getCustomCss();
+    const customNoscript: string | undefined =
+      customizeService.getCustomNoscript();
 
     // retrieve plugin manifests
     const growiPluginService = await import(
@@ -87,7 +88,7 @@ class GrowiDocument extends Document<GrowiDocumentInitialProps> {
     };
   }
 
-  renderCustomScript(customScript: string | null): JSX.Element {
+  renderCustomScript(customScript: string | undefined): JSX.Element {
     if (customScript == null || customScript.length === 0) {
       return <></>;
     }
@@ -100,7 +101,7 @@ class GrowiDocument extends Document<GrowiDocumentInitialProps> {
     );
   }
 
-  renderCustomCss(customCss: string | null): JSX.Element {
+  renderCustomCss(customCss: string | undefined): JSX.Element {
     if (customCss == null || customCss.length === 0) {
       return <></>;
     }
@@ -108,7 +109,7 @@ class GrowiDocument extends Document<GrowiDocumentInitialProps> {
     return <style dangerouslySetInnerHTML={{ __html: customCss }} />;
   }
 
-  renderCustomNoscript(customNoscript: string | null): JSX.Element {
+  renderCustomNoscript(customNoscript: string | undefined): JSX.Element {
     if (customNoscript == null || customNoscript.length === 0) {
       return <></>;
     }

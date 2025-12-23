@@ -13,7 +13,7 @@ import {
 } from 'reactstrap';
 
 import { toastSuccess, toastError } from '~/client/util/toastr';
-import { usePersonalSettings, useSWRxPersonalExternalAccounts } from '~/stores/personal-settings';
+import { useAssociateLdapAccount, useSWRxPersonalExternalAccounts } from '~/stores/personal-settings';
 
 import { LdapAuthTest } from '../Admin/Security/LdapAuthTest';
 
@@ -22,13 +22,20 @@ type Props = {
   onClose: () => void,
 }
 
-const AssociateModal = (props: Props): JSX.Element => {
+/**
+ * AssociateModalSubstance - Presentation component (heavy logic, rendered only when isOpen)
+ */
+type AssociateModalSubstanceProps = {
+  onClose: () => void;
+};
+
+const AssociateModalSubstance = (props: AssociateModalSubstanceProps): JSX.Element => {
+  const { onClose } = props;
   const { t } = useTranslation();
   const { mutate: mutatePersonalExternalAccounts } = useSWRxPersonalExternalAccounts();
-  const { associateLdapAccount } = usePersonalSettings();
-  const [activeTab, setActiveTab] = useState(1);
-  const { isOpen, onClose } = props;
+  const { trigger: associateLdapAccount } = useAssociateLdapAccount();
 
+  const [activeTab, setActiveTab] = useState(1);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
@@ -37,7 +44,6 @@ const AssociateModal = (props: Props): JSX.Element => {
     setUsername('');
     setPassword('');
   }, [onClose]);
-
 
   const clickAddLdapAccountHandler = useCallback(async() => {
     try {
@@ -50,12 +56,16 @@ const AssociateModal = (props: Props): JSX.Element => {
     catch (err) {
       toastError(err);
     }
-
   }, [associateLdapAccount, closeModalHandler, mutatePersonalExternalAccounts, password, t, username]);
 
+  const setTabToLdap = useCallback(() => setActiveTab(1), []);
+  const setTabToGithub = useCallback(() => setActiveTab(2), []);
+  const setTabToGoogle = useCallback(() => setActiveTab(3), []);
+  const handleUsernameChange = useCallback((username: string) => setUsername(username), []);
+  const handlePasswordChange = useCallback((password: string) => setPassword(password), []);
 
   return (
-    <Modal isOpen={isOpen} toggle={closeModalHandler} size="lg" data-testid="grw-associate-modal">
+    <>
       <ModalHeader toggle={onClose}>
         { t('admin:user_management.create_external_account') }
       </ModalHeader>
@@ -64,19 +74,19 @@ const AssociateModal = (props: Props): JSX.Element => {
           <Nav tabs className="mb-2">
             <NavLink
               className={`${activeTab === 1 ? 'active' : ''} d-flex gap-1 align-items-center`}
-              onClick={() => setActiveTab(1)}
+              onClick={setTabToLdap}
             >
               <span className="material-symbols-outlined fs-5">network_node</span> LDAP
             </NavLink>
             <NavLink
               className={`${activeTab === 2 ? 'active' : ''} d-flex gap-1 align-items-center`}
-              onClick={() => setActiveTab(2)}
+              onClick={setTabToGithub}
             >
               <span className="growi-custom-icons">github</span> (TBD) GitHub
             </NavLink>
             <NavLink
               className={`${activeTab === 3 ? 'active' : ''} d-flex gap-1 align-items-center`}
-              onClick={() => setActiveTab(3)}
+              onClick={setTabToGoogle}
             >
               <span className="growi-custom-icons">google</span> (TBD) Google OAuth
             </NavLink>
@@ -86,8 +96,8 @@ const AssociateModal = (props: Props): JSX.Element => {
               <LdapAuthTest
                 username={username}
                 password={password}
-                onChangeUsername={username => setUsername(username)}
-                onChangePassword={password => setPassword(password)}
+                onChangeUsername={handleUsernameChange}
+                onChangePassword={handlePasswordChange}
               />
             </TabPane>
             <TabPane tabId={2}>
@@ -111,6 +121,19 @@ const AssociateModal = (props: Props): JSX.Element => {
           {t('add')}
         </button>
       </ModalFooter>
+    </>
+  );
+};
+
+/**
+ * AssociateModal - Container component (lightweight, always rendered)
+ */
+const AssociateModal = (props: Props): JSX.Element => {
+  const { isOpen, onClose } = props;
+
+  return (
+    <Modal isOpen={isOpen} toggle={onClose} size="lg" data-testid="grw-associate-modal">
+      {isOpen && <AssociateModalSubstance onClose={onClose} />}
     </Modal>
   );
 };

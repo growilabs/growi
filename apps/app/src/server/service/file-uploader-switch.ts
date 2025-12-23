@@ -2,7 +2,6 @@ import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
 import S2sMessage from '../models/vo/s2s-message';
-
 import { configManager } from './config-manager';
 import type { S2sMessagingService } from './s2s-messaging/base';
 import type { S2sMessageHandlable } from './s2s-messaging/handlable';
@@ -10,7 +9,6 @@ import type { S2sMessageHandlable } from './s2s-messaging/handlable';
 const logger = loggerFactory('growi:service:FileUploaderSwitch');
 
 class FileUploaderSwitch implements S2sMessageHandlable {
-
   crowi: Crowi;
 
   s2sMessagingService: S2sMessagingService;
@@ -31,7 +29,10 @@ class FileUploaderSwitch implements S2sMessageHandlable {
       return false;
     }
 
-    return this.lastLoadedAt == null || this.lastLoadedAt < new Date(s2sMessage.updatedAt);
+    return (
+      this.lastLoadedAt == null ||
+      this.lastLoadedAt < new Date(s2sMessage.updatedAt)
+    );
   }
 
   /**
@@ -47,17 +48,20 @@ class FileUploaderSwitch implements S2sMessageHandlable {
     const { s2sMessagingService } = this;
 
     if (s2sMessagingService != null) {
-      const s2sMessage = new S2sMessage('fileUploadServiceUpdated', { updatedAt: new Date() });
+      const s2sMessage = new S2sMessage('fileUploadServiceUpdated', {
+        updatedAt: new Date(),
+      });
 
       try {
         await s2sMessagingService.publish(s2sMessage);
-      }
-      catch (e) {
-        logger.error('Failed to publish update message with S2sMessagingService: ', e.message);
+      } catch (e) {
+        logger.error(
+          'Failed to publish update message with S2sMessagingService: ',
+          e.message,
+        );
       }
     }
   }
-
 }
 
 module.exports = FileUploaderSwitch;

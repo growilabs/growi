@@ -1,7 +1,7 @@
 import React, { memo, useMemo } from 'react';
 
 import type { SidebarContentsType } from '~/interfaces/ui';
-import { useIsGuestUser, useIsReadOnlyUser } from '~/stores-universal/context';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
 
 import { NotAvailableForReadOnlyUser } from '../../NotAvailableForReadOnlyUser';
 import { PageCreateButton } from '../PageCreateButton';
@@ -18,8 +18,8 @@ export type SidebarNavProps = {
 export const SidebarNav = memo((props: SidebarNavProps) => {
   const { onPrimaryItemHover } = props;
 
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
 
   const renderedPageCreateButton = useMemo(() => {
     if (isGuestUser) {

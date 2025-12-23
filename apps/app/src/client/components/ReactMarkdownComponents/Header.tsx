@@ -2,16 +2,15 @@ import {
   useCallback, useEffect, useState, type JSX,
 } from 'react';
 
-import type EventEmitter from 'events';
-
+import { globalEventTarget } from '@growi/core/dist/utils';
 import type { Element } from 'hast';
 import { useRouter } from 'next/router';
 
 import { NextLink } from '~/components/ReactMarkdownComponents/NextLink';
-import {
-  useIsGuestUser, useIsReadOnlyUser, useIsSharedUser, useShareLinkId,
-} from '~/stores-universal/context';
-import { useCurrentPageYjsData } from '~/stores/yjs';
+import { useCurrentPageYjsData, useCurrentPageYjsDataLoading } from '~/features/collaborative-editor/states';
+import { useIsGuestUser, useIsReadOnlyUser, useIsSharedUser } from '~/states/context';
+import { useShareLinkId } from '~/states/page/hooks';
+import type { ReservedNextCaretLineEventDetail } from '~/states/ui/editor/reserved-next-caret-line';
 import loggerFactory from '~/utils/logger';
 
 
@@ -21,15 +20,14 @@ import styles from './Header.module.scss';
 const logger = loggerFactory('growi:components:Header');
 const moduleClass = styles['revision-head'] ?? '';
 
-declare global {
-  // eslint-disable-next-line vars-on-top, no-var
-  var globalEmitter: EventEmitter;
-}
 
-
-function setCaretLine(line?: number): void {
-  if (line != null) {
-    globalEmitter.emit('reservedNextCaretLine', line);
+function setCaretLine(lineNumber?: number): void {
+  if (lineNumber != null) {
+    globalEventTarget.dispatchEvent(new CustomEvent<ReservedNextCaretLineEventDetail>('reservedNextCaretLine', {
+      detail: {
+        lineNumber,
+      },
+    }));
   }
 }
 
@@ -64,11 +62,12 @@ export const Header = (props: HeaderProps): JSX.Element => {
     node, id, children,
   } = props;
 
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { data: isSharedUser } = useIsSharedUser();
-  const { data: shareLinkId } = useShareLinkId();
-  const { data: currentPageYjsData, isLoading: isLoadingCurrentPageYjsData } = useCurrentPageYjsData();
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const isSharedUser = useIsSharedUser();
+  const shareLinkId = useShareLinkId();
+  const currentPageYjsData = useCurrentPageYjsData();
+  const isLoadingCurrentPageYjsData = useCurrentPageYjsDataLoading();
 
   const router = useRouter();
 

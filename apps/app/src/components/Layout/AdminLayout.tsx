@@ -1,5 +1,4 @@
 import type { JSX, ReactNode } from 'react';
-import React from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
@@ -17,14 +16,17 @@ const AdminNavigation = dynamic(
   { ssr: false },
 );
 const PageCreateModal = dynamic(
+  // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
   () => import('~/client/components/PageCreateModal'),
   { ssr: false },
 );
 const SystemVersion = dynamic(
+  // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
   () => import('~/client/components/SystemVersion'),
   { ssr: false },
 );
 const HotkeysManager = dynamic(
+  // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
   () => import('~/client/components/Hotkeys/HotkeysManager'),
   { ssr: false },
 );

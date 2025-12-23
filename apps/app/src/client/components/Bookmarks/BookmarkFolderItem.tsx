@@ -12,7 +12,7 @@ import { toastError } from '~/client/util/toastr';
 import type { BookmarkFolderItems, DragItemDataType, DragItemType } from '~/interfaces/bookmark-info';
 import { DRAG_ITEM_TYPE } from '~/interfaces/bookmark-info';
 import type { onDeletedBookmarkFolderFunction } from '~/interfaces/ui';
-import { useBookmarkFolderDeleteModal } from '~/stores/modal';
+import { useDeleteBookmarkFolderModalActions } from '~/states/ui/modal/delete-bookmark-folder';
 
 import { BookmarkFolderItemControl } from './BookmarkFolderItemControl';
 import { BookmarkFolderNameInput } from './BookmarkFolderNameInput';
@@ -49,7 +49,7 @@ export const BookmarkFolderItem: FC<BookmarkFolderItemProps> = (props: BookmarkF
   const [isRenameAction, setIsRenameAction] = useState<boolean>(false);
   const [isCreateAction, setIsCreateAction] = useState<boolean>(false);
 
-  const { open: openDeleteBookmarkFolderModal } = useBookmarkFolderDeleteModal();
+  const { open: openDeleteBookmarkFolderModal } = useDeleteBookmarkFolderModalActions();
 
   const childrenExists = hasChildren({ childFolder, bookmarks });
 
