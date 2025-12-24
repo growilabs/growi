@@ -89,6 +89,7 @@ export type FindRecentUpdatedPagesOption = {
   desc: number;
   hideRestrictedByOwner: boolean;
   hideRestrictedByGroup: boolean;
+  hideUserPages: boolean;
 };
 
 export type CreateMethod = (
@@ -935,6 +936,13 @@ schema.statics.findRecentUpdatedPages = async function (
 
   const baseQuery = this.find({});
   const queryBuilder = new PageQueryBuilder(baseQuery, includeEmpty);
+
+  const isAdmin = user?.admin ?? false;
+
+  // REMINDER: Change to addConditionToListByNotMatchPathAndChildren
+  if (options.hideUserPages && !isAdmin) {
+    queryBuilder.addConditionToListByNotMatch('/user');
+  }
 
   if (!options.includeTrashed) {
     queryBuilder.addConditionToExcludeTrashed();
