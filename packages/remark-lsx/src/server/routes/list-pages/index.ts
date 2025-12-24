@@ -4,6 +4,7 @@ import { pathUtils } from '@growi/core/dist/utils';
 import escapeStringRegexp from 'escape-string-regexp';
 import type { Request, Response } from 'express';
 import createError, { isHttpError } from 'http-errors';
+import mongoose from 'mongoose';
 
 import type { LsxApiParams, LsxApiResponseData } from '../../../interfaces/api';
 import { addDepthCondition } from './add-depth-condition';
@@ -72,6 +73,16 @@ export const listPages = async (
 ): Promise<Response> => {
   const user = req.user;
 
+  const Config = mongoose.model('Config');
+  const hideUserPageConfig = (await Config.findOne({
+    key: 'security:user-pages:isHidden',
+  }));
+
+  const hideUserPageConfigValue = hideUserPageConfig?.value;
+  const hideUserPagesEnabled = hideUserPageConfigValue === 'true';
+  const isAdmin = user?.admin ?? false;
+  const shouldHideUserPages = hideUserPagesEnabled && !isAdmin;
+
   if (req.query.pagePath == null) {
     return res.status(400).send("the 'pagepath' query must not be null.");
   }
@@ -85,6 +96,11 @@ export const listPages = async (
 
   const { pagePath, offset, limit, options } = params;
   const builder = await generateBaseQuery(params.pagePath, user);
+  let builderQuery = builder.query;
+
+  if (shouldHideUserPages) {
+    builderQuery = builderQuery.and([{ path: { $not: /^\/user(\/|$)/ } }]);
+  }
 
   // count viewers of `/`
   let toppageViewersCount: number;
