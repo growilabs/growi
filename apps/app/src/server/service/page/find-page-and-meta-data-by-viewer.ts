@@ -21,61 +21,72 @@ import type { IPageGrantService } from '~/server/service/page-grant';
 import Subscription from '../../models/subscription';
 import type { IPageService } from './page-service';
 
+// ============================================================
+// Type Definitions
+// ============================================================
+
+// Base options shared by all overloads
+type FindPageBaseOpts = {
+  pageId: string | null;
+  path: string | null;
+  user?: HydratedDocument<IUser>;
+  isSharedPage?: boolean;
+};
+
+// Options with basicOnly flag
+type FindPageOptsBasic = FindPageBaseOpts & { basicOnly: true };
+type FindPageOptsExt = FindPageBaseOpts & { basicOnly?: false };
+type FindPageOptsImpl = FindPageBaseOpts & { basicOnly?: boolean };
+
+// Shorthand for page document type
+type PageDoc = HydratedDocument<PageDocument>;
+
+// Result type aliases
+type PageFoundResult<T extends IPageInfoBasic | IPageInfoExt> =
+  IDataWithRequiredMeta<PageDoc, T>;
+type PageNotFoundResult = IDataWithRequiredMeta<null, IPageNotFoundInfo>;
+
+// Combined result types for each overload
+type FindPageResultBasic = PageFoundResult<IPageInfoBasic> | PageNotFoundResult;
+type FindPageResultExt = PageFoundResult<IPageInfoExt> | PageNotFoundResult;
+
+// Implementation result type (union of all possible returns)
+type FindPageResultImpl =
+  | PageFoundResult<IPageInfoExt>
+  | PageFoundResult<IPageInfoBasic>
+  | PageNotFoundResult;
+
+// ============================================================
+// Function Overloads
+// ============================================================
+
 // Overload: basicOnly = true returns basic info only
 export async function findPageAndMetaDataByViewer(
   pageService: IPageService,
   pageGrantService: IPageGrantService,
-  opts: {
-    pageId: string | null; // either pageId or path must be specified
-    path: string | null; // either pageId or path must be specified
-    user?: HydratedDocument<IUser>;
-    isSharedPage?: boolean;
-    basicOnly: true;
-  },
-): Promise<
-  | IDataWithRequiredMeta<HydratedDocument<PageDocument>, IPageInfoBasic>
-  | IDataWithRequiredMeta<null, IPageNotFoundInfo>
->;
+  opts: FindPageOptsBasic,
+): Promise<FindPageResultBasic>;
 
 // Overload: basicOnly = false or undefined returns extended info
 export async function findPageAndMetaDataByViewer(
   pageService: IPageService,
   pageGrantService: IPageGrantService,
-  opts: {
-    pageId: string | null; // either pageId or path must be specified
-    path: string | null; // either pageId or path must be specified
-    user?: HydratedDocument<IUser>;
-    isSharedPage?: boolean;
-  },
-): Promise<
-  | IDataWithRequiredMeta<HydratedDocument<PageDocument>, IPageInfoExt>
-  | IDataWithRequiredMeta<null, IPageNotFoundInfo>
->;
+  opts: FindPageOptsExt,
+): Promise<FindPageResultExt>;
 
 // Implementation
 export async function findPageAndMetaDataByViewer(
   pageService: IPageService,
   pageGrantService: IPageGrantService,
-  opts: {
-    pageId: string | null; // either pageId or path must be specified
-    path: string | null; // either pageId or path must be specified
-    user?: HydratedDocument<IUser>;
-    isSharedPage?: boolean;
-    basicOnly?: boolean;
-  },
-): Promise<IDataWithRequiredMeta<
-  HydratedDocument<PageDocument> | null,
-  IPageInfoExt | IPageInfoBasic | IPageNotFoundInfo
->> {
+  opts: FindPageOptsImpl,
+): Promise<FindPageResultImpl> {
   const { pageId, path, user, isSharedPage = false, basicOnly = false } = opts;
 
   assert(pageId != null || path != null);
 
-  const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
-    'Page',
-  );
+  const Page = mongoose.model<PageDoc, PageModel>('Page');
 
-  let page: HydratedDocument<PageDocument> | null;
+  let page: PageDoc | null;
   if (pageId != null) {
     // prioritized
     page = await Page.findByIdAndViewer(pageId, user, null, true);
