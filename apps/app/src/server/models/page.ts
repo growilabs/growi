@@ -430,6 +430,22 @@ export class PageQueryBuilder {
     return this;
   }
 
+  addConditionToListByNotMatchPathAndChildren(str: string): PageQueryBuilder {
+    const path = normalizePath(str);
+
+    if (isTopPage(path)) {
+      return this;
+    }
+
+    const startsPattern = escapeStringRegexp(path);
+
+    this.query = this.query.and({
+      path: { $not: new RegExp(`^${startsPattern}(/|$)`) },
+    });
+
+    return this;
+  }
+
   addConditionToListByMatch(str: string): PageQueryBuilder {
     // No request is set for "/"
     if (str === '/') {
