@@ -133,6 +133,9 @@ module.exports = (crowi) => {
       const offset = parseInt(req.query.offset) || 0;
       const includeWipPage = req.query.includeWipPage === 'true'; // Need validation using express-validator
 
+      // REMINDER: Change to security:isHidingUserPages
+      const hideUserPages = configManager.getConfig('security:user-pages:isHidden');
+
       const hideRestrictedByOwner = configManager.getConfig('security:list-policy:hideRestrictedByOwner');
       const hideRestrictedByGroup = configManager.getConfig('security:list-policy:hideRestrictedByGroup');
 
@@ -149,6 +152,7 @@ module.exports = (crowi) => {
         desc: -1,
         hideRestrictedByOwner,
         hideRestrictedByGroup,
+        hideUserPages,
       };
 
       try {
