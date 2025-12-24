@@ -33,6 +33,7 @@ yarn-error.log*
 # Terraform
 **/.terraform/*
 *.tfstate.*
+/aws/
 
 # IDE, dev #
 .idea
