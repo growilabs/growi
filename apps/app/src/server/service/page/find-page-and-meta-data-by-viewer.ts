@@ -25,36 +25,28 @@ import type { IPageService } from './page-service';
 // Type Definitions
 // ============================================================
 
-// Base options shared by all overloads
-type FindPageBaseOpts = {
+// Shorthand for page document type
+type PageDoc = HydratedDocument<PageDocument>;
+
+// Options
+type BaseOpts = {
   pageId: string | null;
   path: string | null;
   user?: HydratedDocument<IUser>;
   isSharedPage?: boolean;
 };
+type OptsBasic = BaseOpts & { basicOnly: true };
+type OptsExt = BaseOpts & { basicOnly?: false };
+type OptsImpl = BaseOpts & { basicOnly?: boolean };
 
-// Options with basicOnly flag
-type FindPageOptsBasic = FindPageBaseOpts & { basicOnly: true };
-type FindPageOptsExt = FindPageBaseOpts & { basicOnly?: false };
-type FindPageOptsImpl = FindPageBaseOpts & { basicOnly?: boolean };
-
-// Shorthand for page document type
-type PageDoc = HydratedDocument<PageDocument>;
-
-// Result type aliases
-type PageFoundResult<T extends IPageInfoBasic | IPageInfoExt> =
+// Results
+type FoundResult<T extends IPageInfoBasic | IPageInfoExt> =
   IDataWithRequiredMeta<PageDoc, T>;
-type PageNotFoundResult = IDataWithRequiredMeta<null, IPageNotFoundInfo>;
+type NotFoundResult = IDataWithRequiredMeta<null, IPageNotFoundInfo>;
 
-// Combined result types for each overload
-type FindPageResultBasic = PageFoundResult<IPageInfoBasic> | PageNotFoundResult;
-type FindPageResultExt = PageFoundResult<IPageInfoExt> | PageNotFoundResult;
-
-// Implementation result type (union of all possible returns)
-type FindPageResultImpl =
-  | PageFoundResult<IPageInfoExt>
-  | PageFoundResult<IPageInfoBasic>
-  | PageNotFoundResult;
+type ResultBasic = FoundResult<IPageInfoBasic> | NotFoundResult;
+type ResultExt = FoundResult<IPageInfoExt> | NotFoundResult;
+type ResultImpl = ResultBasic | ResultExt | NotFoundResult;
 
 // ============================================================
 // Function Overloads
@@ -64,22 +56,22 @@ type FindPageResultImpl =
 export async function findPageAndMetaDataByViewer(
   pageService: IPageService,
   pageGrantService: IPageGrantService,
-  opts: FindPageOptsBasic,
-): Promise<FindPageResultBasic>;
+  opts: OptsBasic,
+): Promise<ResultBasic>;
 
 // Overload: basicOnly = false or undefined returns extended info
 export async function findPageAndMetaDataByViewer(
   pageService: IPageService,
   pageGrantService: IPageGrantService,
-  opts: FindPageOptsExt,
-): Promise<FindPageResultExt>;
+  opts: OptsExt,
+): Promise<ResultExt>;
 
 // Implementation
 export async function findPageAndMetaDataByViewer(
   pageService: IPageService,
   pageGrantService: IPageGrantService,
-  opts: FindPageOptsImpl,
-): Promise<FindPageResultImpl> {
+  opts: OptsImpl,
+): Promise<ResultImpl> {
   const { pageId, path, user, isSharedPage = false, basicOnly = false } = opts;
 
   assert(pageId != null || path != null);
