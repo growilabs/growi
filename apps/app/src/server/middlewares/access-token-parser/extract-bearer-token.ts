@@ -1,4 +1,6 @@
-export const extractBearerToken = (authHeader: string | undefined): string | null => {
+export const extractBearerToken = (
+  authHeader: string | undefined,
+): string | null => {
   if (authHeader == null) {
     return null;
   }

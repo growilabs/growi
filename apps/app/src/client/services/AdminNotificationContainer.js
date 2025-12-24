@@ -2,7 +2,10 @@ import { isServer } from '@growi/core/dist/utils';
 import { Container } from 'unstated';
 
 import {
-  apiv3Delete, apiv3Get, apiv3Post, apiv3Put,
+  apiv3Delete,
+  apiv3Get,
+  apiv3Post,
+  apiv3Put,
 } from '../util/apiv3-client';
 
 /**
@@ -10,7 +13,6 @@ import {
  * @extends {Container} unstated Container
  */
 export default class AdminNotificationContainer extends Container {
-
   constructor(appContainer) {
     super();
 
@@ -32,7 +34,6 @@ export default class AdminNotificationContainer extends Container {
       isNotificationForGroupPageEnabled: false,
       globalNotifications: [],
     };
-
   }
 
   /**
@@ -55,8 +56,10 @@ export default class AdminNotificationContainer extends Container {
       currentBotType: notificationParams.currentBotType,
 
       userNotifications: notificationParams.userNotifications,
-      isNotificationForOwnerPageEnabled: notificationParams.isNotificationForOwnerPageEnabled,
-      isNotificationForGroupPageEnabled: notificationParams.isNotificationForGroupPageEnabled,
+      isNotificationForOwnerPageEnabled:
+        notificationParams.isNotificationForOwnerPageEnabled,
+      isNotificationForGroupPageEnabled:
+        notificationParams.isNotificationForGroupPageEnabled,
       globalNotifications: notificationParams.globalNotifications,
     });
   }
@@ -66,11 +69,14 @@ export default class AdminNotificationContainer extends Container {
    * @memberOf SlackAppConfiguration
    */
   async updateSlackAppConfiguration() {
-    const response = await apiv3Put('/notification-setting/slack-configuration', {
-      webhookUrl: this.state.webhookUrl,
-      isIncomingWebhookPrioritized: this.state.isIncomingWebhookPrioritized,
-      slackToken: this.state.slackToken,
-    });
+    const response = await apiv3Put(
+      '/notification-setting/slack-configuration',
+      {
+        webhookUrl: this.state.webhookUrl,
+        isIncomingWebhookPrioritized: this.state.isIncomingWebhookPrioritized,
+        slackToken: this.state.slackToken,
+      },
+    );
 
     return response;
   }
@@ -80,19 +86,26 @@ export default class AdminNotificationContainer extends Container {
    * @memberOf SlackAppConfiguration
    */
   async addNotificationPattern(pathPattern, channel) {
-    const response = await apiv3Post('/notification-setting/user-notification', {
-      pathPattern,
-      channel,
-    });
+    const response = await apiv3Post(
+      '/notification-setting/user-notification',
+      {
+        pathPattern,
+        channel,
+      },
+    );
 
-    this.setState({ userNotifications: response.data.responseParams.userNotifications });
+    this.setState({
+      userNotifications: response.data.responseParams.userNotifications,
+    });
   }
 
   /**
    * Delete user trigger notification pattern
    */
   async deleteUserTriggerNotificationPattern(notificatiionId) {
-    const response = await apiv3Delete(`/notification-setting/user-notification/${notificatiionId}`);
+    const response = await apiv3Delete(
+      `/notification-setting/user-notification/${notificatiionId}`,
+    );
     const deletedNotificaton = response.data;
     await this.retrieveNotificationData();
     return deletedNotificaton;
@@ -102,14 +115,20 @@ export default class AdminNotificationContainer extends Container {
    * Switch isNotificationForOwnerPageEnabled
    */
   switchIsNotificationForOwnerPageEnabled() {
-    this.setState({ isNotificationForOwnerPageEnabled: !this.state.isNotificationForOwnerPageEnabled });
+    this.setState({
+      isNotificationForOwnerPageEnabled:
+        !this.state.isNotificationForOwnerPageEnabled,
+    });
   }
 
   /**
    * Switch isNotificationForGroupPageEnabled
    */
   switchIsNotificationForGroupPageEnabled() {
-    this.setState({ isNotificationForGroupPageEnabled: !this.state.isNotificationForGroupPageEnabled });
+    this.setState({
+      isNotificationForGroupPageEnabled:
+        !this.state.isNotificationForGroupPageEnabled,
+    });
   }
 
   /**
@@ -117,10 +136,15 @@ export default class AdminNotificationContainer extends Container {
    * @memberOf SlackAppConfiguration
    */
   async updateGlobalNotificationForPages() {
-    const response = await apiv3Put('/notification-setting/notify-for-page-grant/', {
-      isNotificationForOwnerPageEnabled: this.state.isNotificationForOwnerPageEnabled,
-      isNotificationForGroupPageEnabled: this.state.isNotificationForGroupPageEnabled,
-    });
+    const response = await apiv3Put(
+      '/notification-setting/notify-for-page-grant/',
+      {
+        isNotificationForOwnerPageEnabled:
+          this.state.isNotificationForOwnerPageEnabled,
+        isNotificationForGroupPageEnabled:
+          this.state.isNotificationForGroupPageEnabled,
+      },
+    );
 
     return response;
   }
@@ -129,10 +153,11 @@ export default class AdminNotificationContainer extends Container {
    * Delete global notification pattern
    */
   async deleteGlobalNotificationPattern(notificatiionId) {
-    const response = await apiv3Delete(`/notification-setting/global-notification/${notificatiionId}`);
+    const response = await apiv3Delete(
+      `/notification-setting/global-notification/${notificatiionId}`,
+    );
     const deletedNotificaton = response.data;
     await this.retrieveNotificationData();
     return deletedNotificaton;
   }
-
 }

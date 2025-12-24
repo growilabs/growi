@@ -6,7 +6,7 @@ import { format } from 'date-fns/format';
 import { useTranslation } from 'react-i18next';
 
 import { useCreatePage } from '~/client/services/create-page';
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 
 
 type UseCreateTodaysMemo = () => {
@@ -18,7 +18,7 @@ type UseCreateTodaysMemo = () => {
 export const useCreateTodaysMemo: UseCreateTodaysMemo = () => {
   const { t } = useTranslation('commons');
 
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser();
   const { isCreating, create } = useCreatePage();
 
   const isCreatable = currentUser != null;

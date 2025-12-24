@@ -12,7 +12,9 @@ const router = express.Router();
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(crowi);
+  const loginRequiredStrictly = require('../../middlewares/login-required')(
+    crowi,
+  );
   const adminRequired = require('../../middlewares/admin-required')(crowi);
 
   /**
@@ -38,16 +40,26 @@ module.exports = (crowi) => {
    *                    items:
    *                      type: string
    */
-  router.get('/collections', accessTokenParser([SCOPE.READ.ADMIN.EXPORT_DATA]), loginRequiredStrictly, adminRequired, async(req, res) => {
-    const listCollectionsResult = await mongoose.connection.db.listCollections().toArray();
-    const collections = listCollectionsResult.map(collectionObj => collectionObj.name);
+  router.get(
+    '/collections',
+    accessTokenParser([SCOPE.READ.ADMIN.EXPORT_DATA]),
+    loginRequiredStrictly,
+    adminRequired,
+    async (req, res) => {
+      const listCollectionsResult = await mongoose.connection.db
+        .listCollections()
+        .toArray();
+      const collections = listCollectionsResult.map(
+        (collectionObj) => collectionObj.name,
+      );
 
-    // TODO: use res.apiv3
-    return res.json({
-      ok: true,
-      collections,
-    });
-  });
+      // TODO: use res.apiv3
+      return res.json({
+        ok: true,
+        collections,
+      });
+    },
+  );
 
   return router;
 };

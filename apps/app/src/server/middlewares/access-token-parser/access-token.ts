@@ -8,15 +8,18 @@ import loggerFactory from '~/utils/logger';
 import { extractBearerToken } from './extract-bearer-token';
 import type { AccessTokenParserReq } from './interfaces';
 
-const logger = loggerFactory('growi:middleware:access-token-parser:access-token');
+const logger = loggerFactory(
+  'growi:middleware:access-token-parser:access-token',
+);
 
 export const parserForAccessToken = (scopes: Scope[]) => {
-  return async(req: AccessTokenParserReq, res: Response): Promise<void> => {
+  return async (req: AccessTokenParserReq, res: Response): Promise<void> => {
     // Extract token from Authorization header first
     // It is more efficient to call it only once in "AccessTokenParser," which is the caller of the method
     const bearerToken = extractBearerToken(req.headers.authorization);
 
-    const accessToken = bearerToken ?? req.query.access_token ?? req.body.access_token;
+    const accessToken =
+      bearerToken ?? req.query.access_token ?? req.body.access_token;
     if (accessToken == null || typeof accessToken !== 'string') {
       return;
     }
@@ -33,14 +36,15 @@ export const parserForAccessToken = (scopes: Scope[]) => {
     }
 
     // check the user is valid
-    const { user: userByAccessToken }: {user: IUserHasId} = await userId.populate('user');
+    const { user: userByAccessToken }: { user: IUserHasId } =
+      await userId.populate('user');
     if (userByAccessToken == null) {
-      logger.debug('The access token\'s associated user is invalid');
+      logger.debug("The access token's associated user is invalid");
       return;
     }
 
     if (userByAccessToken.readOnly) {
-      logger.debug('The access token\'s associated user is read-only');
+      logger.debug("The access token's associated user is read-only");
       return;
     }
 
@@ -52,6 +56,5 @@ export const parserForAccessToken = (scopes: Scope[]) => {
 
     logger.debug('Access token parsed.');
     return;
-
   };
 };

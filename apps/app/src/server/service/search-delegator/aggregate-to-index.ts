@@ -3,11 +3,11 @@ import type { PipelineStage, Query } from 'mongoose';
 
 import type { PageModel } from '~/server/models/page';
 
-export const aggregatePipelineToIndex = (maxBodyLengthToIndex: number, query?: Query<PageModel, IPage>): PipelineStage[] => {
-
-  const basePipeline = query == null
-    ? []
-    : [{ $match: query.getQuery() }];
+export const aggregatePipelineToIndex = (
+  maxBodyLengthToIndex: number,
+  query?: Query<PageModel, IPage>,
+): PipelineStage[] => {
+  const basePipeline = query == null ? [] : [{ $match: query.getQuery() }];
 
   return [
     ...basePipeline,
@@ -110,6 +110,7 @@ export const aggregatePipelineToIndex = (maxBodyLengthToIndex: number, query?: Q
         'revision.body': {
           $cond: {
             if: { $lte: ['$bodyLength', maxBodyLengthToIndex] },
+            // biome-ignore lint/suspicious/noThenProperty: ignore
             then: '$revision.body',
             else: '',
           },
@@ -121,6 +122,7 @@ export const aggregatePipelineToIndex = (maxBodyLengthToIndex: number, query?: Q
             in: {
               $cond: {
                 if: { $lte: ['$$comment.commentLength', maxBodyLengthToIndex] },
+                // biome-ignore lint/suspicious/noThenProperty: ignore
                 then: '$$comment.comment',
                 else: '',
               },

@@ -6,9 +6,9 @@ import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import LabeledProgressBar from '~/client/components/Admin/Common/LabeledProgressBar';
 import { apiv3Get } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useAdminSocket } from '~/features/admin/states/socket-io';
 import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
 import { SocketEventName } from '~/interfaces/websocket';
-import { useAdminSocket } from '~/stores/socket-io';
 
 import { useSWRxExternalUserGroupList } from '../../stores/external-user-group';
 
@@ -31,7 +31,7 @@ export const SyncExecution = ({
   AdditionalForm = () => <></>,
 }: SyncExecutionProps): JSX.Element => {
   const { t } = useTranslation('admin');
-  const { data: socket } = useAdminSocket();
+  const socket = useAdminSocket();
   const { mutate: mutateExternalUserGroups } = useSWRxExternalUserGroupList();
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(
     SyncStatus.beforeSync,

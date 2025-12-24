@@ -1,8 +1,8 @@
 import { memo, useCallback, useEffect } from 'react';
 
 import { SidebarContentsType } from '~/interfaces/ui';
+import { useGlobalSocket } from '~/states/socket-io';
 import { useSWRxInAppNotificationStatus } from '~/stores/in-app-notification';
-import { useDefaultSocket } from '~/stores/socket-io';
 
 import { PrimaryItem, type PrimaryItemProps } from '../SidebarNav/PrimaryItem';
 
@@ -11,7 +11,7 @@ type PrimaryItemForNotificationProps = Omit<PrimaryItemProps, 'onClick' | 'label
 export const PrimaryItemForNotification = memo((props: PrimaryItemForNotificationProps) => {
   const { sidebarMode, onHover } = props;
 
-  const { data: socket } = useDefaultSocket();
+  const socket = useGlobalSocket();
 
   const { data: notificationCount, mutate: mutateNotificationCount } = useSWRxInAppNotificationStatus();
 

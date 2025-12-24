@@ -2,11 +2,11 @@ import React, { useCallback, type JSX } from 'react';
 
 import { useTranslation } from 'next-i18next';
 
-import { useIsGuestUser, useIsReadOnlyUser } from '~/stores-universal/context';
-import { useEditorMode } from '~/stores-universal/ui';
-import { usePageStatusAlert } from '~/stores/alert';
-import { useSWRxCurrentPage } from '~/stores/page';
-import { useRemoteRevisionId, useRemoteRevisionLastUpdateUser } from '~/stores/remote-latest-page';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
+import { useRemoteRevisionLastUpdateUser } from '~/states/page';
+import { useEditorMode } from '~/states/ui/editor';
+import { usePageStatusAlertStatus } from '~/states/ui/modal/page-status-alert';
+import { useIsRevisionOutdated } from '~/stores/page';
 
 import { Username } from '../../components/User/Username';
 
@@ -15,13 +15,12 @@ import styles from './PageStatusAlert.module.scss';
 export const PageStatusAlert = (): JSX.Element => {
   const { t } = useTranslation();
 
-  const { data: editorMode } = useEditorMode();
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { data: pageStatusAlertData } = usePageStatusAlert();
-  const { data: remoteRevisionId } = useRemoteRevisionId();
-  const { data: remoteRevisionLastUpdateUser } = useRemoteRevisionLastUpdateUser();
-  const { data: pageData } = useSWRxCurrentPage();
+  const { editorMode } = useEditorMode();
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const pageStatusAlertData = usePageStatusAlertStatus();
+  const isRevisionOutdated = useIsRevisionOutdated();
+  const remoteRevisionLastUpdateUser = useRemoteRevisionLastUpdateUser();
 
   const onClickRefreshPage = useCallback(() => {
     pageStatusAlertData?.onRefleshPage?.();
@@ -33,9 +32,6 @@ export const PageStatusAlert = (): JSX.Element => {
 
   const hasResolveConflictHandler = pageStatusAlertData?.onResolveConflict != null;
   const hasRefreshPageHandler = pageStatusAlertData?.onRefleshPage != null;
-
-  const currentRevisionId = pageData?.revision?._id;
-  const isRevisionOutdated = (currentRevisionId != null || remoteRevisionId != null) && currentRevisionId !== remoteRevisionId;
 
   if (!pageStatusAlertData?.isOpen || !!isGuestUser || !!isReadOnlyUser || !isRevisionOutdated) {
     return <></>;
@@ -49,7 +45,7 @@ export const PageStatusAlert = (): JSX.Element => {
     <div className={`${styles['grw-page-status-alert']} card fixed-bottom animated fadeInUp faster text-bg-warning`}>
       <div className="card-body">
         <p className="card-text grw-card-label-container">
-          { hasResolveConflictHandler
+          {hasResolveConflictHandler
             ? <>{t('modal_resolve_conflict.file_conflicting_with_newer_remote')}</>
             : <><Username user={remoteRevisionLastUpdateUser} /> {t('edited this page')}</>
           }

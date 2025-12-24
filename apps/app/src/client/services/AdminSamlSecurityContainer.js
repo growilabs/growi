@@ -13,7 +13,6 @@ const logger = loggerFactory('growi:security:AdminSamlSecurityContainer');
  * @extends {Container} unstated Container
  */
 export default class AdminSamlSecurityContainer extends Container {
-
   constructor(appContainer) {
     super();
 
@@ -49,7 +48,6 @@ export default class AdminSamlSecurityContainer extends Container {
       envAttrMapLastName: '',
       envABLCRule: '',
     };
-
   }
 
   /**
@@ -70,8 +68,10 @@ export default class AdminSamlSecurityContainer extends Container {
         samlAttrMapMail: samlAuth.samlAttrMapMail,
         samlAttrMapFirstName: samlAuth.samlAttrMapFirstName,
         samlAttrMapLastName: samlAuth.samlAttrMapLastName,
-        isSameUsernameTreatedAsIdenticalUser: samlAuth.isSameUsernameTreatedAsIdenticalUser,
-        isSameEmailTreatedAsIdenticalUser: samlAuth.isSameEmailTreatedAsIdenticalUser,
+        isSameUsernameTreatedAsIdenticalUser:
+          samlAuth.isSameUsernameTreatedAsIdenticalUser,
+        isSameEmailTreatedAsIdenticalUser:
+          samlAuth.isSameEmailTreatedAsIdenticalUser,
         samlABLCRule: samlAuth.samlABLCRule,
         envEntryPoint: samlAuth.samlEnvVarEntryPoint,
         envIssuer: samlAuth.samlEnvVarIssuer,
@@ -83,8 +83,7 @@ export default class AdminSamlSecurityContainer extends Container {
         envAttrMapLastName: samlAuth.samlEnvVarAttrMapLastName,
         envABLCRule: samlAuth.samlEnvVarABLCRule,
       });
-    }
-    catch (err) {
+    } catch (err) {
       this.setState({ retrieveError: err });
       logger.error(err);
       throw new Error('Failed to fetch data');
@@ -102,53 +101,66 @@ export default class AdminSamlSecurityContainer extends Container {
    * Switch isSameUsernameTreatedAsIdenticalUser
    */
   switchIsSameUsernameTreatedAsIdenticalUser() {
-    this.setState({ isSameUsernameTreatedAsIdenticalUser: !this.state.isSameUsernameTreatedAsIdenticalUser });
+    this.setState({
+      isSameUsernameTreatedAsIdenticalUser:
+        !this.state.isSameUsernameTreatedAsIdenticalUser,
+    });
   }
 
   /**
    * Switch isSameEmailTreatedAsIdenticalUser
    */
   switchIsSameEmailTreatedAsIdenticalUser() {
-    this.setState({ isSameEmailTreatedAsIdenticalUser: !this.state.isSameEmailTreatedAsIdenticalUser });
+    this.setState({
+      isSameEmailTreatedAsIdenticalUser:
+        !this.state.isSameEmailTreatedAsIdenticalUser,
+    });
   }
 
   /**
    * Update saml option
    */
   async updateSamlSetting(formData) {
-
-    let requestParams = formData != null ? {
-      entryPoint: formData.samlEntryPoint,
-      issuer: formData.samlIssuer,
-      cert: formData.samlCert,
-      attrMapId: formData.samlAttrMapId,
-      attrMapUsername: formData.samlAttrMapUsername,
-      attrMapMail: formData.samlAttrMapMail,
-      attrMapFirstName: formData.samlAttrMapFirstName,
-      attrMapLastName: formData.samlAttrMapLastName,
-      isSameUsernameTreatedAsIdenticalUser: formData.isSameUsernameTreatedAsIdenticalUser,
-      isSameEmailTreatedAsIdenticalUser: formData.isSameEmailTreatedAsIdenticalUser,
-      ABLCRule: formData.samlABLCRule,
-    } : {
-      entryPoint: this.state.samlEntryPoint,
-      issuer: this.state.samlIssuer,
-      cert: this.state.samlCert,
-      attrMapId: this.state.samlAttrMapId,
-      attrMapUsername: this.state.samlAttrMapUsername,
-      attrMapMail: this.state.samlAttrMapMail,
-      attrMapFirstName: this.state.samlAttrMapFirstName,
-      attrMapLastName: this.state.samlAttrMapLastName,
-      isSameUsernameTreatedAsIdenticalUser: this.state.isSameUsernameTreatedAsIdenticalUser,
-      isSameEmailTreatedAsIdenticalUser: this.state.isSameEmailTreatedAsIdenticalUser,
-      ABLCRule: this.state.samlABLCRule,
-    };
+    let requestParams =
+      formData != null
+        ? {
+            entryPoint: formData.samlEntryPoint,
+            issuer: formData.samlIssuer,
+            cert: formData.samlCert,
+            attrMapId: formData.samlAttrMapId,
+            attrMapUsername: formData.samlAttrMapUsername,
+            attrMapMail: formData.samlAttrMapMail,
+            attrMapFirstName: formData.samlAttrMapFirstName,
+            attrMapLastName: formData.samlAttrMapLastName,
+            isSameUsernameTreatedAsIdenticalUser:
+              formData.isSameUsernameTreatedAsIdenticalUser,
+            isSameEmailTreatedAsIdenticalUser:
+              formData.isSameEmailTreatedAsIdenticalUser,
+            ABLCRule: formData.samlABLCRule,
+          }
+        : {
+            entryPoint: this.state.samlEntryPoint,
+            issuer: this.state.samlIssuer,
+            cert: this.state.samlCert,
+            attrMapId: this.state.samlAttrMapId,
+            attrMapUsername: this.state.samlAttrMapUsername,
+            attrMapMail: this.state.samlAttrMapMail,
+            attrMapFirstName: this.state.samlAttrMapFirstName,
+            attrMapLastName: this.state.samlAttrMapLastName,
+            isSameUsernameTreatedAsIdenticalUser:
+              this.state.isSameUsernameTreatedAsIdenticalUser,
+            isSameEmailTreatedAsIdenticalUser:
+              this.state.isSameEmailTreatedAsIdenticalUser,
+            ABLCRule: this.state.samlABLCRule,
+          };
 
     requestParams = await removeNullPropertyFromObject(requestParams);
     const response = await apiv3Put('/security-setting/saml', requestParams);
     const { securitySettingParams } = response.data;
 
     this.setState({
-      missingMandatoryConfigKeys: securitySettingParams.missingMandatoryConfigKeys,
+      missingMandatoryConfigKeys:
+        securitySettingParams.missingMandatoryConfigKeys,
       samlEntryPoint: securitySettingParams.samlEntryPoint,
       samlIssuer: securitySettingParams.samlIssuer,
       samlCert: securitySettingParams.samlCert,
@@ -157,11 +169,12 @@ export default class AdminSamlSecurityContainer extends Container {
       samlAttrMapMail: securitySettingParams.samlAttrMapMail,
       samlAttrMapFirstName: securitySettingParams.samlAttrMapFirstName,
       samlAttrMapLastName: securitySettingParams.samlAttrMapLastName,
-      isSameUsernameTreatedAsIdenticalUser: securitySettingParams.isSameUsernameTreatedAsIdenticalUser,
-      isSameEmailTreatedAsIdenticalUser: securitySettingParams.isSameEmailTreatedAsIdenticalUser,
+      isSameUsernameTreatedAsIdenticalUser:
+        securitySettingParams.isSameUsernameTreatedAsIdenticalUser,
+      isSameEmailTreatedAsIdenticalUser:
+        securitySettingParams.isSameEmailTreatedAsIdenticalUser,
       samlABLCRule: securitySettingParams.samlABLCRule,
     });
     return response;
   }
-
 }

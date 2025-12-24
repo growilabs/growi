@@ -3,7 +3,7 @@ import path from 'path';
 import { format as dateFnsFormat } from 'date-fns/format';
 import mustache from 'mustache';
 
-import { useCurrentPagePath } from '~/stores/page';
+import { useCurrentPagePath } from '~/states/page';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:components:TemplateModal:use-formatter');
@@ -15,7 +15,7 @@ type FormatterData = {
 }
 
 export const useFormatter = (): FormatterData => {
-  const { data: currentPagePath } = useCurrentPagePath();
+  const currentPagePath = useCurrentPagePath();
 
   const format: FormatMethod = (markdown) => {
     if (markdown == null) {
