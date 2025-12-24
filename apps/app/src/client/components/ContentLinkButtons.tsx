@@ -1,6 +1,5 @@
 import React, { type JSX } from 'react';
-
-import { USER_STATUS, type IUserHasId } from '@growi/core';
+import { type IUserHasId, USER_STATUS } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 import { Link as ScrollLink } from 'react-scroll';
 
@@ -38,12 +37,13 @@ const RecentlyCreatedLinkButton = React.memo(() => {
 
 RecentlyCreatedLinkButton.displayName = 'RecentlyCreatedLinkButton';
 
-
 export type ContentLinkButtonsProps = {
-  author?: IUserHasId,
-}
+  author?: IUserHasId;
+};
 
-export const ContentLinkButtons = (props: ContentLinkButtonsProps): JSX.Element => {
+export const ContentLinkButtons = (
+  props: ContentLinkButtonsProps,
+): JSX.Element => {
   const { author } = props;
 
   if (author == null || author.status === USER_STATUS.DELETED) {
