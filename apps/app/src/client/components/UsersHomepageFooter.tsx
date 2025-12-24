@@ -47,11 +47,11 @@ export const UsersHomepageFooter = (props: UsersHomepageFooterProps): JSX.Elemen
           <RecentCreated userId={creatorId} />
         </div>
 
-        <h2 id="user-created-list" className="grw-user-page-header border-bottom pb-2 mb-3 d-flex">
-          <span className="growi-custom-icons me-1">recently_created</span>
+        <h2 id="recent-activity-list" className="grw-user-page-header border-bottom pb-2 mb-3 d-flex">
+          <span className="material-symbols-outlined me-1 fs-1">update</span>
           {t('user_home_page.recent_activity')}
         </h2>
-        <div id="user-created-list" className={`page-list ${styles['page-list']}`}>
+        <div id="recent-activity-list" className={`page-list ${styles['page-list']}`}>
           <RecentActivity userId={creatorId} />
         </div>
       </div>
