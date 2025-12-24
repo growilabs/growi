@@ -4,15 +4,17 @@
 
 // == Sizes
 .grw-primary-items :global {
-  .badge :global {
-    left: 26px;
-    font-size: 8px;
-  }
+
   .btn {
     @extend %btn-basis;
 
     width: 40px;
     height: 40px;
+  }
+
+  .badge :global {
+    left: 26px;
+    font-size: 8px;
   }
 }
 
@@ -20,6 +22,7 @@
 .grw-primary-items :global {
   .btn.btn-primary {
     @extend %btn-primary-color-vars;
+    --bs-btn-active-color: var(--grw-primary-500);
   }
 }
 
@@ -27,7 +30,8 @@
   .grw-primary-items :global {
     .btn-primary {
       --bs-btn-color: var(--grw-sidebar-nav-btn-color, var(--grw-primary-600));
-      --bs-btn-hover-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-300));
+      --bs-btn-hover-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-200));
+      --bs-btn-active-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-200));
     }
   }
 }
@@ -36,7 +40,8 @@
   .grw-primary-items :global {
     .btn-primary {
       --bs-btn-color: var(--grw-sidebar-nav-btn-color, var(--grw-primary-300));
-      --bs-btn-hover-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-700));
+      --bs-btn-hover-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-900));
+      --bs-btn-active-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-900));
     }
   }
 }
