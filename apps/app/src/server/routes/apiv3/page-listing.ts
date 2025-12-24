@@ -149,14 +149,9 @@ const routerFactory = (crowi: Crowi): Router => {
       const hideRestrictedByGroup = await configManager.getConfig('security:list-policy:hideRestrictedByGroup');
 
       try {
-        let pages = await pageListingService.findChildrenByParentPathOrIdAndViewer(
-          (id || path) as string, req.user, !hideRestrictedByOwner, !hideRestrictedByGroup,
+        const pages = await pageListingService.findChildrenByParentPathOrIdAndViewer(
+          (id || path) as string, req.user, !hideRestrictedByOwner, !hideRestrictedByGroup, hideUserPages === true,
         );
-
-        if (hideUserPages === true) {
-          const isUserPagePath = /^\/user(\/|$)/;
-          pages = pages.filter(page => !isUserPagePath.test(page.path));
-        }
 
         return res.apiv3({ children: pages });
       }
