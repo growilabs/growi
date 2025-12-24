@@ -4,11 +4,11 @@ import React, {
   useMemo,
 } from 'react';
 
-import { GlobalCodeMirrorEditorKey } from '@growi/editor';
+import { GlobalCodeMirrorEditorKey, useSetResolvedTheme } from '@growi/editor';
 import { CodeMirrorEditorComment } from '@growi/editor/dist/client/components/CodeMirrorEditorComment';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
-import { useResolvedThemeForEditor } from '@growi/editor/dist/client/stores/use-resolved-theme';
 import { UserPicture } from '@growi/ui/dist/components';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import dynamic from 'next/dynamic';
 import {
@@ -18,16 +18,14 @@ import {
 
 import { uploadAttachments } from '~/client/services/upload-attachments';
 import { toastError } from '~/client/util/toastr';
-import {
-  useCurrentUser, useIsSlackConfigured, useAcceptedUploadFileType,
-} from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
+import { useCurrentPagePath } from '~/states/page';
+import { isSlackConfiguredAtom, useAcceptedUploadFileType } from '~/states/server-configurations';
+import { useIsSlackEnabled } from '~/states/ui/editor';
+import { useCommentEditorsDirtyMap } from '~/states/ui/unsaved-warning';
 import { useNextThemes } from '~/stores-universal/use-next-themes';
 import { useSWRxPageComment } from '~/stores/comment';
-import {
-  useSWRxSlackChannels, useIsSlackEnabled, useIsEnabledUnsavedWarning, useEditorSettings,
-} from '~/stores/editor';
-import { useCurrentPagePath } from '~/stores/page';
-import { useCommentEditorDirtyMap } from '~/stores/ui';
+import { useSWRxSlackChannels, useEditorSettings } from '~/stores/editor';
 import loggerFactory from '~/utils/logger';
 
 import { NotAvailableForGuest } from '../NotAvailableForGuest';
@@ -77,22 +75,21 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
     currentCommentId, commentBody, onCanceled, onCommented,
   } = props;
 
-  const { data: currentUser } = useCurrentUser();
-  const { data: currentPagePath } = useCurrentPagePath();
+  const currentUser = useCurrentUser();
+  const currentPagePath = useCurrentPagePath();
   const { update: updateComment, post: postComment } = useSWRxPageComment(pageId);
-  const { data: isSlackEnabled, mutate: mutateIsSlackEnabled } = useIsSlackEnabled();
-  const { data: acceptedUploadFileType } = useAcceptedUploadFileType();
+  const [isSlackEnabled, setIsSlackEnabled] = useIsSlackEnabled();
+  const acceptedUploadFileType = useAcceptedUploadFileType();
   const { data: slackChannelsData } = useSWRxSlackChannels(currentPagePath);
-  const { data: isSlackConfigured } = useIsSlackConfigured();
+  const isSlackConfigured = useAtomValue(isSlackConfiguredAtom);
   const { data: editorSettings } = useEditorSettings();
-  const { mutate: mutateIsEnabledUnsavedWarning } = useIsEnabledUnsavedWarning();
-  const {
-    evaluate: evaluateEditorDirtyMap,
-    clean: cleanEditorDirtyMap,
-  } = useCommentEditorDirtyMap();
-  const { mutate: mutateResolvedTheme } = useResolvedThemeForEditor();
+  const { markDirty, markClean } = useCommentEditorsDirtyMap();
+
+  const setResolvedTheme = useSetResolvedTheme();
   const { resolvedTheme } = useNextThemes();
-  mutateResolvedTheme({ themeData: resolvedTheme });
+  useEffect(() => {
+    setResolvedTheme(resolvedTheme);
+  }, [resolvedTheme, setResolvedTheme]);
 
   const editorKey = useMemo(() => {
     if (replyTo != null) {
@@ -120,38 +117,37 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
   const slackChannelsDataString = slackChannelsData?.toString();
   const initializeSlackEnabled = useCallback(() => {
     setSlackChannels(slackChannelsDataString ?? '');
-    mutateIsSlackEnabled(false);
-  }, [mutateIsSlackEnabled, slackChannelsDataString]);
+    setIsSlackEnabled(false);
+  }, [setIsSlackEnabled, slackChannelsDataString]);
 
   useEffect(() => {
     initializeSlackEnabled();
   }, [initializeSlackEnabled]);
 
   const isSlackEnabledToggleHandler = (isSlackEnabled: boolean) => {
-    mutateIsSlackEnabled(isSlackEnabled, false);
+    setIsSlackEnabled(isSlackEnabled);
   };
 
   const slackChannelsChangedHandler = useCallback((slackChannels: string) => {
     setSlackChannels(slackChannels);
   }, []);
 
-  const initializeEditor = useCallback(async() => {
-    const dirtyNum = await cleanEditorDirtyMap(editorKey);
-    mutateIsEnabledUnsavedWarning(dirtyNum > 0);
+  const initializeEditor = useCallback(() => {
+    markClean(editorKey);
 
     setShowPreview(false);
     setError(undefined);
 
     initializeSlackEnabled();
 
-  }, [editorKey, cleanEditorDirtyMap, mutateIsEnabledUnsavedWarning, initializeSlackEnabled]);
+  }, [editorKey, markClean, initializeSlackEnabled]);
 
   const cancelButtonClickedHandler = useCallback(() => {
     initializeEditor();
     onCanceled?.();
   }, [onCanceled, initializeEditor]);
 
-  const postCommentHandler = useCallback(async() => {
+  const postCommentHandler = useCallback(async () => {
     const commentBodyToPost = codeMirrorEditor?.getDocString() ?? '';
 
     try {
@@ -209,11 +205,10 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
   }, [codeMirrorEditor, pageId]);
 
   const cmProps = useMemo(() => ({
-    onChange: async(value: string) => {
-      const dirtyNum = await evaluateEditorDirtyMap(editorKey, value);
-      mutateIsEnabledUnsavedWarning(dirtyNum > 0);
+    onChange: (value: string) => {
+      markDirty(editorKey, value);
     },
-  }), [editorKey, evaluateEditorDirtyMap, mutateIsEnabledUnsavedWarning]);
+  }), [editorKey, markDirty]);
 
 
   // initialize CodeMirrorEditor
@@ -321,10 +316,12 @@ export const CommentEditorPre = (props: CommentEditorProps): JSX.Element => {
 
   const { onCommented, onCanceled, ...rest } = props;
 
-  const { data: currentUser } = useCurrentUser();
-  const { mutate: mutateResolvedTheme } = useResolvedThemeForEditor();
+  const currentUser = useCurrentUser();
+  const setResolvedTheme = useSetResolvedTheme();
   const { resolvedTheme } = useNextThemes();
-  mutateResolvedTheme({ themeData: resolvedTheme });
+  useEffect(() => {
+    setResolvedTheme(resolvedTheme);
+  }, [resolvedTheme, setResolvedTheme]);
 
   const [isReadyToUse, setIsReadyToUse] = useState(false);
 

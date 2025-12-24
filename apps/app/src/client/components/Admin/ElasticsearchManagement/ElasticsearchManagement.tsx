@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
-
 
 import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
 import { toastSuccess, toastError } from '~/client/util/toastr';
+import { useAdminSocket } from '~/features/admin/states/socket-io';
 import { SocketEventName } from '~/interfaces/websocket';
-import { useIsSearchServiceReachable } from '~/stores-universal/context';
-import { useAdminSocket } from '~/stores/socket-io';
+import { isSearchServiceReachableAtom } from '~/states/server-configurations';
 
 import NormalizeIndicesControls from './NormalizeIndicesControls';
 import RebuildIndexControls from './RebuildIndexControls';
@@ -16,8 +16,9 @@ import StatusTable from './StatusTable';
 
 const ElasticsearchManagement = (): JSX.Element => {
   const { t } = useTranslation('admin');
-  const { data: isSearchServiceReachable } = useIsSearchServiceReachable();
-  const { data: socket } = useAdminSocket();
+  // Get search service reachable flag from atom
+  const isSearchServiceReachable = useAtomValue(isSearchServiceReachableAtom);
+  const socket = useAdminSocket();
 
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -77,7 +78,7 @@ const ElasticsearchManagement = (): JSX.Element => {
     if (socket == null) {
       return;
     }
-    socket.on(SocketEventName.AddPageProgress, (data) => {
+    socket.on(SocketEventName.AddPageProgress, () => {
       setIsRebuildingProcessing(true);
     });
 

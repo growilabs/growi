@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import { useAppTitle } from '~/stores-universal/context';
+import { useAppTitle } from '~/states/global';
 
 import { CustomBotWithoutProxyConnectionStatus } from './CustomBotWithoutProxyConnectionStatus';
 import CustomBotWithoutProxySettingsAccordion, { botInstallationStep } from './CustomBotWithoutProxySettingsAccordion';
@@ -11,7 +11,7 @@ import CustomBotWithoutProxySettingsAccordion, { botInstallationStep } from './C
 const CustomBotWithoutProxySettings = (props) => {
   const { connectionStatuses } = props;
   const { t } = useTranslation();
-  const { data: appTitle } = useAppTitle();
+  const appTitle = useAppTitle();
   const [siteName, setSiteName] = useState('');
 
   useEffect(() => {

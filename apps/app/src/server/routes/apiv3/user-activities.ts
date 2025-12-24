@@ -3,7 +3,7 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
-import type { PipelineStage, PaginateResult } from 'mongoose';
+import type { PaginateResult, PipelineStage } from 'mongoose';
 import { Types } from 'mongoose';
 
 import type { IActivity } from '~/interfaces/activity';
@@ -12,22 +12,32 @@ import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
-
 import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
 
 const validator = {
   list: [
-    query('limit').optional().isInt({ max: 100 }).withMessage('limit must be a number less than or equal to 100')
+    query('limit')
+      .optional()
+      .isInt({ max: 100 })
+      .withMessage('limit must be a number less than or equal to 100')
       .toInt(),
-    query('offset').optional().isInt().withMessage('page must be a number')
+    query('offset')
+      .optional()
+      .isInt()
+      .withMessage('page must be a number')
       .toInt(),
-    query('searchFilter').optional().isString().withMessage('query must be a string'),
-    query('targetUserId').optional().isMongoId().withMessage('user ID must be a MongoDB ID'),
+    query('searchFilter')
+      .optional()
+      .isString()
+      .withMessage('query must be a string'),
+    query('targetUserId')
+      .optional()
+      .isMongoId()
+      .withMessage('user ID must be a MongoDB ID'),
   ],
 };
 
@@ -41,16 +51,15 @@ interface StrictActivityQuery {
 type CustomRequest<
   TQuery = Request['query'],
   TBody = any,
-  TParams = any
+  TParams = any,
 > = Omit<Request<TParams, any, TBody, TQuery>, 'query'> & {
-    query: TQuery & Request['query'];
-    user?: IUserHasId;
+  query: TQuery & Request['query'];
+  user?: IUserHasId;
 };
 
 type AuthorizedRequest = CustomRequest<StrictActivityQuery>;
 
 type ActivityPaginationResult = PaginateResult<IActivity>;
-
 
 /**
  * @swagger
@@ -134,7 +143,9 @@ type ActivityPaginationResult = PaginateResult<IActivity>;
  */
 
 module.exports = (crowi: Crowi): Router => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(crowi);
+  const loginRequiredStrictly = require('../../middlewares/login-required')(
+    crowi,
+  );
 
   const router = express.Router();
 
@@ -173,10 +184,15 @@ module.exports = (crowi: Crowi): Router => {
    *             schema:
    *               $ref: '#/components/schemas/ActivityResponse'
    */
-  router.get('/',
-    loginRequiredStrictly, validator.list, apiV3FormValidator, async(req: AuthorizedRequest, res: ApiV3Response) => {
-
-      const defaultLimit = configManager.getConfig('customize:showPageLimitationS');
+  router.get(
+    '/',
+    loginRequiredStrictly,
+    validator.list,
+    apiV3FormValidator,
+    async (req: AuthorizedRequest, res: ApiV3Response) => {
+      const defaultLimit = configManager.getConfig(
+        'customize:showPageLimitationS',
+      );
 
       const limit = req.query.limit || defaultLimit || 10;
       const offset = req.query.offset || 0;
@@ -187,9 +203,11 @@ module.exports = (crowi: Crowi): Router => {
       }
 
       if (!targetUserId) {
-        return res.apiv3Err('Target user ID is missing and authenticated user ID is unavailable.', 400);
+        return res.apiv3Err(
+          'Target user ID is missing and authenticated user ID is unavailable.',
+          400,
+        );
       }
-
 
       try {
         const userObjectId = new Types.ObjectId(targetUserId);
@@ -203,9 +221,7 @@ module.exports = (crowi: Crowi): Router => {
           },
           {
             $facet: {
-              totalCount: [
-                { $count: 'count' },
-              ],
+              totalCount: [{ $count: 'count' }],
               docs: [
                 { $sort: { createdAt: -1 } },
                 { $skip: offset },
@@ -256,7 +272,8 @@ module.exports = (crowi: Crowi): Router => {
           },
         ];
 
-        const [activityResults] = await Activity.aggregate(userActivityPipeline);
+        const [activityResults] =
+          await Activity.aggregate(userActivityPipeline);
 
         const serializedResults = activityResults.docs.map((doc: IActivity) => {
           const { user, ...rest } = doc;
@@ -266,7 +283,10 @@ module.exports = (crowi: Crowi): Router => {
           };
         });
 
-        const totalDocs = activityResults.totalCount.length > 0 ? activityResults.totalCount[0].count : 0;
+        const totalDocs =
+          activityResults.totalCount.length > 0
+            ? activityResults.totalCount[0].count
+            : 0;
         const totalPages = Math.ceil(totalDocs / limit);
         const page = Math.floor(offset / limit) + 1;
 
@@ -289,12 +309,12 @@ module.exports = (crowi: Crowi): Router => {
         };
 
         return res.apiv3({ serializedPaginationResult });
-      }
-      catch (err) {
+      } catch (err) {
         logger.error('Failed to get paginated activity', err);
         return res.apiv3Err(err, 500);
       }
-    });
+    },
+  );
 
   return router;
 };

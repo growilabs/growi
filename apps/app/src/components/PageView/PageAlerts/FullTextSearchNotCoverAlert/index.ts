@@ -1,0 +1,1 @@
+export { FullTextSearchNotCoverAlertLazyLoaded } from './dynamic';

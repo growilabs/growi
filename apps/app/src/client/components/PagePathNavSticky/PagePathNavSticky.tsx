@@ -8,9 +8,8 @@ import Sticky from 'react-stickynode';
 
 import { usePrintMode } from '~/client/services/use-print-mode';
 import LinkedPagePath from '~/models/linked-page-path';
-import {
-  usePageControlsX, useCurrentProductNavWidth, useSidebarMode,
-} from '~/stores/ui';
+import { usePageControlsX } from '~/states/ui/page';
+import { useSidebarMode, useCurrentProductNavWidth } from '~/states/ui/sidebar';
 
 import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink';
 import type { PagePathNavLayoutProps } from '../../../components/Common/PagePathNav';
@@ -30,9 +29,9 @@ export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element =>
 
   const isPrinting = usePrintMode();
 
-  const { data: pageControlsX } = usePageControlsX();
-  const { data: sidebarWidth } = useCurrentProductNavWidth();
-  const { data: sidebarMode } = useSidebarMode();
+  const pageControlsX = usePageControlsX();
+  const [sidebarWidth] = useCurrentProductNavWidth();
+  const { sidebarMode } = useSidebarMode();
   const pagePathNavRef = useRef<HTMLDivElement>(null);
 
   const [navMaxWidth, setNavMaxWidth] = useState<number | undefined>();

@@ -1,21 +1,16 @@
 import type { JSX } from 'react';
 
-import type { IUserHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError } from '~/client/util/toastr';
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 
 
-type Props = {
-  currentUser: IUserHasId,
-};
-
-export const Maintenance = (props: Props): JSX.Element => {
+export const Maintenance = (): JSX.Element => {
   const { t } = useTranslation();
 
-  useCurrentUser(props.currentUser ?? null);
+  const currentUser = useCurrentUser();
 
   const logoutHandler = async() => {
     try {
@@ -34,14 +29,14 @@ export const Maintenance = (props: Props): JSX.Element => {
       <h3>{ t('maintenance_mode.growi_is_under_maintenance') }</h3>
       <hr />
       <div className="text-start">
-        {props.currentUser?.admin
+        {currentUser?.admin
               && (
                 <p>
                   <span className="material-symbols-outlined">arrow_circle_right</span>
                   <a className="btn btn-link" href="/admin">{ t('maintenance_mode.admin_page') }</a>
                 </p>
               )}
-        {props.currentUser != null
+        {currentUser != null
           ? (
             <p>
               <span className="material-symbols-outlined">arrow_circle_right</span>
