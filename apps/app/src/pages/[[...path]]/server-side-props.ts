@@ -1,10 +1,4 @@
 import type { GetServerSidePropsContext, GetServerSidePropsResult } from 'next';
-import type {
-  IDataWithMeta,
-  IDataWithRequiredMeta,
-  IPageInfoBasic,
-  IPageNotFoundInfo,
-} from '@growi/core';
 import { isIPageNotFoundInfo } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
 
@@ -13,7 +7,6 @@ import {
   type SupportedActionType,
 } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { PageDocument } from '~/server/models/page';
 
 import { getServerSideBasicLayoutProps } from '../basic-layout-page';
 import {
@@ -25,7 +18,6 @@ import {
   getServerSideRendererConfigProps,
 } from '../general-page';
 import { isValidGeneralPageInitialProps } from '../general-page/type-guards';
-import type { IPageToShowRevisionWithMeta } from '../general-page/types';
 import { addActivity } from '../utils/activity';
 import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
 import { NEXT_JS_ROUTING_PAGE } from './consts';
@@ -65,38 +57,26 @@ function emitPageSeenEvent(
   pageEvent.emit('seen', pageId, user);
 }
 
-function getActivityAction(
-  isIdenticalPathPage: boolean,
-  pageWithMeta?:
-    | IPageToShowRevisionWithMeta
-    | IDataWithRequiredMeta<PageDocument, IPageInfoBasic>
-    | IDataWithMeta<null, IPageNotFoundInfo>
-    | null,
-): SupportedActionType {
-  if (isIdenticalPathPage) {
+function getActivityAction(params: {
+  isIdenticalPathPage: boolean;
+  isForbidden?: boolean;
+  isNotFound?: boolean;
+  path?: string;
+}): SupportedActionType {
+  if (params.isIdenticalPathPage) {
     return SupportedAction.ACTION_PAGE_NOT_CREATABLE;
   }
 
-  const meta = pageWithMeta?.meta;
-  if (isIPageNotFoundInfo(meta)) {
-    if (meta.isForbidden) {
-      return SupportedAction.ACTION_PAGE_FORBIDDEN;
-    }
-
-    if (meta.isNotFound) {
-      return SupportedAction.ACTION_PAGE_NOT_FOUND;
-    }
+  if (params.isForbidden) {
+    return SupportedAction.ACTION_PAGE_FORBIDDEN;
   }
 
-  const pagePath = pageWithMeta?.data?.path;
-  if (pagePath != null) {
-    if (pagePathUtils.isUsersHomepage(pagePath)) {
-      return SupportedAction.ACTION_PAGE_USER_HOME_VIEW;
-    }
+  if (params.isNotFound) {
+    return SupportedAction.ACTION_PAGE_NOT_FOUND;
+  }
 
-    if (!pagePathUtils.isCreatablePage(pagePath)) {
-      return SupportedAction.ACTION_PAGE_NOT_CREATABLE;
-    }
+  if (params.path != null && pagePathUtils.isUsersHomepage(params.path)) {
+    return SupportedAction.ACTION_PAGE_USER_HOME_VIEW;
   }
 
   return SupportedAction.ACTION_PAGE_VIEW;
@@ -155,13 +135,21 @@ export async function getServerSidePropsForInitial(
   emitPageSeenEvent(context, mergedProps.pageWithMeta?.data?._id);
 
   // Persist activity
-  addActivity(
-    context,
-    getActivityAction(
-      mergedProps.isIdenticalPathPage,
-      mergedProps.pageWithMeta,
-    ),
-  );
+  const activityAction = (() => {
+    const meta = mergedProps.pageWithMeta?.meta;
+    if (isIPageNotFoundInfo(meta)) {
+      return getActivityAction({
+        isIdenticalPathPage: mergedProps.isIdenticalPathPage,
+        isForbidden: meta.isForbidden,
+        isNotFound: meta.isNotFound,
+      });
+    }
+    return getActivityAction({
+      isIdenticalPathPage: mergedProps.isIdenticalPathPage,
+      path: mergedProps.pageWithMeta?.data?.path,
+    });
+  })();
+  addActivity(context, activityAction);
 
   return mergedResult;
 }
@@ -183,13 +171,21 @@ export async function getServerSidePropsForSameRoute(
   );
 
   // Persist activity
-  addActivity(
-    context,
-    getActivityAction(
-      pageDataProps.isIdenticalPathPage,
-      internalProps?.pageWithMeta,
-    ),
-  );
+  const activityAction = (() => {
+    const meta = internalProps?.pageWithMeta?.meta;
+    if (isIPageNotFoundInfo(meta)) {
+      return getActivityAction({
+        isIdenticalPathPage: pageDataProps.isIdenticalPathPage,
+        isForbidden: meta.isForbidden,
+        isNotFound: meta.isNotFound,
+      });
+    }
+    return getActivityAction({
+      isIdenticalPathPage: pageDataProps.isIdenticalPathPage,
+      path: internalProps?.pageWithMeta?.data?.path,
+    });
+  })();
+  addActivity(context, activityAction);
 
   const mergedResult = mergeGetServerSidePropsResults(
     { props: pageDataProps },
