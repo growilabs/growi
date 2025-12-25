@@ -4,6 +4,7 @@ import { pathUtils } from '@growi/core/dist/utils';
 import escapeStringRegexp from 'escape-string-regexp';
 import type { Request, Response } from 'express';
 import createError, { isHttpError } from 'http-errors';
+import mongoose from 'mongoose';
 
 import type { LsxApiParams, LsxApiResponseData } from '../../../interfaces/api';
 import { addDepthCondition } from './add-depth-condition';
@@ -66,76 +67,86 @@ interface IListPagesRequest
   user: IUser;
 }
 
-export const listPages = async (
-  req: IListPagesRequest,
-  res: Response,
-): Promise<Response> => {
-  const user = req.user;
+export const listPages = (hideUserPages: boolean) => {
+  return async (req: IListPagesRequest, res: Response): Promise<Response> => {
+    const user = req.user;
 
-  if (req.query.pagePath == null) {
-    return res.status(400).send("the 'pagepath' query must not be null.");
-  }
+    const isAdmin = user?.admin ?? false;
+    const shouldHideUserPages = hideUserPages && !isAdmin;
 
-  const params: LsxApiParams = {
-    pagePath: removeTrailingSlash(req.query.pagePath),
-    offset: req.query?.offset,
-    limit: req.query?.limit,
-    options: req.query?.options ?? {},
-  };
-
-  const { pagePath, offset, limit, options } = params;
-  const builder = await generateBaseQuery(params.pagePath, user);
-
-  // count viewers of `/`
-  let toppageViewersCount: number;
-  try {
-    toppageViewersCount = await getToppageViewersCount();
-  } catch (error) {
-    console.error('Error occurred in getToppageViewersCount:', error);
-    return res.status(500).send('An internal server error occurred.');
-  }
-
-  let query = builder.query;
-  try {
-    // depth
-    if (options?.depth != null) {
-      query = addDepthCondition(
-        query,
-        params.pagePath,
-        OptionParser.parseRange(options.depth),
-      );
-    }
-    // filter
-    if (options?.filter != null) {
-      query = addFilterCondition(query, pagePath, options.filter);
-    }
-    if (options?.except != null) {
-      query = addExceptCondition(query, pagePath, options.except);
+    if (req.query.pagePath == null) {
+      return res.status(400).send("the 'pagepath' query must not be null.");
     }
 
-    // get total num before adding num/sort conditions
-    const total = await query.clone().count();
-
-    // num
-    query = addNumCondition(query, offset, limit);
-    // sort
-    query = addSortCondition(query, options?.sort, options?.reverse);
-
-    const pages = await query.exec();
-    const cursor = (offset ?? 0) + pages.length;
-
-    const responseData: LsxApiResponseData = {
-      pages,
-      cursor,
-      total,
-      toppageViewersCount,
+    const params: LsxApiParams = {
+      pagePath: removeTrailingSlash(req.query.pagePath),
+      offset: req.query?.offset,
+      limit: req.query?.limit,
+      options: req.query?.options ?? {},
     };
-    return res.status(200).send(responseData);
-  } catch (error) {
-    console.error('Error occurred while processing listPages request:', error);
-    if (isHttpError(error)) {
-      return res.status(error.status).send(error.message);
+
+    const { pagePath, offset, limit, options } = params;
+    const builder = await generateBaseQuery(params.pagePath, user);
+    let builderQuery = builder.query;
+
+    if (shouldHideUserPages) {
+      builderQuery = builderQuery.and([{ path: { $not: /^\/user(\/|$)/ } }]);
     }
-    return res.status(500).send('An internal server error occurred.');
-  }
+
+    // count viewers of `/`
+    let toppageViewersCount: number;
+    try {
+      toppageViewersCount = await getToppageViewersCount();
+    } catch (error) {
+      console.error('Error occurred in getToppageViewersCount:', error);
+      return res.status(500).send('An internal server error occurred.');
+    }
+
+    let query = builder.query;
+    try {
+      // depth
+      if (options?.depth != null) {
+        query = addDepthCondition(
+          query,
+          params.pagePath,
+          OptionParser.parseRange(options.depth),
+        );
+      }
+      // filter
+      if (options?.filter != null) {
+        query = addFilterCondition(query, pagePath, options.filter);
+      }
+      if (options?.except != null) {
+        query = addExceptCondition(query, pagePath, options.except);
+      }
+
+      // get total num before adding num/sort conditions
+      const total = await query.clone().count();
+
+      // num
+      query = addNumCondition(query, offset, limit);
+      // sort
+      query = addSortCondition(query, options?.sort, options?.reverse);
+
+      const pages = await query.exec();
+      const cursor = (offset ?? 0) + pages.length;
+
+      const responseData: LsxApiResponseData = {
+        pages,
+        cursor,
+        total,
+        toppageViewersCount,
+      };
+      return res.status(200).send(responseData);
+    } catch (error) {
+      console.error(
+        'Error occurred while processing listPages request:',
+        error,
+      );
+      if (isHttpError(error)) {
+        return res.status(error.status).send(error.message);
+      }
+      return res.status(500).send('An internal server error occurred.');
+    }
+  };
 };

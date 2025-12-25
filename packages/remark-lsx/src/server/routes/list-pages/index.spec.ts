@@ -12,6 +12,8 @@ interface IListPagesRequest
   user: IUser;
 }
 
+const defaultHideUserPages = false;
+
 // mocking modules
 const mocks = vi.hoisted(() => {
   return {
@@ -44,7 +46,8 @@ describe('listPages', () => {
     resMock.status.calledWith(400).mockReturnValue(resStatusMock);
 
     // when
-    await listPages(reqMock, resMock);
+    const handler = listPages(defaultHideUserPages);
+    await handler(reqMock, resMock);
 
     // then
     expect(resMock.status).toHaveBeenCalledOnce();
@@ -85,7 +88,8 @@ describe('listPages', () => {
       resMock.status.calledWith(200).mockReturnValue(resStatusMock);
 
       // when
-      await listPages(reqMock, resMock);
+      const handler = listPages(defaultHideUserPages);
+      await handler(reqMock, resMock);
 
       // then
       expect(mocks.generateBaseQueryMock).toHaveBeenCalledOnce();
@@ -118,7 +122,8 @@ describe('listPages', () => {
       resMock.status.calledWith(500).mockReturnValue(resStatusMock);
 
       // when
-      await listPages(reqMock, resMock);
+      const handler = listPages(defaultHideUserPages);
+      await handler(reqMock, resMock);
 
       // then
       expect(mocks.generateBaseQueryMock).toHaveBeenCalledOnce();
@@ -147,7 +152,8 @@ describe('listPages', () => {
       resMock.status.calledWith(400).mockReturnValue(resStatusMock);
 
       // when
-      await listPages(reqMock, resMock);
+      const handler = listPages(defaultHideUserPages);
+      await handler(reqMock, resMock);
 
       // then
       expect(mocks.generateBaseQueryMock).toHaveBeenCalledOnce();

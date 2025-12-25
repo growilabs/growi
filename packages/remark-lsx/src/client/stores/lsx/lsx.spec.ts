@@ -84,6 +84,9 @@ describe('useSWRxLsx integration tests', () => {
     const mockCrowi = {
       require: () => () => (req: any, res: any, next: any) => next(),
       accessTokenParser: () => (req: any, res: any, next: any) => next(),
+      configManager: {
+        getConfig: vi.fn().mockReturnValue(false),
+      },
     };
 
     // Import and setup the LSX middleware
