@@ -1,4 +1,6 @@
-import React, { useCallback, useState, type JSX } from 'react';
+import React, {
+  useCallback, useState, useRef, type JSX,
+} from 'react';
 
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
@@ -29,7 +31,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
   const [isDefaultLogoSelected, setIsDefaultLogoSelected] = useState<boolean>(isDefaultLogo ?? true);
   const [retrieveError, setRetrieveError] = useState<any>();
   const [isImageCropped, setIsImageCropped] = useState<boolean>(false);
-  const [fileInputKey, setFileInputKey] = useState<string>(Date.now().toString());
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const onSelectFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -55,8 +57,10 @@ const CustomizeLogoSetting = (): JSX.Element => {
     }
   }, [t, isDefaultLogoSelected]);
 
-  const resetFileInput = useCallback(() => {
-    setFileInputKey(Date.now().toString());
+  const clearFileInput = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   }, []);
 
   const onClickDeleteBtn = useCallback(async () => {
@@ -67,14 +71,14 @@ const CustomizeLogoSetting = (): JSX.Element => {
       setUploadLogoSrc(null);
       setIsImageCropped(false);
       setIsImageCropModalShow(false);
-      resetFileInput();
+      clearFileInput();
     }
     catch (err) {
       toastError(err);
       setRetrieveError(err);
       throw new Error('Failed to delete logo');
     }
-  }, [setIsCustomizedLogoUploaded, t, setUploadLogoSrc, setIsImageCropped, setIsImageCropModalShow, resetFileInput, setRetrieveError]);
+  }, [setIsCustomizedLogoUploaded, t, setUploadLogoSrc, setIsImageCropped, setIsImageCropModalShow, clearFileInput, setRetrieveError]);
 
   const processImageCompletedHandler = useCallback(async (croppedImage) => {
     try {
@@ -161,7 +165,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
                   <div className="col-sm-8 col-12">
                     <input
                       type="file"
-                      key={fileInputKey}
+                      ref={fileInputRef}
                       onChange={onSelectFile}
                       name="brandLogo"
                       accept="image/*"
@@ -184,7 +188,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
         src={uploadLogoSrc}
         onModalClose={() => {
           if (!isImageCropped) {
-            resetFileInput();
+            clearFileInput();
             setUploadLogoSrc(null);
           }
           setIsImageCropModalShow(false);
