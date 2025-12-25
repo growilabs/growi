@@ -35,12 +35,14 @@ const AppSetting = (props) => {
       globalLang: adminAppContainer.state.globalLang || 'en-US',
       // Convert boolean to string for radio button value
       isEmailPublishedForNewUser: String(adminAppContainer.state.isEmailPublishedForNewUser ?? true),
+      isReadOnlyForNewUser: adminAppContainer.state.isReadOnlyForNewUser ?? false,
     });
   }, [
     adminAppContainer.state.title,
     adminAppContainer.state.confidential,
     adminAppContainer.state.globalLang,
     adminAppContainer.state.isEmailPublishedForNewUser,
+    adminAppContainer.state.isReadOnlyForNewUser,
     reset,
   ]);
 
@@ -55,6 +57,7 @@ const AppSetting = (props) => {
       // Convert string 'true'/'false' to boolean
       const isEmailPublished = data.isEmailPublishedForNewUser === 'true' || data.isEmailPublishedForNewUser === true;
       await adminAppContainer.changeIsEmailPublishedForNewUserShow(isEmailPublished);
+      await adminAppContainer.changeIsReadOnlyForNewUserShow(data.isReadOnlyForNewUser);
 
       await adminAppContainer.updateAppSettingHandler();
       toastSuccess(t('commons:toaster.update_successed', { target: t('commons:headers.app_settings') }));
@@ -157,6 +160,26 @@ const AppSetting = (props) => {
             <label className="form-label form-check-label" htmlFor="radio-email-hide">{t('commons:Hide')}</label>
           </div>
 
+        </div>
+      </div>
+
+      <div className="row mb-5">
+        <label
+          className="text-start text-md-end col-md-3 col-form-label"
+        >
+          {t('admin:app_setting.default_read_only_for_new_user')}
+        </label>
+        <div className="col-md-6 py-2">
+
+          <div className="form-check form-check-inline">
+            <input
+              type="checkbox"
+              id="checkbox-read-only-for-new-user"
+              className="form-check-input"
+              {...register('isReadOnlyForNewUser')}
+            />
+            <label className="form-label form-check-label" htmlFor="checkbox-read-only-for-new-user">{t('admin:app_setting.set_read_only_for_new_user')}</label>
+          </div>
         </div>
       </div>
 

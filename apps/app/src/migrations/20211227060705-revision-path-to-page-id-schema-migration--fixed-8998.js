@@ -13,11 +13,14 @@ import {
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
-  'growi:migrate:revision-path-to-page-id-schema-migration--fixed-7549',
+  'growi:migrate:revision-path-to-page-id-schema-migration--fixed-8998',
 );
 
 const LIMIT = 300;
 
+/**
+ * @see https://dev.growi.org/69301054963f68dfcf2b7111
+ */
 module.exports = {
   // path => pageId
   async up(db, client) {

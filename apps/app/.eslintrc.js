@@ -45,6 +45,7 @@ module.exports = {
     'src/client/components/Hotkeys/**',
     'src/client/components/Navbar/**',
     'src/client/components/PageHeader/**',
+    'src/client/components/Sidebar/**',
     'src/services/**',
     'src/states/**',
     'src/stores/**',
