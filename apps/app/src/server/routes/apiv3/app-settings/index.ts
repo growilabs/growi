@@ -400,6 +400,9 @@ module.exports = (crowi) => {
         isEmailPublishedForNewUser: configManager.getConfig(
           'customize:isEmailPublishedForNewUser',
         ),
+        isReadOnlyForNewUser: configManager.getConfig(
+          'app:isReadOnlyForNewUser',
+        ),
         useOnlyEnvVarsForIsBulkExportPagesEnabled: configManager.getConfig(
           'env:useOnlyEnvVars:app:isBulkExportPagesEnabled',
         ),
@@ -562,6 +565,7 @@ module.exports = (crowi) => {
         'app:globalLang': req.body.globalLang,
         'customize:isEmailPublishedForNewUser':
           req.body.isEmailPublishedForNewUser,
+        'app:isReadOnlyForNewUser': req.body.isReadOnlyForNewUser,
       };
 
       try {
@@ -572,6 +576,9 @@ module.exports = (crowi) => {
           globalLang: configManager.getConfig('app:globalLang'),
           isEmailPublishedForNewUser: configManager.getConfig(
             'customize:isEmailPublishedForNewUser',
+          ),
+          isReadOnlyForNewUser: configManager.getConfig(
+            'app:isReadOnlyForNewUser',
           ),
         };
 

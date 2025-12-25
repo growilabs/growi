@@ -66,7 +66,6 @@
       "!apps/app/src/client/components/RecentCreated",
       "!apps/app/src/client/components/RevisionComparer",
       "!apps/app/src/client/components/ShortcutsModal",
-      "!apps/app/src/client/components/Sidebar",
       "!apps/app/src/client/components/StaffCredit",
       "!apps/app/src/client/components/TemplateModal"
     ]

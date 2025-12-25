@@ -46,6 +46,7 @@ module.exports = {
     'src/client/components/PageComment/**',
     'src/client/components/PageAccessoriesModal/**',
     'src/client/components/Icons/**',
+    'src/client/components/Sidebar/**',
     'src/services/**',
     'src/states/**',
     'src/stores/**',

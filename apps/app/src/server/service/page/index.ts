@@ -617,14 +617,26 @@ class PageService implements IPageService {
     const userRelatedGroups =
       await this.pageGrantService.getUserRelatedGroups(user);
 
-    const isDeletable = this.canDelete(page, creatorId, user, false);
-    const isAbleToDeleteCompletely = this.canDeleteCompletely(
-      page,
-      creatorId,
-      user,
-      false,
-      userRelatedGroups,
-    ); // use normal delete config
+    const canDeleteUserHomepage = await (async () => {
+      // Not a user homepage
+      if (!pagePathUtils.isUsersHomepage(page.path)) {
+        return true;
+      }
+
+      if (!this.canDeleteUserHomepageByConfig()) {
+        return false;
+      }
+
+      return await this.isUsersHomepageOwnerAbsent(page.path);
+    })();
+
+    const isDeletable =
+      canDeleteUserHomepage && this.canDelete(page, creatorId, user, false);
+
+    const isAbleToDeleteCompletely =
+      canDeleteUserHomepage &&
+      this.canDeleteCompletely(page, creatorId, user, false, userRelatedGroups); // use normal delete config
+
     const isBookmarked: boolean = isGuestUser
       ? false
       : (await Bookmark.findByPageIdAndUserId(pageId, user._id)) != null;
