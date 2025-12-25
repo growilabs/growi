@@ -876,9 +876,8 @@ schema.statics.findRecentUpdatedPages = async function (
 
   const isAdmin = user?.admin ?? false;
 
-  // REMINDER: Change to addConditionToListByNotMatchPathAndChildren
   if (options.hideUserPages && !isAdmin) {
-    queryBuilder.addConditionToListByNotMatch('/user');
+    queryBuilder.addConditionToListByNotMatchPathAndChildren('/user');
   }
 
   if (!options.includeTrashed) {
