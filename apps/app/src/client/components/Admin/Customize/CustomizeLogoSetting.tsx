@@ -28,15 +28,22 @@ const CustomizeLogoSetting = (): JSX.Element => {
   const [isImageCropModalShow, setIsImageCropModalShow] = useState<boolean>(false);
   const [isDefaultLogoSelected, setIsDefaultLogoSelected] = useState<boolean>(isDefaultLogo ?? true);
   const [retrieveError, setRetrieveError] = useState<any>();
+  const [isImageCropped, setIsImageCropped] = useState<boolean>(false);
+  const [fileInputKey, setFileInputKey] = useState<string>(Date.now().toString());
 
   const onSelectFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files != null && e.target.files.length > 0) {
+    const files = e.target.files;
+    const hasFile = files != null && files.length > 0;
+
+    setIsImageCropped(false);
+
+    if (hasFile) {
       const reader = new FileReader();
       reader.addEventListener('load', () => setUploadLogoSrc(reader.result));
-      reader.readAsDataURL(e.target.files[0]);
+      reader.readAsDataURL(files[0]);
       setIsImageCropModalShow(true);
     }
-  }, []);
+  }, [setUploadLogoSrc, setIsImageCropModalShow, setIsImageCropped]);
 
   const onClickSubmit = useCallback(async () => {
     try {
@@ -48,25 +55,34 @@ const CustomizeLogoSetting = (): JSX.Element => {
     }
   }, [t, isDefaultLogoSelected]);
 
+  const resetFileInput = useCallback(() => {
+    setFileInputKey(Date.now().toString());
+  }, []);
+
   const onClickDeleteBtn = useCallback(async () => {
     try {
       await apiv3Delete('/customize-setting/delete-brand-logo');
       setIsCustomizedLogoUploaded(false);
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.current_logo'), ns: 'commons' }));
+      setUploadLogoSrc(null);
+      setIsImageCropped(false);
+      setIsImageCropModalShow(false);
+      resetFileInput();
     }
     catch (err) {
       toastError(err);
       setRetrieveError(err);
       throw new Error('Failed to delete logo');
     }
-  }, [setIsCustomizedLogoUploaded, t]);
-
+  }, [setIsCustomizedLogoUploaded, t, setUploadLogoSrc, setIsImageCropped, setIsImageCropModalShow, resetFileInput, setRetrieveError]);
 
   const processImageCompletedHandler = useCallback(async (croppedImage) => {
     try {
       const formData = new FormData();
       formData.append('file', croppedImage);
       await apiv3PostForm('/customize-setting/upload-brand-logo', formData);
+      setIsImageCropModalShow(false);
+      setIsImageCropped(true);
       setIsCustomizedLogoUploaded(true);
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.current_logo'), ns: 'commons' }));
     }
@@ -75,7 +91,8 @@ const CustomizeLogoSetting = (): JSX.Element => {
       setRetrieveError(err);
       throw new Error('Failed to upload brand logo');
     }
-  }, [setIsCustomizedLogoUploaded, t]);
+  }, [setIsCustomizedLogoUploaded, t, setIsImageCropped, setIsImageCropModalShow, setRetrieveError]);
+
 
   return (
     <React.Fragment>
@@ -142,12 +159,22 @@ const CustomizeLogoSetting = (): JSX.Element => {
                     {t('admin:customize_settings.upload_new_logo')}
                   </label>
                   <div className="col-sm-8 col-12">
-                    <input type="file" onChange={onSelectFile} name="brandLogo" accept="image/*" />
+                    <input
+                      type="file"
+                      key={fileInputKey}
+                      onChange={onSelectFile}
+                      name="brandLogo"
+                      accept="image/*"
+                    />
                   </div>
                 </div>
               </div>
             </div>
-            <AdminUpdateButtonRow onClick={onClickSubmit} disabled={retrieveError != null} />
+            <AdminUpdateButtonRow
+              onClick={onClickSubmit}
+              disabled={retrieveError != null
+              || (!isDefaultLogoSelected && uploadLogoSrc == null && !isCustomizedLogoUploaded)}
+            />
           </div>
         </div>
       </div>
@@ -155,7 +182,13 @@ const CustomizeLogoSetting = (): JSX.Element => {
       <ImageCropModal
         isShow={isImageCropModalShow}
         src={uploadLogoSrc}
-        onModalClose={() => setIsImageCropModalShow(false)}
+        onModalClose={() => {
+          if (!isImageCropped) {
+            resetFileInput();
+            setUploadLogoSrc(null);
+          }
+          setIsImageCropModalShow(false);
+        }}
         onImageProcessCompleted={processImageCompletedHandler}
         isCircular={false}
         showCropOption={false}
