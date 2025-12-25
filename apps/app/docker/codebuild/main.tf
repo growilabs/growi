@@ -18,6 +18,6 @@ terraform {
 }
 
 provider "aws" {
-  profile = "weseek"
+  profile = "weseek-tf"
   region  = "ap-northeast-1"
 }

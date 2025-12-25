@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 
 import { toastError } from '~/client/util/toastr';
-import type { IActivityHasId, ActivityHasUserId } from '~/interfaces/activity';
+import type { IActivityHasId, ActivityHasTargetPage } from '~/interfaces/activity';
 import { useSWRxRecentActivity } from '~/stores/recent-activity';
 import loggerFactory from '~/utils/logger';
 
@@ -18,15 +18,17 @@ type RecentActivityProps = {
   userId: string,
 }
 
-const hasUser = (activity: IActivityHasId): activity is ActivityHasUserId => {
+const hasTargetPage = (activity: IActivityHasId): activity is ActivityHasTargetPage => {
   return activity.user != null
-        && typeof activity.user === 'object';
+         && typeof activity.user === 'object'
+         && activity.target != null
+         && typeof activity.target === 'object';
 };
 
 export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
   const { userId } = props;
 
-  const [activities, setActivities] = useState<ActivityHasUserId[]>([]);
+  const [activities, setActivities] = useState<ActivityHasTargetPage[]>([]);
   const [activePage, setActivePage] = useState(1);
   const [limit] = useState(10);
   const [offset, setOffset] = useState(0);
@@ -49,7 +51,7 @@ export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
 
     if (paginatedData) {
       const activitiesWithPages = paginatedData.docs
-        .filter(hasUser);
+        .filter(hasTargetPage);
 
       setActivities(activitiesWithPages);
     }
@@ -63,7 +65,7 @@ export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
       <ul className="page-list-ul page-list-ul-flat mb-3">
         {activities.map(activity => (
           <li key={`recent-activity-view:${activity._id}`} className="mt-4">
-            <ActivityListItem activity={activity} />
+            <ActivityListItem props={{ activity }} />
           </li>
         ))}
       </ul>
