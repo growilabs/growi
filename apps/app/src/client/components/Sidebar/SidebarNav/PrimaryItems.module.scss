@@ -29,7 +29,8 @@
 @include bs.color-mode(light) {
   .grw-primary-items :global {
     .btn-primary {
-      --bs-btn-color: var(--grw-sidebar-nav-btn-color, var(--grw-primary-600));
+      --bs-btn-color: var(--grw-sidebar-nav-btn-color, var(--grw-highlight-500));
+      --bs-btn-color-hover: var(--grw-sidebar-nav-btn-hover-color, var(--grw-highlight-700));
       --bs-btn-hover-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-200));
       --bs-btn-active-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-200));
     }
@@ -39,7 +40,8 @@
 @include bs.color-mode(dark) {
   .grw-primary-items :global {
     .btn-primary {
-      --bs-btn-color: var(--grw-sidebar-nav-btn-color, var(--grw-primary-300));
+      --bs-btn-color: var(--grw-sidebar-nav-btn-color, var(--grw-highlight-600));
+      --bs-btn-color-hover: var(--grw-sidebar-nav-btn-hover-color, var(--grw-highlight-400));
       --bs-btn-hover-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-900));
       --bs-btn-active-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-900));
     }
