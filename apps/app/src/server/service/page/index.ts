@@ -419,8 +419,7 @@ class PageService implements IPageService {
       return null;
     }
 
-    // REMINDER: Change to security:isHidingUserPages
-    const hideUserPages = configManager.getConfig('security:user-pages:isHidden');
+    const hideUserPages = configManager.getConfig('security:isHidingUserPages');
 
     if (hideUserPages && page.path && page.path.startsWith('/user/')) {
       const isAdmin = user != null && user.admin;
