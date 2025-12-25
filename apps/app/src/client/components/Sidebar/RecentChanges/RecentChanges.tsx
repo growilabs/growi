@@ -1,16 +1,19 @@
-import { Suspense, useState, type JSX } from 'react';
-
+import { type JSX, Suspense, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
 
 import RecentChangesContentSkeleton from './RecentChangesContentSkeleton';
 
-const RecentChangesHeader = dynamic(() => import('./RecentChangesSubstance').then(mod => mod.RecentChangesHeader), { ssr: false });
+const RecentChangesHeader = dynamic(
+  () =>
+    import('./RecentChangesSubstance').then((mod) => mod.RecentChangesHeader),
+  { ssr: false },
+);
 const RecentChangesContent = dynamic(
-  () => import('./RecentChangesSubstance').then(mod => mod.RecentChangesContent),
+  () =>
+    import('./RecentChangesSubstance').then((mod) => mod.RecentChangesContent),
   { ssr: false, loading: RecentChangesContentSkeleton },
 );
-
 
 export const RecentChanges = (): JSX.Element => {
   const { t } = useTranslation();
@@ -27,13 +30,18 @@ export const RecentChanges = (): JSX.Element => {
             isSmall={isSmall}
             onSizeChange={setIsSmall}
             isWipPageShown={isWipPageShown}
-            onWipPageShownChange={() => { setIsWipPageShown(!isWipPageShown) }}
+            onWipPageShownChange={() => {
+              setIsWipPageShown(!isWipPageShown);
+            }}
           />
         </Suspense>
       </div>
 
       <Suspense fallback={<RecentChangesContentSkeleton />}>
-        <RecentChangesContent isWipPageShown={isWipPageShown} isSmall={isSmall} />
+        <RecentChangesContent
+          isWipPageShown={isWipPageShown}
+          isSmall={isSmall}
+        />
       </Suspense>
     </div>
   );

@@ -1,13 +1,18 @@
 import React, { type JSX } from 'react';
-
-import { USER_STATUS, type IUserHasId } from '@growi/core';
+import { type IUserHasId, USER_STATUS } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 import { Link as ScrollLink } from 'react-scroll';
+
+import {
+  BOOKMARKS_LIST_ID,
+  RECENT_ACTIVITY_LIST_ID,
+  RECENTLY_CREATED_LIST_ID,
+} from './UsersHomepageFooter.consts';
 
 const BookMarkLinkButton = React.memo(() => {
   const { t } = useTranslation();
   return (
-    <ScrollLink to="bookmarks-list" offset={-120}>
+    <ScrollLink to={BOOKMARKS_LIST_ID} offset={-120}>
       <button
         type="button"
         className="btn btn-sm btn-outline-neutral-secondary rounded-pill d-flex align-items-center w-100 px-3"
@@ -24,7 +29,7 @@ BookMarkLinkButton.displayName = 'BookMarkLinkButton';
 const RecentlyCreatedLinkButton = React.memo(() => {
   const { t } = useTranslation();
   return (
-    <ScrollLink to="recently-created-list" offset={-120}>
+    <ScrollLink to={RECENTLY_CREATED_LIST_ID} offset={-120}>
       <button
         type="button"
         className="btn btn-sm btn-outline-neutral-secondary rounded-pill d-flex align-items-center w-100 px-3"
@@ -41,7 +46,7 @@ RecentlyCreatedLinkButton.displayName = 'RecentlyCreatedLinkButton';
 const RecentActivityLinkButton = React.memo(() => {
   const { t } = useTranslation();
   return (
-    <ScrollLink to="recent-activity-list" offset={-120}>
+    <ScrollLink to={RECENT_ACTIVITY_LIST_ID} offset={-120}>
       <button
         type="button"
         className="btn btn-sm btn-outline-neutral-secondary rounded-pill d-flex align-items-center w-100 px-3"
@@ -55,12 +60,13 @@ const RecentActivityLinkButton = React.memo(() => {
 
 RecentActivityLinkButton.displayName = 'RecentActivityLinkButton';
 
-
 export type ContentLinkButtonsProps = {
-  author?: IUserHasId,
-}
+  author?: IUserHasId;
+};
 
-export const ContentLinkButtons = (props: ContentLinkButtonsProps): JSX.Element => {
+export const ContentLinkButtons = (
+  props: ContentLinkButtonsProps,
+): JSX.Element => {
   const { author } = props;
 
   if (author == null || author.status === USER_STATUS.DELETED) {
