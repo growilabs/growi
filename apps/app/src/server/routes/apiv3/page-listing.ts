@@ -143,13 +143,16 @@ const routerFactory = (crowi: Crowi): Router => {
     loginRequired, validator.pageIdOrPathRequired, apiV3FormValidator, async(req: AuthorizedRequest, res: ApiV3Response) => {
       const { id, path } = req.query;
 
+      const hideUserPages = await configManager.getConfig('security:isHidingUserPages');
+
       const hideRestrictedByOwner = await configManager.getConfig('security:list-policy:hideRestrictedByOwner');
       const hideRestrictedByGroup = await configManager.getConfig('security:list-policy:hideRestrictedByGroup');
 
       try {
         const pages = await pageListingService.findChildrenByParentPathOrIdAndViewer(
-          (id || path) as string, req.user, !hideRestrictedByOwner, !hideRestrictedByGroup,
+          (id || path) as string, req.user, !hideRestrictedByOwner, !hideRestrictedByGroup, hideUserPages === true,
         );
+
         return res.apiv3({ children: pages });
       }
       catch (err) {

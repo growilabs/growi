@@ -50,6 +50,7 @@ class PageListingService implements IPageListingService {
       user?: IUser,
       showPagesRestrictedByOwner = false,
       showPagesRestrictedByGroup = false,
+      hideUserPages = false,
   ): Promise<IPageForTreeItem[]> {
     const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>('Page');
     let queryBuilder: PageQueryBuilder;
@@ -63,6 +64,11 @@ class PageListingService implements IPageListingService {
       // Use $eq for user-controlled sources. see: https://codeql.github.com/codeql-query-help/javascript/js-sql-injection/#recommendation
       queryBuilder = new PageQueryBuilder(Page.find({ parent: { $eq: parentId } }), true);
     }
+
+    if (hideUserPages) {
+      queryBuilder.addConditionToListByNotMatchPathAndChildren('/user');
+    }
+
     await queryBuilder.addViewerCondition(user, null, undefined, showPagesRestrictedByOwner, showPagesRestrictedByGroup);
 
     const pages: HydratedDocument<Omit<IPageForTreeItem, 'processData'>>[] = await queryBuilder

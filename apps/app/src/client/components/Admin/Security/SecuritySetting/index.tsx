@@ -49,7 +49,7 @@ const SecuritySettingComponent: React.FC<Props> = ({ adminGeneralSecurityContain
         hideRestrictedByGroup: adminGeneralSecurityContainer.state.currentGroupRestrictionDisplayMode === 'Hidden',
         hideRestrictedByOwner: adminGeneralSecurityContainer.state.currentOwnerRestrictionDisplayMode === 'Hidden',
         isUsersHomepageDeletionEnabled: adminGeneralSecurityContainer.state.isUsersHomepageDeletionEnabled,
-        hideUserPages: adminGeneralSecurityContainer.state.hideUserPages,
+        isHidingUserPages: adminGeneralSecurityContainer.state.isHidingUserPages,
         isForceDeleteUserHomepageOnUserDeletion: adminGeneralSecurityContainer.state.isForceDeleteUserHomepageOnUserDeletion,
         isRomUserAllowedToComment: adminGeneralSecurityContainer.state.isRomUserAllowedToComment,
       });
