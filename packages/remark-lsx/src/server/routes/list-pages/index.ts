@@ -68,10 +68,7 @@ interface IListPagesRequest
 }
 
 export const listPages = (hideUserPages: boolean) => {
-  return async (
-    req: IListPagesRequest,
-    res: Response,
-  ): Promise<Response> => {
+  return async (req: IListPagesRequest, res: Response): Promise<Response> => {
     const user = req.user;
 
     const isAdmin = user?.admin ?? false;
