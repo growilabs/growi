@@ -74,10 +74,9 @@ export const listPages = async (
   const user = req.user;
 
   const Config = mongoose.model('Config');
-  // REMINDER: Change to security:isHidingUserPages
-  const hideUserPageConfig = (await Config.findOne({
-    key: 'security:user-pages:isHidden',
-  }));
+  const hideUserPageConfig = await Config.findOne({
+    key: 'security:isHidingUserPages',
+  });
 
   const hideUserPageConfigValue = hideUserPageConfig?.value;
   const hideUserPagesEnabled = hideUserPageConfigValue === 'true';
