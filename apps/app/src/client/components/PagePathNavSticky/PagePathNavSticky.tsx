@@ -25,7 +25,7 @@ const { isTrashPage } = pagePathUtils;
 
 
 export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element => {
-  const { pagePath } = props;
+  const { pagePath, latterLinkClassName, ...rest } = props;
 
   const isPrinting = usePrintMode();
 
@@ -96,10 +96,11 @@ export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element =>
             return (
               <div className="d-inline-block pe-auto">
                 <PagePathNavLayout
-                  {...props}
+                  pagePath={pagePath}
                   latterLink={latterLink}
-                  latterLinkClassName="fs-3 text-truncate"
+                  latterLinkClassName={`${latterLinkClassName} text-truncate`}
                   maxWidth={navMaxWidth}
+                  {...rest}
                 />
               </div>
             );
@@ -109,7 +110,12 @@ export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element =>
             // Use 'd-block' to make the children take the full width
             // This is to improve UX when opening/closing CopyDropdown
             <div className="d-block pe-auto">
-              <PagePathNav {...props} inline />
+              <PagePathNav
+                pagePath={pagePath}
+                latterLinkClassName={latterLinkClassName}
+                inline
+                {...rest}
+              />
             </div>
           );
         }}
