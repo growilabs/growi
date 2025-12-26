@@ -663,18 +663,33 @@ export type IActivity = {
   snapshot?: ISnapshot;
 };
 
+export type IActivityHasId = IActivity & HasObjectId;
+
 export type ActivityHasUserId = IActivityHasId & {
   user: IUserHasId;
 };
 
-export type IActivityHasId = IActivity & HasObjectId;
+export type ActivityHasTargetPage = IActivityHasId & {
+  user: IUserHasId;
+  target: IPopulatedPageTarget;
+};
+
+import type { PageGrant } from '@growi/core';
+export interface IPopulatedPageTarget {
+  _id: string;
+  path: string;
+  status: string;
+  grant?: PageGrant;
+  wip: boolean;
+  deletedAt: Date;
+}
+
+export interface PopulatedUserActivitiesResult {
+  serializedPaginationResult: PaginateResult<ActivityHasTargetPage>;
+}
 
 export type ISearchFilter = {
   usernames?: string[];
   dates?: { startDate: string | null; endDate: string | null };
   actions?: SupportedActionType[];
 };
-
-export interface UserActivitiesResult {
-  serializedPaginationResult: PaginateResult<IActivityHasId>;
-}

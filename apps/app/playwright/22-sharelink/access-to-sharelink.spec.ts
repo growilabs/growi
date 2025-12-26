@@ -10,7 +10,10 @@ test.describe
       await page.goto('/Sandbox/Bootstrap5');
 
       // Create Sharelink
-      await page.getByTestId('open-page-item-control-btn').click();
+      await page
+        .getByTestId('grw-contextual-sub-nav')
+        .getByTestId('open-page-item-control-btn')
+        .click();
       await page
         .getByTestId(
           'open-page-accessories-modal-btn-with-share-link-management-data-tab',

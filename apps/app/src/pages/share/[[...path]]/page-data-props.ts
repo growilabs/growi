@@ -7,6 +7,7 @@ import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type { IShareLink } from '~/interfaces/share-link';
 import type { PageModel } from '~/server/models/page';
 import type { ShareLinkModel } from '~/server/models/share-link';
+import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
 
 import type { ShareLinkPageStatesProps } from './types';
 
@@ -34,7 +35,7 @@ export const getPageDataForInitial = async (
 ): Promise<GetServerSidePropsResult<ShareLinkPageStatesProps>> => {
   const req = context.req as CrowiRequest;
   const { crowi, params } = req;
-  const { pageService, configManager } = crowi;
+  const { pageService, pageGrantService, configManager } = crowi;
 
   if (mongooseModel == null) {
     mongooseModel = (await import('mongoose')).model;
@@ -56,11 +57,10 @@ export const getPageDataForInitial = async (
   }
 
   const pageId = getIdStringForRef(shareLink.relatedPage);
-  const pageWithMeta = await pageService.findPageAndMetaDataByViewer(
-    pageId,
-    null,
-    undefined, // no user for share link
-    true, // isSharedPage
+  const pageWithMeta = await findPageAndMetaDataByViewer(
+    pageService,
+    pageGrantService,
+    { pageId, path: null, isSharedPage: true },
   );
 
   // not found
