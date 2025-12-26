@@ -57,6 +57,7 @@ module.exports = {
     'src/client/components/ShortcutsModal/**',
     'src/client/components/StaffCredit/**',
     'src/client/components/TemplateModal/**',
+    'src/client/components/Sidebar/**',
     'src/services/**',
     'src/states/**',
     'src/stores/**',

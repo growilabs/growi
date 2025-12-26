@@ -78,8 +78,13 @@ export const ItemsTree: FC<Props> = (props: Props) => {
   const dataLoader = useDataLoader(rootPageId, allPagesCount);
 
   // Tree item handlers (rename, create, etc.) with stable callbacks for headless-tree
-  const { getItemName, isItemFolder, handleRename, creatingParentId } =
-    useTreeItemHandlers(triggerTreeRebuild);
+  const {
+    getItemName,
+    isItemFolder,
+    handleRename,
+    creatingParentId,
+    completeRenamingHotkey,
+  } = useTreeItemHandlers(triggerTreeRebuild);
 
   // Configure tree features and get checkbox state and D&D handlers
   const { features, checkboxProperties, dndProperties } = useTreeFeatures({
@@ -137,6 +142,9 @@ export const ItemsTree: FC<Props> = (props: Props) => {
       onDrop: handleDrop,
       canDropInbetween: false,
     }),
+    hotkeys: {
+      completeRenaming: completeRenamingHotkey,
+    },
   });
 
   // Notify parent when checked items change

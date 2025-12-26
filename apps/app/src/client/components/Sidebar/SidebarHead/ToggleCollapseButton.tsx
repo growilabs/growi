@@ -1,17 +1,15 @@
-import {
-  memo, useCallback, useMemo, type JSX,
-} from 'react';
+import { type JSX, memo, useCallback, useMemo } from 'react';
 
 import {
-  useDrawerOpened, useSetPreferCollapsedMode, useSidebarMode, useCollapsedContentsOpened,
+  useCollapsedContentsOpened,
+  useDrawerOpened,
+  useSetPreferCollapsedMode,
+  useSidebarMode,
 } from '~/states/ui/sidebar';
-
 
 import styles from './ToggleCollapseButton.module.scss';
 
-
 export const ToggleCollapseButton = memo((): JSX.Element => {
-
   const { isDrawerMode, isCollapsedMode } = useSidebarMode();
   const [isDrawerOpened, setIsDrawerOpened] = useDrawerOpened();
   const setPreferCollapsedMode = useSetPreferCollapsedMode();
@@ -41,7 +39,9 @@ export const ToggleCollapseButton = memo((): JSX.Element => {
       onClick={isDrawerMode() ? toggleDrawer : toggleCollapsed}
       data-testid="btn-toggle-collapse"
     >
-      <span className={`material-symbols-outlined fs-2 ${rotationClass}`}>{icon}</span>
+      <span className={`material-symbols-outlined fs-2 ${rotationClass}`}>
+        {icon}
+      </span>
     </button>
   );
 });

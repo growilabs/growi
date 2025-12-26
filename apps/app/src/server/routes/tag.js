@@ -128,7 +128,7 @@ module.exports = (crowi, app) => {
     const result = {};
     try {
       // TODO GC-1921 consider permission
-      const page = await Page.findById(pageId);
+      const page = await Page.findOne({ _id: { $eq: pageId } });
       const user = await User.findById(userId);
 
       if (!(await Page.isAccessiblePageByViewer(page._id, user))) {
@@ -137,7 +137,9 @@ module.exports = (crowi, app) => {
         );
       }
 
-      const previousRevision = await Revision.findById(revisionId);
+      const previousRevision = await Revision.findOne({
+        _id: { $eq: revisionId },
+      });
       result.savedPage = await crowi.pageService.updatePage(
         page,
         previousRevision.body,
