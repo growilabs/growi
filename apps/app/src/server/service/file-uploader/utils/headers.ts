@@ -5,6 +5,8 @@ import type { IAttachmentDocument } from '~/server/models/attachment';
 
 import { configManager } from '../../config-manager';
 
+import { defaultContentDispositionSettings } from './security';
+
 type ContentHeaderField = 'Content-Type' | 'Content-Security-Policy' | 'Content-Disposition' | 'Content-Length';
 type ContentHeader = ExpressHttpHeader<ContentHeaderField>;
 
@@ -22,6 +24,10 @@ const determineDisposition = (
   }
   if (inlineMimeTypes.some(mimeType => mimeType.toLowerCase() === normalizedFileFormat)) {
     return 'inline';
+  }
+  const defaultSetting = defaultContentDispositionSettings[normalizedFileFormat];
+  if (defaultSetting) {
+    return defaultSetting;
   }
   return opts?.inline ? 'inline' : 'attachment';
 };
