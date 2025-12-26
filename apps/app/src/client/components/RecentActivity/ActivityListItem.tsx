@@ -3,7 +3,7 @@ import type { Locale } from 'date-fns/locale';
 import { useTranslation } from 'next-i18next';
 
 import type {
-  ActivityHasUserId,
+  ActivityHasTargetPage,
   SupportedActivityActionType,
 } from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
@@ -39,6 +39,18 @@ export const IconActivityTranslationMap: Record<
   [ActivityLogActions.ACTION_COMMENT_CREATE]: 'comment',
 };
 
+type ActivityListItemProps = {
+  activity: ActivityHasTargetPage;
+};
+
+type AllowPageDisplayPayload = {
+  grant: number | undefined;
+  status: string;
+  wip: boolean;
+  deletedAt?: Date;
+  path: string;
+};
+
 const translateAction = (action: SupportedActivityActionType): string => {
   return ActivityActionTranslationMap[action] || 'unknown_action';
 };
@@ -56,14 +68,49 @@ const calculateTimePassed = (date: Date, locale: Locale): string => {
   return timePassed;
 };
 
+const pageAllowedForDisplay = (
+  allowDisplayPayload: AllowPageDisplayPayload,
+): boolean => {
+  const { grant, status, wip, deletedAt } = allowDisplayPayload;
+  if (grant !== 1) return false;
+
+  if (status !== 'published') return false;
+
+  if (wip) return false;
+
+  if (deletedAt) return false;
+
+  return true;
+};
+
+const setPath = (path: string, allowed: boolean): string => {
+  if (allowed) return path;
+
+  return '';
+};
+
 export const ActivityListItem = ({
-  activity,
+  props,
 }: {
-  activity: ActivityHasUserId;
+  props: ActivityListItemProps;
 }): JSX.Element => {
   const { t, i18n } = useTranslation();
   const currentLangCode = i18n.language;
   const dateFnsLocale = getLocale(currentLangCode);
+
+  const { activity } = props;
+
+  const { path, grant, status, wip, deletedAt } = activity.target;
+
+  const allowDisplayPayload: AllowPageDisplayPayload = {
+    grant,
+    status,
+    wip,
+    deletedAt,
+    path,
+  };
+
+  const isPageAllowed = pageAllowedForDisplay(allowDisplayPayload);
 
   const action = activity.action as SupportedActivityActionType;
   const keyToTranslate = translateAction(action);
@@ -71,17 +118,30 @@ export const ActivityListItem = ({
 
   return (
     <div className="activity-row">
-      <p className="mb-1">
-        <span className="material-symbols-outlined me-2">
+      <div className="d-flex align-items-center">
+        <span className="material-symbols-outlined me-2 flex-shrink-0">
           {setIcon(action)}
         </span>
 
-        <span className="dark:text-white"> {t(fullKeyPath)}</span>
+        <div className="flex-grow-1 ms-2">
+          <div className="activity-path-line mb-0">
+            <a
+              href={setPath(path, isPageAllowed)}
+              className="activity-target-link fw-bold text-wrap d-block"
+            >
+              <span>{setPath(path, isPageAllowed)}</span>
+            </a>
+          </div>
 
-        <span className="text-secondary small ms-3">
-          {calculateTimePassed(activity.createdAt, dateFnsLocale)}
-        </span>
-      </p>
+          <div className="activity-details-line d-flex">
+            <span>{t(fullKeyPath)}</span>
+
+            <span className="text-secondary small ms-3 align-self-center">
+              {calculateTimePassed(activity.createdAt, dateFnsLocale)}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
