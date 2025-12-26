@@ -56,7 +56,7 @@
       "!apps/app/src/client/components/PageSelectModal",
       "!apps/app/src/client/components/PageSideContents",
       "!apps/app/src/client/components/PageTags",
-      "!apps/app/src/client/components/ReactMarkdownComponents",
+      "!apps/app/src/client/components/ReactMarkdownComponents"
     ]
   },
   "formatter": {
