@@ -390,7 +390,7 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
       <GroundGlassBar className="py-4 d-block d-md-none d-print-none border-bottom" />
 
       {/* for Sub Navigation */}
-      <GroundGlassBar className={`position-fixed z-1 d-print-none w-100 end-0 ${minHeightSubNavigation}`} />
+      <GroundGlassBar className={`position-fixed z-1 d-edit-none d-print-none w-100 end-0 ${minHeightSubNavigation}`} />
 
       <Sticky
         className="z-3"
