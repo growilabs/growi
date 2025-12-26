@@ -1,6 +1,4 @@
-
-import React, { useState, type JSX } from 'react';
-
+import React, { type JSX, useState } from 'react';
 import type { IUser } from '@growi/core';
 import { useAtomValue } from 'jotai';
 import { Collapse } from 'reactstrap';
@@ -9,30 +7,35 @@ import type { ICommentHasId, ICommentHasIdList } from '~/interfaces/comment';
 import type { RendererOptions } from '~/interfaces/renderer-options';
 import { isAllReplyShownAtom } from '~/states/server-configurations';
 
-
 import { Comment } from './Comment';
 
 import styles from './ReplyComments.module.scss';
 
-
 type ReplycommentsProps = {
-  rendererOptions: RendererOptions,
-  isReadOnly: boolean,
-  revisionId: string,
-  revisionCreatedAt: Date,
-  currentUser: IUser,
-  replyList: ICommentHasIdList,
-  pageId: string,
-  pagePath: string,
-  deleteBtnClicked: (comment: ICommentHasId) => void,
-  onComment: () => void,
-}
+  rendererOptions: RendererOptions;
+  isReadOnly: boolean;
+  revisionId: string;
+  revisionCreatedAt: Date;
+  currentUser: IUser;
+  replyList: ICommentHasIdList;
+  pageId: string;
+  pagePath: string;
+  deleteBtnClicked: (comment: ICommentHasId) => void;
+  onComment: () => void;
+};
 
 export const ReplyComments = (props: ReplycommentsProps): JSX.Element => {
-
   const {
-    rendererOptions, isReadOnly, revisionId, revisionCreatedAt, currentUser, replyList,
-    pageId, pagePath, deleteBtnClicked, onComment,
+    rendererOptions,
+    isReadOnly,
+    revisionId,
+    revisionCreatedAt,
+    currentUser,
+    replyList,
+    pageId,
+    pagePath,
+    deleteBtnClicked,
+    onComment,
   } = props;
 
   const isAllReplyShown = useAtomValue(isAllReplyShownAtom);
@@ -41,7 +44,10 @@ export const ReplyComments = (props: ReplycommentsProps): JSX.Element => {
 
   const renderReply = (reply: ICommentHasId) => {
     return (
-      <div key={reply._id} className={`${styles['page-comment-reply']} mt-2 ms-4 ms-sm-5`}>
+      <div
+        key={reply._id}
+        className={`${styles['page-comment-reply']} mt-2 ms-4 ms-sm-5`}
+      >
         <Comment
           rendererOptions={rendererOptions}
           comment={reply}
@@ -68,9 +74,15 @@ export const ReplyComments = (props: ReplycommentsProps): JSX.Element => {
     );
   }
 
-  const areThereHiddenReplies = (replyList.length > 2);
-  const toggleButtonIconName = isOlderRepliesShown ? 'expand_less' : 'more_vert';
-  const toggleButtonIcon = <span className="material-symbols-outlined me-1">{toggleButtonIconName}</span>;
+  const areThereHiddenReplies = replyList.length > 2;
+  const toggleButtonIconName = isOlderRepliesShown
+    ? 'expand_less'
+    : 'more_vert';
+  const toggleButtonIcon = (
+    <span className="material-symbols-outlined me-1">
+      {toggleButtonIconName}
+    </span>
+  );
   const toggleButtonLabel = isOlderRepliesShown ? '' : 'more';
   const shownReplies = replyList.slice(replyList.length - 2, replyList.length);
   const hiddenReplies = replyList.slice(0, replyList.length - 2);

@@ -3,12 +3,11 @@ import React, { type JSX } from 'react';
 import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '../NotAvailableForReadOnlyUser';
 
 type CommentControlProps = {
-  onClickEditBtn: () => void,
-  onClickDeleteBtn: () => void,
-}
+  onClickEditBtn: () => void;
+  onClickDeleteBtn: () => void;
+};
 
 export const CommentControl = (props: CommentControlProps): JSX.Element => {
-
   const { onClickEditBtn, onClickDeleteBtn } = props;
 
   return (
@@ -16,7 +15,11 @@ export const CommentControl = (props: CommentControlProps): JSX.Element => {
     <div className="page-comment-control">
       <NotAvailableIfReadOnlyUserNotAllowedToComment>
         <>
-          <button type="button" className="btn btn-link p-2 opacity-50" onClick={onClickEditBtn}>
+          <button
+            type="button"
+            className="btn btn-link p-2 opacity-50"
+            onClick={onClickEditBtn}
+          >
             <span className="material-symbols-outlined">edit</span>
           </button>
           <button
@@ -31,5 +34,4 @@ export const CommentControl = (props: CommentControlProps): JSX.Element => {
       </NotAvailableIfReadOnlyUserNotAllowedToComment>
     </div>
   );
-
 };

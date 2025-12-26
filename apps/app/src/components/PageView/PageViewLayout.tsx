@@ -36,7 +36,7 @@ export const PageViewLayout = (props: Props): JSX.Element => {
       <div
         className={`main ${className} ${pageViewLayoutClass} ${fluidLayoutClass} flex-expand-vert ps-sidebar`}
       >
-        <div className="container-lg wide-gutter-x-lg grw-container-convertible flex-expand-vert">
+        <div className="container-lg wide-gutter-x-lg grw-container-convertible flex-expand-vert gap-4">
           {headerContents != null && headerContents}
           {!isPrinting && sideContents != null ? (
             <div className="flex-expand-horiz gap-3 z-0">

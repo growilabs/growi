@@ -1,63 +1,70 @@
 import { useCallback } from 'react';
-
 import type { IPagePopulatedToShowRevision } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
 import { apiv3Put } from '~/client/util/apiv3-client';
-import { toastSuccess, toastError } from '~/client/util/toastr';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useFetchCurrentPage, useSetIsUntitledPage } from '~/states/page';
-import { mutatePageTree, mutatePageList, mutateRecentlyUpdated } from '~/stores/page-listing';
+import {
+  mutatePageList,
+  mutatePageTree,
+  mutateRecentlyUpdated,
+} from '~/stores/page-listing';
 
-
-type PagePathRenameHandler = (newPagePath: string, onRenameFinish?: () => void, onRenameFailure?: () => void, onRenamedSkipped?: () => void) => Promise<void>
+type PagePathRenameHandler = (
+  newPagePath: string,
+  onRenameFinish?: () => void,
+  onRenameFailure?: () => void,
+  onRenamedSkipped?: () => void,
+) => Promise<void>;
 
 export const usePagePathRenameHandler = (
-    currentPage?: IPagePopulatedToShowRevision | null,
+  currentPage?: IPagePopulatedToShowRevision | null,
 ): PagePathRenameHandler => {
-
   const { t } = useTranslation();
   const { fetchCurrentPage } = useFetchCurrentPage();
   const setIsUntitledPage = useSetIsUntitledPage();
 
-  const pagePathRenameHandler = useCallback(async(newPagePath, onRenameFinish, onRenameFailure) => {
-
-    if (currentPage == null) {
-      return;
-    }
-
-    if (newPagePath === currentPage.path || newPagePath === '') {
-      onRenameFinish?.();
-      return;
-    }
-
-    const onRenamed = (fromPath: string | undefined, toPath: string) => {
-      mutatePageTree();
-      mutateRecentlyUpdated();
-      mutatePageList();
-      setIsUntitledPage(false);
-
-      if (currentPage.path === fromPath || currentPage.path === toPath) {
-        fetchCurrentPage({ force: true });
+  const pagePathRenameHandler = useCallback(
+    async (newPagePath, onRenameFinish, onRenameFailure) => {
+      if (currentPage == null) {
+        return;
       }
-    };
 
-    try {
-      await apiv3Put('/pages/rename', {
-        pageId: currentPage._id,
-        revisionId: currentPage.revision?._id,
-        newPagePath,
-      });
+      if (newPagePath === currentPage.path || newPagePath === '') {
+        onRenameFinish?.();
+        return;
+      }
 
-      onRenamed(currentPage.path, newPagePath);
-      onRenameFinish?.();
+      const onRenamed = (fromPath: string | undefined, toPath: string) => {
+        mutatePageTree();
+        mutateRecentlyUpdated();
+        mutatePageList();
+        setIsUntitledPage(false);
 
-      toastSuccess(t('renamed_pages', { path: currentPage.path }));
-    }
-    catch (err) {
-      onRenameFailure?.();
-      toastError(err);
-    }
-  }, [currentPage, fetchCurrentPage, setIsUntitledPage, t]);
+        if (currentPage.path === fromPath || currentPage.path === toPath) {
+          fetchCurrentPage({ force: true });
+        }
+      };
+
+      try {
+        await apiv3Put('/pages/rename', {
+          pageId: currentPage._id,
+          revisionId: currentPage.revision?._id,
+          newPagePath,
+        });
+
+        onRenamed(currentPage.path, newPagePath);
+        onRenameFinish?.();
+
+        toastSuccess(t('renamed_pages', { path: currentPage.path }));
+      } catch (err) {
+        onRenameFailure?.();
+        toastError(err);
+      }
+    },
+    [currentPage, fetchCurrentPage, setIsUntitledPage, t],
+  );
 
   return pagePathRenameHandler;
 };
