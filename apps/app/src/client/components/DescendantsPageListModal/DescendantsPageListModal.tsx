@@ -33,12 +33,12 @@ const PageListTabIcon = (): React.JSX.Element => (
   <span className="material-symbols-outlined">subject</span>
 );
 
-const PageListTabContent = (): React.JSX.Element | null => {
+const PageListTabContent = (): React.JSX.Element => {
   const status = useDescendantsPageListModalStatus();
   const path = status?.path;
 
   if (path == null) {
-    return null;
+    return <></>;
   }
 
   return <DescendantsPageList path={path} />;
