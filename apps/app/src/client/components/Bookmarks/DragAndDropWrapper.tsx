@@ -1,33 +1,44 @@
-import type { ReactNode, JSX } from 'react';
-
+import type { JSX, ReactNode } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 
 import type { DragItemDataType } from '~/interfaces/bookmark-info';
 
 type DragAndDropWrapperProps = {
-  item?: Partial<DragItemDataType>
-  type: string[]
-  children: ReactNode
-  useDragMode?: boolean
-  useDropMode?: boolean
-  onDropItem?:(item: DragItemDataType, type: string | null | symbol) => Promise<void>
-  isDropable?:(item: Partial<DragItemDataType>, type: string | null | symbol) => boolean
-}
+  item?: Partial<DragItemDataType>;
+  type: string[];
+  children: ReactNode;
+  useDragMode?: boolean;
+  useDropMode?: boolean;
+  onDropItem?: (
+    item: DragItemDataType,
+    type: string | null | symbol,
+  ) => Promise<void>;
+  isDropable?: (
+    item: Partial<DragItemDataType>,
+    type: string | null | symbol,
+  ) => boolean;
+};
 
-export const DragAndDropWrapper = (props: DragAndDropWrapperProps): JSX.Element => {
+export const DragAndDropWrapper = (
+  props: DragAndDropWrapperProps,
+): JSX.Element => {
   const {
-    item, children, useDragMode, useDropMode, type, onDropItem, isDropable,
+    item,
+    children,
+    useDragMode,
+    useDropMode,
+    type,
+    onDropItem,
+    isDropable,
   } = props;
-
 
   const acceptedTypes = type;
   const sourcetype: string | symbol = type[0];
 
-
   const [, dragRef] = useDrag({
     type: sourcetype,
     item,
-    collect: monitor => ({
+    collect: (monitor) => ({
       isDragging: monitor.isDragging(),
       canDrag: monitor.canDrag(),
     }),
@@ -48,7 +59,7 @@ export const DragAndDropWrapper = (props: DragAndDropWrapperProps): JSX.Element 
       }
       return false;
     },
-    collect: monitor => ({
+    collect: (monitor) => ({
       isOver: monitor.isOver({ shallow: true }) && monitor.canDrop(),
     }),
   }));
@@ -57,17 +68,18 @@ export const DragAndDropWrapper = (props: DragAndDropWrapperProps): JSX.Element 
     if (useDragMode && useDropMode) {
       dragRef(c);
       dropRef(c);
-    }
-    else if (useDragMode) {
+    } else if (useDragMode) {
       dragRef(c);
-    }
-    else if (useDropMode) {
+    } else if (useDropMode) {
       dropRef(c);
     }
   };
 
   return (
-    <div ref={getCallback} className={`grw-drag-drop-container ${isOver ? 'grw-accept-drop-item' : ''}`}>
+    <div
+      ref={getCallback}
+      className={`grw-drag-drop-container ${isOver ? 'grw-accept-drop-item' : ''}`}
+    >
       {children}
     </div>
   );

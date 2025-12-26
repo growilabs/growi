@@ -1,10 +1,14 @@
-import React, { useEffect, useState, useMemo } from 'react';
-
+import type React from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Scope } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import type { UseFormRegisterReturn } from 'react-hook-form';
 
-import { extractScopes, getDisabledScopes, parseScopes } from '~/client/util/scope-util';
+import {
+  extractScopes,
+  getDisabledScopes,
+  parseScopes,
+} from '~/client/util/scope-util';
 import { useIsAdmin } from '~/states/context';
 
 import { AccessTokenScopeList } from './AccessTokenScopeList';
@@ -21,11 +25,17 @@ type AccessTokenScopeSelectProps = {
 /**
  * Displays a list of permissions in a recursive, nested checkbox interface.
  */
-export const AccessTokenScopeSelect: React.FC<AccessTokenScopeSelectProps> = ({ register, selectedScopes }) => {
+export const AccessTokenScopeSelect: React.FC<AccessTokenScopeSelectProps> = ({
+  register,
+  selectedScopes,
+}) => {
   const [disabledScopes, setDisabledScopes] = useState<Set<Scope>>(new Set());
   const isAdmin = useIsAdmin();
 
-  const ScopesMap = useMemo(() => parseScopes({ scopes: SCOPE, isAdmin }), [isAdmin]);
+  const ScopesMap = useMemo(
+    () => parseScopes({ scopes: SCOPE, isAdmin }),
+    [isAdmin],
+  );
   const extractedScopes = useMemo(() => extractScopes(ScopesMap), [ScopesMap]);
 
   useEffect(() => {
@@ -35,7 +45,11 @@ export const AccessTokenScopeSelect: React.FC<AccessTokenScopeSelectProps> = ({ 
 
   return (
     <div className="border rounded">
-      <AccessTokenScopeList scopeObject={ScopesMap} register={register} disabledScopes={disabledScopes} />
+      <AccessTokenScopeList
+        scopeObject={ScopesMap}
+        register={register}
+        disabledScopes={disabledScopes}
+      />
     </div>
   );
 };
