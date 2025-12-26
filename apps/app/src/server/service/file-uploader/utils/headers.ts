@@ -3,8 +3,34 @@ import type { Response } from 'express';
 import type { ExpressHttpHeader } from '~/server/interfaces/attachment';
 import type { IAttachmentDocument } from '~/server/models/attachment';
 
+import { configManager } from '../../config-manager';
+
+import { defaultContentDispositionSettings } from './security';
+
 type ContentHeaderField = 'Content-Type' | 'Content-Security-Policy' | 'Content-Disposition' | 'Content-Length';
 type ContentHeader = ExpressHttpHeader<ContentHeaderField>;
+
+const determineDisposition = (
+    fileFormat: string,
+    opts?: { inline?: boolean },
+): 'inline' | 'attachment' => {
+  const inlineMimeTypes = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes').inlineMimeTypes;
+  const attachmentMimeTypes = configManager.getConfig('attachments:contentDisposition:attachmentMimeTypes').attachmentMimeTypes;
+
+  const normalizedFileFormat = fileFormat.toLowerCase();
+
+  if (attachmentMimeTypes.some(mimeType => mimeType.toLowerCase() === normalizedFileFormat)) {
+    return 'attachment';
+  }
+  if (inlineMimeTypes.some(mimeType => mimeType.toLowerCase() === normalizedFileFormat)) {
+    return 'inline';
+  }
+  const defaultSetting = defaultContentDispositionSettings[normalizedFileFormat];
+  if (defaultSetting) {
+    return defaultSetting;
+  }
+  return opts?.inline ? 'inline' : 'attachment';
+};
 
 /**
  * Factory function to generate content headers.
@@ -27,9 +53,10 @@ export const createContentHeaders = (attachment: IAttachmentDocument, opts?: { i
   });
 
   // Content-Disposition
+  const disposition = determineDisposition(attachment.fileFormat, opts);
   headers.push({
     field: 'Content-Disposition',
-    value: `${opts?.inline ? 'inline' : 'attachment'};filename*=UTF-8''${encodeURIComponent(attachment.originalName)}`,
+    value: `${disposition};filename*=UTF-8''${encodeURIComponent(attachment.originalName)}`,
   });
 
   // Content-Length
