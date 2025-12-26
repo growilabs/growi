@@ -1,28 +1,31 @@
-import React, {
-  useState, useCallback, useEffect, type JSX,
-} from 'react';
+import React, { type JSX, useCallback, useEffect, useState } from 'react';
 
 import { toastError } from '~/client/util/toastr';
-import type { IActivityHasId, ActivityHasTargetPage } from '~/interfaces/activity';
+import type {
+  ActivityHasTargetPage,
+  IActivityHasId,
+} from '~/interfaces/activity';
 import { useSWRxRecentActivity } from '~/stores/recent-activity';
 import loggerFactory from '~/utils/logger';
 
 import PaginationWrapper from '../PaginationWrapper';
-
 import { ActivityListItem } from './ActivityListItem';
-
 
 const logger = loggerFactory('growi:RecentActivity');
 
 type RecentActivityProps = {
-  userId: string,
-}
+  userId: string;
+};
 
-const hasTargetPage = (activity: IActivityHasId): activity is ActivityHasTargetPage => {
-  return activity.user != null
-         && typeof activity.user === 'object'
-         && activity.target != null
-         && typeof activity.target === 'object';
+const hasTargetPage = (
+  activity: IActivityHasId,
+): activity is ActivityHasTargetPage => {
+  return (
+    activity.user != null &&
+    typeof activity.user === 'object' &&
+    activity.target != null &&
+    typeof activity.target === 'object'
+  );
 };
 
 export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
@@ -33,14 +36,21 @@ export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
   const [limit] = useState(10);
   const [offset, setOffset] = useState(0);
 
-  const { data: paginatedData, error } = useSWRxRecentActivity(limit, offset, userId);
+  const { data: paginatedData, error } = useSWRxRecentActivity(
+    limit,
+    offset,
+    userId,
+  );
 
-  const handlePage = useCallback(async(selectedPage: number) => {
-    const newOffset = (selectedPage - 1) * limit;
+  const handlePage = useCallback(
+    async (selectedPage: number) => {
+      const newOffset = (selectedPage - 1) * limit;
 
-    setOffset(newOffset);
-    setActivePage(selectedPage);
-  }, [limit]);
+      setOffset(newOffset);
+      setActivePage(selectedPage);
+    },
+    [limit],
+  );
 
   useEffect(() => {
     if (error) {
@@ -50,8 +60,7 @@ export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
     }
 
     if (paginatedData) {
-      const activitiesWithPages = paginatedData.docs
-        .filter(hasTargetPage);
+      const activitiesWithPages = paginatedData.docs.filter(hasTargetPage);
 
       setActivities(activitiesWithPages);
     }
@@ -63,7 +72,7 @@ export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
   return (
     <div className="page-list-container-activity">
       <ul className="page-list-ul page-list-ul-flat mb-3">
-        {activities.map(activity => (
+        {activities.map((activity) => (
           <li key={`recent-activity-view:${activity._id}`} className="mt-4">
             <ActivityListItem props={{ activity }} />
           </li>

@@ -8,11 +8,15 @@ type DeleteBookmarkFolderModalProps = Record<string, unknown>;
 export const DeleteBookmarkFolderModalLazyLoaded = (): JSX.Element => {
   const status = useDeleteBookmarkFolderModalStatus();
 
-  const DeleteBookmarkFolderModal = useLazyLoader<DeleteBookmarkFolderModalProps>(
-    'delete-bookmark-folder-modal',
-    () => import('./DeleteBookmarkFolderModal').then(mod => ({ default: mod.DeleteBookmarkFolderModal })),
-    status?.isOpened ?? false,
-  );
+  const DeleteBookmarkFolderModal =
+    useLazyLoader<DeleteBookmarkFolderModalProps>(
+      'delete-bookmark-folder-modal',
+      () =>
+        import('./DeleteBookmarkFolderModal').then((mod) => ({
+          default: mod.DeleteBookmarkFolderModal,
+        })),
+      status?.isOpened ?? false,
+    );
 
   return DeleteBookmarkFolderModal ? <DeleteBookmarkFolderModal /> : <></>;
 };

@@ -10,7 +10,10 @@ export const PutBackPageModalLazyLoaded = (): JSX.Element => {
 
   const PutBackPageModal = useLazyLoader<PutBackPageModalProps>(
     'put-back-page-modal',
-    () => import('./PutbackPageModal').then(mod => ({ default: mod.PutBackPageModal })),
+    () =>
+      import('./PutbackPageModal').then((mod) => ({
+        default: mod.PutBackPageModal,
+      })),
     status?.isOpened ?? false,
   );
 
