@@ -356,6 +356,8 @@
     "confidential_example": "ex): internal use only",
     "default_language": "Default language for new users",
     "default_mail_visibility": "Disclose e-mail for new users",
+    "default_read_only_for_new_user": "Editing Restrictions for New Users",
+    "set_read_only_for_new_user": "Set new users to read-only mode",
     "file_uploading": "File uploading",
     "page_bulk_export_settings": "Page Bulk Export Settings",
     "enable_page_bulk_export": "Enable bulk export",
@@ -446,10 +448,7 @@
     "customize_settings": "Customize",
     "default_sidebar_mode": {
       "title": "Default sidebar mode",
-      "desc": "You can set the sidebar mode for new users and guests visiting the page.",
-      "dock_mode_default_desc": "You can set the initial state of the sidebar when Dock Mode is selected.",
-      "dock_mode_default_open": "Open the page as it was opened from the beginning",
-      "dock_mode_default_close": "Open the page as it was closed from the beginning"
+      "desc": "You can set the sidebar mode for new users and guests visiting the page."
     },
     "layout": "Layout",
     "layout_options": {

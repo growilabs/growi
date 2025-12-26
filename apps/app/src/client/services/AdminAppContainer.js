@@ -21,6 +21,7 @@ export default class AdminAppContainer extends Container {
       confidential: '',
       globalLang: '',
       isEmailPublishedForNewUser: true,
+      isReadOnlyForNewUser: false,
 
       isV5Compatible: null,
       siteUrl: '',
@@ -61,6 +62,7 @@ export default class AdminAppContainer extends Container {
       confidential: appSettingsParams.confidential,
       globalLang: appSettingsParams.globalLang,
       isEmailPublishedForNewUser: appSettingsParams.isEmailPublishedForNewUser,
+      isReadOnlyForNewUser: appSettingsParams.isReadOnlyForNewUser,
       isV5Compatible: appSettingsParams.isV5Compatible,
       siteUrl: appSettingsParams.siteUrl,
       siteUrlUseOnlyEnvVars: appSettingsParams.siteUrlUseOnlyEnvVars,
@@ -106,6 +108,13 @@ export default class AdminAppContainer extends Container {
    */
   changeIsEmailPublishedForNewUserShow(isEmailPublishedForNewUser) {
     this.setState({ isEmailPublishedForNewUser });
+  }
+
+  /**
+   * Change isReadOnlyForNewUser
+   */
+  changeIsReadOnlyForNewUserShow(isReadOnlyForNewUser) {
+    this.setState({ isReadOnlyForNewUser });
   }
 
   /**
@@ -189,6 +198,7 @@ export default class AdminAppContainer extends Container {
       confidential: this.state.confidential,
       globalLang: this.state.globalLang,
       isEmailPublishedForNewUser: this.state.isEmailPublishedForNewUser,
+      isReadOnlyForNewUser: this.state.isReadOnlyForNewUser,
     });
     const { appSettingParams } = response.data;
     return appSettingParams;

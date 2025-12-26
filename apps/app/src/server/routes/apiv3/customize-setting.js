@@ -173,9 +173,6 @@ const router = express.Router();
  *          isSidebarCollapsedMode:
  *            type: boolean
  *            description: The flag whether sidebar is collapsed mode or not.
- *          isSidebarClosedAtDockMode:
- *            type: boolean
- *            description: The flag whether sidebar is closed at dock mode or not.
  *      CustomizePresentation:
  *        description: Customize Presentation
  *        type: object
@@ -206,10 +203,7 @@ module.exports = (crowi) => {
   const validator = {
     layout: [body('isContainerFluid').isBoolean()],
     theme: [body('theme').isString()],
-    sidebar: [
-      body('isSidebarCollapsedMode').isBoolean(),
-      body('isSidebarClosedAtDockMode').optional().isBoolean(),
-    ],
+    sidebar: [body('isSidebarCollapsedMode').isBoolean()],
     function: [
       body('isEnabledTimeline').isBoolean(),
       body('isEnabledAttachTitleHeader').isBoolean(),
@@ -560,13 +554,10 @@ module.exports = (crowi) => {
     adminRequired,
     async (req, res) => {
       try {
-        const isSidebarCollapsedMode = await configManager.getConfig(
+        const isSidebarCollapsedMode = configManager.getConfig(
           'customize:isSidebarCollapsedMode',
         );
-        const isSidebarClosedAtDockMode = await configManager.getConfig(
-          'customize:isSidebarClosedAtDockMode',
-        );
-        return res.apiv3({ isSidebarCollapsedMode, isSidebarClosedAtDockMode });
+        return res.apiv3({ isSidebarCollapsedMode });
       } catch (err) {
         const msg = 'Error occurred in getting sidebar';
         logger.error('Error', err);
@@ -613,18 +604,13 @@ module.exports = (crowi) => {
     async (req, res) => {
       const requestParams = {
         'customize:isSidebarCollapsedMode': req.body.isSidebarCollapsedMode,
-        'customize:isSidebarClosedAtDockMode':
-          req.body.isSidebarClosedAtDockMode,
       };
 
       try {
         await configManager.updateConfigs(requestParams);
         const customizedParams = {
-          isSidebarCollapsedMode: await configManager.getConfig(
+          isSidebarCollapsedMode: configManager.getConfig(
             'customize:isSidebarCollapsedMode',
-          ),
-          isSidebarClosedAtDockMode: await configManager.getConfig(
-            'customize:isSidebarClosedAtDockMode',
           ),
         };
 

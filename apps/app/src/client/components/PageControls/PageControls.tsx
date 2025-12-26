@@ -10,9 +10,7 @@ import {
 
   isIPageInfoForEntity, isIPageInfoForOperation,
 } from '@growi/core';
-import { pagePathUtils } from '@growi/core/dist/utils';
 import { useRect } from '@growi/ui/dist/utils';
-import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import { DropdownItem } from 'reactstrap';
 
@@ -23,7 +21,6 @@ import { toastError } from '~/client/util/toastr';
 import OpenDefaultAiAssistantButton from '~/features/openai/client/components/AiAssistant/OpenDefaultAiAssistantButton';
 import { useIsGuestUser, useIsReadOnlyUser, useIsSearchPage } from '~/states/context';
 import { useCurrentPagePath } from '~/states/page';
-import { isUsersHomepageDeletionEnabledAtom } from '~/states/server-configurations';
 import { useDeviceLargerThanMd } from '~/states/ui/device';
 import {
   EditorMode, useEditorMode,
@@ -140,10 +137,7 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
   const { editorMode } = useEditorMode();
   const [isDeviceLargerThanMd] = useDeviceLargerThanMd();
   const isSearchPage = useIsSearchPage();
-  const isUsersHomepageDeletionEnabled = useAtomValue(isUsersHomepageDeletionEnabledAtom);
   const currentPagePath = useCurrentPagePath();
-
-  const isUsersHomepage = currentPagePath == null ? false : pagePathUtils.isUsersHomepage(currentPagePath);
 
   const { mutate: mutatePageInfo } = useSWRxPageInfo(pageId, shareLinkId);
 
@@ -275,12 +269,8 @@ const PageControlsSubstance = (props: PageControlsSubstanceProps): JSX.Element =
       return false;
     }
 
-    if (isUsersHomepage && !isUsersHomepageDeletionEnabled) {
-      return false;
-    }
-
     return true;
-  }, [currentPagePath, isGuestUser, isUsersHomepage, isUsersHomepageDeletionEnabled]);
+  }, [currentPagePath, isGuestUser]);
 
   const additionalMenuItemOnTopRenderer = useMemo(() => {
     if (!isIPageInfoForEntity(pageInfo)) {
