@@ -427,7 +427,7 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
             )}
 
             {isGuestUser && (
-              <div className="mt-2">
+              <div>
                 <span>
                   <span className="d-inline-block" id="sign-up-link">
                     <Link
