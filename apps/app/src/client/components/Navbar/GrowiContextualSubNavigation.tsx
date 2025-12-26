@@ -396,7 +396,7 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
         className="z-3"
         enabled={!isPrinting}
         onStateChange={status => setStickyActive(status.status === Sticky.STATUS_FIXED)}
-        innerActiveClass="w-100 end-0"
+        innerActiveClass="end-0"
       >
         <nav
           className={`${moduleClass} ${minHeightSubNavigation}

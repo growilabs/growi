@@ -47,9 +47,9 @@ PageControls と切り離して独立した z-index 層として扱えるよう�
 これにより、GroundGlassBar → PagePathNav → PageControls という
 理想的なレイヤー構造を実現できた。
 
-## 未解決の問題（要調査）
+## CopyDropdown が z-2 で動作しない理由（解決済み）
 
-### CopyDropdown が z-2 で動作しない問題
+### 問題
 
 `PagePathNavSticky.tsx` の sticky 時の z-index について：
 
@@ -61,12 +61,25 @@ innerActiveClass="active z-2 mt-1"
 innerActiveClass="active z-3 mt-1"
 ```
 
-**原因は不明。** 将来的に調査が必要。
+### 原因
 
-考えられる可能性：
-- CopyDropdown のドロップダウンメニュー自体の z-index との関係
-- 他の要素が z-2 で被さっている可能性
-- GrowiContextualSubNavigation の nav 要素（z-3）との干渉
+1. `GrowiContextualSubNavigation` の sticky-inner-wrapper は `z-3` かつ横幅いっぱい(Flex アイテム)
+2. この要素が PagePathNavSticky（`z-2`）の上に重なる
+3. CopyDropdown は `.grw-page-path-nav-layout:hover` で `visibility: visible` になる仕組み
+   （参照: `PagePathNavLayout.module.scss`）
+4. **z-3 の要素が上に被さっているため、hover イベントが PagePathNavSticky に届かない**
+5. 結果、CopyDropdown のアイコンが表示されない
+
+### なぜ z-3 で動作するか
+
+- 同じ z-index: 3 になるため、DOM 順序で前後が決まる
+- PagePathNavSticky は GrowiContextualSubNavigation より後にレンダリングされるため前面に来る
+- hover イベントが正常に届き、CopyDropdown が表示される
+
+### 結論
+
+PagePathNavSticky の sticky 時の z-index は `z-3` である必要がある。
+これは GrowiContextualSubNavigation と同じ層に置くことで、DOM 順序による前後関係を利用するため。
 
 ## 関連ファイル
 
