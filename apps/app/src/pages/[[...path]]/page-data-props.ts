@@ -159,9 +159,7 @@ export async function getPageDataForInitial(
   const pageWithMeta = await findPageAndMetaDataByViewer(
     pageService,
     pageGrantService,
-    pageId,
-    resolvedPagePath,
-    user,
+    { pageId, path: resolvedPagePath, user },
   );
 
   // Handle URL conversion
@@ -285,11 +283,7 @@ export async function getPageDataForSameRoute(
   const pageWithMetaBasicOnly = await findPageAndMetaDataByViewer(
     pageService,
     pageGrantService,
-    pageId,
-    resolvedPagePath,
-    user,
-    false, // isSharedPage
-    true, // basicOnly
+    { pageId, path: resolvedPagePath, user, basicOnly: true },
   );
 
   const currentPathname = resolveFinalizedPathname(

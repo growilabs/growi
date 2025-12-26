@@ -60,10 +60,7 @@ export const getPageDataForInitial = async (
   const pageWithMeta = await findPageAndMetaDataByViewer(
     pageService,
     pageGrantService,
-    pageId,
-    null,
-    undefined, // no user for share link
-    true, // isSharedPage
+    { pageId, path: null, isSharedPage: true },
   );
 
   // not found
