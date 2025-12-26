@@ -86,37 +86,40 @@ export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element =>
     <div ref={pagePathNavRef}>
       <Sticky className={moduleClass} enabled={!isPrinting} innerClass="pe-none" innerActiveClass="active mt-1">
         {({ status }) => {
-          const isParentsCollapsed = status === Sticky.STATUS_FIXED;
+          const isStatusFixed = status === Sticky.STATUS_FIXED;
 
-          // Controlling pointer-events
-          //  2. enable pointer-events with 'pe-auto' only against the children
-          //      which width is minimized by 'd-inline-block'
-          //
-          if (isParentsCollapsed) {
-            return (
-              <div className="d-inline-block pe-auto">
-                <PagePathNavLayout
+          return (
+            <>
+              {/*
+                * Controlling pointer-events
+                * 2. enable pointer-events with 'pe-auto' only against the children
+                *      which width is minimized by 'd-inline-block'
+                */}
+              { isStatusFixed && (
+                <div className="d-inline-block pe-auto position-absolute">
+                  <PagePathNavLayout
+                    pagePath={pagePath}
+                    latterLink={latterLink}
+                    latterLinkClassName={`${latterLinkClassName} text-truncate`}
+                    maxWidth={navMaxWidth}
+                    {...rest}
+                  />
+                </div>
+              )}
+
+              {/*
+                * Use 'd-block' to make the children take the full width
+                * This is to improve UX when opening/closing CopyDropdown
+                */}
+              <div className={`d-block pe-auto ${isStatusFixed ? 'invisible' : ''}`}>
+                <PagePathNav
                   pagePath={pagePath}
-                  latterLink={latterLink}
-                  latterLinkClassName={`${latterLinkClassName} text-truncate`}
-                  maxWidth={navMaxWidth}
+                  latterLinkClassName={latterLinkClassName}
+                  inline
                   {...rest}
                 />
               </div>
-            );
-          }
-
-          return (
-            // Use 'd-block' to make the children take the full width
-            // This is to improve UX when opening/closing CopyDropdown
-            <div className="d-block pe-auto">
-              <PagePathNav
-                pagePath={pagePath}
-                latterLinkClassName={latterLinkClassName}
-                inline
-                {...rest}
-              />
-            </div>
+            </>
           );
         }}
       </Sticky>
