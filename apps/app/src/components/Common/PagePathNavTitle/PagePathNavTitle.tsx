@@ -39,10 +39,7 @@ export const PagePathNavTitle = (
   }, []);
 
   return isClient ? (
-    <PagePathNavSticky
-      {...props}
-      latterLinkClassName="fs-2"
-    />
+    <PagePathNavSticky {...props} latterLinkClassName="fs-2" />
   ) : (
     <PagePathNav {...props} latterLinkClassName="fs-2" />
   );
