@@ -1,8 +1,12 @@
 import type { RefObject } from 'react';
 import React, {
-  useEffect, useCallback, useRef, useState, useMemo, type JSX,
+  type JSX,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react';
-
 import SimpleBar from 'simplebar-react';
 import { debounce } from 'throttle-debounce';
 
@@ -11,13 +15,12 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:cli:StickyStretchableScroller');
 
-
 export type StickyStretchableScrollerProps = {
-  stickyElemSelector: string,
-  simplebarRef?: (ref: RefObject<SimpleBar | null>) => void,
-  calcViewHeight?: (scrollElement: HTMLElement) => number,
-  children?: JSX.Element,
-}
+  stickyElemSelector: string;
+  simplebarRef?: (ref: RefObject<SimpleBar | null>) => void;
+  calcViewHeight?: (scrollElement: HTMLElement) => number;
+  children?: JSX.Element;
+};
 
 /**
  * USAGE:
@@ -41,14 +44,20 @@ export type StickyStretchableScrollerProps = {
     </StickyStretchableScroller>
   );
  */
-export const StickyStretchableScroller = (props: StickyStretchableScrollerProps): JSX.Element => {
-
+export const StickyStretchableScroller = (
+  props: StickyStretchableScrollerProps,
+): JSX.Element => {
   const {
-    children, stickyElemSelector, calcViewHeight, simplebarRef: setSimplebarRef,
+    children,
+    stickyElemSelector,
+    calcViewHeight,
+    simplebarRef: setSimplebarRef,
   } = props;
 
   const simplebarRef = useRef<SimpleBar>(null);
-  const [simplebarMaxHeight, setSimplebarMaxHeight] = useState<number|undefined>();
+  const [simplebarMaxHeight, setSimplebarMaxHeight] = useState<
+    number | undefined
+  >();
 
   // Get sticky status
   const isSticky = useSticky(stickyElemSelector);
@@ -72,8 +81,12 @@ export const StickyStretchableScroller = (props: StickyStretchableScrollerProps)
     simplebarRef.current.recalculate();
   }, [calcViewHeight]);
 
-  const resetScrollbarDebounced = useMemo(() => debounce(100, resetScrollbar), [resetScrollbar]);
+  const resetScrollbarDebounced = useMemo(
+    () => debounce(100, resetScrollbar),
+    [resetScrollbar],
+  );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: ignore
   useEffect(() => {
     resetScrollbarDebounced();
   }, [isSticky, resetScrollbarDebounced]);
@@ -106,7 +119,7 @@ export const StickyStretchableScroller = (props: StickyStretchableScrollerProps)
 
   return (
     <SimpleBar style={{ maxHeight: simplebarMaxHeight }} ref={simplebarRef}>
-      { children }
+      {children}
     </SimpleBar>
   );
 };
