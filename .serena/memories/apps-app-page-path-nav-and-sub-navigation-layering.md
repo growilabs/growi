@@ -31,7 +31,7 @@ PageControls が PagePathNav より下層にいたため、sticky 境界付近�
 
 ### ファイル構成
 
-- `GrowiContextualSubNavigation.tsx` - 2つの Sticky に分離
+- `GrowiContextualSubNavigation.tsx` - GroundGlassBar を分離してレンダリング
   - 1つ目: GroundGlassBar のみ（`position-fixed`, `z-1`）
   - 2つ目: nav 要素（`z-3`）
 - `PagePathNavSticky.tsx` - z-index を動的に切り替え
@@ -40,16 +40,12 @@ PageControls が PagePathNav より下層にいたため、sticky 境界付近�
 
 ## 実装のポイント
 
-### GroundGlassBar を別の Sticky に分離した理由
+### GroundGlassBar を分離した理由
 GroundGlassBar を `position-fixed` で常に固定表示にすることで、
 PageControls と切り離して独立した z-index 層として扱えるようにした。
 
 これにより、GroundGlassBar → PagePathNav → PageControls という
 理想的なレイヤー構造を実現できた。
-
-### 代替手段の検討
-現在の「2つの Sticky に分離する」実装は動作するが、
-よりクリーンな代替手段があれば検討の余地がある。
 
 ## 未解決の問題（要調査）
 
@@ -80,6 +76,14 @@ innerActiveClass="active z-3 mt-1"
 - `apps/app/src/client/components/PagePathNavSticky/PagePathNavSticky.tsx`
 - `apps/app/src/client/components/PagePathNavSticky/PagePathNavSticky.module.scss`
 - `apps/app/src/components/Common/PagePathNav/PagePathNavLayout.tsx`（CopyDropdown を含む）
+
+## ライブラリの注意事項
+
+### react-stickynode の deprecation
+`react-stickynode` は **2025-12-31 で deprecated** となる予定。
+https://github.com/yahoo/react-stickynode
+
+将来的には CSS `position: sticky` + `IntersectionObserver` への移行を検討する必要がある。
 
 ## 注意事項
 
