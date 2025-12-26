@@ -8,11 +8,6 @@ import { configManager } from '../../config-manager';
 type ContentHeaderField = 'Content-Type' | 'Content-Security-Policy' | 'Content-Disposition' | 'Content-Length';
 type ContentHeader = ExpressHttpHeader<ContentHeaderField>;
 
-/**
- * Determine Content-Disposition based on MIME type configuration.
- * Checks the configured inline/attachment MIME types and falls back to opts.inline if not configured.
- */
-// 呼び出し元を大量に修正したくないが、headers.ts を pure utility に保ちたかったから関数を作って分けた
 const determineDisposition = (
     fileFormat: string,
     opts?: { inline?: boolean },
@@ -28,7 +23,6 @@ const determineDisposition = (
   if (inlineMimeTypes.some(mimeType => mimeType.toLowerCase() === normalizedFileFormat)) {
     return 'inline';
   }
-  // Fallback to existing behavior when not configured
   return opts?.inline ? 'inline' : 'attachment';
 };
 
