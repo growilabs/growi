@@ -1,10 +1,7 @@
 import { faker } from '@faker-js/faker';
 import type { IPagePopulatedToShowRevision } from '@growi/core';
-import {
-  fireEvent, render, screen, waitFor,
-} from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { mock } from 'vitest-mock-extended';
-
 
 import { EditorMode } from '~/states/ui/editor';
 
@@ -21,13 +18,12 @@ vi.mock('~/states/page', async (importOriginal) => {
     useIsUntitledPage: mocks.useIsUntitledPageMock,
   };
 });
-vi.mock('~/states/ui/editor', async importOriginal => ({
-  ...await importOriginal(),
+vi.mock('~/states/ui/editor', async (importOriginal) => ({
+  ...(await importOriginal()),
   useEditorMode: mocks.useEditorModeMock,
 }));
 
 describe('PageTitleHeader Component with untitled page', () => {
-
   beforeAll(() => {
     mocks.useIsUntitledPageMock.mockImplementation(() => true);
   });
@@ -46,7 +42,8 @@ describe('PageTitleHeader Component with untitled page', () => {
     // header should be rendered
     const headerElement = screen.getByText('Untitled-1');
     const inputElement = screen.getByRole('textbox');
-    const inputElementByPlaceholder = screen.getByPlaceholderText('Input page name');
+    const inputElementByPlaceholder =
+      screen.getByPlaceholderText('Input page name');
     await waitFor(() => {
       expect(inputElement).toBeInTheDocument();
       expect(inputElement).toStrictEqual(inputElementByPlaceholder);
@@ -54,12 +51,9 @@ describe('PageTitleHeader Component with untitled page', () => {
       expect(headerElement).toHaveClass('invisible');
     });
   });
-
 });
 
-
 describe('PageTitleHeader Component', () => {
-
   beforeAll(() => {
     mocks.useIsUntitledPageMock.mockImplementation(() => false);
   });
@@ -112,5 +106,4 @@ describe('PageTitleHeader Component', () => {
       expect(headerElement).toHaveClass('invisible');
     });
   });
-
 });

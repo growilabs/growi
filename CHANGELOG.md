@@ -1,8 +1,18 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.4.0...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.4.1...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.4.1](https://github.com/growilabs/compare/v7.4.0...v7.4.1) - 2025-12-26
+
+### 🚀 Improvement
+
+* imprv: Show page name and link for affected pages in Activity Log (#10590) @arvid-e
+
+### 🧰 Maintenance
+
+* support: Update terraform settings and the policy for OIDC GitHub (#10653) @yuki-takei
 
 ## [v7.4.0](https://github.com/growilabs/compare/v7.3.9...v7.4.0) - 2025-12-24
 
