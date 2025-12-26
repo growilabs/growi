@@ -41,7 +41,6 @@ module.exports = {
     'src/client/components/*.jsx',
     'src/client/components/*.ts',
     'src/client/components/*.js',
-<<<<<<< HEAD
     'src/client/components/AuthorInfo/**',
     'src/client/components/CreateTemplateModal/**',
     'src/client/components/CustomNavigation/**',
@@ -58,12 +57,10 @@ module.exports = {
     'src/client/components/ShortcutsModal/**',
     'src/client/components/StaffCredit/**',
     'src/client/components/TemplateModal/**',
-=======
     'src/client/components/PageEditor/**',
     'src/client/components/Hotkeys/**',
     'src/client/components/Navbar/**',
     'src/client/components/PageHeader/**',
->>>>>>> master
     'src/client/components/Sidebar/**',
     'src/services/**',
     'src/states/**',
