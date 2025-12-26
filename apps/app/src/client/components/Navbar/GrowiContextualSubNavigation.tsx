@@ -59,6 +59,8 @@ import { Skeleton } from '../Skeleton';
 import styles from './GrowiContextualSubNavigation.module.scss';
 import PageEditorModeManagerStyles from './PageEditorModeManager.module.scss';
 
+const moduleClass = styles['grw-contextual-sub-navigation'];
+const minHeightSubNavigation = styles['grw-min-height-sub-navigation'];
 
 const PageEditorModeManager = dynamic(
   () => import('./PageEditorModeManager').then(mod => mod.PageEditorModeManager),
@@ -387,72 +389,76 @@ const GrowiContextualSubNavigation = (props: GrowiContextualSubNavigationProps):
       <GroundGlassBar className="py-4 d-block d-md-none d-print-none border-bottom" />
 
       <Sticky
-        className="z-1"
+        className="z-1 position-fixed d-print-none"
+        enabled={!isPrinting}
+        innerActiveClass="w-100 end-0"
+      >
+        <GroundGlassBar className={minHeightSubNavigation} />
+      </Sticky>
+
+      <Sticky
+        className="z-3"
         enabled={!isPrinting}
         onStateChange={status => setStickyActive(status.status === Sticky.STATUS_FIXED)}
         innerActiveClass="w-100 end-0"
       >
-        <GroundGlassBar>
+        <nav
+          className={`${moduleClass} ${minHeightSubNavigation}
+            d-flex align-items-center justify-content-end pe-2 pe-sm-3 pe-md-4 py-1 gap-2 gap-md-4 d-print-none
+          `}
+          data-testid="grw-contextual-sub-nav"
+          id="grw-contextual-sub-nav"
+        >
 
-          <nav
-            className={`${styles['grw-contextual-sub-navigation']}
-              d-flex align-items-center justify-content-end pe-2 pe-sm-3 pe-md-4 py-1 gap-2 gap-md-4 d-print-none
-            `}
-            data-testid="grw-contextual-sub-nav"
-            id="grw-contextual-sub-nav"
-          >
+          <PageControls
+            pageId={pageId}
+            revisionId={revisionId}
+            shareLinkId={shareLinkId}
+            path={path ?? currentPathname} // If the page is empty, "path" is undefined
+            expandContentWidth={shouldExpandContent}
+            disableSeenUserInfoPopover={isSharedUser}
+            hideSubControls={hideSubControls}
+            showPageControlDropdown={isAbleToShowPageManagement}
+            additionalMenuItemRenderer={additionalMenuItemsRenderer}
+            onClickDuplicateMenuItem={duplicateItemClickedHandler}
+            onClickRenameMenuItem={renameItemClickedHandler}
+            onClickDeleteMenuItem={deleteItemClickedHandler}
+            onClickSwitchContentWidth={switchContentWidthHandler}
+          />
 
-            <PageControls
-              pageId={pageId}
-              revisionId={revisionId}
-              shareLinkId={shareLinkId}
-              path={path ?? currentPathname} // If the page is empty, "path" is undefined
-              expandContentWidth={shouldExpandContent}
-              disableSeenUserInfoPopover={isSharedUser}
-              hideSubControls={hideSubControls}
-              showPageControlDropdown={isAbleToShowPageManagement}
-              additionalMenuItemRenderer={additionalMenuItemsRenderer}
-              onClickDuplicateMenuItem={duplicateItemClickedHandler}
-              onClickRenameMenuItem={renameItemClickedHandler}
-              onClickDeleteMenuItem={deleteItemClickedHandler}
-              onClickSwitchContentWidth={switchContentWidthHandler}
+          {isAbleToChangeEditorMode && (
+            <PageEditorModeManager
+              editorMode={editorMode}
+              isBtnDisabled={!!isGuestUser || !!isReadOnlyUser}
+              path={path}
             />
+          )}
 
-            {isAbleToChangeEditorMode && (
-              <PageEditorModeManager
-                editorMode={editorMode}
-                isBtnDisabled={!!isGuestUser || !!isReadOnlyUser}
-                path={path}
-              />
-            )}
-
-            {isGuestUser && (
-              <div>
-                <span>
-                  <span className="d-inline-block" id="sign-up-link">
-                    <Link
-                      href={!isLocalAccountRegistrationEnabled ? '#' : '/login#register'}
-                      className={`btn me-2 ${!isLocalAccountRegistrationEnabled ? 'opacity-25' : ''}`}
-                      style={{ pointerEvents: !isLocalAccountRegistrationEnabled ? 'none' : undefined }}
-                      prefetch={false}
-                    >
-                      <span className="material-symbols-outlined me-1">person_add</span>{t('Sign up')}
-                    </Link>
-                  </span>
-                  {!isLocalAccountRegistrationEnabled && (
-                    <UncontrolledTooltip target="sign-up-link" fade={false}>
-                      {t('tooltip.login_required')}
-                    </UncontrolledTooltip>
-                  )}
+          {isGuestUser && (
+            <div>
+              <span>
+                <span className="d-inline-block" id="sign-up-link">
+                  <Link
+                    href={!isLocalAccountRegistrationEnabled ? '#' : '/login#register'}
+                    className={`btn me-2 ${!isLocalAccountRegistrationEnabled ? 'opacity-25' : ''}`}
+                    style={{ pointerEvents: !isLocalAccountRegistrationEnabled ? 'none' : undefined }}
+                    prefetch={false}
+                  >
+                    <span className="material-symbols-outlined me-1">person_add</span>{t('Sign up')}
+                  </Link>
                 </span>
-                <Link href="/login#login" className="btn btn-primary" prefetch={false}>
-                  <span className="material-symbols-outlined me-1">login</span>{t('Sign in')}
-                </Link>
-              </div>
-            )}
-          </nav>
-
-        </GroundGlassBar>
+                {!isLocalAccountRegistrationEnabled && (
+                  <UncontrolledTooltip target="sign-up-link" fade={false}>
+                    {t('tooltip.login_required')}
+                  </UncontrolledTooltip>
+                )}
+              </span>
+              <Link href="/login#login" className="btn btn-primary" prefetch={false}>
+                <span className="material-symbols-outlined me-1">login</span>{t('Sign in')}
+              </Link>
+            </div>
+          )}
+        </nav>
       </Sticky>
 
       {path != null && currentUser != null && !isReadOnlyUser && (

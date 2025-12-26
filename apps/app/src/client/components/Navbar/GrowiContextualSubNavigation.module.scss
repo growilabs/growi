@@ -1,12 +1,8 @@
 @use '~/styles/mixins';
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.grw-contextual-sub-navigation {
+.grw-min-height-sub-navigation {
   min-height: 46px;
-
-  @include bs.media-breakpoint-up(lg) {
-    min-height: 46px;
-  }
 }
 
 @include mixins.at-editing() {

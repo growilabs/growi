@@ -84,7 +84,7 @@ export const PagePathNavSticky = (props: PagePathNavLayoutProps): JSX.Element =>
     // Controlling pointer-events
     //  1. disable pointer-events with 'pe-none'
     <div ref={pagePathNavRef}>
-      <Sticky className={moduleClass} enabled={!isPrinting} innerClass="pe-none" innerActiveClass="active mt-1">
+      <Sticky className={moduleClass} enabled={!isPrinting} innerClass="z-2 pe-none" innerActiveClass="active z-3 mt-1">
         {({ status }) => {
           const isStatusFixed = status === Sticky.STATUS_FIXED;
 
