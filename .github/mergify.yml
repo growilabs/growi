@@ -1,6 +1,5 @@
 queue_rules:
   - name: default
-    allow_inplace_checks: false
     queue_conditions:
       - check-success ~= ci-app-lint
       - check-success ~= ci-app-test
