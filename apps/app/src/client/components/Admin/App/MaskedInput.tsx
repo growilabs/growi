@@ -46,7 +46,7 @@ export default function MaskedInput(props: Props): JSX.Element {
       <button
         type="button"
         onClick={togglePassword}
-        className={styles.PasswordReveal}
+        className={`${styles.PasswordReveal} border-0 bg-transparent p-0`}
         aria-pressed={passwordShown}
         aria-label="Toggle password visibility"
       >

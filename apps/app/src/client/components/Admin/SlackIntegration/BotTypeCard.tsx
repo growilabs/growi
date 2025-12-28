@@ -45,7 +45,7 @@ export const BotTypeCard = (props: BotTypeCardProps): JSX.Element => {
   return (
     <button
       type="button"
-      className={`card admin-bot-card rounded border-radius-sm shadow ${isActive ? 'border-primary' : ''}`}
+      className={`card admin-bot-card rounded border-radius-sm shadow ${isActive ? 'border-primary' : ''} border-0 bg-transparent p-0`}
       onClick={() => onBotTypeSelectHandler(botDetails[botType].botType)}
       aria-pressed={isActive}
     >
