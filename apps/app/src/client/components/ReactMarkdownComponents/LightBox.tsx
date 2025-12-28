@@ -1,5 +1,6 @@
+import type React from 'react';
 import type { DetailedHTMLProps, ImgHTMLAttributes, JSX } from 'react';
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import FsLightbox from 'fslightbox-react';
 import { createPortal } from 'react-dom';
 

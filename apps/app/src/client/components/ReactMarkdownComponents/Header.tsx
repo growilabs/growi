@@ -3,8 +3,8 @@ import { useRouter } from 'next/router';
 import { globalEventTarget } from '@growi/core/dist/utils';
 import type { Element } from 'hast';
 
-import { NextLink } from '~/components/ReactMarkdownComponents/NextLink';
 import { useStartEditing } from '~/client/services/use-start-editing';
+import { NextLink } from '~/components/ReactMarkdownComponents/NextLink';
 import {
   useCurrentPageYjsData,
   useCurrentPageYjsDataLoading,
