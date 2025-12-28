@@ -1,8 +1,12 @@
 import type { ForwardRefRenderFunction } from 'react';
 import React, {
-  Fragment, useState, useCallback, forwardRef, useRef, useImperativeHandle,
+  Fragment,
+  forwardRef,
+  useCallback,
+  useImperativeHandle,
+  useRef,
+  useState,
 } from 'react';
-
 import type { TypeaheadRef } from 'react-bootstrap-typeahead';
 import { AsyncTypeahead, Menu, MenuItem } from 'react-bootstrap-typeahead';
 import { useTranslation } from 'react-i18next';
@@ -10,25 +14,27 @@ import { useTranslation } from 'react-i18next';
 import type { IClearable } from '~/client/interfaces/clearable';
 import { useSWRxUsernames } from '~/stores/user';
 
-
 const Categories = {
   activeUser: 'Active User',
   inactiveUser: 'Inactive User',
   activitySnapshotUser: 'Activity Snapshot User',
 } as const;
 
-type CategoryType = typeof Categories[keyof typeof Categories]
+type CategoryType = (typeof Categories)[keyof typeof Categories];
 
 type UserDataType = {
-  username: string
-  category: CategoryType
-}
+  username: string;
+  category: CategoryType;
+};
 
 type Props = {
-  onChange: (text: string[]) => void
-}
+  onChange: (text: string[]) => void;
+};
 
-const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<IClearable, Props> = ((props: Props, ref) => {
+const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
+  IClearable,
+  Props
+> = (props: Props, ref) => {
   const { onChange } = props;
   const { t } = useTranslation();
 
@@ -42,16 +48,33 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<IClearable, Pro
   /*
    * Fetch
    */
-  const requestOptions = { isIncludeActiveUser: true, isIncludeInactiveUser: true, isIncludeActivitySnapshotUser: true };
-  const { data: usernameData, error, isLoading: _isLoading } = useSWRxUsernames(searchKeyword, 0, 5, requestOptions);
-  const activeUsernames = usernameData?.activeUser?.usernames != null ? usernameData.activeUser.usernames : [];
-  const inactiveUsernames = usernameData?.inactiveUser?.usernames != null ? usernameData.inactiveUser.usernames : [];
-  const activitySnapshotUsernames = usernameData?.activitySnapshotUser?.usernames != null ? usernameData.activitySnapshotUser.usernames : [];
+  const requestOptions = {
+    isIncludeActiveUser: true,
+    isIncludeInactiveUser: true,
+    isIncludeActivitySnapshotUser: true,
+  };
+  const {
+    data: usernameData,
+    error,
+    isLoading: _isLoading,
+  } = useSWRxUsernames(searchKeyword, 0, 5, requestOptions);
+  const activeUsernames =
+    usernameData?.activeUser?.usernames != null
+      ? usernameData.activeUser.usernames
+      : [];
+  const inactiveUsernames =
+    usernameData?.inactiveUser?.usernames != null
+      ? usernameData.inactiveUser.usernames
+      : [];
+  const activitySnapshotUsernames =
+    usernameData?.activitySnapshotUser?.usernames != null
+      ? usernameData.activitySnapshotUser.usernames
+      : [];
   const isLoading = _isLoading === true && error == null;
 
   const allUser: UserDataType[] = [];
   const pushToAllUser = (usernames: string[], category: CategoryType) => {
-    usernames.forEach(username => allUser.push({ username, category }));
+    usernames.forEach((username) => allUser.push({ username, category }));
   };
   pushToAllUser(activeUsernames, Categories.activeUser);
   pushToAllUser(inactiveUsernames, Categories.inactiveUser);
@@ -60,10 +83,13 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<IClearable, Pro
   /*
    * Functions
    */
-  const changeHandler = useCallback((userData: UserDataType[]) => {
-    const usernames = userData.map(user => user.username);
-    onChange(usernames);
-  }, [onChange]);
+  const changeHandler = useCallback(
+    (userData: UserDataType[]) => {
+      const usernames = userData.map((user) => user.username);
+      onChange(usernames);
+    },
+    [onChange],
+  );
 
   const searchHandler = useCallback((text: string) => {
     setSearchKeyword(text);
@@ -76,7 +102,7 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<IClearable, Pro
 
     let index = 0;
     const items = Object.values(Categories).map((category) => {
-      const userData = allUser.filter(user => user.category === category);
+      const userData = allUser.filter((user) => user.category === category);
       return (
         <Fragment key={category}>
           {index !== 0 && <Menu.Divider />}
@@ -94,9 +120,7 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<IClearable, Pro
       );
     });
 
-    return (
-      <Menu {...menuProps}>{items}</Menu>
-    );
+    return <Menu {...menuProps}>{items}</Menu>;
   }, []);
 
   useImperativeHandle(ref, () => ({
@@ -129,6 +153,8 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<IClearable, Pro
       />
     </div>
   );
-});
+};
 
-export const SearchUsernameTypeahead = forwardRef(SearchUsernameTypeaheadSubstance);
+export const SearchUsernameTypeahead = forwardRef(
+  SearchUsernameTypeaheadSubstance,
+);

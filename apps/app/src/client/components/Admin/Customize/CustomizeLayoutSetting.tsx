@@ -1,16 +1,14 @@
-import React, {
-  useCallback, useEffect, useState, type JSX,
-} from 'react';
-
+import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 
-import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useNextThemes } from '~/stores-universal/use-next-themes';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useSWRxLayoutSetting } from '~/stores/admin/customize';
+import { useNextThemes } from '~/stores-universal/use-next-themes';
 
 const useIsContainerFluid = () => {
-  const { data: layoutSetting, update: updateLayoutSetting } = useSWRxLayoutSetting();
+  const { data: layoutSetting, update: updateLayoutSetting } =
+    useSWRxLayoutSetting();
   const [isContainerFluid, setIsContainerFluid] = useState<boolean>();
 
   useEffect(() => {
@@ -29,15 +27,22 @@ const CustomizeLayoutSetting = (): JSX.Element => {
 
   const { resolvedTheme } = useNextThemes();
 
-  const { isContainerFluid, setIsContainerFluid, updateLayoutSetting } = useIsContainerFluid();
+  const { isContainerFluid, setIsContainerFluid, updateLayoutSetting } =
+    useIsContainerFluid();
 
-  const onClickSubmit = useCallback(async() => {
-    if (isContainerFluid == null) { return }
+  const onClickSubmit = useCallback(async () => {
+    if (isContainerFluid == null) {
+      return;
+    }
     try {
       await updateLayoutSetting({ isContainerFluid });
-      toastSuccess(t('toaster.update_successed', { target: t('customize_settings.layout'), ns: 'commons' }));
-    }
-    catch (err) {
+      toastSuccess(
+        t('toaster.update_successed', {
+          target: t('customize_settings.layout'),
+          ns: 'commons',
+        }),
+      );
+    } catch (err) {
       toastError(err);
     }
   }, [isContainerFluid, updateLayoutSetting, t]);
@@ -54,7 +59,9 @@ const CustomizeLayoutSetting = (): JSX.Element => {
     <React.Fragment>
       <div className="row">
         <div className="col-12">
-          <h2 className="admin-setting-header">{t('customize_settings.layout')}</h2>
+          <h2 className="admin-setting-header">
+            {t('customize_settings.layout')}
+          </h2>
 
           <div className="d-flex justify-content-around mt-5">
             <div className="row row-cols-2">
@@ -97,7 +104,13 @@ const CustomizeLayoutSetting = (): JSX.Element => {
 
           <div className="row my-3">
             <div className="mx-auto">
-              <button type="button" className="btn btn-primary" onClick={onClickSubmit}>{ t('Update') }</button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={onClickSubmit}
+              >
+                {t('Update')}
+              </button>
             </div>
           </div>
         </div>

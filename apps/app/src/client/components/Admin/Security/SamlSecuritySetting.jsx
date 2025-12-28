@@ -1,5 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
-
+import React, { useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
 import AdminSamlSecurityContainer from '~/client/services/AdminSamlSecurityContainer';
@@ -7,17 +6,15 @@ import { toastError } from '~/client/util/toastr';
 import { toArrayIfNot } from '~/utils/array-utils';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
-
 import SamlSecuritySettingContents from './SamlSecuritySettingContents';
 
 const SamlSecurityManagement = (props) => {
   const { adminSamlSecurityContainer } = props;
 
-  const fetchSamlSecuritySettingsData = useCallback(async() => {
+  const fetchSamlSecuritySettingsData = useCallback(async () => {
     try {
       await adminSamlSecurityContainer.retrieveSecurityData();
-    }
-    catch (err) {
+    } catch (err) {
       const errs = toArrayIfNot(err);
       toastError(errs);
     }
@@ -31,11 +28,13 @@ const SamlSecurityManagement = (props) => {
 };
 
 SamlSecurityManagement.propTypes = {
-  adminSamlSecurityContainer: PropTypes.instanceOf(AdminSamlSecurityContainer).isRequired,
+  adminSamlSecurityContainer: PropTypes.instanceOf(AdminSamlSecurityContainer)
+    .isRequired,
 };
 
-const SamlSecurityManagementWithUnstatedContainer = withUnstatedContainers(SamlSecurityManagement, [
-  AdminSamlSecurityContainer,
-]);
+const SamlSecurityManagementWithUnstatedContainer = withUnstatedContainers(
+  SamlSecurityManagement,
+  [AdminSamlSecurityContainer],
+);
 
 export default SamlSecurityManagementWithUnstatedContainer;

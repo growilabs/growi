@@ -1,11 +1,9 @@
 import React, { useMemo, useState } from 'react';
-
-import { useTranslation } from 'next-i18next';
 import Link from 'next/link';
+import { useTranslation } from 'next-i18next';
 import { TabContent, TabPane } from 'reactstrap';
 
 import CustomNav from '../../CustomNavigation/CustomNav';
-
 import GitHubSecuritySetting from './GitHubSecuritySetting';
 import GoogleSecuritySetting from './GoogleSecuritySetting';
 import LdapSecuritySetting from './LdapSecuritySetting';
@@ -19,7 +17,9 @@ const SecurityManagementContents = () => {
   const { t } = useTranslation('admin');
 
   const [activeTab, setActiveTab] = useState('passport_local');
-  const [activeComponents, setActiveComponents] = useState(new Set(['passport_local']));
+  const [activeComponents, setActiveComponents] = useState(
+    new Set(['passport_local']),
+  );
 
   const switchActiveTab = (selectedTab) => {
     setActiveTab(selectedTab);
@@ -33,7 +33,9 @@ const SecurityManagementContents = () => {
         i18n: 'ID/Pass',
       },
       passport_ldap: {
-        Icon: () => <span className="material-symbols-outlined">network_node</span>,
+        Icon: () => (
+          <span className="material-symbols-outlined">network_node</span>
+        ),
         i18n: 'LDAP',
       },
       passport_saml: {
@@ -45,16 +47,19 @@ const SecurityManagementContents = () => {
         i18n: 'OIDC',
       },
       passport_google: {
-        Icon: () => <span className="growi-custom-icons align-bottom">google</span>,
+        Icon: () => (
+          <span className="growi-custom-icons align-bottom">google</span>
+        ),
         i18n: 'Google',
       },
       passport_github: {
-        Icon: () => <span className="growi-custom-icons align-bottom">github</span>,
+        Icon: () => (
+          <span className="growi-custom-icons align-bottom">github</span>
+        ),
         i18n: 'GitHub',
       },
     };
   }, []);
-
 
   return (
     <div data-testid="admin-security">
@@ -67,22 +72,26 @@ const SecurityManagementContents = () => {
         <ShareLinkSetting />
       </div>
 
-
       {/* XSS configuration link */}
       <div className="mb-5">
-        <h2 className="border-bottom pb-2">{t('security_settings.xss_prevent_setting')}</h2>
+        <h2 className="border-bottom pb-2">
+          {t('security_settings.xss_prevent_setting')}
+        </h2>
         <div className="mt-4">
           <Link
             href="/admin/markdown/#preventXSS"
             style={{ fontSize: 'large' }}
           >
-            <span className="material-symbols-outlined me-1">login</span> {t('security_settings.xss_prevent_setting_link')}
+            <span className="material-symbols-outlined me-1">login</span>{' '}
+            {t('security_settings.xss_prevent_setting_link')}
           </Link>
         </div>
       </div>
 
       <div className="auth-mechanism-configurations">
-        <h2 className="border-bottom pb-2">{t('security_settings.Authentication mechanism settings')}</h2>
+        <h2 className="border-bottom pb-2">
+          {t('security_settings.Authentication mechanism settings')}
+        </h2>
         <CustomNav
           activeTab={activeTab}
           navTabMapping={navTabMapping}
@@ -104,16 +113,19 @@ const SecurityManagementContents = () => {
             {activeComponents.has('passport_oidc') && <OidcSecuritySetting />}
           </TabPane>
           <TabPane tabId="passport_google">
-            {activeComponents.has('passport_google') && <GoogleSecuritySetting />}
+            {activeComponents.has('passport_google') && (
+              <GoogleSecuritySetting />
+            )}
           </TabPane>
           <TabPane tabId="passport_github">
-            {activeComponents.has('passport_github') && <GitHubSecuritySetting />}
+            {activeComponents.has('passport_github') && (
+              <GitHubSecuritySetting />
+            )}
           </TabPane>
         </TabContent>
       </div>
     </div>
   );
-
 };
 
 export default SecurityManagementContents;

@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 
 import type AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 
@@ -7,7 +7,10 @@ type Props = {
   t: (key: string) => string;
 };
 
-export const PageListDisplaySettings: React.FC<Props> = ({ adminGeneralSecurityContainer, t }) => {
+export const PageListDisplaySettings: React.FC<Props> = ({
+  adminGeneralSecurityContainer,
+  t,
+}) => {
   return (
     <>
       <h4 className="alert-anchor">
@@ -47,24 +50,37 @@ export const PageListDisplaySettings: React.FC<Props> = ({ adminGeneralSecurityC
                     aria-expanded="true"
                   >
                     <span className="float-start">
-                      {adminGeneralSecurityContainer.state.currentOwnerRestrictionDisplayMode === 'Displayed'
-                        && t('security_settings.always_displayed')}
-                      {adminGeneralSecurityContainer.state.currentOwnerRestrictionDisplayMode === 'Hidden'
-                        && t('security_settings.always_hidden')}
+                      {adminGeneralSecurityContainer.state
+                        .currentOwnerRestrictionDisplayMode === 'Displayed' &&
+                        t('security_settings.always_displayed')}
+                      {adminGeneralSecurityContainer.state
+                        .currentOwnerRestrictionDisplayMode === 'Hidden' &&
+                        t('security_settings.always_hidden')}
                     </span>
                   </button>
-                  <div className="dropdown-menu" aria-labelledby="isShowRestrictedByOwner">
+                  <div
+                    className="dropdown-menu"
+                    aria-labelledby="isShowRestrictedByOwner"
+                  >
                     <button
                       className="dropdown-item"
                       type="button"
-                      onClick={() => { adminGeneralSecurityContainer.changeOwnerRestrictionDisplayMode('Displayed') }}
+                      onClick={() => {
+                        adminGeneralSecurityContainer.changeOwnerRestrictionDisplayMode(
+                          'Displayed',
+                        );
+                      }}
                     >
                       {t('security_settings.always_displayed')}
                     </button>
                     <button
                       className="dropdown-item"
                       type="button"
-                      onClick={() => { adminGeneralSecurityContainer.changeOwnerRestrictionDisplayMode('Hidden') }}
+                      onClick={() => {
+                        adminGeneralSecurityContainer.changeOwnerRestrictionDisplayMode(
+                          'Hidden',
+                        );
+                      }}
                     >
                       {t('security_settings.always_hidden')}
                     </button>
@@ -84,24 +100,37 @@ export const PageListDisplaySettings: React.FC<Props> = ({ adminGeneralSecurityC
                     aria-expanded="true"
                   >
                     <span className="float-start">
-                      {adminGeneralSecurityContainer.state.currentGroupRestrictionDisplayMode === 'Displayed'
-                        && t('security_settings.always_displayed')}
-                      {adminGeneralSecurityContainer.state.currentGroupRestrictionDisplayMode === 'Hidden'
-                        && t('security_settings.always_hidden')}
+                      {adminGeneralSecurityContainer.state
+                        .currentGroupRestrictionDisplayMode === 'Displayed' &&
+                        t('security_settings.always_displayed')}
+                      {adminGeneralSecurityContainer.state
+                        .currentGroupRestrictionDisplayMode === 'Hidden' &&
+                        t('security_settings.always_hidden')}
                     </span>
                   </button>
-                  <div className="dropdown-menu" aria-labelledby="isShowRestrictedByGroup">
+                  <div
+                    className="dropdown-menu"
+                    aria-labelledby="isShowRestrictedByGroup"
+                  >
                     <button
                       className="dropdown-item"
                       type="button"
-                      onClick={() => { adminGeneralSecurityContainer.changeGroupRestrictionDisplayMode('Displayed') }}
+                      onClick={() => {
+                        adminGeneralSecurityContainer.changeGroupRestrictionDisplayMode(
+                          'Displayed',
+                        );
+                      }}
                     >
                       {t('security_settings.always_displayed')}
                     </button>
                     <button
                       className="dropdown-item"
                       type="button"
-                      onClick={() => { adminGeneralSecurityContainer.changeGroupRestrictionDisplayMode('Hidden') }}
+                      onClick={() => {
+                        adminGeneralSecurityContainer.changeGroupRestrictionDisplayMode(
+                          'Hidden',
+                        );
+                      }}
                     >
                       {t('security_settings.always_hidden')}
                     </button>

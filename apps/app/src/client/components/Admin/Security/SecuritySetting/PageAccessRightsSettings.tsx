@@ -1,5 +1,5 @@
 /* eslint-disable react/no-danger */
-import React from 'react';
+import type React from 'react';
 
 import type AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 
@@ -8,7 +8,10 @@ type Props = {
   t: (key: string, options?: Record<string, unknown>) => string;
 };
 
-export const PageAccessRightsSettings: React.FC<Props> = ({ adminGeneralSecurityContainer, t }) => {
+export const PageAccessRightsSettings: React.FC<Props> = ({
+  adminGeneralSecurityContainer,
+  t,
+}) => {
   const { currentRestrictGuestMode } = adminGeneralSecurityContainer.state;
 
   return (
@@ -31,22 +34,30 @@ export const PageAccessRightsSettings: React.FC<Props> = ({ adminGeneralSecurity
               aria-expanded="true"
             >
               <span className="float-start">
-                {currentRestrictGuestMode === 'Deny' && t('security_settings.guest_mode.deny')}
-                {currentRestrictGuestMode === 'Readonly' && t('security_settings.guest_mode.readonly')}
+                {currentRestrictGuestMode === 'Deny' &&
+                  t('security_settings.guest_mode.deny')}
+                {currentRestrictGuestMode === 'Readonly' &&
+                  t('security_settings.guest_mode.readonly')}
               </span>
             </button>
             <div className="dropdown-menu" aria-labelledby="dropdownMenuButton">
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { adminGeneralSecurityContainer.changeRestrictGuestMode('Deny') }}
+                onClick={() => {
+                  adminGeneralSecurityContainer.changeRestrictGuestMode('Deny');
+                }}
               >
                 {t('security_settings.guest_mode.deny')}
               </button>
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { adminGeneralSecurityContainer.changeRestrictGuestMode('Readonly') }}
+                onClick={() => {
+                  adminGeneralSecurityContainer.changeRestrictGuestMode(
+                    'Readonly',
+                  );
+                }}
               >
                 {t('security_settings.guest_mode.readonly')}
               </button>

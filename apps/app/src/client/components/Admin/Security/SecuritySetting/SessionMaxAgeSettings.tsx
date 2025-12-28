@@ -1,5 +1,4 @@
-import React from 'react';
-
+import type React from 'react';
 import type { UseFormRegister } from 'react-hook-form';
 
 type Props = {
@@ -23,10 +22,16 @@ export const SessionMaxAgeSettings: React.FC<Props> = ({ register, t }) => {
             placeholder="2592000000"
           />
           {/* eslint-disable-next-line react/no-danger */}
-          <p className="form-text text-muted" dangerouslySetInnerHTML={{ __html: t('security_settings.max_age_desc') }} />
+          <p
+            className="form-text text-muted"
+            dangerouslySetInnerHTML={{
+              __html: t('security_settings.max_age_desc'),
+            }}
+          />
           <p className="card custom-card bg-warning-subtle">
             <span className="text-warning">
-              <span className="material-symbols-outlined">info</span> {t('security_settings.max_age_caution')}
+              <span className="material-symbols-outlined">info</span>{' '}
+              {t('security_settings.max_age_caution')}
             </span>
           </p>
         </div>
