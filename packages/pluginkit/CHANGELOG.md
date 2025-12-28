@@ -1,5 +1,16 @@
 # @growi/pluginkit
 
+## 1.2.0
+
+### Minor Changes
+
+- [`2948cf7`](https://github.com/growilabs/growi/commit/2948cf75ea36c6189deae9a41bdac5e56c8b66b4) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Update dependency to use workspace version
+
+### Patch Changes
+
+- Updated dependencies [[`22fae03`](https://github.com/growilabs/growi/commit/22fae03ce3bc7a530b0d7219c300f9c13f1d65c6), [`3de6953`](https://github.com/growilabs/growi/commit/3de6953c5cf049d8bb070f8cc8c59a85b160a6df), [`3de6953`](https://github.com/growilabs/growi/commit/3de6953c5cf049d8bb070f8cc8c59a85b160a6df)]:
+  - @growi/core@2.0.0
+
 ## 1.1.1
 
 ### Patch Changes

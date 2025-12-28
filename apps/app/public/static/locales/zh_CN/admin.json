@@ -365,6 +365,8 @@
     "confidential_example": "ex）：仅供内部使用",
     "default_language": "新用户的默认语言",
     "default_mail_visibility": "新用户的默认电子邮件可见性",
+    "default_read_only_for_new_user": "新用戶編輯限制",
+    "set_read_only_for_new_user": "將新用戶設為僅限瀏覽",
     "file_uploading": "文件上传",
     "page_bulk_export_settings": "页面批量导出设置",
     "enable_page_bulk_export": "启用批量导出",
@@ -455,10 +457,7 @@
     "customize_settings": "页面定制",
     "default_sidebar_mode": {
       "title": "默认的侧边栏模式",
-      "desc": "你可以为新用户和访问该网页的客人设置侧边栏模式。",
-      "dock_mode_default_desc": "当选择Dock模式时，可以设置侧边栏的初始状态。",
-      "dock_mode_default_open": "从头开始翻页",
-      "dock_mode_default_close": "从头开始打开关闭的页面"
+      "desc": "你可以为新用户和访问该网页的客人设置侧边栏模式。"
     },
     "layout": "布局",
     "layout_options": {

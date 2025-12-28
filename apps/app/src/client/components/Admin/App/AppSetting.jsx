@@ -30,12 +30,15 @@ const AppSetting = (props) => {
       isEmailPublishedForNewUser: String(
         adminAppContainer.state.isEmailPublishedForNewUser ?? true,
       ),
+      isReadOnlyForNewUser:
+        adminAppContainer.state.isReadOnlyForNewUser ?? false,
     });
   }, [
     adminAppContainer.state.title,
     adminAppContainer.state.confidential,
     adminAppContainer.state.globalLang,
     adminAppContainer.state.isEmailPublishedForNewUser,
+    adminAppContainer.state.isReadOnlyForNewUser,
     reset,
   ]);
 
@@ -54,6 +57,9 @@ const AppSetting = (props) => {
           data.isEmailPublishedForNewUser === true;
         await adminAppContainer.changeIsEmailPublishedForNewUserShow(
           isEmailPublished,
+        );
+        await adminAppContainer.changeIsReadOnlyForNewUserShow(
+          data.isReadOnlyForNewUser,
         );
 
         await adminAppContainer.updateAppSettingHandler();
@@ -180,6 +186,28 @@ const AppSetting = (props) => {
               htmlFor="radio-email-hide"
             >
               {t('commons:Hide')}
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div className="row mb-5">
+        <label className="text-start text-md-end col-md-3 col-form-label">
+          {t('admin:app_setting.default_read_only_for_new_user')}
+        </label>
+        <div className="col-md-6 py-2">
+          <div className="form-check form-check-inline">
+            <input
+              type="checkbox"
+              id="checkbox-read-only-for-new-user"
+              className="form-check-input"
+              {...register('isReadOnlyForNewUser')}
+            />
+            <label
+              className="form-label form-check-label"
+              htmlFor="checkbox-read-only-for-new-user"
+            >
+              {t('admin:app_setting.set_read_only_for_new_user')}
             </label>
           </div>
         </div>

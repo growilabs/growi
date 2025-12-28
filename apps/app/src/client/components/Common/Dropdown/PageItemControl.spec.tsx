@@ -1,12 +1,12 @@
-import { type IPageInfoForOperation, type IPageInfoForEmpty } from '@growi/core/dist/interfaces';
-import {
-  fireEvent, screen, within,
-} from '@testing-library/dom';
+import type {
+  IPageInfoForEmpty,
+  IPageInfoForOperation,
+} from '@growi/core/dist/interfaces';
+import { fireEvent, screen, within } from '@testing-library/dom';
 import { render } from '@testing-library/react';
 import { mock } from 'vitest-mock-extended';
 
 import { PageItemControl } from './PageItemControl';
-
 
 // mock for isIPageInfoForOperation and isIPageInfoForEmpty
 
@@ -20,10 +20,9 @@ vi.mock('@growi/core/dist/interfaces', () => ({
   isIPageInfoForEmpty: mocks.isIPageInfoForEmptyMock,
 }));
 
-
 describe('PageItemControl.tsx', () => {
   describe('Should trigger onClickRenameMenuItem() when clicking the rename button', () => {
-    it('without fetching PageInfo by useSWRxPageInfo', async() => {
+    it('without fetching PageInfo by useSWRxPageInfo', async () => {
       // setup
       const pageInfo = mock<IPageInfoForOperation>();
 
@@ -47,7 +46,9 @@ describe('PageItemControl.tsx', () => {
       render(<PageItemControl {...props} />);
 
       // when
-      const button = within(screen.getByTestId('open-page-item-control-btn')).getByText(/more_vert/);
+      const button = within(
+        screen.getByTestId('open-page-item-control-btn'),
+      ).getByText(/more_vert/);
       fireEvent.click(button);
       const renameMenuItem = await screen.findByTestId('rename-page-btn');
       fireEvent.click(renameMenuItem);
@@ -56,7 +57,7 @@ describe('PageItemControl.tsx', () => {
       expect(onClickRenameMenuItemMock).toHaveBeenCalled();
     });
 
-    it('with empty page (IPageInfoForEmpty)', async() => {
+    it('with empty page (IPageInfoForEmpty)', async () => {
       // setup - Create an empty page mock with required properties
       const pageInfo: IPageInfoForEmpty = {
         emptyPageId: 'empty-page-id',
@@ -94,14 +95,19 @@ describe('PageItemControl.tsx', () => {
       render(<PageItemControl {...props} />);
 
       // when
-      const button = within(screen.getByTestId('open-page-item-control-btn')).getByText(/more_vert/);
+      const button = within(
+        screen.getByTestId('open-page-item-control-btn'),
+      ).getByText(/more_vert/);
       fireEvent.click(button);
       const renameMenuItem = await screen.findByTestId('rename-page-btn');
       fireEvent.click(renameMenuItem);
 
       // then
       expect(onClickRenameMenuItemMock).toHaveBeenCalled();
-      expect(onClickRenameMenuItemMock).toHaveBeenCalledWith('dummy-page-id', pageInfo);
+      expect(onClickRenameMenuItemMock).toHaveBeenCalledWith(
+        'dummy-page-id',
+        pageInfo,
+      );
     });
   });
 });

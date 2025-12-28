@@ -1,12 +1,13 @@
-import fs from 'fs';
-import path from 'path';
-import { pipeline } from 'stream';
-import { finished } from 'stream/promises';
+import fs from 'node:fs';
+import { pipeline } from 'node:stream';
+import { finished } from 'node:stream/promises';
+import path from 'pathe';
 import unzipStream, { type Entry } from 'unzip-stream';
 
 import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
+import { assertFileNameSafeForBaseDir } from '../../util/safe-path-utils';
 import type { ZipFileStat } from '../interfaces/export';
 import { tapStreamDataByPromise } from './unzip-stream-utils';
 
@@ -55,7 +56,10 @@ export class GrowiBridgeService {
    * @memberOf GrowiBridgeService
    */
   getFile(fileName: string, baseDir: string): string {
-    const jsonFile = path.join(baseDir, fileName);
+    // Prevent path traversal attack
+    assertFileNameSafeForBaseDir(fileName, baseDir);
+
+    const jsonFile = path.resolve(baseDir, fileName);
 
     // throws err if the file does not exist
     fs.accessSync(jsonFile);

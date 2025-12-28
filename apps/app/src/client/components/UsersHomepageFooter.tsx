@@ -1,4 +1,4 @@
-import React, { type JSX, useState } from 'react';
+import { type JSX, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import { RecentActivity } from '~/client/components/RecentActivity/RecentActivity';
@@ -6,6 +6,11 @@ import { RecentCreated } from '~/client/components/RecentCreated/RecentCreated';
 import { useCurrentUser } from '~/states/global';
 
 import { BookmarkFolderTree } from './Bookmarks/BookmarkFolderTree';
+import {
+  BOOKMARKS_LIST_ID,
+  RECENT_ACTIVITY_LIST_ID,
+  RECENTLY_CREATED_LIST_ID,
+} from './UsersHomepageFooter.consts';
 
 import styles from './UsersHomepageFooter.module.scss';
 
@@ -28,7 +33,7 @@ export const UsersHomepageFooter = (
     >
       <div className="grw-user-page-list-m d-edit-none">
         <h2
-          id="bookmarks-list"
+          id={BOOKMARKS_LIST_ID}
           className="grw-user-page-header border-bottom pb-2 mb-3 d-flex"
         >
           <span
@@ -65,30 +70,24 @@ export const UsersHomepageFooter = (
       </div>
       <div className="grw-user-page-list-m mt-5 d-edit-none">
         <h2
-          id="recently-created-list"
+          id={RECENTLY_CREATED_LIST_ID}
           className="grw-user-page-header border-bottom pb-2 mb-3 d-flex"
         >
           <span className="growi-custom-icons me-1">recently_created</span>
           {t('user_home_page.recently_created')}
         </h2>
-        <div
-          id="user-created-list"
-          className={`page-list ${styles['page-list']}`}
-        >
+        <div className={`page-list ${styles['page-list']}`}>
           <RecentCreated userId={creatorId} />
         </div>
 
         <h2
-          id="user-created-list"
+          id={RECENT_ACTIVITY_LIST_ID}
           className="grw-user-page-header border-bottom pb-2 mb-3 d-flex"
         >
-          <span className="growi-custom-icons me-1">recently_created</span>
+          <span className="material-symbols-outlined me-1 fs-1">update</span>
           {t('user_home_page.recent_activity')}
         </h2>
-        <div
-          id="user-created-list"
-          className={`page-list ${styles['page-list']}`}
-        >
+        <div className={`page-list ${styles['page-list']}`}>
           <RecentActivity userId={creatorId} />
         </div>
       </div>
