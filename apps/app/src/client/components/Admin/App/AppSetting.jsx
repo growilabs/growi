@@ -192,7 +192,10 @@ const AppSetting = (props) => {
       </div>
 
       <div className="row mb-5">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <label
+          className="text-start text-md-end col-md-3 col-form-label"
+          htmlFor="checkbox-read-only-for-new-user"
+        >
           {t('admin:app_setting.default_read_only_for_new_user')}
         </label>
         <div className="col-md-6 py-2">
