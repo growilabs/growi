@@ -4,6 +4,7 @@ import { globalEventTarget } from '@growi/core/dist/utils';
 import type { Element } from 'hast';
 
 import { NextLink } from '~/components/ReactMarkdownComponents/NextLink';
+import { useStartEditing } from '~/client/services/use-start-editing';
 import {
   useCurrentPageYjsData,
   useCurrentPageYjsDataLoading,
@@ -13,6 +14,7 @@ import {
   useIsReadOnlyUser,
   useIsSharedUser,
 } from '~/states/context';
+import { useCurrentPagePath } from '~/states/page';
 import { useShareLinkId } from '~/states/page/hooks';
 import type { ReservedNextCaretLineEventDetail } from '~/states/ui/editor/reserved-next-caret-line';
 import loggerFactory from '~/utils/logger';
@@ -46,6 +48,13 @@ type EditLinkProps = {
  */
 const EditLink = (props: EditLinkProps): JSX.Element => {
   const isDisabled = props.line == null;
+  const startEditing = useStartEditing();
+  const currentPagePath = useCurrentPagePath();
+
+  const onClickHandler = useCallback(() => {
+    setCaretLine(props.line);
+    void startEditing(currentPagePath);
+  }, [currentPagePath, props.line, startEditing]);
 
   return (
     <span className="revision-head-edit-button">
@@ -53,7 +62,7 @@ const EditLink = (props: EditLinkProps): JSX.Element => {
         type="button"
         className="border-0 bg-transparent p-0"
         disabled={isDisabled}
-        onClick={() => setCaretLine(props.line)}
+        onClick={onClickHandler}
       >
         <span className="material-symbols-outlined">edit_square</span>
       </button>
