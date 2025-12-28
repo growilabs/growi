@@ -42,7 +42,6 @@
       "!apps/app/src/client/components/Admin/MarkdownSetting",
       "!apps/app/src/client/components/Admin/Notification",
       "!apps/app/src/client/components/Admin/Security",
-      "!apps/app/src/client/components/AuthorInfo",
       "!apps/app/src/client/components/Bookmarks",
       "!apps/app/src/client/components/DescendantsPageListModal",
       "!apps/app/src/client/components/InAppNotification",
