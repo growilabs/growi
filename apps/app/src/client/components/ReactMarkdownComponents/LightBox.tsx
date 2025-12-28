@@ -11,7 +11,7 @@ type Props = DetailedHTMLProps<
 
 export const LightBox = (props: Props): JSX.Element => {
   const [toggler, setToggler] = useState(false);
-  const { alt, onClick: onImageClick, ...rest } = props;
+  const { alt, ...rest } = props;
 
   const lightboxPortal = useMemo(() => {
     return createPortal(
@@ -33,12 +33,7 @@ export const LightBox = (props: Props): JSX.Element => {
         type="button"
         className="border-0 bg-transparent p-0"
         aria-label={alt ?? 'Open image'}
-        onClick={(event) => {
-          onImageClick?.(
-            event as unknown as React.MouseEvent<HTMLImageElement>,
-          );
-          setToggler((prev) => !prev);
-        }}
+        onClick={() => setToggler((prev) => !prev)}
       >
         <img alt={alt} {...rest} />
       </button>
