@@ -5,14 +5,23 @@ import { useGrantedGroupsInheritanceSelectModalStatus } from '~/states/ui/modal/
 
 type GrantedGroupsInheritanceSelectModalProps = Record<string, unknown>;
 
-export const GrantedGroupsInheritanceSelectModalLazyLoaded = (): JSX.Element => {
-  const status = useGrantedGroupsInheritanceSelectModalStatus();
+export const GrantedGroupsInheritanceSelectModalLazyLoaded =
+  (): JSX.Element => {
+    const status = useGrantedGroupsInheritanceSelectModalStatus();
 
-  const GrantedGroupsInheritanceSelectModal = useLazyLoader<GrantedGroupsInheritanceSelectModalProps>(
-    'granted-groups-inheritance-select-modal',
-    () => import('./GrantedGroupsInheritanceSelectModal').then(mod => ({ default: mod.GrantedGroupsInheritanceSelectModal })),
-    status?.isOpened ?? false,
-  );
+    const GrantedGroupsInheritanceSelectModal =
+      useLazyLoader<GrantedGroupsInheritanceSelectModalProps>(
+        'granted-groups-inheritance-select-modal',
+        () =>
+          import('./GrantedGroupsInheritanceSelectModal').then((mod) => ({
+            default: mod.GrantedGroupsInheritanceSelectModal,
+          })),
+        status?.isOpened ?? false,
+      );
 
-  return GrantedGroupsInheritanceSelectModal ? <GrantedGroupsInheritanceSelectModal /> : <></>;
-};
+    return GrantedGroupsInheritanceSelectModal ? (
+      <GrantedGroupsInheritanceSelectModal />
+    ) : (
+      <></>
+    );
+  };

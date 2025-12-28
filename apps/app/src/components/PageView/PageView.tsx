@@ -1,4 +1,12 @@
-import { type JSX, memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import {
+  type JSX,
+  memo,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+} from 'react';
 import dynamic from 'next/dynamic';
 import { isDeepEquals } from '@growi/core/dist/utils/is-deep-equals';
 import { isUsersHomepage } from '@growi/core/dist/utils/page-path-utils';
@@ -103,6 +111,8 @@ const PageViewComponent = (props: Props): JSX.Element => {
   const isNotCreatable = useIsNotCreatable();
   const isNotFoundMeta = usePageNotFound();
 
+  const contentContainerId = useId();
+
   const page = useCurrentPageData();
   const { data: viewOptions } = useViewOptions();
 
@@ -129,9 +139,7 @@ const PageViewComponent = (props: Props): JSX.Element => {
       return;
     }
 
-    const contentContainer = document.getElementById(
-      'page-view-content-container',
-    );
+    const contentContainer = document.getElementById(contentContainerId);
     if (contentContainer == null) return;
 
     const targetId = decodeURIComponent(hash.slice(1));
@@ -152,7 +160,7 @@ const PageViewComponent = (props: Props): JSX.Element => {
     observer.observe(contentContainer, { childList: true, subtree: true });
 
     return () => observer.disconnect();
-  }, [currentPageId]);
+  }, [currentPageId, contentContainerId]);
 
   // *******************************  end  *******************************
 
@@ -252,7 +260,7 @@ const PageViewComponent = (props: Props): JSX.Element => {
           {isUsersHomepagePath && page?.creator != null && (
             <UserInfo author={page.creator} />
           )}
-          <div id="page-view-content-container" className="flex-expand-vert">
+          <div id={contentContainerId} className="flex-expand-vert">
             <Contents />
           </div>
         </>

@@ -67,8 +67,10 @@ const TrashPage: NextPageWithLayout<Props> = (props: Props) => {
 
         <div className="main ps-sidebar">
           <div className="container-lg wide-gutter-x-lg">
-            <PagePathNavTitle pagePath="/trash" />
-            <TrashPageList />
+            <div className="d-flex flex-column gap-4">
+              <PagePathNavTitle pagePath="/trash" />
+              <TrashPageList />
+            </div>
           </div>
         </div>
       </div>

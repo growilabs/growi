@@ -1,5 +1,5 @@
-import { useMemo, type JSX } from 'react';
-
+import { type JSX, useMemo } from 'react';
+import Link from 'next/link';
 import type { IRevisionHasId } from '@growi/core';
 import { GrowiThemeSchemeType } from '@growi/core';
 import { returnPathForURL } from '@growi/core/dist/utils/path-utils';
@@ -9,15 +9,12 @@ import type { Diff2HtmlConfig } from 'diff2html';
 import { html } from 'diff2html';
 import { ColorSchemeType } from 'diff2html/lib/types';
 import { useTranslation } from 'next-i18next';
-import Link from 'next/link';
 import urljoin from 'url-join';
-
 
 import { Themes, useNextThemes } from '~/stores-universal/use-next-themes';
 
 import UserDate from '../../../components/User/UserDate';
 import { useSWRxGrowiThemeSetting } from '../../../stores/admin/customize';
-
 
 import styles from './RevisionDiff.module.scss';
 
@@ -26,19 +23,24 @@ import 'diff2html/bundles/css/diff2html.min.css';
 const moduleClass = styles['revision-diff-container'];
 
 type RevisioinDiffProps = {
-  currentRevision: IRevisionHasId,
-  previousRevision: IRevisionHasId,
-  revisionDiffOpened: boolean,
-  currentPageId: string,
-  currentPagePath: string,
-  onClose: () => void,
-}
+  currentRevision: IRevisionHasId;
+  previousRevision: IRevisionHasId;
+  revisionDiffOpened: boolean;
+  currentPageId: string;
+  currentPagePath: string;
+  onClose: () => void;
+};
 
 export const RevisionDiff = (props: RevisioinDiffProps): JSX.Element => {
   const { t } = useTranslation();
 
   const {
-    currentRevision, previousRevision, revisionDiffOpened, currentPageId, currentPagePath, onClose,
+    currentRevision,
+    previousRevision,
+    revisionDiffOpened,
+    currentPageId,
+    currentPagePath,
+    onClose,
   } = props;
 
   const { theme: userTheme } = useNextThemes();
@@ -49,8 +51,11 @@ export const RevisionDiff = (props: RevisioinDiffProps): JSX.Element => {
       return ColorSchemeType.AUTO;
     }
 
-    const growiThemeSchemeType = growiTheme.pluginThemesMetadatas[0]?.schemeType
-        ?? PresetThemesMetadatas.find(theme => theme.name === growiTheme.currentTheme)?.schemeType;
+    const growiThemeSchemeType =
+      growiTheme.pluginThemesMetadatas[0]?.schemeType ??
+      PresetThemesMetadatas.find(
+        (theme) => theme.name === growiTheme.currentTheme,
+      )?.schemeType;
 
     switch (growiThemeSchemeType) {
       case GrowiThemeSchemeType.DARK:
@@ -58,7 +63,7 @@ export const RevisionDiff = (props: RevisioinDiffProps): JSX.Element => {
       case GrowiThemeSchemeType.LIGHT:
         return ColorSchemeType.LIGHT;
       default:
-        // growiThemeSchemeType === GrowiThemeSchemeType.BOTH
+      // growiThemeSchemeType === GrowiThemeSchemeType.BOTH
     }
     switch (userTheme) {
       case Themes.DARK:
@@ -70,7 +75,8 @@ export const RevisionDiff = (props: RevisioinDiffProps): JSX.Element => {
     }
   }, [growiTheme, userTheme]);
 
-  const previousText = (currentRevision._id === previousRevision._id) ? '' : previousRevision.body;
+  const previousText =
+    currentRevision._id === previousRevision._id ? '' : previousRevision.body;
 
   const patch = createPatch(
     currentRevision.pageId, // currentRevision.path is DEPRECATED
@@ -93,9 +99,14 @@ export const RevisionDiff = (props: RevisioinDiffProps): JSX.Element => {
       <div className="container">
         <div className="row mt-2">
           <div className="col px-0 py-2">
-            <span className="fw-bold">{t('page_history.comparing_source')}</span>
+            <span className="fw-bold">
+              {t('page_history.comparing_source')}
+            </span>
             <Link
-              href={urljoin(returnPathForURL(currentPagePath, currentPageId), `?revisionId=${previousRevision._id}`)}
+              href={urljoin(
+                returnPathForURL(currentPagePath, currentPageId),
+                `?revisionId=${previousRevision._id}`,
+              )}
               className="small ms-2
                 link-created-at
                 link-secondary link-opacity-75 link-opacity-100-hover
@@ -107,9 +118,14 @@ export const RevisionDiff = (props: RevisioinDiffProps): JSX.Element => {
             </Link>
           </div>
           <div className="col px-0 py-2">
-            <span className="fw-bold">{t('page_history.comparing_target')}</span>
+            <span className="fw-bold">
+              {t('page_history.comparing_target')}
+            </span>
             <Link
-              href={urljoin(returnPathForURL(currentPagePath, currentPageId), `?revisionId=${currentRevision._id}`)}
+              href={urljoin(
+                returnPathForURL(currentPagePath, currentPageId),
+                `?revisionId=${currentRevision._id}`,
+              )}
               className="small ms-2
                 link-created-at
                 link-secondary link-opacity-75 link-opacity-100-hover
@@ -123,8 +139,11 @@ export const RevisionDiff = (props: RevisioinDiffProps): JSX.Element => {
         </div>
       </div>
       {/* eslint-disable-next-line react/no-danger */}
-      <div className="revision-history-diff pb-1" dangerouslySetInnerHTML={diffView} />
+      <div
+        className="revision-history-diff pb-1"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: diff view is pre-sanitized HTML
+        dangerouslySetInnerHTML={diffView}
+      />
     </div>
   );
-
 };
