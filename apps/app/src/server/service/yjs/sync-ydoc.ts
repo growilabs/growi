@@ -27,7 +27,7 @@ export const syncYDoc = async (
 ): Promise<void> => {
   const pageId = doc.name;
 
-  // Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js'
+  // Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js' provided by v6.1.0 - v7.0.15
   await normalizeLatestRevisionIfBroken(pageId);
 
   const revision = await Revision.findOne(

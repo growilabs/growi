@@ -17,9 +17,6 @@ export const getServerSideSidebarConfigProps: GetServerSideProps<
         isSidebarCollapsedMode: configManager.getConfig(
           'customize:isSidebarCollapsedMode',
         ),
-        isSidebarClosedAtDockMode: configManager.getConfig(
-          'customize:isSidebarClosedAtDockMode',
-        ),
       },
     },
   };

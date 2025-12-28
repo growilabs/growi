@@ -332,6 +332,7 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
 
         setIsSuccessToRagistration(true);
         resetRegisterErrors();
+        setIsLoading(false);
 
         const { redirectTo } = res.data;
 

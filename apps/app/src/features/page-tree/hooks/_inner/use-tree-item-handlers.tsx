@@ -1,11 +1,18 @@
-import { useCallback, useRef } from 'react';
-import type { ItemInstance, TreeConfig } from '@headless-tree/core';
+import { useCallback, useMemo, useRef } from 'react';
+import type {
+  CustomHotkeysConfig,
+  ItemInstance,
+  TreeConfig,
+} from '@headless-tree/core';
 
 import type { IPageForTreeItem } from '~/interfaces/page';
 
 import { useCreatingParentId } from '../../states/_inner';
 import { usePageCreate } from '../use-page-create';
 import { usePageRename } from '../use-page-rename';
+
+type completeRenamingHotkey =
+  CustomHotkeysConfig<IPageForTreeItem>['completeRenaming'];
 
 type UseTreeItemHandlersReturn = {
   /**
@@ -28,6 +35,11 @@ type UseTreeItemHandlersReturn = {
    * Current creating parent ID (for tree expansion logic)
    */
   creatingParentId: string | null;
+
+  /**
+   * Hotkeys config to complete renaming
+   */
+  completeRenamingHotkey: completeRenamingHotkey;
 };
 
 /**
@@ -116,10 +128,31 @@ export const useTreeItemHandlers = (
     [],
   );
 
+  // When using IME (e.g., Japanese input), pressing Enter to confirm
+  // the conversion would also trigger this hotkey, completing the rename
+  // prematurely. We check `isComposing` to ignore Enter presses during
+  // IME composition.
+  const completeRenamingHotkey: completeRenamingHotkey = useMemo(
+    () => ({
+      hotkey: 'Enter',
+      allowWhenInputFocused: true,
+      isEnabled: (tree) => tree.isRenamingItem(),
+      handler: (e, tree) => {
+        // Disable rename during IME composition
+        if (e.isComposing) {
+          return;
+        }
+        tree.completeRenaming();
+      },
+    }),
+    [],
+  );
+
   return {
     getItemName,
     isItemFolder,
     handleRename,
     creatingParentId,
+    completeRenamingHotkey,
   };
 };

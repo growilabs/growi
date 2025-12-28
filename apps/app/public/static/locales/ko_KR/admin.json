@@ -356,6 +356,8 @@
     "confidential_example": "예): 내부 전용",
     "default_language": "새 사용자를 위한 기본 언어",
     "default_mail_visibility": "새 사용자를 위한 이메일 공개",
+    "default_read_only_for_new_user": "신규 사용자의 편집 제한",
+    "set_read_only_for_new_user": "신규 사용자를 열람 전용으로 설정",
     "file_uploading": "파일 업로드",
     "page_bulk_export_settings": "페이지 대량 내보내기 설정",
     "enable_page_bulk_export": "대량 내보내기 활성화",
@@ -446,10 +448,7 @@
     "customize_settings": "사용자 지정",
     "default_sidebar_mode": {
       "title": "기본 사이드바 모드",
-      "desc": "새 사용자 및 페이지를 방문하는 게스트를 위한 사이드바 모드를 설정할 수 있습니다.",
-      "dock_mode_default_desc": "독 모드가 선택되었을 때 사이드바의 초기 상태를 설정할 수 있습니다.",
-      "dock_mode_default_open": "처음부터 열린 상태로 페이지 열기",
-      "dock_mode_default_close": "처음부터 닫힌 상태로 페이지 열기"
+      "desc": "새 사용자 및 페이지를 방문하는 게스트를 위한 사이드바 모드를 설정할 수 있습니다."
     },
     "layout": "레이아웃",
     "layout_options": {

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="249" height="160" viewBox="0 0 249 160">
+  <g transform="translate(17766 9529)">
+    <rect width="249" height="160" rx="2" transform="translate(-17766 -9529)" fill="#fff"/>
+    <g transform="translate(-17700 -9500)">
+      <rect width="170" height="5" transform="translate(0 10)" fill="#abb4bd"/>
+      <rect width="42.646" height="5" fill="#abb4bd"/>
+      <rect width="170" height="5" transform="translate(0 20)" fill="#abb4bd"/>
+      <rect width="170" height="5" transform="translate(0 30)" fill="#abb4bd"/>
+    </g>
+    <g transform="translate(-17700 -9435)">
+      <rect width="170" height="5" transform="translate(0 10)" fill="#abb4bd"/>
+      <rect width="42.646" height="5" fill="#abb4bd"/>
+      <rect width="170" height="5" transform="translate(0 20)" fill="#abb4bd"/>
+      <rect width="170" height="5" transform="translate(0 30)" fill="#abb4bd"/>
+    </g>
+    <g transform="translate(-217 -20)">
+      <path d="M2,160H-2V0H2Z" transform="translate(-17461 -9509)" fill="#209fd8"/>
+      <rect width="86" height="160" transform="translate(-17549 -9509)" fill="#f3f7fc"/>
+    </g>
+    <g transform="translate(-217 -9)">
+      <rect width="47" height="5" transform="translate(-17530 -9431)" fill="#abb4bd"/>
+      <rect width="47" height="5" transform="translate(-17530 -9441)" fill="#abb4bd"/>
+      <rect width="47" height="5" transform="translate(-17530 -9451)" fill="#abb4bd"/>
+      <rect width="47" height="5" transform="translate(-17530 -9461)" fill="#abb4bd"/>
+      <rect width="47" height="5" transform="translate(-17530 -9471)" fill="#abb4bd"/>
+      <rect width="47" height="5" transform="translate(-17530 -9481)" fill="#abb4bd"/>
+      <rect width="11.787" height="5" transform="translate(-17530 -9491)" fill="#abb4bd"/>
+    </g>
+    <g transform="translate(-37 186)" fill="#2a2d33" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M -17689.794921875 -9624.6689453125 L -17689.794921875 -9628.078125 L -17689.794921875 -9645.810546875 L -17689.794921875 -9649.60546875 L -17687.201171875 -9646.8359375 L -17675.93359375 -9634.8095703125 L -17674.029296875 -9632.7783203125 L -17676.7734375 -9632.3056640625 L -17682.544921875 -9631.3115234375 L -17687.28125 -9626.9716796875 L -17689.794921875 -9624.6689453125 Z" stroke="none"/>
+      <path d="M -17688.294921875 -9645.810546875 L -17688.294921875 -9628.078125 L -17683.234375 -9632.71484375 L -17677.02734375 -9633.7841796875 L -17688.294921875 -9645.810546875 M -17688.294921875 -9648.810546875 C -17687.482421875 -9648.810546875 -17686.68359375 -9648.4794921875 -17686.10546875 -9647.861328125 L -17674.837890625 -9635.8349609375 C -17674.083984375 -9635.0302734375 -17673.83203125 -9633.8759765625 -17674.18359375 -9632.830078125 C -17674.533203125 -9631.7841796875 -17675.431640625 -9631.0146484375 -17676.517578125 -9630.828125 L -17681.857421875 -9629.908203125 L -17686.267578125 -9625.8662109375 C -17687.14453125 -9625.0634765625 -17688.4140625 -9624.8525390625 -17689.50390625 -9625.33203125 C -17690.591796875 -9625.8115234375 -17691.294921875 -9626.888671875 -17691.294921875 -9628.078125 L -17691.294921875 -9645.810546875 C -17691.294921875 -9647.0419921875 -17690.54296875 -9648.1474609375 -17689.3984375 -9648.6005859375 C -17689.0390625 -9648.7421875 -17688.666015625 -9648.810546875 -17688.294921875 -9648.810546875 Z" stroke="none" fill="#fff"/>
+    </g>
+  </g>
+</svg>
