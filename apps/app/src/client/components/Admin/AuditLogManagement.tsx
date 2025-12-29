@@ -112,16 +112,18 @@ export const AuditLogManagement: FC = () => {
       actionMap.set(action, !actionMap.get(action));
       setActionMap(new Map(actionMap.entries()));
     },
-    [actionMap, setActionMap],
+    [actionMap],
   );
 
   const multipleActionCheckboxChangedHandler = useCallback(
     (actions: SupportedActionType[], isChecked) => {
       setActivePageNumber(1);
-      actions.forEach((action) => actionMap.set(action, isChecked));
+      actions.forEach((action) => {
+        actionMap.set(action, isChecked);
+      });
       setActionMap(new Map(actionMap.entries()));
     },
-    [actionMap, setActionMap],
+    [actionMap],
   );
 
   const setUsernamesHandler = useCallback((usernames: string[]) => {
@@ -143,14 +145,7 @@ export const AuditLogManagement: FC = () => {
         ),
       );
     }
-  }, [
-    setActivePageNumber,
-    setStartDate,
-    setEndDate,
-    setSelectedUsernames,
-    setActionMap,
-    auditLogAvailableActionsData,
-  ]);
+  }, [auditLogAvailableActionsData]);
 
   const reloadButtonPushedHandler = useCallback(() => {
     setActivePageNumber(1);
@@ -175,7 +170,7 @@ export const AuditLogManagement: FC = () => {
         setJumpPageNumber(activePageNumber);
       }
     },
-    [totalPagingPages, activePageNumber, setJumpPageNumber],
+    [totalPagingPages, activePageNumber],
   );
 
   const jumpPageInputKeyDownHandler = useCallback(
@@ -184,15 +179,15 @@ export const AuditLogManagement: FC = () => {
         setActivePageNumber(jumpPageNumber);
       }
     },
-    [setActivePageNumber, jumpPageNumber],
+    [jumpPageNumber],
   );
 
   const jumpPageButtonPushedHandler = useCallback(() => {
     setActivePageNumber(jumpPageNumber);
   }, [jumpPageNumber]);
 
-  // eslint-disable-next-line max-len
-  const activityCounter = `<b>${activityList.length === 0 ? 0 : offset + 1}</b> - <b>${PAGING_LIMIT * activePageNumber - (PAGING_LIMIT - activityList.length)}</b> of <b>${totalActivityNum}<b/>`;
+  const startIndex = activityList.length === 0 ? 0 : offset + 1;
+  const endIndex = activityList.length === 0 ? 0 : offset + activityList.length;
 
   if (!auditLogEnabled) {
     return <AuditLogDisableMode />;
@@ -275,11 +270,10 @@ export const AuditLogManagement: FC = () => {
             </div>
           </div>
 
-          <p
-            className="ms-2"
-            // eslint-disable-next-line react/no-danger
-            dangerouslySetInnerHTML={{ __html: activityCounter }}
-          />
+          <p className="ms-2">
+            <strong>{startIndex}</strong> - <strong>{endIndex}</strong> of{' '}
+            <strong>{totalActivityNum}</strong>
+          </p>
 
           {isLoading ? (
             <div className="text-muted text-center mb-5">

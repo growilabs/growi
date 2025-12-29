@@ -35,6 +35,7 @@ const G2GDataTransferStatusIcon = ({
     return (
       <span
         className={`material-symbols-outlined text-info ${className}`}
+        role="img"
         aria-label="completed"
         {...props}
       >
@@ -47,6 +48,7 @@ const G2GDataTransferStatusIcon = ({
     return (
       <span
         className={`material-symbols-outlined text-danger ${className}`}
+        role="img"
         aria-label="error"
         {...props}
       >
@@ -59,6 +61,7 @@ const G2GDataTransferStatusIcon = ({
     return (
       <span
         className={`material-symbols-outlined ${className}`}
+        role="img"
         aria-label="skipped"
         {...props}
       >
@@ -70,6 +73,7 @@ const G2GDataTransferStatusIcon = ({
   return (
     <span
       className={`material-symbols-outlined ${className}`}
+      role="img"
       aria-label="pending"
       {...props}
     >

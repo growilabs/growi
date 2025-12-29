@@ -71,7 +71,7 @@ const IndentForm = (props: Props) => {
                       adminMarkDownContainer.setAdminPreferredIndentSize(num)
                     }
                   >
-                    <a role="menuitem">{num}</a>
+                    <span>{num}</span>
                   </DropdownItem>
                 );
               })}
@@ -116,6 +116,7 @@ const IndentForm = (props: Props) => {
         </div>
         <p
           className="form-text text-muted"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
           dangerouslySetInnerHTML={helpIndentInComment}
         />
       </div>

@@ -172,9 +172,9 @@ const ElasticsearchManagement = (): JSX.Element => {
 
       {/* Controls */}
       <div className="row">
-        <label className="col-md-3 col-form-label text-start text-md-end">
+        <div className="col-md-3 col-form-label text-start text-md-end">
           {t('full_text_search_management.reconnect')}
-        </label>
+        </div>
         <div className="col-md-6">
           <ReconnectControls
             isEnabled={isReconnectBtnEnabled}
@@ -187,9 +187,9 @@ const ElasticsearchManagement = (): JSX.Element => {
       <hr />
 
       <div className="row">
-        <label className="col-md-3 col-form-label text-start text-md-end">
+        <div className="col-md-3 col-form-label text-start text-md-end">
           {t('full_text_search_management.normalize')}
-        </label>
+        </div>
         <div className="col-md-6">
           <NormalizeIndicesControls
             isRebuildingProcessing={isRebuildingProcessing}
@@ -202,9 +202,9 @@ const ElasticsearchManagement = (): JSX.Element => {
       <hr />
 
       <div className="row">
-        <label className="col-md-3 col-form-label text-start text-md-end">
+        <div className="col-md-3 col-form-label text-start text-md-end">
           {t('full_text_search_management.rebuild')}
-        </label>
+        </div>
         <div className="col-md-6">
           <RebuildIndexControls
             isRebuildingProcessing={isRebuildingProcessing}

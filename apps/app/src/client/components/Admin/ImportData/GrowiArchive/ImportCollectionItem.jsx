@@ -221,15 +221,15 @@ export default class ImportCollectionItem extends React.Component {
         </span>
         ,&nbsp;
         {errorsCount > 0 ? (
-          <a
-            className="text-danger"
-            role="button"
+          <button
+            type="button"
+            className="btn btn-link text-danger p-0"
             onClick={this.errorLinkClickedHandler}
           >
             <u>
               <strong>{errorsCount}</strong> Failed
             </u>
-          </a>
+          </button>
         ) : (
           <span className="text-muted">
             <strong>0</strong> Failed

@@ -40,6 +40,7 @@ const LegacySlackIntegration = (props) => {
           <span className="material-symbols-outlined">remove</span>
           {/* eslint-disable-next-line react/no-danger */}
           <span
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
             dangerouslySetInnerHTML={{
               __html: t('admin:slack_integration_legacy.alert_disabled'),
             }}
@@ -51,6 +52,7 @@ const LegacySlackIntegration = (props) => {
         <span className="material-symbols-outlined">info</span>
         {/* eslint-disable-next-line react/no-danger */}
         <span
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
           dangerouslySetInnerHTML={{
             __html: t('admin:slack_integration_legacy.alert_deplicated'),
           }}

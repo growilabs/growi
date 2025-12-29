@@ -44,6 +44,164 @@ type Props = {
   updateOptionsMap: (newOptionsMap: any) => void;
 };
 
+type ImportItemsProps = {
+  collectionNames: string[];
+  selectedCollections: Set<string>;
+  optionsMap: Record<string, GrowiArchiveImportOption>;
+  onToggleCollection: (collectionName: string, isChecked: boolean) => void;
+  onOptionChange: (collectionName: string, data: any) => void;
+  onConfigButtonClicked: (collectionName: string) => void;
+};
+
+const ImportItems = ({
+  collectionNames,
+  selectedCollections,
+  optionsMap,
+  onToggleCollection,
+  onOptionChange,
+  onConfigButtonClicked,
+}: ImportItemsProps): JSX.Element => {
+  return (
+    <div className="row">
+      {collectionNames.map((collectionName) => {
+        const isConfigButtonAvailable = Object.keys(
+          IMPORT_OPTION_CLASS_MAPPING,
+        ).includes(collectionName);
+
+        if (optionsMap[collectionName] == null) {
+          return null;
+        }
+
+        return (
+          <div className="col-md-6 my-1" key={collectionName}>
+            <ImportCollectionItem
+              isImporting={false}
+              isImported={false}
+              insertedCount={0}
+              modifiedCount={0}
+              errorsCount={0}
+              collectionName={collectionName}
+              isSelected={selectedCollections.has(collectionName)}
+              option={optionsMap[collectionName]}
+              isConfigButtonAvailable={isConfigButtonAvailable}
+              // events
+              onChange={onToggleCollection}
+              onOptionChange={onOptionChange}
+              onConfigButtonClicked={onConfigButtonClicked}
+              // TODO: show progress
+              isHideProgress
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+type WarnForGroupsProps = {
+  errors: Error[];
+};
+
+const WarnForGroups = ({ errors }: WarnForGroupsProps): JSX.Element => {
+  if (errors.length === 0) {
+    return <></>;
+  }
+
+  return (
+    <div className="alert alert-warning">
+      <ul>
+        {errors.map((error, index) => {
+          return <li key={`${error.message}-${index}`}>{error.message}</li>;
+        })}
+      </ul>
+    </div>
+  );
+};
+
+type GroupImportItemsProps = {
+  groupList: string[];
+  groupName: string;
+  errors: Error[];
+  allCollectionNames: string[];
+  selectedCollections: Set<string>;
+  optionsMap: Record<string, GrowiArchiveImportOption>;
+  onToggleCollection: (collectionName: string, isChecked: boolean) => void;
+  onOptionChange: (collectionName: string, data: any) => void;
+  onConfigButtonClicked: (collectionName: string) => void;
+};
+
+const GroupImportItems = ({
+  groupList,
+  groupName,
+  errors,
+  allCollectionNames,
+  selectedCollections,
+  optionsMap,
+  onToggleCollection,
+  onOptionChange,
+  onConfigButtonClicked,
+}: GroupImportItemsProps): JSX.Element => {
+  const collectionNames = groupList.filter((groupCollectionName) => {
+    return allCollectionNames.includes(groupCollectionName);
+  });
+
+  if (collectionNames.length === 0) {
+    return <></>;
+  }
+
+  return (
+    <div className="mt-4">
+      <legend>{groupName} Collections</legend>
+      <ImportItems
+        collectionNames={collectionNames}
+        selectedCollections={selectedCollections}
+        optionsMap={optionsMap}
+        onToggleCollection={onToggleCollection}
+        onOptionChange={onOptionChange}
+        onConfigButtonClicked={onConfigButtonClicked}
+      />
+      <WarnForGroups errors={errors} />
+    </div>
+  );
+};
+
+type OtherImportItemsProps = {
+  allCollectionNames: string[];
+  selectedCollections: Set<string>;
+  optionsMap: Record<string, GrowiArchiveImportOption>;
+  onToggleCollection: (collectionName: string, isChecked: boolean) => void;
+  onOptionChange: (collectionName: string, data: any) => void;
+  onConfigButtonClicked: (collectionName: string) => void;
+};
+
+const OtherImportItems = ({
+  allCollectionNames,
+  selectedCollections,
+  optionsMap,
+  onToggleCollection,
+  onOptionChange,
+  onConfigButtonClicked,
+}: OtherImportItemsProps): JSX.Element => {
+  const collectionNames = allCollectionNames.filter((collectionName) => {
+    return !ALL_GROUPED_COLLECTIONS.includes(collectionName);
+  });
+
+  // TODO: エラー対応
+  return (
+    <GroupImportItems
+      groupList={collectionNames}
+      groupName="Other"
+      errors={[]}
+      allCollectionNames={allCollectionNames}
+      selectedCollections={selectedCollections}
+      optionsMap={optionsMap}
+      onToggleCollection={onToggleCollection}
+      onOptionChange={onOptionChange}
+      onConfigButtonClicked={onConfigButtonClicked}
+    />
+  );
+};
+
 const G2GDataTransferExportForm = (props: Props): JSX.Element => {
   const { t } = useTranslation('admin');
 
@@ -83,8 +241,8 @@ const G2GDataTransferExportForm = (props: Props): JSX.Element => {
     [optionsMap, updateOptionsMap],
   );
 
-  const ImportItems = ({ collectionNames }): JSX.Element => {
-    const toggleCheckbox = (collectionName, bool) => {
+  const toggleCheckbox = useCallback(
+    (collectionName, bool) => {
       const collections = new Set(selectedCollections);
       if (bool) {
         collections.add(collectionName);
@@ -96,98 +254,14 @@ const G2GDataTransferExportForm = (props: Props): JSX.Element => {
 
       // TODO: validation
       // this.validate();
-    };
+    },
+    [selectedCollections, updateSelectedCollections],
+  );
 
-    const openConfigurationModal = (collectionName) => {
-      setConfigurationModalOpen(true);
-      setCollectionNameForConfiguration(collectionName);
-    };
-
-    return (
-      <div className="row">
-        {collectionNames.map((collectionName) => {
-          const isConfigButtonAvailable = Object.keys(
-            IMPORT_OPTION_CLASS_MAPPING,
-          ).includes(collectionName);
-
-          if (optionsMap[collectionName] == null) {
-            return null;
-          }
-
-          return (
-            <div className="col-md-6 my-1" key={collectionName}>
-              <ImportCollectionItem
-                isImporting={false}
-                isImported={false}
-                insertedCount={0}
-                modifiedCount={0}
-                errorsCount={0}
-                collectionName={collectionName}
-                isSelected={selectedCollections.has(collectionName)}
-                option={optionsMap[collectionName]}
-                isConfigButtonAvailable={isConfigButtonAvailable}
-                // events
-                onChange={toggleCheckbox}
-                onOptionChange={updateOption}
-                onConfigButtonClicked={openConfigurationModal}
-                // TODO: show progress
-                isHideProgress
-              />
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  const WarnForGroups = ({ errors }: { errors: Error[] }): JSX.Element => {
-    if (errors.length === 0) {
-      return <></>;
-    }
-
-    return (
-      <div className="alert alert-warning">
-        <ul>
-          {errors.map((error) => {
-            return <li>{error.message}</li>;
-          })}
-        </ul>
-      </div>
-    );
-  };
-
-  const GroupImportItems = ({ groupList, groupName, errors }): JSX.Element => {
-    const collectionNames = groupList.filter((groupCollectionName) => {
-      return allCollectionNames.includes(groupCollectionName);
-    });
-
-    if (collectionNames.length === 0) {
-      return <></>;
-    }
-
-    return (
-      <div className="mt-4">
-        <legend>{groupName} Collections</legend>
-        <ImportItems collectionNames={collectionNames} />
-        <WarnForGroups errors={errors} />
-      </div>
-    );
-  };
-
-  const OtherImportItems = (): JSX.Element => {
-    const collectionNames = allCollectionNames.filter((collectionName) => {
-      return !ALL_GROUPED_COLLECTIONS.includes(collectionName);
-    });
-
-    // TODO: エラー対応
-    return (
-      <GroupImportItems
-        groupList={collectionNames}
-        groupName="Other"
-        errors={[]}
-      />
-    );
-  };
+  const openConfigurationModal = useCallback((collectionName) => {
+    setConfigurationModalOpen(true);
+    setCollectionNameForConfiguration(collectionName);
+  }, []);
 
   const configurationModal = useMemo(() => {
     if (collectionNameForConfiguration == null) {
@@ -229,7 +303,7 @@ const G2GDataTransferExportForm = (props: Props): JSX.Element => {
 
   useEffect(() => {
     setInitialOptionsMap();
-  }, []);
+  }, [setInitialOptionsMap]);
 
   return (
     <>
@@ -286,14 +360,47 @@ const G2GDataTransferExportForm = (props: Props): JSX.Element => {
       </div>
 
       {/* TODO: エラー追加 */}
-      <GroupImportItems groupList={GROUPS_PAGE} groupName="Page" errors={[]} />
-      <GroupImportItems groupList={GROUPS_USER} groupName="User" errors={[]} />
+      <GroupImportItems
+        groupList={GROUPS_PAGE}
+        groupName="Page"
+        errors={[]}
+        allCollectionNames={allCollectionNames}
+        selectedCollections={selectedCollections}
+        optionsMap={optionsMap}
+        onToggleCollection={toggleCheckbox}
+        onOptionChange={updateOption}
+        onConfigButtonClicked={openConfigurationModal}
+      />
+      <GroupImportItems
+        groupList={GROUPS_USER}
+        groupName="User"
+        errors={[]}
+        allCollectionNames={allCollectionNames}
+        selectedCollections={selectedCollections}
+        optionsMap={optionsMap}
+        onToggleCollection={toggleCheckbox}
+        onOptionChange={updateOption}
+        onConfigButtonClicked={openConfigurationModal}
+      />
       <GroupImportItems
         groupList={GROUPS_CONFIG}
         groupName="Config"
         errors={[]}
+        allCollectionNames={allCollectionNames}
+        selectedCollections={selectedCollections}
+        optionsMap={optionsMap}
+        onToggleCollection={toggleCheckbox}
+        onOptionChange={updateOption}
+        onConfigButtonClicked={openConfigurationModal}
       />
-      <OtherImportItems />
+      <OtherImportItems
+        allCollectionNames={allCollectionNames}
+        selectedCollections={selectedCollections}
+        optionsMap={optionsMap}
+        onToggleCollection={toggleCheckbox}
+        onOptionChange={updateOption}
+        onConfigButtonClicked={openConfigurationModal}
+      />
 
       {configurationModal}
     </>

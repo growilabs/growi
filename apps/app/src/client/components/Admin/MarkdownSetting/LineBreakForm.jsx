@@ -67,6 +67,7 @@ class LineBreakForm extends React.Component {
         </div>
         <p
           className="form-text text-muted"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
           dangerouslySetInnerHTML={helpLineBreak}
         />
       </div>
@@ -108,6 +109,7 @@ class LineBreakForm extends React.Component {
         </div>
         <p
           className="form-text text-muted"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
           dangerouslySetInnerHTML={helpLineBreakInComment}
         />
       </div>

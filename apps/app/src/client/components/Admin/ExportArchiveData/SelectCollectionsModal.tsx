@@ -1,5 +1,5 @@
 import React, { type JSX, useCallback, useEffect, useState } from 'react';
-import { useTranslation } from 'next-i18next';
+import { Trans, useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 import { apiPost } from '~/client/util/apiv1-client';
@@ -121,13 +121,12 @@ const SelectCollectionsModal = (props: Props): JSX.Element => {
       return <></>;
     }
 
-    const html = t('admin:export_management.desc_password_seed');
-
     return (
       <div className="card">
         <div className="card-body">
-          {/* eslint-disable-next-line react/no-danger */}
-          <p className="card-text" dangerouslySetInnerHTML={{ __html: html }} />
+          <p className="card-text">
+            <Trans i18nKey="admin:export_management.desc_password_seed" t={t} />
+          </p>
         </div>
       </div>
     );

@@ -41,7 +41,6 @@ const ArchiveFilesTableMenu = (
         <button
           type="button"
           className="dropdown-item"
-          role="button"
           onClick={() => props.onZipFileStatRemove(props.fileName)}
         >
           <span className="text-danger">

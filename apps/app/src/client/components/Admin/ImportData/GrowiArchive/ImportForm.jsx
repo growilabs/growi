@@ -97,6 +97,7 @@ class ImportForm extends React.Component {
     return Object.keys(this.state.collectionNameToFileNameMap);
   }
 
+  // biome-ignore lint/correctness/noNestedComponentDefinitions: lifecycle method on a class component
   UNSAFE_componentWillMount() {
     this.setupWebsocketEventHandler();
   }
@@ -366,9 +367,8 @@ class ImportForm extends React.Component {
     return (
       <div key={key} className="alert alert-warning">
         <ul>
-          {errors.map((error, index) => {
-            // eslint-disable-next-line react/no-array-index-key
-            return <li key={`${key}-${index}`}>{error}</li>;
+          {errors.map((error) => {
+            return <li key={`${key}-${String(error)}`}>{error}</li>;
           })}
         </ul>
       </div>

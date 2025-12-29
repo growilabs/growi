@@ -28,6 +28,7 @@ class GrowiArchiveSection extends React.Component {
       this.renderDefferentVersionAlert.bind(this);
   }
 
+  // biome-ignore lint/correctness/noNestedComponentDefinitions: lifecycle method on a class component
   async UNSAFE_componentWillMount() {
     // get uploaded file status
     const res = await apiv3Get('/import/status');

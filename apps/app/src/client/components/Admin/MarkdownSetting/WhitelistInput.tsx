@@ -40,7 +40,8 @@ export const WhitelistInput = (props: Props): JSX.Element => {
       <div className="mt-4">
         <div className="d-flex justify-content-between">
           {t('markdown_settings.xss_options.tag_names')}
-          <p
+          <button
+            type="button"
             id="btn-import-tags"
             className="btn btn-sm btn-primary"
             onClick={clickRecommendTagButtonHandler}
@@ -48,7 +49,7 @@ export const WhitelistInput = (props: Props): JSX.Element => {
             {t('markdown_settings.xss_options.import_recommended', {
               target: 'Tags',
             })}
-          </p>
+          </button>
         </div>
         <textarea
           className="form-control xss-list"
@@ -60,15 +61,16 @@ export const WhitelistInput = (props: Props): JSX.Element => {
       <div className="mt-4">
         <div className="d-flex justify-content-between">
           {t('markdown_settings.xss_options.tag_attributes')}
-          <p
-            id="btn-import-tags"
+          <button
+            type="button"
+            id="btn-import-attrs"
             className="btn btn-sm btn-primary"
             onClick={clickRecommendAttrButtonHandler}
           >
             {t('markdown_settings.xss_options.import_recommended', {
               target: 'Attrs',
             })}
-          </p>
+          </button>
         </div>
         <textarea
           className="form-control xss-list"

@@ -85,17 +85,17 @@ class StatusTable extends React.PureComponent {
     return (
       <div className="card">
         <div className="card-header">
-          <a
-            role="button"
-            className="text-nowrap me-2"
+          <button
+            type="button"
+            className="text-nowrap me-2 btn btn-link p-0"
             data-bs-toggle="collapse"
-            href={`#${collapseId}`}
+            data-bs-target={`#${collapseId}`}
             aria-expanded="true"
             aria-controls={collapseId}
           >
             <span className="material-symbols-outlined">database</span>{' '}
             {indexName}
-          </a>
+          </button>
           <span className="ms-md-3">{aliasLabels}</span>
         </div>
         <div id={collapseId} className="collapse">

@@ -157,8 +157,10 @@ const UserManagement = (props: UserManagementProps) => {
                 onChange={changeSearchTextHandler}
               />
               {adminUsersContainer.state.searchText.length > 0 ? (
-                <span
-                  className="material-symbols-outlined me-1 search-clear"
+                <button
+                  type="button"
+                  className="btn btn-link p-0 material-symbols-outlined me-1 search-clear"
+                  aria-label={t('commons:Clear')}
                   onClick={async () => {
                     await adminUsersContainer.clearSearchText();
                     if (inputRef.current != null) {
@@ -167,7 +169,7 @@ const UserManagement = (props: UserManagementProps) => {
                   }}
                 >
                   cancel
-                </span>
+                </button>
               ) : (
                 ''
               )}

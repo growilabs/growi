@@ -101,7 +101,7 @@ const G2GDataTransfer = (): JSX.Element => {
         toastError(t(key));
       });
     }
-  }, [socket, t, setTransferring, setG2GProgress]);
+  }, [socket, t]);
 
   const cleanUpWebsocketEventHandler = useCallback(() => {
     if (socket != null) {
@@ -135,7 +135,7 @@ const G2GDataTransfer = (): JSX.Element => {
         toastError(errs);
       }
     },
-    [setTransferring, startTransferKey, selectedCollections, optionsMap],
+    [startTransferKey, selectedCollections, optionsMap],
   );
 
   const documentationUrl = useGrowiDocumentationUrl();
@@ -332,7 +332,7 @@ const G2GDataTransfer = (): JSX.Element => {
         </p>
         <p
           className="mb-0"
-          // eslint-disable-next-line react/no-danger
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML link
           dangerouslySetInnerHTML={{
             __html: t('commons:g2g_data_transfer.transfer_to_growi_cloud', {
               documentationUrl,

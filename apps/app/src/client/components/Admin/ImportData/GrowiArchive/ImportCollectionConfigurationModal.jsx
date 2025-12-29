@@ -74,6 +74,7 @@ class ImportCollectionConfigurationModal extends React.Component {
             {t(`${translationBase}.overwrite_author.label`)}
             <p
               className="form-text text-muted mt-0"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
               dangerouslySetInnerHTML={{
                 __html: t(`${translationBase}.overwrite_author.desc`),
               }}
@@ -98,6 +99,7 @@ class ImportCollectionConfigurationModal extends React.Component {
             })}
             <p
               className="form-text text-muted mt-0"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
               dangerouslySetInnerHTML={{
                 __html: t(`${translationBase}.set_public_to_page.desc`, {
                   from: t('Anyone with the link'),
@@ -124,6 +126,7 @@ class ImportCollectionConfigurationModal extends React.Component {
             })}
             <p
               className="form-text text-muted mt-0"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
               dangerouslySetInnerHTML={{
                 __html: t(`${translationBase}.set_public_to_page.desc`, {
                   from: t('Only me'),
@@ -150,6 +153,7 @@ class ImportCollectionConfigurationModal extends React.Component {
             })}
             <p
               className="form-text text-muted mt-0"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
               dangerouslySetInnerHTML={{
                 __html: t(`${translationBase}.set_public_to_page.desc`, {
                   from: t('Only inside the group'),
@@ -174,6 +178,7 @@ class ImportCollectionConfigurationModal extends React.Component {
             {t(`${translationBase}.initialize_meta_datas.label`)}
             <p
               className="form-text text-muted mt-0"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
               dangerouslySetInnerHTML={{
                 __html: t(`${translationBase}.initialize_meta_datas.desc`),
               }}
@@ -212,6 +217,7 @@ class ImportCollectionConfigurationModal extends React.Component {
             {t(`${translationBase}.overwrite_author.label`)}
             <p
               className="form-text text-muted mt-0"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
               dangerouslySetInnerHTML={{
                 __html: t(`${translationBase}.overwrite_author.desc`),
               }}

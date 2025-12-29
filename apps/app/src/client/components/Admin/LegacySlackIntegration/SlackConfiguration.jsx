@@ -64,6 +64,7 @@ const SlackConfiguration = (props) => {
               </button>
               <div
                 className="dropdown-menu"
+                role="menu"
                 aria-labelledby="dropdownMenuButton"
               >
                 <button
@@ -100,11 +101,15 @@ const SlackConfiguration = (props) => {
             </h2>
 
             <div className="row mb-3">
-              <label className="form-label col-md-3 text-start text-md-end">
+              <label
+                className="form-label col-md-3 text-start text-md-end"
+                htmlFor="webhookUrl"
+              >
                 Webhook URL
               </label>
               <div className="col-md-6">
                 <input
+                  id="webhookUrl"
                   className="form-control"
                   type="text"
                   {...register('webhookUrl')}
@@ -154,6 +159,7 @@ const SlackConfiguration = (props) => {
               <br />
               {/* eslint-disable-next-line react/no-danger */}
               <span
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
                 dangerouslySetInnerHTML={{
                   __html: t(
                     'notification_settings.slack_app_configuration_desc',
@@ -161,9 +167,11 @@ const SlackConfiguration = (props) => {
                 }}
               />
               <br />
-              <a
-                href="#slack-incoming-webhooks"
+              <button
+                type="button"
+                className="btn btn-link p-0"
                 data-bs-toggle="tab"
+                data-bs-target="#slack-incoming-webhooks"
                 onClick={() =>
                   adminSlackIntegrationLegacyContainer.switchSlackOption(
                     'Incoming Webhooks',
@@ -171,15 +179,19 @@ const SlackConfiguration = (props) => {
                 }
               >
                 {t('notification_settings.use_instead')}
-              </a>
+              </button>
             </div>
 
             <div className="row mb-5 mt-4">
-              <label className="form-label col-md-3 text-start text-md-end">
+              <label
+                className="form-label col-md-3 text-start text-md-end"
+                htmlFor="slackToken"
+              >
                 OAuth access token
               </label>
               <div className="col-md-6">
                 <input
+                  id="slackToken"
                   className="form-control"
                   type="text"
                   {...register('slackToken')}
@@ -214,6 +226,7 @@ const SlackConfiguration = (props) => {
             <ol>
               {/* eslint-disable-next-line react/no-danger */}
               <li
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
                 dangerouslySetInnerHTML={{
                   __html: t('notification_settings.how_to.workspace_desc1'),
                 }}
@@ -227,6 +240,7 @@ const SlackConfiguration = (props) => {
             <ol>
               {/* eslint-disable-next-line react/no-danger */}
               <li
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
                 dangerouslySetInnerHTML={{
                   __html: t('notification_settings.how_to.at_growi_desc'),
                 }}
