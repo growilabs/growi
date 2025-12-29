@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect } from 'react';
-import { Trans, useTranslation } from 'next-i18next';
+import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { Tooltip } from 'reactstrap';
@@ -98,9 +98,12 @@ const AdminHome = (props) => {
             {t('admin:admin_top.list_of_env_vars')}
           </h2>
           <p>{t('admin:admin_top.env_var_priority')}</p>
-          <p>
-            <Trans i18nKey="admin:admin_top.about_security" t={t} />
-          </p>
+          <p
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: ignore
+            dangerouslySetInnerHTML={{
+              __html: t('admin:admin_top.about_security'),
+            }}
+          />
           <EnvVarsTable envVars={adminHomeContainer.state.envVars} />
         </div>
       </div>
@@ -134,9 +137,13 @@ const AdminHome = (props) => {
             >
               {t('admin:admin_top:copy_prefilled_host_information:done')}
             </Tooltip>
-            <span className="ms-2">
-              <Trans i18nKey="admin:admin_top:submit_bug_report" t={t} />
-            </span>
+            <span
+              className="ms-2"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: ignore
+              dangerouslySetInnerHTML={{
+                __html: t('admin:admin_top:submit_bug_report'),
+              }}
+            />
           </div>
         </div>
       </div>
