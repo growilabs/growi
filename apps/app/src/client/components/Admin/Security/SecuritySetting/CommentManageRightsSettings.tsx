@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 
 import type AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 
@@ -7,7 +7,10 @@ type Props = {
   t: (key: string) => string;
 };
 
-export const CommentManageRightsSettings: React.FC<Props> = ({ adminGeneralSecurityContainer, t }) => {
+export const CommentManageRightsSettings: React.FC<Props> = ({
+  adminGeneralSecurityContainer,
+  t,
+}) => {
   const { isRomUserAllowedToComment } = adminGeneralSecurityContainer.state;
 
   return (
@@ -30,22 +33,32 @@ export const CommentManageRightsSettings: React.FC<Props> = ({ adminGeneralSecur
               aria-expanded="true"
             >
               <span className="float-start">
-                {isRomUserAllowedToComment === true && t('security_settings.read_only_users_comment.accept')}
-                {isRomUserAllowedToComment === false && t('security_settings.read_only_users_comment.deny')}
+                {isRomUserAllowedToComment === true &&
+                  t('security_settings.read_only_users_comment.accept')}
+                {isRomUserAllowedToComment === false &&
+                  t('security_settings.read_only_users_comment.deny')}
               </span>
             </button>
-            <div className="dropdown-menu" aria-labelledby="dropdownMenuButton">
+            <div className="dropdown-menu">
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { adminGeneralSecurityContainer.switchIsRomUserAllowedToComment(false) }}
+                onClick={() => {
+                  adminGeneralSecurityContainer.switchIsRomUserAllowedToComment(
+                    false,
+                  );
+                }}
               >
                 {t('security_settings.read_only_users_comment.deny')}
               </button>
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { adminGeneralSecurityContainer.switchIsRomUserAllowedToComment(true) }}
+                onClick={() => {
+                  adminGeneralSecurityContainer.switchIsRomUserAllowedToComment(
+                    true,
+                  );
+                }}
               >
                 {t('security_settings.read_only_users_comment.accept')}
               </button>

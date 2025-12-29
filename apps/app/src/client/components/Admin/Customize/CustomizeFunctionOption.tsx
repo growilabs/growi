@@ -1,18 +1,15 @@
 import React, { type JSX } from 'react';
 
 type Props = {
-  optionId: string
-  label: string,
-  isChecked: boolean,
-  onChecked: () => void,
-  children: React.ReactNode,
-}
+  optionId: string;
+  label: string;
+  isChecked: boolean;
+  onChecked: () => void;
+  children: React.ReactNode;
+};
 
 const CustomizeFunctionOption = (props: Props): JSX.Element => {
-
-  const {
-    optionId, label, isChecked, onChecked, children,
-  } = props;
+  const { optionId, label, isChecked, onChecked, children } = props;
 
   return (
     <React.Fragment>
@@ -31,7 +28,6 @@ const CustomizeFunctionOption = (props: Props): JSX.Element => {
       {children}
     </React.Fragment>
   );
-
 };
 
 export default CustomizeFunctionOption;

@@ -1,6 +1,4 @@
-
-import React, { useEffect, useCallback } from 'react';
-
+import React, { useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
 import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer';
@@ -9,7 +7,6 @@ import { toArrayIfNot } from '~/utils/array-utils';
 import loggerFactory from '~/utils/logger';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
-
 import CustomizeCssSetting from './CustomizeCssSetting';
 import CustomizeFunctionSetting from './CustomizeFunctionSetting';
 import CustomizeLayoutSetting from './CustomizeLayoutSetting';
@@ -26,11 +23,10 @@ const logger = loggerFactory('growi:services:AdminCustomizePage');
 function Customize(props) {
   const { adminCustomizeContainer } = props;
 
-  const fetchCustomizeSettingsData = useCallback(async() => {
+  const fetchCustomizeSettingsData = useCallback(async () => {
     try {
       await adminCustomizeContainer.retrieveCustomizeData();
-    }
-    catch (err) {
+    } catch (err) {
       const errs = toArrayIfNot(err);
       toastError(errs);
       logger.error(errs);
@@ -40,7 +36,6 @@ function Customize(props) {
   useEffect(() => {
     fetchCustomizeSettingsData();
   }, [fetchCustomizeSettingsData]);
-
 
   return (
     <div data-testid="admin-customize">
@@ -78,10 +73,13 @@ function Customize(props) {
   );
 }
 
-const CustomizePageWithUnstatedContainer = withUnstatedContainers(Customize, [AdminCustomizeContainer]);
+const CustomizePageWithUnstatedContainer = withUnstatedContainers(Customize, [
+  AdminCustomizeContainer,
+]);
 
 Customize.propTypes = {
-  adminCustomizeContainer: PropTypes.instanceOf(AdminCustomizeContainer).isRequired,
+  adminCustomizeContainer: PropTypes.instanceOf(AdminCustomizeContainer)
+    .isRequired,
 };
 
 export default CustomizePageWithUnstatedContainer;

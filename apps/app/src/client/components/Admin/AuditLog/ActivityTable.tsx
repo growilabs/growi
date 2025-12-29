@@ -1,6 +1,5 @@
 import type { FC } from 'react';
-import React, { useState, useCallback } from 'react';
-
+import React, { useCallback, useState } from 'react';
 import { isPopulated } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { UserPicture } from '@growi/ui/dist/components';
@@ -11,18 +10,17 @@ import { Tooltip } from 'reactstrap';
 
 import type { IActivityHasId } from '~/interfaces/activity';
 
- type Props = {
-   activityList: IActivityHasId[]
- }
+type Props = {
+  activityList: IActivityHasId[];
+};
 
 const formatDate = (date: Date): string => {
   return format(new Date(date), 'yyyy/MM/dd HH:mm:ss');
 };
 
-export const ActivityTable : FC<Props> = (props: Props) => {
+export const ActivityTable: FC<Props> = (props: Props) => {
   const { t } = useTranslation();
   const [activeTooltipId, setActiveTooltipId] = useState<string | null>(null);
-
 
   const showToolTip = useCallback((id: string) => {
     setActiveTooltipId(id);
@@ -48,12 +46,16 @@ export const ActivityTable : FC<Props> = (props: Props) => {
             return (
               <tr data-testid="activity-table" key={activity._id}>
                 <td>
-                  { activity.user != null && (
+                  {activity.user != null && (
                     <>
                       <UserPicture user={activity.user} />
                       <a
                         className="ms-2"
-                        href={isPopulated(activity.user) ? pagePathUtils.userHomepagePath(activity.user) : undefined}
+                        href={
+                          isPopulated(activity.user)
+                            ? pagePathUtils.userHomepagePath(activity.user)
+                            : undefined
+                        }
                       >
                         {activity.snapshot?.username}
                       </a>
@@ -68,12 +70,29 @@ export const ActivityTable : FC<Props> = (props: Props) => {
                     <span className="flex-grow-1 text-truncate">
                       {activity.endpoint}
                     </span>
-                    <CopyToClipboard text={activity.endpoint} onCopy={() => showToolTip(activity._id)}>
-                      <button type="button" className="btn btn-outline-secondary border-0 ms-2" id={`tooltipTarget-${activity._id}`}>
-                        <span className="material-symbols-outlined" aria-hidden="true">content_paste</span>
+                    <CopyToClipboard
+                      text={activity.endpoint}
+                      onCopy={() => showToolTip(activity._id)}
+                    >
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary border-0 ms-2"
+                        id={`tooltipTarget-${activity._id}`}
+                      >
+                        <span
+                          className="material-symbols-outlined"
+                          aria-hidden="true"
+                        >
+                          content_paste
+                        </span>
                       </button>
                     </CopyToClipboard>
-                    <Tooltip placement="top" isOpen={activeTooltipId === activity._id} fade={false} target={`tooltipTarget-${activity._id}`}>
+                    <Tooltip
+                      placement="top"
+                      isOpen={activeTooltipId === activity._id}
+                      fade={false}
+                      target={`tooltipTarget-${activity._id}`}
+                    >
                       copied!
                     </Tooltip>
                   </div>

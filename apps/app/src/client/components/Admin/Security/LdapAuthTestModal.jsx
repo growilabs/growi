@@ -1,19 +1,11 @@
 import React from 'react';
-
 import PropTypes from 'prop-types';
-import {
-  Modal,
-  ModalHeader,
-  ModalBody,
-} from 'reactstrap';
+import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
-
 import { LdapAuthTest } from './LdapAuthTest';
 
-
 class LdapAuthTestModal extends React.Component {
-
   constructor(props) {
     super(props);
 
@@ -41,7 +33,6 @@ class LdapAuthTestModal extends React.Component {
   }
 
   render() {
-
     return (
       <Modal isOpen={this.props.isOpen} toggle={this.props.onClose}>
         <ModalHeader tag="h4" toggle={this.props.onClose} className="text-info">
@@ -58,9 +49,7 @@ class LdapAuthTestModal extends React.Component {
       </Modal>
     );
   }
-
 }
-
 
 LdapAuthTestModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
