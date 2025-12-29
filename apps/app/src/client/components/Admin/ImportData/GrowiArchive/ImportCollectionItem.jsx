@@ -1,17 +1,23 @@
 import React from 'react';
-
 import PropTypes from 'prop-types';
 import {
-  Progress, UncontrolledDropdown, DropdownToggle, DropdownMenu, DropdownItem,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
+  Progress,
+  UncontrolledDropdown,
 } from 'reactstrap';
 
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 
-
 const MODE_ATTR_MAP = {
   insert: { color: 'info', icon: 'add_circle', label: 'Insert' },
   upsert: { color: 'success', icon: 'add_circle', label: 'Upsert' },
-  flushAndInsert: { color: 'danger', icon: 'autorenew', label: 'Flush and Insert' },
+  flushAndInsert: {
+    color: 'danger',
+    icon: 'autorenew',
+    label: 'Flush and Insert',
+  },
 };
 
 export const DEFAULT_MODE = 'insert';
@@ -23,13 +29,13 @@ export const MODE_RESTRICTED_COLLECTION = {
 };
 
 export default class ImportCollectionItem extends React.Component {
-
   constructor(props) {
     super(props);
 
     this.changeHandler = this.changeHandler.bind(this);
     this.modeSelectedHandler = this.modeSelectedHandler.bind(this);
-    this.configButtonClickedHandler = this.configButtonClickedHandler.bind(this);
+    this.configButtonClickedHandler =
+      this.configButtonClickedHandler.bind(this);
     this.errorLinkClickedHandler = this.errorLinkClickedHandler.bind(this);
   }
 
@@ -76,13 +82,16 @@ export default class ImportCollectionItem extends React.Component {
   renderModeLabel(mode, isColorized = false) {
     const attrMap = MODE_ATTR_MAP[mode];
     const className = isColorized ? `text-${attrMap.color}` : '';
-    return <span className={`text-nowrap ${className}`}><span className="material-symbols-outlined">{attrMap.icon}</span> {attrMap.label}</span>;
+    return (
+      <span className={`text-nowrap ${className}`}>
+        <span className="material-symbols-outlined">{attrMap.icon}</span>{' '}
+        {attrMap.label}
+      </span>
+    );
   }
 
   renderCheckbox() {
-    const {
-      collectionName, isSelected, isImporting,
-    } = this.props;
+    const { collectionName, isSelected, isImporting } = this.props;
 
     return (
       <div className="form-check form-check-info my-0">
@@ -96,7 +105,10 @@ export default class ImportCollectionItem extends React.Component {
           disabled={isImporting}
           onChange={this.changeHandler}
         />
-        <label className="form-label text-capitalize form-check-label" htmlFor={collectionName}>
+        <label
+          className="form-label text-capitalize form-check-label"
+          htmlFor={collectionName}
+        >
           {collectionName}
         </label>
       </div>
@@ -104,22 +116,26 @@ export default class ImportCollectionItem extends React.Component {
   }
 
   renderModeSelector() {
-    const {
-      collectionName, option, isImporting,
-    } = this.props;
+    const { collectionName, option, isImporting } = this.props;
     const currentMode = option?.mode || 'insert';
     const attrMap = MODE_ATTR_MAP[currentMode];
-    const modes = MODE_RESTRICTED_COLLECTION[collectionName] || Object.keys(MODE_ATTR_MAP);
+    const modes =
+      MODE_RESTRICTED_COLLECTION[collectionName] || Object.keys(MODE_ATTR_MAP);
 
     return (
       <span className="d-inline-flex align-items-center">
         Mode:&nbsp;
         <UncontrolledDropdown size="sm" className="d-inline-block">
-          <DropdownToggle color={attrMap.color} caret disabled={isImporting} id={`ddmMode-${collectionName}`}>
+          <DropdownToggle
+            color={attrMap.color}
+            caret
+            disabled={isImporting}
+            id={`ddmMode-${collectionName}`}
+          >
             {this.renderModeLabel(currentMode)}
           </DropdownToggle>
           <DropdownMenu>
-            {modes.map(mode => (
+            {modes.map((mode) => (
               <DropdownItem
                 key={`buttonMode_${mode}`}
                 onClick={() => this.modeSelectedHandler(mode)}
@@ -141,7 +157,9 @@ export default class ImportCollectionItem extends React.Component {
         type="button"
         className="btn btn-outline-secondary btn-sm p-1 ms-2"
         disabled={isImporting || !isConfigButtonAvailable}
-        onClick={isConfigButtonAvailable ? this.configButtonClickedHandler : null}
+        onClick={
+          isConfigButtonAvailable ? this.configButtonClickedHandler : null
+        }
       >
         <span className="material-symbols-outlined">settings</span>
       </button>
@@ -149,17 +167,37 @@ export default class ImportCollectionItem extends React.Component {
   }
 
   renderProgressBar() {
-    const {
-      isImporting, insertedCount, modifiedCount, errorsCount,
-    } = this.props;
+    const { isImporting, insertedCount, modifiedCount, errorsCount } =
+      this.props;
 
     const total = insertedCount + modifiedCount + errorsCount;
 
     return (
       <Progress multi className="mb-0">
-        <Progress bar max={total} color="info" striped={isImporting} animated={isImporting} value={insertedCount} />
-        <Progress bar max={total} color="success" striped={isImporting} animated={isImporting} value={modifiedCount} />
-        <Progress bar max={total} color="danger" striped={isImporting} animated={isImporting} value={errorsCount} />
+        <Progress
+          bar
+          max={total}
+          color="info"
+          striped={isImporting}
+          animated={isImporting}
+          value={insertedCount}
+        />
+        <Progress
+          bar
+          max={total}
+          color="success"
+          striped={isImporting}
+          animated={isImporting}
+          value={modifiedCount}
+        />
+        <Progress
+          bar
+          max={total}
+          color="danger"
+          striped={isImporting}
+          animated={isImporting}
+          value={errorsCount}
+        />
       </Progress>
     );
   }
@@ -174,20 +212,35 @@ export default class ImportCollectionItem extends React.Component {
     const { insertedCount, modifiedCount, errorsCount } = this.props;
     return (
       <div className="w-100 text-center">
-        <span className="text-info"><strong>{insertedCount}</strong> Inserted</span>,&nbsp;
-        <span className="text-success"><strong>{modifiedCount}</strong> Modified</span>,&nbsp;
-        { errorsCount > 0
-          ? <a className="text-danger" role="button" onClick={this.errorLinkClickedHandler}><u><strong>{errorsCount}</strong> Failed</u></a>
-          : <span className="text-muted"><strong>0</strong> Failed</span>
-        }
+        <span className="text-info">
+          <strong>{insertedCount}</strong> Inserted
+        </span>
+        ,&nbsp;
+        <span className="text-success">
+          <strong>{modifiedCount}</strong> Modified
+        </span>
+        ,&nbsp;
+        {errorsCount > 0 ? (
+          <a
+            className="text-danger"
+            role="button"
+            onClick={this.errorLinkClickedHandler}
+          >
+            <u>
+              <strong>{errorsCount}</strong> Failed
+            </u>
+          </a>
+        ) : (
+          <span className="text-muted">
+            <strong>0</strong> Failed
+          </span>
+        )}
       </div>
     );
   }
 
   render() {
-    const {
-      isSelected, isHideProgress,
-    } = this.props;
+    const { isSelected, isHideProgress } = this.props;
 
     return (
       <div className="card border-light">
@@ -211,7 +264,6 @@ export default class ImportCollectionItem extends React.Component {
       </div>
     );
   }
-
 }
 
 ImportCollectionItem.propTypes = {

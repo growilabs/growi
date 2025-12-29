@@ -1,7 +1,10 @@
 import React, {
-  useState, useEffect, useCallback, useMemo, type JSX,
+  type JSX,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
 } from 'react';
-
 import { useTranslation } from 'next-i18next';
 
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
@@ -9,41 +12,52 @@ import { ImportOptionForPages } from '~/models/admin/import-option-for-pages';
 import { ImportOptionForRevisions } from '~/models/admin/import-option-for-revisions';
 
 import ImportCollectionConfigurationModal from './ImportData/GrowiArchive/ImportCollectionConfigurationModal';
-import ImportCollectionItem, { DEFAULT_MODE, MODE_RESTRICTED_COLLECTION } from './ImportData/GrowiArchive/ImportCollectionItem';
+import ImportCollectionItem, {
+  DEFAULT_MODE,
+  MODE_RESTRICTED_COLLECTION,
+} from './ImportData/GrowiArchive/ImportCollectionItem';
 
-const GROUPS_PAGE = [
-  'pages', 'revisions', 'tags', 'pagetagrelations',
-];
+const GROUPS_PAGE = ['pages', 'revisions', 'tags', 'pagetagrelations'];
 const GROUPS_USER = [
-  'users', 'externalaccounts', 'usergroups', 'usergrouprelations',
+  'users',
+  'externalaccounts',
+  'usergroups',
+  'usergrouprelations',
 ];
-const GROUPS_CONFIG = [
-  'configs', 'updateposts', 'globalnotificationsettings',
-];
-const ALL_GROUPED_COLLECTIONS = GROUPS_PAGE.concat(GROUPS_USER).concat(GROUPS_CONFIG);
+const GROUPS_CONFIG = ['configs', 'updateposts', 'globalnotificationsettings'];
+const ALL_GROUPED_COLLECTIONS =
+  GROUPS_PAGE.concat(GROUPS_USER).concat(GROUPS_CONFIG);
 
-const IMPORT_OPTION_CLASS_MAPPING: Record<string, typeof GrowiArchiveImportOption> = {
+const IMPORT_OPTION_CLASS_MAPPING: Record<
+  string,
+  typeof GrowiArchiveImportOption
+> = {
   pages: ImportOptionForPages,
   revisions: ImportOptionForRevisions,
 };
 
 type Props = {
-  allCollectionNames: string[],
-  selectedCollections: Set<string>,
-  updateSelectedCollections: (newSelectedCollections: Set<string>) => void,
-  optionsMap: any,
-  updateOptionsMap: (newOptionsMap: any) => void,
+  allCollectionNames: string[];
+  selectedCollections: Set<string>;
+  updateSelectedCollections: (newSelectedCollections: Set<string>) => void;
+  optionsMap: any;
+  updateOptionsMap: (newOptionsMap: any) => void;
 };
 
 const G2GDataTransferExportForm = (props: Props): JSX.Element => {
   const { t } = useTranslation('admin');
 
   const {
-    allCollectionNames, selectedCollections, updateSelectedCollections, optionsMap, updateOptionsMap,
+    allCollectionNames,
+    selectedCollections,
+    updateSelectedCollections,
+    optionsMap,
+    updateOptionsMap,
   } = props;
 
   const [isConfigurationModalOpen, setConfigurationModalOpen] = useState(false);
-  const [collectionNameForConfiguration, setCollectionNameForConfiguration] = useState<any>();
+  const [collectionNameForConfiguration, setCollectionNameForConfiguration] =
+    useState<any>();
 
   const checkAll = useCallback(() => {
     updateSelectedCollections(new Set(allCollectionNames));
@@ -53,26 +67,28 @@ const G2GDataTransferExportForm = (props: Props): JSX.Element => {
     updateSelectedCollections(new Set());
   }, [updateSelectedCollections]);
 
-  const updateOption = useCallback((collectionName, data) => {
-    const options = optionsMap[collectionName];
+  const updateOption = useCallback(
+    (collectionName, data) => {
+      const options = optionsMap[collectionName];
 
-    // merge
-    Object.assign(options, data);
+      // merge
+      Object.assign(options, data);
 
-    const updatedOptionsMap = {};
-    updatedOptionsMap[collectionName] = options;
-    updateOptionsMap((prev) => {
-      return { ...prev, updatedOptionsMap };
-    });
-  }, [optionsMap, updateOptionsMap]);
+      const updatedOptionsMap = {};
+      updatedOptionsMap[collectionName] = options;
+      updateOptionsMap((prev) => {
+        return { ...prev, updatedOptionsMap };
+      });
+    },
+    [optionsMap, updateOptionsMap],
+  );
 
   const ImportItems = ({ collectionNames }): JSX.Element => {
     const toggleCheckbox = (collectionName, bool) => {
       const collections = new Set(selectedCollections);
       if (bool) {
         collections.add(collectionName);
-      }
-      else {
+      } else {
         collections.delete(collectionName);
       }
 
@@ -90,7 +106,9 @@ const G2GDataTransferExportForm = (props: Props): JSX.Element => {
     return (
       <div className="row">
         {collectionNames.map((collectionName) => {
-          const isConfigButtonAvailable = Object.keys(IMPORT_OPTION_CLASS_MAPPING).includes(collectionName);
+          const isConfigButtonAvailable = Object.keys(
+            IMPORT_OPTION_CLASS_MAPPING,
+          ).includes(collectionName);
 
           if (optionsMap[collectionName] == null) {
             return null;
@@ -162,7 +180,13 @@ const G2GDataTransferExportForm = (props: Props): JSX.Element => {
     });
 
     // TODO: エラー対応
-    return <GroupImportItems groupList={collectionNames} groupName="Other" errors={[]} />;
+    return (
+      <GroupImportItems
+        groupList={collectionNames}
+        groupName="Other"
+        errors={[]}
+      />
+    );
   };
 
   const configurationModal = useMemo(() => {
@@ -179,16 +203,26 @@ const G2GDataTransferExportForm = (props: Props): JSX.Element => {
         option={optionsMap[collectionNameForConfiguration]}
       />
     );
-  }, [collectionNameForConfiguration, isConfigurationModalOpen, optionsMap, updateOption]);
+  }, [
+    collectionNameForConfiguration,
+    isConfigurationModalOpen,
+    optionsMap,
+    updateOption,
+  ]);
 
   const setInitialOptionsMap = useCallback(() => {
     const initialOptionsMap = {};
     allCollectionNames.forEach((collectionName) => {
-      const initialMode = (MODE_RESTRICTED_COLLECTION[collectionName] != null)
-        ? MODE_RESTRICTED_COLLECTION[collectionName][0]
-        : DEFAULT_MODE;
-      const ImportOption = IMPORT_OPTION_CLASS_MAPPING[collectionName] || GrowiArchiveImportOption;
-      initialOptionsMap[collectionName] = new ImportOption(collectionName, initialMode);
+      const initialMode =
+        MODE_RESTRICTED_COLLECTION[collectionName] != null
+          ? MODE_RESTRICTED_COLLECTION[collectionName][0]
+          : DEFAULT_MODE;
+      const ImportOption =
+        IMPORT_OPTION_CLASS_MAPPING[collectionName] || GrowiArchiveImportOption;
+      initialOptionsMap[collectionName] = new ImportOption(
+        collectionName,
+        initialMode,
+      );
     });
     updateOptionsMap(initialOptionsMap);
   }, [allCollectionNames, updateOptionsMap]);
@@ -201,24 +235,52 @@ const G2GDataTransferExportForm = (props: Props): JSX.Element => {
     <>
       <form className="mt-3 row row-cols-lg-auto g-3 align-items-center">
         <div className="col-12">
-          <button type="button" className="btn btn-sm btn-outline-secondary me-2" onClick={checkAll}>
-            <span className="material-symbols-outlined">check_box</span>, {t('admin:export_management.check_all')}
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-secondary me-2"
+            onClick={checkAll}
+          >
+            <span className="material-symbols-outlined">check_box</span>,{' '}
+            {t('admin:export_management.check_all')}
           </button>
         </div>
         <div className="col-12">
-          <button type="button" className="btn btn-sm btn-outline-secondary me-2" onClick={uncheckAll}>
-            <span className="material-symbols-outlined">check_box_outline_blank</span> {t('admin:export_management.uncheck_all')}
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-secondary me-2"
+            onClick={uncheckAll}
+          >
+            <span className="material-symbols-outlined">
+              check_box_outline_blank
+            </span>{' '}
+            {t('admin:export_management.uncheck_all')}
           </button>
         </div>
       </form>
 
       <div className="card custom-card small my-4">
         <ul>
-          <li>{t('admin:importer_management.growi_settings.description_of_import_mode.about')}</li>
+          <li>
+            {t(
+              'admin:importer_management.growi_settings.description_of_import_mode.about',
+            )}
+          </li>
           <ul>
-            <li>{t('admin:importer_management.growi_settings.description_of_import_mode.insert')}</li>
-            <li>{t('admin:importer_management.growi_settings.description_of_import_mode.upsert')}</li>
-            <li>{t('admin:importer_management.growi_settings.description_of_import_mode.flash_and_insert')}</li>
+            <li>
+              {t(
+                'admin:importer_management.growi_settings.description_of_import_mode.insert',
+              )}
+            </li>
+            <li>
+              {t(
+                'admin:importer_management.growi_settings.description_of_import_mode.upsert',
+              )}
+            </li>
+            <li>
+              {t(
+                'admin:importer_management.growi_settings.description_of_import_mode.flash_and_insert',
+              )}
+            </li>
           </ul>
         </ul>
       </div>
@@ -226,7 +288,11 @@ const G2GDataTransferExportForm = (props: Props): JSX.Element => {
       {/* TODO: エラー追加 */}
       <GroupImportItems groupList={GROUPS_PAGE} groupName="Page" errors={[]} />
       <GroupImportItems groupList={GROUPS_USER} groupName="User" errors={[]} />
-      <GroupImportItems groupList={GROUPS_CONFIG} groupName="Config" errors={[]} />
+      <GroupImportItems
+        groupList={GROUPS_CONFIG}
+        groupName="Config"
+        errors={[]}
+      />
       <OtherImportItems />
 
       {configurationModal}

@@ -1,47 +1,61 @@
-import React, {
-  useCallback, useState, useEffect, type JSX,
-} from 'react';
-
+import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
-import {
-  Modal, ModalHeader, ModalBody, ModalFooter,
-} from 'reactstrap';
+import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 import { apiPost } from '~/client/util/apiv1-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 
-
 const GROUPS_PAGE = [
-  'pages', 'revisions', 'tags', 'pagetagrelations', 'pageredirects', 'comments', 'sharelinks',
+  'pages',
+  'revisions',
+  'tags',
+  'pagetagrelations',
+  'pageredirects',
+  'comments',
+  'sharelinks',
 ];
 const GROUPS_USER = [
-  'users', 'externalaccounts', 'usergroups', 'usergrouprelations',
-  'externalusergroups', 'externalusergrouprelations',
-  'useruisettings', 'editorsettings', 'bookmarks', 'bookmarkfolders', 'subscriptions',
+  'users',
+  'externalaccounts',
+  'usergroups',
+  'usergrouprelations',
+  'externalusergroups',
+  'externalusergrouprelations',
+  'useruisettings',
+  'editorsettings',
+  'bookmarks',
+  'bookmarkfolders',
+  'subscriptions',
   'inappnotificationsettings',
 ];
 const GROUPS_CONFIG = [
-  'configs', 'migrations', 'updateposts', 'globalnotificationsettings', 'slackappintegrations',
+  'configs',
+  'migrations',
+  'updateposts',
+  'globalnotificationsettings',
+  'slackappintegrations',
   'growiplugins',
 ];
-const ALL_GROUPED_COLLECTIONS = GROUPS_PAGE.concat(GROUPS_USER).concat(GROUPS_CONFIG);
+const ALL_GROUPED_COLLECTIONS =
+  GROUPS_PAGE.concat(GROUPS_USER).concat(GROUPS_CONFIG);
 
 type Props = {
-  isOpen: boolean,
-  onExportingRequested: () => void,
-  onClose: () => void,
-  collections: string[],
-  isAllChecked?: boolean,
+  isOpen: boolean;
+  onExportingRequested: () => void;
+  onClose: () => void;
+  collections: string[];
+  isAllChecked?: boolean;
 };
 
 const SelectCollectionsModal = (props: Props): JSX.Element => {
   const { t } = useTranslation();
 
-  const {
-    isOpen, onExportingRequested, onClose, collections, isAllChecked,
-  } = props;
+  const { isOpen, onExportingRequested, onClose, collections, isAllChecked } =
+    props;
 
-  const [selectedCollections, setSelectedCollections] = useState<Set<string>>(new Set());
+  const [selectedCollections, setSelectedCollections] = useState<Set<string>>(
+    new Set(),
+  );
 
   const toggleCheckbox = useCallback((e) => {
     const { target } = e;
@@ -51,8 +65,7 @@ const SelectCollectionsModal = (props: Props): JSX.Element => {
       const selectedCollections = new Set(prevState);
       if (checked) {
         selectedCollections.add(name);
-      }
-      else {
+      } else {
         selectedCollections.delete(name);
       }
 
@@ -68,27 +81,31 @@ const SelectCollectionsModal = (props: Props): JSX.Element => {
     setSelectedCollections(new Set());
   }, []);
 
-  const doExport = useCallback(async(e) => {
-    e.preventDefault();
+  const doExport = useCallback(
+    async (e) => {
+      e.preventDefault();
 
-    try {
-      // TODO: use apiv3Post
-      const result = await apiPost<any>('/v3/export', { collections: Array.from(selectedCollections) });
+      try {
+        // TODO: use apiv3Post
+        const result = await apiPost<any>('/v3/export', {
+          collections: Array.from(selectedCollections),
+        });
 
-      if (!result.ok) {
-        throw new Error('Error occured.');
+        if (!result.ok) {
+          throw new Error('Error occured.');
+        }
+
+        toastSuccess('Export process has requested.');
+
+        onExportingRequested();
+        onClose();
+        uncheckAll();
+      } catch (err) {
+        toastError(err);
       }
-
-      toastSuccess('Export process has requested.');
-
-      onExportingRequested();
-      onClose();
-      uncheckAll();
-    }
-    catch (err) {
-      toastError(err);
-    }
-  }, [onClose, onExportingRequested, selectedCollections, uncheckAll]);
+    },
+    [onClose, onExportingRequested, selectedCollections, uncheckAll],
+  );
 
   const validateForm = useCallback(() => {
     return selectedCollections.size > 0;
@@ -116,42 +133,51 @@ const SelectCollectionsModal = (props: Props): JSX.Element => {
     );
   }, [selectedCollections, t]);
 
-  const renderCheckboxes = useCallback((collectionNames, color?) => {
-    const checkboxColor = color ? `form-check-${color}` : 'form-check-info';
+  const renderCheckboxes = useCallback(
+    (collectionNames, color?) => {
+      const checkboxColor = color ? `form-check-${color}` : 'form-check-info';
 
-    return (
-      <div className={`form-check ${checkboxColor}`}>
-        <div className="row">
-          {collectionNames.map((collectionName) => {
-            return (
-              <div className="col-sm-6 my-1" key={collectionName}>
-                <input
-                  type="checkbox"
-                  className="form-check-input"
-                  id={collectionName}
-                  name={collectionName}
-                  value={collectionName}
-                  checked={selectedCollections.has(collectionName)}
-                  onChange={toggleCheckbox}
-                />
-                <label className="form-label text-capitalize form-check-label ms-3" htmlFor={collectionName}>
-                  {collectionName}
-                </label>
-              </div>
-            );
-          })}
+      return (
+        <div className={`form-check ${checkboxColor}`}>
+          <div className="row">
+            {collectionNames.map((collectionName) => {
+              return (
+                <div className="col-sm-6 my-1" key={collectionName}>
+                  <input
+                    type="checkbox"
+                    className="form-check-input"
+                    id={collectionName}
+                    name={collectionName}
+                    value={collectionName}
+                    checked={selectedCollections.has(collectionName)}
+                    onChange={toggleCheckbox}
+                  />
+                  <label
+                    className="form-label text-capitalize form-check-label ms-3"
+                    htmlFor={collectionName}
+                  >
+                    {collectionName}
+                  </label>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
-    );
-  }, [selectedCollections, toggleCheckbox]);
+      );
+    },
+    [selectedCollections, toggleCheckbox],
+  );
 
-  const renderGroups = useCallback((groupList, color?) => {
-    const collectionNames = groupList.filter((collectionName) => {
-      return collections.includes(collectionName);
-    });
+  const renderGroups = useCallback(
+    (groupList, color?) => {
+      const collectionNames = groupList.filter((collectionName) => {
+        return collections.includes(collectionName);
+      });
 
-    return renderCheckboxes(collectionNames, color);
-  }, [collections, renderCheckboxes]);
+      return renderCheckboxes(collectionNames, color);
+    },
+    [collections, renderCheckboxes],
+  );
 
   const renderOthers = useCallback(() => {
     const collectionNames = collections.filter((collectionName) => {
@@ -175,11 +201,23 @@ const SelectCollectionsModal = (props: Props): JSX.Element => {
         <ModalBody>
           <div className="row">
             <div className="col-sm-12">
-              <button type="button" className="btn btn-sm btn-outline-secondary me-2" onClick={checkAll}>
-                <span className="material-symbols-outlined">check_box</span> {t('admin:export_management.check_all')}
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary me-2"
+                onClick={checkAll}
+              >
+                <span className="material-symbols-outlined">check_box</span>{' '}
+                {t('admin:export_management.check_all')}
               </button>
-              <button type="button" className="btn btn-sm btn-outline-secondary me-2" onClick={uncheckAll}>
-                <span className="material-symbols-outlined">check_box_outline_blank</span> {t('admin:export_management.uncheck_all')}
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary me-2"
+                onClick={uncheckAll}
+              >
+                <span className="material-symbols-outlined">
+                  check_box_outline_blank
+                </span>{' '}
+                {t('admin:export_management.uncheck_all')}
               </button>
             </div>
           </div>
@@ -198,21 +236,37 @@ const SelectCollectionsModal = (props: Props): JSX.Element => {
           </div>
           <div className="row mt-4">
             <div className="col-sm-12">
-              <h3 className="admin-setting-header">MongoDB Config Collections</h3>
+              <h3 className="admin-setting-header">
+                MongoDB Config Collections
+              </h3>
               {renderGroups(GROUPS_CONFIG)}
             </div>
           </div>
           <div className="row mt-4">
             <div className="col-sm-12">
-              <h3 className="admin-setting-header">MongoDB Other Collections</h3>
+              <h3 className="admin-setting-header">
+                MongoDB Other Collections
+              </h3>
               {renderOthers()}
             </div>
           </div>
         </ModalBody>
 
         <ModalFooter>
-          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClose}>{t('admin:export_management.cancel')}</button>
-          <button type="submit" className="btn btn-sm btn-primary" disabled={!validateForm()}>{t('admin:export_management.export')}</button>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-secondary"
+            onClick={onClose}
+          >
+            {t('admin:export_management.cancel')}
+          </button>
+          <button
+            type="submit"
+            className="btn btn-sm btn-primary"
+            disabled={!validateForm()}
+          >
+            {t('admin:export_management.export')}
+          </button>
         </ModalFooter>
       </form>
     </Modal>

@@ -1,5 +1,4 @@
 import React from 'react';
-
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
@@ -9,7 +8,6 @@ import { SocketEventName } from '~/interfaces/websocket';
 import LabeledProgressBar from '../Common/LabeledProgressBar';
 
 class RebuildIndexControls extends React.Component {
-
   constructor(props) {
     super(props);
 
@@ -44,12 +42,8 @@ class RebuildIndexControls extends React.Component {
   }
 
   renderProgressBar() {
-    const {
-      isRebuildingProcessing, isRebuildingCompleted,
-    } = this.props;
-    const {
-      total, current,
-    } = this.state;
+    const { isRebuildingProcessing, isRebuildingCompleted } = this.props;
+    const { total, current } = this.state;
     const showProgressBar = isRebuildingProcessing || isRebuildingCompleted;
 
     if (!showProgressBar) {
@@ -76,25 +70,28 @@ class RebuildIndexControls extends React.Component {
 
     return (
       <>
-        { this.renderProgressBar() }
+        {this.renderProgressBar()}
 
         <button
           type="submit"
           className="btn btn-primary"
-          onClick={() => { this.props.onRebuildingRequested() }}
+          onClick={() => {
+            this.props.onRebuildingRequested();
+          }}
           disabled={!isEnabled}
         >
-          { t('full_text_search_management.rebuild_button') }
+          {t('full_text_search_management.rebuild_button')}
         </button>
 
         <p className="form-text text-muted">
-          { t('full_text_search_management.rebuild_description_1') }<br />
-          { t('full_text_search_management.rebuild_description_2') }<br />
+          {t('full_text_search_management.rebuild_description_1')}
+          <br />
+          {t('full_text_search_management.rebuild_description_2')}
+          <br />
         </p>
       </>
     );
   }
-
 }
 
 const RebuildIndexControlsFC = (props) => {
@@ -102,7 +99,6 @@ const RebuildIndexControlsFC = (props) => {
   const socket = useAdminSocket();
   return <RebuildIndexControls t={t} socket={socket} {...props} />;
 };
-
 
 RebuildIndexControls.propTypes = {
   t: PropTypes.func.isRequired, // i18next
