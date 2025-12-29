@@ -1,43 +1,54 @@
 import React from 'react';
-
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
 class StatusTable extends React.PureComponent {
-
   renderPreInitializedLabel() {
     return <span className="badge text-bg-default">――</span>;
   }
 
   renderConnectionStatusLabels() {
     const { t } = this.props;
-    const {
-      isErrorOccuredOnSearchService,
-      isConnected, isConfigured,
-    } = this.props;
+    const { isErrorOccuredOnSearchService, isConnected, isConfigured } =
+      this.props;
 
-    const errorOccuredLabel = isErrorOccuredOnSearchService
-      ? <span className="badge text-bg-danger ms-2">{ t('full_text_search_management.connection_status_label_erroroccured') }</span>
-      : null;
+    const errorOccuredLabel = isErrorOccuredOnSearchService ? (
+      <span className="badge text-bg-danger ms-2">
+        {t('full_text_search_management.connection_status_label_erroroccured')}
+      </span>
+    ) : null;
 
     let connectionStatusLabel = null;
     if (!isConfigured) {
       connectionStatusLabel = (
         <span className="badge text-bg-default">
-          { t('full_text_search_management.connection_status_label_unconfigured') }
+          {t(
+            'full_text_search_management.connection_status_label_unconfigured',
+          )}
         </span>
       );
-    }
-    else {
-      connectionStatusLabel = isConnected
+    } else {
+      connectionStatusLabel = isConnected ? (
         // eslint-disable-next-line max-len
-        ? <span data-testid="connection-status-badge-connected" className="badge text-bg-success">{ t('full_text_search_management.connection_status_label_connected') }</span>
-        : <span className="badge text-bg-danger">{ t('full_text_search_management.connection_status_label_disconnected') }</span>;
+        <span
+          data-testid="connection-status-badge-connected"
+          className="badge text-bg-success"
+        >
+          {t('full_text_search_management.connection_status_label_connected')}
+        </span>
+      ) : (
+        <span className="badge text-bg-danger">
+          {t(
+            'full_text_search_management.connection_status_label_disconnected',
+          )}
+        </span>
+      );
     }
 
     return (
       <>
-        {connectionStatusLabel}{errorOccuredLabel}
+        {connectionStatusLabel}
+        {errorOccuredLabel}
       </>
     );
   }
@@ -45,9 +56,15 @@ class StatusTable extends React.PureComponent {
   renderIndicesStatusLabel() {
     const { t, isNormalized } = this.props;
 
-    return isNormalized
-      ? <span className="badge text-bg-info">{ t('full_text_search_management.indices_status_label_normalized') }</span>
-      : <span className="badge text-bg-warning">{ t('full_text_search_management.indices_status_label_unnormalized') }</span>;
+    return isNormalized ? (
+      <span className="badge text-bg-info">
+        {t('full_text_search_management.indices_status_label_normalized')}
+      </span>
+    ) : (
+      <span className="badge text-bg-warning">
+        {t('full_text_search_management.indices_status_label_unnormalized')}
+      </span>
+    );
   }
 
   renderIndexInfoPanel(indexName, body = {}, aliases = []) {
@@ -55,7 +72,10 @@ class StatusTable extends React.PureComponent {
 
     const aliasLabels = aliases.map((aliasName) => {
       return (
-        <span key={`badge-${indexName}-${aliasName}`} className="badge text-bg-primary me-2">
+        <span
+          key={`badge-${indexName}-${aliasName}`}
+          className="badge text-bg-primary me-2"
+        >
           <span className="material-symbols-outlined">sell</span>
           <span>{aliasName}</span>
         </span>
@@ -65,17 +85,22 @@ class StatusTable extends React.PureComponent {
     return (
       <div className="card">
         <div className="card-header">
-
-          <a role="button" className="text-nowrap me-2" data-bs-toggle="collapse" href={`#${collapseId}`} aria-expanded="true" aria-controls={collapseId}>
-            <span className="material-symbols-outlined">database</span> {indexName}
-          </a>
+          <button
+            type="button"
+            className="text-nowrap me-2 btn btn-link p-0"
+            data-bs-toggle="collapse"
+            data-bs-target={`#${collapseId}`}
+            aria-expanded="true"
+            aria-controls={collapseId}
+          >
+            <span className="material-symbols-outlined">database</span>{' '}
+            {indexName}
+          </button>
           <span className="ms-md-3">{aliasLabels}</span>
         </div>
         <div id={collapseId} className="collapse">
           <div className="card-body">
-            <pre>
-              {JSON.stringify(body, null, 2)}
-            </pre>
+            <pre>{JSON.stringify(body, null, 2)}</pre>
           </div>
         </div>
       </div>
@@ -83,10 +108,7 @@ class StatusTable extends React.PureComponent {
   }
 
   renderIndexInfoPanels() {
-    const {
-      indicesData,
-      aliasesData,
-    } = this.props;
+    const { indicesData, aliasesData } = this.props;
 
     // data is null
     if (indicesData == null) {
@@ -126,43 +148,60 @@ class StatusTable extends React.PureComponent {
 
     return (
       <div className="row">
-        { Object.keys(indexNameToDataMap).map((indexName) => {
+        {Object.keys(indexNameToDataMap).map((indexName) => {
           return (
             <div key={`col-${indexName}`} className="col-md-6">
-              { this.renderIndexInfoPanel(indexName, indexNameToDataMap[indexName], indexNameToAliasMap[indexName]) }
+              {this.renderIndexInfoPanel(
+                indexName,
+                indexNameToDataMap[indexName],
+                indexNameToAliasMap[indexName],
+              )}
             </div>
           );
-        }) }
+        })}
       </div>
     );
   }
 
   render() {
     const { t } = this.props;
-    const {
-      isInitialized,
-    } = this.props;
+    const { isInitialized } = this.props;
 
     return (
       <table className="table table-bordered">
         <tbody>
           <tr>
-            <th className="w-25">{t('full_text_search_management.connection_status')}</th>
-            <td className="w-75">{ isInitialized ? this.renderConnectionStatusLabels() : this.renderPreInitializedLabel() }</td>
+            <th className="w-25">
+              {t('full_text_search_management.connection_status')}
+            </th>
+            <td className="w-75">
+              {isInitialized
+                ? this.renderConnectionStatusLabels()
+                : this.renderPreInitializedLabel()}
+            </td>
           </tr>
           <tr>
-            <th className="w-25">{t('full_text_search_management.indices_status')}</th>
-            <td className="w-75">{ isInitialized ? this.renderIndicesStatusLabel() : this.renderPreInitializedLabel() }</td>
+            <th className="w-25">
+              {t('full_text_search_management.indices_status')}
+            </th>
+            <td className="w-75">
+              {isInitialized
+                ? this.renderIndicesStatusLabel()
+                : this.renderPreInitializedLabel()}
+            </td>
           </tr>
           <tr>
-            <th className="w-25">{t('full_text_search_management.indices_summary')}</th>
-            <td className="p-4 w-75">{ isInitialized && this.renderIndexInfoPanels() }</td>
+            <th className="w-25">
+              {t('full_text_search_management.indices_summary')}
+            </th>
+            <td className="p-4 w-75">
+              {isInitialized && this.renderIndexInfoPanels()}
+            </td>
           </tr>
         </tbody>
       </table>
     );
   }
-
 }
 
 const StatusTableWrapperFC = (props) => {

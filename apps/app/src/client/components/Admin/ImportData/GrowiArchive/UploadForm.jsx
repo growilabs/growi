@@ -1,5 +1,4 @@
 import React from 'react';
-
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
@@ -7,7 +6,6 @@ import { apiv3PostForm } from '~/client/util/apiv3-client';
 import { toastError } from '~/client/util/toastr';
 
 class UploadForm extends React.Component {
-
   constructor(props) {
     super(props);
 
@@ -33,14 +31,12 @@ class UploadForm extends React.Component {
     try {
       const { data } = await apiv3PostForm('/import/upload', formData);
       this.props.onUpload(data);
-    }
-    catch (err) {
+    } catch (err) {
       if (err[0].code === 'versions-are-not-met') {
         if (this.props.onVersionMismatch !== null) {
           this.props.onVersionMismatch(err[0].code);
         }
-      }
-      else {
+      } else {
         toastError(err);
       }
     }
@@ -48,9 +44,9 @@ class UploadForm extends React.Component {
 
   validateForm() {
     return (
-      this.inputRef.current // null check
-      && this.inputRef.current.files[0] // null check
-      && /\.zip$/.test(this.inputRef.current.files[0].name) // validate extension
+      this.inputRef.current && // null check
+      this.inputRef.current.files[0] && // null check
+      /\.zip$/.test(this.inputRef.current.files[0].name) // validate extension
     );
   }
 
@@ -61,7 +57,10 @@ class UploadForm extends React.Component {
       <form onSubmit={this.uploadZipFile}>
         <fieldset>
           <div className="row">
-            <label htmlFor="file" className="col-md-3 col-form-label col-form-label-sm">
+            <label
+              htmlFor="file"
+              className="col-md-3 col-form-label col-form-label-sm"
+            >
               {t('admin:importer_management.growi_settings.growi_archive_file')}
             </label>
             <div className="col-md-6">
@@ -76,12 +75,20 @@ class UploadForm extends React.Component {
           </div>
           <div className="row">
             <div className="mt-4 text-center">
-              { this.props.onDiscard && (
-                <button type="button" className="btn btn-outline-secondary mx-1" onClick={this.props.onDiscard}>
+              {this.props.onDiscard && (
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary mx-1"
+                  onClick={this.props.onDiscard}
+                >
                   {t('admin:importer_management.growi_settings.discard')}
                 </button>
-              ) }
-              <button type="submit" className="btn btn-primary" disabled={!this.validateForm()}>
+              )}
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={!this.validateForm()}
+              >
                 {t('admin:importer_management.growi_settings.upload')}
               </button>
             </div>
@@ -90,7 +97,6 @@ class UploadForm extends React.Component {
       </form>
     );
   }
-
 }
 
 UploadForm.propTypes = {

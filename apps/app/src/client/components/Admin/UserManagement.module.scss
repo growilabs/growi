@@ -8,18 +8,21 @@
   // corner radius
   border-top-right-radius: bs.$border-radius;
   border-bottom-right-radius: bs.$border-radius;
-  .rbt-input-main {
+  .rbt-input-main,
+  input {
     padding-right: 36px;
   }
   .search-clear {
     position: absolute;
-    top: 15px;
-    right: 1px;
+    top: 50%;
+    right: 6px;
     z-index: 3;
     width: 24px;
     height: 24px;
     padding: 0;
+    margin-right: 0;
     line-height: 0;
+    transform: translateY(-50%);
   }
 
   .rbt-menu {

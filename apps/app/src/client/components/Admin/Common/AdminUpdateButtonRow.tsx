@@ -1,12 +1,11 @@
 import React, { type JSX } from 'react';
-
 import { useTranslation } from 'next-i18next';
 
 type Props = {
-  onClick?: () => void,
-  disabled?: boolean,
-  type?: 'button' | 'submit' | 'reset',
-}
+  onClick?: () => void;
+  disabled?: boolean;
+  type?: 'button' | 'submit' | 'reset';
+};
 
 const AdminUpdateButtonRow = (props: Props): JSX.Element => {
   const { t } = useTranslation('admin');
@@ -22,7 +21,7 @@ const AdminUpdateButtonRow = (props: Props): JSX.Element => {
           onClick={props.onClick}
           disabled={props.disabled ?? false}
         >
-          { t('Update') }
+          {t('Update')}
         </button>
       </div>
     </div>
