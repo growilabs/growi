@@ -34,6 +34,7 @@ export const AuditLogSettings: FC = () => {
         <br />
         <b
           // eslint-disable-next-line react/no-danger
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
           dangerouslySetInnerHTML={{
             __html: t('admin:audit_log_management.fixed_by_env_var', {
               key: 'ACTIVITY_EXPIRATION_SECONDS',
@@ -53,10 +54,12 @@ export const AuditLogSettings: FC = () => {
           href={t('admin:audit_log_management.docs_url.log_type')}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label="Help"
         >
           <span className="material-symbols-outlined" aria-hidden="true">
             help
           </span>
+          <span className="visually-hidden">Help</span>
         </a>
       </h4>
       <p className="form-text text-muted">

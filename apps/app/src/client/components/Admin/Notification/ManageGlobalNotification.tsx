@@ -71,8 +71,8 @@ const ManageGlobalNotification = (props: Props): JSX.Element => {
   }, [notExistsGlobalNotification, router]);
 
   const onChangeTriggerEvents = useCallback(
-    (triggerEvent) => {
-      let newTriggerEvents;
+    (triggerEvent: string) => {
+      let newTriggerEvents: string[];
 
       if (triggerEvents.has(triggerEvent)) {
         newTriggerEvents = [...triggerEvents].filter(
@@ -150,6 +150,7 @@ const ManageGlobalNotification = (props: Props): JSX.Element => {
               {t('notification_settings.trigger_path')}
               {/* eslint-disable-next-line react/no-danger */}
               <small
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t(
                     'notification_settings.trigger_path_help',
@@ -233,6 +234,7 @@ const ManageGlobalNotification = (props: Props): JSX.Element => {
                 {!isMailerSetup && (
                   <span
                     className="form-text text-muted"
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t('admin:mailer_setup_required'),
                     }}
@@ -270,6 +272,7 @@ const ManageGlobalNotification = (props: Props): JSX.Element => {
               <p className="p-2">
                 {/* eslint-disable-next-line react/no-danger */}
                 <span
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t('notification_settings.channel_desc'),
                   }}

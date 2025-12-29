@@ -22,7 +22,7 @@ const SamlSecurityManagement = (props) => {
 
   useEffect(() => {
     fetchSamlSecuritySettingsData();
-  }, [adminSamlSecurityContainer, fetchSamlSecuritySettingsData]);
+  }, [fetchSamlSecuritySettingsData]);
 
   return <SamlSecuritySettingContents />;
 };

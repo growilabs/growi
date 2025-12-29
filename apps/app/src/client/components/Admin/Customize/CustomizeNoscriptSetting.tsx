@@ -62,6 +62,7 @@ const CustomizeNoscriptSetting = (props: Props): JSX.Element => {
             <CardBody className="px-0 py-2">
               <span
                 // eslint-disable-next-line react/no-danger
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('admin:customize_settings.custom_noscript_detail'),
                 }}
@@ -78,11 +79,11 @@ const CustomizeNoscriptSetting = (props: Props): JSX.Element => {
               />
             </div>
 
-            <a
-              className="text-muted"
+            <button
+              type="button"
+              className="btn btn-link text-muted p-0"
               data-bs-toggle="collapse"
-              href="#collapseExampleHtml"
-              role="button"
+              data-bs-target="#collapseExampleHtml"
               aria-expanded="false"
               aria-controls="collapseExampleHtml"
             >
@@ -93,7 +94,7 @@ const CustomizeNoscriptSetting = (props: Props): JSX.Element => {
                 navigate_next
               </span>
               Example for Google Tag Manager
-            </a>
+            </button>
             <div className="collapse" id="collapseExampleHtml">
               <PrismAsyncLight style={oneDark} language="javascript">
                 {`<iframe src="https://www.googletagmanager.com/ns.html?id=GTM-XXXXXXX"

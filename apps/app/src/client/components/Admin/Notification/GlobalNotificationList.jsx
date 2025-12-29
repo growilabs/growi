@@ -105,7 +105,9 @@ class GlobalNotificationList extends React.Component {
                   <label
                     className="form-label form-check-label"
                     htmlFor={notification._id}
-                  />
+                  >
+                    <span className="visually-hidden">{t('Enable')}</span>
+                  </label>
                 </div>
               </td>
               <td>{notification.triggerPath}</td>
@@ -175,10 +177,7 @@ class GlobalNotificationList extends React.Component {
                     <span className="material-symbols-outlined">settings</span>{' '}
                     <span className="caret"></span>
                   </button>
-                  <div
-                    className="dropdown-menu dropdown-menu-right"
-                    aria-labelledby="dropdownMenuButton"
-                  >
+                  <div className="dropdown-menu dropdown-menu-right">
                     <a
                       className="dropdown-item"
                       href={urljoin(

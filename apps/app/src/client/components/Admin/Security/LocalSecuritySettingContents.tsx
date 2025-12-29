@@ -76,6 +76,7 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
         <p
           className="alert alert-info"
           // eslint-disable-next-line max-len
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
           dangerouslySetInnerHTML={{
             __html: t('security_settings.Local.note for the only env option', {
               env: 'LOCAL_STRATEGY_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
@@ -142,10 +143,7 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
                   {registrationMode === 'Closed' &&
                     t('security_settings.registration_mode.closed')}
                 </button>
-                <div
-                  className="dropdown-menu"
-                  aria-labelledby="dropdownMenuButton"
-                >
+                <div className="dropdown-menu">
                   <button
                     className="dropdown-item"
                     type="button"
@@ -189,6 +187,7 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
           <div className="row">
             <div className="col-12 col-md-4 text-start text-md-end">
               <strong
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t(
                     'security_settings.The whitelist of registration permission E-mail address',
@@ -214,9 +213,9 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
           </div>
 
           <div className="row">
-            <label className="col-12 col-md-4 text-start text-md-end  col-form-label">
+            <span className="col-12 col-md-4 text-start text-md-end col-form-label">
               {t('security_settings.Local.password_reset_by_users')}
-            </label>
+            </span>
             <div className="col-12 col-md-8">
               <div className="form-check form-switch form-check-success">
                 <input
@@ -253,9 +252,9 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
           </div>
 
           <div className="row">
-            <label className="col-12 col-md-4 text-start text-md-end  col-form-label">
+            <span className="col-12 col-md-4 text-start text-md-end col-form-label">
               {t('security_settings.Local.email_authentication')}
-            </label>
+            </span>
             <div className="col-12 col-md-8">
               <div className="form-check form-switch form-check-success">
                 <input

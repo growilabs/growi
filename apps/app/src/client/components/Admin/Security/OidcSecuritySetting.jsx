@@ -22,7 +22,7 @@ const OidcSecurityManagement = (props) => {
 
   useEffect(() => {
     fetchOidcSecuritySettingsData();
-  }, [adminOidcSecurityContainer, fetchOidcSecuritySettingsData]);
+  }, [fetchOidcSecuritySettingsData]);
 
   return <OidcSecurityManagementContents />;
 };

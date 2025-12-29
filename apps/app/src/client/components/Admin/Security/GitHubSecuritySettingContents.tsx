@@ -108,11 +108,15 @@ const GitHubSecurityManagementContents = (props: Props) => {
         </div>
 
         <div className="row mb-4">
-          <label className="form-label col-12 col-md-3 text-start text-md-end py-2">
+          <label
+            className="form-label col-12 col-md-3 text-start text-md-end py-2"
+            htmlFor="gitHubCallbackUrl"
+          >
             {t('security_settings.callback_URL')}
           </label>
           <div className="col-12 col-md-6">
             <input
+              id="gitHubCallbackUrl"
               className="form-control"
               type="text"
               value={gitHubCallbackUrl}
@@ -127,6 +131,7 @@ const GitHubSecurityManagementContents = (props: Props) => {
               <div className="alert alert-danger">
                 <span className="material-symbols-outlined">error</span>
                 <span // eslint-disable-next-line max-len
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t('alert.siteUrl_is_not_set', {
                       link: `<a href="/admin/app">${t('headers.app_settings', { ns: 'commons' })}<span class="material-symbols-outlined">login</span></a>`,
@@ -160,6 +165,7 @@ const GitHubSecurityManagementContents = (props: Props) => {
                 />
                 <p className="form-text text-muted">
                   <small
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t('security_settings.Use env var if empty', {
                         env: 'OAUTH_GITHUB_CLIENT_ID',
@@ -185,6 +191,7 @@ const GitHubSecurityManagementContents = (props: Props) => {
                 />
                 <p className="form-text text-muted">
                   <small
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t('security_settings.Use env var if empty', {
                         env: 'OAUTH_GITHUB_CLIENT_SECRET',
@@ -213,15 +220,20 @@ const GitHubSecurityManagementContents = (props: Props) => {
                   <label
                     className="form-check-label"
                     htmlFor="bindByUserNameGitHub"
-                    dangerouslySetInnerHTML={{
-                      __html: t(
-                        'security_settings.Treat email matching as identical',
-                      ),
-                    }}
-                  />
+                  >
+                    <span
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
+                      dangerouslySetInnerHTML={{
+                        __html: t(
+                          'security_settings.Treat email matching as identical',
+                        ),
+                      }}
+                    />
+                  </label>
                 </div>
                 <p className="form-text text-muted">
                   <small
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t(
                         'security_settings.Treat email matching as identical_warn',
@@ -262,6 +274,7 @@ const GitHubSecurityManagementContents = (props: Props) => {
             <ol id="collapseHelpForGitHubOauth" className="collapse mb-0">
               {/* eslint-disable-next-line max-len */}
               <li
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('security_settings.OAuth.GitHub.register_1', {
                     link: '<a href="https://github.com/settings/developers" target=_blank>GitHub Developer Settings</a>',
@@ -269,6 +282,7 @@ const GitHubSecurityManagementContents = (props: Props) => {
                 }}
               />
               <li
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('security_settings.OAuth.GitHub.register_2', {
                     url: gitHubCallbackUrl,
@@ -276,6 +290,7 @@ const GitHubSecurityManagementContents = (props: Props) => {
                 }}
               />
               <li
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('security_settings.OAuth.GitHub.register_3'),
                 }}

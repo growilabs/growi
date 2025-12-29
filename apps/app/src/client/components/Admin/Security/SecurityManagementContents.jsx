@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'next-i18next';
 import { TabContent, TabPane } from 'reactstrap';
@@ -13,6 +13,52 @@ import SamlSecuritySetting from './SamlSecuritySetting';
 import { SecuritySetting } from './SecuritySetting';
 import ShareLinkSetting from './ShareLinkSetting';
 
+const PassportLocalIcon = () => (
+  <span className="material-symbols-outlined">groups</span>
+);
+const PassportLdapIcon = () => (
+  <span className="material-symbols-outlined">network_node</span>
+);
+const PassportSamlIcon = () => (
+  <span className="material-symbols-outlined">key</span>
+);
+const PassportOidcIcon = () => (
+  <span className="material-symbols-outlined">key</span>
+);
+const PassportGoogleIcon = () => (
+  <span className="growi-custom-icons align-bottom">google</span>
+);
+const PassportGitHubIcon = () => (
+  <span className="growi-custom-icons align-bottom">github</span>
+);
+
+const navTabMapping = {
+  passport_local: {
+    Icon: PassportLocalIcon,
+    i18n: 'ID/Pass',
+  },
+  passport_ldap: {
+    Icon: PassportLdapIcon,
+    i18n: 'LDAP',
+  },
+  passport_saml: {
+    Icon: PassportSamlIcon,
+    i18n: 'SAML',
+  },
+  passport_oidc: {
+    Icon: PassportOidcIcon,
+    i18n: 'OIDC',
+  },
+  passport_google: {
+    Icon: PassportGoogleIcon,
+    i18n: 'Google',
+  },
+  passport_github: {
+    Icon: PassportGitHubIcon,
+    i18n: 'GitHub',
+  },
+};
+
 const SecurityManagementContents = () => {
   const { t } = useTranslation('admin');
 
@@ -25,41 +71,6 @@ const SecurityManagementContents = () => {
     setActiveTab(selectedTab);
     setActiveComponents(activeComponents.add(selectedTab));
   };
-
-  const navTabMapping = useMemo(() => {
-    return {
-      passport_local: {
-        Icon: () => <span className="material-symbols-outlined">groups</span>,
-        i18n: 'ID/Pass',
-      },
-      passport_ldap: {
-        Icon: () => (
-          <span className="material-symbols-outlined">network_node</span>
-        ),
-        i18n: 'LDAP',
-      },
-      passport_saml: {
-        Icon: () => <span className="material-symbols-outlined">key</span>,
-        i18n: 'SAML',
-      },
-      passport_oidc: {
-        Icon: () => <span className="material-symbols-outlined">key</span>,
-        i18n: 'OIDC',
-      },
-      passport_google: {
-        Icon: () => (
-          <span className="growi-custom-icons align-bottom">google</span>
-        ),
-        i18n: 'Google',
-      },
-      passport_github: {
-        Icon: () => (
-          <span className="growi-custom-icons align-bottom">github</span>
-        ),
-        i18n: 'GitHub',
-      },
-    };
-  }, []);
 
   return (
     <div data-testid="admin-security">

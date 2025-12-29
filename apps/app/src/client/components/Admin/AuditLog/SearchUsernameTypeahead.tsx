@@ -74,7 +74,9 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
 
   const allUser: UserDataType[] = [];
   const pushToAllUser = (usernames: string[], category: CategoryType) => {
-    usernames.forEach((username) => allUser.push({ username, category }));
+    usernames.forEach((username) => {
+      allUser.push({ username, category });
+    });
   };
   pushToAllUser(activeUsernames, Categories.activeUser);
   pushToAllUser(inactiveUsernames, Categories.inactiveUser);

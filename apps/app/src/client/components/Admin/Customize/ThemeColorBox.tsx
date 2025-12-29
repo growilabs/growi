@@ -26,14 +26,15 @@ export const ThemeColorBox = (props: Props): JSX.Element => {
   } = metadata;
 
   return (
-    <div
+    <button
+      type="button"
       id={`theme-option-${name}`}
       className={`${themeOptionClass} d-flex flex-column align-items-center ${isSelected ? 'active' : ''}`}
       onClick={onSelected}
+      aria-pressed={isSelected}
     >
-      <a
+      <div
         id={name}
-        role="button"
         className={`
           m-0 rounded rounded-3
           border border-4 border-primary ${isSelected ? '' : 'border-opacity-10'}`}
@@ -45,6 +46,7 @@ export const ThemeColorBox = (props: Props): JSX.Element => {
           height="64"
           className="rounded"
         >
+          <title>{name}</title>
           <path d="M32.5,0V36.364L64,20.437V0Z" fill={lightBg} />
           <path d="M32.5,36.364V64H64V20.438Z" fill={darkBg} />
           <path
@@ -73,7 +75,7 @@ export const ThemeColorBox = (props: Props): JSX.Element => {
             fill={darkIcon}
           />
         </svg>
-      </a>
+      </div>
       <span className={`mt-2 ${isSelected ? '' : 'opacity-25'}`}>
         <b>{name}</b>
       </span>
@@ -84,6 +86,6 @@ export const ThemeColorBox = (props: Props): JSX.Element => {
           Plugin
         </span>
       )}
-    </div>
+    </button>
   );
 };

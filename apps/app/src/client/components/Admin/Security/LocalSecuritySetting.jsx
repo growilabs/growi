@@ -22,7 +22,7 @@ const LocalSecuritySetting = (props) => {
 
   useEffect(() => {
     fetchLocalSecuritySettingsData();
-  }, [adminLocalSecurityContainer, fetchLocalSecuritySettingsData]);
+  }, [fetchLocalSecuritySettingsData]);
 
   return <LocalSecuritySettingContents />;
 };

@@ -40,7 +40,7 @@ export const PageAccessRightsSettings: React.FC<Props> = ({
                   t('security_settings.guest_mode.readonly')}
               </span>
             </button>
-            <div className="dropdown-menu" aria-labelledby="dropdownMenuButton">
+            <div className="dropdown-menu">
               <button
                 className="dropdown-item"
                 type="button"
@@ -70,6 +70,7 @@ export const PageAccessRightsSettings: React.FC<Props> = ({
               <br />
               {/* eslint-disable-next-line react/no-danger */}
               <b
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('security_settings.Fixed by env var', {
                     key: 'FORCE_WIKI_MODE',

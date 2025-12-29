@@ -74,11 +74,11 @@ const CustomizeScriptSetting = (props: Props): JSX.Element => {
               />
             </div>
 
-            <a
-              className="text-muted"
+            <button
+              type="button"
+              className="btn btn-link text-muted p-0"
               data-bs-toggle="collapse"
-              href="#collapseExampleScript"
-              role="button"
+              data-bs-target="#collapseExampleScript"
               aria-expanded="false"
               aria-controls="collapseExampleScript"
             >
@@ -89,7 +89,7 @@ const CustomizeScriptSetting = (props: Props): JSX.Element => {
                 navigate_next
               </span>
               Example for Google Tag Manager
-            </a>
+            </button>
             <div className="collapse" id="collapseExampleScript">
               <PrismAsyncLight style={oneDark} language="javascript">
                 {`(function(w,d,s,l,i){

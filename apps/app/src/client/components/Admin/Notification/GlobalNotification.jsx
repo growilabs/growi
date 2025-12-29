@@ -42,6 +42,7 @@ const GlobalNotification = (props) => {
       <p className="card custom-card bg-body-tertiary">
         {/* eslint-disable-next-line react/no-danger */}
         <span
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
           dangerouslySetInnerHTML={{
             __html: t('notification_settings.link_notification_help'),
           }}
@@ -68,6 +69,7 @@ const GlobalNotification = (props) => {
             >
               {/* eslint-disable-next-line react/no-danger */}
               <span
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('notification_settings.just_me_notification_help'),
                 }}
@@ -98,6 +100,7 @@ const GlobalNotification = (props) => {
             >
               {/* eslint-disable-next-line react/no-danger */}
               <span
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('notification_settings.group_notification_help'),
                 }}
@@ -137,6 +140,7 @@ const GlobalNotification = (props) => {
             <th>
               {t('notification_settings.trigger_path')}{' '}
               <span
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('notification_settings.trigger_path_help'),
                 }}

@@ -53,26 +53,28 @@ const CustomizeSidebarsetting = (): JSX.Element => {
           <div className="d-flex justify-content-around mt-5">
             <div className="row row-cols-2">
               <div className="col">
-                <div
+                <button
+                  type="button"
                   className={`card border border-4 ${isSidebarCollapsedMode ? 'border-primary' : ''}`}
                   onClick={() => setIsSidebarCollapsedMode(true)}
-                  role="button"
+                  aria-pressed={isSidebarCollapsedMode}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={collapsedIconFileName} alt="Collapsed Mode" />
                   <div className="card-body text-center">Collapsed Mode</div>
-                </div>
+                </button>
               </div>
               <div className="col">
-                <div
+                <button
+                  type="button"
                   className={`card border border-4 ${!isSidebarCollapsedMode ? 'border-primary' : ''}`}
                   onClick={() => setIsSidebarCollapsedMode(false)}
-                  role="button"
+                  aria-pressed={!isSidebarCollapsedMode}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={dockIconFileName} alt="Dock Mode" />
                   <div className="card-body  text-center">Dock Mode</div>
-                </div>
+                </button>
               </div>
             </div>
           </div>

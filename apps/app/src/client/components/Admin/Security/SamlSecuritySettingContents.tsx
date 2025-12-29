@@ -94,6 +94,7 @@ const SamlSecurityManagementContents = (props: Props) => {
       {useOnlyEnvVars && (
         <p
           className="alert alert-info"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
           dangerouslySetInnerHTML={{
             __html: t('security_settings.SAML.note for the only env option', {
               env: 'SAML_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
@@ -134,11 +135,15 @@ const SamlSecurityManagementContents = (props: Props) => {
       </div>
 
       <div className="row mb-5">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <label
+          className="text-start text-md-end col-md-3 col-form-label"
+          htmlFor="samlCallbackUrl"
+        >
           {t('security_settings.callback_URL')}
         </label>
         <div className="col-md-6">
           <input
+            id="samlCallbackUrl"
             className="form-control"
             type="text"
             defaultValue={samlCallbackUrl}
@@ -154,6 +159,7 @@ const SamlSecurityManagementContents = (props: Props) => {
               <span className="material-symbols-outlined">error</span>
               <span
                 // eslint-disable-next-line max-len
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('alert.siteUrl_is_not_set', {
                     link: `<a href="/admin/app">${t('headers.app_settings', { ns: 'commons' })}<span class="material-symbols-outlined">login</span></a>`,
@@ -227,6 +233,7 @@ const SamlSecurityManagementContents = (props: Props) => {
                   />
                   <p className="form-text text-muted">
                     <small
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{
                         __html: t(
                           'security_settings.SAML.Use env var if empty',
@@ -256,6 +263,7 @@ const SamlSecurityManagementContents = (props: Props) => {
                   />
                   <p className="form-text text-muted">
                     <small
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{
                         __html: t(
                           'security_settings.SAML.Use env var if empty',
@@ -303,6 +311,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                   />
                   <p className="form-text text-muted">
                     <small
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{
                         __html: t(
                           'security_settings.SAML.Use env var if empty',
@@ -355,6 +364,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                   />
                   <p className="form-text text-muted">
                     <small
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{
                         __html: t(
                           'security_settings.SAML.Use env var if empty',
@@ -375,6 +385,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                   />
                   <p className="form-text text-muted">
                     <small
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{
                         __html: t('security_settings.SAML.username_detail'),
                       }}
@@ -392,6 +403,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                   />
                   <p className="form-text text-muted">
                     <small
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{
                         __html: t(
                           'security_settings.SAML.Use env var if empty',
@@ -412,6 +424,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                   />
                   <p className="form-text text-muted">
                     <small
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{
                         __html: t('security_settings.SAML.mapping_detail', {
                           target: 'Email',
@@ -431,6 +444,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                   />
                   <p className="form-text text-muted">
                     <small
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{
                         __html: t(
                           'security_settings.SAML.Use env var if empty',
@@ -454,6 +468,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                   <p className="form-text text-muted">
                     {/* eslint-disable-next-line max-len */}
                     <small
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{
                         __html: t('security_settings.SAML.mapping_detail', {
                           target: t(
@@ -476,6 +491,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                   <p className="form-text text-muted">
                     <small>
                       <span
+                        // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                         dangerouslySetInnerHTML={{
                           __html: t(
                             'security_settings.SAML.Use env var if empty',
@@ -485,6 +501,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                       />
                       <br />
                       <span
+                        // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                         dangerouslySetInnerHTML={{
                           __html: t(
                             'security_settings.Use default if both are empty',
@@ -507,6 +524,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                   <p className="form-text text-muted">
                     {/* eslint-disable-next-line max-len */}
                     <small
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{
                         __html: t('security_settings.SAML.mapping_detail', {
                           target: t(
@@ -529,6 +547,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                   <p className="form-text text-muted">
                     <small>
                       <span
+                        // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                         dangerouslySetInnerHTML={{
                           __html: t(
                             'security_settings.SAML.Use env var if empty',
@@ -538,6 +557,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                       />
                       <br />
                       <span
+                        // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                         dangerouslySetInnerHTML={{
                           __html: t(
                             'security_settings.Use default if both are empty',
@@ -573,15 +593,20 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
               <label
                 className="form-label form-check-label"
                 htmlFor="bindByUserName-SAML"
-                dangerouslySetInnerHTML={{
-                  __html: t(
-                    'security_settings.Treat username matching as identical',
-                  ),
-                }}
-              />
+              >
+                <span
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
+                  dangerouslySetInnerHTML={{
+                    __html: t(
+                      'security_settings.Treat username matching as identical',
+                    ),
+                  }}
+                />
+              </label>
             </div>
             <p className="form-text text-muted">
               <small
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t(
                     'security_settings.Treat username matching as identical_warn',
@@ -608,15 +633,20 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
               <label
                 className="form-label form-check-label"
                 htmlFor="bindByEmail-SAML"
-                dangerouslySetInnerHTML={{
-                  __html: t(
-                    'security_settings.Treat email matching as identical',
-                  ),
-                }}
-              />
+              >
+                <span
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
+                  dangerouslySetInnerHTML={{
+                    __html: t(
+                      'security_settings.Treat email matching as identical',
+                    ),
+                  }}
+                />
+              </label>
             </div>
             <p className="form-text text-muted">
               <small
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t(
                     'security_settings.Treat email matching as identical_warn',
@@ -632,6 +662,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
 
           <p className="form-text text-muted">
             <small
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
               dangerouslySetInnerHTML={{
                 __html: t(
                   'security_settings.SAML.attr_based_login_control_detail',
@@ -695,6 +726,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                         <Collapse isOpen={isHelpOpened}>
                           <div className="accordion-body">
                             <p
+                              // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                               dangerouslySetInnerHTML={{
                                 __html: t(
                                   'security_settings.SAML.attr_based_login_control_rule_help',
@@ -702,6 +734,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                               }}
                             />
                             <p
+                              // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                               dangerouslySetInnerHTML={{
                                 __html: t(
                                   'security_settings.SAML.attr_based_login_control_rule_example1',
@@ -709,6 +742,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                               }}
                             />
                             <p
+                              // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                               dangerouslySetInnerHTML={{
                                 __html: t(
                                   'security_settings.SAML.attr_based_login_control_rule_example2',
@@ -729,6 +763,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                   />
                   <p className="form-text text-muted">
                     <small
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{
                         __html: t(
                           'security_settings.SAML.Use env var if empty',

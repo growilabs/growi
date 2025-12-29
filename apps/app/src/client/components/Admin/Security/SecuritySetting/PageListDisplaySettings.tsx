@@ -58,10 +58,7 @@ export const PageListDisplaySettings: React.FC<Props> = ({
                         t('security_settings.always_hidden')}
                     </span>
                   </button>
-                  <div
-                    className="dropdown-menu"
-                    aria-labelledby="isShowRestrictedByOwner"
-                  >
+                  <div className="dropdown-menu">
                     <button
                       className="dropdown-item"
                       type="button"
@@ -108,10 +105,7 @@ export const PageListDisplaySettings: React.FC<Props> = ({
                         t('security_settings.always_hidden')}
                     </span>
                   </button>
-                  <div
-                    className="dropdown-menu"
-                    aria-labelledby="isShowRestrictedByGroup"
-                  >
+                  <div className="dropdown-menu">
                     <button
                       className="dropdown-item"
                       type="button"

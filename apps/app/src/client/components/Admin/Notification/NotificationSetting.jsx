@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { SlackbotType } from '@growi/slack';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
@@ -17,6 +17,21 @@ import UserTriggerNotification from './UserTriggerNotification';
 const logger = loggerFactory('growi:NotificationSetting');
 
 let retrieveErrors = null;
+
+const SettingsIcon = () => (
+  <span className="material-symbols-outlined">settings</span>
+);
+
+const navTabMapping = {
+  user_trigger_notification: {
+    Icon: SettingsIcon,
+    i18n: 'User trigger notification',
+  },
+  global_notification: {
+    Icon: SettingsIcon,
+    i18n: 'Global notification',
+  },
+};
 
 // eslint-disable-next-line react/prop-types
 const Badge = ({ isEnabled }) => {
@@ -65,6 +80,7 @@ const SlackIntegrationListItem = ({ isEnabled, currentBotType }) => {
         <ul className="mt-2 ps-4">
           {/* eslint-disable-next-line react/no-danger */}
           <li
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
             dangerouslySetInnerHTML={{
               __html: t('external_notification.caution_enabled'),
             }}
@@ -93,6 +109,7 @@ const LegacySlackIntegrationListItem = ({ isEnabled }) => {
             {/* eslint-disable-next-line react/no-danger */}
             <span
               className="text-danger"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
               dangerouslySetInnerHTML={{
                 __html: t('slack_integration_legacy.alert_deplicated'),
               }}
@@ -136,19 +153,6 @@ function NotificationSetting(props) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  const navTabMapping = useMemo(() => {
-    return {
-      user_trigger_notification: {
-        Icon: () => <span className="material-symbols-outlined">settings</span>,
-        i18n: 'User trigger notification',
-      },
-      global_notification: {
-        Icon: () => <span className="material-symbols-outlined">settings</span>,
-        i18n: 'Global notification',
-      },
-    };
-  }, []);
 
   const { isSlackbotConfigured, isSlackLegacyConfigured, currentBotType } =
     adminNotificationContainer.state;

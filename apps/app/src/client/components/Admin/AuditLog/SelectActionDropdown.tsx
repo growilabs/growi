@@ -142,6 +142,7 @@ export const SelectActionDropdown: FC<Props> = (props: Props) => {
                 <input
                   type="checkbox"
                   className="form-check-input"
+                  id={`checkboxCategory${item.actionCategory}`}
                   defaultChecked
                   onChange={(e) => {
                     multipleActionCheckboxChangedHandler(
@@ -150,7 +151,10 @@ export const SelectActionDropdown: FC<Props> = (props: Props) => {
                     );
                   }}
                 />
-                <label className="form-label form-check-label">
+                <label
+                  className="form-label form-check-label"
+                  htmlFor={`checkboxCategory${item.actionCategory}`}
+                >
                   {t(`admin:audit_log_action_category.${item.actionCategory}`)}
                 </label>
               </div>

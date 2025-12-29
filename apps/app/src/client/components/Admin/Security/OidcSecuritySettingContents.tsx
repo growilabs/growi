@@ -159,11 +159,15 @@ const OidcSecurityManagementContents = (props: Props) => {
       </div>
 
       <div className="row mb-5">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <label
+          className="text-start text-md-end col-md-3 col-form-label"
+          htmlFor="oidcCallbackUrl"
+        >
           {t('security_settings.callback_URL')}
         </label>
         <div className="col-md-6">
           <input
+            id="oidcCallbackUrl"
             className="form-control"
             type="text"
             value={oidcCallbackUrl}
@@ -177,6 +181,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               <span className="material-symbols-outlined">error</span>
               <span
                 // eslint-disable-next-line max-len
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('alert.siteUrl_is_not_set', {
                     link: `<a href="/admin/app">${t('headers.app_settings', { ns: 'commons' })}<span class="material-symbols-outlined">login</span></a>`,
@@ -226,6 +231,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t('security_settings.Use env var if empty', {
                       env: 'OAUTH_OIDC_ISSUER_HOST',
@@ -251,6 +257,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t('security_settings.Use env var if empty', {
                       env: 'OAUTH_OIDC_CLIENT_ID',
@@ -276,6 +283,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t('security_settings.Use env var if empty', {
                       env: 'OAUTH_OIDC_CLIENT_SECRET',
@@ -301,6 +309,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t(
                       'security_settings.OAuth.OIDC.Use discovered URL if empty',
@@ -326,6 +335,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t(
                       'security_settings.OAuth.OIDC.Use discovered URL if empty',
@@ -351,6 +361,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t(
                       'security_settings.OAuth.OIDC.Use discovered URL if empty',
@@ -376,6 +387,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t(
                       'security_settings.OAuth.OIDC.Use discovered URL if empty',
@@ -401,6 +413,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t(
                       'security_settings.OAuth.OIDC.Use discovered URL if empty',
@@ -426,6 +439,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t(
                       'security_settings.OAuth.OIDC.Use discovered URL if empty',
@@ -451,6 +465,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t(
                       'security_settings.OAuth.OIDC.Use discovered URL if empty',
@@ -476,6 +491,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t(
                       'security_settings.OAuth.OIDC.Use discovered URL if empty',
@@ -505,6 +521,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t('security_settings.OAuth.OIDC.id_detail'),
                   }}
@@ -528,6 +545,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t('security_settings.OAuth.OIDC.username_detail'),
                   }}
@@ -551,6 +569,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t('security_settings.OAuth.OIDC.name_detail'),
                   }}
@@ -574,6 +593,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t('security_settings.OAuth.OIDC.mapping_detail', {
                       target: t('Email'),
@@ -585,11 +605,15 @@ const OidcSecurityManagementContents = (props: Props) => {
           </div>
 
           <div className="row mb-4">
-            <label className="form-label text-start text-md-end col-md-3 col-form-label">
+            <label
+              className="form-label text-start text-md-end col-md-3 col-form-label"
+              htmlFor="oidcCallbackUrlPreview"
+            >
               {t('security_settings.callback_URL')}
             </label>
             <div className="col-md-6">
               <input
+                id="oidcCallbackUrlPreview"
                 className="form-control"
                 type="text"
                 defaultValue={oidcCallbackUrl}
@@ -605,6 +629,7 @@ const OidcSecurityManagementContents = (props: Props) => {
                   <span className="material-symbols-outlined">error</span>
                   <span
                     // eslint-disable-next-line max-len
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t('alert.siteUrl_is_not_set', {
                         link: `<a href="/admin/app">${t('headers.app_settings', { ns: 'commons' })}<span class="material-symbols-outlined">login</span></a>`,
@@ -635,15 +660,20 @@ const OidcSecurityManagementContents = (props: Props) => {
                 <label
                   className="form-label form-check-label"
                   htmlFor="bindByUserName-oidc"
-                  dangerouslySetInnerHTML={{
-                    __html: t(
-                      'security_settings.Treat username matching as identical',
-                    ),
-                  }}
-                />
+                >
+                  <span
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
+                    dangerouslySetInnerHTML={{
+                      __html: t(
+                        'security_settings.Treat username matching as identical',
+                      ),
+                    }}
+                  />
+                </label>
               </div>
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t(
                       'security_settings.Treat username matching as identical_warn',
@@ -672,15 +702,20 @@ const OidcSecurityManagementContents = (props: Props) => {
                 <label
                   className="form-label form-check-label"
                   htmlFor="bindByEmail-oidc"
-                  dangerouslySetInnerHTML={{
-                    __html: t(
-                      'security_settings.Treat email matching as identical',
-                    ),
-                  }}
-                />
+                >
+                  <span
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
+                    dangerouslySetInnerHTML={{
+                      __html: t(
+                        'security_settings.Treat email matching as identical',
+                      ),
+                    }}
+                  />
+                </label>
               </div>
               <p className="form-text text-muted">
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t(
                       'security_settings.Treat email matching as identical_warn',
@@ -723,6 +758,7 @@ const OidcSecurityManagementContents = (props: Props) => {
           <ol id="collapseHelpForOidcOauth" className="collapse mb-0">
             <li>{t('security_settings.OAuth.OIDC.register_1')}</li>
             <li
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
               dangerouslySetInnerHTML={{
                 __html: t('security_settings.OAuth.OIDC.register_2', {
                   url: oidcCallbackUrl,

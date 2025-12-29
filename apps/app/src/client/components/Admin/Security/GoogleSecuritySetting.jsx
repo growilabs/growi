@@ -22,7 +22,7 @@ const GoogleSecurityManagement = (props) => {
 
   useEffect(() => {
     fetchGoogleSecuritySettingsData();
-  }, [adminGoogleSecurityContainer, fetchGoogleSecuritySettingsData]);
+  }, [fetchGoogleSecuritySettingsData]);
 
   return <GoogleSecurityManagementContents />;
 };

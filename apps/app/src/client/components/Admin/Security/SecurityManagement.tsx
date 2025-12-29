@@ -25,7 +25,7 @@ const SecurityManagement = (props: Props) => {
 
   useEffect(() => {
     fetchGeneralSecuritySettingsData();
-  }, [adminGeneralSecurityContainer, fetchGeneralSecuritySettingsData]);
+  }, [fetchGeneralSecuritySettingsData]);
 
   return <SecurityManagementContents />;
 };

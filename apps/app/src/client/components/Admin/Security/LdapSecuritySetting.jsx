@@ -22,7 +22,7 @@ const LdapSecuritySetting = (props) => {
 
   useEffect(() => {
     fetchLdapSecuritySettingsData();
-  }, [adminLdapSecurityContainer, fetchLdapSecuritySettingsData]);
+  }, [fetchLdapSecuritySettingsData]);
 
   return <LdapSecuritySettingContents />;
 };

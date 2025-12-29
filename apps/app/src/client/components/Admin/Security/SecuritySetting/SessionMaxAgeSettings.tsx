@@ -11,11 +11,15 @@ export const SessionMaxAgeSettings: React.FC<Props> = ({ register, t }) => {
     <>
       <h4>{t('security_settings.session')}</h4>
       <div className="row">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <label
+          className="text-start text-md-end col-md-3 col-form-label"
+          htmlFor="sessionMaxAge"
+        >
           {t('security_settings.max_age')}
         </label>
         <div className="col-md-8">
           <input
+            id="sessionMaxAge"
             className="form-control col-md-4"
             type="text"
             {...register('sessionMaxAge')}
@@ -24,6 +28,7 @@ export const SessionMaxAgeSettings: React.FC<Props> = ({ register, t }) => {
           {/* eslint-disable-next-line react/no-danger */}
           <p
             className="form-text text-muted"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
             dangerouslySetInnerHTML={{
               __html: t('security_settings.max_age_desc'),
             }}

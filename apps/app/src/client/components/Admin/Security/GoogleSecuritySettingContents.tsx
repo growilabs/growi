@@ -108,11 +108,15 @@ const GoogleSecurityManagementContents = (props: Props) => {
         </div>
 
         <div className="row mb-5">
-          <label className="form-label col-12 col-md-3 text-start text-md-end py-2">
+          <label
+            className="form-label col-12 col-md-3 text-start text-md-end py-2"
+            htmlFor="googleCallbackUrl"
+          >
             {t('security_settings.callback_URL')}
           </label>
           <div className="col-12 col-md-6">
             <input
+              id="googleCallbackUrl"
               className="form-control"
               type="text"
               value={googleCallbackUrl}
@@ -128,6 +132,7 @@ const GoogleSecurityManagementContents = (props: Props) => {
                 <span className="material-symbols-outlined">error</span>
                 <span
                   // eslint-disable-next-line max-len
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t('alert.siteUrl_is_not_set', {
                       link: `<a href="/admin/app">${t('headers.app_settings', { ns: 'commons' })}<span class="material-symbols-outlined">login</span></a>`,
@@ -161,6 +166,7 @@ const GoogleSecurityManagementContents = (props: Props) => {
                 />
                 <p className="form-text text-muted">
                   <small
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t('security_settings.Use env var if empty', {
                         env: 'OAUTH_GOOGLE_CLIENT_ID',
@@ -186,6 +192,7 @@ const GoogleSecurityManagementContents = (props: Props) => {
                 />
                 <p className="form-text text-muted">
                   <small
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t('security_settings.Use env var if empty', {
                         env: 'OAUTH_GOOGLE_CLIENT_SECRET',
@@ -214,15 +221,20 @@ const GoogleSecurityManagementContents = (props: Props) => {
                   <label
                     className="form-check-label"
                     htmlFor="bindByUserNameGoogle"
-                    dangerouslySetInnerHTML={{
-                      __html: t(
-                        'security_settings.Treat email matching as identical',
-                      ),
-                    }}
-                  />
+                  >
+                    <span
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
+                      dangerouslySetInnerHTML={{
+                        __html: t(
+                          'security_settings.Treat email matching as identical',
+                        ),
+                      }}
+                    />
+                  </label>
                 </div>
                 <p className="form-text text-muted">
                   <small
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t(
                         'security_settings.Treat email matching as identical_warn',
@@ -263,6 +275,7 @@ const GoogleSecurityManagementContents = (props: Props) => {
             <ol id="collapseHelpForGoogleOauth" className="collapse mb-0">
               {/* eslint-disable-next-line max-len */}
               <li
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('security_settings.OAuth.Google.register_1', {
                     link: '<a href="https://console.cloud.google.com/apis/credentials" target=_blank>Google Cloud Platform API Manager</a>',
@@ -270,16 +283,19 @@ const GoogleSecurityManagementContents = (props: Props) => {
                 }}
               />
               <li
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('security_settings.OAuth.Google.register_2'),
                 }}
               />
               <li
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('security_settings.OAuth.Google.register_3'),
                 }}
               />
               <li
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('security_settings.OAuth.Google.register_4', {
                     url: googleCallbackUrl,
@@ -287,6 +303,7 @@ const GoogleSecurityManagementContents = (props: Props) => {
                 }}
               />
               <li
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('security_settings.OAuth.Google.register_5'),
                 }}

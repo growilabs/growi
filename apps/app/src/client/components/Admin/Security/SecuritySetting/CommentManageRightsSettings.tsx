@@ -39,7 +39,7 @@ export const CommentManageRightsSettings: React.FC<Props> = ({
                   t('security_settings.read_only_users_comment.deny')}
               </span>
             </button>
-            <div className="dropdown-menu" aria-labelledby="dropdownMenuButton">
+            <div className="dropdown-menu">
               <button
                 className="dropdown-item"
                 type="button"

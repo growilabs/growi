@@ -57,6 +57,7 @@ export const CustomizeTitle: FC = () => {
             <CardBody className="px-0 py-2">
               {/* eslint-disable react/no-danger */}
               <p
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('admin:customize_settings.custom_title_detail'),
                 }}
@@ -64,6 +65,7 @@ export const CustomizeTitle: FC = () => {
               <ul>
                 <li>
                   <span
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t(
                         'admin:customize_settings.custom_title_detail_placeholder1',
@@ -73,6 +75,7 @@ export const CustomizeTitle: FC = () => {
                 </li>
                 <li>
                   <span
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t(
                         'admin:customize_settings.custom_title_detail_placeholder2',
@@ -82,6 +85,7 @@ export const CustomizeTitle: FC = () => {
                 </li>
                 <li>
                   <span
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t(
                         'admin:customize_settings.custom_title_detail_placeholder3',

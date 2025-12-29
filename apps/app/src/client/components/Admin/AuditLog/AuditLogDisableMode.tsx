@@ -20,6 +20,7 @@ export const AuditLogDisableMode: FC = () => {
               </h1>
               <h3
                 // eslint-disable-next-line react/no-danger
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('audit_log_management.disable_mode_explanation'),
                 }}

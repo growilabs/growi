@@ -158,6 +158,7 @@ const LdapSecuritySettingContents = (props: Props) => {
                 <p
                   className="form-text text-muted"
                   // eslint-disable-next-line react/no-danger
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t('security_settings.ldap.server_url_detail'),
                   }}
@@ -171,9 +172,9 @@ const LdapSecuritySettingContents = (props: Props) => {
           </div>
 
           <div className="row my-3">
-            <label className="form-label text-start text-md-end col-md-3 col-form-label">
+            <span className="form-label text-start text-md-end col-md-3 col-form-label">
               <strong>{t('security_settings.ldap.bind_mode')}</strong>
-            </label>
+            </span>
             <div className="col-md-9">
               <div className="dropdown">
                 <button
@@ -194,10 +195,7 @@ const LdapSecuritySettingContents = (props: Props) => {
                     </span>
                   )}
                 </button>
-                <div
-                  className="dropdown-menu"
-                  aria-labelledby="dropdownMenuButton"
-                >
+                <div className="dropdown-menu">
                   <button
                     className="dropdown-item"
                     type="button"
@@ -222,11 +220,15 @@ const LdapSecuritySettingContents = (props: Props) => {
           </div>
 
           <div className="row my-3">
-            <label className="form-label text-start text-md-end col-md-3 col-form-label">
+            <label
+              className="form-label text-start text-md-end col-md-3 col-form-label"
+              htmlFor="ldapBindDN"
+            >
               <strong>Bind DN</strong>
             </label>
             <div className="col-md-9">
               <input
+                id="ldapBindDN"
                 className="form-control"
                 type="text"
                 {...register('ldapBindDN')}
@@ -238,6 +240,7 @@ const LdapSecuritySettingContents = (props: Props) => {
                     <br />
                     {/* eslint-disable-next-line react/no-danger */}
                     <span
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{
                         __html: t(
                           'security_settings.ldap.bind_DN_user_detail2',
@@ -302,11 +305,15 @@ const LdapSecuritySettingContents = (props: Props) => {
           </div>
 
           <div className="row my-3">
-            <label className="form-label text-start text-md-end col-md-3 col-form-label">
+            <label
+              className="form-label text-start text-md-end col-md-3 col-form-label"
+              htmlFor="ldapSearchFilter"
+            >
               <strong>{t('security_settings.ldap.search_filter')}</strong>
             </label>
             <div className="col-md-9">
               <input
+                id="ldapSearchFilter"
                 className="form-control"
                 type="text"
                 {...register('ldapSearchFilter')}
@@ -317,6 +324,7 @@ const LdapSecuritySettingContents = (props: Props) => {
                   <br />
                   {/* eslint-disable-next-line react/no-danger */}
                   <span
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t('security_settings.ldap.search_filter_detail2'),
                     }}
@@ -324,6 +332,7 @@ const LdapSecuritySettingContents = (props: Props) => {
                   <br />
                   {/* eslint-disable-next-line react/no-danger */}
                   <span
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t('security_settings.ldap.search_filter_detail3'),
                     }}
@@ -367,6 +376,7 @@ const LdapSecuritySettingContents = (props: Props) => {
               <p className="form-text text-muted">
                 {/* eslint-disable-next-line react/no-danger */}
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t('security_settings.ldap.username_detail'),
                   }}
@@ -393,17 +403,22 @@ const LdapSecuritySettingContents = (props: Props) => {
                 <label
                   className="form-check-label"
                   htmlFor="isSameUsernameTreatedAsIdenticalUser"
-                  // eslint-disable-next-line react/no-danger
-                  dangerouslySetInnerHTML={{
-                    __html: t(
-                      'security_settings.Treat username matching as identical',
-                    ),
-                  }}
-                />
+                >
+                  <span
+                    // eslint-disable-next-line react/no-danger
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
+                    dangerouslySetInnerHTML={{
+                      __html: t(
+                        'security_settings.Treat username matching as identical',
+                      ),
+                    }}
+                  />
+                </label>
               </div>
               <p className="form-text text-muted">
                 {/* eslint-disable-next-line react/no-danger */}
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t(
                       'security_settings.Treat username matching as identical_warn',
@@ -476,6 +491,7 @@ const LdapSecuritySettingContents = (props: Props) => {
                 <small>
                   {/* eslint-disable-next-line react/no-danger */}
                   <span
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t(
                         'security_settings.ldap.group_search_base_DN_detail',
@@ -507,6 +523,7 @@ const LdapSecuritySettingContents = (props: Props) => {
                 <small>
                   {/* eslint-disable react/no-danger */}
                   <span
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t(
                         'security_settings.ldap.group_search_filter_detail1',
@@ -515,6 +532,7 @@ const LdapSecuritySettingContents = (props: Props) => {
                   />
                   <br />
                   <span
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t(
                         'security_settings.ldap.group_search_filter_detail2',
@@ -523,6 +541,7 @@ const LdapSecuritySettingContents = (props: Props) => {
                   />
                   <br />
                   <span
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t(
                         'security_settings.ldap.group_search_filter_detail3',
@@ -537,6 +556,7 @@ const LdapSecuritySettingContents = (props: Props) => {
                   {t('security_settings.example')}:
                   {/* eslint-disable-next-line react/no-danger */}
                   <span
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t(
                         'security_settings.ldap.group_search_filter_detail4',
@@ -567,6 +587,7 @@ const LdapSecuritySettingContents = (props: Props) => {
               <p className="form-text text-muted">
                 {/* eslint-disable-next-line react/no-danger */}
                 <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t(
                       'security_settings.ldap.group_search_user_DN_property_detail',

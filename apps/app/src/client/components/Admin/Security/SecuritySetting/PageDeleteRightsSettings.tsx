@@ -172,7 +172,7 @@ export const PageDeleteRightsSettings: React.FC<Props> = ({
               {t(getDeleteConfigValueForT(currentState))}
             </span>
           </button>
-          <div className="dropdown-menu" aria-labelledby="dropdownMenuButton">
+          <div className="dropdown-menu">
             {isRecursiveDeletion(deletionType) ? (
               <button
                 className="dropdown-item"
@@ -332,6 +332,7 @@ export const PageDeleteRightsSettings: React.FC<Props> = ({
                         <span className="material-symbols-outlined">info</span>
                         {/* eslint-disable-next-line react/no-danger */}
                         <span
+                          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                           dangerouslySetInnerHTML={{
                             __html: t(
                               'security_settings.page_delete_rights_caution',

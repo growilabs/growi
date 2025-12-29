@@ -66,10 +66,11 @@ const CustomizeLayoutSetting = (): JSX.Element => {
           <div className="d-flex justify-content-around mt-5">
             <div className="row row-cols-2">
               <div className="col">
-                <div
+                <button
+                  type="button"
                   className={`card border border-4 ${!isContainerFluid ? 'border-primary' : ''}`}
                   onClick={() => setIsContainerFluid(false)}
-                  role="button"
+                  aria-pressed={!isContainerFluid}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -80,13 +81,14 @@ const CustomizeLayoutSetting = (): JSX.Element => {
                   <div className="card-body text-center">
                     {t('customize_settings.layout_options.default')}
                   </div>
-                </div>
+                </button>
               </div>
               <div className="col">
-                <div
+                <button
+                  type="button"
                   className={`card border border-4 ${isContainerFluid ? 'border-primary' : ''}`}
                   onClick={() => setIsContainerFluid(true)}
-                  role="button"
+                  aria-pressed={isContainerFluid}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -97,7 +99,7 @@ const CustomizeLayoutSetting = (): JSX.Element => {
                   <div className="card-body text-center">
                     {t('customize_settings.layout_options.expanded')}
                   </div>
-                </div>
+                </button>
               </div>
             </div>
           </div>

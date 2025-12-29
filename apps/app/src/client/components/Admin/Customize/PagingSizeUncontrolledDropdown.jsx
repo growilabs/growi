@@ -20,7 +20,7 @@ const PagingSizeUncontrolledDropdown = (props) => {
       <div className="row">
         <div className="offset-md-2 col-md-7 text-start">
           <div className="my-0 w-100">
-            <label className="form-label">{props.label}</label>
+            <span className="form-label">{props.label}</span>
           </div>
           <UncontrolledDropdown>
             <DropdownToggle className="text-end col-6" caret>
@@ -34,7 +34,7 @@ const PagingSizeUncontrolledDropdown = (props) => {
                     role="presentation"
                     onClick={() => dropdownItemOnClickHandler(num)}
                   >
-                    <a role="menuitem">{num}</a>
+                    {num}
                   </DropdownItem>
                 );
               })}

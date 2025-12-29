@@ -22,7 +22,7 @@ const GitHubSecurityManagement = (props) => {
 
   useEffect(() => {
     fetchGitHubSecuritySettingsData();
-  }, [adminGitHubSecurityContainer, fetchGitHubSecuritySettingsData]);
+  }, [fetchGitHubSecuritySettingsData]);
 
   return <GitHubSecuritySettingContents />;
 };

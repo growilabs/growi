@@ -128,7 +128,11 @@ const CustomizeLogoSetting = (): JSX.Element => {
                     </label>
                   </div>
                 </h4>
-                <img src={DEFAULT_LOGO} width="64" />
+                <img
+                  src={DEFAULT_LOGO}
+                  width="64"
+                  alt={t('admin:customize_settings.default_logo')}
+                />
               </div>
               <div className="col-md-6 col-12">
                 <h4>
@@ -153,9 +157,9 @@ const CustomizeLogoSetting = (): JSX.Element => {
                   </div>
                 </h4>
                 <div className="row mb-3">
-                  <label className="col-sm-4 col-12 col-form-label text-start">
+                  <span className="col-sm-4 col-12 col-form-label text-start">
                     {t('admin:customize_settings.current_logo')}
-                  </label>
+                  </span>
                   <div className="col-sm-8 col-12">
                     {isCustomizedLogoUploaded && (
                       <>
@@ -164,6 +168,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
                             src={CUSTOMIZED_LOGO}
                             id="settingBrandLogo"
                             width="64"
+                            alt={t('admin:customize_settings.current_logo')}
                           />
                         </p>
                         <button
@@ -178,11 +183,15 @@ const CustomizeLogoSetting = (): JSX.Element => {
                   </div>
                 </div>
                 <div className="row">
-                  <label className="col-sm-4 col-12 col-form-label text-start">
+                  <label
+                    className="col-sm-4 col-12 col-form-label text-start"
+                    htmlFor="uploadLogoInput"
+                  >
                     {t('admin:customize_settings.upload_new_logo')}
                   </label>
                   <div className="col-sm-8 col-12">
                     <input
+                      id="uploadLogoInput"
                       type="file"
                       onChange={onSelectFile}
                       name="brandLogo"

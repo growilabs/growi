@@ -69,6 +69,7 @@ export const UserHomepageDeletionSettings: React.FC<Props> = ({
           </div>
           <p
             className="form-text text-muted small mt-2"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
             dangerouslySetInnerHTML={{
               __html: t('security_settings.user_homepage_deletion.desc'),
             }}
