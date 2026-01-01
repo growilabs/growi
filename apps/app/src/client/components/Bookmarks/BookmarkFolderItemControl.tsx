@@ -1,15 +1,17 @@
-import React, { useState, type JSX } from 'react';
-
+import React, { type JSX, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import {
-  Dropdown, DropdownItem, DropdownMenu, DropdownToggle,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
 } from 'reactstrap';
 
 export const BookmarkFolderItemControl: React.FC<{
-  children?: React.ReactNode
-  onClickMoveToRoot?: () => Promise<void>
-  onClickRename: () => void
-  onClickDelete: () => void
+  children?: React.ReactNode;
+  onClickMoveToRoot?: () => Promise<void>;
+  onClickRename: () => void;
+  onClickDelete: () => void;
 }> = ({
   children,
   onClickMoveToRoot,
@@ -21,23 +23,25 @@ export const BookmarkFolderItemControl: React.FC<{
 
   return (
     <Dropdown isOpen={isOpen} toggle={() => setIsOpen(!isOpen)}>
-      { children ?? (
-        <DropdownToggle color="transparent" className="border-0 rounded btn-page-item-control d-flex align-items-center justify-content-center">
+      {children ?? (
+        <DropdownToggle
+          color="transparent"
+          className="border-0 rounded btn-page-item-control d-flex align-items-center justify-content-center"
+        >
           <span className="material-symbols-outlined">more_horiz</span>
         </DropdownToggle>
-      ) }
+      )}
 
-      { isOpen && (
-        <DropdownMenu
-          container="body"
-          style={{ zIndex: 1055 }}
-        >
+      {isOpen && (
+        <DropdownMenu container="body" style={{ zIndex: 1055 }}>
           {onClickMoveToRoot && (
             <DropdownItem
               onClick={onClickMoveToRoot}
               className="grw-page-control-dropdown-item"
             >
-              <span className="material-symbols-outlined grw-page-control-dropdown-icon">bookmark</span>
+              <span className="material-symbols-outlined grw-page-control-dropdown-icon">
+                bookmark
+              </span>
               {t('bookmark_folder.move_to_root')}
             </DropdownItem>
           )}
@@ -45,7 +49,9 @@ export const BookmarkFolderItemControl: React.FC<{
             onClick={onClickRename}
             className="grw-page-control-dropdown-item"
           >
-            <span className="material-symbols-outlined me-1 grw-page-control-dropdown-icon">redo</span>
+            <span className="material-symbols-outlined me-1 grw-page-control-dropdown-icon">
+              redo
+            </span>
             {t('Rename')}
           </DropdownItem>
 
@@ -55,11 +61,13 @@ export const BookmarkFolderItemControl: React.FC<{
             className="pt-2 grw-page-control-dropdown-item text-danger"
             onClick={onClickDelete}
           >
-            <span className="material-symbols-outlined me-1 grw-page-control-dropdown-icon">delete</span>
+            <span className="material-symbols-outlined me-1 grw-page-control-dropdown-icon">
+              delete
+            </span>
             {t('Delete')}
           </DropdownItem>
         </DropdownMenu>
-      ) }
+      )}
     </Dropdown>
   );
 };

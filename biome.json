@@ -29,12 +29,9 @@
       "!packages/pdf-converter-client/src/index.ts",
       "!packages/pdf-converter-client/specs",
       "!apps/app/src/client/components/Admin",
-      "!apps/app/src/client/components/Bookmarks",
       "!apps/app/src/client/components/DescendantsPageListModal",
-      "!apps/app/src/client/components/InAppNotification",
       "!apps/app/src/client/components/ItemsTree",
       "!apps/app/src/client/components/LoginForm",
-      "!apps/app/src/client/components/Me",
       "!apps/app/src/client/components/Page",
       "!apps/app/src/client/components/PageAttachment",
       "!apps/app/src/client/components/PageDeleteModal",
@@ -45,9 +42,7 @@
       "!apps/app/src/client/components/PagePresentationModal",
       "!apps/app/src/client/components/PageRenameModal",
       "!apps/app/src/client/components/PageSelectModal",
-      "!apps/app/src/client/components/PageSideContents",
-      "!apps/app/src/client/components/PageTags",
-      "!apps/app/src/client/components/ReactMarkdownComponents"
+      "!apps/app/src/client/components/PageSideContents"
     ]
   },
   "formatter": {

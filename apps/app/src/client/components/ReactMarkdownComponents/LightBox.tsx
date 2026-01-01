@@ -1,10 +1,13 @@
+import type React from 'react';
 import type { DetailedHTMLProps, ImgHTMLAttributes, JSX } from 'react';
-import React, { useMemo, useState } from 'react';
-
+import { useMemo, useState } from 'react';
 import FsLightbox from 'fslightbox-react';
 import { createPortal } from 'react-dom';
 
-type Props = DetailedHTMLProps<ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement>
+type Props = DetailedHTMLProps<
+  ImgHTMLAttributes<HTMLImageElement>,
+  HTMLImageElement
+>;
 
 export const LightBox = (props: Props): JSX.Element => {
   const [toggler, setToggler] = useState(false);
@@ -26,7 +29,14 @@ export const LightBox = (props: Props): JSX.Element => {
   return (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img alt={alt} {...rest} onClick={() => setToggler(!toggler)} />
+      <button
+        type="button"
+        className="border-0 bg-transparent p-0"
+        aria-label={alt ?? 'Open image'}
+        onClick={() => setToggler((prev) => !prev)}
+      >
+        <img alt={alt} {...rest} />
+      </button>
 
       {lightboxPortal}
     </>
