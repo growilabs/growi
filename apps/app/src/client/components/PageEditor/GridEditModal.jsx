@@ -1,10 +1,7 @@
 import React from 'react';
-
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
-import {
-  Modal, ModalHeader, ModalBody, ModalFooter,
-} from 'reactstrap';
+import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 import BootstrapGrid from '~/client/models/BootstrapGrid';
 
@@ -19,7 +16,6 @@ const resSizeObj = {
   [resSizes.MD_SIZE]: { displayText: 'desktop' },
 };
 class GridEditModal extends React.Component {
-
   constructor(props) {
     super(props);
 
@@ -73,7 +69,10 @@ class GridEditModal extends React.Component {
 
   pasteCodedGrid() {
     const { colsRatios, responsiveSize } = this.state;
-    const convertedHTML = geu.convertRatiosAndSizeToHTML(colsRatios, responsiveSize);
+    const convertedHTML = geu.convertRatiosAndSizeToHTML(
+      colsRatios,
+      responsiveSize,
+    );
     const spaceTab = '    ';
     const pastedGridData = `::: editable-row\n<div class="container">\n${spaceTab}<div class="row">\n${convertedHTML}\n${spaceTab}</div>\n</div>\n:::`;
 
@@ -92,16 +91,22 @@ class GridEditModal extends React.Component {
     const { t } = this.props;
     const output = Object.entries(resSizeObj).map((responsiveSizeForMap) => {
       return (
-        <div key={responsiveSizeForMap[0]} className="form-check form-check-inline">
+        <div
+          key={responsiveSizeForMap[0]}
+          className="form-check form-check-inline"
+        >
           <input
             type="radio"
             className="form-check-input"
             id={responsiveSizeForMap[1].displayText}
             value={responsiveSizeForMap[1].displayText}
             checked={this.state.responsiveSize === responsiveSizeForMap[0]}
-            onChange={e => this.checkResposiveSize(responsiveSizeForMap[0])}
+            onChange={(e) => this.checkResposiveSize(responsiveSizeForMap[0])}
           />
-          <label className="form-label form-check-label" htmlFor={responsiveSizeForMap[1].displayText}>
+          <label
+            className="form-label form-check-label"
+            htmlFor={responsiveSizeForMap[1].displayText}
+          >
             {t(responsiveSizeForMap[1].displayText)}
           </label>
         </div>
@@ -119,17 +124,33 @@ class GridEditModal extends React.Component {
           {gridDivisions.map((gridDivision) => {
             const numOfDivisions = gridDivision.numberOfGridDivisions;
             return (
-              <div key={`${numOfDivisions}-divisions`} className="col-md-4 text-center">
-                <h6 className="dropdown-header">{numOfDivisions} {t('grid_edit.division')}</h6>
+              <div
+                key={`${numOfDivisions}-divisions`}
+                className="col-md-4 text-center"
+              >
+                <h6 className="dropdown-header">
+                  {numOfDivisions} {t('grid_edit.division')}
+                </h6>
                 {gridDivision.mapping.map((gridOneDivision) => {
                   const keyOfRow = `${numOfDivisions}-divisions-${gridOneDivision.join('-')}`;
                   return (
-                    <button key={keyOfRow} className="dropdown-item" type="button" onClick={() => { this.checkColsRatios(gridOneDivision) }}>
+                    <button
+                      key={keyOfRow}
+                      className="dropdown-item"
+                      type="button"
+                      onClick={() => {
+                        this.checkColsRatios(gridOneDivision);
+                      }}
+                    >
                       <div className="row">
                         {gridOneDivision.map((god, i) => {
                           const keyOfCol = `${keyOfRow}-${i}`;
                           const className = `bg-info col-${god} border`;
-                          return <span key={keyOfCol} className={className}>{god}</span>;
+                          return (
+                            <span key={keyOfCol} className={className}>
+                              {god}
+                            </span>
+                          );
                         })}
                       </div>
                     </button>
@@ -145,8 +166,10 @@ class GridEditModal extends React.Component {
 
   renderPreview() {
     const { t } = this.props;
-    const isMdSelected = this.state.responsiveSize === BootstrapGrid.ResponsiveSize.MD_SIZE;
-    const isXsSelected = this.state.responsiveSize === BootstrapGrid.ResponsiveSize.XS_SIZE;
+    const isMdSelected =
+      this.state.responsiveSize === BootstrapGrid.ResponsiveSize.MD_SIZE;
+    const isXsSelected =
+      this.state.responsiveSize === BootstrapGrid.ResponsiveSize.XS_SIZE;
     return (
       <div className="row grw-grid-edit-preview border my-4 p-3">
         <div className="col-lg-2">
@@ -178,19 +201,20 @@ class GridEditModal extends React.Component {
       const ratio = isBreakEnabled ? 12 : colsRatio;
       const key = `grid-preview-col-${i}`;
       const className = `col-${ratio} grid-edit-border-for-each-cols`;
-      return (
-        <div key={key} className={`${key} ${className}`}></div>
-      );
+      return <div key={key} className={`${key} ${className}`}></div>;
     });
-    return (
-      <div className="row">{convertedHTML}</div>
-    );
+    return <div className="row">{convertedHTML}</div>;
   }
 
   render() {
     const { t } = this.props;
     return (
-      <Modal isOpen={this.state.show} toggle={this.cancel} size="xl" className={`grw-grid-edit-modal ${styles['grw-grid-edit-modal']}`}>
+      <Modal
+        isOpen={this.state.show}
+        toggle={this.cancel}
+        size="xl"
+        className={`grw-grid-edit-modal ${styles['grw-grid-edit-modal']}`}
+      >
         <ModalHeader tag="h4" toggle={this.cancel}>
           {t('grid_edit.create_bootstrap_4_grid')}
         </ModalHeader>
@@ -214,7 +238,11 @@ class GridEditModal extends React.Component {
                     >
                       {this.renderSelectedGridPattern()}
                     </button>
-                    <div className="dropdown-menu grid-division-menu" aria-labelledby="dropdownMenuButton">
+                    <div
+                      className="dropdown-menu grid-division-menu"
+                      role="menu"
+                      aria-labelledby="dropdownMenuButton"
+                    >
                       {this.renderGridDivisionMenu()}
                     </div>
                   </div>
@@ -231,16 +259,22 @@ class GridEditModal extends React.Component {
             </div>
           </div>
           <h3 className="grw-modal-head">{t('preview')}</h3>
-          <div className="col-12">
-            {this.renderPreview()}
-          </div>
+          <div className="col-12">{this.renderPreview()}</div>
         </ModalBody>
         <ModalFooter className="grw-modal-footer">
           <div className="ms-auto">
-            <button type="button" className="me-2 btn btn-secondary" onClick={this.cancel}>
+            <button
+              type="button"
+              className="me-2 btn btn-secondary"
+              onClick={this.cancel}
+            >
               Cancel
             </button>
-            <button type="button" className="btn btn-primary" onClick={this.pasteCodedGrid}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={this.pasteCodedGrid}
+            >
               Done
             </button>
           </div>
@@ -248,7 +282,6 @@ class GridEditModal extends React.Component {
       </Modal>
     );
   }
-
 }
 
 const GridEditModalFc = React.forwardRef((props, ref) => {

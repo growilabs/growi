@@ -1,12 +1,18 @@
 import React, {
-  useState, useMemo, useCallback, type ReactNode, type CSSProperties,
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useMemo,
+  useState,
 } from 'react';
-
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import {
-  Dropdown, DropdownToggle, DropdownMenu, DropdownItem,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
   Tooltip,
 } from 'reactstrap';
 
@@ -33,20 +39,28 @@ interface CopyDropdownProps {
 
 /* eslint-disable react/prop-types */
 const DropdownItemContents: React.FC<DropdownItemContentsProps> = ({
-  title, contents, className = '', style,
+  title,
+  contents,
+  className = '',
+  style,
 }) => (
   <>
-    <div className="h6 mt-1 mb-2"><strong>{title}</strong></div>
-    <div className={`card mb-1 p-2 ${className}`} style={style}>{contents}</div>
+    <div className="h6 mt-1 mb-2">
+      <strong>{title}</strong>
+    </div>
+    <div className={`card mb-1 p-2 ${className}`} style={style}>
+      {contents}
+    </div>
   </>
 );
 /* eslint-enable react/prop-types */
 
-
 export const CopyDropdown: React.FC<CopyDropdownProps> = (props) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [tooltipOpen, setTooltipOpen] = useState(false);
-  const [isParamsAppended, setParamsAppended] = useState(!props.isShareLinkMode);
+  const [isParamsAppended, setParamsAppended] = useState(
+    !props.isShareLinkMode,
+  );
 
   /*
    * functions to construct labels and URLs
@@ -56,9 +70,7 @@ export const CopyDropdown: React.FC<CopyDropdownProps> = (props) => {
       return '';
     }
 
-    const {
-      search, hash,
-    } = window.location;
+    const { search, hash } = window.location;
 
     return `${search}${hash}`;
   }, [isParamsAppended, dropdownOpen]);
@@ -96,7 +108,6 @@ export const CopyDropdown: React.FC<CopyDropdownProps> = (props) => {
     return `[${label}](${permalink})`;
   }, [props, getUriParams, permalink]);
 
-
   /**
    * control
    */
@@ -115,16 +126,17 @@ export const CopyDropdown: React.FC<CopyDropdownProps> = (props) => {
     }, 1000);
   }, []);
 
-
   /*
    * render
    */
   const { t } = useTranslation('commons');
   const {
-    dropdownToggleId, pageId,
+    dropdownToggleId,
+    pageId,
     dropdownToggleClassName,
     dropdownMenuContainer,
-    children, isShareLinkMode,
+    children,
+    isShareLinkMode,
   } = props;
 
   const customSwitchForParamsId = `customSwitchForParams_${dropdownToggleId}`;
@@ -151,9 +163,9 @@ export const CopyDropdown: React.FC<CopyDropdownProps> = (props) => {
         >
           <div className="d-flex align-items-center justify-content-between">
             <DropdownItem header className="px-3">
-              { t('copy_to_clipboard.Copy to clipboard') }
+              {t('copy_to_clipboard.Copy to clipboard')}
             </DropdownItem>
-            { !isShareLinkMode && (
+            {!isShareLinkMode && (
               <div className="px-3 form-check form-switch form-switch-sm">
                 <input
                   type="checkbox"
@@ -162,9 +174,14 @@ export const CopyDropdown: React.FC<CopyDropdownProps> = (props) => {
                   checked={isParamsAppended}
                   onChange={toggleAppendParams}
                 />
-                <label className="form-label form-check-label small" htmlFor={customSwitchForParamsId}>{ t('copy_to_clipboard.Append params') }</label>
+                <label
+                  className="form-label form-check-label small"
+                  htmlFor={customSwitchForParamsId}
+                >
+                  {t('copy_to_clipboard.Append params')}
+                </label>
               </div>
-            ) }
+            )}
           </div>
 
           <DropdownItem divider className="my-0"></DropdownItem>
@@ -195,7 +212,7 @@ export const CopyDropdown: React.FC<CopyDropdownProps> = (props) => {
           <DropdownItem divider className="my-0"></DropdownItem>
 
           {/* Permanent Link */}
-          { pageId && (
+          {pageId && (
             <CopyToClipboard text={permalink} onCopy={showToolTip}>
               <DropdownItem className="px-3">
                 <DropdownItemContents
@@ -210,12 +227,21 @@ export const CopyDropdown: React.FC<CopyDropdownProps> = (props) => {
           <DropdownItem divider className="my-0"></DropdownItem>
 
           {/* Page path + Permanent Link */}
-          { pageId && (
-            <CopyToClipboard text={`${pagePathWithParams}\n${permalink}`} onCopy={showToolTip}>
+          {pageId && (
+            <CopyToClipboard
+              text={`${pagePathWithParams}\n${permalink}`}
+              onCopy={showToolTip}
+            >
               <DropdownItem className="px-3">
                 <DropdownItemContents
                   title={t('copy_to_clipboard.Page path and permanent link')}
-                  contents={<>{pagePathWithParams}<br />{permalink}</>}
+                  contents={
+                    <>
+                      {pagePathWithParams}
+                      <br />
+                      {permalink}
+                    </>
+                  }
                   className="text-truncate d-block"
                 />
               </DropdownItem>
@@ -225,18 +251,25 @@ export const CopyDropdown: React.FC<CopyDropdownProps> = (props) => {
           <DropdownItem divider className="my-0"></DropdownItem>
 
           {/* Markdown Link */}
-          { pageId && (
+          {pageId && (
             <CopyToClipboard text={markdownLink} onCopy={showToolTip}>
               <DropdownItem className="px-3 text-wrap">
-                <DropdownItemContents title={t('copy_to_clipboard.Markdown link')} contents={markdownLink} />
+                <DropdownItemContents
+                  title={t('copy_to_clipboard.Markdown link')}
+                  contents={markdownLink}
+                />
               </DropdownItem>
             </CopyToClipboard>
           )}
         </DropdownMenu>
-
       </Dropdown>
 
-      <Tooltip placement="bottom" isOpen={tooltipOpen} target={dropdownToggleId} fade={false}>
+      <Tooltip
+        placement="bottom"
+        isOpen={tooltipOpen}
+        target={dropdownToggleId}
+        fade={false}
+      >
         copied!
       </Tooltip>
     </>

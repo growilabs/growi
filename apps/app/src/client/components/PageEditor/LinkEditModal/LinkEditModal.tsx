@@ -1,17 +1,17 @@
-import React, {
-  useEffect, useState, useCallback,
-} from 'react';
-
-import path from 'path';
-
+import type React from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Linker } from '@growi/editor/dist/models/linker';
-import { useLinkEditModalStatus, useLinkEditModalActions } from '@growi/editor/dist/states/modal/link-edit';
+import {
+  useLinkEditModalActions,
+  useLinkEditModalStatus,
+} from '@growi/editor/dist/states/modal/link-edit';
 import { useTranslation } from 'next-i18next';
+import path from 'path';
 import {
   Modal,
-  ModalHeader,
   ModalBody,
   ModalFooter,
+  ModalHeader,
   Popover,
   PopoverBody,
 } from 'reactstrap';
@@ -25,9 +25,7 @@ import loggerFactory from '~/utils/logger';
 import SearchTypeahead from '../../SearchTypeahead';
 import Preview from '../Preview';
 
-
 import styles from './LinkEditPreview.module.scss';
-
 
 const logger = loggerFactory('growi:components:LinkEditModal');
 
@@ -52,11 +50,16 @@ const LinkEditModalSubstance: React.FC = () => {
   const [permalink, setPermalink] = useState<string>('');
   const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
 
-  const getRootPath = useCallback((type: string) => {
-    // rootPaths of md link and pukiwiki link are different
-    if (currentPath == null) return '';
-    return type === Linker.types.markdownLink ? path.dirname(currentPath) : currentPath;
-  }, [currentPath]);
+  const getRootPath = useCallback(
+    (type: string) => {
+      // rootPaths of md link and pukiwiki link are different
+      if (currentPath == null) return '';
+      return type === Linker.types.markdownLink
+        ? path.dirname(currentPath)
+        : currentPath;
+    },
+    [currentPath],
+  );
 
   // parse link, link is ...
   // case-1. url of this growi's page (ex. 'http://localhost:3000/hoge/fuga')
@@ -64,52 +67,61 @@ const LinkEditModalSubstance: React.FC = () => {
   // case-3. relative path of this growi's page (ex. '../fuga', 'hoge')
   // case-4. external link (ex. 'https://growi.org')
   // case-5. the others (ex. '')
-  const parseLinkAndSetState = useCallback((link: string, type: string) => {
-    // create url from link, add dummy origin if link is not valid url.
-    // ex-1. link = 'https://growi.org/' -> url = 'https://growi.org/' (case-1,4)
-    // ex-2. link = 'hoge' -> url = 'http://example.com/hoge' (case-2,3,5)
-    let isFqcn = false;
-    let isUseRelativePath = false;
-    let url;
-    try {
-      const url = new URL(link, 'http://example.com');
-      isFqcn = url.origin !== 'http://example.com';
-    }
-    catch (err) {
-      logger.debug(err);
-    }
+  const parseLinkAndSetState = useCallback(
+    (link: string, type: string) => {
+      // create url from link, add dummy origin if link is not valid url.
+      // ex-1. link = 'https://growi.org/' -> url = 'https://growi.org/' (case-1,4)
+      // ex-2. link = 'hoge' -> url = 'http://example.com/hoge' (case-2,3,5)
+      let isFqcn = false;
+      let isUseRelativePath = false;
+      let url: URL | undefined;
+      try {
+        url = new URL(link, 'http://example.com');
+        isFqcn = url.origin !== 'http://example.com';
+      } catch (err) {
+        logger.debug(err);
+      }
 
-    // case-1: when link is this growi's page url, return pathname only
-    let reshapedLink = url != null && url.origin === window.location.origin
-      ? decodeURIComponent(url.pathname)
-      : link;
+      // case-1: when link is this growi's page url, return pathname only
+      let reshapedLink =
+        url != null && url.origin === window.location.origin
+          ? decodeURIComponent(url.pathname)
+          : link;
 
-    // case-3
-    if (!isFqcn && !reshapedLink.startsWith('/') && reshapedLink !== '') {
-      isUseRelativePath = true;
-      const rootPath = getRootPath(type);
-      reshapedLink = path.resolve(rootPath, reshapedLink);
-    }
+      // case-3
+      if (!isFqcn && !reshapedLink.startsWith('/') && reshapedLink !== '') {
+        isUseRelativePath = true;
+        const rootPath = getRootPath(type);
+        reshapedLink = path.resolve(rootPath, reshapedLink);
+      }
 
-    setLinkInputValue(reshapedLink);
-    setIsUseRelativePath(isUseRelativePath);
-  }, [getRootPath]);
+      setLinkInputValue(reshapedLink);
+      setIsUseRelativePath(isUseRelativePath);
+    },
+    [getRootPath],
+  );
 
   useEffect(() => {
-    if (linkEditModalStatus == null) { return }
-    const { label = '', link = '' } = linkEditModalStatus.defaultMarkdownLink ?? {};
-    const { type = Linker.types.markdownLink } = linkEditModalStatus.defaultMarkdownLink ?? {};
+    if (linkEditModalStatus == null) {
+      return;
+    }
+    const { label = '', link = '' } =
+      linkEditModalStatus.defaultMarkdownLink ?? {};
+    const { type = Linker.types.markdownLink } =
+      linkEditModalStatus.defaultMarkdownLink ?? {};
 
     parseLinkAndSetState(link, type);
     setLabelInputValue(label);
     setIsUsePermanentLink(false);
     setPermalink('');
     setLinkerType(type);
-
   }, [linkEditModalStatus, parseLinkAndSetState]);
 
   const toggleIsUseRelativePath = useCallback(() => {
-    if (!linkInputValue.startsWith('/') || linkerType === Linker.types.growiLink) {
+    if (
+      !linkInputValue.startsWith('/') ||
+      linkerType === Linker.types.growiLink
+    ) {
       return;
     }
 
@@ -128,7 +140,7 @@ const LinkEditModalSubstance: React.FC = () => {
     setIsUseRelativePath(false);
   }, [permalink, linkerType, isUsePermanentLink]);
 
-  const setMarkdownHandler = useCallback(async() => {
+  const setMarkdownHandler = useCallback(async () => {
     const path = linkInputValue;
     let markdown = '';
     let pagePath = '';
@@ -137,20 +149,23 @@ const LinkEditModalSubstance: React.FC = () => {
     if (path.startsWith('/')) {
       try {
         const pathWithoutFragment = new URL(path, 'http://dummy').pathname;
-        const isPermanentLink = validator.isMongoId(pathWithoutFragment.slice(1));
+        const isPermanentLink = validator.isMongoId(
+          pathWithoutFragment.slice(1),
+        );
         const pageId = isPermanentLink ? pathWithoutFragment.slice(1) : null;
 
-        const { data } = await apiv3Get('/page', { path: pathWithoutFragment, page_id: pageId });
+        const { data } = await apiv3Get('/page', {
+          path: pathWithoutFragment,
+          page_id: pageId,
+        });
         const { page } = data;
         markdown = page.revision.body;
         pagePath = page.path;
         permalink = page.id;
-      }
-      catch (err) {
+      } catch (err) {
         setPreviewError(err.message);
       }
-    }
-    else {
+    } else {
       setPreviewError(t('link_edit.page_not_found_in_preview', { path }));
     }
 
@@ -160,11 +175,13 @@ const LinkEditModalSubstance: React.FC = () => {
   }, [linkInputValue, t]);
 
   const generateLink = useCallback(() => {
-
     let reshapedLink = linkInputValue;
     if (isUseRelativePath) {
       const rootPath = getRootPath(linkerType);
-      reshapedLink = rootPath === linkInputValue ? '.' : path.relative(rootPath, linkInputValue);
+      reshapedLink =
+        rootPath === linkInputValue
+          ? '.'
+          : path.relative(rootPath, linkInputValue);
     }
 
     if (isUsePermanentLink && permalink != null) {
@@ -172,7 +189,15 @@ const LinkEditModalSubstance: React.FC = () => {
     }
 
     return new Linker(linkerType, labelInputValue, reshapedLink);
-  }, [linkInputValue, isUseRelativePath, getRootPath, linkerType, isUsePermanentLink, permalink, labelInputValue]);
+  }, [
+    linkInputValue,
+    isUseRelativePath,
+    getRootPath,
+    linkerType,
+    isUsePermanentLink,
+    permalink,
+    labelInputValue,
+  ]);
 
   const renderLinkPreview = (): React.JSX.Element => {
     const linker = generateLink();
@@ -180,12 +205,18 @@ const LinkEditModalSubstance: React.FC = () => {
       <div className="d-flex justify-content-between mb-3 flex-column flex-sm-row">
         <div className="card card-disabled w-100 p-1 mb-0">
           <p className="text-start text-muted mb-1 small">Markdown</p>
-          <p className="text-center text-truncate text-muted">{linker.generateMarkdownText()}</p>
+          <p className="text-center text-truncate text-muted">
+            {linker.generateMarkdownText()}
+          </p>
         </div>
         <div className="d-flex align-items-center justify-content-center">
           <span className="lead mx-3">
-            <span className="d-none d-sm-block material-symbols-outlined">arrow_right</span>
-            <span className="d-sm-none material-symbols-outlined">arrow_drop_down</span>
+            <span className="d-none d-sm-block material-symbols-outlined">
+              arrow_right
+            </span>
+            <span className="d-sm-none material-symbols-outlined">
+              arrow_drop_down
+            </span>
           </span>
         </div>
         <div className="card w-100 p-1 mb-0">
@@ -212,16 +243,22 @@ const LinkEditModalSubstance: React.FC = () => {
     setLabelInputValue(label);
   }, []);
 
-  const handleChangeLinkInput = useCallback((link) => {
-    let useRelativePath = isUseRelativePath;
-    if (!linkInputValue.startsWith('/') || linkerType === Linker.types.growiLink) {
-      useRelativePath = false;
-    }
-    setLinkInputValue(link);
-    setIsUseRelativePath(useRelativePath);
-    setIsUsePermanentLink(false);
-    setPermalink('');
-  }, [linkInputValue, isUseRelativePath, linkerType]);
+  const handleChangeLinkInput = useCallback(
+    (link) => {
+      let useRelativePath = isUseRelativePath;
+      if (
+        !linkInputValue.startsWith('/') ||
+        linkerType === Linker.types.growiLink
+      ) {
+        useRelativePath = false;
+      }
+      setLinkInputValue(link);
+      setIsUseRelativePath(useRelativePath);
+      setIsUsePermanentLink(false);
+      setPermalink('');
+    },
+    [linkInputValue, isUseRelativePath, linkerType],
+  );
 
   const save = useCallback(() => {
     const linker = generateLink();
@@ -233,7 +270,7 @@ const LinkEditModalSubstance: React.FC = () => {
     close();
   }, [generateLink, linkEditModalStatus, close]);
 
-  const toggleIsPreviewOpen = useCallback(async() => {
+  const toggleIsPreviewOpen = useCallback(async () => {
     // open popover
     if (!isPreviewOpen) {
       setMarkdownHandler();
@@ -259,18 +296,36 @@ const LinkEditModalSubstance: React.FC = () => {
                 autoFocus
               />
               <div className="d-none d-sm-block">
-                <button type="button" id="preview-btn" className={`btn btn-info btn-page-preview ${styles['btn-page-preview']}`}>
-                  <span className="material-symbols-outlined">find_in_page</span>
+                <button
+                  type="button"
+                  id="preview-btn"
+                  className={`btn btn-info btn-page-preview ${styles['btn-page-preview']}`}
+                >
+                  <span className="material-symbols-outlined">
+                    find_in_page
+                  </span>
                 </button>
-                <Popover trigger="focus" placement="right" isOpen={isPreviewOpen} target="preview-btn" toggle={toggleIsPreviewOpen}>
+                <Popover
+                  trigger="focus"
+                  placement="right"
+                  isOpen={isPreviewOpen}
+                  target="preview-btn"
+                  toggle={toggleIsPreviewOpen}
+                >
                   <PopoverBody>
-                    {markdown != null && pagePath != null && rendererOptions != null
-                    && (
-                      <div className={`linkedit-preview ${styles['linkedit-preview']}`}>
-                        <Preview markdown={markdown} pagePath={pagePath} rendererOptions={rendererOptions} />
-                      </div>
-                    )
-                    }
+                    {markdown != null &&
+                      pagePath != null &&
+                      rendererOptions != null && (
+                        <div
+                          className={`linkedit-preview ${styles['linkedit-preview']}`}
+                        >
+                          <Preview
+                            markdown={markdown}
+                            pagePath={pagePath}
+                            rendererOptions={rendererOptions}
+                          />
+                        </div>
+                      )}
                   </PopoverBody>
                 </Popover>
               </div>
@@ -286,7 +341,7 @@ const LinkEditModalSubstance: React.FC = () => {
                 className="form-control"
                 id="label"
                 value={labelInputValue}
-                onChange={e => handleChangeLabelInput(e.target.value)}
+                onChange={(e) => handleChangeLabelInput(e.target.value)}
                 disabled={linkerType === Linker.types.growiLink}
                 placeholder={linkInputValue}
               />
@@ -302,7 +357,9 @@ const LinkEditModalSubstance: React.FC = () => {
       <div className="card custom-card pt-3">
         <form className="mb-0">
           <div className="mb-0 row">
-            <label className="form-label col-sm-3">{t('link_edit.path_format')}</label>
+            <span className="form-label col-sm-3">
+              {t('link_edit.path_format')}
+            </span>
             <div className="col-sm-9">
               <div className="form-check form-check-info form-check-inline">
                 <input
@@ -311,9 +368,15 @@ const LinkEditModalSubstance: React.FC = () => {
                   type="checkbox"
                   checked={isUseRelativePath}
                   onChange={toggleIsUseRelativePath}
-                  disabled={!linkInputValue.startsWith('/') || linkerType === Linker.types.growiLink}
+                  disabled={
+                    !linkInputValue.startsWith('/') ||
+                    linkerType === Linker.types.growiLink
+                  }
                 />
-                <label className="form-label form-check-label" htmlFor="relativePath">
+                <label
+                  className="form-label form-check-label"
+                  htmlFor="relativePath"
+                >
                   {t('link_edit.use_relative_path')}
                 </label>
               </div>
@@ -324,9 +387,14 @@ const LinkEditModalSubstance: React.FC = () => {
                   type="checkbox"
                   checked={isUsePermanentLink}
                   onChange={toggleIsUsePamanentLink}
-                  disabled={permalink === '' || linkerType === Linker.types.growiLink}
+                  disabled={
+                    permalink === '' || linkerType === Linker.types.growiLink
+                  }
                 />
-                <label className="form-label form-check-label" htmlFor="permanentLink">
+                <label
+                  className="form-label form-check-label"
+                  htmlFor="permanentLink"
+                >
                   {t('link_edit.use_permanent_link')}
                 </label>
               </div>
@@ -358,11 +426,19 @@ const LinkEditModalSubstance: React.FC = () => {
         </div>
       </ModalBody>
       <ModalFooter>
-        { previewError && <span className="text-danger">{previewError}</span>}
-        <button type="button" className="btn btn-sm btn-outline-secondary mx-1" onClick={close}>
+        {previewError && <span className="text-danger">{previewError}</span>}
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-secondary mx-1"
+          onClick={close}
+        >
           {t('Cancel')}
         </button>
-        <button type="submit" className="btn btn-sm btn-primary mx-1" onClick={save}>
+        <button
+          type="submit"
+          className="btn btn-sm btn-primary mx-1"
+          onClick={save}
+        >
           {t('Done')}
         </button>
       </ModalFooter>
@@ -380,7 +456,13 @@ export const LinkEditModal = (): React.JSX.Element => {
   const isOpened = linkEditModalStatus?.isOpened ?? false;
 
   return (
-    <Modal className="link-edit-modal" isOpen={isOpened} toggle={close} size="lg" autoFocus={false}>
+    <Modal
+      className="link-edit-modal"
+      isOpen={isOpened}
+      toggle={close}
+      size="lg"
+      autoFocus={false}
+    >
       {isOpened && <LinkEditModalSubstance />}
     </Modal>
   );

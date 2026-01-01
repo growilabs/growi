@@ -101,7 +101,11 @@ const getEod = (editor: EditorView) => {
 export const getMarkdownDrawioMxfile = (editor: EditorView): string | null => {
   const bod = getBod(editor);
   const eod = getEod(editor);
-  if (bod == null || eod == null || JSON.stringify(bod) === JSON.stringify(eod)) {
+  if (
+    bod == null ||
+    eod == null ||
+    JSON.stringify(bod) === JSON.stringify(eod)
+  ) {
     return null;
   }
 
@@ -115,11 +119,18 @@ export const getMarkdownDrawioMxfile = (editor: EditorView): string | null => {
   return editor.state.sliceDoc(bodLine, eodLine);
 };
 
-export const replaceFocusedDrawioWithEditor = (editor: EditorView, drawioData: string): void => {
+export const replaceFocusedDrawioWithEditor = (
+  editor: EditorView,
+  drawioData: string,
+): void => {
   const drawioBlock = ['``` drawio', drawioData.toString(), '```'].join('\n');
   let bod = getBod(editor);
   let eod = getEod(editor);
-  if (bod == null || eod == null || JSON.stringify(bod) === JSON.stringify(eod)) {
+  if (
+    bod == null ||
+    eod == null ||
+    JSON.stringify(bod) === JSON.stringify(eod)
+  ) {
     bod = curPos(editor);
     eod = curPos(editor);
   }

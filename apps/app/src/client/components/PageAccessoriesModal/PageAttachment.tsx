@@ -1,7 +1,4 @@
-import React, {
-  useCallback, useMemo, useState, type JSX,
-} from 'react';
-
+import React, { type JSX, useCallback, useMemo, useState } from 'react';
 import type { IAttachmentHasId } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 
@@ -19,7 +16,6 @@ const checkIfFileInUse = (markdown: string, attachment): boolean => {
 };
 
 const PageAttachment = (): JSX.Element => {
-
   const pageId = useCurrentPageId();
   const currentPage = useCurrentPageData();
 
@@ -32,32 +28,40 @@ const PageAttachment = (): JSX.Element => {
   const [pageNumber, setPageNumber] = useState(1);
 
   // SWRs
-  const { data: dataAttachments, remove } = useSWRxAttachments(pageId, pageNumber);
+  const { data: dataAttachments, remove } = useSWRxAttachments(
+    pageId,
+    pageNumber,
+  );
   const { open: openDeleteAttachmentModal } = useDeleteAttachmentModalActions();
   const markdown = currentPage?.revision?.body;
 
   // Custom hooks
-  const inUseAttachmentsMap: { [id: string]: boolean } | undefined = useMemo(() => {
-    if (markdown == null || dataAttachments == null) {
-      return undefined;
-    }
+  const inUseAttachmentsMap: { [id: string]: boolean } | undefined =
+    useMemo(() => {
+      if (markdown == null || dataAttachments == null) {
+        return undefined;
+      }
 
-    const attachmentEntries = dataAttachments.attachments
-      .map((attachment) => {
-        return [attachment._id, checkIfFileInUse(markdown, attachment)];
-      });
+      const attachmentEntries = dataAttachments.attachments.map(
+        (attachment) => {
+          return [attachment._id, checkIfFileInUse(markdown, attachment)];
+        },
+      );
 
-    return Object.fromEntries(attachmentEntries);
-  }, [dataAttachments, markdown]);
+      return Object.fromEntries(attachmentEntries);
+    }, [dataAttachments, markdown]);
 
   // Methods
   const onChangePageHandler = useCallback((newPageNumber: number) => {
     setPageNumber(newPageNumber);
   }, []);
 
-  const onAttachmentDeleteClicked = useCallback((attachment: IAttachmentHasId) => {
-    openDeleteAttachmentModal(attachment, remove);
-  }, [openDeleteAttachmentModal, remove]);
+  const onAttachmentDeleteClicked = useCallback(
+    (attachment: IAttachmentHasId) => {
+      openDeleteAttachmentModal(attachment, remove);
+    },
+    [openDeleteAttachmentModal, remove],
+  );
 
   // Renderers
   const renderPageAttachmentList = useCallback(() => {
@@ -77,7 +81,12 @@ const PageAttachment = (): JSX.Element => {
         isUserLoggedIn={!isPageAttachmentDisabled}
       />
     );
-  }, [dataAttachments, inUseAttachmentsMap, isPageAttachmentDisabled, onAttachmentDeleteClicked]);
+  }, [
+    dataAttachments,
+    inUseAttachmentsMap,
+    isPageAttachmentDisabled,
+    onAttachmentDeleteClicked,
+  ]);
 
   const renderPaginationWrapper = useCallback(() => {
     if (dataAttachments == null || dataAttachments.attachments.length === 0) {

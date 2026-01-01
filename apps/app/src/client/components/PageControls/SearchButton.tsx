@@ -1,18 +1,15 @@
-import React, { useCallback, type JSX } from 'react';
+import React, { type JSX, useCallback } from 'react';
 
 import { useSearchModalActions } from '~/features/search/client/states/modal/search';
 
 import styles from './SearchButton.module.scss';
 
-
 const SearchButton = (): JSX.Element => {
-
   const { open: openSearchModal } = useSearchModalActions();
 
   const searchButtonClickHandler = useCallback(() => {
     openSearchModal();
   }, [openSearchModal]);
-
 
   return (
     <button

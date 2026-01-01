@@ -1,5 +1,4 @@
 import type { JSX } from 'react';
-
 import { useLinkEditModalStatus } from '@growi/editor/dist/states/modal/link-edit';
 
 import { useLazyLoader } from '~/components/utils/use-lazy-loader';
@@ -11,7 +10,8 @@ export const LinkEditModalLazyLoaded = (): JSX.Element => {
 
   const LinkEditModal = useLazyLoader<LinkEditModalProps>(
     'link-edit-modal',
-    () => import('./LinkEditModal').then(mod => ({ default: mod.LinkEditModal })),
+    () =>
+      import('./LinkEditModal').then((mod) => ({ default: mod.LinkEditModal })),
     status?.isOpened ?? false,
   );
 
