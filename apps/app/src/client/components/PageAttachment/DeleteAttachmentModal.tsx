@@ -1,16 +1,15 @@
-import React, {
-  useCallback, useMemo, useState,
-} from 'react';
-
+import type React from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { IAttachmentHasId } from '@growi/core';
-import { UserPicture, LoadingSpinner } from '@growi/ui/dist/components';
+import { LoadingSpinner, UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
-import {
-  Button, Modal, ModalHeader, ModalBody, ModalFooter,
-} from 'reactstrap';
+import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useDeleteAttachmentModalStatus, useDeleteAttachmentModalActions } from '~/states/ui/modal/delete-attachment';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import {
+  useDeleteAttachmentModalActions,
+  useDeleteAttachmentModalStatus,
+} from '~/states/ui/modal/delete-attachment';
 import loggerFactory from '~/utils/logger';
 
 import { Username } from '../../../components/User/Username';
@@ -48,7 +47,7 @@ const DeleteAttachmentModalSubstance = ({
     setDeleteError('');
   }, [closeModal]);
 
-  const onClickDeleteButtonHandler = useCallback(async() => {
+  const onClickDeleteButtonHandler = useCallback(async () => {
     if (remove == null || attachment == null) {
       return;
     }
@@ -60,8 +59,7 @@ const DeleteAttachmentModalSubstance = ({
       setDeleting(false);
       closeModal();
       toastSuccess(`Delete ${attachment.originalName}`);
-    }
-    catch (err) {
+    } catch (err) {
       setDeleting(false);
       setDeleteError('Attachment could not be deleted.');
       toastError(err);
@@ -74,18 +72,25 @@ const DeleteAttachmentModalSubstance = ({
       return;
     }
 
-    const content = (attachment.fileFormat.match(/image\/.+/i))
+    const content = attachment.fileFormat.match(/image\/.+/i) ? (
       // eslint-disable-next-line @next/next/no-img-element
-      ? <img src={attachment.filePathProxied} alt="deleting image" />
-      : '';
+      <img src={attachment.filePathProxied} alt="deleting attachment" />
+    ) : (
+      ''
+    );
 
     return (
       <div className="attachment-delete-image">
         <p>
-          <span className="material-symbols-outlined">{iconByFormat(attachment.fileFormat)}</span> {attachment.originalName}
+          <span className="material-symbols-outlined">
+            {iconByFormat(attachment.fileFormat)}
+          </span>{' '}
+          {attachment.originalName}
         </p>
         <p>
-          uploaded by <UserPicture user={attachment.creator} size="sm"></UserPicture> <Username user={attachment.creator}></Username>
+          uploaded by{' '}
+          <UserPicture user={attachment.creator} size="sm"></UserPicture>{' '}
+          <Username user={attachment.creator}></Username>
         </p>
         {content}
       </div>
@@ -105,26 +110,22 @@ const DeleteAttachmentModalSubstance = ({
   return (
     <div>
       <ModalHeader tag="h4" toggle={toggleHandler} className="text-danger">
-        <span id="contained-modal-title-lg">{t('delete_attachment_modal.confirm_delete_attachment')}</span>
+        <span id="contained-modal-title-lg">
+          {t('delete_attachment_modal.confirm_delete_attachment')}
+        </span>
       </ModalHeader>
-      <ModalBody>
-        {attachmentFileFormat}
-      </ModalBody>
+      <ModalBody>{attachmentFileFormat}</ModalBody>
       <ModalFooter>
-        <div className="me-3 d-inline-block">
-          {deletingIndicator}
-        </div>
-        <Button
-          color="outline-neutral-secondary"
-          onClick={toggleHandler}
-        >
+        <div className="me-3 d-inline-block">{deletingIndicator}</div>
+        <Button color="outline-neutral-secondary" onClick={toggleHandler}>
           {t('commons:Cancel')}
         </Button>
         <Button
           color="danger"
           onClick={onClickDeleteButtonHandler}
           disabled={deleting}
-        >{t('commons:Delete')}
+        >
+          {t('commons:Delete')}
         </Button>
       </ModalFooter>
     </div>
