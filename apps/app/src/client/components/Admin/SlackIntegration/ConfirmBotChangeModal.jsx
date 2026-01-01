@@ -1,10 +1,7 @@
 import React from 'react';
-
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
-import {
-  Modal, ModalHeader, ModalBody, ModalFooter,
-} from 'reactstrap';
+import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 const ConfirmBotChangeModal = (props) => {
   const { t } = useTranslation('admin');
@@ -23,10 +20,7 @@ const ConfirmBotChangeModal = (props) => {
 
   return (
     <Modal isOpen={props.isOpen} centered>
-      <ModalHeader
-        toggle={handleCancelButton}
-        className="text-danger"
-      >
+      <ModalHeader toggle={handleCancelButton} className="text-danger">
         {t('slack_integration.modal.warning')}
       </ModalHeader>
       <ModalBody>
@@ -38,10 +32,18 @@ const ConfirmBotChangeModal = (props) => {
         </div>
       </ModalBody>
       <ModalFooter>
-        <button type="button" className="btn btn-secondary" onClick={handleCancelButton}>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={handleCancelButton}
+        >
           {t('slack_integration.modal.cancel')}
         </button>
-        <button type="button" className="btn btn-danger" onClick={handleChangeButton}>
+        <button
+          type="button"
+          className="btn btn-danger"
+          onClick={handleChangeButton}
+        >
           {t('slack_integration.modal.change')}
         </button>
       </ModalFooter>
