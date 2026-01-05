@@ -1,11 +1,8 @@
 import type { ReactNode } from 'react';
-
 import { render, screen } from '@testing-library/react';
 import { Provider } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
-import {
-  describe, it, expect, vi,
-} from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { isRomUserAllowedToCommentAtom } from '~/states/server-configurations';
 
@@ -18,21 +15,28 @@ vi.mock('~/states/context', () => ({
 }));
 
 vi.mock('react-disable', () => ({
-  Disable: ({ children, disabled }: { children: ReactNode; disabled: boolean }) => (
-    <div aria-hidden={disabled ? 'true' : undefined}>
-      {children}
-    </div>
-  ),
+  Disable: ({
+    children,
+    disabled,
+  }: {
+    children: ReactNode;
+    disabled: boolean;
+  }) => <div aria-hidden={disabled ? 'true' : undefined}>{children}</div>,
 }));
 
-const HydrateAtoms = ({ children, initialValues }: { children: ReactNode; initialValues: Array<[typeof isRomUserAllowedToCommentAtom, boolean]> }) => {
+const HydrateAtoms = ({
+  children,
+  initialValues,
+}: {
+  children: ReactNode;
+  initialValues: Array<[typeof isRomUserAllowedToCommentAtom, boolean]>;
+}) => {
   useHydrateAtoms(initialValues);
   return <>{children}</>;
 };
 
 describe('NotAvailableForReadOnlyUser.tsx', () => {
-
-  it('renders NotAvailable component as enable when user is read-only and comments by rom users is allowed', async() => {
+  it('renders NotAvailable component as enable when user is read-only and comments by rom users is allowed', async () => {
     useIsReadOnlyUser.mockReturnValue(true);
 
     render(
@@ -53,7 +57,7 @@ describe('NotAvailableForReadOnlyUser.tsx', () => {
     expect(wrapperElement).not.toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('renders NotAvailable component as disable when user is read-only and comments by rom users is not allowed', async() => {
+  it('renders NotAvailable component as disable when user is read-only and comments by rom users is not allowed', async () => {
     useIsReadOnlyUser.mockReturnValue(true);
 
     render(
@@ -74,7 +78,7 @@ describe('NotAvailableForReadOnlyUser.tsx', () => {
     expect(wrapperElement).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('renders NotAvailable component as enable when user is not read-only and comments by rom users is allowed', async() => {
+  it('renders NotAvailable component as enable when user is not read-only and comments by rom users is allowed', async () => {
     useIsReadOnlyUser.mockReturnValue(false);
 
     render(
@@ -95,7 +99,7 @@ describe('NotAvailableForReadOnlyUser.tsx', () => {
     expect(wrapperElement).not.toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('renders NotAvailable component as enable when user is not read-only and comments by rom users is not allowed', async() => {
+  it('renders NotAvailable component as enable when user is not read-only and comments by rom users is not allowed', async () => {
     useIsReadOnlyUser.mockReturnValue(false);
 
     render(
@@ -115,5 +119,4 @@ describe('NotAvailableForReadOnlyUser.tsx', () => {
     // then
     expect(wrapperElement).not.toHaveAttribute('aria-hidden', 'true');
   });
-
 });
