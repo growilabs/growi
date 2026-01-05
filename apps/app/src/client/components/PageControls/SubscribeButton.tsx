@@ -1,17 +1,15 @@
 import type { FC } from 'react';
 import React, { useCallback } from 'react';
-
 import { SubscriptionStatusType } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
 
 import styles from './SubscribeButton.module.scss';
 
-
 type Props = {
-  isGuestUser?: boolean,
-  status?: SubscriptionStatusType,
-  onClick?: () => Promise<void>,
+  isGuestUser?: boolean;
+  status?: SubscriptionStatusType;
+  onClick?: () => Promise<void>;
 };
 
 const SubscribeButton: FC<Props> = (props: Props) => {
@@ -21,7 +19,6 @@ const SubscribeButton: FC<Props> = (props: Props) => {
   const isSubscribing = status === SubscriptionStatusType.SUBSCRIBE;
 
   const getTooltipMessage = useCallback(() => {
-
     if (isSubscribing) {
       return 'tooltip.stop_notification';
     }
@@ -37,17 +34,22 @@ const SubscribeButton: FC<Props> = (props: Props) => {
         className={`shadow-none btn btn-subscribe ${styles['btn-subscribe']} border-0
           ${isSubscribing ? 'active' : ''} ${isGuestUser ? 'disabled' : ''}`}
       >
-        <span className={`material-symbols-outlined ${isSubscribing ? 'fill' : ''}`}>
+        <span
+          className={`material-symbols-outlined ${isSubscribing ? 'fill' : ''}`}
+        >
           {isSubscribing ? 'notifications' : 'notifications_off'}
         </span>
       </button>
 
-      <UncontrolledTooltip data-testid="subscribe-button-tooltip" target="subscribe-button" fade={false}>
+      <UncontrolledTooltip
+        data-testid="subscribe-button-tooltip"
+        target="subscribe-button"
+        fade={false}
+      >
         {t(getTooltipMessage())}
       </UncontrolledTooltip>
     </>
   );
-
 };
 
 export default SubscribeButton;
