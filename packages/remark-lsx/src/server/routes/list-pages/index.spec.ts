@@ -12,7 +12,10 @@ interface IListPagesRequest
   user: IUser;
 }
 
-const defaultHideUserPages = false;
+const crowiMock = mock<any>();
+crowiMock.pageService = {
+  getExcludedPathsBySystem: vi.fn().mockReturnValue(['/user']), // Default mock behavior
+};
 
 // mocking modules
 const mocks = vi.hoisted(() => {
@@ -38,6 +41,10 @@ vi.mock('./get-toppage-viewers-count', () => ({
 }));
 
 describe('listPages', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("returns 400 HTTP response when the query 'pagePath' is undefined", async () => {
     // setup
     const reqMock = mock<IListPagesRequest>();
@@ -46,7 +53,7 @@ describe('listPages', () => {
     resMock.status.calledWith(400).mockReturnValue(resStatusMock);
 
     // when
-    const handler = listPages(defaultHideUserPages);
+    const handler = listPages(crowiMock);
     await handler(reqMock, resMock);
 
     // then
@@ -60,12 +67,16 @@ describe('listPages', () => {
     reqMock.query = { pagePath: '/Sandbox' };
 
     const builderMock = mock<PageQueryBuilder>();
-
-    mocks.generateBaseQueryMock.mockResolvedValue(builderMock);
-    mocks.getToppageViewersCountMock.mockImplementation(() => 99);
-
+    
     const queryMock = mock<PageQuery>();
     builderMock.query = queryMock;
+
+    beforeEach(() => {
+      mocks.generateBaseQueryMock.mockResolvedValue(builderMock);
+      mocks.getToppageViewersCountMock.mockImplementation(() => 99);
+
+      queryMock.and.mockReturnValue(queryMock);
+    });
 
     it('returns 200 HTTP response', async () => {
       // setup query.clone().count()
@@ -88,7 +99,7 @@ describe('listPages', () => {
       resMock.status.calledWith(200).mockReturnValue(resStatusMock);
 
       // when
-      const handler = listPages(defaultHideUserPages);
+      const handler = listPages(crowiMock);
       await handler(reqMock, resMock);
 
       // then
@@ -122,7 +133,7 @@ describe('listPages', () => {
       resMock.status.calledWith(500).mockReturnValue(resStatusMock);
 
       // when
-      const handler = listPages(defaultHideUserPages);
+      const handler = listPages(crowiMock);
       await handler(reqMock, resMock);
 
       // then
@@ -152,7 +163,7 @@ describe('listPages', () => {
       resMock.status.calledWith(400).mockReturnValue(resStatusMock);
 
       // when
-      const handler = listPages(defaultHideUserPages);
+      const handler = listPages(crowiMock);
       await handler(reqMock, resMock);
 
       // then
