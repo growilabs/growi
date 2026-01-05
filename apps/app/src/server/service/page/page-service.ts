@@ -1,13 +1,9 @@
 import type { EventEmitter } from 'node:events';
 import type {
   HasObjectId,
-  IDataWithRequiredMeta,
   IGrantedGroup,
   IPage,
-  IPageInfoExt,
-  IPageInfoForEmpty,
-  IPageInfoForEntity,
-  IPageNotFoundInfo,
+  IPageInfoBasic,
   IUser,
   IUserHasId,
   PageGrant,
@@ -62,24 +58,6 @@ export interface IPageService {
     pages: ObjectIdLike[],
     user: IUser | undefined,
   ) => Promise<void>;
-  findPageAndMetaDataByViewer(
-    pageId: string,
-    path: string | null,
-    user?: HydratedDocument<IUser>,
-    isSharedPage?: boolean,
-  ): Promise<
-    | IDataWithRequiredMeta<HydratedDocument<PageDocument>, IPageInfoExt>
-    | IDataWithRequiredMeta<null, IPageNotFoundInfo>
-  >;
-  findPageAndMetaDataByViewer(
-    pageId: string | null,
-    path: string,
-    user?: HydratedDocument<IUser>,
-    isSharedPage?: boolean,
-  ): Promise<
-    | IDataWithRequiredMeta<HydratedDocument<PageDocument>, IPageInfoExt>
-    | IDataWithRequiredMeta<null, IPageNotFoundInfo>
-  >;
   resumeRenameSubOperation(
     renamedPage: PageDocument,
     pageOp: PageOperationDocument,
@@ -98,15 +76,7 @@ export interface IPageService {
   constructBasicPageInfo(
     page: HydratedDocument<PageDocument>,
     isGuestUser?: boolean,
-  ):
-    | Omit<
-        IPageInfoForEmpty,
-        'bookmarkCount' | 'isDeletable' | 'isAbleToDeleteCompletely'
-      >
-    | Omit<
-        IPageInfoForEntity,
-        'bookmarkCount' | 'isDeletable' | 'isAbleToDeleteCompletely'
-      >;
+  ): IPageInfoBasic;
   normalizeAllPublicPages(): Promise<void>;
   canDelete(
     page: PageDocument,
@@ -212,4 +182,10 @@ export interface IPageService {
     options: IOptionsForCreate,
     pageOpId: ObjectIdLike,
   ): Promise<void>;
+
+  getCreatorIdForCanDelete(page: PageDocument): Promise<ObjectIdLike | null>;
+
+  canDeleteUserHomepageByConfig(): boolean;
+
+  isUsersHomepageOwnerAbsent(path: string): Promise<boolean>;
 }

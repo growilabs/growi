@@ -2,11 +2,13 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import express from 'express';
-import { connection } from 'mongoose';
 
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { Revision } from '~/server/models/revision';
-import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
+import {
+  getAppliedAtForRevisionFilter,
+  normalizeLatestRevisionIfBroken,
+} from '~/server/service/revision/normalize-latest-revision-if-broken';
 import loggerFactory from '~/utils/logger';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
@@ -16,9 +18,6 @@ const logger = loggerFactory('growi:routes:apiv3:pages');
 const { query, param } = require('express-validator');
 
 const router = express.Router();
-
-const MIGRATION_FILE_NAME =
-  '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549';
 
 /**
  * @swagger
@@ -83,24 +82,6 @@ module.exports = (crowi) => {
       query('pageId').isMongoId().withMessage('pageId is required'),
       param('id').isMongoId().withMessage('id is required'),
     ],
-  };
-
-  let cachedAppliedAt = null;
-
-  const getAppliedAtOfTheMigrationFile = async () => {
-    if (cachedAppliedAt != null) {
-      return cachedAppliedAt;
-    }
-
-    const migrationCollection = connection.collection('migrations');
-    const migration = await migrationCollection.findOne({
-      fileName: { $regex: `^${MIGRATION_FILE_NAME}` },
-    });
-    const appliedAt = migration.appliedAt;
-
-    cachedAppliedAt = appliedAt;
-
-    return appliedAt;
   };
 
   /**
@@ -176,7 +157,7 @@ module.exports = (crowi) => {
         );
       }
 
-      // Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js'
+      // Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js' provided by v6.1.0 - v7.0.15
       try {
         await normalizeLatestRevisionIfBroken(pageId);
       } catch (err) {
@@ -186,7 +167,7 @@ module.exports = (crowi) => {
       try {
         const page = await Page.findOne({ _id: pageId });
 
-        const appliedAt = await getAppliedAtOfTheMigrationFile();
+        const appliedAt = await getAppliedAtForRevisionFilter();
 
         const queryOpts = {
           offset,
@@ -202,7 +183,7 @@ module.exports = (crowi) => {
 
         const queryCondition = {
           pageId: page._id,
-          createdAt: { $gt: appliedAt },
+          ...(appliedAt != null && { createdAt: { $gt: appliedAt } }),
         };
 
         // https://redmine.weseek.co.jp/issues/151652

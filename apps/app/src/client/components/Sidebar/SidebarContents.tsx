@@ -1,12 +1,15 @@
 import React, { memo, useMemo } from 'react';
-
 import { useAtomValue } from 'jotai';
 
 import { AiAssistant } from '~/features/openai/client/components/AiAssistant/Sidebar/AiAssistant';
 import { SidebarContentsType } from '~/interfaces/ui';
 import { useIsGuestUser } from '~/states/context';
 import { aiEnabledAtom } from '~/states/server-configurations';
-import { useSidebarMode, useCollapsedContentsOpened, useCurrentSidebarContents } from '~/states/ui/sidebar';
+import {
+  useCollapsedContentsOpened,
+  useCurrentSidebarContents,
+  useSidebarMode,
+} from '~/states/ui/sidebar';
 
 import { Bookmarks } from './Bookmarks';
 import { CustomSidebar } from './Custom';
@@ -16,7 +19,6 @@ import { RecentChanges } from './RecentChanges';
 import Tag from './Tag';
 
 import styles from './SidebarContents.module.scss';
-
 
 export const SidebarContents = memo(() => {
   const { isCollapsedMode } = useSidebarMode();
@@ -57,7 +59,10 @@ export const SidebarContents = memo(() => {
   const classToHide = isHidden ? 'd-none' : '';
 
   return (
-    <div className={`grw-sidebar-contents ${styles['grw-sidebar-contents']} ${classToHide}`} data-testid="grw-sidebar-contents">
+    <div
+      className={`grw-sidebar-contents ${styles['grw-sidebar-contents']} ${classToHide}`}
+      data-testid="grw-sidebar-contents"
+    >
       <Contents />
     </div>
   );

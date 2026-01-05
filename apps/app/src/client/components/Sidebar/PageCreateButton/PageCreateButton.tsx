@@ -1,5 +1,4 @@
-import React, { useState, type JSX } from 'react';
-
+import React, { type JSX, useState } from 'react';
 import { Dropdown } from 'reactstrap';
 
 import { useCreateTemplatePage } from '~/client/services/create-page';
@@ -12,7 +11,6 @@ import { DropendMenu } from './DropendMenu';
 import { DropendToggle } from './DropendToggle';
 import { useCreateNewPage, useCreateTodaysMemo } from './hooks';
 
-
 export const PageCreateButton = React.memo((): JSX.Element => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -23,11 +21,16 @@ export const PageCreateButton = React.memo((): JSX.Element => {
 
   const { createNewPage, isCreating: isNewPageCreating } = useCreateNewPage();
   // TODO: https://redmine.weseek.co.jp/issues/138806
-  const { createTodaysMemo, isCreating: isTodaysPageCreating, todaysPath } = useCreateTodaysMemo();
+  const {
+    createTodaysMemo,
+    isCreating: isTodaysPageCreating,
+    todaysPath,
+  } = useCreateTodaysMemo();
   // TODO: https://redmine.weseek.co.jp/issues/138805
   const {
     createTemplate,
-    isCreating: isTemplatePageCreating, isCreatable: isTemplatePageCreatable,
+    isCreating: isTemplatePageCreating,
+    isCreatable: isTemplatePageCreatable,
   } = useCreateTemplatePage();
 
   const createNewPageWithToastr = useToastrOnError(createNewPage);
@@ -46,20 +49,23 @@ export const PageCreateButton = React.memo((): JSX.Element => {
   const toggle = () => setDropdownOpen(!dropdownOpen);
 
   return (
-    <div
-      className="d-flex flex-row mt-2"
+    <fieldset
+      className="d-flex flex-row mt-2 border-0 p-0 m-0"
       onMouseEnter={onMouseEnterHandler}
       onMouseLeave={onMouseLeaveHandler}
       data-testid="grw-page-create-button"
+      aria-label="Page create actions"
     >
       <div className="btn-group flex-grow-1">
         <CreateButton
           className="z-2"
           onClick={createNewPageWithToastr}
-          disabled={isNewPageCreating || isTodaysPageCreating || isTemplatePageCreating}
+          disabled={
+            isNewPageCreating || isTodaysPageCreating || isTemplatePageCreating
+          }
         />
       </div>
-      { isHovered && (
+      {isHovered && (
         <Dropdown
           isOpen={dropdownOpen}
           toggle={toggle}
@@ -69,13 +75,17 @@ export const PageCreateButton = React.memo((): JSX.Element => {
           <DropendToggle />
           <DropendMenu
             onClickCreateNewPage={createNewPageWithToastr}
-            onClickOpenPageCreateModal={() => openPageCreateModal(currentPagePath)}
+            onClickOpenPageCreateModal={() =>
+              openPageCreateModal(currentPagePath)
+            }
             onClickCreateTodaysMemo={createTodaysMemoWithToastr}
-            onClickCreateTemplate={isTemplatePageCreatable ? createTemplateWithToastr : undefined}
+            onClickCreateTemplate={
+              isTemplatePageCreatable ? createTemplateWithToastr : undefined
+            }
             todaysPath={todaysPath}
           />
         </Dropdown>
       )}
-    </div>
+    </fieldset>
   );
 });

@@ -21,7 +21,7 @@ export default class AdminAppContainer extends Container {
       confidential: '',
       globalLang: '',
       isEmailPublishedForNewUser: true,
-      fileUpload: '',
+      isReadOnlyForNewUser: false,
 
       isV5Compatible: null,
       siteUrl: '',
@@ -62,7 +62,7 @@ export default class AdminAppContainer extends Container {
       confidential: appSettingsParams.confidential,
       globalLang: appSettingsParams.globalLang,
       isEmailPublishedForNewUser: appSettingsParams.isEmailPublishedForNewUser,
-      fileUpload: appSettingsParams.fileUpload,
+      isReadOnlyForNewUser: appSettingsParams.isReadOnlyForNewUser,
       isV5Compatible: appSettingsParams.isV5Compatible,
       siteUrl: appSettingsParams.siteUrl,
       siteUrlUseOnlyEnvVars: appSettingsParams.siteUrlUseOnlyEnvVars,
@@ -111,10 +111,10 @@ export default class AdminAppContainer extends Container {
   }
 
   /**
-   * Change fileUpload
+   * Change isReadOnlyForNewUser
    */
-  changeFileUpload(fileUpload) {
-    this.setState({ fileUpload });
+  changeIsReadOnlyForNewUserShow(isReadOnlyForNewUser) {
+    this.setState({ isReadOnlyForNewUser });
   }
 
   /**
@@ -198,7 +198,7 @@ export default class AdminAppContainer extends Container {
       confidential: this.state.confidential,
       globalLang: this.state.globalLang,
       isEmailPublishedForNewUser: this.state.isEmailPublishedForNewUser,
-      fileUpload: this.state.fileUpload,
+      isReadOnlyForNewUser: this.state.isReadOnlyForNewUser,
     });
     const { appSettingParams } = response.data;
     return appSettingParams;

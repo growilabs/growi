@@ -39,6 +39,7 @@ import ShareLink from '~/server/models/share-link';
 import Subscription from '~/server/models/subscription';
 import { configManager } from '~/server/service/config-manager';
 import { exportService } from '~/server/service/export';
+import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
 import type { IPageGrantService } from '~/server/service/page-grant';
 import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
@@ -94,13 +95,13 @@ module.exports = (crowi: Crowi) => {
 
   const globalNotificationService = crowi.getGlobalNotificationService();
   const Page = mongoose.model<IPage, PageModel>('Page');
-  const { pageService } = crowi;
+  const { pageService, pageGrantService } = crowi;
 
   const activityEvent = crowi.event('activity');
 
   const validator = {
     getPage: [
-      query('pageId').optional().isString(),
+      query('pageId').isMongoId().optional().isString(),
       query('path').optional().isString(),
       query('findAll').optional().isBoolean(),
       query('shareLinkId').optional().isMongoId(),
@@ -262,12 +263,12 @@ module.exports = (crowi: Crowi) => {
             return res.apiv3Err('ShareLink is not found', 404);
           }
           return respondWithSinglePage(
-            await pageService.findPageAndMetaDataByViewer(
-              getIdStringForRef(shareLink.relatedPage),
+            await findPageAndMetaDataByViewer(pageService, pageGrantService, {
+              pageId: getIdStringForRef(shareLink.relatedPage),
               path,
               user,
-              true,
-            ),
+              isSharedPage: true,
+            }),
           );
         }
 
@@ -290,7 +291,11 @@ module.exports = (crowi: Crowi) => {
         }
 
         return respondWithSinglePage(
-          await pageService.findPageAndMetaDataByViewer(pageId, path, user),
+          await findPageAndMetaDataByViewer(pageService, pageGrantService, {
+            pageId,
+            path,
+            user,
+          }),
         );
       } catch (err) {
         logger.error('get-page-failed', err);
@@ -583,11 +588,10 @@ module.exports = (crowi: Crowi) => {
       const { pageId } = req.query;
 
       try {
-        const { meta } = await pageService.findPageAndMetaDataByViewer(
-          pageId,
-          null,
-          user,
-          isSharedPage,
+        const { meta } = await findPageAndMetaDataByViewer(
+          pageService,
+          pageGrantService,
+          { pageId, path: null, user, isSharedPage },
         );
 
         if (isIPageNotFoundInfo(meta)) {
@@ -1041,7 +1045,7 @@ module.exports = (crowi: Crowi) => {
         return res.apiv3Err(err, 500);
       }
 
-      // Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js'
+      // Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js' provided by v6.1.0 - v7.0.15
       try {
         await normalizeLatestRevisionIfBroken(pageId);
       } catch (err) {

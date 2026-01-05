@@ -35,14 +35,14 @@ const AppSetting = (props) => {
       globalLang: adminAppContainer.state.globalLang || 'en-US',
       // Convert boolean to string for radio button value
       isEmailPublishedForNewUser: String(adminAppContainer.state.isEmailPublishedForNewUser ?? true),
-      fileUpload: adminAppContainer.state.fileUpload ?? false,
+      isReadOnlyForNewUser: adminAppContainer.state.isReadOnlyForNewUser ?? false,
     });
   }, [
     adminAppContainer.state.title,
     adminAppContainer.state.confidential,
     adminAppContainer.state.globalLang,
     adminAppContainer.state.isEmailPublishedForNewUser,
-    adminAppContainer.state.fileUpload,
+    adminAppContainer.state.isReadOnlyForNewUser,
     reset,
   ]);
 
@@ -57,7 +57,7 @@ const AppSetting = (props) => {
       // Convert string 'true'/'false' to boolean
       const isEmailPublished = data.isEmailPublishedForNewUser === 'true' || data.isEmailPublishedForNewUser === true;
       await adminAppContainer.changeIsEmailPublishedForNewUserShow(isEmailPublished);
-      await adminAppContainer.changeFileUpload(data.fileUpload);
+      await adminAppContainer.changeIsReadOnlyForNewUserShow(data.isReadOnlyForNewUser);
 
       await adminAppContainer.updateAppSettingHandler();
       toastSuccess(t('commons:toaster.update_successed', { target: t('commons:headers.app_settings') }));
@@ -163,31 +163,23 @@ const AppSetting = (props) => {
         </div>
       </div>
 
-      <div className="row mb-2">
+      <div className="row mb-5">
         <label
           className="text-start text-md-end col-md-3 col-form-label"
         >
-          {/* {t('admin:app_setting.file_uploading')} */}
+          {t('admin:app_setting.default_read_only_for_new_user')}
         </label>
-        <div className="col-md-6">
-          <div className="form-check form-check-info">
+        <div className="col-md-6 py-2">
+
+          <div className="form-check form-check-inline">
             <input
               type="checkbox"
-              id="cbFileUpload"
+              id="checkbox-read-only-for-new-user"
               className="form-check-input"
-              {...register('fileUpload')}
+              {...register('isReadOnlyForNewUser')}
             />
-            <label
-              className="form-label form-check-label"
-              htmlFor="cbFileUpload"
-            >
-              {t('admin:app_setting.enable_files_except_image')}
-            </label>
+            <label className="form-label form-check-label" htmlFor="checkbox-read-only-for-new-user">{t('admin:app_setting.set_read_only_for_new_user')}</label>
           </div>
-
-          <p className="form-text text-muted">
-            {t('admin:app_setting.attach_enable')}
-          </p>
         </div>
       </div>
 

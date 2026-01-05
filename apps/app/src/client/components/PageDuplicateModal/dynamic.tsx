@@ -10,7 +10,10 @@ export const PageDuplicateModalLazyLoaded = (): JSX.Element => {
 
   const PageDuplicateModal = useLazyLoader<PageDuplicateModalProps>(
     'page-duplicate-modal',
-    () => import('./PageDuplicateModal').then(mod => ({ default: mod.PageDuplicateModal })),
+    () =>
+      import('./PageDuplicateModal').then((mod) => ({
+        default: mod.PageDuplicateModal,
+      })),
     status?.isOpened ?? false,
   );
 

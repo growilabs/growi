@@ -148,7 +148,7 @@ module.exports = (crowi) => {
       const appUrl = growiInfoService.getSiteUrl();
 
       try {
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email: { $eq: email } });
 
         // when the user is not found or active
         if (user == null || user.status !== 2) {

@@ -32,6 +32,7 @@ module.exports = {
   'growi:service:g2g-transfer': 'debug',
 
   'growi:migration:add-installed-date-to-config': 'debug',
+  'growi:events:page:seen': 'debug',
 
   /*
    * configure level for client

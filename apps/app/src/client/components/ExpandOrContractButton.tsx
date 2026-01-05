@@ -4,13 +4,12 @@ import React from 'react';
 import styles from './ExpandOrContractButton.module.scss';
 
 type Props = {
-  isWindowExpanded: boolean,
-  contractWindow?: () => void,
-  expandWindow?: () => void,
+  isWindowExpanded: boolean;
+  contractWindow?: () => void;
+  expandWindow?: () => void;
 };
 
 const moduleClass = styles['btn-expand-or-contract'] ?? '';
-
 
 const ExpandOrContractButton: FC<Props> = (props: Props) => {
   const { isWindowExpanded, contractWindow, expandWindow } = props;
@@ -31,7 +30,9 @@ const ExpandOrContractButton: FC<Props> = (props: Props) => {
     <button
       type="button"
       className={`btn ${moduleClass}`}
-      onClick={isWindowExpanded ? clickContractButtonHandler : clickExpandButtonHandler}
+      onClick={
+        isWindowExpanded ? clickContractButtonHandler : clickExpandButtonHandler
+      }
     >
       <span className="material-symbols-outlined fw-bold">
         {isWindowExpanded ? 'close_fullscreen' : 'open_in_full'}
@@ -39,6 +40,5 @@ const ExpandOrContractButton: FC<Props> = (props: Props) => {
     </button>
   );
 };
-
 
 export default ExpandOrContractButton;
