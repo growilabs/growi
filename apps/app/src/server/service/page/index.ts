@@ -419,18 +419,6 @@ class PageService implements IPageService {
       return null;
     }
 
-    const hideUserPages = configManager.getConfig('security:isHidingUserPages');
-    const userPagePattern = /^\/user(\/.*)?$/;
-
-    if (hideUserPages && page.path && userPagePattern.test(page.path)) {
-      const isAdmin = user != null && user.admin;
-      const isOwnPage = user != null && page.path === `/user/${user.username}`;
-
-      if (!isOwnPage && !isAdmin) {
-        return null;
-      }
-    }
-
     if (isSharedPage) {
       return {
         data: page,

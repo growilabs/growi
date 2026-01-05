@@ -2,6 +2,7 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import express from 'express';
 
 import { middlewareFactory as rateLimiterFactory } from '~/features/rate-limiter';
+import { blockUserPagesMiddlewareFactory } from '~/server/middlewares/block-user-pages';
 
 import { accessTokenParser } from '../middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '../middlewares/add-activity';
@@ -52,6 +53,7 @@ module.exports = (crowi, app) => {
   const search = require('./search')(crowi, app);
   const ogp = require('./ogp')(crowi);
   const { createApiRouter } = require('~/server/util/createApiRouter');
+  const blockUserPages = blockUserPagesMiddlewareFactory(crowi);
 
   const next = nextFactory(crowi);
 
@@ -440,6 +442,6 @@ module.exports = (crowi, app) => {
       ),
   );
 
-  app.get('/*/$', loginRequired, next.delegateToNext);
-  app.get('/*', loginRequired, autoReconnectToSearch, next.delegateToNext);
+  app.get('/*/$', loginRequired, blockUserPages, next.delegateToNext);
+  app.get('/*', loginRequired, blockUserPages, autoReconnectToSearch, next.delegateToNext);
 };
