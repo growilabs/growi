@@ -13,7 +13,6 @@ import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import ShareLink from '~/server/models/share-link';
 import { configManager } from '~/server/service/config-manager';
-import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 import {
   prepareDeleteConfigValuesForCalc,
@@ -21,6 +20,7 @@ import {
 } from '~/utils/page-delete-config';
 
 import { checkSetupStrategiesHasAdmin } from './checkSetupStrategiesHasAdmin';
+import { samlAuthValidator, handleSamlUpdate } from './saml';
 
 const logger = loggerFactory('growi:routes:apiv3:security-setting');
 
@@ -111,41 +111,6 @@ const validator = {
       .if((value) => value != null)
       .isString(),
     body('ldapGroupDnProperty')
-      .if((value) => value != null)
-      .isString(),
-  ],
-  samlAuth: [
-    body('entryPoint')
-      .if((value) => value != null)
-      .isString(),
-    body('issuer')
-      .if((value) => value != null)
-      .isString(),
-    body('cert')
-      .if((value) => value != null)
-      .isString(),
-    body('attrMapId')
-      .if((value) => value != null)
-      .isString(),
-    body('attrMapUsername')
-      .if((value) => value != null)
-      .isString(),
-    body('attrMapMail')
-      .if((value) => value != null)
-      .isString(),
-    body('attrMapFirstName')
-      .if((value) => value != null)
-      .isString(),
-    body('attrMapLastName')
-      .if((value) => value != null)
-      .isString(),
-    body('isSameUsernameTreatedAsIdenticalUser')
-      .if((value) => value != null)
-      .isBoolean(),
-    body('isSameEmailTreatedAsIdenticalUser')
-      .if((value) => value != null)
-      .isBoolean(),
-    body('ABLCRule')
       .if((value) => value != null)
       .isString(),
   ],
@@ -363,75 +328,6 @@ const validator = {
  *          ldapGroupDnProperty:
  *            type: string
  *            description: The property of user object to use in dn interpolation of Group Search Filter
- *      SamlAuthSetting:
- *        type: object
- *        properties:
- *          missingMandatoryConfigKeys:
- *            type: array
- *            description: array of missing mandatory config keys
- *            items:
- *              type: string
- *              description: missing mandatory config key
- *          useOnlyEnvVarsForSomeOptions:
- *            type: boolean
- *            description: use only env vars for some options
- *          samlEntryPoint:
- *            type: string
- *            description: entry point for saml
- *          samlIssuer:
- *            type: string
- *            description: issuer for saml
- *          samlEnvVarIssuer:
- *            type: string
- *            description: issuer for saml
- *          samlCert:
- *            type: string
- *            description: certificate for saml
- *          samlEnvVarCert:
- *            type: string
- *            description: certificate for saml
- *          samlAttrMapId:
- *            type: string
- *            description: attribute mapping id for saml
- *          samlAttrMapUserName:
- *            type: string
- *            description: attribute mapping user name for saml
- *          samlAttrMapMail:
- *            type: string
- *            description: attribute mapping mail for saml
- *          samlEnvVarAttrMapId:
- *            type: string
- *            description: attribute mapping id for saml
- *          samlEnvVarAttrMapUserName:
- *            type: string
- *            description: attribute mapping user name for saml
- *          samlEnvVarAttrMapMail:
- *            type: string
- *            description: attribute mapping mail for saml
- *          samlAttrMapFirstName:
- *            type: string
- *            description: attribute mapping first name for saml
- *          samlAttrMapLastName:
- *            type: string
- *            description: attribute mapping last name for saml
- *          samlEnvVarAttrMapFirstName:
- *            type: string
- *            description: attribute mapping first name for saml
- *          samlEnvVarAttrMapLastName:
- *            type: string
- *            description: attribute mapping last name for saml
- *          isSameUsernameTreatedAsIdenticalUser:
- *            type: boolean
- *            description: local account automatically linked the user name matched
- *          isSameEmailTreatedAsIdenticalUser:
- *            type: boolean
- *            description: local account automatically linked the email matched
- *          samlABLCRule:
- *            type: string
- *            description: ABLCRule for saml
- *          samlEnvVarABLCRule:
- *            type: string
- *            description: ABLCRule for saml
  *      OidcAuthSetting:
  *        type: object
  *        properties:
@@ -1566,131 +1462,9 @@ module.exports = (crowi) => {
     loginRequiredStrictly,
     adminRequired,
     addActivity,
-    validator.samlAuth,
+    samlAuthValidator,
     apiV3FormValidator,
-    async (req, res) => {
-      const { t } = await getTranslation({
-        lang: req.user.lang,
-        ns: ['translation', 'admin'],
-      });
-
-      //  For the value of each mandatory items,
-      //  check whether it from the environment variables is empty and form value to update it is empty
-      //  validate the syntax of a attribute - based login control rule
-      const invalidValues = [];
-      for (const configKey of crowi.passportService
-        .mandatoryConfigKeysForSaml) {
-        const key = configKey.replace('security:passport-saml:', '');
-        const formValue = req.body[key];
-        if (
-          configManager.getConfig(configKey, ConfigSource.env) == null &&
-          formValue == null
-        ) {
-          const formItemName = t(`security_settings.form_item_name.${key}`);
-          invalidValues.push(
-            t('input_validation.message.required', { param: formItemName }),
-          );
-        }
-      }
-      if (invalidValues.length !== 0) {
-        return res.apiv3Err(
-          t('input_validation.message.error_message'),
-          400,
-          invalidValues,
-        );
-      }
-
-      const rule = req.body.ABLCRule;
-      // Empty string disables attribute-based login control.
-      // So, when rule is empty string, validation is passed.
-      if (rule != null) {
-        try {
-          crowi.passportService.parseABLCRule(rule);
-        } catch (err) {
-          return res.apiv3Err(
-            t('input_validation.message.invalid_syntax', {
-              syntax: t('security_settings.form_item_name.ABLCRule'),
-            }),
-            400,
-          );
-        }
-      }
-
-      const requestParams = {
-        'security:passport-saml:entryPoint': toNonBlankStringOrUndefined(req.body.entryPoint),
-        'security:passport-saml:issuer': toNonBlankStringOrUndefined(req.body.issuer),
-        'security:passport-saml:cert': toNonBlankStringOrUndefined(req.body.cert),
-        'security:passport-saml:attrMapId': toNonBlankStringOrUndefined(req.body.attrMapId),
-        'security:passport-saml:attrMapUsername': toNonBlankStringOrUndefined(req.body.attrMapUsername),
-        'security:passport-saml:attrMapMail': toNonBlankStringOrUndefined(req.body.attrMapMail),
-        'security:passport-saml:attrMapFirstName': toNonBlankStringOrUndefined(req.body.attrMapFirstName),
-        'security:passport-saml:attrMapLastName': toNonBlankStringOrUndefined(req.body.attrMapLastName),
-        'security:passport-saml:isSameUsernameTreatedAsIdenticalUser':
-          req.body.isSameUsernameTreatedAsIdenticalUser,
-        'security:passport-saml:isSameEmailTreatedAsIdenticalUser':
-          req.body.isSameEmailTreatedAsIdenticalUser,
-        'security:passport-saml:ABLCRule': toNonBlankStringOrUndefined(req.body.ABLCRule),
-      };
-
-      try {
-        await updateAndReloadStrategySettings('saml', requestParams, { removeIfUndefined: true });
-
-        const securitySettingParams = {
-          missingMandatoryConfigKeys:
-            await crowi.passportService.getSamlMissingMandatoryConfigKeys(),
-          samlEntryPoint: await configManager.getConfig(
-            'security:passport-saml:entryPoint',
-            ConfigSource.db,
-          ),
-          samlIssuer: await configManager.getConfig(
-            'security:passport-saml:issuer',
-            ConfigSource.db,
-          ),
-          samlCert: await configManager.getConfig(
-            'security:passport-saml:cert',
-            ConfigSource.db,
-          ),
-          samlAttrMapId: await configManager.getConfig(
-            'security:passport-saml:attrMapId',
-            ConfigSource.db,
-          ),
-          samlAttrMapUsername: await configManager.getConfig(
-            'security:passport-saml:attrMapUsername',
-            ConfigSource.db,
-          ),
-          samlAttrMapMail: await configManager.getConfig(
-            'security:passport-saml:attrMapMail',
-            ConfigSource.db,
-          ),
-          samlAttrMapFirstName: await configManager.getConfig(
-            'security:passport-saml:attrMapFirstName',
-            ConfigSource.db,
-          ),
-          samlAttrMapLastName: await configManager.getConfig(
-            'security:passport-saml:attrMapLastName',
-            ConfigSource.db,
-          ),
-          isSameUsernameTreatedAsIdenticalUser: await configManager.getConfig(
-            'security:passport-saml:isSameUsernameTreatedAsIdenticalUser',
-          ),
-          isSameEmailTreatedAsIdenticalUser: await configManager.getConfig(
-            'security:passport-saml:isSameEmailTreatedAsIdenticalUser',
-          ),
-          samlABLCRule: await configManager.getConfig(
-            'security:passport-saml:ABLCRule',
-          ),
-        };
-        const parameters = {
-          action: SupportedAction.ACTION_ADMIN_AUTH_SAML_UPDATE,
-        };
-        activityEvent.emit('update', res.locals.activity._id, parameters);
-        return res.apiv3({ securitySettingParams });
-      } catch (err) {
-        const msg = 'Error occurred in updating SAML setting';
-        logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(msg, 'update-SAML-failed'));
-      }
-    },
+    handleSamlUpdate(crowi, activityEvent, updateAndReloadStrategySettings),
   );
 
   /**
