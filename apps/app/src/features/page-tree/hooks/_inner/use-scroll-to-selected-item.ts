@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Virtualizer } from '@tanstack/react-virtual';
 
 import type { IPageForTreeItem } from '~/interfaces/page';
@@ -14,7 +14,15 @@ export const useScrollToSelectedItem = ({
   items,
   virtualizer,
 }: UseScrollToSelectedItemParams): void => {
+  // Track the previous targetPathOrId to detect actual changes
+  const prevTargetPathOrIdRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
+    // Only scroll when targetPathOrId actually changes, not on items change alone
+    // This prevents unwanted scrolling when creating a new page (items update but targetPathOrId stays the same)
+    if (targetPathOrId === prevTargetPathOrIdRef.current) return;
+    prevTargetPathOrIdRef.current = targetPathOrId;
+
     if (targetPathOrId == null) return;
 
     const selectedIndex = items.findIndex((item) => {
