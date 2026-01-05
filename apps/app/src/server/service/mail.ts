@@ -107,6 +107,8 @@ class MailService implements S2sMessageHandlable {
       this.mailer = this.createSMTPClient();
     } else if (transmissionMethod === 'ses') {
       this.mailer = this.createSESClient();
+    } else if (transmissionMethod === 'oauth2') {
+      this.mailer = this.createOAuth2Client();
     } else {
       this.mailer = null;
     }
@@ -179,6 +181,39 @@ class MailService implements S2sMessageHandlable {
     const client = nodemailer.createTransport(ses(option));
 
     logger.debug('mailer set up for SES', client);
+
+    return client;
+  }
+
+  createOAuth2Client(option?) {
+    const { configManager } = this;
+
+    if (!option) {
+      const clientId = configManager.getConfig('mail:oauth2ClientId');
+      const clientSecret = configManager.getConfig('mail:oauth2ClientSecret');
+      const refreshToken = configManager.getConfig('mail:oauth2RefreshToken');
+      const user = configManager.getConfig('mail:oauth2User');
+
+      if (clientId == null || clientSecret == null || refreshToken == null || user == null) {
+        return null;
+      }
+
+      option = {
+        // eslint-disable-line no-param-reassign
+        service: 'gmail',
+        auth: {
+          type: 'OAuth2',
+          user,
+          clientId,
+          clientSecret,
+          refreshToken,
+        },
+      };
+    }
+
+    const client = nodemailer.createTransport(option);
+
+    logger.debug('mailer set up for OAuth2', client);
 
     return client;
   }

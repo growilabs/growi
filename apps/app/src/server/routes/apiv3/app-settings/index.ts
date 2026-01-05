@@ -340,7 +340,7 @@ module.exports = (crowi) => {
         .trim()
         .if((value) => value !== '')
         .isEmail(),
-      body('transmissionMethod').isIn(['smtp', 'ses']),
+      body('transmissionMethod').isIn(['smtp', 'ses', 'oauth2']),
     ],
     smtpSetting: [
       body('smtpHost').trim(),
@@ -357,6 +357,15 @@ module.exports = (crowi) => {
         .if((value) => value !== '')
         .matches(/^[\da-zA-Z]+$/),
       body('sesSecretAccessKey').trim(),
+    ],
+    oauth2Setting: [
+      body('oauth2ClientId').trim(),
+      body('oauth2ClientSecret').trim(),
+      body('oauth2RefreshToken').trim(),
+      body('oauth2User')
+        .trim()
+        .if((value) => value !== '')
+        .isEmail(),
     ],
     pageBulkExportSettings: [
       body('isBulkExportPagesEnabled').isBoolean(),
@@ -422,6 +431,10 @@ module.exports = (crowi) => {
         smtpPassword: configManager.getConfig('mail:smtpPassword'),
         sesAccessKeyId: configManager.getConfig('mail:sesAccessKeyId'),
         sesSecretAccessKey: configManager.getConfig('mail:sesSecretAccessKey'),
+        oauth2ClientId: configManager.getConfig('mail:oauth2ClientId'),
+        oauth2ClientSecret: configManager.getConfig('mail:oauth2ClientSecret'),
+        oauth2RefreshToken: configManager.getConfig('mail:oauth2RefreshToken'),
+        oauth2User: configManager.getConfig('mail:oauth2User'),
 
         fileUploadType: configManager.getConfig('app:fileUploadType'),
         envFileUploadType: configManager.getConfig(
@@ -759,6 +772,10 @@ module.exports = (crowi) => {
       smtpPassword: configManager.getConfig('mail:smtpPassword'),
       sesAccessKeyId: configManager.getConfig('mail:sesAccessKeyId'),
       sesSecretAccessKey: configManager.getConfig('mail:sesSecretAccessKey'),
+      oauth2ClientId: configManager.getConfig('mail:oauth2ClientId'),
+      oauth2ClientSecret: configManager.getConfig('mail:oauth2ClientSecret'),
+      oauth2RefreshToken: configManager.getConfig('mail:oauth2RefreshToken'),
+      oauth2User: configManager.getConfig('mail:oauth2User'),
     };
   };
 
@@ -926,6 +943,95 @@ module.exports = (crowi) => {
       mailService.publishUpdatedMessage();
       const parameters = {
         action: SupportedAction.ACTION_ADMIN_MAIL_SES_UPDATE,
+      };
+      activityEvent.emit('update', res.locals.activity._id, parameters);
+      return res.apiv3({ mailSettingParams });
+    },
+  );
+
+  /**
+   * @swagger
+   *
+   *    /app-settings/oauth2-setting:
+   *      put:
+   *        tags: [AppSettings]
+   *        security:
+   *          - cookieAuth: []
+   *        summary: /app-settings/oauth2-setting
+   *        description: Update OAuth 2.0 setting for email
+   *        requestBody:
+   *          required: true
+   *          content:
+   *            application/json:
+   *              schema:
+   *                type: object
+   *                properties:
+   *                  fromAddress:
+   *                    type: string
+   *                    description: e-mail address used as from address
+   *                    example: 'info@growi.org'
+   *                  transmissionMethod:
+   *                    type: string
+   *                    description: transmission method
+   *                    example: 'oauth2'
+   *                  oauth2ClientId:
+   *                    type: string
+   *                    description: OAuth 2.0 Client ID
+   *                  oauth2ClientSecret:
+   *                    type: string
+   *                    description: OAuth 2.0 Client Secret
+   *                  oauth2RefreshToken:
+   *                    type: string
+   *                    description: OAuth 2.0 Refresh Token
+   *                  oauth2User:
+   *                    type: string
+   *                    description: Email address of the authorized account
+   *        responses:
+   *          200:
+   *            description: Succeeded to update OAuth 2.0 setting
+   *            content:
+   *              application/json:
+   *                schema:
+   *                  type: object
+   *                  properties:
+   *                    mailSettingParams:
+   *                      type: object
+   */
+  router.put(
+    '/oauth2-setting',
+    accessTokenParser([SCOPE.WRITE.ADMIN.APP]),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    validator.oauth2Setting,
+    apiV3FormValidator,
+    async (req, res) => {
+      const { mailService } = crowi;
+
+      const requestOAuth2SettingParams = {
+        'mail:from': req.body.fromAddress,
+        'mail:transmissionMethod': req.body.transmissionMethod,
+        'mail:oauth2ClientId': req.body.oauth2ClientId,
+        'mail:oauth2ClientSecret': req.body.oauth2ClientSecret,
+        'mail:oauth2RefreshToken': req.body.oauth2RefreshToken,
+        'mail:oauth2User': req.body.oauth2User,
+      };
+
+      let mailSettingParams: Awaited<ReturnType<typeof updateMailSettinConfig>>;
+      try {
+        mailSettingParams = await updateMailSettinConfig(
+          requestOAuth2SettingParams,
+        );
+      } catch (err) {
+        const msg = 'Error occurred in updating OAuth 2.0 setting';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-oauth2-setting-failed'));
+      }
+
+      await mailService.initialize();
+      mailService.publishUpdatedMessage();
+      const parameters = {
+        action: SupportedAction.ACTION_ADMIN_MAIL_OAUTH2_UPDATE,
       };
       activityEvent.emit('update', res.locals.activity._id, parameters);
       return res.apiv3({ mailSettingParams });
