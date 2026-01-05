@@ -27,17 +27,7 @@
       "!apps/pdf-converter/specs",
       "!apps/slackbot-proxy/src/public/bootstrap",
       "!packages/pdf-converter-client/src/index.ts",
-      "!packages/pdf-converter-client/specs",
-      "!apps/app/src/client/components/Admin/*.ts",
-      "!apps/app/src/client/components/Admin/*.tsx",
-      "!apps/app/src/client/components/Admin/*.scss",
-      "!apps/app/src/client/components/Admin/AdminHome",
-      "!apps/app/src/client/components/Admin/Common",
-      "!apps/app/src/client/components/Admin/ElasticsearchManagement",
-      "!apps/app/src/client/components/Admin/ExportArchiveData",
-      "!apps/app/src/client/components/Admin/ImportData",
-      "!apps/app/src/client/components/Admin/LegacySlackIntegration",
-      "!apps/app/src/client/components/Admin/MarkdownSetting"
+      "!packages/pdf-converter-client/specs"
     ]
   },
   "formatter": {
