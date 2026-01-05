@@ -1,5 +1,6 @@
 import { body } from 'express-validator';
-import type { Lang, NonBlankString } from '@growi/core';
+import type { EventEmitter } from 'events';
+import type { NonBlankString } from '@growi/core';
 import {
   ConfigSource,
   toNonBlankStringOrUndefined,
@@ -7,10 +8,13 @@ import {
 import { ErrorV3 } from '@growi/core/dist/models';
 
 import { SupportedAction } from '~/interfaces/activity';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 import type Crowi from '~/server/crowi';
+
+import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:security-setting:saml');
 
@@ -168,10 +172,10 @@ export const samlAuthValidator = [
  */
 export const handleSamlUpdate = (
   crowi: Crowi,
-  activityEvent: any,
+  activityEvent: EventEmitter,
   updateAndReloadStrategySettings: UpdateAndReloadStrategySettings,
 ) => {
-  return async (req: any, res: any) => {
+  return async (req: CrowiRequest, res: ApiV3Response) => {
     const { t } = await getTranslation({
       lang: req.user?.lang,
       ns: ['translation', 'admin'],
