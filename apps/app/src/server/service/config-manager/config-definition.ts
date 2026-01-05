@@ -568,7 +568,9 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'SAML_ENABLED',
     defaultValue: false,
   }),
-  'security:passport-saml:callbackUrl': defineConfig<NonBlankString | undefined>({
+  'security:passport-saml:callbackUrl': defineConfig<
+    NonBlankString | undefined
+  >({
     envVarName: 'SAML_CALLBACK_URI',
     defaultValue: undefined,
   }),
@@ -576,19 +578,27 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'SAML_ATTR_MAPPING_ID',
     defaultValue: undefined,
   }),
-  'security:passport-saml:attrMapUsername': defineConfig<NonBlankString | undefined>({
+  'security:passport-saml:attrMapUsername': defineConfig<
+    NonBlankString | undefined
+  >({
     envVarName: 'SAML_ATTR_MAPPING_USERNAME',
     defaultValue: undefined,
   }),
-  'security:passport-saml:attrMapMail': defineConfig<NonBlankString | undefined>({
+  'security:passport-saml:attrMapMail': defineConfig<
+    NonBlankString | undefined
+  >({
     envVarName: 'SAML_ATTR_MAPPING_MAIL',
     defaultValue: undefined,
   }),
-  'security:passport-saml:attrMapFirstName': defineConfig<NonBlankString | undefined>({
+  'security:passport-saml:attrMapFirstName': defineConfig<
+    NonBlankString | undefined
+  >({
     envVarName: 'SAML_ATTR_MAPPING_FIRST_NAME',
     defaultValue: undefined,
   }),
-  'security:passport-saml:attrMapLastName': defineConfig<NonBlankString | undefined>({
+  'security:passport-saml:attrMapLastName': defineConfig<
+    NonBlankString | undefined
+  >({
     envVarName: 'SAML_ATTR_MAPPING_LAST_NAME',
     defaultValue: undefined,
   }),
@@ -596,10 +606,12 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'SAML_ABLC_RULE',
     defaultValue: undefined,
   }),
-  'security:passport-saml:entryPoint': defineConfig<NonBlankString | undefined>({
-    envVarName: 'SAML_ENTRY_POINT',
-    defaultValue: undefined,
-  }),
+  'security:passport-saml:entryPoint': defineConfig<NonBlankString | undefined>(
+    {
+      envVarName: 'SAML_ENTRY_POINT',
+      defaultValue: undefined,
+    },
+  ),
   'security:passport-saml:issuer': defineConfig<NonBlankString | undefined>({
     envVarName: 'SAML_ISSUER',
     defaultValue: undefined,

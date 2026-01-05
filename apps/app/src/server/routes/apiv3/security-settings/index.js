@@ -20,7 +20,7 @@ import {
 } from '~/utils/page-delete-config';
 
 import { checkSetupStrategiesHasAdmin } from './checkSetupStrategiesHasAdmin';
-import { samlAuthValidator, handleSamlUpdate } from './saml';
+import { handleSamlUpdate, samlAuthValidator } from './saml';
 
 const logger = loggerFactory('growi:routes:apiv3:security-setting');
 
