@@ -1,19 +1,18 @@
-import React, {
-  useState, useEffect, useCallback, useMemo,
-} from 'react';
-
+import type React from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
-import {
-  Modal, ModalHeader, ModalBody, ModalFooter,
-} from 'reactstrap';
+import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 import { debounce } from 'throttle-debounce';
 
 import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
 import { toastError } from '~/client/util/toastr';
 import { useSiteUrl } from '~/states/global';
 import { isSearchServiceReachableAtom } from '~/states/server-configurations';
-import { usePageDuplicateModalStatus, usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate';
+import {
+  usePageDuplicateModalActions,
+  usePageDuplicateModalStatus,
+} from '~/states/ui/modal/page-duplicate';
 
 import DuplicatePathsTable from '../DuplicatedPathsTable';
 import ApiErrorMessageList from '../PageManagement/ApiErrorMessageList';
@@ -38,16 +37,32 @@ const PageDuplicateModalSubstance: React.FC = () => {
   const [subordinatedPages, setSubordinatedPages] = useState([]);
   const [existingPaths, setExistingPaths] = useState<string[]>([]);
   const [isDuplicateRecursively, setIsDuplicateRecursively] = useState(true);
-  const [isDuplicateRecursivelyWithoutExistPath, setIsDuplicateRecursivelyWithoutExistPath] = useState(true);
-  const [onlyDuplicateUserRelatedResources, setOnlyDuplicateUserRelatedResources] = useState(false);
+  const [
+    isDuplicateRecursivelyWithoutExistPath,
+    setIsDuplicateRecursivelyWithoutExistPath,
+  ] = useState(true);
+  const [
+    onlyDuplicateUserRelatedResources,
+    setOnlyDuplicateUserRelatedResources,
+  ] = useState(false);
 
   // Memoize computed values
-  const isTargetPageDuplicate = useMemo(() => existingPaths.includes(pageNameInput), [existingPaths, pageNameInput]);
-  const submitButtonEnabled = useMemo(() => (
-    existingPaths.length === 0 || (isDuplicateRecursively && isDuplicateRecursivelyWithoutExistPath)
-  ), [existingPaths.length, isDuplicateRecursively, isDuplicateRecursivelyWithoutExistPath]);
+  const isTargetPageDuplicate = useMemo(
+    () => existingPaths.includes(pageNameInput),
+    [existingPaths, pageNameInput],
+  );
+  const submitButtonEnabled = useMemo(
+    () =>
+      existingPaths.length === 0 ||
+      (isDuplicateRecursively && isDuplicateRecursivelyWithoutExistPath),
+    [
+      existingPaths.length,
+      isDuplicateRecursively,
+      isDuplicateRecursivelyWithoutExistPath,
+    ],
+  );
 
-  const updateSubordinatedList = useCallback(async() => {
+  const updateSubordinatedList = useCallback(async () => {
     if (page == null) {
       return;
     }
@@ -56,28 +71,32 @@ const PageDuplicateModalSubstance: React.FC = () => {
     try {
       const res = await apiv3Get('/pages/subordinated-list', { path });
       setSubordinatedPages(res.data.subordinatedPages);
-    }
-    catch (err) {
+    } catch (err) {
       setErrs(err);
       toastError(t('modal_duplicate.label.Failed to get subordinated pages'));
     }
   }, [page, t]);
 
-  const checkExistPaths = useCallback(async(fromPath, toPath) => {
-    if (page == null) {
-      return;
-    }
+  const checkExistPaths = useCallback(
+    async (fromPath, toPath) => {
+      if (page == null) {
+        return;
+      }
 
-    try {
-      const res = await apiv3Get<{ existPaths: string[] }>('/page/exist-paths', { fromPath, toPath });
-      const { existPaths } = res.data;
-      setExistingPaths(existPaths);
-    }
-    catch (err) {
-      setErrs(err);
-      toastError(t('modal_rename.label.Failed to get exist path'));
-    }
-  }, [page, t]);
+      try {
+        const res = await apiv3Get<{ existPaths: string[] }>(
+          '/page/exist-paths',
+          { fromPath, toPath },
+        );
+        const { existPaths } = res.data;
+        setExistingPaths(existPaths);
+      } catch (err) {
+        setErrs(err);
+        toastError(t('modal_rename.label.Failed to get exist path'));
+      }
+    },
+    [page, t],
+  );
 
   const checkExistPathsDebounce = useMemo(() => {
     return debounce(1000, checkExistPaths);
@@ -87,7 +106,7 @@ const PageDuplicateModalSubstance: React.FC = () => {
     if (isOpened && page != null && pageNameInput !== page.path) {
       checkExistPathsDebounce(page.path, pageNameInput);
     }
-  }, [isOpened, pageNameInput, subordinatedPages, checkExistPathsDebounce, page]);
+  }, [isOpened, pageNameInput, checkExistPathsDebounce, page]);
 
   const ppacInputChangeHandler = useCallback((value: string) => {
     setErrs(null);
@@ -114,7 +133,7 @@ const PageDuplicateModalSubstance: React.FC = () => {
     }
   }, [isOpened, page, updateSubordinatedList]);
 
-  const duplicate = useCallback(async() => {
+  const duplicate = useCallback(async () => {
     if (page == null) {
       return;
     }
@@ -124,7 +143,10 @@ const PageDuplicateModalSubstance: React.FC = () => {
     const { pageId, path } = page;
     try {
       const { data } = await apiv3Post('/pages/duplicate', {
-        pageId, pageNameInput, isRecursively: isDuplicateRecursively, onlyDuplicateUserRelatedResources,
+        pageId,
+        pageNameInput,
+        isRecursively: isDuplicateRecursively,
+        onlyDuplicateUserRelatedResources,
       });
       const onDuplicated = opts?.onDuplicated;
       const fromPath = path;
@@ -134,11 +156,17 @@ const PageDuplicateModalSubstance: React.FC = () => {
         onDuplicated(fromPath, toPath);
       }
       closeDuplicateModal();
-    }
-    catch (err) {
+    } catch (err) {
       setErrs(err);
     }
-  }, [closeDuplicateModal, opts?.onDuplicated, isDuplicateRecursively, page, pageNameInput, onlyDuplicateUserRelatedResources]);
+  }, [
+    closeDuplicateModal,
+    opts?.onDuplicated,
+    isDuplicateRecursively,
+    page,
+    pageNameInput,
+    onlyDuplicateUserRelatedResources,
+  ]);
 
   useEffect(() => {
     if (isOpened) {
@@ -154,9 +182,7 @@ const PageDuplicateModalSubstance: React.FC = () => {
       setIsDuplicateRecursively(true);
       setIsDuplicateRecursivelyWithoutExistPath(false);
     }, 1000);
-
   }, [isOpened]);
-
 
   const renderBodyContent = () => {
     if (!isOpened || page == null) {
@@ -167,41 +193,46 @@ const PageDuplicateModalSubstance: React.FC = () => {
 
     return (
       <>
-        <div className="mt-3"><label className="form-label">{t('modal_duplicate.label.Current page name')}</label><br />
+        <div className="mt-3">
+          <span className="form-label">
+            {t('modal_duplicate.label.Current page name')}
+          </span>
+          <br />
           <code>{path}</code>
         </div>
         <div className="mt-3">
-          <label className="form-label" htmlFor="duplicatePageName">{ t('modal_duplicate.label.New page name') }</label><br />
+          <label className="form-label" htmlFor="duplicatePageName">
+            {t('modal_duplicate.label.New page name')}
+          </label>
+          <br />
           <div className="input-group">
             <div>
               <span className="input-group-text">{siteUrl}</span>
             </div>
             <div className="flex-fill">
-              {isReachable
-                ? (
-                  <PagePathAutoComplete
-                    initializedPath={path}
-                    onSubmit={duplicate}
-                    onInputChange={ppacInputChangeHandler}
-                    autoFocus
-                  />
-                )
-                : (
-                  <input
-                    type="text"
-                    value={pageNameInput}
-                    className="form-control"
-                    onChange={e => inputChangeHandler(e.target.value)}
-                    required
-                  />
-                )}
+              {isReachable ? (
+                <PagePathAutoComplete
+                  initializedPath={path}
+                  onSubmit={duplicate}
+                  onInputChange={ppacInputChangeHandler}
+                  autoFocus
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={pageNameInput}
+                  className="form-control"
+                  onChange={(e) => inputChangeHandler(e.target.value)}
+                  required
+                />
+              )}
             </div>
           </div>
         </div>
 
-        { isTargetPageDuplicate && (
+        {isTargetPageDuplicate && (
           <p className="text-danger">Error: Target path is duplicated.</p>
-        ) }
+        )}
 
         <div className="form-check form-check-warning mt-3">
           <input
@@ -212,9 +243,14 @@ const PageDuplicateModalSubstance: React.FC = () => {
             checked={isDuplicateRecursively}
             onChange={changeIsDuplicateRecursivelyHandler}
           />
-          <label className="form-label form-check-label" htmlFor="cbDuplicateRecursively">
-            { t('modal_duplicate.label.Recursively') }
-            <p className="form-text text-muted my-0">{ t('modal_duplicate.help.recursive') }</p>
+          <label
+            className="form-label form-check-label"
+            htmlFor="cbDuplicateRecursively"
+          >
+            {t('modal_duplicate.label.Recursively')}
+            <p className="form-text text-muted my-0">
+              {t('modal_duplicate.help.recursive')}
+            </p>
           </label>
 
           <div className="mt-3">
@@ -226,11 +262,20 @@ const PageDuplicateModalSubstance: React.FC = () => {
                   id="cbDuplicatewithoutExistRecursively"
                   type="checkbox"
                   checked={isDuplicateRecursivelyWithoutExistPath}
-                  onChange={() => setIsDuplicateRecursivelyWithoutExistPath(!isDuplicateRecursivelyWithoutExistPath)}
+                  onChange={() =>
+                    setIsDuplicateRecursivelyWithoutExistPath(
+                      !isDuplicateRecursivelyWithoutExistPath,
+                    )
+                  }
                 />
-                <label className="form-label form-check-label" htmlFor="cbDuplicatewithoutExistRecursively">
-                  { t('modal_duplicate.label.Duplicate without exist path') }
-                  <p className="form-text text-muted my-0">{ t('modal_duplicate.help.recursive') }</p>
+                <label
+                  className="form-label form-check-label"
+                  htmlFor="cbDuplicatewithoutExistRecursively"
+                >
+                  {t('modal_duplicate.label.Duplicate without exist path')}
+                  <p className="form-text text-muted my-0">
+                    {t('modal_duplicate.help.recursive')}
+                  </p>
                 </label>
               </div>
             )}
@@ -243,17 +288,30 @@ const PageDuplicateModalSubstance: React.FC = () => {
             id="cbOnlyDuplicateUserRelatedResources"
             type="checkbox"
             checked={onlyDuplicateUserRelatedResources}
-            onChange={() => setOnlyDuplicateUserRelatedResources(!onlyDuplicateUserRelatedResources)}
+            onChange={() =>
+              setOnlyDuplicateUserRelatedResources(
+                !onlyDuplicateUserRelatedResources,
+              )
+            }
           />
-          <label className="form-label form-check-label" htmlFor="cbOnlyDuplicateUserRelatedResources">
-            { t('modal_duplicate.label.Only duplicate user related pages') }
-            <p className="form-text text-muted my-0">{ t('modal_duplicate.help.only_inherit_user_related_groups') }</p>
+          <label
+            className="form-label form-check-label"
+            htmlFor="cbOnlyDuplicateUserRelatedResources"
+          >
+            {t('modal_duplicate.label.Only duplicate user related pages')}
+            <p className="form-text text-muted my-0">
+              {t('modal_duplicate.help.only_inherit_user_related_groups')}
+            </p>
           </label>
         </div>
         <div className="mt-3">
           {isDuplicateRecursively && existingPaths.length !== 0 && (
-            <DuplicatePathsTable existingPaths={existingPaths} fromPath={path} toPath={pageNameInput} />
-          ) }
+            <DuplicatePathsTable
+              existingPaths={existingPaths}
+              fromPath={path}
+              toPath={pageNameInput}
+            />
+          )}
         </div>
       </>
     );
@@ -274,24 +332,19 @@ const PageDuplicateModalSubstance: React.FC = () => {
           onClick={duplicate}
           disabled={!submitButtonEnabled}
         >
-          { t('modal_duplicate.label.Duplicate page') }
+          {t('modal_duplicate.label.Duplicate page')}
         </button>
       </>
     );
   };
 
-
   return (
     <>
       <ModalHeader tag="h4" toggle={closeDuplicateModal}>
-        { t('modal_duplicate.label.Duplicate page') }
+        {t('modal_duplicate.label.Duplicate page')}
       </ModalHeader>
-      <ModalBody>
-        {renderBodyContent()}
-      </ModalBody>
-      <ModalFooter>
-        {renderFooterContent()}
-      </ModalFooter>
+      <ModalBody>{renderBodyContent()}</ModalBody>
+      <ModalFooter>{renderFooterContent()}</ModalFooter>
     </>
   );
 };
@@ -304,7 +357,14 @@ export const PageDuplicateModal = (): React.JSX.Element => {
   const { close: closeDuplicateModal } = usePageDuplicateModalActions();
 
   return (
-    <Modal size="lg" isOpen={isOpened} toggle={closeDuplicateModal} data-testid="page-duplicate-modal" className="grw-duplicate-page" autoFocus={false}>
+    <Modal
+      size="lg"
+      isOpen={isOpened}
+      toggle={closeDuplicateModal}
+      data-testid="page-duplicate-modal"
+      className="grw-duplicate-page"
+      autoFocus={false}
+    >
       {isOpened && <PageDuplicateModalSubstance />}
     </Modal>
   );
