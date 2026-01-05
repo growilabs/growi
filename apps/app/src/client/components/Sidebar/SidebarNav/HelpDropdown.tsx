@@ -1,18 +1,19 @@
 import type { FC } from 'react';
 import { memo } from 'react';
-
 import { useTranslation } from 'next-i18next';
 import {
-  UncontrolledDropdown, DropdownToggle, DropdownMenu, DropdownItem,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
+  UncontrolledDropdown,
 } from 'reactstrap';
 
-import { useGrowiVersion, useGrowiCloudUri } from '~/states/global';
+import { useGrowiCloudUri, useGrowiVersion } from '~/states/global';
 import { useShortcutsModalActions } from '~/states/ui/modal/shortcuts';
 
 import { SkeletonItem } from './SkeletonItem';
 
 import styles from './HelpDropdown.module.scss';
-
 
 export const HelpDropdown: FC = memo(() => {
   const { t } = useTranslation();
@@ -31,7 +32,9 @@ export const HelpDropdown: FC = memo(() => {
 
   // Cloud users see Help, others see Docs
   const isCloudUser = growiCloudUri != null;
-  const helpUrl = isCloudUser ? 'https://growi.cloud/help/' : 'https://docs.growi.org';
+  const helpUrl = isCloudUser
+    ? 'https://growi.cloud/help/'
+    : 'https://docs.growi.org';
   const helpLabel = isCloudUser ? t('Help') : 'GROWI Docs';
 
   return (
@@ -65,14 +68,14 @@ export const HelpDropdown: FC = memo(() => {
           </span>
         </DropdownItem>
 
-        <DropdownItem
-          className="my-1"
-          onClick={() => openShortcutsModal()}
-        >
+        <DropdownItem className="my-1" onClick={() => openShortcutsModal()}>
           <span className="d-flex align-items-center">
-            <span className="flex-grow-1">{t('help_dropdown.show_shortcuts')}</span>
+            <span className="flex-grow-1">
+              {t('help_dropdown.show_shortcuts')}
+            </span>
             <span className="text-secondary">
-              <span className={`cmd-key ${os}`} />&nbsp;+ /
+              <span className={`cmd-key ${os}`} />
+              &nbsp;+ /
             </span>
           </span>
         </DropdownItem>
@@ -81,7 +84,10 @@ export const HelpDropdown: FC = memo(() => {
 
         <DropdownItem header className="py-1">
           <span className="d-flex text-secondary">
-            <span className="flex-grow-1"> {t('help_dropdown.growi_version')}</span>
+            <span className="flex-grow-1">
+              {' '}
+              {t('help_dropdown.growi_version')}
+            </span>
             {growiVersion}
           </span>
         </DropdownItem>
