@@ -1,18 +1,18 @@
-import { body } from 'express-validator';
-import type { EventEmitter } from 'events';
+import type { EventEmitter } from 'node:events';
 import type { NonBlankString } from '@growi/core';
 import {
   ConfigSource,
   toNonBlankStringOrUndefined,
 } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import { body } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
+import type Crowi from '~/server/crowi';
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
-import type Crowi from '~/server/crowi';
 
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 
@@ -51,7 +51,7 @@ interface SamlSecuritySettingParams {
 type UpdateAndReloadStrategySettings = (
   authId: string,
   params: Record<string, unknown>,
-  opts?: { removeIfUndefined?: boolean }
+  opts?: { removeIfUndefined?: boolean },
 ) => Promise<void>;
 
 // Validator
@@ -187,114 +187,131 @@ export const handleSamlUpdate = (
     //  check whether it from the environment variables is empty and form value to update it is empty
     //  validate the syntax of a attribute - based login control rule
     const invalidValues: string[] = [];
-    for (const configKey of crowi.passportService
-      .mandatoryConfigKeysForSaml) {
-        const key = configKey.replace('security:passport-saml:', '');
-        const formValue = reqBody[key as keyof SamlRequestBody];
-        if (
-          configManager.getConfig(configKey, ConfigSource.env) == null &&
-          formValue == null
-        ) {
-          const formItemName = t(`security_settings.form_item_name.${key}`);
-          invalidValues.push(
-            t('input_validation.message.required', { param: formItemName }),
-          );
-        }
-      }
-      if (invalidValues.length !== 0) {
-        return res.apiv3Err(
-          t('input_validation.message.error_message'),
-          400,
-          invalidValues,
+    for (const configKey of crowi.passportService.mandatoryConfigKeysForSaml) {
+      const key = configKey.replace('security:passport-saml:', '');
+      const formValue = reqBody[key as keyof SamlRequestBody];
+      if (
+        configManager.getConfig(configKey, ConfigSource.env) == null &&
+        formValue == null
+      ) {
+        const formItemName = t(`security_settings.form_item_name.${key}`);
+        invalidValues.push(
+          t('input_validation.message.required', { param: formItemName }),
         );
       }
+    }
+    if (invalidValues.length !== 0) {
+      return res.apiv3Err(
+        t('input_validation.message.error_message'),
+        400,
+        invalidValues,
+      );
+    }
 
-      const rule = reqBody.ABLCRule;
-      // Empty string disables attribute-based login control.
-      // So, when rule is empty string, validation is passed.
-      if (rule != null) {
-        try {
-          crowi.passportService.parseABLCRule(rule);
-        } catch (err) {
-          return res.apiv3Err(
-            t('input_validation.message.invalid_syntax', {
-              syntax: t('security_settings.form_item_name.ABLCRule'),
-            }),
-            400,
-          );
-        }
-      }
-
-      const requestParams: Record<string, unknown> = {
-        'security:passport-saml:entryPoint': toNonBlankStringOrUndefined(reqBody.entryPoint),
-        'security:passport-saml:issuer': toNonBlankStringOrUndefined(reqBody.issuer),
-        'security:passport-saml:cert': toNonBlankStringOrUndefined(reqBody.cert),
-        'security:passport-saml:attrMapId': toNonBlankStringOrUndefined(reqBody.attrMapId),
-        'security:passport-saml:attrMapUsername': toNonBlankStringOrUndefined(reqBody.attrMapUsername),
-        'security:passport-saml:attrMapMail': toNonBlankStringOrUndefined(reqBody.attrMapMail),
-        'security:passport-saml:attrMapFirstName': toNonBlankStringOrUndefined(reqBody.attrMapFirstName),
-        'security:passport-saml:attrMapLastName': toNonBlankStringOrUndefined(reqBody.attrMapLastName),
-        'security:passport-saml:isSameUsernameTreatedAsIdenticalUser':
-          reqBody.isSameUsernameTreatedAsIdenticalUser,
-        'security:passport-saml:isSameEmailTreatedAsIdenticalUser':
-          reqBody.isSameEmailTreatedAsIdenticalUser,
-        'security:passport-saml:ABLCRule': toNonBlankStringOrUndefined(reqBody.ABLCRule),
-      };
-
+    const rule = reqBody.ABLCRule;
+    // Empty string disables attribute-based login control.
+    // So, when rule is empty string, validation is passed.
+    if (rule != null) {
       try {
-        await updateAndReloadStrategySettings('saml', requestParams, { removeIfUndefined: true });
+        crowi.passportService.parseABLCRule(rule);
+      } catch (_err) {
+        return res.apiv3Err(
+          t('input_validation.message.invalid_syntax', {
+            syntax: t('security_settings.form_item_name.ABLCRule'),
+          }),
+          400,
+        );
+      }
+    }
 
-        const securitySettingParams: SamlSecuritySettingParams = {
-          missingMandatoryConfigKeys:
-            await crowi.passportService.getSamlMissingMandatoryConfigKeys(),
-          samlEntryPoint: await configManager.getConfig(
-            'security:passport-saml:entryPoint',
-            ConfigSource.db,
-          ),
-          samlIssuer: await configManager.getConfig(
-            'security:passport-saml:issuer',
-            ConfigSource.db,
-          ),
-          samlCert: await configManager.getConfig(
-            'security:passport-saml:cert',
-            ConfigSource.db,
-          ),
-          samlAttrMapId: await configManager.getConfig(
-            'security:passport-saml:attrMapId',
-            ConfigSource.db,
-          ),
-          samlAttrMapUsername: await configManager.getConfig(
-            'security:passport-saml:attrMapUsername',
-            ConfigSource.db,
-          ),
-          samlAttrMapMail: await configManager.getConfig(
-            'security:passport-saml:attrMapMail',
-            ConfigSource.db,
-          ),
-          samlAttrMapFirstName: await configManager.getConfig(
-            'security:passport-saml:attrMapFirstName',
-            ConfigSource.db,
-          ),
-          samlAttrMapLastName: await configManager.getConfig(
-            'security:passport-saml:attrMapLastName',
-            ConfigSource.db,
-          ),
-          isSameUsernameTreatedAsIdenticalUser: await configManager.getConfig(
-            'security:passport-saml:isSameUsernameTreatedAsIdenticalUser',
-          ),
-          isSameEmailTreatedAsIdenticalUser: await configManager.getConfig(
-            'security:passport-saml:isSameEmailTreatedAsIdenticalUser',
-          ),
-          samlABLCRule: await configManager.getConfig(
-            'security:passport-saml:ABLCRule',
-          ),
-        };
-        const parameters = {
-          action: SupportedAction.ACTION_ADMIN_AUTH_SAML_UPDATE,
-        };
-        activityEvent.emit('update', res.locals.activity._id, parameters);
-        return res.apiv3({ securitySettingParams });
-      } catch (err) {
+    const requestParams: Record<string, unknown> = {
+      'security:passport-saml:entryPoint': toNonBlankStringOrUndefined(
+        reqBody.entryPoint,
+      ),
+      'security:passport-saml:issuer': toNonBlankStringOrUndefined(
+        reqBody.issuer,
+      ),
+      'security:passport-saml:cert': toNonBlankStringOrUndefined(reqBody.cert),
+      'security:passport-saml:attrMapId': toNonBlankStringOrUndefined(
+        reqBody.attrMapId,
+      ),
+      'security:passport-saml:attrMapUsername': toNonBlankStringOrUndefined(
+        reqBody.attrMapUsername,
+      ),
+      'security:passport-saml:attrMapMail': toNonBlankStringOrUndefined(
+        reqBody.attrMapMail,
+      ),
+      'security:passport-saml:attrMapFirstName': toNonBlankStringOrUndefined(
+        reqBody.attrMapFirstName,
+      ),
+      'security:passport-saml:attrMapLastName': toNonBlankStringOrUndefined(
+        reqBody.attrMapLastName,
+      ),
+      'security:passport-saml:isSameUsernameTreatedAsIdenticalUser':
+        reqBody.isSameUsernameTreatedAsIdenticalUser,
+      'security:passport-saml:isSameEmailTreatedAsIdenticalUser':
+        reqBody.isSameEmailTreatedAsIdenticalUser,
+      'security:passport-saml:ABLCRule': toNonBlankStringOrUndefined(
+        reqBody.ABLCRule,
+      ),
+    };
+
+    try {
+      await updateAndReloadStrategySettings('saml', requestParams, {
+        removeIfUndefined: true,
+      });
+
+      const securitySettingParams: SamlSecuritySettingParams = {
+        missingMandatoryConfigKeys:
+          await crowi.passportService.getSamlMissingMandatoryConfigKeys(),
+        samlEntryPoint: await configManager.getConfig(
+          'security:passport-saml:entryPoint',
+          ConfigSource.db,
+        ),
+        samlIssuer: await configManager.getConfig(
+          'security:passport-saml:issuer',
+          ConfigSource.db,
+        ),
+        samlCert: await configManager.getConfig(
+          'security:passport-saml:cert',
+          ConfigSource.db,
+        ),
+        samlAttrMapId: await configManager.getConfig(
+          'security:passport-saml:attrMapId',
+          ConfigSource.db,
+        ),
+        samlAttrMapUsername: await configManager.getConfig(
+          'security:passport-saml:attrMapUsername',
+          ConfigSource.db,
+        ),
+        samlAttrMapMail: await configManager.getConfig(
+          'security:passport-saml:attrMapMail',
+          ConfigSource.db,
+        ),
+        samlAttrMapFirstName: await configManager.getConfig(
+          'security:passport-saml:attrMapFirstName',
+          ConfigSource.db,
+        ),
+        samlAttrMapLastName: await configManager.getConfig(
+          'security:passport-saml:attrMapLastName',
+          ConfigSource.db,
+        ),
+        isSameUsernameTreatedAsIdenticalUser: await configManager.getConfig(
+          'security:passport-saml:isSameUsernameTreatedAsIdenticalUser',
+        ),
+        isSameEmailTreatedAsIdenticalUser: await configManager.getConfig(
+          'security:passport-saml:isSameEmailTreatedAsIdenticalUser',
+        ),
+        samlABLCRule: await configManager.getConfig(
+          'security:passport-saml:ABLCRule',
+        ),
+      };
+      const parameters = {
+        action: SupportedAction.ACTION_ADMIN_AUTH_SAML_UPDATE,
+      };
+      activityEvent.emit('update', res.locals.activity._id, parameters);
+      return res.apiv3({ securitySettingParams });
+    } catch (err) {
       const msg = 'Error occurred in updating SAML setting';
       logger.error('Error', err);
       return res.apiv3Err(new ErrorV3(msg, 'update-SAML-failed'));
