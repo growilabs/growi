@@ -684,6 +684,16 @@ class PageService implements IPageService {
     return renamedPage;
   }
 
+  getExcludedPathsBySystem(): string[] {
+    const excludedPaths: string[] = [];
+
+    if (configManager.getConfig('security:isHidingUserPages')) {
+      excludedPaths.push('/user');
+    }
+
+    return excludedPaths;
+  }
+
   async renameSubOperation(page, newPagePath: string, user, options, renamedPage, pageOpId: ObjectIdLike, activity?): Promise<void> {
     const Page = mongoose.model('Page') as unknown as PageModel;
 

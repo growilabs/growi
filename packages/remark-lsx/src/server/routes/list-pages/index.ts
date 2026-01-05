@@ -4,7 +4,6 @@ import { pathUtils } from '@growi/core/dist/utils';
 import escapeStringRegexp from 'escape-string-regexp';
 import type { Request, Response } from 'express';
 import createError, { isHttpError } from 'http-errors';
-import mongoose from 'mongoose';
 
 import type { LsxApiParams, LsxApiResponseData } from '../../../interfaces/api';
 import { addDepthCondition } from './add-depth-condition';
@@ -67,13 +66,8 @@ interface IListPagesRequest
   user: IUser;
 }
 
-export const listPages = (hideUserPages: boolean) => {
+export const listPages = (crowi) => {
   return async (req: IListPagesRequest, res: Response): Promise<Response> => {
-    const user = req.user;
-
-    const isAdmin = user?.admin ?? false;
-    const shouldHideUserPages = hideUserPages && !isAdmin;
-
     if (req.query.pagePath == null) {
       return res.status(400).send("the 'pagepath' query must not be null.");
     }
@@ -86,11 +80,18 @@ export const listPages = (hideUserPages: boolean) => {
     };
 
     const { pagePath, offset, limit, options } = params;
-    const builder = await generateBaseQuery(params.pagePath, user);
-    let builderQuery = builder.query;
+    const user = req.user;
+    const isAdmin = user?.admin ?? false;
+    const excludedPaths = crowi.pageService.getExcludedPathsBySystem();
 
-    if (shouldHideUserPages) {
-      builderQuery = builderQuery.and([{ path: { $not: /^\/user(\/|$)/ } }]);
+    const builder = await generateBaseQuery(params.pagePath, user);
+    let query = builder.query;
+
+    if (!isAdmin && excludedPaths.length > 0) {
+      const pattern = excludedPaths.map((p) => p.replace(/^\//, '')).join('|');
+      const regex = new RegExp(`^\\/(${pattern})(\\/|$)`);
+
+      query = query.and([{ path: { $not: regex } }]);
     }
 
     // count viewers of `/`
@@ -102,7 +103,6 @@ export const listPages = (hideUserPages: boolean) => {
       return res.status(500).send('An internal server error occurred.');
     }
 
-    let query = builder.query;
     try {
       // depth
       if (options?.depth != null) {

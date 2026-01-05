@@ -57,9 +57,6 @@ const middleware = (crowi: any, app: any): void => {
     loginRequiredFallback,
   );
   const accessTokenParser = crowi.accessTokenParser;
-  const hideUserPages = crowi.configManager.getConfig(
-    'security:isHidingUserPages',
-  );
 
   app.get(
     '/_api/lsx',
@@ -67,7 +64,7 @@ const middleware = (crowi: any, app: any): void => {
     loginRequired,
     lsxValidator,
     paramValidator,
-    listPages(hideUserPages),
+    listPages(crowi),
   );
 };
 
