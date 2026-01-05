@@ -25,8 +25,8 @@ export const HelpDropdown: FC = memo(() => {
   }
 
   // add classes to cmd-key by OS
-  const platform = window.navigator.platform.toLowerCase();
-  const isMac = (platform.indexOf('mac') > -1);
+  const userAgent = window.navigator.userAgent.toLowerCase();
+  const isMac = userAgent.indexOf('mac') > -1;
   const os = isMac ? 'mac' : 'win';
 
   // Cloud users see Help, others see Docs
