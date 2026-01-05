@@ -443,5 +443,11 @@ module.exports = (crowi, app) => {
   );
 
   app.get('/*/$', loginRequired, blockUserPages, next.delegateToNext);
-  app.get('/*', loginRequired, blockUserPages, autoReconnectToSearch, next.delegateToNext);
+  app.get(
+    '/*',
+    loginRequired,
+    blockUserPages,
+    autoReconnectToSearch,
+    next.delegateToNext,
+  );
 };
