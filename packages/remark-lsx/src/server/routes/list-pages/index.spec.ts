@@ -67,7 +67,7 @@ describe('listPages', () => {
     reqMock.query = { pagePath: '/Sandbox' };
 
     const builderMock = mock<PageQueryBuilder>();
-    
+
     const queryMock = mock<PageQuery>();
     builderMock.query = queryMock;
 

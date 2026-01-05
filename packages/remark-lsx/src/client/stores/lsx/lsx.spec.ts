@@ -84,6 +84,9 @@ describe('useSWRxLsx integration tests', () => {
     const mockCrowi = {
       require: () => () => (req: any, res: any, next: any) => next(),
       accessTokenParser: () => (req: any, res: any, next: any) => next(),
+      pageService: {
+        getExcludedPathsBySystem: vi.fn().mockReturnValue(['/user']),
+      },
       configManager: {
         getConfig: vi.fn().mockReturnValue(false),
       },
