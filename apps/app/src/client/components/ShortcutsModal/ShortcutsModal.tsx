@@ -19,8 +19,8 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
 
   // Memoize OS-specific class
   const additionalClassByOs = useMemo(() => {
-    const platform = window.navigator.platform.toLowerCase();
-    const isMac = platform.indexOf('mac') > -1;
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isMac = userAgent.indexOf('mac') > -1;
     return isMac ? 'mac' : 'win';
   }, []);
 

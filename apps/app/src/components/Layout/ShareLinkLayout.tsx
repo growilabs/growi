@@ -18,10 +18,6 @@ const GrowiNavbarBottom = dynamic(
     ),
   { ssr: false },
 );
-const SystemVersion = dynamic(
-  () => import('~/client/components/SystemVersion'),
-  { ssr: false },
-);
 // biome-ignore-end lint/style/noRestrictedImports: no-problem dynamic import
 
 type Props = {
@@ -37,7 +33,6 @@ export const ShareLinkLayout = ({ children }: Props): JSX.Element => {
 
       <ShortcutsModalLazyLoaded />
       <PageCreateModal />
-      <SystemVersion showShortcutsButton />
     </RawLayout>
   );
 };
