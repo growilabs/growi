@@ -1617,23 +1617,23 @@ module.exports = (crowi) => {
       }
 
       const requestParams = {
-        'security:passport-saml:entryPoint': req.body.entryPoint,
-        'security:passport-saml:issuer': req.body.issuer,
-        'security:passport-saml:cert': req.body.cert,
-        'security:passport-saml:attrMapId': req.body.attrMapId,
-        'security:passport-saml:attrMapUsername': req.body.attrMapUsername,
-        'security:passport-saml:attrMapMail': req.body.attrMapMail,
-        'security:passport-saml:attrMapFirstName': req.body.attrMapFirstName,
-        'security:passport-saml:attrMapLastName': req.body.attrMapLastName,
+        'security:passport-saml:entryPoint': toNonBlankStringOrUndefined(req.body.entryPoint),
+        'security:passport-saml:issuer': toNonBlankStringOrUndefined(req.body.issuer),
+        'security:passport-saml:cert': toNonBlankStringOrUndefined(req.body.cert),
+        'security:passport-saml:attrMapId': toNonBlankStringOrUndefined(req.body.attrMapId),
+        'security:passport-saml:attrMapUsername': toNonBlankStringOrUndefined(req.body.attrMapUsername),
+        'security:passport-saml:attrMapMail': toNonBlankStringOrUndefined(req.body.attrMapMail),
+        'security:passport-saml:attrMapFirstName': toNonBlankStringOrUndefined(req.body.attrMapFirstName),
+        'security:passport-saml:attrMapLastName': toNonBlankStringOrUndefined(req.body.attrMapLastName),
         'security:passport-saml:isSameUsernameTreatedAsIdenticalUser':
           req.body.isSameUsernameTreatedAsIdenticalUser,
         'security:passport-saml:isSameEmailTreatedAsIdenticalUser':
           req.body.isSameEmailTreatedAsIdenticalUser,
-        'security:passport-saml:ABLCRule': req.body.ABLCRule,
+        'security:passport-saml:ABLCRule': toNonBlankStringOrUndefined(req.body.ABLCRule),
       };
 
       try {
-        await updateAndReloadStrategySettings('saml', requestParams);
+        await updateAndReloadStrategySettings('saml', requestParams, { removeIfUndefined: true });
 
         const securitySettingParams = {
           missingMandatoryConfigKeys:
