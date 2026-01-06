@@ -93,132 +93,129 @@ export const CompleteUserRegistrationForm: React.FC<Props> = (props: Props) => {
   }
 
   return (
-    <>
-      <div
-        className={`${moduleClass} nologin-dialog mx-auto rounded-4 rounded-top-0`}
-        id="nologin-dialog"
-      >
-        <div className="row mx-0">
-          <div className="col-12 px-4">
-            {errorCode != null &&
-              errorCode === UserActivationErrorCode.TOKEN_NOT_FOUND && (
-                <p className="alert alert-danger">
-                  <span>Token not found</span>
-                </p>
-              )}
-
-            {errorCode != null &&
-              errorCode ===
-                UserActivationErrorCode.USER_REGISTRATION_ORDER_IS_NOT_APPROPRIATE && (
-                <p className="alert alert-danger">
-                  <span>{t('message.incorrect_token_or_expired_url')}</span>
-                </p>
-              )}
-
-            {!isEmailAuthenticationEnabled && (
+    <div
+      className={`${moduleClass} nologin-dialog mx-auto rounded-4 rounded-top-0`}
+    >
+      <div className="row mx-0">
+        <div className="col-12 px-4">
+          {errorCode != null &&
+            errorCode === UserActivationErrorCode.TOKEN_NOT_FOUND && (
               <p className="alert alert-danger">
-                <span>{t('message.email_authentication_is_not_enabled')}</span>
+                <span>Token not found</span>
               </p>
             )}
 
-            <form onSubmit={handleSubmitRegistration} id="registration-form">
-              <input type="hidden" name="token" value={token} />
+          {errorCode != null &&
+            errorCode ===
+              UserActivationErrorCode.USER_REGISTRATION_ORDER_IS_NOT_APPROPRIATE && (
+              <p className="alert alert-danger">
+                <span>{t('message.incorrect_token_or_expired_url')}</span>
+              </p>
+            )}
 
-              <div className="input-group">
-                <span className="p-2 text-white opacity-75">
-                  <span className="material-symbols-outlined">mail</span>
-                </span>
-                <input
-                  type="text"
-                  className="form-control rounded"
-                  placeholder={t('Email')}
-                  disabled
-                  value={email}
-                />
-              </div>
+          {!isEmailAuthenticationEnabled && (
+            <p className="alert alert-danger">
+              <span>{t('message.email_authentication_is_not_enabled')}</span>
+            </p>
+          )}
 
-              <div className="input-group" id="input-group-username">
-                <span className="p-2 text-white opacity-75">
-                  <span className="material-symbols-outlined">person</span>
-                </span>
-                <input
-                  type="text"
-                  className="form-control rounded"
-                  placeholder={t('User ID')}
-                  name="username"
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  disabled={forceDisableForm || disableForm}
-                />
-              </div>
-              {!usernameAvailable && (
-                <p className="form-text text-red">
-                  <span id="help-block-username">
-                    <span className="p-2 text-white opacity-75">
-                      <span className="material-symbols-outlined">block</span>
-                    </span>
-                    {t('installer.unavaliable_user_id')}
+          <form onSubmit={handleSubmitRegistration} id="registration-form">
+            <input type="hidden" name="token" value={token} />
+
+            <div className="input-group">
+              <span className="p-2 text-white opacity-75">
+                <span className="material-symbols-outlined">mail</span>
+              </span>
+              <input
+                type="text"
+                className="form-control rounded"
+                placeholder={t('Email')}
+                disabled
+                value={email}
+              />
+            </div>
+
+            <div className="input-group">
+              <span className="p-2 text-white opacity-75">
+                <span className="material-symbols-outlined">person</span>
+              </span>
+              <input
+                type="text"
+                className="form-control rounded"
+                placeholder={t('User ID')}
+                name="username"
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                disabled={forceDisableForm || disableForm}
+              />
+            </div>
+            {!usernameAvailable && (
+              <p className="form-text text-red">
+                <span>
+                  <span className="p-2 text-white opacity-75">
+                    <span className="material-symbols-outlined">block</span>
                   </span>
-                </p>
-              )}
-
-              <div className="input-group">
-                <span className="p-2 text-white opacity-75">
-                  <span className="material-symbols-outlined">sell</span>
+                  {t('installer.unavaliable_user_id')}
                 </span>
-                <input
-                  type="text"
-                  className="form-control rounded"
-                  placeholder={t('Name')}
-                  name="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  disabled={forceDisableForm || disableForm}
-                />
-              </div>
+              </p>
+            )}
 
-              <div className="input-group">
-                <span className="p-2 text-white opacity-75">
-                  <span className="material-symbols-outlined">lock</span>
-                </span>
-                <input
-                  type="password"
-                  className="form-control rounded"
-                  placeholder={t('Password')}
-                  name="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={forceDisableForm || disableForm}
-                />
-              </div>
+            <div className="input-group">
+              <span className="p-2 text-white opacity-75">
+                <span className="material-symbols-outlined">sell</span>
+              </span>
+              <input
+                type="text"
+                className="form-control rounded"
+                placeholder={t('Name')}
+                name="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                disabled={forceDisableForm || disableForm}
+              />
+            </div>
 
-              <div className="input-group justify-content-center mt-4">
-                <button
-                  type="submit"
-                  disabled={forceDisableForm || disableForm}
-                  className="btn btn-secondary btn-register col-6 mx-auto d-flex"
-                >
-                  <span>
-                    <span className="material-symbols-outlined">
-                      person_add
-                    </span>
+            <div className="input-group">
+              <span className="p-2 text-white opacity-75">
+                <span className="material-symbols-outlined">lock</span>
+              </span>
+              <input
+                type="password"
+                className="form-control rounded"
+                placeholder={t('Password')}
+                name="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={forceDisableForm || disableForm}
+              />
+            </div>
+
+            <div className="input-group justify-content-center mt-4">
+              <button
+                type="submit"
+                disabled={forceDisableForm || disableForm}
+                className="btn btn-secondary btn-register col-6 mx-auto d-flex"
+              >
+                <span>
+                  <span className="material-symbols-outlined">
+                    person_add
                   </span>
-                  <span className="flex-grow-1">{t('Create')}</span>
-                </button>
-              </div>
+                </span>
+                <span className="flex-grow-1">{t('Create')}</span>
+              </button>
+            </div>
 
-              <div className="input-group mt-5 d-flex">
-                <a href="https://growi.org" className="link-growi-org">
-                  <span className="growi">GROWI</span>
-                  <span className="org">.org</span>
-                </a>
-              </div>
-            </form>
-          </div>
+            <div className="input-group mt-5 d-flex">
+              <a href="https://growi.org" className="link-growi-org">
+                <span className="growi">GROWI</span>
+                <span className="org">.org</span>
+              </a>
+            </div>
+          </form>
         </div>
       </div>
-    </>
+    </div>
   );
 };

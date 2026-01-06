@@ -415,13 +415,10 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
           </p>
         )}
 
-        <form
-          onSubmit={(e) => handleRegisterFormSubmit(e, registerAction)}
-          id="register-form"
-        >
+        <form onSubmit={(e) => handleRegisterFormSubmit(e, registerAction)}>
           {!isEmailAuthenticationEnabled && (
             <div>
-              <div className="input-group" id="input-group-username">
+              <div className="input-group">
                 <span className="text-white opacity-75 d-flex align-items-center">
                   <span className="material-symbols-outlined">person</span>
                 </span>
@@ -439,7 +436,7 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
                 />
               </div>
               <p className="form-text text-danger">
-                <span id="help-block-username"></span>
+                <span></span>
               </p>
               <div className="input-group">
                 <span className="text-white opacity-75 d-flex align-items-center">

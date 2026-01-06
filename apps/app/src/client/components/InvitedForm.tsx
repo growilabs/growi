@@ -90,9 +90,9 @@ export const InvitedForm = (props: InvitedFormProps): JSX.Element => {
   }
 
   return (
-    <div className="nologin-dialog px-3 pb-3 mx-auto" id="nologin-dialog">
+    <div className="nologin-dialog px-3 pb-3 mx-auto">
       {formNotification()}
-      <form onSubmit={handleSubmit(submitHandler)} id="invited-form">
+      <form onSubmit={handleSubmit(submitHandler)}>
         {/* Email Form */}
         <div className="input-group">
           <span className="input-group-text">
@@ -109,7 +109,7 @@ export const InvitedForm = (props: InvitedFormProps): JSX.Element => {
           />
         </div>
         {/* UserID Form */}
-        <div className="input-group" id="input-group-username">
+        <div className="input-group">
           <span className="input-group-text">
             <span className="material-symbols-outlined">person</span>
           </span>
