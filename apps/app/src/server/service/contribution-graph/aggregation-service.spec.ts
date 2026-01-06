@@ -2,11 +2,6 @@ import {
   vi, describe, beforeAll, beforeEach, it, expect,
 } from 'vitest';
 
-import { ContributionAggregationService } from './aggregation-service';
-
-interface MockAggregate {
-    exec: () => Promise<any>;
-}
 
 describe('ContributionAggregationService', { timeout: 15000 }, () => {
   let service: any;
@@ -53,6 +48,7 @@ describe('ContributionAggregationService', { timeout: 15000 }, () => {
 
     // 1. Assert Match Stage
     const match = pipeline.find(s => '$match' in s)?.$match;
+    expect(match.action.$in).toHaveLength(2);
     expect(match).toMatchObject({
       userId,
       action: { $in: ['PAGE_CREATE', 'PAGE_UPDATE'] },
@@ -100,40 +96,56 @@ describe('ContributionAggregationService', { timeout: 15000 }, () => {
   });
 
 
-  // Test Case 2: Simulates the execution and verifies the final output
-  it('should call aggregate with the pipeline and return the result', async() => {
-    const userId = 'user_456';
-    const startDate = new Date('2025-11-12T00:00:00.000Z');
+  it('should generate the pipeline and pass it directly to the Activity model', async() => {
+  // 1. Arrange: Create a spy on the internal buildPipeline method
+    const buildPipelineSpy = vi.spyOn(service, 'buildPipeline');
 
-    const mockDbOutput = [
-      { d: '2025-11-12', c: 10 },
-      { d: '2025-11-13', c: 3 },
-    ];
-    const mockExec = vi.fn().mockResolvedValue(mockDbOutput);
-    const mockAggregate: MockAggregate = { exec: mockExec };
+    const params = {
+      userId: 'user_789',
+      startDate: new Date('2026-01-01'),
+    };
 
-    aggregateMockFn.mockReturnValue(mockAggregate);
+    // 2. Act
+    service.runAggregationPipeline(params);
 
-    const result = await service.runAggregationPipeline({ userId, startDate }).exec();
+    // 3. Assert
+    expect(buildPipelineSpy).toHaveBeenCalledWith(params);
 
-    expect(aggregateMockFn).toHaveBeenCalledTimes(1);
-    expect(mockExec).toHaveBeenCalledTimes(1);
-    expect(result).toEqual(mockDbOutput);
+    // Check that the output of buildPipeline was passed to Activity.aggregate
+    const generatedPipeline = buildPipelineSpy.mock.results[0].value;
+    expect(aggregateMockFn).toHaveBeenCalledWith(generatedPipeline);
   });
 
-  // Test Case 3: Ensures an empty array is returned when no results are found
-  it('should return an empty array if no activities are found in the range', async() => {
-    const userId = 'user_empty';
-    const startDate = new Date('2025-11-15T00:00:00.000Z');
+  it('should include all required activity actions in the match stage', () => {
+    const pipeline = service.buildPipeline({ userId: '123', startDate: new Date() });
+    const match = pipeline.find(s => '$match' in s)?.$match;
 
-    const mockExec = vi.fn().mockResolvedValue([]);
-    const mockAggregate: MockAggregate = { exec: mockExec };
+    expect(match.action.$in).toContain('PAGE_CREATE');
+    expect(match.action.$in).toContain('PAGE_UPDATE');
+  });
 
-    aggregateMockFn.mockReturnValue(mockAggregate);
+  it('should exclude activities from today by using a "less than" midnight boundary', () => {
+    const startDate = new Date('2025-01-01');
+    const pipeline = service.buildPipeline({ userId: '123', startDate });
 
-    const result = await service.runAggregationPipeline({ userId, startDate }).exec();
+    const match = pipeline.find(s => '$match' in s)?.$match;
 
-    expect(aggregateMockFn).toHaveBeenCalledTimes(1);
-    expect(result).toEqual([]);
+    // Verify the operator is specifically $lt and not $lte
+    expect(match.timestamp).toHaveProperty('$lt');
+    expect(match.timestamp).not.toHaveProperty('$lte');
+
+    // Verify the endDate is exactly midnight
+    const endDate = match.timestamp.$lt;
+    expect(endDate.getUTCHours()).toBe(0);
+  });
+
+  it('should use UTC (Z) for both grouping and date formatting', () => {
+    const pipeline = service.buildPipeline({ userId: '123', startDate: new Date() });
+
+    const group = pipeline.find(s => '$group' in s)?.$group;
+
+    // This ensures the "Source of Truth" for the date is UTC
+    expect(group._id.$dateToString.timezone).toBe('Z');
+    expect(group._id.$dateToString.format).toBe('%Y-%m-%d');
   });
 });
