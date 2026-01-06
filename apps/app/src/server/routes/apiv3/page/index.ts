@@ -14,7 +14,6 @@ import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 import sanitize from 'sanitize-filename';
 
-
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IPageGrantData } from '~/interfaces/page';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
