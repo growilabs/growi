@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 
 import {
-  type IPageInfoExt, isIPageInfoForOperation,
+  type IPageInfoExt, isIPageInfoForOperation, isIPageInfoForEmpty,
 } from '@growi/core/dist/interfaces';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
@@ -76,21 +76,24 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const bookmarkItemClickedHandler = useCallback(async() => {
-    if (!isIPageInfoForOperation(pageInfo) || onClickBookmarkMenuItem == null) {
+    if (onClickBookmarkMenuItem == null) return;
+
+    if (!isIPageInfoForEmpty(pageInfo) && !isIPageInfoForOperation(pageInfo)) {
       return;
     }
+
     await onClickBookmarkMenuItem(pageId, !pageInfo.isBookmarked);
   }, [onClickBookmarkMenuItem, pageId, pageInfo]);
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const renameItemClickedHandler = useCallback(async() => {
-    if (onClickRenameMenuItem == null) {
-      return;
-    }
-    if (!isIPageInfoForOperation(pageInfo) || !pageInfo?.isMovable) {
+    if (onClickRenameMenuItem == null) return;
+
+    if (!(isIPageInfoForEmpty(pageInfo) || isIPageInfoForOperation(pageInfo)) || !pageInfo?.isMovable) {
       logger.warn('This page could not be renamed.');
       return;
     }
+
     await onClickRenameMenuItem(pageId, pageInfo);
   }, [onClickRenameMenuItem, pageId, pageInfo]);
 
@@ -111,10 +114,9 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const deleteItemClickedHandler = useCallback(async() => {
-    if (pageInfo == null || onClickDeleteMenuItem == null) {
-      return;
-    }
-    if (!isIPageInfoForOperation(pageInfo) || !pageInfo?.isDeletable) {
+    if (onClickDeleteMenuItem == null) return;
+
+    if (!(isIPageInfoForEmpty(pageInfo) || isIPageInfoForOperation(pageInfo)) || !pageInfo?.isDeletable) {
       logger.warn('This page could not be deleted.');
       return;
     }
@@ -173,7 +175,7 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
         ) }
 
         {/* Bookmark */}
-        { !forceHideMenuItems?.includes(MenuItemType.BOOKMARK) && isEnableActions && isIPageInfoForOperation(pageInfo) && (
+        { !forceHideMenuItems?.includes(MenuItemType.BOOKMARK) && isEnableActions && (isIPageInfoForEmpty(pageInfo) || isIPageInfoForOperation(pageInfo)) && (
           <DropdownItem
             onClick={bookmarkItemClickedHandler}
             className="grw-page-control-dropdown-item"
@@ -186,7 +188,8 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
 
         {/* Move/Rename */}
         { !forceHideMenuItems?.includes(MenuItemType.RENAME) && isEnableActions && !isReadOnlyUser
-          && isIPageInfoForOperation(pageInfo) && pageInfo.isMovable && (
+          && (isIPageInfoForEmpty(pageInfo) || isIPageInfoForOperation(pageInfo))
+          && pageInfo.isMovable && (
           <DropdownItem
             onClick={renameItemClickedHandler}
             data-testid="rename-page-btn"
@@ -211,7 +214,8 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
 
         {/* Revert */}
         { !forceHideMenuItems?.includes(MenuItemType.REVERT) && isEnableActions && !isReadOnlyUser
-          && isIPageInfoForOperation(pageInfo) && pageInfo.isRevertible && (
+          && (isIPageInfoForEmpty(pageInfo) || isIPageInfoForOperation(pageInfo))
+          && pageInfo.isRevertible && (
           <DropdownItem
             onClick={revertItemClickedHandler}
             className="grw-page-control-dropdown-item"
@@ -242,7 +246,8 @@ const PageItemControlDropdownMenu = React.memo((props: DropdownMenuProps): JSX.E
         {/* divider */}
         {/* Delete */}
         { !forceHideMenuItems?.includes(MenuItemType.DELETE) && isEnableActions && !isReadOnlyUser
-          && isIPageInfoForOperation(pageInfo) && pageInfo.isDeletable && (
+          && (isIPageInfoForEmpty(pageInfo) || isIPageInfoForOperation(pageInfo))
+          && pageInfo.isDeletable && (
           <>
             { showDeviderBeforeDelete && <DropdownItem divider /> }
             <DropdownItem

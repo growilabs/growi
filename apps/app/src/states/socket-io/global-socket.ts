@@ -68,7 +68,7 @@ export const useSetupGlobalSocket = (): void => {
  */
 export const useSetupGlobalSocketForPage = (): void => {
   const socket = useAtomValue(globalSocketAtom);
-  const pageId = useCurrentPageId();
+  const pageId = useCurrentPageId(true);
 
   useEffect(() => {
     if (socket == null || pageId == null) {

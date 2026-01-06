@@ -23,4 +23,12 @@ data "aws_iam_policy_document" "policy_document" {
       module.codebuild.project_arn
     ]
   }
+  statement {
+    actions = [
+      "logs:GetLogEvents"
+    ]
+    resources = [
+      "arn:aws:logs:*:*:log-group:/aws/codebuild/${module.codebuild.project_name}:*"
+    ]
+  }
 }

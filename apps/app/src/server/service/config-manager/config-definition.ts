@@ -45,7 +45,6 @@ export const CONFIG_KEYS = [
   'app:title',
   'app:timezone',
   'app:globalLang',
-  'app:fileUpload',
   'app:fileUploadType',
   'app:plantumlUri',
   'app:drawioUri',
@@ -56,7 +55,6 @@ export const CONFIG_KEYS = [
   'app:maxFileSize',
   'app:fileUploadTimeout',
   'app:fileUploadTotalLimit',
-  'app:fileUploadDisabled',
   'app:elasticsearchVersion',
   'app:elasticsearchUri',
   'app:elasticsearchRequestTimeout',
@@ -79,6 +77,7 @@ export const CONFIG_KEYS = [
   'app:wipPageExpirationSeconds',
   'app:openaiThreadDeletionCronMaxMinutesUntilRequest',
   'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest',
+  'app:isReadOnlyForNewUser',
 
   // Security Settings
   'security:wikiMode',
@@ -225,7 +224,6 @@ export const CONFIG_KEYS = [
   'customize:showPageSideAuthors',
   'customize:isEnabledMarp',
   'customize:isSidebarCollapsedMode',
-  'customize:isSidebarClosedAtDockMode',
 
   // Markdown Settings
   'markdown:xss:tagWhitelist',
@@ -388,12 +386,6 @@ export const CONFIG_DEFINITIONS = {
   'app:globalLang': defineConfig<string>({
     defaultValue: 'en_US',
   }),
-  'app:fileUpload': defineConfig<boolean>({
-    defaultValue: false,
-  }),
-  'app:fileUploadDisabled': defineConfig<boolean>({
-    defaultValue: false,
-  }),
   'app:fileUploadType': defineConfig<AttachmentMethodType>({
     envVarName: 'FILE_UPLOAD',
     defaultValue: AttachmentMethodType.aws,
@@ -524,6 +516,10 @@ export const CONFIG_DEFINITIONS = {
         'OPENAI_VECTOR_STORE_FILE_DELETION_CRON_MAX_MINUTES_UNTIL_REQUEST',
       defaultValue: 30,
     }),
+  'app:isReadOnlyForNewUser': defineConfig<boolean>({
+    envVarName: 'DEFAULT_USER_READONLY',
+    defaultValue: false,
+  }),
 
   // Security Settings
   'security:wikiMode': defineConfig<string | undefined>({
@@ -1014,10 +1010,6 @@ export const CONFIG_DEFINITIONS = {
   'customize:isSidebarCollapsedMode': defineConfig<boolean>({
     defaultValue: false,
   }),
-  'customize:isSidebarClosedAtDockMode': defineConfig<boolean>({
-    defaultValue: false,
-  }),
-
   // Markdown Settings
   'markdown:xss:tagWhitelist': defineConfig<string[]>({
     defaultValue: [],

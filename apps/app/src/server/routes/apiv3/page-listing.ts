@@ -1,6 +1,6 @@
-import type { IPageInfo, IPageInfoForListing, IUserHasId } from '@growi/core';
+import type { IPageInfoForListing, IUserHasId } from '@growi/core';
 import { getIdForRef, isIPageInfoForEntity } from '@growi/core';
-import { SCOPE } from '@growi/core/dist/interfaces';
+import { type IPageInfoForEmpty, SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, Router } from 'express';
 import express from 'express';
@@ -275,8 +275,10 @@ const routerFactory = (crowi: Crowi): Router => {
           )) as Record<string, number>;
         }
 
-        const idToPageInfoMap: Record<string, IPageInfo | IPageInfoForListing> =
-          {};
+        const idToPageInfoMap: Record<
+          string,
+          IPageInfoForEmpty | IPageInfoForListing
+        > = {};
 
         const isGuestUser = req.user == null;
 
@@ -285,16 +287,14 @@ const routerFactory = (crowi: Crowi): Router => {
         );
 
         for (const page of pages) {
-          const basicPageInfo = {
-            ...pageService.constructBasicPageInfo(page, isGuestUser),
-            bookmarkCount:
-              bookmarkCountMap != null
-                ? (bookmarkCountMap[page._id.toString()] ?? 0)
-                : 0,
-          };
-
           // TODO: use pageService.getCreatorIdForCanDelete to get creatorId (https://redmine.weseek.co.jp/issues/140574)
-          const canDeleteCompletely = pageService.canDeleteCompletely(
+          const isDeletable = pageService.canDelete(
+            page,
+            page.creator == null ? null : getIdForRef(page.creator),
+            req.user,
+            false,
+          );
+          const isAbleToDeleteCompletely = pageService.canDeleteCompletely(
             page,
             page.creator == null ? null : getIdForRef(page.creator),
             req.user,
@@ -302,11 +302,20 @@ const routerFactory = (crowi: Crowi): Router => {
             userRelatedGroups,
           ); // use normal delete config
 
+          const basicPageInfo = {
+            ...pageService.constructBasicPageInfo(page, isGuestUser),
+            isDeletable,
+            isAbleToDeleteCompletely,
+            bookmarkCount:
+              bookmarkCountMap != null
+                ? (bookmarkCountMap[page._id.toString()] ?? 0)
+                : 0,
+          };
+
           const pageInfo = !isIPageInfoForEntity(basicPageInfo)
-            ? basicPageInfo
+            ? (basicPageInfo satisfies IPageInfoForEmpty)
             : ({
                 ...basicPageInfo,
-                isAbleToDeleteCompletely: canDeleteCompletely,
                 revisionShortBody:
                   shortBodiesMap != null
                     ? (shortBodiesMap[page._id.toString()] ?? undefined)

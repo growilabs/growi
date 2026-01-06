@@ -365,9 +365,9 @@
     "confidential_example": "例: 社外秘",
     "default_language": "新規ユーザーのデフォルト設定言語",
     "default_mail_visibility": "新規ユーザーの初期メール公開設定",
+    "default_read_only_for_new_user": "新規ユーザーの編集制限",
+    "set_read_only_for_new_user": "新規ユーザーを閲覧専用にする",
     "file_uploading": "ファイルアップロード",
-    "enable_files_except_image": "画像以外のファイルアップロードを許可",
-    "attach_enable": "許可をしている場合、画像以外のファイルをページに添付可能になります。",
     "page_bulk_export_settings": "ページ一括エクスポート設定",
     "enable_page_bulk_export": "一括エクスポートを有効にする",
     "page_bulk_export_explanation": "すべてのユーザーが、ページメニューから選択したページとその配下ページをまとめてエクスポートできる機能を有効化します。エクスポートされたデータは保存期間経過後に自動的に削除されます。",
@@ -457,10 +457,7 @@
     "customize_settings": "カスタマイズ",
     "default_sidebar_mode": {
       "title": "デフォルトのサイドバーモード",
-      "desc": "新規ユーザー、ページを訪れたゲストのサイドバーモードを設定できます。",
-      "dock_mode_default_desc": "Dock Mode選択時のサイドバーの初期状態を設定できます。",
-      "dock_mode_default_open": "初めから開いた状態でページを開く",
-      "dock_mode_default_close": "初めから閉じた状態でページを開く"
+      "desc": "新規ユーザー、ページを訪れたゲストのサイドバーモードを設定できます。"
     },
     "layout": "レイアウト",
     "layout_options": {

@@ -1,19 +1,16 @@
-import { Suspense, useState, type JSX } from 'react';
-
+import { type JSX, Suspense, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useTranslation } from 'react-i18next';
 
 import ItemsTreeContentSkeleton from '../../ItemsTree/ItemsTreeContentSkeleton';
-
 import { PageTreeHeader } from './PageTreeSubstance';
 
 const PageTreeContent = dynamic(
-  () => import('./PageTreeSubstance').then(mod => mod.PageTreeContent),
+  () => import('./PageTreeSubstance').then((mod) => mod.PageTreeContent),
   { ssr: false, loading: ItemsTreeContentSkeleton },
 );
-
 
 export const PageTree = (): JSX.Element => {
   const { t } = useTranslation();
@@ -27,7 +24,9 @@ export const PageTree = (): JSX.Element => {
         <Suspense>
           <PageTreeHeader
             isWipPageShown={isWipPageShown}
-            onWipPageShownChange={() => { setIsWipPageShown(!isWipPageShown) }}
+            onWipPageShownChange={() => {
+              setIsWipPageShown(!isWipPageShown);
+            }}
           />
         </Suspense>
       </div>

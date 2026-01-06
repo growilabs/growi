@@ -1,3 +1,5 @@
+import type { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import type {
   IDataWithMeta,
   IPage,
@@ -19,10 +21,8 @@ import { convertToNewAffiliationPath } from '@growi/core/dist/utils/page-path-ut
 import { normalizePath } from '@growi/core/dist/utils/path-utils';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
-import path from 'path';
+import path from 'pathe';
 import sanitize from 'sanitize-filename';
-import type { Readable } from 'stream';
-import { pipeline } from 'stream/promises';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IPageGrantData } from '~/interfaces/page';
@@ -39,6 +39,7 @@ import ShareLink from '~/server/models/share-link';
 import Subscription from '~/server/models/subscription';
 import { configManager } from '~/server/service/config-manager';
 import { exportService } from '~/server/service/export';
+import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
 import type { IPageGrantService } from '~/server/service/page-grant';
 import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
@@ -94,13 +95,13 @@ module.exports = (crowi: Crowi) => {
 
   const globalNotificationService = crowi.getGlobalNotificationService();
   const Page = mongoose.model<IPage, PageModel>('Page');
-  const { pageService } = crowi;
+  const { pageService, pageGrantService } = crowi;
 
   const activityEvent = crowi.event('activity');
 
   const validator = {
     getPage: [
-      query('pageId').optional().isString(),
+      query('pageId').isMongoId().optional().isString(),
       query('path').optional().isString(),
       query('findAll').optional().isBoolean(),
       query('shareLinkId').optional().isMongoId(),
@@ -262,12 +263,12 @@ module.exports = (crowi: Crowi) => {
             return res.apiv3Err('ShareLink is not found', 404);
           }
           return respondWithSinglePage(
-            await pageService.findPageAndMetaDataByViewer(
-              getIdStringForRef(shareLink.relatedPage),
+            await findPageAndMetaDataByViewer(pageService, pageGrantService, {
+              pageId: getIdStringForRef(shareLink.relatedPage),
               path,
               user,
-              true,
-            ),
+              isSharedPage: true,
+            }),
           );
         }
 
@@ -290,7 +291,11 @@ module.exports = (crowi: Crowi) => {
         }
 
         return respondWithSinglePage(
-          await pageService.findPageAndMetaDataByViewer(pageId, path, user),
+          await findPageAndMetaDataByViewer(pageService, pageGrantService, {
+            pageId,
+            path,
+            user,
+          }),
         );
       } catch (err) {
         logger.error('get-page-failed', err);
@@ -583,16 +588,14 @@ module.exports = (crowi: Crowi) => {
       const { pageId } = req.query;
 
       try {
-        const { meta } = await pageService.findPageAndMetaDataByViewer(
-          pageId,
-          null,
-          user,
-          isSharedPage,
+        const { meta } = await findPageAndMetaDataByViewer(
+          pageService,
+          pageGrantService,
+          { pageId, path: null, user, isSharedPage },
         );
 
         if (isIPageNotFoundInfo(meta)) {
           // Return error only when the page is forbidden
-          // Empty pages (isEmpty: true) should return page info for UI operations
           if (meta.isForbidden) {
             return res.apiv3Err(
               new ErrorV3(
@@ -604,9 +607,9 @@ module.exports = (crowi: Crowi) => {
               403,
             );
           }
-          // For not found but not forbidden pages (isEmpty: true), return the meta info
         }
 
+        // Empty pages (isEmpty: true) should return page info for UI operations
         return res.apiv3(meta);
       } catch (err) {
         logger.error('get-page-info', err);
@@ -640,7 +643,7 @@ module.exports = (crowi: Crowi) => {
    *                    isGrantNormalized:
    *                      type: boolean
    *          400:
-   *            description: Bad request. Page is unreachable or empty.
+   *            description: Bad request. Page is unreachable.
    *          500:
    *            description: Internal server error.
    */
@@ -656,15 +659,12 @@ module.exports = (crowi: Crowi) => {
       const Page = mongoose.model<IPage, PageModel>('Page');
       const pageGrantService = crowi.pageGrantService as IPageGrantService;
 
-      const page = await Page.findByIdAndViewer(pageId, req.user, null, false);
+      const page = await Page.findByIdAndViewer(pageId, req.user, null, true);
 
       if (page == null) {
         // Empty page should not be related to grant API
         return res.apiv3Err(
-          new ErrorV3(
-            'Page is unreachable or empty.',
-            'page_unreachable_or_empty',
-          ),
+          new ErrorV3('Page is unreachable', 'page_unreachable'),
           400,
         );
       }
@@ -708,7 +708,7 @@ module.exports = (crowi: Crowi) => {
         getIdForRef(page.parent),
         req.user,
         null,
-        false,
+        true,
       );
 
       // user isn't allowed to see parent's grant
@@ -866,7 +866,7 @@ module.exports = (crowi: Crowi) => {
    *                     items:
    *                       type: string
    *         400:
-   *           description: Bad request. Page is unreachable or empty.
+   *           description: Bad request. Page is unreachable.
    *         500:
    *           description: Internal server error.
    */
@@ -880,15 +880,12 @@ module.exports = (crowi: Crowi) => {
       const { pageId } = req.query;
 
       const Page = mongoose.model<IPage, PageModel>('Page');
-      const page = await Page.findByIdAndViewer(pageId, req.user, null);
+      const page = await Page.findByIdAndViewer(pageId, req.user, null, true);
 
       if (page == null) {
         // Empty page should not be related to grant API
         return res.apiv3Err(
-          new ErrorV3(
-            'Page is unreachable or empty.',
-            'page_unreachable_or_empty',
-          ),
+          new ErrorV3('Page is unreachable', 'page_unreachable'),
           400,
         );
       }
@@ -1048,7 +1045,7 @@ module.exports = (crowi: Crowi) => {
         return res.apiv3Err(err, 500);
       }
 
-      // Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js'
+      // Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js' provided by v6.1.0 - v7.0.15
       try {
         await normalizeLatestRevisionIfBroken(pageId);
       } catch (err) {

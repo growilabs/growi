@@ -1,33 +1,37 @@
-import type { Readable } from 'stream';
-
 import type { TokenCredential } from '@azure/identity';
 import { ClientSecretCredential } from '@azure/identity';
 import type {
   BlobClient,
-  BlockBlobClient,
   BlobDeleteOptions,
+  BlockBlobClient,
   ContainerClient,
 } from '@azure/storage-blob';
 import {
-  generateBlobSASQueryParameters,
-  BlobServiceClient,
-  ContainerSASPermissions,
-  SASProtocol,
   type BlobDeleteIfExistsResponse,
-  type BlockBlobUploadResponse,
+  BlobServiceClient,
   type BlockBlobParallelUploadOptions,
+  type BlockBlobUploadResponse,
+  ContainerSASPermissions,
+  generateBlobSASQueryParameters,
+  SASProtocol,
 } from '@azure/storage-blob';
 import { toNonBlankStringOrUndefined } from '@growi/core/dist/interfaces';
+import type { Readable } from 'stream';
 
 import type Crowi from '~/server/crowi';
-import { FilePathOnStoragePrefix, ResponseMode, type RespondOptions } from '~/server/interfaces/attachment';
+import {
+  FilePathOnStoragePrefix,
+  type RespondOptions,
+  ResponseMode,
+} from '~/server/interfaces/attachment';
 import type { IAttachmentDocument } from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../config-manager';
-
 import {
-  AbstractFileUploader, type TemporaryUrl, type SaveFileParam,
+  AbstractFileUploader,
+  type SaveFileParam,
+  type TemporaryUrl,
 } from './file-uploader';
 import { createContentHeaders, getContentHeaderValue } from './utils';
 
@@ -41,15 +45,17 @@ interface FileMeta {
 }
 
 type AzureConfig = {
-  accountName: string,
-  containerName: string,
-}
+  accountName: string;
+  containerName: string;
+};
 
 // Cache holders to avoid repeated instantiation of credential and clients
-let cachedCredential: { key: string, credential: TokenCredential } | null = null;
-let cachedBlobServiceClient: { key: string, client: BlobServiceClient } | null = null;
-let cachedContainerClient: { key: string, client: ContainerClient } | null = null;
-
+let cachedCredential: { key: string; credential: TokenCredential } | null =
+  null;
+let cachedBlobServiceClient: { key: string; client: BlobServiceClient } | null =
+  null;
+let cachedContainerClient: { key: string; client: ContainerClient } | null =
+  null;
 
 function getAzureConfig(): AzureConfig {
   const accountName = configManager.getConfig('azure:storageAccountName');
@@ -67,12 +73,20 @@ function getAzureConfig(): AzureConfig {
 
 function getCredential(): TokenCredential {
   // Build cache key from credential-related configs
-  const tenantId = toNonBlankStringOrUndefined(configManager.getConfig('azure:tenantId'));
-  const clientId = toNonBlankStringOrUndefined(configManager.getConfig('azure:clientId'));
-  const clientSecret = toNonBlankStringOrUndefined(configManager.getConfig('azure:clientSecret'));
+  const tenantId = toNonBlankStringOrUndefined(
+    configManager.getConfig('azure:tenantId'),
+  );
+  const clientId = toNonBlankStringOrUndefined(
+    configManager.getConfig('azure:clientId'),
+  );
+  const clientSecret = toNonBlankStringOrUndefined(
+    configManager.getConfig('azure:clientSecret'),
+  );
 
   if (tenantId == null || clientId == null || clientSecret == null) {
-    throw new Error(`Azure Blob Storage missing required configuration: tenantId=${tenantId}, clientId=${clientId}, clientSecret=${clientSecret}`);
+    throw new Error(
+      `Azure Blob Storage missing required configuration: tenantId=${tenantId}, clientId=${clientId}, clientSecret=${clientSecret}`,
+    );
   }
 
   const key = `${tenantId}|${clientId}|${clientSecret}`;
@@ -82,7 +96,11 @@ function getCredential(): TokenCredential {
     return cachedCredential.credential;
   }
 
-  const credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+  const credential = new ClientSecretCredential(
+    tenantId,
+    clientId,
+    clientSecret,
+  );
   cachedCredential = { key, credential };
   return credential;
 }
@@ -91,7 +109,7 @@ function getBlobServiceClient(): BlobServiceClient {
   const { accountName } = getAzureConfig();
   // Include credential cache key to ensure we re-create if cred changed
   const credential = getCredential();
-  const credentialKey = (cachedCredential?.key) ?? 'unknown-cred';
+  const credentialKey = cachedCredential?.key ?? 'unknown-cred';
   const key = `${accountName}|${credentialKey}`;
 
   if (cachedBlobServiceClient != null && cachedBlobServiceClient.key === key) {
@@ -110,7 +128,7 @@ function getBlobServiceClient(): BlobServiceClient {
 
 async function getContainerClient(): Promise<ContainerClient> {
   const { accountName, containerName } = getAzureConfig();
-  const credentialKey = (cachedCredential?.key) ?? 'unknown-cred';
+  const credentialKey = cachedCredential?.key ?? 'unknown-cred';
   const key = `${accountName}|${containerName}|${credentialKey}`;
 
   if (cachedContainerClient != null && cachedContainerClient.key === key) {
@@ -124,12 +142,14 @@ async function getContainerClient(): Promise<ContainerClient> {
 }
 
 function getFilePathOnStorage(attachment: IAttachmentDocument) {
-  const dirName = (attachment.page != null) ? FilePathOnStoragePrefix.attachment : FilePathOnStoragePrefix.user;
+  const dirName =
+    attachment.page != null
+      ? FilePathOnStoragePrefix.attachment
+      : FilePathOnStoragePrefix.user;
   return urljoin(dirName, attachment.fileName);
 }
 
 class AzureFileUploader extends AbstractFileUploader {
-
   /**
    * @inheritdoc
    */
@@ -137,8 +157,7 @@ class AzureFileUploader extends AbstractFileUploader {
     try {
       getAzureConfig();
       return true;
-    }
-    catch (e) {
+    } catch (e) {
       logger.error(e);
       return false;
     }
@@ -166,7 +185,8 @@ class AzureFileUploader extends AbstractFileUploader {
     const containerClient = await getContainerClient();
     const blockBlobClient = await containerClient.getBlockBlobClient(filePath);
     const options: BlobDeleteOptions = { deleteSnapshots: 'include' };
-    const blobDeleteIfExistsResponse: BlobDeleteIfExistsResponse = await blockBlobClient.deleteIfExists(options);
+    const blobDeleteIfExistsResponse: BlobDeleteIfExistsResponse =
+      await blockBlobClient.deleteIfExists(options);
     if (!blobDeleteIfExistsResponse.errorCode) {
       logger.info(`deleted blob ${filePath}`);
     }
@@ -175,7 +195,9 @@ class AzureFileUploader extends AbstractFileUploader {
   /**
    * @inheritdoc
    */
-  override async deleteFiles(attachments: IAttachmentDocument[]): Promise<void> {
+  override async deleteFiles(
+    attachments: IAttachmentDocument[],
+  ): Promise<void> {
     if (!this.getIsUploadable()) {
       throw new Error('Azure is not configured.');
     }
@@ -187,7 +209,10 @@ class AzureFileUploader extends AbstractFileUploader {
   /**
    * @inheritdoc
    */
-  override async uploadAttachment(readable: Readable, attachment: IAttachmentDocument): Promise<void> {
+  override async uploadAttachment(
+    readable: Readable,
+    attachment: IAttachmentDocument,
+  ): Promise<void> {
     if (!this.getIsUploadable()) {
       throw new Error('Azure is not configured.');
     }
@@ -195,7 +220,8 @@ class AzureFileUploader extends AbstractFileUploader {
     logger.debug(`File uploading: fileName=${attachment.fileName}`);
     const filePath = getFilePathOnStorage(attachment);
     const containerClient = await getContainerClient();
-    const blockBlobClient: BlockBlobClient = containerClient.getBlockBlobClient(filePath);
+    const blockBlobClient: BlockBlobClient =
+      containerClient.getBlockBlobClient(filePath);
     const contentHeaders = createContentHeaders(attachment);
 
     try {
@@ -204,21 +230,30 @@ class AzureFileUploader extends AbstractFileUploader {
       await blockBlobClient.uploadStream(readable, undefined, undefined, {
         blobHTTPHeaders: {
           // put type and the file name for reference information when uploading
-          blobContentType: getContentHeaderValue(contentHeaders, 'Content-Type'),
-          blobContentDisposition: getContentHeaderValue(contentHeaders, 'Content-Disposition'),
+          blobContentType: getContentHeaderValue(
+            contentHeaders,
+            'Content-Type',
+          ),
+          blobContentDisposition: getContentHeaderValue(
+            contentHeaders,
+            'Content-Disposition',
+          ),
         },
         abortSignal: AbortSignal.timeout(uploadTimeout),
       });
 
-      logger.debug(`File upload completed successfully: fileName=${attachment.fileName}`);
-    }
-    catch (error) {
+      logger.debug(
+        `File upload completed successfully: fileName=${attachment.fileName}`,
+      );
+    } catch (error) {
       // Handle timeout error specifically
       if (error.name === 'AbortError') {
         logger.warn(`Upload timeout: fileName=${attachment.fileName}`, error);
-      }
-      else {
-        logger.error(`File upload failed: fileName=${attachment.fileName}`, error);
+      } else {
+        logger.error(
+          `File upload failed: fileName=${attachment.fileName}`,
+          error,
+        );
       }
       // Re-throw the error to be handled by the caller.
       // The pipeline automatically handles stream cleanup on error.
@@ -239,13 +274,17 @@ class AzureFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override respond(): void {
-    throw new Error('AzureFileUploader does not support ResponseMode.DELEGATE.');
+    throw new Error(
+      'AzureFileUploader does not support ResponseMode.DELEGATE.',
+    );
   }
 
   /**
    * @inheritdoc
    */
-  override async findDeliveryFile(attachment: IAttachmentDocument): Promise<NodeJS.ReadableStream> {
+  override async findDeliveryFile(
+    attachment: IAttachmentDocument,
+  ): Promise<NodeJS.ReadableStream> {
     if (!this.getIsReadable()) {
       throw new Error('Azure is not configured.');
     }
@@ -259,7 +298,9 @@ class AzureFileUploader extends AbstractFileUploader {
       throw new Error(downloadResponse.errorCode);
     }
     if (!downloadResponse?.readableStreamBody) {
-      throw new Error(`Coudn't get file from Azure for the Attachment (${filePath})`);
+      throw new Error(
+        `Coudn't get file from Azure for the Attachment (${filePath})`,
+      );
     }
 
     return downloadResponse.readableStreamBody;
@@ -269,21 +310,27 @@ class AzureFileUploader extends AbstractFileUploader {
    * @inheritDoc
    * @see https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-create-user-delegation-sas-javascript
    */
-  override async generateTemporaryUrl(attachment: IAttachmentDocument, opts?: RespondOptions): Promise<TemporaryUrl> {
+  override async generateTemporaryUrl(
+    attachment: IAttachmentDocument,
+    opts?: RespondOptions,
+  ): Promise<TemporaryUrl> {
     if (!this.getIsUploadable()) {
       throw new Error('Azure Blob is not configured.');
     }
 
-    const lifetimeSecForTemporaryUrl = configManager.getConfig('azure:lifetimeSecForTemporaryUrl');
+    const lifetimeSecForTemporaryUrl = configManager.getConfig(
+      'azure:lifetimeSecForTemporaryUrl',
+    );
 
-    const url = await (async() => {
+    const url = await (async () => {
       const containerClient = await getContainerClient();
       const filePath = getFilePathOnStorage(attachment);
-      const blockBlobClient = await containerClient.getBlockBlobClient(filePath);
+      const blockBlobClient =
+        await containerClient.getBlockBlobClient(filePath);
       return blockBlobClient.url;
     })();
 
-    const sasToken = await (async() => {
+    const sasToken = await (async () => {
       const { accountName, containerName } = getAzureConfig();
       // Reuse the same BlobServiceClient (singleton)
       const blobServiceClient = getBlobServiceClient();
@@ -291,25 +338,39 @@ class AzureFileUploader extends AbstractFileUploader {
       const now = Date.now();
       const startsOn = new Date(now - 30 * 1000);
       const expiresOn = new Date(now + lifetimeSecForTemporaryUrl * 1000);
-      const userDelegationKey = await blobServiceClient.getUserDelegationKey(startsOn, expiresOn);
+      const userDelegationKey = await blobServiceClient.getUserDelegationKey(
+        startsOn,
+        expiresOn,
+      );
 
       const isDownload = opts?.download ?? false;
-      const contentHeaders = createContentHeaders(attachment, { inline: !isDownload });
+      const contentHeaders = createContentHeaders(attachment, {
+        inline: !isDownload,
+      });
 
       // https://github.com/Azure/azure-sdk-for-js/blob/d4d55f73/sdk/storage/storage-blob/src/ContainerSASPermissions.ts#L24
       // r:read, a:add, c:create, w:write, d:delete, l:list
       const containerPermissionsForAnonymousUser = 'rl';
       const sasOptions = {
         containerName,
-        permissions: ContainerSASPermissions.parse(containerPermissionsForAnonymousUser),
+        permissions: ContainerSASPermissions.parse(
+          containerPermissionsForAnonymousUser,
+        ),
         protocol: SASProtocol.HttpsAndHttp,
         startsOn,
         expiresOn,
         contentType: getContentHeaderValue(contentHeaders, 'Content-Type'),
-        contentDisposition: getContentHeaderValue(contentHeaders, 'Content-Disposition'),
+        contentDisposition: getContentHeaderValue(
+          contentHeaders,
+          'Content-Disposition',
+        ),
       };
 
-      return generateBlobSASQueryParameters(sasOptions, userDelegationKey, accountName).toString();
+      return generateBlobSASQueryParameters(
+        sasOptions,
+        userDelegationKey,
+        accountName,
+      ).toString();
     })();
 
     const signedUrl = `${url}?${sasToken}`;
@@ -318,33 +379,34 @@ class AzureFileUploader extends AbstractFileUploader {
       url: signedUrl,
       lifetimeSec: lifetimeSecForTemporaryUrl,
     };
-
   }
-
 }
 
 module.exports = (crowi: Crowi) => {
   const lib = new AzureFileUploader(crowi);
 
-  lib.isValidUploadSettings = function() {
-    return configManager.getConfig('azure:storageAccountName') != null
-      && configManager.getConfig('azure:storageContainerName') != null;
-  };
+  lib.isValidUploadSettings = () =>
+    configManager.getConfig('azure:storageAccountName') != null &&
+    configManager.getConfig('azure:storageContainerName') != null;
 
-  lib.saveFile = async function({ filePath, contentType, data }) {
+  lib.saveFile = async ({ filePath, contentType, data }) => {
     const containerClient = await getContainerClient();
-    const blockBlobClient: BlockBlobClient = containerClient.getBlockBlobClient(filePath);
+    const blockBlobClient: BlockBlobClient =
+      containerClient.getBlockBlobClient(filePath);
     const options: BlockBlobParallelUploadOptions = {
       blobHTTPHeaders: {
         blobContentType: contentType,
       },
     };
-    const blockBlobUploadResponse: BlockBlobUploadResponse = await blockBlobClient.upload(data, data.length, options);
-    if (blockBlobUploadResponse.errorCode) { throw new Error(blockBlobUploadResponse.errorCode) }
+    const blockBlobUploadResponse: BlockBlobUploadResponse =
+      await blockBlobClient.upload(data, data.length, options);
+    if (blockBlobUploadResponse.errorCode) {
+      throw new Error(blockBlobUploadResponse.errorCode);
+    }
     return;
   };
 
-  (lib as any).listFiles = async function() {
+  (lib as any).listFiles = async () => {
     if (!lib.getIsReadable()) {
       throw new Error('Azure is not configured.');
     }
@@ -359,9 +421,7 @@ module.exports = (crowi: Crowi) => {
       includeVersions: false,
       prefix: '',
     })) {
-      files.push(
-        { name: blob.name, size: blob.properties.contentLength || 0 },
-      );
+      files.push({ name: blob.name, size: blob.properties.contentLength || 0 });
     }
 
     return files;

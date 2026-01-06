@@ -6,7 +6,6 @@ import { Container } from 'unstated';
  * @extends {Container} unstated Container
  */
 export default class AdminImportContainer extends Container {
-
   constructor(appContainer) {
     super();
 
@@ -27,5 +26,4 @@ export default class AdminImportContainer extends Container {
   static getClassName() {
     return 'AdminImportContainer';
   }
-
 }

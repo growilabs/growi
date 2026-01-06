@@ -7,7 +7,7 @@ import type {
   Lang,
   PageGrant,
   PageStatus,
-} from '@growi/core';
+} from '@growi/core/dist/interfaces';
 import { renderHook, waitFor } from '@testing-library/react';
 // biome-ignore lint/style/noRestrictedImports: import only types
 import type { AxiosResponse } from 'axios';
@@ -19,7 +19,8 @@ import * as apiv3Client from '~/client/util/apiv3-client';
 import { useFetchCurrentPage } from '~/states/page';
 import {
   currentPageDataAtom,
-  currentPageIdAtom,
+  currentPageEmptyIdAtom,
+  currentPageEntityIdAtom,
   isForbiddenAtom,
   pageErrorAtom,
   pageLoadingAtom,
@@ -120,9 +121,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
   const mockApiResponse = (
     page: IPagePopulatedToShowRevision,
-  ): AxiosResponse<{ page: IPagePopulatedToShowRevision }> => {
+  ): AxiosResponse<{ page: IPagePopulatedToShowRevision; meta: unknown }> => {
     return {
-      data: { page },
+      data: { page, meta: {} },
       status: 200,
       statusText: 'OK',
       headers: {},
@@ -167,7 +168,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       '/initial/path',
       'initial content',
     );
-    store.set(currentPageIdAtom, initialPageData._id);
+    store.set(currentPageEntityIdAtom, initialPageData._id);
     store.set(currentPageDataAtom, initialPageData);
 
     // Arrange: Navigate to a new page
@@ -191,7 +192,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       );
 
       // 2. Atoms were updated
-      expect(store.get(currentPageIdAtom)).toBe(newPageData._id);
+      expect(store.get(currentPageEntityIdAtom)).toBe(newPageData._id);
       expect(store.get(currentPageDataAtom)).toEqual(newPageData);
       expect(store.get(pageLoadingAtom)).toBe(false);
       expect(store.get(pageNotFoundAtom)).toBe(false);
@@ -206,7 +207,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       '/same/path',
       'current content',
     );
-    store.set(currentPageIdAtom, currentPageData._id);
+    store.set(currentPageEntityIdAtom, currentPageData._id);
     store.set(currentPageDataAtom, currentPageData);
 
     // Act
@@ -226,7 +227,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       '/some/path',
       'current content',
     );
-    store.set(currentPageIdAtom, currentPageData._id);
+    store.set(currentPageEntityIdAtom, currentPageData._id);
     store.set(currentPageDataAtom, currentPageData);
 
     // Act
@@ -245,7 +246,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       '/same/path',
       'current content',
     );
-    store.set(currentPageIdAtom, currentPageData._id);
+    store.set(currentPageEntityIdAtom, currentPageData._id);
     store.set(currentPageDataAtom, currentPageData);
 
     // Arrange: API returns different revision
@@ -289,7 +290,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       'current content',
     );
     const currentRevisionId = currentPageData.revision?._id;
-    store.set(currentPageIdAtom, currentPageData._id);
+    store.set(currentPageEntityIdAtom, currentPageData._id);
     store.set(currentPageDataAtom, currentPageData);
 
     // Act
@@ -311,7 +312,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       '/same/path',
       'old content',
     );
-    store.set(currentPageIdAtom, currentPageData._id);
+    store.set(currentPageEntityIdAtom, currentPageData._id);
     store.set(currentPageDataAtom, currentPageData);
 
     // Arrange: API returns old revision
@@ -354,7 +355,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       '/same/path',
       'old content',
     );
-    store.set(currentPageIdAtom, currentPageData._id);
+    store.set(currentPageEntityIdAtom, currentPageData._id);
     store.set(currentPageDataAtom, currentPageData);
 
     // Arrange: API returns updated data
@@ -392,7 +393,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       '/some/path',
       'old content',
     );
-    store.set(currentPageIdAtom, currentPageData._id);
+    store.set(currentPageEntityIdAtom, currentPageData._id);
     store.set(currentPageDataAtom, currentPageData);
 
     // Arrange: API returns updated data
@@ -431,7 +432,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       '/actual/path',
       'old content',
     );
-    store.set(currentPageIdAtom, permalinkId);
+    store.set(currentPageEntityIdAtom, permalinkId);
     store.set(currentPageDataAtom, currentPageData);
 
     // Arrange: API returns updated data
@@ -478,7 +479,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
     await result.current.fetchCurrentPage({ path: '/some/page' });
 
     await waitFor(() => {
-      expect(store.get(currentPageIdAtom)).toBe('regularPageId');
+      expect(store.get(currentPageEntityIdAtom)).toBe('regularPageId');
     });
 
     // Arrange: Navigate to the root page
@@ -499,7 +500,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
         '/page',
         expect.objectContaining({ path: '/' }),
       );
-      expect(store.get(currentPageIdAtom)).toBe('rootPageId');
+      expect(store.get(currentPageEntityIdAtom)).toBe('rootPageId');
     });
   });
 
@@ -524,7 +525,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
         '/page',
         expect.objectContaining({ path: decodedPath }),
       );
-      expect(store.get(currentPageIdAtom)).toBe('encodedPageId');
+      expect(store.get(currentPageEntityIdAtom)).toBe('encodedPageId');
     });
   });
 
@@ -548,7 +549,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
         '/page',
         expect.objectContaining({ pageId: '65d4e0a0f7b7b2e5a8652e86' }),
       );
-      expect(store.get(currentPageIdAtom)).toBe('65d4e0a0f7b7b2e5a8652e86');
+      expect(store.get(currentPageEntityIdAtom)).toBe(
+        '65d4e0a0f7b7b2e5a8652e86',
+      );
     });
   });
 
@@ -574,14 +577,14 @@ describe('useFetchCurrentPage - Integration Test', () => {
         '/page',
         expect.objectContaining({ pageId: expectedPageId }),
       );
-      // 2. API should NOT be called with path
+      // 2. API should NOT use the permalink from path
       expect(mockedApiv3Get).toHaveBeenCalledWith(
         '/page',
         expect.not.objectContaining({ path: expect.anything() }),
       );
 
       // 3. State should be updated correctly
-      expect(store.get(currentPageIdAtom)).toBe(expectedPageId);
+      expect(store.get(currentPageEntityIdAtom)).toBe(expectedPageId);
       expect(store.get(currentPageDataAtom)).toEqual(pageData);
       expect(store.get(pageLoadingAtom)).toBe(false);
       expect(store.get(pageNotFoundAtom)).toBe(false);
@@ -621,7 +624,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       );
 
       // 3. State should be updated with explicit pageId
-      expect(store.get(currentPageIdAtom)).toBe(explicitPageId);
+      expect(store.get(currentPageEntityIdAtom)).toBe(explicitPageId);
       expect(store.get(currentPageDataAtom)).toEqual(pageData);
     });
   });
@@ -654,7 +657,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       );
 
       // 3. State should be updated correctly
-      expect(store.get(currentPageIdAtom)).toBe('regularPageId123');
+      expect(store.get(currentPageEntityIdAtom)).toBe('regularPageId123');
       expect(store.get(currentPageDataAtom)).toEqual(pageData);
     });
   });
@@ -688,7 +691,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       );
 
       // 3. State should be updated correctly
-      expect(store.get(currentPageIdAtom)).toBe(expectedPageId);
+      expect(store.get(currentPageEntityIdAtom)).toBe(expectedPageId);
       expect(store.get(currentPageDataAtom)).toEqual(pageData);
       expect(store.get(pageLoadingAtom)).toBe(false);
       expect(store.get(pageNotFoundAtom)).toBe(false);
@@ -739,7 +742,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
           '/page',
           expect.objectContaining({ pageId: testCase.expectedPageId }),
         );
-        expect(store.get(currentPageIdAtom)).toBe(testCase.expectedPageId);
+        expect(store.get(currentPageEntityIdAtom)).toBe(
+          testCase.expectedPageId,
+        );
       });
     }
   });
@@ -751,7 +756,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       '/some/existing',
       'existing body',
     );
-    store.set(currentPageIdAtom, existingPage._id);
+    store.set(currentPageEntityIdAtom, existingPage._id);
     store.set(currentPageDataAtom, existingPage);
     store.set(remoteRevisionBodyAtom, 'remote body');
 
@@ -776,7 +781,8 @@ describe('useFetchCurrentPage - Integration Test', () => {
         message: 'Page not found',
       });
       expect(store.get(currentPageDataAtom)).toBeUndefined();
-      expect(store.get(currentPageIdAtom)).toBeUndefined();
+      expect(store.get(currentPageEntityIdAtom)).toBeUndefined();
+      expect(store.get(currentPageEmptyIdAtom)).toBeUndefined();
       expect(store.get(remoteRevisionBodyAtom)).toBeUndefined();
     });
   });
@@ -841,6 +847,144 @@ describe('useFetchCurrentPage - Integration Test', () => {
       expect(store.get(pageNotFoundAtom)).toBe(false);
       // isForbiddenAtom should remain at default state
       expect(store.get(isForbiddenAtom)).toBe(false);
+    });
+  });
+
+  it('should set emptyPageId when page not found with IPageInfoForEmpty in meta', async () => {
+    // Arrange: Mock API response with null page and IPageInfoForEmpty meta
+    const emptyPageId = 'empty123';
+    const notFoundResponseWithEmptyPage = {
+      data: {
+        page: null,
+        meta: {
+          isNotFound: true,
+          isForbidden: false,
+          isEmpty: true, // Required for isIPageInfoForEmpty check
+          emptyPageId,
+        },
+      },
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config: {} as AxiosResponse['config'],
+    };
+    mockedApiv3Get.mockResolvedValueOnce(notFoundResponseWithEmptyPage);
+
+    const { result } = renderHookWithProvider();
+    await result.current.fetchCurrentPage({ path: '/empty/page' });
+
+    // Assert: emptyPageId should be set from meta
+    await waitFor(() => {
+      expect(store.get(pageLoadingAtom)).toBe(false);
+      expect(store.get(pageNotFoundAtom)).toBe(true);
+      expect(store.get(isForbiddenAtom)).toBe(false);
+      expect(store.get(currentPageEmptyIdAtom)).toBe(emptyPageId);
+      expect(store.get(currentPageDataAtom)).toBeUndefined();
+      expect(store.get(currentPageEntityIdAtom)).toBeUndefined();
+    });
+  });
+
+  it('should not set emptyPageId when page not found without IPageInfoForEmpty', async () => {
+    // Arrange: Mock API response with null page and IPageNotFoundInfo meta without emptyPageId
+    const notFoundResponseWithoutEmptyPage = {
+      data: {
+        page: null,
+        meta: {
+          isNotFound: true,
+          isForbidden: false,
+          // No emptyPageId property - not IPageInfoForEmpty
+        },
+      },
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config: {} as AxiosResponse['config'],
+    };
+    mockedApiv3Get.mockResolvedValueOnce(notFoundResponseWithoutEmptyPage);
+
+    const { result } = renderHookWithProvider();
+    await result.current.fetchCurrentPage({ path: '/regular/not/found' });
+
+    // Assert: emptyPageId should be undefined
+    await waitFor(() => {
+      expect(store.get(pageLoadingAtom)).toBe(false);
+      expect(store.get(pageNotFoundAtom)).toBe(true);
+      expect(store.get(isForbiddenAtom)).toBe(false);
+      expect(store.get(currentPageEmptyIdAtom)).toBeUndefined();
+      expect(store.get(currentPageDataAtom)).toBeUndefined();
+      expect(store.get(currentPageEntityIdAtom)).toBeUndefined();
+    });
+  });
+
+  it('should reset emptyPageId to undefined on successful fetch', async () => {
+    // Arrange: Set emptyPageId from a previous failed fetch
+    store.set(currentPageEmptyIdAtom, 'previousEmptyPageId');
+    store.set(pageNotFoundAtom, true);
+
+    // Arrange: API returns successful page data
+    const successPageData = createPageDataMock(
+      'newPageId',
+      '/success/path',
+      'success content',
+    );
+    mockedApiv3Get.mockResolvedValue(mockApiResponse(successPageData));
+
+    // Act
+    const { result } = renderHookWithProvider();
+    await result.current.fetchCurrentPage({ path: '/success/path' });
+
+    // Assert: emptyPageId should be reset to undefined
+    await waitFor(() => {
+      expect(store.get(pageLoadingAtom)).toBe(false);
+      expect(store.get(pageNotFoundAtom)).toBe(false);
+      expect(store.get(currentPageEmptyIdAtom)).toBeUndefined();
+      expect(store.get(currentPageDataAtom)).toEqual(successPageData);
+      expect(store.get(currentPageEntityIdAtom)).toBe('newPageId');
+    });
+  });
+
+  it('should handle path with encoded Japanese characters', async () => {
+    // Arrange: Path with Japanese characters
+    const japanesePath = '/日本語/ページ';
+    const encodedPath = encodeURIComponent(japanesePath);
+    const pageData = createPageDataMock(
+      'japanesePageId',
+      japanesePath,
+      'Japanese content',
+    );
+    mockedApiv3Get.mockResolvedValue(mockApiResponse(pageData));
+
+    // Act
+    const { result } = renderHookWithProvider();
+    await result.current.fetchCurrentPage({ path: japanesePath });
+
+    // Assert: Path should be properly decoded and sent to API
+    await waitFor(() => {
+      expect(mockedApiv3Get).toHaveBeenCalledWith(
+        '/page',
+        expect.objectContaining({ path: japanesePath }),
+      );
+      expect(store.get(currentPageEntityIdAtom)).toBe('japanesePageId');
+    });
+  });
+
+  it('should call mutatePageInfo after successful fetch', async () => {
+    // Arrange
+    const pageData = createPageDataMock(
+      'pageId123',
+      '/test/path',
+      'test content',
+    );
+    mockedApiv3Get.mockResolvedValue(mockApiResponse(pageData));
+
+    // Act
+    const { result } = renderHookWithProvider();
+    await result.current.fetchCurrentPage({ path: '/test/path' });
+
+    // Assert: mutatePageInfo should be called to refetch metadata
+    await waitFor(() => {
+      expect(mockMutatePageInfo).toHaveBeenCalled();
+      expect(store.get(currentPageEntityIdAtom)).toBe('pageId123');
     });
   });
 });

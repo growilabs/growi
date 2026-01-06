@@ -18,8 +18,6 @@ import { CustomNavDropdown, CustomNavTab } from '../CustomNavigation/CustomNav';
 import CustomTabContent from '../CustomNavigation/CustomTabContent';
 import ExpandOrContractButton from '../ExpandOrContractButton';
 
-import { useAutoOpenModalByQueryParam } from './hooks';
-
 import styles from './PageAccessoriesModal.module.scss';
 
 
@@ -44,8 +42,6 @@ const PageAccessoriesModalSubstance = ({ isWindowExpanded, setIsWindowExpanded }
 
   const status = usePageAccessoriesModalStatus();
   const { close, selectContents } = usePageAccessoriesModalActions();
-
-  useAutoOpenModalByQueryParam();
 
   // Memoize heavy navTabMapping calculation
   const navTabMapping = useMemo(() => {

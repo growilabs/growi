@@ -42,7 +42,9 @@ const isAbleToShowTagLabelAtom = atom((get) => {
 
   // "/trash" page does not exist on page collection and unable to add tags
   return (
+    // biome-ignore lint/style/noNonNullAssertion: currentPagePath should be defined here
     !isUsersTopPage(currentPagePath!) &&
+    // biome-ignore lint/style/noNonNullAssertion: currentPagePath should be defined here
     !isTrashTopPage(currentPagePath!) &&
     shareLinkId == null &&
     !isIdenticalPath &&
@@ -60,22 +62,13 @@ export const useIsAbleToShowTagLabel = (): boolean => {
 // Derived atom for TrashPageManagementButtons display ability
 const isAbleToShowTrashPageManagementButtonsAtom = atom((get) => {
   const currentUser = get(globalAtoms.currentUserAtom);
-  const currentPageId = get(pageAtoms.currentPageIdAtom);
-  const isNotFound = get(pageAtoms.pageNotFoundAtom);
+  const currentPageEntityId = get(pageAtoms.currentPageEntityIdAtom);
+  const currentPageEmptyId = get(pageAtoms.currentPageEmptyIdAtom);
   const isTrashPage = get(pageAtoms.isTrashPageAtom);
   const isReadOnlyUser = get(contextAtoms.isReadOnlyUserAtom);
 
-  // Return false if any dependency is undefined
-  if (
-    [currentUser, currentPageId, isNotFound, isReadOnlyUser, isTrashPage].some(
-      (v) => v === undefined,
-    )
-  ) {
-    return false;
-  }
-
   const isCurrentUserExist = currentUser != null;
-  const isPageExist = currentPageId != null && isNotFound === false;
+  const isPageExist = currentPageEntityId != null || currentPageEmptyId != null;
   const isTrashPageCondition = isPageExist && isTrashPage === true;
   const isReadOnlyUserCondition = isPageExist && isReadOnlyUser === true;
 
@@ -91,29 +84,16 @@ export const useIsAbleToShowTrashPageManagementButtons = (): boolean => {
 
 // Derived atom for PageManagement display ability
 const isAbleToShowPageManagementAtom = atom((get) => {
-  const currentPageId = get(pageAtoms.currentPageIdAtom);
-  const isNotFound = get(pageAtoms.pageNotFoundAtom);
+  const currentPageEntityId = get(pageAtoms.currentPageEntityIdAtom);
+  const currentPageEmptyId = get(pageAtoms.currentPageEmptyIdAtom);
   const isTrashPage = get(pageAtoms.isTrashPageAtom);
   const isSharedUser = get(contextAtoms.isSharedUserAtom);
 
-  const pageId = currentPageId;
-
-  // Return false if any dependency is undefined
-  if (
-    [pageId, isTrashPage, isSharedUser, isNotFound].some((v) => v === undefined)
-  ) {
-    return false;
-  }
-
-  const isPageExist = pageId != null && isNotFound === false;
-  const isEmptyPage = pageId != null && isNotFound === true;
+  const isPageExist = currentPageEntityId != null || currentPageEmptyId != null;
   const isTrashPageCondition = isPageExist && isTrashPage === true;
   const isSharedUserCondition = isPageExist && isSharedUser === true;
 
-  return (
-    (isPageExist && !isTrashPageCondition && !isSharedUserCondition) ||
-    isEmptyPage
-  );
+  return isPageExist && !isTrashPageCondition && !isSharedUserCondition;
 });
 
 /**
@@ -130,12 +110,7 @@ export const useIsAbleToChangeEditorMode = (): boolean => {
   const isEditable = useIsEditable();
   const isSharedUser = useIsSharedUser();
 
-  const includesUndefined = [isEditable, isSharedUser].some(
-    (v) => v === undefined,
-  );
-  if (includesUndefined) return false;
-
-  return !!isEditable && !isSharedUser;
+  return isEditable && !isSharedUser;
 };
 
 /**
@@ -143,15 +118,12 @@ export const useIsAbleToChangeEditorMode = (): boolean => {
  */
 export const useIsAbleToShowPageAuthors = (): boolean => {
   const pageId = useCurrentPageId();
-  const isNotFound = usePageNotFound();
   const pagePath = useCurrentPagePath();
 
-  const includesUndefined = [pageId, pagePath, isNotFound].some(
-    (v) => v === undefined,
-  );
+  const includesUndefined = [pageId, pagePath].some((v) => v === undefined);
   if (includesUndefined) return false;
 
-  const isPageExist = pageId != null && !isNotFound;
+  const isPageExist = pageId != null;
   const isUsersTopPagePath = pagePath != null && isUsersTopPage(pagePath);
 
   return isPageExist && !isUsersTopPagePath;

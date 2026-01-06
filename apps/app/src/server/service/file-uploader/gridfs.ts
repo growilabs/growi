@@ -1,8 +1,7 @@
-import { Readable } from 'stream';
-import util from 'util';
-
 import mongoose from 'mongoose';
 import { createModel } from 'mongoose-gridfs';
+import { Readable } from 'stream';
+import util from 'util';
 
 import type Crowi from '~/server/crowi';
 import type { RespondOptions } from '~/server/interfaces/attachment';
@@ -10,8 +9,11 @@ import type { IAttachmentDocument } from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../config-manager';
-
-import { AbstractFileUploader, type TemporaryUrl, type SaveFileParam } from './file-uploader';
+import {
+  AbstractFileUploader,
+  type SaveFileParam,
+  type TemporaryUrl,
+} from './file-uploader';
 import { createContentHeaders, getContentHeaderValue } from './utils';
 
 const logger = loggerFactory('growi:service:fileUploaderGridfs');
@@ -27,7 +29,7 @@ type PromisifiedUtils = {
   unlink: (file: object, done?: Function) => void;
   promisifiedWrite: (file: object, readable: Readable) => Promise<any>;
   promisifiedUnlink: (file: object) => Promise<any>;
-}
+};
 
 type AttachmentFileModel = mongoose.Model<any> & PromisifiedUtils;
 
@@ -40,10 +42,20 @@ let cachedConnection: mongoose.Connection; // Track the connection instance itse
  * Initialize GridFS models with connection instance monitoring
  * This prevents memory leaks from repeated model creation
  */
-function initializeGridFSModels(): { attachmentFileModel: AttachmentFileModel, chunkCollection: mongoose.Collection } {
+function initializeGridFSModels(): {
+  attachmentFileModel: AttachmentFileModel;
+  chunkCollection: mongoose.Collection;
+} {
   // Check if we can reuse cached models by comparing connection instance
-  if (cachedAttachmentFileModel != null && cachedChunkCollection != null && cachedConnection === mongoose.connection) {
-    return { attachmentFileModel: cachedAttachmentFileModel, chunkCollection: cachedChunkCollection };
+  if (
+    cachedAttachmentFileModel != null &&
+    cachedChunkCollection != null &&
+    cachedConnection === mongoose.connection
+  ) {
+    return {
+      attachmentFileModel: cachedAttachmentFileModel,
+      chunkCollection: cachedChunkCollection,
+    };
   }
 
   // Check connection state
@@ -62,8 +74,12 @@ function initializeGridFSModels(): { attachmentFileModel: AttachmentFileModel, c
 
   // Setup promisified methods on the model instance (not globally)
   if (!attachmentFileModel.promisifiedWrite) {
-    attachmentFileModel.promisifiedWrite = util.promisify(attachmentFileModel.write).bind(attachmentFileModel);
-    attachmentFileModel.promisifiedUnlink = util.promisify(attachmentFileModel.unlink).bind(attachmentFileModel);
+    attachmentFileModel.promisifiedWrite = util
+      .promisify(attachmentFileModel.write)
+      .bind(attachmentFileModel);
+    attachmentFileModel.promisifiedUnlink = util
+      .promisify(attachmentFileModel.unlink)
+      .bind(attachmentFileModel);
   }
 
   // Cache the instances
@@ -76,10 +92,8 @@ function initializeGridFSModels(): { attachmentFileModel: AttachmentFileModel, c
   return { attachmentFileModel, chunkCollection };
 }
 
-
 // TODO: rewrite this module to be a type-safe implementation
 class GridfsFileUploader extends AbstractFileUploader {
-
   /**
    * @inheritdoc
    */
@@ -108,10 +122,14 @@ class GridfsFileUploader extends AbstractFileUploader {
     const { attachmentFileModel } = initializeGridFSModels();
     const filenameValue = attachment.fileName;
 
-    const attachmentFile = await attachmentFileModel.findOne({ filename: filenameValue });
+    const attachmentFile = await attachmentFileModel.findOne({
+      filename: filenameValue,
+    });
 
     if (attachmentFile == null) {
-      logger.warn(`Any AttachmentFile that relate to the Attachment (${attachment._id.toString()}) does not exist in GridFS`);
+      logger.warn(
+        `Any AttachmentFile that relate to the Attachment (${attachment._id.toString()}) does not exist in GridFS`,
+      );
       return;
     }
 
@@ -123,14 +141,21 @@ class GridfsFileUploader extends AbstractFileUploader {
    *
    * Bulk delete files since unlink method of mongoose-gridfs does not support bulk operation
    */
-  override async deleteFiles(attachments: IAttachmentDocument[]): Promise<void> {
+  override async deleteFiles(
+    attachments: IAttachmentDocument[],
+  ): Promise<void> {
     const { attachmentFileModel, chunkCollection } = initializeGridFSModels();
 
     const filenameValues = attachments.map((attachment) => {
       return attachment.fileName;
     });
-    const fileIdObjects = await attachmentFileModel.find({ filename: { $in: filenameValues } }, { _id: 1 });
-    const idsRelatedFiles = fileIdObjects.map((obj) => { return obj._id });
+    const fileIdObjects = await attachmentFileModel.find(
+      { filename: { $in: filenameValues } },
+      { _id: 1 },
+    );
+    const idsRelatedFiles = fileIdObjects.map((obj) => {
+      return obj._id;
+    });
 
     await Promise.all([
       attachmentFileModel.deleteMany({ filename: { $in: filenameValues } }),
@@ -145,13 +170,19 @@ class GridfsFileUploader extends AbstractFileUploader {
    * {@link https://github.com/growilabs/growi/blob/798e44f14ad01544c1d75ba83d4dfb321a94aa0b/src/server/service/file-uploader/gridfs.js#L86-L88}
    */
   override getFileUploadTotalLimit() {
-    return configManager.getConfig('gridfs:totalLimit') ?? configManager.getConfig('app:fileUploadTotalLimit');
+    return (
+      configManager.getConfig('gridfs:totalLimit') ??
+      configManager.getConfig('app:fileUploadTotalLimit')
+    );
   }
 
   /**
    * @inheritdoc
    */
-  override async uploadAttachment(readable: Readable, attachment: IAttachmentDocument): Promise<void> {
+  override async uploadAttachment(
+    readable: Readable,
+    attachment: IAttachmentDocument,
+  ): Promise<void> {
     logger.debug(`File uploading: fileName=${attachment.fileName}`);
 
     const { attachmentFileModel } = initializeGridFSModels();
@@ -171,34 +202,39 @@ class GridfsFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override respond(): void {
-    throw new Error('GridfsFileUploader does not support ResponseMode.DELEGATE.');
+    throw new Error(
+      'GridfsFileUploader does not support ResponseMode.DELEGATE.',
+    );
   }
 
   /**
    * @inheritdoc
    */
-  override findDeliveryFile(attachment: IAttachmentDocument): Promise<NodeJS.ReadableStream> {
+  override findDeliveryFile(
+    attachment: IAttachmentDocument,
+  ): Promise<NodeJS.ReadableStream> {
     throw new Error('Method not implemented.');
   }
 
   /**
    * @inheritDoc
    */
-  override async generateTemporaryUrl(attachment: IAttachmentDocument, opts?: RespondOptions): Promise<TemporaryUrl> {
-    throw new Error('GridfsFileUploader does not support ResponseMode.REDIRECT.');
+  override async generateTemporaryUrl(
+    attachment: IAttachmentDocument,
+    opts?: RespondOptions,
+  ): Promise<TemporaryUrl> {
+    throw new Error(
+      'GridfsFileUploader does not support ResponseMode.REDIRECT.',
+    );
   }
-
 }
 
-
-module.exports = function(crowi: Crowi) {
+module.exports = (crowi: Crowi) => {
   const lib = new GridfsFileUploader(crowi);
 
-  lib.isValidUploadSettings = function() {
-    return true;
-  };
+  lib.isValidUploadSettings = () => true;
 
-  lib.saveFile = async function({ filePath, contentType, data }) {
+  lib.saveFile = async ({ filePath, contentType, data }) => {
     const { attachmentFileModel } = initializeGridFSModels();
 
     // Create a readable stream from the data
@@ -227,11 +263,9 @@ module.exports = function(crowi: Crowi) {
       );
 
       return result;
-    }
-    catch (error) {
+    } catch (error) {
       throw error;
-    }
-    finally {
+    } finally {
       // Explicit cleanup to prevent memory leaks
       if (typeof readable.destroy === 'function') {
         readable.destroy();
@@ -245,14 +279,18 @@ module.exports = function(crowi: Crowi) {
    * @param {Attachment} attachment
    * @return {stream.Readable} readable stream
    */
-  lib.findDeliveryFile = async function(attachment) {
+  lib.findDeliveryFile = async (attachment) => {
     const { attachmentFileModel } = initializeGridFSModels();
     const filenameValue = attachment.fileName;
 
-    const attachmentFile = await attachmentFileModel.findOne({ filename: filenameValue });
+    const attachmentFile = await attachmentFileModel.findOne({
+      filename: filenameValue,
+    });
 
     if (attachmentFile == null) {
-      throw new Error(`Any AttachmentFile that relate to the Attachment (${attachment._id.toString()}) does not exist in GridFS`);
+      throw new Error(
+        `Any AttachmentFile that relate to the Attachment (${attachment._id.toString()}) does not exist in GridFS`,
+      );
     }
 
     // return stream.Readable
@@ -262,12 +300,13 @@ module.exports = function(crowi: Crowi) {
   /**
    * List files in storage
    */
-  (lib as any).listFiles = async function() {
+  (lib as any).listFiles = async () => {
     const { attachmentFileModel } = initializeGridFSModels();
 
     const attachmentFiles = await attachmentFileModel.find();
     return attachmentFiles.map(({ filename: name, length: size }) => ({
-      name, size,
+      name,
+      size,
     }));
   };
 

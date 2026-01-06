@@ -127,7 +127,6 @@ export class InstallerService {
     await configManager.updateConfigs(
       {
         'app:installed': true,
-        'app:fileUpload': true,
         'app:isV5Compatible': true,
         'app:globalLang': globalLang,
       },
