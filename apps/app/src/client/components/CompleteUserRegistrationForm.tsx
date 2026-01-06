@@ -199,9 +199,7 @@ export const CompleteUserRegistrationForm: React.FC<Props> = (props: Props) => {
                 className="btn btn-secondary btn-register col-6 mx-auto d-flex"
               >
                 <span>
-                  <span className="material-symbols-outlined">
-                    person_add
-                  </span>
+                  <span className="material-symbols-outlined">person_add</span>
                 </span>
                 <span className="flex-grow-1">{t('Create')}</span>
               </button>
