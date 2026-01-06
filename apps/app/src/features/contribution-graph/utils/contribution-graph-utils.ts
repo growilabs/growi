@@ -18,3 +18,15 @@ export const getDaysDifference = (
 export const getCurrentWeekStart = (date: Date = new Date()): Date => {
   return startOfWeek(date, { weekStartsOn: 1 });
 };
+
+export const getUTCMidnightToday = () => {
+  const currentTime = new Date();
+
+  return new Date(
+    Date.UTC(
+      currentTime.getUTCFullYear(),
+      currentTime.getUTCMonth(),
+      currentTime.getUTCDate(),
+    ),
+  );
+};
