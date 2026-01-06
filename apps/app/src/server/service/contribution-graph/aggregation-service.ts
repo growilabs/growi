@@ -21,59 +21,33 @@ export class ContributionAggregationService {
 
   public buildPipeline(params: PipelineParams): PipelineStage[] {
     const { userId, startDate } = params;
-
     const endDate = getUTCMidnightToday();
 
-    const pipeline: PipelineStage[] = [
+    return [
       {
-        // 1. Find actions for a user, with certain actions and date
         $match: {
           userId,
           action: { $in: Object.values(ActivityLogActions) },
-          timestamp: {
-            $gte: startDate,
-            $lt: endDate,
-          },
+          timestamp: { $gte: startDate, $lt: endDate },
         },
       },
-
-      // 2. Group activities by day
       {
         $group: {
           _id: {
-            $dateTrunc: {
-              date: '$timestamp',
-              unit: 'day',
-              timezone: 'Z',
-            },
+            $dateToString: { format: '%Y-%m-%d', date: '$timestamp', timezone: 'Z' },
           },
           count: { $sum: 1 },
         },
       },
-
-      // 3. Project the result into the minified format for caching
       {
         $project: {
           _id: 0,
-          d: {
-            $dateToString: {
-              format: '%Y-%m-%d',
-              date: '$_id',
-              timezone: 'Z',
-            },
-          },
+          d: '$_id',
+          c: '$count',
         },
       },
-
-      // 4. Ensure the results are in chronological order
-      {
-        $sort: {
-          d: 1,
-        },
-      },
+      { $sort: { d: 1 } },
     ];
-
-    return pipeline;
   }
 
 }
