@@ -126,7 +126,7 @@ const InstallerForm = memo((props: Props): JSX.Element => {
           </div>
         )}
 
-        <form id="register-form" className="ps-1" onSubmit={submitHandler}>
+        <form className="ps-1" onSubmit={submitHandler}>
           <div className="dropdown mb-3">
             <div className="input-group dropdown-with-icon">
               <span className="p-2 text-white opacity-75">
