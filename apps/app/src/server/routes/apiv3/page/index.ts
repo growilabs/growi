@@ -20,7 +20,6 @@ import type { IPageGrantData } from '~/interfaces/page';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
-import { blockUserPagesMiddlewareFactory } from '~/server/middlewares/block-user-pages';
 import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
@@ -78,7 +77,6 @@ module.exports = (crowi) => {
   const loginRequiredStrictly = require('../../../middlewares/login-required')(crowi);
   const certifySharedPage = require('../../../middlewares/certify-shared-page')(crowi);
   const addActivity = generateAddActivityMiddleware();
-  const blockUserPages = blockUserPagesMiddlewareFactory(crowi);
 
   const globalNotificationService = crowi.getGlobalNotificationService();
   const Page = mongoose.model<IPage, PageModel>('Page');
@@ -175,7 +173,7 @@ module.exports = (crowi) => {
    */
   router.get('/',
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
-    certifySharedPage, loginRequired, blockUserPages, validator.getPage, apiV3FormValidator, async(req, res) => {
+    certifySharedPage, loginRequired, validator.getPage, apiV3FormValidator, async(req, res) => {
       const { user, isSharedPage } = req;
       const {
         pageId, path, findAll, revisionId, shareLinkId, includeEmpty,
@@ -485,26 +483,25 @@ module.exports = (crowi) => {
    *          500:
    *            description: Internal server error.
    */
-  router.get('/info', accessTokenParser([SCOPE.READ.FEATURES.PAGE]),
-    certifySharedPage, loginRequired, blockUserPages, validator.info, apiV3FormValidator, async(req, res) => {
-      const { user, isSharedPage } = req;
-      const { pageId } = req.query;
+  router.get('/info', accessTokenParser([SCOPE.READ.FEATURES.PAGE]), certifySharedPage, loginRequired, validator.info, apiV3FormValidator, async(req, res) => {
+    const { user, isSharedPage } = req;
+    const { pageId } = req.query;
 
-      try {
-        const pageWithMeta = await pageService.findPageAndMetaDataByViewer(pageId, null, user, true, isSharedPage);
+    try {
+      const pageWithMeta = await pageService.findPageAndMetaDataByViewer(pageId, null, user, true, isSharedPage);
 
-        if (pageWithMeta == null) {
-          return res.apiv3Err(`Page '${pageId}' is not found or forbidden`);
-        }
-
-        return res.apiv3(pageWithMeta.meta);
-      }
-      catch (err) {
-        logger.error('get-page-info', err);
-        return res.apiv3Err(err, 500);
+      if (pageWithMeta == null) {
+        return res.apiv3Err(`Page '${pageId}' is not found or forbidden`);
       }
 
-    });
+      return res.apiv3(pageWithMeta.meta);
+    }
+    catch (err) {
+      logger.error('get-page-info', err);
+      return res.apiv3Err(err, 500);
+    }
+
+  });
 
   /**
    * @swagger
