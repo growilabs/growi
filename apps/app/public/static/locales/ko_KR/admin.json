@@ -731,7 +731,7 @@
       "description1": "이메일 주소로 새 사용자를 임시 발급합니다.",
       "description2": "첫 로그인 시 임시 비밀번호가 생성됩니다.",
       "invite_thru_email": "초대 이메일 전송",
-      "mail_setting_link": "<span className='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>이메일 설정</a>",
+      "mail_setting_link": "<span class='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>이메일 설정</a>",
       "valid_email": "유효한 이메일 주소가 필요합니다.",
       "temporary_password": "생성된 사용자에게는 임시 비밀번호가 있습니다.",
       "send_new_password": "새 비밀번호를 사용자에게 보내주십시오.",
