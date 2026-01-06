@@ -645,7 +645,7 @@ async function injectPageData(
 
   if (hideUserPages && page) {
     const targetPath = page.path ?? currentPathname;
-    
+
     const isTopPage = isUsersTopPage(page.path)
     const isSpecificUserPage = isUserPage(page.path);
 
