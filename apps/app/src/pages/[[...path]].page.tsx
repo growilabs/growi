@@ -12,6 +12,7 @@ import type {
 } from '@growi/core';
 import { isIPageInfo } from '@growi/core';
 import { isClient, pagePathUtils, pathUtils } from '@growi/core/dist/utils';
+import { isUserPage, isUsersTopPage } from '@growi/core/dist/utils/page-path-utils';
 import EventEmitter from 'events';
 import ExtensibleCustomError from 'extensible-custom-error';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
@@ -639,6 +640,28 @@ async function injectPageData(
   }
 
   props.pageWithMeta = null;
+
+  const hideUserPages = configManager.getConfig('security:isHidingUserPages');
+
+  if (hideUserPages && page) {
+    const targetPath = page.path ?? currentPathname;
+    
+    const isTopPage = isUsersTopPage(page.path)
+    const isSpecificUserPage = isUserPage(page.path);
+
+    if (isTopPage || isSpecificUserPage) {
+      const isOwnPage = user != null && (
+        targetPath === `/user/${user.username}` ||
+        targetPath.startsWith(`/user/${user.username}/`)
+      );
+
+      if (!isOwnPage && !user?.admin) {
+        props.pageWithMeta = null;
+        props.isNotFound = true;
+        return;
+      }
+    }
+  }
 
   // populate & check if the revision is latest
   if (page != null) {
