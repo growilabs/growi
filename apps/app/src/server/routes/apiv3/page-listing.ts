@@ -4,6 +4,7 @@ import type {
 import { getIdForRef, isIPageInfoForEntity } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import { isUserPage, isUsersTopPage } from '@growi/core/dist/utils/page-path-utils';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { query, oneOf } from 'express-validator';
@@ -222,9 +223,33 @@ const routerFactory = (crowi: Crowi): Router => {
       const pageGrantService: IPageGrantService = crowi.pageGrantService!;
 
       try {
-        const pages = pageIds != null
+        let pages = pageIds != null
           ? await Page.findByIdsAndViewer(pageIds as string[], req.user, null, true)
           : await Page.findByPathAndViewer(path as string, req.user, null, false, true);
+
+        const hideUserPages = crowi.configManager.getConfig('security:isHidingUserPages');
+
+        if (hideUserPages) {
+          const { user } = req;
+
+          pages = pages.filter((page) => {
+            const targetPath = page.path;
+            const isTargetUserPage = isUserPage(targetPath) || isUsersTopPage(targetPath);
+
+            if (!isTargetUserPage) return true;
+
+            const isOwnPage = user != null && (
+              targetPath === `/user/${user.username}` || targetPath.startsWith(`/user/${user.username}/`)
+            );
+            const isAdmin = user?.admin;
+
+            return isOwnPage || isAdmin;
+          });
+        }
+
+        if (pages.length === 0 && path != null) {
+          return res.apiv3Err(new ErrorV3('Page is not found', 'not_found'), 404);
+        }
 
         const foundIds = pages.map(page => page._id);
 
