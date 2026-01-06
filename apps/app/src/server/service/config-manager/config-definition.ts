@@ -924,7 +924,9 @@ export const CONFIG_DEFINITIONS = {
   'mail:from': defineConfig<string | undefined>({
     defaultValue: undefined,
   }),
-  'mail:transmissionMethod': defineConfig<'smtp' | 'ses' | 'oauth2' | undefined>({
+  'mail:transmissionMethod': defineConfig<
+    'smtp' | 'ses' | 'oauth2' | undefined
+  >({
     defaultValue: undefined,
   }),
   'mail:smtpHost': defineConfig<string | undefined>({

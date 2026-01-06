@@ -194,7 +194,12 @@ class MailService implements S2sMessageHandlable {
       const refreshToken = configManager.getConfig('mail:oauth2RefreshToken');
       const user = configManager.getConfig('mail:oauth2User');
 
-      if (clientId == null || clientSecret == null || refreshToken == null || user == null) {
+      if (
+        clientId == null ||
+        clientSecret == null ||
+        refreshToken == null ||
+        user == null
+      ) {
         return null;
       }
 
