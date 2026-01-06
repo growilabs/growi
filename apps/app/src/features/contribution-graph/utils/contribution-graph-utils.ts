@@ -22,9 +22,11 @@ export const getCurrentWeekStart = (date: Date = new Date()): Date => {
 export const getUTCMidnightToday = () => {
   const currentTime = new Date();
 
-  return new Date(Date.UTC(
-    currentTime.getUTCFullYear(),
-    currentTime.getUTCMonth(),
-    currentTime.getUTCDate()
-  ));
-}
+  return new Date(
+    Date.UTC(
+      currentTime.getUTCFullYear(),
+      currentTime.getUTCMonth(),
+      currentTime.getUTCDate(),
+    ),
+  );
+};
