@@ -2,6 +2,8 @@ import {
   vi, describe, beforeAll, beforeEach, it, expect,
 } from 'vitest';
 
+import { ContributionAggregationService } from './aggregation-service';
+
 interface MockAggregate {
     exec: () => Promise<any>;
 }
@@ -42,21 +44,59 @@ describe('ContributionAggregationService', { timeout: 15000 }, () => {
     vi.clearAllMocks();
   });
 
-
-  // Test Case 1: Verifies the pipeline structure and parameterization
-  it('should build a correctly structured 5-stage pipeline with dynamic parameters', () => {
+  it('should build a pipeline with correct filtering, UTC grouping, and sorting', () => {
     const userId = 'user_123';
-    const startDate = new Date('2025-11-01T00:00:00.000Z');
+    const startDate = new Date('2025-11-01T00:00:00Z');
 
+    // Act
     const pipeline = service.buildPipeline({ userId, startDate });
 
-    const matchStage = (pipeline[0] as { $match: any }).$match;
-    expect(matchStage.userId).toBe(userId);
-    expect(matchStage.timestamp.$gte).toEqual(startDate);
+    // 1. Assert Match Stage
+    const match = pipeline.find(s => '$match' in s)?.$match;
+    expect(match).toMatchObject({
+      userId,
+      action: { $in: ['PAGE_CREATE', 'PAGE_UPDATE'] },
+      timestamp: {
+        $gte: startDate,
+        $lt: expect.any(Date),
+      },
+    });
 
-    const expectedActions = ['PAGE_CREATE', 'PAGE_UPDATE'];
-    expect(matchStage.action.$in).toEqual(expectedActions);
-    expect(pipeline).toHaveLength(5);
+    // 2. Assert Group Stage
+    const group = pipeline.find(s => '$group' in s)?.$group;
+    expect(group?._id?.$dateToString).toEqual({
+      format: '%Y-%m-%d',
+      date: '$timestamp',
+      timezone: 'Z',
+    });
+    expect(group?.count).toEqual({ $sum: 1 });
+
+    // 3. Assert Project Stage
+    const project = pipeline.find(s => '$project' in s)?.$project;
+    expect(project).toEqual({
+      _id: 0,
+      d: '$_id',
+      c: '$count',
+    });
+
+    // 4. Assert Sort Stage
+    const sort = pipeline.find(s => '$sort' in s)?.$sort;
+    expect(sort).toEqual({ d: 1 });
+
+    expect(pipeline).toHaveLength(4);
+  });
+
+  it('should set the endDate to midnight today in UTC', () => {
+    const startDate = new Date('2025-01-01');
+    const pipeline = service.buildPipeline({ userId: '123', startDate });
+
+    const match = pipeline[0].$match;
+    const endDate = match.timestamp.$lt;
+
+    // Verify it's midnight (00:00:00.000)
+    expect(endDate.getUTCHours()).toBe(0);
+    expect(endDate.getUTCMinutes()).toBe(0);
+    expect(endDate.getUTCSeconds()).toBe(0);
   });
 
 
