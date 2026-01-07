@@ -1426,7 +1426,7 @@ schema.methods.calculateAndUpdateLatestRevisionBodyLength = async function (
     return;
   }
 
-  // eslint-disable-next-line rulesdir/no-populate
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   const populatedPageDocument = await this.populate<PageDocument>(
     'revision',
     'body',

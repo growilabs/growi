@@ -1,7 +1,11 @@
 engine biome(1.0)
 language js(typescript)
 
-`$obj.populate($args)` where {
+// Match any populate method call
+or {
+  `$obj.populate($_)`,
+  `$obj.populate<$type>($_)`
+} where {
   register_diagnostic(
     span=$obj,
     message="The 'populate' method should not be called in model modules. Consider restructuring your code to avoid using populate in model files."
