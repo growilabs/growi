@@ -1,4 +1,7 @@
-import React, { useCallback, useState, useRef, type JSX } from 'react';
+import React, {
+  useCallback, useState, useRef, type JSX,
+} from 'react';
+
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
@@ -28,7 +31,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
   const [isDefaultLogoSelected, setIsDefaultLogoSelected] = useState<boolean>(isDefaultLogo ?? true);
   const [retrieveError, setRetrieveError] = useState<any>();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const isUpdateButtonDisabled = retrieveError != null || (!isDefaultLogoSelected && uploadLogoSrc == null && !isCustomizedLogoUploaded)
+  const isUpdateButtonDisabled = retrieveError != null || (!isDefaultLogoSelected && uploadLogoSrc == null && !isCustomizedLogoUploaded);
 
   const onSelectFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -94,7 +97,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
     clearFileInput();
     setUploadLogoSrc(null);
     setIsImageCropModalShow(false);
-  }, [clearFileInput, setUploadLogoSrc, setIsImageCropModalShow])
+  }, [clearFileInput, setUploadLogoSrc, setIsImageCropModalShow]);
 
 
   return (
