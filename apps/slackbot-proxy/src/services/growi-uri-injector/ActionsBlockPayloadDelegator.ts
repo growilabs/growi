@@ -59,8 +59,8 @@ export class ActionsBlockPayloadDelegator
     );
 
     // collect elements
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const elements = actionsBlocks.flatMap(
+      // biome-ignore lint/style/noNonNullAssertion: elements must be set --- IGNORE ---
       (actionBlock) => actionBlock.elements!,
     );
 
@@ -94,7 +94,7 @@ export class ActionsBlockPayloadDelegator
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    // biome-ignore lint/style/noNonNullAssertion: growiUriWithOriginalData must be set --- IGNORE ---
     return growiUriWithOriginalData!;
   }
 }

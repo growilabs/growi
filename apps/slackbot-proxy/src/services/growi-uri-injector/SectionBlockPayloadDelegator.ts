@@ -66,7 +66,6 @@ export class SectionBlockPayloadDelegator
     );
 
     // collect elements
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const accessories = sectionBlocks.flatMap(
       (sectionBlock) => sectionBlock.accessory,
     );

@@ -58,8 +58,8 @@ export class ViewInteractionPayloadDelegator
   }
 
   extract(data: ViewInteractionPayload): GrowiUriWithOriginalData {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const restoredData: GrowiUriWithOriginalData = JSON.parse(
+      // biome-ignore lint/style/noNonNullAssertion: private_metadata must be set --- IGNORE ---
       data.view.private_metadata!,
     ); // private_metadata must not be null at this moment
     data.view.private_metadata = restoredData.originalData;

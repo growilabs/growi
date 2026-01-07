@@ -199,9 +199,9 @@ export class RegisterService
 
     const installationId =
       authorizeResult.enterpriseId || authorizeResult.teamId;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const installation =
       await this.installationRepository.findByTeamIdOrEnterpriseId(
+        // biome-ignore lint/style/noNonNullAssertion: installationId must be set --- IGNORE ---
         installationId!,
       );
 

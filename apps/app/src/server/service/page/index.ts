@@ -3292,8 +3292,7 @@ class PageService implements IPageService {
       contentAge: page.getContentAge(),
       descendantCount: page.descendantCount,
       commentCount: page.commentCount,
-      // the page must have a revision if it is not empty
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      // biome-ignore lint/style/noNonNullAssertion: the page must have a revision if it is not empty
       latestRevisionId: getIdStringForRef(page.revision!),
     } satisfies IPageInfoBasicForEntity;
 
