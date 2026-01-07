@@ -14,7 +14,7 @@ import { isIPageInfo } from '@growi/core';
 import { isClient, pagePathUtils, pathUtils } from '@growi/core/dist/utils';
 import {
   isUserPage,
-  isUsersTopPage
+  isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import EventEmitter from 'events';
 import ExtensibleCustomError from 'extensible-custom-error';
