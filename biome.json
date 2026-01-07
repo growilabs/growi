@@ -137,7 +137,7 @@
     },
     {
       "includes": ["apps/app/src/server/models/**"],
-      "plugins": ["apps/app/.biome/plugins/no-populate.grit"]
+      "plugins": ["apps/app/src/server/models/.biome/plugins/no-populate.grit"]
     }
   ]
 }
