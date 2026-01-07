@@ -106,7 +106,7 @@ export const ExtractedAttachments = React.memo(
       refsContext,
     ]);
 
-        const renderExtractedImage = useCallback(
+    const renderExtractedImage = useCallback(
       (attachment: IAttachmentHasId, _index: number) => {
         const { options } = refsContext;
 
