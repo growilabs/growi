@@ -229,20 +229,13 @@ const routerFactory = (crowi: Crowi): Router => {
         const hideUserPages = crowi.configManager.getConfig('security:isHidingUserPages');
 
         if (hideUserPages) {
-          const { user } = req;
-
           pages = pages.filter((page) => {
             const targetPath = page.path;
             const isTargetUserPage = isUserPage(targetPath) || isUsersTopPage(targetPath);
 
-            if (!isTargetUserPage) return true;
+            if (isTargetUserPage) return false;
 
-            const isOwnPage = user != null && (
-              targetPath === `/user/${user.username}` || targetPath.startsWith(`/user/${user.username}/`)
-            );
-            const isAdmin = user?.admin;
-
-            return isOwnPage || isAdmin;
+            return true;
           });
         }
 
