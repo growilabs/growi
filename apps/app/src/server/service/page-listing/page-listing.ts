@@ -19,6 +19,7 @@ export interface IPageListingService {
     user?: IUser,
     showPagesRestrictedByOwner?: boolean,
     showPagesRestrictedByGroup?: boolean,
+    hideUserPages?: boolean,
   ): Promise<IPageForTreeItem[]>,
 }
 
@@ -50,7 +51,7 @@ class PageListingService implements IPageListingService {
       user?: IUser,
       showPagesRestrictedByOwner = false,
       showPagesRestrictedByGroup = false,
-      shouldHideUserPages = false,
+      hideUserPages = false,
   ): Promise<IPageForTreeItem[]> {
     const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>('Page');
     let queryBuilder: PageQueryBuilder;
@@ -65,7 +66,7 @@ class PageListingService implements IPageListingService {
       queryBuilder = new PageQueryBuilder(Page.find({ parent: { $eq: parentId } }), true);
     }
 
-    if (shouldHideUserPages) {
+    if (hideUserPages) {
       queryBuilder.addConditionToListByNotMatchPathAndChildren('/user');
     }
 
