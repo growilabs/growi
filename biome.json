@@ -10,6 +10,7 @@
       "!**/vite.config.ts.timestamp-*",
       "!**/vite.server.config.ts.timestamp-*",
       "!**/vite.client.config.ts.timestamp-*",
+      "!**/*.grit",
       "!**/.turbo",
       "!**/.vscode",
       "!**/turbo.json",

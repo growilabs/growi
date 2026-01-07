@@ -639,6 +639,7 @@ export class PageQueryBuilder {
   }
 
   populateDataToList(userPublicFields): PageQueryBuilder {
+    // biome-ignore lint/plugin: populating is the purpose of this method
     this.query = this.query.populate({
       path: 'lastUpdateUser',
       select: userPublicFields,

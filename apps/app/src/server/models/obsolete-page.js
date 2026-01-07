@@ -79,6 +79,7 @@ export const populateDataToShowRevision = (
   userPublicFields,
   shouldExcludeBody = false,
 ) => {
+  // biome-ignore lint/plugin: populating is the purpose of this method
   return page.populate([
     { path: 'lastUpdateUser', select: userPublicFields },
     { path: 'creator', select: userPublicFields },
@@ -150,6 +151,7 @@ export const getPageSchema = (crowi) => {
 
   pageSchema.methods.findRelatedTagsById = async function () {
     const PageTagRelation = mongoose.model('PageTagRelation');
+    // biome-ignore lint/plugin: allow populate for backward compatibility
     const relations = await PageTagRelation.find({
       relatedPage: this._id,
     }).populate('relatedTag');
@@ -159,6 +161,7 @@ export const getPageSchema = (crowi) => {
   };
 
   pageSchema.methods.isUpdatable = async function (previousRevision, origin) {
+    // biome-ignore lint/plugin: allow populate for backward compatibility
     const populatedPageDataWithRevisionOrigin = await this.populate(
       'revision',
       'origin',
@@ -284,6 +287,7 @@ export const getPageSchema = (crowi) => {
     if (revisionId != null) {
       this.revision = revisionId;
     }
+    // biome-ignore lint/plugin: populating is the purpose of this method
     return this.populate('revision');
   };
 
@@ -680,6 +684,7 @@ export const getPageSchema = (crowi) => {
       );
     });
 
+    // biome-ignore lint/plugin: allow populate for backward compatibility
     const templatePages = await this.find({ path: { $in: regexpList } })
       .populate({ path: 'revision', model: 'Revision' })
       .exec();

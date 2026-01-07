@@ -130,6 +130,7 @@ schema.statics.createTagListWithCount = createTagListWithCount;
 
 const findByPageId: FindByPageId = async function (pageId, options = {}) {
   const isAcceptRelatedTagNull = options.nullable || null;
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   const relations = await this.find({ relatedPage: pageId })
     .populate('relatedTag')
     .select('relatedTag');
