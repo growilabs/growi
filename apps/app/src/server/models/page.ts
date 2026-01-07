@@ -874,9 +874,7 @@ schema.statics.findRecentUpdatedPages = async function (
   const baseQuery = this.find({});
   const queryBuilder = new PageQueryBuilder(baseQuery, includeEmpty);
 
-  const isAdmin = user?.admin ?? false;
-
-  if (options.hideUserPages && !isAdmin) {
+  if (options.hideUserPages) {
     queryBuilder.addConditionToListByNotMatchPathAndChildren('/user');
   }
 
