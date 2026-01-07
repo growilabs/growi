@@ -211,7 +211,7 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
           </div>
         )}
 
-        <form onSubmit={handleLoginWithLocalSubmit} id="login-form">
+        <form onSubmit={handleLoginWithLocalSubmit} data-testid="login-form">
           <div className="input-group">
             <label
               className="text-white opacity-75 d-flex align-items-center"
@@ -413,13 +413,10 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
           </p>
         )}
 
-        <form
-          onSubmit={(e) => handleRegisterFormSubmit(e, registerAction)}
-          id="register-form"
-        >
+        <form onSubmit={(e) => handleRegisterFormSubmit(e, registerAction)}>
           {!isEmailAuthenticationEnabled && (
             <div>
-              <div className="input-group" id="input-group-username">
+              <div className="input-group">
                 <span className="text-white opacity-75 d-flex align-items-center">
                   <span className="material-symbols-outlined">person</span>
                 </span>
@@ -437,7 +434,7 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
                 />
               </div>
               <p className="form-text text-danger">
-                <span id="help-block-username"></span>
+                <span></span>
               </p>
               <div className="input-group">
                 <span className="text-white opacity-75 d-flex align-items-center">
@@ -580,11 +577,7 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
 
   return (
     <div className={moduleClass}>
-      <div
-        className="nologin-dialog mx-auto rounded-4 rounded-top-0"
-        id="nologin-dialog"
-        data-testid="login-form"
-      >
+      <div className="nologin-dialog mx-auto rounded-4 rounded-top-0">
         <div className="row mx-0">
           <div className="col-12 px-md-4 pb-5">
             <ReactCardFlip

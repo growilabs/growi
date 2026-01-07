@@ -29,7 +29,7 @@ export const ThemeColorBox = (props: Props): JSX.Element => {
     <button
       type="button"
       id={`theme-option-${name}`}
-      className={`${themeOptionClass} d-flex flex-column align-items-center ${isSelected ? 'active' : ''}`}
+      className={`${themeOptionClass} d-flex flex-column align-items-center ${isSelected ? 'active' : ''} border-0 bg-transparent`}
       onClick={onSelected}
       aria-pressed={isSelected}
     >

@@ -30,13 +30,13 @@ importers:
         version: 1.49.1
       '@swc-node/register':
         specifier: ^1.10.9
-        version: 1.10.9(@swc/core@1.10.7(@swc/helpers@0.5.15))(@swc/types@0.1.17)(typescript@5.0.4)
+        version: 1.10.9(@swc/core@1.10.7(@swc/helpers@0.5.18))(@swc/types@0.1.17)(typescript@5.0.4)
       '@swc/core':
         specifier: ^1.5.25
-        version: 1.10.7(@swc/helpers@0.5.15)
+        version: 1.10.7(@swc/helpers@0.5.18)
       '@swc/helpers':
-        specifier: ^0.5.11
-        version: 0.5.15
+        specifier: ^0.5.18
+        version: 0.5.18
       '@testing-library/dom':
         specifier: ^10.4.0
         version: 10.4.0
@@ -120,7 +120,7 @@ importers:
         version: 6.2.0
       ts-node:
         specifier: ^10.9.2
-        version: 10.9.2(@swc/core@1.10.7(@swc/helpers@0.5.15))(@types/node@20.19.17)(typescript@5.0.4)
+        version: 10.9.2(@swc/core@1.10.7(@swc/helpers@0.5.18))(@types/node@20.19.17)(typescript@5.0.4)
       ts-patch:
         specifier: ^3.2.0
         version: 3.2.0
@@ -1283,8 +1283,8 @@ importers:
         specifier: ^6.5.2
         version: 6.5.3
       '@codemirror/view':
-        specifier: ^6.36.2
-        version: 6.39.7
+        specifier: ^6.39.9
+        version: 6.39.9
       '@emoji-mart/data':
         specifier: ^1.2.1
         version: 1.2.1
@@ -1305,13 +1305,13 @@ importers:
         version: 2.11.8
       '@replit/codemirror-emacs':
         specifier: ^6.1.0
-        version: 6.1.0(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)
+        version: 6.1.0(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)
       '@replit/codemirror-vim':
         specifier: ^6.2.1
-        version: 6.2.1(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)
+        version: 6.2.1(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)
       '@replit/codemirror-vscode-keymap':
         specifier: ^6.0.2
-        version: 6.0.2(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)
+        version: 6.0.2(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)
       '@types/react':
         specifier: ^18.2.14
         version: 18.3.3
@@ -1320,28 +1320,28 @@ importers:
         version: 18.3.0
       '@uiw/codemirror-theme-eclipse':
         specifier: ^4.23.8
-        version: 4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)
+        version: 4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)
       '@uiw/codemirror-theme-kimbie':
         specifier: ^4.23.8
-        version: 4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)
+        version: 4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)
       '@uiw/codemirror-themes':
         specifier: ^4.23.8
-        version: 4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)
+        version: 4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)
       '@uiw/react-codemirror':
         specifier: ^4.23.8
-        version: 4.23.8(@babel/runtime@7.25.4)(@codemirror/autocomplete@6.18.4)(@codemirror/language@6.12.1)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/theme-one-dark@6.1.2)(@codemirror/view@6.39.7)(codemirror@6.0.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 4.23.8(@babel/runtime@7.25.4)(@codemirror/autocomplete@6.18.4)(@codemirror/language@6.12.1)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/theme-one-dark@6.1.2)(@codemirror/view@6.39.9)(codemirror@6.0.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       bootstrap:
         specifier: '=5.3.2'
         version: 5.3.2(@popperjs/core@2.11.8)
       cm6-theme-basic-light:
         specifier: ^0.2.0
-        version: 0.2.0(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)(@lezer/highlight@1.2.3)
+        version: 0.2.0(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)(@lezer/highlight@1.2.3)
       cm6-theme-material-dark:
         specifier: ^0.2.0
-        version: 0.2.0(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)(@lezer/highlight@1.2.3)
+        version: 0.2.0(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)(@lezer/highlight@1.2.3)
       cm6-theme-nord:
         specifier: ^0.2.0
-        version: 0.2.0(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)(@lezer/highlight@1.2.3)
+        version: 0.2.0(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)(@lezer/highlight@1.2.3)
       codemirror:
         specifier: ^6.0.1
         version: 6.0.1
@@ -1389,7 +1389,7 @@ importers:
         version: 6.2.0
       y-codemirror.next:
         specifier: ^0.3.5
-        version: 0.3.5(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)(yjs@13.6.19)
+        version: 0.3.5(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)(yjs@13.6.19)
       y-socket.io:
         specifier: ^1.1.3
         version: 1.1.3(yjs@13.6.19)
@@ -2693,11 +2693,8 @@ packages:
   '@codemirror/theme-one-dark@6.1.2':
     resolution: {integrity: sha512-F+sH0X16j/qFLMAfbciKTxVOwkdAS336b7AXTKOZhy8BR3eH/RelsnLgLFINrpST63mmN2OuwUt0W2ndUgYwUA==}
 
-  '@codemirror/view@6.39.7':
-    resolution: {integrity: sha512-3Vif9hnNHJnl2YgOtkR/wzGzhYcQ8gy3LGdUhkLUU8xSBbgsTxrE8he/CMTpeINm5TgxLe2FmzvF6IYQL/BSAg==}
-
-  '@codemirror/view@6.39.8':
-    resolution: {integrity: sha512-1rASYd9Z/mE3tkbC9wInRlCNyCkSn+nLsiQKZhEDUUJiUfs/5FHDpCUDaQpoTIaNGeDc6/bhaEAyLmeEucEFPw==}
+  '@codemirror/view@6.39.9':
+    resolution: {integrity: sha512-miGSIfBOKC1s2oHoa80dp+BjtsL8sXsrgGlQnQuOcfvaedcQUtqddTmKbJSDkLl4mkgPvZyXuKic2HDNYcJLYA==}
 
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
@@ -5211,9 +5208,6 @@ packages:
 
   '@swc/counter@0.1.3':
     resolution: {integrity: sha512-e2BR4lsJkkRlKZ/qCHPw9ZaSxc0MVUd7gtbtaB7aMvHeJVYe8sOB8DBZkP2DtISHGSku9sCK6T6cnY0CtXrOCQ==}
-
-  '@swc/helpers@0.5.15':
-    resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
 
   '@swc/helpers@0.5.18':
     resolution: {integrity: sha512-TXTnIcNJQEKwThMMqBXsZ4VGAza6bvN4pa41Rkqoio6QBKMvo+5lexeTMScGCIxtzgQJzElcvIltani+adC5PQ==}
@@ -16251,7 +16245,7 @@ snapshots:
       '@azure/core-util': 1.10.0
       '@azure/logger': 1.1.2
       http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6(supports-color@10.0.0)
+      https-proxy-agent: 7.0.6
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
@@ -16353,7 +16347,7 @@ snapshots:
       '@babel/traverse': 7.24.6
       '@babel/types': 7.25.6
       convert-source-map: 2.0.0
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       gensync: 1.0.0-beta.2
       json5: 2.2.3
       semver: 6.3.1
@@ -16524,7 +16518,7 @@ snapshots:
       '@babel/helper-split-export-declaration': 7.24.6
       '@babel/parser': 7.25.6
       '@babel/types': 7.25.6
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       globals: 11.12.0
     transitivePeerDependencies:
       - supports-color
@@ -16772,14 +16766,14 @@ snapshots:
     dependencies:
       '@codemirror/language': 6.12.1
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
       '@lezer/common': 1.5.0
 
   '@codemirror/commands@6.8.0':
     dependencies:
       '@codemirror/language': 6.12.1
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
       '@lezer/common': 1.5.0
 
   '@codemirror/lang-angular@0.1.2':
@@ -16819,7 +16813,7 @@ snapshots:
       '@codemirror/lang-javascript': 6.1.9
       '@codemirror/language': 6.12.1
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
       '@lezer/common': 1.5.0
       '@lezer/css': 1.1.3
       '@lezer/html': 1.3.6
@@ -16835,7 +16829,7 @@ snapshots:
       '@codemirror/language': 6.12.1
       '@codemirror/lint': 6.8.1
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
       '@lezer/common': 1.5.0
       '@lezer/javascript': 1.4.5
 
@@ -16857,7 +16851,7 @@ snapshots:
       '@codemirror/lang-html': 6.4.5
       '@codemirror/language': 6.12.1
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
       '@lezer/common': 1.5.0
       '@lezer/highlight': 1.2.3
       '@lezer/lr': 1.4.5
@@ -16868,7 +16862,7 @@ snapshots:
       '@codemirror/lang-html': 6.4.5
       '@codemirror/language': 6.12.1
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
       '@lezer/common': 1.5.0
       '@lezer/markdown': 1.0.5
 
@@ -16967,7 +16961,7 @@ snapshots:
   '@codemirror/language@6.12.1':
     dependencies:
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
       '@lezer/common': 1.5.0
       '@lezer/highlight': 1.2.3
       '@lezer/lr': 1.4.5
@@ -16980,21 +16974,21 @@ snapshots:
   '@codemirror/lint@6.8.1':
     dependencies:
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
       crelt: 1.0.6
 
   '@codemirror/merge@6.8.0':
     dependencies:
       '@codemirror/language': 6.12.1
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
       '@lezer/highlight': 1.2.3
       style-mod: 4.1.3
 
   '@codemirror/search@6.5.6':
     dependencies:
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
       crelt: 1.0.6
 
   '@codemirror/state@6.5.3':
@@ -17005,17 +16999,10 @@ snapshots:
     dependencies:
       '@codemirror/language': 6.12.1
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.8
+      '@codemirror/view': 6.39.9
       '@lezer/highlight': 1.2.3
 
-  '@codemirror/view@6.39.7':
-    dependencies:
-      '@codemirror/state': 6.5.3
-      crelt: 1.0.6
-      style-mod: 4.1.3
-      w3c-keyname: 2.2.8
-
-  '@codemirror/view@6.39.8':
+  '@codemirror/view@6.39.9':
     dependencies:
       '@codemirror/state': 6.5.3
       crelt: 1.0.6
@@ -17074,7 +17061,7 @@ snapshots:
 
   '@elastic/elasticsearch@7.17.13':
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       hpagent: 0.1.2
       ms: 2.1.3
       secure-json-parse: 2.7.0
@@ -17103,7 +17090,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.0.1(@opentelemetry/api@1.9.0)
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       hpagent: 1.2.0
       ms: 2.1.3
       secure-json-parse: 3.0.2
@@ -17116,7 +17103,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.0.1(@opentelemetry/api@1.9.0)
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       hpagent: 1.2.0
       ms: 2.1.3
       secure-json-parse: 4.0.0
@@ -17445,7 +17432,7 @@ snapshots:
       '@antfu/install-pkg': 1.1.0
       '@antfu/utils': 8.1.1
       '@iconify/types': 2.0.0
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       globals: 15.15.0
       kolorist: 1.8.0
       local-pkg: 1.1.1
@@ -19128,23 +19115,23 @@ snapshots:
       immutable: 4.3.6
       redux: 4.2.1
 
-  '@replit/codemirror-emacs@6.1.0(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)':
+  '@replit/codemirror-emacs@6.1.0(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)':
     dependencies:
       '@codemirror/autocomplete': 6.18.4
       '@codemirror/commands': 6.8.0
       '@codemirror/search': 6.5.6
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
 
-  '@replit/codemirror-vim@6.2.1(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)':
+  '@replit/codemirror-vim@6.2.1(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)':
     dependencies:
       '@codemirror/commands': 6.8.0
       '@codemirror/language': 6.12.1
       '@codemirror/search': 6.5.6
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
 
-  '@replit/codemirror-vscode-keymap@6.0.2(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)':
+  '@replit/codemirror-vscode-keymap@6.0.2(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)':
     dependencies:
       '@codemirror/autocomplete': 6.18.4
       '@codemirror/commands': 6.8.0
@@ -19152,7 +19139,7 @@ snapshots:
       '@codemirror/lint': 6.8.1
       '@codemirror/search': 6.5.6
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
 
   '@restart/hooks@0.4.16(react@18.2.0)':
     dependencies:
@@ -20100,11 +20087,6 @@ snapshots:
       '@stoplight/yaml-ast-parser': 0.0.50
       tslib: 2.8.1
 
-  '@swc-node/core@1.13.3(@swc/core@1.10.7(@swc/helpers@0.5.15))(@swc/types@0.1.17)':
-    dependencies:
-      '@swc/core': 1.10.7(@swc/helpers@0.5.15)
-      '@swc/types': 0.1.17
-
   '@swc-node/core@1.13.3(@swc/core@1.10.7(@swc/helpers@0.5.18))(@swc/types@0.1.17)':
     dependencies:
       '@swc/core': 1.10.7(@swc/helpers@0.5.18)
@@ -20121,11 +20103,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@swc-node/register@1.10.9(@swc/core@1.10.7(@swc/helpers@0.5.15))(@swc/types@0.1.17)(typescript@5.0.4)':
+  '@swc-node/register@1.10.9(@swc/core@1.10.7(@swc/helpers@0.5.18))(@swc/types@0.1.17)(typescript@5.0.4)':
     dependencies:
-      '@swc-node/core': 1.13.3(@swc/core@1.10.7(@swc/helpers@0.5.15))(@swc/types@0.1.17)
+      '@swc-node/core': 1.13.3(@swc/core@1.10.7(@swc/helpers@0.5.18))(@swc/types@0.1.17)
       '@swc-node/sourcemap-support': 0.5.1
-      '@swc/core': 1.10.7(@swc/helpers@0.5.15)
+      '@swc/core': 1.10.7(@swc/helpers@0.5.18)
       colorette: 2.0.20
       debug: 4.4.3(supports-color@5.5.0)
       oxc-resolver: 1.12.0
@@ -20142,7 +20124,7 @@ snapshots:
       '@swc-node/sourcemap-support': 0.5.1
       '@swc/core': 1.10.7(@swc/helpers@0.5.18)
       colorette: 2.0.20
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       oxc-resolver: 1.12.0
       pirates: 4.0.6
       tslib: 2.8.1
@@ -20216,23 +20198,6 @@ snapshots:
   '@swc/core-win32-x64-msvc@1.4.17':
     optional: true
 
-  '@swc/core@1.10.7(@swc/helpers@0.5.15)':
-    dependencies:
-      '@swc/counter': 0.1.3
-      '@swc/types': 0.1.17
-    optionalDependencies:
-      '@swc/core-darwin-arm64': 1.10.7
-      '@swc/core-darwin-x64': 1.10.7
-      '@swc/core-linux-arm-gnueabihf': 1.10.7
-      '@swc/core-linux-arm64-gnu': 1.10.7
-      '@swc/core-linux-arm64-musl': 1.10.7
-      '@swc/core-linux-x64-gnu': 1.10.7
-      '@swc/core-linux-x64-musl': 1.10.7
-      '@swc/core-win32-arm64-msvc': 1.10.7
-      '@swc/core-win32-ia32-msvc': 1.10.7
-      '@swc/core-win32-x64-msvc': 1.10.7
-      '@swc/helpers': 0.5.15
-
   '@swc/core@1.10.7(@swc/helpers@0.5.18)':
     dependencies:
       '@swc/counter': 0.1.3
@@ -20268,10 +20233,6 @@ snapshots:
       '@swc/helpers': 0.5.18
 
   '@swc/counter@0.1.3': {}
-
-  '@swc/helpers@0.5.15':
-    dependencies:
-      tslib: 2.8.1
 
   '@swc/helpers@0.5.18':
     dependencies:
@@ -21331,7 +21292,7 @@ snapshots:
 
   '@types/zen-observable@0.8.3': {}
 
-  '@uiw/codemirror-extensions-basic-setup@4.23.8(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)':
+  '@uiw/codemirror-extensions-basic-setup@4.23.8(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)':
     dependencies:
       '@codemirror/autocomplete': 6.18.4
       '@codemirror/commands': 6.8.0
@@ -21339,38 +21300,38 @@ snapshots:
       '@codemirror/lint': 6.8.1
       '@codemirror/search': 6.5.6
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
 
-  '@uiw/codemirror-theme-eclipse@4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)':
+  '@uiw/codemirror-theme-eclipse@4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)':
     dependencies:
-      '@uiw/codemirror-themes': 4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)
+      '@uiw/codemirror-themes': 4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)
     transitivePeerDependencies:
       - '@codemirror/language'
       - '@codemirror/state'
       - '@codemirror/view'
 
-  '@uiw/codemirror-theme-kimbie@4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)':
+  '@uiw/codemirror-theme-kimbie@4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)':
     dependencies:
-      '@uiw/codemirror-themes': 4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)
+      '@uiw/codemirror-themes': 4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)
     transitivePeerDependencies:
       - '@codemirror/language'
       - '@codemirror/state'
       - '@codemirror/view'
 
-  '@uiw/codemirror-themes@4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)':
+  '@uiw/codemirror-themes@4.23.8(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)':
     dependencies:
       '@codemirror/language': 6.12.1
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
 
-  '@uiw/react-codemirror@4.23.8(@babel/runtime@7.25.4)(@codemirror/autocomplete@6.18.4)(@codemirror/language@6.12.1)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/theme-one-dark@6.1.2)(@codemirror/view@6.39.7)(codemirror@6.0.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
+  '@uiw/react-codemirror@4.23.8(@babel/runtime@7.25.4)(@codemirror/autocomplete@6.18.4)(@codemirror/language@6.12.1)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/theme-one-dark@6.1.2)(@codemirror/view@6.39.9)(codemirror@6.0.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
     dependencies:
       '@babel/runtime': 7.25.4
       '@codemirror/commands': 6.8.0
       '@codemirror/state': 6.5.3
       '@codemirror/theme-one-dark': 6.1.2
-      '@codemirror/view': 6.39.7
-      '@uiw/codemirror-extensions-basic-setup': 4.23.8(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)
+      '@codemirror/view': 6.39.9
+      '@uiw/codemirror-extensions-basic-setup': 4.23.8(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)
       codemirror: 6.0.1
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
@@ -21666,7 +21627,7 @@ snapshots:
 
   agent-base@6.0.2:
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -22719,25 +22680,25 @@ snapshots:
 
   clsx@2.1.1: {}
 
-  cm6-theme-basic-light@0.2.0(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)(@lezer/highlight@1.2.3):
+  cm6-theme-basic-light@0.2.0(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)(@lezer/highlight@1.2.3):
     dependencies:
       '@codemirror/language': 6.12.1
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
       '@lezer/highlight': 1.2.3
 
-  cm6-theme-material-dark@0.2.0(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)(@lezer/highlight@1.2.3):
+  cm6-theme-material-dark@0.2.0(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)(@lezer/highlight@1.2.3):
     dependencies:
       '@codemirror/language': 6.12.1
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
       '@lezer/highlight': 1.2.3
 
-  cm6-theme-nord@0.2.0(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)(@lezer/highlight@1.2.3):
+  cm6-theme-nord@0.2.0(@codemirror/language@6.12.1)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)(@lezer/highlight@1.2.3):
     dependencies:
       '@codemirror/language': 6.12.1
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
       '@lezer/highlight': 1.2.3
 
   co@4.6.0: {}
@@ -22750,7 +22711,7 @@ snapshots:
       '@codemirror/lint': 6.8.1
       '@codemirror/search': 6.5.6
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
 
   collect-v8-coverage@1.0.2: {}
 
@@ -22920,7 +22881,7 @@ snapshots:
 
   connect-mongo@4.6.0(express-session@1.18.0)(mongodb@4.17.2(@aws-sdk/client-sso-oidc@3.600.0)):
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       express-session: 1.18.0
       kruptein: 3.0.6
       mongodb: 4.17.2(@aws-sdk/client-sso-oidc@3.600.0)
@@ -23768,7 +23729,7 @@ snapshots:
   engine.io-client@6.6.4:
     dependencies:
       '@socket.io/component-emitter': 3.1.2
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       engine.io-parser: 5.2.3
       ws: 8.18.3
       xmlhttprequest-ssl: 2.1.2
@@ -23787,7 +23748,7 @@ snapshots:
       base64id: 2.0.0
       cookie: 0.7.2
       cors: 2.8.5
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       engine.io-parser: 5.2.3
       ws: 8.18.3
     transitivePeerDependencies:
@@ -24408,7 +24369,7 @@ snapshots:
 
   follow-redirects@1.15.11(debug@4.4.3):
     optionalDependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
 
   for-each@0.3.3:
     dependencies:
@@ -24561,7 +24522,7 @@ snapshots:
   gaxios@6.7.1(encoding@0.1.13):
     dependencies:
       extend: 3.0.2
-      https-proxy-agent: 7.0.6(supports-color@10.0.0)
+      https-proxy-agent: 7.0.6
       is-stream: 2.0.0
       node-fetch: 2.7.0(encoding@0.1.13)
       uuid: 9.0.1
@@ -25169,14 +25130,14 @@ snapshots:
     dependencies:
       '@tootallnate/once': 2.0.0
       agent-base: 6.0.2
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
   http-proxy-agent@7.0.2:
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -25199,14 +25160,14 @@ snapshots:
   https-proxy-agent@5.0.1:
     dependencies:
       agent-base: 6.0.2
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
   https-proxy-agent@7.0.6:
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -25655,7 +25616,7 @@ snapshots:
 
   istanbul-lib-source-maps@4.0.1:
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       istanbul-lib-coverage: 3.2.2
       source-map: 0.6.1
     transitivePeerDependencies:
@@ -27193,7 +27154,7 @@ snapshots:
   micromark@4.0.0:
     dependencies:
       '@types/debug': 4.1.7
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       decode-named-character-reference: 1.0.2
       devlop: 1.1.0
       micromark-core-commonmark: 2.0.1
@@ -27382,10 +27343,10 @@ snapshots:
     dependencies:
       async-mutex: 0.4.1
       camelcase: 6.3.0
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       find-cache-dir: 3.3.2
       follow-redirects: 1.15.11(debug@4.4.3)
-      https-proxy-agent: 7.0.6(supports-color@10.0.0)
+      https-proxy-agent: 7.0.6
       mongodb: 5.9.2(@aws-sdk/credential-providers@3.600.0(@aws-sdk/client-sso-oidc@3.600.0))
       new-find-package-json: 2.0.0
       semver: 7.6.3
@@ -27489,7 +27450,7 @@ snapshots:
 
   mquery@4.0.3:
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -27581,7 +27542,7 @@ snapshots:
 
   new-find-package-json@2.0.0:
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -28272,7 +28233,7 @@ snapshots:
   passport-saml@3.2.4:
     dependencies:
       '@xmldom/xmldom': 0.7.13
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       passport-strategy: 1.0.0
       xml-crypto: 2.1.5
       xml-encryption: 2.0.0
@@ -29461,7 +29422,7 @@ snapshots:
 
   require-in-the-middle@7.4.0:
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       module-details-from-path: 1.0.3
       resolve: 1.22.8
     transitivePeerDependencies:
@@ -29511,7 +29472,7 @@ snapshots:
 
   retry-request@4.2.2:
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       extend: 3.0.2
     transitivePeerDependencies:
       - supports-color
@@ -29967,7 +29928,7 @@ snapshots:
 
   socket.io-adapter@2.5.6:
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       ws: 8.18.3
     transitivePeerDependencies:
       - bufferutil
@@ -29977,7 +29938,7 @@ snapshots:
   socket.io-client@4.8.3:
     dependencies:
       '@socket.io/component-emitter': 3.1.2
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       engine.io-client: 6.6.4
       socket.io-parser: 4.2.5
     transitivePeerDependencies:
@@ -29988,7 +29949,7 @@ snapshots:
   socket.io-parser@4.2.5:
     dependencies:
       '@socket.io/component-emitter': 3.1.2
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -29997,7 +29958,7 @@ snapshots:
       accepts: 1.3.8
       base64id: 2.0.0
       cors: 2.8.5
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       engine.io: 6.6.5
       socket.io-adapter: 2.5.6
       socket.io-parser: 4.2.5
@@ -30426,7 +30387,7 @@ snapshots:
     dependencies:
       component-emitter: 1.3.1
       cookiejar: 2.1.4
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       fast-safe-stringify: 2.1.1
       form-data: 4.0.4
       formidable: 3.5.4
@@ -30798,7 +30759,7 @@ snapshots:
 
   ts-interface-checker@0.1.13: {}
 
-  ts-node@10.9.2(@swc/core@1.10.7(@swc/helpers@0.5.15))(@types/node@20.19.17)(typescript@5.0.4):
+  ts-node@10.9.2(@swc/core@1.10.7(@swc/helpers@0.5.18))(@types/node@20.19.17)(typescript@5.0.4):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       '@tsconfig/node10': 1.0.9
@@ -30816,7 +30777,7 @@ snapshots:
       v8-compile-cache-lib: 3.0.1
       yn: 3.1.1
     optionalDependencies:
-      '@swc/core': 1.10.7(@swc/helpers@0.5.15)
+      '@swc/core': 1.10.7(@swc/helpers@0.5.18)
 
   ts-node@10.9.2(@swc/core@1.10.7(@swc/helpers@0.5.18))(@types/node@20.19.17)(typescript@5.4.2):
     dependencies:
@@ -31855,10 +31816,10 @@ snapshots:
 
   xtend@4.0.2: {}
 
-  y-codemirror.next@0.3.5(@codemirror/state@6.5.3)(@codemirror/view@6.39.7)(yjs@13.6.19):
+  y-codemirror.next@0.3.5(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)(yjs@13.6.19):
     dependencies:
       '@codemirror/state': 6.5.3
-      '@codemirror/view': 6.39.7
+      '@codemirror/view': 6.39.9
       lib0: 0.2.94
       yjs: 13.6.19
 
