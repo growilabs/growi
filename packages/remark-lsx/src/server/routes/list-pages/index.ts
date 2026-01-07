@@ -81,13 +81,12 @@ export const listPages = (crowi) => {
 
     const { pagePath, offset, limit, options } = params;
     const user = req.user;
-    const isAdmin = user?.admin ?? false;
     const excludedPaths = crowi.pageService.getExcludedPathsBySystem();
 
     const builder = await generateBaseQuery(params.pagePath, user);
     let query = builder.query;
 
-    if (!isAdmin && excludedPaths.length > 0) {
+    if (excludedPaths.length > 0) {
       const pattern = excludedPaths.map((p) => p.replace(/^\//, '')).join('|');
       const regex = new RegExp(`^\\/(${pattern})(\\/|$)`);
 
