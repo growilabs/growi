@@ -647,23 +647,13 @@ async function injectPageData(
   const hideUserPages = configManager.getConfig('security:isHidingUserPages');
 
   if (hideUserPages && page) {
-    const targetPath = page.path ?? currentPathname;
-
     const isTopPage = isUsersTopPage(page.path);
     const isSpecificUserPage = isUserPage(page.path);
 
     if (isTopPage || isSpecificUserPage) {
-      const isOwnPage =
-        user != null &&
-        (targetPath === `/user/${user.username}` ||
-          targetPath.startsWith(`/user/${user.username}/`)
-      );
-
-      if (!isOwnPage && !user?.admin) {
-        props.pageWithMeta = null;
-        props.isNotFound = true;
-        return;
-      }
+      props.pageWithMeta = null;
+      props.isNotFound = true;
+      return;
     }
   }
 

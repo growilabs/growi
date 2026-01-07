@@ -145,7 +145,7 @@ const routerFactory = (crowi: Crowi): Router => {
       const { id, path } = req.query;
 
       const hideUserPages = await configManager.getConfig('security:isHidingUserPages');
-      const shouldHideUserPages = hideUserPages && !req.user?.admin;
+      const shouldHideUserPages = hideUserPages;
 
       const hideRestrictedByOwner = await configManager.getConfig('security:list-policy:hideRestrictedByOwner');
       const hideRestrictedByGroup = await configManager.getConfig('security:list-policy:hideRestrictedByGroup');
