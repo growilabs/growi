@@ -285,7 +285,6 @@ export const Sidebar = (): JSX.Element => {
 
   // css styles
   const grwSidebarClass = styles['grw-sidebar'];
-  // eslint-disable-next-line no-nested-ternary
   let modeClass = '';
   switch (sidebarMode) {
     case SidebarMode.DRAWER:

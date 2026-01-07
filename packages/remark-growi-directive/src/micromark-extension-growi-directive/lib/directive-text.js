@@ -56,7 +56,6 @@ function tokenizeDirectiveText(effects, ok, nok) {
 
   /** @type {State} */
   function afterName(code) {
-    // eslint-disable-next-line no-nested-ternary
     return code === codes.dollarSign
       ? nok(code)
       : code === codes.leftSquareBracket
