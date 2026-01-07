@@ -1,5 +1,5 @@
 
-/* eslint-disable no-undef, no-var, vars-on-top, no-restricted-globals, regex/invalid, import/extensions */
+/* eslint-disable no-undef, no-restricted-globals, regex/invalid, import/extensions */
 // ignore lint error because this file is js as mongoshell
 
 /**
