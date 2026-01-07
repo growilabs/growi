@@ -76,6 +76,9 @@
       },
       "correctness": {
         "useUniqueElementIds": "warn"
+      },
+      "nursery": {
+        "useMaxParams": "warn"
       }
     }
   },
