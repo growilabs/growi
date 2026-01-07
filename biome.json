@@ -61,6 +61,7 @@
     "rules": {
       "recommended": true,
       "style": {
+        "useThrowOnlyError": "error",
         "noParameterAssign": "warn"
       },
       "suspicious": {
