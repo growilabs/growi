@@ -65,7 +65,8 @@
       },
       "suspicious": {
         "noConsole": "error",
-        "noAlert": "error"
+        "noAlert": "error",
+        "useAwait": "warn"
       },
       "performance": {
         "noAwaitInLoops": "warn"
