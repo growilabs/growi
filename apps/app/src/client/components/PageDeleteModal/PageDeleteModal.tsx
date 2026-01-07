@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { IPageInfoForEntity, IPageToDeleteWithMeta } from '@growi/core';
 import { isIPageInfoForEntity } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
@@ -62,7 +62,6 @@ export const PageDeleteModal: FC = () => {
     () =>
       (pages ?? []).filter((p) => !isIPageInfoForEntityForDeleteModal(p.meta)),
     // Optimization: Use pageIds and pagesLength instead of pages array reference to avoid unnecessary re-computation
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [pageIds, pagesLength],
   );
 
@@ -83,7 +82,6 @@ export const PageDeleteModal: FC = () => {
       return null;
     },
     // Optimization: Use pageIds and pagesLength instead of pages array reference to avoid unnecessary re-computation
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [pageIds, pagesLength, injectTo],
   );
 
@@ -106,7 +104,6 @@ export const PageDeleteModal: FC = () => {
   const pagePaths = useMemo(
     () => pages?.map((p) => p.data?.path ?? '') ?? [],
     // Optimization: Use pageIds and pagesLength instead of pages array reference to avoid unnecessary re-computation
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [pageIds, pagesLength],
   );
 
