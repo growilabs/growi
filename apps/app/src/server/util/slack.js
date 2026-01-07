@@ -42,7 +42,6 @@ const prepareAttachmentTextForUpdate = (page, siteUrl, previousRevision) => {
 
   diff.diffLines(previousRevision.body, page.revision.body).forEach((line) => {
     logger.debug('diff line', line);
-    const value = line.value.replace(/\r\n|\r/g, '\n'); // eslint-disable-line no-unused-vars
     if (line.added) {
       diffText += `${line.value} ... :lower_left_fountain_pen:`;
     } else if (line.removed) {

@@ -192,8 +192,7 @@ export class RegisterService
     const tokenGtoP = inputValues.tokenGtoP.contents_input.value;
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const url = new URL(growiUrl);
+      const _url = new URL(growiUrl);
     } catch (error) {
       throw new InvalidUrlError(growiUrl);
     }

@@ -83,8 +83,7 @@ export class SectionBlockPayloadDelegator
     return false;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  extract(data: BlockActionsPayload): GrowiUriWithOriginalData {
+  extract(_data: BlockActionsPayload): GrowiUriWithOriginalData {
     throw new Error('No need to implement. Use ActionsBlockPayloadDelegator');
   }
 }

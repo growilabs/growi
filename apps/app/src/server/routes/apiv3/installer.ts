@@ -20,8 +20,7 @@ import {
 } from '../../service/installer';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const logger = loggerFactory('growi:routes:apiv3:installer');
+const _logger = loggerFactory('growi:routes:apiv3:installer');
 
 type FormRequest = Request & { form: any; logIn: any };
 

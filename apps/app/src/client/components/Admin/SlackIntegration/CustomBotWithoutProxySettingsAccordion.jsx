@@ -31,8 +31,7 @@ const CustomBotWithoutProxySettingsAccordion = (props) => {
   const successMessage = 'Successfully sent to Slack workspace.';
 
   const { t } = useTranslation();
-  // eslint-disable-next-line no-unused-vars
-  const [defaultOpenAccordionKeys, setDefaultOpenAccordionKeys] = useState(
+  const [defaultOpenAccordionKeys, _setDefaultOpenAccordionKeys] = useState(
     new Set([activeStep]),
   );
   const [isLatestConnectionSuccess, setIsLatestConnectionSuccess] =

@@ -13,7 +13,6 @@ import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import UpdatePost from '../../models/update-post';
 
-// eslint-disable-next-line no-unused-vars
 const logger = loggerFactory('growi:routes:apiv3:notification-setting');
 
 const router = express.Router();

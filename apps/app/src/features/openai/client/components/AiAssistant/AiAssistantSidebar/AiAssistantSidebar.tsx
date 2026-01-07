@@ -285,7 +285,6 @@ const AiAssistantSidebarSubstance: React.FC<
         if (!response.ok) {
           const resJson = await response.json();
           if ('errors' in resJson) {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const errors = resJson.errors
               .map(({ message }) => message)
               .join(', ');

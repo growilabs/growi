@@ -9,7 +9,7 @@ import loggerFactory from '~/utils/logger';
 import { prepareSlackMessageForGlobalNotification } from '../../util/slack';
 import { growiInfoService } from '../growi-info';
 
-const logger = loggerFactory('growi:service:GlobalNotificationSlackService'); // eslint-disable-line no-unused-vars
+const _logger = loggerFactory('growi:service:GlobalNotificationSlackService');
 const urljoin = require('url-join');
 
 const { encodeSpaces } = pagePathUtils;

@@ -34,7 +34,6 @@ import { configManager } from './config-manager';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const logger = loggerFactory('growi:service:search');
 
 const nonNullable = <T>(value: T): value is NonNullable<T> => value != null;

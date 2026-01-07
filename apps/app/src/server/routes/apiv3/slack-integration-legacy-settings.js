@@ -11,7 +11,6 @@ import loggerFactory from '~/utils/logger';
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 
-// eslint-disable-next-line no-unused-vars
 const logger = loggerFactory(
   'growi:routes:apiv3:slack-integration-legacy-setting',
 );

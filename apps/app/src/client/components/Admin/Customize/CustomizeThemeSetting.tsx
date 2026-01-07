@@ -11,8 +11,7 @@ import CustomizeThemeOptions from './CustomizeThemeOptions';
 // eslint-disable-next-line @typescript-eslint/ban-types
 type Props = {};
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const CustomizeThemeSetting = (props: Props): JSX.Element => {
+const CustomizeThemeSetting = (_props: Props): JSX.Element => {
   const { t } = useTranslation();
 
   const { data, error, update } = useSWRxGrowiThemeSetting();
