@@ -66,6 +66,7 @@
       "suspicious": {
         "noConsole": "error",
         "noAlert": "error",
+        "noVar": "error",
         "useAwait": "warn"
       },
       "performance": {
