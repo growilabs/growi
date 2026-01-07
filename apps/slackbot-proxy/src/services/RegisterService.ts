@@ -34,9 +34,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const isOfficialMode = process.env.OFFICIAL_MODE === 'true';
 
 export type RegisterCommandBody = {
-  // eslint-disable-next-line camelcase
   trigger_id: string;
-  // eslint-disable-next-line camelcase
   channel_name: string;
 };
 

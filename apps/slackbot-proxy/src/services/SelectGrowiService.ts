@@ -29,11 +29,8 @@ type SelectValue = {
 };
 
 type SendCommandBody = {
-  // eslint-disable-next-line camelcase
   trigger_id: string;
-  // eslint-disable-next-line camelcase
   channel_id: string;
-  // eslint-disable-next-line camelcase
   channel_name: string;
 };
 

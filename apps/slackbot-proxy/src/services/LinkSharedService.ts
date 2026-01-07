@@ -25,7 +25,6 @@ type TokenPtoG = string;
 export type LinkSharedRequestEvent = {
   channel: string;
 
-  // eslint-disable-next-line camelcase
   message_ts: string;
 
   links: LinkSharedEventLink[];
