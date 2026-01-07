@@ -19,7 +19,6 @@
       "!bin",
       "!tsconfig.base.json",
       "!**/.devcontainer",
-      "!**/.eslintrc.js",
       "!**/.stylelintrc.json",
       "!**/package.json",
       "!apps/app/src/styles/prebuilt",
@@ -133,6 +132,10 @@
           }
         }
       }
+    },
+    {
+      "includes": ["apps/app/src/server/models/**"],
+      "plugins": ["apps/app/.biome/plugins/no-populate.grit"]
     }
   ]
 }
