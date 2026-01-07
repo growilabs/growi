@@ -21,7 +21,6 @@ const attributes = { tokenize: tokenizeAttributes, partial: true };
 
 /** @type {Tokenizer} */
 function tokenizeDirectiveLeaf(effects, ok, nok) {
-  // eslint-disable-next-line @typescript-eslint/no-this-alias
   const self = this;
 
   return start;

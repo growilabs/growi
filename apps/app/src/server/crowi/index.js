@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-this-alias */
-
 import next from 'next';
 import { createTerminus } from '@godaddy/terminus';
 import attachmentRoutes from '@growi/remark-attachment-refs/dist/server';

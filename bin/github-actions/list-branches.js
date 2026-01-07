@@ -1,5 +1,3 @@
-/* eslint-disable no-console */
-
 /*
  * USAGE:
  *  node list-branches [OPTION]

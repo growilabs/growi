@@ -175,7 +175,6 @@ export class Server {
     }
     // use morgan
     else {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const morgan = require('morgan');
       this.app.use(morgan('dev'));
     }

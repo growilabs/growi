@@ -38,7 +38,7 @@ module.exports = {
       'pagegrouprelations',
     );
     if (!isPagegrouprelationsExists) {
-      logger.info("'pagegrouprelations' collection doesn't exist"); // eslint-disable-line
+      logger.info("'pagegrouprelations' collection doesn't exist");
       logger.info('Migration has successfully applied');
       return;
     }

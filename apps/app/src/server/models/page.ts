@@ -558,7 +558,7 @@ export class PageQueryBuilder {
   }
 
   addConditionToPagenate(offset, limit, sortOpt?): PageQueryBuilder {
-    this.query = this.query.sort(sortOpt).skip(offset).limit(limit); // eslint-disable-line newline-per-chained-call
+    this.query = this.query.sort(sortOpt).skip(offset).limit(limit);
 
     return this;
   }

@@ -32,7 +32,6 @@ function previous(code) {
 
 /** @type {Tokenizer} */
 function tokenizeDirectiveText(effects, ok, nok) {
-  // eslint-disable-next-line @typescript-eslint/no-this-alias
   const self = this;
 
   return start;
