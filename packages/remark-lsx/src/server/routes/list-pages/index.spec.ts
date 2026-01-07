@@ -12,11 +12,6 @@ interface IListPagesRequest
   user: IUser;
 }
 
-const crowiMock = mock<any>();
-crowiMock.pageService = {
-  getExcludedPathsBySystem: vi.fn().mockReturnValue(['/user']), // Default mock behavior
-};
-
 // mocking modules
 const mocks = vi.hoisted(() => {
   return {
@@ -53,7 +48,7 @@ describe('listPages', () => {
     resMock.status.calledWith(400).mockReturnValue(resStatusMock);
 
     // when
-    const handler = listPages(crowiMock);
+    const handler = listPages({ excludedPaths: [] });
     await handler(reqMock, resMock);
 
     // then
@@ -99,7 +94,7 @@ describe('listPages', () => {
       resMock.status.calledWith(200).mockReturnValue(resStatusMock);
 
       // when
-      const handler = listPages(crowiMock);
+      const handler = listPages({ excludedPaths: [] });
       await handler(reqMock, resMock);
 
       // then
@@ -133,7 +128,7 @@ describe('listPages', () => {
       resMock.status.calledWith(500).mockReturnValue(resStatusMock);
 
       // when
-      const handler = listPages(crowiMock);
+      const handler = listPages({ excludedPaths: [] });
       await handler(reqMock, resMock);
 
       // then
@@ -163,7 +158,7 @@ describe('listPages', () => {
       resMock.status.calledWith(400).mockReturnValue(resStatusMock);
 
       // when
-      const handler = listPages(crowiMock);
+      const handler = listPages({ excludedPaths: [] });
       await handler(reqMock, resMock);
 
       // then
@@ -258,5 +253,69 @@ describe('listPages', () => {
         createError(400, 'filter option require value in regular expression.'),
       );
     });
+  });
+});
+
+describe('when excludedPaths is handled', () => {
+  const pagePath = '/Sandbox';
+  const builderMock = mock<PageQueryBuilder>();
+  const queryMock = mock<PageQuery>();
+  builderMock.query = queryMock;
+
+  beforeEach(() => {
+    mocks.generateBaseQueryMock.mockResolvedValue(builderMock);
+    queryMock.and.mockReturnValue(queryMock);
+
+    // Setup successful flow for count and exec
+    const queryClonedMock = mock<PageQuery>();
+    queryMock.clone.mockReturnValue(queryClonedMock);
+    queryClonedMock.count.mockResolvedValue(0);
+    queryMock.exec.mockResolvedValue([]);
+
+    mocks.addNumConditionMock.mockReturnValue(queryMock);
+    mocks.addSortConditionMock.mockReturnValue(queryMock);
+    mocks.getToppageViewersCountMock.mockResolvedValue(0);
+  });
+
+  it('does not add path exclusion conditions when excludedPaths is empty', async () => {
+    // setup
+    const reqMock = mock<IListPagesRequest>();
+    reqMock.query = { pagePath };
+    const resMock = mock<Response>();
+    resMock.status.mockReturnValue(mock<Response>());
+
+    // excludedPaths is empty
+    const handler = listPages({ excludedPaths: [] });
+    await handler(reqMock, resMock);
+
+    // query.and should NOT be called with a $not regex for paths
+    expect(queryMock.and).not.toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: expect.objectContaining({ $not: expect.any(RegExp) }),
+        }),
+      ]),
+    );
+  });
+
+  it('adds a regex exclusion condition when excludedPaths is specified', async () => {
+    // setup
+    const reqMock = mock<IListPagesRequest>();
+    reqMock.query = { pagePath };
+    const resMock = mock<Response>();
+    resMock.status.mockReturnValue(mock<Response>());
+
+    // excludedPaths provided
+    const excludedPaths = ['/user', '/tmp'];
+    const handler = listPages({ excludedPaths });
+    await handler(reqMock, resMock);
+
+    // check if the logic generates the correct regex: ^\/(user|tmp)(\/|$)
+    const expectedRegex = /^\/(user|tmp)(\/|$)/;
+    expect(queryMock.and).toHaveBeenCalledWith([
+      {
+        path: { $not: expectedRegex },
+      },
+    ]);
   });
 });
