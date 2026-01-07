@@ -5,8 +5,6 @@ import loggerFactory from '~/utils/logger';
 import { Attachment } from '../../models/attachment';
 import { validateImageContentType } from './image-content-type-validator';
 
-/* eslint-disable no-use-before-define */
-
 const logger = loggerFactory('growi:routes:attachment');
 
 const ApiResponse = require('../../util/apiResponse');

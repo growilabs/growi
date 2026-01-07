@@ -14,7 +14,6 @@ import UpdatePost from '../models/update-post';
  *    name: Pages
  */
 
-/* eslint-disable no-use-before-define */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi, app) => {
   const logger = loggerFactory('growi:routes:page');

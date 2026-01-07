@@ -19,8 +19,6 @@ import UserGroupRelation from './user-group-relation';
 
 const logger = loggerFactory('growi:models:page');
 
-/* eslint-disable no-use-before-define */
-
 const nodePath = require('path');
 
 const mongoose = require('mongoose');

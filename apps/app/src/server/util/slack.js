@@ -8,8 +8,6 @@ const logger = loggerFactory('growi:util:slack');
  * slack
  */
 
-/* eslint-disable no-use-before-define */
-
 const convertMarkdownToMarkdown = (body, siteUrl) =>
   body
     .replace(/\n\*\s(.+)/g, '\n• $1')

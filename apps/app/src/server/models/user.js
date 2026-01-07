@@ -1,4 +1,3 @@
-/* eslint-disable no-use-before-define */
 import { omitInsecureAttributes } from '@growi/core/dist/models/serializers';
 import { pagePathUtils } from '@growi/core/dist/utils';
 
