@@ -49,7 +49,6 @@ describe('loginRequired', () => {
           .mockImplementation(() => false);
       });
 
-      /* eslint-disable indent */
       test.each`
         userStatus | expectedPath
         ${1}       | ${'/login/error/registered'}
@@ -75,7 +74,6 @@ describe('loginRequired', () => {
           expect(req.session.redirectTo).toBe(undefined);
         },
       );
-      /* eslint-disable indent */
 
       test("redirect to '/login' when the user does not loggedin", () => {
         req.baseUrl = '/path/that/requires/loggedin';
@@ -125,7 +123,6 @@ describe('loginRequired', () => {
           .mockImplementation(() => true);
       });
 
-      /* eslint-disable indent */
       test.each`
         userStatus | expectedPath
         ${1}       | ${'/login/error/registered'}
@@ -151,7 +148,6 @@ describe('loginRequired', () => {
           expect(req.session.redirectTo).toBe(undefined);
         },
       );
-      /* eslint-disable indent */
 
       test('pass guest user', () => {
         const result = loginRequired(req, res, next);
@@ -251,7 +247,6 @@ describe('loginRequired', () => {
       expect(req.session.redirectTo).toBe(undefined);
     });
 
-    /* eslint-disable indent */
     test.each`
       userStatus | expectedPath
       ${1}       | ${'/login/error/registered'}
@@ -277,7 +272,6 @@ describe('loginRequired', () => {
         expect(req.session.redirectTo).toBe(undefined);
       },
     );
-    /* eslint-disable indent */
 
     test("redirect to '/login' when user.status is 'STATUS_DELETED'", () => {
       const User = crowi.model('User');
