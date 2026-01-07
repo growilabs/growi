@@ -15,6 +15,7 @@ import SortControl from './SortControl';
 import styles from './SearchControl.module.scss';
 
 type Props = {
+  isHidingUserPages: boolean,
   isEnableSort: boolean,
   isEnableFilter: boolean,
   initialSearchConditions: Partial<ISearchConditions>,

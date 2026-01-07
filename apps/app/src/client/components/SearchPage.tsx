@@ -8,7 +8,9 @@ import type { ISelectableAll, ISelectableAndIndeterminatable } from '~/client/in
 import { useKeywordManager } from '~/client/services/search-operation';
 import type { IFormattedSearchResult } from '~/interfaces/search';
 import { useShowPageLimitationL } from '~/stores-universal/context';
-import { type ISearchConditions, type ISearchConfigurations, useSWRxSearch } from '~/stores/search';
+import {
+  type ISearchConditions, type ISearchConfigurations, useSWRxSearch, useSWRxSecuritySettings,
+} from '~/stores/search';
 
 import { NotAvailableForGuest } from './NotAvailableForGuest';
 import { NotAvailableForReadOnlyUser } from './NotAvailableForReadOnlyUser';
@@ -97,8 +99,14 @@ export const SearchPage = (): JSX.Element => {
   const selectAllControlRef = useRef<ISelectableAndIndeterminatable|null>(null);
   const searchPageBaseRef = useRef<ISelectableAll & IReturnSelectedPageIds|null>(null);
 
+  const { data: generalSetting } = useSWRxSecuritySettings();
+  const isHidingUserPages = generalSetting?.isHidingUserPages ?? false;
+
+
+
   const { data, conditions, mutate } = useSWRxSearch(keyword ?? '', null, {
     ...configurationsByControl,
+    includeUserPages: isHidingUserPages ? false : configurationsByControl.includeUserPages,
     offset,
     limit,
   });
