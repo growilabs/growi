@@ -62,7 +62,8 @@
       "recommended": true,
       "style": {
         "useThrowOnlyError": "error",
-        "noParameterAssign": "warn"
+        "noParameterAssign": "warn",
+        "noDefaultExport": "warn"
       },
       "suspicious": {
         "noConsole": "error",
