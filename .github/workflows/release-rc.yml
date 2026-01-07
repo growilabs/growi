@@ -47,7 +47,7 @@ jobs:
   publish-image-rc:
     needs: [determine-tags, build-image-rc]
 
-    uses: weseek/growi/.github/workflows/reusable-app-create-manifests.yml@master
+    uses: growilabs/growi/.github/workflows/reusable-app-create-manifests.yml@master
     with:
       tags: ${{ needs.determine-tags.outputs.TAGS }}
       registry: docker.io
