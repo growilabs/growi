@@ -4,8 +4,8 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
 import { useIsAdmin, useIsGuestUser } from '~/states/context';
-import { useGrowiCloudUri } from '~/states/global';
 
+import { HelpDropdown } from './HelpDropdown';
 import { SkeletonItem } from './SkeletonItem';
 
 import styles from './SecondaryItems.module.scss';
@@ -42,21 +42,11 @@ const SecondaryItem: FC<SecondaryItemProps> = (props: SecondaryItemProps) => {
 
 export const SecondaryItems: FC = memo(() => {
   const isAdmin = useIsAdmin();
-  const growiCloudUri = useGrowiCloudUri();
   const isGuestUser = useIsGuestUser();
 
   return (
     <div className={styles['grw-secondary-items']}>
-      <SecondaryItem
-        label="Help"
-        iconName="help"
-        href={
-          growiCloudUri != null
-            ? 'https://growi.cloud/help/'
-            : 'https://docs.growi.org'
-        }
-        isBlank
-      />
+      <HelpDropdown />
       {isAdmin && (
         <SecondaryItem label="Admin" iconName="settings" href="/admin" />
       )}

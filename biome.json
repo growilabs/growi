@@ -27,27 +27,7 @@
       "!apps/pdf-converter/specs",
       "!apps/slackbot-proxy/src/public/bootstrap",
       "!packages/pdf-converter-client/src/index.ts",
-      "!packages/pdf-converter-client/specs",
-      "!apps/app/src/client/components/Admin",
-      "!apps/app/src/client/components/Bookmarks",
-      "!apps/app/src/client/components/DescendantsPageListModal",
-      "!apps/app/src/client/components/InAppNotification",
-      "!apps/app/src/client/components/ItemsTree",
-      "!apps/app/src/client/components/LoginForm",
-      "!apps/app/src/client/components/Me",
-      "!apps/app/src/client/components/Page",
-      "!apps/app/src/client/components/PageAttachment",
-      "!apps/app/src/client/components/PageDeleteModal",
-      "!apps/app/src/client/components/PageDuplicateModal",
-      "!apps/app/src/client/components/PageList",
-      "!apps/app/src/client/components/PageManagement",
-      "!apps/app/src/client/components/PagePathNavSticky",
-      "!apps/app/src/client/components/PagePresentationModal",
-      "!apps/app/src/client/components/PageRenameModal",
-      "!apps/app/src/client/components/PageSelectModal",
-      "!apps/app/src/client/components/PageSideContents",
-      "!apps/app/src/client/components/PageTags",
-      "!apps/app/src/client/components/ReactMarkdownComponents"
+      "!packages/pdf-converter-client/specs"
     ]
   },
   "formatter": {

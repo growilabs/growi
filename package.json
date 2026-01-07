@@ -52,7 +52,7 @@
     "@testing-library/react-hooks": "^8.0.1",
     "@swc-node/register": "^1.10.9",
     "@swc/core": "^1.5.25",
-    "@swc/helpers": "^0.5.11",
+    "@swc/helpers": "^0.5.18",
     "@types/css-modules": "^1.0.2",
     "@types/eslint": "^8.37.0",
     "@types/estree": "^1.0.1",
