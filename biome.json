@@ -60,6 +60,9 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "suspicious": {
+        "noConsole": "error"
+      },
       "correctness": {
         "useUniqueElementIds": "warn"
       }

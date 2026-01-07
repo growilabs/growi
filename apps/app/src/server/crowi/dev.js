@@ -23,7 +23,8 @@ class CrowiDev {
 
   initPromiseRejectionWarningHandler() {
     // https://qiita.com/syuilo/items/0800d7e44e93203c7285
-    process.on('unhandledRejection', console.dir); // eslint-disable-line no-console
+    // biome-ignore lint:plugin: Allow to use
+    process.on('unhandledRejection', console.dir);
   }
 
   /**
