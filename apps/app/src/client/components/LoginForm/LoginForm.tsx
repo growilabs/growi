@@ -148,7 +148,6 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
       return (
         <div className="alert alert-danger">
           {errors.map((err, index) => {
-            // eslint-disable-next-line react/no-danger
             return (
               <small
                 key={`${err.code}-${index}`}
@@ -203,7 +202,6 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
               {t('login.enabled_ldap_has_configuration_problem')}
             </strong>
             <br />
-            {/* eslint-disable-next-line react/no-danger */}
             <span
               // biome-ignore lint/security/noDangerouslySetInnerHtml: rendered HTML from translations
               dangerouslySetInnerHTML={{

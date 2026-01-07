@@ -68,7 +68,6 @@ export const PageAccessRightsSettings: React.FC<Props> = ({
               <span className="material-symbols-outlined me-1">error</span>
               <b>FIXED</b>
               <br />
-              {/* eslint-disable-next-line react/no-danger */}
               <b
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{

@@ -157,7 +157,6 @@ const LdapSecuritySettingContents = (props: Props) => {
               <small>
                 <p
                   className="form-text text-muted"
-                  // eslint-disable-next-line react/no-danger
                   // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t('security_settings.ldap.server_url_detail'),
@@ -238,7 +237,6 @@ const LdapSecuritySettingContents = (props: Props) => {
                   <small>
                     {t('security_settings.ldap.bind_DN_user_detail1')}
                     <br />
-                    {/* eslint-disable-next-line react/no-danger */}
                     <span
                       // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{
@@ -322,7 +320,6 @@ const LdapSecuritySettingContents = (props: Props) => {
                 <small>
                   {t('security_settings.ldap.search_filter_detail1')}
                   <br />
-                  {/* eslint-disable-next-line react/no-danger */}
                   <span
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
@@ -330,7 +327,6 @@ const LdapSecuritySettingContents = (props: Props) => {
                     }}
                   />
                   <br />
-                  {/* eslint-disable-next-line react/no-danger */}
                   <span
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
@@ -374,7 +370,6 @@ const LdapSecuritySettingContents = (props: Props) => {
                 {...register('ldapAttrMapUsername')}
               />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
                 <small
                   // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
@@ -405,7 +400,6 @@ const LdapSecuritySettingContents = (props: Props) => {
                   htmlFor="isSameUsernameTreatedAsIdenticalUser"
                 >
                   <span
-                    // eslint-disable-next-line react/no-danger
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t(
@@ -416,7 +410,6 @@ const LdapSecuritySettingContents = (props: Props) => {
                 </label>
               </div>
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
                 <small
                   // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
@@ -489,7 +482,6 @@ const LdapSecuritySettingContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small>
-                  {/* eslint-disable-next-line react/no-danger */}
                   <span
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
@@ -554,7 +546,6 @@ const LdapSecuritySettingContents = (props: Props) => {
               <p className="form-text text-muted">
                 <small>
                   {t('security_settings.example')}:
-                  {/* eslint-disable-next-line react/no-danger */}
                   <span
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
@@ -585,7 +576,6 @@ const LdapSecuritySettingContents = (props: Props) => {
                 {...register('ldapGroupDnProperty')}
               />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
                 <small
                   // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{

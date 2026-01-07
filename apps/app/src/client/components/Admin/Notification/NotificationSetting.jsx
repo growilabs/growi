@@ -78,7 +78,6 @@ const SlackIntegrationListItem = ({ isEnabled, currentBotType }) => {
       </h4>
       {isCautionVisible && (
         <ul className="mt-2 ps-4">
-          {/* eslint-disable-next-line react/no-danger */}
           <li
             // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
             dangerouslySetInnerHTML={{
@@ -106,7 +105,6 @@ const LegacySlackIntegrationListItem = ({ isEnabled }) => {
       {isEnabled && (
         <ul className="mt-2 ps-4">
           <li>
-            {/* eslint-disable-next-line react/no-danger */}
             <span
               className="text-danger"
               // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup

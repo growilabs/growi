@@ -138,7 +138,6 @@ const RegisteringProxyUrlProcess = () => {
       <ol>
         <li>
           <p
-            // eslint-disable-next-line react/no-danger
             // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
             dangerouslySetInnerHTML={{
               __html: t('admin:slack_integration.accordion.copy_proxy_url'),
@@ -154,7 +153,6 @@ const RegisteringProxyUrlProcess = () => {
         </li>
         <li>
           <p
-            // eslint-disable-next-line react/no-danger
             // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
             dangerouslySetInnerHTML={{
               __html: t(
@@ -271,7 +269,6 @@ const GeneratingTokensAndRegisteringProxyServiceProcess = (props) => {
           <li>
             <p
               className="ms-2"
-              // eslint-disable-next-line react/no-danger
               // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
               dangerouslySetInnerHTML={{
                 __html: t(
@@ -285,7 +282,6 @@ const GeneratingTokensAndRegisteringProxyServiceProcess = (props) => {
               className="ms-2"
               // TODO: Add dynamic link
               // TODO: Add logo
-              // eslint-disable-next-line react/no-danger
               // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
               dangerouslySetInnerHTML={{
                 __html: t('admin:slack_integration.accordion.paste_growi_url'),
@@ -309,7 +305,6 @@ const GeneratingTokensAndRegisteringProxyServiceProcess = (props) => {
           <li>
             <p
               className="ms-2"
-              // eslint-disable-next-line react/no-danger
               // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
               dangerouslySetInnerHTML={{
                 __html: t(

@@ -105,9 +105,7 @@ const PageBulkExportSettings = (): JSX.Element => {
               </div>
               {data?.useOnlyEnvVarsForIsBulkExportPagesEnabled && (
                 <p className="form-text text-muted">
-                  {/* eslint-disable-next-line react/no-danger */}
                   <b
-                    // eslint-disable-next-line react/no-danger
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                     dangerouslySetInnerHTML={{
                       __html: t('admin:app_setting.fixed_by_env_var', {
