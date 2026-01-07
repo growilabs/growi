@@ -52,7 +52,6 @@ class ImportCollectionConfigurationModal extends React.Component {
     const translationBase =
       'admin:importer_management.growi_settings.configuration.pages';
 
-    /* eslint-disable react/no-unescaped-entities */
     return (
       <>
         <div className="form-check form-check-warning">
@@ -185,7 +184,6 @@ class ImportCollectionConfigurationModal extends React.Component {
         </div>
       </>
     );
-    /* eslint-enable react/no-unescaped-entities */
   }
 
   renderRevisionsContents() {
@@ -195,7 +193,6 @@ class ImportCollectionConfigurationModal extends React.Component {
     const translationBase =
       'admin:importer_management.growi_settings.configuration.revisions';
 
-    /* eslint-disable react/no-unescaped-entities */
     return (
       <div className="form-check form-check-warning">
         <input
@@ -222,7 +219,6 @@ class ImportCollectionConfigurationModal extends React.Component {
         </label>
       </div>
     );
-    /* eslint-enable react/no-unescaped-entities */
   }
 
   render() {

@@ -224,7 +224,6 @@ export const PageDeleteModal: FC = () => {
       }
     },
     // Optimization: Use pageIds and pagesLength instead of pages array reference to avoid unnecessary re-computation
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       pageIds,
       pagesLength,
@@ -364,7 +363,6 @@ export const PageDeleteModal: FC = () => {
       </>
     );
     // Optimization: Use direct dependencies instead of JSX.Element reference for better performance
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isOpened,
     t,
