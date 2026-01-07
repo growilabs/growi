@@ -203,7 +203,6 @@ export const AdminNavigation = (): JSX.Element => {
     (isListGroupItems: boolean) => {
       return (
         <>
-          {/* eslint-disable no-multi-spaces */}
           <MenuLink
             menu="home"
             isListGroupItems={isListGroupItems}
@@ -295,7 +294,6 @@ export const AdminNavigation = (): JSX.Element => {
               <MenuLabel menu="cloud" />
             </a>
           )}
-          {/* eslint-enable no-multi-spaces */}
         </>
       );
     },
@@ -321,7 +319,6 @@ export const AdminNavigation = (): JSX.Element => {
           aria-expanded="false"
         >
           <span className="float-start">
-            {/* eslint-disable no-multi-spaces */}
             {pathname === '/admin' && <MenuLabel menu="home" />}
             {isActiveMenu('/app') && <MenuLabel menu="app" />}
             {isActiveMenu('/security') && <MenuLabel menu="security" />}
@@ -347,7 +344,6 @@ export const AdminNavigation = (): JSX.Element => {
             )}
             {/* Temporarily hiding */}
             {/* {isActiveMenu('/ai-integration')                && <MenuLabel menu="ai-integration" />} */}
-            {/* eslint-enable no-multi-spaces */}
           </span>
         </button>
         <div
