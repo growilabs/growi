@@ -1,4 +1,3 @@
-/* eslint-disable react/no-danger */
 import React, { useCallback, useEffect } from 'react';
 import { pathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';

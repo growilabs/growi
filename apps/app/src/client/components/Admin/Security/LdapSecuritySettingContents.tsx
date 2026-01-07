@@ -513,7 +513,6 @@ const LdapSecuritySettingContents = (props: Props) => {
               />
               <p className="form-text text-muted">
                 <small>
-                  {/* eslint-disable react/no-danger */}
                   <span
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
@@ -540,7 +539,6 @@ const LdapSecuritySettingContents = (props: Props) => {
                       ),
                     }}
                   />
-                  {/* eslint-enable react/no-danger */}
                 </small>
               </p>
               <p className="form-text text-muted">
