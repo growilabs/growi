@@ -35,7 +35,7 @@ importers:
         specifier: ^1.5.25
         version: 1.10.7(@swc/helpers@0.5.18)
       '@swc/helpers':
-        specifier: ^0.5.11
+        specifier: ^0.5.18
         version: 0.5.18
       '@testing-library/dom':
         specifier: ^10.4.0
@@ -1328,7 +1328,7 @@ importers:
         specifier: ^6.5.2
         version: 6.5.3
       '@codemirror/view':
-        specifier: ^6.36.2
+        specifier: ^6.39.9
         version: 6.39.9
       '@emoji-mart/data':
         specifier: ^1.2.1
@@ -10563,6 +10563,7 @@ packages:
     resolution: {integrity: sha512-Quz3MvAwHxVYNXsOByL7xI5EB2WYOeFswqaHIA3qOK3isRWTxiplBEocmmru6XmxDB2L7jDNYtYA4FyimoAFEw==}
     engines: {node: '>=8.17.0'}
     hasBin: true
+    bundledDependencies: []
 
   jsonfile@3.0.1:
     resolution: {integrity: sha512-oBko6ZHlubVB5mRFkur5vgYR1UyqX+S6Y/oCfLhqNdcc2fYFlDpIoNc7AfKS1KOGcnNAkvsr0grLck9ANM815w==}
