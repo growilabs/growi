@@ -110,7 +110,6 @@ export class UnregisterService
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleInteraction(
     interactionPayloadAccessor: InteractionPayloadAccessor,
   ): boolean {
@@ -122,7 +121,6 @@ export class UnregisterService
   }
 
   async processInteraction(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     authorizeResult: AuthorizeResult,
     interactionPayload: any,
     interactionPayloadAccessor: InteractionPayloadAccessor,
@@ -162,9 +160,9 @@ export class UnregisterService
     return interactionHandledResult as InteractionHandledResult<void>;
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+  // biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
   async handleUnregisterInteraction(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+    // biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
     authorizeResult: AuthorizeResult,
     interactionPayload: any,
     interactionPayloadAccessor: InteractionPayloadAccessor,
@@ -241,7 +239,7 @@ export class UnregisterService
     return;
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+  // biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
   async handleUnregisterCancelInteraction(
     interactionPayloadAccessor: InteractionPayloadAccessor,
   ): Promise<void> {

@@ -122,7 +122,6 @@ export class RegisterService
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleInteraction(
     interactionPayloadAccessor: InteractionPayloadAccessor,
   ): boolean {
@@ -134,7 +133,6 @@ export class RegisterService
   }
 
   async processInteraction(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     authorizeResult: AuthorizeResult,
     interactionPayload: any,
     interactionPayloadAccessor: InteractionPayloadAccessor,
@@ -156,7 +154,6 @@ export class RegisterService
   }
 
   async handleRegisterInteraction(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     authorizeResult: AuthorizeResult,
     interactionPayload: any,
     interactionPayloadAccessor: InteractionPayloadAccessor,
@@ -180,7 +177,6 @@ export class RegisterService
   }
 
   async insertOrderRecord(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     authorizeResult: AuthorizeResult,
     interactionPayloadAccessor: InteractionPayloadAccessor,
   ): Promise<void> {
@@ -212,7 +208,6 @@ export class RegisterService
   }
 
   async notifyServerUriToSlack(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     interactionPayloadAccessor: InteractionPayloadAccessor,
   ): Promise<void> {
     const serverUri = process.env.SERVER_URI;

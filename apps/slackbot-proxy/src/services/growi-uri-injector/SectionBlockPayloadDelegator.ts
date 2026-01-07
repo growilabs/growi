@@ -50,7 +50,6 @@ export class SectionBlockPayloadDelegator
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleToInject(data: any): data is SectionWithAccessoryElement[] {
     const sectionBlocks = data.filter(
       (blockElement) =>
@@ -77,7 +76,6 @@ export class SectionBlockPayloadDelegator
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleToExtract(data: any): data is BlockActionsPayload {
     return false;
   }

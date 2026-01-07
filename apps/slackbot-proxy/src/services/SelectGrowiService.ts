@@ -120,7 +120,6 @@ export class SelectGrowiService
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleInteraction(
     interactionPayloadAccessor: InteractionPayloadAccessor,
   ): boolean {
@@ -132,7 +131,6 @@ export class SelectGrowiService
   }
 
   async processInteraction(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     authorizeResult: AuthorizeResult,
     interactionPayload: any,
     interactionPayloadAccessor: InteractionPayloadAccessor,
@@ -157,9 +155,7 @@ export class SelectGrowiService
     return interactionHandledResult as InteractionHandledResult<SelectedGrowiInformation>;
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   async handleSelectInteraction(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     authorizeResult: AuthorizeResult,
     interactionPayload: any,
     interactionPayloadAccessor: InteractionPayloadAccessor,

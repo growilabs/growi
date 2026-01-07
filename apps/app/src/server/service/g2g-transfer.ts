@@ -5,14 +5,10 @@ import rawAxios, { type AxiosRequestConfig } from 'axios';
 import FormData from 'form-data';
 import type { ReadStream } from 'fs';
 import { createReadStream } from 'fs';
-import mongoose, {
-  type HydratedDocument,
-  Types as MongooseTypes,
-} from 'mongoose';
+import mongoose, { Types as MongooseTypes } from 'mongoose';
 import { basename } from 'path';
 
 import { G2G_PROGRESS_STATUS } from '~/interfaces/g2g-transfer';
-import type { ITransferKey } from '~/interfaces/transfer-key';
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { ImportMode } from '~/models/admin/import-mode';
 import TransferKeyModel from '~/server/models/transfer-key';
@@ -233,8 +229,7 @@ interface Receiver {
 export class G2GTransferPusherService implements Pusher {
   crowi: Crowi;
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  constructor(crowi: any) {
+  constructor(crowi: Crowi) {
     this.crowi = crowi;
   }
 

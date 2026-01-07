@@ -174,7 +174,7 @@ SinglePermissionSettingComponent.propTypes = {
   onPermissionListChanged: PropTypes.func,
 };
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+// biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
 const ManageCommandsProcessWithoutProxy = ({
   commandPermission,
   eventActionsPermission,

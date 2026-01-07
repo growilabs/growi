@@ -12,7 +12,6 @@ export type IPageSearchMeta = {
   };
 };
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export const isIPageSearchMeta = (meta: any): meta is IPageSearchMeta => {
   return meta != null && 'elasticSearchResult' in meta;
 };

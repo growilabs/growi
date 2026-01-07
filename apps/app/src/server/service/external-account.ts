@@ -14,7 +14,6 @@ const logger = loggerFactory('growi:service:external-account-service');
 class ExternalAccountService {
   passportService: PassportService;
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   constructor(passportService: PassportService) {
     this.passportService = passportService;
   }
