@@ -84,7 +84,6 @@ export class InstallerService {
     if (initialPagesCreatedAt != null) {
       try {
         // TODO typescriptize models/user.js and remove eslint-disable-next-line
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const Page = mongoose.model('Page') as any;
 
         // Increment timestamp to avoid difference for order in VRT

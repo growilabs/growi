@@ -1122,7 +1122,6 @@ class PassportService implements S2sMessageHandlable {
     const User = this.crowi.model('User');
 
     passport.serializeUser((user, done) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       done(null, (user as any).id);
     });
     passport.deserializeUser(async (id, done) => {

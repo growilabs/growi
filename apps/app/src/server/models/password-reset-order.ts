@@ -9,7 +9,6 @@ import { getOrCreateModel } from '../util/mongoose-utils';
 export interface IPasswordResetOrder {
   token: string;
   email: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   relatedUser: any;
   isRevoked: boolean;
   createdAt: Date;

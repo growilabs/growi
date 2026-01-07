@@ -38,7 +38,6 @@ const deleteIconAndKey = {
   },
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isIPageInfoForEntityForDeleteModal = (
   pageInfo: any | undefined,
 ): pageInfo is IPageInfoForEntity => {

@@ -287,7 +287,6 @@ export class G2GTransferPusherService implements Pusher {
       };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const User = mongoose.model<IUser, any>('User');
     const activeUserCount = await User.countActiveUsers();
     if ((destGROWIInfo.userUpperLimit ?? Infinity) < activeUserCount) {
