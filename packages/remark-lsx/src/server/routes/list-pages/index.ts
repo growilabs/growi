@@ -86,9 +86,12 @@ export const listPages = ({ excludedPaths }: { excludedPaths: string[] }) => {
     let query = builder.query;
 
     if (excludedPaths.length > 0) {
-      const escapedPaths = excludedPaths.map((p) => p.replace(/\//g, '\\/'));
-      const regex = new RegExp(`^\\/(${escapedPaths.join('|')})(\\/|$)`);
+      const escapedPaths = excludedPaths.map((p) => {
+        const cleanPath = p.startsWith('/') ? p.substring(1) : p;
+        return cleanPath.replace(/\//g, '\\/');
+      });
 
+      const regex = new RegExp(`^\\/(${escapedPaths.join('|')})(\\/|$)`);
       query = query.and([{ path: { $not: regex } }]);
     }
 
