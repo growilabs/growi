@@ -19,9 +19,6 @@ import UserGroupRelation from './user-group-relation';
 
 const logger = loggerFactory('growi:models:page');
 
-// disable no-return-await for model functions
-/* eslint-disable no-return-await */
-
 /* eslint-disable no-use-before-define */
 
 const nodePath = require('path');

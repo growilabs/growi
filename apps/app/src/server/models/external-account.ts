@@ -1,5 +1,3 @@
-// disable no-return-await for model functions
-/* eslint-disable no-return-await */
 import type {
   IExternalAccount,
   IUser,

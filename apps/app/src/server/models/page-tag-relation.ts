@@ -11,9 +11,6 @@ import { getOrCreateModel } from '../util/mongoose-utils';
 import type { IdToNamesMap } from './tag';
 import Tag from './tag';
 
-// disable no-return-await for model functions
-/* eslint-disable no-return-await */
-
 const flatMap = require('array.prototype.flatmap');
 
 export interface PageTagRelationDocument extends IPageTagRelation, Document {}
