@@ -222,7 +222,6 @@ module.exports = (crowi) => {
    *                  userData:
    *                    $ref: '#/components/schemas/User'
    */
-  // eslint-disable-next-line max-len
   router.put(
     '/',
     checkPassportStrategyMiddleware,

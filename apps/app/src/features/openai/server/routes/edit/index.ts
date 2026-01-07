@@ -65,7 +65,6 @@ type PostMessageHandlersFactory = (crowi: Crowi) => RequestHandler[];
 // -----------------------------------------------------------------------------
 // Instructions
 // -----------------------------------------------------------------------------
-/* eslint-disable max-len */
 const withMarkdownCaution = `# IMPORTANT:
 - Spaces and line breaks are also counted as individual characters.
 - The text for lines that do not need correction must be returned exactly as in the original text.
@@ -115,7 +114,6 @@ The array should contain:
 
 ${withMarkdown ? withMarkdownCaution : ''}`;
 }
-/* eslint-disable max-len */
 
 function instructionForAssistantInstruction(
   assistantInstruction: string,

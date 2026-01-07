@@ -15,7 +15,6 @@ const MenuLabel = ({ menu }: { menu: string }) => {
   const { t } = useTranslation(['admin', 'commons']);
 
   switch (menu) {
-    /* eslint-disable no-multi-spaces, max-len */
     case 'app':
       return (
         <>
@@ -149,7 +148,6 @@ const MenuLabel = ({ menu }: { menu: string }) => {
           {t('wiki_management_homepage')}
         </>
       );
-    /* eslint-enable no-multi-spaces, max-len */
   }
 };
 

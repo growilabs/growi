@@ -4074,7 +4074,6 @@ class PageService implements IPageService {
     let nextCount = count;
     let nextSkiped = skiped;
 
-    // eslint-disable-next-line max-len
     const buildPipelineToCreateEmptyPagesByUser =
       this.buildPipelineToCreateEmptyPagesByUser.bind(this);
 
@@ -5277,7 +5276,6 @@ class PageService implements IPageService {
       let isGrantNormalized = false;
       try {
         const shouldCheckDescendants = !options.overwriteScopesOfDescendants;
-        // eslint-disable-next-line max-len
         isGrantNormalized = await this.pageGrantService.isGrantNormalized(
           user,
           clonedPageData.path,

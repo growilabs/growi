@@ -81,7 +81,6 @@ module.exports = (crowi: Crowi): Router => {
    *                    type: string
    *                    example: Installation completed (Logged in as an admin user)
    */
-  // eslint-disable-next-line max-len
   router.post(
     '/',
     registerRules(minPasswordLength),

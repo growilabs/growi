@@ -158,7 +158,6 @@ const SamlSecurityManagementContents = (props: Props) => {
             <div className="alert alert-danger">
               <span className="material-symbols-outlined">error</span>
               <span
-                // eslint-disable-next-line max-len
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('alert.siteUrl_is_not_set', {
@@ -466,7 +465,6 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                     {...register('samlAttrMapFirstName')}
                   />
                   <p className="form-text text-muted">
-                    {/* eslint-disable-next-line max-len */}
                     <small
                       // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{
@@ -522,7 +520,6 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                     {...register('samlAttrMapLastName')}
                   />
                   <p className="form-text text-muted">
-                    {/* eslint-disable-next-line max-len */}
                     <small
                       // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                       dangerouslySetInnerHTML={{

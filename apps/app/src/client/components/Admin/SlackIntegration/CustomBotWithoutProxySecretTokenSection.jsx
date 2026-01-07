@@ -80,7 +80,6 @@ const CustomBotWithoutProxySecretTokenSection = (props) => {
             readOnly
           />
           <p className="form-text text-muted">
-            {/* eslint-disable-next-line max-len, react/no-danger */}
             <small
               // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
               dangerouslySetInnerHTML={{

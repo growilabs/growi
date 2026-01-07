@@ -279,7 +279,6 @@ export class GrowiPluginService implements IGrowiPluginService {
     await GrowiPlugin.insertMany(plugins);
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types, max-len
   private static async detectPlugins(
     origin: IGrowiPluginOrigin,
     ghOrganizationName: string,

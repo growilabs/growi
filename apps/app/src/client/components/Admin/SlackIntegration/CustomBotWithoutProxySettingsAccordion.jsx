@@ -177,7 +177,6 @@ const CustomBotWithoutProxySettingsAccordion = (props) => {
         defaultIsActive={defaultOpenAccordionKeys.has(
           botInstallationStep.REGISTER_SLACK_CONFIGURATION,
         )}
-        // eslint-disable-next-line max-len
         title={
           <>
             <span className="me-3">3</span>
@@ -202,7 +201,6 @@ const CustomBotWithoutProxySettingsAccordion = (props) => {
         defaultIsActive={defaultOpenAccordionKeys.has(
           botInstallationStep.CONNECTION_TEST,
         )}
-        // eslint-disable-next-line max-len
         title={
           <>
             <span className="me-3">4</span>
@@ -219,7 +217,6 @@ const CustomBotWithoutProxySettingsAccordion = (props) => {
         defaultIsActive={defaultOpenAccordionKeys.has(
           botInstallationStep.CONNECTION_TEST,
         )}
-        // eslint-disable-next-line max-len
         title={
           <>
             <span className="me-3">5</span>

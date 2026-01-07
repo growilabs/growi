@@ -263,7 +263,6 @@ const ManageCommandsProcessWithoutProxy = ({
           <div className="form-check">
             <div className="row mb-5 d-block">
               {defaultCommandsName.map((commandName) => {
-                // eslint-disable-next-line max-len
                 return (
                   <SinglePermissionSettingComponent
                     key={`${commandName}-component`}

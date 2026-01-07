@@ -1584,7 +1584,6 @@ module.exports = (crowi) => {
           });
         }
 
-        // eslint-disable-next-line max-len
         const canIncludeMixedUsernames =
           (options.isIncludeMixedUsernames && req.user.admin) ||
           (options.isIncludeMixedUsernames &&

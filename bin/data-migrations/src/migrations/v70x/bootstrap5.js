@@ -13,7 +13,6 @@ module.exports = [
     let replacedBody = body;
 
     replacedBody = replacedBody.replace(
-      // eslint-disable-next-line max-len
       /\sdata-(animation|autohide|boundary|container|content|custom-class|delay|dismiss|display|html|interval|keyboard|method|offset|pause|placement|popper-config|reference|ride|selector|slide(-to)?|target|template|title|toggle|touch|trigger|wrap)=/g,
       (match, p1) => {
         if (p1 === 'toggle' && match.includes('data-bs-toggle="')) {

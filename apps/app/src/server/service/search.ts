@@ -595,8 +595,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
         const highlightData = data._highlight;
         if (highlightData != null) {
           const snippet = this.canShowSnippet(pageData, user, userGroups)
-            ? // eslint-disable-next-line max-len
-              highlightData.body ||
+            ? highlightData.body ||
               highlightData['body.en'] ||
               highlightData['body.ja'] ||
               highlightData.comments ||

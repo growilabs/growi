@@ -417,8 +417,6 @@ const AiAssistantSidebarSubstance: React.FC<
         logger.error(err.toString());
         form.setError('input', { type: 'manual', message: err.toString() });
       }
-
-      // eslint-disable-next-line max-len
     },
     [
       isGenerating,

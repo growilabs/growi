@@ -281,7 +281,6 @@ module.exports = (crowi) => {
    *                            $ref: '#/components/schemas/UserNotification'
    *                            description: user notification settings
    */
-  // eslint-disable-next-line max-len
   router.post(
     '/user-notification',
     accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),
@@ -452,7 +451,6 @@ module.exports = (crowi) => {
    *                      description: notification param created
    *                      $ref: '#/components/schemas/GlobalNotification'
    */
-  // eslint-disable-next-line max-len
   router.post(
     '/global-notification',
     accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),
@@ -528,7 +526,6 @@ module.exports = (crowi) => {
    *                      description: notification param updated
    *                      $ref: '#/components/schemas/GlobalNotification'
    */
-  // eslint-disable-next-line max-len
   router.put(
     '/global-notification/:id',
     accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),
@@ -614,7 +611,6 @@ module.exports = (crowi) => {
    *                schema:
    *                  $ref: '#/components/schemas/NotifyForPageGrant'
    */
-  // eslint-disable-next-line max-len
   router.put(
     '/notify-for-page-grant',
     accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),

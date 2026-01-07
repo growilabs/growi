@@ -294,7 +294,6 @@ export class G2GTransferPusherService implements Pusher {
       return {
         canTransfer: false,
         // TODO: i18n for reason
-        // eslint-disable-next-line max-len
         reason: `The number of active users (${activeUserCount} users) exceeds the limit of the destination GROWI (up to ${destGROWIInfo.userUpperLimit} users).`,
       };
     }
@@ -336,7 +335,6 @@ export class G2GTransferPusherService implements Pusher {
       return {
         canTransfer: false,
         // TODO: i18n for reason
-        // eslint-disable-next-line max-len
         reason: `The total file size of attachments exceeds the file upload limit of the destination GROWI. Requires ${totalFileSize.toLocaleString()} bytes, but got ${(destGROWIInfo.fileUploadTotalLimit as number).toLocaleString()} bytes.`,
       };
     }
@@ -462,7 +460,6 @@ export class G2GTransferPusherService implements Pusher {
     }
   }
 
-  // eslint-disable-next-line max-len
   public async startTransfer(
     tk: TransferKey,
     user: any,
