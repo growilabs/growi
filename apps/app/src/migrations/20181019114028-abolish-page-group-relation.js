@@ -52,8 +52,8 @@ module.exports = {
       .find()
       .toArray();
 
-    /* eslint-disable no-await-in-loop */
     for (const relation of relations) {
+      // biome-ignore lint/performance/noAwaitInLoops: Allow for memory consumption control
       const page = await Page.findOne({ _id: relation.targetPage });
 
       // skip if grant mismatch
@@ -71,7 +71,6 @@ module.exports = {
       page.grantedGroup = userGroup;
       await page.save();
     }
-    /* eslint-enable no-await-in-loop */
 
     // drop collection
     await db.collection('pagegrouprelations').drop();
@@ -89,12 +88,12 @@ module.exports = {
     // retrieve all Page documents which granted by UserGroup
     const relatedPages = await Page.find({ grant: Page.GRANT_USER_GROUP });
     const insertDocs = [];
-    /* eslint-disable no-await-in-loop */
     for (const page of relatedPages) {
       if (page.grantedGroup == null) {
         continue;
       }
 
+      // biome-ignore lint/performance/noAwaitInLoops: Allow for memory consumption control
       const userGroup = await UserGroup.findOne({ _id: page.grantedGroup });
 
       // skip if userGroup does not exist
@@ -113,7 +112,6 @@ module.exports = {
       page.grantedGroup = undefined;
       await page.save();
     }
-    /* eslint-enable no-await-in-loop */
 
     if (insertDocs.length > 0) {
       await db.collection('pagegrouprelations').insertMany(insertDocs);

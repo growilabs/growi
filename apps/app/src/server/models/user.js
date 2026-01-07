@@ -651,7 +651,7 @@ const factory = (crowi) => {
 
     for (const email of creationEmailList) {
       try {
-        // eslint-disable-next-line no-await-in-loop
+        // biome-ignore lint/performance/noAwaitInLoops: Allow for memory consumption control
         const createdUser = await this.createUserByEmail(email);
         createdUserList.push(createdUser);
       } catch (err) {
