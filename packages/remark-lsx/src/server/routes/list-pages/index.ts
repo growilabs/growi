@@ -66,7 +66,7 @@ interface IListPagesRequest
   user: IUser;
 }
 
-export const listPages = (crowi) => {
+export const listPages = ({ excludedPaths }: { excludedPaths: string[] }) => {
   return async (req: IListPagesRequest, res: Response): Promise<Response> => {
     if (req.query.pagePath == null) {
       return res.status(400).send("the 'pagepath' query must not be null.");
@@ -81,14 +81,13 @@ export const listPages = (crowi) => {
 
     const { pagePath, offset, limit, options } = params;
     const user = req.user;
-    const excludedPaths = crowi.pageService.getExcludedPathsBySystem();
 
     const builder = await generateBaseQuery(params.pagePath, user);
     let query = builder.query;
 
     if (excludedPaths.length > 0) {
-      const pattern = excludedPaths.map((p) => p.replace(/^\//, '')).join('|');
-      const regex = new RegExp(`^\\/(${pattern})(\\/|$)`);
+      const escapedPaths = excludedPaths.map(p => p.replace(/\//g, '\\/'));
+      const regex = new RegExp(`^\\/(${escapedPaths.join('|')})(\\/|$)`);
 
       query = query.and([{ path: { $not: regex } }]);
     }
