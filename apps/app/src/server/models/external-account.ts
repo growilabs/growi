@@ -74,8 +74,8 @@ schema.statics.findOrRegister = function (
   isSameEmailTreatedAsIdenticalUser: boolean,
   providerType: string,
   accountId: string,
-  usernameToBeRegistered?: string,
-  nameToBeRegistered?: string,
+  usernameToBeRegistered: string | undefined,
+  nameToBeRegistered = '',
   mailToBeRegistered?: string,
 ): Promise<HydratedDocument<IExternalAccount<IExternalAuthProviderType>>> {
   return this.findOne({ providerType, accountId }).then((account) => {
@@ -117,10 +117,6 @@ schema.statics.findOrRegister = function (
             `User '${usernameToBeRegistered}' already exists`,
             user,
           );
-        }
-        if (nameToBeRegistered == null) {
-          // eslint-disable-next-line no-param-reassign
-          nameToBeRegistered = '';
         }
 
         // create a new User with STATUS_ACTIVE

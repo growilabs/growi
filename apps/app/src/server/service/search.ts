@@ -325,11 +325,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   async parseSearchQuery(
-    queryString: string,
+    _queryString: string,
     nqName: string | null,
   ): Promise<ParsedQuery> {
-    // eslint-disable-next-line no-param-reassign
-    queryString = normalizeQueryString(queryString);
+    const queryString = normalizeQueryString(_queryString);
 
     const terms = this.parseQueryString(queryString);
 
@@ -442,7 +441,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
     ];
   }
 
-  parseQueryString(queryString: string): QueryTerms {
+  parseQueryString(_queryString: string): QueryTerms {
+    let queryString = _queryString;
+
     // terms
     const matchWords: string[] = [];
     const notMatchWords: string[] = [];
@@ -458,7 +459,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const phrases = queryString.match(phraseRegExp);
 
     if (phrases !== null) {
-      queryString = queryString.replace(phraseRegExp, ''); // eslint-disable-line no-param-reassign
+      queryString = queryString.replace(phraseRegExp, '');
 
       phrases.forEach((phrase) => {
         phrase.trim();

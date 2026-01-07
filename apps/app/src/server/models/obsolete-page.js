@@ -4,6 +4,7 @@ import {
   pathUtils,
   templateChecker,
 } from '@growi/core/dist/utils';
+import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import { differenceInYears } from 'date-fns/differenceInYears';
 import escapeStringRegexp from 'escape-string-regexp';
 
@@ -326,11 +327,7 @@ export const getPageSchema = (crowi) => {
   };
 
   pageSchema.statics.getDeletedPageName = (path) => {
-    if (path.match('/')) {
-      // eslint-disable-next-line no-param-reassign
-      path = path.substr(1);
-    }
-    return `/trash/${path}`;
+    return `/trash/${removeHeadingSlash(path)}`;
   };
 
   pageSchema.statics.getRevertDeletedPageName = (path) =>

@@ -414,10 +414,7 @@ const factory = (crowi) => {
       });
   };
 
-  userSchema.statics.findAllUsers = function (option) {
-    // eslint-disable-next-line no-param-reassign
-    option = option || {};
-
+  userSchema.statics.findAllUsers = function (option = {}) {
     const sort = option.sort || { createdAt: -1 };
     const fields = option.fields || {};
 
@@ -436,10 +433,7 @@ const factory = (crowi) => {
       .sort(sort);
   };
 
-  userSchema.statics.findUsersByIds = function (ids, option) {
-    // eslint-disable-next-line no-param-reassign
-    option = option || {};
-
+  userSchema.statics.findUsersByIds = function (ids, option = {}) {
     const sort = option.sort || { createdAt: -1 };
     const status = option.status || STATUS_ACTIVE;
     const fields = option.fields || {};
@@ -690,7 +684,7 @@ const factory = (crowi) => {
     // check email duplication because email must be unique
     const count = await this.count({ email });
     if (count > 0) {
-      // eslint-disable-next-line no-param-reassign
+      // biome-ignore lint/style/noParameterAssign: ignore
       email = generateRandomEmail();
     }
 

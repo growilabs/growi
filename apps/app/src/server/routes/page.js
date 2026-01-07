@@ -225,12 +225,11 @@ module.exports = (crowi, app) => {
 
     UpdatePost.findSettingsByPath(path)
       .then((data) => {
-        // eslint-disable-next-line no-param-reassign
-        data = data.map((e) => {
+        const channels = data.map((e) => {
           return e.channel;
         });
-        logger.debug('Found updatePost data', data);
-        const result = { updatePost: data };
+        logger.debug('Found updatePost data', channels);
+        const result = { updatePost: channels };
         return res.json(ApiResponse.success(result));
       })
       .catch((err) => {

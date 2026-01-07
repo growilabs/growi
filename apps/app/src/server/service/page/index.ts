@@ -671,11 +671,12 @@ class PageService implements IPageService {
     pageOpId: ObjectIdLike,
     activity?,
   ): Promise<PageDocument | null> {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const updateMetadata = options.updateMetadata || false;
+
     // sanitize path
-    newPagePath = generalXssFilter.process(newPagePath); // eslint-disable-line no-param-reassign
+    const newPagePathSanitized = generalXssFilter.process(newPagePath);
 
     // UserGroup & Owner validation
     // use the parent's grant when target page is an empty page
@@ -701,7 +702,7 @@ class PageService implements IPageService {
       try {
         isGrantNormalized = await this.pageGrantService.isGrantNormalized(
           user,
-          newPagePath,
+          newPagePathSanitized,
           grant,
           grantedUserIds,
           grantedGroupIds,
@@ -709,14 +710,14 @@ class PageService implements IPageService {
         );
       } catch (err) {
         logger.error(
-          `Failed to validate grant of page at "${newPagePath}" when renaming`,
+          `Failed to validate grant of page at "${newPagePathSanitized}" when renaming`,
           err,
         );
         throw err;
       }
       if (!isGrantNormalized) {
         throw Error(
-          `This page cannot be renamed to "${newPagePath}" since the selected grant or grantedGroup is not assignable to this page.`,
+          `This page cannot be renamed to "${newPagePathSanitized}" since the selected grant or grantedGroup is not assignable to this page.`,
         );
       }
     }
@@ -727,18 +728,21 @@ class PageService implements IPageService {
     // 2. Find new parent
     let newParent: PageDocument | undefined;
     // If renaming to under target, run getParentAndforceCreateEmptyTree to fill new ancestors
-    if (this.isRenamingToUnderTarget(page.path, newPagePath)) {
+    if (this.isRenamingToUnderTarget(page.path, newPagePathSanitized)) {
       newParent = await this.getParentAndforceCreateEmptyTree(
         page,
-        newPagePath,
+        newPagePathSanitized,
       );
     } else {
-      newParent = await this.getParentAndFillAncestorsByUser(user, newPagePath);
+      newParent = await this.getParentAndFillAncestorsByUser(
+        user,
+        newPagePathSanitized,
+      );
     }
 
     // 3. Put back target page to tree (also update the other attrs)
     const update: Partial<IPage> = {};
-    update.path = newPagePath;
+    update.path = newPagePathSanitized;
     update.parent = newParent?._id;
     if (updateMetadata) {
       update.lastUpdateUser = user;
@@ -760,7 +764,10 @@ class PageService implements IPageService {
 
     // create page redirect
     if (options.createRedirectPage) {
-      await PageRedirect.create({ fromPath: page.path, toPath: newPagePath });
+      await PageRedirect.create({
+        fromPath: page.path,
+        toPath: newPagePathSanitized,
+      });
     }
     this.pageEvent.emit('rename');
 
@@ -778,7 +785,7 @@ class PageService implements IPageService {
      */
     this.renameSubOperation(
       page,
-      newPagePath,
+      newPagePathSanitized,
       user,
       options,
       renamedPage,
@@ -791,7 +798,7 @@ class PageService implements IPageService {
 
   async renameSubOperation(
     page,
-    newPagePath: string,
+    newPagePathSanitized: string,
     user,
     options,
     renamedPage,
@@ -809,7 +816,7 @@ class PageService implements IPageService {
       const descendantsSubscribedSets = new Set();
       await this.renameDescendantsWithStream(
         page,
-        newPagePath,
+        newPagePathSanitized,
         user,
         options,
         false,
@@ -854,7 +861,7 @@ class PageService implements IPageService {
     );
 
     // Remove leaf empty pages if not moving to under the ex-target position
-    if (!this.isRenamingToUnderTarget(page.path, newPagePath)) {
+    if (!this.isRenamingToUnderTarget(page.path, newPagePathSanitized)) {
       // remove empty pages at leaf position
       await Page.removeLeafEmptyPagesRecursively(page.parent);
     }
@@ -1004,16 +1011,21 @@ class PageService implements IPageService {
     } = options;
 
     // sanitize path
-    newPagePath = generalXssFilter.process(newPagePath); // eslint-disable-line no-param-reassign
+    const newPagePathSanitized = generalXssFilter.process(newPagePath);
 
     // create descendants first
     if (isRecursively) {
-      await this.renameDescendantsWithStream(page, newPagePath, user, options);
+      await this.renameDescendantsWithStream(
+        page,
+        newPagePathSanitized,
+        user,
+        options,
+      );
     }
 
     const update: any = {};
     // update Page
-    update.path = newPagePath;
+    update.path = newPagePathSanitized;
     if (updateMetadata) {
       update.lastUpdateUser = user;
       update.updatedAt = Date.now();
@@ -1033,7 +1045,10 @@ class PageService implements IPageService {
     });
 
     if (createRedirectPage) {
-      await PageRedirect.create({ fromPath: page.path, toPath: newPagePath });
+      await PageRedirect.create({
+        fromPath: page.path,
+        toPath: newPagePathSanitized,
+      });
     }
 
     this.pageEvent.emit('rename');
@@ -1194,7 +1209,7 @@ class PageService implements IPageService {
 
   private async renameDescendantsWithStream(
     targetPage,
-    newPagePath,
+    newPagePathSanitized,
     user,
     options = {},
     shouldUseV4Process = true,
@@ -1204,7 +1219,7 @@ class PageService implements IPageService {
     if (shouldUseV4Process) {
       return this.renameDescendantsWithStreamV4(
         targetPage,
-        newPagePath,
+        newPagePathSanitized,
         user,
         options,
       );
@@ -1219,7 +1234,7 @@ class PageService implements IPageService {
 
     const batchStream = createBatchStream(BULK_REINDEX_SIZE);
 
-    const newPagePathPrefix = newPagePath;
+    const newPagePathPrefix = newPagePathSanitized;
     const pathRegExp = new RegExp(
       `^${escapeStringRegexp(targetPage.path)}`,
       'i',
@@ -1256,7 +1271,7 @@ class PageService implements IPageService {
         logger.debug(`Renaming pages has completed: (totalCount=${count})`);
 
         // update path
-        targetPage.path = newPagePath;
+        targetPage.path = newPagePathSanitized;
         pageEvent.emit('syncDescendantsUpdate', targetPage, user);
 
         callback();
@@ -1268,7 +1283,7 @@ class PageService implements IPageService {
 
   private async renameDescendantsWithStreamV4(
     targetPage,
-    newPagePath,
+    newPagePathSanitized,
     user,
     options = {},
   ) {
@@ -1278,7 +1293,7 @@ class PageService implements IPageService {
     );
     const batchStream = createBatchStream(BULK_REINDEX_SIZE);
 
-    const newPagePathPrefix = newPagePath;
+    const newPagePathPrefix = newPagePathSanitized;
     const pathRegExp = new RegExp(
       `^${escapeStringRegexp(targetPage.path)}`,
       'i',
@@ -1309,7 +1324,7 @@ class PageService implements IPageService {
       final(callback) {
         logger.debug(`Renaming pages has completed: (totalCount=${count})`);
         // update  path
-        targetPage.path = newPagePath;
+        targetPage.path = newPagePathSanitized;
         pageEvent.emit('syncDescendantsUpdate', targetPage, user);
         callback();
       },
@@ -1342,14 +1357,14 @@ class PageService implements IPageService {
       throw Error('Page not found.');
     }
 
-    newPagePath = generalXssFilter.process(newPagePath); // eslint-disable-line no-param-reassign
+    const newPagePathSanitized = generalXssFilter.process(newPagePath);
 
     // 1. Separate v4 & v5 process
     const isShouldUseV4Process = shouldUseV4Process(page);
     if (isShouldUseV4Process) {
       return this.duplicateV4(
         page,
-        newPagePath,
+        newPagePathSanitized,
         user,
         isRecursively,
         onlyDuplicateUserRelatedResources,
@@ -1359,11 +1374,11 @@ class PageService implements IPageService {
     const canOperate = await this.crowi.pageOperationService.canOperate(
       isRecursively,
       page.path,
-      newPagePath,
+      newPagePathSanitized,
     );
     if (!canOperate) {
       throw Error(
-        `Cannot operate duplicate to path "${newPagePath}" right now.`,
+        `Cannot operate duplicate to path "${newPagePathSanitized}" right now.`,
       );
     }
 
@@ -1396,7 +1411,7 @@ class PageService implements IPageService {
       try {
         isGrantNormalized = await this.pageGrantService.isGrantNormalized(
           user,
-          newPagePath,
+          newPagePathSanitized,
           grant,
           grantedUserIds,
           grantedGroupIds,
@@ -1404,14 +1419,14 @@ class PageService implements IPageService {
         );
       } catch (err) {
         logger.error(
-          `Failed to validate grant of page at "${newPagePath}" when duplicating`,
+          `Failed to validate grant of page at "${newPagePathSanitized}" when duplicating`,
           err,
         );
         throw err;
       }
       if (!isGrantNormalized) {
         throw Error(
-          `This page cannot be duplicated to "${newPagePath}" since the selected grant or grantedGroup is not assignable to this page.`,
+          `This page cannot be duplicated to "${newPagePathSanitized}" since the selected grant or grantedGroup is not assignable to this page.`,
         );
       }
     }
@@ -1605,10 +1620,10 @@ class PageService implements IPageService {
     options.grantUserGroupIds = page.grantedGroups;
     options.grantedUserIds = page.grantedUsers;
 
-    newPagePath = generalXssFilter.process(newPagePath); // eslint-disable-line no-param-reassign
+    const newPagePathSanitized = generalXssFilter.process(newPagePath);
 
     const createdPage = await this.create(
-      newPagePath,
+      newPagePathSanitized,
       page.revision.body,
       user,
       options,
@@ -1618,7 +1633,7 @@ class PageService implements IPageService {
     if (isRecursively) {
       this.duplicateDescendantsWithStream(
         page,
-        newPagePath,
+        newPagePathSanitized,
         user,
         onlyDuplicateUserRelatedResources,
       );
@@ -1844,7 +1859,7 @@ class PageService implements IPageService {
 
   private async duplicateDescendantsWithStream(
     page,
-    newPagePath,
+    newPagePathSanitized,
     user,
     onlyDuplicateUserRelatedResources: boolean,
     shouldUseV4Process = true,
@@ -1852,7 +1867,7 @@ class PageService implements IPageService {
     if (shouldUseV4Process) {
       return this.duplicateDescendantsWithStreamV4(
         page,
-        newPagePath,
+        newPagePathSanitized,
         user,
         onlyDuplicateUserRelatedResources,
       );
@@ -1866,7 +1881,7 @@ class PageService implements IPageService {
     const readStream = await iterableFactory.generateReadable();
     const batchStream = createBatchStream(BULK_REINDEX_SIZE);
 
-    const newPagePathPrefix = newPagePath;
+    const newPagePathPrefix = newPagePathSanitized;
     const pathRegExp = new RegExp(`^${escapeStringRegexp(page.path)}`, 'i');
 
     const duplicateDescendants = this.duplicateDescendants.bind(this);
@@ -1899,7 +1914,7 @@ class PageService implements IPageService {
       async final(callback) {
         logger.debug(`Adding pages has completed: (totalCount=${count})`);
         // update  path
-        page.path = newPagePath;
+        page.path = newPagePathSanitized;
         pageEvent.emit('syncDescendantsUpdate', page, user);
         callback();
       },
@@ -1912,7 +1927,7 @@ class PageService implements IPageService {
 
   private async duplicateDescendantsWithStreamV4(
     page,
-    newPagePath,
+    newPagePathSanitized,
     user,
     onlyDuplicateUserRelatedResources: boolean,
   ) {
@@ -1922,7 +1937,7 @@ class PageService implements IPageService {
     );
     const batchStream = createBatchStream(BULK_REINDEX_SIZE);
 
-    const newPagePathPrefix = newPagePath;
+    const newPagePathPrefix = newPagePathSanitized;
     const pathRegExp = new RegExp(`^${escapeStringRegexp(page.path)}`, 'i');
 
     const duplicateDescendants = this.duplicateDescendants.bind(this);
@@ -1930,7 +1945,7 @@ class PageService implements IPageService {
     let count = 0;
     const writeStream = new Writable({
       objectMode: true,
-      async write(batch, encoding, callback) {
+      async write(batch, _encoding, callback) {
         try {
           count += batch.length;
           await duplicateDescendants(
@@ -1950,7 +1965,7 @@ class PageService implements IPageService {
       final(callback) {
         logger.debug(`Adding pages has completed: (totalCount=${count})`);
         // update  path
-        page.path = newPagePath;
+        page.path = newPagePathSanitized;
         pageEvent.emit('syncDescendantsUpdate', page, user);
         callback();
       },
@@ -4910,22 +4925,22 @@ class PageService implements IPageService {
     );
 
     // sanitize path
-    path = generalXssFilter.process(path); // eslint-disable-line no-param-reassign
+    const pathSanitized = generalXssFilter.process(path);
 
     let grant = options.grant;
     // force public
-    if (isTopPage(path)) {
+    if (isTopPage(pathSanitized)) {
       grant = PageGrant.GRANT_PUBLIC;
     }
 
-    const isExist = await Page.count({ path });
+    const isExist = await Page.count({ path: pathSanitized });
 
     if (isExist) {
       throw new Error('Cannot create new page to existed path');
     }
 
     const page = new Page();
-    page.path = path;
+    page.path = pathSanitized;
     page.creator = user;
     page.lastUpdateUser = user;
     page.status = PageStatus.STATUS_PUBLISHED;
@@ -5004,11 +5019,10 @@ class PageService implements IPageService {
     }
 
     // Values
-    // eslint-disable-next-line no-param-reassign
-    path = generalXssFilter.process(path); // sanitize path
+    const pathSanitized = generalXssFilter.process(path);
 
     const { grantUserGroupIds, grantUserIds } = options;
-    const grant = isTopPage(path) ? Page.GRANT_PUBLIC : options.grant;
+    const grant = isTopPage(pathSanitized) ? Page.GRANT_PUBLIC : options.grant;
 
     const isGrantRestricted = grant === Page.GRANT_RESTRICTED;
     const isGrantOwner = grant === Page.GRANT_OWNER;
@@ -5024,27 +5038,31 @@ class PageService implements IPageService {
       throw Error('grantedUser must exist when grant is GRANT_OWNER');
     }
     const canProcessForceCreateBySystem =
-      await this.canProcessForceCreateBySystem(path, grantData);
+      await this.canProcessForceCreateBySystem(pathSanitized, grantData);
     if (!canProcessForceCreateBySystem) {
       throw Error('Cannot process forceCreateBySystem');
     }
 
     // Prepare a page document
     const shouldNew = isGrantRestricted;
-    const page = await this.preparePageDocumentToCreate(path, shouldNew);
+    const page = await this.preparePageDocumentToCreate(
+      pathSanitized,
+      shouldNew,
+    );
 
     // Set field
-    this.setFieldExceptForGrantRevisionParent(page, path);
+    this.setFieldExceptForGrantRevisionParent(page, pathSanitized);
 
     // Apply scope
     page.applyScope({ _id: grantUserIds?.[0] }, grant, grantUserGroupIds);
 
     // Set parent
-    if (isTopPage(path) || isGrantRestricted) {
+    if (isTopPage(pathSanitized) || isGrantRestricted) {
       // set parent to null when GRANT_RESTRICTED
       page.parent = null;
     } else {
-      const parent = await this.getParentAndFillAncestorsBySystem(path);
+      const parent =
+        await this.getParentAndFillAncestorsBySystem(pathSanitized);
       page.parent = parent._id;
     }
 

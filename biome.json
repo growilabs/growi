@@ -60,6 +60,9 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "style": {
+        "noParameterAssign": "warn"
+      },
       "suspicious": {
         "noConsole": "error"
       },
