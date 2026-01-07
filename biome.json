@@ -64,7 +64,8 @@
         "noParameterAssign": "warn"
       },
       "suspicious": {
-        "noConsole": "error"
+        "noConsole": "error",
+        "noAlert": "error"
       },
       "performance": {
         "noAwaitInLoops": "warn"

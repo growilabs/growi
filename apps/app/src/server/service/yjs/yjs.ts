@@ -111,7 +111,7 @@ class YjsService implements IYjsService {
     const persistece = createMongoDBPersistence(mdb);
 
     // foce set to private property
-    // eslint-disable-next-line dot-notation
+    // biome-ignore lint/complexity/useLiteralKeys: ignore
     ysocketio['persistence'] = persistece;
   }
 
