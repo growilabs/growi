@@ -25,7 +25,6 @@ type ExtraProps = {
 };
 type Props = AdminCommonProps & ExtraProps;
 
-// eslint-disable-next-line react/prop-types
 const AdminHomepage: NextPageWithLayout<Props> = ({
   growiCloudUri,
   growiAppIdForGrowiCloud,

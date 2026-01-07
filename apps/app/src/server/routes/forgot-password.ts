@@ -8,7 +8,7 @@ import type { IPasswordResetOrder } from '../models/password-reset-order';
 
 const logger = loggerFactory('growi:routes:forgot-password');
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export const checkForgotPasswordEnabledMiddlewareFactory = (
   crowi: any,
   forApi = false,

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { SlackbotType } from '@growi/slack';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
@@ -16,8 +16,6 @@ import UserTriggerNotification from './UserTriggerNotification';
 
 const logger = loggerFactory('growi:NotificationSetting');
 
-let retrieveErrors = null;
-
 const SettingsIcon = () => (
   <span className="material-symbols-outlined">settings</span>
 );
@@ -33,7 +31,6 @@ const navTabMapping = {
   },
 };
 
-// eslint-disable-next-line react/prop-types
 const Badge = ({ isEnabled }) => {
   const { t } = useTranslation('admin');
 
@@ -57,7 +54,6 @@ const SkeletonListItem = () => (
   </li>
 );
 
-// eslint-disable-next-line react/prop-types
 const SlackIntegrationListItem = ({ isEnabled, currentBotType }) => {
   const { t } = useTranslation('admin');
 
@@ -90,7 +86,6 @@ const SlackIntegrationListItem = ({ isEnabled, currentBotType }) => {
   );
 };
 
-// eslint-disable-next-line react/prop-types
 const LegacySlackIntegrationListItem = ({ isEnabled }) => {
   const { t } = useTranslation('admin');
 

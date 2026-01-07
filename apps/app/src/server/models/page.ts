@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { GroupType, type HasObjectId, type IPage } from '@growi/core';
 import type {
   IPagePopulatedToShowRevision,

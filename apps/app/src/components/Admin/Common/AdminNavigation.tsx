@@ -10,7 +10,6 @@ import styles from './AdminNavigation.module.scss';
 
 const moduleClass = styles['admin-navigation'];
 
-// eslint-disable-next-line react/prop-types
 const MenuLabel = ({ menu }: { menu: string }) => {
   const { t } = useTranslation(['admin', 'commons']);
 

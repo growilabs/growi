@@ -1,5 +1,4 @@
-/* eslint-disable react/prop-types */
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { SlackbotType } from '@growi/slack';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
