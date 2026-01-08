@@ -123,7 +123,7 @@ export const TrashPageList = (): JSX.Element => {
   }, [t]);
 
   return (
-    <div data-testid="trash-page-list" className="mt-5 d-edit-none">
+    <div data-testid="trash-page-list" className="d-edit-none">
       <CustomNavAndContents
         navTabMapping={navTabMapping}
         navRightElement={emptyTrashButton}

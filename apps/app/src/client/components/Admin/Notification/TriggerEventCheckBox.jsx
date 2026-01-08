@@ -1,5 +1,4 @@
 import React from 'react';
-
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
@@ -15,14 +14,15 @@ const TriggerEventCheckBox = (props) => {
         checked={props.checked}
         onChange={props.onChange}
       />
-      <label className="form-label form-check-label" htmlFor={`trigger-event-${props.event}`}>
-        {props.children}{' '}
-        {t(`notification_settings.event_${props.event}`)}
+      <label
+        className="form-label form-check-label"
+        htmlFor={`trigger-event-${props.event}`}
+      >
+        {props.children} {t(`notification_settings.event_${props.event}`)}
       </label>
     </div>
   );
 };
-
 
 TriggerEventCheckBox.propTypes = {
   t: PropTypes.func.isRequired, // i18next

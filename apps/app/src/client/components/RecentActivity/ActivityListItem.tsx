@@ -1,11 +1,13 @@
 import { formatDistanceToNow } from 'date-fns';
-import { type Locale } from 'date-fns/locale';
+import type { Locale } from 'date-fns/locale';
 import { useTranslation } from 'next-i18next';
 
-import type { SupportedActivityActionType, ActivityHasTargetPage } from '~/interfaces/activity';
+import type {
+  ActivityHasTargetPage,
+  SupportedActivityActionType,
+} from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
 import { getLocale } from '~/server/util/locale-utils';
-
 
 export const ActivityActionTranslationMap: Record<
   SupportedActivityActionType,
@@ -38,16 +40,16 @@ export const IconActivityTranslationMap: Record<
 };
 
 type ActivityListItemProps = {
-  activity: ActivityHasTargetPage,
-}
+  activity: ActivityHasTargetPage;
+};
 
 type AllowPageDisplayPayload = {
-  grant: number | undefined,
-  status: string,
-  wip: boolean,
-  deletedAt?: Date,
-  path: string,
-}
+  grant: number | undefined;
+  status: string;
+  wip: boolean;
+  deletedAt?: Date;
+  path: string;
+};
 
 const translateAction = (action: SupportedActivityActionType): string => {
   return ActivityActionTranslationMap[action] || 'unknown_action';
@@ -66,10 +68,10 @@ const calculateTimePassed = (date: Date, locale: Locale): string => {
   return timePassed;
 };
 
-const pageAllowedForDisplay = (allowDisplayPayload: AllowPageDisplayPayload): boolean => {
-  const {
-    grant, status, wip, deletedAt,
-  } = allowDisplayPayload;
+const pageAllowedForDisplay = (
+  allowDisplayPayload: AllowPageDisplayPayload,
+): boolean => {
+  const { grant, status, wip, deletedAt } = allowDisplayPayload;
   if (grant !== 1) return false;
 
   if (status !== 'published') return false;
@@ -87,18 +89,18 @@ const setPath = (path: string, allowed: boolean): string => {
   return '';
 };
 
-
-export const ActivityListItem = ({ props }: { props: ActivityListItemProps }): JSX.Element => {
+export const ActivityListItem = ({
+  props,
+}: {
+  props: ActivityListItemProps;
+}): JSX.Element => {
   const { t, i18n } = useTranslation();
   const currentLangCode = i18n.language;
   const dateFnsLocale = getLocale(currentLangCode);
 
   const { activity } = props;
 
-  const {
-    path, grant, status, wip, deletedAt,
-  } = activity.target;
-
+  const { path, grant, status, wip, deletedAt } = activity.target;
 
   const allowDisplayPayload: AllowPageDisplayPayload = {
     grant,
@@ -127,21 +129,16 @@ export const ActivityListItem = ({ props }: { props: ActivityListItemProps }): J
               href={setPath(path, isPageAllowed)}
               className="activity-target-link fw-bold text-wrap d-block"
             >
-              <span>
-                {setPath(path, isPageAllowed)}
-              </span>
+              <span>{setPath(path, isPageAllowed)}</span>
             </a>
           </div>
 
           <div className="activity-details-line d-flex">
-            <span>
-              {t(fullKeyPath)}
-            </span>
+            <span>{t(fullKeyPath)}</span>
 
             <span className="text-secondary small ms-3 align-self-center">
               {calculateTimePassed(activity.createdAt, dateFnsLocale)}
             </span>
-
           </div>
         </div>
       </div>

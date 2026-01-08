@@ -1,12 +1,14 @@
-import React, { useMemo } from 'react';
-
+import type React from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
-import { Modal, ModalHeader, ModalBody } from 'reactstrap';
+import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
-import { useShortcutsModalStatus, useShortcutsModalActions } from '~/states/ui/modal/shortcuts';
+import {
+  useShortcutsModalActions,
+  useShortcutsModalStatus,
+} from '~/states/ui/modal/shortcuts';
 
 import styles from './ShortcutsModal.module.scss';
-
 
 /**
  * ShortcutsModalSubstance - Presentation component (heavy logic, rendered only when isOpen)
@@ -17,8 +19,8 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
 
   // Memoize OS-specific class
   const additionalClassByOs = useMemo(() => {
-    const platform = window.navigator.platform.toLowerCase();
-    const isMac = (platform.indexOf('mac') > -1);
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isMac = userAgent.indexOf('mac') > -1;
     return isMac ? 'mac' : 'win';
   }, []);
 
@@ -39,7 +41,12 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
                   <span
                     className="text-nowrap"
                     // eslint-disable-next-line react/no-danger
-                    dangerouslySetInnerHTML={{ __html: t('modal_shortcuts.global.Open/Close shortcut help') }}
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n content includes markup
+                    dangerouslySetInnerHTML={{
+                      __html: t(
+                        'modal_shortcuts.global.Open/Close shortcut help',
+                      ),
+                    }}
                   />
                 </div>
                 <div className="d-flex align-items-center">
@@ -50,21 +57,27 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               </li>
               {/* Create Page */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.global.Create Page')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.global.Create Page')}
+                </div>
                 <div>
                   <span className="key">C</span>
                 </div>
               </li>
               {/* Edit Page */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.global.Edit Page')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.global.Edit Page')}
+                </div>
                 <div>
                   <span className="key">E</span>
                 </div>
               </li>
               {/* Search */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.global.Search')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.global.Search')}
+                </div>
                 <div>
                   <span className="key">/</span>
                 </div>
@@ -75,27 +88,50 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
                   <span
                     className="text-nowrap"
                     // eslint-disable-next-line react/no-danger
-                    dangerouslySetInnerHTML={{ __html: t('modal_shortcuts.global.Show Contributors') }}
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n content includes markup
+                    dangerouslySetInnerHTML={{
+                      __html: t('modal_shortcuts.global.Show Contributors'),
+                    }}
                   />
                 </div>
                 <div className="text-start">
-                  <a href={t('modal_shortcuts.global.konami_code_url')} target="_blank" rel="noreferrer">
+                  <a
+                    href={t('modal_shortcuts.global.konami_code_url')}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     <span className="text-secondary small">
                       {t('modal_shortcuts.global.Konami Code')}
                     </span>
                   </a>
                   <div className="d-flex gap-2 flex-column align-items-start mt-1">
                     <div className="d-flex gap-1">
-                      <span className="key material-symbols-outlined fs-5 px-0">arrow_upward</span>
-                      <span className="key material-symbols-outlined fs-5 px-0">arrow_upward</span>
-                      <span className="key material-symbols-outlined fs-5 px-0">arrow_downward</span>
-                      <span className="key material-symbols-outlined fs-5 px-0">arrow_downward</span>
+                      <span className="key material-symbols-outlined fs-5 px-0">
+                        arrow_upward
+                      </span>
+                      <span className="key material-symbols-outlined fs-5 px-0">
+                        arrow_upward
+                      </span>
+                      <span className="key material-symbols-outlined fs-5 px-0">
+                        arrow_downward
+                      </span>
+                      <span className="key material-symbols-outlined fs-5 px-0">
+                        arrow_downward
+                      </span>
                     </div>
                     <div className="d-flex gap-1">
-                      <span className="key material-symbols-outlined fs-5 px-0">arrow_back</span>
-                      <span className="key material-symbols-outlined fs-5 px-0">arrow_forward</span>
-                      <span className="key material-symbols-outlined fs-5 px-0">arrow_back</span>
-                      <span className="key material-symbols-outlined fs-5 px-0">arrow_forward</span>
+                      <span className="key material-symbols-outlined fs-5 px-0">
+                        arrow_back
+                      </span>
+                      <span className="key material-symbols-outlined fs-5 px-0">
+                        arrow_forward
+                      </span>
+                      <span className="key material-symbols-outlined fs-5 px-0">
+                        arrow_back
+                      </span>
+                      <span className="key material-symbols-outlined fs-5 px-0">
+                        arrow_forward
+                      </span>
                     </div>
                     <div className="d-flex gap-1">
                       <span className="key">B</span>
@@ -106,9 +142,15 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               </li>
               {/* Mirror Mode */}
               <li className="d-flex align-items-center p-3">
-                <div className="flex-grow-1">{t('modal_shortcuts.global.MirrorMode')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.global.MirrorMode')}
+                </div>
                 <div className="text-start">
-                  <a href={t('modal_shortcuts.global.konami_code_url')} target="_blank" rel="noreferrer">
+                  <a
+                    href={t('modal_shortcuts.global.konami_code_url')}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     <span className="text-secondary small">
                       {t('modal_shortcuts.global.Konami Code')}
                     </span>
@@ -127,8 +169,12 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
                       <span className="key">Y</span>
                     </div>
                     <div className="d-flex gap-1">
-                      <span className="key material-symbols-outlined fs-5 px-0">arrow_downward</span>
-                      <span className="key material-symbols-outlined fs-5 px-0">arrow_back</span>
+                      <span className="key material-symbols-outlined fs-5 px-0">
+                        arrow_downward
+                      </span>
+                      <span className="key material-symbols-outlined fs-5 px-0">
+                        arrow_back
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -143,7 +189,9 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
             <ul className="list-unstyled m-0">
               {/* Search in Editor */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.editor.Search in Editor')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.editor.Search in Editor')}
+                </div>
                 <div className="text-nowrap">
                   <span className={`key cmd-key ${additionalClassByOs}`}></span>
                   <span className="text-secondary mx-2">+</span>
@@ -154,7 +202,9 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               <li className="d-flex align-items-center p-3 border-bottom">
                 <div className="flex-grow-1">
                   {t('modal_shortcuts.editor.Save Page')}
-                  <span className="small text-secondary ms-1">{t('modal_shortcuts.editor.Only Editor')}</span>
+                  <span className="small text-secondary ms-1">
+                    {t('modal_shortcuts.editor.Only Editor')}
+                  </span>
                 </div>
                 <div className="text-nowrap">
                   <span className={`key cmd-key ${additionalClassByOs}`}></span>
@@ -164,14 +214,18 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               </li>
               {/* Indent */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.editor.Indent')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.editor.Indent')}
+                </div>
                 <div>
                   <span className="key">Tab</span>
                 </div>
               </li>
               {/* Outdent */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.editor.Outdent')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.editor.Outdent')}
+                </div>
                 <div className="text-nowrap gap-1">
                   <span className="key">Shift</span>
                   <span className="text-secondary mx-2">+</span>
@@ -180,7 +234,9 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               </li>
               {/* Delete Line */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.editor.Delete Line')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.editor.Delete Line')}
+                </div>
                 <div className="text-nowrap">
                   <span className={`key cmd-key ${additionalClassByOs}`}></span>
                   <span className="text-secondary mx-2">+</span>
@@ -194,10 +250,15 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
                 <div className="flex-grow-1">
                   <span
                     // eslint-disable-next-line react/no-danger
-                    dangerouslySetInnerHTML={{ __html: t('modal_shortcuts.editor.Insert Line') }}
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n content includes markup
+                    dangerouslySetInnerHTML={{
+                      __html: t('modal_shortcuts.editor.Insert Line'),
+                    }}
                   />
                   <br />
-                  <span className="small text-secondary ms-1">{t('modal_shortcuts.editor.Post Comment')}</span>
+                  <span className="small text-secondary ms-1">
+                    {t('modal_shortcuts.editor.Post Comment')}
+                  </span>
                 </div>
                 <div className="text-nowrap">
                   <span className={`key cmd-key ${additionalClassByOs}`}></span>
@@ -207,30 +268,44 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               </li>
               {/* Move Line */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.editor.Move Line')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.editor.Move Line')}
+                </div>
                 <div className="text-nowrap">
                   <span className={`key alt-key ${additionalClassByOs}`}></span>
                   <span className="text-secondary mx-2">+</span>
-                  <span className="key material-symbols-outlined fs-5 px-0">arrow_downward</span>
+                  <span className="key material-symbols-outlined fs-5 px-0">
+                    arrow_downward
+                  </span>
                   <span className="text-secondary mx-2">or</span>
-                  <span className="key material-symbols-outlined fs-5 px-0">arrow_upward</span>
+                  <span className="key material-symbols-outlined fs-5 px-0">
+                    arrow_upward
+                  </span>
                 </div>
               </li>
               {/* Copy Line */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.editor.Copy Line')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.editor.Copy Line')}
+                </div>
                 <div className="text-nowrap">
                   <div className="text-start">
                     <div>
-                      <span className={`key alt-key ${additionalClassByOs}`}></span>
+                      <span
+                        className={`key alt-key ${additionalClassByOs}`}
+                      ></span>
                       <span className="text-secondary mx-2">+</span>
                       <span className="key">Shift</span>
                       <span className="text-secondary ms-2">+</span>
                     </div>
                     <div className="mt-1">
-                      <span className="key material-symbols-outlined fs-5 px-0">arrow_downward</span>
+                      <span className="key material-symbols-outlined fs-5 px-0">
+                        arrow_downward
+                      </span>
                       <span className="text-secondary mx-2">or</span>
-                      <span className="key material-symbols-outlined fs-5 px-0">arrow_upward</span>
+                      <span className="key material-symbols-outlined fs-5 px-0">
+                        arrow_upward
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -243,18 +318,27 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
                 <div className="text-nowrap">
                   <div className="text-end">
                     <div>
-                      <span className={`key cmd-key ${additionalClassByOs}`}></span>
+                      <span
+                        className={`key cmd-key ${additionalClassByOs}`}
+                      ></span>
                       <span className="text-secondary mx-2">+</span>
-                      <span className={`key alt-key ${additionalClassByOs}`}></span>
+                      <span
+                        className={`key alt-key ${additionalClassByOs}`}
+                      ></span>
                       <span className="text-secondary ms-2">+</span>
                     </div>
                     <div className="mt-1">
-                      <span className="key material-symbols-outlined fs-5 px-0">arrow_downward</span>
+                      <span className="key material-symbols-outlined fs-5 px-0">
+                        arrow_downward
+                      </span>
                       <span className="text-secondary mx-2">or</span>
-                      <span className="key material-symbols-outlined fs-5 px-0">arrow_upward</span>
+                      <span className="key material-symbols-outlined fs-5 px-0">
+                        arrow_upward
+                      </span>
                     </div>
-                    <span className="small text-secondary">{t('modal_shortcuts.editor.Or Alt Click')}</span>
-
+                    <span className="small text-secondary">
+                      {t('modal_shortcuts.editor.Or Alt Click')}
+                    </span>
                   </div>
                 </div>
               </li>
@@ -271,7 +355,9 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
             <ul className="list-unstyled m-0">
               {/* Bold */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.format.Bold')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.format.Bold')}
+                </div>
                 <div className="text-nowrap">
                   <span className={`key cmd-key ${additionalClassByOs}`}></span>
                   <span className="text-secondary mx-2">+</span>
@@ -280,7 +366,9 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               </li>
               {/* Italic */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.format.Italic')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.format.Italic')}
+                </div>
                 <div className="text-nowrap">
                   <span className={`key cmd-key ${additionalClassByOs}`}></span>
                   <span className="text-secondary mx-2">+</span>
@@ -291,7 +379,9 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               </li>
               {/* Strikethrough */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.format.Strikethrough')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.format.Strikethrough')}
+                </div>
                 <div className="text-nowrap">
                   <span className={`key cmd-key ${additionalClassByOs}`}></span>
                   <span className="text-secondary mx-2">+</span>
@@ -302,7 +392,9 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               </li>
               {/* Code Text */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.format.Code Text')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.format.Code Text')}
+                </div>
                 <div className="text-nowrap">
                   <span className={`key cmd-key ${additionalClassByOs}`}></span>
                   <span className="text-secondary mx-2">+</span>
@@ -313,7 +405,9 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               </li>
               {/* Hyperlink */}
               <li className="d-flex align-items-center p-3">
-                <div className="flex-grow-1">{t('modal_shortcuts.format.Hyperlink')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.format.Hyperlink')}
+                </div>
                 <div className="text-nowrap">
                   <span className={`key cmd-key ${additionalClassByOs}`}></span>
                   <span className="text-secondary mx-2">+</span>
@@ -332,7 +426,9 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
             <ul className="list-unstyled m-0">
               {/* Simple List */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.line_settings.Numbered List')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.line_settings.Numbered List')}
+                </div>
                 <div className="text-nowrap">
                   <span className={`key cmd-key ${additionalClassByOs}`}></span>
                   <span className="text-secondary mx-2">+</span>
@@ -343,7 +439,9 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               </li>
               {/* Numbered List */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.line_settings.Bullet List')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.line_settings.Bullet List')}
+                </div>
                 <div className="text-nowrap">
                   <span className={`key cmd-key ${additionalClassByOs}`}></span>
                   <span className="text-secondary mx-2">+</span>
@@ -354,7 +452,9 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               </li>
               {/* Quote */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.line_settings.Quote')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.line_settings.Quote')}
+                </div>
                 <div className="text-nowrap">
                   <span className={`key cmd-key ${additionalClassByOs}`}></span>
                   <span className="text-secondary mx-2">+</span>
@@ -365,13 +465,19 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               </li>
               {/* Code Block */}
               <li className="d-flex align-items-center p-3 border-bottom">
-                <div className="flex-grow-1">{t('modal_shortcuts.line_settings.Code Block')}</div>
+                <div className="flex-grow-1">
+                  {t('modal_shortcuts.line_settings.Code Block')}
+                </div>
                 <div className="text-nowrap">
                   <div className="text-start">
                     <div>
-                      <span className={`key cmd-key ${additionalClassByOs}`}></span>
+                      <span
+                        className={`key cmd-key ${additionalClassByOs}`}
+                      ></span>
                       <span className="text-secondary mx-2">+</span>
-                      <span className={`key alt-key ${additionalClassByOs}`}></span>
+                      <span
+                        className={`key alt-key ${additionalClassByOs}`}
+                      ></span>
                       <span className="text-secondary ms-2">+</span>
                     </div>
                     <div className="mt-1">
@@ -385,8 +491,11 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
               {/* Hide comments */}
               <li className="d-flex align-items-center p-3">
                 <div className="flex-grow-1">
-                  {t('modal_shortcuts.line_settings.Comment Out')}<br />
-                  <span className="small text-secondary">{t('modal_shortcuts.line_settings.Comment Out Desc')}</span>
+                  {t('modal_shortcuts.line_settings.Comment Out')}
+                  <br />
+                  <span className="small text-secondary">
+                    {t('modal_shortcuts.line_settings.Comment Out Desc')}
+                  </span>
                 </div>
                 <div className="text-nowrap">
                   <span className={`key cmd-key ${additionalClassByOs}`}></span>
@@ -421,7 +530,13 @@ export const ShortcutsModal = (): React.JSX.Element => {
   const { close } = useShortcutsModalActions();
 
   return (
-    <Modal id="shortcuts-modal" size="lg" isOpen={status?.isOpened ?? false} toggle={close} className={`shortcuts-modal ${styles['shortcuts-modal']}`}>
+    <Modal
+      id="shortcuts-modal"
+      size="lg"
+      isOpen={status?.isOpened ?? false}
+      toggle={close}
+      className={`shortcuts-modal ${styles['shortcuts-modal']}`}
+    >
       {status?.isOpened && <ShortcutsModalSubstance />}
     </Modal>
   );

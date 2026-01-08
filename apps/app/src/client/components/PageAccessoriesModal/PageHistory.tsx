@@ -1,19 +1,20 @@
-import React from 'react';
+import type React from 'react';
 
-import { useCurrentPagePath, useCurrentPageId } from '~/states/page';
+import { useCurrentPageId, useCurrentPagePath } from '~/states/page';
 import loggerFactory from '~/utils/logger';
 
 import { PageRevisionTable } from '../PageHistory/PageRevisionTable';
-
 import { useAutoComparingRevisionsByQueryParam } from './hooks';
 
 const logger = loggerFactory('growi:PageHistory');
 
 type PageHistoryProps = {
-  onClose: () => void
-}
+  onClose: () => void;
+};
 
-export const PageHistory: React.FC<PageHistoryProps> = (props: PageHistoryProps) => {
+export const PageHistory: React.FC<PageHistoryProps> = (
+  props: PageHistoryProps,
+) => {
   const { onClose } = props;
 
   const currentPageId = useCurrentPageId();

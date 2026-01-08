@@ -1,25 +1,19 @@
 import type { FC, JSX } from 'react';
-import {
-  Suspense, useState, useCallback, useMemo,
-} from 'react';
-
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { dirname } from 'pathe';
-import {
-  Modal, ModalHeader, ModalBody, ModalFooter, Button,
-} from 'reactstrap';
+import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 import { ItemsTree } from '~/features/page-tree/components';
 import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
 import { useCurrentPageData } from '~/states/page';
 import {
-  usePageSelectModalStatus,
   usePageSelectModalActions,
+  usePageSelectModalStatus,
   useSelectedPageInModal,
 } from '~/states/ui/modal/page-select';
 
 import ItemsTreeContentSkeleton from '../ItemsTree/ItemsTreeContentSkeleton';
-
 import { TreeItemForModal, treeItemForModalSize } from './TreeItemForModal';
 
 const PageSelectModalSubstance: FC = () => {
@@ -43,7 +37,8 @@ const PageSelectModalSubstance: FC = () => {
   // Get selected page from atom
   const selectedPage = useSelectedPageInModal();
 
-  const isHierarchicalSelectionMode = opts?.isHierarchicalSelectionMode ?? false;
+  const isHierarchicalSelectionMode =
+    opts?.isHierarchicalSelectionMode ?? false;
 
   const onClickCancel = useCallback(() => {
     closeModal();
@@ -66,9 +61,10 @@ const PageSelectModalSubstance: FC = () => {
   }, [currentPage?.path]);
 
   // Memoize target path calculation
-  const targetPath = useMemo(() => (
-    selectedPage?.path || parentPagePath
-  ), [selectedPage?.path, parentPagePath]);
+  const targetPath = useMemo(
+    () => selectedPage?.path || parentPagePath,
+    [selectedPage?.path, parentPagePath],
+  );
 
   // Memoize checkbox handler
   const handleIncludeSubPageChange = useCallback(() => {
@@ -81,7 +77,9 @@ const PageSelectModalSubstance: FC = () => {
 
   return (
     <>
-      <ModalHeader toggle={closeModal}>{t('page_select_modal.select_page_location')}</ModalHeader>
+      <ModalHeader toggle={closeModal}>
+        {t('page_select_modal.select_page_location')}
+      </ModalHeader>
       <ModalBody className="p-0">
         <Suspense fallback={<ItemsTreeContentSkeleton />}>
           {/* 133px = 63px(ModalHeader) + 70px(ModalFooter) */}
@@ -105,7 +103,7 @@ const PageSelectModalSubstance: FC = () => {
         </Suspense>
       </ModalBody>
       <ModalFooter className="border-top d-flex flex-column">
-        { isHierarchicalSelectionMode && (
+        {isHierarchicalSelectionMode && (
           <div className="form-check form-check-info align-self-start ms-4">
             <input
               type="checkbox"
@@ -124,8 +122,12 @@ const PageSelectModalSubstance: FC = () => {
           </div>
         )}
         <div className="d-flex gap-2 align-self-end">
-          <Button color="secondary" onClick={onClickCancel}>{t('Cancel')}</Button>
-          <Button color="primary" onClick={onClickDone}>{t('Done')}</Button>
+          <Button color="secondary" onClick={onClickCancel}>
+            {t('Cancel')}
+          </Button>
+          <Button color="primary" onClick={onClickDone}>
+            {t('Done')}
+          </Button>
         </div>
       </ModalFooter>
     </>

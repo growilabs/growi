@@ -780,6 +780,11 @@
       "updatedAt": "Dernière modification"
     }
   },
+  "help_dropdown": {
+    "show_shortcuts": "Afficher les raccourcis",
+    "growi_cloud_help": "Aide GROWI.cloud",
+    "growi_version": "Version GROWI"
+  },
   "private_legacy_pages": {
     "title": "Anciennes pages privées",
     "bulk_operation": "Opération de masse",
