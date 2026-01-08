@@ -31,13 +31,14 @@ const CustomizeLogoSetting = (): JSX.Element => {
   const [isDefaultLogoSelected, setIsDefaultLogoSelected] = useState<boolean>(isDefaultLogo ?? true);
   const [retrieveError, setRetrieveError] = useState<any>();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const isUpdateButtonDisabled = retrieveError != null || (!isDefaultLogoSelected && uploadLogoSrc == null && !isCustomizedLogoUploaded);
+  const isSystemError: boolean = retrieveError != null;
+  const isLogoSettingIncomplete: boolean = !isDefaultLogoSelected && (uploadLogoSrc == null && !isCustomizedLogoUploaded);
+  const isUpdateButtonDisabled: boolean = isSystemError || isLogoSettingIncomplete;
 
   const onSelectFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    const hasFile = files != null && files.length > 0;
+    const files: FileList | null = e.target.files;
 
-    if (hasFile) {
+    if (files != null && files.length > 0) {
       const reader = new FileReader();
       reader.addEventListener('load', () => setUploadLogoSrc(reader.result));
       reader.readAsDataURL(files[0]);
