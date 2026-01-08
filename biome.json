@@ -23,6 +23,7 @@
       "!**/.stylelintrc.json",
       "!**/package.json",
       "!apps/app/src/styles/prebuilt",
+      "!apps/app/src/styles/tailwind.css",
       "!apps/app/tmp",
       "!apps/pdf-converter/specs",
       "!apps/slackbot-proxy/src/public/bootstrap",

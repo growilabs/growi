@@ -25,7 +25,9 @@ import type {
 } from '../../interfaces/message';
 import type { IThreadRelationHasId } from '../../interfaces/thread-relation';
 import { ThreadType } from '../../interfaces/thread-relation';
-import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
+// import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
+// import { useAiAssistantSidebar } from '../stores/ai-assistant';
+// import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
@@ -179,10 +181,11 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
     }
 
     return (
-      <AiAssistantChatInitialView
-        description={aiAssistantData.description}
-        pagePathPatterns={aiAssistantData.pagePathPatterns}
-      />
+      // <AiAssistantChatInitialView
+      //   description={aiAssistantSidebarData.aiAssistantData.description}
+      //   pagePathPatterns={aiAssistantSidebarData.aiAssistantData.pagePathPatterns}
+      // />
+      <></>
     );
   }, [aiAssistantData]);
 

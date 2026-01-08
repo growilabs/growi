@@ -25,9 +25,9 @@ const InlineCodeBlockSubstance = (props: InlineCodeBlockProps): JSX.Element => {
   );
 };
 
-function extractChildrenToIgnoreReactNode(children: ReactNode): ReactNode {
+function extractChildrenToIgnoreReactNode(children: ReactNode): string {
   if (children == null) {
-    return children;
+    return '';
   }
 
   // Single element array
@@ -108,8 +108,8 @@ export const CodeBlock = (props: CodeBlockProps): JSX.Element => {
   }
 
   const match = /language-(\w+)(:?.+)?/.exec(className || '');
-  const lang = match && match[1] ? match[1] : '';
-  const name = match && match[2] ? match[2].slice(1) : null;
+  const lang = match?.[1] ?? '';
+  const name = match?.[2]?.slice(1) ?? null;
 
   return (
     <>
