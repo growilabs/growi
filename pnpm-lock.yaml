@@ -857,6 +857,9 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
+      '@typescript/native-preview':
+        specifier: 7.0.0-dev.20260108.1
+        version: 7.0.0-dev.20260108.1
       babel-loader:
         specifier: ^8.2.5
         version: 8.3.0(@babel/core@7.24.6)(webpack@5.92.1(@swc/core@1.10.7(@swc/helpers@0.5.18)))
@@ -5962,6 +5965,45 @@ packages:
   '@types/zen-observable@0.8.3':
     resolution: {integrity: sha512-fbF6oTd4sGGy0xjHPKAt+eS2CrxJ3+6gQ3FGcBoIJR2TLAyCkCyI8JqZNy+FeON0AhVgNJoUumVoZQjBFUqHkw==}
 
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260108.1':
+    resolution: {integrity: sha512-ASs9Qec6SFtmvFp89DpuXaRbR4H5ilIxG/l3WZY9YdBQyr/ZNdY0itHYx+3JtlsTxoo2r7daRoreRy8olpkJEw==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260108.1':
+    resolution: {integrity: sha512-bqD5TBjN7ikeQjyoDFcHjooLzIJ8qwBihhrmVASXHFNHhbbD11nf1rL/v42B7O2kUcFTt6fyBFsS4rJPAMWbbg==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260108.1':
+    resolution: {integrity: sha512-stUw/kVZCWEmYDkcY5sorZwRUufUrirMNFjntUAgetUCFcqNErpxwaDstF7HKdcTC44oo40afE0qT2ZhCtisyw==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260108.1':
+    resolution: {integrity: sha512-2DFXwvxf4ZKx408s/BWjUeLlqmyzW7aTIML2m8Tn8qsElImJS4Uujr7qF7a+2ahnA886MySTmzZJ2tDZp7P+KA==}
+    cpu: [arm]
+    os: [linux]
+
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260108.1':
+    resolution: {integrity: sha512-fGQ7vCwZ8ipNF1wdJ1JXPOniKWnFvgfsT6yBFWMlPUERDSZLByIBXZIajilV2ypl8tTQgPygCJoXO68Fb8599Q==}
+    cpu: [x64]
+    os: [linux]
+
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260108.1':
+    resolution: {integrity: sha512-zcvtTXRR9wlkzdmKtoHDvzBL0sAySkovXrMydtmynwSoZRYS2EFh68sdiysyRmKDaUVSR8IRmbqiiGjkIXHWdw==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260108.1':
+    resolution: {integrity: sha512-ZZ/n5ILDUS1MPchVr9FTqXgKfZ/WWfXcU2YxBxiNJ6ksirE49Yuzfias80siRS1O8F9BoDEvUzOKJZjU+Ez9NA==}
+    cpu: [x64]
+    os: [win32]
+
+  '@typescript/native-preview@7.0.0-dev.20260108.1':
+    resolution: {integrity: sha512-c7unqmodysPZ5K9gVKOz9u2Ca9g/CUsSQZfHJ+RJ3TDlopfYYOs7Ui/OyDD8lbn9epteXB0S8LgdFRWpUqhgMg==}
+    hasBin: true
+
   '@uiw/codemirror-extensions-basic-setup@4.23.8':
     resolution: {integrity: sha512-XJR/8AEVcE7ufy1BhW2nCN9qSVDYEdCtYLfvhaMwl6Q3qcaYYCGE2K5QbFCy7LsdP/3uZKvc1OskuqatoOPdhQ==}
     peerDependencies:
@@ -10265,7 +10307,6 @@ packages:
     resolution: {integrity: sha512-Quz3MvAwHxVYNXsOByL7xI5EB2WYOeFswqaHIA3qOK3isRWTxiplBEocmmru6XmxDB2L7jDNYtYA4FyimoAFEw==}
     engines: {node: '>=8.17.0'}
     hasBin: true
-    bundledDependencies: []
 
   jsonfile@3.0.1:
     resolution: {integrity: sha512-oBko6ZHlubVB5mRFkur5vgYR1UyqX+S6Y/oCfLhqNdcc2fYFlDpIoNc7AfKS1KOGcnNAkvsr0grLck9ANM815w==}
@@ -21291,6 +21332,37 @@ snapshots:
     optional: true
 
   '@types/zen-observable@0.8.3': {}
+
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260108.1':
+    optional: true
+
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260108.1':
+    optional: true
+
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260108.1':
+    optional: true
+
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260108.1':
+    optional: true
+
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260108.1':
+    optional: true
+
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260108.1':
+    optional: true
+
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260108.1':
+    optional: true
+
+  '@typescript/native-preview@7.0.0-dev.20260108.1':
+    optionalDependencies:
+      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20260108.1
+      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20260108.1
+      '@typescript/native-preview-linux-arm': 7.0.0-dev.20260108.1
+      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20260108.1
+      '@typescript/native-preview-linux-x64': 7.0.0-dev.20260108.1
+      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260108.1
+      '@typescript/native-preview-win32-x64': 7.0.0-dev.20260108.1
 
   '@uiw/codemirror-extensions-basic-setup@4.23.8(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.3)(@codemirror/view@6.39.9)':
     dependencies:
