@@ -42,7 +42,6 @@ export const MaintenanceMode: FC = () => {
       );
     }
 
-    // eslint-disable-next-line max-len
     toastSuccess(
       isMaintenanceMode
         ? t('admin:maintenance_mode.successfully_ended_maintenance_mode')
@@ -65,7 +64,6 @@ export const MaintenanceMode: FC = () => {
             ? t('admin:maintenance_mode.warning_message_to_end')
             : t('admin:maintenance_mode.warning_message_to_start')
         }
-        // eslint-disable-next-line max-len
         supplymentaryMessage={
           isMaintenanceMode
             ? null

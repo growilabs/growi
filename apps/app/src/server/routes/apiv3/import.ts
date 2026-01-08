@@ -14,7 +14,7 @@ import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 
-const logger = loggerFactory('growi:routes:apiv3:import'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:routes:apiv3:import');
 
 const path = require('path');
 
@@ -294,7 +294,6 @@ export default function route(crowi: Crowi): Router {
         // unzip
         await importService.unzip(zipFile);
 
-        // eslint-disable-next-line no-unused-vars
         const parseZipResult = await growiBridgeService.parseZipFile(zipFile);
         if (parseZipResult == null) {
           throw new Error('parseZipFile returns null');

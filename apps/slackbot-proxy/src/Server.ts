@@ -3,10 +3,8 @@ import '@tsed/swagger';
 import '@tsed/typeorm'; // !! DO NOT MODIFY !! -- https://github.com/tsedio/tsed/issues/1332#issuecomment-837840612
 
 import { createTerminus } from '@godaddy/terminus';
-/* eslint-disable @typescript-eslint/consistent-type-imports */
 import { HttpServer, PlatformApplication } from '@tsed/common';
 import { Configuration, Inject, InjectorService } from '@tsed/di';
-/* eslint-enable @typescript-eslint/consistent-type-imports */
 import bodyParser from 'body-parser';
 import compress from 'compression';
 import cookieParser from 'cookie-parser';
@@ -177,7 +175,6 @@ export class Server {
     }
     // use morgan
     else {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const morgan = require('morgan');
       this.app.use(morgan('dev'));
     }

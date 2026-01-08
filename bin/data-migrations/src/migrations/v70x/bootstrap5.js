@@ -13,7 +13,6 @@ module.exports = [
     let replacedBody = body;
 
     replacedBody = replacedBody.replace(
-      // eslint-disable-next-line max-len
       /\sdata-(animation|autohide|boundary|container|content|custom-class|delay|dismiss|display|html|interval|keyboard|method|offset|pause|placement|popper-config|reference|ride|selector|slide(-to)?|target|template|title|toggle|touch|trigger|wrap)=/g,
       (match, p1) => {
         if (p1 === 'toggle' && match.includes('data-bs-toggle="')) {
@@ -670,12 +669,19 @@ module.exports = [
     );
 
     replacedBody = replacedBody.replace(
-      /<select([^>]*)\bclass=['"]([^'"]*)form-control(-lg|-sm)?([^'"]*)['"]([^>]*)>/g, '<select$1class="$2form-select$3$4"$5>',
+      /<select([^>]*)\bclass=['"]([^'"]*)form-control(-lg|-sm)?([^'"]*)['"]([^>]*)>/g,
+      '<select$1class="$2form-select$3$4"$5>',
     );
 
-    replacedBody = replacedBody.replace(/<select([^>]*)\bclass=['"]([^'"]*)form-control\b([^'"]*['"])/g, '<select$1class="$2form-select$3');
+    replacedBody = replacedBody.replace(
+      /<select([^>]*)\bclass=['"]([^'"]*)form-control\b([^'"]*['"])/g,
+      '<select$1class="$2form-select$3',
+    );
 
-    replacedBody = replacedBody.replace('<span aria-hidden="true">&times;</span>', '');
+    replacedBody = replacedBody.replace(
+      '<span aria-hidden="true">&times;</span>',
+      '',
+    );
 
     return replacedBody;
   },

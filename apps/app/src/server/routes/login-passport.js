@@ -8,8 +8,6 @@ import loggerFactory from '~/utils/logger';
 
 import { externalAccountService } from '../service/external-account';
 
-/* eslint-disable no-use-before-define */
-
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi, app) => {
   const logger = loggerFactory('growi:routes:login-passport');

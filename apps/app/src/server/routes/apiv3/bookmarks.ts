@@ -16,7 +16,7 @@ import loggerFactory from '~/utils/logger';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import BookmarkFolder from '../../models/bookmark-folder';
 
-const logger = loggerFactory('growi:routes:apiv3:bookmarks'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:routes:apiv3:bookmarks');
 
 const express = require('express');
 const { body, query, param } = require('express-validator');
@@ -331,7 +331,6 @@ module.exports = (crowi) => {
             );
           }
         } else {
-          // eslint-disable-next-line no-lonely-if
           if (bool) {
             logger.warn(
               `Adding the bookmark for ${page._id} by ${req.user._id} failed because the bookmark has already exist.`,
