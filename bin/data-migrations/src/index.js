@@ -1,4 +1,3 @@
-
 /* eslint-disable no-undef, regex/invalid, import/extensions */
 // ignore lint error because this file is js as mongoshell
 
@@ -20,12 +19,17 @@ var migrationModule = process.env.MIGRATION_MODULE;
 var migrationModules = require(`./migrations/${migrationModule}`);
 
 if (migrationModules.length === 0) {
-  throw Error('No valid migrationModules found. Please enter a valid environment variable');
+  throw Error(
+    'No valid migrationModules found. Please enter a valid environment variable',
+  );
 }
 
 /** @type {ReplaceLatestRevisions} */
 function replaceLatestRevisions(body, migrationModules) {
-  return migrationModules.reduce((replacedBody, module) => module(replacedBody), body);
+  return migrationModules.reduce(
+    (replacedBody, module) => module(replacedBody),
+    body,
+  );
 }
 
 var pipeline = [
@@ -51,7 +55,6 @@ var pipeline = [
   },
 ];
 
-
 try {
   /** @type {Operations} */
   var operations = [];
@@ -70,7 +73,9 @@ try {
     }
 
     try {
-      var replacedBody = replaceLatestRevisions(doc.body, [...migrationModules]);
+      var replacedBody = replaceLatestRevisions(doc.body, [
+        ...migrationModules,
+      ]);
 
       operations.push({
         updateOne: {
@@ -91,15 +96,14 @@ try {
 
         operations = [];
       }
-    }
-    catch (err) {
+    } catch (err) {
       print(`Error processing document ${doc?._id}: ${err}`);
     }
   }
 
   print('Migration complete!');
-}
-catch (err) {
+  print(`Processed documents count: ${processedCount}`);
+} catch (err) {
   print(`Fatal error during migration: ${err}`);
   throw err;
 }

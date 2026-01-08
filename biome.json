@@ -18,7 +18,6 @@
       "!.turbo",
       "!.vscode",
       "!.claude",
-      "!bin",
       "!tsconfig.base.json",
       "!apps/app/src/styles/prebuilt",
       "!apps/app/tmp",
@@ -91,6 +90,29 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["bin/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["bin/data-migrations/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noVar": "off"
+          },
+          "correctness": {
+            "noInnerDeclarations": "off"
+          }
+        }
+      }
+    },
     {
       "includes": ["apps/pdf-converter/**", "./apps/slackbot-proxy/**"],
       "linter": {

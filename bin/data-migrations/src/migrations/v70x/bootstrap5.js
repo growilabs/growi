@@ -669,12 +669,19 @@ module.exports = [
     );
 
     replacedBody = replacedBody.replace(
-      /<select([^>]*)\bclass=['"]([^'"]*)form-control(-lg|-sm)?([^'"]*)['"]([^>]*)>/g, '<select$1class="$2form-select$3$4"$5>',
+      /<select([^>]*)\bclass=['"]([^'"]*)form-control(-lg|-sm)?([^'"]*)['"]([^>]*)>/g,
+      '<select$1class="$2form-select$3$4"$5>',
     );
 
-    replacedBody = replacedBody.replace(/<select([^>]*)\bclass=['"]([^'"]*)form-control\b([^'"]*['"])/g, '<select$1class="$2form-select$3');
+    replacedBody = replacedBody.replace(
+      /<select([^>]*)\bclass=['"]([^'"]*)form-control\b([^'"]*['"])/g,
+      '<select$1class="$2form-select$3',
+    );
 
-    replacedBody = replacedBody.replace('<span aria-hidden="true">&times;</span>', '');
+    replacedBody = replacedBody.replace(
+      '<span aria-hidden="true">&times;</span>',
+      '',
+    );
 
     return replacedBody;
   },

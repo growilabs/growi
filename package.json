@@ -29,6 +29,7 @@
     "app:server": "cd apps/app && pnpm run server",
     "slackbot-proxy:build": "turbo run build --filter @growi/slackbot-proxy",
     "slackbot-proxy:server": "cd apps/slackbot-proxy && pnpm run start:prod",
+    "lint": "biome check bin",
     "version-subpackages": "changeset version && pnpm update \"@growi/*\" -r && pnpm dedupe",
     "release-subpackages": "turbo run build --filter @growi/core --filter @growi/pluginkit && changeset publish",
     "release-subpackages:snapshot": "turbo run build --filter @growi/core --filter @growi/pluginkit && changeset version --snapshot next && changeset publish --no-git-tag --snapshot --tag next",
