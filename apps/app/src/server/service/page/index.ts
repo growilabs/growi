@@ -1807,7 +1807,7 @@ class PageService implements IPageService {
     oldPagePathPrefix,
     newPagePathPrefix,
   ) {
-    const Page = this.crowi.models.Page;
+    const Page = mongoose.model('Page') as unknown as PageModel;
 
     const pageIds = pages.map((page) => page._id);
     const revisions = await Revision.find({ pageId: { $in: pageIds } });
@@ -2370,7 +2370,7 @@ class PageService implements IPageService {
 
   async deleteCompletelyOperation(pageIds, pagePaths): Promise<void> {
     // Delete Attachments, Revisions, Pages and emit delete
-    const Page = this.crowi.models.Page;
+    const Page = mongoose.model('Page') as unknown as PageModel;
 
     const { attachmentService } = this.crowi;
     const attachments = await Attachment.find({ page: { $in: pageIds } });
@@ -3112,7 +3112,7 @@ class PageService implements IPageService {
     userRelatedGroups: PopulatedGrantedGroup[],
     userRelatedParentGrantedGroups: IGrantedGroup[],
   ): Promise<void> {
-    const Page = this.crowi.models.Page;
+    const Page = mongoose.model('Page') as unknown as PageModel;
     const operations: any = [];
 
     pages.forEach((childPage) => {
@@ -3855,7 +3855,7 @@ class PageService implements IPageService {
   }
 
   async _isPagePathIndexUnique() {
-    const Page = this.crowi.models.Page;
+    const Page = mongoose.model('Page') as unknown as PageModel;
     const now = new Date().toString();
     const path = `growi_check_is_path_index_unique_${now}`;
 
