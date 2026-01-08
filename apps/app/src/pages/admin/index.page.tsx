@@ -15,7 +15,7 @@ import {
 
 const AdminHome = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/Admin/AdminHome/AdminHome'),
+  () => import('~/client/components/Admin/AdminHome').then((mod) => mod.AdminHome),
   { ssr: false },
 );
 

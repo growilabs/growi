@@ -16,7 +16,7 @@ const COPY_STATE = {
   DONE: 'done',
 } as const;
 
-const AdminHome: FC = () => {
+export const AdminHome: FC = () => {
   const { t } = useTranslation();
   const { data: adminHomeData } = useSWRxAdminHome();
   const { data: migrationStatus } = useSWRxV5MigrationStatus();
@@ -166,5 +166,3 @@ const AdminHome: FC = () => {
     </div>
   );
 };
-
-export default AdminHome;
