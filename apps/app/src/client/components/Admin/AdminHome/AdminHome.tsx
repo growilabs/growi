@@ -38,8 +38,8 @@ const AdminHome: FC<Props> = (props) => {
   }, [fetchAdminHomeData]);
 
   // Generate CSS-safe ID by removing colons from useId() result
-  const prefilledHostInformationButtonIdRaw = useId();
-  const prefilledHostInformationButtonId = `prefilled-host-info-button-${prefilledHostInformationButtonIdRaw.replace(/:/g, '')}`;
+  const copyButtonIdRaw = useId();
+  const copyButtonId = `copy-button-${copyButtonIdRaw.replace(/:/g, '')}`;
 
   return (
     <div data-testid="admin-home">
@@ -121,38 +121,54 @@ const AdminHome: FC<Props> = (props) => {
           <h2 className="admin-setting-header">
             {t('admin:admin_top.bug_report')}
           </h2>
-          <div className="d-flex align-items-center">
-            <CopyToClipboard
-              text={adminHomeContainer.generatePrefilledHostInformationMarkdown()}
-              onCopy={() => adminHomeContainer.onCopyPrefilledHostInformation()}
-            >
-              <button
-                id={prefilledHostInformationButtonId}
-                type="button"
-                className="btn btn-primary"
+          <ol className="mb-0">
+            <li className="mb-3">
+              <CopyToClipboard
+                text={adminHomeContainer.generatePrefilledHostInformationMarkdown()}
+                onCopy={() =>
+                  adminHomeContainer.onCopyPrefilledHostInformation()
+                }
               >
-                {t('admin:admin_top:copy_prefilled_host_information:default')}
-              </button>
-            </CopyToClipboard>
-            <Tooltip
-              placement="bottom"
-              isOpen={
-                adminHomeContainer.state.copyState ===
-                adminHomeContainer.copyStateValues?.DONE
-              }
-              target={prefilledHostInformationButtonId}
-              fade={false}
-            >
-              {t('admin:admin_top:copy_prefilled_host_information:done')}
-            </Tooltip>
-            <span
-              className="ms-2"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: ignore
-              dangerouslySetInnerHTML={{
-                __html: t('admin:admin_top:submit_bug_report'),
-              }}
-            />
-          </div>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary btn-sm"
+                  style={{ verticalAlign: 'baseline' }}
+                  onClick={(e) => e.preventDefault()}
+                >
+                  <span
+                    id={copyButtonId}
+                    className="material-symbols-outlined"
+                    aria-hidden="true"
+                  >
+                    content_copy
+                  </span>
+                  {t('admin:admin_top:copy_prefilled_host_information:default')}
+                </button>
+              </CopyToClipboard>
+              <Tooltip
+                placement="bottom"
+                isOpen={
+                  adminHomeContainer.state.copyState ===
+                  adminHomeContainer.copyStateValues?.DONE
+                }
+                target={copyButtonId}
+                fade={false}
+              >
+                {t('admin:admin_top:copy_prefilled_host_information:done')}
+              </Tooltip>
+            </li>
+            <li>
+              <a
+                className="link-secondary link-offset-1"
+                style={{ textDecoration: 'underline' }}
+                href="https://github.com/growilabs/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {t('admin:admin_top:submit_bug_report')}
+              </a>
+            </li>
+          </ol>
         </div>
       </div>
     </div>
