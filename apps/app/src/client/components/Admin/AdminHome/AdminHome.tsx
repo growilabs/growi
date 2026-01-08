@@ -1,41 +1,33 @@
 import type { FC } from 'react';
-import { useCallback, useEffect, useId } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { Tooltip } from 'reactstrap';
 
-import AdminHomeContainer from '~/client/services/AdminHomeContainer';
-import { toastError } from '~/client/util/toastr';
+import { useSWRxAdminHome } from '~/stores/admin/admin-home';
 import { useSWRxV5MigrationStatus } from '~/stores/page-listing';
-import loggerFactory from '~/utils/logger';
+import { generatePrefilledHostInformationMarkdown } from '~/utils/admin-home';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
 import { EnvVarsTable } from './EnvVarsTable';
 import SystemInfomationTable from './SystemInfomationTable';
 
-const logger = loggerFactory('growi:admin');
+const COPY_STATE = {
+  DEFAULT: 'default',
+  DONE: 'done',
+} as const;
 
-type Props = {
-  adminHomeContainer: AdminHomeContainer;
-};
-
-const AdminHome: FC<Props> = (props) => {
-  const { adminHomeContainer } = props;
+const AdminHome: FC = () => {
   const { t } = useTranslation();
+  const { data: adminHomeData } = useSWRxAdminHome();
   const { data: migrationStatus } = useSWRxV5MigrationStatus();
+  const [copyState, setCopyState] = useState<string>(COPY_STATE.DEFAULT);
 
-  const fetchAdminHomeData = useCallback(async () => {
-    try {
-      await adminHomeContainer.retrieveAdminHomeData();
-    } catch (err) {
-      toastError(err);
-      logger.error(err);
-    }
-  }, [adminHomeContainer]);
-
-  useEffect(() => {
-    fetchAdminHomeData();
-  }, [fetchAdminHomeData]);
+  const handleCopyPrefilledHostInformation = () => {
+    setCopyState(COPY_STATE.DONE);
+    setTimeout(() => {
+      setCopyState(COPY_STATE.DEFAULT);
+    }, 500);
+  };
 
   // Generate CSS-safe ID by removing colons from useId() result
   const copyButtonIdRaw = useId();
@@ -45,7 +37,7 @@ const AdminHome: FC<Props> = (props) => {
     <div data-testid="admin-home">
       {
         // Alert message will be displayed in case that the GROWI is under maintenance
-        adminHomeContainer.state.isMaintenanceMode && (
+        adminHomeData?.isMaintenanceMode && (
           <div className="alert alert-danger alert-link" role="alert">
             <h3 className="alert-heading">
               {t('admin:maintenance_mode.maintenance_mode')}
@@ -112,7 +104,7 @@ const AdminHome: FC<Props> = (props) => {
               __html: t('admin:admin_top.about_security'),
             }}
           />
-          <EnvVarsTable envVars={adminHomeContainer.state.envVars} />
+          <EnvVarsTable envVars={adminHomeData?.envVars} />
         </div>
       </div>
 
@@ -124,10 +116,13 @@ const AdminHome: FC<Props> = (props) => {
           <ol className="mb-0">
             <li className="mb-3">
               <CopyToClipboard
-                text={adminHomeContainer.generatePrefilledHostInformationMarkdown()}
-                onCopy={() =>
-                  adminHomeContainer.onCopyPrefilledHostInformation()
-                }
+                text={generatePrefilledHostInformationMarkdown({
+                  growiVersion: adminHomeData?.growiVersion,
+                  nodeVersion: adminHomeData?.nodeVersion,
+                  npmVersion: adminHomeData?.npmVersion,
+                  pnpmVersion: adminHomeData?.pnpmVersion,
+                })}
+                onCopy={handleCopyPrefilledHostInformation}
               >
                 <button
                   type="button"
@@ -147,10 +142,7 @@ const AdminHome: FC<Props> = (props) => {
               </CopyToClipboard>
               <Tooltip
                 placement="bottom"
-                isOpen={
-                  adminHomeContainer.state.copyState ===
-                  adminHomeContainer.copyStateValues?.DONE
-                }
+                isOpen={copyState === COPY_STATE.DONE}
                 target={copyButtonId}
                 fade={false}
               >
@@ -175,8 +167,4 @@ const AdminHome: FC<Props> = (props) => {
   );
 };
 
-const AdminHomeWrapper = withUnstatedContainers(AdminHome, [
-  AdminHomeContainer,
-]);
-
-export default AdminHomeWrapper;
+export default AdminHome;
