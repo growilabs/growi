@@ -179,7 +179,7 @@ export class LinkSharedEventHandler
     pages: any,
     isPermalink: boolean,
   ): DataForUnfurl[] {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = this.crowi.models.Page;
     const unfurlData: DataForUnfurl[] = [];
 
     for (const page of pages) {

@@ -60,8 +60,8 @@ const normalizeNQName = (nqName: string): string => {
 };
 
 const findPageListByIds = async (pageIds: ObjectIdLike[], crowi: any) => {
-  const Page = mongoose.model('Page') as unknown as PageModel;
-  const User = mongoose.model('User') as any; // Cast to any to access static properties
+  const Page = crowi.models.Page as unknown as PageModel;
+  const User = crowi.models.User;
 
   const builder = new Page.PageQueryBuilder(
     Page.find({ _id: { $in: pageIds } }),
@@ -549,7 +549,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     /*
      * Format ElasticSearch result
      */
-    const User = mongoose.model('User') as any; // Cast to any to access static properties
+    const User = this.crowi.models.User;
     const result = {} as IFormattedSearchResult;
 
     // get page data

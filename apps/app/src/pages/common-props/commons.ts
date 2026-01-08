@@ -1,6 +1,5 @@
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import type { ColorScheme, IUserHasId } from '@growi/core';
-import mongoose from 'mongoose';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import { getGrowiVersion } from '~/utils/growi-version';
@@ -154,7 +153,7 @@ export const getServerSideCommonEachProps = async (
 
   let currentUser: IUserHasId | undefined;
   if (user != null) {
-    const User = mongoose.model('User');
+    const User = crowi.models.User;
     const userData = await User.findById(user.id).populate({
       path: 'imageAttachment',
       select: 'filePathProxied',
