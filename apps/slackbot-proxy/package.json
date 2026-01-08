@@ -63,7 +63,7 @@
     "mysql2": "^2.2.5",
     "read-pkg-up": "^7.0.1",
     "tslib": "^2.8.0",
-    "typeorm": "=0.2.45",
+    "typeorm": "=0.3.26",
     "universal-bunyan": "^0.9.2"
   },
   "// comments for devDependencies": {
