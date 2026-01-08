@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect } from 'react';
+import type { FC } from 'react';
+import { useCallback, useEffect, useId } from 'react';
 import { useTranslation } from 'next-i18next';
-import PropTypes from 'prop-types';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { Tooltip } from 'reactstrap';
 
@@ -15,7 +15,11 @@ import SystemInfomationTable from './SystemInfomationTable';
 
 const logger = loggerFactory('growi:admin');
 
-const AdminHome = (props) => {
+type Props = {
+  adminHomeContainer: AdminHomeContainer;
+};
+
+const AdminHome: FC<Props> = (props) => {
   const { adminHomeContainer } = props;
   const { t } = useTranslation();
   const { data: migrationStatus } = useSWRxV5MigrationStatus();
@@ -32,6 +36,10 @@ const AdminHome = (props) => {
   useEffect(() => {
     fetchAdminHomeData();
   }, [fetchAdminHomeData]);
+
+  // Generate CSS-safe ID by removing colons from useId() result
+  const prefilledHostInformationButtonIdRaw = useId();
+  const prefilledHostInformationButtonId = `prefilled-host-info-button-${prefilledHostInformationButtonIdRaw.replace(/:/g, '')}`;
 
   return (
     <div data-testid="admin-home">
@@ -119,7 +127,7 @@ const AdminHome = (props) => {
               onCopy={() => adminHomeContainer.onCopyPrefilledHostInformation()}
             >
               <button
-                id="prefilledHostInformationButton"
+                id={prefilledHostInformationButtonId}
                 type="button"
                 className="btn btn-primary"
               >
@@ -130,9 +138,9 @@ const AdminHome = (props) => {
               placement="bottom"
               isOpen={
                 adminHomeContainer.state.copyState ===
-                adminHomeContainer.copyStateValues.DONE
+                adminHomeContainer.copyStateValues?.DONE
               }
-              target="prefilledHostInformationButton"
+              target={prefilledHostInformationButtonId}
               fade={false}
             >
               {t('admin:admin_top:copy_prefilled_host_information:done')}
@@ -154,9 +162,5 @@ const AdminHome = (props) => {
 const AdminHomeWrapper = withUnstatedContainers(AdminHome, [
   AdminHomeContainer,
 ]);
-
-AdminHome.propTypes = {
-  adminHomeContainer: PropTypes.instanceOf(AdminHomeContainer).isRequired,
-};
 
 export default AdminHomeWrapper;
