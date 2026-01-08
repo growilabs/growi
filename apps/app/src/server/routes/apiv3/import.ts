@@ -134,8 +134,8 @@ export default function route(crowi: Crowi): Router {
   const adminRequired = require('../../middlewares/admin-required')(crowi);
   const addActivity = generateAddActivityMiddleware();
 
-  const adminEvent = crowi.event('admin');
-  const activityEvent = crowi.event('activity');
+  const adminEvent = crowi.events.admin;
+  const activityEvent = crowi.events.activity;
 
   // setup event
   adminEvent.on('onProgressForImport', (data) => {

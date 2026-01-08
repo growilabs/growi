@@ -97,7 +97,7 @@ module.exports = (crowi: Crowi) => {
   const Page = mongoose.model<IPage, PageModel>('Page');
   const { pageService, pageGrantService } = crowi;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const validator = {
     getPage: [

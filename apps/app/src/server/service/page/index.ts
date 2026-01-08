@@ -205,9 +205,9 @@ class PageService implements IPageService {
 
   constructor(crowi: Crowi) {
     this.crowi = crowi;
-    this.pageEvent = crowi.event('page');
-    this.tagEvent = crowi.event('tag');
-    this.activityEvent = crowi.event('activity');
+    this.pageEvent = crowi.events.page;
+    this.tagEvent = crowi.events.tag;
+    this.activityEvent = crowi.events.activity;
     this.pageGrantService = crowi.pageGrantService;
 
     // init

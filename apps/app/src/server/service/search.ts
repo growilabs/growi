@@ -60,8 +60,8 @@ const normalizeNQName = (nqName: string): string => {
 };
 
 const findPageListByIds = async (pageIds: ObjectIdLike[], crowi: any) => {
-  const Page = crowi.model('Page') as unknown as PageModel;
-  const User = crowi.model('User');
+  const Page = crowi.models.Page as unknown as PageModel;
+  const User = crowi.models.User;
 
   const builder = new Page.PageQueryBuilder(
     Page.find({ _id: { $in: pageIds } }),
@@ -159,7 +159,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   registerUpdateEvent() {
-    const pageEvent = this.crowi.event('page');
+    const pageEvent = this.crowi.events.page;
     pageEvent.on(
       'create',
       this.fullTextSearchDelegator.syncPageUpdated.bind(
@@ -227,7 +227,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
       );
     });
 
-    const bookmarkEvent = this.crowi.event('bookmark');
+    const bookmarkEvent = this.crowi.events.bookmark;
     bookmarkEvent.on(
       'create',
       this.fullTextSearchDelegator.syncBookmarkChanged.bind(
@@ -241,7 +241,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
       ),
     );
 
-    const tagEvent = this.crowi.event('tag');
+    const tagEvent = this.crowi.events.tag;
     tagEvent.on(
       'update',
       this.fullTextSearchDelegator.syncTagChanged.bind(
@@ -549,7 +549,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     /*
      * Format ElasticSearch result
      */
-    const User = this.crowi.model('User');
+    const User = this.crowi.models.User;
     const result = {} as IFormattedSearchResult;
 
     // get page data

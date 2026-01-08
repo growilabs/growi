@@ -12,7 +12,6 @@ import type {
 export type PdfCtrlSyncJobStatus202Status = typeof PdfCtrlSyncJobStatus202Status[keyof typeof PdfCtrlSyncJobStatus202Status];
 
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const PdfCtrlSyncJobStatus202Status = {
   HTML_EXPORT_IN_PROGRESS: 'HTML_EXPORT_IN_PROGRESS',
   HTML_EXPORT_DONE: 'HTML_EXPORT_DONE',
@@ -30,7 +29,6 @@ export type PdfCtrlSyncJobStatus202 = {
 export type PdfCtrlSyncJobStatusBodyStatus = typeof PdfCtrlSyncJobStatusBodyStatus[keyof typeof PdfCtrlSyncJobStatusBodyStatus];
 
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const PdfCtrlSyncJobStatusBodyStatus = {
   HTML_EXPORT_IN_PROGRESS: 'HTML_EXPORT_IN_PROGRESS',
   HTML_EXPORT_DONE: 'HTML_EXPORT_DONE',

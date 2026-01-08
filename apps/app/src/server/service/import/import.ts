@@ -63,7 +63,7 @@ export class ImportService {
     this.crowi = crowi;
     this.growiBridgeService = crowi.growiBridgeService;
 
-    this.adminEvent = crowi.event('admin');
+    this.adminEvent = crowi.events.admin;
 
     this.currentProgressingStatus = null;
   }

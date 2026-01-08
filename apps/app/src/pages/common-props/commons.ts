@@ -153,7 +153,7 @@ export const getServerSideCommonEachProps = async (
 
   let currentUser: IUserHasId | undefined;
   if (user != null) {
-    const User = crowi.model('User');
+    const User = crowi.models.User;
     const userData = await User.findById(user.id).populate({
       path: 'imageAttachment',
       select: 'filePathProxied',
