@@ -62,6 +62,20 @@ const CustomizeLogoSetting = (): JSX.Element => {
     }
   }, []);
 
+  const resetFileSelectionState = useCallback(() => {
+    clearFileInput();
+    setUploadLogoSrc(null);
+  }, [clearFileInput, setUploadLogoSrc]);
+
+  const onModalStateClose = useCallback(() => {
+    setIsImageCropModalShow(false);
+  }, [setIsImageCropModalShow]);
+
+  const onCancelOrErrorClose = useCallback(() => {
+    resetFileSelectionState();
+    onModalStateClose();
+}, [resetFileSelectionState, onModalStateClose]);
+
   const onClickDeleteBtn = useCallback(async () => {
     try {
       await apiv3Delete('/customize-setting/delete-brand-logo');
@@ -83,23 +97,17 @@ const CustomizeLogoSetting = (): JSX.Element => {
       const formData = new FormData();
       formData.append('file', croppedImage);
       await apiv3PostForm('/customize-setting/upload-brand-logo', formData);
-      setIsImageCropModalShow(false);
+      onModalStateClose();
       setIsCustomizedLogoUploaded(true);
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.current_logo'), ns: 'commons' }));
     }
     catch (err) {
       toastError(err);
       setRetrieveError(err);
+      onCancelOrErrorClose();
       throw new Error('Failed to upload brand logo');
     }
-  }, [setIsCustomizedLogoUploaded, t, setIsImageCropModalShow, setRetrieveError]);
-
-  const closeImageCropModalHandler = useCallback(() => {
-    clearFileInput();
-    setUploadLogoSrc(null);
-    setIsImageCropModalShow(false);
-  }, [clearFileInput, setUploadLogoSrc, setIsImageCropModalShow]);
-
+  }, [setIsCustomizedLogoUploaded, t, setRetrieveError, onModalStateClose, onCancelOrErrorClose]);
 
   return (
     <React.Fragment>
@@ -188,7 +196,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
       <ImageCropModal
         isShow={isImageCropModalShow}
         src={uploadLogoSrc}
-        onModalClose={closeImageCropModalHandler}
+        onModalClose={onCancelOrErrorClose}
         onImageProcessCompleted={processImageCompletedHandler}
         isCircular={false}
         showCropOption={false}
