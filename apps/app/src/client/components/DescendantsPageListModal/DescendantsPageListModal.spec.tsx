@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import { DescendantsPageListModal } from './DescendantsPageListModal';
 
@@ -33,7 +33,9 @@ vi.mock('~/states/context', () => ({
 }));
 
 vi.mock('../DescendantsPageList', () => ({
-  DescendantsPageList: () => <div data-testid="descendants-page-list">DescendantsPageList</div>,
+  DescendantsPageList: () => (
+    <div data-testid="descendants-page-list">DescendantsPageList</div>
+  ),
 }));
 
 vi.mock('../PageTimeline', () => ({
@@ -41,7 +43,6 @@ vi.mock('../PageTimeline', () => ({
 }));
 
 describe('DescendantsPageListModal.tsx', () => {
-
   it('should render the modal when isOpened is true', () => {
     render(<DescendantsPageListModal />);
     expect(screen.getByTestId('descendants-page-list-modal')).not.toBeNull();
@@ -55,7 +56,6 @@ describe('DescendantsPageListModal.tsx', () => {
   });
 
   describe('when device is larger than lg', () => {
-
     it('should render CustomNavTab', () => {
       render(<DescendantsPageListModal />);
       expect(screen.getByTestId('custom-nav-tab')).not.toBeNull();

@@ -1,14 +1,12 @@
 import type { JSX } from 'react';
 import { useCallback } from 'react';
-
 import { useTranslation } from 'next-i18next';
-import { useForm, useController } from 'react-hook-form';
+import { useController, useForm } from 'react-hook-form';
 
-import { toastSuccess, toastError } from '~/client/util/toastr';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import { FileUploadType } from '~/interfaces/file-uploader';
 
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
-
 import { AwsSettingMolecule } from './AwsSetting';
 import { AzureSettingMolecule } from './AzureSetting';
 import type { FileUploadFormValues } from './FileUploadSetting.types';
@@ -17,33 +15,33 @@ import { useFileUploadSettings } from './useFileUploadSettings';
 
 const FileUploadSetting = (): JSX.Element => {
   const { t } = useTranslation(['admin', 'commons']);
-  const {
-    data, isLoading, error, updateSettings,
-  } = useFileUploadSettings();
+  const { data, isLoading, error, updateSettings } = useFileUploadSettings();
 
-  const {
-    register, handleSubmit, control, watch, formState,
-  } = useForm<FileUploadFormValues>({
-    values: data ? {
-      fileUploadType: data.fileUploadType,
-      s3Region: data.s3Region,
-      s3CustomEndpoint: data.s3CustomEndpoint,
-      s3Bucket: data.s3Bucket,
-      s3AccessKeyId: data.s3AccessKeyId,
-      s3SecretAccessKey: data.s3SecretAccessKey,
-      s3ReferenceFileWithRelayMode: data.s3ReferenceFileWithRelayMode,
-      gcsApiKeyJsonPath: data.gcsApiKeyJsonPath,
-      gcsBucket: data.gcsBucket,
-      gcsUploadNamespace: data.gcsUploadNamespace,
-      gcsReferenceFileWithRelayMode: data.gcsReferenceFileWithRelayMode,
-      azureTenantId: data.azureTenantId,
-      azureClientId: data.azureClientId,
-      azureClientSecret: data.azureClientSecret,
-      azureStorageAccountName: data.azureStorageAccountName,
-      azureStorageContainerName: data.azureStorageContainerName,
-      azureReferenceFileWithRelayMode: data.azureReferenceFileWithRelayMode,
-    } : undefined,
-  });
+  const { register, handleSubmit, control, watch, formState } =
+    useForm<FileUploadFormValues>({
+      values: data
+        ? {
+            fileUploadType: data.fileUploadType,
+            s3Region: data.s3Region,
+            s3CustomEndpoint: data.s3CustomEndpoint,
+            s3Bucket: data.s3Bucket,
+            s3AccessKeyId: data.s3AccessKeyId,
+            s3SecretAccessKey: data.s3SecretAccessKey,
+            s3ReferenceFileWithRelayMode: data.s3ReferenceFileWithRelayMode,
+            gcsApiKeyJsonPath: data.gcsApiKeyJsonPath,
+            gcsBucket: data.gcsBucket,
+            gcsUploadNamespace: data.gcsUploadNamespace,
+            gcsReferenceFileWithRelayMode: data.gcsReferenceFileWithRelayMode,
+            azureTenantId: data.azureTenantId,
+            azureClientId: data.azureClientId,
+            azureClientSecret: data.azureClientSecret,
+            azureStorageAccountName: data.azureStorageAccountName,
+            azureStorageContainerName: data.azureStorageContainerName,
+            azureReferenceFileWithRelayMode:
+              data.azureReferenceFileWithRelayMode,
+          }
+        : undefined,
+    });
 
   // Use controller for fileUploadType radio buttons
   const { field: fileUploadTypeField } = useController({
@@ -69,15 +67,22 @@ const FileUploadSetting = (): JSX.Element => {
 
   const fileUploadType = watch('fileUploadType');
 
-  const onSubmit = useCallback(async(formData: FileUploadFormValues) => {
-    try {
-      await updateSettings(formData, formState.dirtyFields);
-      toastSuccess(t('toaster.update_successed', { target: t('admin:app_setting.file_upload_settings'), ns: 'commons' }));
-    }
-    catch (err) {
-      toastError(err);
-    }
-  }, [updateSettings, formState.dirtyFields, t]);
+  const onSubmit = useCallback(
+    async (formData: FileUploadFormValues) => {
+      try {
+        await updateSettings(formData, formState.dirtyFields);
+        toastSuccess(
+          t('toaster.update_successed', {
+            target: t('admin:app_setting.file_upload_settings'),
+            ns: 'commons',
+          }),
+        );
+      } catch (err) {
+        toastError(err);
+      }
+    },
+    [updateSettings, formState.dirtyFields, t],
+  );
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -98,9 +103,9 @@ const FileUploadSetting = (): JSX.Element => {
       </p>
 
       <div className="row mb-3">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <span className="text-start text-md-end col-md-3 col-form-label">
           {t('admin:app_setting.file_upload_method')}
-        </label>
+        </span>
 
         <div className="col-md-6 py-2">
           {Object.values(FileUploadType).map((type) => {
@@ -115,7 +120,10 @@ const FileUploadSetting = (): JSX.Element => {
                   disabled={data.isFixedFileUploadByEnvVar}
                   onChange={() => fileUploadTypeField.onChange(type)}
                 />
-                <label className="form-label form-check-label" htmlFor={`file-upload-type-radio-${type}`}>
+                <label
+                  className="form-label form-check-label"
+                  htmlFor={`file-upload-type-radio-${type}`}
+                >
                   {t(`admin:app_setting.${type}_label`)}
                 </label>
               </div>
@@ -128,12 +136,15 @@ const FileUploadSetting = (): JSX.Element => {
             <b>FIXED</b>
             <br />
             {/* eslint-disable-next-line react/no-danger */}
-            <b dangerouslySetInnerHTML={{
-              __html: t('admin:app_setting.fixed_by_env_var', {
-                envKey: 'FILE_UPLOAD',
-                envVar: data.envFileUploadType,
-              }),
-            }}
+            <b
+              // eslint-disable-next-line react/no-danger
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
+              dangerouslySetInnerHTML={{
+                __html: t('admin:app_setting.fixed_by_env_var', {
+                  envKey: 'FILE_UPLOAD',
+                  envVar: data.envFileUploadType,
+                }),
+              }}
             />
           </p>
         )}

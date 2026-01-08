@@ -731,7 +731,7 @@
       "description1": "Créer des utilisateurs temporaires avec une adresse courriel.",
       "description2": "Un mot de passe temporaire est généré automatiquement.",
       "invite_thru_email": "Courriel d'invitation",
-      "mail_setting_link": "<span className='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>Paramètres courriel</a>",
+      "mail_setting_link": "<span class='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>Paramètres courriel</a>",
       "valid_email": "Adresse courriel valide requise",
       "temporary_password": "Cette utilisateur a un mot de passe temporaire",
       "send_new_password": "Envoyez le nouveau mot de passe à l'utilisateur.",

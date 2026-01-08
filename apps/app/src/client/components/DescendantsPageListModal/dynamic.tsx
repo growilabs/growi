@@ -10,7 +10,10 @@ export const DescendantsPageListModalLazyLoaded = (): JSX.Element => {
 
   const DescendantsPageListModal = useLazyLoader<DescendantsPageListModalProps>(
     'descendants-page-list-modal',
-    () => import('./DescendantsPageListModal').then(mod => ({ default: mod.DescendantsPageListModal })),
+    () =>
+      import('./DescendantsPageListModal').then((mod) => ({
+        default: mod.DescendantsPageListModal,
+      })),
     status?.isOpened ?? false,
   );
 

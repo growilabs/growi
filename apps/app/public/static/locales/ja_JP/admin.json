@@ -740,7 +740,7 @@
       "description1": "メールアドレスを使用して新規ユーザーを仮発行します。",
       "description2": "初回のログイン時に使用する仮パスワードが生成されます。",
       "invite_thru_email": "招待メールを送信する",
-      "mail_setting_link": "<span className='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>メールの設定</a>",
+      "mail_setting_link": "<span class='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>メールの設定</a>",
       "valid_email": "メールアドレスを入力してください。",
       "temporary_password": "作成したユーザーは仮パスワードが設定されています。",
       "send_new_password": "新規発行したパスワードを、対象ユーザーへ連絡してください。",

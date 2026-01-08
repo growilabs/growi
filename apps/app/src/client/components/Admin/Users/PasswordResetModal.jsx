@@ -1,12 +1,15 @@
 import React from 'react';
-
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import {
-  Modal, ModalHeader, ModalBody, ModalFooter, Tooltip,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  Tooltip,
 } from 'reactstrap';
 
 import AdminUsersContainer from '~/client/services/AdminUsersContainer';
@@ -15,7 +18,6 @@ import { toastError } from '~/client/util/toastr';
 import { isMailerSetupAtom } from '~/states/server-configurations';
 
 class PasswordResetModal extends React.Component {
-
   constructor(props) {
     super(props);
 
@@ -28,17 +30,22 @@ class PasswordResetModal extends React.Component {
     };
 
     this.resetPassword = this.resetPassword.bind(this);
-    this.onClickSendNewPasswordButton = this.onClickSendNewPasswordButton.bind(this);
+    this.onClickSendNewPasswordButton =
+      this.onClickSendNewPasswordButton.bind(this);
   }
 
   async resetPassword() {
     const { userForPasswordResetModal } = this.props;
     try {
-      const res = await apiv3Put('/users/reset-password', { id: userForPasswordResetModal._id });
+      const res = await apiv3Put('/users/reset-password', {
+        id: userForPasswordResetModal._id,
+      });
       const { newPassword } = res.data;
-      this.setState({ temporaryPassword: newPassword, isPasswordResetDone: true });
-    }
-    catch (err) {
+      this.setState({
+        temporaryPassword: newPassword,
+        isPasswordResetDone: true,
+      });
+    } catch (err) {
       toastError(err);
     }
   }
@@ -56,9 +63,14 @@ class PasswordResetModal extends React.Component {
           disabled={!isMailerSetup || isEmailSending || isEmailSent}
         >
           {isEmailSending && <LoadingSpinner className="mx-2" />}
-          {!isEmailSending && (isEmailSent ? t('commons:Done') : t('commons:Send'))}
+          {!isEmailSending &&
+            (isEmailSent ? t('commons:Done') : t('commons:Send'))}
         </button>
-        <button type="submit" className="btn btn-danger" onClick={this.props.onClose}>
+        <button
+          type="submit"
+          className="btn btn-danger"
+          onClick={this.props.onClose}
+        >
           {t('commons:Close')}
         </button>
       </>
@@ -71,7 +83,14 @@ class PasswordResetModal extends React.Component {
     return (
       <div className="d-flex col text-start ms-1 ps-0">
         {!isMailerSetup ? (
-          <label className="form-label form-text text-muted" dangerouslySetInnerHTML={{ __html: t('admin:mailer_setup_required') }} />
+          <p
+            className="form-label form-text text-muted mb-0"
+            // eslint-disable-next-line react/no-danger
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
+            dangerouslySetInnerHTML={{
+              __html: t('admin:mailer_setup_required'),
+            }}
+          />
         ) : (
           <>
             <p className="me-2">To:</p>
@@ -91,11 +110,15 @@ class PasswordResetModal extends React.Component {
     return (
       <>
         <p>
-          {t('user_management.reset_password_modal.password_never_seen')}<br />
-          <span className="text-danger">{t('user_management.reset_password_modal.send_new_password')}</span>
+          {t('user_management.reset_password_modal.password_never_seen')}
+          <br />
+          <span className="text-danger">
+            {t('user_management.reset_password_modal.send_new_password')}
+          </span>
         </p>
         <p>
-          {t('user_management.reset_password_modal.target_user')}: <code>{userForPasswordResetModal.email}</code>
+          {t('user_management.reset_password_modal.target_user')}:{' '}
+          <code>{userForPasswordResetModal.email}</code>
         </p>
       </>
     );
@@ -111,23 +134,41 @@ class PasswordResetModal extends React.Component {
 
     return (
       <>
-        <p className="text-danger">{t('user_management.reset_password_modal.password_reset_message')}</p>
+        <p className="text-danger">
+          {t('user_management.reset_password_modal.password_reset_message')}
+        </p>
         <p>
-          {t('user_management.reset_password_modal.target_user')}: <code>{userForPasswordResetModal.email}</code>
+          {t('user_management.reset_password_modal.target_user')}:{' '}
+          <code>{userForPasswordResetModal.email}</code>
         </p>
         <p>
           {t('user_management.reset_password_modal.new_password')}:{' '}
           <code>
-            <span
+            <button
+              type="button"
+              className="btn btn-link p-0 align-baseline"
               onMouseEnter={() => this.setState({ showPassword: true })}
               onMouseLeave={() => this.setState({ showPassword: false })}
+              aria-pressed={showPassword}
+              aria-label={t(
+                'user_management.reset_password_modal.new_password',
+              )}
             >
               {showPassword ? temporaryPassword : maskedPassword}
-            </span>
+            </button>
           </code>
-          <CopyToClipboard text={temporaryPassword} onCopy={() => this.setState({ showTooltip: true })}>
-            <button id="copy-tooltip" type="button" className="btn btn-outline-secondary border-0">
-              <span className="material-symbols-outlined" aria-hidden="true">content_copy</span>
+          <CopyToClipboard
+            text={temporaryPassword}
+            onCopy={() => this.setState({ showTooltip: true })}
+          >
+            <button
+              id="copy-tooltip"
+              type="button"
+              className="btn btn-outline-secondary border-0"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                content_copy
+              </span>
             </button>
           </CopyToClipboard>
           <Tooltip
@@ -146,7 +187,11 @@ class PasswordResetModal extends React.Component {
   returnModalFooterBeforeReset() {
     const { t } = this.props;
     return (
-      <button type="submit" className="btn btn-danger" onClick={this.resetPassword}>
+      <button
+        type="submit"
+        className="btn btn-danger"
+        onClick={this.resetPassword}
+      >
         {t('user_management.reset_password')}
       </button>
     );
@@ -162,51 +207,61 @@ class PasswordResetModal extends React.Component {
   }
 
   async onClickSendNewPasswordButton() {
-
-    const {
-      userForPasswordResetModal,
-    } = this.props;
+    const { userForPasswordResetModal } = this.props;
 
     this.setState({ isEmailSending: true });
 
     try {
-      await apiv3Put('/users/reset-password-email', { id: userForPasswordResetModal._id, newPassword: this.state.temporaryPassword });
+      await apiv3Put('/users/reset-password-email', {
+        id: userForPasswordResetModal._id,
+        newPassword: this.state.temporaryPassword,
+      });
       this.setState({ isEmailSent: true });
-    }
-    catch (err) {
+    } catch (err) {
       this.setState({ isEmailSent: false });
       toastError(err);
-    }
-    finally {
+    } finally {
       this.setState({ isEmailSending: false });
     }
   }
-
 
   render() {
     const { t } = this.props;
 
     return (
       <Modal isOpen={this.props.isOpen} toggle={this.props.onClose}>
-        <ModalHeader tag="h4" toggle={this.props.onClose} className="text-warning">
-          {t('user_management.reset_password') }
+        <ModalHeader
+          tag="h4"
+          toggle={this.props.onClose}
+          className="text-warning"
+        >
+          {t('user_management.reset_password')}
         </ModalHeader>
         <ModalBody>
-          {this.state.isPasswordResetDone ? this.returnModalBodyAfterReset() : this.renderModalBodyBeforeReset()}
+          {this.state.isPasswordResetDone
+            ? this.returnModalBodyAfterReset()
+            : this.renderModalBodyBeforeReset()}
         </ModalBody>
         <ModalFooter>
-          {this.state.isPasswordResetDone ? this.returnModalFooterAfterReset() : this.returnModalFooterBeforeReset()}
+          {this.state.isPasswordResetDone
+            ? this.returnModalFooterAfterReset()
+            : this.returnModalFooterBeforeReset()}
         </ModalFooter>
       </Modal>
     );
   }
-
 }
 
 const PasswordResetModalWrapperFC = (props) => {
   const { t } = useTranslation('admin');
   const isMailerSetup = useAtomValue(isMailerSetupAtom);
-  return <PasswordResetModal t={t} isMailerSetup={isMailerSetup ?? false} {...props} />;
+  return (
+    <PasswordResetModal
+      t={t}
+      isMailerSetup={isMailerSetup ?? false}
+      {...props}
+    />
+  );
 };
 
 /**
@@ -222,7 +277,6 @@ PasswordResetModal.propTypes = {
   userForPasswordResetModal: PropTypes.object,
   onSuccessfullySentNewPasswordEmail: PropTypes.func.isRequired,
   adminUsersContainer: PropTypes.instanceOf(AdminUsersContainer).isRequired,
-
 };
 
 export default PasswordResetModalWrapperFC;
