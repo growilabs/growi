@@ -19,6 +19,7 @@ export interface IPageListingService {
     user?: IUser,
     showPagesRestrictedByOwner?: boolean,
     showPagesRestrictedByGroup?: boolean,
+    hideUserPages?: boolean,
   ): Promise<IPageForTreeItem[]>,
 }
 
