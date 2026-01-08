@@ -4,7 +4,6 @@ import { useLazyLoader } from '~/components/utils/use-lazy-loader';
 import { useAiAssistantSidebarStatus } from '~/features/openai/client/states';
 
 export const ChatSidebarLazyLoaded = (): JSX.Element => {
-
   const aiAiAssistantSidebarStatus = useAiAssistantSidebarStatus();
 
   const ChatSidebar = useLazyLoader(
