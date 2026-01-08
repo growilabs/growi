@@ -81,18 +81,14 @@ export const useSWRxSearch = (
     ([endpoint, , fixedConfigurations]) => {
       const { limit, offset, sort, order } = fixedConfigurations;
 
-      return apiGet(
-        endpoint,
-        {
-          q: encodeURIComponent(rawQuery),
-          nq: typeof nqName === 'string' ? encodeURIComponent(nqName) : null,
-          limit,
-          offset,
-          sort,
-          order,
-        },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ).then((result) => result as IFormattedSearchResult);
+      return apiGet(endpoint, {
+        q: encodeURIComponent(rawQuery),
+        nq: typeof nqName === 'string' ? encodeURIComponent(nqName) : null,
+        limit,
+        offset,
+        sort,
+        order,
+      }).then((result) => result as IFormattedSearchResult);
     },
     {
       keepPreviousData: true,

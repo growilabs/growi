@@ -51,67 +51,61 @@ const CustomizeNoscriptSetting = (props: Props): JSX.Element => {
   );
 
   return (
-    <React.Fragment>
-      <div className="row">
-        <div className="col-12">
-          <h2 className="admin-setting-header">
-            {t('admin:customize_settings.custom_noscript')}
-          </h2>
+    <div className="row">
+      <div className="col-12">
+        <h2 className="admin-setting-header">
+          {t('admin:customize_settings.custom_noscript')}
+        </h2>
 
-          <Card className="card custom-card bg-body-tertiary my-3">
-            <CardBody className="px-0 py-2">
-              <span
-                // eslint-disable-next-line react/no-danger
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
-                dangerouslySetInnerHTML={{
-                  __html: t('admin:customize_settings.custom_noscript_detail'),
-                }}
-              />
-            </CardBody>
-          </Card>
-
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <div>
-              <textarea
-                className="form-control mb-2"
-                rows={8}
-                {...register('customizeNoscript')}
-              />
-            </div>
-
-            <button
-              type="button"
-              className="btn btn-link text-muted p-0"
-              data-bs-toggle="collapse"
-              data-bs-target="#collapseExampleHtml"
-              aria-expanded="false"
-              aria-controls="collapseExampleHtml"
-            >
-              <span
-                className="material-symbols-outlined me-1"
-                aria-hidden="true"
-              >
-                navigate_next
-              </span>
-              Example for Google Tag Manager
-            </button>
-            <div className="collapse" id="collapseExampleHtml">
-              <PrismAsyncLight style={oneDark} language="javascript">
-                {`<iframe src="https://www.googletagmanager.com/ns.html?id=GTM-XXXXXXX"
-  height="0"
-  width="0"
-  style="display:none;visibility:hidden"></iframe>`}
-              </PrismAsyncLight>
-            </div>
-
-            <AdminUpdateButtonRow
-              type="submit"
-              disabled={adminCustomizeContainer.state.retrieveError != null}
+        <Card className="card custom-card bg-body-tertiary my-3">
+          <CardBody className="px-0 py-2">
+            <span
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
+              dangerouslySetInnerHTML={{
+                __html: t('admin:customize_settings.custom_noscript_detail'),
+              }}
             />
-          </form>
-        </div>
+          </CardBody>
+        </Card>
+
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <div>
+            <textarea
+              className="form-control mb-2"
+              rows={8}
+              {...register('customizeNoscript')}
+            />
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-link text-muted p-0"
+            data-bs-toggle="collapse"
+            data-bs-target="#collapseExampleHtml"
+            aria-expanded="false"
+            aria-controls="collapseExampleHtml"
+          >
+            <span className="material-symbols-outlined me-1" aria-hidden="true">
+              navigate_next
+            </span>
+            Example for Google Tag Manager
+          </button>
+          <div className="collapse" id="collapseExampleHtml">
+            <PrismAsyncLight style={oneDark} language="javascript">
+              {`<iframe src="https://www.googletagmanager.com/ns.html?id=GTM-XXXXXXX"
+height="0"
+width="0"
+style="display:none;visibility:hidden"></iframe>`}
+            </PrismAsyncLight>
+          </div>
+
+          <AdminUpdateButtonRow
+            type="submit"
+            disabled={adminCustomizeContainer.state.retrieveError != null}
+          />
+        </form>
       </div>
-    </React.Fragment>
+    </div>
   );
 };
 

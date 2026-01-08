@@ -10,7 +10,6 @@ type Props = {
   value?: string;
   onChange?: (e: ChangeEvent<HTMLInputElement>) => void;
   tabIndex?: number | undefined;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   register?: UseFormRegister<any>;
   fieldName?: string;
 };

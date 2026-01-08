@@ -20,7 +20,7 @@ import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
 import { excludeReadOnlyUser } from '../../middlewares/exclude-read-only-user';
 
-const logger = loggerFactory('growi:routes:apiv3:attachment'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:routes:apiv3:attachment');
 
 const router = express.Router();
 const { query, param, body } = require('express-validator');

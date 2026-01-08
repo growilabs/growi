@@ -35,7 +35,6 @@ const PrivateLegacyPagesMigrationModalSubstance = ({
 
   const [isRecursively, setIsRecursively] = useState(true);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [errs, setErrs] = useState<Error[] | null>(null);
 
   // Memoize submit handler

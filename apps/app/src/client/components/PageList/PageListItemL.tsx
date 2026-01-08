@@ -296,7 +296,6 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
                           <a
                             className="page-segment"
                             href={returnPathForURL(pageData.path, pageData._id)}
-                            // eslint-disable-next-line react/no-danger
                             // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight markup is sanitized
                             dangerouslySetInnerHTML={{
                               __html: linkedPagePathHighlightedLatter.pathName,
@@ -350,7 +349,6 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
                 <Clamp lines={2}>
                   {elasticSearchResult != null &&
                     elasticSearchResult.snippet != null && (
-                      // eslint-disable-next-line react/no-danger
                       <div
                         // biome-ignore lint/security/noDangerouslySetInnerHtml: snippet markup is sanitized
                         dangerouslySetInnerHTML={{

@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { IPageInfoForEntity, IPageToDeleteWithMeta } from '@growi/core';
 import { isIPageInfoForEntity } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
@@ -38,7 +38,6 @@ const deleteIconAndKey = {
   },
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isIPageInfoForEntityForDeleteModal = (
   pageInfo: any | undefined,
 ): pageInfo is IPageInfoForEntity => {
@@ -63,7 +62,6 @@ export const PageDeleteModal: FC = () => {
     () =>
       (pages ?? []).filter((p) => !isIPageInfoForEntityForDeleteModal(p.meta)),
     // Optimization: Use pageIds and pagesLength instead of pages array reference to avoid unnecessary re-computation
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [pageIds, pagesLength],
   );
 
@@ -84,7 +82,6 @@ export const PageDeleteModal: FC = () => {
       return null;
     },
     // Optimization: Use pageIds and pagesLength instead of pages array reference to avoid unnecessary re-computation
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [pageIds, pagesLength, injectTo],
   );
 
@@ -107,7 +104,6 @@ export const PageDeleteModal: FC = () => {
   const pagePaths = useMemo(
     () => pages?.map((p) => p.data?.path ?? '') ?? [],
     // Optimization: Use pageIds and pagesLength instead of pages array reference to avoid unnecessary re-computation
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [pageIds, pagesLength],
   );
 
@@ -128,7 +124,6 @@ export const PageDeleteModal: FC = () => {
       ? 'completely'
       : 'temporary';
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [errs, setErrs] = useState<Error[] | null>(null);
 
   // initialize when opening modal
@@ -229,7 +224,6 @@ export const PageDeleteModal: FC = () => {
       }
     },
     // Optimization: Use pageIds and pagesLength instead of pages array reference to avoid unnecessary re-computation
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       pageIds,
       pagesLength,
@@ -369,7 +363,6 @@ export const PageDeleteModal: FC = () => {
       </>
     );
     // Optimization: Use direct dependencies instead of JSX.Element reference for better performance
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isOpened,
     t,

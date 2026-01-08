@@ -1,4 +1,3 @@
-/* eslint-disable no-use-before-define */
 import { omitInsecureAttributes } from '@growi/core/dist/models/serializers';
 import { pagePathUtils } from '@growi/core/dist/utils';
 
@@ -414,10 +413,7 @@ const factory = (crowi) => {
       });
   };
 
-  userSchema.statics.findAllUsers = function (option) {
-    // eslint-disable-next-line no-param-reassign
-    option = option || {};
-
+  userSchema.statics.findAllUsers = function (option = {}) {
     const sort = option.sort || { createdAt: -1 };
     const fields = option.fields || {};
 
@@ -436,10 +432,7 @@ const factory = (crowi) => {
       .sort(sort);
   };
 
-  userSchema.statics.findUsersByIds = function (ids, option) {
-    // eslint-disable-next-line no-param-reassign
-    option = option || {};
-
+  userSchema.statics.findUsersByIds = function (ids, option = {}) {
     const sort = option.sort || { createdAt: -1 };
     const status = option.status || STATUS_ACTIVE;
     const fields = option.fields || {};
@@ -599,10 +592,8 @@ const factory = (crowi) => {
     const User = this;
     const newUser = new User();
 
-    /* eslint-disable newline-per-chained-call */
     const tmpUsername = `temp_${crypto.randomBytes(8).toString('hex')}`;
     const password = crypto.randomBytes(12).toString('hex');
-    /* eslint-enable newline-per-chained-call */
 
     newUser.username = tmpUsername;
     newUser.email = email;
@@ -651,7 +642,7 @@ const factory = (crowi) => {
 
     for (const email of creationEmailList) {
       try {
-        // eslint-disable-next-line no-await-in-loop
+        // biome-ignore lint/performance/noAwaitInLoops: Allow for memory consumption control
         const createdUser = await this.createUserByEmail(email);
         createdUserList.push(createdUser);
       } catch (err) {
@@ -690,7 +681,7 @@ const factory = (crowi) => {
     // check email duplication because email must be unique
     const count = await this.count({ email });
     if (count > 0) {
-      // eslint-disable-next-line no-param-reassign
+      // biome-ignore lint/style/noParameterAssign: ignore
       email = generateRandomEmail();
     }
 

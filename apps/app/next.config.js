@@ -105,9 +105,6 @@ module.exports = async (phase) => {
     i18n,
 
     // for build
-    eslint: {
-      ignoreDuringBuilds: true,
-    },
     typescript: {
       tsconfigPath: 'tsconfig.build.client.json',
     },

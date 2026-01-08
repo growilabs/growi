@@ -33,7 +33,7 @@ import { keepOriginal } from './overwrite-function';
 
 import JSONStream from 'JSONStream';
 
-const logger = loggerFactory('growi:services:ImportService'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:services:ImportService');
 
 const BULK_IMPORT_SIZE = 100;
 

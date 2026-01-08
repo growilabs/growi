@@ -288,7 +288,6 @@ describe('ExternalUserGroupSyncService.syncExternalUserGroups', () => {
       await configManager.updateConfigs(configParams);
     });
 
-    // eslint-disable-next-line jest/expect-expect
     it('syncs groups with new users', async () => {
       await testService.syncExternalUserGroups();
       await checkSync();
@@ -305,7 +304,6 @@ describe('ExternalUserGroupSyncService.syncExternalUserGroups', () => {
       await configManager.updateConfigs(configParams);
     });
 
-    // eslint-disable-next-line jest/expect-expect
     it('syncs groups without new users', async () => {
       await testService.syncExternalUserGroups();
       await checkSync(false);

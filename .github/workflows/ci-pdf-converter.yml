@@ -9,7 +9,7 @@ on:
     paths:
       - .github/mergify.yml
       - .github/workflows/ci-pdf-converter.yml
-      - .eslint*
+      - biome.json
       - tsconfig.base.json
       - turbo.json
       - pnpm-lock.yaml

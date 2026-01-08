@@ -19,7 +19,6 @@ function generateRespondBodyForInternalServerError(
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleErrorWithWebClient(
   error: Error,
   client: WebClient,
@@ -49,14 +48,12 @@ export async function handleError(
   responseUrl?: string,
 ): Promise<void>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function handleError(
   error: Error,
   client: WebClient,
   body: any,
 ): Promise<ChatPostEphemeralResponse>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function handleError(
   error: SlackCommandHandlerError | Error,
   ...args: any[]

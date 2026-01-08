@@ -1,4 +1,4 @@
-import React, { type JSX, memo, useCallback, useEffect } from 'react';
+import { type JSX, memo, useCallback, useEffect } from 'react';
 import { type IPageHasId, isPopulated } from '@growi/core';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { UserPicture } from '@growi/ui/dist/components';
@@ -19,8 +19,7 @@ import styles from './RecentChangesSubstance.module.scss';
 const formerLinkClass = styles['grw-former-link'];
 const pageItemLowerClass = styles['grw-recent-changes-item-lower'];
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const logger = loggerFactory('growi:History');
+const _logger = loggerFactory('growi:components:History');
 
 type PageItemLowerProps = {
   page: IPageHasId;

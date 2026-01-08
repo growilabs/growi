@@ -29,7 +29,6 @@ class StatusTable extends React.PureComponent {
       );
     } else {
       connectionStatusLabel = isConnected ? (
-        // eslint-disable-next-line max-len
         <span
           data-testid="connection-status-badge-connected"
           className="badge text-bg-success"

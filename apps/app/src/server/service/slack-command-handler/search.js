@@ -154,7 +154,6 @@ module.exports = (crowi) => {
       action_id: 'search:dismissSearchResults',
     });
     // show "Prev" button if previous page exists
-    // eslint-disable-next-line yoda
     if (0 < offset) {
       actionBlocks.elements.push({
         type: 'button',

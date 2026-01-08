@@ -139,8 +139,7 @@ module.exports = (crowi) => {
     }),
     loginRequiredStrictly,
     async (req: CrowiRequest, res: ApiV3Response) => {
-      // user must be set by loginRequiredStrictly
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      // biome-ignore lint/style/noNonNullAssertion: user must be set by loginRequiredStrictly
       const user = req.user!;
 
       const limit =
@@ -229,8 +228,7 @@ module.exports = (crowi) => {
     }),
     loginRequiredStrictly,
     async (req: CrowiRequest, res: ApiV3Response) => {
-      // user must be set by loginRequiredStrictly
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      // biome-ignore lint/style/noNonNullAssertion: user must be set by loginRequiredStrictly
       const user = req.user!;
 
       try {
@@ -280,8 +278,7 @@ module.exports = (crowi) => {
     }),
     loginRequiredStrictly,
     async (req: CrowiRequest, res: ApiV3Response) => {
-      // user must be set by loginRequiredStrictly
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      // biome-ignore lint/style/noNonNullAssertion: user must be set by loginRequiredStrictly
       const user = req.user!;
 
       const id = req.body.id;
@@ -319,8 +316,7 @@ module.exports = (crowi) => {
     loginRequiredStrictly,
     addActivity,
     async (req: CrowiRequest, res: ApiV3Response) => {
-      // user must be set by loginRequiredStrictly
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      // biome-ignore lint/style/noNonNullAssertion: user must be set by loginRequiredStrictly
       const user = req.user!;
 
       try {

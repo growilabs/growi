@@ -23,8 +23,6 @@ export const PresetThemes = {
 } as const;
 export type PresetThemes = (typeof PresetThemes)[keyof typeof PresetThemes];
 
-/* eslint-disable no-multi-spaces, */
-
 export const DefaultThemeMetadata: GrowiThemeMetadata = {
   name: PresetThemes.DEFAULT,
   manifestKey: `src/styles/${PresetThemes.DEFAULT}.scss`,
@@ -218,4 +216,3 @@ export const PresetThemesMetadatas: GrowiThemeMetadata[] = [
       manifestKey: `src/styles/${metadata.name}.scss`,
     };
   });
-/* eslint-disable no-multi-spaces */

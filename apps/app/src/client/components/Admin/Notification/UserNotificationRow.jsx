@@ -46,7 +46,7 @@ UserNotificationRow.propTypes = {
   onClickDeleteBtn: PropTypes.func.isRequired,
 };
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+// biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
 const UserNotificationRowWrapperWrapperFC = (props) => {
   const { t } = useTranslation();
 
