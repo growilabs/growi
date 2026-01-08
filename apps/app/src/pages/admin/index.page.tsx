@@ -14,8 +14,9 @@ import {
 } from './_shared';
 
 const AdminHome = dynamic(
-  // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/Admin/AdminHome/AdminHome'),
+  () =>
+    // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
+    import('~/client/components/Admin/AdminHome').then((mod) => mod.AdminHome),
   { ssr: false },
 );
 
@@ -43,14 +44,6 @@ const AdminHomepage: NextPageWithLayout<Props> = ({
 
 AdminHomepage.getLayout = createAdminPageLayout<Props>({
   title: (_p, t) => t('wiki_management_homepage'),
-  containerFactories: [
-    async () => {
-      const AdminHomeContainer =
-        // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-        (await import('~/client/services/AdminHomeContainer')).default;
-      return new AdminHomeContainer();
-    },
-  ],
 });
 
 export const getServerSideProps: GetServerSideProps<Props> = async (
