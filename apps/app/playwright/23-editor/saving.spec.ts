@@ -14,8 +14,12 @@ test('Successfully create page under specific path', async ({ page }) => {
 
   await page.goto('/Sandbox');
 
-  await page.keyboard.press(openPageCreateModalShortcutKey);
-  await expect(page.getByTestId('page-create-modal')).toBeVisible();
+  await expect(async () => {
+    await page.keyboard.press(openPageCreateModalShortcutKey);
+    await expect(page.getByTestId('page-create-modal')).toBeVisible({
+      timeout: 1000,
+    });
+  }).toPass();
   page
     .getByTestId('page-create-modal')
     .locator('.rbt-input-main')

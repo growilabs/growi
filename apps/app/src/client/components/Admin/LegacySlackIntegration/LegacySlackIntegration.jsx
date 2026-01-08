@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
@@ -9,8 +8,6 @@ import { toArrayIfNot } from '~/utils/array-utils';
 import loggerFactory from '~/utils/logger';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
-
-
 import SlackConfiguration from './SlackConfiguration';
 
 const logger = loggerFactory('growi:NotificationSetting');
@@ -19,39 +16,47 @@ const LegacySlackIntegration = (props) => {
   const { t } = useTranslation();
   const { adminSlackIntegrationLegacyContainer } = props;
 
-
   useEffect(() => {
-    const fetchLegacySlackIntegrationData = async() => {
+    const fetchLegacySlackIntegrationData = async () => {
       await adminSlackIntegrationLegacyContainer.retrieveData();
     };
 
     try {
       fetchLegacySlackIntegrationData();
-    }
-    catch (err) {
+    } catch (err) {
       const errs = toArrayIfNot(err);
       toastError(errs);
       logger.error(errs);
     }
   }, [adminSlackIntegrationLegacyContainer]);
 
-
-  const isDisabled = adminSlackIntegrationLegacyContainer.state.isSlackbotConfigured;
+  const isDisabled =
+    adminSlackIntegrationLegacyContainer.state.isSlackbotConfigured;
 
   return (
     <div data-testid="admin-slack-integration-legacy">
-      { isDisabled && (
+      {isDisabled && (
         <div className="alert alert-danger">
           <span className="material-symbols-outlined">remove</span>
           {/* eslint-disable-next-line react/no-danger */}
-          <span dangerouslySetInnerHTML={{ __html: t('admin:slack_integration_legacy.alert_disabled') }}></span>
+          <span
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
+            dangerouslySetInnerHTML={{
+              __html: t('admin:slack_integration_legacy.alert_disabled'),
+            }}
+          ></span>
         </div>
-      ) }
+      )}
 
       <div className="alert alert-warning">
         <span className="material-symbols-outlined">info</span>
         {/* eslint-disable-next-line react/no-danger */}
-        <span dangerouslySetInnerHTML={{ __html: t('admin:slack_integration_legacy.alert_deplicated') }}></span>
+        <span
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
+          dangerouslySetInnerHTML={{
+            __html: t('admin:slack_integration_legacy.alert_deplicated'),
+          }}
+        ></span>
       </div>
 
       <SlackConfiguration />
@@ -59,10 +64,15 @@ const LegacySlackIntegration = (props) => {
   );
 };
 
-const LegacySlackIntegrationWithUnstatedContainer = withUnstatedContainers(LegacySlackIntegration, [AdminSlackIntegrationLegacyContainer]);
+const LegacySlackIntegrationWithUnstatedContainer = withUnstatedContainers(
+  LegacySlackIntegration,
+  [AdminSlackIntegrationLegacyContainer],
+);
 
 LegacySlackIntegration.propTypes = {
-  adminSlackIntegrationLegacyContainer: PropTypes.instanceOf(AdminSlackIntegrationLegacyContainer).isRequired,
+  adminSlackIntegrationLegacyContainer: PropTypes.instanceOf(
+    AdminSlackIntegrationLegacyContainer,
+  ).isRequired,
 };
 
 export default LegacySlackIntegrationWithUnstatedContainer;

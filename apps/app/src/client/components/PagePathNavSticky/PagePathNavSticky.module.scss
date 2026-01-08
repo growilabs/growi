@@ -1,23 +1,7 @@
-@use '@growi/core-styles/scss/bootstrap/init' as bs;
-
 .grw-page-path-nav-sticky :global {
-  .sticky-inner-wrapper {
-    z-index: bs.$zindex-sticky;
-  }
-
-  // TODO:Responsive font size
-  // set smaller font-size when sticky
   .sticky-inner-wrapper.active {
     h1 {
       font-size: 1.75rem !important;
-    }
-  }
-}
-
-@media print {
-  .grw-page-path-nav-sticky :global {
-    .sticky-inner-wrapper {
-      position: static !important;
     }
   }
 }

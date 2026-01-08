@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect } from 'react';
-
-import { useTranslation } from 'next-i18next';
 import Link from 'next/link';
+import { useAtomValue } from 'jotai';
+import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 
 import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 import AdminLocalSecurityContainer from '~/client/services/AdminLocalSecurityContainer';
-import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useIsMailerSetup } from '~/stores-universal/context';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { isMailerSetupAtom } from '~/states/server-configurations';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -17,54 +17,70 @@ type Props = {
 };
 
 const LocalSecuritySettingContents = (props: Props): JSX.Element => {
-  const {
-    adminGeneralSecurityContainer,
-    adminLocalSecurityContainer,
-  } = props;
+  const { adminGeneralSecurityContainer, adminLocalSecurityContainer } = props;
 
   const { t } = useTranslation('admin');
-  const { data: isMailerSetup = false } = useIsMailerSetup();
+  const isMailerSetup = useAtomValue(isMailerSetupAtom);
 
   const { register, handleSubmit, reset } = useForm();
 
-  const { registrationMode, isPasswordResetEnabled, isEmailAuthenticationEnabled } = adminLocalSecurityContainer.state;
+  const {
+    registrationMode,
+    isPasswordResetEnabled,
+    isEmailAuthenticationEnabled,
+  } = adminLocalSecurityContainer.state;
   const { isLocalEnabled } = adminGeneralSecurityContainer.state;
 
   useEffect(() => {
     reset({
-      registrationWhitelist: adminLocalSecurityContainer.state.registrationWhitelist.join('\n'),
+      registrationWhitelist:
+        adminLocalSecurityContainer.state.registrationWhitelist.join('\n'),
     });
   }, [reset, adminLocalSecurityContainer.state.registrationWhitelist]);
 
-  const onSubmit = useCallback(async(data) => {
-    try {
-      await adminLocalSecurityContainer.changeRegistrationWhitelist(data.registrationWhitelist);
-      await adminLocalSecurityContainer.updateLocalSecuritySetting();
-      await adminGeneralSecurityContainer.retrieveSetupStratedies();
-      toastSuccess(t('security_settings.updated_general_security_setting'));
-    }
-    catch (err) {
-      toastError(err);
-    }
-  }, [t, adminGeneralSecurityContainer, adminLocalSecurityContainer]);
+  const onSubmit = useCallback(
+    async (data) => {
+      try {
+        await adminLocalSecurityContainer.updateLocalSecuritySetting({
+          registrationMode: adminLocalSecurityContainer.state.registrationMode,
+          registrationWhitelist: data.registrationWhitelist.split('\n'),
+          isPasswordResetEnabled:
+            adminLocalSecurityContainer.state.isPasswordResetEnabled,
+          isEmailAuthenticationEnabled:
+            adminLocalSecurityContainer.state.isEmailAuthenticationEnabled,
+        });
+        await adminGeneralSecurityContainer.retrieveSetupStratedies();
+        toastSuccess(t('security_settings.updated_general_security_setting'));
+      } catch (err) {
+        toastError(err);
+      }
+    },
+    [t, adminGeneralSecurityContainer, adminLocalSecurityContainer],
+  );
 
   return (
     <>
       {adminLocalSecurityContainer.state.retrieveError != null && (
         <div className="alert alert-danger">
           <p>
-            {t('Error occurred')} : {adminLocalSecurityContainer.state.retrieveError}
+            {t('Error occurred')} :{' '}
+            {adminLocalSecurityContainer.state.retrieveError}
           </p>
         </div>
       )}
-      <h2 className="alert-anchor border-bottom">{t('security_settings.Local.name')}</h2>
+      <h2 className="alert-anchor border-bottom">
+        {t('security_settings.Local.name')}
+      </h2>
 
       {adminLocalSecurityContainer.state.useOnlyEnvVars && (
         <p
           className="alert alert-info"
           // eslint-disable-next-line max-len
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
           dangerouslySetInnerHTML={{
-            __html: t('security_settings.Local.note for the only env option', { env: 'LOCAL_STRATEGY_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS' }),
+            __html: t('security_settings.Local.note for the only env option', {
+              env: 'LOCAL_STRATEGY_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+            }),
           }}
         />
       )}
@@ -77,22 +93,34 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
               className="form-check-input"
               id="isLocalEnabled"
               checked={isLocalEnabled}
-              onChange={() => adminGeneralSecurityContainer.switchIsLocalEnabled()}
+              onChange={() =>
+                adminGeneralSecurityContainer.switchIsLocalEnabled()
+              }
               disabled={adminLocalSecurityContainer.state.useOnlyEnvVars}
             />
-            <label className="form-label form-check-label" htmlFor="isLocalEnabled">
+            <label
+              className="form-label form-check-label"
+              htmlFor="isLocalEnabled"
+            >
               {t('security_settings.Local.enable_local')}
             </label>
           </div>
-          {!adminGeneralSecurityContainer.state.setupStrategies.includes('local') && isLocalEnabled && (
-            <div className="badge bg-warning text-dark">{t('security_settings.setup_is_not_yet_complete')}</div>
-          )}
+          {!adminGeneralSecurityContainer.state.setupStrategies.includes(
+            'local',
+          ) &&
+            isLocalEnabled && (
+              <div className="badge bg-warning text-dark">
+                {t('security_settings.setup_is_not_yet_complete')}
+              </div>
+            )}
         </div>
       </div>
 
       {isLocalEnabled && (
         <form onSubmit={handleSubmit(onSubmit)}>
-          <h3 className="border-bottom">{t('security_settings.configuration')}</h3>
+          <h3 className="border-bottom">
+            {t('security_settings.configuration')}
+          </h3>
 
           <div className="row">
             <div className="col-12 col-md-4 text-start text-md-end py-2">
@@ -108,16 +136,21 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
                   aria-haspopup="true"
                   aria-expanded="true"
                 >
-                  {registrationMode === 'Open' && t('security_settings.registration_mode.open')}
-                  {registrationMode === 'Restricted' && t('security_settings.registration_mode.restricted')}
-                  {registrationMode === 'Closed' && t('security_settings.registration_mode.closed')}
+                  {registrationMode === 'Open' &&
+                    t('security_settings.registration_mode.open')}
+                  {registrationMode === 'Restricted' &&
+                    t('security_settings.registration_mode.restricted')}
+                  {registrationMode === 'Closed' &&
+                    t('security_settings.registration_mode.closed')}
                 </button>
-                <div className="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                <div className="dropdown-menu">
                   <button
                     className="dropdown-item"
                     type="button"
                     onClick={() => {
-                      adminLocalSecurityContainer.changeRegistrationMode('Open');
+                      adminLocalSecurityContainer.changeRegistrationMode(
+                        'Open',
+                      );
                     }}
                   >
                     {t('security_settings.registration_mode.open')}
@@ -126,7 +159,9 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
                     className="dropdown-item"
                     type="button"
                     onClick={() => {
-                      adminLocalSecurityContainer.changeRegistrationMode('Restricted');
+                      adminLocalSecurityContainer.changeRegistrationMode(
+                        'Restricted',
+                      );
                     }}
                   >
                     {t('security_settings.registration_mode.restricted')}
@@ -135,19 +170,30 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
                     className="dropdown-item"
                     type="button"
                     onClick={() => {
-                      adminLocalSecurityContainer.changeRegistrationMode('Closed');
+                      adminLocalSecurityContainer.changeRegistrationMode(
+                        'Closed',
+                      );
                     }}
                   >
                     {t('security_settings.registration_mode.closed')}
                   </button>
                 </div>
               </div>
-              <p className="form-text text-muted small">{t('security_settings.register_limitation_desc')}</p>
+              <p className="form-text text-muted small">
+                {t('security_settings.register_limitation_desc')}
+              </p>
             </div>
           </div>
           <div className="row">
             <div className="col-12 col-md-4 text-start text-md-end">
-              <strong dangerouslySetInnerHTML={{ __html: t('security_settings.The whitelist of registration permission E-mail address') }} />
+              <strong
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
+                dangerouslySetInnerHTML={{
+                  __html: t(
+                    'security_settings.The whitelist of registration permission E-mail address',
+                  ),
+                }}
+              />
             </div>
             <div className="col-12 col-md-8">
               <textarea
@@ -167,7 +213,9 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
           </div>
 
           <div className="row">
-            <label className="col-12 col-md-4 text-start text-md-end  col-form-label">{t('security_settings.Local.password_reset_by_users')}</label>
+            <span className="col-12 col-md-4 text-start text-md-end col-form-label">
+              {t('security_settings.Local.password_reset_by_users')}
+            </span>
             <div className="col-12 col-md-8">
               <div className="form-check form-switch form-check-success">
                 <input
@@ -175,17 +223,25 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
                   className="form-check-input"
                   id="isPasswordResetEnabled"
                   checked={isPasswordResetEnabled}
-                  onChange={() => adminLocalSecurityContainer.switchIsPasswordResetEnabled()}
+                  onChange={() =>
+                    adminLocalSecurityContainer.switchIsPasswordResetEnabled()
+                  }
                 />
-                <label className="form-label form-check-label" htmlFor="isPasswordResetEnabled">
+                <label
+                  className="form-label form-check-label"
+                  htmlFor="isPasswordResetEnabled"
+                >
                   {t('security_settings.Local.enable_password_reset_by_users')}
                 </label>
               </div>
               {!isMailerSetup && (
                 <div className="alert alert-warning p-2 my-1 small d-inline-block">
-                  <span>{t('commons:alert.password_reset_please_enable_mailer')}</span>
+                  <span>
+                    {t('commons:alert.password_reset_please_enable_mailer')}
+                  </span>
                   <Link href="/admin/app#mail-settings">
-                    <span className="material-symbols-outlined">link</span> {t('app_setting.mail_settings')}
+                    <span className="material-symbols-outlined">link</span>{' '}
+                    {t('app_setting.mail_settings')}
                   </Link>
                 </div>
               )}
@@ -196,7 +252,9 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
           </div>
 
           <div className="row">
-            <label className="col-12 col-md-4 text-start text-md-end  col-form-label">{t('security_settings.Local.email_authentication')}</label>
+            <span className="col-12 col-md-4 text-start text-md-end col-form-label">
+              {t('security_settings.Local.email_authentication')}
+            </span>
             <div className="col-12 col-md-8">
               <div className="form-check form-switch form-check-success">
                 <input
@@ -204,9 +262,14 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
                   className="form-check-input"
                   id="isEmailAuthenticationEnabled"
                   checked={isEmailAuthenticationEnabled}
-                  onChange={() => adminLocalSecurityContainer.switchIsEmailAuthenticationEnabled()}
+                  onChange={() =>
+                    adminLocalSecurityContainer.switchIsEmailAuthenticationEnabled()
+                  }
                 />
-                <label className="form-label form-check-label" htmlFor="isEmailAuthenticationEnabled">
+                <label
+                  className="form-label form-check-label"
+                  htmlFor="isEmailAuthenticationEnabled"
+                >
                   {t('security_settings.Local.enable_email_authentication')}
                 </label>
               </div>
@@ -214,7 +277,8 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
                 <div className="alert alert-warning p-2 my-1 small d-inline-block">
                   <span>{t('commons:alert.please_enable_mailer')}</span>
                   <Link href="/admin/app#mail-settings">
-                    <span className="material-symbols-outlined">link</span> {t('app_setting.mail_settings')}
+                    <span className="material-symbols-outlined">link</span>{' '}
+                    {t('app_setting.mail_settings')}
                   </Link>
                 </div>
               )}
@@ -229,7 +293,9 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={adminLocalSecurityContainer.state.retrieveError != null}
+                disabled={
+                  adminLocalSecurityContainer.state.retrieveError != null
+                }
               >
                 {t('Update')}
               </button>
@@ -241,9 +307,9 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
   );
 };
 
-const LocalSecuritySettingContentsWrapper = withUnstatedContainers(LocalSecuritySettingContents, [
-  AdminGeneralSecurityContainer,
-  AdminLocalSecurityContainer,
-]);
+const LocalSecuritySettingContentsWrapper = withUnstatedContainers(
+  LocalSecuritySettingContents,
+  [AdminGeneralSecurityContainer, AdminLocalSecurityContainer],
+);
 
 export default LocalSecuritySettingContentsWrapper;

@@ -24,5 +24,13 @@ export const factory = (crowi: Crowi): express.Router => {
     router.get('/threads', getThreadsFactory(crowi));
   });
 
+  import('./delete-thread').then(({ deleteThreadHandlersFactory }) => {
+    router.delete('/thread/:threadId', deleteThreadHandlersFactory(crowi));
+  });
+
+  import('./get-messages').then(({ getMessagesHandlersFactory }) => {
+    router.get('/messages/:threadId', getMessagesHandlersFactory(crowi));
+  });
+
   return router;
 };

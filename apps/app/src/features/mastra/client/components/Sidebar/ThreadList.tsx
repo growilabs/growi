@@ -1,15 +1,17 @@
 import type React from 'react';
 import { useCallback } from 'react';
-import { getIdStringForRef } from '@growi/core';
 import { useTranslation } from 'react-i18next';
 
 import InfiniteScroll from '~/client/components/InfiniteScroll';
 import { toastError, toastSuccess } from '~/client/util/toastr';
+import {
+  useAiAssistantSidebarActions,
+  useAiAssistantSidebarStatus,
+} from '~/features/openai/client/states';
 import { useSWRMUTxThreads } from '~/features/openai/client/stores/thread';
 import loggerFactory from '~/utils/logger';
 
 import { deleteThread } from '../../../../openai/client/services/thread';
-import { useAiAssistantSidebar } from '../../../../openai/client/stores/ai-assistant';
 import { useSWRINFxRecentThreads } from '../../stores/thread';
 
 const logger = loggerFactory('growi:openai:client:components:ThreadList');
@@ -18,11 +20,9 @@ export const ThreadList: React.FC = () => {
   const swrInfiniteThreads = useSWRINFxRecentThreads();
   const { t } = useTranslation();
   const { data, mutate: mutateRecentThreads } = swrInfiniteThreads;
-  const {
-    openChat,
-    data: aiAssistantSidebarData,
-    close: closeAiAssistantSidebar,
-  } = useAiAssistantSidebar();
+  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
+  const { openChat, close: closeAiAssistantSidebar } =
+    useAiAssistantSidebarActions();
   const { trigger: mutateAssistantThreadData } = useSWRMUTxThreads(
     aiAssistantSidebarData?.aiAssistantData?._id,
   );

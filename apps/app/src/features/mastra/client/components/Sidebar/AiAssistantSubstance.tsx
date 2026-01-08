@@ -2,10 +2,12 @@ import React, { type JSX, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
-  useAiAssistantManagementModal,
-  useAiAssistantSidebar,
-  useSWRxAiAssistants,
-} from '../../../../openai/client/stores/ai-assistant';
+  useAiAssistantSidebarActions,
+  useAiAssistantSidebarStatus,
+} from '~/features/openai/client/states';
+import { useAiAssistantManagementModalActions } from '~/features/openai/client/states/modal/ai-assistant-management';
+import { useSWRxAiAssistants } from '~/features/openai/client/stores/ai-assistant';
+
 import { useSWRINFxRecentThreads } from '../../stores/thread';
 import { AiAssistantList } from './AiAssistantList';
 import { ThreadList } from './ThreadList';
@@ -16,9 +18,9 @@ const moduleClass = styles['grw-ai-assistant-substance'] ?? '';
 
 export const AiAssistantContent = (): JSX.Element => {
   const { t } = useTranslation();
-  const { open } = useAiAssistantManagementModal();
-  const { data: aiAssistantSidebarData, close: closeAiAssistantSidebar } =
-    useAiAssistantSidebar();
+  const { open } = useAiAssistantManagementModalActions();
+  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
+  const { close: closeAiAssistantSidebar } = useAiAssistantSidebarActions();
   const { mutate: mutateRecentThreads } = useSWRINFxRecentThreads();
   const { data: aiAssistants, mutate: mutateAiAssistants } =
     useSWRxAiAssistants();

@@ -1,10 +1,9 @@
 import React, { type JSX } from 'react';
-
+import Link from 'next/link';
 import type { IPageHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';
-import Link from 'next/link';
 
-import { useCurrentPagePath } from '~/stores/page';
+import { useCurrentPagePath } from '~/states/page';
 import { useSWRINFxPageTimeline } from '~/stores/page-timeline';
 import { useTimelineOptions } from '~/stores/renderer';
 
@@ -13,13 +12,11 @@ import { RevisionLoader } from './Page/RevisionLoader';
 
 import styles from './PageTimeline.module.scss';
 
-
 type TimelineCardProps = {
-  page: IPageHasId,
-}
+  page: IPageHasId;
+};
 
 const TimelineCard = ({ page }: TimelineCardProps): JSX.Element => {
-
   const { data: rendererOptions } = useTimelineOptions(page.path);
 
   return (
@@ -30,29 +27,32 @@ const TimelineCard = ({ page }: TimelineCardProps): JSX.Element => {
         </Link>
       </div>
       <div className="card-body">
-        { rendererOptions != null && page.revision != null && (
+        {rendererOptions != null && page.revision != null && (
           <RevisionLoader
             rendererOptions={rendererOptions}
             pageId={page._id}
             revisionId={page.revision}
           />
-        ) }
+        )}
       </div>
     </div>
   );
 };
 
 export const PageTimeline = (): JSX.Element => {
-
   const PER_PAGE = 3;
   const { t } = useTranslation();
-  const { data: currentPagePath } = useCurrentPagePath();
+  const currentPagePath = useCurrentPagePath();
 
-  const swrInfinitexPageTimeline = useSWRINFxPageTimeline(currentPagePath, PER_PAGE);
+  const swrInfinitexPageTimeline = useSWRINFxPageTimeline(
+    currentPagePath ?? undefined,
+    PER_PAGE,
+  );
   const { data } = swrInfinitexPageTimeline;
 
   const isEmpty = data?.[0]?.pages.length === 0;
-  const isReachingEnd = isEmpty || (data != null && data[data.length - 1]?.pages.length < PER_PAGE);
+  const isReachingEnd =
+    isEmpty || (data != null && data[data.length - 1]?.pages.length < PER_PAGE);
 
   if (data == null || isEmpty) {
     return (
@@ -68,11 +68,10 @@ export const PageTimeline = (): JSX.Element => {
         swrInifiniteResponse={swrInfinitexPageTimeline}
         isReachingEnd={isReachingEnd}
       >
-        { data != null && data.flatMap(apiResult => apiResult.pages)
-          .map(page => (
-            <TimelineCard key={page._id} page={page} />
-          ))
-        }
+        {data != null &&
+          data
+            .flatMap((apiResult) => apiResult.pages)
+            .map((page) => <TimelineCard key={page._id} page={page} />)}
       </InfiniteScroll>
     </div>
   );

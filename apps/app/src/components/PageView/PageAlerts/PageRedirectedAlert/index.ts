@@ -1,0 +1,1 @@
+export { PageRedirectedAlertLazyLoaded } from './dynamic';

@@ -1,8 +1,7 @@
+import archiver from 'archiver';
 import fs from 'fs';
 import path from 'path';
 import { Readable, Transform } from 'stream';
-
-import archiver from 'archiver';
 
 import { toArrayIfNot } from '~/utils/array-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
@@ -10,13 +9,11 @@ import loggerFactory from '~/utils/logger';
 
 import type CollectionProgress from '../models/vo/collection-progress';
 import CollectionProgressingStatus from '../models/vo/collection-progressing-status';
-
 import type AppService from './app';
 import { configManager } from './config-manager';
 import type { GrowiBridgeService } from './growi-bridge';
 import { growiInfoService } from './growi-info';
 import type { ZipFileStat } from './interfaces/export';
-
 
 const logger = loggerFactory('growi:services:ExportService');
 const { pipeline, finished } = require('stream/promises');
@@ -24,22 +21,21 @@ const { pipeline, finished } = require('stream/promises');
 const mongoose = require('mongoose');
 
 class ExportProgressingStatus extends CollectionProgressingStatus {
-
   async init() {
     // retrieve total document count from each collections
-    const promises = this.progressList.map(async(collectionProgress) => {
-      const collection = mongoose.connection.collection(collectionProgress.collectionName);
+    const promises = this.progressList.map(async (collectionProgress) => {
+      const collection = mongoose.connection.collection(
+        collectionProgress.collectionName,
+      );
       collectionProgress.totalCount = await collection.count();
     });
     await Promise.all(promises);
 
     this.recalculateTotalCount();
   }
-
 }
 
 class ExportService {
-
   crowi: any;
 
   appService: AppService;
@@ -83,7 +79,9 @@ class ExportService {
    * @return {object} info for zip files and whether currentProgressingStatus exists
    */
   async getStatus() {
-    const zipFiles = fs.readdirSync(this.baseDir).filter(file => path.extname(file) === '.zip');
+    const zipFiles = fs
+      .readdirSync(this.baseDir)
+      .filter((file) => path.extname(file) === '.zip');
 
     // process serially so as not to waste memory
     const zipFileStats: Array<ZipFileStat | null> = [];
@@ -96,14 +94,16 @@ class ExportService {
     }
 
     // filter null object (broken zip)
-    const filtered = zipFileStats.filter(element => element != null);
+    const filtered = zipFileStats.filter((element) => element != null);
 
     const isExporting = this.currentProgressingStatus != null;
 
     return {
       zipFileStats: filtered,
       isExporting,
-      progressList: isExporting ? this.currentProgressingStatus?.progressList : null,
+      progressList: isExporting
+        ? this.currentProgressingStatus?.progressList
+        : null,
     };
   }
 
@@ -114,8 +114,13 @@ class ExportService {
    * @return {string} path to meta.json
    */
   async createMetaJson(): Promise<string> {
-    const metaJson = path.join(this.baseDir, this.growiBridgeService.getMetaFileName());
-    const writeStream = fs.createWriteStream(metaJson, { encoding: this.growiBridgeService.getEncoding() });
+    const metaJson = path.join(
+      this.baseDir,
+      this.growiBridgeService.getMetaFileName(),
+    );
+    const writeStream = fs.createWriteStream(metaJson, {
+      encoding: this.growiBridgeService.getEncoding(),
+    });
     const passwordSeed = this.crowi.env.PASSWORD_SEED || null;
 
     const metaData = {
@@ -211,12 +216,15 @@ class ExportService {
     const transformStream = this.generateTransformStream();
 
     // log configuration
-    const exportProgress = this.currentProgressingStatus?.progressMap[collectionName];
+    const exportProgress =
+      this.currentProgressingStatus?.progressMap[collectionName];
     const logStream = this.generateLogStream(exportProgress);
 
     // create WritableStream
     const jsonFileToWrite = path.join(this.baseDir, `${collectionName}.json`);
-    const writeStream = fs.createWriteStream(jsonFileToWrite, { encoding: this.growiBridgeService.getEncoding() });
+    const writeStream = fs.createWriteStream(jsonFileToWrite, {
+      encoding: this.growiBridgeService.getEncoding(),
+    });
 
     await pipeline(readStream, logStream, transformStream, writeStream);
 
@@ -230,12 +238,16 @@ class ExportService {
    * @param {Array.<string>} collections array of collection name
    * @return {Array.<ZipFileStat>} info of zip file created
    */
-  async exportCollectionsToZippedJson(collections: string[]): Promise<ZipFileStat | null> {
+  async exportCollectionsToZippedJson(
+    collections: string[],
+  ): Promise<ZipFileStat | null> {
     const metaJson = await this.createMetaJson();
 
     // process serially so as not to waste memory
     const jsonFiles: string[] = [];
-    const jsonFilesPromises = collections.map(collectionName => this.exportCollectionToJson(collectionName));
+    const jsonFilesPromises = collections.map((collectionName) =>
+      this.exportCollectionToJson(collectionName),
+    );
     for await (const jsonFile of jsonFilesPromises) {
       jsonFiles.push(jsonFile);
     }
@@ -244,14 +256,17 @@ class ExportService {
     this.emitStartZippingEvent();
 
     // zip json
-    const configs = jsonFiles.map((jsonFile) => { return { from: jsonFile, as: path.basename(jsonFile) } });
+    const configs = jsonFiles.map((jsonFile) => {
+      return { from: jsonFile, as: path.basename(jsonFile) };
+    });
     // add meta.json in zip
     configs.push({ from: metaJson, as: path.basename(metaJson) });
     // exec zip
     const zipFile = await this.zipFiles(configs);
 
     // get stats for the zip file
-    const addedZipFileStat = await this.growiBridgeService.parseZipFile(zipFile);
+    const addedZipFileStat =
+      await this.growiBridgeService.parseZipFile(zipFile);
 
     // send terminate event
     this.emitTerminateEvent(addedZipFileStat);
@@ -272,8 +287,7 @@ class ExportService {
     let zipFileStat: ZipFileStat | null;
     try {
       zipFileStat = await this.exportCollectionsToZippedJson(collections);
-    }
-    finally {
+    } finally {
       this.currentProgressingStatus = null;
     }
 
@@ -288,7 +302,10 @@ class ExportService {
    * @param {CollectionProgress} collectionProgress
    * @param {number} currentCount number of items exported
    */
-  logProgress(collectionProgress: CollectionProgress | undefined, currentCount: number): void {
+  logProgress(
+    collectionProgress: CollectionProgress | undefined,
+    currentCount: number,
+  ): void {
     if (collectionProgress == null) return;
 
     const output = `${collectionProgress.collectionName}: ${currentCount}/${collectionProgress.totalCount} written`;
@@ -334,7 +351,9 @@ class ExportService {
    * @param {object} zipFileStat added zip file status data
    */
   emitTerminateEvent(zipFileStat: ZipFileStat | null): void {
-    this.adminEvent.emit('onTerminateForExport', { addedZipFileStat: zipFileStat });
+    this.adminEvent.emit('onTerminateForExport', {
+      addedZipFileStat: zipFileStat,
+    });
   }
 
   /**
@@ -345,11 +364,14 @@ class ExportService {
    * @return {string} absolute path to the zip file
    * @see https://www.archiverjs.com/#quick-start
    */
-  async zipFiles(_configs: {from: string, as: string}[]): Promise<string> {
+  async zipFiles(_configs: { from: string; as: string }[]): Promise<string> {
     const configs = toArrayIfNot(_configs);
     const appTitle = this.appService.getAppTitle();
-    const timeStamp = (new Date()).getTime();
-    const zipFile = path.join(this.baseDir, `${appTitle}-${timeStamp}.growi.zip`);
+    const timeStamp = new Date().getTime();
+    const zipFile = path.join(
+      this.baseDir,
+      `${appTitle}-${timeStamp}.growi.zip`,
+    );
     const archive = archiver('zip', {
       zlib: { level: this.zlibLevel },
     });
@@ -361,7 +383,9 @@ class ExportService {
     });
 
     // good practice to catch this error explicitly
-    archive.on('error', (err) => { throw err });
+    archive.on('error', (err) => {
+      throw err;
+    });
 
     for (const { from, as } of configs) {
       const input = fs.createReadStream(from);
@@ -379,7 +403,9 @@ class ExportService {
     // pipe archive data to the file
     await pipeline(archive, output);
 
-    logger.info(`zipped GROWI data into ${zipFile} (${archive.pointer()} bytes)`);
+    logger.info(
+      `zipped GROWI data into ${zipFile} (${archive.pointer()} bytes)`,
+    );
 
     // delete json files
     for (const { from } of configs) {
@@ -399,7 +425,6 @@ class ExportService {
 
     return readable;
   }
-
 }
 
 // eslint-disable-next-line import/no-mutable-exports

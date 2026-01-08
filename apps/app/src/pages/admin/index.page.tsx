@@ -1,104 +1,75 @@
-import { useEffect, useMemo } from 'react';
-import type {
-  GetServerSideProps,
-  GetServerSidePropsContext,
-  NextPage,
-} from 'next';
+import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
-import Head from 'next/head';
-import { useTranslation } from 'next-i18next';
-import type { Container } from 'unstated';
-import { Provider } from 'unstated';
+import { useHydrateAtoms } from 'jotai/utils';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { CommonProps } from '~/pages/utils/commons';
-import { generateCustomTitle } from '~/pages/utils/commons';
+import { _atomsForAdminPagesHydration as atoms } from '~/states/global';
+
+import type { NextPageWithLayout } from '../_app.page';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+import type { AdminCommonProps } from './_shared';
 import {
-  useCurrentUser,
-  useGrowiAppIdForGrowiCloud,
-  useGrowiCloudUri,
-} from '~/stores-universal/context';
+  createAdminPageLayout,
+  getServerSideAdminCommonProps,
+} from './_shared';
 
-import { retrieveServerSideProps } from '../../utils/admin-page-util';
-
-const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), {
-  ssr: false,
-});
 const AdminHome = dynamic(
+  // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
   () => import('~/client/components/Admin/AdminHome/AdminHome'),
   { ssr: false },
 );
-const ForbiddenPage = dynamic(
-  () =>
-    import('~/client/components/Admin/ForbiddenPage').then(
-      (mod) => mod.ForbiddenPage,
-    ),
-  { ssr: false },
-);
 
-type Props = CommonProps & {
+type ExtraProps = {
   growiCloudUri?: string;
   growiAppIdForGrowiCloud?: number;
 };
+type Props = AdminCommonProps & ExtraProps;
 
-const AdminHomepage: NextPage<Props> = (props: Props) => {
-  useCurrentUser(props.currentUser ?? null);
-  useGrowiCloudUri(props.growiCloudUri);
-  useGrowiAppIdForGrowiCloud(props.growiAppIdForGrowiCloud);
-
-  const { t } = useTranslation('admin');
-
-  const title = generateCustomTitle(props, t('wiki_management_homepage'));
-
-  const injectableContainers: Container<any>[] = useMemo(() => [], []);
-
-  useEffect(() => {
-    (async () => {
-      const AdminHomeContainer = (
-        await import('~/client/services/AdminHomeContainer')
-      ).default;
-      const adminHomeContainer = new AdminHomeContainer();
-      injectableContainers.push(adminHomeContainer);
-    })();
-  }, [injectableContainers]);
-
-  if (props.isAccessDeniedForNonAdminUser) {
-    return <ForbiddenPage />;
-  }
-
-  return (
-    <Provider inject={[...injectableContainers]}>
-      <AdminLayout componentTitle={title}>
-        <Head>
-          <title>{title}</title>
-        </Head>
-        <AdminHome />
-      </AdminLayout>
-    </Provider>
+// eslint-disable-next-line react/prop-types
+const AdminHomepage: NextPageWithLayout<Props> = ({
+  growiCloudUri,
+  growiAppIdForGrowiCloud,
+}) => {
+  // Hydrate atoms with fragment values (idempotent if already set by common props)
+  useHydrateAtoms(
+    [
+      [atoms.growiCloudUriAtom, growiCloudUri],
+      [atoms.growiAppIdForGrowiCloudAtom, growiAppIdForGrowiCloud],
+    ],
+    { dangerouslyForceHydrate: true },
   );
+
+  return <AdminHome />;
 };
 
-const injectServerConfigurations = async (
-  context: GetServerSidePropsContext,
-  props: Props,
-): Promise<void> => {
-  const req: CrowiRequest = context.req as CrowiRequest;
-  const { crowi } = req;
+AdminHomepage.getLayout = createAdminPageLayout<Props>({
+  title: (_p, t) => t('wiki_management_homepage'),
+  containerFactories: [
+    async () => {
+      const AdminHomeContainer =
+        // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
+        (await import('~/client/services/AdminHomeContainer')).default;
+      return new AdminHomeContainer();
+    },
+  ],
+});
 
-  props.growiCloudUri = crowi.configManager.getConfig('app:growiCloudUri');
-  props.growiAppIdForGrowiCloud = crowi.configManager.getConfig(
-    'app:growiAppIdForCloud',
-  );
-};
-
-export const getServerSideProps: GetServerSideProps = async (
+export const getServerSideProps: GetServerSideProps<Props> = async (
   context: GetServerSidePropsContext,
 ) => {
-  const props = await retrieveServerSideProps(
-    context,
-    injectServerConfigurations,
-  );
-  return props;
+  const baseResult = await getServerSideAdminCommonProps(context);
+
+  const req: CrowiRequest = context.req as CrowiRequest;
+  const { crowi } = req;
+  const fragment = {
+    props: {
+      growiCloudUri: crowi.configManager.getConfig('app:growiCloudUri'),
+      growiAppIdForGrowiCloud: crowi.configManager.getConfig(
+        'app:growiAppIdForCloud',
+      ),
+    },
+  } satisfies { props: ExtraProps };
+  return mergeGetServerSidePropsResults(baseResult, fragment);
 };
 
 export default AdminHomepage;
