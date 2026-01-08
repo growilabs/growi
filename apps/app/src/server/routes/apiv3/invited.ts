@@ -76,7 +76,6 @@ module.exports = (crowi: Crowi): Router => {
         return res.apiv3Err(req.form.errors, 400);
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const User = mongoose.model<IUser, any>('User');
 
       const user = req.user;

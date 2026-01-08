@@ -17,7 +17,6 @@ const PagePathNavSticky = withLoadingProps<PagePathNavLayoutProps>(
       {
         ssr: false,
         loading: () => {
-          // eslint-disable-next-line react-hooks/rules-of-hooks
           const props = useLoadingProps();
           return <PagePathNav {...props} />;
         },

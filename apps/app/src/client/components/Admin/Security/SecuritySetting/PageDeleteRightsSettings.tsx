@@ -330,7 +330,6 @@ export const PageDeleteRightsSettings: React.FC<Props> = ({
                     <p className="card custom-card bg-warning-sublte">
                       <span className="text-warning">
                         <span className="material-symbols-outlined">info</span>
-                        {/* eslint-disable-next-line react/no-danger */}
                         <span
                           // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                           dangerouslySetInnerHTML={{

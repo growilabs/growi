@@ -14,7 +14,7 @@ import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import httpErrorHandler from '../../middlewares/http-error-handler';
 import { checkForgotPasswordEnabledMiddlewareFactory } from '../forgot-password';
 
-const logger = loggerFactory('growi:routes:apiv3:forgotPassword'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:routes:apiv3:forgotPassword');
 
 const express = require('express');
 const { body } = require('express-validator');
@@ -222,7 +222,6 @@ module.exports = (crowi) => {
    *                  userData:
    *                    $ref: '#/components/schemas/User'
    */
-  // eslint-disable-next-line max-len
   router.put(
     '/',
     checkPassportStrategyMiddleware,
