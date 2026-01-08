@@ -6,24 +6,20 @@ import { useTranslation } from 'react-i18next';
 import { Collapse } from 'reactstrap';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useCurrentUser } from '~/stores-universal/context';
-import loggerFactory from '~/utils/logger';
-
 import {
   deleteAiAssistant,
   setDefaultAiAssistant,
-} from '../../../../openai/client/services/ai-assistant';
-import {
-  useAiAssistantManagementModal,
-  useAiAssistantSidebar,
-} from '../../../../openai/client/stores/ai-assistant';
-import { getShareScopeIcon } from '../../../../openai/client/utils/get-share-scope-Icon';
-import {
-  type AiAssistantHasId,
-  AiAssistantShareScope,
-} from '../../../../openai/interfaces/ai-assistant';
-import { determineShareScope } from '../../../../openai/utils/determine-share-scope';
-import { DeleteAiAssistantModal } from './DeleteAiAssistantModal';
+} from '~/features/openai/client/services/ai-assistant';
+import { useAiAssistantSidebarActions } from '~/features/openai/client/states';
+import { useAiAssistantManagementModalActions } from '~/features/openai/client/states/modal/ai-assistant-management';
+import { getShareScopeIcon } from '~/features/openai/client/utils/get-share-scope-Icon';
+import type { AiAssistantHasId } from '~/features/openai/interfaces/ai-assistant';
+import { AiAssistantShareScope } from '~/features/openai/interfaces/ai-assistant';
+import { determineShareScope } from '~/features/openai/utils/determine-share-scope';
+import { useCurrentUser } from '~/states/global';
+import loggerFactory from '~/utils/logger';
+
+import { DeleteAiAssistantModalLazyLoaded } from './DeleteAiAssistantModal';
 
 const logger = loggerFactory('growi:openai:client:components:AiAssistantList');
 
@@ -87,77 +83,72 @@ const AiAssistantItem: React.FC<AiAssistantItemProps> = ({
       AiAssistantShareScope.PUBLIC_ONLY;
 
   return (
-    <>
-      <li className="list-group-item border-0 p-0">
-        <button
-          type="button"
-          className="btn btn-link list-group-item-action border-0 d-flex align-items-center rounded-1"
-          onClick={(e) => {
-            e.stopPropagation();
-            openChatHandler(aiAssistant);
-          }}
-          onMouseDown={(e) => {
-            e.preventDefault();
-          }}
-        >
-          <div className="d-flex justify-content-center">
-            <span className="material-symbols-outlined fs-5">
-              {getShareScopeIcon(
-                aiAssistant.shareScope,
-                aiAssistant.accessScope,
-              )}
-            </span>
-          </div>
+    <li className="list-group-item border-0 p-0">
+      <button
+        type="button"
+        className="btn btn-link list-group-item-action border-0 d-flex align-items-center rounded-1"
+        onClick={(e) => {
+          e.stopPropagation();
+          openChatHandler(aiAssistant);
+        }}
+        onMouseDown={(e) => {
+          e.preventDefault();
+        }}
+      >
+        <div className="d-flex justify-content-center">
+          <span className="material-symbols-outlined fs-5">
+            {getShareScopeIcon(aiAssistant.shareScope, aiAssistant.accessScope)}
+          </span>
+        </div>
 
-          <div className="grw-item-title ps-1">
-            <p className="text-truncate m-auto">{aiAssistant.name}</p>
-          </div>
+        <div className="grw-item-title ps-1">
+          <p className="text-truncate m-auto">{aiAssistant.name}</p>
+        </div>
 
-          <div className="grw-btn-actions opacity-0 d-flex justify-content-center">
-            {isPublicAiAssistantOperable && (
+        <div className="grw-btn-actions opacity-0 d-flex justify-content-center">
+          {isPublicAiAssistantOperable && (
+            <button
+              type="button"
+              className="btn btn-link text-secondary p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDefaultAiAssistantHandler();
+              }}
+            >
+              <span
+                className={`material-symbols-outlined fs-5 ${aiAssistant.isDefault ? 'fill' : ''}`}
+              >
+                star
+              </span>
+            </button>
+          )}
+          {isOperable && (
+            <>
               <button
                 type="button"
                 className="btn btn-link text-secondary p-0"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setDefaultAiAssistantHandler();
+                  openManagementModalHandler(aiAssistant);
                 }}
               >
-                <span
-                  className={`material-symbols-outlined fs-5 ${aiAssistant.isDefault ? 'fill' : ''}`}
-                >
-                  star
-                </span>
+                <span className="material-symbols-outlined fs-5">edit</span>
               </button>
-            )}
-            {isOperable && (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-link text-secondary p-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openManagementModalHandler(aiAssistant);
-                  }}
-                >
-                  <span className="material-symbols-outlined fs-5">edit</span>
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-link text-secondary p-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteClick(aiAssistant);
-                  }}
-                >
-                  <span className="material-symbols-outlined fs-5">delete</span>
-                </button>
-              </>
-            )}
-          </div>
-        </button>
-      </li>
-    </>
+              <button
+                type="button"
+                className="btn btn-link text-secondary p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteClick(aiAssistant);
+                }}
+              >
+                <span className="material-symbols-outlined fs-5">delete</span>
+              </button>
+            </>
+          )}
+        </div>
+      </button>
+    </li>
   );
 };
 
@@ -180,10 +171,10 @@ export const AiAssistantList: React.FC<AiAssistantListProps> = ({
   onCollapsed,
 }) => {
   const { t } = useTranslation();
-  const { openChat } = useAiAssistantSidebar();
-  const { data: currentUser } = useCurrentUser();
+  const { openChat } = useAiAssistantSidebarActions();
+  const currentUser = useCurrentUser();
   const { open: openAiAssistantManagementModal } =
-    useAiAssistantManagementModal();
+    useAiAssistantManagementModalActions();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -274,7 +265,7 @@ export const AiAssistantList: React.FC<AiAssistantListProps> = ({
         </ul>
       </Collapse>
 
-      <DeleteAiAssistantModal
+      <DeleteAiAssistantModalLazyLoaded
         isShown={isDeleteModalShown}
         aiAssistant={aiAssistantToBeDeleted}
         errorMessage={errorMessageOnDelete}

@@ -3,12 +3,13 @@ import type { IUserSerializedSecurely } from '@growi/core/dist/models/serializer
 import type { Request } from 'express';
 
 type ReqQuery = {
-  access_token?: string,
-}
+  access_token?: string;
+};
 type ReqBody = {
-  access_token?: string,
-}
+  access_token?: string;
+};
 
-export interface AccessTokenParserReq extends Request<undefined, undefined, ReqBody, ReqQuery> {
-  user?: IUserSerializedSecurely<IUserHasId>,
+export interface AccessTokenParserReq
+  extends Request<undefined, undefined, ReqBody, ReqQuery> {
+  user?: IUserSerializedSecurely<IUserHasId>;
 }

@@ -1,10 +1,9 @@
-import assert from 'assert';
-
 import { isClient } from '@growi/core/dist/utils/browser-utils';
 import * as presentation from '@growi/presentation/dist/client/services/sanitize-option';
 import * as refsGrowiDirective from '@growi/remark-attachment-refs/dist/client';
 import * as drawio from '@growi/remark-drawio';
 import * as lsxGrowiDirective from '@growi/remark-lsx/dist/client';
+import assert from 'assert';
 import katex from 'rehype-katex';
 import sanitize from 'rehype-sanitize';
 import slug from 'rehype-slug';
@@ -24,7 +23,7 @@ import * as callout from '~/features/callout';
 import * as mermaid from '~/features/mermaid';
 import * as plantuml from '~/features/plantuml';
 import type { RendererOptions } from '~/interfaces/renderer-options';
-import { type RendererConfigExt } from '~/interfaces/services/renderer';
+import type { RendererConfigExt } from '~/interfaces/services/renderer';
 import * as addLineNumberAttribute from '~/services/renderer/rehype-plugins/add-line-number-attribute';
 import * as keywordHighlighter from '~/services/renderer/rehype-plugins/keyword-highlighter';
 import * as relocateToc from '~/services/renderer/rehype-plugins/relocate-toc';
@@ -32,29 +31,26 @@ import * as attachment from '~/services/renderer/remark-plugins/attachment';
 import * as codeBlock from '~/services/renderer/remark-plugins/codeblock';
 import * as xsvToTable from '~/services/renderer/remark-plugins/xsv-to-table';
 import {
-  getCommonSanitizeOption, generateCommonOptions, verifySanitizePlugin,
+  generateCommonOptions,
+  getCommonSanitizeOption,
+  verifySanitizePlugin,
 } from '~/services/renderer/renderer';
 import loggerFactory from '~/utils/logger';
 
 // import EasyGrid from './PreProcessor/EasyGrid';
 
-
 import '@growi/remark-lsx/dist/client/style.css';
 import '@growi/remark-attachment-refs/dist/client/style.css';
 
-
 const logger = loggerFactory('growi:cli:services:renderer');
-
 
 assert(isClient(), 'This module must be loaded only from client modules.');
 
-
 export const generateViewOptions = (
-    pagePath: string,
-    config: RendererConfigExt,
-    storeTocNode: (toc: HtmlElementNode) => void,
+  pagePath: string,
+  config: RendererConfigExt,
+  storeTocNode: (toc: HtmlElementNode) => void,
 ): RendererOptions => {
-
   const options = generateCommonOptions(pagePath);
 
   const { remarkPlugins, rehypePlugins, components } = options;
@@ -62,7 +58,10 @@ export const generateViewOptions = (
   // add remark plugins
   remarkPlugins.push(
     math,
-    [plantuml.remarkPlugin, { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode }],
+    [
+      plantuml.remarkPlugin,
+      { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode },
+    ],
     [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
     mermaid.remarkPlugin,
     xsvToTable.remarkPlugin,
@@ -76,24 +75,31 @@ export const generateViewOptions = (
     remarkPlugins.push(breaks);
   }
 
-  const rehypeSanitizePlugin: Pluggable | (() => void) = config.isEnabledXssPrevention
-    ? [sanitize, deepmerge(
-      getCommonSanitizeOption(config),
-      presentation.sanitizeOption,
-      drawio.sanitizeOption,
-      mermaid.sanitizeOption,
-      callout.sanitizeOption,
-      attachment.sanitizeOption,
-      lsxGrowiDirective.sanitizeOption,
-      refsGrowiDirective.sanitizeOption,
-      codeBlock.sanitizeOption,
-    )]
-    : () => {};
+  const rehypeSanitizePlugin: Pluggable | (() => void) =
+    config.isEnabledXssPrevention
+      ? [
+          sanitize,
+          deepmerge(
+            getCommonSanitizeOption(config),
+            presentation.sanitizeOption,
+            drawio.sanitizeOption,
+            mermaid.sanitizeOption,
+            callout.sanitizeOption,
+            attachment.sanitizeOption,
+            lsxGrowiDirective.sanitizeOption,
+            refsGrowiDirective.sanitizeOption,
+            codeBlock.sanitizeOption,
+          ),
+        ]
+      : () => {};
 
   // add rehype plugins
   rehypePlugins.push(
     slug,
-    [lsxGrowiDirective.rehypePlugin, { pagePath, isSharedPage: config.isSharedPage }],
+    [
+      lsxGrowiDirective.rehypePlugin,
+      { pagePath, isSharedPage: config.isSharedPage },
+    ],
     [refsGrowiDirective.rehypePlugin, { pagePath }],
     rehypeSanitizePlugin,
     katex,
@@ -128,8 +134,10 @@ export const generateViewOptions = (
   return options;
 };
 
-export const generateTocOptions = (config: RendererConfigExt, tocNode: HtmlElementNode | undefined): RendererOptions => {
-
+export const generateTocOptions = (
+  config: RendererConfigExt,
+  tocNode: HtmlElementNode | undefined,
+): RendererOptions => {
   const options = generateCommonOptions(undefined);
 
   const { rehypePlugins } = options;
@@ -137,12 +145,13 @@ export const generateTocOptions = (config: RendererConfigExt, tocNode: HtmlEleme
   // add remark plugins
   // remarkPlugins.push();
 
-  const rehypeSanitizePlugin: Pluggable | (() => void) = config.isEnabledXssPrevention
-    ? [sanitize, deepmerge(
-      getCommonSanitizeOption(config),
-      codeBlock.sanitizeOption,
-    )]
-    : () => {};
+  const rehypeSanitizePlugin: Pluggable | (() => void) =
+    config.isEnabledXssPrevention
+      ? [
+          sanitize,
+          deepmerge(getCommonSanitizeOption(config), codeBlock.sanitizeOption),
+        ]
+      : () => {};
 
   // add rehype plugins
   rehypePlugins.push(
@@ -158,10 +167,10 @@ export const generateTocOptions = (config: RendererConfigExt, tocNode: HtmlEleme
 };
 
 export const generateSimpleViewOptions = (
-    config: RendererConfigExt,
-    pagePath: string,
-    highlightKeywords?: string | string[],
-    overrideIsEnabledLinebreaks?: boolean,
+  config: RendererConfigExt,
+  pagePath: string,
+  highlightKeywords?: string | string[],
+  overrideIsEnabledLinebreaks?: boolean,
 ): RendererOptions => {
   const options = generateCommonOptions(pagePath);
 
@@ -170,7 +179,10 @@ export const generateSimpleViewOptions = (
   // add remark plugins
   remarkPlugins.push(
     math,
-    [plantuml.remarkPlugin, { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode }],
+    [
+      plantuml.remarkPlugin,
+      { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode },
+    ],
     [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
     mermaid.remarkPlugin,
     xsvToTable.remarkPlugin,
@@ -181,29 +193,37 @@ export const generateSimpleViewOptions = (
     refsGrowiDirective.remarkPlugin,
   );
 
-  const isEnabledLinebreaks = overrideIsEnabledLinebreaks ?? config.isEnabledLinebreaks;
+  const isEnabledLinebreaks =
+    overrideIsEnabledLinebreaks ?? config.isEnabledLinebreaks;
 
   if (isEnabledLinebreaks) {
     remarkPlugins.push(breaks);
   }
 
-  const rehypeSanitizePlugin: Pluggable | (() => void) = config.isEnabledXssPrevention
-    ? [sanitize, deepmerge(
-      getCommonSanitizeOption(config),
-      presentation.sanitizeOption,
-      drawio.sanitizeOption,
-      mermaid.sanitizeOption,
-      callout.sanitizeOption,
-      attachment.sanitizeOption,
-      lsxGrowiDirective.sanitizeOption,
-      refsGrowiDirective.sanitizeOption,
-      codeBlock.sanitizeOption,
-    )]
-    : () => {};
+  const rehypeSanitizePlugin: Pluggable | (() => void) =
+    config.isEnabledXssPrevention
+      ? [
+          sanitize,
+          deepmerge(
+            getCommonSanitizeOption(config),
+            presentation.sanitizeOption,
+            drawio.sanitizeOption,
+            mermaid.sanitizeOption,
+            callout.sanitizeOption,
+            attachment.sanitizeOption,
+            lsxGrowiDirective.sanitizeOption,
+            refsGrowiDirective.sanitizeOption,
+            codeBlock.sanitizeOption,
+          ),
+        ]
+      : () => {};
 
   // add rehype plugins
   rehypePlugins.push(
-    [lsxGrowiDirective.rehypePlugin, { pagePath, isSharedPage: config.isSharedPage }],
+    [
+      lsxGrowiDirective.rehypePlugin,
+      { pagePath, isSharedPage: config.isSharedPage },
+    ],
     [refsGrowiDirective.rehypePlugin, { pagePath }],
     [keywordHighlighter.rehypePlugin, { keywords: highlightKeywords }],
     rehypeSanitizePlugin,
@@ -232,26 +252,21 @@ export const generateSimpleViewOptions = (
 };
 
 export const generatePresentationViewOptions = (
-    config: RendererConfigExt,
-    pagePath: string,
+  config: RendererConfigExt,
+  pagePath: string,
 ): RendererOptions => {
   // based on simple view options
   const options = generateSimpleViewOptions(config, pagePath);
 
   const { rehypePlugins } = options;
 
-
-  const rehypeSanitizePlugin: Pluggable | (() => void) = config.isEnabledXssPrevention
-    ? [sanitize, deepmerge(
-      addLineNumberAttribute.sanitizeOption,
-    )]
-    : () => {};
+  const rehypeSanitizePlugin: Pluggable | (() => void) =
+    config.isEnabledXssPrevention
+      ? [sanitize, deepmerge(addLineNumberAttribute.sanitizeOption)]
+      : () => {};
 
   // add rehype plugins
-  rehypePlugins.push(
-    addLineNumberAttribute.rehypePlugin,
-    rehypeSanitizePlugin,
-  );
+  rehypePlugins.push(addLineNumberAttribute.rehypePlugin, rehypeSanitizePlugin);
 
   if (config.isEnabledXssPrevention) {
     verifySanitizePlugin(options, false);
@@ -259,7 +274,10 @@ export const generatePresentationViewOptions = (
   return options;
 };
 
-export const generatePreviewOptions = (config: RendererConfigExt, pagePath: string): RendererOptions => {
+export const generatePreviewOptions = (
+  config: RendererConfigExt,
+  pagePath: string,
+): RendererOptions => {
   const options = generateCommonOptions(pagePath);
 
   const { remarkPlugins, rehypePlugins, components } = options;
@@ -267,7 +285,10 @@ export const generatePreviewOptions = (config: RendererConfigExt, pagePath: stri
   // add remark plugins
   remarkPlugins.push(
     math,
-    [plantuml.remarkPlugin, { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode }],
+    [
+      plantuml.remarkPlugin,
+      { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode },
+    ],
     [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
     mermaid.remarkPlugin,
     xsvToTable.remarkPlugin,
@@ -281,23 +302,30 @@ export const generatePreviewOptions = (config: RendererConfigExt, pagePath: stri
     remarkPlugins.push(breaks);
   }
 
-  const rehypeSanitizePlugin: Pluggable | (() => void) = config.isEnabledXssPrevention
-    ? [sanitize, deepmerge(
-      getCommonSanitizeOption(config),
-      drawio.sanitizeOption,
-      mermaid.sanitizeOption,
-      callout.sanitizeOption,
-      attachment.sanitizeOption,
-      lsxGrowiDirective.sanitizeOption,
-      refsGrowiDirective.sanitizeOption,
-      addLineNumberAttribute.sanitizeOption,
-      codeBlock.sanitizeOption,
-    )]
-    : () => {};
+  const rehypeSanitizePlugin: Pluggable | (() => void) =
+    config.isEnabledXssPrevention
+      ? [
+          sanitize,
+          deepmerge(
+            getCommonSanitizeOption(config),
+            drawio.sanitizeOption,
+            mermaid.sanitizeOption,
+            callout.sanitizeOption,
+            attachment.sanitizeOption,
+            lsxGrowiDirective.sanitizeOption,
+            refsGrowiDirective.sanitizeOption,
+            addLineNumberAttribute.sanitizeOption,
+            codeBlock.sanitizeOption,
+          ),
+        ]
+      : () => {};
 
   // add rehype plugins
   rehypePlugins.push(
-    [lsxGrowiDirective.rehypePlugin, { pagePath, isSharedPage: config.isSharedPage }],
+    [
+      lsxGrowiDirective.rehypePlugin,
+      { pagePath, isSharedPage: config.isSharedPage },
+    ],
     [refsGrowiDirective.rehypePlugin, { pagePath }],
     addLineNumberAttribute.rehypePlugin,
     rehypeSanitizePlugin,

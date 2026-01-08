@@ -1,6 +1,6 @@
 {
   "name": "@growi/pluginkit",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Plugin kit for GROWI",
   "license": "MIT",
   "main": "dist/index.cjs",
@@ -21,7 +21,7 @@
     "test": "vitest run --coverage"
   },
   "dependencies": {
-    "@growi/core": "^1.5.0",
+    "@growi/core": "workspace:^",
     "extensible-custom-error": "^0.0.7"
   },
   "devDependencies": {

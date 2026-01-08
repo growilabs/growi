@@ -1,9 +1,7 @@
 /* eslint-disable import/prefer-default-export */
 
 import React from 'react';
-
 import { Provider, Subscribe } from 'unstated';
-
 
 /**
  * generate K/V object by specified instances
@@ -45,11 +43,16 @@ function generateAutoNamedProps(instances) {
  *    )}
  *  </Subscribe>
  */
-export function withUnstatedContainers<T, P>(Component, containerClasses): React.ForwardRefExoticComponent<React.PropsWithoutRef<P> & React.RefAttributes<T>> {
+export function withUnstatedContainers<T, P>(
+  Component,
+  containerClasses,
+): React.ForwardRefExoticComponent<
+  React.PropsWithoutRef<P> & React.RefAttributes<T>
+> {
   const unstatedContainer = React.forwardRef<T, P>((props, ref) => (
     // wrap with <Subscribe></Subscribe>
     <Subscribe to={containerClasses}>
-      { (...containers) => {
+      {(...containers) => {
         const propsForContainers = generateAutoNamedProps(containers);
         return <Component {...props} {...propsForContainers} ref={ref} />;
       }}

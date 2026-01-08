@@ -3,7 +3,9 @@ import loggerFactory from '~/utils/logger';
 
 import type { S2sMessagingService } from './base';
 
-const logger = loggerFactory('growi:service:s2s-messaging:S2sMessagingServiceFactory');
+const logger = loggerFactory(
+  'growi:service:s2s-messaging:S2sMessagingServiceFactory',
+);
 
 const envToModuleMappings = {
   redis: 'redis',
@@ -40,7 +42,6 @@ const envToModuleMappings = {
  * Instanciate server-to-server messaging service
  */
 class S2sMessagingServiceFactory {
-
   delegator!: S2sMessagingService;
 
   initializeDelegator(crowi: Crowi) {
@@ -70,7 +71,6 @@ class S2sMessagingServiceFactory {
     }
     return this.delegator;
   }
-
 }
 
 const factory = new S2sMessagingServiceFactory();

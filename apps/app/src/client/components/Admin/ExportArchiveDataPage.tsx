@@ -1,26 +1,24 @@
-import React, {
-  useCallback, useEffect, useState, type JSX,
-} from 'react';
-
+import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 
 import { apiDelete } from '~/client/util/apiv1-client';
 import { apiv3Get } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useAdminSocket } from '~/stores/socket-io';
+import { useAdminSocket } from '~/features/admin/states/socket-io';
 
 import LabeledProgressBar from './Common/LabeledProgressBar';
 import ArchiveFilesTable from './ExportArchiveData/ArchiveFilesTable';
 import SelectCollectionsModal from './ExportArchiveData/SelectCollectionsModal';
 
-
 const IGNORED_COLLECTION_NAMES = [
-  'sessions', 'rlflx', 'yjs-writings', 'transferkeys',
+  'sessions',
+  'rlflx',
+  'yjs-writings',
+  'transferkeys',
 ];
 
 const ExportArchiveDataPage = (): JSX.Element => {
-  const { data: socket } = useAdminSocket();
+  const socket = useAdminSocket();
   const { t } = useTranslation('admin');
 
   const [collections, setCollections] = useState<any[]>([]);
@@ -31,16 +29,26 @@ const ExportArchiveDataPage = (): JSX.Element => {
   const [isZipping, setZipping] = useState(false);
   const [isExported, setExported] = useState(false);
 
-  const fetchData = useCallback(async() => {
-    const [{ data: collectionsData }, { data: statusData }] = await Promise.all([
-      apiv3Get<{collections: any[]}>('/mongo/collections', {}),
-      apiv3Get<{status: { zipFileStats: any[], isExporting: boolean, progressList: any[] }}>('/export/status', {}),
-    ]);
+  const fetchData = useCallback(async () => {
+    const [{ data: collectionsData }, { data: statusData }] = await Promise.all(
+      [
+        apiv3Get<{ collections: any[] }>('/mongo/collections', {}),
+        apiv3Get<{
+          status: {
+            zipFileStats: any[];
+            isExporting: boolean;
+            progressList: any[];
+          };
+        }>('/export/status', {}),
+      ],
+    );
 
     // filter only not ignored collection names
-    const filteredCollections = collectionsData.collections.filter((collectionName) => {
-      return !IGNORED_COLLECTION_NAMES.includes(collectionName);
-    });
+    const filteredCollections = collectionsData.collections.filter(
+      (collectionName) => {
+        return !IGNORED_COLLECTION_NAMES.includes(collectionName);
+      },
+    );
 
     const { zipFileStats, isExporting, progressList } = statusData.status;
     setCollections(filteredCollections);
@@ -67,7 +75,7 @@ const ExportArchiveDataPage = (): JSX.Element => {
       setExporting(false);
       setZipping(false);
       setExported(true);
-      setZipFileStats(prev => prev.concat([addedZipFileStat]));
+      setZipFileStats((prev) => prev.concat([addedZipFileStat]));
 
       toastSuccess(`New Archive Data '${addedZipFileStat.fileName}' is added`);
     };
@@ -83,18 +91,18 @@ const ExportArchiveDataPage = (): JSX.Element => {
       socket.off('admin:onStartZippingForExport', onStartZipping);
       socket.off('admin:onTerminateForExport', onTerminateForExport);
     };
-
   }, [socket]);
 
-  const onZipFileStatRemove = useCallback(async(fileName) => {
+  const onZipFileStatRemove = useCallback(async (fileName) => {
     try {
       await apiDelete(`/v3/export/${fileName}`, {});
 
-      setZipFileStats(prev => prev.filter(stat => stat.fileName !== fileName));
+      setZipFileStats((prev) =>
+        prev.filter((stat) => stat.fileName !== fileName),
+      );
 
       toastSuccess(`Deleted ${fileName}`);
-    }
-    catch (err) {
+    } catch (err) {
       toastError(err);
     }
   }, []);
@@ -148,23 +156,28 @@ const ExportArchiveDataPage = (): JSX.Element => {
     };
   }, [fetchData, setupWebsocketEventHandler]);
 
-  const showExportingData = (isExported || isExporting) && (progressList != null);
+  const showExportingData = (isExported || isExporting) && progressList != null;
 
   return (
     <div data-testid="admin-export-archive-data">
       <h2>{t('export_management.export_archive_data')}</h2>
 
-      <button type="button" className="btn btn-outline-secondary" disabled={isExporting} onClick={() => setExportModalOpen(true)}>
+      <button
+        type="button"
+        className="btn btn-outline-secondary"
+        disabled={isExporting}
+        onClick={() => setExportModalOpen(true)}
+      >
         {t('export_management.create_new_archive_data')}
       </button>
 
-      { showExportingData && (
+      {showExportingData && (
         <div className="mt-5">
           <h3>{t('export_management.exporting_collection_list')}</h3>
-          { renderProgressBarsForCollections() }
-          { renderProgressBarForZipping() }
+          {renderProgressBarsForCollections()}
+          {renderProgressBarForZipping()}
         </div>
-      ) }
+      )}
 
       <div className="mt-5">
         <h3 className="mb-3">{t('export_management.exported_data_list')}</h3>

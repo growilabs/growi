@@ -60,7 +60,7 @@ const models = [
 
 const moduleClass = styles['grw-chat-sidebar'] ?? '';
 
-const ChatSidebarSubstance = (): JSX.Element => {
+export const ChatSidebar = (): JSX.Element => {
   const [input, setInput] = useState('');
   const [model, setModel] = useState<string>(models[0].value);
   const [webSearch, setWebSearch] = useState(false);
@@ -236,14 +236,4 @@ const ChatSidebarSubstance = (): JSX.Element => {
       </div>
     </div>
   );
-};
-
-export const ChatSidebar = (): JSX.Element => {
-  const isOpened = true;
-
-  if (!isOpened) {
-    return <></>;
-  }
-
-  return <ChatSidebarSubstance />;
 };

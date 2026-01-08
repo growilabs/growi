@@ -9,7 +9,6 @@ const logger = loggerFactory('growi:service:cron');
  * Base class for services that manage a cronjob
  */
 abstract class CronService {
-
   // The current cronjob to manage
   cronJob: ScheduledTask | undefined;
 
@@ -50,16 +49,14 @@ abstract class CronService {
    * @param cronSchedule e.g. '0 1 * * *'
    */
   protected generateCronJob(cronSchedule: string): ScheduledTask {
-    return nodeCron.schedule(cronSchedule, async() => {
+    return nodeCron.schedule(cronSchedule, async () => {
       try {
         await this.executeJob();
-      }
-      catch (e) {
+      } catch (e) {
         logger.error(e);
       }
     });
   }
-
 }
 
 export default CronService;

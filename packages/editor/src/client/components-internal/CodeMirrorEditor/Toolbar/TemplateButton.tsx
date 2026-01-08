@@ -1,7 +1,7 @@
 import { type JSX, useCallback } from 'react';
 
+import { useTemplateModalActions } from '../../../../states/modal/template';
 import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
-import { useTemplateModal } from '../../../stores/use-template-modal';
 
 type Props = {
   editorKey: string;
@@ -10,7 +10,7 @@ type Props = {
 export const TemplateButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(editorKey);
-  const { open: openTemplateModal } = useTemplateModal();
+  const { open: openTemplateModal } = useTemplateModalActions();
 
   const onClickTempleteButton = useCallback(() => {
     const editor = codeMirrorEditor?.view;

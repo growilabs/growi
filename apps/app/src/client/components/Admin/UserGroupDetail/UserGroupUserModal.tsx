@@ -1,10 +1,7 @@
 import React, { type JSX } from 'react';
-
 import type { IUserGroupHasId, IUserHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';
-import {
-  Modal, ModalHeader, ModalBody,
-} from 'reactstrap';
+import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import type { SearchType } from '~/interfaces/user-group';
 import { SearchTypes } from '~/interfaces/user-group';
@@ -14,18 +11,18 @@ import RadioButtonForSerchUserOption from './RadioButtonForSerchUserOption';
 import { UserGroupUserFormByInput } from './UserGroupUserFormByInput';
 
 type Props = {
-  isOpen: boolean,
-  userGroup: IUserGroupHasId,
-  searchType: SearchType,
-  isAlsoMailSearched: boolean,
-  isAlsoNameSearched: boolean,
-  onClickAddUserBtn: (username: string) => Promise<void>,
-  onSearchApplicableUsers: (searchWord: string) => Promise<IUserHasId[]>,
-  onSwitchSearchType: (searchType: SearchType) => void
-  onClose: () => void,
-  onToggleIsAlsoMailSearched: () => void,
-  onToggleIsAlsoNameSearched: () => void,
-}
+  isOpen: boolean;
+  userGroup: IUserGroupHasId;
+  searchType: SearchType;
+  isAlsoMailSearched: boolean;
+  isAlsoNameSearched: boolean;
+  onClickAddUserBtn: (username: string) => Promise<void>;
+  onSearchApplicableUsers: (searchWord: string) => Promise<IUserHasId[]>;
+  onSwitchSearchType: (searchType: SearchType) => void;
+  onClose: () => void;
+  onToggleIsAlsoMailSearched: () => void;
+  onToggleIsAlsoNameSearched: () => void;
+};
 
 const UserGroupUserModal = (props: Props): JSX.Element => {
   const { t } = useTranslation();
@@ -46,10 +43,12 @@ const UserGroupUserModal = (props: Props): JSX.Element => {
   return (
     <Modal isOpen={isOpen} toggle={onClose}>
       <ModalHeader tag="h4" toggle={onClose} className="text-info">
-        {t('admin:user_group_management.add_modal.add_user') }
+        {t('admin:user_group_management.add_modal.add_user')}
       </ModalHeader>
       <ModalBody>
-        <p className="card custom-card">{t('admin:user_group_management.add_modal.description')}</p>
+        <p className="card custom-card">
+          {t('admin:user_group_management.add_modal.description')}
+        </p>
         <div className="p-3">
           <UserGroupUserFormByInput
             userGroup={userGroup}
@@ -60,7 +59,9 @@ const UserGroupUserModal = (props: Props): JSX.Element => {
             searchType={searchType}
           />
         </div>
-        <h2 className="border-bottom">{t('admin:user_group_management.add_modal.search_option')}</h2>
+        <h2 className="border-bottom">
+          {t('admin:user_group_management.add_modal.search_option')}
+        </h2>
         <div className="row mt-4">
           <div className="col-6">
             <div className="mb-5">

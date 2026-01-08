@@ -6,14 +6,11 @@ import { useIsomorphicLayoutEffect } from 'usehooks-ts';
 import type { PagePathNavLayoutProps } from '../PagePathNav';
 import { PagePathNav } from '../PagePathNav';
 
-import styles from './PagePathNavTitle.module.scss';
-
-const moduleClass = styles['grw-page-path-nav-title'] ?? '';
-
 const PagePathNavSticky = withLoadingProps<PagePathNavLayoutProps>(
   (useLoadingProps) =>
     dynamic(
       () =>
+        // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
         import('~/client/components/PagePathNavSticky').then(
           (mod) => mod.PagePathNavSticky,
         ),
@@ -42,16 +39,8 @@ export const PagePathNavTitle = (
   }, []);
 
   return isClient ? (
-    <PagePathNavSticky
-      {...props}
-      className={moduleClass}
-      latterLinkClassName="fs-2"
-    />
+    <PagePathNavSticky {...props} latterLinkClassName="fs-2" />
   ) : (
-    <PagePathNav
-      {...props}
-      className={moduleClass}
-      latterLinkClassName="fs-2"
-    />
+    <PagePathNav {...props} latterLinkClassName="fs-2" />
   );
 };

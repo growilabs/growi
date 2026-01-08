@@ -1,4 +1,7 @@
-import { PageDeleteConfigValue, type IPageDeleteConfigValue } from '~/interfaces/page-delete-config';
+import {
+  type IPageDeleteConfigValue,
+  PageDeleteConfigValue,
+} from '~/interfaces/page-delete-config';
 
 export const DeletionTypeForT = Object.freeze({
   Deletion: 'deletion',
@@ -15,9 +18,11 @@ export const DeletionType = Object.freeze({
 } as const);
 
 export type DeletionTypeKey = keyof typeof DeletionType;
-export type DeletionTypeValue = typeof DeletionType[DeletionTypeKey];
+export type DeletionTypeValue = (typeof DeletionType)[DeletionTypeKey];
 
-export const getDeletionTypeForT = (deletionType: DeletionTypeValue): string => {
+export const getDeletionTypeForT = (
+  deletionType: DeletionTypeValue,
+): string => {
   switch (deletionType) {
     case DeletionType.Deletion:
       return DeletionTypeForT.Deletion;
@@ -30,7 +35,9 @@ export const getDeletionTypeForT = (deletionType: DeletionTypeValue): string => 
   }
 };
 
-export const getDeleteConfigValueForT = (deleteConfigValue: IPageDeleteConfigValue | null): string => {
+export const getDeleteConfigValueForT = (
+  deleteConfigValue: IPageDeleteConfigValue | null,
+): string => {
   switch (deleteConfigValue) {
     case PageDeleteConfigValue.Anyone:
     case null:
@@ -51,8 +58,13 @@ export const getDeleteConfigValueForT = (deleteConfigValue: IPageDeleteConfigVal
  * @param deletionType Deletion type
  * @returns boolean
  */
-export const isRecursiveDeletion = (deletionType: DeletionTypeValue): boolean => {
-  return deletionType === DeletionType.RecursiveDeletion || deletionType === DeletionType.RecursiveCompleteDeletion;
+export const isRecursiveDeletion = (
+  deletionType: DeletionTypeValue,
+): boolean => {
+  return (
+    deletionType === DeletionType.RecursiveDeletion ||
+    deletionType === DeletionType.RecursiveCompleteDeletion
+  );
 };
 
 /**
@@ -61,5 +73,8 @@ export const isRecursiveDeletion = (deletionType: DeletionTypeValue): boolean =>
  * @returns boolean
  */
 export const isTypeDeletion = (deletionType: DeletionTypeValue): boolean => {
-  return deletionType === DeletionType.Deletion || deletionType === DeletionType.RecursiveDeletion;
+  return (
+    deletionType === DeletionType.Deletion ||
+    deletionType === DeletionType.RecursiveDeletion
+  );
 };
