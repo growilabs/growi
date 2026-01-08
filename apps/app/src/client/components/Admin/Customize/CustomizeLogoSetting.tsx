@@ -81,16 +81,14 @@ const CustomizeLogoSetting = (): JSX.Element => {
       await apiv3Delete('/customize-setting/delete-brand-logo');
       setIsCustomizedLogoUploaded(false);
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.current_logo'), ns: 'commons' }));
-      setUploadLogoSrc(null);
-      setIsImageCropModalShow(false);
-      clearFileInput();
+      resetFileSelectionState();
     }
     catch (err) {
       toastError(err);
       setRetrieveError(err);
       throw new Error('Failed to delete logo');
     }
-  }, [setIsCustomizedLogoUploaded, t, setUploadLogoSrc, setIsImageCropModalShow, clearFileInput, setRetrieveError]);
+  }, [setIsCustomizedLogoUploaded, t, setRetrieveError, resetFileSelectionState]);
 
   const processImageCompletedHandler = useCallback(async (croppedImage) => {
     try {
