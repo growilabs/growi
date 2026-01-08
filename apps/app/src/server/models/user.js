@@ -592,10 +592,8 @@ const factory = (crowi) => {
     const User = this;
     const newUser = new User();
 
-    /* eslint-disable newline-per-chained-call */
     const tmpUsername = `temp_${crypto.randomBytes(8).toString('hex')}`;
     const password = crypto.randomBytes(12).toString('hex');
-    /* eslint-enable newline-per-chained-call */
 
     newUser.username = tmpUsername;
     newUser.email = email;

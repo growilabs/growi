@@ -253,7 +253,6 @@ export class GrowiPluginService implements IGrowiPluginService {
         })
         .catch((err) => {
           logger.error(err);
-          // eslint-disable-next-line prefer-promise-reject-errors
           rejects('Failed to download file.');
         });
     });

@@ -69,7 +69,6 @@ export const extractToAncestorsPaths = (pagePath) => {
  * @param {string} userPublicFields string to set to select
  * @param {boolean} shouldExcludeBody boolean indicating whether to include 'revision.body' or not
  */
-/* eslint-disable object-curly-newline, object-property-newline */
 export const populateDataToShowRevision = (
   page,
   userPublicFields,
@@ -91,7 +90,6 @@ export const populateDataToShowRevision = (
     },
   ]);
 };
-/* eslint-enable object-curly-newline, object-property-newline */
 
 /** @param {import('~/server/crowi').default | null} crowi Crowi instance */
 export const getPageSchema = (crowi) => {

@@ -1,6 +1,3 @@
-/* eslint-disable no-undef, regex/invalid, import/extensions */
-// ignore lint error because this file is js as mongoshell
-
 /**
  * @typedef {import('./types').MigrationModule} MigrationModule
  * @typedef {import('./types').ReplaceLatestRevisions} ReplaceLatestRevisions

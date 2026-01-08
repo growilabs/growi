@@ -114,7 +114,6 @@ class GlobalNotificationSlackService {
             `invalid vars supplied to GlobalNotificationSlackService.generateOption for event ${event}`,
           );
         }
-        // eslint-disable-next-line no-case-declarations
         messageBody = `:bell: ${username} moved ${oldPath} to ${parmaLink}`;
         break;
       case GlobalNotificationSettingEvent.PAGE_LIKE:

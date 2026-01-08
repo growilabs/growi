@@ -1,5 +1,3 @@
-/* eslint-disable arrow-body-style */
-
 const { getInstance } = require('../setup-crowi');
 
 describe('loginRequired', () => {
@@ -35,7 +33,7 @@ describe('loginRequired', () => {
 
       let isGuestAllowedToReadSpy;
 
-      beforeEach(async () => {
+      beforeEach(() => {
         // setup req
         req = {
           originalUrl: 'original url 1',
@@ -109,7 +107,7 @@ describe('loginRequired', () => {
 
       let isGuestAllowedToReadSpy;
 
-      beforeEach(async () => {
+      beforeEach(() => {
         // setup req
         req = {
           originalUrl: 'original url 1',
@@ -189,7 +187,7 @@ describe('loginRequired', () => {
 
     let isGuestAllowedToReadSpy;
 
-    beforeEach(async () => {
+    beforeEach(() => {
       // reset session object
       req.session = {};
       // spy for AclService.isGuestAllowedToRead
@@ -309,7 +307,7 @@ describe('loginRequired', () => {
 
     let isGuestAllowedToReadSpy;
 
-    beforeEach(async () => {
+    beforeEach(() => {
       // reset session object
       req.session = {};
       // spy for AclService.isGuestAllowedToRead
