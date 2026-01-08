@@ -74,7 +74,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
   const onCancelOrErrorClose = useCallback(() => {
     resetFileSelectionState();
     onModalStateClose();
-}, [resetFileSelectionState, onModalStateClose]);
+  }, [resetFileSelectionState, onModalStateClose]);
 
   const onClickDeleteBtn = useCallback(async () => {
     try {
