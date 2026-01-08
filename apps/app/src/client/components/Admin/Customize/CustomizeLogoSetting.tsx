@@ -1,4 +1,6 @@
-import React, { useCallback, useState, type JSX } from 'react';
+import React, {
+  useCallback, useState, useRef, type JSX,
+} from 'react';
 
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
@@ -28,15 +30,21 @@ const CustomizeLogoSetting = (): JSX.Element => {
   const [isImageCropModalShow, setIsImageCropModalShow] = useState<boolean>(false);
   const [isDefaultLogoSelected, setIsDefaultLogoSelected] = useState<boolean>(isDefaultLogo ?? true);
   const [retrieveError, setRetrieveError] = useState<any>();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const isSystemError: boolean = retrieveError != null;
+  const isLogoSettingIncomplete: boolean = !isDefaultLogoSelected && (uploadLogoSrc == null && !isCustomizedLogoUploaded);
+  const isUpdateButtonDisabled: boolean = isSystemError || isLogoSettingIncomplete;
 
   const onSelectFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files != null && e.target.files.length > 0) {
+    const files: FileList | null = e.target.files;
+
+    if (files != null && files.length > 0) {
       const reader = new FileReader();
       reader.addEventListener('load', () => setUploadLogoSrc(reader.result));
-      reader.readAsDataURL(e.target.files[0]);
+      reader.readAsDataURL(files[0]);
       setIsImageCropModalShow(true);
     }
-  }, []);
+  }, [setUploadLogoSrc, setIsImageCropModalShow]);
 
   const onClickSubmit = useCallback(async () => {
     try {
@@ -48,34 +56,56 @@ const CustomizeLogoSetting = (): JSX.Element => {
     }
   }, [t, isDefaultLogoSelected]);
 
+  const clearFileInput = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
+  const resetFileSelectionState = useCallback(() => {
+    clearFileInput();
+    setUploadLogoSrc(null);
+  }, [clearFileInput, setUploadLogoSrc]);
+
+  const onModalStateClose = useCallback(() => {
+    setIsImageCropModalShow(false);
+  }, [setIsImageCropModalShow]);
+
+  const onCancelOrErrorClose = useCallback(() => {
+    resetFileSelectionState();
+    onModalStateClose();
+  }, [resetFileSelectionState, onModalStateClose]);
+
   const onClickDeleteBtn = useCallback(async () => {
     try {
       await apiv3Delete('/customize-setting/delete-brand-logo');
       setIsCustomizedLogoUploaded(false);
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.current_logo'), ns: 'commons' }));
+      resetFileSelectionState();
     }
     catch (err) {
       toastError(err);
       setRetrieveError(err);
       throw new Error('Failed to delete logo');
     }
-  }, [setIsCustomizedLogoUploaded, t]);
-
+  }, [setIsCustomizedLogoUploaded, t, setRetrieveError, resetFileSelectionState]);
 
   const processImageCompletedHandler = useCallback(async (croppedImage) => {
     try {
       const formData = new FormData();
       formData.append('file', croppedImage);
       await apiv3PostForm('/customize-setting/upload-brand-logo', formData);
+      onModalStateClose();
       setIsCustomizedLogoUploaded(true);
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.current_logo'), ns: 'commons' }));
     }
     catch (err) {
       toastError(err);
       setRetrieveError(err);
+      onCancelOrErrorClose();
       throw new Error('Failed to upload brand logo');
     }
-  }, [setIsCustomizedLogoUploaded, t]);
+  }, [setIsCustomizedLogoUploaded, t, setRetrieveError, onModalStateClose, onCancelOrErrorClose]);
 
   return (
     <React.Fragment>
@@ -142,12 +172,21 @@ const CustomizeLogoSetting = (): JSX.Element => {
                     {t('admin:customize_settings.upload_new_logo')}
                   </label>
                   <div className="col-sm-8 col-12">
-                    <input type="file" onChange={onSelectFile} name="brandLogo" accept="image/*" />
+                    <input
+                      type="file"
+                      onChange={onSelectFile}
+                      name="brandLogo"
+                      accept="image/*"
+                      ref={fileInputRef}
+                    />
                   </div>
                 </div>
               </div>
             </div>
-            <AdminUpdateButtonRow onClick={onClickSubmit} disabled={retrieveError != null} />
+            <AdminUpdateButtonRow
+              onClick={onClickSubmit}
+              disabled={isUpdateButtonDisabled}
+            />
           </div>
         </div>
       </div>
@@ -155,15 +194,13 @@ const CustomizeLogoSetting = (): JSX.Element => {
       <ImageCropModal
         isShow={isImageCropModalShow}
         src={uploadLogoSrc}
-        onModalClose={() => setIsImageCropModalShow(false)}
+        onModalClose={onCancelOrErrorClose}
         onImageProcessCompleted={processImageCompletedHandler}
         isCircular={false}
         showCropOption={false}
       />
     </React.Fragment>
   );
-
-
 };
 
 
