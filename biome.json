@@ -91,6 +91,16 @@
   },
   "overrides": [
     {
+      "includes": ["**/vite*.config.ts", "vitest*.config.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["bin/**"],
       "linter": {
         "rules": {
