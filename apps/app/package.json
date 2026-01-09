@@ -270,7 +270,7 @@
     "@growi/editor": "workspace:^",
     "@growi/ui": "workspace:^",
     "@handsontable/react": "=2.1.0",
-    "@headless-tree/core": "^1.5.1",
+    "@headless-tree/core": "github:miya/headless-tree#fix/enter-key-android-3&path:packages/core",
     "@headless-tree/react": "^1.5.1",
     "@next/bundle-analyzer": "^14.1.3",
     "@popperjs/core": "^2.11.8",
