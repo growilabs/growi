@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+GROWI is a team collaboration wiki platform built with Next.js, Express, and MongoDB. This guide helps AI coding agents navigate the monorepo and work effectively with GROWI's architecture.
 
 ## Language
 
@@ -48,27 +48,6 @@ GROWI is a team collaboration software using markdown - a wiki platform with hie
 - `/apps/slackbot-proxy/` - Slack integration proxy service
 - `/packages/` - Shared libraries and components
 
-### Main Application (`/apps/app/src/`)
-- `client/` - Client-side React components and utilities
-- `server/` - Express.js backend (API routes, models, services)  
-- `components/` - Shared React components and layouts
-- `pages/` - Next.js page components using file-based routing
-- `stores/` - State management (SWR-based stores with React context)
-- `styles/` - SCSS stylesheets with modular architecture
-- `migrations/` - MongoDB database migration scripts
-- `interfaces/` - TypeScript type definitions
-
-### Key Technical Details
-- **Frontend**: Next.js 14 with React 18, TypeScript, SCSS modules
-- **Backend**: Express.js with TypeScript, MongoDB with Mongoose
-- **State Management**: SWR for server state, React Context for client state
-- **Authentication**: Passport.js with multiple strategies (local, LDAP, OAuth, SAML)
-- **Real-time Features**: Socket.io for collaborative editing and notifications
-- **Editor**: Custom markdown editor with collaborative editing using Yjs
-- **Database**: MongoDB 8.0+ with migration system using migrate-mongo
-- **Package Manager**: pnpm with workspace support
-- **Build System**: Turborepo for monorepo orchestration
-
 ### Development Dependencies
 - Node.js v20.x or v22.x
 - pnpm 10.x  
@@ -83,15 +62,12 @@ GROWI is a team collaboration software using markdown - a wiki platform with hie
 - Export components through `index.ts` files where appropriate
 - Group related components in feature-based directories
 
-### API Structure
-- Server routes in `server/routes/`
-- API v3 endpoints follow OpenAPI specification
-- Models in `server/models/` using Mongoose schemas
-- Services in `server/service/` for business logic
+### Tests
+- Unit Test: `*.spec.ts`
+- Integration Test: `*.integ.ts`
+- Component Test: `*.spec.tsx`
 
-### State Management
-- Use SWR hooks in `stores/` for server state
-- Custom hooks pattern for complex state logic
-- Context providers in `stores-universal/` for app-wide state
+
+---
 
 When working with this codebase, always run the appropriate linting and testing commands before committing changes. The application uses strict TypeScript checking and comprehensive test coverage requirements.
