@@ -73,7 +73,7 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
           );
         }
 
-        const threads = await memory.getThreadsByResourceIdPaginated({
+        const paginatedThread = await memory.getThreadsByResourceIdPaginated({
           resourceId: req.user._id.toString(),
           page: req.query.page,
           perPage: req.query.perPage,
@@ -81,7 +81,7 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
           sortDirection: req.query.sortDirection,
         });
 
-        return res.apiv3({ threads });
+        return res.apiv3({ paginatedThread });
       } catch (err) {
         logger.error(err);
         return res.apiv3Err(new ErrorV3('Failed to get threads'));
