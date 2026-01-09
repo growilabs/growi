@@ -158,7 +158,6 @@ export const AuditLogManagement: FC = () => {
       const isNan = Number.isNaN(inputNumber);
 
       if (!isNan) {
-        // eslint-disable-next-line no-nested-ternary
         const jumpPageNumber =
           inputNumber > totalPagingPages
             ? totalPagingPages

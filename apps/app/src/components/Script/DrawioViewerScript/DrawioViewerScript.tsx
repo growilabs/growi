@@ -5,7 +5,6 @@ import type { IGraphViewerGlobal } from '@growi/remark-drawio';
 import { generateViewerMinJsUrl } from './use-viewer-min-js-url';
 
 declare global {
-  // eslint-disable-next-line vars-on-top, no-var
   var GraphViewer: IGraphViewerGlobal;
 }
 

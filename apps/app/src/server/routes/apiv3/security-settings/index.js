@@ -796,7 +796,6 @@ module.exports = (crowi) => {
    *                  type: object
    *                  description: updated param
    */
-  // eslint-disable-next-line max-len
   router.put(
     '/authentication/enabled',
     accessTokenParser([SCOPE.WRITE.ADMIN.SECURITY]),
@@ -1013,7 +1012,6 @@ module.exports = (crowi) => {
           req.body.pageDeletionAuthority,
           req.body.pageRecursiveDeletionAuthority,
         );
-      // eslint-disable-next-line max-len
       const [singleAuthority2, recursiveAuthority2] =
         prepareDeleteConfigValuesForCalc(
           req.body.pageCompleteDeletionAuthority,
@@ -1140,7 +1138,6 @@ module.exports = (crowi) => {
             'security:disableLinkSharing',
           ),
         };
-        // eslint-disable-next-line max-len
         const parameters = {
           action: updateData['security:disableLinkSharing']
             ? SupportedAction.ACTION_ADMIN_REJECT_SHARE_LINK

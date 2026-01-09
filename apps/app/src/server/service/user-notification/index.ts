@@ -31,7 +31,6 @@ export class UserNotificationService {
    * @param {IRevisionHasId} previousRevision
    * @param {Comment} comment
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async fire(
     page,
     user,

@@ -29,7 +29,6 @@ export const createContentHeaders = (
   // Content-Security-Policy
   headers.push({
     field: 'Content-Security-Policy',
-    // eslint-disable-next-line max-len
     value:
       "script-src 'unsafe-hashes'; style-src 'self' 'unsafe-inline'; object-src 'none'; require-trusted-types-for 'script'; media-src 'self'; default-src 'none';",
   });

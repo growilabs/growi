@@ -15,7 +15,7 @@ import useSWR, {
 } from 'swr';
 import useSWRImmutable from 'swr/immutable';
 import type { SWRInfiniteResponse } from 'swr/infinite';
-import useSWRInfinite, { unstable_serialize } from 'swr/infinite'; // eslint-disable-line camelcase
+import useSWRInfinite, { unstable_serialize } from 'swr/infinite';
 
 import type { IPagingResult } from '~/interfaces/paging-result';
 

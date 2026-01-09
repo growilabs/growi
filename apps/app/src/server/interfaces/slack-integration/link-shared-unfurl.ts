@@ -25,7 +25,6 @@ export type UnfurlEventLink = {
 export type UnfurlRequestEvent = {
   channel: string;
 
-  // eslint-disable-next-line camelcase
   message_ts: string;
 
   links: UnfurlEventLink[];

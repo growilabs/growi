@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import { GroupType } from '@growi/core';
 import { advanceTo } from 'jest-date-mock';
 

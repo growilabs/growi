@@ -287,7 +287,6 @@ const SearchTypeahead: ForwardRefRenderFunction<IFocusable, Props> = (
         id="search-typeahead-asynctypeahead"
         ref={typeaheadRef}
         delay={400}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         inputProps={{ autoComplete: 'off', ...((inputProps as any) ?? {}) }}
         isLoading={isLoading}
         labelKey={labelKey}

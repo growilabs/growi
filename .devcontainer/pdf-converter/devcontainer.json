@@ -15,7 +15,6 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "dbaeumer.vscode-eslint",
         "biomejs.biome",
         "mhutchie.git-graph",
         "eamodio.gitlens"

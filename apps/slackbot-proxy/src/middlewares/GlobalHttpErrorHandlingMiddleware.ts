@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/consistent-type-imports */
 import {
   Err,
   Middleware,
@@ -6,7 +5,6 @@ import {
   PlatformContext,
   PlatformResponse,
 } from '@tsed/common';
-/* eslint-enable @typescript-eslint/consistent-type-imports */
 import type { HttpError } from 'http-errors';
 import { isHttpError } from 'http-errors';
 

@@ -7,7 +7,7 @@ import { serializeUserGroupRelationSecurely } from '~/server/models/serializers'
 import UserGroupRelation from '~/server/models/user-group-relation';
 import loggerFactory from '~/utils/logger';
 
-const logger = loggerFactory('growi:routes:apiv3:user-group-relation'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:routes:apiv3:user-group-relation');
 
 const { query } = require('express-validator');
 

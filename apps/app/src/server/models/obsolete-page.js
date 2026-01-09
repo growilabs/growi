@@ -4,6 +4,7 @@ import {
   pathUtils,
   templateChecker,
 } from '@growi/core/dist/utils';
+import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import { differenceInYears } from 'date-fns/differenceInYears';
 import escapeStringRegexp from 'escape-string-regexp';
 
@@ -17,11 +18,6 @@ import UserGroup from './user-group';
 import UserGroupRelation from './user-group-relation';
 
 const logger = loggerFactory('growi:models:page');
-
-// disable no-return-await for model functions
-/* eslint-disable no-return-await */
-
-/* eslint-disable no-use-before-define */
 
 const nodePath = require('path');
 
@@ -73,12 +69,12 @@ export const extractToAncestorsPaths = (pagePath) => {
  * @param {string} userPublicFields string to set to select
  * @param {boolean} shouldExcludeBody boolean indicating whether to include 'revision.body' or not
  */
-/* eslint-disable object-curly-newline, object-property-newline */
 export const populateDataToShowRevision = (
   page,
   userPublicFields,
   shouldExcludeBody = false,
 ) => {
+  // biome-ignore lint/plugin: populating is the purpose of this method
   return page.populate([
     { path: 'lastUpdateUser', select: userPublicFields },
     { path: 'creator', select: userPublicFields },
@@ -94,7 +90,6 @@ export const populateDataToShowRevision = (
     },
   ]);
 };
-/* eslint-enable object-curly-newline, object-property-newline */
 
 /** @param {import('~/server/crowi').default | null} crowi Crowi instance */
 export const getPageSchema = (crowi) => {
@@ -150,6 +145,7 @@ export const getPageSchema = (crowi) => {
 
   pageSchema.methods.findRelatedTagsById = async function () {
     const PageTagRelation = mongoose.model('PageTagRelation');
+    // biome-ignore lint/plugin: allow populate for backward compatibility
     const relations = await PageTagRelation.find({
       relatedPage: this._id,
     }).populate('relatedTag');
@@ -159,6 +155,7 @@ export const getPageSchema = (crowi) => {
   };
 
   pageSchema.methods.isUpdatable = async function (previousRevision, origin) {
+    // biome-ignore lint/plugin: allow populate for backward compatibility
     const populatedPageDataWithRevisionOrigin = await this.populate(
       'revision',
       'origin',
@@ -284,6 +281,7 @@ export const getPageSchema = (crowi) => {
     if (revisionId != null) {
       this.revision = revisionId;
     }
+    // biome-ignore lint/plugin: populating is the purpose of this method
     return this.populate('revision');
   };
 
@@ -322,11 +320,7 @@ export const getPageSchema = (crowi) => {
   };
 
   pageSchema.statics.getDeletedPageName = (path) => {
-    if (path.match('/')) {
-      // eslint-disable-next-line no-param-reassign
-      path = path.substr(1);
-    }
-    return `/trash/${path}`;
+    return `/trash/${removeHeadingSlash(path)}`;
   };
 
   pageSchema.statics.getRevertDeletedPageName = (path) =>
@@ -680,6 +674,7 @@ export const getPageSchema = (crowi) => {
       );
     });
 
+    // biome-ignore lint/plugin: allow populate for backward compatibility
     const templatePages = await this.find({ path: { $in: regexpList } })
       .populate({ path: 'revision', model: 'Revision' })
       .exec();

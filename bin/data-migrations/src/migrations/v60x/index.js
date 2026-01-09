@@ -5,4 +5,11 @@ const plantUML = require('./plantuml');
 const remarkGrowiDirective = require('./remark-growi-directive');
 const tsv = require('./tsv');
 
-module.exports = [...bracketlink, ...csv, ...drawio, ...plantUML, ...tsv, ...remarkGrowiDirective];
+module.exports = [
+  ...bracketlink,
+  ...csv,
+  ...drawio,
+  ...plantUML,
+  ...tsv,
+  ...remarkGrowiDirective,
+];

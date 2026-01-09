@@ -8,7 +8,7 @@ import loggerFactory from '~/utils/logger';
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 
-const logger = loggerFactory('growi:routes:apiv3:search'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:routes:apiv3:search');
 
 const express = require('express');
 const { body } = require('express-validator');

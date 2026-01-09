@@ -37,62 +37,60 @@ const CustomizeSidebarsetting = (): JSX.Element => {
   const { isSidebarCollapsedMode } = data;
 
   return (
-    <React.Fragment>
-      <div className="row">
-        <div className="col-12">
-          <h2 className="admin-setting-header">
-            {t('customize_settings.default_sidebar_mode.title')}
-          </h2>
+    <div className="row">
+      <div className="col-12">
+        <h2 className="admin-setting-header">
+          {t('customize_settings.default_sidebar_mode.title')}
+        </h2>
 
-          <Card className="card custom-card bg-body-tertiary my-3">
-            <CardBody className="px-0 py-2">
-              {t('customize_settings.default_sidebar_mode.desc')}
-            </CardBody>
-          </Card>
+        <Card className="card custom-card bg-body-tertiary my-3">
+          <CardBody className="px-0 py-2">
+            {t('customize_settings.default_sidebar_mode.desc')}
+          </CardBody>
+        </Card>
 
-          <div className="d-flex justify-content-around mt-5">
-            <div className="row row-cols-2">
-              <div className="col">
-                <button
-                  type="button"
-                  className={`card border border-4 ${isSidebarCollapsedMode ? 'border-primary' : ''}`}
-                  onClick={() => setIsSidebarCollapsedMode(true)}
-                  aria-pressed={isSidebarCollapsedMode}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={collapsedIconFileName} alt="Collapsed Mode" />
-                  <div className="card-body text-center">Collapsed Mode</div>
-                </button>
-              </div>
-              <div className="col">
-                <button
-                  type="button"
-                  className={`card border border-4 ${!isSidebarCollapsedMode ? 'border-primary' : ''}`}
-                  onClick={() => setIsSidebarCollapsedMode(false)}
-                  aria-pressed={!isSidebarCollapsedMode}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={dockIconFileName} alt="Dock Mode" />
-                  <div className="card-body  text-center">Dock Mode</div>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="row my-3">
-            <div className="mx-auto">
+        <div className="d-flex justify-content-around mt-5">
+          <div className="row row-cols-2">
+            <div className="col">
               <button
                 type="button"
-                onClick={onClickSubmit}
-                className="btn btn-primary"
+                className={`card border border-4 ${isSidebarCollapsedMode ? 'border-primary' : ''}`}
+                onClick={() => setIsSidebarCollapsedMode(true)}
+                aria-pressed={isSidebarCollapsedMode}
               >
-                {t('Update')}
+                {/* biome-ignore lint/performance/noImgElement: Ignore for SVG */}
+                <img src={collapsedIconFileName} alt="Collapsed Mode" />
+                <div className="card-body text-center">Collapsed Mode</div>
+              </button>
+            </div>
+            <div className="col">
+              <button
+                type="button"
+                className={`card border border-4 ${!isSidebarCollapsedMode ? 'border-primary' : ''}`}
+                onClick={() => setIsSidebarCollapsedMode(false)}
+                aria-pressed={!isSidebarCollapsedMode}
+              >
+                {/* biome-ignore lint/performance/noImgElement: Ignore for SVG */}
+                <img src={dockIconFileName} alt="Dock Mode" />
+                <div className="card-body  text-center">Dock Mode</div>
               </button>
             </div>
           </div>
         </div>
+
+        <div className="row my-3">
+          <div className="mx-auto">
+            <button
+              type="button"
+              onClick={onClickSubmit}
+              className="btn btn-primary"
+            >
+              {t('Update')}
+            </button>
+          </div>
+        </div>
       </div>
-    </React.Fragment>
+    </div>
   );
 };
 

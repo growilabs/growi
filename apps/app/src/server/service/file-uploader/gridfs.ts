@@ -23,12 +23,14 @@ const CHUNK_COLLECTION_NAME = `${COLLECTION_NAME}.chunks`;
 
 type PromisifiedUtils = {
   read: (options?: object) => Readable;
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  write: (file: object, stream: Readable, done?: Function) => void;
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  unlink: (file: object, done?: Function) => void;
-  promisifiedWrite: (file: object, readable: Readable) => Promise<any>;
-  promisifiedUnlink: (file: object) => Promise<any>;
+  write: (
+    file: object,
+    stream: Readable,
+    done: (error?: Error | null) => void,
+  ) => void;
+  unlink: (file: object, done: (error?: Error | null) => void) => void;
+  promisifiedWrite: (file: object, readable: Readable) => Promise<void>;
+  promisifiedUnlink: (file: object) => Promise<void>;
 };
 
 type AttachmentFileModel = mongoose.Model<any> & PromisifiedUtils;

@@ -40,7 +40,6 @@ describe('PassportService test', () => {
       );
     });
 
-    /* eslint-disable indent */
     let i = 0;
     describe.each`
       conditionId | departments   | positions     | ruleStr                                                   | expected

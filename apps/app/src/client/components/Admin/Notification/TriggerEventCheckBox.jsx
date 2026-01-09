@@ -34,7 +34,7 @@ TriggerEventCheckBox.propTypes = {
   children: PropTypes.object.isRequired,
 };
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+// biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
 const TriggerEventCheckBoxWrapperFC = (props) => {
   const { t } = useTranslation('admin');
 

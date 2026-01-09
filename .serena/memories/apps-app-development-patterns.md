@@ -93,7 +93,6 @@ components/MyComponent/
 
 ### コード品質
 - [ ] TypeScript エラーなし
-- [ ] ESLint ルール準拠
 - [ ] テストケース作成
 - [ ] 型安全性確保
 - [ ] パフォーマンス影響確認

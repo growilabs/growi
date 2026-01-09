@@ -21,7 +21,7 @@ import loggerFactory from '~/utils/logger';
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 
-const logger = loggerFactory('growi:routes:apiv3:user-group'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:routes:apiv3:user-group');
 
 const router = express.Router();
 

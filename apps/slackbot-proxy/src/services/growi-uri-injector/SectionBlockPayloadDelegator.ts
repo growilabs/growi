@@ -50,7 +50,6 @@ export class SectionBlockPayloadDelegator
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleToInject(data: any): data is SectionWithAccessoryElement[] {
     const sectionBlocks = data.filter(
       (blockElement) =>
@@ -66,7 +65,6 @@ export class SectionBlockPayloadDelegator
     );
 
     // collect elements
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const accessories = sectionBlocks.flatMap(
       (sectionBlock) => sectionBlock.accessory,
     );
@@ -78,13 +76,11 @@ export class SectionBlockPayloadDelegator
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleToExtract(data: any): data is BlockActionsPayload {
     return false;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  extract(data: BlockActionsPayload): GrowiUriWithOriginalData {
+  extract(_data: BlockActionsPayload): GrowiUriWithOriginalData {
     throw new Error('No need to implement. Use ActionsBlockPayloadDelegator');
   }
 }

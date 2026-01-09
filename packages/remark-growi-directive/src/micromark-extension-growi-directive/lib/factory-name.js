@@ -15,7 +15,6 @@ import { codes } from 'micromark-util-symbol';
  * @param {string} type
  */
 export function factoryName(effects, ok, nok, type) {
-  // eslint-disable-next-line @typescript-eslint/no-this-alias
   const self = this;
 
   return start;

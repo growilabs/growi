@@ -90,7 +90,7 @@ describe('cli', () => {
     await cliModule.main();
 
     // Verify error was logged
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: This is a test file
     expect(console.error).toHaveBeenCalledWith(error);
 
     // Verify writeFileSync was not called

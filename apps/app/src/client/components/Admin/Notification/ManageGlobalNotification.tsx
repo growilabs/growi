@@ -148,7 +148,6 @@ const ManageGlobalNotification = (props: Props): JSX.Element => {
           <h3>
             <label htmlFor="triggerPath" className="form-label">
               {t('notification_settings.trigger_path')}
-              {/* eslint-disable-next-line react/no-danger */}
               <small
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
@@ -230,7 +229,6 @@ const ManageGlobalNotification = (props: Props): JSX.Element => {
               </div>
 
               <p className="p-2">
-                {/* eslint-disable-next-line react/no-danger */}
                 {!isMailerSetup && (
                   <span
                     className="form-text text-muted"
@@ -270,7 +268,6 @@ const ManageGlobalNotification = (props: Props): JSX.Element => {
                 />
               </div>
               <p className="p-2">
-                {/* eslint-disable-next-line react/no-danger */}
                 <span
                   // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{

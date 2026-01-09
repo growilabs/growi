@@ -1,6 +1,6 @@
 import loggerFactory from '~/utils/logger';
 
-const logger = loggerFactory('growi:routes:apiv3:healthcheck'); // eslint-disable-line no-unused-vars
+const _logger = loggerFactory('growi:routes:apiv3:healthcheck');
 
 const express = require('express');
 

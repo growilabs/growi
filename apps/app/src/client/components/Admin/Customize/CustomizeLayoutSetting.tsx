@@ -56,68 +56,66 @@ const CustomizeLayoutSetting = (): JSX.Element => {
   }
 
   return (
-    <React.Fragment>
-      <div className="row">
-        <div className="col-12">
-          <h2 className="admin-setting-header">
-            {t('customize_settings.layout')}
-          </h2>
+    <div className="row">
+      <div className="col-12">
+        <h2 className="admin-setting-header">
+          {t('customize_settings.layout')}
+        </h2>
 
-          <div className="d-flex justify-content-around mt-5">
-            <div className="row row-cols-2">
-              <div className="col">
-                <button
-                  type="button"
-                  className={`card border border-4 ${!isContainerFluid ? 'border-primary' : ''}`}
-                  onClick={() => setIsContainerFluid(false)}
-                  aria-pressed={!isContainerFluid}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    className="card-img-top"
-                    src={`/images/customize-settings/default-${resolvedTheme}.svg`}
-                    alt={t('customize_settings.layout_options.default')}
-                  />
-                  <div className="card-body text-center">
-                    {t('customize_settings.layout_options.default')}
-                  </div>
-                </button>
-              </div>
-              <div className="col">
-                <button
-                  type="button"
-                  className={`card border border-4 ${isContainerFluid ? 'border-primary' : ''}`}
-                  onClick={() => setIsContainerFluid(true)}
-                  aria-pressed={isContainerFluid}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    className="card-img-top"
-                    src={`/images/customize-settings/fluid-${resolvedTheme}.svg`}
-                    alt={t('customize_settings.layout_options.expanded')}
-                  />
-                  <div className="card-body text-center">
-                    {t('customize_settings.layout_options.expanded')}
-                  </div>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="row my-3">
-            <div className="mx-auto">
+        <div className="d-flex justify-content-around mt-5">
+          <div className="row row-cols-2">
+            <div className="col">
               <button
                 type="button"
-                className="btn btn-primary"
-                onClick={onClickSubmit}
+                className={`card border border-4 ${!isContainerFluid ? 'border-primary' : ''}`}
+                onClick={() => setIsContainerFluid(false)}
+                aria-pressed={!isContainerFluid}
               >
-                {t('Update')}
+                {/* biome-ignore lint/performance/noImgElement: Ignore for SVG */}
+                <img
+                  className="card-img-top"
+                  src={`/images/customize-settings/default-${resolvedTheme}.svg`}
+                  alt={t('customize_settings.layout_options.default')}
+                />
+                <div className="card-body text-center">
+                  {t('customize_settings.layout_options.default')}
+                </div>
+              </button>
+            </div>
+            <div className="col">
+              <button
+                type="button"
+                className={`card border border-4 ${isContainerFluid ? 'border-primary' : ''}`}
+                onClick={() => setIsContainerFluid(true)}
+                aria-pressed={isContainerFluid}
+              >
+                {/* biome-ignore lint/performance/noImgElement: Ignore for SVG */}
+                <img
+                  className="card-img-top"
+                  src={`/images/customize-settings/fluid-${resolvedTheme}.svg`}
+                  alt={t('customize_settings.layout_options.expanded')}
+                />
+                <div className="card-body text-center">
+                  {t('customize_settings.layout_options.expanded')}
+                </div>
               </button>
             </div>
           </div>
         </div>
+
+        <div className="row my-3">
+          <div className="mx-auto">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onClickSubmit}
+            >
+              {t('Update')}
+            </button>
+          </div>
+        </div>
       </div>
-    </React.Fragment>
+    </div>
   );
 };
 

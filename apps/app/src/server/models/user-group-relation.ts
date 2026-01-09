@@ -90,6 +90,7 @@ schema.statics.removeAllInvalidRelations = function () {
  * @memberof UserGroupRelation
  */
 schema.statics.findAllRelation = function () {
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   return this.find().populate('relatedUser').populate('relatedGroup').exec();
 };
 
@@ -103,6 +104,7 @@ schema.statics.findAllRelation = function () {
  */
 schema.statics.findAllRelationForUserGroup = function (userGroup) {
   logger.debug('findAllRelationForUserGroup is called', userGroup);
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   return this.find({ relatedGroup: userGroup }).populate('relatedUser').exec();
 };
 
@@ -126,6 +128,7 @@ schema.statics.findAllUserIdsForUserGroups = async function (
  * @memberof UserGroupRelation
  */
 schema.statics.findAllRelationForUserGroups = function (userGroups) {
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   return this.find({ relatedGroup: { $in: userGroups } })
     .populate('relatedUser')
     .exec();
@@ -142,6 +145,7 @@ schema.statics.findAllRelationForUserGroups = function (userGroups) {
 schema.statics.findAllGroupsForUser = async function (
   user,
 ): Promise<UserGroupDocument[]> {
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   const userGroupRelations = await this.find({
     relatedUser: user._id,
   }).populate('relatedGroup');

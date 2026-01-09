@@ -35,8 +35,7 @@ import * as xsvToTable from './remark-plugins/xsv-to-table';
 
 // import EasyGrid from './PreProcessor/EasyGrid';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const logger = loggerFactory('growi:services:renderer');
+const _logger = loggerFactory('growi:services:renderer');
 
 type SanitizePlugin = PluginTuple<[SanitizeOption]>;
 

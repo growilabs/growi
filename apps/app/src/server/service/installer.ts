@@ -83,8 +83,7 @@ export class InstallerService {
     // update createdAt and updatedAt fields of all pages
     if (initialPagesCreatedAt != null) {
       try {
-        // TODO typescriptize models/user.js and remove eslint-disable-next-line
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // biome-ignore lint/suspicious/noExplicitAny: TODO: typescriptize models/user.js and remove biome suppressions
         const Page = mongoose.model('Page') as any;
 
         // Increment timestamp to avoid difference for order in VRT

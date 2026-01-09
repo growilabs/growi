@@ -8,7 +8,7 @@ import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
 
-const logger = loggerFactory('growi:service:GlobalNotificationMailService'); // eslint-disable-line no-unused-vars
+const _logger = loggerFactory('growi:service:GlobalNotificationMailService');
 
 /**
  * sub service class of GlobalNotificationSetting

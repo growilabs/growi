@@ -60,8 +60,6 @@ module.exports = (crowi, app) => {
   const unavailableWhenMaintenanceModeForApi =
     generateUnavailableWhenMaintenanceModeMiddlewareForApi(crowi);
 
-  /* eslint-disable max-len, comma-spacing, no-multi-spaces */
-
   const [apiV3Router, apiV3AdminRouter, apiV3AuthRouter] = require('./apiv3')(
     crowi,
     app,

@@ -25,7 +25,6 @@ type ViewInteractionPayload = TypedBlock & {
 export class ViewInteractionPayloadDelegator
   implements GrowiUriInjector<any, ViewElement, any, ViewInteractionPayload>
 {
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleToInject(data: any): data is ViewElement {
     return data.type != null && data.private_metadata != null;
   }
@@ -38,7 +37,6 @@ export class ViewInteractionPayloadDelegator
     data.private_metadata = JSON.stringify(urlWithOrgData);
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleToExtract(data: any): data is ViewInteractionPayload {
     const { type, view } = data;
     if (type !== 'view_submission') {
@@ -58,8 +56,8 @@ export class ViewInteractionPayloadDelegator
   }
 
   extract(data: ViewInteractionPayload): GrowiUriWithOriginalData {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const restoredData: GrowiUriWithOriginalData = JSON.parse(
+      // biome-ignore lint/style/noNonNullAssertion: private_metadata must be set --- IGNORE ---
       data.view.private_metadata!,
     ); // private_metadata must not be null at this moment
     data.view.private_metadata = restoredData.originalData;

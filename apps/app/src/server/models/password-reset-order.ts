@@ -9,7 +9,6 @@ import { getOrCreateModel } from '../util/mongoose-utils';
 export interface IPasswordResetOrder {
   token: string;
   email: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   relatedUser: any;
   isRevoked: boolean;
   createdAt: Date;
@@ -63,7 +62,7 @@ schema.statics.createPasswordResetOrder = async function (email) {
 
   do {
     token = this.generateOneTimeToken();
-    // eslint-disable-next-line no-await-in-loop
+    // biome-ignore lint/performance/noAwaitInLoops: The loop is necessary to process one after another
     duplicateToken = await this.findOne({ token });
   } while (duplicateToken != null);
 

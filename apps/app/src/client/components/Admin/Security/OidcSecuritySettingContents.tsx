@@ -180,7 +180,6 @@ const OidcSecurityManagementContents = (props: Props) => {
             <div className="alert alert-danger">
               <span className="material-symbols-outlined">error</span>
               <span
-                // eslint-disable-next-line max-len
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
                   __html: t('alert.siteUrl_is_not_set', {
@@ -628,7 +627,6 @@ const OidcSecurityManagementContents = (props: Props) => {
                 <div className="alert alert-danger">
                   <span className="material-symbols-outlined">error</span>
                   <span
-                    // eslint-disable-next-line max-len
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
                       __html: t('alert.siteUrl_is_not_set', {

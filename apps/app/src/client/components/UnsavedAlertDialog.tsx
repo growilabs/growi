@@ -1,4 +1,4 @@
-import React, { type JSX, memo, useCallback, useEffect } from 'react';
+import { type JSX, memo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'next-i18next';
 
@@ -26,11 +26,10 @@ const UnsavedAlertDialog = (): JSX.Element => {
   const alertUnsavedWarningByNextRouter = useCallback(() => {
     if (isEnabledUnsavedWarning) {
       // see: https://zenn.dev/qaynam/articles/c4794537a163d2
-      // eslint-disable-next-line no-alert
+      // biome-ignore lint/suspicious/noAlert: Allow to use confirm dialog here
       const answer = window.confirm(t('page_edit.changes_not_saved'));
       if (!answer) {
-        // eslint-disable-next-line no-throw-literal
-        throw 'Abort route';
+        throw new Error('Abort route');
       }
     }
   }, [isEnabledUnsavedWarning, t]);

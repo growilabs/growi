@@ -344,7 +344,6 @@ class PageBulkExportJobCronService
   }
 }
 
-// eslint-disable-next-line import/no-mutable-exports
 export let pageBulkExportJobCronService:
   | PageBulkExportJobCronService
   | undefined; // singleton instance

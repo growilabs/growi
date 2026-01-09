@@ -61,7 +61,6 @@ const RevokeAdminMenuItem = (props: Props): JSX.Element => {
 /**
  * Wrapper component for using unstated
  */
-// eslint-disable-next-line max-len
 const RevokeAdminMenuItemWrapper: React.ForwardRefExoticComponent<
   Pick<any, string | number | symbol> & React.RefAttributes<any>
 > = withUnstatedContainers(RevokeAdminMenuItem, [AdminUsersContainer]);

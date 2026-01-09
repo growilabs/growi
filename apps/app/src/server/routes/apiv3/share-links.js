@@ -1,5 +1,4 @@
 // TODO remove this setting after implemented all
-/* eslint-disable no-unused-vars */
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';

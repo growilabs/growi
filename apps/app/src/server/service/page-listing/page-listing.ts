@@ -32,8 +32,8 @@ export interface IPageListingService {
 let pageOperationService: IPageOperationService;
 async function getPageOperationServiceInstance(): Promise<IPageOperationService> {
   if (pageOperationService == null) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     pageOperationService = await import('../page-operation').then(
+      // biome-ignore lint/style/noNonNullAssertion: the module must export pageOperationService
       (mod) => mod.pageOperationService!,
     );
   }

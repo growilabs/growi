@@ -1,6 +1,10 @@
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 
+import loggerFactory from '~/utils/logger';
+
+const logger = loggerFactory('growi:components:utils:use-lazy-loader');
+
 type ComponentModule<T> = { default: React.ComponentType<T> };
 
 // Global cache for dynamically loaded components
@@ -68,15 +72,13 @@ export const useLazyLoader = <T extends Record<string, unknown>>(
           if (mod?.default) {
             setComponent(() => mod.default);
           } else {
-            // eslint-disable-next-line no-console
-            console.error(
+            logger.error(
               `Failed to load component with key "${importKey}": Module or default export is missing`,
             );
           }
         })
         .catch((error) => {
-          // eslint-disable-next-line no-console
-          console.error(
+          logger.error(
             `Failed to load component with key "${importKey}":`,
             error,
           );

@@ -176,7 +176,6 @@ describe('AclService test', () => {
       expect(result).toBe(true);
     });
 
-    /* eslint-disable indent */
     describe.each`
       restrictGuestMode | expected
       ${undefined}      | ${false}

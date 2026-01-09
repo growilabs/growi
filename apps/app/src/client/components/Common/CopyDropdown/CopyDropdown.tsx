@@ -37,7 +37,6 @@ interface CopyDropdownProps {
   isShareLinkMode?: boolean;
 }
 
-/* eslint-disable react/prop-types */
 const DropdownItemContents: React.FC<DropdownItemContentsProps> = ({
   title,
   contents,
@@ -53,7 +52,6 @@ const DropdownItemContents: React.FC<DropdownItemContentsProps> = ({
     </div>
   </>
 );
-/* eslint-enable react/prop-types */
 
 export const CopyDropdown: React.FC<CopyDropdownProps> = (props) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);

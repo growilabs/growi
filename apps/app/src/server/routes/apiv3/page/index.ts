@@ -55,7 +55,7 @@ import { syncLatestRevisionBodyToYjsDraftHandlerFactory } from './sync-latest-re
 import { unpublishPageHandlersFactory } from './unpublish-page';
 import { updatePageHandlersFactory } from './update-page';
 
-const logger = loggerFactory('growi:routes:apiv3:page'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:routes:apiv3:page');
 
 const express = require('express');
 const { body, query, param } = require('express-validator');

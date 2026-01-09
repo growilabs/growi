@@ -18,7 +18,6 @@ class UploadForm extends React.Component {
 
   changeFileName(e) {
     // to trigger rerender at onChange event
-    // eslint-disable-next-line react/no-unused-state
     this.setState({ dummy: e.target.files[0].name });
   }
 

@@ -11,7 +11,6 @@ pnpm run lint:biome
 pnpm run lint
 
 # 個別実行（必要に応じて）
-pnpm run lint:eslint      # ESLint（廃止予定）
 pnpm run lint:styles      # Stylelint
 pnpm run lint:typecheck   # TypeScript型チェック
 ```
@@ -82,7 +81,7 @@ pnpm run dev:migrate         # マイグレーション実行
 - 可能であればtest-with-vite/にVitestテストとして書き直し
 
 ## コミット前の最終チェック
-1. Biome（または過渡期はESLint）エラーが解消されているか
+1. Biome エラーが解消されているか
 2. Vitestテスト（または過渡期はJest）がパスしているか
 3. 重要な変更はPlaywright E2Eテストも実行
 4. ビルドが成功するか

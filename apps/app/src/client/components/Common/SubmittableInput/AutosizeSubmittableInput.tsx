@@ -10,9 +10,7 @@ export const getAdjustedMaxWidthForAutosizeInput = (
   size: 'sm' | 'md' | 'lg' = 'md',
   isValid?: boolean,
 ): number => {
-  // eslint-disable-next-line no-nested-ternary
   const bsFormPaddingSize = size === 'sm' ? 8 : size === 'md' ? 12 : 16; // by bootstrap form
-  // eslint-disable-next-line no-nested-ternary
   const bsValidationIconSize = size === 'sm' ? 25 : size === 'md' ? 24 : 26; // by bootstrap form validation
 
   return (

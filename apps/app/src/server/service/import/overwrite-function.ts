@@ -51,9 +51,7 @@ export const keepOriginal: OverwriteFunction = (
   }
 
   // _id
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (propertyName === '_id' && ObjectId.isValid(value as any)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return new ObjectId(value as any);
   }
 

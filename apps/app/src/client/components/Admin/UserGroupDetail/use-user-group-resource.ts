@@ -13,7 +13,6 @@ import {
   useSWRxUserGroupRelations,
 } from '~/stores/user-group';
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export const useUserGroup = (userGroupId: string, isExternalGroup: boolean) => {
   const userGroupRes = useSWRxUserGroup(isExternalGroup ? null : userGroupId);
   const externalUserGroupRes = useSWRxExternalUserGroup(
@@ -22,7 +21,6 @@ export const useUserGroup = (userGroupId: string, isExternalGroup: boolean) => {
   return isExternalGroup ? externalUserGroupRes : userGroupRes;
 };
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export const useUserGroupRelations = (
   userGroupId: string,
   isExternalGroup: boolean,
@@ -36,7 +34,6 @@ export const useUserGroupRelations = (
   return isExternalGroup ? externalUserGroupRes : userGroupRes;
 };
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export const useChildUserGroupList = (
   userGroupId: string,
   isExternalGroup: boolean,
@@ -52,7 +49,6 @@ export const useChildUserGroupList = (
   return isExternalGroup ? externalUserGroupRes : userGroupRes;
 };
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export const useUserGroupRelationList = (
   userGroupIds: string[],
   isExternalGroup: boolean,
@@ -66,7 +62,6 @@ export const useUserGroupRelationList = (
   return isExternalGroup ? externalUserGroupRes : userGroupRes;
 };
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export const useAncestorUserGroups = (
   userGroupId: string,
   isExternalGroup: boolean,
