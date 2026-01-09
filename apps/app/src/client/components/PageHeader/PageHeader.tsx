@@ -15,12 +15,21 @@ export const PageHeader = (): JSX.Element => {
   const pageControlsX = usePageControlsX();
   const pageHeaderRef = useRef<HTMLDivElement>(null);
 
-  const [maxWidth, setMaxWidth] = useState<number>();
+  const [maxWidth, setMaxWidth] = useState<number>(300);
 
   const calcMaxWidth = useCallback(() => {
-    if (pageControlsX == null || pageHeaderRef.current == null) {
-      // Length that allows users to use PageHeader functionality.
-      setMaxWidth(300);
+    if (pageHeaderRef.current == null) {
+      return;
+    }
+
+    // For mobile screens (< 576px), use full screen width
+    if (window.innerWidth < 576) {
+      const maxWidth = window.innerWidth - pageHeaderRef.current.getBoundingClientRect().x;
+      setMaxWidth(maxWidth);
+      return;
+    }
+
+    if (pageControlsX == null) {
       return;
     }
 
@@ -33,6 +42,12 @@ export const PageHeader = (): JSX.Element => {
 
   useEffect(() => {
     calcMaxWidth();
+
+    // Recalculate on window resize
+    window.addEventListener('resize', calcMaxWidth);
+    return () => {
+      window.removeEventListener('resize', calcMaxWidth);
+    };
   }, [calcMaxWidth]);
 
   if (currentPage == null) {
