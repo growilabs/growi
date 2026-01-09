@@ -1,43 +1,43 @@
-import React, { useCallback, useEffect } from 'react';
+import type { FC } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'next-i18next';
-import PropTypes from 'prop-types';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { Tooltip } from 'reactstrap';
 
-import AdminHomeContainer from '~/client/services/AdminHomeContainer';
-import { toastError } from '~/client/util/toastr';
+import { useSWRxAdminHome } from '~/stores/admin/admin-home';
 import { useSWRxV5MigrationStatus } from '~/stores/page-listing';
-import loggerFactory from '~/utils/logger';
+import { generatePrefilledHostInformationMarkdown } from '~/utils/admin-home';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
 import { EnvVarsTable } from './EnvVarsTable';
 import SystemInfomationTable from './SystemInfomationTable';
 
-const logger = loggerFactory('growi:admin');
+const COPY_STATE = {
+  DEFAULT: 'default',
+  DONE: 'done',
+} as const;
 
-const AdminHome = (props) => {
-  const { adminHomeContainer } = props;
+export const AdminHome: FC = () => {
   const { t } = useTranslation();
+  const { data: adminHomeData } = useSWRxAdminHome();
   const { data: migrationStatus } = useSWRxV5MigrationStatus();
+  const [copyState, setCopyState] = useState<string>(COPY_STATE.DEFAULT);
 
-  const fetchAdminHomeData = useCallback(async () => {
-    try {
-      await adminHomeContainer.retrieveAdminHomeData();
-    } catch (err) {
-      toastError(err);
-      logger.error(err);
-    }
-  }, [adminHomeContainer]);
+  const handleCopyPrefilledHostInformation = () => {
+    setCopyState(COPY_STATE.DONE);
+    setTimeout(() => {
+      setCopyState(COPY_STATE.DEFAULT);
+    }, 500);
+  };
 
-  useEffect(() => {
-    fetchAdminHomeData();
-  }, [fetchAdminHomeData]);
+  // Generate CSS-safe ID by removing colons from useId() result
+  const copyButtonIdRaw = useId();
+  const copyButtonId = `copy-button-${copyButtonIdRaw.replace(/:/g, '')}`;
 
   return (
     <div data-testid="admin-home">
       {
         // Alert message will be displayed in case that the GROWI is under maintenance
-        adminHomeContainer.state.isMaintenanceMode && (
+        adminHomeData?.isMaintenanceMode && (
           <div className="alert alert-danger alert-link" role="alert">
             <h3 className="alert-heading">
               {t('admin:maintenance_mode.maintenance_mode')}
@@ -104,7 +104,7 @@ const AdminHome = (props) => {
               __html: t('admin:admin_top.about_security'),
             }}
           />
-          <EnvVarsTable envVars={adminHomeContainer.state.envVars} />
+          <EnvVarsTable envVars={adminHomeData?.envVars} />
         </div>
       </div>
 
@@ -113,50 +113,56 @@ const AdminHome = (props) => {
           <h2 className="admin-setting-header">
             {t('admin:admin_top.bug_report')}
           </h2>
-          <div className="d-flex align-items-center">
-            <CopyToClipboard
-              text={adminHomeContainer.generatePrefilledHostInformationMarkdown()}
-              onCopy={() => adminHomeContainer.onCopyPrefilledHostInformation()}
-            >
-              <button
-                id="prefilledHostInformationButton"
-                type="button"
-                className="btn btn-primary"
+          <ol className="mb-0">
+            <li className="mb-3">
+              <CopyToClipboard
+                text={generatePrefilledHostInformationMarkdown({
+                  growiVersion: adminHomeData?.growiVersion,
+                  nodeVersion: adminHomeData?.nodeVersion,
+                  npmVersion: adminHomeData?.npmVersion,
+                  pnpmVersion: adminHomeData?.pnpmVersion,
+                })}
+                onCopy={handleCopyPrefilledHostInformation}
               >
-                {t('admin:admin_top:copy_prefilled_host_information:default')}
-              </button>
-            </CopyToClipboard>
-            <Tooltip
-              placement="bottom"
-              isOpen={
-                adminHomeContainer.state.copyState ===
-                adminHomeContainer.copyStateValues.DONE
-              }
-              target="prefilledHostInformationButton"
-              fade={false}
-            >
-              {t('admin:admin_top:copy_prefilled_host_information:done')}
-            </Tooltip>
-            <span
-              className="ms-2"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: ignore
-              dangerouslySetInnerHTML={{
-                __html: t('admin:admin_top:submit_bug_report'),
-              }}
-            />
-          </div>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary btn-sm"
+                  style={{ verticalAlign: 'baseline' }}
+                  onClick={(e) => e.preventDefault()}
+                >
+                  <span
+                    id={copyButtonId}
+                    className="material-symbols-outlined"
+                    aria-hidden="true"
+                  >
+                    content_copy
+                  </span>
+                  {t('admin:admin_top:copy_prefilled_host_information:default')}
+                </button>
+              </CopyToClipboard>
+              <Tooltip
+                placement="bottom"
+                isOpen={copyState === COPY_STATE.DONE}
+                target={copyButtonId}
+                fade={false}
+              >
+                {t('admin:admin_top:copy_prefilled_host_information:done')}
+              </Tooltip>
+            </li>
+            <li>
+              <a
+                className="link-secondary link-offset-1"
+                style={{ textDecoration: 'underline' }}
+                href="https://github.com/growilabs/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {t('admin:admin_top:submit_bug_report')}
+              </a>
+            </li>
+          </ol>
         </div>
       </div>
     </div>
   );
 };
-
-const AdminHomeWrapper = withUnstatedContainers(AdminHome, [
-  AdminHomeContainer,
-]);
-
-AdminHome.propTypes = {
-  adminHomeContainer: PropTypes.instanceOf(AdminHomeContainer).isRequired,
-};
-
-export default AdminHomeWrapper;
