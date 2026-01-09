@@ -51,9 +51,6 @@ export const HelpDropdown: FC = memo(() => {
         data-testid="help-dropdown-menu"
         className={styles['help-dropdown-menu']}
       >
-        <DropdownItem header className="text-secondary py-1">
-          {t('Help')}
-        </DropdownItem>
         <DropdownItem
           tag="a"
           href={helpUrl}

@@ -12,7 +12,6 @@ export const SidebarBrandLogo = memo((props: SidebarBrandLogoProps) => {
   return isDefaultLogo ? (
     <GrowiLogo />
   ) : (
-    // eslint-disable-next-line @next/next/no-img-element
     <div>
       <img
         src="/attachment/brand-logo"

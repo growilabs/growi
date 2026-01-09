@@ -13,7 +13,6 @@ import { pageListingService } from './page-listing';
 vi.mock('~/server/service/page-operation', () => ({
   pageOperationService: {
     generateProcessInfo: vi.fn((pageOperations: IPageOperation[]) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const processInfo: Record<string, any> = {};
       pageOperations.forEach((pageOp) => {
         const pageId = pageOp.page._id.toString();
@@ -37,7 +36,6 @@ describe('page-listing store integration tests', () => {
   let rootPage: HydratedDocument<IPage>;
 
   // Helper function to validate IPageForTreeItem type structure
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const validatePageForTreeItem = (page: any): void => {
     expect(page).toBeDefined();
     expect(page._id).toBeDefined();

@@ -427,7 +427,6 @@ class ExportService {
   }
 }
 
-// eslint-disable-next-line import/no-mutable-exports
 export let exportService: ExportService | undefined; // singleton instance
 export default function instanciate(crowi: any): void {
   exportService = new ExportService(crowi);

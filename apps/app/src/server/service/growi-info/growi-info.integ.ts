@@ -74,7 +74,6 @@ describe('GrowiInfoService', () => {
       expect(growiInfo.osInfo?.arch).toBeTruthy();
       expect(growiInfo.osInfo?.totalmem).toBeTruthy();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (growiInfo as any).osInfo;
 
       expect(growiInfo).toEqual({
@@ -105,7 +104,6 @@ describe('GrowiInfoService', () => {
       expect(growiInfo.osInfo?.arch).toBeTruthy();
       expect(growiInfo.osInfo?.totalmem).toBeTruthy();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (growiInfo as any).osInfo;
 
       expect(growiInfo).toEqual({

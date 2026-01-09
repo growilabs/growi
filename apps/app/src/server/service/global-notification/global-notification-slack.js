@@ -9,7 +9,7 @@ import loggerFactory from '~/utils/logger';
 import { prepareSlackMessageForGlobalNotification } from '../../util/slack';
 import { growiInfoService } from '../growi-info';
 
-const logger = loggerFactory('growi:service:GlobalNotificationSlackService'); // eslint-disable-line no-unused-vars
+const _logger = loggerFactory('growi:service:GlobalNotificationSlackService');
 const urljoin = require('url-join');
 
 const { encodeSpaces } = pagePathUtils;
@@ -114,7 +114,6 @@ class GlobalNotificationSlackService {
             `invalid vars supplied to GlobalNotificationSlackService.generateOption for event ${event}`,
           );
         }
-        // eslint-disable-next-line no-case-declarations
         messageBody = `:bell: ${username} moved ${oldPath} to ${parmaLink}`;
         break;
       case GlobalNotificationSettingEvent.PAGE_LIKE:

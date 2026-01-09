@@ -31,7 +31,7 @@ GROWI is a team collaboration software using markdown - a wiki platform with hie
 
 ### Testing and Quality
 - `turbo run test @apps/app` - Run Jest and Vitest test suites with coverage
-- `turbo run lint @apps/app` - Run all linters (TypeScript, ESLint, Biome, Stylelint, OpenAPI)
+- `turbo run lint @apps/app` - Run all linters (TypeScript, Biome, Stylelint, OpenAPI)
 - `cd apps/app && pnpm run lint:typecheck` - TypeScript type checking only
 - `cd apps/app && pnpm run test:vitest` - Run Vitest unit tests
 - `cd apps/app && pnpm run test:jest` - Run Jest integration tests

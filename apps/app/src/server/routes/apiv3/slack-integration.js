@@ -99,7 +99,6 @@ module.exports = (crowi) => {
           text: 'Command is not supported',
           blocks: [
             markdownSectionBlock('*Command is not supported*'),
-            // eslint-disable-next-line max-len
             markdownSectionBlock(
               `\`/growi ${growiCommand.growiCommandType}\` command is not supported in this version of GROWI bot. Run \`/growi help\` to see all supported commands.`,
             ),
@@ -257,7 +256,6 @@ module.exports = (crowi) => {
   const verifyUrlMiddleware = (req, res, next) => {
     const { body } = req;
 
-    // eslint-disable-next-line max-len
     // see: https://api.slack.com/apis/connections/events-api#the-events-api__subscribing-to-event-types__events-api-request-urls__request-url-configuration--verification
     if (body.type === 'url_verification') {
       return res.send({ challenge: body.challenge });
@@ -472,7 +470,6 @@ module.exports = (crowi) => {
     async (req, res) => {
       const { body } = req;
 
-      // eslint-disable-next-line max-len
       // see: https://api.slack.com/apis/connections/events-api#the-events-api__subscribing-to-event-types__events-api-request-urls__request-url-configuration--verification
       if (body.type === 'url_verification') {
         return res.send({ challenge: body.challenge });

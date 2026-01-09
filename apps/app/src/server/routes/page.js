@@ -14,7 +14,6 @@ import UpdatePost from '../models/update-post';
  *    name: Pages
  */
 
-/* eslint-disable no-use-before-define */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi, app) => {
   const logger = loggerFactory('growi:routes:page');
@@ -225,12 +224,11 @@ module.exports = (crowi, app) => {
 
     UpdatePost.findSettingsByPath(path)
       .then((data) => {
-        // eslint-disable-next-line no-param-reassign
-        data = data.map((e) => {
+        const channels = data.map((e) => {
           return e.channel;
         });
-        logger.debug('Found updatePost data', data);
-        const result = { updatePost: data };
+        logger.debug('Found updatePost data', channels);
+        const result = { updatePost: channels };
         return res.json(ApiResponse.success(result));
       })
       .catch((err) => {

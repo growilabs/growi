@@ -1,8 +1,6 @@
 {
   "files.eol": "\n",
 
-  "eslint.workingDirectories": [{ "mode": "auto" }],
-
   "[typescript]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
@@ -24,7 +22,6 @@
   "scss.validate": false,
 
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": "explicit",
     "source.fixAll.biome": "explicit",
     "source.organizeImports.biome": "explicit",
     "source.fixAll.markdownlint": "explicit",

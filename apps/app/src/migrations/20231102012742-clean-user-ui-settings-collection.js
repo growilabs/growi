@@ -1,4 +1,3 @@
-// eslint-disable-next-line import/no-named-as-default
 import UserUISettings from '~/server/models/user-ui-settings';
 import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
