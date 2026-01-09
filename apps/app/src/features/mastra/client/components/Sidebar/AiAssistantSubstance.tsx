@@ -7,8 +7,8 @@ import {
 } from '~/features/openai/client/states';
 import { useAiAssistantManagementModalActions } from '~/features/openai/client/states/modal/ai-assistant-management';
 import { useSWRxAiAssistants } from '~/features/openai/client/stores/ai-assistant';
-import { useSWRINFxRecentThreads } from '~/features/openai/client/stores/thread';
 
+import { useSWRINFxRecentThreads } from '../../stores/thread';
 import { AiAssistantList } from './AiAssistantList';
 import { ThreadList } from './ThreadList';
 

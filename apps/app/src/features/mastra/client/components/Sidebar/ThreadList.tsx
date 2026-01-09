@@ -1,6 +1,5 @@
 import type React from 'react';
 import { useCallback } from 'react';
-import { getIdStringForRef } from '@growi/core';
 import { useTranslation } from 'react-i18next';
 
 import InfiniteScroll from '~/client/components/InfiniteScroll';
@@ -9,20 +8,18 @@ import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
 } from '~/features/openai/client/states';
-import {
-  useSWRINFxRecentThreads,
-  useSWRMUTxThreads,
-} from '~/features/openai/client/stores/thread';
+import { useSWRMUTxThreads } from '~/features/openai/client/stores/thread';
 import loggerFactory from '~/utils/logger';
 
 import { deleteThread } from '../../../../openai/client/services/thread';
+import { useSWRINFxRecentThreads } from '../../stores/thread';
 
 const logger = loggerFactory('growi:openai:client:components:ThreadList');
 
 export const ThreadList: React.FC = () => {
-  const swrInifiniteThreads = useSWRINFxRecentThreads();
+  const swrInfiniteThreads = useSWRINFxRecentThreads();
   const { t } = useTranslation();
-  const { data, mutate: mutateRecentThreads } = swrInifiniteThreads;
+  const { data, mutate: mutateRecentThreads } = swrInfiniteThreads;
   const aiAssistantSidebarData = useAiAssistantSidebarStatus();
   const { openChat, close: closeAiAssistantSidebar } =
     useAiAssistantSidebarActions();
@@ -30,11 +27,9 @@ export const ThreadList: React.FC = () => {
     aiAssistantSidebarData?.aiAssistantData?._id,
   );
 
-  const isEmpty = data?.[0]?.paginateResult.totalDocs === 0;
+  const isEmpty = data?.[0]?.total === 0;
   const isReachingEnd =
-    isEmpty ||
-    (data != null &&
-      data[data.length - 1].paginateResult.hasNextPage === false);
+    isEmpty || (data != null && data[data.length - 1]?.hasMore === false);
 
   const deleteThreadHandler = useCallback(
     async (aiAssistantId: string, threadRelationId: string) => {
@@ -71,20 +66,20 @@ export const ThreadList: React.FC = () => {
   return (
     <ul className="list-group">
       <InfiniteScroll
-        swrInifiniteResponse={swrInifiniteThreads}
+        swrInifiniteResponse={swrInfiniteThreads}
         isReachingEnd={isReachingEnd}
       >
         {data
-          ?.flatMap((thread) => thread.paginateResult.docs)
+          ?.flatMap((threadData) => threadData.threads)
           .map((thread) => (
-            <li key={thread._id} className="list-group-item border-0 p-0">
+            <li key={thread.id} className="list-group-item border-0 p-0">
               <button
                 type="button"
                 className="btn btn-link list-group-item-action border-0 d-flex align-items-center rounded-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openChat(thread.aiAssistant, thread);
-                }}
+                // onClick={(e) => {
+                //   e.stopPropagation();
+                //   openChat(thread.aiAssistant, thread);
+                // }}
                 onMouseDown={(e) => {
                   e.preventDefault();
                 }}
@@ -103,13 +98,13 @@ export const ThreadList: React.FC = () => {
                   <button
                     type="button"
                     className="btn btn-link text-secondary p-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteThreadHandler(
-                        getIdStringForRef(thread.aiAssistant),
-                        thread._id,
-                      );
-                    }}
+                    // onClick={(e) => {
+                    //   e.stopPropagation();
+                    //   deleteThreadHandler(
+                    //     getIdStringForRef(thread.aiAssistant),
+                    //     thread._id,
+                    //   );
+                    // }}
                   >
                     <span className="material-symbols-outlined fs-5">
                       delete
