@@ -26,13 +26,16 @@ export const CustomSidebar = (): JSX.Element => {
       <div className="grw-sidebar-content-header d-flex">
         <h3 className="fs-6 fw-bold mb-0">
           {t('Custom Sidebar')}
-          {!isLoading && data != null && (
-            <Link href="/Sidebar#edit" className="h6 ms-2">
-              <span className="material-symbols-outlined">edit</span>
-            </Link>
-          )}
+          <Link
+            href="/Sidebar#edit"
+            className={`h6 ms-2 ${!isLoading && data != null ? 'visible' : 'invisible'}`}
+          >
+            <span className="material-symbols-outlined">edit</span>
+          </Link>
         </h3>
-        {!isLoading && <SidebarHeaderReloadButton onClick={() => mutate()} />}
+        <span className={`ms-auto ${isLoading ? 'invisible' : ''}`}>
+          <SidebarHeaderReloadButton onClick={() => mutate()} />
+        </span>
       </div>
 
       <Suspense fallback={<DefaultContentSkeleton />}>
