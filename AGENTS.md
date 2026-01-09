@@ -12,6 +12,13 @@ When generating source code, all comments and explanations within the code will 
 
 GROWI is a team collaboration software using markdown - a wiki platform with hierarchical page organization. It's built with Next.js, Express, MongoDB, and includes features like real-time collaborative editing, authentication integrations, and plugin support.
 
+## Development Tools
+- **Package Manager**: pnpm with workspace support
+- **Build System**: Turborepo for monorepo orchestration
+- **Code Quality**: 
+  - Biome for linting and formatting
+  - Stylelint for SCSS/CSS
+
 ## Development Commands
 
 ### Core Development
@@ -47,12 +54,6 @@ GROWI is a team collaboration software using markdown - a wiki platform with hie
 - `/apps/pdf-converter/` - PDF conversion microservice
 - `/apps/slackbot-proxy/` - Slack integration proxy service
 - `/packages/` - Shared libraries and components
-
-### Development Dependencies
-- Node.js v20.x or v22.x
-- pnpm 10.x  
-- MongoDB v6.x or v8.x
-- Optional: Redis 3.x, Elasticsearch 7.x/8.x/9.x (for full-text search)
 
 ## File Organization Patterns
 
