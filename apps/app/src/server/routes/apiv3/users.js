@@ -15,6 +15,7 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import Activity from '~/server/models/activity';
 import ExternalAccount from '~/server/models/external-account';
 import { serializePageSecurely } from '~/server/models/serializers';
+import { UserStatus } from '~/server/models/user/conts';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
@@ -124,10 +125,10 @@ module.exports = (crowi) => {
   const { User, Page } = crowi.models;
 
   const statusNo = {
-    registered: User.STATUS_REGISTERED,
-    active: User.STATUS_ACTIVE,
-    suspended: User.STATUS_SUSPENDED,
-    invited: User.STATUS_INVITED,
+    registered: UserStatus.STATUS_REGISTERED,
+    active: UserStatus.STATUS_ACTIVE,
+    suspended: UserStatus.STATUS_SUSPENDED,
+    invited: UserStatus.STATUS_INVITED,
   };
 
   validator.statusList = [
@@ -1535,7 +1536,7 @@ module.exports = (crowi) => {
           const activeUserData =
             await User.findUserByUsernameRegexWithTotalCount(
               q,
-              [User.STATUS_ACTIVE],
+              [UserStatus.STATUS_ACTIVE],
               { offset, limit },
             );
           const activeUsernames = activeUserData.users.map(
@@ -1551,9 +1552,9 @@ module.exports = (crowi) => {
 
         if (options.isIncludeInactiveUser) {
           const inactiveUserStates = [
-            User.STATUS_REGISTERED,
-            User.STATUS_SUSPENDED,
-            User.STATUS_INVITED,
+            UserStatus.STATUS_REGISTERED,
+            UserStatus.STATUS_SUSPENDED,
+            UserStatus.STATUS_INVITED,
           ];
           const inactiveUserData =
             await User.findUserByUsernameRegexWithTotalCount(

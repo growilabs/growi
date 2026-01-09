@@ -17,13 +17,11 @@ describe('access-token-parser middleware', () => {
 
   beforeAll(async () => {
     const crowiMock = mock<Crowi>({
-      event: vi.fn().mockImplementation((eventName) => {
-        if (eventName === 'user') {
-          return mock<UserEvent>({
-            on: vi.fn(),
-          });
-        }
-      }),
+      events: {
+        user: mock<UserEvent>({
+          on: vi.fn(),
+        }),
+      },
     });
     const userModelFactory = (await import('../../models/user')).default;
     User = userModelFactory(crowiMock);

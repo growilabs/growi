@@ -83,11 +83,11 @@ export interface InternalServerError {
 
 
   /**
- *
+ * 
     Sync job pdf convert status with GROWI.
     Register or update job inside pdf-converter with given jobId, expirationDate, and status.
     Return resulting status of job to GROWI.
-
+  
  */
 export const pdfCtrlSyncJobStatus = <TData = AxiosResponse<PdfCtrlSyncJobStatus202>>(
     pdfCtrlSyncJobStatusBody: PdfCtrlSyncJobStatusBody, options?: AxiosRequestConfig

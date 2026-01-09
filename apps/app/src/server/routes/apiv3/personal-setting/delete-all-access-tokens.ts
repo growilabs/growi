@@ -29,7 +29,7 @@ export const deleteAllAccessTokensHandlersFactory: DeleteAllAccessTokensHandlers
     const loginRequiredStrictly =
       require('../../../middlewares/login-required')(crowi);
     const addActivity = generateAddActivityMiddleware();
-    const activityEvent = crowi.event('activity');
+    const activityEvent = crowi.events.activity;
 
     return [
       accessTokenParser([SCOPE.WRITE.USER_SETTINGS.API.ACCESS_TOKEN]),

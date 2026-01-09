@@ -127,7 +127,7 @@ export const updatePageHandlersFactory: UpdatePageHandlersFactory = (crowi) => {
       target: updatedPage,
       action: SupportedAction.ACTION_PAGE_UPDATE,
     };
-    const activityEvent = crowi.event('activity');
+    const activityEvent = crowi.events.activity;
     activityEvent.emit(
       'update',
       res.locals.activity._id,

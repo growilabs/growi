@@ -42,13 +42,11 @@ describe('GrowiInfoService', () => {
 
     const crowiMock = mock<Crowi>({
       version: appVersion,
-      event: vi.fn().mockImplementation((eventName) => {
-        if (eventName === 'user') {
-          return mock<UserEvent>({
-            on: vi.fn(),
-          });
-        }
-      }),
+      events: {
+        user: mock<UserEvent>({
+          on: vi.fn(),
+        }),
+      },
     });
 
     const userModelFactory = (await import('~/server/models/user')).default;

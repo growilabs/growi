@@ -16,7 +16,7 @@ describe('constructConvertMap', () => {
       user: mock<EventEmitter>(),
     };
     const crowiMock = mock<Crowi>({
-      event: (name: string) => events[name],
+      events,
     });
 
     await setupModelsDependentOnCrowi(crowiMock);

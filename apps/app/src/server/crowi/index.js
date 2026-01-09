@@ -267,16 +267,18 @@ Crowi.prototype.getEnv = function () {
  * @param {string} modelName
  * @returns {mongoose.Model}
  */
-Crowi.prototype.model = (modelName) => getModelSafely(modelName);
+// DEPRECATED: Use crowi.models[modelName] instead
+// Crowi.prototype.model = (modelName) => getModelSafely(modelName);
 
+// DEPRECATED: Use crowi.events[name] instead
 // getter/setter of event instance
-Crowi.prototype.event = function (name, event) {
-  if (event) {
-    this.events[name] = event;
-  }
-
-  return this.events[name];
-};
+// Crowi.prototype.event = function (name, event) {
+//   if (event) {
+//     this.events[name] = event;
+//   }
+//
+//   return this.events[name];
+// };
 
 Crowi.prototype.setupDatabase = () => {
   mongoose.Promise = global.Promise;

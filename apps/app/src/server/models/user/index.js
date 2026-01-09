@@ -10,6 +10,7 @@ import { aclService } from '../service/acl';
 import { configManager } from '../service/config-manager';
 import { getModelSafely } from '../util/mongoose-utils';
 import { Attachment } from './attachment';
+import { USER_FIELDS_EXCEPT_CONFIDENTIAL, UserStatus } from './conts';
 
 const crypto = require('crypto');
 
@@ -25,15 +26,6 @@ const factory = (crowi) => {
   if (userModelExists != null) {
     return userModelExists;
   }
-
-  const STATUS_REGISTERED = 1;
-  const STATUS_ACTIVE = 2;
-  const STATUS_SUSPENDED = 3;
-  const STATUS_DELETED = 4;
-  const STATUS_INVITED = 5;
-  const USER_FIELDS_EXCEPT_CONFIDENTIAL =
-    '_id image isEmailPublished isGravatarEnabled googleId name username email introduction' +
-    ' status lang createdAt lastLoginAt admin imageUrlCached';
 
   const PAGE_ITEMS = 50;
 
@@ -77,7 +69,7 @@ const factory = (crowi) => {
       status: {
         type: Number,
         required: true,
-        default: STATUS_ACTIVE,
+        default: UserStatus.STATUS_ACTIVE,
         index: true,
       },
       lastLoginAt: { type: Date, index: true },
@@ -110,7 +102,7 @@ const factory = (crowi) => {
 
     const isInstalled = configManager.getConfig('app:installed');
     if (!isInstalled) {
-      return STATUS_ACTIVE; // is this ok?
+      return UserStatus.STATUS_ACTIVE; // is this ok?
     }
 
     // status decided depends on registrationMode
@@ -119,12 +111,12 @@ const factory = (crowi) => {
     );
     switch (registrationMode) {
       case aclService.labels.SECURITY_REGISTRATION_MODE_OPEN:
-        return STATUS_ACTIVE;
+        return UserStatus.STATUS_ACTIVE;
       case aclService.labels.SECURITY_REGISTRATION_MODE_RESTRICTED:
       case aclService.labels.SECURITY_REGISTRATION_MODE_CLOSED: // 一応
-        return STATUS_REGISTERED;
+        return UserStatus.STATUS_REGISTERED;
       default:
-        return STATUS_ACTIVE; // どっちにすんのがいいんだろうな
+        return UserStatus.STATUS_ACTIVE; // どっちにすんのがいいんだろうな
     }
   }
 
@@ -289,7 +281,7 @@ const factory = (crowi) => {
     this.setPassword(password);
     this.name = name;
     this.username = username;
-    this.status = STATUS_ACTIVE;
+    this.status = UserStatus.STATUS_ACTIVE;
     this.isEmailPublished = configManager.getConfig(
       'customize:isEmailPublishedForNewUser',
     );
@@ -335,14 +327,14 @@ const factory = (crowi) => {
 
   userSchema.methods.statusActivate = async function () {
     logger.debug('Activate User', this);
-    this.status = STATUS_ACTIVE;
+    this.status = UserStatus.STATUS_ACTIVE;
     const userData = await this.save();
     return userEvent.emit('activated', userData);
   };
 
   userSchema.methods.statusSuspend = async function () {
     logger.debug('Suspend User', this);
-    this.status = STATUS_SUSPENDED;
+    this.status = UserStatus.STATUS_SUSPENDED;
     if (this.email === undefined || this.email === null) {
       // migrate old data
       this.email = '-';
@@ -364,7 +356,7 @@ const factory = (crowi) => {
     const now = new Date();
     const deletedLabel = `deleted_at_${now.getTime()}`;
 
-    this.status = STATUS_DELETED;
+    this.status = UserStatus.STATUS_DELETED;
     this.username = deletedLabel;
     this.password = '';
     this.name = '';
@@ -417,7 +409,10 @@ const factory = (crowi) => {
     const sort = option.sort || { createdAt: -1 };
     const fields = option.fields || {};
 
-    let status = option.status || [STATUS_ACTIVE, STATUS_SUSPENDED];
+    let status = option.status || [
+      UserStatus.STATUS_ACTIVE,
+      UserStatus.STATUS_SUSPENDED,
+    ];
     if (!Array.isArray(status)) {
       status = [status];
     }
@@ -434,7 +429,7 @@ const factory = (crowi) => {
 
   userSchema.statics.findUsersByIds = function (ids, option = {}) {
     const sort = option.sort || { createdAt: -1 };
-    const status = option.status || STATUS_ACTIVE;
+    const status = option.status || UserStatus.STATUS_ACTIVE;
     const fields = option.fields || {};
 
     return this.find({ _id: { $in: ids }, status })
@@ -445,7 +440,7 @@ const factory = (crowi) => {
   userSchema.statics.findAdmins = async function (option) {
     const sort = option?.sort ?? { createdAt: -1 };
 
-    let status = option?.status ?? [STATUS_ACTIVE];
+    let status = option?.status ?? [UserStatus.STATUS_ACTIVE];
     if (!Array.isArray(status)) {
       status = [status];
     }
@@ -511,7 +506,7 @@ const factory = (crowi) => {
   };
 
   userSchema.statics.countActiveUsers = async function () {
-    return this.countListByStatus(STATUS_ACTIVE);
+    return this.countListByStatus(UserStatus.STATUS_ACTIVE);
   };
 
   userSchema.statics.countListByStatus = async function (status) {
@@ -598,7 +593,7 @@ const factory = (crowi) => {
     newUser.username = tmpUsername;
     newUser.email = email;
     newUser.setPassword(password);
-    newUser.status = STATUS_INVITED;
+    newUser.status = UserStatus.STATUS_INVITED;
 
     const globalLang = configManager.getConfig('app:globalLang');
     if (globalLang != null) {
@@ -628,7 +623,7 @@ const factory = (crowi) => {
     // check exists and get list of try to create
     const existingUserList = await User.find({
       email: { $in: emailList },
-      userStatus: { $ne: STATUS_DELETED },
+      status: { $ne: UserStatus.STATUS_DELETED },
     });
     const existingEmailList = existingUserList.map((user) => {
       return user.email;
@@ -715,7 +710,7 @@ const factory = (crowi) => {
         return callback(err);
       }
 
-      if (userData.status === STATUS_ACTIVE) {
+      if (userData.status === UserStatus.STATUS_ACTIVE) {
         userEvent.emit('activated', userData);
       }
       return callback(err, userData);
@@ -854,15 +849,6 @@ const factory = (crowi) => {
       this.name = this.constructor.name;
     }
   }
-
-  userSchema.statics.STATUS_REGISTERED = STATUS_REGISTERED;
-  userSchema.statics.STATUS_ACTIVE = STATUS_ACTIVE;
-  userSchema.statics.STATUS_SUSPENDED = STATUS_SUSPENDED;
-  userSchema.statics.STATUS_DELETED = STATUS_DELETED;
-  userSchema.statics.STATUS_INVITED = STATUS_INVITED;
-  userSchema.statics.USER_FIELDS_EXCEPT_CONFIDENTIAL =
-    USER_FIELDS_EXCEPT_CONFIDENTIAL;
-  userSchema.statics.PAGE_ITEMS = PAGE_ITEMS;
 
   return mongoose.model('User', userSchema);
 };
