@@ -1,6 +1,8 @@
 import { createRedirectToForUnauthenticated } from '~/server/util/createRedirectToForUnauthenticated';
 import loggerFactory from '~/utils/logger';
 
+import { UserStatus } from '../models/user/conts';
+
 const logger = loggerFactory('growi:middleware:login-required');
 
 /**
@@ -11,11 +13,9 @@ const logger = loggerFactory('growi:middleware:login-required');
  */
 module.exports = (crowi, isGuestAllowed = false, fallback = null) => {
   return (req, res, next) => {
-    const User = crowi.model('User');
-
     // check the user logged in
     if (req.user != null && req.user instanceof Object && '_id' in req.user) {
-      if (req.user.status === User.STATUS_ACTIVE) {
+      if (req.user.status === UserStatus.STATUS_ACTIVE) {
         // Active の人だけ先に進める
         return next();
       }

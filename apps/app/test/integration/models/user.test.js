@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const { getInstance } = require('../setup-crowi');
+const { UserStatus } = require('../../../src/server/models/user/conts');
 
 describe('User', () => {
   // biome-ignore lint/correctness/noUnusedVariables: ignore
@@ -27,7 +28,7 @@ describe('User', () => {
         email: 'adminusertest1@example.com',
         password: 'adminusertestpass',
         admin: true,
-        status: User.STATUS_ACTIVE,
+        status: UserStatus.STATUS_ACTIVE,
         lang: 'en_US',
       },
       {
@@ -36,7 +37,7 @@ describe('User', () => {
         email: 'adminusertes2@example.com',
         password: 'adminusertestpass',
         admin: true,
-        status: User.STATUS_SUSPENDED,
+        status: UserStatus.STATUS_SUSPENDED,
         lang: 'en_US',
       },
       {
@@ -45,7 +46,7 @@ describe('User', () => {
         email: 'adminusertestToBeRemoved@example.com',
         password: 'adminusertestpass',
         admin: true,
-        status: User.STATUS_ACTIVE,
+        status: UserStatus.STATUS_ACTIVE,
         lang: 'en_US',
       },
     ]);
@@ -121,7 +122,7 @@ describe('User', () => {
 
     test("with 'includesInactive' option should retrieves suspended users", async () => {
       const users = await User.findAdmins({
-        status: [User.STATUS_ACTIVE, User.STATUS_SUSPENDED],
+        status: [UserStatus.STATUS_ACTIVE, UserStatus.STATUS_SUSPENDED],
       });
       const adminusertestActive = users.find(
         (user) => user.username === 'adminusertest1',

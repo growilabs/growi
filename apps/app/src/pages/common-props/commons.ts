@@ -154,12 +154,12 @@ export const getServerSideCommonEachProps = async (
 
   let currentUser: IUserHasId | undefined;
   if (user != null) {
-    const User = mongoose.model('User');
+    const User = mongoose.model<IUserHasId>('User');
     const userData = await User.findById(user.id).populate({
       path: 'imageAttachment',
       select: 'filePathProxied',
     });
-    currentUser = userData.toObject();
+    currentUser = userData?.toObject();
   }
 
   // Redirect destination for page transition by next/link

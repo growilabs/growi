@@ -179,7 +179,6 @@ export class LinkSharedEventHandler
     pages: any,
     isPermalink: boolean,
   ): DataForUnfurl[] {
-    const Page = mongoose.model('Page') as unknown as PageModel;
     const unfurlData: DataForUnfurl[] = [];
 
     for (const page of pages) {
