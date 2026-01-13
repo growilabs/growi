@@ -1,3 +1,5 @@
+import assert from 'assert';
+
 import { attributes, tagNames } from './recommended-whitelist';
 
 describe('recommended-whitelist', () => {
