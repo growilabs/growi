@@ -796,17 +796,6 @@ class PageService implements IPageService {
     return renamedPage;
   }
 
-<<<<<<< HEAD
-  async renameSubOperation(
-    page,
-    newPagePathSanitized: string,
-    user,
-    options,
-    renamedPage,
-    pageOpId: ObjectIdLike,
-    activity?,
-  ): Promise<void> {
-=======
   getExcludedPathsBySystem(): string[] {
     const excludedPaths: string[] = [];
 
@@ -817,8 +806,15 @@ class PageService implements IPageService {
     return excludedPaths;
   }
 
-  async renameSubOperation(page, newPagePath: string, user, options, renamedPage, pageOpId: ObjectIdLike, activity?): Promise<void> {
->>>>>>> 01481adae4 (Use list of excluded paths to not be usable using lsx)
+  async renameSubOperation(
+    page,
+    newPagePathSanitized: string,
+    user,
+    options,
+    renamedPage,
+    pageOpId: ObjectIdLike,
+    activity?,
+  ): Promise<void> {
     const Page = mongoose.model('Page') as unknown as PageModel;
 
     const exParentId = page.parent;
