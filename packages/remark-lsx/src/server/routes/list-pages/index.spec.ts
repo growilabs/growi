@@ -48,8 +48,8 @@ describe('listPages', () => {
 
     const resMock = mock<Response>();
     const resStatusMock = mock<Response>();
-    resMock.status.calledWith(400).mockReturnValue(resStatusMock);
-
+    resMock.status.mockReturnValue(resStatusMock);
+    // Mock generateBaseQuery to return a dummy builder so it doesn't crash on .query
     mocks.generateBaseQueryMock.mockResolvedValue({ query: {} });
 
     // when
