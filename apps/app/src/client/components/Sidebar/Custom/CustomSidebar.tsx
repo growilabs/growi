@@ -19,20 +19,23 @@ const CustomSidebarContent = dynamic(
 export const CustomSidebar = (): JSX.Element => {
   const { t } = useTranslation();
 
-  const { mutate, isLoading } = useSWRxPageByPath('/Sidebar');
+  const { data, mutate, isLoading } = useSWRxPageByPath('/Sidebar');
 
   return (
     <div className="pt-4 pb-3 px-3">
       <div className="grw-sidebar-content-header d-flex">
         <h3 className="fs-6 fw-bold mb-0">
           {t('Custom Sidebar')}
-          {!isLoading && (
-            <Link href="/Sidebar#edit" className="h6 ms-2">
-              <span className="material-symbols-outlined">edit</span>
-            </Link>
-          )}
+          <Link
+            href="/Sidebar#edit"
+            className={`h6 ms-2 ${!isLoading && data != null ? 'visible' : 'invisible'}`}
+          >
+            <span className="material-symbols-outlined">edit</span>
+          </Link>
         </h3>
-        {!isLoading && <SidebarHeaderReloadButton onClick={() => mutate()} />}
+        <span className={`ms-auto ${isLoading ? 'invisible' : ''}`}>
+          <SidebarHeaderReloadButton onClick={() => mutate()} />
+        </span>
       </div>
 
       <Suspense fallback={<DefaultContentSkeleton />}>
