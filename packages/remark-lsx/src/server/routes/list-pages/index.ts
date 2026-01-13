@@ -77,6 +77,10 @@ export const listPages = ({ excludedPaths }: { excludedPaths: string[] }) => {
 
     const { pagePath, offset, limit, options } = params;
 
+    if (pagePath == null || pagePath === '') {
+      return res.status(400).send("the 'pagepath' query must not be null.");
+    }
+
     // count viewers of `/`
     let toppageViewersCount: number;
     try {
