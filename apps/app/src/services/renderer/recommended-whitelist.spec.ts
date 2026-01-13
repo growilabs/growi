@@ -159,7 +159,6 @@ describe('recommended-whitelist', () => {
 
     test('.attributes should have empty arrays for tags without specific attributes', () => {
       expect(attributes).not.toBeNull();
-      assert(attributes != null);
 
       // Tags that should have empty attribute arrays
       const tagsWithEmptyAttributes = [
@@ -173,6 +172,8 @@ describe('recommended-whitelist', () => {
       ];
 
       tagsWithEmptyAttributes.forEach((tag) => {
+        assert(attributes != null);
+
         expect(Object.keys(attributes)).toContain(tag);
         expect(attributes[tag]).toEqual([]);
       });
