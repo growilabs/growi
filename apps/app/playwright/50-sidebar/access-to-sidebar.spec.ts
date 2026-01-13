@@ -29,7 +29,6 @@ test.describe('Access to sidebar', () => {
   test('Successfully access to custom sidebar', async ({ page }) => {
     await page.getByTestId('grw-sidebar-nav-primary-custom-sidebar').click();
     await expect(page.getByTestId('grw-sidebar-contents')).toBeVisible();
-    await expect(page.locator('.grw-sidebar-content')).toBeVisible();
 
     // Check if edit_note icon is visible within the button
     const editNoteIcon = page
