@@ -71,7 +71,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
     setIsImageCropModalShow(false);
   }, [setIsImageCropModalShow]);
 
-  const onCancelOrErrorClose = useCallback(() => {
+  const onCloseCropModal = useCallback(() => {
     resetFileSelectionState();
     onModalStateClose();
   }, [resetFileSelectionState, onModalStateClose]);
@@ -95,17 +95,16 @@ const CustomizeLogoSetting = (): JSX.Element => {
       const formData = new FormData();
       formData.append('file', croppedImage);
       await apiv3PostForm('/customize-setting/upload-brand-logo', formData);
-      onModalStateClose();
+      setIsImageCropModalShow(false);
       setIsCustomizedLogoUploaded(true);
       toastSuccess(t('toaster.update_successed', { target: t('admin:customize_settings.current_logo'), ns: 'commons' }));
     }
     catch (err) {
       toastError(err);
       setRetrieveError(err);
-      onCancelOrErrorClose();
       throw new Error('Failed to upload brand logo');
     }
-  }, [setIsCustomizedLogoUploaded, t, setRetrieveError, onModalStateClose, onCancelOrErrorClose]);
+  }, [setIsCustomizedLogoUploaded, t, setRetrieveError, setIsImageCropModalShow]);
 
   return (
     <React.Fragment>
@@ -194,7 +193,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
       <ImageCropModal
         isShow={isImageCropModalShow}
         src={uploadLogoSrc}
-        onModalClose={onCancelOrErrorClose}
+        onModalClose={onCloseCropModal}
         onImageProcessCompleted={processImageCompletedHandler}
         isCircular={false}
         showCropOption={false}
