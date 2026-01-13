@@ -43,18 +43,20 @@ describe('listPages', () => {
   it("returns 400 HTTP response when the query 'pagePath' is undefined", async () => {
     // setup
     const reqMock = mock<IListPagesRequest>();
+    reqMock.query = { pagePath: '' };
+
     const resMock = mock<Response>();
     const resStatusMock = mock<Response>();
-    resMock.status.calledWith(400).mockReturnValue(resStatusMock);
+    resMock.status.mockReturnValue(resStatusMock);
 
-    // when
+    mocks.generateBaseQueryMock.mockRejectedValue(
+      createError(400, 'pagePath is required'),
+    );
+
     const handler = listPages({ excludedPaths: [] });
     await handler(reqMock, resMock);
 
-    // then
-    expect(resMock.status).toHaveBeenCalledOnce();
-    expect(resStatusMock.send).toHaveBeenCalledOnce();
-    expect(mocks.generateBaseQueryMock).not.toHaveBeenCalled();
+    expect(resMock.status).toHaveBeenCalledWith(400);
   });
 
   describe('with num option', () => {

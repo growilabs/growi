@@ -118,7 +118,8 @@ const SecuritySettingComponent: React.FC<Props> = ({
             t={t}
           />
           <UserPageVisibilitySettings
-            adminGeneralSecurityContainer={adminGeneralSecurityContainer} t={t}
+            adminGeneralSecurityContainer={adminGeneralSecurityContainer}
+            t={t}
           />
           <CommentManageRightsSettings
             adminGeneralSecurityContainer={adminGeneralSecurityContainer}

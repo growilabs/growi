@@ -76,20 +76,6 @@ export const listPages = ({ excludedPaths }: { excludedPaths: string[] }) => {
     };
 
     const { pagePath, offset, limit, options } = params;
-    const user = req.user;
-
-    const builder = await generateBaseQuery(params.pagePath, user);
-    let query = builder.query;
-
-    if (excludedPaths.length > 0) {
-      const escapedPaths = excludedPaths.map((p) => {
-        const cleanPath = p.startsWith('/') ? p.substring(1) : p;
-        return cleanPath.replace(/\//g, '\\/');
-      });
-
-      const regex = new RegExp(`^\\/(${escapedPaths.join('|')})(\\/|$)`);
-      query = query.and([{ path: { $not: regex } }]);
-    }
 
     // count viewers of `/`
     let toppageViewersCount: number;
@@ -102,6 +88,20 @@ export const listPages = ({ excludedPaths }: { excludedPaths: string[] }) => {
     }
 
     try {
+      const user = req.user;
+      const builder = await generateBaseQuery(params.pagePath, user);
+      let query = builder.query;
+
+      if (excludedPaths.length > 0) {
+        const escapedPaths = excludedPaths.map((p) => {
+          const cleanPath = p.startsWith('/') ? p.substring(1) : p;
+          return cleanPath.replace(/\//g, '\\/');
+        });
+
+        const regex = new RegExp(`^\\/(${escapedPaths.join('|')})(\\/|$)`);
+        query = query.and([{ path: { $not: regex } }]);
+      }
+
       // depth
       if (options?.depth != null) {
         query = addDepthCondition(

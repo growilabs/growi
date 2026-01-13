@@ -48,7 +48,8 @@ const validator = {
       .if((value) => value != null)
       .isBoolean(),
     body('isHidingUserPages')
-      .if(value => value != null).isBoolean(),
+      .if((value) => value != null)
+      .isBoolean(),
     body('isUsersHomepageDeletionEnabled')
       .if((value) => value != null)
       .isBoolean(),
@@ -511,7 +512,7 @@ module.exports = (crowi) => {
             'security:list-policy:hideRestrictedByGroup',
           ),
           isHidingUserPages: await configManager.getConfig(
-            'security:isHidingUserPages'
+            'security:isHidingUserPages',
           ),
           isUsersHomepageDeletionEnabled: await configManager.getConfig(
             'security:user-homepage-deletion:isEnabled',
@@ -1003,8 +1004,7 @@ module.exports = (crowi) => {
           req.body.hideRestrictedByOwner,
         'security:list-policy:hideRestrictedByGroup':
           req.body.hideRestrictedByGroup,
-        'security:isHidingUserPages':
-          req.body.isHidingUserPages,
+        'security:isHidingUserPages': req.body.isHidingUserPages,
         'security:user-homepage-deletion:isEnabled':
           req.body.isUsersHomepageDeletionEnabled,
         // Validate user-homepage-deletion config
@@ -1078,7 +1078,7 @@ module.exports = (crowi) => {
             'security:list-policy:hideRestrictedByGroup',
           ),
           isHidingUserPages: await configManager.getConfig(
-            'security:isHidingUserPages'
+            'security:isHidingUserPages',
           ),
           isUsersHomepageDeletionEnabled: await configManager.getConfig(
             'security:user-homepage-deletion:isEnabled',

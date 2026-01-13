@@ -194,9 +194,8 @@ module.exports = (crowi) => {
         'security:list-policy:hideRestrictedByGroup',
       );
       const hideUserPages = configManager.getConfig(
-        'security:isHidingUserPages'
+        'security:isHidingUserPages',
       );
-
 
       /**
        * @type {import('~/server/models/page').FindRecentUpdatedPagesOption}
