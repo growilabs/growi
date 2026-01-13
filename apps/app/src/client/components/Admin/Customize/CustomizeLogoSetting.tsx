@@ -41,19 +41,16 @@ const CustomizeLogoSetting = (): JSX.Element => {
   const isUpdateButtonDisabled: boolean =
     isSystemError || isLogoSettingIncomplete;
 
-  const onSelectFile = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files: FileList | null = e.target.files;
+  const onSelectFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files: FileList | null = e.target.files;
 
-      if (files != null && files.length > 0) {
-        const reader = new FileReader();
-        reader.addEventListener('load', () => setUploadLogoSrc(reader.result));
-        reader.readAsDataURL(files[0]);
-        setIsImageCropModalShow(true);
-      }
-    },
-    [setUploadLogoSrc, setIsImageCropModalShow],
-  );
+    if (files != null && files.length > 0) {
+      const reader = new FileReader();
+      reader.addEventListener('load', () => setUploadLogoSrc(reader.result));
+      reader.readAsDataURL(files[0]);
+      setIsImageCropModalShow(true);
+    }
+  }, []);
 
   const onClickSubmit = useCallback(async () => {
     try {
@@ -80,11 +77,11 @@ const CustomizeLogoSetting = (): JSX.Element => {
   const resetFileSelectionState = useCallback(() => {
     clearFileInput();
     setUploadLogoSrc(null);
-  }, [clearFileInput, setUploadLogoSrc]);
+  }, [clearFileInput]);
 
   const onModalStateClose = useCallback(() => {
     setIsImageCropModalShow(false);
-  }, [setIsImageCropModalShow]);
+  }, []);
 
   const onCloseCropModal = useCallback(() => {
     resetFileSelectionState();
@@ -95,32 +92,19 @@ const CustomizeLogoSetting = (): JSX.Element => {
     try {
       await apiv3Delete('/customize-setting/delete-brand-logo');
       setIsCustomizedLogoUploaded(false);
-      <<<<<<< HEAD
-      toastSuccess(t('toaster.update_successed',
-      target: t('admin:customize_settings.current_logo'), ns
-      : 'commons'
-      ))
-      resetFileSelectionState()
-    } catch (err) {
-      =======
       toastSuccess(
-        t('toaster.update_successed',
-      target: t('admin:customize_settings.current_logo'), ns
-      : 'commons',
-      ),
-      )
+        t('toaster.update_successed', {
+          target: t('admin:customize_settings.current_logo'),
+          ns: 'commons',
+        }),
+      );
+      resetFileSelectionState();
+    } catch (err) {
+      toastError(err);
+      setRetrieveError(err);
+      throw new Error('Failed to delete logo');
     }
-    catch (err)
-    >>>>>>> master
-      toastError(err)
-    setRetrieveError(err)
-    throw new Error('Failed to delete logo');
-  }, [
-    setIsCustomizedLogoUploaded,
-    t,
-    setRetrieveError,
-    resetFileSelectionState,
-  ]);
+  }, [setIsCustomizedLogoUploaded, t, resetFileSelectionState]);
 
   const processImageCompletedHandler = useCallback(
     async (croppedImage) => {
@@ -142,7 +126,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
         throw new Error('Failed to upload brand logo');
       }
     },
-    [setIsCustomizedLogoUploaded, t, setRetrieveError, setIsImageCropModalShow],
+    [setIsCustomizedLogoUploaded, t],
   );
 
   return (
