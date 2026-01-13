@@ -1,20 +1,21 @@
-import React, { useCallback } from 'react';
-
+import type React from 'react';
+import { useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import type { PresentationProps } from '@growi/presentation/dist/client';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useFullScreen } from '@growi/ui/dist/utils';
-import dynamic from 'next/dynamic';
 import type { Options as ReactMarkdownOptions } from 'react-markdown';
-import {
-  Modal, ModalBody,
-} from 'reactstrap';
+import { Modal, ModalBody } from 'reactstrap';
 
 import { useCurrentPageData } from '~/states/page';
 import { useRendererConfig } from '~/states/server-configurations';
-import { usePresentationModalActions, usePresentationModalStatus } from '~/states/ui/modal/page-presentation';
-import { useNextThemes } from '~/stores-universal/use-next-themes';
+import {
+  usePresentationModalActions,
+  usePresentationModalStatus,
+} from '~/states/ui/modal/page-presentation';
 import { usePresentationViewOptions } from '~/stores/renderer';
+import { useNextThemes } from '~/stores-universal/use-next-themes';
 
 import { RendererErrorMessage } from '../Common/RendererErrorMessage';
 
@@ -22,19 +23,18 @@ import styles from './PagePresentationModal.module.scss';
 
 const moduleClass = styles['grw-presentation-modal'] ?? '';
 
-
-const Presentation = dynamic<PresentationProps>(() => import('../Presentation/Presentation').then(mod => mod.Presentation), {
-  ssr: false,
-  loading: () => (
-    <LoadingSpinner className="text-muted fs-1" />
-  ),
-});
+const Presentation = dynamic<PresentationProps>(
+  () => import('../Presentation/Presentation').then((mod) => mod.Presentation),
+  {
+    ssr: false,
+    loading: () => <LoadingSpinner className="text-muted fs-1" />,
+  },
+);
 
 /**
  * PagePresentationModalSubstance - Heavy processing component (rendered only when modal is open)
  */
 const PagePresentationModalSubstance: React.FC = () => {
-
   const { close: closePresentationModal } = usePresentationModalActions();
 
   const { isDarkMode } = useNextThemes();
@@ -52,8 +52,7 @@ const PagePresentationModalSubstance: React.FC = () => {
   const toggleFullscreenHandler = useCallback(() => {
     if (fullscreen.active) {
       fullscreen.exit();
-    }
-    else {
+    } else {
       fullscreen.enter();
     }
   }, [fullscreen]);
@@ -76,11 +75,16 @@ const PagePresentationModalSubstance: React.FC = () => {
         >
           {fullscreen.active ? 'close_fullscreen' : 'open_in_full'}
         </button>
-        <button className="btn-close" type="button" aria-label="Close" onClick={closeHandler}></button>
+        <button
+          className="btn-close"
+          type="button"
+          aria-label="Close"
+          onClick={closeHandler}
+        ></button>
       </div>
       <ModalBody className="modal-body d-flex justify-content-center align-items-center">
-        { !isLoading && rendererOptions == null && <RendererErrorMessage />}
-        { rendererOptions != null && isEnabledMarp != null && (
+        {!isLoading && rendererOptions == null && <RendererErrorMessage />}
+        {rendererOptions != null && isEnabledMarp != null && (
           <Presentation
             options={{
               rendererOptions: rendererOptions as ReactMarkdownOptions,
@@ -94,7 +98,7 @@ const PagePresentationModalSubstance: React.FC = () => {
           >
             {markdown}
           </Presentation>
-        ) }
+        )}
       </ModalBody>
     </>
   );

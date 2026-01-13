@@ -298,7 +298,7 @@
   },
   "mailer_setup_required": "<a href='/admin/app'>이메일 설정</a>이 전송에 필요합니다.",
   "admin_top": {
-    "management_wiki": "관리 위키",
+    "management_wiki": "위키 관리",
     "system_information": "시스템 정보",
     "wiki_administrator": "위키 관리자만 이 페이지에 접근할 수 있습니다",
     "assign_administrator": "사용자 관리 페이지에서 '관리자 권한 부여' 버튼을 사용하여 선택한 사용자에게 위키 관리자 권한을 부여할 수 있습니다.",
@@ -313,7 +313,7 @@
       "done": "클립보드에 복사되었습니다!"
     },
     "bug_report": "버그 보고서 제출",
-    "submit_bug_report": "<a href='https://github.com/growilabs/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>그런 다음 GitHub에 문제를 제출하십시오.</a>"
+    "submit_bug_report": "GitHub 에 이슈를 제출하세요."
   },
   "v5_page_migration": {
     "migration_desc": "일부 페이지는 이전 v4 호환성을 가지고 있습니다. 페이지 트리 및 쉬운 이름 변경과 같은 새로운 기능을 활용하려면 모든 페이지를 v5 호환성으로 변환하십시오.",
@@ -731,7 +731,7 @@
       "description1": "이메일 주소로 새 사용자를 임시 발급합니다.",
       "description2": "첫 로그인 시 임시 비밀번호가 생성됩니다.",
       "invite_thru_email": "초대 이메일 전송",
-      "mail_setting_link": "<span className='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>이메일 설정</a>",
+      "mail_setting_link": "<span class='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>이메일 설정</a>",
       "valid_email": "유효한 이메일 주소가 필요합니다.",
       "temporary_password": "생성된 사용자에게는 임시 비밀번호가 있습니다.",
       "send_new_password": "새 비밀번호를 사용자에게 보내주십시오.",

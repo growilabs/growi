@@ -1,5 +1,4 @@
 import { withUnstatedContainers } from '../../UnstatedUtils';
-
 import GrowiArchiveSection from './GrowiArchiveSection';
 
 const ImportDataPageContents = () => {
@@ -13,6 +12,9 @@ const ImportDataPageContents = () => {
 /**
  * Wrapper component for using unstated
  */
-const ImportDataPageContentsWrapper = withUnstatedContainers(ImportDataPageContents, []);
+const ImportDataPageContentsWrapper = withUnstatedContainers(
+  ImportDataPageContents,
+  [],
+);
 
 export default ImportDataPageContentsWrapper;

@@ -28,7 +28,6 @@ export class Linker {
   static patterns = {
     pukiwikiLinkWithLabel: /^\[\[(?<label>.+)>(?<link>.+)\]\]$/, // https://regex101.com/r/2fNmUN/2
     pukiwikiLinkWithoutLabel: /^\[\[(?<label>.+)\]\]$/, // https://regex101.com/r/S7w5Xu/1
-    growiLink: /^\[(?<label>\/.+)\]$/, // https://regex101.com/r/DJfkYf/3
     markdownLink: /^\[(?<label>.*)\]\((?<link>.*)\)$/, // https://regex101.com/r/DZCKP3/2
   };
 
@@ -61,33 +60,33 @@ export class Linker {
     let link = '';
     let type = Linker.types.markdownLink;
 
-    // pukiwiki with separator ">".
-    if (str.match(Linker.patterns.pukiwikiLinkWithLabel)) {
-      type = Linker.types.pukiwikiLink;
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      ({ label, link } = str.match(Linker.patterns.pukiwikiLinkWithLabel)!
-        .groups!);
-    }
-    // pukiwiki without separator ">".
-    else if (str.match(Linker.patterns.pukiwikiLinkWithoutLabel)) {
-      type = Linker.types.pukiwikiLink;
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      ({ label } = str.match(Linker.patterns.pukiwikiLinkWithoutLabel)!
-        .groups!);
-      link = label;
-    }
-    // markdown
-    else if (str.match(Linker.patterns.markdownLink)) {
-      type = Linker.types.markdownLink;
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      ({ label, link } = str.match(Linker.patterns.markdownLink)!.groups!);
-    }
-    // growi
-    else if (str.match(Linker.patterns.growiLink)) {
-      type = Linker.types.growiLink;
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      ({ label } = str.match(Linker.patterns.growiLink)!.groups!);
-      link = label;
+    const patterns = [
+      // pukiwiki with separator ">".
+      {
+        type: Linker.types.pukiwikiLink,
+        pattern: Linker.patterns.pukiwikiLinkWithLabel,
+      },
+      // pukiwiki without separator ">".
+      {
+        type: Linker.types.pukiwikiLink,
+        pattern: Linker.patterns.pukiwikiLinkWithoutLabel,
+      },
+      // markdown link.
+      {
+        type: Linker.types.markdownLink,
+        pattern: Linker.patterns.markdownLink,
+      },
+    ];
+
+    // evaluate patterns
+    for (const { type: patternType, pattern } of patterns) {
+      const match = str.match(pattern);
+      if (match?.groups) {
+        type = patternType;
+        label = match.groups.label;
+        link = match.groups.link ?? label;
+        break;
+      }
     }
 
     return new Linker(type, label, link);

@@ -1,23 +1,13 @@
-/* eslint-disable react/no-danger */
-
 import React from 'react';
-
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
-import {
-  Modal,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-} from 'reactstrap';
+import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 
 // import { toastSuccess, toastError } from '~/client/util/toastr';
 
-
 class ImportCollectionConfigurationModal extends React.Component {
-
   constructor(props) {
     super(props);
 
@@ -46,9 +36,7 @@ class ImportCollectionConfigurationModal extends React.Component {
   }
 
   updateOption() {
-    const {
-      collectionName, onOptionChange, onClose,
-    } = this.props;
+    const { collectionName, onOptionChange, onClose } = this.props;
 
     if (onOptionChange != null) {
       onOptionChange(collectionName, this.state.option);
@@ -61,9 +49,9 @@ class ImportCollectionConfigurationModal extends React.Component {
     const { t } = this.props;
     const { option } = this.state;
 
-    const translationBase = 'admin:importer_management.growi_settings.configuration.pages';
+    const translationBase =
+      'admin:importer_management.growi_settings.configuration.pages';
 
-    /* eslint-disable react/no-unescaped-entities */
     return (
       <>
         <div className="form-check form-check-warning">
@@ -72,11 +60,22 @@ class ImportCollectionConfigurationModal extends React.Component {
             type="checkbox"
             className="form-check-input"
             checked={option.isOverwriteAuthorWithCurrentUser || false} // add ' || false' to avoid uncontrolled input warning
-            onChange={() => this.changeHandler({ isOverwriteAuthorWithCurrentUser: !option.isOverwriteAuthorWithCurrentUser })}
+            onChange={() =>
+              this.changeHandler({
+                isOverwriteAuthorWithCurrentUser:
+                  !option.isOverwriteAuthorWithCurrentUser,
+              })
+            }
           />
           <label htmlFor="cbOpt4" className="form-label form-check-label">
             {t(`${translationBase}.overwrite_author.label`)}
-            <p className="form-text text-muted mt-0" dangerouslySetInnerHTML={{ __html: t(`${translationBase}.overwrite_author.desc`) }} />
+            <p
+              className="form-text text-muted mt-0"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
+              dangerouslySetInnerHTML={{
+                __html: t(`${translationBase}.overwrite_author.desc`),
+              }}
+            />
           </label>
         </div>
         <div className="form-check form-check-warning">
@@ -85,13 +84,24 @@ class ImportCollectionConfigurationModal extends React.Component {
             type="checkbox"
             className="form-check-input"
             checked={option.makePublicForGrant2 || false} // add ' || false' to avoid uncontrolled input warning
-            onChange={() => this.changeHandler({ makePublicForGrant2: !option.makePublicForGrant2 })}
+            onChange={() =>
+              this.changeHandler({
+                makePublicForGrant2: !option.makePublicForGrant2,
+              })
+            }
           />
           <label htmlFor="cbOpt1" className="form-label form-check-label">
-            {t(`${translationBase}.set_public_to_page.label`, { from: t('Anyone with the link') })}
+            {t(`${translationBase}.set_public_to_page.label`, {
+              from: t('Anyone with the link'),
+            })}
             <p
               className="form-text text-muted mt-0"
-              dangerouslySetInnerHTML={{ __html: t(`${translationBase}.set_public_to_page.desc`, { from: t('Anyone with the link') }) }}
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
+              dangerouslySetInnerHTML={{
+                __html: t(`${translationBase}.set_public_to_page.desc`, {
+                  from: t('Anyone with the link'),
+                }),
+              }}
             />
           </label>
         </div>
@@ -101,13 +111,24 @@ class ImportCollectionConfigurationModal extends React.Component {
             type="checkbox"
             className="form-check-input"
             checked={option.makePublicForGrant4 || false} // add ' || false' to avoid uncontrolled input warning
-            onChange={() => this.changeHandler({ makePublicForGrant4: !option.makePublicForGrant4 })}
+            onChange={() =>
+              this.changeHandler({
+                makePublicForGrant4: !option.makePublicForGrant4,
+              })
+            }
           />
           <label htmlFor="cbOpt2" className="form-label form-check-label">
-            {t(`${translationBase}.set_public_to_page.label`, { from: t('Only me') })}
+            {t(`${translationBase}.set_public_to_page.label`, {
+              from: t('Only me'),
+            })}
             <p
               className="form-text text-muted mt-0"
-              dangerouslySetInnerHTML={{ __html: t(`${translationBase}.set_public_to_page.desc`, { from: t('Only me') }) }}
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
+              dangerouslySetInnerHTML={{
+                __html: t(`${translationBase}.set_public_to_page.desc`, {
+                  from: t('Only me'),
+                }),
+              }}
             />
           </label>
         </div>
@@ -117,13 +138,24 @@ class ImportCollectionConfigurationModal extends React.Component {
             type="checkbox"
             className="form-check-input"
             checked={option.makePublicForGrant5 || false} // add ' || false' to avoid uncontrolled input warning
-            onChange={() => this.changeHandler({ makePublicForGrant5: !option.makePublicForGrant5 })}
+            onChange={() =>
+              this.changeHandler({
+                makePublicForGrant5: !option.makePublicForGrant5,
+              })
+            }
           />
           <label htmlFor="cbOpt3" className="form-label form-check-label">
-            {t(`${translationBase}.set_public_to_page.label`, { from: t('Only inside the group') })}
+            {t(`${translationBase}.set_public_to_page.label`, {
+              from: t('Only inside the group'),
+            })}
             <p
               className="form-text text-muted mt-0"
-              dangerouslySetInnerHTML={{ __html: t(`${translationBase}.set_public_to_page.desc`, { from: t('Only inside the group') }) }}
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
+              dangerouslySetInnerHTML={{
+                __html: t(`${translationBase}.set_public_to_page.desc`, {
+                  from: t('Only inside the group'),
+                }),
+              }}
             />
           </label>
         </div>
@@ -133,43 +165,60 @@ class ImportCollectionConfigurationModal extends React.Component {
             type="checkbox"
             className="form-check-input"
             checked={option.initPageMetadatas || false} // add ' || false' to avoid uncontrolled input warning
-            onChange={() => this.changeHandler({ initPageMetadatas: !option.initPageMetadatas })}
+            onChange={() =>
+              this.changeHandler({
+                initPageMetadatas: !option.initPageMetadatas,
+              })
+            }
           />
           <label htmlFor="cbOpt5" className="form-label form-check-label">
             {t(`${translationBase}.initialize_meta_datas.label`)}
-            <p className="form-text text-muted mt-0" dangerouslySetInnerHTML={{ __html: t(`${translationBase}.initialize_meta_datas.desc`) }} />
+            <p
+              className="form-text text-muted mt-0"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
+              dangerouslySetInnerHTML={{
+                __html: t(`${translationBase}.initialize_meta_datas.desc`),
+              }}
+            />
           </label>
         </div>
       </>
     );
-    /* eslint-enable react/no-unescaped-entities */
   }
 
   renderRevisionsContents() {
     const { t } = this.props;
     const { option } = this.state;
 
-    const translationBase = 'admin:importer_management.growi_settings.configuration.revisions';
+    const translationBase =
+      'admin:importer_management.growi_settings.configuration.revisions';
 
-    /* eslint-disable react/no-unescaped-entities */
     return (
-      <>
-        <div className="form-check form-check-warning">
-          <input
-            id="cbOpt1"
-            type="checkbox"
-            className="form-check-input"
-            checked={option.isOverwriteAuthorWithCurrentUser || false} // add ' || false' to avoid uncontrolled input warning
-            onChange={() => this.changeHandler({ isOverwriteAuthorWithCurrentUser: !option.isOverwriteAuthorWithCurrentUser })}
+      <div className="form-check form-check-warning">
+        <input
+          id="cbOpt1"
+          type="checkbox"
+          className="form-check-input"
+          checked={option.isOverwriteAuthorWithCurrentUser || false} // add ' || false' to avoid uncontrolled input warning
+          onChange={() =>
+            this.changeHandler({
+              isOverwriteAuthorWithCurrentUser:
+                !option.isOverwriteAuthorWithCurrentUser,
+            })
+          }
+        />
+        <label htmlFor="cbOpt1" className="form-label form-check-label">
+          {t(`${translationBase}.overwrite_author.label`)}
+          <p
+            className="form-text text-muted mt-0"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
+            dangerouslySetInnerHTML={{
+              __html: t(`${translationBase}.overwrite_author.desc`),
+            }}
           />
-          <label htmlFor="cbOpt1" className="form-label form-check-label">
-            {t(`${translationBase}.overwrite_author.label`)}
-            <p className="form-text text-muted mt-0" dangerouslySetInnerHTML={{ __html: t(`${translationBase}.overwrite_author.desc`) }} />
-          </label>
-        </div>
-      </>
+        </label>
+      </div>
     );
-    /* eslint-enable react/no-unescaped-entities */
   }
 
   render() {
@@ -189,23 +238,36 @@ class ImportCollectionConfigurationModal extends React.Component {
     }
 
     return (
-      <Modal isOpen={this.props.isOpen} toggle={this.props.onClose} onEnter={this.initialize}>
+      <Modal
+        isOpen={this.props.isOpen}
+        toggle={this.props.onClose}
+        onEnter={this.initialize}
+      >
         <ModalHeader tag="h4" toggle={this.props.onClose} className="text-info">
           {`'${collectionName}'`} Configuration
         </ModalHeader>
 
-        <ModalBody>
-          {contents}
-        </ModalBody>
+        <ModalBody>{contents}</ModalBody>
 
         <ModalFooter>
-          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={this.props.onClose}>{t('Cancel')}</button>
-          <button type="button" className="btn btn-sm btn-primary" onClick={this.updateOption}>{t('Update')}</button>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-secondary"
+            onClick={this.props.onClose}
+          >
+            {t('Cancel')}
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-primary"
+            onClick={this.updateOption}
+          >
+            {t('Update')}
+          </button>
         </ModalFooter>
       </Modal>
     );
   }
-
 }
 
 ImportCollectionConfigurationModal.propTypes = {

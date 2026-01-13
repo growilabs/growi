@@ -10,7 +10,10 @@ export const PageRenameModalLazyLoaded = (): JSX.Element => {
 
   const PageRenameModal = useLazyLoader<PageRenameModalProps>(
     'page-rename-modal',
-    () => import('./PageRenameModal').then(mod => ({ default: mod.PageRenameModal })),
+    () =>
+      import('./PageRenameModal').then((mod) => ({
+        default: mod.PageRenameModal,
+      })),
     status?.isOpened ?? false,
   );
 

@@ -10,7 +10,10 @@ export const ShortcutsModalLazyLoaded = (): JSX.Element => {
 
   const ShortcutsModal = useLazyLoader<ShortcutsModalProps>(
     'shortcuts-modal',
-    () => import('./ShortcutsModal').then(mod => ({ default: mod.ShortcutsModal })),
+    () =>
+      import('./ShortcutsModal').then((mod) => ({
+        default: mod.ShortcutsModal,
+      })),
     status?.isOpened ?? false,
   );
 

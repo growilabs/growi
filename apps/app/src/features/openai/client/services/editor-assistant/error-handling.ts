@@ -187,11 +187,11 @@ export class ClientErrorHandler {
       suggestions: error.details.suggestions?.length || 0,
     };
 
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: Allow logging
     console.warn('[ClientErrorHandler]', logData);
 
     if (originalError) {
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: Allow logging
       console.error('[ClientErrorHandler] Original error:', originalError);
     }
   }

@@ -6,10 +6,6 @@ import { useIsomorphicLayoutEffect } from 'usehooks-ts';
 import type { PagePathNavLayoutProps } from '../PagePathNav';
 import { PagePathNav } from '../PagePathNav';
 
-import styles from './PagePathNavTitle.module.scss';
-
-const moduleClass = styles['grw-page-path-nav-title'] ?? '';
-
 const PagePathNavSticky = withLoadingProps<PagePathNavLayoutProps>(
   (useLoadingProps) =>
     dynamic(
@@ -21,7 +17,6 @@ const PagePathNavSticky = withLoadingProps<PagePathNavLayoutProps>(
       {
         ssr: false,
         loading: () => {
-          // eslint-disable-next-line react-hooks/rules-of-hooks
           const props = useLoadingProps();
           return <PagePathNav {...props} />;
         },
@@ -42,15 +37,9 @@ export const PagePathNavTitle = (
     setClient(true);
   }, []);
 
-  const className = `${moduleClass} mb-4`;
-
   return isClient ? (
-    <PagePathNavSticky
-      {...props}
-      className={className}
-      latterLinkClassName="fs-2"
-    />
+    <PagePathNavSticky {...props} latterLinkClassName="fs-2" />
   ) : (
-    <PagePathNav {...props} className={className} latterLinkClassName="fs-2" />
+    <PagePathNav {...props} latterLinkClassName="fs-2" />
   );
 };

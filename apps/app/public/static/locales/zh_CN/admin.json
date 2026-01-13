@@ -322,7 +322,7 @@
       "done": "复制到剪贴板!"
     },
     "bug_report": "提交一个错误报告",
-    "submit_bug_report": "<a href='https://github.com/growilabs/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>然后提交你的问题到GitHub。</a>"
+    "submit_bug_report": "将您的问题提交到 GitHub。"
   },
   "v5_page_migration": {
     "migration_desc": "有一些页面具有旧的v4兼容性。为了利用新的功能，如页面树和容易重命名，请将您的所有页面转换为v5兼容性。",
@@ -739,7 +739,7 @@
       "emails": "电子邮件",
       "description1": "通过电子邮件地址临时发布新用户。",
       "description2": "将为首次登录生成一个临时密码。",
-      "mail_setting_link": "<span className='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>Email settings</a>",
+      "mail_setting_link": "<span class='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>Email settings</a>",
       "valid_email": "需要有效的电子邮件地址",
       "invite_thru_email": "发送邀请电子邮件",
       "temporary_password": "创建的用户具有临时密码",

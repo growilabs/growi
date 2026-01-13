@@ -143,7 +143,6 @@ module.exports = (crowi) => {
 
   const activityEvent = crowi.event('activity');
 
-  //  eslint-disable-next-line max-len
   router.put(
     '/',
     accessTokenParser([SCOPE.WRITE.ADMIN.APP]),

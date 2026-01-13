@@ -1,18 +1,18 @@
 import type { FC } from 'react';
 import React from 'react';
-
 import type { HasObjectId } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 
-import type { IInAppNotification, PaginateResult } from '~/interfaces/in-app-notification';
-
+import type {
+  IInAppNotification,
+  PaginateResult,
+} from '~/interfaces/in-app-notification';
 
 import InAppNotificationElm from './InAppNotificationElm';
 
-
 type Props = {
-  inAppNotificationData?: PaginateResult<IInAppNotification>,
-  onUnopenedNotificationOpend?: () => void,
+  inAppNotificationData?: PaginateResult<IInAppNotification>;
+  onUnopenedNotificationOpend?: () => void;
 };
 
 const InAppNotificationList: FC<Props> = (props: Props) => {
@@ -32,7 +32,7 @@ const InAppNotificationList: FC<Props> = (props: Props) => {
 
   return (
     <div className="list-group">
-      { notifications.map((notification: IInAppNotification & HasObjectId) => {
+      {notifications.map((notification: IInAppNotification & HasObjectId) => {
         return (
           <InAppNotificationElm
             key={notification._id}
@@ -40,10 +40,9 @@ const InAppNotificationList: FC<Props> = (props: Props) => {
             onUnopenedNotificationOpend={onUnopenedNotificationOpend}
           />
         );
-      }) }
+      })}
     </div>
   );
 };
-
 
 export default InAppNotificationList;

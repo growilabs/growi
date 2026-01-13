@@ -93,9 +93,7 @@ export class ConfigManager
   /**
    * @deprecated
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getConfigLegacy<T = any>(key: string, source?: ConfigSource): T {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return this.getConfig(key as any, source) as T;
   }
 

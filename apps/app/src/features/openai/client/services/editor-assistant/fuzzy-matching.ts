@@ -6,8 +6,14 @@
 
 import { distance } from 'fastest-levenshtein';
 
+import loggerFactory from '~/utils/logger';
+
 import type { MatchResult, SearchContext } from '../../interfaces/types';
 import { normalizeForBrowserFuzzyMatch } from './text-normalization';
+
+const logger = loggerFactory(
+  'growi:features:openai:client:services:editor-assistant:fuzzy-matching',
+);
 
 // -----------------------------------------------------------------------------
 // Browser-Optimized Similarity Calculation
@@ -302,8 +308,7 @@ export class ClientFuzzyMatcher {
     while (leftIndex >= startIndex || rightIndex <= actualEndIndex) {
       // Browser timeout protection
       if (performance.now() - startTime > this.maxSearchTime) {
-        // eslint-disable-next-line no-console
-        console.warn('Fuzzy matching timeout, returning best result found');
+        logger.warn('Fuzzy matching timeout, returning best result found');
         break;
       }
 
@@ -490,8 +495,7 @@ export function measurePerformance<T>(
   const duration = performance.now() - start;
 
   if (duration > 100) {
-    // eslint-disable-next-line no-console
-    console.warn(`${label} took ${duration.toFixed(2)}ms (slow)`);
+    logger.warn(`${label} took ${duration.toFixed(2)}ms (slow)`);
   }
 
   return { result, duration };

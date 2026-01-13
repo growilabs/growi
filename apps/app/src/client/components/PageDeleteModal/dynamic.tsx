@@ -10,7 +10,10 @@ export const PageDeleteModalLazyLoaded = (): JSX.Element => {
 
   const PageDeleteModal = useLazyLoader<PageDeleteModalProps>(
     'page-delete-modal',
-    () => import('./PageDeleteModal').then(mod => ({ default: mod.PageDeleteModal })),
+    () =>
+      import('./PageDeleteModal').then((mod) => ({
+        default: mod.PageDeleteModal,
+      })),
     status?.isOpened ?? false,
   );
 

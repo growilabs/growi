@@ -313,7 +313,7 @@
       "done": "Copied to clipboard!"
     },
     "bug_report": "Submitting a bug report",
-    "submit_bug_report": "<a href='https://github.com/growilabs/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>then submit your issue to GitHub.</a>"
+    "submit_bug_report": "Submit your issue to GitHub."
   },
   "v5_page_migration": {
     "migration_desc": "There are some pages with old v4 compatibility. To take advantage of new features such as page trees and easy renaming, please convert all your pages to v5 compatibility.",
@@ -731,7 +731,7 @@
       "description1": "Temporarily issue new users by email addresses.",
       "description2": "A temporary password will be generated for the first login.",
       "invite_thru_email": "Send invitation email",
-      "mail_setting_link": "<span className='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>Email settings</a>",
+      "mail_setting_link": "<span class='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>Email settings</a>",
       "valid_email": "Valid email address is required",
       "temporary_password": "The created user has a temporary password",
       "send_new_password": "Please send the new password to the user.",

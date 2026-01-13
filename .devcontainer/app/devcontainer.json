@@ -26,7 +26,6 @@
         // AI
         "anthropic.claude-code",
         // linter
-        "dbaeumer.vscode-eslint",
         "biomejs.biome",
         "editorconfig.editorconfig",
         "shinnn.stylelint",

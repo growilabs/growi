@@ -1,8 +1,47 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.4.0...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.4.2...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.4.2](https://github.com/growilabs/compare/v7.4.1...v7.4.2) - 2026-01-08
+
+### 🚀 Improvement
+
+* imprv: New help button (#10553) @satof3
+* imprv: PagePathNavTitle spacing and z-index layering (#10665) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Handle blank configurations for SAML settings (#10674) @yuki-takei
+* fix: Text strings inside invitation email modal are incorrect (#10679) @miya
+* fix: Scroll jumps back to current PageTreeItem when creating page from PageTree (#10671) @miya
+
+### 🧰 Maintenance
+
+* support: Update dependencies (#10685) @miya
+* support: Update dependencies (#10682) @miya
+* ci(mergify): upgrade configuration to current format (#10673) @[mergify[bot]](https://github.com/apps/mergify)
+* support: Configure biome for some client components inside app 8 (#10668) @arafubeatbox
+* support: Configure biome for some client components inside app 7 (#10667) @arafubeatbox
+* support: Configure biome for some client components in app 6 (#10636) @arafubeatbox
+* support: Configure biome for some client components in app 4 (#10634) @arafubeatbox
+* support: Configure biome for some client components in app 3 (#10633) @arafubeatbox
+* ci(deps): bump qs from 6.13.0 to 6.14.1 (#10669) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Configure biome for some client components in app 5 (#10635) @arafubeatbox
+* support: Configure biome for some client components in app 2 (#10632) @arafubeatbox
+* support: Configure biome for some client components in app 1 (#10631) @arafubeatbox
+* ci(deps): bump next from 14.2.33 to 14.2.35 (#10597) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.4.1](https://github.com/growilabs/compare/v7.4.0...v7.4.1) - 2025-12-26
+
+### 🚀 Improvement
+
+* imprv: Show page name and link for affected pages in Activity Log (#10590) @arvid-e
+
+### 🧰 Maintenance
+
+* support: Update terraform settings and the policy for OIDC GitHub (#10653) @yuki-takei
 
 ## [v7.4.0](https://github.com/growilabs/compare/v7.3.9...v7.4.0) - 2025-12-24
 

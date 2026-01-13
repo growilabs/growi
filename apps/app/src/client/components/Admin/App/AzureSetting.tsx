@@ -1,5 +1,4 @@
 import type { JSX } from 'react';
-
 import { useTranslation } from 'next-i18next';
 import type { UseFormRegister } from 'react-hook-form';
 
@@ -7,18 +6,20 @@ import type { FileUploadFormValues } from './FileUploadSetting.types';
 import MaskedInput from './MaskedInput';
 
 export type AzureSettingMoleculeProps = {
-  register: UseFormRegister<FileUploadFormValues>
-  azureReferenceFileWithRelayMode: boolean
-  azureUseOnlyEnvVars: boolean
-  envAzureTenantId?: string
-  envAzureClientId?: string
-  envAzureClientSecret?: string
-  envAzureStorageAccountName?: string
-  envAzureStorageContainerName?: string
-  onChangeAzureReferenceFileWithRelayMode: (val: boolean) => void
+  register: UseFormRegister<FileUploadFormValues>;
+  azureReferenceFileWithRelayMode: boolean;
+  azureUseOnlyEnvVars: boolean;
+  envAzureTenantId?: string;
+  envAzureClientId?: string;
+  envAzureClientSecret?: string;
+  envAzureStorageAccountName?: string;
+  envAzureStorageContainerName?: string;
+  onChangeAzureReferenceFileWithRelayMode: (val: boolean) => void;
 };
 
-export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Element => {
+export const AzureSettingMolecule = (
+  props: AzureSettingMoleculeProps,
+): JSX.Element => {
   const { t } = useTranslation();
 
   const {
@@ -34,9 +35,9 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
   return (
     <>
       <div className="row form-group my-3">
-        <label className="text-left text-md-right col-md-3 col-form-label">
+        <span className="text-left text-md-right col-md-3 col-form-label">
           {t('admin:app_setting.file_delivery_method')}
-        </label>
+        </span>
 
         <div className="col-md-6">
           <div className="dropdown">
@@ -48,21 +49,27 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
               aria-haspopup="true"
               aria-expanded="true"
             >
-              {azureReferenceFileWithRelayMode && t('admin:app_setting.file_delivery_method_relay')}
-              {!azureReferenceFileWithRelayMode && t('admin:app_setting.file_delivery_method_redirect')}
+              {azureReferenceFileWithRelayMode &&
+                t('admin:app_setting.file_delivery_method_relay')}
+              {!azureReferenceFileWithRelayMode &&
+                t('admin:app_setting.file_delivery_method_redirect')}
             </button>
-            <div className="dropdown-menu" aria-labelledby="ddAzureReferenceFileWithRelayMode">
+            <div className="dropdown-menu">
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props.onChangeAzureReferenceFileWithRelayMode(true) }}
+                onClick={() => {
+                  props.onChangeAzureReferenceFileWithRelayMode(true);
+                }}
               >
                 {t('admin:app_setting.file_delivery_method_relay')}
               </button>
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props.onChangeAzureReferenceFileWithRelayMode(false) }}
+                onClick={() => {
+                  props.onChangeAzureReferenceFileWithRelayMode(false);
+                }}
               >
                 {t('admin:app_setting.file_delivery_method_redirect')}
               </button>
@@ -80,11 +87,17 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
       {azureUseOnlyEnvVars && (
         <p
           className="alert alert-info"
-          // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: t('admin:app_setting.azure_note_for_the_only_env_option', { env: 'AZURE_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS' }) }}
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: includes <br> and <code> from i18n strings
+          dangerouslySetInnerHTML={{
+            __html: t('admin:app_setting.azure_note_for_the_only_env_option', {
+              env: 'AZURE_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+            }),
+          }}
         />
       )}
-      <table className={`table settings-table ${azureUseOnlyEnvVars && 'use-only-env-vars'}`}>
+      <table
+        className={`table settings-table ${azureUseOnlyEnvVars && 'use-only-env-vars'}`}
+      >
         <colgroup>
           <col className="item-name" />
           <col className="from-db" />
@@ -108,10 +121,21 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
               />
             </td>
             <td>
-              <MaskedInput name="envAzureTenantId" value={envAzureTenantId || ''} readOnly tabIndex={-1} />
+              <MaskedInput
+                name="envAzureTenantId"
+                value={envAzureTenantId || ''}
+                readOnly
+                tabIndex={-1}
+              />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
-                <small dangerouslySetInnerHTML={{ __html: t('admin:app_setting.use_env_var_if_empty', { variable: 'AZURE_TENANT_ID' }) }} />
+                <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
+                  dangerouslySetInnerHTML={{
+                    __html: t('admin:app_setting.use_env_var_if_empty', {
+                      variable: 'AZURE_TENANT_ID',
+                    }),
+                  }}
+                />
               </p>
             </td>
           </tr>
@@ -125,10 +149,21 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
               />
             </td>
             <td>
-              <MaskedInput name="envAzureClientId" value={envAzureClientId || ''} readOnly tabIndex={-1} />
+              <MaskedInput
+                name="envAzureClientId"
+                value={envAzureClientId || ''}
+                readOnly
+                tabIndex={-1}
+              />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
-                <small dangerouslySetInnerHTML={{ __html: t('admin:app_setting.use_env_var_if_empty', { variable: 'AZURE_CLIENT_ID' }) }} />
+                <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
+                  dangerouslySetInnerHTML={{
+                    __html: t('admin:app_setting.use_env_var_if_empty', {
+                      variable: 'AZURE_CLIENT_ID',
+                    }),
+                  }}
+                />
               </p>
             </td>
           </tr>
@@ -142,10 +177,21 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
               />
             </td>
             <td>
-              <MaskedInput name="envAzureClientSecret" value={envAzureClientSecret || ''} readOnly tabIndex={-1} />
+              <MaskedInput
+                name="envAzureClientSecret"
+                value={envAzureClientSecret || ''}
+                readOnly
+                tabIndex={-1}
+              />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
-                <small dangerouslySetInnerHTML={{ __html: t('admin:app_setting.use_env_var_if_empty', { variable: 'AZURE_CLIENT_SECRET' }) }} />
+                <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
+                  dangerouslySetInnerHTML={{
+                    __html: t('admin:app_setting.use_env_var_if_empty', {
+                      variable: 'AZURE_CLIENT_SECRET',
+                    }),
+                  }}
+                />
               </p>
             </td>
           </tr>
@@ -160,10 +206,22 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
               />
             </td>
             <td>
-              <input className="form-control" type="text" value={envAzureStorageAccountName || ''} readOnly tabIndex={-1} />
+              <input
+                className="form-control"
+                type="text"
+                value={envAzureStorageAccountName || ''}
+                readOnly
+                tabIndex={-1}
+              />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
-                <small dangerouslySetInnerHTML={{ __html: t('admin:app_setting.use_env_var_if_empty', { variable: 'AZURE_STORAGE_ACCOUNT_NAME' }) }} />
+                <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
+                  dangerouslySetInnerHTML={{
+                    __html: t('admin:app_setting.use_env_var_if_empty', {
+                      variable: 'AZURE_STORAGE_ACCOUNT_NAME',
+                    }),
+                  }}
+                />
               </p>
             </td>
           </tr>
@@ -178,10 +236,22 @@ export const AzureSettingMolecule = (props: AzureSettingMoleculeProps): JSX.Elem
               />
             </td>
             <td>
-              <input className="form-control" type="text" value={envAzureStorageContainerName || ''} readOnly tabIndex={-1} />
+              <input
+                className="form-control"
+                type="text"
+                value={envAzureStorageContainerName || ''}
+                readOnly
+                tabIndex={-1}
+              />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
-                <small dangerouslySetInnerHTML={{ __html: t('admin:app_setting.use_env_var_if_empty', { variable: 'AZURE_STORAGE_CONTAINER_NAME' }) }} />
+                <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
+                  dangerouslySetInnerHTML={{
+                    __html: t('admin:app_setting.use_env_var_if_empty', {
+                      variable: 'AZURE_STORAGE_CONTAINER_NAME',
+                    }),
+                  }}
+                />
               </p>
             </td>
           </tr>
