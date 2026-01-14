@@ -38,11 +38,6 @@ test.describe
       await expect(page.getByTestId('grw-editor-navbar-bottom')).toBeVisible();
     });
 
-    test.afterAll(async ({ page }) => {
-      // Restore keymap to default
-      await changeKeymap(page, 'default');
-    });
-
     test('Insert mode should persist while typing multiple characters', async ({
       page,
     }) => {
@@ -77,5 +72,8 @@ test.describe
 
       // Expect a success toaster to be displayed
       await expect(page.locator('.Toastify__toast--success')).toBeVisible();
+
+      // Restore keymap to default
+      await changeKeymap(page, 'default');
     });
   });
