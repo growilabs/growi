@@ -24,7 +24,8 @@ export const PageHeader = (): JSX.Element => {
 
     // For mobile screens (< 576px), use full screen width
     if (window.innerWidth < 576) {
-      const maxWidth = window.innerWidth - pageHeaderRef.current.getBoundingClientRect().x;
+      const maxWidth =
+        window.innerWidth - pageHeaderRef.current.getBoundingClientRect().x;
       setMaxWidth(maxWidth);
       return;
     }
