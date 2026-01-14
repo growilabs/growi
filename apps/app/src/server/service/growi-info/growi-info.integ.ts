@@ -1,7 +1,7 @@
+import type { IPage, IUser } from '@growi/core/dist/interfaces';
 import mongoose from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
-import type { IPage, IUser } from '^/../../packages/core/dist';
 import pkg from '^/package.json';
 
 import type UserEvent from '~/server/events/user';
@@ -50,6 +50,8 @@ describe('GrowiInfoService', () => {
     });
 
     const userModelFactory = (await import('~/server/models/user')).default;
+    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+    // @ts-ignore
     User = userModelFactory(crowiMock);
 
     await User.deleteMany({}); // clear users
