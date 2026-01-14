@@ -26,6 +26,10 @@
       "import": "./dist/interfaces/index.js",
       "require": "./dist/interfaces/index.cjs"
     },
+    "./dist/interfaces/server": {
+      "import": "./dist/interfaces/server/index.js",
+      "require": "./dist/interfaces/server/index.cjs"
+    },
     "./dist/models": {
       "import": "./dist/models/index.js",
       "require": "./dist/models/index.cjs"
@@ -73,6 +77,7 @@
     "escape-string-regexp": "^4.0.0"
   },
   "devDependencies": {
+    "@types/express": "^4",
     "mongoose": "^6.13.6",
     "socket.io-client": "^4.7.5",
     "swr": "^2.2.2"
