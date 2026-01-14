@@ -104,7 +104,11 @@ const useKeymapExtension = (
     if (keymapExtension == null) {
       return;
     }
-    const cleanupFunction = codeMirrorEditor?.appendExtensions(keymapExtension);
+    // Use Prec.high() for user-selected keymaps (Vim, Emacs, VSCode) to ensure they
+    // have priority over editor shortcuts
+    const cleanupFunction = codeMirrorEditor?.appendExtensions(
+      Prec.high(keymapExtension),
+    );
     return cleanupFunction;
   }, [codeMirrorEditor, keymapExtension]);
 };
@@ -114,9 +118,9 @@ export const useEditorSettings = (
   editorSettings?: EditorSettings,
   onSave?: () => void,
 ): void => {
+  useKeymapExtension(codeMirrorEditor, editorSettings?.keymapMode, onSave);
   useEditorShortcuts(codeMirrorEditor, editorSettings?.keymapMode);
   useStyleActiveLine(codeMirrorEditor, editorSettings?.styleActiveLine);
   useEnterKeyHandler(codeMirrorEditor, editorSettings?.autoFormatMarkdownTable);
   useThemeExtension(codeMirrorEditor, editorSettings?.theme);
-  useKeymapExtension(codeMirrorEditor, editorSettings?.keymapMode, onSave);
 };
