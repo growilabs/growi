@@ -104,9 +104,7 @@ const useKeymapExtension = (
     if (keymapExtension == null) {
       return;
     }
-    const cleanupFunction = codeMirrorEditor?.appendExtensions(
-      Prec.low(keymapExtension),
-    );
+    const cleanupFunction = codeMirrorEditor?.appendExtensions(keymapExtension);
     return cleanupFunction;
   }, [codeMirrorEditor, keymapExtension]);
 };
