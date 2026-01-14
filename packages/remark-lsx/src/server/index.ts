@@ -1,4 +1,5 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
+import type { AccessTokenParser } from '@growi/core/dist/interfaces/server';
 import type { NextFunction, Request, Response } from 'express';
 import { query, validationResult } from 'express-validator';
 import { FilterXSS } from 'xss';
@@ -56,10 +57,12 @@ const middleware = (crowi: any, app: any): void => {
     true,
     loginRequiredFallback,
   );
-  const accessTokenParser = crowi.accessTokenParser;
+  const accessTokenParser: AccessTokenParser = crowi.accessTokenParser;
 
   app.get(
     '/_api/lsx',
+    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+    // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
     loginRequired,
     lsxValidator,
