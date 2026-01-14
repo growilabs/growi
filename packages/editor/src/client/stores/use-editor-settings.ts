@@ -103,8 +103,7 @@ const useKeymapExtension = (
   useEffect(() => {
     const settingKeyMap = async (name?: KeyMapMode) => {
       // Pass a stable wrapper function that delegates to the ref
-      const stableOnSave =
-        onSaveRef.current != null ? () => onSaveRef.current?.() : undefined;
+      const stableOnSave = () => onSaveRef.current?.();
       setKeymapExtension(await getKeymap(name, stableOnSave));
     };
     settingKeyMap(keymapMode);
