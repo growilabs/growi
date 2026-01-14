@@ -402,9 +402,9 @@ export const OptionsSelector = (): JSX.Element => {
       }}
       direction="up"
       className=""
-      data-testid="options-selector"
     >
       <DropdownToggle
+        data-testid="options-selector-btn"
         className={`btn btn-sm btn-outline-neutral-secondary d-flex align-items-center justify-content-center
               ${isDeviceLargerThanMd ? '' : 'border-0'}
               ${dropdownOpen ? 'active' : ''}
@@ -417,7 +417,7 @@ export const OptionsSelector = (): JSX.Element => {
           <></>
         )}
       </DropdownToggle>
-      <DropdownMenu container="body">
+      <DropdownMenu container="body" data-testid="options-selector-menu">
         {status === OptionsStatus.Home && (
           <div className="d-flex flex-column">
             <span className="text-muted ms-3">
