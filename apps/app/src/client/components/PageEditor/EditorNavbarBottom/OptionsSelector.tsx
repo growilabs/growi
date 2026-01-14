@@ -402,7 +402,7 @@ export const OptionsSelector = (): JSX.Element => {
       }}
       direction="up"
       className=""
-      data-testid="options-selector-dropdown"
+      data-testid="options-selector"
     >
       <DropdownToggle
         className={`btn btn-sm btn-outline-neutral-secondary d-flex align-items-center justify-content-center
