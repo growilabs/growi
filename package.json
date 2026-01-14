@@ -39,8 +39,7 @@
     "version:preminor": "pnpm version preminor --preid=RC --no-git-tag-version",
     "version:premajor": "pnpm version premajor --preid=RC --no-git-tag-version"
   },
-  "// comments for defDependencies": {
-    "vite-plugin-dts": "v4.2.1 causes the unexpected error 'Cannot find package 'vue-tsc''"
+  "// comments for devDependencies": {
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.6",
@@ -91,8 +90,7 @@
     "vite-plugin-dts": "^3.9.1",
     "vite-tsconfig-paths": "^5.0.1",
     "vitest": "^2.1.1",
-    "vitest-mock-extended": "^2.0.2",
-    "vue-tsc": "^2.1.10"
+    "vitest-mock-extended": "^2.0.2"
   },
   "// comments for pnpm.overrides": {
     "@lykmapipo/common>flat": "flat v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
