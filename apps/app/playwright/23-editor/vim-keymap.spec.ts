@@ -27,22 +27,19 @@ const changeKeymap = async (page: Page, keymap: string) => {
   await expect(page.getByTestId('options-selector-menu')).not.toBeVisible();
 };
 
-const targetPagePath = '/Sandbox/vim-keymap-test-page';
-
 test.describe('Vim keymap mode', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto(targetPagePath);
+  test('Insert mode should persist while typing multiple characters', async ({
+    page,
+  }) => {
+    const testText = 'Hello World';
+    const testPagePath = '/Sandbox/vim-keymap-test-page';
+
+    await page.goto(testPagePath);
 
     // Open Editor
     await expect(page.getByTestId('editor-button')).toBeVisible();
     await page.getByTestId('editor-button').click();
     await expect(page.getByTestId('grw-editor-navbar-bottom')).toBeVisible();
-  });
-
-  test('Insert mode should persist while typing multiple characters', async ({
-    page,
-  }) => {
-    const testText = 'Hello World';
 
     // Change to Vim keymap
     await changeKeymap(page, 'vim');
