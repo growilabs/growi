@@ -1,6 +1,8 @@
 import { ALL_SIGN, type Scope } from '@growi/core/dist/interfaces';
 
 // Data structure for the final merged scopes
+// biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+// @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
 interface ScopeMap {
   [key: string]: Scope | ScopeMap;
 }
