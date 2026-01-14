@@ -13,17 +13,19 @@ export const useAppendExtensions = (view?: EditorView): AppendExtensions => {
     (args) => {
       const extensions = Array.isArray(args) ? args : [args];
 
-      const compartment = new Compartment();
+      const compartments = extensions.map(() => new Compartment());
       view?.dispatch({
-        effects: extensions.map((extension) => {
-          return StateEffect.appendConfig.of(compartment.of(extension));
+        effects: extensions.map((extension, index) => {
+          return StateEffect.appendConfig.of(compartments[index].of(extension));
         }),
       });
 
       // return cleanup function
       return () => {
         view?.dispatch({
-          effects: compartment.reconfigure([]),
+          effects: compartments.map((compartment) =>
+            compartment.reconfigure([]),
+          ),
         });
       };
     },
