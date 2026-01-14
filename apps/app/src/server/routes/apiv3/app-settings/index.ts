@@ -8,6 +8,7 @@ import * as nextI18nConfig from '^/config/next-i18next.config';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
+import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
@@ -314,8 +315,7 @@ const router = express.Router();
  *            type: boolean
  *            description: is enable internal stream system for azure file request
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+module.exports = (crowi: Crowi) => {
   const loginRequiredStrictly = require('../../../middlewares/login-required')(
     crowi,
   );

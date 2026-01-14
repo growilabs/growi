@@ -4,6 +4,7 @@ import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
+import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 
@@ -84,8 +85,7 @@ const router = express.Router();
  *           items:
  *             $ref: '#/components/schemas/User'
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+module.exports = (crowi: Crowi) => {
   const loginRequiredStrictly = require('../../middlewares/login-required')(
     crowi,
   );

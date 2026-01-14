@@ -5,6 +5,7 @@ import mongoose, { type HydratedDocument } from 'mongoose';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IBookmarkInfo } from '~/interfaces/bookmark-info';
+import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import type { BookmarkDocument, BookmarkModel } from '~/server/models/bookmark';
@@ -87,8 +88,7 @@ const router = express.Router();
  *            items:
  *              $ref: '#/components/schemas/User'
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+module.exports = (crowi: Crowi) => {
   const loginRequiredStrictly = require('../../middlewares/login-required')(
     crowi,
   );

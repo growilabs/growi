@@ -4,6 +4,7 @@ import { body } from 'express-validator';
 import type { Types } from 'mongoose';
 
 import type { BookmarkFolderItems } from '~/interfaces/bookmark-info';
+import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { InvalidParentBookmarkFolderError } from '~/server/models/errors';
@@ -132,8 +133,7 @@ const validator = {
   ],
 };
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+module.exports = (crowi: Crowi) => {
   const loginRequiredStrictly = require('../../middlewares/login-required')(
     crowi,
   );
