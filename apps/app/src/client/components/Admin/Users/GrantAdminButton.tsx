@@ -40,8 +40,9 @@ const GrantAdminButton = (props: GrantAdminButtonProps): JSX.Element => {
 /**
  * Wrapper component for using unstated
  */
-const GrantAdminButtonWrapper: React.ForwardRefExoticComponent<
-  Pick<any, string | number | symbol> & React.RefAttributes<any>
-> = withUnstatedContainers(GrantAdminButton, [AdminUsersContainer]);
+const GrantAdminButtonWrapper = withUnstatedContainers<
+  unknown,
+  GrantAdminButtonProps
+>(GrantAdminButton, [AdminUsersContainer]);
 
 export default GrantAdminButtonWrapper;

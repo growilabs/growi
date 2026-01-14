@@ -1,13 +1,32 @@
-const { serializePageSecurely } = require('../serializers/page-serializer');
+import type { IPage, IUser } from '@growi/core/dist/interfaces';
+import { isPopulated } from '@growi/core/dist/interfaces';
+
+import { serializePageSecurely } from '../serializers/page-serializer';
 
 /**
  * Server-to-client message VO
  */
-class S2cMessagePageUpdated {
-  constructor(page, user) {
+export class S2cMessagePageUpdated {
+  pageId: string;
+
+  revisionId: string;
+
+  revisionBody: string;
+
+  revisionUpdateAt: Date;
+
+  revisionOrigin: string | undefined;
+
+  remoteLastUpdateUser?: IUser;
+
+  lastUpdateUsername?: string;
+
+  constructor(page: IPage, user?: IUser) {
     const serializedPage = serializePageSecurely(page);
 
     const { _id, revision, updatedAt } = serializedPage;
+
+    assert(page.revision != null && isPopulated(page.revision));
 
     this.pageId = _id;
     this.revisionId = revision;
@@ -22,7 +41,3 @@ class S2cMessagePageUpdated {
     }
   }
 }
-
-module.exports = {
-  S2cMessagePageUpdated,
-};

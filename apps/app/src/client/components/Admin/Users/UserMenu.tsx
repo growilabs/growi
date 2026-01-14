@@ -146,8 +146,9 @@ const UserMenu = (props: UserMenuProps) => {
 /**
  * Wrapper component for using unstated
  */
-const UserMenuWrapper: React.ForwardRefExoticComponent<
-  Pick<any, string | number | symbol> & React.RefAttributes<any>
-> = withUnstatedContainers(UserMenu, [AdminUsersContainer]);
+const UserMenuWrapper = withUnstatedContainers<unknown, UserMenuProps>(
+  UserMenu,
+  [AdminUsersContainer],
+);
 
 export default UserMenuWrapper;
