@@ -43,6 +43,7 @@ const auditLogBulkExportJobSchema = new Schema<IAuditLogBulkExportJob>(
     completedAt: { type: Date },
     restartFlag: { type: Boolean, required: true, default: false },
     totalExportedCount: { type: Number, default: 0 },
+    attachment: { type: Schema.Types.ObjectId, ref: 'Attachment' },
   },
   { timestamps: true },
 );
