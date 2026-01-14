@@ -12,7 +12,8 @@ const logger = loggerFactory('growi:middleware:access-token-parser');
 
 export type { AccessTokenParser, AccessTokenParserReq };
 
-// @ts-expect-error - Scope type causes "Type instantiation is excessively deep" with tsgo
+// biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+// @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
 export const accessTokenParser: AccessTokenParser = (scopes, opts) => {
   return async (req, res, next): Promise<void> => {
     if (scopes == null || scopes.length === 0) {
