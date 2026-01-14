@@ -1,5 +1,6 @@
-import type { IAttachment, IPage, IUser } from '@growi/core';
+import type { IAttachment, IPage, IUser } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
+import type { AccessTokenParser } from '@growi/core/dist/interfaces/server';
 import { serializeAttachmentSecurely } from '@growi/core/dist/models/serializers';
 import { OptionParser } from '@growi/core/dist/remark-plugins';
 import type { Request } from 'express';
@@ -73,7 +74,7 @@ export const routesFactory = (crowi): any => {
     true,
     loginRequiredFallback,
   );
-  const accessTokenParser = crowi.accessTokenParser;
+  const accessTokenParser: AccessTokenParser = crowi.accessTokenParser;
 
   const router = Router();
 
@@ -92,6 +93,8 @@ export const routesFactory = (crowi): any => {
    */
   router.get(
     '/ref',
+    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+    // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
     loginRequired,
     async (req: RequestWithUser, res) => {
