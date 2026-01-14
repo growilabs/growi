@@ -1,24 +1,33 @@
+import type { IUser } from '@growi/core/dist/interfaces';
 import nodePath from 'path';
 
+import type Crowi from '~/server/crowi';
 import {
   GlobalNotificationSettingEvent,
   GlobalNotificationSettingType,
 } from '~/server/models/GlobalNotificationSetting';
+import type { PageDocument } from '~/server/models/page';
 import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
 
+import type { GlobalNotificationEventVars } from './types';
+
 const _logger = loggerFactory('growi:service:GlobalNotificationMailService');
+
+interface MailOption {
+  subject: string;
+  template: string;
+  vars: Record<string, unknown>;
+}
 
 /**
  * sub service class of GlobalNotificationSetting
  */
 class GlobalNotificationMailService {
-  /** @type {import('~/server/crowi').default} Crowi instance */
-  crowi;
+  crowi: Crowi;
 
-  /** @param {import('~/server/crowi').default} crowi Crowi instance */
-  constructor(crowi) {
+  constructor(crowi: Crowi) {
     this.crowi = crowi;
   }
 
@@ -27,27 +36,33 @@ class GlobalNotificationMailService {
    *
    * @memberof GlobalNotificationMailService
    *
-   * @param {string} event event name triggered
-   * @param {import('~/server/models/page').PageDocument} page page triggered the event
-   * @param {User} triggeredBy user who triggered the event
-   * @param {{ comment: Comment, oldPath: string }} _ event specific vars
+   * @param event event name triggered
+   * @param page page triggered the event
+   * @param triggeredBy user who triggered the event
+   * @param vars event specific vars
    */
-  async fire(event, page, triggeredBy, vars) {
+  async fire(
+    event: string,
+    page: PageDocument,
+    triggeredBy: IUser,
+    vars: GlobalNotificationEventVars,
+  ): Promise<void> {
     const { mailService } = this.crowi;
 
     const { GlobalNotificationSetting } = this.crowi.models;
-    const notifications =
-      await GlobalNotificationSetting.findSettingByPathAndEvent(
-        event,
-        page.path,
-        GlobalNotificationSettingType.MAIL,
-      );
+    const notifications = await (
+      GlobalNotificationSetting as any
+    ).findSettingByPathAndEvent(
+      event,
+      page.path,
+      GlobalNotificationSettingType.MAIL,
+    );
 
     const option = this.generateOption(event, page, triggeredBy, vars);
 
     await Promise.all(
-      notifications.map((notification) => {
-        return mailService.send({ ...option, to: notification.toEmail });
+      notifications.map((notification: { toEmail: string }) => {
+        return mailService?.send({ ...option, to: notification.toEmail });
       }),
     );
   }
@@ -57,14 +72,19 @@ class GlobalNotificationMailService {
    *
    * @memberof GlobalNotificationMailService
    *
-   * @param {string} event event name triggered
-   * @param {import('~/server/models/page').PageDocument} page path triggered the event
-   * @param {User} triggeredBy user triggered the event
-   * @param {{ comment: Comment, oldPath: string }} _ event specific vars
+   * @param event event name triggered
+   * @param page path triggered the event
+   * @param triggeredBy user triggered the event
+   * @param vars event specific vars
    *
-   * @return  {{ subject: string, template: string, vars: object }}
+   * @return {{ subject: string, template: string, vars: object }}
    */
-  generateOption(event, page, triggeredBy, { comment, oldPath }) {
+  generateOption(
+    event: string,
+    page: PageDocument,
+    triggeredBy: IUser,
+    { comment, oldPath }: GlobalNotificationEventVars,
+  ): MailOption {
     const locale = configManager.getConfig('app:globalLang');
     // validate for all events
     if (event == null || page == null || triggeredBy == null) {
@@ -81,10 +101,10 @@ class GlobalNotificationMailService {
     const path = page.path;
     const appTitle = this.crowi.appService.getAppTitle();
     const siteUrl = growiInfoService.getSiteUrl();
-    const pageUrl = new URL(page._id, siteUrl);
+    const pageUrl = new URL(page._id?.toString() ?? '', siteUrl);
 
-    let subject;
-    let vars = {
+    let subject: string;
+    let vars: Record<string, unknown> = {
       appTitle,
       siteUrl,
       path,
@@ -151,4 +171,4 @@ class GlobalNotificationMailService {
   }
 }
 
-module.exports = GlobalNotificationMailService;
+export default GlobalNotificationMailService;

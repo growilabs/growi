@@ -1,25 +1,38 @@
+import { PageGrant } from '@growi/core';
+import type { IUser } from '@growi/core/dist/interfaces';
+
+import type Crowi from '~/server/crowi';
+import type { PageDocument } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
+import GlobalNotificationMailService from './global-notification-mail';
+import GlobalNotificationSlackService from './global-notification-slack';
+import type { GlobalNotificationEventVars } from './types';
+
 const logger = loggerFactory('growi:service:GlobalNotificationService');
-const GloabalNotificationMail = require('./global-notification-mail');
-const GloabalNotificationSlack = require('./global-notification-slack');
 
 /**
  * service class of GlobalNotificationSetting
  */
 class GlobalNotificationService {
-  /** @type {import('~/server/crowi').default} Crowi instance */
-  crowi;
+  crowi: Crowi;
 
-  /** @param {import('~/server/crowi').default} crowi Crowi instance */
-  constructor(crowi) {
+  defaultLang: string;
+
+  globalNotificationMailService: GlobalNotificationMailService;
+
+  globalNotificationSlackService: GlobalNotificationSlackService;
+
+  constructor(crowi: Crowi) {
     this.crowi = crowi;
     this.defaultLang = 'en_US'; // TODO: get defaultLang from app global config
 
-    this.gloabalNotificationMail = new GloabalNotificationMail(crowi);
-    this.gloabalNotificationSlack = new GloabalNotificationSlack(crowi);
-
-    this.Page = this.crowi.models.Page;
+    this.globalNotificationMailService = new GlobalNotificationMailService(
+      crowi,
+    );
+    this.globalNotificationSlackService = new GlobalNotificationSlackService(
+      crowi,
+    );
   }
 
   /**
@@ -27,12 +40,17 @@ class GlobalNotificationService {
    *
    * @memberof GlobalNotificationService
    *
-   * @param {string} event event name triggered
-   * @param {string} page page triggered the event
-   * @param {User} triggeredBy user who triggered the event
-   * @param {object} vars event specific vars
+   * @param event event name triggered
+   * @param page page triggered the event
+   * @param triggeredBy user who triggered the event
+   * @param vars event specific vars
    */
-  async fire(event, page, triggeredBy, vars = {}) {
+  async fire(
+    event: string,
+    page: PageDocument,
+    triggeredBy: IUser,
+    vars: GlobalNotificationEventVars = {},
+  ): Promise<void> {
     logger.debug(`global notficatoin event ${event} was triggered`);
 
     // validation
@@ -48,10 +66,10 @@ class GlobalNotificationService {
     }
 
     await Promise.all([
-      this.gloabalNotificationMail.fire(event, page, triggeredBy, vars),
-      this.gloabalNotificationSlack.fire(
+      this.globalNotificationMailService.fire(event, page, triggeredBy, vars),
+      this.globalNotificationSlackService.fire(
         event,
-        page.id,
+        page.id ?? page._id?.toString(),
         page.path,
         triggeredBy,
         vars,
@@ -64,27 +82,33 @@ class GlobalNotificationService {
    *
    * @memberof GlobalNotificationService
    *
-   * @param {number} grant page grant
-   * @return {boolean} isSendNotification
+   * @param grant page grant
+   * @return isSendNotification
    */
-  isSendNotification(grant) {
+  isSendNotification(grant: number): boolean {
     switch (grant) {
-      case this.Page.GRANT_PUBLIC:
+      case PageGrant.GRANT_PUBLIC:
         return true;
-      case this.Page.GRANT_RESTRICTED:
+      case PageGrant.GRANT_RESTRICTED:
         return false;
-      case this.Page.GRANT_SPECIFIED:
+      case PageGrant.GRANT_SPECIFIED:
         return false;
-      case this.Page.GRANT_OWNER:
-        return this.crowi.configManager.getConfig(
-          'notification:owner-page:isEnabled',
+      case PageGrant.GRANT_OWNER:
+        return (
+          this.crowi.configManager.getConfig(
+            'notification:owner-page:isEnabled',
+          ) ?? false
         );
-      case this.Page.GRANT_USER_GROUP:
-        return this.crowi.configManager.getConfig(
-          'notification:group-page:isEnabled',
+      case PageGrant.GRANT_USER_GROUP:
+        return (
+          this.crowi.configManager.getConfig(
+            'notification:group-page:isEnabled',
+          ) ?? false
         );
+      default:
+        return false;
     }
   }
 }
 
-module.exports = GlobalNotificationService;
+export default GlobalNotificationService;

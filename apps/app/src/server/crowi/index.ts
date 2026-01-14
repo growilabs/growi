@@ -670,7 +670,9 @@ class Crowi {
    * setup GlobalNotificationService
    */
   async setUpGlobalNotification(): Promise<void> {
-    const GlobalNotificationService = require('../service/global-notification');
+    const GlobalNotificationService = (
+      await import('../service/global-notification')
+    ).default;
     if (this.globalNotificationService == null) {
       this.globalNotificationService = new GlobalNotificationService(this);
     }
