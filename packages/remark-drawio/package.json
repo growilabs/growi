@@ -27,7 +27,7 @@
     "watch": "pnpm run dev -w --emptyOutDir=false",
     "lint:js": "biome check",
     "lint:styles": "stylelint --allow-empty-input \"src/**/*.scss\" \"src/**/*.css\"",
-    "lint:typecheck": "vue-tsc --noEmit",
+    "lint:typecheck": "tsgo --noEmit",
     "lint": "run-p lint:*"
   },
   "devDependencies": {
