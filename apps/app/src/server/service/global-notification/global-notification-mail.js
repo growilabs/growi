@@ -35,11 +35,13 @@ class GlobalNotificationMailService {
   async fire(event, page, triggeredBy, vars) {
     const { mailService } = this.crowi;
 
-    const notifications = await GlobalNotification.findSettingByPathAndEvent(
-      event,
-      page.path,
-      GlobalNotificationSettingType.MAIL,
-    );
+    const { GlobalNotificationSetting } = this.crowi.models;
+    const notifications =
+      await GlobalNotificationSetting.findSettingByPathAndEvent(
+        event,
+        page.path,
+        GlobalNotificationSettingType.MAIL,
+      );
 
     const option = this.generateOption(event, page, triggeredBy, vars);
 
