@@ -63,7 +63,7 @@ test.describe
       await page.keyboard.press('Escape');
 
       // Enter command mode
-      await page.keyboard.type(':');
+      await page.keyboard.press('Shift+Semicolon');
       await expect(page.locator('.cm-vim-panel')).toBeVisible();
 
       // Type write command and execute
