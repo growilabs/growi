@@ -65,8 +65,8 @@ module.exports = (crowi, _app) => {
 
   const activityEvent = crowi.events.activity;
 
-  const globalNotificationService = crowi.getGlobalNotificationService();
-  const userNotificationService = crowi.getUserNotificationService();
+  const globalNotificationService = crowi.globalNotificationService;
+  const userNotificationService = crowi.userNotificationService;
 
   const { body } = require('express-validator');
   const mongoose = require('mongoose');

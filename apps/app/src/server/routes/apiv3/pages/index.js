@@ -50,7 +50,7 @@ module.exports = (crowi) => {
 
   const activityEvent = crowi.events.activity;
 
-  const globalNotificationService = crowi.getGlobalNotificationService();
+  const globalNotificationService = crowi.globalNotificationService;
 
   const addActivity = generateAddActivityMiddleware(crowi);
 

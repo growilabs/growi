@@ -1,10 +1,10 @@
 import next from 'next';
+import http from 'node:http';
+import path from 'node:path';
 import { createTerminus } from '@godaddy/terminus';
 import attachmentRoutes from '@growi/remark-attachment-refs/dist/server';
 import lsxRoutes from '@growi/remark-lsx/dist/server/index.cjs';
-import http from 'http';
 import mongoose from 'mongoose';
-import path from 'path';
 
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
@@ -47,11 +47,7 @@ import { SocketIoService } from '../service/socket-io';
 import UserGroupService from '../service/user-group';
 import { UserNotificationService } from '../service/user-notification';
 import { initializeYjsService } from '../service/yjs';
-import {
-  getModelSafely,
-  getMongoUri,
-  mongoOptions,
-} from '../util/mongoose-utils';
+import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
 import { setupModelsDependentOnCrowi } from './setup-models';
 
 const logger = loggerFactory('growi:crowi');
@@ -116,6 +112,21 @@ class Crowi {
 
   /** @type UserNotificationService */
   userNotificationService;
+
+  /** @type {UserGroupService} */
+  userGroupService;
+
+  /** @type {import('~/features/external-user-group/server/service/ldap-user-group-sync').LdapUserGroupSyncService} */
+  ldapUserGroupSyncService;
+
+  /** @type {import('~/features/external-user-group/server/service/keycloak-user-group-sync').KeycloakUserGroupSyncService} */
+  keycloakUserGroupSyncService;
+
+  /** @type {import('../service/global-notification').GlobalNotificationService} */
+  globalNotificationService;
+
+  /** @type {any} */
+  sessionConfig;
 
   constructor() {
     this.version = getGrowiVersion();
@@ -377,14 +388,6 @@ Crowi.prototype.getSlack = function () {
 
 Crowi.prototype.getSlackLegacy = function () {
   return this.slackLegacy;
-};
-
-Crowi.prototype.getGlobalNotificationService = function () {
-  return this.globalNotificationService;
-};
-
-Crowi.prototype.getUserNotificationService = function () {
-  return this.userNotificationService;
 };
 
 Crowi.prototype.setupPassport = async function () {

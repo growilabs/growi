@@ -27,7 +27,7 @@ module.exports = (crowi, _app) => {
 
   const ApiResponse = require('../util/apiResponse');
 
-  const globalNotificationService = crowi.getGlobalNotificationService();
+  const globalNotificationService = crowi.globalNotificationService;
 
   const actions = {};
 
