@@ -10,7 +10,9 @@ import { withUnstatedContainers } from '../../UnstatedUtils';
 import { SortIcons } from './SortIcons';
 import UserMenu from './UserMenu';
 
-type UserTableProps = {
+type UserTableExternalProps = Record<string, never>;
+
+type UserTableProps = UserTableExternalProps & {
   adminUsersContainer: AdminUsersContainer;
 };
 
@@ -189,8 +191,9 @@ const UserTable = (props: UserTableProps) => {
   );
 };
 
-const UserTableWrapper = withUnstatedContainers(UserTable, [
-  AdminUsersContainer,
-]);
+const UserTableWrapper = withUnstatedContainers<
+  UserTableExternalProps,
+  UserTableProps
+>(UserTable, [AdminUsersContainer]);
 
 export default UserTableWrapper;

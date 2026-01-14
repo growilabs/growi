@@ -18,9 +18,12 @@ import UserRemoveButton from './UserRemoveButton';
 
 import styles from './UserMenu.module.scss';
 
-type UserMenuProps = {
-  adminUsersContainer: AdminUsersContainer;
+type UserMenuExternalProps = {
   user: IUserHasId;
+};
+
+type UserMenuProps = UserMenuExternalProps & {
+  adminUsersContainer: AdminUsersContainer;
 };
 
 const UserMenu = (props: UserMenuProps) => {
@@ -146,9 +149,9 @@ const UserMenu = (props: UserMenuProps) => {
 /**
  * Wrapper component for using unstated
  */
-const UserMenuWrapper = withUnstatedContainers<unknown, UserMenuProps>(
-  UserMenu,
-  [AdminUsersContainer],
-);
+const UserMenuWrapper = withUnstatedContainers<
+  UserMenuExternalProps,
+  UserMenuProps
+>(UserMenu, [AdminUsersContainer]);
 
 export default UserMenuWrapper;
