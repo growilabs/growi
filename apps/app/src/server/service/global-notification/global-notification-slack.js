@@ -40,7 +40,7 @@ class GlobalNotificationSlackService {
   async fire(event, id, path, triggeredBy, vars) {
     const { appService, slackIntegrationService } = this.crowi;
 
-    const GlobalNotification = this.crowi.model('GlobalNotificationSetting');
+    const { GlobalNotification } = this.crowi.models;
     const notifications = await GlobalNotification.findSettingByPathAndEvent(
       event,
       path,

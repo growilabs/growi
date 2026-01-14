@@ -141,13 +141,12 @@ module.exports = (crowi) => {
   const loginRequiredStrictly = require('../../middlewares/login-required')(
     crowi,
   );
-  const Page = crowi.model('Page');
-  const User = crowi.model('User');
+  const { Page, User } = crowi.models;
   const { attachmentService } = crowi;
   const uploads = multer({ dest: `${crowi.tmpDir}uploads` });
   const addActivity = generateAddActivityMiddleware(crowi);
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const validator = {
     retrieveAttachment: [

@@ -55,9 +55,9 @@ module.exports = (crowi) => {
   const adminRequired = require('../../middlewares/admin-required')(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
-  const SlackAppIntegration = crowi.model('SlackAppIntegration');
+  const { SlackAppIntegration } = crowi.models;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const validator = {
     botType: [body('currentBotType').isString()],

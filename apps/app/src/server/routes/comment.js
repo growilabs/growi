@@ -58,13 +58,12 @@ import { preNotifyService } from '../service/pre-notify';
  */
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi, app) => {
+module.exports = (crowi, _app) => {
   const logger = loggerFactory('growi:routes:comment');
-  const User = crowi.model('User');
-  const Page = crowi.model('Page');
+  const { User, Page } = crowi.models;
   const ApiResponse = require('../util/apiResponse');
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const globalNotificationService = crowi.getGlobalNotificationService();
   const userNotificationService = crowi.getUserNotificationService();

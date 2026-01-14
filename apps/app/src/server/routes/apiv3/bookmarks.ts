@@ -98,7 +98,7 @@ module.exports = (crowi) => {
   );
   const addActivity = generateAddActivityMiddleware();
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const validator = {
     bookmarks: [body('pageId').isString(), body('bool').isBoolean()],

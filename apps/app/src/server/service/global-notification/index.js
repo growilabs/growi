@@ -19,7 +19,7 @@ class GlobalNotificationService {
     this.gloabalNotificationMail = new GloabalNotificationMail(crowi);
     this.gloabalNotificationSlack = new GloabalNotificationSlack(crowi);
 
-    this.Page = this.crowi.model('Page');
+    this.Page = this.crowi.models.Page;
   }
 
   /**

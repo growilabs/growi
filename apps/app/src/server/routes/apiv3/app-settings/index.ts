@@ -319,7 +319,7 @@ module.exports = (crowi) => {
   const adminRequired = require('../../../middlewares/admin-required')(crowi);
   const addActivity = generateAddActivityMiddleware();
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const validator = {
     appSetting: [

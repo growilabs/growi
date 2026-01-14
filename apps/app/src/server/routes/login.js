@@ -12,9 +12,9 @@ import { growiInfoService } from '../service/growi-info';
 module.exports = (crowi, app) => {
   const logger = loggerFactory('growi:routes:login');
   const path = require('path');
-  const User = crowi.model('User');
+  const { User } = crowi.models;
   const { appService, aclService, mailService, activityService } = crowi;
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const actions = {};
 

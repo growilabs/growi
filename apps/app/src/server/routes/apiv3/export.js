@@ -128,8 +128,8 @@ module.exports = (crowi) => {
 
   const { socketIoService } = crowi;
 
-  const activityEvent = crowi.event('activity');
-  const adminEvent = crowi.event('admin');
+  const activityEvent = crowi.events.activity;
+  const adminEvent = crowi.events.admin;
 
   // setup event
   adminEvent.on('onProgressForExport', (data) => {

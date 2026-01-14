@@ -93,9 +93,9 @@ module.exports = (crowi) => {
 
   const inAppNotificationService = crowi.inAppNotificationService;
 
-  const User = crowi.model('User');
+  const { User } = crowi.models;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   /**
    * @swagger

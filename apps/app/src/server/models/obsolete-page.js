@@ -98,7 +98,7 @@ export const getPageSchema = (crowi) => {
 
   // init event
   if (crowi != null) {
-    pageEvent = crowi.event('page');
+    pageEvent = crowi.events.page;
     pageEvent.on('create', pageEvent.onCreate);
     pageEvent.on('update', pageEvent.onUpdate);
     pageEvent.on('createMany', pageEvent.onCreateMany);
@@ -255,7 +255,7 @@ export const getPageSchema = (crowi) => {
     return this.save();
   };
 
-  pageSchema.methods.initLatestRevisionField = async function (revisionId) {
+  pageSchema.methods.initLatestRevisionField = function (revisionId) {
     this.latestRevision = this.revision;
     if (revisionId != null) {
       this.revision = revisionId;
@@ -267,8 +267,7 @@ export const getPageSchema = (crowi) => {
   ) {
     validateCrowi();
 
-    const User = crowi.model('User');
-    return populateDataToShowRevision(
+    return await populateDataToShowRevision(
       this,
       USER_FIELDS_EXCEPT_CONFIDENTIAL,
       shouldExcludeBody,
@@ -283,7 +282,7 @@ export const getPageSchema = (crowi) => {
       this.revision = revisionId;
     }
     // biome-ignore lint/plugin: populating is the purpose of this method
-    return this.populate('revision');
+    return await this.populate('revision');
   };
 
   pageSchema.methods.applyScope = function (user, grant, grantUserGroupIds) {

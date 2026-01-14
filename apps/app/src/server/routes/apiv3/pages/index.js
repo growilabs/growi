@@ -46,10 +46,9 @@ module.exports = (crowi) => {
   );
   const adminRequired = require('../../../middlewares/admin-required')(crowi);
 
-  const Page = crowi.model('Page');
-  const User = crowi.model('User');
+  const { Page, User } = crowi.models;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const globalNotificationService = crowi.getGlobalNotificationService();
 

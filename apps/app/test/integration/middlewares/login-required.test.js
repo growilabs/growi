@@ -228,8 +228,6 @@ describe('loginRequired', () => {
     });
 
     test('pass user who logged in', () => {
-      const User = crowi.model('User');
-
       req.user = {
         _id: 'user id',
         status: UserStatus.STATUS_ACTIVE,
@@ -273,8 +271,6 @@ describe('loginRequired', () => {
     );
 
     test("redirect to '/login' when user.status is 'STATUS_DELETED'", () => {
-      const User = crowi.model('User');
-
       req.baseUrl = '/path/that/requires/loggedin';
       req.user = {
         _id: 'user id',

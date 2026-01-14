@@ -29,7 +29,7 @@ const factory = (crowi) => {
 
   // init event
   if (crowi != null) {
-    userEvent = crowi.event('user');
+    userEvent = crowi.events.user;
     userEvent.on('activated', userEvent.onActivated);
   }
 

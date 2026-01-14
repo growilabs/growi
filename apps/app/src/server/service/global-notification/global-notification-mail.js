@@ -35,7 +35,6 @@ class GlobalNotificationMailService {
   async fire(event, page, triggeredBy, vars) {
     const { mailService } = this.crowi;
 
-    const GlobalNotification = this.crowi.model('GlobalNotificationSetting');
     const notifications = await GlobalNotification.findSettingByPathAndEvent(
       event,
       page.path,

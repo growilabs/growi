@@ -86,9 +86,9 @@ module.exports = (crowi) => {
   const adminRequired = require('../../middlewares/admin-required')(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
-  const Page = crowi.model('Page');
+  const { Page } = crowi.models;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   /**
    * middleware to limit link sharing
