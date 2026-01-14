@@ -1,22 +1,20 @@
+import crypto from 'node:crypto';
 import { omitInsecureAttributes } from '@growi/core/dist/models/serializers';
 import { pagePathUtils } from '@growi/core/dist/utils';
+import mongoose from 'mongoose';
+import mongoosePaginate from 'mongoose-paginate-v2';
+import uniqueValidator from 'mongoose-unique-validator';
 
 import { i18n } from '^/config/next-i18next.config';
 
 import { generateGravatarSrc } from '~/utils/gravatar';
 import loggerFactory from '~/utils/logger';
 
-import { aclService } from '../service/acl';
-import { configManager } from '../service/config-manager';
-import { getModelSafely } from '../util/mongoose-utils';
-import { Attachment } from './attachment';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL, UserStatus } from './conts';
-
-const crypto = require('crypto');
-
-const mongoose = require('mongoose');
-const mongoosePaginate = require('mongoose-paginate-v2');
-const uniqueValidator = require('mongoose-unique-validator');
+import { aclService } from '../../service/acl';
+import { configManager } from '../../service/config-manager';
+import { getModelSafely } from '../../util/mongoose-utils';
+import { Attachment } from '../attachment';
+import { UserStatus } from './conts';
 
 const logger = loggerFactory('growi:models:user');
 
@@ -26,8 +24,6 @@ const factory = (crowi) => {
   if (userModelExists != null) {
     return userModelExists;
   }
-
-  const PAGE_ITEMS = 50;
 
   let userEvent;
 
