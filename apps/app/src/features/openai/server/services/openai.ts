@@ -1,31 +1,39 @@
-import fs from 'fs';
 import assert from 'node:assert';
-import { Readable, Transform, Writable } from 'stream';
-import { pipeline } from 'stream/promises';
-
-import type {
-  IUser, Ref, Lang, IPage, Nullable,
-} from '@growi/core';
+import type { IPage, IUser, Lang, Nullable, Ref } from '@growi/core';
 import {
-  PageGrant, getIdForRef, getIdStringForRef, isPopulated, type IUserHasId,
+  getIdForRef,
+  getIdStringForRef,
+  type IUserHasId,
+  isPopulated,
+  PageGrant,
 } from '@growi/core';
 import { deepEquals } from '@growi/core/dist/utils';
 import { isGlobPatternPath } from '@growi/core/dist/utils/page-path-utils';
 import escapeStringRegexp from 'escape-string-regexp';
+import fs from 'fs';
 import createError from 'http-errors';
 import mongoose, { type HydratedDocument, type Types } from 'mongoose';
 import { type OpenAI, toFile } from 'openai';
-import { type ChatCompletionChunk } from 'openai/resources/chat/completions';
+import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
+import { Readable, Transform, Writable } from 'stream';
+import { pipeline } from 'stream/promises';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import ThreadRelationModel, { type ThreadRelationDocument } from '~/features/openai/server/models/thread-relation';
-import VectorStoreModel, { type VectorStoreDocument } from '~/features/openai/server/models/vector-store';
+import ThreadRelationModel, {
+  type ThreadRelationDocument,
+} from '~/features/openai/server/models/thread-relation';
+import VectorStoreModel, {
+  type VectorStoreDocument,
+} from '~/features/openai/server/models/vector-store';
 import VectorStoreFileRelationModel, {
-  type VectorStoreFileRelation,
   prepareVectorStoreFileRelations,
+  type VectorStoreFileRelation,
 } from '~/features/openai/server/models/vector-store-file-relation';
 import type Crowi from '~/server/crowi';
-import type { IAttachmentDocument, IAttachmentModel } from '~/server/models/attachment';
+import type {
+  IAttachmentDocument,
+  IAttachmentModel,
+} from '~/server/models/attachment';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { configManager } from '~/server/service/config-manager';
@@ -35,17 +43,21 @@ import loggerFactory from '~/utils/logger';
 import { OpenaiServiceTypes } from '../../interfaces/ai';
 import type { UpsertAiAssistantData } from '../../interfaces/ai-assistant';
 import {
-  type AccessibleAiAssistants, type AiAssistant, AiAssistantAccessScope, AiAssistantShareScope,
+  type AccessibleAiAssistants,
+  type AiAssistant,
+  AiAssistantAccessScope,
+  AiAssistantShareScope,
 } from '../../interfaces/ai-assistant';
 import type { MessageListParams } from '../../interfaces/message';
 import { ThreadType } from '../../interfaces/thread-relation';
 import type { IVectorStore } from '../../interfaces/vector-store';
 import { removeGlobPath } from '../../utils/remove-glob-path';
-import AiAssistantModel, { type AiAssistantDocument } from '../models/ai-assistant';
+import AiAssistantModel, {
+  type AiAssistantDocument,
+} from '../models/ai-assistant';
 import { convertMarkdownToHtml } from '../utils/convert-markdown-to-html';
 import { generateGlobPatterns } from '../utils/generate-glob-patterns';
 import { isVectorStoreCompatible } from '../utils/is-vector-store-compatible';
-
 import { getClient, isStreamResponse } from './client-delegator';
 import { openaiApiErrorHandler } from './openai-api-error-handler';
 import { replaceAnnotationWithPageLink } from './replace-annotation-with-page-link';
@@ -56,11 +68,11 @@ const BATCH_SIZE = 100;
 
 const logger = loggerFactory('growi:service:openai');
 
+type VectorStoreFileRelationsMap = Map<string, VectorStoreFileRelation>;
 
-type VectorStoreFileRelationsMap = Map<string, VectorStoreFileRelation>
-
-
-const convertPathPatternsToRegExp = (pagePathPatterns: string[]): Array<string | RegExp> => {
+const convertPathPatternsToRegExp = (
+  pagePathPatterns: string[],
+): Array<string | RegExp> => {
   return pagePathPatterns.map((pagePathPattern) => {
     if (isGlobPatternPath(pagePathPattern)) {
       const trimedPagePathPattern = pagePathPattern.replace('/*', '');
@@ -73,36 +85,73 @@ const convertPathPatternsToRegExp = (pagePathPatterns: string[]): Array<string |
 };
 
 export interface IOpenaiService {
-  generateAndProcessPreMessage(message: string, chunkProcessor: (chunk: ChatCompletionChunk) => void): Promise<void>
-  createThread(userId: string, type: ThreadType, aiAssistantId?: string, initialUserMessage?: string): Promise<ThreadRelationDocument>;
-  getThreadsByAiAssistantId(aiAssistantId: string): Promise<ThreadRelationDocument[]>
+  generateAndProcessPreMessage(
+    message: string,
+    chunkProcessor: (chunk: ChatCompletionChunk) => void,
+  ): Promise<void>;
+  createThread(
+    userId: string,
+    type: ThreadType,
+    aiAssistantId?: string,
+    initialUserMessage?: string,
+  ): Promise<ThreadRelationDocument>;
+  getThreadsByAiAssistantId(
+    aiAssistantId: string,
+  ): Promise<ThreadRelationDocument[]>;
   deleteThread(threadRelationId: string): Promise<ThreadRelationDocument>;
   deleteExpiredThreads(limit: number, apiCallInterval: number): Promise<void>; // for CronJob
-  deleteObsoletedVectorStoreRelations(): Promise<void> // for CronJob
+  deleteObsoletedVectorStoreRelations(): Promise<void>; // for CronJob
   deleteVectorStore(vectorStoreRelationId: string): Promise<void>;
-  getMessageData(threadId: string, lang?: Lang, options?: MessageListParams): Promise<OpenAI.Beta.Threads.Messages.MessagesPage>;
+  getMessageData(
+    threadId: string,
+    lang?: Lang,
+    options?: MessageListParams,
+  ): Promise<OpenAI.Beta.Threads.Messages.MessagesPage>;
   createVectorStoreFileOnPageCreate(pages: PageDocument[]): Promise<void>;
-  updateVectorStoreFileOnPageUpdate(page: HydratedDocument<PageDocument>): Promise<void>;
+  updateVectorStoreFileOnPageUpdate(
+    page: HydratedDocument<PageDocument>,
+  ): Promise<void>;
   deleteVectorStoreFilesByPageIds(pageIds: Types.ObjectId[]): Promise<void>;
-  deleteObsoleteVectorStoreFile(limit: number, apiCallInterval: number): Promise<void>; // for CronJob
-  isAiAssistantUsable(aiAssistantId: string, user: IUserHasId): Promise<boolean>;
-  createAiAssistant(data: UpsertAiAssistantData, user: IUserHasId): Promise<AiAssistantDocument>;
-  updateAiAssistant(aiAssistantId: string, data: UpsertAiAssistantData, user: IUserHasId): Promise<AiAssistantDocument>;
-  getAccessibleAiAssistants(user: IUserHasId): Promise<AccessibleAiAssistants>
-  isLearnablePageLimitExceeded(user: IUserHasId, pagePathPatterns: string[]): Promise<boolean>;
+  deleteObsoleteVectorStoreFile(
+    limit: number,
+    apiCallInterval: number,
+  ): Promise<void>; // for CronJob
+  isAiAssistantUsable(
+    aiAssistantId: string,
+    user: IUserHasId,
+  ): Promise<boolean>;
+  createAiAssistant(
+    data: UpsertAiAssistantData,
+    user: IUserHasId,
+  ): Promise<AiAssistantDocument>;
+  updateAiAssistant(
+    aiAssistantId: string,
+    data: UpsertAiAssistantData,
+    user: IUserHasId,
+  ): Promise<AiAssistantDocument>;
+  getAccessibleAiAssistants(user: IUserHasId): Promise<AccessibleAiAssistants>;
+  isLearnablePageLimitExceeded(
+    user: IUserHasId,
+    pagePathPatterns: string[],
+  ): Promise<boolean>;
 }
 class OpenaiService implements IOpenaiService {
-
   private crowi: Crowi;
 
   constructor(crowi: Crowi) {
     this.crowi = crowi;
 
-    this.createVectorStoreFileOnUploadAttachment = this.createVectorStoreFileOnUploadAttachment.bind(this);
-    crowi.attachmentService.addAttachHandler(this.createVectorStoreFileOnUploadAttachment);
+    this.createVectorStoreFileOnUploadAttachment =
+      this.createVectorStoreFileOnUploadAttachment.bind(this);
+    crowi.attachmentService.addAttachHandler(
+      this.createVectorStoreFileOnUploadAttachment,
+    );
 
-    this.deleteVectorStoreFileOnDeleteAttachment = this.deleteVectorStoreFileOnDeleteAttachment.bind(this);
-    crowi.attachmentService.addDetachHandler(this.deleteVectorStoreFileOnDeleteAttachment);
+    this.deleteVectorStoreFileOnDeleteAttachment =
+      this.deleteVectorStoreFileOnDeleteAttachment.bind(this);
+    crowi.attachmentService.addDetachHandler(
+      this.deleteVectorStoreFileOnDeleteAttachment,
+    );
   }
 
   private get client() {
@@ -110,7 +159,10 @@ class OpenaiService implements IOpenaiService {
     return getClient({ openaiServiceType });
   }
 
-  async generateAndProcessPreMessage(message: string, chunkProcessor: (delta: ChatCompletionChunk) => void): Promise<void> {
+  async generateAndProcessPreMessage(
+    message: string,
+    chunkProcessor: (delta: ChatCompletionChunk) => void,
+  ): Promise<void> {
     const systemMessage = [
       "Generate a message briefly confirming the user's question.",
       'Please generate up to 20 characters',
@@ -140,7 +192,9 @@ class OpenaiService implements IOpenaiService {
     }
   }
 
-  private async generateThreadTitle(message: string): Promise<Nullable<string>> {
+  private async generateThreadTitle(
+    message: string,
+  ): Promise<Nullable<string>> {
     const systemMessage = [
       'Create a brief title (max 5 words) from your message.',
       'Respond in the same language the user uses in their input.',
@@ -167,13 +221,23 @@ class OpenaiService implements IOpenaiService {
     }
   }
 
-  async createThread(userId: string, type: ThreadType, aiAssistantId?: string, initialUserMessage?: string): Promise<ThreadRelationDocument> {
+  async createThread(
+    userId: string,
+    type: ThreadType,
+    aiAssistantId?: string,
+    initialUserMessage?: string,
+  ): Promise<ThreadRelationDocument> {
     try {
-      const aiAssistant = aiAssistantId != null
-        ? await AiAssistantModel.findOne({ _id: { $eq: aiAssistantId } }).populate<{ vectorStore: IVectorStore }>('vectorStore')
-        : null;
+      const aiAssistant =
+        aiAssistantId != null
+          ? await AiAssistantModel.findOne({
+              _id: { $eq: aiAssistantId },
+            }).populate<{ vectorStore: IVectorStore }>('vectorStore')
+          : null;
 
-      const thread = await this.client.createThread(aiAssistant?.vectorStore?.vectorStoreId);
+      const thread = await this.client.createThread(
+        aiAssistant?.vectorStore?.vectorStoreId,
+      );
       const threadRelation = await ThreadRelationModel.create({
         userId,
         type,
@@ -185,65 +249,87 @@ class OpenaiService implements IOpenaiService {
       if (initialUserMessage != null) {
         // Do not await, run in background
         this.generateThreadTitle(initialUserMessage)
-          .then(async(generatedTitle) => {
+          .then(async (generatedTitle) => {
             if (generatedTitle != null) {
               threadRelation.title = generatedTitle;
               await threadRelation.save();
             }
           })
           .catch((err) => {
-            logger.error(`Failed to generate thread title for threadId ${thread.id}:`, err);
+            logger.error(
+              `Failed to generate thread title for threadId ${thread.id}:`,
+              err,
+            );
           });
       }
 
       return threadRelation;
-    }
-    catch (err) {
+    } catch (err) {
       throw err;
     }
   }
 
-  private async updateThreads(aiAssistantId: string, vectorStoreId: string): Promise<void> {
+  private async updateThreads(
+    aiAssistantId: string,
+    vectorStoreId: string,
+  ): Promise<void> {
     const threadRelations = await this.getThreadsByAiAssistantId(aiAssistantId);
     for await (const threadRelation of threadRelations) {
       try {
-        const updatedThreadResponse = await this.client.updateThread(threadRelation.threadId, vectorStoreId);
+        const updatedThreadResponse = await this.client.updateThread(
+          threadRelation.threadId,
+          vectorStoreId,
+        );
         logger.debug('Update thread', updatedThreadResponse);
-      }
-      catch (err) {
+      } catch (err) {
         logger.error(err);
       }
     }
   }
 
-  async getThreadsByAiAssistantId(aiAssistantId: string, type: ThreadType = ThreadType.KNOWLEDGE): Promise<ThreadRelationDocument[]> {
-    const threadRelations = await ThreadRelationModel
-      .find({ aiAssistant: aiAssistantId, type })
-      .sort({ updatedAt: -1 });
+  async getThreadsByAiAssistantId(
+    aiAssistantId: string,
+    type: ThreadType = ThreadType.KNOWLEDGE,
+  ): Promise<ThreadRelationDocument[]> {
+    const threadRelations = await ThreadRelationModel.find({
+      aiAssistant: aiAssistantId,
+      type,
+    }).sort({ updatedAt: -1 });
     return threadRelations;
   }
 
-  async deleteThread(threadRelationId: string): Promise<ThreadRelationDocument> {
+  async deleteThread(
+    threadRelationId: string,
+  ): Promise<ThreadRelationDocument> {
     const threadRelation = await ThreadRelationModel.findById(threadRelationId);
     if (threadRelation == null) {
       throw createError(404, 'ThreadRelation document does not exist');
     }
 
     try {
-      const deletedThreadResponse = await this.client.deleteThread(threadRelation.threadId);
+      const deletedThreadResponse = await this.client.deleteThread(
+        threadRelation.threadId,
+      );
       logger.debug('Delete thread', deletedThreadResponse);
       await threadRelation.remove();
-    }
-    catch (err) {
-      await openaiApiErrorHandler(err, { notFoundError: async() => { await threadRelation.remove() } });
+    } catch (err) {
+      await openaiApiErrorHandler(err, {
+        notFoundError: async () => {
+          await threadRelation.remove();
+        },
+      });
       throw err;
     }
 
     return threadRelation;
   }
 
-  public async deleteExpiredThreads(limit: number, apiCallInterval: number): Promise<void> {
-    const expiredThreadRelations = await ThreadRelationModel.getExpiredThreadRelations(limit);
+  public async deleteExpiredThreads(
+    limit: number,
+    apiCallInterval: number,
+  ): Promise<void> {
+    const expiredThreadRelations =
+      await ThreadRelationModel.getExpiredThreadRelations(limit);
     if (expiredThreadRelations == null) {
       return;
     }
@@ -251,22 +337,29 @@ class OpenaiService implements IOpenaiService {
     const deletedThreadIds: string[] = [];
     for await (const expiredThreadRelation of expiredThreadRelations) {
       try {
-        const deleteThreadResponse = await this.client.deleteThread(expiredThreadRelation.threadId);
+        const deleteThreadResponse = await this.client.deleteThread(
+          expiredThreadRelation.threadId,
+        );
         logger.debug('Delete thread', deleteThreadResponse);
         deletedThreadIds.push(expiredThreadRelation.threadId);
 
         // sleep
-        await new Promise(resolve => setTimeout(resolve, apiCallInterval));
-      }
-      catch (err) {
+        await new Promise((resolve) => setTimeout(resolve, apiCallInterval));
+      } catch (err) {
         logger.error(err);
       }
     }
 
-    await ThreadRelationModel.deleteMany({ threadId: { $in: deletedThreadIds } });
+    await ThreadRelationModel.deleteMany({
+      threadId: { $in: deletedThreadIds },
+    });
   }
 
-  async getMessageData(threadId: string, lang?: Lang, options?: MessageListParams): Promise<OpenAI.Beta.Threads.Messages.MessagesPage> {
+  async getMessageData(
+    threadId: string,
+    lang?: Lang,
+    options?: MessageListParams,
+  ): Promise<OpenAI.Beta.Threads.Messages.MessagesPage> {
     const messages = await this.client.getMessages(threadId, options);
 
     for await (const message of messages.data) {
@@ -280,8 +373,9 @@ class OpenaiService implements IOpenaiService {
     return messages;
   }
 
-
-  private async getVectorStoreRelationsByPageIds(pageIds: Types.ObjectId[]): Promise<VectorStoreDocument[]> {
+  private async getVectorStoreRelationsByPageIds(
+    pageIds: Types.ObjectId[],
+  ): Promise<VectorStoreDocument[]> {
     const pipeline = [
       // Stage 1: Match documents with the given pageId
       {
@@ -331,7 +425,10 @@ class OpenaiService implements IOpenaiService {
       },
     ];
 
-    const vectorStoreRelations = await VectorStoreFileRelationModel.aggregate<VectorStoreDocument>(pipeline);
+    const vectorStoreRelations =
+      await VectorStoreFileRelationModel.aggregate<VectorStoreDocument>(
+        pipeline,
+      );
     return vectorStoreRelations;
   }
 
@@ -339,27 +436,36 @@ class OpenaiService implements IOpenaiService {
     try {
       const newVectorStore = await this.client.createVectorStore(name);
 
-      const newVectorStoreDocument = await VectorStoreModel.create({
+      const newVectorStoreDocument = (await VectorStoreModel.create({
         vectorStoreId: newVectorStore.id,
-      }) as VectorStoreDocument;
+      })) as VectorStoreDocument;
 
       return newVectorStoreDocument;
-    }
-    catch (err) {
+    } catch (err) {
       throw new Error(err);
     }
   }
 
-  private async uploadFile(revisionBody: string, page: HydratedDocument<PageDocument>): Promise<OpenAI.Files.FileObject> {
+  private async uploadFile(
+    revisionBody: string,
+    page: HydratedDocument<PageDocument>,
+  ): Promise<OpenAI.Files.FileObject> {
     const siteUrl = configManager.getConfig('app:siteUrl');
 
-    const convertedHtml = await convertMarkdownToHtml(revisionBody, { page, siteUrl });
+    const convertedHtml = await convertMarkdownToHtml(revisionBody, {
+      page,
+      siteUrl,
+    });
     const file = await toFile(Readable.from(convertedHtml), `${page._id}.html`);
     const uploadedFile = await this.client.uploadFile(file);
     return uploadedFile;
   }
 
-  private async uploadFileForAttachment(fileName: string, readStream?: NodeJS.ReadableStream, filePath?: string): Promise<OpenAI.Files.FileObject> {
+  private async uploadFileForAttachment(
+    fileName: string,
+    readStream?: NodeJS.ReadableStream,
+    filePath?: string,
+  ): Promise<OpenAI.Files.FileObject> {
     const streamSource: NodeJS.ReadableStream = (() => {
       if (readStream != null) {
         return readStream;
@@ -372,55 +478,80 @@ class OpenaiService implements IOpenaiService {
       throw new Error('readStream and filePath are both null');
     })();
 
-    const uploadableFile = await toFile(
-      streamSource,
-      fileName,
-    );
+    const uploadableFile = await toFile(streamSource, fileName);
 
     const uploadedFile = await this.client.uploadFile(uploadableFile);
     return uploadedFile;
   }
 
   async deleteVectorStore(vectorStoreRelationId: string): Promise<void> {
-    const vectorStoreDocument: VectorStoreDocument | null = await VectorStoreModel.findOne({ _id: vectorStoreRelationId, isDeleted: false });
+    const vectorStoreDocument: VectorStoreDocument | null =
+      await VectorStoreModel.findOne({
+        _id: vectorStoreRelationId,
+        isDeleted: false,
+      });
     if (vectorStoreDocument == null) {
       return;
     }
 
     try {
-      const deleteVectorStoreResponse = await this.client.deleteVectorStore(vectorStoreDocument.vectorStoreId);
+      const deleteVectorStoreResponse = await this.client.deleteVectorStore(
+        vectorStoreDocument.vectorStoreId,
+      );
       logger.debug('Delete vector store', deleteVectorStoreResponse);
       await vectorStoreDocument.markAsDeleted();
-    }
-    catch (err) {
-      await openaiApiErrorHandler(err, { notFoundError: vectorStoreDocument.markAsDeleted });
+    } catch (err) {
+      await openaiApiErrorHandler(err, {
+        notFoundError: vectorStoreDocument.markAsDeleted,
+      });
       throw new Error(err);
     }
   }
 
   private async createVectorStoreFileWithStreamForAttachment(
-      pageId: Types.ObjectId, vectorStoreRelationId: Types.ObjectId, vectorStoreFileRelationsMap: VectorStoreFileRelationsMap,
+    pageId: Types.ObjectId,
+    vectorStoreRelationId: Types.ObjectId,
+    vectorStoreFileRelationsMap: VectorStoreFileRelationsMap,
   ): Promise<void> {
-
-    const Attachment = mongoose.model<HydratedDocument<IAttachmentDocument>, IAttachmentModel>('Attachment');
+    const Attachment = mongoose.model<
+      HydratedDocument<IAttachmentDocument>,
+      IAttachmentModel
+    >('Attachment');
     const attachmentsCursor = Attachment.find({ page: pageId }).cursor();
     const batchStream = createBatchStream(BATCH_SIZE);
 
     const uploadFileStreamForAttachment = new Writable({
       objectMode: true,
-      write: async(attachments: HydratedDocument<IAttachmentDocument>[], _encoding, callback) => {
+      write: async (
+        attachments: HydratedDocument<IAttachmentDocument>[],
+        _encoding,
+        callback,
+      ) => {
         for await (const attachment of attachments) {
           try {
-            if (!isVectorStoreCompatible(attachment.originalName, attachment.fileFormat)) {
+            if (
+              !isVectorStoreCompatible(
+                attachment.originalName,
+                attachment.fileFormat,
+              )
+            ) {
               continue;
             }
-            const readStream = await this.crowi.fileUploadService.findDeliveryFile(attachment);
-            const uploadedFileForAttachment = await this.uploadFileForAttachment(attachment.originalName, readStream);
+            const readStream =
+              await this.crowi.fileUploadService.findDeliveryFile(attachment);
+            const uploadedFileForAttachment =
+              await this.uploadFileForAttachment(
+                attachment.originalName,
+                readStream,
+              );
             prepareVectorStoreFileRelations(
-              vectorStoreRelationId, pageId, uploadedFileForAttachment.id, vectorStoreFileRelationsMap, attachment._id,
+              vectorStoreRelationId,
+              pageId,
+              uploadedFileForAttachment.id,
+              vectorStoreFileRelationsMap,
+              attachment._id,
             );
-          }
-          catch (err) {
+          } catch (err) {
             logger.error(err);
           }
         }
@@ -432,32 +563,63 @@ class OpenaiService implements IOpenaiService {
       },
     });
 
-    await pipeline(attachmentsCursor, batchStream, uploadFileStreamForAttachment);
+    await pipeline(
+      attachmentsCursor,
+      batchStream,
+      uploadFileStreamForAttachment,
+    );
   }
 
   private async createVectorStoreFile(
-      vectorStoreRelation: VectorStoreDocument, pages: Array<HydratedDocument<PageDocument>>, ignoreAttachments = false,
+    vectorStoreRelation: VectorStoreDocument,
+    pages: Array<HydratedDocument<PageDocument>>,
+    ignoreAttachments = false,
   ): Promise<void> {
     const vectorStoreFileRelationsMap: VectorStoreFileRelationsMap = new Map();
-    const processUploadFile = async(page: HydratedDocument<PageDocument>) => {
+    const processUploadFile = async (page: HydratedDocument<PageDocument>) => {
       if (page._id != null && page.revision != null) {
         if (isPopulated(page.revision) && page.revision.body.length > 0) {
           const uploadedFile = await this.uploadFile(page.revision.body, page);
-          prepareVectorStoreFileRelations(vectorStoreRelation._id, page._id, uploadedFile.id, vectorStoreFileRelationsMap);
+          prepareVectorStoreFileRelations(
+            vectorStoreRelation._id,
+            page._id,
+            uploadedFile.id,
+            vectorStoreFileRelationsMap,
+          );
 
           if (!ignoreAttachments) {
-            await this.createVectorStoreFileWithStreamForAttachment(page._id, vectorStoreRelation._id, vectorStoreFileRelationsMap);
+            await this.createVectorStoreFileWithStreamForAttachment(
+              page._id,
+              vectorStoreRelation._id,
+              vectorStoreFileRelationsMap,
+            );
           }
           return;
         }
 
-        const pagePopulatedToShowRevision = await page.populateDataToShowRevision();
-        if (pagePopulatedToShowRevision.revision != null && pagePopulatedToShowRevision.revision.body.length > 0) {
-          const uploadedFile = await this.uploadFile(pagePopulatedToShowRevision.revision.body, page);
-          prepareVectorStoreFileRelations(vectorStoreRelation._id, page._id, uploadedFile.id, vectorStoreFileRelationsMap);
+        const pagePopulatedToShowRevision =
+          await page.populateDataToShowRevision();
+        if (
+          pagePopulatedToShowRevision.revision != null &&
+          pagePopulatedToShowRevision.revision.body.length > 0
+        ) {
+          const uploadedFile = await this.uploadFile(
+            pagePopulatedToShowRevision.revision.body,
+            page,
+          );
+          prepareVectorStoreFileRelations(
+            vectorStoreRelation._id,
+            page._id,
+            uploadedFile.id,
+            vectorStoreFileRelationsMap,
+          );
 
           if (!ignoreAttachments) {
-            await this.createVectorStoreFileWithStreamForAttachment(page._id, vectorStoreRelation._id, vectorStoreFileRelationsMap);
+            await this.createVectorStoreFileWithStreamForAttachment(
+              page._id,
+              vectorStoreRelation._id,
+              vectorStoreFileRelationsMap,
+            );
           }
         }
       }
@@ -467,7 +629,10 @@ class OpenaiService implements IOpenaiService {
     const workers = pages.map(processUploadFile);
 
     // Wait for all processing to complete.
-    assert(workers.length <= BATCH_SIZE, 'workers.length must be less than or equal to BATCH_SIZE');
+    assert(
+      workers.length <= BATCH_SIZE,
+      'workers.length must be less than or equal to BATCH_SIZE',
+    );
     const fileUploadResult = await Promise.allSettled(workers);
     fileUploadResult.forEach((result) => {
       if (result.status === 'rejected') {
@@ -475,27 +640,39 @@ class OpenaiService implements IOpenaiService {
       }
     });
 
-    const vectorStoreFileRelations = Array.from(vectorStoreFileRelationsMap.values());
-    const uploadedFileIds = vectorStoreFileRelations.map(data => data.fileIds).flat();
+    const vectorStoreFileRelations = Array.from(
+      vectorStoreFileRelationsMap.values(),
+    );
+    const uploadedFileIds = vectorStoreFileRelations.flatMap(
+      (data) => data.fileIds,
+    );
 
     if (uploadedFileIds.length === 0) {
       return;
     }
 
-    const pageIds = pages.map(page => page._id);
+    const pageIds = pages.map((page) => page._id);
 
     try {
       // Save vector store file relation
-      await VectorStoreFileRelationModel.upsertVectorStoreFileRelations(vectorStoreFileRelations);
+      await VectorStoreFileRelationModel.upsertVectorStoreFileRelations(
+        vectorStoreFileRelations,
+      );
 
       // Create vector store file
-      const createVectorStoreFileBatchResponse = await this.client.createVectorStoreFileBatch(vectorStoreRelation.vectorStoreId, uploadedFileIds);
-      logger.debug('Create vector store file', createVectorStoreFileBatchResponse);
+      const createVectorStoreFileBatchResponse =
+        await this.client.createVectorStoreFileBatch(
+          vectorStoreRelation.vectorStoreId,
+          uploadedFileIds,
+        );
+      logger.debug(
+        'Create vector store file',
+        createVectorStoreFileBatchResponse,
+      );
 
       // Set isAttachedToVectorStore: true when the uploaded file is attached to VectorStore
       await VectorStoreFileRelationModel.markAsAttachedToVectorStore(pageIds);
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
 
       // Delete all uploaded files if createVectorStoreFileBatch fails
@@ -503,56 +680,67 @@ class OpenaiService implements IOpenaiService {
         await this.deleteVectorStoreFile(vectorStoreRelation._id, pageId);
       }
     }
-
   }
 
   // Deletes all VectorStore documents that are marked as deleted (isDeleted: true) and have no associated VectorStoreFileRelation documents
   async deleteObsoletedVectorStoreRelations(): Promise<void> {
-    const deletedVectorStoreRelations = await VectorStoreModel.find({ isDeleted: true });
+    const deletedVectorStoreRelations = await VectorStoreModel.find({
+      isDeleted: true,
+    });
     if (deletedVectorStoreRelations.length === 0) {
       return;
     }
 
-    const currentVectorStoreRelationIds: Types.ObjectId[] = await VectorStoreFileRelationModel.aggregate([
-      {
-        $group: {
-          _id: '$vectorStoreRelationId',
-          relationCount: { $sum: 1 },
+    const currentVectorStoreRelationIds: Types.ObjectId[] =
+      await VectorStoreFileRelationModel.aggregate([
+        {
+          $group: {
+            _id: '$vectorStoreRelationId',
+            relationCount: { $sum: 1 },
+          },
         },
-      },
-      { $match: { relationCount: { $gt: 0 } } },
-      { $project: { _id: 1 } },
-    ]);
+        { $match: { relationCount: { $gt: 0 } } },
+        { $project: { _id: 1 } },
+      ]);
 
     if (currentVectorStoreRelationIds.length === 0) {
       return;
     }
 
-    await VectorStoreModel.deleteMany({ _id: { $nin: currentVectorStoreRelationIds }, isDeleted: true });
+    await VectorStoreModel.deleteMany({
+      _id: { $nin: currentVectorStoreRelationIds },
+      isDeleted: true,
+    });
   }
 
-  private async deleteVectorStoreFileForAttachment(vectorStoreFileRelation: VectorStoreFileRelation): Promise<void> {
+  private async deleteVectorStoreFileForAttachment(
+    vectorStoreFileRelation: VectorStoreFileRelation,
+  ): Promise<void> {
     if (vectorStoreFileRelation.attachment == null) {
       return;
     }
 
-    const deleteAllAttachmentVectorStoreFileRelations = async() => {
-      await VectorStoreFileRelationModel.deleteMany({ attachment: vectorStoreFileRelation.attachment });
+    const deleteAllAttachmentVectorStoreFileRelations = async () => {
+      await VectorStoreFileRelationModel.deleteMany({
+        attachment: vectorStoreFileRelation.attachment,
+      });
     };
 
     try {
       // Delete entities in VectorStoreFile
       const fileId = vectorStoreFileRelation.fileIds[0];
       const deleteFileResponse = await this.client.deleteFile(fileId);
-      logger.debug('Delete vector store file (attachment) ', deleteFileResponse);
+      logger.debug(
+        'Delete vector store file (attachment) ',
+        deleteFileResponse,
+      );
 
       // Delete related VectorStoreFileRelation document
       const attachmentId = vectorStoreFileRelation.attachment;
       if (attachmentId != null) {
         await deleteAllAttachmentVectorStoreFileRelations();
       }
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
       await openaiApiErrorHandler(err, {
         notFoundError: () => deleteAllAttachmentVectorStoreFileRelations(),
@@ -561,21 +749,27 @@ class OpenaiService implements IOpenaiService {
   }
 
   private async deleteVectorStoreFile(
-      vectorStoreRelationId: Types.ObjectId, pageId: Types.ObjectId, ignoreAttachments = false, apiCallInterval?: number,
+    vectorStoreRelationId: Types.ObjectId,
+    pageId: Types.ObjectId,
+    ignoreAttachments = false,
+    apiCallInterval?: number,
   ): Promise<void> {
-
     if (!ignoreAttachments) {
       // Get all VectorStoreFIleDocument (attachments) associated with the page
-      const vectorStoreFileRelationsForAttachment = await VectorStoreFileRelationModel.find({
-        vectorStoreRelationId, page: pageId, attachment: { $exists: true },
-      });
+      const vectorStoreFileRelationsForAttachment =
+        await VectorStoreFileRelationModel.find({
+          vectorStoreRelationId,
+          page: pageId,
+          attachment: { $exists: true },
+        });
 
       if (vectorStoreFileRelationsForAttachment.length !== 0) {
         for await (const vectorStoreFileRelation of vectorStoreFileRelationsForAttachment) {
           try {
-            await this.deleteVectorStoreFileForAttachment(vectorStoreFileRelation);
-          }
-          catch (err) {
+            await this.deleteVectorStoreFileForAttachment(
+              vectorStoreFileRelation,
+            );
+          } catch (err) {
             logger.error(err);
           }
         }
@@ -583,7 +777,10 @@ class OpenaiService implements IOpenaiService {
     }
 
     // Delete vector store file and delete vector store file relation
-    const vectorStoreFileRelation = await VectorStoreFileRelationModel.findOne({ vectorStoreRelationId, page: pageId });
+    const vectorStoreFileRelation = await VectorStoreFileRelationModel.findOne({
+      vectorStoreRelationId,
+      page: pageId,
+    });
     if (vectorStoreFileRelation == null) {
       return;
     }
@@ -596,16 +793,21 @@ class OpenaiService implements IOpenaiService {
         deletedFileIds.push(fileId);
         if (apiCallInterval != null) {
           // sleep
-          await new Promise(resolve => setTimeout(resolve, apiCallInterval));
+          await new Promise((resolve) => setTimeout(resolve, apiCallInterval));
         }
-      }
-      catch (err) {
-        await openaiApiErrorHandler(err, { notFoundError: async() => { deletedFileIds.push(fileId) } });
+      } catch (err) {
+        await openaiApiErrorHandler(err, {
+          notFoundError: async () => {
+            deletedFileIds.push(fileId);
+          },
+        });
         logger.error(err);
       }
     }
 
-    const undeletedFileIds = vectorStoreFileRelation.fileIds.filter(fileId => !deletedFileIds.includes(fileId));
+    const undeletedFileIds = vectorStoreFileRelation.fileIds.filter(
+      (fileId) => !deletedFileIds.includes(fileId),
+    );
 
     if (undeletedFileIds.length === 0) {
       await vectorStoreFileRelation.remove();
@@ -616,27 +818,43 @@ class OpenaiService implements IOpenaiService {
     await vectorStoreFileRelation.save();
   }
 
-  async deleteVectorStoreFilesByPageIds(pageIds: Types.ObjectId[]): Promise<void> {
-    const vectorStoreRelations = await this.getVectorStoreRelationsByPageIds(pageIds);
+  async deleteVectorStoreFilesByPageIds(
+    pageIds: Types.ObjectId[],
+  ): Promise<void> {
+    const vectorStoreRelations =
+      await this.getVectorStoreRelationsByPageIds(pageIds);
     if (vectorStoreRelations != null && vectorStoreRelations.length !== 0) {
       for await (const pageId of pageIds) {
-        const deleteVectorStoreFilePromises = vectorStoreRelations.map(vectorStoreRelation => this.deleteVectorStoreFile(vectorStoreRelation._id, pageId));
+        const deleteVectorStoreFilePromises = vectorStoreRelations.map(
+          (vectorStoreRelation) =>
+            this.deleteVectorStoreFile(vectorStoreRelation._id, pageId),
+        );
         await Promise.allSettled(deleteVectorStoreFilePromises);
       }
     }
   }
 
-  async deleteObsoleteVectorStoreFile(limit: number, apiCallInterval: number): Promise<void> {
+  async deleteObsoleteVectorStoreFile(
+    limit: number,
+    apiCallInterval: number,
+  ): Promise<void> {
     // Retrieves all VectorStore documents that are marked as deleted
-    const deletedVectorStoreRelations = await VectorStoreModel.find({ isDeleted: true });
+    const deletedVectorStoreRelations = await VectorStoreModel.find({
+      isDeleted: true,
+    });
     if (deletedVectorStoreRelations.length === 0) {
       return;
     }
 
     // Retrieves VectorStoreFileRelation documents associated with deleted VectorStore documents
-    const obsoleteVectorStoreFileRelations = await VectorStoreFileRelationModel.find(
-      { vectorStoreRelationId: { $in: deletedVectorStoreRelations.map(deletedVectorStoreRelation => deletedVectorStoreRelation._id) } },
-    ).limit(limit);
+    const obsoleteVectorStoreFileRelations =
+      await VectorStoreFileRelationModel.find({
+        vectorStoreRelationId: {
+          $in: deletedVectorStoreRelations.map(
+            (deletedVectorStoreRelation) => deletedVectorStoreRelation._id,
+          ),
+        },
+      }).limit(limit);
     if (obsoleteVectorStoreFileRelations.length === 0) {
       return;
     }
@@ -644,46 +862,68 @@ class OpenaiService implements IOpenaiService {
     // Delete obsolete VectorStoreFile
     for await (const vectorStoreFileRelation of obsoleteVectorStoreFileRelations) {
       try {
-        await this.deleteVectorStoreFile(vectorStoreFileRelation.vectorStoreRelationId, vectorStoreFileRelation.page, false, apiCallInterval);
-      }
-      catch (err) {
+        await this.deleteVectorStoreFile(
+          vectorStoreFileRelation.vectorStoreRelationId,
+          vectorStoreFileRelation.page,
+          false,
+          apiCallInterval,
+        );
+      } catch (err) {
         logger.error(err);
       }
     }
   }
 
   private async deleteVectorStoreFileOnDeleteAttachment(attachmentId: string) {
-    const vectorStoreFileRelation = await VectorStoreFileRelationModel.findOne({ attachment: attachmentId });
+    const vectorStoreFileRelation = await VectorStoreFileRelationModel.findOne({
+      attachment: attachmentId,
+    });
     if (vectorStoreFileRelation == null) {
       return;
     }
 
     try {
       await this.deleteVectorStoreFileForAttachment(vectorStoreFileRelation);
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
     }
   }
 
+  private async filterPagesByAccessScope(
+    aiAssistant: AiAssistantDocument,
+    pages: HydratedDocument<PageDocument>[],
+  ) {
+    const isPublicPage = (page: HydratedDocument<PageDocument>) =>
+      page.grant === PageGrant.GRANT_PUBLIC;
 
-  private async filterPagesByAccessScope(aiAssistant: AiAssistantDocument, pages: HydratedDocument<PageDocument>[]) {
-    const isPublicPage = (page: HydratedDocument<PageDocument>) => page.grant === PageGrant.GRANT_PUBLIC;
-
-    const isUserGroupAccessible = (page: HydratedDocument<PageDocument>, ownerUserGroupIds: string[]) => {
+    const isUserGroupAccessible = (
+      page: HydratedDocument<PageDocument>,
+      ownerUserGroupIds: string[],
+    ) => {
       if (page.grant !== PageGrant.GRANT_USER_GROUP) return false;
-      return page.grantedGroups.some(group => ownerUserGroupIds.includes(getIdStringForRef(group.item)));
+      return page.grantedGroups.some((group) =>
+        ownerUserGroupIds.includes(getIdStringForRef(group.item)),
+      );
     };
 
-    const isOwnerAccessible = (page: HydratedDocument<PageDocument>, ownerId: Ref<IUser>) => {
+    const isOwnerAccessible = (
+      page: HydratedDocument<PageDocument>,
+      ownerId: Ref<IUser>,
+    ) => {
       if (page.grant !== PageGrant.GRANT_OWNER) return false;
-      return page.grantedUsers.some(user => getIdStringForRef(user) === getIdStringForRef(ownerId));
+      return page.grantedUsers.some(
+        (user) => getIdStringForRef(user) === getIdStringForRef(ownerId),
+      );
     };
 
-    const getOwnerUserGroupIds = async(owner: Ref<IUser>) => {
-      const userGroups = await UserGroupRelation.findAllUserGroupIdsRelatedToUser(owner);
-      const externalGroups = await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(owner);
-      return [...userGroups, ...externalGroups].map(group => getIdStringForRef(group));
+    const getOwnerUserGroupIds = async (owner: Ref<IUser>) => {
+      const userGroups =
+        await UserGroupRelation.findAllUserGroupIdsRelatedToUser(owner);
+      const externalGroups =
+        await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(owner);
+      return [...userGroups, ...externalGroups].map((group) =>
+        getIdStringForRef(group),
+      );
     };
 
     switch (aiAssistant.accessScope) {
@@ -692,12 +932,21 @@ class OpenaiService implements IOpenaiService {
 
       case AiAssistantAccessScope.GROUPS: {
         const ownerUserGroupIds = await getOwnerUserGroupIds(aiAssistant.owner);
-        return pages.filter(page => isPublicPage(page) || isUserGroupAccessible(page, ownerUserGroupIds));
+        return pages.filter(
+          (page) =>
+            isPublicPage(page) ||
+            isUserGroupAccessible(page, ownerUserGroupIds),
+        );
       }
 
       case AiAssistantAccessScope.OWNER: {
         const ownerUserGroupIds = await getOwnerUserGroupIds(aiAssistant.owner);
-        return pages.filter(page => isPublicPage(page) || isOwnerAccessible(page, aiAssistant.owner) || isUserGroupAccessible(page, ownerUserGroupIds));
+        return pages.filter(
+          (page) =>
+            isPublicPage(page) ||
+            isOwnerAccessible(page, aiAssistant.owner) ||
+            isUserGroupAccessible(page, ownerUserGroupIds),
+        );
       }
 
       default:
@@ -705,9 +954,14 @@ class OpenaiService implements IOpenaiService {
     }
   }
 
-  async createVectorStoreFileOnPageCreate(pages: HydratedDocument<PageDocument>[]): Promise<void> {
-    const pagePaths = pages.map(page => page.path);
-    const aiAssistants = await this.findAiAssistantByPagePath(pagePaths, { shouldPopulateOwner: true, shouldPopulateVectorStore: true });
+  async createVectorStoreFileOnPageCreate(
+    pages: HydratedDocument<PageDocument>[],
+  ): Promise<void> {
+    const pagePaths = pages.map((page) => page.path);
+    const aiAssistants = await this.findAiAssistantByPagePath(pagePaths, {
+      shouldPopulateOwner: true,
+      shouldPopulateVectorStore: true,
+    });
 
     if (aiAssistants.length === 0) {
       return;
@@ -718,12 +972,19 @@ class OpenaiService implements IOpenaiService {
         continue;
       }
 
-      const isLearnablePageLimitExceeded = await this.isLearnablePageLimitExceeded(aiAssistant.owner, aiAssistant.pagePathPatterns);
+      const isLearnablePageLimitExceeded =
+        await this.isLearnablePageLimitExceeded(
+          aiAssistant.owner,
+          aiAssistant.pagePathPatterns,
+        );
       if (isLearnablePageLimitExceeded) {
         continue;
       }
 
-      const pagesToVectorize = await this.filterPagesByAccessScope(aiAssistant, pages);
+      const pagesToVectorize = await this.filterPagesByAccessScope(
+        aiAssistant,
+        pages,
+      );
       const vectorStoreRelation = aiAssistant.vectorStore;
       if (vectorStoreRelation == null || !isPopulated(vectorStoreRelation)) {
         continue;
@@ -731,22 +992,35 @@ class OpenaiService implements IOpenaiService {
 
       logger.debug('--------- createVectorStoreFileOnPageCreate ---------');
       logger.debug('AccessScopeType of aiAssistant: ', aiAssistant.accessScope);
-      logger.debug('VectorStoreFile pagePath to be created: ', pagesToVectorize.map(page => page.path));
+      logger.debug(
+        'VectorStoreFile pagePath to be created: ',
+        pagesToVectorize.map((page) => page.path),
+      );
       logger.debug('-----------------------------------------------------');
 
-      await this.createVectorStoreFile(vectorStoreRelation as VectorStoreDocument, pagesToVectorize);
+      await this.createVectorStoreFile(
+        vectorStoreRelation as VectorStoreDocument,
+        pagesToVectorize,
+      );
     }
   }
 
-  async updateVectorStoreFileOnPageUpdate(page: HydratedDocument<PageDocument>) {
-    const aiAssistants = await this.findAiAssistantByPagePath([page.path], { shouldPopulateVectorStore: true });
+  async updateVectorStoreFileOnPageUpdate(
+    page: HydratedDocument<PageDocument>,
+  ) {
+    const aiAssistants = await this.findAiAssistantByPagePath([page.path], {
+      shouldPopulateVectorStore: true,
+    });
 
     if (aiAssistants.length === 0) {
       return;
     }
 
     for await (const aiAssistant of aiAssistants) {
-      const pagesToVectorize = await this.filterPagesByAccessScope(aiAssistant, [page]);
+      const pagesToVectorize = await this.filterPagesByAccessScope(
+        aiAssistant,
+        [page],
+      );
       const vectorStoreRelation = aiAssistant.vectorStore;
       if (vectorStoreRelation == null || !isPopulated(vectorStoreRelation)) {
         continue;
@@ -755,7 +1029,10 @@ class OpenaiService implements IOpenaiService {
       logger.debug('---------- updateVectorStoreOnPageUpdate ------------');
       logger.debug('AccessScopeType of aiAssistant: ', aiAssistant.accessScope);
       logger.debug('PagePath of VectorStoreFile to be deleted: ', page.path);
-      logger.debug('pagePath of VectorStoreFile to be created: ', pagesToVectorize.map(page => page.path));
+      logger.debug(
+        'pagePath of VectorStoreFile to be created: ',
+        pagesToVectorize.map((page) => page.path),
+      );
       logger.debug('-----------------------------------------------------');
 
       // Do not create a new VectorStoreFile if page is changed to a permission that AiAssistant does not have access to
@@ -773,28 +1050,41 @@ class OpenaiService implements IOpenaiService {
   }
 
   private async createVectorStoreFileOnUploadAttachment(
-      pageId: string, attachment: HydratedDocument<IAttachmentDocument>, file: Express.Multer.File,
+    pageId: string,
+    attachment: HydratedDocument<IAttachmentDocument>,
+    file: Express.Multer.File,
   ): Promise<void> {
     if (!isVectorStoreCompatible(file.originalname, file.mimetype)) {
       return;
     }
 
-    const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>('Page');
+    const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
+      'Page',
+    );
     const page = await Page.findById(pageId);
     if (page == null) {
       return;
     }
 
-    const aiAssistants = await this.findAiAssistantByPagePath([page.path], { shouldPopulateVectorStore: true });
+    const aiAssistants = await this.findAiAssistantByPagePath([page.path], {
+      shouldPopulateVectorStore: true,
+    });
     if (aiAssistants.length === 0) {
       return;
     }
 
-    const uploadedFile = await this.uploadFileForAttachment(file.originalname, undefined, file.path);
+    const uploadedFile = await this.uploadFileForAttachment(
+      file.originalname,
+      undefined,
+      file.path,
+    );
     logger.debug('Uploaded file', uploadedFile);
 
     for await (const aiAssistant of aiAssistants) {
-      const pagesToVectorize = await this.filterPagesByAccessScope(aiAssistant, [page]);
+      const pagesToVectorize = await this.filterPagesByAccessScope(
+        aiAssistant,
+        [page],
+      );
       if (pagesToVectorize.length === 0) {
         continue;
       }
@@ -804,18 +1094,37 @@ class OpenaiService implements IOpenaiService {
         continue;
       }
 
-      await this.client.createVectorStoreFile(vectorStoreRelation.vectorStoreId, uploadedFile.id);
+      await this.client.createVectorStoreFile(
+        vectorStoreRelation.vectorStoreId,
+        uploadedFile.id,
+      );
 
-      const vectorStoreFileRelationsMap: VectorStoreFileRelationsMap = new Map();
-      prepareVectorStoreFileRelations(vectorStoreRelation._id as Types.ObjectId, page._id, uploadedFile.id, vectorStoreFileRelationsMap, attachment._id);
-      const vectorStoreFileRelations = Array.from(vectorStoreFileRelationsMap.values());
+      const vectorStoreFileRelationsMap: VectorStoreFileRelationsMap =
+        new Map();
+      prepareVectorStoreFileRelations(
+        vectorStoreRelation._id as Types.ObjectId,
+        page._id,
+        uploadedFile.id,
+        vectorStoreFileRelationsMap,
+        attachment._id,
+      );
+      const vectorStoreFileRelations = Array.from(
+        vectorStoreFileRelationsMap.values(),
+      );
 
-      await VectorStoreFileRelationModel.upsertVectorStoreFileRelations(vectorStoreFileRelations);
+      await VectorStoreFileRelationModel.upsertVectorStoreFileRelations(
+        vectorStoreFileRelations,
+      );
     }
   }
 
-  private async createVectorStoreFileWithStream(vectorStoreRelation: VectorStoreDocument, conditions: mongoose.FilterQuery<PageDocument>): Promise<void> {
-    const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>('Page');
+  private async createVectorStoreFileWithStream(
+    vectorStoreRelation: VectorStoreDocument,
+    conditions: mongoose.FilterQuery<PageDocument>,
+  ): Promise<void> {
+    const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
+      'Page',
+    );
 
     const pagesStream = Page.find({ ...conditions })
       .populate('revision')
@@ -825,14 +1134,20 @@ class OpenaiService implements IOpenaiService {
     const createVectorStoreFile = this.createVectorStoreFile.bind(this);
     const createVectorStoreFileStream = new Transform({
       objectMode: true,
-      async transform(chunk: HydratedDocument<PageDocument>[], encoding, callback) {
+      async transform(
+        chunk: HydratedDocument<PageDocument>[],
+        encoding,
+        callback,
+      ) {
         try {
-          logger.debug('Target page path for VectorStoreFile generation: ', chunk.map(page => page.path));
+          logger.debug(
+            'Target page path for VectorStoreFile generation: ',
+            chunk.map((page) => page.path),
+          );
           await createVectorStoreFile(vectorStoreRelation, chunk);
           this.push(chunk);
           callback();
-        }
-        catch (error) {
+        } catch (error) {
           callback(error);
         }
       },
@@ -842,16 +1157,18 @@ class OpenaiService implements IOpenaiService {
   }
 
   private async createConditionForCreateVectorStoreFile(
-      owner: AiAssistant['owner'],
-      accessScope: AiAssistant['accessScope'],
-      grantedGroupsForAccessScope: AiAssistant['grantedGroupsForAccessScope'],
-      pagePathPatterns: AiAssistant['pagePathPatterns'],
+    owner: AiAssistant['owner'],
+    accessScope: AiAssistant['accessScope'],
+    grantedGroupsForAccessScope: AiAssistant['grantedGroupsForAccessScope'],
+    pagePathPatterns: AiAssistant['pagePathPatterns'],
   ): Promise<mongoose.FilterQuery<PageDocument>> {
-
-    const convertedPagePathPatterns = convertPathPatternsToRegExp(pagePathPatterns);
+    const convertedPagePathPatterns =
+      convertPathPatternsToRegExp(pagePathPatterns);
 
     // Include pages in search targets when their paths with 'Anyone with the link' permission are directly specified instead of using glob pattern
-    const nonGrabPagePathPatterns = pagePathPatterns.filter(pagePathPattern => !isGlobPatternPath(pagePathPattern));
+    const nonGrabPagePathPatterns = pagePathPatterns.filter(
+      (pagePathPattern) => !isGlobPatternPath(pagePathPattern),
+    );
     const baseCondition: mongoose.FilterQuery<PageDocument> = {
       grant: PageGrant.GRANT_RESTRICTED,
       path: { $in: nonGrabPagePathPatterns },
@@ -870,20 +1187,32 @@ class OpenaiService implements IOpenaiService {
     }
 
     if (accessScope === AiAssistantAccessScope.GROUPS) {
-      if (grantedGroupsForAccessScope == null || grantedGroupsForAccessScope.length === 0) {
+      if (
+        grantedGroupsForAccessScope == null ||
+        grantedGroupsForAccessScope.length === 0
+      ) {
         throw new Error('grantedGroups is required when accessScope is GROUPS');
       }
 
-      const extractedGrantedGroupIdsForAccessScope = grantedGroupsForAccessScope.map(group => getIdForRef(group.item).toString());
+      const extractedGrantedGroupIdsForAccessScope =
+        grantedGroupsForAccessScope.map((group) =>
+          getIdForRef(group.item).toString(),
+        );
 
       return {
         $or: [
           baseCondition,
           {
-            grant: { $in: [PageGrant.GRANT_PUBLIC, PageGrant.GRANT_USER_GROUP] },
+            grant: {
+              $in: [PageGrant.GRANT_PUBLIC, PageGrant.GRANT_USER_GROUP],
+            },
             path: { $in: convertedPagePathPatterns },
             $or: [
-              { 'grantedGroups.item': { $in: extractedGrantedGroupIdsForAccessScope } },
+              {
+                'grantedGroups.item': {
+                  $in: extractedGrantedGroupIdsForAccessScope,
+                },
+              },
               { grant: PageGrant.GRANT_PUBLIC },
             ],
           },
@@ -894,14 +1223,22 @@ class OpenaiService implements IOpenaiService {
     if (accessScope === AiAssistantAccessScope.OWNER) {
       const ownerUserGroups = [
         ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(owner)),
-        ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(owner)),
-      ].map(group => group.toString());
+        ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
+          owner,
+        )),
+      ].map((group) => group.toString());
 
       return {
         $or: [
           baseCondition,
           {
-            grant: { $in: [PageGrant.GRANT_PUBLIC, PageGrant.GRANT_USER_GROUP, PageGrant.GRANT_OWNER] },
+            grant: {
+              $in: [
+                PageGrant.GRANT_PUBLIC,
+                PageGrant.GRANT_USER_GROUP,
+                PageGrant.GRANT_OWNER,
+              ],
+            },
             path: { $in: convertedPagePathPatterns },
             $or: [
               { 'grantedGroups.item': { $in: ownerUserGroups } },
@@ -917,84 +1254,138 @@ class OpenaiService implements IOpenaiService {
   }
 
   private async validateGrantedUserGroupsForAiAssistant(
-      owner: AiAssistant['owner'],
-      shareScope: AiAssistant['shareScope'],
-      accessScope: AiAssistant['accessScope'],
-      grantedGroupsForShareScope: AiAssistant['grantedGroupsForShareScope'],
-      grantedGroupsForAccessScope: AiAssistant['grantedGroupsForAccessScope'],
+    owner: AiAssistant['owner'],
+    shareScope: AiAssistant['shareScope'],
+    accessScope: AiAssistant['accessScope'],
+    grantedGroupsForShareScope: AiAssistant['grantedGroupsForShareScope'],
+    grantedGroupsForAccessScope: AiAssistant['grantedGroupsForAccessScope'],
   ) {
-
     // Check if grantedGroupsForShareScope is not specified when shareScope is not a “group”
-    if (shareScope !== AiAssistantShareScope.GROUPS && grantedGroupsForShareScope != null) {
-      throw new Error('grantedGroupsForShareScope is specified when shareScope is not “groups”.');
+    if (
+      shareScope !== AiAssistantShareScope.GROUPS &&
+      grantedGroupsForShareScope != null
+    ) {
+      throw new Error(
+        'grantedGroupsForShareScope is specified when shareScope is not “groups”.',
+      );
     }
 
     // Check if grantedGroupsForAccessScope is not specified when accessScope is not a “group”
-    if (accessScope !== AiAssistantAccessScope.GROUPS && grantedGroupsForAccessScope != null) {
-      throw new Error('grantedGroupsForAccessScope is specified when accsessScope is not “groups”.');
+    if (
+      accessScope !== AiAssistantAccessScope.GROUPS &&
+      grantedGroupsForAccessScope != null
+    ) {
+      throw new Error(
+        'grantedGroupsForAccessScope is specified when accsessScope is not “groups”.',
+      );
     }
 
     const ownerUserGroupIds = [
       ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(owner)),
-      ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(owner)),
-    ].map(group => group.toString());
+      ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
+        owner,
+      )),
+    ].map((group) => group.toString());
 
     // Check if the owner belongs to the group specified in grantedGroupsForShareScope
-    if (grantedGroupsForShareScope != null && grantedGroupsForShareScope.length > 0) {
-      const extractedGrantedGroupIdsForShareScope = grantedGroupsForShareScope.map(group => getIdForRef(group.item).toString());
-      const isValid = extractedGrantedGroupIdsForShareScope.every(groupId => ownerUserGroupIds.includes(groupId));
+    if (
+      grantedGroupsForShareScope != null &&
+      grantedGroupsForShareScope.length > 0
+    ) {
+      const extractedGrantedGroupIdsForShareScope =
+        grantedGroupsForShareScope.map((group) =>
+          getIdForRef(group.item).toString(),
+        );
+      const isValid = extractedGrantedGroupIdsForShareScope.every((groupId) =>
+        ownerUserGroupIds.includes(groupId),
+      );
       if (!isValid) {
-        throw new Error('A userGroup to which the owner does not belong is specified in grantedGroupsForShareScope');
+        throw new Error(
+          'A userGroup to which the owner does not belong is specified in grantedGroupsForShareScope',
+        );
       }
     }
 
     // Check if the owner belongs to the group specified in grantedGroupsForAccessScope
-    if (grantedGroupsForAccessScope != null && grantedGroupsForAccessScope.length > 0) {
-      const extractedGrantedGroupIdsForAccessScope = grantedGroupsForAccessScope.map(group => getIdForRef(group.item).toString());
-      const isValid = extractedGrantedGroupIdsForAccessScope.every(groupId => ownerUserGroupIds.includes(groupId));
+    if (
+      grantedGroupsForAccessScope != null &&
+      grantedGroupsForAccessScope.length > 0
+    ) {
+      const extractedGrantedGroupIdsForAccessScope =
+        grantedGroupsForAccessScope.map((group) =>
+          getIdForRef(group.item).toString(),
+        );
+      const isValid = extractedGrantedGroupIdsForAccessScope.every((groupId) =>
+        ownerUserGroupIds.includes(groupId),
+      );
       if (!isValid) {
-        throw new Error('A userGroup to which the owner does not belong is specified in grantedGroupsForAccessScope');
+        throw new Error(
+          'A userGroup to which the owner does not belong is specified in grantedGroupsForAccessScope',
+        );
       }
     }
   }
 
-  async isAiAssistantUsable(aiAssistantId: string, user: IUserHasId): Promise<boolean> {
-    const aiAssistant = await AiAssistantModel.findOne({ _id: { $eq: aiAssistantId } });
+  async isAiAssistantUsable(
+    aiAssistantId: string,
+    user: IUserHasId,
+  ): Promise<boolean> {
+    const aiAssistant = await AiAssistantModel.findOne({
+      _id: { $eq: aiAssistantId },
+    });
 
     if (aiAssistant == null) {
       throw createError(404, 'AiAssistant document does not exist');
     }
 
-    const isOwner = getIdStringForRef(aiAssistant.owner) === getIdStringForRef(user._id);
+    const isOwner =
+      getIdStringForRef(aiAssistant.owner) === getIdStringForRef(user._id);
 
     if (aiAssistant.shareScope === AiAssistantShareScope.PUBLIC_ONLY) {
       return true;
     }
 
-    if ((aiAssistant.shareScope === AiAssistantShareScope.OWNER) && isOwner) {
+    if (aiAssistant.shareScope === AiAssistantShareScope.OWNER && isOwner) {
       return true;
     }
 
-    if ((aiAssistant.shareScope === AiAssistantShareScope.SAME_AS_ACCESS_SCOPE) && (aiAssistant.accessScope === AiAssistantAccessScope.OWNER) && isOwner) {
+    if (
+      aiAssistant.shareScope === AiAssistantShareScope.SAME_AS_ACCESS_SCOPE &&
+      aiAssistant.accessScope === AiAssistantAccessScope.OWNER &&
+      isOwner
+    ) {
       return true;
     }
 
-    if ((aiAssistant.shareScope === AiAssistantShareScope.GROUPS)
-      || ((aiAssistant.shareScope === AiAssistantShareScope.SAME_AS_ACCESS_SCOPE) && (aiAssistant.accessScope === AiAssistantAccessScope.GROUPS))) {
+    if (
+      aiAssistant.shareScope === AiAssistantShareScope.GROUPS ||
+      (aiAssistant.shareScope === AiAssistantShareScope.SAME_AS_ACCESS_SCOPE &&
+        aiAssistant.accessScope === AiAssistantAccessScope.GROUPS)
+    ) {
       const userGroupIds = [
         ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
-        ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
-      ].map(group => group.toString());
+        ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
+          user,
+        )),
+      ].map((group) => group.toString());
 
-      const grantedGroupIdsForShareScope = aiAssistant.grantedGroupsForShareScope?.map(group => getIdStringForRef(group.item)) ?? [];
-      const isShared = userGroupIds.some(userGroupId => grantedGroupIdsForShareScope.includes(userGroupId));
+      const grantedGroupIdsForShareScope =
+        aiAssistant.grantedGroupsForShareScope?.map((group) =>
+          getIdStringForRef(group.item),
+        ) ?? [];
+      const isShared = userGroupIds.some((userGroupId) =>
+        grantedGroupIdsForShareScope.includes(userGroupId),
+      );
       return isShared;
     }
 
     return false;
   }
 
-  async createAiAssistant(data: UpsertAiAssistantData, user: IUserHasId): Promise<AiAssistantDocument> {
+  async createAiAssistant(
+    data: UpsertAiAssistantData,
+    user: IUserHasId,
+  ): Promise<AiAssistantDocument> {
     await this.validateGrantedUserGroupsForAiAssistant(
       user,
       data.shareScope,
@@ -1012,7 +1403,9 @@ class OpenaiService implements IOpenaiService {
 
     const vectorStoreRelation = await this.createVectorStore(data.name);
     const aiAssistant = await AiAssistantModel.create({
-      ...data, owner: user, vectorStore: vectorStoreRelation,
+      ...data,
+      owner: user,
+      vectorStore: vectorStoreRelation,
     });
 
     // VectorStore creation process does not await
@@ -1021,8 +1414,15 @@ class OpenaiService implements IOpenaiService {
     return aiAssistant;
   }
 
-  async updateAiAssistant(aiAssistantId: string, data: UpsertAiAssistantData, user: IUserHasId): Promise<AiAssistantDocument> {
-    const aiAssistant = await AiAssistantModel.findOne({ owner: user, _id: aiAssistantId });
+  async updateAiAssistant(
+    aiAssistantId: string,
+    data: UpsertAiAssistantData,
+    user: IUserHasId,
+  ): Promise<AiAssistantDocument> {
+    const aiAssistant = await AiAssistantModel.findOne({
+      owner: user,
+      _id: aiAssistantId,
+    });
     if (aiAssistant == null) {
       throw createError(404, 'AiAssistant document does not exist');
     }
@@ -1035,13 +1435,23 @@ class OpenaiService implements IOpenaiService {
       data.grantedGroupsForAccessScope,
     );
 
-    const grantedGroupIdsForAccessScopeFromReq = data.grantedGroupsForAccessScope?.map(group => getIdStringForRef(group.item)) ?? []; // ObjectId[] -> string[]
-    const grantedGroupIdsForAccessScopeFromDb = aiAssistant.grantedGroupsForAccessScope?.map(group => getIdStringForRef(group.item)) ?? []; // ObjectId[] -> string[]
+    const grantedGroupIdsForAccessScopeFromReq =
+      data.grantedGroupsForAccessScope?.map((group) =>
+        getIdStringForRef(group.item),
+      ) ?? []; // ObjectId[] -> string[]
+    const grantedGroupIdsForAccessScopeFromDb =
+      aiAssistant.grantedGroupsForAccessScope?.map((group) =>
+        getIdStringForRef(group.item),
+      ) ?? []; // ObjectId[] -> string[]
 
     // If accessScope, pagePathPatterns, grantedGroupsForAccessScope have not changed, do not build VectorStore
-    const shouldRebuildVectorStore = data.accessScope !== aiAssistant.accessScope
-      || !isDeepEquals(data.pagePathPatterns, aiAssistant.pagePathPatterns)
-      || !isDeepEquals(grantedGroupIdsForAccessScopeFromReq, grantedGroupIdsForAccessScopeFromDb);
+    const shouldRebuildVectorStore =
+      data.accessScope !== aiAssistant.accessScope ||
+      !isDeepEquals(data.pagePathPatterns, aiAssistant.pagePathPatterns) ||
+      !isDeepEquals(
+        grantedGroupIdsForAccessScopeFromReq,
+        grantedGroupIdsForAccessScopeFromDb,
+      );
 
     let newVectorStoreRelation: VectorStoreDocument | undefined;
     if (shouldRebuildVectorStore) {
@@ -1053,7 +1463,9 @@ class OpenaiService implements IOpenaiService {
       );
 
       // Delete obsoleted VectorStore
-      const obsoletedVectorStoreRelationId = getIdStringForRef(aiAssistant.vectorStore);
+      const obsoletedVectorStoreRelationId = getIdStringForRef(
+        aiAssistant.vectorStore,
+      );
       await this.deleteVectorStore(obsoletedVectorStoreRelationId);
 
       newVectorStoreRelation = await this.createVectorStore(data.name);
@@ -1072,17 +1484,27 @@ class OpenaiService implements IOpenaiService {
     aiAssistant.set({ ...newData });
     let updatedAiAssistant: AiAssistantDocument = await aiAssistant.save();
 
-    if (data.shareScope !== AiAssistantShareScope.PUBLIC_ONLY && aiAssistant.isDefault) {
-      updatedAiAssistant = await AiAssistantModel.setDefault(aiAssistant._id, false);
+    if (
+      data.shareScope !== AiAssistantShareScope.PUBLIC_ONLY &&
+      aiAssistant.isDefault
+    ) {
+      updatedAiAssistant = await AiAssistantModel.setDefault(
+        aiAssistant._id,
+        false,
+      );
     }
 
     return updatedAiAssistant;
   }
 
-  async getAccessibleAiAssistants(user: IUserHasId): Promise<AccessibleAiAssistants> {
+  async getAccessibleAiAssistants(
+    user: IUserHasId,
+  ): Promise<AccessibleAiAssistants> {
     const userGroupIds = [
       ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
-      ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
+      ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
+        user,
+      )),
     ];
 
     const assistants = await AiAssistantModel.find({
@@ -1112,37 +1534,64 @@ class OpenaiService implements IOpenaiService {
       .populate('grantedGroupsForAccessScope.item');
 
     return {
-      myAiAssistants: assistants.filter(assistant => assistant.owner.toString() === user._id.toString()) ?? [],
-      teamAiAssistants: assistants.filter(assistant => assistant.owner.toString() !== user._id.toString()) ?? [],
+      myAiAssistants:
+        assistants.filter(
+          (assistant) => assistant.owner.toString() === user._id.toString(),
+        ) ?? [],
+      teamAiAssistants:
+        assistants.filter(
+          (assistant) => assistant.owner.toString() !== user._id.toString(),
+        ) ?? [],
     };
   }
 
-  async isLearnablePageLimitExceeded(user: IUserHasId, pagePathPatterns: string[]): Promise<boolean> {
+  async isLearnablePageLimitExceeded(
+    user: IUserHasId,
+    pagePathPatterns: string[],
+  ): Promise<boolean> {
     const normalizedPagePathPatterns = removeGlobPath(pagePathPatterns);
 
     const PageModel = mongoose.model<IPage, PageModel>('Page');
-    const pagePathsWithDescendantCount = await PageModel.descendantCountByPaths(normalizedPagePathPatterns, user, null, true, true);
+    const pagePathsWithDescendantCount = await PageModel.descendantCountByPaths(
+      normalizedPagePathPatterns,
+      user,
+      null,
+      true,
+      true,
+    );
 
-    const totalPageCount = pagePathsWithDescendantCount.reduce((total, pagePathWithDescendantCount) => {
-      const descendantCount = pagePathPatterns.includes(pagePathWithDescendantCount.path)
-        ? 0 // Treat as single page when included in "pagePathPatterns"
-        : pagePathWithDescendantCount.descendantCount;
+    const totalPageCount = pagePathsWithDescendantCount.reduce(
+      (total, pagePathWithDescendantCount) => {
+        const descendantCount = pagePathPatterns.includes(
+          pagePathWithDescendantCount.path,
+        )
+          ? 0 // Treat as single page when included in "pagePathPatterns"
+          : pagePathWithDescendantCount.descendantCount;
 
-      const pageCount = descendantCount + 1;
-      return total + pageCount;
-    }, 0);
+        const pageCount = descendantCount + 1;
+        return total + pageCount;
+      },
+      0,
+    );
 
     logger.debug('TotalPageCount: ', totalPageCount);
 
-    const limitLearnablePageCountPerAssistant = configManager.getConfig('openai:limitLearnablePageCountPerAssistant');
+    const limitLearnablePageCountPerAssistant = configManager.getConfig(
+      'openai:limitLearnablePageCountPerAssistant',
+    );
     return totalPageCount > limitLearnablePageCountPerAssistant;
   }
 
   private async findAiAssistantByPagePath(
-      pagePaths: string[], options?: { shouldPopulateOwner?: boolean, shouldPopulateVectorStore?: boolean },
+    pagePaths: string[],
+    options?: {
+      shouldPopulateOwner?: boolean;
+      shouldPopulateVectorStore?: boolean;
+    },
   ): Promise<AiAssistantDocument[]> {
-
-    const pagePathsWithGlobPattern = pagePaths.map(pagePath => generateGlobPatterns(pagePath)).flat();
+    const pagePathsWithGlobPattern = pagePaths.flatMap((pagePath) =>
+      generateGlobPatterns(pagePath),
+    );
 
     const query = AiAssistantModel.find({
       $or: [
@@ -1164,14 +1613,17 @@ class OpenaiService implements IOpenaiService {
     const aiAssistants = await query.exec();
     return aiAssistants;
   }
-
 }
 
 let instance: OpenaiService;
 export const initializeOpenaiService = (crowi: Crowi): void => {
   const aiEnabled = configManager.getConfig('app:aiEnabled');
   const openaiServiceType = configManager.getConfig('openai:serviceType');
-  if (aiEnabled && openaiServiceType != null && OpenaiServiceTypes.includes(openaiServiceType)) {
+  if (
+    aiEnabled &&
+    openaiServiceType != null &&
+    OpenaiServiceTypes.includes(openaiServiceType)
+  ) {
     instance = new OpenaiService(crowi);
   }
 };

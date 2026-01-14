@@ -9,9 +9,7 @@ import { SidebarNotFound } from './CustomSidebarNotFound';
 
 import styles from './CustomSidebarSubstance.module.scss';
 
-
 const logger = loggerFactory('growi:components:CustomSidebarSubstance');
-
 
 export const CustomSidebarSubstance = (): JSX.Element => {
   const { data: rendererOptions } = useCustomSidebarOptions({ suspense: true });
@@ -22,16 +20,17 @@ export const CustomSidebarSubstance = (): JSX.Element => {
   const markdown = page?.revision?.body;
 
   return (
-    <div className={`py-4 grw-custom-sidebar-content ${styles['grw-custom-sidebar-content']}`}>
-      { markdown == null
-        ? <SidebarNotFound />
-        : (
-          <RevisionRenderer
-            rendererOptions={rendererOptions}
-            markdown={markdown}
-          />
-        )
-      }
+    <div
+      className={`py-4 grw-custom-sidebar-content ${styles['grw-custom-sidebar-content']}`}
+    >
+      {markdown == null ? (
+        <SidebarNotFound />
+      ) : (
+        <RevisionRenderer
+          rendererOptions={rendererOptions}
+          markdown={markdown}
+        />
+      )}
     </div>
   );
 };

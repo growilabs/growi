@@ -1,31 +1,36 @@
-import { test, expect } from '@playwright/test';
+/** biome-ignore-all lint/performance/noAwaitInLoops: Allow in tests */
 
+import { expect, test } from '@playwright/test';
 
-test('Visit User home', async({ page }) => {
+test('Visit User home', async ({ page }) => {
   await page.goto('dummy');
 
   // Open PersonalDropdown
   await page.getByTestId('personal-dropdown-button').click();
-  await expect(page.getByTestId('grw-personal-dropdown-menu-user-home')).toBeVisible();
+  await expect(
+    page.getByTestId('grw-personal-dropdown-menu-user-home'),
+  ).toBeVisible();
 
   // Click UserHomeMenu
   await page.getByTestId('grw-personal-dropdown-menu-user-home').click();
   await expect(page.getByTestId('grw-users-info')).toBeVisible();
 });
 
-test('Vist User settings', async({ page }) => {
+test('Vist User settings', async ({ page }) => {
   await page.goto('dummy');
 
   // Open PersonalDropdown
   await page.getByTestId('personal-dropdown-button').click();
-  await expect(page.getByTestId('grw-personal-dropdown-menu-user-home')).toBeVisible();
+  await expect(
+    page.getByTestId('grw-personal-dropdown-menu-user-home'),
+  ).toBeVisible();
 
   // Click UserSettingsMenu
   page.getByTestId('grw-personal-dropdown-menu-user-settings').click();
   await expect(page.getByTestId('grw-user-settings')).toBeVisible();
 });
 
-test('Access User information', async({ page }) => {
+test('Access User information', async ({ page }) => {
   await page.goto('/me');
 
   // Click BasicInfoSettingUpdateButton
@@ -36,23 +41,29 @@ test('Access User information', async({ page }) => {
   await expect(page.locator('.Toastify__toast')).toBeVisible();
 });
 
-test('Access External account', async({ page }) => {
+test('Access External account', async ({ page }) => {
   await page.goto('/me');
 
   // Click ExternalAccountsTabButton
   await expect(page.getByTestId('grw-user-settings')).toBeVisible();
   await page.getByTestId('external-accounts-tab-button').first().click();
 
-  // Expect an error toaster to be displayed when the AddExternalAccountsButton is pressed
+  // press AddExternalAccountButton
   await page.getByTestId('grw-external-account-add-button').click();
   await expect(page.getByTestId('grw-associate-modal')).toBeVisible();
   await page.getByTestId('add-external-account-button').click();
-  await expect(page.locator('.Toastify__toast')).toBeVisible();
-  await page.locator('.Toastify__close-button').click();
+
+  // Expect a few failed toasters to be displayed
+  await expect(page.locator('.Toastify__toast').first()).toBeVisible();
+  const toastCloseButtons = page.locator('.Toastify__close-button');
+  const count = await toastCloseButtons.count();
+  for (let i = 0; i < count; i++) {
+    await toastCloseButtons.first().click();
+  }
   await expect(page.locator('.Toastify__toast')).not.toBeVisible();
 });
 
-test('Access Password setting', async({ page }) => {
+test('Access Password setting', async ({ page }) => {
   await page.goto('/me');
 
   // Click PasswordSettingTabButton
@@ -65,15 +76,13 @@ test('Access Password setting', async({ page }) => {
 
   const toastElementsCount = await toastElements.count();
   for (let i = 0; i < toastElementsCount; i++) {
-    // eslint-disable-next-line no-await-in-loop
     await toastElements.nth(i).click();
   }
 
   await expect(page.getByTestId('.Toastify__toast')).not.toBeVisible();
 });
 
-
-test('Access API setting', async({ page }) => {
+test('Access API setting', async ({ page }) => {
   await page.goto('/me');
 
   // Click ApiSettingTabButton
@@ -85,7 +94,7 @@ test('Access API setting', async({ page }) => {
   await expect(page.locator('.Toastify__toast')).toBeVisible();
 });
 
-test('Access Access Token setting', async({ page }) => {
+test('Access Access Token setting', async ({ page }) => {
   await page.goto('/me');
 
   // Click ApiSettingTabButton
@@ -98,7 +107,9 @@ test('Access Access Token setting', async({ page }) => {
   await page.getByTestId('grw-accesstoken-checkbox-read:*').check();
   await page.getByTestId('grw-accesstoken-create-button').click();
   await expect(page.locator('.Toastify__toast')).toBeVisible();
-  await expect(page.getByTestId('grw-accesstoken-new-token-display')).toBeVisible();
+  await expect(
+    page.getByTestId('grw-accesstoken-new-token-display'),
+  ).toBeVisible();
 
   // Expect a success toaster to be displayed when the Access Token is deleted
   await page.getByTestId('grw-accesstoken-delete-button').click();
@@ -106,22 +117,26 @@ test('Access Access Token setting', async({ page }) => {
   await page.getByTestId('grw-accesstoken-delete-button').click();
   await page.getByTestId('grw-accesstoken-delete-button-in-modal').click();
   await expect(page.locator('.Toastify__toast')).toBeVisible();
-
 });
 
-test('Access In-App Notification setting', async({ page }) => {
+test('Access In-App Notification setting', async ({ page }) => {
   await page.goto('/me');
 
   // Click InAppNotificationSettingTabButton
   await expect(page.getByTestId('grw-user-settings')).toBeVisible();
-  await page.getByTestId('in-app-notification-settings-tab-button').first().click();
+  await page
+    .getByTestId('in-app-notification-settings-tab-button')
+    .first()
+    .click();
 
   // Expect a success toaster to be displayed when the InAppNotificationSettingsUpdateButton is clicked
-  await page.getByTestId('grw-in-app-notification-settings-update-button').click();
+  await page
+    .getByTestId('grw-in-app-notification-settings-update-button')
+    .click();
   await expect(page.locator('.Toastify__toast')).toBeVisible();
 });
 
-test('Acccess Other setting', async({ page }) => {
+test('Acccess Other setting', async ({ page }) => {
   await page.goto('/me');
 
   // Click OtherSettingTabButton

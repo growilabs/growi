@@ -1,4 +1,4 @@
-import { memo, type JSX } from 'react';
+import { type JSX, memo } from 'react';
 
 import { useGrowiCustomIcon } from './use-growi-custom-icons';
 import { useLatoFontFamily } from './use-lato';

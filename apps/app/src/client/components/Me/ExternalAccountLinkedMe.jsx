@@ -1,19 +1,15 @@
 import React, { Fragment } from 'react';
-
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
-
 
 import { useSWRxPersonalExternalAccounts } from '~/stores/personal-settings';
 
 import { withUnstatedContainers } from '../UnstatedUtils';
-
 import AssociateModal from './AssociateModal';
 import DisassociateModal from './DisassociateModal';
 import ExternalAccountRow from './ExternalAccountRow';
 
 class ExternalAccountLinkedMe extends React.Component {
-
   constructor(props) {
     super(props);
 
@@ -58,7 +54,7 @@ class ExternalAccountLinkedMe extends React.Component {
     return (
       <Fragment>
         <h2 className="border-bottom mt-4 pb-2 fs-4">
-          { t('admin:user_management.external_accounts') }
+          {t('admin:user_management.external_accounts')}
         </h2>
         <button
           type="button"
@@ -66,29 +62,35 @@ class ExternalAccountLinkedMe extends React.Component {
           className="btn btn-outline-secondary btn-sm pull-right mb-2"
           onClick={this.openAssociateModal}
         >
-          <span className="material-symbols-outlined" aria-hidden="true">add_circle</span>
+          <span className="material-symbols-outlined" aria-hidden="true">
+            add_circle
+          </span>
           Add
         </button>
 
         <table className="table table-bordered table-user-list">
           <thead>
             <tr>
-              <th width="120px">{ t('admin:user_management.authentication_provider') }</th>
+              <th width="120px">
+                {t('admin:user_management.authentication_provider')}
+              </th>
               <th>
                 <code>accountId</code>
               </th>
-              <th width="200px">{ t('Created') }</th>
-              <th width="150px">{ t('Admin') }</th>
+              <th width="200px">{t('Created')}</th>
+              <th width="150px">{t('Admin')}</th>
             </tr>
           </thead>
           <tbody>
-            {personalExternalAccounts != null && personalExternalAccounts.length > 0 && personalExternalAccounts.map(account => (
-              <ExternalAccountRow
-                account={account}
-                key={account._id}
-                openDisassociateModal={this.openDisassociateModal}
-              />
-            ))}
+            {personalExternalAccounts != null &&
+              personalExternalAccounts.length > 0 &&
+              personalExternalAccounts.map((account) => (
+                <ExternalAccountRow
+                  account={account}
+                  key={account._id}
+                  openDisassociateModal={this.openDisassociateModal}
+                />
+              ))}
           </tbody>
         </table>
 
@@ -97,19 +99,16 @@ class ExternalAccountLinkedMe extends React.Component {
           onClose={this.closeAssociateModal}
         />
 
-        {this.state.accountForDisassociate != null
-        && (
+        {this.state.accountForDisassociate != null && (
           <DisassociateModal
             isOpen={this.state.isDisassociateModalOpen}
             onClose={this.closeDisassociateModal}
             accountForDisassociate={this.state.accountForDisassociate}
           />
         )}
-
       </Fragment>
     );
   }
-
 }
 
 ExternalAccountLinkedMe.propTypes = {
@@ -119,9 +118,16 @@ ExternalAccountLinkedMe.propTypes = {
 
 const ExternalAccountLinkedMeWrapperFC = (props) => {
   const { t } = useTranslation();
-  const { data: personalExternalAccountsData } = useSWRxPersonalExternalAccounts();
+  const { data: personalExternalAccountsData } =
+    useSWRxPersonalExternalAccounts();
 
-  return <ExternalAccountLinkedMe t={t} personalExternalAccounts={personalExternalAccountsData} {...props} />;
+  return (
+    <ExternalAccountLinkedMe
+      t={t}
+      personalExternalAccounts={personalExternalAccountsData}
+      {...props}
+    />
+  );
 };
 
 export default ExternalAccountLinkedMeWrapperFC;

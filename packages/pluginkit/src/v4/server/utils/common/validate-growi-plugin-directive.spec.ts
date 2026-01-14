@@ -1,7 +1,6 @@
 import { GrowiPluginType } from '@growi/core';
 
 import examplePkg from '../../../../../test/fixtures/example-package/template1/package.json';
-
 import { validateGrowiDirective } from './validate-growi-plugin-directive';
 
 const mocks = vi.hoisted(() => {

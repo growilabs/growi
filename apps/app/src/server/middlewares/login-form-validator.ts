@@ -1,7 +1,10 @@
-import { body, validationResult, type ValidationChain } from 'express-validator';
+import {
+  body,
+  type ValidationChain,
+  validationResult,
+} from 'express-validator';
 // form rules
 export const loginRules = (): ValidationChain[] => {
-
   return [
     body('loginForm.username')
       .matches(/^[\da-zA-Z\-_.+@]+$/)
@@ -30,7 +33,7 @@ export const loginValidation = (req, res, next): ValidationChain[] => {
   }
 
   const extractedErrors: string[] = [];
-  errors.array().map(err => extractedErrors.push(err.msg));
+  errors.array().map((err) => extractedErrors.push(err.msg));
 
   Object.assign(form, {
     isValid: false,

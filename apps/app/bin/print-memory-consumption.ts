@@ -11,8 +11,9 @@
  *        print-memory-consumption.ts [--port=9229] [--host=localhost] [--json]
  */
 
-import { get } from 'node:http';
+/** biome-ignore-all lint/suspicious/noConsole: Allow printing to console */
 
+import { get } from 'node:http';
 import WebSocket from 'ws';
 
 interface MemoryInfo {
@@ -297,7 +298,9 @@ class NodeMemoryConsumptionChecker {
     // Memory Flags
     if (info.memoryFlags.length > 0) {
       console.log('\n🔸 Memory Flags:');
-      info.memoryFlags.forEach((flag) => console.log(`  ${flag}`));
+      info.memoryFlags.forEach((flag) => {
+        console.log(`  ${flag}`);
+      });
     }
 
     // Summary

@@ -1,12 +1,8 @@
 @use '~/styles/mixins';
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.grw-contextual-sub-navigation {
-  @include bs.media-breakpoint-down(md) {
-    // set min-height to keep the height
-    //  even if the item is empty on the share link page
-    min-height: 46px;
-  }
+.grw-min-height-sub-navigation {
+  min-height: 46px;
 }
 
 @include mixins.at-editing() {

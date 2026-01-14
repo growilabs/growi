@@ -9,8 +9,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const { URL } = require('node:url');
 
 const { getMongoUri, mongoOptions } = isProduction
-  ? // eslint-disable-next-line import/extensions, import/no-unresolved
-    require('../dist/server/util/mongoose-utils')
+  ? require('../dist/server/util/mongoose-utils')
   : require('../src/server/util/mongoose-utils');
 
 // get migrationsDir from env var

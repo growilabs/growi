@@ -1,19 +1,21 @@
 import path from 'node:path';
-
 import { expect, type Page } from '@playwright/test';
 
 const authFile = path.resolve(__dirname, '../.auth/admin.json');
 
-export const login = async(page: Page): Promise<void> => {
+export const login = async (page: Page): Promise<void> => {
   // Perform authentication steps. Replace these actions with your own.
   await page.goto('/admin');
 
-  const loginForm = await page.getByRole('form');
+  const loginForm = await page.getByTestId('login-form');
 
   if (loginForm != null) {
-    await page.getByLabel('Username or E-mail').fill('admin');
-    await page.getByLabel('Password').fill('adminadmin');
-    await page.locator('[type=submit]').filter({ hasText: 'Login' }).click();
+    await loginForm.getByPlaceholder('Username or E-mail').fill('admin');
+    await loginForm.getByPlaceholder('Password').fill('adminadmin');
+    await loginForm
+      .locator('[type=submit]')
+      .filter({ hasText: 'Login' })
+      .click();
   }
 
   await page.waitForURL('/admin');

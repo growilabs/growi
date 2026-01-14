@@ -1,4 +1,12 @@
-import type { HasObjectId, IUser, Ref } from '@growi/core';
+import type {
+  HasObjectId,
+  IPageHasId,
+  IUser,
+  IUserHasId,
+  Ref,
+} from '@growi/core';
+
+import type { PaginateResult } from './mongoose-utils';
 
 // Model
 const MODEL_PAGE = 'Page';
@@ -134,14 +142,6 @@ const ACTION_ADMIN_ARCHIVE_DATA_UPLOAD = 'ADMIN_ARCHIVE_DATA_UPLOAD';
 const ACTION_ADMIN_GROWI_DATA_IMPORTED = 'ADMIN_GROWI_DATA_IMPORTED';
 const ACTION_ADMIN_UPLOADED_GROWI_DATA_DISCARDED =
   'ADMIN_UPLOADED_GROWI_DATA_DISCARDED';
-const ACTION_ADMIN_ESA_DATA_IMPORTED = 'ADMIN_ESA_DATA_IMPORTED';
-const ACTION_ADMIN_ESA_DATA_UPDATED = 'ADMIN_ESA_DATA_UPDATED';
-const ACTION_ADMIN_CONNECTION_TEST_OF_ESA_DATA =
-  'ADMIN_CONNECTION_TEST_OF_ESA_DATA';
-const ACTION_ADMIN_QIITA_DATA_IMPORTED = 'ADMIN_QIITA_DATA_IMPORTED';
-const ACTION_ADMIN_QIITA_DATA_UPDATED = 'ADMIN_QIITA_DATA_UPDATED';
-const ACTION_ADMIN_CONNECTION_TEST_OF_QIITA_DATA =
-  'ADMIN_CONNECTION_TEST_OF_QIITA_DATA';
 const ACTION_ADMIN_ARCHIVE_DATA_CREATE = 'ADMIN_ARCHIVE_DATA_CREATE';
 const ACTION_ADMIN_ARCHIVE_DATA_DOWNLOAD = 'ADMIN_ARCHIVE_DATA_DOWNLOAD';
 const ACTION_ADMIN_ARCHIVE_DATA_DELETE = 'ADMIN_ARCHIVE_DATA_DELETE';
@@ -329,13 +329,7 @@ export const SupportedAction = {
   ACTION_ADMIN_CUSTOM_SCRIPT_UPDATE,
   ACTION_ADMIN_ARCHIVE_DATA_UPLOAD,
   ACTION_ADMIN_GROWI_DATA_IMPORTED,
-  ACTION_ADMIN_ESA_DATA_IMPORTED,
-  ACTION_ADMIN_QIITA_DATA_IMPORTED,
   ACTION_ADMIN_UPLOADED_GROWI_DATA_DISCARDED,
-  ACTION_ADMIN_ESA_DATA_UPDATED,
-  ACTION_ADMIN_CONNECTION_TEST_OF_ESA_DATA,
-  ACTION_ADMIN_QIITA_DATA_UPDATED,
-  ACTION_ADMIN_CONNECTION_TEST_OF_QIITA_DATA,
   ACTION_ADMIN_ARCHIVE_DATA_CREATE,
   ACTION_ADMIN_ARCHIVE_DATA_DOWNLOAD,
   ACTION_ADMIN_ARCHIVE_DATA_DELETE,
@@ -387,6 +381,7 @@ export const SupportedAction = {
 
 // Action required for notification
 export const EssentialActionGroup = {
+  ACTION_PAGE_CREATE,
   ACTION_PAGE_LIKE,
   ACTION_PAGE_BOOKMARK,
   ACTION_PAGE_UPDATE,
@@ -531,13 +526,7 @@ export const LargeActionGroup = {
   ACTION_ADMIN_CUSTOM_SCRIPT_UPDATE,
   ACTION_ADMIN_ARCHIVE_DATA_UPLOAD,
   ACTION_ADMIN_GROWI_DATA_IMPORTED,
-  ACTION_ADMIN_ESA_DATA_IMPORTED,
-  ACTION_ADMIN_QIITA_DATA_IMPORTED,
   ACTION_ADMIN_UPLOADED_GROWI_DATA_DISCARDED,
-  ACTION_ADMIN_ESA_DATA_UPDATED,
-  ACTION_ADMIN_CONNECTION_TEST_OF_ESA_DATA,
-  ACTION_ADMIN_QIITA_DATA_UPDATED,
-  ACTION_ADMIN_CONNECTION_TEST_OF_QIITA_DATA,
   ACTION_ADMIN_ARCHIVE_DATA_CREATE,
   ACTION_ADMIN_ARCHIVE_DATA_DOWNLOAD,
   ACTION_ADMIN_ARCHIVE_DATA_DELETE,
@@ -579,6 +568,18 @@ export const LargeActionGroup = {
   ACTION_ADMIN_SEARCH_CONNECTION,
   ACTION_ADMIN_SEARCH_INDICES_NORMALIZE,
   ACTION_ADMIN_SEARCH_INDICES_REBUILD,
+} as const;
+
+export const ActivityLogActions = {
+  ACTION_PAGE_CREATE,
+  ACTION_PAGE_UPDATE,
+  ACTION_PAGE_RENAME,
+  ACTION_PAGE_DUPLICATE,
+  ACTION_PAGE_DELETE,
+  ACTION_PAGE_DELETE_COMPLETELY,
+  ACTION_PAGE_REVERT,
+  ACTION_PAGE_LIKE,
+  ACTION_COMMENT_CREATE,
 } as const;
 
 /*
@@ -658,7 +659,8 @@ export type SupportedActionType =
   (typeof SupportedAction)[keyof typeof SupportedAction];
 export type SupportedActionCategoryType =
   (typeof SupportedActionCategory)[keyof typeof SupportedActionCategory];
-
+export type SupportedActivityActionType =
+  (typeof ActivityLogActions)[keyof typeof ActivityLogActions];
 export type ISnapshot = Partial<Pick<IUser, 'username'>>;
 
 export type IActivity = {
@@ -675,6 +677,29 @@ export type IActivity = {
 };
 
 export type IActivityHasId = IActivity & HasObjectId;
+
+export type ActivityHasUserId = IActivityHasId & {
+  user: IUserHasId;
+};
+
+export type ActivityHasTargetPage = IActivityHasId & {
+  user: IUserHasId;
+  target: IPopulatedPageTarget;
+};
+
+import type { PageGrant } from '@growi/core';
+export interface IPopulatedPageTarget {
+  _id: string;
+  path: string;
+  status: string;
+  grant?: PageGrant;
+  wip: boolean;
+  deletedAt: Date;
+}
+
+export interface PopulatedUserActivitiesResult {
+  serializedPaginationResult: PaginateResult<ActivityHasTargetPage>;
+}
 
 export type ISearchFilter = {
   usernames?: string[];

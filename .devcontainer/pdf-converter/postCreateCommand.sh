@@ -22,3 +22,6 @@ pnpm install turbo --global
 
 # Install dependencies
 turbo run bootstrap
+
+# Install Lefthook git hooks
+pnpm lefthook install

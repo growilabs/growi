@@ -1,5 +1,4 @@
 import type { IPage } from '..';
-
 import { isTopPage } from './page-path-utils/is-top-page';
 
 // const GRANT_PUBLIC = 1;

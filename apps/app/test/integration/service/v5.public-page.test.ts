@@ -1,7 +1,6 @@
-/* eslint-disable no-unused-vars */
-
 import type { IPage, IRevision } from '@growi/core';
 import mongoose from 'mongoose';
+
 import type { CommentModel } from '../../../src/features/comment/server/models/comment';
 import type { IComment } from '../../../src/interfaces/comment';
 import {

@@ -1,4 +1,6 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
+
+import type { IResAdminHome } from '~/interfaces/res/admin/admin-home';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { configManager } from '~/server/service/config-manager';
 import { getGrowiVersion } from '~/utils/growi-version';
@@ -60,7 +62,9 @@ const router = express.Router();
  */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(crowi);
+  const loginRequiredStrictly = require('../../middlewares/login-required')(
+    crowi,
+  );
   const adminRequired = require('../../middlewares/admin-required')(crowi);
 
   /**
@@ -83,22 +87,30 @@ module.exports = (crowi) => {
    *                    adminHomeParams:
    *                      $ref: "#/components/schemas/SystemInformationParams"
    */
-  router.get('/', accessTokenParser([SCOPE.READ.ADMIN.TOP]), loginRequiredStrictly, adminRequired, async(req, res) => {
-    const { getRuntimeVersions } = await import('~/server/util/runtime-versions');
-    const runtimeVersions = await getRuntimeVersions();
+  router.get(
+    '/',
+    accessTokenParser([SCOPE.READ.ADMIN.TOP]),
+    loginRequiredStrictly,
+    adminRequired,
+    async (_req, res) => {
+      const { getRuntimeVersions } = await import(
+        '~/server/util/runtime-versions'
+      );
+      const runtimeVersions = await getRuntimeVersions();
 
-    const adminHomeParams = {
-      growiVersion: getGrowiVersion(),
-      nodeVersion: runtimeVersions.node ?? '-',
-      npmVersion: runtimeVersions.npm ?? '-',
-      pnpmVersion: runtimeVersions.pnpm ?? '-',
-      envVars: configManager.getManagedEnvVars(),
-      isV5Compatible: configManager.getConfig('app:isV5Compatible'),
-      isMaintenanceMode: configManager.getConfig('app:isMaintenanceMode'),
-    };
+      const adminHomeParams: IResAdminHome = {
+        growiVersion: getGrowiVersion(),
+        nodeVersion: runtimeVersions.node ?? '-',
+        npmVersion: runtimeVersions.npm ?? '-',
+        pnpmVersion: runtimeVersions.pnpm ?? '-',
+        envVars: configManager.getManagedEnvVars(),
+        isV5Compatible: configManager.getConfig('app:isV5Compatible'),
+        isMaintenanceMode: configManager.getConfig('app:isMaintenanceMode'),
+      };
 
-    return res.apiv3({ adminHomeParams });
-  });
+      return res.apiv3({ adminHomeParams });
+    },
+  );
 
   return router;
 };

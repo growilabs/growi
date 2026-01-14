@@ -8,7 +8,6 @@ import { apiv3Get, apiv3Post, apiv3Put } from '../util/apiv3-client';
  * @extends {Container} unstated Container
  */
 export default class AdminAppContainer extends Container {
-
   constructor() {
     super();
 
@@ -22,7 +21,7 @@ export default class AdminAppContainer extends Container {
       confidential: '',
       globalLang: '',
       isEmailPublishedForNewUser: true,
-      fileUpload: '',
+      isReadOnlyForNewUser: false,
 
       isV5Compatible: null,
       siteUrl: '',
@@ -40,47 +39,8 @@ export default class AdminAppContainer extends Container {
       sesAccessKeyId: '',
       sesSecretAccessKey: '',
 
-      fileUploadType: '',
-      envFileUploadType: '',
-      isFixedFileUploadByEnvVar: false,
-
-      gcsUseOnlyEnvVars: false,
-      gcsApiKeyJsonPath: '',
-      envGcsApiKeyJsonPath: '',
-      gcsBucket: '',
-      envGcsBucket: '',
-      gcsUploadNamespace: '',
-      envGcsUploadNamespace: '',
-      gcsReferenceFileWithRelayMode: false,
-
-      s3Region: '',
-      s3CustomEndpoint: '',
-      s3Bucket: '',
-      s3AccessKeyId: '',
-      s3SecretAccessKey: '',
-      s3ReferenceFileWithRelayMode: false,
-
-      azureReferenceFileWithRelayMode: false,
-      azureUseOnlyEnvVars: false,
-      azureTenantId: '',
-      azureClientId: '',
-      azureClientSecret: '',
-      azureStorageAccountName: '',
-      azureStorageContainerName: '',
-      envAzureTenantId: '',
-      envAzureClientId: '',
-      envAzureClientSecret: '',
-      envAzureStorageAccountName: '',
-      envAzureStorageContainerName: '',
-
-      isEnabledPlugins: true,
-
       isMaintenanceMode: false,
-
-      // TODO: remove this property when bulk export can be relased for cloud (https://redmine.weseek.co.jp/issues/163220)
-      isBulkExportDisabledForCloud: false,
     };
-
   }
 
   /**
@@ -102,7 +62,7 @@ export default class AdminAppContainer extends Container {
       confidential: appSettingsParams.confidential,
       globalLang: appSettingsParams.globalLang,
       isEmailPublishedForNewUser: appSettingsParams.isEmailPublishedForNewUser,
-      fileUpload: appSettingsParams.fileUpload,
+      isReadOnlyForNewUser: appSettingsParams.isReadOnlyForNewUser,
       isV5Compatible: appSettingsParams.isV5Compatible,
       siteUrl: appSettingsParams.siteUrl,
       siteUrlUseOnlyEnvVars: appSettingsParams.siteUrlUseOnlyEnvVars,
@@ -118,51 +78,8 @@ export default class AdminAppContainer extends Container {
       sesAccessKeyId: appSettingsParams.sesAccessKeyId,
       sesSecretAccessKey: appSettingsParams.sesSecretAccessKey,
 
-      fileUploadType: appSettingsParams.fileUploadType,
-      envFileUploadType: appSettingsParams.envFileUploadType,
-      useOnlyEnvVarForFileUploadType: appSettingsParams.useOnlyEnvVarForFileUploadType,
-
-      s3Region: appSettingsParams.s3Region,
-      s3CustomEndpoint: appSettingsParams.s3CustomEndpoint,
-      s3Bucket: appSettingsParams.s3Bucket,
-      s3AccessKeyId: appSettingsParams.s3AccessKeyId,
-      s3ReferenceFileWithRelayMode: appSettingsParams.s3ReferenceFileWithRelayMode,
-
-      gcsUseOnlyEnvVars: appSettingsParams.gcsUseOnlyEnvVars,
-      gcsApiKeyJsonPath: appSettingsParams.gcsApiKeyJsonPath,
-      gcsBucket: appSettingsParams.gcsBucket,
-      gcsUploadNamespace: appSettingsParams.gcsUploadNamespace,
-      gcsReferenceFileWithRelayMode: appSettingsParams.gcsReferenceFileWithRelayMode,
-      envGcsApiKeyJsonPath: appSettingsParams.envGcsApiKeyJsonPath,
-      envGcsBucket: appSettingsParams.envGcsBucket,
-      envGcsUploadNamespace: appSettingsParams.envGcsUploadNamespace,
-
-      azureUseOnlyEnvVars: appSettingsParams.azureUseOnlyEnvVars,
-      azureTenantId: appSettingsParams.azureTenantId,
-      azureClientId: appSettingsParams.azureClientId,
-      azureClientSecret: appSettingsParams.azureClientSecret,
-      azureStorageAccountName: appSettingsParams.azureStorageAccountName,
-      azureStorageContainerName: appSettingsParams.azureStorageContainerName,
-      azureReferenceFileWithRelayMode: appSettingsParams.azureReferenceFileWithRelayMode,
-      envAzureTenantId: appSettingsParams.envAzureTenantId,
-      envAzureClientId: appSettingsParams.envAzureClientId,
-      envAzureClientSecret: appSettingsParams.envAzureClientSecret,
-      envAzureStorageAccountName: appSettingsParams.envAzureStorageAccountName,
-      envAzureStorageContainerName: appSettingsParams.envAzureStorageContainerName,
-
-      isEnabledPlugins: appSettingsParams.isEnabledPlugins,
       isMaintenanceMode: appSettingsParams.isMaintenanceMode,
-
-      // TODO: remove this property when bulk export can be relased for cloud (https://redmine.weseek.co.jp/issues/163220)
-      isBulkExportDisabledForCloud: appSettingsParams.isBulkExportDisabledForCloud,
     });
-
-    // if useOnlyEnvVarForFileUploadType is true, get fileUploadType from only env var and make the forms fixed.
-    // and if env var 'FILE_UPLOAD' is null, envFileUploadType is 'aws' that is default value of 'FILE_UPLOAD'.
-    if (appSettingsParams.useOnlyEnvVarForFileUploadType) {
-      this.setState({ fileUploadType: appSettingsParams.envFileUploadType });
-      this.setState({ isFixedFileUploadByEnvVar: true });
-    }
   }
 
   /**
@@ -194,10 +111,10 @@ export default class AdminAppContainer extends Container {
   }
 
   /**
-   * Change fileUpload
+   * Change isReadOnlyForNewUser
    */
-  changeFileUpload(fileUpload) {
-    this.setState({ fileUpload });
+  changeIsReadOnlyForNewUserShow(isReadOnlyForNewUser) {
+    this.setState({ isReadOnlyForNewUser });
   }
 
   /**
@@ -213,7 +130,6 @@ export default class AdminAppContainer extends Container {
   changeSiteUrl(siteUrl) {
     this.setState({ siteUrl });
   }
-
 
   /**
    * Change from address
@@ -272,125 +188,6 @@ export default class AdminAppContainer extends Container {
   }
 
   /**
-   * Change s3Region
-   */
-  changeS3Region(s3Region) {
-    this.setState({ s3Region });
-  }
-
-  /**
-   * Change s3CustomEndpoint
-   */
-  changeS3CustomEndpoint(s3CustomEndpoint) {
-    this.setState({ s3CustomEndpoint });
-  }
-
-  /**
-   * Change fileUploadType
-   */
-  changeFileUploadType(fileUploadType) {
-    this.setState({ fileUploadType });
-  }
-
-  /**
-   * Change region
-   */
-  changeS3Bucket(s3Bucket) {
-    this.setState({ s3Bucket });
-  }
-
-  /**
-   * Change access key id
-   */
-  changeS3AccessKeyId(s3AccessKeyId) {
-    this.setState({ s3AccessKeyId });
-  }
-
-  /**
-   * Change secret access key
-   */
-  changeS3SecretAccessKey(s3SecretAccessKey) {
-    this.setState({ s3SecretAccessKey });
-  }
-
-  /**
-   * Change s3ReferenceFileWithRelayMode
-   */
-  changeS3ReferenceFileWithRelayMode(s3ReferenceFileWithRelayMode) {
-    this.setState({ s3ReferenceFileWithRelayMode });
-  }
-
-  /**
-   * Change gcsApiKeyJsonPath
-   */
-  changeGcsApiKeyJsonPath(gcsApiKeyJsonPath) {
-    this.setState({ gcsApiKeyJsonPath });
-  }
-
-  /**
-   * Change gcsBucket
-   */
-  changeGcsBucket(gcsBucket) {
-    this.setState({ gcsBucket });
-  }
-
-  /**
-   * Change gcsUploadNamespace
-   */
-  changeGcsUploadNamespace(gcsUploadNamespace) {
-    this.setState({ gcsUploadNamespace });
-  }
-
-  /**
-   * Change gcsReferenceFileWithRelayMode
-   */
-  changeGcsReferenceFileWithRelayMode(gcsReferenceFileWithRelayMode) {
-    this.setState({ gcsReferenceFileWithRelayMode });
-  }
-
-  /**
-   * Change azureReferenceFileWithRelayMode
-   */
-  changeAzureReferenceFileWithRelayMode(azureReferenceFileWithRelayMode) {
-    this.setState({ azureReferenceFileWithRelayMode });
-  }
-
-  /**
-   * Change azureTenantId
-   */
-  changeAzureTenantId(azureTenantId) {
-    this.setState({ azureTenantId });
-  }
-
-  /**
-   * Change azureClientId
-   */
-  changeAzureClientId(azureClientId) {
-    this.setState({ azureClientId });
-  }
-
-  /**
-   * Change azureClientSecret
-   */
-  changeAzureClientSecret(azureClientSecret) {
-    this.setState({ azureClientSecret });
-  }
-
-  /**
-   * Change azureStorageAccountName
-   */
-  changeAzureStorageAccountName(azureStorageAccountName) {
-    this.setState({ azureStorageAccountName });
-  }
-
-  /**
-   * Change azureStorageContainerName
-   */
-  changeAzureStorageContainerName(azureStorageContainerName) {
-    this.setState({ azureStorageContainerName });
-  }
-
-  /**
    * Update app setting
    * @memberOf AdminAppContainer
    * @return {Array} Appearance
@@ -401,12 +198,11 @@ export default class AdminAppContainer extends Container {
       confidential: this.state.confidential,
       globalLang: this.state.globalLang,
       isEmailPublishedForNewUser: this.state.isEmailPublishedForNewUser,
-      fileUpload: this.state.fileUpload,
+      isReadOnlyForNewUser: this.state.isReadOnlyForNewUser,
     });
     const { appSettingParams } = response.data;
     return appSettingParams;
   }
-
 
   /**
    * Update site url setting
@@ -478,47 +274,6 @@ export default class AdminAppContainer extends Container {
   }
 
   /**
-   * Update updateFileUploadSettingHandler
-   * @memberOf AdminAppContainer
-   */
-  async updateFileUploadSettingHandler() {
-    const { fileUploadType } = this.state;
-
-    const requestParams = {
-      fileUploadType,
-    };
-
-    if (fileUploadType === 'gcs') {
-      requestParams.gcsApiKeyJsonPath = this.state.gcsApiKeyJsonPath;
-      requestParams.gcsBucket = this.state.gcsBucket;
-      requestParams.gcsUploadNamespace = this.state.gcsUploadNamespace;
-      requestParams.gcsReferenceFileWithRelayMode = this.state.gcsReferenceFileWithRelayMode;
-    }
-
-    if (fileUploadType === 'aws') {
-      requestParams.s3Region = this.state.s3Region;
-      requestParams.s3CustomEndpoint = this.state.s3CustomEndpoint;
-      requestParams.s3Bucket = this.state.s3Bucket;
-      requestParams.s3AccessKeyId = this.state.s3AccessKeyId;
-      requestParams.s3SecretAccessKey = this.state.s3SecretAccessKey;
-      requestParams.s3ReferenceFileWithRelayMode = this.state.s3ReferenceFileWithRelayMode;
-    }
-
-    if (fileUploadType === 'azure') {
-      requestParams.azureTenantId = this.state.azureTenantId;
-      requestParams.azureClientId = this.state.azureClientId;
-      requestParams.azureClientSecret = this.state.azureClientSecret;
-      requestParams.azureStorageAccountName = this.state.azureStorageAccountName;
-      requestParams.azureStorageContainerName = this.state.azureStorageContainerName;
-      requestParams.azureReferenceFileWithRelayMode = this.state.azureReferenceFileWithRelayMode;
-    }
-
-    const response = await apiv3Put('/app-settings/file-upload-setting', requestParams);
-    const { responseParams } = response.data;
-    return this.setState(responseParams);
-  }
-
-  /**
    * Start v5 page migration
    * @memberOf AdminAppContainer
    */
@@ -535,5 +290,4 @@ export default class AdminAppContainer extends Container {
   async endMaintenanceMode() {
     await apiv3Post('/app-settings/maintenance-mode', { flag: false });
   }
-
 }

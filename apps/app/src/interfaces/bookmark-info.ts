@@ -1,9 +1,15 @@
-import type { IPageHasId, IUser, Ref } from '@growi/core';
+import type { IPageHasId, IUser, Ref } from '@growi/core/dist/interfaces';
+import type { IUserSerializedSecurely } from '@growi/core/dist/models/serializers';
+
+export interface IBookmark {
+  page: Ref<IPageHasId>;
+  user: Ref<IUser>;
+}
 
 export interface IBookmarkInfo {
   sumOfBookmarks: number;
   isBookmarked: boolean;
-  bookmarkedUsers: IUser[];
+  bookmarkedUsers: IUserSerializedSecurely<IUser>[];
   pageId: string;
 }
 

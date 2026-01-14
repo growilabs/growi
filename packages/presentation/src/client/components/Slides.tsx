@@ -1,7 +1,6 @@
 import type { JSX } from 'react';
 
 import type { PresentationOptions } from '../consts';
-
 import { GrowiSlides } from './GrowiSlides';
 import { MarpSlides } from './MarpSlides';
 

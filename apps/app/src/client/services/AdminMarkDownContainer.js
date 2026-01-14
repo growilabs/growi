@@ -8,7 +8,6 @@ import { apiv3Get, apiv3Put } from '../util/apiv3-client';
  * @extends {Container} unstated Container
  */
 export default class AdminMarkDownContainer extends Container {
-
   constructor(appContainer) {
     super();
 
@@ -31,7 +30,8 @@ export default class AdminMarkDownContainer extends Container {
     };
 
     this.switchEnableXss = this.switchEnableXss.bind(this);
-    this.setAdminPreferredIndentSize = this.setAdminPreferredIndentSize.bind(this);
+    this.setAdminPreferredIndentSize =
+      this.setAdminPreferredIndentSize.bind(this);
   }
 
   /**
@@ -50,7 +50,8 @@ export default class AdminMarkDownContainer extends Container {
 
     this.setState({
       isEnabledLinebreaks: markdownParams.isEnabledLinebreaks,
-      isEnabledLinebreaksInComments: markdownParams.isEnabledLinebreaksInComments,
+      isEnabledLinebreaksInComments:
+        markdownParams.isEnabledLinebreaksInComments,
       adminPreferredIndentSize: markdownParams.adminPreferredIndentSize,
       isIndentSizeForced: markdownParams.isIndentSizeForced,
       isEnabledXss: markdownParams.isEnabledXss,
@@ -75,7 +76,6 @@ export default class AdminMarkDownContainer extends Container {
    * Update LineBreak Setting
    */
   async updateLineBreakSetting() {
-
     const response = await apiv3Put('/markdown-setting/lineBreak', {
       isEnabledLinebreaks: this.state.isEnabledLinebreaks,
       isEnabledLinebreaksInComments: this.state.isEnabledLinebreaksInComments,
@@ -88,7 +88,6 @@ export default class AdminMarkDownContainer extends Container {
    * Update
    */
   async updateIndentSetting() {
-
     const response = await apiv3Put('/markdown-setting/indent', {
       adminPreferredIndentSize: this.state.adminPreferredIndentSize,
       isIndentSizeForced: this.state.isIndentSizeForced,
@@ -101,25 +100,25 @@ export default class AdminMarkDownContainer extends Container {
    * Update Xss Setting
    */
   async updateXssSetting() {
-    let { tagWhitelist } = this.state;
-    const { attrWhitelist } = this.state;
+    let { tagWhitelist = '' } = this.state;
+    const { attrWhitelist = '{}' } = this.state;
 
-    tagWhitelist = Array.isArray(tagWhitelist) ? tagWhitelist : tagWhitelist.split(',');
+    tagWhitelist = Array.isArray(tagWhitelist)
+      ? tagWhitelist
+      : tagWhitelist.split(',');
 
     try {
       // Check if parsing is possible
       JSON.parse(attrWhitelist);
-    }
-    catch (err) {
-      throw Error(err);
+    } catch (err) {
+      throw Error(`attrWhitelist parsing error occured: ${err.message}`);
     }
 
     await apiv3Put('/markdown-setting/xss', {
       isEnabledXss: this.state.isEnabledXss,
       xssOption: this.state.xssOption,
       tagWhitelist,
-      attrWhitelist: attrWhitelist ?? '{}',
+      attrWhitelist,
     });
   }
-
 }

@@ -2,14 +2,16 @@
  * Utility for markdown list
  */
 class MarkdownListUtil {
-
   constructor() {
     // https://github.com/codemirror/CodeMirror/blob/c7853a989c77bb9f520c9c530cbe1497856e96fc/addon/edit/continuelist.js#L14
     // https://regex101.com/r/7BN2fR/5
-    this.indentAndMarkRE = /^(\s*)(>[> ]*|[*+-] \[[x ]\]\s|[*+-]\s|(\d+)([.)]))(\s*)/;
-    this.indentAndMarkOnlyRE = /^(\s*)(>[> ]*|[*+-] \[[x ]\]|[*+-]|(\d+)[.)])(\s*)$/;
+    this.indentAndMarkRE =
+      /^(\s*)(>[> ]*|[*+-] \[[x ]\]\s|[*+-]\s|(\d+)([.)]))(\s*)/;
+    this.indentAndMarkOnlyRE =
+      /^(\s*)(>[> ]*|[*+-] \[[x ]\]|[*+-]|(\d+)[.)])(\s*)$/;
 
-    this.newlineAndIndentContinueMarkdownList = this.newlineAndIndentContinueMarkdownList.bind(this);
+    this.newlineAndIndentContinueMarkdownList =
+      this.newlineAndIndentContinueMarkdownList.bind(this);
     this.pasteText = this.pasteText.bind(this);
   }
 
@@ -23,13 +25,11 @@ class MarkdownListUtil {
     if (this.indentAndMarkOnlyRE.test(strFromBol)) {
       // clear current line and end list
       editor.replaceBolToCurrentPos('\n');
-    }
-    else if (this.indentAndMarkRE.test(strFromBol)) {
+    } else if (this.indentAndMarkRE.test(strFromBol)) {
       // continue list
       const indentAndMark = strFromBol.match(this.indentAndMarkRE)[0];
       editor.insertText(`\n${indentAndMark}`);
-    }
-    else {
+    } else {
       editor.insertLinebreak();
     }
   }
@@ -124,7 +124,6 @@ class MarkdownListUtil {
 
     return isListful;
   }
-
 }
 
 // singleton pattern

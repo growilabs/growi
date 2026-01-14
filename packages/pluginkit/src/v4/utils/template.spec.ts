@@ -1,5 +1,4 @@
 import type { TemplateSummary } from '../interfaces';
-
 import { extractSupportedLocales, getLocalizedTemplate } from './template';
 
 describe('getLocalizedTemplate', () => {

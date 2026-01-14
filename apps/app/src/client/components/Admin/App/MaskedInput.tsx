@@ -1,13 +1,17 @@
-import { useState, type JSX } from 'react';
+import type { ChangeEvent } from 'react';
+import { type JSX, useState } from 'react';
+import type { UseFormRegister } from 'react-hook-form';
 
 import styles from './MaskedInput.module.scss';
 
 type Props = {
-  name: string
-  readOnly: boolean
-  value: string
-  onChange?: (e: any) => void
-  tabIndex?: number | undefined
+  name?: string;
+  readOnly: boolean;
+  value?: string;
+  onChange?: (e: ChangeEvent<HTMLInputElement>) => void;
+  tabIndex?: number | undefined;
+  register?: UseFormRegister<any>;
+  fieldName?: string;
 };
 
 export default function MaskedInput(props: Props): JSX.Element {
@@ -16,28 +20,41 @@ export default function MaskedInput(props: Props): JSX.Element {
     setPasswordShown(!passwordShown);
   };
 
-  const {
-    name, readOnly, value, onChange, tabIndex,
-  } = props;
+  const { name, readOnly, value, onChange, tabIndex, register, fieldName } =
+    props;
+
+  // Use register if provided, otherwise use value/onChange
+  const inputProps =
+    register && fieldName
+      ? register(fieldName)
+      : {
+          name,
+          value,
+          onChange,
+        };
 
   return (
     <div className={styles.MaskedInput}>
       <input
         className="form-control"
         type={passwordShown ? 'text' : 'password'}
-        name={name}
         readOnly={readOnly}
-        value={value}
-        onChange={onChange}
         tabIndex={tabIndex}
+        {...inputProps}
       />
-      <span onClick={togglePassword} className={styles.PasswordReveal}>
+      <button
+        type="button"
+        onClick={togglePassword}
+        className={`${styles.PasswordReveal} border-0 bg-transparent p-0`}
+        aria-pressed={passwordShown}
+        aria-label="Toggle password visibility"
+      >
         {passwordShown ? (
           <span className="material-symbols-outlined">visibility</span>
         ) : (
           <span className="material-symbols-outlined">visibility_off</span>
         )}
-      </span>
+      </button>
     </div>
   );
 }

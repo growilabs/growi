@@ -53,7 +53,10 @@ const escapeHTML = (string): string => {
   });
 };
 
-export const generateMxgraphData = (code: string): string => {
+export const generateMxgraphData = (
+  code: string,
+  isDarkMode: boolean,
+): string => {
   const trimedCode = code.trim();
   if (!trimedCode) {
     return '';
@@ -82,7 +85,9 @@ export const generateMxgraphData = (code: string): string => {
     resize: true,
     lightbox: 'false',
     xml,
-    'dark-mode': 'auto',
+    // To sync with GROWI app's color mode, pass 'dark' when the app is in dark mode. 'auto' would read OS color scheme via window.matchMedia instead.
+    // refs: https://github.com/jgraph/drawio/blob/eaae294cba5010e3a9d04b685407e79512f88d2d/src/main/webapp/js/diagramly/GraphViewer.js#L888-L892
+    'dark-mode': isDarkMode ? 'dark' : undefined,
   };
 
   return escapeHTML(JSON.stringify(mxGraphData));

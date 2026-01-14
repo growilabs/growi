@@ -1,90 +1,70 @@
-import { useEffect, useMemo } from 'react';
-
-import { objectIdUtils } from '@growi/core/dist/utils';
-import type {
-  NextPage, GetServerSideProps, GetServerSidePropsContext,
-} from 'next';
-import { useTranslation } from 'next-i18next';
+import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import Head from 'next/head';
 import { useRouter } from 'next/router';
-import type { Container } from 'unstated';
-import { Provider } from 'unstated';
+import { objectIdUtils } from '@growi/core/dist/utils';
 
-import type { CommonProps } from '~/pages/utils/commons';
-import { generateCustomTitle } from '~/pages/utils/commons';
-import { useCurrentUser } from '~/stores-universal/context';
+import type { NextPageWithLayout } from '../../_app.page';
+import type { AdminCommonProps } from '../_shared';
+import {
+  createAdminPageLayout,
+  getServerSideAdminCommonProps,
+} from '../_shared';
 
-import { retrieveServerSideProps } from '../../../utils/admin-page-util';
+const ManageGlobalNotification = dynamic(
+  () =>
+    // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
+    import('~/client/components/Admin/Notification/ManageGlobalNotification'),
+  { ssr: false },
+);
 
+type Props = AdminCommonProps;
 
-const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), { ssr: false });
-const ManageGlobalNotification = dynamic(() => import('~/client/components/Admin/Notification/ManageGlobalNotification'), { ssr: false });
-const ForbiddenPage = dynamic(() => import('~/client/components/Admin/ForbiddenPage').then(mod => mod.ForbiddenPage), { ssr: false });
-
-
-const AdminGlobalNotificationNewPage: NextPage<CommonProps> = (props) => {
-  const { t } = useTranslation('admin');
-  useCurrentUser(props.currentUser ?? null);
+const AdminGlobalNotificationDetailPage: NextPageWithLayout<Props> = () => {
   const router = useRouter();
   const { globalNotificationId } = router.query;
-  const currentGlobalNotificationId = Array.isArray(globalNotificationId) ? globalNotificationId[0] : globalNotificationId;
-
+  const currentGlobalNotificationId = Array.isArray(globalNotificationId)
+    ? globalNotificationId[0]
+    : globalNotificationId;
 
   useEffect(() => {
-    const toastError = import('~/client/util/toastr').then(mod => mod.toastError);
-
+    // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
+    const toastErrorPromise = import('~/client/util/toastr').then(
+      (mod) => mod.toastError,
+    );
     if (globalNotificationId == null) {
       router.push('/admin/notification');
-    }
-    if ((currentGlobalNotificationId != null && !objectIdUtils.isValidObjectId(currentGlobalNotificationId))) {
-      (async() => {
-        (await toastError)(t('notification_settings.not_found_global_notification_triggerid'));
-        router.push('/admin/global-notification/new');
-      })();
       return;
     }
-  }, [currentGlobalNotificationId, globalNotificationId, router, t]);
+    if (
+      currentGlobalNotificationId != null &&
+      !objectIdUtils.isValidObjectId(currentGlobalNotificationId)
+    ) {
+      (async () => {
+        (await toastErrorPromise)('Invalid notification id');
+        router.push('/admin/global-notification/new');
+      })();
+    }
+  }, [currentGlobalNotificationId, globalNotificationId, router]);
 
-
-  const title = t('external_notification.external_notification');
-  const customTitle = generateCustomTitle(props, title);
-
-  const injectableContainers: Container<any>[] = useMemo(() => [], []);
-
-  useEffect(() => {
-    (async() => {
-      const AdminNotificationContainer = (await import('~/client/services/AdminNotificationContainer')).default;
-      const adminNotificationContainer = new AdminNotificationContainer();
-      injectableContainers.push(adminNotificationContainer);
-    })();
-  }, [injectableContainers]);
-
-  if (props.isAccessDeniedForNonAdminUser) {
-    <ForbiddenPage />;
-  }
-
-  return (
-    <Provider inject={[...injectableContainers]}>
-      <AdminLayout componentTitle={title}>
-        <Head>
-          <title>{customTitle}</title>
-        </Head>
-        {
-          currentGlobalNotificationId != null && router.isReady
-      && <ManageGlobalNotification globalNotificationId={currentGlobalNotificationId} />
-        }
-      </AdminLayout>
-    </Provider>
-  );
-
+  return currentGlobalNotificationId != null && router.isReady ? (
+    <ManageGlobalNotification
+      globalNotificationId={currentGlobalNotificationId}
+    />
+  ) : null;
 };
 
+AdminGlobalNotificationDetailPage.getLayout = createAdminPageLayout<Props>({
+  title: (_p, t) => t('external_notification.external_notification'),
+  containerFactories: [
+    async () => {
+      const AdminNotificationContainer =
+        // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
+        (await import('~/client/services/AdminNotificationContainer')).default;
+      return new AdminNotificationContainer();
+    },
+  ],
+});
 
-export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {
-  const props = await retrieveServerSideProps(context);
-  return props;
-};
+export const getServerSideProps = getServerSideAdminCommonProps;
 
-
-export default AdminGlobalNotificationNewPage;
+export default AdminGlobalNotificationDetailPage;
