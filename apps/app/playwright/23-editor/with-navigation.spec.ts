@@ -1,6 +1,8 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { readFileSync } from 'fs';
 import path from 'path';
+
+import { appendTextToEditorUntilContains } from '../utils/AppendTextToEditorUntilContains';
 
 /**
  * for the issues:
@@ -60,13 +62,6 @@ test('should not be cleared and should prevent GrantSelector from modified', asy
     'Browsing of this page is restricted',
   );
 });
-
-const appendTextToEditorUntilContains = async (page: Page, text: string) => {
-  await page.locator('.cm-content').fill(text);
-  await expect(page.getByTestId('page-editor-preview-body')).toContainText(
-    text,
-  );
-};
 
 /**
  * for the issue:
