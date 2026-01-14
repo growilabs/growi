@@ -27,54 +27,55 @@ const changeKeymap = async (page: Page, keymap: string) => {
   await expect(page.getByTestId('options-selector-menu')).not.toBeVisible();
 };
 
-test.describe('Vim keymap mode', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/Sandbox/vim-keymap-test-page');
+test.describe
+  .serial('Vim keymap mode', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/Sandbox/vim-keymap-test-page');
 
-    // Open Editor
-    await expect(page.getByTestId('editor-button')).toBeVisible();
-    await page.getByTestId('editor-button').click();
-    await expect(page.getByTestId('grw-editor-navbar-bottom')).toBeVisible();
+      // Open Editor
+      await expect(page.getByTestId('editor-button')).toBeVisible();
+      await page.getByTestId('editor-button').click();
+      await expect(page.getByTestId('grw-editor-navbar-bottom')).toBeVisible();
+    });
+
+    test.afterAll(async ({ page }) => {
+      // Restore keymap to default
+      await changeKeymap(page, 'default');
+    });
+
+    test('Insert mode should persist while typing multiple characters', async ({
+      page,
+    }) => {
+      const testText = 'Hello World';
+
+      // Change to Vim keymap
+      await changeKeymap(page, 'vim');
+
+      // Focus the editor
+      await page.locator('.cm-content').click();
+
+      // Enter insert mode
+      await page.keyboard.type('i');
+
+      // Append text
+      await appendTextToEditorUntilContains(page, testText);
+    });
+
+    test('Write command (:w) should save the page successfully', async ({
+      page,
+    }) => {
+      //  Enter normal mode
+      await page.keyboard.press('Escape');
+
+      // Enter command mode
+      await page.keyboard.type(':');
+      await expect(page.locator('.cm-vim-panel')).toBeVisible();
+
+      // Type write command and execute
+      await page.keyboard.type('w');
+      await page.keyboard.press('Enter');
+
+      // Expect a success toaster to be displayed
+      await expect(page.locator('.Toastify__toast--success')).toBeVisible();
+    });
   });
-
-  test.afterAll(async ({ page }) => {
-    // Restore keymap to default
-    await changeKeymap(page, 'default');
-  });
-
-  test('Insert mode should persist while typing multiple characters', async ({
-    page,
-  }) => {
-    const testText = 'Hello World';
-
-    // Change to Vim keymap
-    await changeKeymap(page, 'vim');
-
-    // Focus the editor
-    await page.locator('.cm-content').click();
-
-    // Enter insert mode
-    await page.keyboard.type('i');
-
-    // Append text
-    await appendTextToEditorUntilContains(page, testText);
-  });
-
-  test('Write command (:w) should save the page successfully', async ({
-    page,
-  }) => {
-    //  Enter normal mode
-    await page.keyboard.press('Escape');
-
-    // Enter command mode
-    await page.keyboard.type(':');
-    await expect(page.locator('.cm-vim-panel')).toBeVisible();
-
-    // Type write command and execute
-    await page.keyboard.type('w');
-    await page.keyboard.press('Enter');
-
-    // Expect a success toaster to be displayed
-    await expect(page.locator('.Toastify__toast--success')).toBeVisible();
-  });
-});
