@@ -301,7 +301,6 @@
     "@types/url-join": "^4.0.2",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.18.1",
-    "@typescript/native-preview": "7.0.0-dev.20260108.1",
     "babel-loader": "^8.2.5",
     "bootstrap": "=5.3.2",
     "commander": "^14.0.0",
