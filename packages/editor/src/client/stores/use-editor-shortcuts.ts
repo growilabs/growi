@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Prec } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import { type KeyBinding, keymap } from '@codemirror/view';
 import type { KeyMapMode } from 'src/consts';
@@ -58,9 +59,9 @@ export const useEditorShortcuts = (
   const makeCodeBlockExtension = useMakeCodeBlockExtension();
 
   useEffect(() => {
-    const cleanupFunction = codeMirrorEditor?.appendExtensions?.([
-      makeCodeBlockExtension,
-    ]);
+    const cleanupFunction = codeMirrorEditor?.appendExtensions?.(
+      Prec.low(makeCodeBlockExtension),
+    );
     return cleanupFunction;
   }, [codeMirrorEditor, makeCodeBlockExtension]);
 
@@ -69,7 +70,7 @@ export const useEditorShortcuts = (
       return;
     }
 
-    const keyboardShortcutsExtension = keymap.of(keyBindings);
+    const keyboardShortcutsExtension = Prec.low(keymap.of(keyBindings));
 
     const cleanupFunction = codeMirrorEditor?.appendExtensions?.(
       keyboardShortcutsExtension,

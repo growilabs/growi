@@ -52,7 +52,7 @@ const useEnterKeyHandler = (
   );
 
   useEffect(() => {
-    const extension = keymap.of([{ key: 'Enter', run: onPressEnter }]);
+    const extension = Prec.low(keymap.of([{ key: 'Enter', run: onPressEnter }]));
     const cleanupFunction = codeMirrorEditor?.appendExtensions?.(extension);
     return cleanupFunction;
   }, [codeMirrorEditor, onPressEnter]);
