@@ -1,8 +1,7 @@
 import React, { type JSX } from 'react';
-
+import Image from 'next/image';
 import { SlackbotType } from '@growi/slack';
 import { useTranslation } from 'next-i18next';
-import Image from 'next/image';
 
 const botDetails = {
   officialBot: {
@@ -31,9 +30,9 @@ const botDetails = {
 };
 
 type BotTypeCardProps = {
-  isActive: boolean,
-  botType: string,
-  onBotTypeSelectHandler: (botType: SlackbotType) => void,
+  isActive: boolean;
+  botType: string;
+  onBotTypeSelectHandler: (botType: SlackbotType) => void;
 };
 
 export const BotTypeCard = (props: BotTypeCardProps): JSX.Element => {
@@ -44,34 +43,41 @@ export const BotTypeCard = (props: BotTypeCardProps): JSX.Element => {
   const isBotTypeOfficial = botType === SlackbotType.OFFICIAL;
 
   return (
-    <div
-      className={`card admin-bot-card rounded border-radius-sm shadow ${isActive ? 'border-primary' : ''}`}
+    <button
+      type="button"
+      className={`card admin-bot-card rounded border-radius-sm shadow ${isActive ? 'border-primary' : ''} border-0 bg-transparent p-0`}
       onClick={() => onBotTypeSelectHandler(botDetails[botType].botType)}
-      role="button"
-      key={botType}
+      aria-pressed={isActive}
     >
       <div>
-        <h3 className={`card-header mb-0 py-3
+        <h3
+          className={`card-header mb-0 py-3
               ${isBotTypeOfficial ? 'd-flex align-items-center justify-content-center' : 'text-center'}
               ${isActive ? 'bg-primary grw-botcard-title-active' : ''}`}
         >
           <span className="me-2">
-            {t(`admin:slack_integration.selecting_bot_types.${botDetails[botType].botTypeCategory}`)}
+            {t(
+              `admin:slack_integration.selecting_bot_types.${botDetails[botType].botTypeCategory}`,
+            )}
           </span>
 
           {/*  A recommended badge is shown on official bot card, supplementary names are shown on Custom bot cards   */}
-          { isBotTypeOfficial
-            ? (
-              <span className="badge bg-info me-2">
-                {t('admin:slack_integration.selecting_bot_types.recommended')}
-              </span>
-            ) : (
-              <span className="supplementary-bot-name me-2">
-                {t(`admin:slack_integration.selecting_bot_types.${botDetails[botType].supplementaryBotName}`)}
-              </span>
-            )}
+          {isBotTypeOfficial ? (
+            <span className="badge bg-info me-2">
+              {t('admin:slack_integration.selecting_bot_types.recommended')}
+            </span>
+          ) : (
+            <span className="supplementary-bot-name me-2">
+              {t(
+                `admin:slack_integration.selecting_bot_types.${botDetails[botType].supplementaryBotName}`,
+              )}
+            </span>
+          )}
 
-          <i className={isActive ? 'grw-botcard-title-active' : ''} aria-hidden="true"></i>
+          <i
+            className={isActive ? 'grw-botcard-title-active' : ''}
+            aria-hidden="true"
+          ></i>
         </h3>
       </div>
       <div className="card-body p-4">
@@ -85,7 +91,11 @@ export const BotTypeCard = (props: BotTypeCardProps): JSX.Element => {
               height={60}
             />
             <div className="d-flex justify-content-between mb-3 align-items-center">
-              <span>{t('admin:slack_integration.selecting_bot_types.multiple_workspaces_integration')}</span>
+              <span>
+                {t(
+                  'admin:slack_integration.selecting_bot_types.multiple_workspaces_integration',
+                )}
+              </span>
               <Image
                 className="bot-type-disc"
                 src={`/images/slack-integration/${botDetails[botType].multiWSIntegration}.png`}
@@ -95,7 +105,11 @@ export const BotTypeCard = (props: BotTypeCardProps): JSX.Element => {
               />
             </div>
             <div className="d-flex justify-content-between align-items-center">
-              <span>{t('admin:slack_integration.selecting_bot_types.security_control')}</span>
+              <span>
+                {t(
+                  'admin:slack_integration.selecting_bot_types.security_control',
+                )}
+              </span>
               <Image
                 className="bot-type-disc"
                 src={`/images/slack-integration/${botDetails[botType].securityControl}.png`}
@@ -107,7 +121,7 @@ export const BotTypeCard = (props: BotTypeCardProps): JSX.Element => {
           </div>
         </div>
       </div>
-    </div>
+    </button>
   );
 };
 

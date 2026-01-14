@@ -1,14 +1,16 @@
-/* eslint-disable react/prop-types */
 import type { FC } from 'react';
-
 import { useTranslation } from 'next-i18next';
 import {
-  FormGroup, Input, InputGroup, InputGroupText,
-  PopoverBody, PopoverHeader, UncontrolledPopover,
+  FormGroup,
+  Input,
+  InputGroup,
+  InputGroupText,
+  PopoverBody,
+  PopoverHeader,
+  UncontrolledPopover,
 } from 'reactstrap';
 
 import styles from './SlackNotification.module.scss';
-
 
 type SlackNotificationProps = {
   id: string;
@@ -19,13 +21,16 @@ type SlackNotificationProps = {
 };
 
 export const SlackNotification: FC<SlackNotificationProps> = ({
-  id, isSlackEnabled, slackChannels, onEnabledFlagChange, onChannelChange,
+  id,
+  isSlackEnabled,
+  slackChannels,
+  onEnabledFlagChange,
+  onChannelChange,
 }) => {
-
   const { t } = useTranslation();
   const idForSlackPopover = `${id}ForSlackPopover`;
 
-  const updateCheckboxHandler = (event: { target: { checked: boolean }; }) => {
+  const updateCheckboxHandler = (event: { target: { checked: boolean } }) => {
     const value = event.target.checked;
     if (onEnabledFlagChange != null) {
       onEnabledFlagChange(value);
@@ -39,9 +44,10 @@ export const SlackNotification: FC<SlackNotificationProps> = ({
     }
   };
 
-
   return (
-    <InputGroup className={`d-flex align-items-center ${styles['grw-slack-switch']}`}>
+    <InputGroup
+      className={`d-flex align-items-center ${styles['grw-slack-switch']}`}
+    >
       <InputGroupText className="rounded-pill rounded-end border-end-0 p-0 pe-1 grw-slack-switch">
         <FormGroup switch className="position-relative pe-4 py-3 m-0 me-2">
           <Input
@@ -62,7 +68,11 @@ export const SlackNotification: FC<SlackNotificationProps> = ({
         placeholder={`${t('slack_notification.input_channels')}`}
         onChange={updateSlackChannelsHandler}
       />
-      <UncontrolledPopover trigger="focus" placement="top" target={idForSlackPopover}>
+      <UncontrolledPopover
+        trigger="focus"
+        placement="top"
+        target={idForSlackPopover}
+      >
         <PopoverHeader>{t('slack_notification.popover_title')}</PopoverHeader>
         <PopoverBody>{t('slack_notification.popover_desc')}</PopoverBody>
       </UncontrolledPopover>

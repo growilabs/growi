@@ -8,9 +8,7 @@ import { isAiEnabled } from '../services';
 
 const router = express.Router();
 
-
 export const factory = (crowi: Crowi): express.Router => {
-
   // disable all routes if AI is not enabled
   if (!isAiEnabled()) {
     router.all('*', (req, res: ApiV3Response) => {
@@ -32,13 +30,21 @@ export const factory = (crowi: Crowi): express.Router => {
     });
 
     import('./delete-thread').then(({ deleteThreadFactory }) => {
-      router.delete('/thread/:aiAssistantId/:threadRelationId', deleteThreadFactory(crowi));
+      router.delete(
+        '/thread/:aiAssistantId/:threadRelationId',
+        deleteThreadFactory(crowi),
+      );
     });
 
-    import('./message').then(({ getMessagesFactory, postMessageHandlersFactory }) => {
-      router.post('/message', postMessageHandlersFactory(crowi));
-      router.get('/messages/:aiAssistantId/:threadId', getMessagesFactory(crowi));
-    });
+    import('./message').then(
+      ({ getMessagesFactory, postMessageHandlersFactory }) => {
+        router.post('/message', postMessageHandlersFactory(crowi));
+        router.get(
+          '/messages/:aiAssistantId/:threadId',
+          getMessagesFactory(crowi),
+        );
+      },
+    );
 
     import('./edit').then(({ postMessageToEditHandlersFactory }) => {
       router.post('/edit', postMessageToEditHandlersFactory(crowi));
@@ -56,9 +62,14 @@ export const factory = (crowi: Crowi): express.Router => {
       router.put('/ai-assistant/:id', updateAiAssistantsFactory(crowi));
     });
 
-    import('./set-default-ai-assistant').then(({ setDefaultAiAssistantFactory }) => {
-      router.put('/ai-assistant/:id/set-default', setDefaultAiAssistantFactory(crowi));
-    });
+    import('./set-default-ai-assistant').then(
+      ({ setDefaultAiAssistantFactory }) => {
+        router.put(
+          '/ai-assistant/:id/set-default',
+          setDefaultAiAssistantFactory(crowi),
+        );
+      },
+    );
 
     import('./delete-ai-assistant').then(({ deleteAiAssistantsFactory }) => {
       router.delete('/ai-assistant/:id', deleteAiAssistantsFactory(crowi));

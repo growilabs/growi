@@ -1,6 +1,4 @@
-import path from 'path';
-
-
+import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import glob from 'glob';
 import { nodeExternals } from 'rollup-plugin-node-externals';
@@ -25,11 +23,11 @@ const devSocketIOPlugin = (): Plugin => ({
     // setup socket.io
     const io = new Server(server.httpServer);
     io.on('connection', (socket) => {
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: Allow to use
       console.log('Client connected');
 
       socket.on('disconnect', () => {
-        // eslint-disable-next-line no-console
+        // biome-ignore lint/suspicious/noConsole: Allow to use
         console.log('Client disconnected');
       });
     });
@@ -47,9 +45,7 @@ export default defineConfig({
     devSocketIOPlugin(),
     dts({
       entryRoot: 'src',
-      exclude: [
-        ...excludeFiles,
-      ],
+      exclude: [...excludeFiles],
       copyDtsFiles: true,
     }),
     {
@@ -65,10 +61,7 @@ export default defineConfig({
     sourcemap: true,
     lib: {
       entry: glob.sync(path.resolve(__dirname, 'src/**/*.{ts,tsx}'), {
-        ignore: [
-          ...excludeFiles,
-          '**/*.spec.ts',
-        ],
+        ignore: [...excludeFiles, '**/*.spec.ts'],
       }),
       name: 'editor-libs',
       formats: ['es'],

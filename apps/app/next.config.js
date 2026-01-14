@@ -58,6 +58,7 @@ const getTranspilePackages = () => {
     'github-slugger',
     'html-url-attributes',
     'estree-util-is-identifier-name',
+    'superjson',
     ...listPrefixedPackages([
       'remark-',
       'rehype-',
@@ -104,9 +105,6 @@ module.exports = async (phase) => {
     i18n,
 
     // for build
-    eslint: {
-      ignoreDuringBuilds: true,
-    },
     typescript: {
       tsconfigPath: 'tsconfig.build.client.json',
     },
@@ -159,8 +157,10 @@ module.exports = async (phase) => {
   };
 
   // production server
+  // Skip withSuperjson() in production server phase because the pages directory
+  // doesn't exist in the production build and withSuperjson() tries to find it
   if (phase === PHASE_PRODUCTION_SERVER) {
-    return withSuperjson()(nextConfig);
+    return nextConfig;
   }
 
   const withBundleAnalyzer = require('@next/bundle-analyzer')({

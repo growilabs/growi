@@ -1,64 +1,45 @@
-import type {
-  NextPage, GetServerSideProps, GetServerSidePropsContext,
-} from 'next';
-import { useTranslation } from 'next-i18next';
+import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
-import Head from 'next/head';
+import { useHydrateAtoms } from 'jotai/utils';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { CommonProps } from '~/pages/utils/commons';
-import { generateCustomTitle } from '~/pages/utils/commons';
-import { useCurrentUser, useSiteUrl } from '~/stores-universal/context';
+import { _atomsForAdminPagesHydration as atoms } from '~/states/global';
 
-import { retrieveServerSideProps } from '../../utils/admin-page-util';
+import type { NextPageWithLayout } from '../_app.page';
+import type { AdminCommonProps } from './_shared';
+import {
+  createAdminPageLayout,
+  getServerSideAdminCommonProps,
+} from './_shared';
 
+const SlackIntegration = dynamic(
+  () =>
+    // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
+    import('~/client/components/Admin/SlackIntegration/SlackIntegration').then(
+      (mod) => mod.SlackIntegration,
+    ),
+  { ssr: false },
+);
 
-const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), { ssr: false });
-const SlackIntegration = dynamic(() => import('~/client/components/Admin/SlackIntegration/SlackIntegration').then(mod => mod.SlackIntegration), { ssr: false });
-const ForbiddenPage = dynamic(() => import('~/client/components/Admin/ForbiddenPage').then(mod => mod.ForbiddenPage), { ssr: false });
+type Props = AdminCommonProps;
 
-
-type Props = CommonProps & {
-  siteUrl: string
-};
-
-
-const AdminSlackIntegrationPage: NextPage<Props> = (props) => {
-  const { t } = useTranslation('admin');
-  useCurrentUser(props.currentUser ?? null);
-  useSiteUrl(props.siteUrl);
-
-  const componentTitle = t('slack_integration.slack_integration');
-  const pageTitle = generateCustomTitle(props, componentTitle);
-
-  if (props.isAccessDeniedForNonAdminUser) {
-    return <ForbiddenPage />;
-  }
-
-  return (
-    <AdminLayout componentTitle={componentTitle}>
-      <Head>
-        <title>{pageTitle}</title>
-      </Head>
-      <SlackIntegration />
-    </AdminLayout>
+const AdminSlackIntegrationPage: NextPageWithLayout<Props> = (props: Props) => {
+  // hydrate global state
+  useHydrateAtoms(
+    [[atoms.siteUrlWithEmptyValueWarnAtom, props.siteUrlWithEmptyValueWarn]],
+    { dangerouslyForceHydrate: true },
   );
+
+  return <SlackIntegration />;
 };
 
+AdminSlackIntegrationPage.getLayout = createAdminPageLayout<Props>({
+  title: (_p, t) => t('slack_integration.slack_integration'),
+});
 
-const injectServerConfigurations = async(context: GetServerSidePropsContext, props: Props): Promise<void> => {
-  const req: CrowiRequest = context.req as CrowiRequest;
-  const { crowi } = req;
-  const { growiInfoService } = crowi;
-
-  props.siteUrl = growiInfoService.getSiteUrl();
+export const getServerSideProps: GetServerSideProps<Props> = async (
+  context: GetServerSidePropsContext,
+) => {
+  return getServerSideAdminCommonProps(context);
 };
-
-
-export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {
-  const props = await retrieveServerSideProps(context, injectServerConfigurations);
-  return props;
-};
-
 
 export default AdminSlackIntegrationPage;

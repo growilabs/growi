@@ -14,7 +14,6 @@ import {
   ExternalGroupProviderType,
   LdapGroupMembershipAttributeType,
 } from '../../interfaces/external-user-group';
-
 import ExternalUserGroupSyncService from './external-user-group-sync';
 
 const logger = loggerFactory('growi:service:ldap-user-group-sync-service');
@@ -30,7 +29,7 @@ export class LdapUserGroupSyncService extends ExternalUserGroupSyncService {
 
   isInitialized = false;
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+  // biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
   constructor(
     passportService: PassportService,
     s2sMessagingService: S2sMessagingService,

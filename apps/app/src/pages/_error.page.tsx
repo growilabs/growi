@@ -1,12 +1,10 @@
 import type { JSX } from 'react';
-
 import type { NextPageContext } from 'next';
 import type { ErrorProps } from 'next/error';
-import Error from 'next/error';
-
+import NextError from 'next/error';
 
 export default function ErrorPage(props: ErrorProps): JSX.Element {
-  return <Error {...props} />;
+  return <NextError {...props} />;
 }
 
 // add getInitialProps to disable "https://nextjs.org/docs/messages/prerender-error"

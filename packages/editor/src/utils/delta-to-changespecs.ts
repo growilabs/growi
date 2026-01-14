@@ -1,4 +1,4 @@
-import { type ChangeSpec } from '@codemirror/state';
+import type { ChangeSpec } from '@codemirror/state';
 
 import type { Delta } from '../interfaces';
 

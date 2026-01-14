@@ -1,44 +1,38 @@
 import type { JSX } from 'react';
-
 import { useTranslation } from 'next-i18next';
+import type { UseFormRegister } from 'react-hook-form';
 
+import type { FileUploadFormValues } from './FileUploadSetting.types';
 
 export type GcsSettingMoleculeProps = {
-  gcsReferenceFileWithRelayMode
-  gcsUseOnlyEnvVars
-  gcsApiKeyJsonPath
-  gcsBucket
-  gcsUploadNamespace
-  envGcsApiKeyJsonPath?
-  envGcsBucket?
-  envGcsUploadNamespace?
-  onChangeGcsReferenceFileWithRelayMode: (val: boolean) => void
-  onChangeGcsApiKeyJsonPath: (val: string) => void
-  onChangeGcsBucket: (val: string) => void
-  onChangeGcsUploadNamespace: (val: string) => void
+  register: UseFormRegister<FileUploadFormValues>;
+  gcsReferenceFileWithRelayMode: boolean;
+  gcsUseOnlyEnvVars: boolean;
+  envGcsApiKeyJsonPath?: string;
+  envGcsBucket?: string;
+  envGcsUploadNamespace?: string;
+  onChangeGcsReferenceFileWithRelayMode: (val: boolean) => void;
 };
 
-export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element => {
+export const GcsSettingMolecule = (
+  props: GcsSettingMoleculeProps,
+): JSX.Element => {
   const { t } = useTranslation();
 
   const {
     gcsReferenceFileWithRelayMode,
     gcsUseOnlyEnvVars,
-    gcsApiKeyJsonPath,
     envGcsApiKeyJsonPath,
-    gcsBucket,
     envGcsBucket,
-    gcsUploadNamespace,
     envGcsUploadNamespace,
   } = props;
 
   return (
     <>
-
       <div className="row my-3">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <span className="text-start text-md-end col-md-3 col-form-label">
           {t('admin:app_setting.file_delivery_method')}
-        </label>
+        </span>
 
         <div className="col-md-6">
           <div className="dropdown">
@@ -50,23 +44,29 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
               aria-haspopup="true"
               aria-expanded="true"
             >
-              {gcsReferenceFileWithRelayMode && t('admin:app_setting.file_delivery_method_relay')}
-              {!gcsReferenceFileWithRelayMode && t('admin:app_setting.file_delivery_method_redirect')}
+              {gcsReferenceFileWithRelayMode &&
+                t('admin:app_setting.file_delivery_method_relay')}
+              {!gcsReferenceFileWithRelayMode &&
+                t('admin:app_setting.file_delivery_method_redirect')}
             </button>
-            <div className="dropdown-menu" aria-labelledby="ddGcsReferenceFileWithRelayMode">
+            <div className="dropdown-menu">
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props?.onChangeGcsReferenceFileWithRelayMode(true) }}
+                onClick={() => {
+                  props.onChangeGcsReferenceFileWithRelayMode(true);
+                }}
               >
                 {t('admin:app_setting.file_delivery_method_relay')}
               </button>
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props?.onChangeGcsReferenceFileWithRelayMode(false) }}
+                onClick={() => {
+                  props.onChangeGcsReferenceFileWithRelayMode(false);
+                }}
               >
-                { t('admin:app_setting.file_delivery_method_redirect')}
+                {t('admin:app_setting.file_delivery_method_redirect')}
               </button>
             </div>
 
@@ -82,11 +82,17 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
       {gcsUseOnlyEnvVars && (
         <p
           className="alert alert-info"
-          // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: t('admin:app_setting.note_for_the_only_env_option', { env: 'GCS_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS' }) }}
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
+          dangerouslySetInnerHTML={{
+            __html: t('admin:app_setting.note_for_the_only_env_option', {
+              env: 'GCS_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+            }),
+          }}
         />
       )}
-      <table className={`table settings-table ${gcsUseOnlyEnvVars && 'use-only-env-vars'}`}>
+      <table
+        className={`table settings-table ${gcsUseOnlyEnvVars && 'use-only-env-vars'}`}
+      >
         <colgroup>
           <col className="item-name" />
           <col className="from-db" />
@@ -106,17 +112,27 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
               <input
                 className="form-control"
                 type="text"
-                name="gcsApiKeyJsonPath"
                 readOnly={gcsUseOnlyEnvVars}
-                value={gcsApiKeyJsonPath}
-                onChange={e => props?.onChangeGcsApiKeyJsonPath(e.target.value)}
+                {...props.register('gcsApiKeyJsonPath')}
               />
             </td>
             <td>
-              <input className="form-control" type="text" value={envGcsApiKeyJsonPath || ''} readOnly tabIndex={-1} />
+              <input
+                className="form-control"
+                type="text"
+                value={envGcsApiKeyJsonPath || ''}
+                readOnly
+                tabIndex={-1}
+              />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
-                <small dangerouslySetInnerHTML={{ __html: t('admin:app_setting.use_env_var_if_empty', { variable: 'GCS_API_KEY_JSON_PATH' }) }} />
+                <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
+                  dangerouslySetInnerHTML={{
+                    __html: t('admin:app_setting.use_env_var_if_empty', {
+                      variable: 'GCS_API_KEY_JSON_PATH',
+                    }),
+                  }}
+                />
               </p>
             </td>
           </tr>
@@ -126,17 +142,27 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
               <input
                 className="form-control"
                 type="text"
-                name="gcsBucket"
                 readOnly={gcsUseOnlyEnvVars}
-                value={gcsBucket}
-                onChange={e => props?.onChangeGcsBucket(e.target.value)}
+                {...props.register('gcsBucket')}
               />
             </td>
             <td>
-              <input className="form-control" type="text" value={envGcsBucket || ''} readOnly tabIndex={-1} />
+              <input
+                className="form-control"
+                type="text"
+                value={envGcsBucket || ''}
+                readOnly
+                tabIndex={-1}
+              />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
-                <small dangerouslySetInnerHTML={{ __html: t('admin:app_setting.use_env_var_if_empty', { variable: 'GCS_BUCKET' }) }} />
+                <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
+                  dangerouslySetInnerHTML={{
+                    __html: t('admin:app_setting.use_env_var_if_empty', {
+                      variable: 'GCS_BUCKET',
+                    }),
+                  }}
+                />
               </p>
             </td>
           </tr>
@@ -146,23 +172,32 @@ export const GcsSettingMolecule = (props: GcsSettingMoleculeProps): JSX.Element 
               <input
                 className="form-control"
                 type="text"
-                name="gcsUploadNamespace"
                 readOnly={gcsUseOnlyEnvVars}
-                value={gcsUploadNamespace}
-                onChange={e => props?.onChangeGcsUploadNamespace(e.target.value)}
+                {...props.register('gcsUploadNamespace')}
               />
             </td>
             <td>
-              <input className="form-control" type="text" value={envGcsUploadNamespace || ''} readOnly tabIndex={-1} />
+              <input
+                className="form-control"
+                type="text"
+                value={envGcsUploadNamespace || ''}
+                readOnly
+                tabIndex={-1}
+              />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
-                <small dangerouslySetInnerHTML={{ __html: t('admin:app_setting.use_env_var_if_empty', { variable: 'GCS_UPLOAD_NAMESPACE' }) }} />
+                <small
+                  // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
+                  dangerouslySetInnerHTML={{
+                    __html: t('admin:app_setting.use_env_var_if_empty', {
+                      variable: 'GCS_UPLOAD_NAMESPACE',
+                    }),
+                  }}
+                />
               </p>
             </td>
           </tr>
         </tbody>
       </table>
-
     </>
   );
 };

@@ -1,36 +1,44 @@
-import type { ReactNode, JSX } from 'react';
-
+import type { JSX, ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 
-import { useIsNotFound } from '~/stores/page';
+import { usePageNotFound } from '~/states/page';
 
-import styles from './PagePathNav.module.scss';
+import styles from './PagePathNavLayout.module.scss';
 
 const moduleClass = styles['grw-page-path-nav-layout'] ?? '';
 
 export type PagePathNavLayoutProps = {
-  pagePath: string,
-  inline?: boolean,
-  className?: string,
-  pageId?: string | null,
-  isWipPage?: boolean,
-  maxWidth?: number,
-  formerLinkClassName?: string,
-  latterLinkClassName?: string,
-}
+  pagePath: string;
+  inline?: boolean;
+  className?: string;
+  pageId?: string | null;
+  isWipPage?: boolean;
+  maxWidth?: number;
+  formerLinkClassName?: string;
+  latterLinkClassName?: string;
+};
 
 type Props = PagePathNavLayoutProps & {
-  formerLink?: ReactNode,
-  latterLink?: ReactNode,
-}
+  formerLink?: ReactNode;
+  latterLink?: ReactNode;
+};
 
-const CopyDropdown = dynamic(() => import('~/client/components/Common/CopyDropdown').then(mod => mod.CopyDropdown), { ssr: false });
+const CopyDropdown = dynamic(
+  () =>
+    // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
+    import('~/client/components/Common/CopyDropdown').then(
+      (mod) => mod.CopyDropdown,
+    ),
+  { ssr: false },
+);
 
 export const PagePathNavLayout = (props: Props): JSX.Element => {
   const {
     className = '',
     inline = false,
-    pageId, pagePath, isWipPage,
+    pageId,
+    pagePath,
+    isWipPage,
     formerLink,
     formerLinkClassName = '',
     latterLink,
@@ -38,19 +46,18 @@ export const PagePathNavLayout = (props: Props): JSX.Element => {
     maxWidth,
   } = props;
 
-  const { data: isNotFound } = useIsNotFound();
+  const isNotFound = usePageNotFound();
 
   const copyDropdownId = `copydropdown-in-pagepathnavlayout-${pageId}`;
 
   const containerLayoutClass = inline ? '' : 'd-flex align-items-center';
 
   return (
-    <div
-      className={`${className} ${moduleClass}`}
-      style={{ maxWidth }}
-    >
+    <div className={`${className} ${moduleClass}`} style={{ maxWidth }}>
       {formerLink && (
-        <span className={`${formerLinkClassName ?? ''} ${styles['grw-former-link']} mb-2 d-block`}>
+        <span
+          className={`${formerLinkClassName ?? ''} ${styles['grw-former-link']} mb-2 d-block`}
+        >
           {formerLink}
         </span>
       )}
@@ -58,11 +65,9 @@ export const PagePathNavLayout = (props: Props): JSX.Element => {
         <h1 className={`m-0 d-inline align-bottom ${latterLinkClassName}`}>
           {latterLink}
         </h1>
-        { pageId != null && !isNotFound && (
+        {pageId != null && !isNotFound && (
           <span className="d-inline-flex align-items-center align-bottom ms-2 gap-2">
-            { isWipPage && (
-              <span className="badge text-bg-secondary">WIP</span>
-            )}
+            {isWipPage && <span className="badge text-bg-secondary">WIP</span>}
             <span className="grw-page-path-nav-copydropdown">
               <CopyDropdown
                 pageId={pageId}
@@ -75,7 +80,7 @@ export const PagePathNavLayout = (props: Props): JSX.Element => {
               </CopyDropdown>
             </span>
           </span>
-        ) }
+        )}
       </div>
     </div>
   );

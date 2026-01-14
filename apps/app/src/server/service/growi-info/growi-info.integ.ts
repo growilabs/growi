@@ -1,7 +1,7 @@
-import type { IPage } from '^/../../packages/core/dist';
 import mongoose from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
+import type { IPage, IUser } from '^/../../packages/core/dist';
 import pkg from '^/package.json';
 
 import type UserEvent from '~/server/events/user';
@@ -11,16 +11,15 @@ import { configManager } from '~/server/service/config-manager';
 import type Crowi from '../../crowi';
 import type { PageModel } from '../../models/page';
 import pageModel from '../../models/page';
-
 import { growiInfoService } from './growi-info';
 
 describe('GrowiInfoService', () => {
   const appVersion = pkg.version;
 
-  let User;
-  let Page;
+  let User: mongoose.Model<IUser>;
+  let Page: PageModel;
 
-  beforeAll(async() => {
+  beforeAll(async () => {
     process.env.APP_SITE_URL = 'http://growi.test.jp';
     process.env.DEPLOYMENT_TYPE = 'growi-docker-compose';
     process.env.SAML_ENABLED = 'true';
@@ -65,8 +64,7 @@ describe('GrowiInfoService', () => {
   });
 
   describe('getGrowiInfo', () => {
-
-    test('Should get correct GROWI info', async() => {
+    test('Should get correct GROWI info', async () => {
       const growiInfo = await growiInfoService.getGrowiInfo();
 
       assert(growiInfo != null);
@@ -76,7 +74,6 @@ describe('GrowiInfoService', () => {
       expect(growiInfo.osInfo?.arch).toBeTruthy();
       expect(growiInfo.osInfo?.totalmem).toBeTruthy();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (growiInfo as any).osInfo;
 
       expect(growiInfo).toEqual({
@@ -89,7 +86,7 @@ describe('GrowiInfoService', () => {
       });
     });
 
-    test('Should get correct GROWI info with additionalInfo', async() => {
+    test('Should get correct GROWI info with additionalInfo', async () => {
       // arrange
       await User.create({
         username: 'growiinfo test user',
@@ -107,7 +104,6 @@ describe('GrowiInfoService', () => {
       expect(growiInfo.osInfo?.arch).toBeTruthy();
       expect(growiInfo.osInfo?.totalmem).toBeTruthy();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (growiInfo as any).osInfo;
 
       expect(growiInfo).toEqual({
@@ -129,9 +125,11 @@ describe('GrowiInfoService', () => {
       });
     });
 
-    test('Should get correct GROWI info with specific options - attachment only', async() => {
+    test('Should get correct GROWI info with specific options - attachment only', async () => {
       // act
-      const growiInfo = await growiInfoService.getGrowiInfo({ includeAttachmentInfo: true });
+      const growiInfo = await growiInfoService.getGrowiInfo({
+        includeAttachmentInfo: true,
+      });
 
       // assert
       assert(growiInfo != null);
@@ -141,9 +139,11 @@ describe('GrowiInfoService', () => {
       });
     });
 
-    test('Should get correct GROWI info with specific options - user count only', async() => {
+    test('Should get correct GROWI info with specific options - user count only', async () => {
       // act
-      const growiInfo = await growiInfoService.getGrowiInfo({ includeUserCountInfo: true });
+      const growiInfo = await growiInfoService.getGrowiInfo({
+        includeUserCountInfo: true,
+      });
 
       // assert
       assert(growiInfo != null);
@@ -155,9 +155,11 @@ describe('GrowiInfoService', () => {
       });
     });
 
-    test('Should get correct GROWI info with specific options - installed info only', async() => {
+    test('Should get correct GROWI info with specific options - installed info only', async () => {
       // act
-      const growiInfo = await growiInfoService.getGrowiInfo({ includeInstalledInfo: true });
+      const growiInfo = await growiInfoService.getGrowiInfo({
+        includeInstalledInfo: true,
+      });
 
       // assert
       assert(growiInfo != null);
@@ -169,7 +171,7 @@ describe('GrowiInfoService', () => {
       });
     });
 
-    test('Should get correct GROWI info with combined options', async() => {
+    test('Should get correct GROWI info with combined options', async () => {
       // act
       const growiInfo = await growiInfoService.getGrowiInfo({
         includeAttachmentInfo: true,
@@ -188,7 +190,7 @@ describe('GrowiInfoService', () => {
       });
     });
 
-    test('Should get correct GROWI info with all options', async() => {
+    test('Should get correct GROWI info with all options', async () => {
       // act
       const growiInfo = await growiInfoService.getGrowiInfo({
         includeAttachmentInfo: true,
@@ -210,7 +212,7 @@ describe('GrowiInfoService', () => {
       });
     });
 
-    test('Should get correct GROWI info with empty options', async() => {
+    test('Should get correct GROWI info with empty options', async () => {
       // act
       const growiInfo = await growiInfoService.getGrowiInfo({});
 
@@ -227,6 +229,5 @@ describe('GrowiInfoService', () => {
         osInfo: growiInfo.osInfo, // Keep the osInfo as it's dynamic
       });
     });
-
   });
 });

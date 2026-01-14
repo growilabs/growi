@@ -5,9 +5,7 @@ import nocache from 'nocache';
 import loggerFactory from '~/utils/logger';
 
 import { Config } from '../../models/config';
-
 import type { ApiV3Response } from './interfaces/apiv3-response';
-
 
 const logger = loggerFactory('growi:routes:apiv3:healthcheck');
 
@@ -79,15 +77,19 @@ const router = express.Router();
  */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-
   async function checkMongo(errors, info) {
     try {
       await Config.findOne({});
 
       info.mongo = 'OK';
-    }
-    catch (err) {
-      errors.push(new ErrorV3(`MongoDB is not connectable - ${err.message}`, 'healthcheck-mongodb-unhealthy', err.stack));
+    } catch (err) {
+      errors.push(
+        new ErrorV3(
+          `MongoDB is not connectable - ${err.message}`,
+          'healthcheck-mongodb-unhealthy',
+          err.stack,
+        ),
+      );
     }
   }
 
@@ -97,9 +99,14 @@ module.exports = (crowi) => {
       try {
         info.searchInfo = await searchService.getInfoForHealth();
         searchService.resetErrorStatus();
-      }
-      catch (err) {
-        errors.push(new ErrorV3(`The Search Service is not connectable - ${err.message}`, 'healthcheck-search-unhealthy', err.stack));
+      } catch (err) {
+        errors.push(
+          new ErrorV3(
+            `The Search Service is not connectable - ${err.message}`,
+            'healthcheck-search-unhealthy',
+            err.stack,
+          ),
+        );
       }
     }
   }
@@ -165,20 +172,26 @@ module.exports = (crowi) => {
    *                  info:
    *                    $ref: '#/components/schemas/HealthcheckInfo'
    */
-  router.get('/', nocache(), async(req, res: ApiV3Response) => {
+  router.get('/', nocache(), async (req, res: ApiV3Response) => {
     let checkServices = (() => {
       if (req.query.checkServices == null) return [];
-      return Array.isArray(req.query.checkServices) ? req.query.checkServices : [req.query.checkServices];
+      return Array.isArray(req.query.checkServices)
+        ? req.query.checkServices
+        : [req.query.checkServices];
     })();
     let isStrictly = req.query.strictly != null;
 
     // for backward compatibility
     if (req.query.connectToMiddlewares != null) {
-      logger.warn('The param \'connectToMiddlewares\' is deprecated. Use \'checkServices[]\' instead.');
+      logger.warn(
+        "The param 'connectToMiddlewares' is deprecated. Use 'checkServices[]' instead.",
+      );
       checkServices = ['mongo', 'search'];
     }
     if (req.query.checkMiddlewaresStrictly != null) {
-      logger.warn('The param \'checkMiddlewaresStrictly\' is deprecated. Use \'checkServices[]\' and \'strictly\' instead.');
+      logger.warn(
+        "The param 'checkMiddlewaresStrictly' is deprecated. Use 'checkServices[]' and 'strictly' instead.",
+      );
       checkServices = ['mongo', 'search'];
       isStrictly = true;
     }

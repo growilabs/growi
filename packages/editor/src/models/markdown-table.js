@@ -15,7 +15,6 @@ const defaultOptions = { stringLength: stringWidth };
  *   ref. https://github.com/wooorm/markdown-table
  */
 export class MarkdownTable {
-
   constructor(table, options) {
     this.table = table || [];
     this.options = Object.assign(options || {}, defaultOptions);
@@ -47,8 +46,7 @@ export class MarkdownTable {
       for (let j = 0; j < this.table[i].length; j++) {
         if (this.table[i][j] != null) {
           this.table[i][j] = this.table[i][j].trim().replace(/\r?\n/g, ' ');
-        }
-        else {
+        } else {
           this.table[i][j] = '';
         }
       }
@@ -65,7 +63,7 @@ export class MarkdownTable {
    */
   static fromHTMLTableTag(str) {
     // set up DOMParser
-    const domParser = new (window.DOMParser)();
+    const domParser = new window.DOMParser();
 
     // use DOMParser to prevent DOM based XSS (https://developer.mozilla.org/en-US/docs/Web/API/DOMParser)
     const dom = domParser.parseFromString(str, 'application/xml');
@@ -102,7 +100,9 @@ export class MarkdownTable {
    * return a MarkdownTable instance made from a string of delimiter-separated values
    */
   static fromDSV(str, delimiter) {
-    return MarkdownTable.fromMarkdownString(csvToMarkdown(str, delimiter, true));
+    return MarkdownTable.fromMarkdownString(
+      csvToMarkdown(str, delimiter, true),
+    );
   }
 
   /**
@@ -117,7 +117,10 @@ export class MarkdownTable {
     for (let n = 0; n < arrMDTableLines.length; n++) {
       const line = arrMDTableLines[n];
 
-      if (tableAlignmentLineRE.test(line) && !tableAlignmentLineNegRE.test(line)) {
+      if (
+        tableAlignmentLineRE.test(line) &&
+        !tableAlignmentLineNegRE.test(line)
+      ) {
         // parse line which described alignment
         const alignRuleRE = [
           { align: 'c', regex: /^:-+:$/ },
@@ -128,11 +131,12 @@ export class MarkdownTable {
         lineText = line.replace(/^\||\|$/g, ''); // strip off pipe charactor which is placed head of line and last of line.
         lineText = lineText.replace(/\s*/g, '');
         aligns = lineText.split(/\|/).map((col) => {
-          const rule = alignRuleRE.find((rule) => { return col.match(rule.regex) });
-          return (rule != null) ? rule.align : '';
+          const rule = alignRuleRE.find((rule) => {
+            return col.match(rule.regex);
+          });
+          return rule != null ? rule.align : '';
         });
-      }
-      else if (linePartOfTableRE.test(line)) {
+      } else if (linePartOfTableRE.test(line)) {
         // parse line whether header or body
         let lineText = '';
         lineText = line.replace(/\s*\|\s*/g, '|');
@@ -141,7 +145,6 @@ export class MarkdownTable {
         contents.push(row);
       }
     }
-    return (new MarkdownTable(contents, { align: aligns }));
+    return new MarkdownTable(contents, { align: aligns });
   }
-
 }

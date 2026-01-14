@@ -6,10 +6,10 @@ export const G2GTransferErrorCode = {
   FAILED_TO_RETRIEVE_FILE_METADATA: 'FAILED_TO_RETRIEVE_FILE_METADATA',
 } as const;
 
-export type G2GTransferErrorCode = typeof G2GTransferErrorCode[keyof typeof G2GTransferErrorCode];
+export type G2GTransferErrorCode =
+  (typeof G2GTransferErrorCode)[keyof typeof G2GTransferErrorCode];
 
 export class G2GTransferError extends ExtensibleCustomError {
-
   readonly id = 'G2GTransferError';
 
   code!: G2GTransferErrorCode;
@@ -18,7 +18,6 @@ export class G2GTransferError extends ExtensibleCustomError {
     super(message);
     this.code = code;
   }
-
 }
 
 export const isG2GTransferError = (err: any): err is G2GTransferError => {

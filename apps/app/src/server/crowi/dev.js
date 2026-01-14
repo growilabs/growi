@@ -1,6 +1,5 @@
-import path from 'path';
-
 import express from 'express';
+import path from 'path';
 
 import loggerFactory from '~/utils/logger';
 
@@ -8,9 +7,7 @@ import nextFactory from '../routes/next';
 
 const logger = loggerFactory('growi:crowi:dev');
 
-
 class CrowiDev {
-
   /**
    * @param {import('~/server/crowi').default} crowi Crowi instance
    *
@@ -26,7 +23,8 @@ class CrowiDev {
 
   initPromiseRejectionWarningHandler() {
     // https://qiita.com/syuilo/items/0800d7e44e93203c7285
-    process.on('unhandledRejection', console.dir); // eslint-disable-line no-console
+    // biome-ignore lint:plugin: Allow to use
+    process.on('unhandledRejection', console.dir);
   }
 
   /**
@@ -43,7 +41,9 @@ class CrowiDev {
     let serverUrl = `http://localhost:${port}}`;
 
     if (this.crowi.env.DEV_HTTPS) {
-      logger.info(`[${this.crowi.node_env}] Express server will start with HTTPS Self-Signed Certification`);
+      logger.info(
+        `[${this.crowi.node_env}] Express server will start with HTTPS Self-Signed Certification`,
+      );
 
       serverUrl = `https://localhost:${port}}`;
 
@@ -51,8 +51,12 @@ class CrowiDev {
       const https = require('https');
 
       const options = {
-        key: fs.readFileSync(path.join(this.crowi.rootDir, './resource/certs/localhost/key.pem')),
-        cert: fs.readFileSync(path.join(this.crowi.rootDir, './resource/certs/localhost/cert.pem')),
+        key: fs.readFileSync(
+          path.join(this.crowi.rootDir, './resource/certs/localhost/key.pem'),
+        ),
+        cert: fs.readFileSync(
+          path.join(this.crowi.rootDir, './resource/certs/localhost/cert.pem'),
+        ),
       };
 
       server = https.createServer(options, app);
@@ -64,9 +68,15 @@ class CrowiDev {
     });
 
     eazyLogger.info('{bold:Server URLs:}');
-    eazyLogger.unprefixed('info', '{grey:=======================================}');
+    eazyLogger.unprefixed(
+      'info',
+      '{grey:=======================================}',
+    );
     eazyLogger.unprefixed('info', `         APP: {magenta:${serverUrl}}`);
-    eazyLogger.unprefixed('info', '{grey:=======================================}');
+    eazyLogger.unprefixed(
+      'info',
+      '{grey:=======================================}',
+    );
 
     return server;
   }
@@ -81,14 +91,16 @@ class CrowiDev {
 
   setupNextBundleAnalyzer(app) {
     const next = nextFactory(this.crowi);
-    app.use('/analyze', express.static(path.resolve(__dirname, '../../../.next/analyze')));
+    app.use(
+      '/analyze',
+      express.static(path.resolve(__dirname, '../../../.next/analyze')),
+    );
   }
 
   setupNextjsStackFrame(app) {
     const next = nextFactory(this.crowi);
     app.get('/__nextjs_original-stack-frame', next.delegateToNext);
   }
-
 }
 
 module.exports = CrowiDev;

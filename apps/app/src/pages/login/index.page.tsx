@@ -1,60 +1,61 @@
 import React from 'react';
-
-import { pagePathUtils } from '@growi/core/dist/utils';
 import type {
-  NextPage, GetServerSideProps, GetServerSidePropsContext,
+  GetServerSideProps,
+  GetServerSidePropsContext,
+  NextPage,
 } from 'next';
-import { useTranslation } from 'next-i18next';
-import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
+import {
+  isPermalink,
+  isUserPage,
+  isUsersTopPage,
+} from '@growi/core/dist/utils/page-path-utils';
+import { useTranslation } from 'next-i18next';
 
 import { NoLoginLayout } from '~/components/Layout/NoLoginLayout';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type { IExternalAccountLoginError } from '~/interfaces/errors/external-account-login-error';
-import { isExternalAccountLoginError } from '~/interfaces/errors/external-account-login-error';
 import { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 import type { RegistrationMode } from '~/interfaces/registration-mode';
-import type { CommonProps } from '~/pages/utils/commons';
-import { getServerSideCommonProps, generateCustomTitle, getNextI18NextConfig } from '~/pages/utils/commons';
+
+import type { CommonEachProps, CommonInitialProps } from '../common-props';
 import {
-  useCsrfToken,
-  useCurrentPathname,
-} from '~/stores-universal/context';
+  getServerSideCommonEachProps,
+  getServerSideCommonInitialProps,
+  getServerSideI18nProps,
+} from '../common-props';
+import { useCustomTitle } from '../utils/page-title-customization';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
 
 import styles from './index.module.scss';
 
+const LoginForm = dynamic(
+  // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
+  () => import('~/client/components/LoginForm').then((mod) => mod.LoginForm),
+  { ssr: false },
+);
 
-const { isPermalink, isUserPage, isUsersTopPage } = pagePathUtils;
-
-const LoginForm = dynamic(() => import('~/client/components/LoginForm').then(mod => mod.LoginForm), { ssr: false });
-
-
-type Props = CommonProps & {
-  registrationMode: RegistrationMode,
-  pageWithMetaStr: string,
-  isMailerSetup: boolean,
-  enabledExternalAuthType: IExternalAuthProviderType[],
-  registrationWhitelist: string[],
-  isLocalStrategySetup: boolean,
-  isLdapStrategySetup: boolean,
-  isLdapSetupFailed: boolean,
-  isPasswordResetEnabled: boolean,
-  isEmailAuthenticationEnabled: boolean,
-  externalAccountLoginError?: IExternalAccountLoginError,
-  minPasswordLength: number,
+type ServerConfigurationProps = {
+  registrationMode: RegistrationMode;
+  isMailerSetup: boolean;
+  enabledExternalAuthType: IExternalAuthProviderType[];
+  registrationWhitelist: string[];
+  isLocalStrategySetup: boolean;
+  isLdapStrategySetup: boolean;
+  isLdapSetupFailed: boolean;
+  isPasswordResetEnabled: boolean;
+  isEmailAuthenticationEnabled: boolean;
+  externalAccountLoginError?: IExternalAccountLoginError;
+  minPasswordLength: number;
 };
+
+type Props = CommonInitialProps & CommonEachProps & ServerConfigurationProps;
 
 const LoginPage: NextPage<Props> = (props: Props) => {
   const { t } = useTranslation();
 
-  // commons
-  useCsrfToken(props.csrfToken);
-
-  // page
-  useCurrentPathname(props.currentPathname);
-
-  const title = generateCustomTitle(props, t('login.title'));
+  const title = useCustomTitle(t('login.title'));
   const classNames: string[] = ['login-page', styles['login-page']];
 
   return (
@@ -79,90 +80,89 @@ const LoginPage: NextPage<Props> = (props: Props) => {
   );
 };
 
-/**
- * for Server Side Translations
- * @param context
- * @param props
- * @param namespacesRequired
- */
-async function injectNextI18NextConfigurations(context: GetServerSidePropsContext, props: Props, namespacesRequired?: string[] | undefined): Promise<void> {
-  const nextI18NextConfig = await getNextI18NextConfig(serverSideTranslations, context, namespacesRequired);
-  props._nextI18Next = nextI18NextConfig._nextI18Next;
-}
-
-function injectEnabledStrategies(context: GetServerSidePropsContext, props: Props): void {
+const getServerSideConfigurationProps: GetServerSideProps<
+  ServerConfigurationProps
+> = async (context: GetServerSidePropsContext) => {
   const req: CrowiRequest = context.req as CrowiRequest;
   const { crowi } = req;
-  const {
-    configManager,
-  } = crowi;
-
-  props.enabledExternalAuthType = [
-    configManager.getConfig('security:passport-google:isEnabled') === true ? IExternalAuthProviderType.google : undefined,
-    configManager.getConfig('security:passport-github:isEnabled') === true ? IExternalAuthProviderType.github : undefined,
-    configManager.getConfig('security:passport-saml:isEnabled') === true ? IExternalAuthProviderType.saml : undefined,
-    configManager.getConfig('security:passport-oidc:isEnabled') === true ? IExternalAuthProviderType.oidc : undefined,
-
-  ]
-    .filter((authType): authType is Exclude<typeof authType, undefined> => authType != null);
-}
-
-async function injectServerConfigurations(context: GetServerSidePropsContext, props: Props): Promise<void> {
-  const req: CrowiRequest = context.req as CrowiRequest;
-  const { crowi } = req;
-  const {
-    mailService,
-    configManager,
-    passportService,
-  } = crowi;
-
-  props.isPasswordResetEnabled = configManager.getConfig('security:passport-local:isPasswordResetEnabled');
-  props.isMailerSetup = mailService.isMailerSetup;
-  props.isLocalStrategySetup = passportService.isLocalStrategySetup;
-  props.isLdapStrategySetup = passportService.isLdapStrategySetup;
-  props.isLdapSetupFailed = configManager.getConfig('security:passport-ldap:isEnabled') && !props.isLdapStrategySetup;
-  props.registrationWhitelist = configManager.getConfig('security:registrationWhitelist');
-  props.isEmailAuthenticationEnabled = configManager.getConfig('security:passport-local:isEmailAuthenticationEnabled');
-  props.registrationMode = configManager.getConfig('security:registrationMode');
-  props.minPasswordLength = configManager.getConfig('app:minPasswordLength');
-}
-
-export const getServerSideProps: GetServerSideProps = async(context: GetServerSidePropsContext) => {
-  const result = await getServerSideCommonProps(context);
-
-
-  // redirect to the page the user was on before moving to the Login Page
-  if (context.req.headers.referer != null) {
-    const urlBeforeLogin = new URL(context.req.headers.referer);
-    if (isPermalink(urlBeforeLogin.pathname) || isUserPage(urlBeforeLogin.pathname) || isUsersTopPage(urlBeforeLogin.pathname)) {
-      (context.req as CrowiRequest).session.redirectTo = urlBeforeLogin.href;
-    }
-  }
-
-  // check for presence
-  // see: https://github.com/vercel/next.js/issues/19271#issuecomment-730006862
-  if (!('props' in result)) {
-    throw new Error('invalid getSSP result');
-  }
-
-  const props: Props = result.props as Props;
-
-  const externalAccountLoginError = (context.req as CrowiRequest).session.externalAccountLoginError;
-  if (externalAccountLoginError != null) {
-    delete (context.req as CrowiRequest).session.externalAccountLoginError;
-    const parsedError = JSON.parse(externalAccountLoginError);
-    if (isExternalAccountLoginError(parsedError)) {
-      props.externalAccountLoginError = { ...parsedError as IExternalAccountLoginError };
-    }
-  }
-
-  injectServerConfigurations(context, props);
-  injectEnabledStrategies(context, props);
-  await injectNextI18NextConfigurations(context, props, ['translation']);
+  const { configManager, mailService, passportService } = crowi;
 
   return {
-    props,
+    props: {
+      enabledExternalAuthType: [
+        configManager.getConfig('security:passport-google:isEnabled') === true
+          ? IExternalAuthProviderType.google
+          : undefined,
+        configManager.getConfig('security:passport-github:isEnabled') === true
+          ? IExternalAuthProviderType.github
+          : undefined,
+        configManager.getConfig('security:passport-saml:isEnabled') === true
+          ? IExternalAuthProviderType.saml
+          : undefined,
+        configManager.getConfig('security:passport-oidc:isEnabled') === true
+          ? IExternalAuthProviderType.oidc
+          : undefined,
+      ].filter(
+        (authType): authType is Exclude<typeof authType, undefined> =>
+          authType != null,
+      ),
+      isPasswordResetEnabled: configManager.getConfig(
+        'security:passport-local:isPasswordResetEnabled',
+      ),
+      isMailerSetup: mailService.isMailerSetup,
+      isLocalStrategySetup: passportService.isLocalStrategySetup,
+      isLdapStrategySetup: passportService.isLdapStrategySetup,
+      isLdapSetupFailed:
+        configManager.getConfig('security:passport-ldap:isEnabled') &&
+        !passportService.isLdapStrategySetup,
+      registrationWhitelist: configManager.getConfig(
+        'security:registrationWhitelist',
+      ),
+      isEmailAuthenticationEnabled: configManager.getConfig(
+        'security:passport-local:isEmailAuthenticationEnabled',
+      ),
+      registrationMode: configManager.getConfig('security:registrationMode'),
+      minPasswordLength: configManager.getConfig('app:minPasswordLength'),
+    },
   };
+};
+
+export const getServerSideProps: GetServerSideProps = async (
+  context: GetServerSidePropsContext,
+) => {
+  const req: CrowiRequest = context.req as CrowiRequest;
+
+  // redirect to the page the user was on before moving to the Login Page
+  if (req.headers.referer != null) {
+    const urlBeforeLogin = new URL(req.headers.referer);
+    if (
+      isPermalink(urlBeforeLogin.pathname) ||
+      isUserPage(urlBeforeLogin.pathname) ||
+      isUsersTopPage(urlBeforeLogin.pathname)
+    ) {
+      req.session.redirectTo = urlBeforeLogin.href;
+    }
+  }
+
+  const [
+    commonInitialResult,
+    commonEachResult,
+    serverConfigResult,
+    i18nPropsResult,
+  ] = await Promise.all([
+    getServerSideCommonInitialProps(context),
+    getServerSideCommonEachProps(context),
+    getServerSideConfigurationProps(context),
+    getServerSideI18nProps(context, ['translation']),
+  ]);
+
+  return mergeGetServerSidePropsResults(
+    commonInitialResult,
+    mergeGetServerSidePropsResults(
+      commonEachResult,
+      mergeGetServerSidePropsResults(serverConfigResult, i18nPropsResult),
+    ),
+  );
 };
 
 export default LoginPage;

@@ -14,28 +14,29 @@ module.exports = (crowi) => {
    *    user: Object
    * }]
    */
-  const createGrowiPages = async(pages) => {
+  const createGrowiPages = async (pages) => {
     const promises = [];
     const errors = [];
 
-    /* eslint-disable no-await-in-loop */
     for (const page of pages) {
       const path = page.path;
       const user = page.user;
       const body = page.body;
       const isCreatableName = isCreatablePage(path);
+      // biome-ignore lint/performance/noAwaitInLoops: Allow for memory consumption control
       const isPageNameTaken = await Page.findByPathAndViewer(path, user);
 
       if (isCreatableName && !isPageNameTaken) {
         try {
-          const promise = crowi.pageService.create(path, body, user, { grant: Page.GRANT_PUBLIC, grantUserGroupId: null });
+          const promise = crowi.pageService.create(path, body, user, {
+            grant: Page.GRANT_PUBLIC,
+            grantUserGroupId: null,
+          });
           promises.push(promise);
-        }
-        catch (err) {
+        } catch (err) {
           errors.push(err);
         }
-      }
-      else {
+      } else {
         if (!isCreatableName) {
           errors.push(new Error(`${path} is not a creatable name in GROWI`));
         }
@@ -44,7 +45,6 @@ module.exports = (crowi) => {
         }
       }
     }
-    /* eslint-enable no-await-in-loop */
 
     await Promise.all(promises);
 

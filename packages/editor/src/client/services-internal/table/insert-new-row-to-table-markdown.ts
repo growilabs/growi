@@ -74,13 +74,15 @@ const addRowToMarkdownTable = (mdtable: MarkdownTable): any => {
   mdtable.table.push(newRow);
 };
 
-export const mergeMarkdownTable = (mdtableList: MarkdownTable[]): MarkdownTable => {
+export const mergeMarkdownTable = (
+  mdtableList: MarkdownTable[],
+): MarkdownTable => {
   let newTable: any[] = [];
   const options = mdtableList[0].options;
   mdtableList.forEach((mdtable) => {
     newTable = newTable.concat(mdtable.table);
   });
-  return (new MarkdownTable(newTable, options));
+  return new MarkdownTable(newTable, options);
 };
 
 const addRow = (editor: EditorView) => {
@@ -122,7 +124,6 @@ const addRow = (editor: EditorView) => {
 };
 
 const removeRow = (editor: EditorView) => {
-
   const curPos = getCurPos(editor);
 
   const curLine = editor.state.doc.lineAt(curPos).number;
@@ -168,7 +169,9 @@ const reformTable = (editor: EditorView) => {
     },
   });
 
-  const nextCurPos = isLastRow ? editor.state.doc.line(curLine).to : editor.state.doc.line(nextLine).from + 2;
+  const nextCurPos = isLastRow
+    ? editor.state.doc.line(curLine).to
+    : editor.state.doc.line(nextLine).from + 2;
 
   editor.dispatch({
     selection: { anchor: nextCurPos },
@@ -176,7 +179,6 @@ const reformTable = (editor: EditorView) => {
 };
 
 export const insertNewRowToMarkdownTable = (editor: EditorView): void => {
-
   const curPos = getCurPos(editor);
 
   const curLine = editor.state.doc.lineAt(curPos).number;
@@ -192,11 +194,9 @@ export const insertNewRowToMarkdownTable = (editor: EditorView): void => {
 
   if (isEndOfLine) {
     addRow(editor);
-  }
-  else if (isLastRow && emptyLineOfTableRE.test(strFromBol + strToEol)) {
+  } else if (isLastRow && emptyLineOfTableRE.test(strFromBol + strToEol)) {
     removeRow(editor);
-  }
-  else {
+  } else {
     reformTable(editor);
   }
 };

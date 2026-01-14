@@ -1,16 +1,18 @@
-import { type JSX } from 'react';
-
+import type { JSX } from 'react';
+import Link from 'next/link';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
-import Link from 'next/link';
 import {
-  UncontrolledDropdown, DropdownToggle, DropdownMenu, DropdownItem,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
+  UncontrolledDropdown,
 } from 'reactstrap';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError } from '~/client/util/toastr';
-import { useCurrentUser } from '~/stores-universal/context';
+import { useCurrentUser } from '~/states/global';
 
 import { SkeletonItem } from './SkeletonItem';
 
@@ -18,27 +20,24 @@ import styles from './PersonalDropdown.module.scss';
 
 export const PersonalDropdown = (): JSX.Element => {
   const { t } = useTranslation('commons');
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser();
 
   if (currentUser == null) {
     return <SkeletonItem />;
   }
 
-  const logoutHandler = async() => {
+  const logoutHandler = async () => {
     try {
       await apiv3Post('/logout');
       window.location.reload();
-    }
-    catch (err) {
+    } catch (err) {
       toastError(err);
     }
   };
 
   return (
     <>
-      <UncontrolledDropdown
-        direction="end"
-      >
+      <UncontrolledDropdown direction="end">
         <DropdownToggle
           className={`btn btn-primary ${styles['btn-personal-dropdown']} opacity-100`}
           data-testid="personal-dropdown-button"
@@ -57,11 +56,15 @@ export const PersonalDropdown = (): JSX.Element => {
             </div>
             <div className="ms-1 fs-6">{currentUser.name}</div>
             <div className="d-flex align-items-center my-2">
-              <small className="material-symbols-outlined me-1 pb-0 fs-6">person</small>
+              <small className="material-symbols-outlined me-1 pb-0 fs-6">
+                person
+              </small>
               <span>{currentUser.username}</span>
             </div>
             <div className="d-flex align-items-center">
-              <span className="material-symbols-outlined me-1 pb-0 fs-6">mail</span>
+              <span className="material-symbols-outlined me-1 pb-0 fs-6">
+                mail
+              </span>
               <span className="item-text-email">{currentUser.email}</span>
             </div>
           </DropdownItem>
@@ -72,9 +75,13 @@ export const PersonalDropdown = (): JSX.Element => {
             href={pagePathUtils.userHomepagePath(currentUser)}
             data-testid="grw-personal-dropdown-menu-user-home"
           >
-            <DropdownItem className={`my-1 ${styles['personal-dropdown-item']}`}>
+            <DropdownItem
+              className={`my-1 ${styles['personal-dropdown-item']}`}
+            >
               <span className="d-flex align-items-center">
-                <span className="item-icon material-symbols-outlined me-2 pb-0 fs-6">home</span>
+                <span className="item-icon material-symbols-outlined me-2 pb-0 fs-6">
+                  home
+                </span>
                 <span className="item-text">{t('personal_dropdown.home')}</span>
               </span>
             </DropdownItem>
@@ -84,17 +91,29 @@ export const PersonalDropdown = (): JSX.Element => {
             href="/me"
             data-testid="grw-personal-dropdown-menu-user-settings"
           >
-            <DropdownItem className={`my-1 ${styles['personal-dropdown-item']}`}>
+            <DropdownItem
+              className={`my-1 ${styles['personal-dropdown-item']}`}
+            >
               <span className="d-flex align-items-center">
-                <span className="item-icon material-symbols-outlined me-2 pb-0 fs-6">discover_tune</span>
-                <span className="item-text">{t('personal_dropdown.settings')}</span>
+                <span className="item-icon material-symbols-outlined me-2 pb-0 fs-6">
+                  discover_tune
+                </span>
+                <span className="item-text">
+                  {t('personal_dropdown.settings')}
+                </span>
               </span>
             </DropdownItem>
           </Link>
 
-          <DropdownItem data-testid="logout-button" onClick={logoutHandler} className={`my-1 ${styles['personal-dropdown-item']}`}>
+          <DropdownItem
+            data-testid="logout-button"
+            onClick={logoutHandler}
+            className={`my-1 ${styles['personal-dropdown-item']}`}
+          >
             <span className="d-flex align-items-center">
-              <span className="item-icon material-symbols-outlined me-2 pb-0 fs-6">logout</span>
+              <span className="item-icon material-symbols-outlined me-2 pb-0 fs-6">
+                logout
+              </span>
               <span className="item-text">{t('Sign out')}</span>
             </span>
           </DropdownItem>
@@ -102,5 +121,4 @@ export const PersonalDropdown = (): JSX.Element => {
       </UncontrolledDropdown>
     </>
   );
-
 };

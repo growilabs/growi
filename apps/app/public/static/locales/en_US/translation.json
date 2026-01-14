@@ -786,6 +786,11 @@
       "updatedAt": "Last update date"
     }
   },
+  "help_dropdown": {
+    "show_shortcuts": "Show shortcuts",
+    "growi_cloud_help": "GROWI.cloud Help",
+    "growi_version": "GROWI version"
+  },
   "private_legacy_pages": {
     "title": "Private Legacy Pages",
     "bulk_operation": "Bulk operation",
@@ -999,7 +1004,18 @@
   },
   "user_home_page": {
     "bookmarks": "Bookmarks",
-    "recently_created": "Recently Created"
+    "recently_created": "Recently Created",
+    "recent_activity": "Recent Activity",
+    "unknown_action": "made an unspecified change",
+    "page_create": "created a page",
+    "page_update": "updated a page",
+    "page_delete": "deleted a page",
+    "page_delete_completely": "deleted a page",
+    "page_rename": "renamed a page",
+    "page_revert": "reverted a page",
+    "page_like": "liked a page",
+    "page_duplicate": "duplicated a page",
+    "comment_create": "posted a comment"
   },
   "bookmark_folder": {
     "bookmark_folder": "bookmark folder",

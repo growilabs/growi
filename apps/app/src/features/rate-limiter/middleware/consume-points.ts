@@ -1,7 +1,6 @@
 import type { RateLimiterRes } from 'rate-limiter-flexible';
 
 import { DEFAULT_MAX_REQUESTS, type IApiRateLimitConfig } from '../config';
-
 import { rateLimiterFactory } from './rate-limiter-factory';
 
 export const consumePoints = async (

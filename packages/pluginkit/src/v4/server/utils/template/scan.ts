@@ -7,7 +7,6 @@ import {
   type TemplateStatus,
   type TemplateSummary,
 } from '../../../interfaces';
-
 import { getStatus } from './get-status';
 import { validateTemplatePluginGrowiDirective } from './validate-growi-plugin-directive';
 
@@ -58,7 +57,7 @@ export const scanTemplate = async (
     }
   }
 
-  // eslint-disable-next-line no-console
+  // biome-ignore lint/suspicious/noConsole: Allow to use
   console.debug(`Template directory (${projectDirRoot}) has scanned`, {
     status,
   });

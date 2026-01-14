@@ -9,7 +9,9 @@ type ExtractPropertyDefinition<T> = T extends Record<string, (infer U)[]>
 
 type PropertyDefinition = ExtractPropertyDefinition<NonNullable<Attributes>>;
 
-const excludeRestrictedClassAttributes = (propertyDefinitions: PropertyDefinition[]): PropertyDefinition[] => {
+const excludeRestrictedClassAttributes = (
+  propertyDefinitions: PropertyDefinition[],
+): PropertyDefinition[] => {
   if (propertyDefinitions == null) {
     return propertyDefinitions;
   }
@@ -18,15 +20,24 @@ const excludeRestrictedClassAttributes = (propertyDefinitions: PropertyDefinitio
     if (!Array.isArray(propertyDefinition)) {
       return true;
     }
-    return propertyDefinition[0] !== 'class' && propertyDefinition[0] !== 'className';
+    return (
+      propertyDefinition[0] !== 'class' && propertyDefinition[0] !== 'className'
+    );
   });
 };
 
 // generate relaxed schema
-const relaxedSchemaAttributes: Record<string, PropertyDefinition[]> = structuredClone(defaultSchema.attributes) ?? {};
-relaxedSchemaAttributes.a = excludeRestrictedClassAttributes(relaxedSchemaAttributes.a);
-relaxedSchemaAttributes.ul = excludeRestrictedClassAttributes(relaxedSchemaAttributes.ul);
-relaxedSchemaAttributes.li = excludeRestrictedClassAttributes(relaxedSchemaAttributes.li);
+const relaxedSchemaAttributes: Record<string, PropertyDefinition[]> =
+  structuredClone(defaultSchema.attributes) ?? {};
+relaxedSchemaAttributes.a = excludeRestrictedClassAttributes(
+  relaxedSchemaAttributes.a,
+);
+relaxedSchemaAttributes.ul = excludeRestrictedClassAttributes(
+  relaxedSchemaAttributes.ul,
+);
+relaxedSchemaAttributes.li = excludeRestrictedClassAttributes(
+  relaxedSchemaAttributes.li,
+);
 
 /**
  * reference: https://meta.stackexchange.com/questions/1777/what-html-tags-are-allowed-on-stack-exchange-sites,
@@ -34,23 +45,46 @@ relaxedSchemaAttributes.li = excludeRestrictedClassAttributes(relaxedSchemaAttri
  */
 
 export const tagNames: Array<string> = [
-  ...defaultSchema.tagNames ?? [],
-  '-', 'bdi',
+  ...(defaultSchema.tagNames ?? []),
+  '-',
+  'abbr',
+  'bdo',
+  'bdi',
   'button',
-  'col', 'colgroup',
+  'caption',
+  'cite',
+  'col',
+  'colgroup',
   'data',
+  'dfn',
+  'figure',
+  'figcaption',
   'iframe',
+  'mark',
+  'rb',
+  'small',
+  'time',
+  'u',
   'video',
-  'rb', 'u',
+  'wbr',
 ];
 
-export const attributes: Attributes = deepmerge(
-  relaxedSchemaAttributes,
-  {
-    iframe: ['allow', 'referrerpolicy', 'sandbox', 'src'],
-    video: ['controls', 'src', 'muted', 'preload', 'width', 'height', 'autoplay'],
-    // The special value 'data*' as a property name can be used to allow all data properties.
-    // see: https://github.com/syntax-tree/hast-util-sanitize/
-    '*': ['key', 'class', 'className', 'style', 'role', 'data*'],
-  },
-);
+export const attributes: Attributes = deepmerge(relaxedSchemaAttributes, {
+  a: ['target'],
+  abbr: ['title'],
+  bdo: ['dir'],
+  caption: [],
+  cite: [],
+  dfn: ['title'],
+  figure: [],
+  figcaption: [],
+  iframe: ['allow', 'referrerpolicy', 'sandbox', 'src'],
+  mark: [],
+  small: [],
+  time: ['datetime'],
+  video: ['controls', 'src', 'muted', 'preload', 'width', 'height', 'autoplay'],
+  wbr: [],
+  // The special value 'data*' as a property name can be used to allow all data properties.
+  // see: https://github.com/syntax-tree/hast-util-sanitize/
+  '*': ['key', 'class', 'className', 'style', 'role', 'data*'],
+});

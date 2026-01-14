@@ -6,7 +6,6 @@ import type { Request, Response } from 'express';
 import createError, { isHttpError } from 'http-errors';
 
 import type { LsxApiParams, LsxApiResponseData } from '../../../interfaces/api';
-
 import { addDepthCondition } from './add-depth-condition';
 import { addNumCondition } from './add-num-condition';
 import { addSortCondition } from './add-sort-condition';
@@ -92,6 +91,7 @@ export const listPages = async (
   try {
     toppageViewersCount = await getToppageViewersCount();
   } catch (error) {
+    // biome-ignore lint/suspicious/noConsole: Allow to use console.error here
     console.error('Error occurred in getToppageViewersCount:', error);
     return res.status(500).send('An internal server error occurred.');
   }
@@ -133,6 +133,7 @@ export const listPages = async (
     };
     return res.status(200).send(responseData);
   } catch (error) {
+    // biome-ignore lint/suspicious/noConsole: Allow to use console.error here
     console.error('Error occurred while processing listPages request:', error);
     if (isHttpError(error)) {
       return res.status(error.status).send(error.message);

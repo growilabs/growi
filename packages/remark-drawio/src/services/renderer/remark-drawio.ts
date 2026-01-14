@@ -4,7 +4,7 @@ import type { Code, Node, Paragraph } from 'mdast';
 import type { Plugin } from 'unified';
 import { visit } from 'unist-util-visit';
 
-const SUPPORTED_ATTRIBUTES = ['diagramIndex', 'bol', 'eol'];
+const SUPPORTED_ATTRIBUTES = ['diagramIndex', 'bol', 'eol', 'isDarkMode'];
 
 interface Data {
   hName?: string;
@@ -17,7 +17,7 @@ function isDrawioBlock(lang?: string | null): lang is Lang {
   return /^drawio$/.test(lang ?? '');
 }
 
-function rewriteNode(node: Node, index: number) {
+function rewriteNode(node: Node, index: number, isDarkMode?: boolean) {
   node.type = 'paragraph';
   (node as Paragraph).children = [
     { type: 'text', value: (node as Code).value },
@@ -32,16 +32,23 @@ function rewriteNode(node: Node, index: number) {
     diagramIndex: index,
     bol: node.position?.start.line,
     eol: node.position?.end.line,
+    isDarkMode: isDarkMode ? 'true' : 'false',
     key: `drawio-${index}`,
   };
 }
 
-export const remarkPlugin: Plugin = () => (tree) => {
-  visit(tree, 'code', (node: Code, index) => {
-    if (isDrawioBlock(node.lang)) {
-      rewriteNode(node, index ?? 0);
-    }
-  });
+type DrawioRemarkPlugin = {
+  isDarkMode?: boolean;
+};
+
+export const remarkPlugin: Plugin<[DrawioRemarkPlugin]> = (options) => {
+  return (tree) => {
+    visit(tree, 'code', (node: Code, index) => {
+      if (isDrawioBlock(node.lang)) {
+        rewriteNode(node, index ?? 0, options.isDarkMode);
+      }
+    });
+  };
 };
 
 export const sanitizeOption: SanitizeOption = {

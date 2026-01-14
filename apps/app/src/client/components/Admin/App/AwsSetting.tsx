@@ -1,33 +1,26 @@
 import type { JSX } from 'react';
-
 import { useTranslation } from 'next-i18next';
+import type { UseFormRegister } from 'react-hook-form';
 
+import type { FileUploadFormValues } from './FileUploadSetting.types';
 
 export type AwsSettingMoleculeProps = {
-  s3ReferenceFileWithRelayMode
-  s3Region
-  s3CustomEndpoint
-  s3Bucket
-  s3AccessKeyId
-  s3SecretAccessKey
-  onChangeS3ReferenceFileWithRelayMode: (val: boolean) => void
-  onChangeS3Region: (val: string) => void
-  onChangeS3CustomEndpoint: (val: string) => void
-  onChangeS3Bucket: (val: string) => void
-  onChangeS3AccessKeyId: (val: string) => void
-  onChangeS3SecretAccessKey: (val: string) => void
+  register: UseFormRegister<FileUploadFormValues>;
+  s3ReferenceFileWithRelayMode: boolean;
+  onChangeS3ReferenceFileWithRelayMode: (val: boolean) => void;
 };
 
-export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element => {
+export const AwsSettingMolecule = (
+  props: AwsSettingMoleculeProps,
+): JSX.Element => {
   const { t } = useTranslation();
 
   return (
     <>
-
       <div className="row my-3">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <span className="text-start text-md-end col-md-3 col-form-label">
           {t('admin:app_setting.file_delivery_method')}
-        </label>
+        </span>
 
         <div className="col-md-6">
           <div className="dropdown">
@@ -39,23 +32,29 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
               aria-haspopup="true"
               aria-expanded="true"
             >
-              {props.s3ReferenceFileWithRelayMode && t('admin:app_setting.file_delivery_method_relay')}
-              {!props.s3ReferenceFileWithRelayMode && t('admin:app_setting.file_delivery_method_redirect')}
+              {props.s3ReferenceFileWithRelayMode &&
+                t('admin:app_setting.file_delivery_method_relay')}
+              {!props.s3ReferenceFileWithRelayMode &&
+                t('admin:app_setting.file_delivery_method_redirect')}
             </button>
-            <div className="dropdown-menu" aria-labelledby="ddS3ReferenceFileWithRelayMode">
+            <div className="dropdown-menu">
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props?.onChangeS3ReferenceFileWithRelayMode(true) }}
+                onClick={() => {
+                  props.onChangeS3ReferenceFileWithRelayMode(true);
+                }}
               >
                 {t('admin:app_setting.file_delivery_method_relay')}
               </button>
               <button
                 className="dropdown-item"
                 type="button"
-                onClick={() => { props?.onChangeS3ReferenceFileWithRelayMode(false) }}
+                onClick={() => {
+                  props.onChangeS3ReferenceFileWithRelayMode(false);
+                }}
               >
-                { t('admin:app_setting.file_delivery_method_redirect')}
+                {t('admin:app_setting.file_delivery_method_redirect')}
               </button>
             </div>
 
@@ -69,23 +68,27 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
       </div>
 
       <div className="row">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <label
+          className="text-start text-md-end col-md-3 col-form-label"
+          htmlFor="admin-aws-setting-region"
+        >
           {t('admin:app_setting.region')}
         </label>
         <div className="col-md-6">
           <input
             className="form-control"
             placeholder={`${t('eg')} ap-northeast-1`}
-            value={props.s3Region || ''}
-            onChange={(e) => {
-              props?.onChangeS3Region(e.target.value);
-            }}
+            id="admin-aws-setting-region"
+            {...props.register('s3Region')}
           />
         </div>
       </div>
 
       <div className="row">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <label
+          className="text-start text-md-end col-md-3 col-form-label"
+          htmlFor="admin-aws-setting-custom-endpoint"
+        >
           {t('admin:app_setting.custom_endpoint')}
         </label>
         <div className="col-md-6">
@@ -93,17 +96,20 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
             className="form-control"
             type="text"
             placeholder={`${t('eg')} http://localhost:9000`}
-            value={props.s3CustomEndpoint || ''}
-            onChange={(e) => {
-              props?.onChangeS3CustomEndpoint(e.target.value);
-            }}
+            id="admin-aws-setting-custom-endpoint"
+            {...props.register('s3CustomEndpoint')}
           />
-          <p className="form-text text-muted">{t('admin:app_setting.custom_endpoint_change')}</p>
+          <p className="form-text text-muted">
+            {t('admin:app_setting.custom_endpoint_change')}
+          </p>
         </div>
       </div>
 
       <div className="row">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <label
+          className="text-start text-md-end col-md-3 col-form-label"
+          htmlFor="admin-aws-setting-bucket-name"
+        >
           {t('admin:app_setting.bucket_name')}
         </label>
         <div className="col-md-6">
@@ -111,47 +117,48 @@ export const AwsSettingMolecule = (props: AwsSettingMoleculeProps): JSX.Element 
             className="form-control"
             type="text"
             placeholder={`${t('eg')} crowi`}
-            value={props.s3Bucket || ''}
-            onChange={(e) => {
-              props.onChangeS3Bucket(e.target.value);
-            }}
+            id="admin-aws-setting-bucket-name"
+            {...props.register('s3Bucket')}
           />
         </div>
       </div>
 
       <div className="row">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <label
+          className="text-start text-md-end col-md-3 col-form-label"
+          htmlFor="admin-aws-setting-access-key-id"
+        >
           Access key ID
         </label>
         <div className="col-md-6">
           <input
             className="form-control"
             type="text"
-            value={props.s3AccessKeyId || ''}
-            onChange={(e) => {
-              props?.onChangeS3AccessKeyId(e.target.value);
-            }}
+            id="admin-aws-setting-access-key-id"
+            {...props.register('s3AccessKeyId')}
           />
         </div>
       </div>
 
       <div className="row">
-        <label className="text-start text-md-end col-md-3 col-form-label">
+        <label
+          className="text-start text-md-end col-md-3 col-form-label"
+          htmlFor="admin-aws-setting-secret-access-key"
+        >
           Secret access key
         </label>
         <div className="col-md-6">
           <input
             className="form-control"
             type="text"
-            onChange={(e) => {
-              props?.onChangeS3SecretAccessKey(e.target.value);
-            }}
+            id="admin-aws-setting-secret-access-key"
+            {...props.register('s3SecretAccessKey')}
           />
-          <p className="form-text text-muted">{t('admin:app_setting.s3_secret_access_key_input_description')}</p>
+          <p className="form-text text-muted">
+            {t('admin:app_setting.s3_secret_access_key_input_description')}
+          </p>
         </div>
       </div>
-
-
     </>
   );
 };

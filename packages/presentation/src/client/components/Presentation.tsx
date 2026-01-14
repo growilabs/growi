@@ -1,10 +1,10 @@
-import { type JSX, useEffect } from 'react';
-
+import { type JSX, useEffect, useRef } from 'react';
 import Reveal from 'reveal.js';
 
 import type { PresentationOptions } from '../consts';
-import styles from './Presentation.module.scss';
 import { Slides } from './Slides';
+
+import styles from './Presentation.module.scss';
 
 const moduleClass = styles['grw-presentation'] ?? '';
 
@@ -38,12 +38,16 @@ export type PresentationProps = {
 export const Presentation = (props: PresentationProps): JSX.Element => {
   const { options, marp, children } = props;
   const { revealOptions } = options;
+  const deckRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (children == null) {
+    if (children == null || deckRef.current == null) {
       return;
     }
-    const deck = new Reveal({ ...baseRevealOptions, ...revealOptions });
+    const deck = new Reveal(deckRef.current, {
+      ...baseRevealOptions,
+      ...revealOptions,
+    });
     deck.initialize().then(() => deck.slide(0)); // navigate to the first slide
 
     deck.on('ready', removeAllHiddenElements);
@@ -56,7 +60,7 @@ export const Presentation = (props: PresentationProps): JSX.Element => {
   }, [children, revealOptions]);
 
   return (
-    <div className={`${moduleClass} reveal`}>
+    <div ref={deckRef} className={`${moduleClass} reveal`}>
       <Slides options={options} hasMarpFlag={marp} presentation>
         {children}
       </Slides>

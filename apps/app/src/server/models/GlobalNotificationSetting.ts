@@ -1,6 +1,3 @@
-// disable no-return-await for model functions
-/* eslint-disable no-return-await */
-
 const mongoose = require('mongoose');
 
 const GlobalNotificationSetting = require('./GlobalNotificationSetting/index');
@@ -29,10 +26,13 @@ export const GlobalNotificationSettingType = {
 };
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-const factory = function(crowi) {
+const factory = (crowi) => {
   GlobalNotificationSettingClass.crowi = crowi;
   GlobalNotificationSettingSchema.loadClass(GlobalNotificationSettingClass);
-  return mongoose.model('GlobalNotificationSetting', GlobalNotificationSettingSchema);
+  return mongoose.model(
+    'GlobalNotificationSetting',
+    GlobalNotificationSettingSchema,
+  );
 };
 
 export default factory;

@@ -1,75 +1,86 @@
-
 import React from 'react';
-
 import { useTranslation } from 'next-i18next';
+import type { UseFormRegister } from 'react-hook-form';
 
 import AdminAppContainer from '~/client/services/AdminAppContainer';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
-
 type Props = {
-  adminAppContainer: AdminAppContainer,
-}
+  adminAppContainer?: AdminAppContainer;
+  register: UseFormRegister<any>;
+};
 
-const SmtpSetting = (props: Props) => {
+const SmtpSetting = (props: Props): JSX.Element => {
   const { t } = useTranslation();
-  const { adminAppContainer } = props;
+  const { register } = props;
 
   return (
     <React.Fragment>
-      <div id="mail-smtp" className="tab-pane active mt-5">
+      <div id="mail-smtp" className="tab-pane active">
         <div className="row">
-          <label className="text-start text-md-end col-md-3 col-form-label">
+          <label
+            className="text-start text-md-end col-md-3 col-form-label"
+            htmlFor="admin-smtp-host"
+          >
             {t('admin:app_setting.host')}
           </label>
           <div className="col-md-6">
             <input
               className="form-control"
               type="text"
-              value={adminAppContainer.state.smtpHost || ''}
-              onChange={(e) => { adminAppContainer.changeSmtpHost(e.target.value) }}
+              id="admin-smtp-host"
+              {...register('smtpHost')}
             />
           </div>
         </div>
 
         <div className="row">
-          <label className="text-start text-md-end col-md-3 col-form-label">
+          <label
+            className="text-start text-md-end col-md-3 col-form-label"
+            htmlFor="admin-smtp-port"
+          >
             {t('admin:app_setting.port')}
           </label>
           <div className="col-md-6">
             <input
               className="form-control"
-              value={adminAppContainer.state.smtpPort || ''}
-              onChange={(e) => { adminAppContainer.changeSmtpPort(e.target.value) }}
+              id="admin-smtp-port"
+              {...register('smtpPort')}
             />
           </div>
         </div>
 
         <div className="row">
-          <label className="text-start text-md-end col-md-3 col-form-label">
+          <label
+            className="text-start text-md-end col-md-3 col-form-label"
+            htmlFor="admin-smtp-user"
+          >
             {t('admin:app_setting.user')}
           </label>
           <div className="col-md-6">
             <input
               className="form-control"
               type="text"
-              value={adminAppContainer.state.smtpUser || ''}
-              onChange={(e) => { adminAppContainer.changeSmtpUser(e.target.value) }}
+              id="admin-smtp-user"
+              {...register('smtpUser')}
             />
           </div>
         </div>
 
         <div className="row">
-          <label className="text-start text-md-end col-md-3 col-form-label">
+          <label
+            className="text-start text-md-end col-md-3 col-form-label"
+            htmlFor="admin-smtp-password"
+          >
             {t('Password')}
           </label>
           <div className="col-md-6">
             <input
               className="form-control"
               type="password"
-              value={adminAppContainer.state.smtpPassword || ''}
-              onChange={(e) => { adminAppContainer.changeSmtpPassword(e.target.value) }}
+              id="admin-smtp-password"
+              {...register('smtpPassword')}
             />
           </div>
         </div>
@@ -78,8 +89,12 @@ const SmtpSetting = (props: Props) => {
   );
 };
 
+export { SmtpSetting };
+
 /**
  * Wrapper component for using unstated
  */
-const SmtpSettingWrapper = withUnstatedContainers(SmtpSetting, [AdminAppContainer]);
+const SmtpSettingWrapper = withUnstatedContainers(SmtpSetting, [
+  AdminAppContainer,
+]);
 export default SmtpSettingWrapper;

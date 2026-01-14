@@ -7,11 +7,9 @@ import { getRandomIntInRange } from '~/utils/rand';
 import { isAiEnabled } from '../is-ai-enabled';
 import { getOpenaiService, type IOpenaiService } from '../openai';
 
-
 const logger = loggerFactory('growi:service:thread-deletion-cron');
 
 export class ThreadDeletionCronService {
-
   cronJob: nodeCron.ScheduledTask;
 
   openaiService: IOpenaiService;
@@ -24,7 +22,8 @@ export class ThreadDeletionCronService {
 
   threadDeletionApiCallInterval: number;
 
-  sleep = (msec: number): Promise<void> => new Promise(resolve => setTimeout(resolve, msec));
+  sleep = (msec: number): Promise<void> =>
+    new Promise((resolve) => setTimeout(resolve, msec));
 
   startCron(): void {
     if (!isAiEnabled()) {
@@ -37,10 +36,18 @@ export class ThreadDeletionCronService {
     }
 
     this.openaiService = openaiService;
-    this.threadDeletionCronExpression = configManager.getConfig('openai:threadDeletionCronExpression');
-    this.threadDeletionCronMaxMinutesUntilRequest = configManager.getConfig('app:openaiThreadDeletionCronMaxMinutesUntilRequest');
-    this.threadDeletionBarchSize = configManager.getConfig('openai:threadDeletionBarchSize');
-    this.threadDeletionApiCallInterval = configManager.getConfig('openai:threadDeletionApiCallInterval');
+    this.threadDeletionCronExpression = configManager.getConfig(
+      'openai:threadDeletionCronExpression',
+    );
+    this.threadDeletionCronMaxMinutesUntilRequest = configManager.getConfig(
+      'app:openaiThreadDeletionCronMaxMinutesUntilRequest',
+    );
+    this.threadDeletionBarchSize = configManager.getConfig(
+      'openai:threadDeletionBarchSize',
+    );
+    this.threadDeletionApiCallInterval = configManager.getConfig(
+      'openai:threadDeletionApiCallInterval',
+    );
 
     this.cronJob?.stop();
     this.cronJob = this.generateCronJob();
@@ -49,22 +56,29 @@ export class ThreadDeletionCronService {
 
   private async executeJob(): Promise<void> {
     // Must be careful of OpenAI's rate limit
-    await this.openaiService.deleteExpiredThreads(this.threadDeletionBarchSize, this.threadDeletionApiCallInterval);
+    await this.openaiService.deleteExpiredThreads(
+      this.threadDeletionBarchSize,
+      this.threadDeletionApiCallInterval,
+    );
   }
 
   private generateCronJob() {
-    return nodeCron.schedule(this.threadDeletionCronExpression, async() => {
+    return nodeCron.schedule(this.threadDeletionCronExpression, async () => {
       try {
         // Random fractional sleep to distribute request timing among GROWI apps
-        const randomMilliseconds = getRandomIntInRange(0, this.threadDeletionCronMaxMinutesUntilRequest) * 60 * 1000;
+        const randomMilliseconds =
+          getRandomIntInRange(
+            0,
+            this.threadDeletionCronMaxMinutesUntilRequest,
+          ) *
+          60 *
+          1000;
         await this.sleep(randomMilliseconds);
 
         await this.executeJob();
-      }
-      catch (e) {
+      } catch (e) {
         logger.error(e);
       }
     });
   }
-
 }

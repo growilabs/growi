@@ -1,21 +1,19 @@
-import path from 'path';
-
 import { format as dateFnsFormat } from 'date-fns/format';
 import mustache from 'mustache';
+import path from 'path';
 
-import { useCurrentPagePath } from '~/stores/page';
+import { useCurrentPagePath } from '~/states/page';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:components:TemplateModal:use-formatter');
 
-
 type FormatMethod = (markdown?: string) => string;
 type FormatterData = {
-  format: FormatMethod,
-}
+  format: FormatMethod;
+};
 
 export const useFormatter = (): FormatterData => {
-  const { data: currentPagePath } = useCurrentPagePath();
+  const currentPagePath = useCurrentPagePath();
 
   const format: FormatMethod = (markdown) => {
     if (markdown == null) {
@@ -34,8 +32,7 @@ export const useFormatter = (): FormatterData => {
         HH: dateFnsFormat(now, 'HH'),
         mm: dateFnsFormat(now, 'mm'),
       });
-    }
-    catch (err) {
+    } catch (err) {
       logger.warn('An error occured while ejs processing.', err);
       return markdown;
     }

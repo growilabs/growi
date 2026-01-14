@@ -9,6 +9,6 @@ function TagEvent(crowi) {
 }
 util.inherits(TagEvent, events.EventEmitter);
 
-TagEvent.prototype.onUpdate = function(tag) { };
+TagEvent.prototype.onUpdate = (tag) => {};
 
 module.exports = TagEvent;

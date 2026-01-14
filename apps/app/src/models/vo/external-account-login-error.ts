@@ -1,5 +1,4 @@
 export class ExternalAccountLoginError extends Error {
-
   args?: any;
 
   constructor(message = '', args = undefined) {
@@ -7,5 +6,4 @@ export class ExternalAccountLoginError extends Error {
     this.message = message;
     this.args = args;
   }
-
 }

@@ -1,5 +1,4 @@
-import { type JSX } from 'react';
-
+import type { JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 
@@ -10,41 +9,44 @@ import styles from './MessageCard.module.scss';
 
 const moduleClass = styles['message-card'] ?? '';
 
-
 const userMessageCardModuleClass = styles['user-message-card'] ?? '';
 
 const UserMessageCard = ({ children }: { children: string }): JSX.Element => (
-  <div className={`card d-inline-flex align-self-end bg-success-subtle bg-info-subtle ${moduleClass} ${userMessageCardModuleClass}`}>
+  <div
+    className={`card d-inline-flex align-self-end bg-success-subtle bg-info-subtle ${moduleClass} ${userMessageCardModuleClass}`}
+  >
     <div className="card-body">
       <ReactMarkdown>{children}</ReactMarkdown>
     </div>
   </div>
 );
 
-
 const assistantMessageCardModuleClass = styles['assistant-message-card'] ?? '';
-
 
 const AssistantMessageCard = ({
   children,
   additionalItem,
 }: {
-  children: string,
-  additionalItem?: JSX.Element,
+  children: string;
+  additionalItem?: JSX.Element;
 }): JSX.Element => {
   const { t } = useTranslation();
 
   return (
-    <div className={`card border-0 ${moduleClass} ${assistantMessageCardModuleClass}`}>
+    <div
+      className={`card border-0 ${moduleClass} ${assistantMessageCardModuleClass}`}
+    >
       <div className="card-body d-flex">
         <div className="me-2 me-lg-3">
-          <span className="growi-custom-icons grw-ai-icon rounded-pill">growi_ai</span>
+          <span className="growi-custom-icons grw-ai-icon rounded-pill">
+            growi_ai
+          </span>
         </div>
         <div>
-          { children.length > 0
-            ? (
-              <>
-                <ReactMarkdown components={{
+          {children.length > 0 ? (
+            <>
+              <ReactMarkdown
+                components={{
                   a: NextLinkWrapper,
                   h1: ({ children }) => <Header level={1}>{children}</Header>,
                   h2: ({ children }) => <Header level={2}>{children}</Header>,
@@ -53,43 +55,39 @@ const AssistantMessageCard = ({
                   h5: ({ children }) => <Header level={5}>{children}</Header>,
                   h6: ({ children }) => <Header level={6}>{children}</Header>,
                 }}
-                >{children}
-                </ReactMarkdown>
-                { additionalItem }
-              </>
-            )
-            : (
-              <span className="text-thinking">
-                {t('sidebar_ai_assistant.progress_label')} <span className="material-symbols-outlined">more_horiz</span>
-              </span>
-            )
-          }
+              >
+                {children}
+              </ReactMarkdown>
+              {additionalItem}
+            </>
+          ) : (
+            <span className="text-thinking">
+              {t('sidebar_ai_assistant.progress_label')}{' '}
+              <span className="material-symbols-outlined">more_horiz</span>
+            </span>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-
-type MessageCardRole = 'user' | 'assistant';
+type MessageSender = 'user' | 'assistant';
 
 type Props = {
-  role: MessageCardRole,
-  children: string,
-  additionalItem?: JSX.Element,
-}
+  sender: MessageSender;
+  children: string;
+  additionalItem?: JSX.Element;
+};
 
 export const MessageCard = (props: Props): JSX.Element => {
-  const {
-    role, children, additionalItem,
-  } = props;
+  const { sender, children, additionalItem } = props;
 
-  return role === 'user'
-    ? <UserMessageCard>{children}</UserMessageCard>
-    : (
-      <AssistantMessageCard
-        additionalItem={additionalItem}
-      >{children}
-      </AssistantMessageCard>
-    );
+  return sender === 'user' ? (
+    <UserMessageCard>{children}</UserMessageCard>
+  ) : (
+    <AssistantMessageCard additionalItem={additionalItem}>
+      {children}
+    </AssistantMessageCard>
+  );
 };

@@ -1,17 +1,14 @@
 import { Transform } from 'stream';
 
 export const convertStreamToBuffer = (stream: any): Promise<Buffer> => {
-
   return new Promise((resolve, reject) => {
-
     const buffer: Uint8Array[] = [];
 
     stream.on('data', (chunk: Uint8Array) => {
       buffer.push(chunk);
     });
     stream.on('end', () => resolve(Buffer.concat(buffer)));
-    stream.on('error', err => reject(err));
-
+    stream.on('error', (err) => reject(err));
   });
 };
 
@@ -29,7 +26,10 @@ export const getBufferToFixedSizeTransform = (size: number): Transform => {
         // - If the remaining chunk size is larger than the remaining buffer size:
         //     - Fill the buffer, and upload => dataSize is the remaining buffer size
         //     - The remaining chunk after upload will be added to buffer in the next iteration
-        const dataSize = Math.min(size - filledBufferSize, chunk.length - offset);
+        const dataSize = Math.min(
+          size - filledBufferSize,
+          chunk.length - offset,
+        );
         // Add chunk data to buffer
         chunk.copy(buffer, filledBufferSize, offset, offset + dataSize);
         filledBufferSize += dataSize;

@@ -1,5 +1,4 @@
 import { writeFileSync } from 'node:fs';
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { generateOperationIds } from './generate-operation-ids';
@@ -91,7 +90,7 @@ describe('cli', () => {
     await cliModule.main();
 
     // Verify error was logged
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: This is a test file
     expect(console.error).toHaveBeenCalledWith(error);
 
     // Verify writeFileSync was not called

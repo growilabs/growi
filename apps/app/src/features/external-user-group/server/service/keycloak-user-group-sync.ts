@@ -12,7 +12,6 @@ import type {
   ExternalUserInfo,
 } from '../../interfaces/external-user-group';
 import { ExternalGroupProviderType } from '../../interfaces/external-user-group';
-
 import ExternalUserGroupSyncService from './external-user-group-sync';
 
 const logger = loggerFactory('growi:service:keycloak-user-group-sync-service');
@@ -31,7 +30,7 @@ export class KeycloakUserGroupSyncService extends ExternalUserGroupSyncService {
 
   isInitialized = false;
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+  // biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
   constructor(
     s2sMessagingService: S2sMessagingService | null,
     socketIoService,

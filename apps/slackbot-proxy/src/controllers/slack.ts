@@ -1,5 +1,4 @@
 import { ServerResponse } from 'node:http';
-
 import {
   type GrowiCommand,
   type IChannelOptionalId,
@@ -274,7 +273,6 @@ export class SlackCtrl {
         text: 'Command is not supported',
         blocks: [
           markdownSectionBlock('*Command is not supported*'),
-          // eslint-disable-next-line max-len
           markdownSectionBlock(
             `\`/growi ${growiCommand.growiCommandType}\` command is not supported in this version of GROWI bot. Run \`/growi help\` to see all supported commands.`,
           ),
