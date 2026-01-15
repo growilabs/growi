@@ -4,7 +4,7 @@ import path from 'node:path';
 import { createTerminus } from '@godaddy/terminus';
 import attachmentRoutes from '@growi/remark-attachment-refs/dist/server';
 import lsxRoutes from '@growi/remark-lsx/dist/server/index.cjs';
-import type { Express, RequestHandler } from 'express';
+import type { Express } from 'express';
 import mongoose from 'mongoose';
 
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
@@ -653,7 +653,7 @@ class Crowi {
    * !! this must be after the Routes setup !!
    */
   setupGlobalErrorHandlers(): void {
-    this.express.use(httpErrorHandler as RequestHandler);
+    this.express.use(httpErrorHandler);
   }
 
   /**

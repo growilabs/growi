@@ -70,20 +70,26 @@ describe('User', () => {
   describe('Create and Find.', () => {
     describe('The user', () => {
       // Skip: This test requires crowi instance to generate password
-      test.skip('should created with createUserByEmailAndPassword', (done) => {
-        User.createUserByEmailAndPassword(
-          'Example2 for User Test',
-          'usertest2',
-          'usertest2@example.com',
-          'usertest2pass',
-          'en_US',
-          (err: Error | null, userData: typeof User) => {
-            expect(err).toBeNull();
-            expect(userData).toBeInstanceOf(User);
-            expect(userData.name).toBe('Example2 for User Test');
-            done();
-          },
-        );
+      test.skip('should created with createUserByEmailAndPassword', async () => {
+        await new Promise<void>((resolve, reject) => {
+          User.createUserByEmailAndPassword(
+            'Example2 for User Test',
+            'usertest2',
+            'usertest2@example.com',
+            'usertest2pass',
+            'en_US',
+            (err: Error | null, userData: typeof User) => {
+              try {
+                expect(err).toBeNull();
+                expect(userData).toBeInstanceOf(User);
+                expect(userData.name).toBe('Example2 for User Test');
+                resolve();
+              } catch (error) {
+                reject(error);
+              }
+            },
+          );
+        });
       });
 
       test('should be found by findUserByUsername', async () => {
