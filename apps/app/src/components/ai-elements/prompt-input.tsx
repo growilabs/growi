@@ -151,7 +151,7 @@ export type PromptInputProviderProps = PropsWithChildren<{
 export function PromptInputProvider({
   initialInput: initialTextInput = '',
   children,
-}: PromptInputProviderProps) {
+}: PromptInputProviderProps): JSX.Element {
   // ----- textInput state
   const [textInput, setTextInput] = useState(initialTextInput);
   const clearInput = useCallback(() => setTextInput(''), []);
@@ -269,7 +269,7 @@ export function PromptInputAttachment({
   data,
   className,
   ...props
-}: PromptInputAttachmentProps) {
+}: PromptInputAttachmentProps): JSX.Element {
   const attachments = usePromptInputAttachments();
 
   const mediaType =
@@ -341,7 +341,7 @@ export function PromptInputAttachments({
   className,
   children,
   ...props
-}: PromptInputAttachmentsProps) {
+}: PromptInputAttachmentsProps): JSX.Element | null {
   const attachments = usePromptInputAttachments();
   const [height, setHeight] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -412,7 +412,7 @@ export type PromptInputActionAddAttachmentsProps = ComponentProps<
 export const PromptInputActionAddAttachments = ({
   label = 'Add photos or files',
   ...props
-}: PromptInputActionAddAttachmentsProps) => {
+}: PromptInputActionAddAttachmentsProps): JSX.Element => {
   const attachments = usePromptInputAttachments();
 
   return (
@@ -468,7 +468,7 @@ export const PromptInput = ({
   onSubmit,
   children,
   ...props
-}: PromptInputProps) => {
+}: PromptInputProps): JSX.Element => {
   // Try to use a provider controller if present
   const controller = useOptionalPromptInputController();
   const usingProvider = !!controller;
@@ -789,7 +789,7 @@ export type PromptInputBodyProps = HTMLAttributes<HTMLDivElement>;
 export const PromptInputBody = ({
   className,
   ...props
-}: PromptInputBodyProps) => (
+}: PromptInputBodyProps): JSX.Element => (
   <div className={cn('tw:contents', className)} {...props} />
 );
 
@@ -802,7 +802,7 @@ export const PromptInputTextarea = ({
   className,
   placeholder = 'What would you like to know?',
   ...props
-}: PromptInputTextareaProps) => {
+}: PromptInputTextareaProps): JSX.Element => {
   const controller = useOptionalPromptInputController();
   const attachments = usePromptInputAttachments();
   const [isComposing, setIsComposing] = useState(false);
@@ -895,7 +895,7 @@ export type PromptInputHeaderProps = Omit<
 export const PromptInputHeader = ({
   className,
   ...props
-}: PromptInputHeaderProps) => (
+}: PromptInputHeaderProps): JSX.Element => (
   <InputGroupAddon
     align="block-end"
     className={cn('tw:order-first tw:gap-1', className)}
@@ -911,7 +911,7 @@ export type PromptInputFooterProps = Omit<
 export const PromptInputFooter = ({
   className,
   ...props
-}: PromptInputFooterProps) => (
+}: PromptInputFooterProps): JSX.Element => (
   <InputGroupAddon
     align="block-end"
     className={cn('tw:justify-between tw:gap-1', className)}
@@ -924,7 +924,7 @@ export type PromptInputToolsProps = HTMLAttributes<HTMLDivElement>;
 export const PromptInputTools = ({
   className,
   ...props
-}: PromptInputToolsProps) => (
+}: PromptInputToolsProps): JSX.Element => (
   <div
     className={cn('tw:flex tw:items-center tw:gap-1', className)}
     {...props}
@@ -938,7 +938,7 @@ export const PromptInputButton = ({
   className,
   size,
   ...props
-}: PromptInputButtonProps) => {
+}: PromptInputButtonProps): JSX.Element => {
   const newSize =
     size ?? (Children.count(props.children) > 1 ? 'sm' : 'icon-sm');
 
@@ -954,9 +954,9 @@ export const PromptInputButton = ({
 };
 
 export type PromptInputActionMenuProps = ComponentProps<typeof DropdownMenu>;
-export const PromptInputActionMenu = (props: PromptInputActionMenuProps) => (
-  <DropdownMenu {...props} />
-);
+export const PromptInputActionMenu = (
+  props: PromptInputActionMenuProps,
+): JSX.Element => <DropdownMenu {...props} />;
 
 export type PromptInputActionMenuTriggerProps = PromptInputButtonProps;
 
@@ -964,7 +964,7 @@ export const PromptInputActionMenuTrigger = ({
   className,
   children,
   ...props
-}: PromptInputActionMenuTriggerProps) => (
+}: PromptInputActionMenuTriggerProps): JSX.Element => (
   <DropdownMenuTrigger asChild>
     <PromptInputButton className={className} {...props}>
       {children ?? <PlusIcon className="tw:size-4" />}
@@ -978,7 +978,7 @@ export type PromptInputActionMenuContentProps = ComponentProps<
 export const PromptInputActionMenuContent = ({
   className,
   ...props
-}: PromptInputActionMenuContentProps) => (
+}: PromptInputActionMenuContentProps): JSX.Element => (
   <DropdownMenuContent align="start" className={cn(className)} {...props} />
 );
 
@@ -988,7 +988,7 @@ export type PromptInputActionMenuItemProps = ComponentProps<
 export const PromptInputActionMenuItem = ({
   className,
   ...props
-}: PromptInputActionMenuItemProps) => (
+}: PromptInputActionMenuItemProps): JSX.Element => (
   <DropdownMenuItem className={cn(className)} {...props} />
 );
 
@@ -1006,7 +1006,7 @@ export const PromptInputSubmit = ({
   status,
   children,
   ...props
-}: PromptInputSubmitProps) => {
+}: PromptInputSubmitProps): JSX.Element => {
   let Icon = <SendIcon className="tw:size-4" />;
 
   if (status === 'submitted') {
@@ -1096,7 +1096,7 @@ export const PromptInputSpeechButton = ({
   textareaRef,
   onTranscriptionChange,
   ...props
-}: PromptInputSpeechButtonProps) => {
+}: PromptInputSpeechButtonProps): JSX.Element => {
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(
     null,
@@ -1195,9 +1195,9 @@ export const PromptInputSpeechButton = ({
 
 export type PromptInputModelSelectProps = ComponentProps<typeof Select>;
 
-export const PromptInputModelSelect = (props: PromptInputModelSelectProps) => (
-  <Select {...props} />
-);
+export const PromptInputModelSelect = (
+  props: PromptInputModelSelectProps,
+): JSX.Element => <Select {...props} />;
 
 export type PromptInputModelSelectTriggerProps = ComponentProps<
   typeof SelectTrigger
@@ -1206,7 +1206,7 @@ export type PromptInputModelSelectTriggerProps = ComponentProps<
 export const PromptInputModelSelectTrigger = ({
   className,
   ...props
-}: PromptInputModelSelectTriggerProps) => (
+}: PromptInputModelSelectTriggerProps): JSX.Element => (
   <SelectTrigger
     className={cn(
       'tw:border-none tw:bg-transparent tw:font-medium tw:text-muted-foreground tw:shadow-none tw:transition-colors',
@@ -1224,7 +1224,7 @@ export type PromptInputModelSelectContentProps = ComponentProps<
 export const PromptInputModelSelectContent = ({
   className,
   ...props
-}: PromptInputModelSelectContentProps) => (
+}: PromptInputModelSelectContentProps): JSX.Element => (
   <SelectContent className={cn(className)} {...props} />
 );
 
@@ -1233,7 +1233,7 @@ export type PromptInputModelSelectItemProps = ComponentProps<typeof SelectItem>;
 export const PromptInputModelSelectItem = ({
   className,
   ...props
-}: PromptInputModelSelectItemProps) => (
+}: PromptInputModelSelectItemProps): JSX.Element => (
   <SelectItem className={cn(className)} {...props} />
 );
 
@@ -1244,7 +1244,7 @@ export type PromptInputModelSelectValueProps = ComponentProps<
 export const PromptInputModelSelectValue = ({
   className,
   ...props
-}: PromptInputModelSelectValueProps) => (
+}: PromptInputModelSelectValueProps): JSX.Element => (
   <SelectValue className={cn(className)} {...props} />
 );
 
@@ -1254,7 +1254,7 @@ export const PromptInputHoverCard = ({
   openDelay = 0,
   closeDelay = 0,
   ...props
-}: PromptInputHoverCardProps) => (
+}: PromptInputHoverCardProps): JSX.Element => (
   <HoverCard closeDelay={closeDelay} openDelay={openDelay} {...props} />
 );
 
@@ -1264,7 +1264,7 @@ export type PromptInputHoverCardTriggerProps = ComponentProps<
 
 export const PromptInputHoverCardTrigger = (
   props: PromptInputHoverCardTriggerProps,
-) => <HoverCardTrigger {...props} />;
+): JSX.Element => <HoverCardTrigger {...props} />;
 
 export type PromptInputHoverCardContentProps = ComponentProps<
   typeof HoverCardContent
@@ -1273,7 +1273,7 @@ export type PromptInputHoverCardContentProps = ComponentProps<
 export const PromptInputHoverCardContent = ({
   align = 'start',
   ...props
-}: PromptInputHoverCardContentProps) => (
+}: PromptInputHoverCardContentProps): JSX.Element => (
   <HoverCardContent align={align} {...props} />
 );
 
@@ -1282,21 +1282,25 @@ export type PromptInputTabsListProps = HTMLAttributes<HTMLDivElement>;
 export const PromptInputTabsList = ({
   className,
   ...props
-}: PromptInputTabsListProps) => <div className={cn(className)} {...props} />;
+}: PromptInputTabsListProps): JSX.Element => (
+  <div className={cn(className)} {...props} />
+);
 
 export type PromptInputTabProps = HTMLAttributes<HTMLDivElement>;
 
 export const PromptInputTab = ({
   className,
   ...props
-}: PromptInputTabProps) => <div className={cn(className)} {...props} />;
+}: PromptInputTabProps): JSX.Element => (
+  <div className={cn(className)} {...props} />
+);
 
 export type PromptInputTabLabelProps = HTMLAttributes<HTMLHeadingElement>;
 
 export const PromptInputTabLabel = ({
   className,
   ...props
-}: PromptInputTabLabelProps) => (
+}: PromptInputTabLabelProps): JSX.Element => (
   <h3
     className={cn(
       'tw:mb-2 tw:px-3 tw:font-medium tw:text-muted-foreground tw:text-xs',
@@ -1311,7 +1315,7 @@ export type PromptInputTabBodyProps = HTMLAttributes<HTMLDivElement>;
 export const PromptInputTabBody = ({
   className,
   ...props
-}: PromptInputTabBodyProps) => (
+}: PromptInputTabBodyProps): JSX.Element => (
   <div className={cn('tw:space-y-1', className)} {...props} />
 );
 
@@ -1320,7 +1324,7 @@ export type PromptInputTabItemProps = HTMLAttributes<HTMLDivElement>;
 export const PromptInputTabItem = ({
   className,
   ...props
-}: PromptInputTabItemProps) => (
+}: PromptInputTabItemProps): JSX.Element => (
   <div
     className={cn(
       'tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:text-xs tw:hover:bg-accent',
@@ -1335,14 +1339,16 @@ export type PromptInputCommandProps = ComponentProps<typeof Command>;
 export const PromptInputCommand = ({
   className,
   ...props
-}: PromptInputCommandProps) => <Command className={cn(className)} {...props} />;
+}: PromptInputCommandProps): JSX.Element => (
+  <Command className={cn(className)} {...props} />
+);
 
 export type PromptInputCommandInputProps = ComponentProps<typeof CommandInput>;
 
 export const PromptInputCommandInput = ({
   className,
   ...props
-}: PromptInputCommandInputProps) => (
+}: PromptInputCommandInputProps): JSX.Element => (
   <CommandInput className={cn(className)} {...props} />
 );
 
@@ -1351,7 +1357,7 @@ export type PromptInputCommandListProps = ComponentProps<typeof CommandList>;
 export const PromptInputCommandList = ({
   className,
   ...props
-}: PromptInputCommandListProps) => (
+}: PromptInputCommandListProps): JSX.Element => (
   <CommandList className={cn(className)} {...props} />
 );
 
@@ -1360,7 +1366,7 @@ export type PromptInputCommandEmptyProps = ComponentProps<typeof CommandEmpty>;
 export const PromptInputCommandEmpty = ({
   className,
   ...props
-}: PromptInputCommandEmptyProps) => (
+}: PromptInputCommandEmptyProps): JSX.Element => (
   <CommandEmpty className={cn(className)} {...props} />
 );
 
@@ -1369,7 +1375,7 @@ export type PromptInputCommandGroupProps = ComponentProps<typeof CommandGroup>;
 export const PromptInputCommandGroup = ({
   className,
   ...props
-}: PromptInputCommandGroupProps) => (
+}: PromptInputCommandGroupProps): JSX.Element => (
   <CommandGroup className={cn(className)} {...props} />
 );
 
@@ -1378,7 +1384,7 @@ export type PromptInputCommandItemProps = ComponentProps<typeof CommandItem>;
 export const PromptInputCommandItem = ({
   className,
   ...props
-}: PromptInputCommandItemProps) => (
+}: PromptInputCommandItemProps): JSX.Element => (
   <CommandItem className={cn(className)} {...props} />
 );
 
@@ -1389,6 +1395,6 @@ export type PromptInputCommandSeparatorProps = ComponentProps<
 export const PromptInputCommandSeparator = ({
   className,
   ...props
-}: PromptInputCommandSeparatorProps) => (
+}: PromptInputCommandSeparatorProps): JSX.Element => (
   <CommandSeparator className={cn(className)} {...props} />
 );

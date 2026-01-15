@@ -12,7 +12,7 @@ import { cn } from '~/utils/shadcn-ui';
 
 export type SourcesProps = ComponentProps<'div'>;
 
-export const Sources = ({ className, ...props }: SourcesProps) => (
+export const Sources = ({ className, ...props }: SourcesProps): JSX.Element => (
   <Collapsible
     className={cn('tw:not-prose tw:mb-4 tw:text-primary tw:text-xs', className)}
     {...props}
@@ -28,7 +28,7 @@ export const SourcesTrigger = ({
   count,
   children,
   ...props
-}: SourcesTriggerProps) => (
+}: SourcesTriggerProps): JSX.Element => (
   <CollapsibleTrigger
     className={cn('tw:flex tw:items-center tw:gap-2', className)}
     {...props}
@@ -47,7 +47,7 @@ export type SourcesContentProps = ComponentProps<typeof CollapsibleContent>;
 export const SourcesContent = ({
   className,
   ...props
-}: SourcesContentProps) => (
+}: SourcesContentProps): JSX.Element => (
   <CollapsibleContent
     className={cn(
       'tw:mt-3 tw:flex tw:w-fit tw:flex-col tw:gap-2',
@@ -61,7 +61,12 @@ export const SourcesContent = ({
 
 export type SourceProps = ComponentProps<'a'>;
 
-export const Source = ({ href, title, children, ...props }: SourceProps) => (
+export const Source = ({
+  href,
+  title,
+  children,
+  ...props
+}: SourceProps): JSX.Element => (
   <a
     className="tw:flex tw:items-center tw:gap-2"
     href={href}

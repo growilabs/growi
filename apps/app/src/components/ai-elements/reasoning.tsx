@@ -53,7 +53,7 @@ export const Reasoning = memo(
     duration: durationProp,
     children,
     ...props
-  }: ReasoningProps) => {
+  }: ReasoningProps): JSX.Element => {
     const [isOpen, setIsOpen] = useControllableState({
       prop: open,
       defaultProp: defaultOpen,
@@ -131,7 +131,7 @@ const getThinkingMessage = (isStreaming: boolean, duration?: number) => {
 };
 
 export const ReasoningTrigger = memo(
-  ({ className, children, ...props }: ReasoningTriggerProps) => {
+  ({ className, children, ...props }: ReasoningTriggerProps): JSX.Element => {
     const { isStreaming, isOpen, duration } = useReasoning();
 
     return (
@@ -166,7 +166,7 @@ export type ReasoningContentProps = ComponentProps<
 };
 
 export const ReasoningContent = memo(
-  ({ className, children, ...props }: ReasoningContentProps) => (
+  ({ className, children, ...props }: ReasoningContentProps): JSX.Element => (
     <CollapsibleContent
       className={cn(
         'tw:mt-4 tw:text-sm',

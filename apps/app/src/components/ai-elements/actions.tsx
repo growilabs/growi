@@ -13,7 +13,11 @@ import { cn } from '~/utils/shadcn-ui';
 
 export type ActionsProps = ComponentProps<'div'>;
 
-export const Actions = ({ className, children, ...props }: ActionsProps) => (
+export const Actions = ({
+  className,
+  children,
+  ...props
+}: ActionsProps): JSX.Element => (
   <div className={cn('tw:flex tw:items-center tw:gap-1', className)} {...props}>
     {children}
   </div>
@@ -32,7 +36,7 @@ export const Action = ({
   variant = 'ghost',
   size = 'sm',
   ...props
-}: ActionProps) => {
+}: ActionProps): JSX.Element => {
   const button = (
     <Button
       className={cn(

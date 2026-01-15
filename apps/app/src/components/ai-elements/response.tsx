@@ -8,7 +8,7 @@ import { cn } from '~/utils/shadcn-ui';
 type ResponseProps = ComponentProps<typeof Streamdown>;
 
 export const Response = memo(
-  ({ className, ...props }: ResponseProps) => (
+  ({ className, ...props }: ResponseProps): JSX.Element => (
     <Streamdown
       className={cn(
         'tw:size-full tw:[&>*:first-child]:mt-0 tw:[&>*:last-child]:mb-0',
