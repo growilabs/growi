@@ -43,6 +43,7 @@ import {
   useSWRxV5MigrationStatus,
 } from '~/stores/page-listing';
 import { useSWRxSearch } from '~/stores/search';
+import { useSWRxSecuritySettings } from '~/stores/security-settings';
 
 import { OperateAllControl } from './SearchPage/OperateAllControl';
 import SearchControl from './SearchPage/SearchControl';
@@ -268,6 +269,9 @@ const PrivateLegacyPages = (): JSX.Element => {
   const keyword = useSearchKeyword();
   const setSearchKeyword = useSetSearchKeyword('/_private-legacy-pages');
 
+  const { data: generalSetting } = useSWRxSecuritySettings();
+  const isHidingUserPages = generalSetting?.isHidingUserPages ?? false;
+
   const [offset, setOffset] = useState<number>(0);
   const [limit, setLimit] = useState<number>(INITIAL_PAGING_SIZE);
   const [isOpenConvertModal, setOpenConvertModal] = useState<boolean>(false);
@@ -295,6 +299,7 @@ const PrivateLegacyPages = (): JSX.Element => {
       includeUserPages: true,
       includeTrashPages: false,
     },
+    isHidingUserPages,
   );
 
   const { data: migrationStatus, mutate: mutateMigrationStatus } =
@@ -515,6 +520,7 @@ const PrivateLegacyPages = (): JSX.Element => {
   const searchControl = useMemo(() => {
     return (
       <SearchControl
+        isHidingUserPages={isHidingUserPages}
         isEnableSort={false}
         isEnableFilter={false}
         initialSearchConditions={{ keyword: initQ, limit: INITIAL_PAGING_SIZE }}
@@ -522,7 +528,7 @@ const PrivateLegacyPages = (): JSX.Element => {
         extraControls={extraControls}
       />
     );
-  }, [searchInvokedHandler, extraControls]);
+  }, [searchInvokedHandler, extraControls, isHidingUserPages]);
 
   const searchResultListHead = useMemo(() => {
     if (data == null) {
