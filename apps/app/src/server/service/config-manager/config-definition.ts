@@ -200,6 +200,10 @@ export const CONFIG_KEYS = [
   'mail:smtpPassword',
   'mail:sesSecretAccessKey',
   'mail:sesAccessKeyId',
+  'mail:oauth2ClientId',
+  'mail:oauth2ClientSecret',
+  'mail:oauth2RefreshToken',
+  'mail:oauth2User',
 
   // Customize Settings
   'customize:isEmailPublishedForNewUser',
@@ -932,7 +936,9 @@ export const CONFIG_DEFINITIONS = {
   'mail:from': defineConfig<string | undefined>({
     defaultValue: undefined,
   }),
-  'mail:transmissionMethod': defineConfig<'smtp' | 'ses' | undefined>({
+  'mail:transmissionMethod': defineConfig<
+    'smtp' | 'ses' | 'oauth2' | undefined
+  >({
     defaultValue: undefined,
   }),
   'mail:smtpHost': defineConfig<string | undefined>({
@@ -951,6 +957,20 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
   }),
   'mail:sesSecretAccessKey': defineConfig<string | undefined>({
+    defaultValue: undefined,
+  }),
+  'mail:oauth2ClientId': defineConfig<string | undefined>({
+    defaultValue: undefined,
+  }),
+  'mail:oauth2ClientSecret': defineConfig<string | undefined>({
+    defaultValue: undefined,
+    isSecret: true,
+  }),
+  'mail:oauth2RefreshToken': defineConfig<string | undefined>({
+    defaultValue: undefined,
+    isSecret: true,
+  }),
+  'mail:oauth2User': defineConfig<string | undefined>({
     defaultValue: undefined,
   }),
 
