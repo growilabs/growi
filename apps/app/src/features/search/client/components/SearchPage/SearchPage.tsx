@@ -17,6 +17,7 @@ import {
   type ISearchConfigurations,
   useSWRxSearch,
 } from '~/stores/search';
+import { useSWRxSecuritySettings } from '~/stores/security-settings';
 
 import { OperateAllControl } from './OperateAllControl';
 import SearchControl from './SearchControl';
@@ -106,6 +107,9 @@ export const SearchPage = (): JSX.Element => {
   const keyword = useSearchKeyword();
   const setSearchKeyword = useSetSearchKeyword();
 
+  const { data: generalSetting } = useSWRxSecuritySettings();
+  const isHidingUserPages = generalSetting?.isHidingUserPages ?? false;
+
   const [offset, setOffset] = useState<number>(0);
   const [limit, setLimit] = useState<number>(
     showPageLimitationL ?? INITIAL_PAGIONG_SIZE,
@@ -123,11 +127,16 @@ export const SearchPage = (): JSX.Element => {
     (ISelectableAll & IReturnSelectedPageIds) | null
   >(null);
 
-  const { data, conditions, mutate } = useSWRxSearch(keyword ?? '', null, {
-    ...configurationsByControl,
-    offset,
-    limit,
-  });
+  const { data, conditions, mutate } = useSWRxSearch(
+    keyword ?? '',
+    null,
+    {
+      ...configurationsByControl,
+      offset,
+      limit,
+    },
+    isHidingUserPages,
+  );
 
   const searchInvokedHandler = useCallback(
     (newKeyword: string, newConfigurations: Partial<ISearchConfigurations>) => {
@@ -286,6 +295,7 @@ export const SearchPage = (): JSX.Element => {
       <SearchControl
         isEnableSort
         isEnableFilter
+        isHidingUserPages={isHidingUserPages}
         initialSearchConditions={initialSearchConditions}
         onSearchInvoked={searchInvokedHandler}
         extraControls={extraControls}
@@ -298,6 +308,7 @@ export const SearchPage = (): JSX.Element => {
     collapseContents,
     initialSearchConditions,
     isCollapsed,
+    isHidingUserPages,
     searchInvokedHandler,
   ]);
 

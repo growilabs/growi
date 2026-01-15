@@ -54,6 +54,7 @@ export const useSWRxSearch = (
   keyword: string | null,
   nqName: string | null,
   configurations: ISearchConfigurations,
+  isHidingUserPagesForced: boolean,
 ): SWRResponse<IFormattedSearchResult, Error> & {
   conditions: ISearchConditions;
 } => {
@@ -66,7 +67,9 @@ export const useSWRxSearch = (
     sort: sort ?? SORT_AXIS.RELATION_SCORE,
     order: order ?? SORT_ORDER.DESC,
     includeTrashPages: includeTrashPages ?? false,
-    includeUserPages: includeUserPages ?? false,
+    includeUserPages: isHidingUserPagesForced
+      ? false
+      : (includeUserPages ?? false),
   };
   const rawQuery = createSearchQuery(
     keyword ?? '',
@@ -77,7 +80,9 @@ export const useSWRxSearch = (
   const isKeywordValid = keyword != null && keyword.length > 0;
 
   const swrResult = useSWR(
-    isKeywordValid ? ['/search', keyword, fixedConfigurations] : null,
+    isKeywordValid
+      ? ['/search', keyword, fixedConfigurations, isHidingUserPagesForced]
+      : null,
     ([endpoint, , fixedConfigurations]) => {
       const { limit, offset, sort, order } = fixedConfigurations;
 
