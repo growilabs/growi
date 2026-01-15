@@ -1148,6 +1148,7 @@ export const PromptInputSpeechButton = ({
       };
 
       speechRecognition.onerror = (event) => {
+        // biome-ignore lint/suspicious/noConsole: Allow to use
         console.error('Speech recognition error:', event.error);
         setIsListening(false);
       };
