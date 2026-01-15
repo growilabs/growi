@@ -193,6 +193,10 @@ module.exports = (crowi: Crowi) => {
       const { pageId, path, findAll, revisionId, shareLinkId, includeEmpty } =
         req.query;
 
+      const isHidingUserPages = crowi.configManager.getConfig(
+        'security:isHidingUserPages',
+      );
+
       const respondWithSinglePage = async (
         pageWithMeta:
           | IDataWithMeta<HydratedDocument<PageDocument>, IPageInfoExt>
@@ -217,6 +221,20 @@ module.exports = (crowi: Crowi) => {
             new ErrorV3('Page is not found', 'page-not-found', undefined, meta),
             404,
           );
+        }
+
+        if (isHidingUserPages && page != null) {
+          const pagePath = page.path;
+          if (pagePath.startsWith('/user')) {
+            const isOwnPage =
+              user != null && pagePath === `/user/${user.username}`;
+            if (!isOwnPage) {
+              return res.apiv3Err(
+                new ErrorV3('Page is forbidden', 'page-is-forbidden'),
+                403,
+              );
+            }
+          }
         }
 
         if (page != null) {

@@ -162,6 +162,36 @@ export async function getPageDataForInitial(
     { pageId, path: resolvedPagePath, user },
   );
 
+  const isHidingUserPages = configManager.getConfig(
+    'security:isHidingUserPages',
+  );
+
+  if (isHidingUserPages && pageWithMeta.data != null) {
+    const pagePath = pageWithMeta.data.path;
+
+    if (pagePath.startsWith('/user')) {
+      const isOwnPage = user != null && pagePath === `/user/${user.username}`;
+
+      if (!isOwnPage) {
+        return {
+          props: {
+            currentPathname: resolvedPagePath,
+            isIdenticalPathPage: false,
+            pageWithMeta: {
+              data: null,
+              meta: {
+                isNotFound: true,
+                isForbidden: true,
+              },
+            } satisfies IDataWithRequiredMeta<null, IPageNotFoundInfo>,
+            skipSSR: false,
+            redirectFrom,
+          },
+        };
+      }
+    }
+  }
+
   // Handle URL conversion
   const currentPathname = resolveFinalizedPathname(
     resolvedPagePath,
