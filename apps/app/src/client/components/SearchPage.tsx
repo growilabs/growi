@@ -9,8 +9,9 @@ import { useKeywordManager } from '~/client/services/search-operation';
 import type { IFormattedSearchResult } from '~/interfaces/search';
 import { useShowPageLimitationL } from '~/stores-universal/context';
 import {
-  type ISearchConditions, type ISearchConfigurations, useSWRxSearch, useSWRxSecuritySettings,
+  type ISearchConditions, type ISearchConfigurations, useSWRxSearch,
 } from '~/stores/search';
+import { useSWRxSecuritySettings } from '~/stores/security';
 
 import { NotAvailableForGuest } from './NotAvailableForGuest';
 import { NotAvailableForReadOnlyUser } from './NotAvailableForReadOnlyUser';
@@ -101,8 +102,6 @@ export const SearchPage = (): JSX.Element => {
 
   const { data: generalSetting } = useSWRxSecuritySettings();
   const isHidingUserPages = generalSetting?.isHidingUserPages ?? false;
-
-
 
   const { data, conditions, mutate } = useSWRxSearch(keyword ?? '', null, {
     ...configurationsByControl,
@@ -243,6 +242,7 @@ export const SearchPage = (): JSX.Element => {
       <SearchControl
         isEnableSort
         isEnableFilter
+        isHidingUserPages={isHidingUserPages}
         initialSearchConditions={initialSearchConditions}
         onSearchInvoked={searchInvokedHandler}
         extraControls={extraControls}
