@@ -13,10 +13,10 @@ export type ReqWithUserRegistrationOrder = Request & {
   userRegistrationOrder: IUserRegistrationOrder;
 };
 
-// eslint-disable-next-line import/no-anonymous-default-export
+// biome-ignore lint/style/noDefaultExport: ignore
 export default async (
   req: ReqWithUserRegistrationOrder,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ): Promise<void> => {
   const token = req.params.token || req.body.token;

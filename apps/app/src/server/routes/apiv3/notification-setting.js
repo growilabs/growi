@@ -13,7 +13,6 @@ import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import UpdatePost from '../../models/update-post';
 
-// eslint-disable-next-line no-unused-vars
 const logger = loggerFactory('growi:routes:apiv3:notification-setting');
 
 const router = express.Router();
@@ -281,7 +280,6 @@ module.exports = (crowi) => {
    *                            $ref: '#/components/schemas/UserNotification'
    *                            description: user notification settings
    */
-  // eslint-disable-next-line max-len
   router.post(
     '/user-notification',
     accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),
@@ -452,7 +450,6 @@ module.exports = (crowi) => {
    *                      description: notification param created
    *                      $ref: '#/components/schemas/GlobalNotification'
    */
-  // eslint-disable-next-line max-len
   router.post(
     '/global-notification',
     accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),
@@ -528,7 +525,6 @@ module.exports = (crowi) => {
    *                      description: notification param updated
    *                      $ref: '#/components/schemas/GlobalNotification'
    */
-  // eslint-disable-next-line max-len
   router.put(
     '/global-notification/:id',
     accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),
@@ -614,7 +610,6 @@ module.exports = (crowi) => {
    *                schema:
    *                  $ref: '#/components/schemas/NotifyForPageGrant'
    */
-  // eslint-disable-next-line max-len
   router.put(
     '/notify-for-page-grant',
     accessTokenParser([SCOPE.WRITE.ADMIN.EXTERNAL_NOTIFICATION]),

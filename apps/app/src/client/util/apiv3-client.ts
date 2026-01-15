@@ -28,7 +28,6 @@ const apiv3ErrorHandler = (_err: any): any[] => {
   return errs;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function apiv3Request<T = any>(
   method: string,
   path: string,

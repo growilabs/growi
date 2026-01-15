@@ -35,7 +35,6 @@ const BridgeCore = (props: BridgeCoreProps): JSX.Element => {
           <span className={iconClass}>{iconName}</span>
           <small
             className="ms-2 d-none d-lg-inline"
-            // eslint-disable-next-line react/no-danger
             // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
             dangerouslySetInnerHTML={{ __html: description }}
           />
@@ -52,7 +51,6 @@ const BridgeCore = (props: BridgeCoreProps): JSX.Element => {
         className="d-block d-lg-none"
       >
         <small
-          // eslint-disable-next-line react/no-danger
           // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
           dangerouslySetInnerHTML={{ __html: description }}
         />

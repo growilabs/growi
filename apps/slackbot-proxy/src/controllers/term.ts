@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/consistent-type-imports */
 import { Controller, PlatformRouter } from '@tsed/common';
-/* eslint-enable @typescript-eslint/consistent-type-imports */
 import type { Request, Response } from 'express';
 
 const isOfficialMode = process.env.OFFICIAL_MODE === 'true';

@@ -11,7 +11,7 @@ on:
     paths:
       - .github/mergify.yml
       - .github/workflows/ci-app.yml
-      - .eslint*
+      - biome.json
       - tsconfig.base.json
       - turbo.json
       - pnpm-lock.yaml
@@ -24,7 +24,7 @@ on:
     paths:
       - .github/mergify.yml
       - .github/workflows/ci-app.yml
-      - .eslint*
+      - biome.json
       - tsconfig.base.json
       - turbo.json
       - pnpm-lock.yaml

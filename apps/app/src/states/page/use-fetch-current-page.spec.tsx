@@ -128,7 +128,6 @@ describe('useFetchCurrentPage - Integration Test', () => {
       statusText: 'OK',
       headers: {},
       // Cast to satisfy AxiosResponse without resorting to explicit any
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       config: {} as AxiosResponse['config'],
     };
   };

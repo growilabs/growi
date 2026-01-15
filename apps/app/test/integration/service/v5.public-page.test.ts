@@ -1,5 +1,3 @@
-/* eslint-disable no-unused-vars */
-
 import type { IPage, IRevision } from '@growi/core';
 import mongoose from 'mongoose';
 

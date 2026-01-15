@@ -175,7 +175,6 @@ export class LinkSharedEventHandler
     return [...unfurlDataFromNormalLinks, ...unfurlDataFromPermalinks];
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private generateDataForUnfurl(
     pages: any,
     isPermalink: boolean,

@@ -34,7 +34,7 @@ import {
  * @param {string} attributeValueData
  * @param {boolean} [disallowEol=false]
  */
-/* eslint-disable-next-line max-params */
+// biome-ignore lint/nursery/useMaxParams: This module is transplanted from micromark and we want to keep the signature same.
 export function factoryAttributes(
   effects,
   ok,

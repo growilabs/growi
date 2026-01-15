@@ -96,7 +96,6 @@ const PageItemControlDropdownMenu = React.memo(
       alignEnd,
     } = props;
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const bookmarkItemClickedHandler = useCallback(async () => {
       if (onClickBookmarkMenuItem == null) return;
 
@@ -110,7 +109,6 @@ const PageItemControlDropdownMenu = React.memo(
       await onClickBookmarkMenuItem(pageId, !pageInfo.isBookmarked);
     }, [onClickBookmarkMenuItem, pageId, pageInfo]);
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const renameItemClickedHandler = useCallback(async () => {
       if (onClickRenameMenuItem == null) return;
 
@@ -125,7 +123,6 @@ const PageItemControlDropdownMenu = React.memo(
       await onClickRenameMenuItem(pageId, pageInfo);
     }, [onClickRenameMenuItem, pageId, pageInfo]);
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const duplicateItemClickedHandler = useCallback(async () => {
       if (onClickDuplicateMenuItem == null) {
         return;
@@ -140,7 +137,6 @@ const PageItemControlDropdownMenu = React.memo(
       await onClickRevertMenuItem(pageId);
     }, [onClickRevertMenuItem, pageId]);
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const deleteItemClickedHandler = useCallback(async () => {
       if (onClickDeleteMenuItem == null) return;
 
@@ -154,7 +150,6 @@ const PageItemControlDropdownMenu = React.memo(
       await onClickDeleteMenuItem(pageId, pageInfo);
     }, [onClickDeleteMenuItem, pageId, pageInfo]);
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const pathRecoveryItemClickedHandler = useCallback(async () => {
       if (onClickPathRecoveryMenuItem == null) {
         return;

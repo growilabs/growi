@@ -5,7 +5,6 @@ import { useSiteUrl } from '~/states/global';
 
 const isValidUrl = (str: string): boolean => {
   try {
-    // eslint-disable-next-line no-new
     new URL(str);
     return true;
   } catch {

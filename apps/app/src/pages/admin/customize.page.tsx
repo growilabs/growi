@@ -26,7 +26,6 @@ type PageProps = {
 
 type Props = AdminCommonProps & PageProps;
 
-// eslint-disable-next-line react/prop-types
 const AdminCustomizeSettingsPage: NextPageWithLayout<Props> = (
   props: Props,
 ) => {

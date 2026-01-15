@@ -40,7 +40,6 @@ const GlobalNotification = (props) => {
       </h2>
 
       <p className="card custom-card bg-body-tertiary">
-        {/* eslint-disable-next-line react/no-danger */}
         <span
           // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
           dangerouslySetInnerHTML={{
@@ -67,7 +66,6 @@ const GlobalNotification = (props) => {
               className="form-label form-check-label"
               htmlFor="isNotificationForOwnerPageEnabled"
             >
-              {/* eslint-disable-next-line react/no-danger */}
               <span
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
@@ -98,7 +96,6 @@ const GlobalNotification = (props) => {
               className="form-label form-check-label"
               htmlFor="isNotificationForGroupPageEnabled"
             >
-              {/* eslint-disable-next-line react/no-danger */}
               <span
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
@@ -136,7 +133,6 @@ const GlobalNotification = (props) => {
         <thead>
           <tr>
             <th>ON/OFF</th>
-            {/* eslint-disable-next-line react/no-danger */}
             <th>
               {t('notification_settings.trigger_path')}{' '}
               <span

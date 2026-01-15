@@ -1,4 +1,3 @@
-/* eslint-disable react/no-danger */
 import type React from 'react';
 
 import type AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';

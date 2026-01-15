@@ -51,7 +51,6 @@ const ResizableArea = withLoadingProps<ResizableAreaProps>((useLoadingProps) =>
   dynamic(() => import('./ResizableArea').then((mod) => mod.ResizableArea), {
     ssr: false,
     loading: () => {
-      // eslint-disable-next-line react-hooks/rules-of-hooks
       const { children, ...rest } = useLoadingProps();
       return (
         <ResizableAreaFallback {...rest}>{children}</ResizableAreaFallback>
@@ -286,7 +285,6 @@ export const Sidebar = (): JSX.Element => {
 
   // css styles
   const grwSidebarClass = styles['grw-sidebar'];
-  // eslint-disable-next-line no-nested-ternary
   let modeClass = '';
   switch (sidebarMode) {
     case SidebarMode.DRAWER:

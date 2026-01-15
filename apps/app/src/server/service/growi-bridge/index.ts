@@ -11,7 +11,7 @@ import { assertFileNameSafeForBaseDir } from '../../util/safe-path-utils';
 import type { ZipFileStat } from '../interfaces/export';
 import { tapStreamDataByPromise } from './unzip-stream-utils';
 
-const logger = loggerFactory('growi:services:GrowiBridgeService'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:services:GrowiBridgeService');
 
 /**
  * the service class for bridging GROWIs (export and import)

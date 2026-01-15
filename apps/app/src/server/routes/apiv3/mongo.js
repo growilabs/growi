@@ -3,7 +3,7 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loggerFactory from '~/utils/logger';
 
-const logger = loggerFactory('growi:routes:apiv3:mongo'); // eslint-disable-line no-unused-vars
+const _logger = loggerFactory('growi:routes:apiv3:mongo');
 
 const express = require('express');
 const mongoose = require('mongoose');

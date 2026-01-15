@@ -402,7 +402,6 @@ class PassportService implements S2sMessageHandlable {
    * @memberof PassportService
    */
   getLdapConfigurationFunc(config, opts) {
-    /* eslint-disable no-multi-spaces */
     const { configManager } = this.crowi;
 
     // get configurations
@@ -428,7 +427,6 @@ class PassportService implements S2sMessageHandlable {
     const groupDnProperty =
       configManager.getConfig('security:passport-ldap:groupDnProperty') ||
       'uid';
-    /* eslint-enable no-multi-spaces */
 
     // parse serverUrl
     // see: https://regex101.com/r/0tuYBB/1
@@ -1122,7 +1120,6 @@ class PassportService implements S2sMessageHandlable {
     const User = this.crowi.model('User');
 
     passport.serializeUser((user, done) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       done(null, (user as any).id);
     });
     passport.deserializeUser(async (id, done) => {

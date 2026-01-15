@@ -1,19 +1,12 @@
-import React from 'react';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 
-import AdminHomeContainer from '~/client/services/AdminHomeContainer';
+import { useSWRxAdminHome } from '~/stores/admin/admin-home';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
-
-type Props = {
-  adminHomeContainer: AdminHomeContainer;
-};
-
-const SystemInformationTable = (props: Props) => {
-  const { adminHomeContainer } = props;
+const SystemInformationTable = () => {
+  const { data: adminHomeData } = useSWRxAdminHome();
 
   const { growiVersion, nodeVersion, npmVersion, pnpmVersion } =
-    adminHomeContainer.state;
+    adminHomeData ?? {};
 
   if (
     growiVersion == null ||
@@ -51,12 +44,4 @@ const SystemInformationTable = (props: Props) => {
   );
 };
 
-/**
- * Wrapper component for using unstated
- */
-const SystemInformationTableWrapper = withUnstatedContainers(
-  SystemInformationTable,
-  [AdminHomeContainer],
-);
-
-export default SystemInformationTableWrapper;
+export default SystemInformationTable;

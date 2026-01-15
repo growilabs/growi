@@ -501,7 +501,6 @@ const PrivateLegacyPages = (): JSX.Element => {
         {isAdmin && renderOpenModalButton()}
       </div>
     );
-    // eslint-disable-next-line max-len
   }, [
     convertMenuItemClickedHandler,
     deleteAllButtonClickedHandler,

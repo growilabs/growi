@@ -1,5 +1,3 @@
-/* eslint-disable react/no-danger */
-
 import React from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
@@ -54,7 +52,6 @@ class ImportCollectionConfigurationModal extends React.Component {
     const translationBase =
       'admin:importer_management.growi_settings.configuration.pages';
 
-    /* eslint-disable react/no-unescaped-entities */
     return (
       <>
         <div className="form-check form-check-warning">
@@ -187,7 +184,6 @@ class ImportCollectionConfigurationModal extends React.Component {
         </div>
       </>
     );
-    /* eslint-enable react/no-unescaped-entities */
   }
 
   renderRevisionsContents() {
@@ -197,36 +193,32 @@ class ImportCollectionConfigurationModal extends React.Component {
     const translationBase =
       'admin:importer_management.growi_settings.configuration.revisions';
 
-    /* eslint-disable react/no-unescaped-entities */
     return (
-      <>
-        <div className="form-check form-check-warning">
-          <input
-            id="cbOpt1"
-            type="checkbox"
-            className="form-check-input"
-            checked={option.isOverwriteAuthorWithCurrentUser || false} // add ' || false' to avoid uncontrolled input warning
-            onChange={() =>
-              this.changeHandler({
-                isOverwriteAuthorWithCurrentUser:
-                  !option.isOverwriteAuthorWithCurrentUser,
-              })
-            }
+      <div className="form-check form-check-warning">
+        <input
+          id="cbOpt1"
+          type="checkbox"
+          className="form-check-input"
+          checked={option.isOverwriteAuthorWithCurrentUser || false} // add ' || false' to avoid uncontrolled input warning
+          onChange={() =>
+            this.changeHandler({
+              isOverwriteAuthorWithCurrentUser:
+                !option.isOverwriteAuthorWithCurrentUser,
+            })
+          }
+        />
+        <label htmlFor="cbOpt1" className="form-label form-check-label">
+          {t(`${translationBase}.overwrite_author.label`)}
+          <p
+            className="form-text text-muted mt-0"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
+            dangerouslySetInnerHTML={{
+              __html: t(`${translationBase}.overwrite_author.desc`),
+            }}
           />
-          <label htmlFor="cbOpt1" className="form-label form-check-label">
-            {t(`${translationBase}.overwrite_author.label`)}
-            <p
-              className="form-text text-muted mt-0"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
-              dangerouslySetInnerHTML={{
-                __html: t(`${translationBase}.overwrite_author.desc`),
-              }}
-            />
-          </label>
-        </div>
-      </>
+        </label>
+      </div>
     );
-    /* eslint-enable react/no-unescaped-entities */
   }
 
   render() {

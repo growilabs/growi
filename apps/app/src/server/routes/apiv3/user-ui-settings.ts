@@ -69,7 +69,6 @@ module.exports = () => {
    *                 preferCollapsedModeByUser:
    *                   type: boolean
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   router.put(
     '/',
     validatorForPut,

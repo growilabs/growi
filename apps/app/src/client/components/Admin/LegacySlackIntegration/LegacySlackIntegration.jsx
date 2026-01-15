@@ -38,7 +38,6 @@ const LegacySlackIntegration = (props) => {
       {isDisabled && (
         <div className="alert alert-danger">
           <span className="material-symbols-outlined">remove</span>
-          {/* eslint-disable-next-line react/no-danger */}
           <span
             // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
             dangerouslySetInnerHTML={{
@@ -50,7 +49,6 @@ const LegacySlackIntegration = (props) => {
 
       <div className="alert alert-warning">
         <span className="material-symbols-outlined">info</span>
-        {/* eslint-disable-next-line react/no-danger */}
         <span
           // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
           dangerouslySetInnerHTML={{

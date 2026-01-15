@@ -401,14 +401,14 @@ export class ClientSearchReplaceProcessor {
       diffsPerSecond: Math.round((totalDiffs / totalTime) * 1000),
     };
 
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: Allow logging
     console.info(
       '[ClientSearchReplaceProcessor] Performance metrics:',
       metrics,
     );
 
     if (totalTime > 5000) {
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: Allow warn
       console.warn(
         '[ClientSearchReplaceProcessor] Slow processing detected:',
         metrics,

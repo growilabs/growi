@@ -86,5 +86,4 @@ src/
 - **turbo.json**: Turbo.jsビルド設定
 - **tsconfig.base.json**: TypeScript基本設定
 - **biome.json**: Biome linter/formatter設定
-- **.eslintrc.js**: ESLint設定（廃止予定）
 - **vitest.workspace.mts**: Vitestワークスペース設定

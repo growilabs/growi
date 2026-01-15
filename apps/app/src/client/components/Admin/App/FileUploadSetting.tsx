@@ -135,9 +135,7 @@ const FileUploadSetting = (): JSX.Element => {
             <span className="material-symbols-outlined">help</span>
             <b>FIXED</b>
             <br />
-            {/* eslint-disable-next-line react/no-danger */}
             <b
-              // eslint-disable-next-line react/no-danger
               // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
               dangerouslySetInnerHTML={{
                 __html: t('admin:app_setting.fixed_by_env_var', {

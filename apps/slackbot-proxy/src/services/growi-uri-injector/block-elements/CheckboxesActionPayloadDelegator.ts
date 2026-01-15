@@ -70,7 +70,7 @@ export class CheckboxesActionPayloadDelegator
       oneOfRestoredData = restoredData;
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    // biome-ignore lint/style/noNonNullAssertion: oneOfRestoredData must be set --- IGNORE ---
     return oneOfRestoredData!;
   }
 }

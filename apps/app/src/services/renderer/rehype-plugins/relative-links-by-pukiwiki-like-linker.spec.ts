@@ -8,7 +8,6 @@ import { pukiwikiLikeLinker } from '../remark-plugins/pukiwiki-like-linker';
 import { relativeLinksByPukiwikiLikeLinker } from './relative-links-by-pukiwiki-like-linker';
 
 describe('relativeLinksByPukiwikiLikeLinker', () => {
-  /* eslint-disable indent */
   describe.each`
     input                              | expectedHref                       | expectedValue
     ${'[[/page]]'}                     | ${'/page'}                         | ${'/page'}
@@ -22,8 +21,6 @@ describe('relativeLinksByPukiwikiLikeLinker', () => {
   `(
     'should convert relative links correctly',
     ({ input, expectedHref, expectedValue }) => {
-      /* eslint-enable indent */
-
       test(`when the input is '${input}'`, () => {
         // setup:
         const processor = unified()

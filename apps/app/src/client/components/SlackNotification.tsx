@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 import type { FC } from 'react';
 import { useTranslation } from 'next-i18next';
 import {

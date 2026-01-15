@@ -886,7 +886,6 @@ function youtube(d) {
     list.push(`title="${this.encode(d.label)}"`);
   }
 
-  // eslint-disable-next-line no-restricted-syntax
   for (prop in attrs) {
     if (prop !== 'v') {
       list.push(`${this.encode(prop)}="${this.encode(attrs[prop])}"`);
@@ -910,7 +909,6 @@ function lsx(d) {
 
   const props = [];
 
-  // eslint-disable-next-line no-restricted-syntax
   for (const key in attrs) {
     if (attrs[key].length === 0) {
       props.push(`prefix="${key}"`);
@@ -932,7 +930,6 @@ function h(d) {
   /** @type {string} */
   let prop;
 
-  // eslint-disable-next-line no-restricted-syntax
   for (prop in attrs) {
     if (own.call(attrs, prop)) {
       list.push(`${this.encode(prop)}="${this.encode(attrs[prop])}"`);

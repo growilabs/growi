@@ -157,7 +157,6 @@ const SlackConfiguration = (props) => {
                 RECOMMENDED
               </span>
               <br />
-              {/* eslint-disable-next-line react/no-danger */}
               <span
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
                 dangerouslySetInnerHTML={{
@@ -224,7 +223,6 @@ const SlackConfiguration = (props) => {
           <li className="ms-3">
             {t('notification_settings.how_to.workspace')}
             <ol>
-              {/* eslint-disable-next-line react/no-danger */}
               <li
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
                 dangerouslySetInnerHTML={{
@@ -238,7 +236,6 @@ const SlackConfiguration = (props) => {
           <li className="ms-3">
             {t('notification_settings.how_to.at_growi')}
             <ol>
-              {/* eslint-disable-next-line react/no-danger */}
               <li
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
                 dangerouslySetInnerHTML={{

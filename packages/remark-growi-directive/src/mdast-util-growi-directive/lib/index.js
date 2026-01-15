@@ -224,7 +224,6 @@ function attributes(node, state) {
   /** @type {string} */
   let key;
 
-  // eslint-disable-next-line no-restricted-syntax
   for (key in attrs) {
     if (
       own.call(attrs, key) &&

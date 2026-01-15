@@ -28,7 +28,7 @@ export const validateAllTemplateLocales = async (
   for (const [id, validMap] of Object.entries(idValidMap)) {
     // warn
     if (!validMap.every((bool) => bool)) {
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: Allow to use
       console.warn(
         `[WARN] Template '${id}' has some locales that status is invalid`,
       );

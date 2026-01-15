@@ -468,11 +468,11 @@ module.exports = (crowi: Crowi) => {
 
     // handle pagination
     while (shouldContinue) {
-      // eslint-disable-next-line no-await-in-loop
       const {
         Contents = [],
         IsTruncated,
         NextMarker,
+        // biome-ignore lint/performance/noAwaitInLoops: Allow for memory consumption control
       } = await s3.send(
         new ListObjectsCommand({
           ...params,

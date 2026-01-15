@@ -33,7 +33,6 @@ export const AuditLogSettings: FC = () => {
         <b>FIXED</b>
         <br />
         <b
-          // eslint-disable-next-line react/no-danger
           // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
           dangerouslySetInnerHTML={{
             __html: t('admin:audit_log_management.fixed_by_env_var', {

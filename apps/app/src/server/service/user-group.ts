@@ -22,7 +22,7 @@ import type {
 } from '../models/user-group-relation';
 import UserGroupRelation from '../models/user-group-relation';
 
-const logger = loggerFactory('growi:service:UserGroupService'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:service:UserGroupService');
 
 export interface IUserGroupService {
   init(): Promise<void>;

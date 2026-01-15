@@ -209,7 +209,6 @@ const scrollPreview = (
   editorRootElement.scrollTop = newScrollTop;
 };
 
-// eslint-disable-next-line max-len
 export const useScrollSync = (
   codeMirrorKey: GlobalCodeMirrorEditorKey,
   previewRef: RefObject<HTMLDivElement | null>,

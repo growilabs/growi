@@ -40,7 +40,6 @@ export const useHandsontableModalLauncherForView = (opts?: {
 
   const setRemoteLatestPageData = useSetRemoteLatestPageData();
 
-  // eslint-disable-next-line max-len
   const updatePage = useCallback(
     async (
       revisionId: string,
@@ -84,7 +83,6 @@ export const useHandsontableModalLauncherForView = (opts?: {
     [_updatePage, closeConflictDiffModal, currentPage, opts, shareLinkId],
   );
 
-  // eslint-disable-next-line max-len
   const generateResolveConflictHandler = useCallback(
     (
       revisionId: string,

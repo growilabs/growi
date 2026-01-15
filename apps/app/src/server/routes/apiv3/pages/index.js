@@ -29,7 +29,7 @@ import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user
 import { serializePageSecurely } from '../../../models/serializers/page-serializer';
 import { isV5ConversionError } from '../../../models/vo/v5-conversion-error';
 
-const logger = loggerFactory('growi:routes:apiv3:pages'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:routes:apiv3:pages');
 const router = express.Router();
 
 const LIMIT_FOR_LIST = 10;

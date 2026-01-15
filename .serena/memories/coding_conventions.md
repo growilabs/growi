@@ -6,18 +6,8 @@
 - **適用範囲**: 
   - dist/, node_modules/, coverage/ などは除外
   - .next/, bin/, config/ などのビルド成果物は除外
-  - package.json, .eslintrc.js などの設定ファイルは除外
+  - package.json などの設定ファイルは除外
 - **推奨**: 新規開発では Biome を使用
-
-### ESLint設定（廃止予定・過渡期）
-- **ベース設定**: weseek ESLint設定を使用
-- **TypeScript**: weseek/typescript 設定を適用
-- **React**: React関連のルールを適用
-- **主要なルール**:
-  - `import/prefer-default-export`: オフ（名前付きエクスポートを推奨）
-  - `import/order`: import文の順序を規定
-    - React を最初に
-    - 内部モジュール（`/**`）をparentグループの前に配置
 
 ## TypeScript設定
 - **ターゲット**: ESNext
@@ -37,7 +27,7 @@
 ## ファイル命名規則
 - TypeScript/JavaScriptファイル: キャメルケースまたはケバブケース
 - コンポーネントファイル: PascalCase（Reactコンポーネント）
-- 設定ファイル: ドット記法（.eslintrc.js など）
+- 設定ファイル: ドット記法（.biome.json など）
 
 ## テストファイル命名規則（Vitest）
 vitest.workspace.mts の設定に基づく：
@@ -68,4 +58,4 @@ vitest.workspace.mts の設定に基づく：
 
 ## 移行ガイドライン
 - 新規開発: Biome + Vitest を使用
-- 既存コード: 段階的に ESLint → Biome、Jest → Vitest に移行
+- 既存コード: 段階的に Jest → Vitest に移行

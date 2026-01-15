@@ -12,8 +12,7 @@ import { parse } from 'date-fns/parse';
 import { SlackCommandHandlerError } from '~/server/models/vo/slack-command-handler-error';
 import loggerFactory from '~/utils/logger';
 
-// eslint-disable-next-line no-unused-vars
-const logger = loggerFactory('growi:service:SlackBotService:togetter');
+const _logger = loggerFactory('growi:service:SlackBotService:togetter');
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {

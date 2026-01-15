@@ -187,7 +187,6 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
         err.message || 'An unknown error occured when posting comment';
       setError(errorMessage);
     }
-    // eslint-disable-next-line max-len
   }, [
     currentCommentId,
     initializeEditor,

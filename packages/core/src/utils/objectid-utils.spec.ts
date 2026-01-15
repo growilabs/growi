@@ -3,7 +3,6 @@ import ObjectId from 'bson-objectid';
 import { isValidObjectId } from './objectid-utils';
 
 describe('isValidObjectId', () => {
-  /* eslint-disable indent */
   describe.concurrent.each`
     arg                                           | expected
     ${undefined}                                  | ${false}

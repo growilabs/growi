@@ -1,3 +1,5 @@
+/** biome-ignore-all lint/performance/noAwaitInLoops: Allow in tests */
+
 import { expect, test } from '@playwright/test';
 
 test('Visit User home', async ({ page }) => {
@@ -74,7 +76,6 @@ test('Access Password setting', async ({ page }) => {
 
   const toastElementsCount = await toastElements.count();
   for (let i = 0; i < toastElementsCount; i++) {
-    // eslint-disable-next-line no-await-in-loop
     await toastElements.nth(i).click();
   }
 

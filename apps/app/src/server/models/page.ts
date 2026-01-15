@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { GroupType, type HasObjectId, type IPage } from '@growi/core';
 import type {
   IPagePopulatedToShowRevision,
@@ -560,7 +558,7 @@ export class PageQueryBuilder {
   }
 
   addConditionToPagenate(offset, limit, sortOpt?): PageQueryBuilder {
-    this.query = this.query.sort(sortOpt).skip(offset).limit(limit); // eslint-disable-line newline-per-chained-call
+    this.query = this.query.sort(sortOpt).skip(offset).limit(limit);
 
     return this;
   }
@@ -639,6 +637,7 @@ export class PageQueryBuilder {
   }
 
   populateDataToList(userPublicFields): PageQueryBuilder {
+    // biome-ignore lint/plugin: populating is the purpose of this method
     this.query = this.query.populate({
       path: 'lastUpdateUser',
       select: userPublicFields,
@@ -1427,7 +1426,7 @@ schema.methods.calculateAndUpdateLatestRevisionBodyLength = async function (
     return;
   }
 
-  // eslint-disable-next-line rulesdir/no-populate
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   const populatedPageDocument = await this.populate<PageDocument>(
     'revision',
     'body',

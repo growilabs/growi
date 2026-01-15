@@ -5,7 +5,6 @@ import { useTranslation } from 'next-i18next';
 import { CopyDropdown } from '../../Common/CopyDropdown';
 
 type ShareLinkTrProps = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   shareLink: any;
   isAdmin?: boolean;
   onDelete?: () => void;
@@ -68,7 +67,6 @@ const ShareLinkTr = (props: ShareLinkTrProps): JSX.Element => {
 };
 
 type Props = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   shareLinks: any[];
   onClickDeleteButton?: (shareLinkId: string) => void;
   isAdmin?: boolean;

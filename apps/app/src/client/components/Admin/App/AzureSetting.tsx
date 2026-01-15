@@ -87,7 +87,6 @@ export const AzureSettingMolecule = (
       {azureUseOnlyEnvVars && (
         <p
           className="alert alert-info"
-          // eslint-disable-next-line react/no-danger
           // biome-ignore lint/security/noDangerouslySetInnerHtml: includes <br> and <code> from i18n strings
           dangerouslySetInnerHTML={{
             __html: t('admin:app_setting.azure_note_for_the_only_env_option', {
@@ -129,9 +128,7 @@ export const AzureSettingMolecule = (
                 tabIndex={-1}
               />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
                 <small
-                  // eslint-disable-next-line react/no-danger
                   // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                   dangerouslySetInnerHTML={{
                     __html: t('admin:app_setting.use_env_var_if_empty', {
@@ -159,9 +156,7 @@ export const AzureSettingMolecule = (
                 tabIndex={-1}
               />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
                 <small
-                  // eslint-disable-next-line react/no-danger
                   // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                   dangerouslySetInnerHTML={{
                     __html: t('admin:app_setting.use_env_var_if_empty', {
@@ -189,9 +184,7 @@ export const AzureSettingMolecule = (
                 tabIndex={-1}
               />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
                 <small
-                  // eslint-disable-next-line react/no-danger
                   // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                   dangerouslySetInnerHTML={{
                     __html: t('admin:app_setting.use_env_var_if_empty', {
@@ -221,9 +214,7 @@ export const AzureSettingMolecule = (
                 tabIndex={-1}
               />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
                 <small
-                  // eslint-disable-next-line react/no-danger
                   // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                   dangerouslySetInnerHTML={{
                     __html: t('admin:app_setting.use_env_var_if_empty', {
@@ -253,9 +244,7 @@ export const AzureSettingMolecule = (
                 tabIndex={-1}
               />
               <p className="form-text text-muted">
-                {/* eslint-disable-next-line react/no-danger */}
                 <small
-                  // eslint-disable-next-line react/no-danger
                   // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
                   dangerouslySetInnerHTML={{
                     __html: t('admin:app_setting.use_env_var_if_empty', {

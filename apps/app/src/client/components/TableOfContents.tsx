@@ -12,8 +12,7 @@ import styles from './TableOfContents.module.scss';
 
 const { isUsersHomepage: _isUsersHomepage } = pagePathUtils;
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const logger = loggerFactory('growi:TableOfContents');
+const _logger = loggerFactory('growi:TableOfContents');
 
 type Props = {
   tagsElementHeight?: number;

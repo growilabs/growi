@@ -10,7 +10,7 @@ import { serializeUserGroupRelationSecurely } from '~/server/models/serializers/
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
-const logger = loggerFactory('growi:routes:apiv3:user-group-relation'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:routes:apiv3:user-group-relation');
 
 const express = require('express');
 const { query } = require('express-validator');

@@ -34,7 +34,6 @@ import { configManager } from './config-manager';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const logger = loggerFactory('growi:service:search');
 
 const nonNullable = <T>(value: T): value is NonNullable<T> => value != null;
@@ -326,11 +325,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   async parseSearchQuery(
-    queryString: string,
+    _queryString: string,
     nqName: string | null,
   ): Promise<ParsedQuery> {
-    // eslint-disable-next-line no-param-reassign
-    queryString = normalizeQueryString(queryString);
+    const queryString = normalizeQueryString(_queryString);
 
     const terms = this.parseQueryString(queryString);
 
@@ -443,7 +441,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
     ];
   }
 
-  parseQueryString(queryString: string): QueryTerms {
+  parseQueryString(_queryString: string): QueryTerms {
+    let queryString = _queryString;
+
     // terms
     const matchWords: string[] = [];
     const notMatchWords: string[] = [];
@@ -459,7 +459,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const phrases = queryString.match(phraseRegExp);
 
     if (phrases !== null) {
-      queryString = queryString.replace(phraseRegExp, ''); // eslint-disable-line no-param-reassign
+      queryString = queryString.replace(phraseRegExp, '');
 
       phrases.forEach((phrase) => {
         phrase.trim();
@@ -595,8 +595,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
         const highlightData = data._highlight;
         if (highlightData != null) {
           const snippet = this.canShowSnippet(pageData, user, userGroups)
-            ? // eslint-disable-next-line max-len
-              highlightData.body ||
+            ? highlightData.body ||
               highlightData['body.en'] ||
               highlightData['body.ja'] ||
               highlightData.comments ||

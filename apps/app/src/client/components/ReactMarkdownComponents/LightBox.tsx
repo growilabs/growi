@@ -28,7 +28,6 @@ export const LightBox = (props: Props): JSX.Element => {
 
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <button
         type="button"
         className="border-0 bg-transparent p-0"

@@ -18,7 +18,7 @@ async function cleanup(filePath: string): Promise<void> {
     await fs.unlink(filePath);
     await fs.rmdir(path.dirname(filePath));
   } catch (err) {
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: This is a test file
     console.error('Cleanup failed:', err);
   }
 }

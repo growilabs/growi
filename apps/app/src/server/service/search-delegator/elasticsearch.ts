@@ -828,7 +828,8 @@ class ElasticsearchDelegator
     query: SearchQuery,
     parsedKeywords: ESQueryTerms,
   ): void {
-    query = this.initializeBoolQuery(query); // eslint-disable-line no-param-reassign
+    // biome-ignore lint/style/noParameterAssign: ignore
+    query = this.initializeBoolQuery(query);
 
     if (query.body?.query?.bool == null) {
       throw new Error('query.body.query.bool is not initialized');
@@ -967,7 +968,8 @@ class ElasticsearchDelegator
       'security:list-policy:hideRestrictedByGroup',
     );
 
-    query = this.initializeBoolQuery(query); // eslint-disable-line no-param-reassign
+    // biome-ignore lint/style/noParameterAssign: ignore
+    query = this.initializeBoolQuery(query);
 
     if (
       query.body?.query?.bool?.filter == null ||
