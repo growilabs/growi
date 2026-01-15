@@ -59,6 +59,9 @@ test.describe
     test('Write command (:w) should save the page successfully', async ({
       page,
     }) => {
+      // Focus the editor
+      await page.locator('.cm-content').click();
+
       //  Enter normal mode
       await page.keyboard.press('Escape');
 
