@@ -14,6 +14,7 @@ import ExternalUserGroupRelation from '~/features/external-user-group/server/mod
 import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../service/config-manager';
+import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from './user/conts';
 import UserGroup from './user-group';
 import UserGroupRelation from './user-group-relation';
 
@@ -97,7 +98,7 @@ export const getPageSchema = (crowi) => {
 
   // init event
   if (crowi != null) {
-    pageEvent = crowi.event('page');
+    pageEvent = crowi.events.page;
     pageEvent.on('create', pageEvent.onCreate);
     pageEvent.on('update', pageEvent.onUpdate);
     pageEvent.on('createMany', pageEvent.onCreateMany);
@@ -254,7 +255,7 @@ export const getPageSchema = (crowi) => {
     return this.save();
   };
 
-  pageSchema.methods.initLatestRevisionField = async function (revisionId) {
+  pageSchema.methods.initLatestRevisionField = function (revisionId) {
     this.latestRevision = this.revision;
     if (revisionId != null) {
       this.revision = revisionId;
@@ -266,10 +267,9 @@ export const getPageSchema = (crowi) => {
   ) {
     validateCrowi();
 
-    const User = crowi.model('User');
-    return populateDataToShowRevision(
+    return await populateDataToShowRevision(
       this,
-      User.USER_FIELDS_EXCEPT_CONFIDENTIAL,
+      USER_FIELDS_EXCEPT_CONFIDENTIAL,
       shouldExcludeBody,
     );
   };
@@ -282,7 +282,7 @@ export const getPageSchema = (crowi) => {
       this.revision = revisionId;
     }
     // biome-ignore lint/plugin: populating is the purpose of this method
-    return this.populate('revision');
+    return await this.populate('revision');
   };
 
   pageSchema.methods.applyScope = function (user, grant, grantUserGroupIds) {
@@ -525,7 +525,6 @@ export const getPageSchema = (crowi) => {
   ) {
     validateCrowi();
 
-    const User = crowi.model('User');
     const opt = Object.assign({ sort: 'updatedAt', desc: -1 }, option);
     const sortOpt = {};
     sortOpt[opt.sort] = opt.desc;
@@ -547,7 +546,7 @@ export const getPageSchema = (crowi) => {
 
     // find
     builder.addConditionToPagenate(opt.offset, opt.limit, sortOpt);
-    builder.populateDataToList(User.USER_FIELDS_EXCEPT_CONFIDENTIAL);
+    builder.populateDataToList(USER_FIELDS_EXCEPT_CONFIDENTIAL);
     const pages = await builder.query.lean().clone().exec('find');
     const result = {
       pages,

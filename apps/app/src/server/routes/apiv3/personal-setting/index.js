@@ -80,7 +80,7 @@ module.exports = (crowi) => {
 
   const { User } = crowi.models;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const minPasswordLength = crowi.configManager.getConfig(
     'app:minPasswordLength',

@@ -11,6 +11,7 @@ import {
 } from '@growi/core/dist/utils/path-utils';
 import assert from 'assert';
 import escapeStringRegexp from 'escape-string-regexp';
+import type mongoose from 'mongoose';
 import type {
   AnyObject,
   Document,
@@ -18,7 +19,7 @@ import type {
   Model,
   Types,
 } from 'mongoose';
-import mongoose, { Schema } from 'mongoose';
+import { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 import nodePath from 'path';
@@ -40,6 +41,7 @@ import {
   getPageSchema,
   populateDataToShowRevision,
 } from './obsolete-page';
+import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from './user/conts';
 import type { UserGroupDocument } from './user-group';
 import UserGroupRelation from './user-group-relation';
 
@@ -911,7 +913,6 @@ schema.statics.findRecentUpdatedPages = async function (
 ): Promise<PaginatedPages> {
   const sortOpt = {};
   sortOpt[options.sort] = options.desc;
-  const User = mongoose.model('User') as any;
 
   if (path == null) {
     throw new Error('path is required.');
@@ -929,7 +930,7 @@ schema.statics.findRecentUpdatedPages = async function (
   }
 
   queryBuilder.addConditionToListWithDescendants(path, options);
-  queryBuilder.populateDataToList(User.USER_FIELDS_EXCEPT_CONFIDENTIAL);
+  queryBuilder.populateDataToList(USER_FIELDS_EXCEPT_CONFIDENTIAL);
   await queryBuilder.addViewerCondition(
     user,
     undefined,

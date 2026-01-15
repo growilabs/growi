@@ -1,6 +1,7 @@
 import { useHydrateAtoms } from 'jotai/utils';
 
 import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props';
+import { createAtomTuple } from '~/utils/jotai-utils';
 
 import { _atomsForHydration } from './global';
 
@@ -29,29 +30,35 @@ const {
 export const useHydrateGlobalInitialAtoms = (
   commonInitialProps: CommonInitialProps | undefined,
 ): void => {
-  // Hydrate global atoms with server-side data
-  useHydrateAtoms(
+  const tuples =
     commonInitialProps == null
       ? []
       : [
-          [appTitleAtom, commonInitialProps.appTitle],
-          [siteUrlAtom, commonInitialProps.siteUrl],
-          [
+          createAtomTuple(appTitleAtom, commonInitialProps.appTitle),
+          createAtomTuple(siteUrlAtom, commonInitialProps.siteUrl),
+          createAtomTuple(
             siteUrlWithEmptyValueWarnAtom,
             commonInitialProps.siteUrlWithEmptyValueWarn,
-          ],
-          [confidentialAtom, commonInitialProps.confidential],
-          [growiVersionAtom, commonInitialProps.growiVersion],
-          [isDefaultLogoAtom, commonInitialProps.isDefaultLogo],
-          [customTitleTemplateAtom, commonInitialProps.customTitleTemplate],
-          [growiCloudUriAtom, commonInitialProps.growiCloudUri],
-          [
+          ),
+          createAtomTuple(confidentialAtom, commonInitialProps.confidential),
+          createAtomTuple(growiVersionAtom, commonInitialProps.growiVersion),
+          createAtomTuple(isDefaultLogoAtom, commonInitialProps.isDefaultLogo),
+          createAtomTuple(
+            customTitleTemplateAtom,
+            commonInitialProps.customTitleTemplate,
+          ),
+          createAtomTuple(growiCloudUriAtom, commonInitialProps.growiCloudUri),
+          createAtomTuple(
             growiAppIdForGrowiCloudAtom,
             commonInitialProps.growiAppIdForGrowiCloud,
-          ],
-          [forcedColorSchemeAtom, commonInitialProps.forcedColorScheme],
-        ],
-  );
+          ),
+          createAtomTuple(
+            forcedColorSchemeAtom,
+            commonInitialProps.forcedColorScheme,
+          ),
+        ];
+
+  useHydrateAtoms(tuples);
 };
 
 /**
@@ -62,13 +69,11 @@ export const useHydrateGlobalInitialAtoms = (
 export const useHydrateGlobalEachAtoms = (
   commonEachProps: CommonEachProps,
 ): void => {
-  // Hydrate global atoms with server-side data
-  useHydrateAtoms(
-    [
-      [currentPathnameAtom, commonEachProps.currentPathname],
-      [currentUserAtom, commonEachProps.currentUser],
-      [isMaintenanceModeAtom, commonEachProps.isMaintenanceMode],
-    ],
-    { dangerouslyForceHydrate: true },
-  );
+  const tuples = [
+    createAtomTuple(currentPathnameAtom, commonEachProps.currentPathname),
+    createAtomTuple(currentUserAtom, commonEachProps.currentUser),
+    createAtomTuple(isMaintenanceModeAtom, commonEachProps.isMaintenanceMode),
+  ];
+
+  useHydrateAtoms(tuples, { dangerouslyForceHydrate: true });
 };

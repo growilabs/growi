@@ -188,4 +188,6 @@ export interface IPageService {
   canDeleteUserHomepageByConfig(): boolean;
 
   isUsersHomepageOwnerAbsent(path: string): Promise<boolean>;
+
+  createTtlIndex(): Promise<void>;
 }

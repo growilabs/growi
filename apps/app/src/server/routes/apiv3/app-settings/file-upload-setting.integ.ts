@@ -52,9 +52,9 @@ describe('file-upload-setting route', () => {
 
     // Mock crowi instance
     crowiMock = mock<Crowi>({
-      event: vi.fn().mockReturnValue({
-        emit: vi.fn(),
-      }),
+      events: {
+        // Mock a generic event emitter
+      } as any,
       setUpFileUpload: vi.fn().mockResolvedValue(undefined),
       fileUploaderSwitchService: {
         publishUpdatedMessage: vi.fn(),

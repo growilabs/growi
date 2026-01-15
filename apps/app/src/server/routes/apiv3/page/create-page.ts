@@ -208,7 +208,7 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
     createdPage: PageDocument;
     pageTags: string[];
   }) {
-    const tagEvent = crowi.event('tag');
+    const tagEvent = crowi.events.tag;
     await PageTagRelation.updatePageTags(createdPage.id, pageTags);
     tagEvent.emit('update', createdPage, pageTags);
     return PageTagRelation.listTagNamesByPage(createdPage.id);
@@ -225,7 +225,7 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
       target: createdPage,
       action: SupportedAction.ACTION_PAGE_CREATE,
     };
-    const activityEvent = crowi.event('activity');
+    const activityEvent = crowi.events.activity;
     activityEvent.emit('update', res.locals.activity._id, parameters);
 
     // global notification

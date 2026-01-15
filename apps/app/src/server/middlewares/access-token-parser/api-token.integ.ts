@@ -1,4 +1,5 @@
 import { faker } from '@faker-js/faker';
+import type { AccessTokenParserReq } from '@growi/core/dist/interfaces/server';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Response } from 'express';
 import { mock } from 'vitest-mock-extended';
@@ -7,7 +8,6 @@ import type Crowi from '~/server/crowi';
 import type UserEvent from '~/server/events/user';
 
 import { parserForApiToken } from './api-token';
-import type { AccessTokenParserReq } from './interfaces';
 
 vi.mock('@growi/core/dist/models/serializers', { spy: true });
 
@@ -17,13 +17,11 @@ describe('access-token-parser middleware', () => {
 
   beforeAll(async () => {
     const crowiMock = mock<Crowi>({
-      event: vi.fn().mockImplementation((eventName) => {
-        if (eventName === 'user') {
-          return mock<UserEvent>({
-            on: vi.fn(),
-          });
-        }
-      }),
+      events: {
+        user: mock<UserEvent>({
+          on: vi.fn(),
+        }),
+      },
     });
     const userModelFactory = (await import('../../models/user')).default;
     User = userModelFactory(crowiMock);

@@ -1,13 +1,13 @@
-const { Transform } = require('stream');
+import { Transform } from 'node:stream';
 
-function createBatchStream(batchSize) {
-  let batchBuffer = [];
+export function createBatchStream<T>(batchSize: number): Transform {
+  let batchBuffer: T[] = [];
 
   return new Transform({
     // object mode
     objectMode: true,
 
-    transform(doc, encoding, callback) {
+    transform(doc: T, _encoding, callback) {
       batchBuffer.push(doc);
 
       if (batchBuffer.length >= batchSize) {
@@ -28,7 +28,3 @@ function createBatchStream(batchSize) {
     },
   });
 }
-
-module.exports = {
-  createBatchStream,
-};

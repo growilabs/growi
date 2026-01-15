@@ -93,11 +93,11 @@ module.exports = (crowi: Crowi) => {
   );
   const addActivity = generateAddActivityMiddleware();
 
-  const globalNotificationService = crowi.getGlobalNotificationService();
+  const globalNotificationService = crowi.globalNotificationService;
   const Page = mongoose.model<IPage, PageModel>('Page');
   const { pageService, pageGrantService } = crowi;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const validator = {
     getPage: [
@@ -1102,7 +1102,9 @@ module.exports = (crowi: Crowi) => {
       }
 
       res.set({
-        'Content-Disposition': `attachment;filename*=UTF-8''${encodeURIComponent(fileName)}.${format}`,
+        'Content-Disposition': `attachment;filename*=UTF-8''${encodeURIComponent(
+          fileName,
+        )}.${format}`,
       });
 
       const parameters = {

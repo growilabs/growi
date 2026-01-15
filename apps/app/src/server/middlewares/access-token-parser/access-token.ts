@@ -1,4 +1,5 @@
 import type { IUserHasId, Scope } from '@growi/core/dist/interfaces';
+import type { AccessTokenParserReq } from '@growi/core/dist/interfaces/server';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Response } from 'express';
 
@@ -6,12 +7,13 @@ import { AccessToken } from '~/server/models/access-token';
 import loggerFactory from '~/utils/logger';
 
 import { extractBearerToken } from './extract-bearer-token';
-import type { AccessTokenParserReq } from './interfaces';
 
 const logger = loggerFactory(
   'growi:middleware:access-token-parser:access-token',
 );
 
+// biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+// @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
 export const parserForAccessToken = (scopes: Scope[]) => {
   return async (req: AccessTokenParserReq, res: Response): Promise<void> => {
     // Extract token from Authorization header first

@@ -39,7 +39,7 @@
     "watch:server": "pnpm run dev:server -w --emptyOutDir=false",
     "lint:js": "biome check",
     "lint:styles": "stylelint \"src/**/*.scss\" \"src/**/*.css\"",
-    "lint:typecheck": "vue-tsc --noEmit",
+    "lint:typecheck": "tsgo --noEmit",
     "lint": "run-p lint:*",
     "test": "vitest run --coverage"
   },

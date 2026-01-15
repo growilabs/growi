@@ -75,7 +75,9 @@ type FlattenObject<T> = {
   [K in keyof T]: T[K] extends object
     ? keyof T[K] extends never
       ? K
-      : `${K & string}:${FlattenObject<T[K]> & string}`
+      : // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+        // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
+        `${K & string}:${FlattenObject<T[K]> & string}`
     : K;
 }[keyof T];
 

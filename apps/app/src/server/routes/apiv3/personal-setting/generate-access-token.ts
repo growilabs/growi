@@ -78,7 +78,7 @@ export const generateAccessTokenHandlerFactory: GenerateAccessTokenHandlerFactor
   (crowi) => {
     const loginRequiredStrictly =
       require('../../../middlewares/login-required')(crowi);
-    const activityEvent = crowi.event('activity');
+    const activityEvent = crowi.events.activity;
     const addActivity = generateAddActivityMiddleware();
 
     return [

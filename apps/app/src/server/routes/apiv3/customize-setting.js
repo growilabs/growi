@@ -194,7 +194,7 @@ module.exports = (crowi) => {
   const adminRequired = require('../../middlewares/admin-required')(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const { customizeService, attachmentService } = crowi;
   const uploads = multer({ dest: `${crowi.tmpDir}uploads` });

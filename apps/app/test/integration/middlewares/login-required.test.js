@@ -1,3 +1,4 @@
+const { UserStatus } = require('../../../src/server/models/user/conts');
 const { getInstance } = require('../setup-crowi');
 
 describe('loginRequired', () => {
@@ -227,11 +228,9 @@ describe('loginRequired', () => {
     });
 
     test('pass user who logged in', () => {
-      const User = crowi.model('User');
-
       req.user = {
         _id: 'user id',
-        status: User.STATUS_ACTIVE,
+        status: UserStatus.STATUS_ACTIVE,
       };
 
       const result = loginRequiredStrictly(req, res, next);
@@ -272,12 +271,10 @@ describe('loginRequired', () => {
     );
 
     test("redirect to '/login' when user.status is 'STATUS_DELETED'", () => {
-      const User = crowi.model('User');
-
       req.baseUrl = '/path/that/requires/loggedin';
       req.user = {
         _id: 'user id',
-        status: User.STATUS_DELETED,
+        status: UserStatus.STATUS_DELETED,
       };
 
       const result = loginRequiredStrictly(req, res, next);

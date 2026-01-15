@@ -267,7 +267,7 @@ class PassportService implements S2sMessageHandlable {
 
     logger.debug('LocalStrategy: setting up..');
 
-    const User = this.crowi.model('User');
+    const { User } = this.crowi.models;
 
     passport.use(
       new LocalStrategy(
@@ -1117,7 +1117,7 @@ class PassportService implements S2sMessageHandlable {
 
     logger.debug('setting up serializer and deserializer');
 
-    const User = this.crowi.model('User');
+    const { User } = this.crowi.models;
 
     passport.serializeUser((user, done) => {
       done(null, (user as any).id);

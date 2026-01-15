@@ -41,7 +41,7 @@ export interface BookmarkModel extends Model<BookmarkDocument> {
 }
 
 const factory = (crowi: Crowi) => {
-  const bookmarkEvent = crowi.event('bookmark');
+  const bookmarkEvent = crowi.events.bookmark;
 
   const bookmarkSchema = new Schema<BookmarkDocument, BookmarkModel>(
     {

@@ -49,7 +49,7 @@ module.exports = (crowi: Crowi): Router => {
   const adminRequired = require('~/server/middlewares/admin-required')(crowi);
   const addActivity = generateAddActivityMiddleware();
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const isExecutingSync = () => {
     return (
