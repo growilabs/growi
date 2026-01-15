@@ -9,7 +9,11 @@ export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage['role'];
 };
 
-export const Message = ({ className, from, ...props }: MessageProps) => (
+export const Message = ({
+  className,
+  from,
+  ...props
+}: MessageProps): JSX.Element => (
   <div
     className={cn(
       'tw:group tw:flex tw:w-full tw:items-end tw:justify-end tw:gap-2 tw:py-4',
@@ -52,7 +56,7 @@ export const MessageContent = ({
   className,
   variant,
   ...props
-}: MessageContentProps) => (
+}: MessageContentProps): JSX.Element => (
   <div
     className={cn(messageContentVariants({ variant, className }))}
     {...props}
@@ -71,7 +75,7 @@ export const MessageAvatar = ({
   name,
   className,
   ...props
-}: MessageAvatarProps) => (
+}: MessageAvatarProps): JSX.Element => (
   <Avatar
     className={cn('tw:size-8 tw:ring-1 tw:ring-border', className)}
     {...props}

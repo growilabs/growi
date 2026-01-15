@@ -84,7 +84,11 @@ export type LoaderProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 };
 
-export const Loader = ({ className, size = 16, ...props }: LoaderProps) => (
+export const Loader = ({
+  className,
+  size = 16,
+  ...props
+}: LoaderProps): JSX.Element => (
   <div
     className={cn(
       'tw:inline-flex tw:animate-spin tw:items-center tw:justify-center',

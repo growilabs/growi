@@ -25,7 +25,7 @@ const ShimmerComponent = ({
   className,
   duration = 2,
   spread = 2,
-}: TextShimmerProps) => {
+}: TextShimmerProps): JSX.Element => {
   const MotionComponent = motion.create(
     Component as keyof JSX.IntrinsicElements,
   );
