@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import type { ComponentProps } from 'react';
 import { createContext, memo, useContext, useEffect, useState } from 'react';
 import { useControllableState } from '@radix-ui/react-use-controllable-state';
@@ -43,7 +44,7 @@ export type ReasoningProps = ComponentProps<typeof Collapsible> & {
 const AUTO_CLOSE_DELAY = 1000;
 const MS_IN_S = 1000;
 
-export const Reasoning = memo(
+export const Reasoning: React.NamedExoticComponent<ReasoningProps> = memo(
   ({
     className,
     isStreaming = false,
@@ -130,34 +131,35 @@ const getThinkingMessage = (isStreaming: boolean, duration?: number) => {
   return <p>Thought for {duration} seconds</p>;
 };
 
-export const ReasoningTrigger = memo(
-  ({ className, children, ...props }: ReasoningTriggerProps): JSX.Element => {
-    const { isStreaming, isOpen, duration } = useReasoning();
+export const ReasoningTrigger: React.NamedExoticComponent<ReasoningTriggerProps> =
+  memo(
+    ({ className, children, ...props }: ReasoningTriggerProps): JSX.Element => {
+      const { isStreaming, isOpen, duration } = useReasoning();
 
-    return (
-      <CollapsibleTrigger
-        className={cn(
-          'tw:flex tw:w-full tw:items-center tw:gap-2 tw:text-muted-foreground tw:text-sm tw:transition-colors tw:hover:text-foreground',
-          className,
-        )}
-        {...props}
-      >
-        {children ?? (
-          <>
-            <BrainIcon className="tw:size-4" />
-            {getThinkingMessage(isStreaming, duration)}
-            <ChevronDownIcon
-              className={cn(
-                'tw:size-4 tw:transition-transform',
-                isOpen ? 'tw:rotate-180' : 'tw:rotate-0',
-              )}
-            />
-          </>
-        )}
-      </CollapsibleTrigger>
-    );
-  },
-);
+      return (
+        <CollapsibleTrigger
+          className={cn(
+            'tw:flex tw:w-full tw:items-center tw:gap-2 tw:text-muted-foreground tw:text-sm tw:transition-colors tw:hover:text-foreground',
+            className,
+          )}
+          {...props}
+        >
+          {children ?? (
+            <>
+              <BrainIcon className="tw:size-4" />
+              {getThinkingMessage(isStreaming, duration)}
+              <ChevronDownIcon
+                className={cn(
+                  'tw:size-4 tw:transition-transform',
+                  isOpen ? 'tw:rotate-180' : 'tw:rotate-0',
+                )}
+              />
+            </>
+          )}
+        </CollapsibleTrigger>
+      );
+    },
+  );
 
 export type ReasoningContentProps = ComponentProps<
   typeof CollapsibleContent
@@ -165,21 +167,22 @@ export type ReasoningContentProps = ComponentProps<
   children: string;
 };
 
-export const ReasoningContent = memo(
-  ({ className, children, ...props }: ReasoningContentProps): JSX.Element => (
-    <CollapsibleContent
-      className={cn(
-        'tw:mt-4 tw:text-sm',
-        // eslint-disable-next-line max-len
-        'tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:slide-out-to-top-2 tw:data-[state=open]:slide-in-from-top-2 tw:text-muted-foreground tw:outline-none tw:data-[state=closed]:animate-out tw:data-[state=open]:animate-in',
-        className,
-      )}
-      {...props}
-    >
-      <Response className="tw:grid tw:gap-2">{children}</Response>
-    </CollapsibleContent>
-  ),
-);
+export const ReasoningContent: React.NamedExoticComponent<ReasoningContentProps> =
+  memo(
+    ({ className, children, ...props }: ReasoningContentProps): JSX.Element => (
+      <CollapsibleContent
+        className={cn(
+          'tw:mt-4 tw:text-sm',
+          // eslint-disable-next-line max-len
+          'tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:slide-out-to-top-2 tw:data-[state=open]:slide-in-from-top-2 tw:text-muted-foreground tw:outline-none tw:data-[state=closed]:animate-out tw:data-[state=open]:animate-in',
+          className,
+        )}
+        {...props}
+      >
+        <Response className="tw:grid tw:gap-2">{children}</Response>
+      </CollapsibleContent>
+    ),
+  );
 
 Reasoning.displayName = 'Reasoning';
 ReasoningTrigger.displayName = 'ReasoningTrigger';

@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import { type ComponentProps, memo } from 'react';
 import { Streamdown } from 'streamdown';
 
@@ -7,7 +8,7 @@ import { cn } from '~/utils/shadcn-ui';
 
 type ResponseProps = ComponentProps<typeof Streamdown>;
 
-export const Response = memo(
+export const Response: React.NamedExoticComponent<ResponseProps> = memo(
   ({ className, ...props }: ResponseProps): JSX.Element => (
     <Streamdown
       className={cn(
