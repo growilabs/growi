@@ -1,5 +1,6 @@
 'use client';
 
+import type React from 'react';
 import {
   type CSSProperties,
   type ElementType,
@@ -25,7 +26,7 @@ const ShimmerComponent = ({
   className,
   duration = 2,
   spread = 2,
-}: TextShimmerProps) => {
+}: TextShimmerProps): JSX.Element => {
   const MotionComponent = motion.create(
     Component as keyof JSX.IntrinsicElements,
   );
@@ -63,4 +64,5 @@ const ShimmerComponent = ({
   );
 };
 
-export const Shimmer = memo(ShimmerComponent);
+export const Shimmer: React.NamedExoticComponent<TextShimmerProps> =
+  memo(ShimmerComponent);
