@@ -25,6 +25,7 @@ import type { IFocusable } from '~/client/interfaces/focusable';
 import type { TypeaheadProps } from '~/client/interfaces/react-bootstrap-typeahead';
 import type { IPageWithSearchMeta } from '~/interfaces/search';
 import { useSWRxSearch } from '~/stores/search';
+import { useSWRxSecuritySettings } from '~/stores/security-settings';
 
 import styles from './SearchTypeahead.module.scss';
 
@@ -83,13 +84,21 @@ const SearchTypeahead: ForwardRefRenderFunction<IFocusable, Props> = (
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isFocused, setFocused] = useState(false);
 
+  const { data: generalSetting } = useSWRxSecuritySettings();
+  const isHidingUserPages = generalSetting?.isHidingUserPages ?? false;
+
   const {
     data: searchResult,
     error: searchError,
     isLoading,
-  } = useSWRxSearch(disableIncrementalSearch ? null : searchKeyword, null, {
-    limit: 10,
-  });
+  } = useSWRxSearch(
+    disableIncrementalSearch ? null : searchKeyword,
+    null,
+    {
+      limit: 10,
+    },
+    isHidingUserPages,
+  );
 
   const typeaheadRef = useRef<TypeaheadRef>(null);
 
