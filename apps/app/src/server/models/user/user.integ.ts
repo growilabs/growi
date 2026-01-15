@@ -1,6 +1,8 @@
 import type mongoose from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
+import type Crowi from '~/server/crowi';
+import type UserEvent from '~/server/events/user';
 import { configManager } from '~/server/service/config-manager';
 import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
 
@@ -17,10 +19,23 @@ describe('User', () => {
     configManager.setS2sMessagingService(s2sMessagingServiceMock);
     await configManager.loadConfigs();
 
-    // Initialize User model without Crowi using dynamic import
+    // Mock Crowi instance with required properties
+    const crowiMock = mock<Crowi>({
+      events: {
+        user: mock<UserEvent>({
+          on: vi.fn(),
+        }),
+      },
+      env: {
+        PASSWORD_SEED: 'testPasswordSeed',
+      },
+    });
+
+    // Initialize User model with mocked Crowi using dynamic import
     const userModule = await import('./index');
     const userFactory = userModule.default;
-    User = userFactory(null);
+    // @ts-expect-error - mock has partial properties
+    User = userFactory(crowiMock);
 
     await User.insertMany([
       {
@@ -69,8 +84,7 @@ describe('User', () => {
 
   describe('Create and Find.', () => {
     describe('The user', () => {
-      // Skip: This test requires crowi instance to generate password
-      test.skip('should created with createUserByEmailAndPassword', async () => {
+      test('should created with createUserByEmailAndPassword', async () => {
         await new Promise<void>((resolve, reject) => {
           User.createUserByEmailAndPassword(
             'Example2 for User Test',
