@@ -3,6 +3,7 @@ import { PagePathLabel, UserPicture } from '@growi/ui/dist/components';
 import { useDebounce } from 'usehooks-ts';
 
 import { useSWRxSearch } from '~/stores/search';
+import { useSWRxSecuritySettings } from '~/stores/security-settings';
 
 import type { GetItemProps } from '../interfaces/downshift';
 import { SearchMenuItem } from './SearchMenuItem';
@@ -15,6 +16,9 @@ type Props = {
 export const SearchResultMenuItem = (props: Props): JSX.Element => {
   const { activeIndex, searchKeyword, getItemProps } = props;
 
+  const { data: generalSetting } = useSWRxSecuritySettings();
+  const isHidingUserPages = generalSetting?.isHidingUserPages ?? false;
+
   const debouncedKeyword = useDebounce(searchKeyword, 500);
 
   const isEmptyKeyword = searchKeyword.trim().length === 0;
@@ -23,6 +27,7 @@ export const SearchResultMenuItem = (props: Props): JSX.Element => {
     isEmptyKeyword ? null : debouncedKeyword,
     null,
     { limit: 10 },
+    isHidingUserPages,
   );
 
   /**
