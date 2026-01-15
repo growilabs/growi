@@ -66,7 +66,6 @@ const ProfileImageSettings = (): JSX.Element => {
           }),
         );
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setUploadedPictureSrc((response as any).attachment.filePathProxied);
       } catch (err) {
         toastError(err);

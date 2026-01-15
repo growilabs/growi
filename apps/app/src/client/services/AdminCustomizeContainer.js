@@ -6,7 +6,6 @@ import loggerFactory from '~/utils/logger';
 
 import { apiv3Get, apiv3Put } from '../util/apiv3-client';
 
-// eslint-disable-next-line no-unused-vars
 const logger = loggerFactory('growi:services:AdminCustomizeContainer');
 
 /**

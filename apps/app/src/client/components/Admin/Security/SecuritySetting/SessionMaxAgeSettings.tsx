@@ -25,7 +25,6 @@ export const SessionMaxAgeSettings: React.FC<Props> = ({ register, t }) => {
             {...register('sessionMaxAge')}
             placeholder="2592000000"
           />
-          {/* eslint-disable-next-line react/no-danger */}
           <p
             className="form-text text-muted"
             // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup

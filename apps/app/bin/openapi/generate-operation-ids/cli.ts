@@ -16,9 +16,9 @@ export const main = async (): Promise<void> => {
   const { out: outputFile, overwriteExisting } = program.opts();
   const [inputFile] = program.args;
 
-  // eslint-disable-next-line no-console
   const jsonStrings = await generateOperationIds(inputFile, {
     overwriteExisting,
+    // biome-ignore lint/suspicious/noConsole: Allow to dump errors
   }).catch(console.error);
   if (jsonStrings != null) {
     writeFileSync(outputFile ?? inputFile, jsonStrings);

@@ -3,7 +3,6 @@ import { isServer } from '@growi/core/dist/utils/browser-utils';
 import deepmerge from 'ts-deepmerge';
 
 declare global {
-  // eslint-disable-next-line vars-on-top, no-var
   var growiFacade: GrowiFacade;
 }
 

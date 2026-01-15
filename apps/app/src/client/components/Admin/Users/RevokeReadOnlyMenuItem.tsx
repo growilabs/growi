@@ -37,7 +37,6 @@ const RevokeReadOnlyMenuItem: React.FC<{
 /**
  * Wrapper component for using unstated
  */
-// eslint-disable-next-line max-len
 const RevokeReadOnlyMenuItemWrapper: React.ForwardRefExoticComponent<
   Pick<any, string | number | symbol> & React.RefAttributes<any>
 > = withUnstatedContainers(RevokeReadOnlyMenuItem, [AdminUsersContainer]);

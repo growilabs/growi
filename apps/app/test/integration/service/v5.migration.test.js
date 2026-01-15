@@ -1,4 +1,3 @@
-/* eslint-disable max-len */
 const mongoose = require('mongoose');
 
 const { getInstance } = require('../setup-crowi');

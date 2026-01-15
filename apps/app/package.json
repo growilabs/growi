@@ -1,6 +1,6 @@
 {
   "name": "@growi/app",
-  "version": "7.4.2-RC.0",
+  "version": "7.4.3-RC.0",
   "license": "MIT",
   "private": "true",
   "scripts": {
@@ -27,7 +27,6 @@
     "//// for CI": "",
     "launch-dev:ci": "cross-env NODE_ENV=development pnpm run dev:migrate && pnpm run ts-node src/server/app.ts --ci",
     "lint:typecheck": "vue-tsc --noEmit",
-    "lint:eslint": "eslint --quiet \"**/*.{js,mjs,jsx,ts,mts,tsx}\"",
     "lint:biome": "biome check --diagnostic-level=error",
     "lint:styles": "stylelint \"src/**/*.scss\"",
     "lint:openapi:apiv3": "node node_modules/swagger2openapi/oas-validate tmp/openapi-spec-apiv3.json",
@@ -342,7 +341,6 @@
     "diff2html": "^3.4.47",
     "downshift": "^8.2.3",
     "eazy-logger": "^3.1.0",
-    "eslint-plugin-jest": "^26.5.3",
     "fastest-levenshtein": "^1.0.16",
     "fslightbox-react": "^1.7.6",
     "handsontable": "=6.2.2",

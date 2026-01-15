@@ -13,7 +13,6 @@ const fs = require('fs');
 
 const mongoose = require('mongoose');
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const logger = loggerFactory('growi:service:AttachmentService');
 
 const createReadStream = (filePath: string): ReadStream => {

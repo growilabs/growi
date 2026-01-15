@@ -75,7 +75,6 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
       {adminLocalSecurityContainer.state.useOnlyEnvVars && (
         <p
           className="alert alert-info"
-          // eslint-disable-next-line max-len
           // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
           dangerouslySetInnerHTML={{
             __html: t('security_settings.Local.note for the only env option', {

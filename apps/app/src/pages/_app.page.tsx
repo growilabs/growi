@@ -44,7 +44,7 @@ const StateManagementContainer = ({
   );
 };
 
-// eslint-disable-next-line @typescript-eslint/ban-types
+// biome-ignore lint/complexity/noBannedTypes: Define empty interface to extend later
 export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
   getLayout?: (page: JSX.Element) => ReactNode;
 };

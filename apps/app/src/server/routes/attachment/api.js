@@ -5,8 +5,6 @@ import loggerFactory from '~/utils/logger';
 import { Attachment } from '../../models/attachment';
 import { validateImageContentType } from './image-content-type-validator';
 
-/* eslint-disable no-use-before-define */
-
 const logger = loggerFactory('growi:routes:attachment');
 
 const ApiResponse = require('../../util/apiResponse');
@@ -135,8 +133,7 @@ const ApiResponse = require('../../util/apiResponse');
 export const routesFactory = (crowi) => {
   const Page = crowi.model('Page');
   const User = crowi.model('User');
-  const GlobalNotificationSetting = crowi.model('GlobalNotificationSetting');
-  const { attachmentService, globalNotificationService } = crowi;
+  const { attachmentService } = crowi;
 
   const activityEvent = crowi.event('activity');
 
@@ -158,7 +155,6 @@ export const routesFactory = (crowi) => {
       return user.id === ownerId.toString();
     }
 
-    // eslint-disable-next-line no-return-await
     return await Page.isAccessiblePageByViewer(attachment.page, user);
   }
 

@@ -2,43 +2,14 @@
 @use '../button-styles';
 @use '../variables' as sidebarVar;
 
+// == Sizes
 .grw-primary-items :global {
+
   .btn {
     @extend %btn-basis;
 
-    i {
-      opacity: 0.7;
-
-      &:hover,
-      &:focus {
-        opacity: 0.8;
-      }
-    }
-  }
-}
-
-// Add indicator
-.grw-primary-items :global {
-  $btn-height: sidebarVar.$grw-sidebar-button-height;
-  $btn-active-indicator-height: 34px;
-
-  .btn {
-    &.active {
-      position: relative;
-
-      // indicator
-      &::after {
-        position: absolute;
-        top: 0;
-        left: 0;
-        display: block;
-        width: 3px;
-        height: $btn-active-indicator-height;
-        content: '';
-        background-color: var(--bs-primary);
-        transform: translateY(#{($btn-height - $btn-active-indicator-height) * 0.5});
-      }
-    }
+    width: 40px;
+    height: 40px;
   }
 
   .badge :global {
@@ -51,14 +22,17 @@
 .grw-primary-items :global {
   .btn.btn-primary {
     @extend %btn-primary-color-vars;
+    --bs-btn-active-color: var(--grw-sidebar-nav-btn-active-color, var(--grw-primary-500));
   }
 }
 
 @include bs.color-mode(light) {
   .grw-primary-items :global {
     .btn-primary {
-      --bs-btn-color: var(--grw-sidebar-nav-btn-color, var(--grw-primary-600));
-      --bs-btn-hover-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-300));
+      --bs-btn-color: var(--grw-sidebar-nav-btn-color, var(--grw-highlight-600));
+      --bs-btn-color-hover: var(--grw-sidebar-nav-btn-hover-color, var(--grw-highlight-700));
+      --bs-btn-hover-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-200));
+      --bs-btn-active-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-200));
     }
   }
 }
@@ -66,8 +40,10 @@
 @include bs.color-mode(dark) {
   .grw-primary-items :global {
     .btn-primary {
-      --bs-btn-color: var(--grw-sidebar-nav-btn-color, var(--grw-primary-300));
-      --bs-btn-hover-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-700));
+      --bs-btn-color: var(--grw-sidebar-nav-btn-color, var(--grw-highlight-600));
+      --bs-btn-color-hover: var(--grw-sidebar-nav-btn-hover-color, var(--grw-highlight-400));
+      --bs-btn-hover-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-900));
+      --bs-btn-active-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-900));
     }
   }
 }

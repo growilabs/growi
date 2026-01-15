@@ -1,6 +1,3 @@
-// disable no-return-await for model functions
-/* eslint-disable no-return-await */
-
 const mongoose = require('mongoose');
 
 const GlobalNotificationSetting = require('./GlobalNotificationSetting/index');

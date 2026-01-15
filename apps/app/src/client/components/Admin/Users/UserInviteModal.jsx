@@ -126,10 +126,8 @@ class UserInviteModal extends React.Component {
             {t('admin:user_management.invite_modal.invite_thru_email')}
           </label>
           {isMailerSetup ? (
-            // eslint-disable-next-line react/no-danger
             <p
               className="form-text text-muted"
-              // eslint-disable-next-line react/no-danger
               // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
               dangerouslySetInnerHTML={{
                 __html: t(
@@ -138,7 +136,6 @@ class UserInviteModal extends React.Component {
               }}
             />
           ) : (
-            // eslint-disable-next-line react/no-danger
             <p
               className="form-text text-muted"
               // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
