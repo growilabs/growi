@@ -22,6 +22,7 @@ import loggerFactory from '~/utils/logger';
 import UserEvent from '../events/user';
 import type { AccessTokenParser } from '../middlewares/access-token-parser';
 import { accessTokenParser } from '../middlewares/access-token-parser';
+import httpErrorHandler from '../middlewares/http-error-handler';
 import type { AclService } from '../service/acl';
 import { aclService as aclServiceSingletonInstance } from '../service/acl';
 import AppService from '../service/app';
@@ -55,7 +56,6 @@ import type { ModelsMapDependentOnCrowi } from './setup-models';
 import { setupModelsDependentOnCrowi } from './setup-models';
 
 const logger = loggerFactory('growi:crowi');
-const httpErrorHandler = require('../middlewares/http-error-handler');
 
 const sep = path.sep;
 

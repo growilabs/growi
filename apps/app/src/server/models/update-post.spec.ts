@@ -1,4 +1,4 @@
-import UpdatePost from '../../../src/server/models/update-post';
+import UpdatePost from './update-post';
 
 describe('UpdatePost', () => {
   describe('.createPrefixesByPathPattern', () => {
