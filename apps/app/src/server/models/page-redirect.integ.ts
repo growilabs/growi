@@ -1,18 +1,6 @@
-import mongoose from 'mongoose';
-
-import { getInstance } from '../setup-crowi';
+import PageRedirect from './page-redirect';
 
 describe('PageRedirect', () => {
-  // biome-ignore lint/correctness/noUnusedVariables: ignore
-  let crowi;
-  let PageRedirect;
-
-  beforeAll(async () => {
-    crowi = await getInstance();
-
-    PageRedirect = mongoose.model('PageRedirect');
-  });
-
   beforeEach(async () => {
     // clear collection
     await PageRedirect.deleteMany({});
@@ -91,12 +79,12 @@ describe('PageRedirect', () => {
 
       // then:
       expect(endpoints).not.toBeNull();
-      expect(endpoints.start).not.toBeNull();
-      expect(endpoints.start.fromPath).toEqual('/path1');
-      expect(endpoints.start.toPath).toEqual('/path2');
-      expect(endpoints.end).not.toBeNull();
-      expect(endpoints.end.fromPath).toEqual('/path1');
-      expect(endpoints.end.toPath).toEqual('/path2');
+      expect(endpoints?.start).not.toBeNull();
+      expect(endpoints?.start.fromPath).toEqual('/path1');
+      expect(endpoints?.start.toPath).toEqual('/path2');
+      expect(endpoints?.end).not.toBeNull();
+      expect(endpoints?.end.fromPath).toEqual('/path1');
+      expect(endpoints?.end.toPath).toEqual('/path2');
     });
 
     test('shoud return IPageRedirectEnds', async () => {
@@ -117,12 +105,12 @@ describe('PageRedirect', () => {
 
       // then:
       expect(endpoints).not.toBeNull();
-      expect(endpoints.start).not.toBeNull();
-      expect(endpoints.start.fromPath).toEqual('/path1');
-      expect(endpoints.start.toPath).toEqual('/path2');
-      expect(endpoints.end).not.toBeNull();
-      expect(endpoints.end.fromPath).toEqual('/path3');
-      expect(endpoints.end.toPath).toEqual('/path4');
+      expect(endpoints?.start).not.toBeNull();
+      expect(endpoints?.start.fromPath).toEqual('/path1');
+      expect(endpoints?.start.toPath).toEqual('/path2');
+      expect(endpoints?.end).not.toBeNull();
+      expect(endpoints?.end.fromPath).toEqual('/path3');
+      expect(endpoints?.end.toPath).toEqual('/path4');
     });
   });
 });
