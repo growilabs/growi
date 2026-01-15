@@ -142,7 +142,6 @@ const ImageCropModal: FC<Props> = (props: Props) => {
       // Save image to database
       onImageProcessCompleted(processedImage);
     }
-    onModalCloseHandler();
   }, [
     imageRef,
     cropOptions,
@@ -150,7 +149,6 @@ const ImageCropModal: FC<Props> = (props: Props) => {
     getCroppedImg,
     convertBase64ToBlob,
     onImageProcessCompleted,
-    onModalCloseHandler,
   ]);
 
   const toggleCropMode = useCallback(
