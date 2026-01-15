@@ -60,6 +60,7 @@ class PageListingService implements IPageListingService {
     user?: IUser,
     showPagesRestrictedByOwner = false,
     showPagesRestrictedByGroup = false,
+    hideUserPages = false,
   ): Promise<IPageForTreeItem[]> {
     const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
       'Page',

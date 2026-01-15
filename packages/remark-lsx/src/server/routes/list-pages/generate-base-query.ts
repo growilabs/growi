@@ -1,4 +1,5 @@
 import type { IPageHasId, IUser } from '@growi/core';
+import createError from 'http-errors';
 import type { Document, Query } from 'mongoose';
 import { model } from 'mongoose';
 
@@ -17,6 +18,10 @@ export const generateBaseQuery = async (
   pagePath: string,
   user: IUser,
 ): Promise<PageQueryBuilder> => {
+  if (pagePath === '') {
+    throw createError(400, 'pagePath must not be empty');
+  }
+
   const Page = model<IPageHasId>('Page');
   // biome-ignore lint/suspicious/noExplicitAny: ignore
   const PageAny = Page as any;

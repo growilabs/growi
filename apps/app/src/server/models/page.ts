@@ -89,6 +89,7 @@ export type FindRecentUpdatedPagesOption = {
   desc: number;
   hideRestrictedByOwner: boolean;
   hideRestrictedByGroup: boolean;
+  hideUserPages: boolean;
 };
 
 export type CreateMethod = (
@@ -425,6 +426,22 @@ export class PageQueryBuilder {
 
     this.query = this.query.and({
       path: new RegExp(`^(?!${startsPattern}).*$`),
+    });
+
+    return this;
+  }
+
+  addConditionToListByNotMatchPathAndChildren(str: string): PageQueryBuilder {
+    const path = normalizePath(str);
+
+    if (isTopPage(path)) {
+      return this;
+    }
+
+    const startsPattern = escapeStringRegexp(path);
+
+    this.query = this.query.and({
+      path: { $not: new RegExp(`^${startsPattern}(/|$)`) },
     });
 
     return this;
@@ -919,6 +936,10 @@ schema.statics.findRecentUpdatedPages = async function (
 
   const baseQuery = this.find({});
   const queryBuilder = new PageQueryBuilder(baseQuery, includeEmpty);
+
+  if (options.hideUserPages) {
+    queryBuilder.addConditionToListByNotMatchPathAndChildren('/user');
+  }
 
   if (!options.includeTrashed) {
     queryBuilder.addConditionToExcludeTrashed();

@@ -65,6 +65,11 @@
       "enable_force_delete_user_homepage_on_user_deletion": "删除用户时，该用户的主页及其所有子页面将被完全删除",
       "desc": "您可以删除已删除用户的主页。"
     },
+    "user_page_visibility": {
+      "user_page_visibility": "用户页面可见性",
+      "hide_user_pages": "隐藏用户页面",
+      "desc": "对一般用户隐藏所有用户相关页面"
+    },
     "session": "会议",
     "max_age": "有效期间  (msec)",
     "max_age_desc": "指定使用户会话过期的数量(以毫秒为单位)。<br>默认值: 2592000000 (30天)",

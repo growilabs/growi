@@ -56,6 +56,11 @@
       "enable_force_delete_user_homepage_on_user_deletion": "Supprimer la page d'accueil et ses pages enfants",
       "desc": "Les pages d'accueil utilisateurs pourront être supprimées."
     },
+    "user_page_visibility": {
+      "user_page_visibility": "Visibilité de la page utilisateur",
+      "hide_user_pages": "Masquer les pages utilisateur",
+      "desc": "Masque toutes les pages liées aux utilisateurs pour les utilisateurs généraux"
+    },
     "session": "Session",
     "max_age": "Âge maximal (ms)",
     "max_age_desc": "Spécifie (en milliseconde) l'âge maximal d'une session <br>Par défaut: 2592000000 (30 jours)",

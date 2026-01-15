@@ -65,6 +65,11 @@
       "enable_force_delete_user_homepage_on_user_deletion": "ユーザーを削除したとき、ユーザーホームページとその配下のページを完全削除する",
       "desc": "削除済みユーザーのユーザーホームページを削除できるようになります。"
     },
+    "user_page_visibility": {
+      "user_page_visibility": "ユーザーページの表示/非表示",
+      "hide_user_pages": "ユーザーページを非表示にする",
+      "desc": "一般ユーザーに対して、すべてのユーザー関連ページを非表示にする"
+    },
     "session": "セッション",
     "max_age": "有効期間 (ミリ秒)",
     "max_age_desc": "ユーザーのセッション情報の有効期間をミリ秒で指定できます。<br>デフォルト値: 2592000000 (30日間)",
