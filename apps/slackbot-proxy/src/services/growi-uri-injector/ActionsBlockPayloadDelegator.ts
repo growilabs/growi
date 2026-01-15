@@ -45,7 +45,6 @@ export class ActionsBlockPayloadDelegator
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleToInject(data: any): data is BlockElement[] {
     const actionsBlocks = data.filter(
       (blockElement) => blockElement.type === 'actions',
@@ -59,8 +58,8 @@ export class ActionsBlockPayloadDelegator
     );
 
     // collect elements
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const elements = actionsBlocks.flatMap(
+      // biome-ignore lint/style/noNonNullAssertion: elements must be set --- IGNORE ---
       (actionBlock) => actionBlock.elements!,
     );
 
@@ -71,7 +70,6 @@ export class ActionsBlockPayloadDelegator
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleToExtract(data: any): data is BlockActionsPayload {
     if (data.actions == null || data.actions.length === 0) {
       return false;
@@ -94,7 +92,7 @@ export class ActionsBlockPayloadDelegator
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    // biome-ignore lint/style/noNonNullAssertion: growiUriWithOriginalData must be set --- IGNORE ---
     return growiUriWithOriginalData!;
   }
 }

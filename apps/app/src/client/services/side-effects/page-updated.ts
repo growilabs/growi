@@ -66,7 +66,6 @@ export const usePageUpdatedEffect = (): void => {
           closePageStatusAlert();
         }
       }
-      // eslint-disable-next-line max-len
     },
     [
       currentPage?._id,

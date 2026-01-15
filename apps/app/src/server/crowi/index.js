@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-this-alias */
-
 import next from 'next';
 import { createTerminus } from '@godaddy/terminus';
 import attachmentRoutes from '@growi/remark-attachment-refs/dist/server';
@@ -30,7 +28,7 @@ import { AttachmentService } from '../service/attachment';
 import { configManager as configManagerSingletonInstance } from '../service/config-manager';
 import instanciateExportService from '../service/export';
 import instanciateExternalAccountService from '../service/external-account';
-import { FileUploader, getUploader } from '../service/file-uploader'; // eslint-disable-line no-unused-vars
+import { FileUploader, getUploader } from '../service/file-uploader';
 import {
   G2GTransferPusherService,
   G2GTransferReceiverService,

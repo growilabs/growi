@@ -32,7 +32,6 @@ function previous(code) {
 
 /** @type {Tokenizer} */
 function tokenizeDirectiveText(effects, ok, nok) {
-  // eslint-disable-next-line @typescript-eslint/no-this-alias
   const self = this;
 
   return start;
@@ -56,7 +55,6 @@ function tokenizeDirectiveText(effects, ok, nok) {
 
   /** @type {State} */
   function afterName(code) {
-    // eslint-disable-next-line no-nested-ternary
     return code === codes.dollarSign
       ? nok(code)
       : code === codes.leftSquareBracket

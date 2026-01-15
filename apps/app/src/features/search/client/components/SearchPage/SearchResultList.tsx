@@ -116,9 +116,8 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const duplicatedHandler = useCallback(
-    (fromPath, toPath) => {
+    (fromPath, _toPath) => {
       toastSuccess(t('duplicated_pages', { fromPath }));
 
       mutatePageTree();

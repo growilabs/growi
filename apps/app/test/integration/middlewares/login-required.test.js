@@ -1,5 +1,3 @@
-/* eslint-disable arrow-body-style */
-
 const { getInstance } = require('../setup-crowi');
 
 describe('loginRequired', () => {
@@ -35,7 +33,7 @@ describe('loginRequired', () => {
 
       let isGuestAllowedToReadSpy;
 
-      beforeEach(async () => {
+      beforeEach(() => {
         // setup req
         req = {
           originalUrl: 'original url 1',
@@ -49,7 +47,6 @@ describe('loginRequired', () => {
           .mockImplementation(() => false);
       });
 
-      /* eslint-disable indent */
       test.each`
         userStatus | expectedPath
         ${1}       | ${'/login/error/registered'}
@@ -75,7 +72,6 @@ describe('loginRequired', () => {
           expect(req.session.redirectTo).toBe(undefined);
         },
       );
-      /* eslint-disable indent */
 
       test("redirect to '/login' when the user does not loggedin", () => {
         req.baseUrl = '/path/that/requires/loggedin';
@@ -111,7 +107,7 @@ describe('loginRequired', () => {
 
       let isGuestAllowedToReadSpy;
 
-      beforeEach(async () => {
+      beforeEach(() => {
         // setup req
         req = {
           originalUrl: 'original url 1',
@@ -125,7 +121,6 @@ describe('loginRequired', () => {
           .mockImplementation(() => true);
       });
 
-      /* eslint-disable indent */
       test.each`
         userStatus | expectedPath
         ${1}       | ${'/login/error/registered'}
@@ -151,7 +146,6 @@ describe('loginRequired', () => {
           expect(req.session.redirectTo).toBe(undefined);
         },
       );
-      /* eslint-disable indent */
 
       test('pass guest user', () => {
         const result = loginRequired(req, res, next);
@@ -193,7 +187,7 @@ describe('loginRequired', () => {
 
     let isGuestAllowedToReadSpy;
 
-    beforeEach(async () => {
+    beforeEach(() => {
       // reset session object
       req.session = {};
       // spy for AclService.isGuestAllowedToRead
@@ -251,7 +245,6 @@ describe('loginRequired', () => {
       expect(req.session.redirectTo).toBe(undefined);
     });
 
-    /* eslint-disable indent */
     test.each`
       userStatus | expectedPath
       ${1}       | ${'/login/error/registered'}
@@ -277,7 +270,6 @@ describe('loginRequired', () => {
         expect(req.session.redirectTo).toBe(undefined);
       },
     );
-    /* eslint-disable indent */
 
     test("redirect to '/login' when user.status is 'STATUS_DELETED'", () => {
       const User = crowi.model('User');
@@ -315,7 +307,7 @@ describe('loginRequired', () => {
 
     let isGuestAllowedToReadSpy;
 
-    beforeEach(async () => {
+    beforeEach(() => {
       // reset session object
       req.session = {};
       // spy for AclService.isGuestAllowedToRead

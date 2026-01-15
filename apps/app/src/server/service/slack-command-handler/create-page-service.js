@@ -1,14 +1,12 @@
 import { markdownSectionBlock } from '@growi/slack/dist/utils/block-kit-builder';
 import { reshapeContentsBody } from '@growi/slack/dist/utils/reshape-contents-body';
 
-import Crowi from '~/server/crowi';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
 
 import { growiInfoService } from '../growi-info';
 
-// eslint-disable-next-line no-unused-vars
-const logger = loggerFactory('growi:service:CreatePageService');
+const _logger = loggerFactory('growi:service:CreatePageService');
 
 const { pathUtils } = require('@growi/core/dist/utils');
 const mongoose = require('mongoose');

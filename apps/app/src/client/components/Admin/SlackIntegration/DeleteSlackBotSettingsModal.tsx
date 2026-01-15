@@ -48,7 +48,6 @@ export const DeleteSlackBotSettingsModal = React.memo(
         : t('admin:slack_integration.slackbot_settings_notice');
       return (
         <span
-          // eslint-disable-next-line react/no-danger
           // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
           dangerouslySetInnerHTML={{ __html: htmlContent }}
         />

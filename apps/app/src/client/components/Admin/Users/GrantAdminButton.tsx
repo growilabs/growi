@@ -40,7 +40,6 @@ const GrantAdminButton = (props: GrantAdminButtonProps): JSX.Element => {
 /**
  * Wrapper component for using unstated
  */
-// eslint-disable-next-line max-len
 const GrantAdminButtonWrapper: React.ForwardRefExoticComponent<
   Pick<any, string | number | symbol> & React.RefAttributes<any>
 > = withUnstatedContainers(GrantAdminButton, [AdminUsersContainer]);

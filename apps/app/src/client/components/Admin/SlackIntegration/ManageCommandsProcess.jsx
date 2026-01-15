@@ -236,7 +236,7 @@ PermissionSettingsForEachCategoryComponent.propTypes = {
   permissionSettings: PropTypes.object,
 };
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+// biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
 const ManageCommandsProcess = ({
   slackAppIntegrationId,
   permissionsForBroadcastUseCommands,

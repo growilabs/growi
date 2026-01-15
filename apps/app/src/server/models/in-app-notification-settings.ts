@@ -25,7 +25,6 @@ const inAppNotificationSettingsSchema = new Schema<
   ],
 });
 
-// eslint-disable-next-line max-len
 export default getOrCreateModel<
   InAppNotificationSettingsDocument,
   InAppNotificationSettingsModel

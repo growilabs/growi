@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { anonymizeQueryParams } from './anonymize-query-params';
 
 describe('anonymizeQueryParams', () => {
-  /* eslint-disable max-len */
   it.each`
     description                     | target                                                            | paramNames         | expected
     ${'no matching parameters'}     | ${'/_api/v3/test?other=value&another=test'}                       | ${['nonexistent']} | ${'/_api/v3/test?other=value&another=test'}
@@ -21,7 +20,6 @@ describe('anonymizeQueryParams', () => {
     ${'URL with no query params'}   | ${'/_api/v3/test'}                                                | ${['q']}           | ${'/_api/v3/test'}
     ${'complex path with encoding'} | ${'/_api/v3/test?path=%2Fuser%2Fjohn%20doe'}                      | ${['path']}        | ${'/_api/v3/test?path=%5BANONYMIZED%5D'}
   `('should handle $description', ({ target, paramNames, expected }) => {
-    /* eslint-enable max-len */
     const result = anonymizeQueryParams(target, paramNames);
     expect(result).toBe(expected);
   });
