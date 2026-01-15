@@ -35,6 +35,7 @@ test.describe
       // Open Editor
       await expect(page.getByTestId('editor-button')).toBeVisible();
       await page.getByTestId('editor-button').click();
+      await expect(page.locator('.cm-content')).toBeVisible();
       await expect(page.getByTestId('grw-editor-navbar-bottom')).toBeVisible();
     });
 
@@ -59,14 +60,8 @@ test.describe
     test('Write command (:w) should save the page successfully', async ({
       page,
     }) => {
-      // Focus the editor
-      await page.locator('.cm-content').click();
-
-      //  Enter normal mode
-      await page.keyboard.press('Escape');
-
       // Enter command mode
-      await page.keyboard.press('Shift+Semicolon');
+      await page.keyboard.type(':');
       await expect(page.locator('.cm-vim-panel')).toBeVisible();
 
       // Type write command and execute
