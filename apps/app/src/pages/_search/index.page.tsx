@@ -71,7 +71,10 @@ const SearchResultPage: NextPageWithLayout<Props> = (props: Props) => {
       <DrawioViewerScript drawioUri={props.rendererConfig.drawioUri} />
 
       <SearchResultLayout>
-        <SearchPage />
+        <SearchPage
+          serverConfig={props.serverConfig}
+          rendererConfig={props.rendererConfig}
+        />
       </SearchResultLayout>
     </>
   );
