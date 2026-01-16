@@ -14,7 +14,6 @@ import { ModalBody } from 'reactstrap';
 import SimpleBar from 'simplebar-react';
 
 import { useSWRxSearch } from '~/stores/search';
-import { useSWRxSecuritySettings } from '~/stores/security-settings';
 
 import type { SelectablePage } from '../../../../interfaces/selectable-page';
 import { useSelectedPages } from '../../../services/use-selected-pages';
@@ -50,9 +49,6 @@ type Props = {
 export const AiAssistantKeywordSearch = (props: Props): JSX.Element => {
   const { isActivePane, baseSelectedPages, updateBaseSelectedPages } = props;
 
-  const { data: generalSetting } = useSWRxSecuritySettings();
-  const isHidingUserPages = generalSetting?.isHidingUserPages ?? false;
-
   const [selectedSearchKeywords, setSelectedSearchKeywords] = useState<
     Array<SelectedSearchKeyword>
   >([]);
@@ -73,7 +69,6 @@ export const AiAssistantKeywordSearch = (props: Props): JSX.Element => {
       includeUserPages: true,
       includeTrashPages: false,
     },
-    isHidingUserPages,
   );
 
   // Search results will include subordinate pages by default

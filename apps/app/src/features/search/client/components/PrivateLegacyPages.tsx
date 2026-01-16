@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react';
 import { LoadingSpinner } from '@growi/ui/dist/components';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import {
   DropdownItem,
@@ -35,6 +36,7 @@ import type { PageMigrationErrorData } from '~/interfaces/websocket';
 import { SocketEventName } from '~/interfaces/websocket';
 import { useIsAdmin } from '~/states/context';
 import { useSearchKeyword, useSetSearchKeyword } from '~/states/search';
+import { isHidingUserPagesAtom } from '~/states/server-configurations';
 import { useGlobalSocket } from '~/states/socket-io';
 import type { ILegacyPrivatePage } from '~/states/ui/modal/private-legacy-pages-migration';
 import { usePrivateLegacyPagesMigrationModalActions } from '~/states/ui/modal/private-legacy-pages-migration';
@@ -43,7 +45,6 @@ import {
   useSWRxV5MigrationStatus,
 } from '~/stores/page-listing';
 import { useSWRxSearch } from '~/stores/search';
-import { useSWRxSecuritySettings } from '~/stores/security-settings';
 
 import { OperateAllControl } from './SearchPage/OperateAllControl';
 import SearchControl from './SearchPage/SearchControl';
@@ -269,8 +270,7 @@ const PrivateLegacyPages = (): JSX.Element => {
   const keyword = useSearchKeyword();
   const setSearchKeyword = useSetSearchKeyword('/_private-legacy-pages');
 
-  const { data: generalSetting } = useSWRxSecuritySettings();
-  const isHidingUserPages = generalSetting?.isHidingUserPages ?? false;
+  const isHidingUserPages = useAtomValue(isHidingUserPagesAtom);
 
   const [offset, setOffset] = useState<number>(0);
   const [limit, setLimit] = useState<number>(INITIAL_PAGING_SIZE);
@@ -299,7 +299,6 @@ const PrivateLegacyPages = (): JSX.Element => {
       includeUserPages: true,
       includeTrashPages: false,
     },
-    isHidingUserPages,
   );
 
   const { data: migrationStatus, mutate: mutateMigrationStatus } =
