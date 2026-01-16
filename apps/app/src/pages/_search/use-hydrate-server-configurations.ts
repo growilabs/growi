@@ -1,8 +1,11 @@
+import { useEffect } from 'react';
+import { useSetAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 
 import type { RendererConfig } from '~/interfaces/services/renderer';
 import {
   isContainerFluidAtom,
+  isHidingUserPagesAtom,
   rendererConfigAtom,
   showPageLimitationLAtom,
 } from '~/states/server-configurations';
@@ -25,6 +28,15 @@ export const useHydrateServerConfigurationAtoms = (
           [isContainerFluidAtom, serverConfig.isContainerFluid],
           [showPageLimitationLAtom, serverConfig.showPageLimitationL],
           [rendererConfigAtom, rendererConfigs],
+          [isHidingUserPagesAtom, serverConfig.isHidingUserPages],
         ],
   );
+
+  const setIsHidingUserPages = useSetAtom(isHidingUserPagesAtom);
+
+  useEffect(() => {
+    if (serverConfig?.isHidingUserPages !== undefined) {
+      setIsHidingUserPages(serverConfig.isHidingUserPages);
+    }
+  }, [serverConfig?.isHidingUserPages, setIsHidingUserPages]);
 };
