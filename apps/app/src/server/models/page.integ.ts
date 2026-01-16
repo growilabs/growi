@@ -1,8 +1,20 @@
-import type mongoose from 'mongoose';
+import { EventEmitter } from 'node:events';
 import { mock } from 'vitest-mock-extended';
 
+import type Crowi from '~/server/crowi';
 import { configManager } from '~/server/service/config-manager';
 import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
+
+// Minimal mock for PageEvent that extends EventEmitter
+class MockPageEvent extends EventEmitter {
+  onCreate = vi.fn();
+
+  onUpdate = vi.fn();
+
+  onCreateMany = vi.fn();
+
+  onAddSeenUsers = vi.fn();
+}
 
 describe('Page', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,16 +39,24 @@ describe('Page', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let parentPage: any;
 
+  // Mock Crowi instance with minimal required properties
+  const mockPageEvent = new MockPageEvent();
+  const crowiMock = {
+    events: {
+      page: mockPageEvent,
+    },
+  } as unknown as Crowi;
+
   beforeAll(async () => {
     // Initialize configManager
     const s2sMessagingServiceMock = mock<S2sMessagingService>();
     configManager.setS2sMessagingService(s2sMessagingServiceMock);
     await configManager.loadConfigs();
 
-    // Initialize models without Crowi using dynamic import
+    // Initialize models with mocked Crowi using dynamic import
     const pageModule = await import('./page');
     const pageFactory = pageModule.default;
-    Page = pageFactory(null);
+    Page = pageFactory(crowiMock);
     PageQueryBuilder = Page.PageQueryBuilder;
 
     const userModule = await import('./user/index');
@@ -376,8 +396,7 @@ describe('Page', () => {
     });
   });
 
-  // Skip: These tests require crowi instance
-  describe.skip('.findListWithDescendants', () => {
+  describe('.findListWithDescendants', () => {
     test('can retrieve all pages with testUser0', async () => {
       const result = await Page.findListWithDescendants('/grant', testUser0);
       const { pages } = result;
@@ -451,8 +470,7 @@ describe('Page', () => {
     });
   });
 
-  // Skip: These tests require crowi instance
-  describe.skip('.findManageableListWithDescendants', () => {
+  describe('.findManageableListWithDescendants', () => {
     test('can retrieve all pages with testUser0', async () => {
       const pages = await Page.findManageableListWithDescendants(
         parentPage,
