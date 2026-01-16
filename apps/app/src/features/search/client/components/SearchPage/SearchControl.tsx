@@ -212,6 +212,7 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
       <SearchOptionModalLazyLoaded
         isOpen={isFileterOptionModalShown || false}
         onClose={() => setIsFileterOptionModalShown(false)}
+        isHidingUserPages={isHidingUserPages}
         includeUserPages={includeUserPages}
         includeTrashPages={includeTrashPages}
         onIncludeUserPagesSwitched={setIncludeUserPages}
