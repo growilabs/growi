@@ -17,7 +17,11 @@ import {
   SubscriptionStatusType,
 } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
-import { convertToNewAffiliationPath } from '@growi/core/dist/utils/page-path-utils';
+import {
+  convertToNewAffiliationPath,
+  isUserPage,
+  isUsersTopPage,
+} from '@growi/core/dist/utils/page-path-utils';
 import { normalizePath } from '@growi/core/dist/utils/path-utils';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
@@ -225,9 +229,15 @@ module.exports = (crowi: Crowi) => {
 
         if (isHidingUserPages && page != null) {
           const pagePath = page.path;
-          if (pagePath.startsWith('/user')) {
+          const isTargetUserPage =
+            isUserPage(page.path) || isUsersTopPage(page.path);
+
+          if (isTargetUserPage) {
             const isOwnPage =
-              user != null && pagePath === `/user/${user.username}`;
+              user != null &&
+              (pagePath === `/user/${user.username}` ||
+                pagePath.startsWith(`/user/${user.username}/`));
+
             if (!isOwnPage) {
               return res.apiv3Err(
                 new ErrorV3('Page is forbidden', 'page-is-forbidden'),

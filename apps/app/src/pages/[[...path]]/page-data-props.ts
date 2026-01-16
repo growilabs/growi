@@ -10,6 +10,8 @@ import { isIPageInfo, isIPageNotFoundInfo } from '@growi/core';
 import {
   isPermalink as _isPermalink,
   isTopPage,
+  isUserPage,
+  isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import assert from 'assert';
@@ -168,9 +170,13 @@ export async function getPageDataForInitial(
 
   if (isHidingUserPages && pageWithMeta.data != null) {
     const pagePath = pageWithMeta.data.path;
+    const isTargetUserPage = isUserPage(pagePath) || isUsersTopPage(pagePath);
 
-    if (pagePath.startsWith('/user')) {
-      const isOwnPage = user != null && pagePath === `/user/${user.username}`;
+    if (isTargetUserPage) {
+      const isOwnPage =
+        user != null &&
+        (pagePath === `/user/${user.username}` ||
+          pagePath.startsWith(`/user/${user.username}/`));
 
       if (!isOwnPage) {
         return {
