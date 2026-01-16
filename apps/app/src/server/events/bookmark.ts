@@ -1,15 +1,22 @@
-const events = require('events');
-const util = require('util');
+import EventEmitter from 'node:events';
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-function BookmarkEvent(crowi) {
-  this.crowi = crowi;
+import type Crowi from '../crowi';
 
-  events.EventEmitter.call(this);
+class BookmarkEvent extends EventEmitter {
+  crowi: Crowi;
+
+  constructor(crowi: Crowi) {
+    super();
+    this.crowi = crowi;
+  }
+
+  onCreate(_bookmark: unknown): void {
+    // placeholder for event handler
+  }
+
+  onDelete(_bookmark: unknown): void {
+    // placeholder for event handler
+  }
 }
-util.inherits(BookmarkEvent, events.EventEmitter);
 
-BookmarkEvent.prototype.onCreate = (bookmark) => {};
-BookmarkEvent.prototype.onDelete = (bookmark) => {};
-
-module.exports = BookmarkEvent;
+export default BookmarkEvent;

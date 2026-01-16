@@ -1,12 +1,14 @@
-const events = require('events');
-const util = require('util');
+import EventEmitter from 'node:events';
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-function AdminEvent(crowi) {
-  this.crowi = crowi;
+import type Crowi from '../crowi';
 
-  events.EventEmitter.call(this);
+class AdminEvent extends EventEmitter {
+  crowi: Crowi;
+
+  constructor(crowi: Crowi) {
+    super();
+    this.crowi = crowi;
+  }
 }
-util.inherits(AdminEvent, events.EventEmitter);
 
-module.exports = AdminEvent;
+export default AdminEvent;

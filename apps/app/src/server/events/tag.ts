@@ -1,14 +1,19 @@
-const events = require('events');
-const util = require('util');
+import EventEmitter from 'node:events';
+import type { ITag } from '@growi/core';
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-function TagEvent(crowi) {
-  this.crowi = crowi;
+import type Crowi from '../crowi';
 
-  events.EventEmitter.call(this);
+class TagEvent extends EventEmitter {
+  crowi: Crowi;
+
+  constructor(crowi: Crowi) {
+    super();
+    this.crowi = crowi;
+  }
+
+  onUpdate(_tag: ITag): void {
+    // placeholder for event handler
+  }
 }
-util.inherits(TagEvent, events.EventEmitter);
 
-TagEvent.prototype.onUpdate = (tag) => {};
-
-module.exports = TagEvent;
+export default TagEvent;

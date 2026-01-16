@@ -1,28 +1,35 @@
-import events from 'events';
-import util from 'util';
+import EventEmitter from 'node:events';
+import type { IPage, IUserHasId } from '@growi/core';
 
 import loggerFactory from '~/utils/logger';
 
+import type Crowi from '../crowi';
+
 const logger = loggerFactory('growi:events:page');
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-function PageEvent(crowi) {
-  this.crowi = crowi;
+class PageEvent extends EventEmitter {
+  crowi: Crowi;
 
-  events.EventEmitter.call(this);
+  constructor(crowi: Crowi) {
+    super();
+    this.crowi = crowi;
+  }
+
+  onCreate(_page: IPage, _user: IUserHasId): void {
+    logger.debug('onCreate event fired');
+  }
+
+  onUpdate(_page: IPage, _user: IUserHasId): void {
+    logger.debug('onUpdate event fired');
+  }
+
+  onCreateMany(_pages: IPage[], _user: IUserHasId): void {
+    logger.debug('onCreateMany event fired');
+  }
+
+  onAddSeenUsers(_pages: IPage[], _user: IUserHasId): void {
+    logger.debug('onAddSeenUsers event fired');
+  }
 }
-util.inherits(PageEvent, events.EventEmitter);
 
-PageEvent.prototype.onCreate = (page, user) => {
-  logger.debug('onCreate event fired');
-};
-PageEvent.prototype.onUpdate = (page, user) => {
-  logger.debug('onUpdate event fired');
-};
-PageEvent.prototype.onCreateMany = (pages, user) => {
-  logger.debug('onCreateMany event fired');
-};
-PageEvent.prototype.onAddSeenUsers = (pages, user) => {
-  logger.debug('onAddSeenUsers event fired');
-};
-module.exports = PageEvent;
+export default PageEvent;

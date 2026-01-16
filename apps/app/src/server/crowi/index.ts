@@ -19,6 +19,11 @@ import { projectRoot } from '~/server/util/project-dir-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
 
+import ActivityEvent from '../events/activity';
+import AdminEvent from '../events/admin';
+import BookmarkEvent from '../events/bookmark';
+import PageEvent from '../events/page';
+import TagEvent from '../events/tag';
 import UserEvent from '../events/user';
 import type { AccessTokenParser } from '../middlewares/access-token-parser';
 import { accessTokenParser } from '../middlewares/access-token-parser';
@@ -242,11 +247,11 @@ class Crowi {
 
     this.events = {
       user: new UserEvent(this),
-      page: new (require('../events/page'))(this),
-      activity: new (require('../events/activity'))(this),
-      bookmark: new (require('../events/bookmark'))(this),
-      tag: new (require('../events/tag'))(this),
-      admin: new (require('../events/admin'))(this),
+      page: new PageEvent(this),
+      activity: new ActivityEvent(this),
+      bookmark: new BookmarkEvent(this),
+      tag: new TagEvent(this),
+      admin: new AdminEvent(this),
     };
   }
 
