@@ -92,6 +92,9 @@ export const getServerSideGeneralPageProps: GetServerSideProps<
         showPageSideAuthors: configManager.getConfig(
           'customize:showPageSideAuthors',
         ),
+        isHidingUserPages: configManager.getConfig(
+          'security:isHidingUserPages',
+        ),
         isContainerFluid: configManager.getConfig('customize:isContainerFluid'),
         isEnabledStaleNotification: configManager.getConfig(
           'customize:isEnabledStaleNotification',
