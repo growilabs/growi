@@ -1,38 +1,45 @@
-const { UserStatus } = require('../../../src/server/models/user/conts');
-const { getInstance } = require('../setup-crowi');
+import { UserStatus } from '../models/user/conts';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LoginRequiredMiddleware = (req: any, res: any, next: any) => any;
 
 describe('loginRequired', () => {
-  let crowi;
-  const fallbackMock = jest.fn().mockReturnValue('fallback');
+  let fallbackMock: ReturnType<typeof vi.fn>;
 
-  let loginRequiredStrictly;
-  let loginRequired;
-  let loginRequiredWithFallback;
+  let loginRequiredStrictly: LoginRequiredMiddleware;
+  let loginRequired: LoginRequiredMiddleware;
+  let loginRequiredWithFallback: LoginRequiredMiddleware;
+
+  // Mock Crowi with only the required aclService
+  const crowiMock = {
+    aclService: {
+      isGuestAllowedToRead: vi.fn(),
+    },
+  };
 
   beforeEach(async () => {
-    crowi = await getInstance();
-    loginRequiredStrictly = require('~/server/middlewares/login-required')(
-      crowi,
-    );
-    loginRequired = require('~/server/middlewares/login-required')(crowi, true);
-    loginRequiredWithFallback = require('~/server/middlewares/login-required')(
-      crowi,
+    vi.resetAllMocks();
+    fallbackMock = vi.fn().mockReturnValue('fallback');
+
+    // Use dynamic import to load the middleware factory
+    const loginRequiredFactory = (await import('./login-required')).default;
+
+    loginRequiredStrictly = loginRequiredFactory(crowiMock);
+    loginRequired = loginRequiredFactory(crowiMock, true);
+    loginRequiredWithFallback = loginRequiredFactory(
+      crowiMock,
       false,
       fallbackMock,
     );
   });
 
   describe('not strict mode', () => {
-    const res = {
-      redirect: jest.fn().mockReturnValue('redirect'),
-      sendStatus: jest.fn().mockReturnValue('sendStatus'),
-    };
-    const next = jest.fn().mockReturnValue('next');
-
     describe('and when aclService.isGuestAllowedToRead() returns false', () => {
-      let req;
-
-      let isGuestAllowedToReadSpy;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let req: any;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let res: any;
+      let next: ReturnType<typeof vi.fn>;
 
       beforeEach(() => {
         // setup req
@@ -40,12 +47,13 @@ describe('loginRequired', () => {
           originalUrl: 'original url 1',
           session: {},
         };
-        // reset session object
-        req.session = {};
-        // prepare spy for AclService.isGuestAllowedToRead
-        isGuestAllowedToReadSpy = jest
-          .spyOn(crowi.aclService, 'isGuestAllowedToRead')
-          .mockImplementation(() => false);
+        res = {
+          redirect: vi.fn().mockReturnValue('redirect'),
+          sendStatus: vi.fn().mockReturnValue('sendStatus'),
+        };
+        next = vi.fn().mockReturnValue('next');
+        // prepare mock for AclService.isGuestAllowedToRead
+        crowiMock.aclService.isGuestAllowedToRead.mockReturnValue(false);
       });
 
       test.each`
@@ -63,7 +71,9 @@ describe('loginRequired', () => {
 
           const result = loginRequired(req, res, next);
 
-          expect(isGuestAllowedToReadSpy).not.toHaveBeenCalled();
+          expect(
+            crowiMock.aclService.isGuestAllowedToRead,
+          ).not.toHaveBeenCalled();
           expect(next).not.toHaveBeenCalled();
           expect(fallbackMock).not.toHaveBeenCalled();
           expect(res.sendStatus).not.toHaveBeenCalled();
@@ -79,7 +89,7 @@ describe('loginRequired', () => {
 
         const result = loginRequired(req, res, next);
 
-        expect(isGuestAllowedToReadSpy).toHaveBeenCalled();
+        expect(crowiMock.aclService.isGuestAllowedToRead).toHaveBeenCalled();
         expect(next).not.toHaveBeenCalled();
         expect(fallbackMock).not.toHaveBeenCalled();
         expect(res.sendStatus).not.toHaveBeenCalled();
@@ -94,7 +104,7 @@ describe('loginRequired', () => {
 
         const result = loginRequired(req, res, next);
 
-        expect(isGuestAllowedToReadSpy).toHaveBeenCalled();
+        expect(crowiMock.aclService.isGuestAllowedToRead).toHaveBeenCalled();
         expect(fallbackMock).not.toHaveBeenCalled();
         expect(res.sendStatus).not.toHaveBeenCalled();
         expect(next).toHaveBeenCalled();
@@ -104,9 +114,11 @@ describe('loginRequired', () => {
     });
 
     describe('and when aclService.isGuestAllowedToRead() returns true', () => {
-      let req;
-
-      let isGuestAllowedToReadSpy;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let req: any;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let res: any;
+      let next: ReturnType<typeof vi.fn>;
 
       beforeEach(() => {
         // setup req
@@ -114,12 +126,13 @@ describe('loginRequired', () => {
           originalUrl: 'original url 1',
           session: {},
         };
-        // reset session object
-        req.session = {};
-        // prepare spy for AclService.isGuestAllowedToRead
-        isGuestAllowedToReadSpy = jest
-          .spyOn(crowi.aclService, 'isGuestAllowedToRead')
-          .mockImplementation(() => true);
+        res = {
+          redirect: vi.fn().mockReturnValue('redirect'),
+          sendStatus: vi.fn().mockReturnValue('sendStatus'),
+        };
+        next = vi.fn().mockReturnValue('next');
+        // prepare mock for AclService.isGuestAllowedToRead
+        crowiMock.aclService.isGuestAllowedToRead.mockReturnValue(true);
       });
 
       test.each`
@@ -137,7 +150,9 @@ describe('loginRequired', () => {
 
           const result = loginRequired(req, res, next);
 
-          expect(isGuestAllowedToReadSpy).not.toHaveBeenCalled();
+          expect(
+            crowiMock.aclService.isGuestAllowedToRead,
+          ).not.toHaveBeenCalled();
           expect(next).not.toHaveBeenCalled();
           expect(fallbackMock).not.toHaveBeenCalled();
           expect(res.sendStatus).not.toHaveBeenCalled();
@@ -151,7 +166,9 @@ describe('loginRequired', () => {
       test('pass guest user', () => {
         const result = loginRequired(req, res, next);
 
-        expect(isGuestAllowedToReadSpy).toHaveBeenCalledTimes(1);
+        expect(crowiMock.aclService.isGuestAllowedToRead).toHaveBeenCalledTimes(
+          1,
+        );
         expect(fallbackMock).not.toHaveBeenCalled();
         expect(res.sendStatus).not.toHaveBeenCalled();
         expect(next).toHaveBeenCalled();
@@ -164,7 +181,7 @@ describe('loginRequired', () => {
 
         const result = loginRequired(req, res, next);
 
-        expect(isGuestAllowedToReadSpy).toHaveBeenCalled();
+        expect(crowiMock.aclService.isGuestAllowedToRead).toHaveBeenCalled();
         expect(fallbackMock).not.toHaveBeenCalled();
         expect(res.sendStatus).not.toHaveBeenCalled();
         expect(next).toHaveBeenCalled();
@@ -175,27 +192,22 @@ describe('loginRequired', () => {
   });
 
   describe('strict mode', () => {
-    // setup req/res/next
-    const req = {
-      originalUrl: 'original url 1',
-      session: null,
-    };
-    const res = {
-      redirect: jest.fn().mockReturnValue('redirect'),
-      sendStatus: jest.fn().mockReturnValue('sendStatus'),
-    };
-    const next = jest.fn().mockReturnValue('next');
-
-    let isGuestAllowedToReadSpy;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let req: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let res: any;
+    let next: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
-      // reset session object
-      req.session = {};
-      // spy for AclService.isGuestAllowedToRead
-      isGuestAllowedToReadSpy = jest.spyOn(
-        crowi.aclService,
-        'isGuestAllowedToRead',
-      );
+      req = {
+        originalUrl: 'original url 1',
+        session: {},
+      };
+      res = {
+        redirect: vi.fn().mockReturnValue('redirect'),
+        sendStatus: vi.fn().mockReturnValue('sendStatus'),
+      };
+      next = vi.fn().mockReturnValue('next');
     });
 
     test("send status 403 when 'req.baseUrl' starts with '_api'", () => {
@@ -203,7 +215,7 @@ describe('loginRequired', () => {
 
       const result = loginRequiredStrictly(req, res, next);
 
-      expect(isGuestAllowedToReadSpy).not.toHaveBeenCalled();
+      expect(crowiMock.aclService.isGuestAllowedToRead).not.toHaveBeenCalled();
       expect(next).not.toHaveBeenCalled();
       expect(fallbackMock).not.toHaveBeenCalled();
       expect(res.redirect).not.toHaveBeenCalled();
@@ -217,7 +229,7 @@ describe('loginRequired', () => {
 
       const result = loginRequiredStrictly(req, res, next);
 
-      expect(isGuestAllowedToReadSpy).not.toHaveBeenCalled();
+      expect(crowiMock.aclService.isGuestAllowedToRead).not.toHaveBeenCalled();
       expect(next).not.toHaveBeenCalled();
       expect(fallbackMock).not.toHaveBeenCalled();
       expect(res.sendStatus).not.toHaveBeenCalled();
@@ -235,7 +247,7 @@ describe('loginRequired', () => {
 
       const result = loginRequiredStrictly(req, res, next);
 
-      expect(isGuestAllowedToReadSpy).not.toHaveBeenCalled();
+      expect(crowiMock.aclService.isGuestAllowedToRead).not.toHaveBeenCalled();
       expect(fallbackMock).not.toHaveBeenCalled();
       expect(res.sendStatus).not.toHaveBeenCalled();
       expect(res.redirect).not.toHaveBeenCalled();
@@ -259,7 +271,9 @@ describe('loginRequired', () => {
 
         const result = loginRequiredStrictly(req, res, next);
 
-        expect(isGuestAllowedToReadSpy).not.toHaveBeenCalled();
+        expect(
+          crowiMock.aclService.isGuestAllowedToRead,
+        ).not.toHaveBeenCalled();
         expect(next).not.toHaveBeenCalled();
         expect(fallbackMock).not.toHaveBeenCalled();
         expect(res.sendStatus).not.toHaveBeenCalled();
@@ -279,7 +293,7 @@ describe('loginRequired', () => {
 
       const result = loginRequiredStrictly(req, res, next);
 
-      expect(isGuestAllowedToReadSpy).not.toHaveBeenCalled();
+      expect(crowiMock.aclService.isGuestAllowedToRead).not.toHaveBeenCalled();
       expect(next).not.toHaveBeenCalled();
       expect(fallbackMock).not.toHaveBeenCalled();
       expect(res.sendStatus).not.toHaveBeenCalled();
@@ -291,27 +305,22 @@ describe('loginRequired', () => {
   });
 
   describe('specified fallback', () => {
-    // setup req/res/next
-    const req = {
-      originalUrl: 'original url 1',
-      session: null,
-    };
-    const res = {
-      redirect: jest.fn().mockReturnValue('redirect'),
-      sendStatus: jest.fn().mockReturnValue('sendStatus'),
-    };
-    const next = jest.fn().mockReturnValue('next');
-
-    let isGuestAllowedToReadSpy;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let req: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let res: any;
+    let next: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
-      // reset session object
-      req.session = {};
-      // spy for AclService.isGuestAllowedToRead
-      isGuestAllowedToReadSpy = jest.spyOn(
-        crowi.aclService,
-        'isGuestAllowedToRead',
-      );
+      req = {
+        originalUrl: 'original url 1',
+        session: {},
+      };
+      res = {
+        redirect: vi.fn().mockReturnValue('redirect'),
+        sendStatus: vi.fn().mockReturnValue('sendStatus'),
+      };
+      next = vi.fn().mockReturnValue('next');
     });
 
     test("invoke fallback when 'req.path' starts with '_api'", () => {
@@ -319,7 +328,7 @@ describe('loginRequired', () => {
 
       const result = loginRequiredWithFallback(req, res, next);
 
-      expect(isGuestAllowedToReadSpy).not.toHaveBeenCalled();
+      expect(crowiMock.aclService.isGuestAllowedToRead).not.toHaveBeenCalled();
       expect(next).not.toHaveBeenCalled();
       expect(res.redirect).not.toHaveBeenCalled();
       expect(res.sendStatus).not.toHaveBeenCalled();
@@ -333,7 +342,7 @@ describe('loginRequired', () => {
 
       const result = loginRequiredWithFallback(req, res, next);
 
-      expect(isGuestAllowedToReadSpy).not.toHaveBeenCalled();
+      expect(crowiMock.aclService.isGuestAllowedToRead).not.toHaveBeenCalled();
       expect(next).not.toHaveBeenCalled();
       expect(res.sendStatus).not.toHaveBeenCalled();
       expect(res.redirect).not.toHaveBeenCalled();
