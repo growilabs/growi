@@ -10,6 +10,9 @@ import type {
   ISelectableAndIndeterminatable,
 } from '~/client/interfaces/selectable-all';
 import type { IFormattedSearchResult } from '~/interfaces/search';
+import type { RendererConfig } from '~/interfaces/services/renderer';
+import type { ServerConfigurationProps } from '~/pages/_search/types';
+import { useHydrateServerConfigurationAtoms } from '~/pages/_search/use-hydrate-server-configurations';
 import { useSearchKeyword, useSetSearchKeyword } from '~/states/search';
 import {
   isHidingUserPagesAtom,
@@ -42,6 +45,11 @@ type SearchResultListHeadProps = {
   searchResult: IFormattedSearchResult;
   pagingSize: number;
   onPagingSizeChanged: (size: number) => void;
+};
+
+type SearchPageProps = {
+  serverConfig: ServerConfigurationProps['serverConfig'];
+  rendererConfig: RendererConfig;
 };
 
 const SearchResultListHead = React.memo(
@@ -102,9 +110,10 @@ const SearchResultListHead = React.memo(
 
 SearchResultListHead.displayName = 'SearchResultListHead';
 
-export const SearchPage = (): JSX.Element => {
+export const SearchPage = (props: SearchPageProps): JSX.Element => {
   const { t } = useTranslation();
   const showPageLimitationL = useAtomValue(showPageLimitationLAtom);
+  useHydrateServerConfigurationAtoms(props.serverConfig, props.rendererConfig);
 
   const keyword = useSearchKeyword();
   const setSearchKeyword = useSetSearchKeyword();
