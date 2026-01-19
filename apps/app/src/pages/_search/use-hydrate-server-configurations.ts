@@ -1,5 +1,3 @@
-import { useEffect } from 'react';
-import { useSetAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 
 import type { RendererConfig } from '~/interfaces/services/renderer';
@@ -31,12 +29,4 @@ export const useHydrateServerConfigurationAtoms = (
           [isHidingUserPagesAtom, serverConfig.isHidingUserPages],
         ],
   );
-
-  const setIsHidingUserPages = useSetAtom(isHidingUserPagesAtom);
-
-  useEffect(() => {
-    if (serverConfig?.isHidingUserPages !== undefined) {
-      setIsHidingUserPages(serverConfig.isHidingUserPages);
-    }
-  }, [serverConfig?.isHidingUserPages, setIsHidingUserPages]);
 };
