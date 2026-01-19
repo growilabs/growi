@@ -1,11 +1,16 @@
 import ldap, { type Client } from 'ldapjs';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
-import { LdapUserGroupSyncService } from '../../../src/features/external-user-group/server/service/ldap-user-group-sync';
-import type Crowi from '../../../src/server/crowi';
-import { configManager } from '../../../src/server/service/config-manager';
-import { ldapService } from '../../../src/server/service/ldap';
-import PassportService from '../../../src/server/service/passport';
-import { getInstance } from '../setup-crowi';
+import { getInstance } from '^/test-with-vite/setup/crowi';
+
+import type Crowi from '~/server/crowi';
+import { configManager } from '~/server/service/config-manager';
+import { ldapService } from '~/server/service/ldap';
+import PassportService from '~/server/service/passport';
+import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
+
+import { LdapUserGroupSyncService } from './ldap-user-group-sync';
 
 describe('LdapUserGroupSyncService.generateExternalUserGroupTrees', () => {
   let crowi: Crowi;
@@ -23,10 +28,10 @@ describe('LdapUserGroupSyncService.generateExternalUserGroupTrees', () => {
       'ldap://openldap:1389/dc=example,dc=org',
   };
 
-  jest.mock('../../../src/server/service/ldap');
-  const mockBind = jest.spyOn(ldapService, 'bind');
-  const mockLdapSearch = jest.spyOn(ldapService, 'search');
-  const mockLdapCreateClient = jest.spyOn(ldap, 'createClient');
+  const mockBind = vi.spyOn(ldapService, 'bind');
+  const mockSearchGroupDir = vi.spyOn(ldapService, 'searchGroupDir');
+  const mockSearch = vi.spyOn(ldapService, 'search');
+  const mockLdapCreateClient = vi.spyOn(ldap, 'createClient');
 
   beforeAll(async () => {
     crowi = await getInstance();
@@ -42,77 +47,79 @@ describe('LdapUserGroupSyncService.generateExternalUserGroupTrees', () => {
     const passportService = new PassportService(crowi);
     ldapUserGroupSyncService = new LdapUserGroupSyncService(
       passportService,
-      null,
+      mock<S2sMessagingService>(),
       null,
     );
   });
 
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe('When there is no circular reference in group tree', () => {
     it('creates ExternalUserGroupTrees', async () => {
-      // mock search on LDAP server
-      mockLdapSearch.mockImplementation((filter, base) => {
-        if (base === 'ou=groups,dc=example,dc=org') {
-          // search groups
-          return Promise.resolve([
+      // mock searchGroupDir for group entries
+      mockSearchGroupDir.mockResolvedValue([
+        {
+          objectName: 'cn=childGroup,ou=groups,dc=example,dc=org',
+          attributes: [
+            { type: 'cn', values: ['childGroup'] },
+            { type: 'description', values: ['this is a child group'] },
             {
-              objectName: 'cn=childGroup,ou=groups,dc=example,dc=org',
-              attributes: [
-                { type: 'cn', values: ['childGroup'] },
-                { type: 'description', values: ['this is a child group'] },
-                {
-                  type: 'member',
-                  values: ['cn=childGroupUser,ou=users,dc=example,dc=org'],
-                },
+              type: 'member',
+              values: ['cn=childGroupUser,ou=users,dc=example,dc=org'],
+            },
+          ],
+        },
+        {
+          objectName: 'cn=parentGroup,ou=groups,dc=example,dc=org',
+          attributes: [
+            { type: 'cn', values: ['parentGroup'] },
+            { type: 'description', values: ['this is a parent group'] },
+            {
+              type: 'member',
+              values: [
+                'cn=childGroup,ou=groups,dc=example,dc=org',
+                'cn=parentGroupUser,ou=users,dc=example,dc=org',
               ],
             },
+          ],
+        },
+        // root node
+        {
+          objectName: 'cn=grandParentGroup,ou=groups,dc=example,dc=org',
+          attributes: [
+            { type: 'cn', values: ['grandParentGroup'] },
             {
-              objectName: 'cn=parentGroup,ou=groups,dc=example,dc=org',
-              attributes: [
-                { type: 'cn', values: ['parentGroup'] },
-                { type: 'description', values: ['this is a parent group'] },
-                {
-                  type: 'member',
-                  values: [
-                    'cn=childGroup,ou=groups,dc=example,dc=org',
-                    'cn=parentGroupUser,ou=users,dc=example,dc=org',
-                  ],
-                },
+              type: 'description',
+              values: ['this is a grand parent group'],
+            },
+            {
+              type: 'member',
+              values: [
+                'cn=parentGroup,ou=groups,dc=example,dc=org',
+                'cn=grandParentGroupUser,ou=users,dc=example,dc=org',
               ],
             },
-            // root node
+          ],
+        },
+        // another root node
+        {
+          objectName: 'cn=rootGroup,ou=groups,dc=example,dc=org',
+          attributes: [
+            { type: 'cn', values: ['rootGroup'] },
+            { type: 'description', values: ['this is a root group'] },
             {
-              objectName: 'cn=grandParentGroup,ou=groups,dc=example,dc=org',
-              attributes: [
-                { type: 'cn', values: ['grandParentGroup'] },
-                {
-                  type: 'description',
-                  values: ['this is a grand parent group'],
-                },
-                {
-                  type: 'member',
-                  values: [
-                    'cn=parentGroup,ou=groups,dc=example,dc=org',
-                    'cn=grandParentGroupUser,ou=users,dc=example,dc=org',
-                  ],
-                },
-              ],
+              type: 'member',
+              values: ['cn=rootGroupUser,ou=users,dc=example,dc=org'],
             },
-            // another root node
-            {
-              objectName: 'cn=rootGroup,ou=groups,dc=example,dc=org',
-              attributes: [
-                { type: 'cn', values: ['rootGroup'] },
-                { type: 'description', values: ['this is a root group'] },
-                {
-                  type: 'member',
-                  values: ['cn=rootGroupUser,ou=users,dc=example,dc=org'],
-                },
-              ],
-            },
-          ]);
-        }
+          ],
+        },
+      ]);
+
+      // mock search for user lookups
+      mockSearch.mockImplementation((_filter, base) => {
         if (base === 'cn=childGroupUser,ou=users,dc=example,dc=org') {
-          // search childGroupUser
           return Promise.resolve([
             {
               objectName: 'cn=childGroupUser,ou=users,dc=example,dc=org',
@@ -124,7 +131,6 @@ describe('LdapUserGroupSyncService.generateExternalUserGroupTrees', () => {
             },
           ]);
         }
-        // search parentGroupUser
         if (base === 'cn=parentGroupUser,ou=users,dc=example,dc=org') {
           return Promise.resolve([
             {
@@ -137,7 +143,6 @@ describe('LdapUserGroupSyncService.generateExternalUserGroupTrees', () => {
             },
           ]);
         }
-        // search grandParentGroupUser
         if (base === 'cn=grandParentGroupUser,ou=users,dc=example,dc=org') {
           return Promise.resolve([
             {
@@ -150,7 +155,6 @@ describe('LdapUserGroupSyncService.generateExternalUserGroupTrees', () => {
             },
           ]);
         }
-        // search rootGroupUser
         if (base === 'cn=rootGroupUser,ou=users,dc=example,dc=org') {
           return Promise.resolve([
             {
@@ -243,52 +247,46 @@ describe('LdapUserGroupSyncService.generateExternalUserGroupTrees', () => {
 
   describe('When there is a circular reference in group tree', () => {
     it('rejects creating ExternalUserGroupTrees', async () => {
-      // mock search on LDAP server
-      mockLdapSearch.mockImplementation((filter, base) => {
-        if (base === 'ou=groups,dc=example,dc=org') {
-          // search groups
-          return Promise.resolve([
-            // childGroup and parentGroup have circular reference
+      // mock searchGroupDir for group entries with circular reference
+      mockSearchGroupDir.mockResolvedValue([
+        // childGroup and parentGroup have circular reference
+        {
+          objectName: 'cn=childGroup,ou=groups,dc=example,dc=org',
+          attributes: [
+            { type: 'cn', values: ['childGroup'] },
+            { type: 'description', values: ['this is a child group'] },
             {
-              objectName: 'cn=childGroup,ou=groups,dc=example,dc=org',
-              attributes: [
-                { type: 'cn', values: ['childGroup'] },
-                { type: 'description', values: ['this is a child group'] },
-                {
-                  type: 'member',
-                  values: ['cn=parentGroup,ou=groups,dc=example,dc=org'],
-                },
-              ],
+              type: 'member',
+              values: ['cn=parentGroup,ou=groups,dc=example,dc=org'],
+            },
+          ],
+        },
+        {
+          objectName: 'cn=parentGroup,ou=groups,dc=example,dc=org',
+          attributes: [
+            { type: 'cn', values: ['parentGroup'] },
+            { type: 'description', values: ['this is a parent group'] },
+            {
+              type: 'member',
+              values: ['cn=childGroup,ou=groups,dc=example,dc=org'],
+            },
+          ],
+        },
+        {
+          objectName: 'cn=grandParentGroup,ou=groups,dc=example,dc=org',
+          attributes: [
+            { type: 'cn', values: ['grandParentGroup'] },
+            {
+              type: 'description',
+              values: ['this is a grand parent group'],
             },
             {
-              objectName: 'cn=parentGroup,ou=groups,dc=example,dc=org',
-              attributes: [
-                { type: 'cn', values: ['parentGroup'] },
-                { type: 'description', values: ['this is a parent group'] },
-                {
-                  type: 'member',
-                  values: ['cn=childGroup,ou=groups,dc=example,dc=org'],
-                },
-              ],
+              type: 'member',
+              values: ['cn=parentGroup,ou=groups,dc=example,dc=org'],
             },
-            {
-              objectName: 'cn=grandParentGroup,ou=groups,dc=example,dc=org',
-              attributes: [
-                { type: 'cn', values: ['grandParentGroup'] },
-                {
-                  type: 'description',
-                  values: ['this is a grand parent group'],
-                },
-                {
-                  type: 'member',
-                  values: ['cn=parentGroup,ou=groups,dc=example,dc=org'],
-                },
-              ],
-            },
-          ]);
-        }
-        return Promise.reject(new Error('not found'));
-      });
+          ],
+        },
+      ]);
 
       await expect(
         ldapUserGroupSyncService?.generateExternalUserGroupTrees(),
