@@ -47,11 +47,6 @@ type SearchResultListHeadProps = {
   onPagingSizeChanged: (size: number) => void;
 };
 
-type SearchPageProps = {
-  serverConfig: ServerConfigurationProps['serverConfig'];
-  rendererConfig: RendererConfig;
-};
-
 const SearchResultListHead = React.memo(
   (props: SearchResultListHeadProps): JSX.Element => {
     const { t } = useTranslation();
@@ -110,10 +105,9 @@ const SearchResultListHead = React.memo(
 
 SearchResultListHead.displayName = 'SearchResultListHead';
 
-export const SearchPage = (props: SearchPageProps): JSX.Element => {
+export const SearchPage = (): JSX.Element => {
   const { t } = useTranslation();
   const showPageLimitationL = useAtomValue(showPageLimitationLAtom);
-  useHydrateServerConfigurationAtoms(props.serverConfig, props.rendererConfig);
 
   const keyword = useSearchKeyword();
   const setSearchKeyword = useSetSearchKeyword();
