@@ -9,7 +9,6 @@ import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
 import { UserStatus } from './conts';
 
 describe('User', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let User: any;
   let adminusertestToBeRemovedId: mongoose.Types.ObjectId;
 
@@ -34,7 +33,6 @@ describe('User', () => {
     // Initialize User model with mocked Crowi using dynamic import
     const userModule = await import('./index');
     const userFactory = userModule.default;
-    // @ts-expect-error - mock has partial properties
     User = userFactory(crowiMock);
 
     await User.insertMany([
