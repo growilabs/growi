@@ -23,11 +23,30 @@ export default defineWorkspace([
 
   // integration test
   mergeConfig(configShared, {
+    resolve: {
+      // Prefer require (CJS) for server-side packages
+      conditions: ['require', 'node', 'default'],
+    },
     test: {
       name: 'app-integration',
       environment: 'node',
       include: ['**/*.integ.ts'],
       setupFiles: ['./test-with-vite/setup/mongoms.ts'],
+      deps: {
+        // Transform inline modules (allows ESM in require context)
+        interopDefault: true,
+      },
+      server: {
+        deps: {
+          // Inline workspace packages that use CJS format
+          inline: [
+            '@growi/remark-attachment-refs',
+            '@growi/remark-drawio',
+            '@growi/remark-lsx',
+            /src\/server\/events/,
+          ],
+        },
+      },
     },
   }),
 

@@ -1,4 +1,4 @@
-import type { IUserHasId } from '@growi/core';
+import type { IPage, IUserHasId } from '@growi/core';
 import mongoose, { Types } from 'mongoose';
 import {
   afterEach,
@@ -11,7 +11,11 @@ import {
 } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
+import { getInstance } from '^/test-with-vite/setup/crowi';
+
+import type Crowi from '~/server/crowi';
 import ExternalAccount from '~/server/models/external-account';
+import type { PageModel } from '~/server/models/page';
 import { configManager } from '~/server/service/config-manager';
 import instanciateExternalAccountService from '~/server/service/external-account';
 import type PassportService from '~/server/service/passport';
@@ -215,9 +219,17 @@ const checkSync = async (autoGenerateUserOnGroupSync = true) => {
       'previouslySyncedGroupUser',
     );
 
-    // Note: User page creation is handled by crowi.events.user.onActivated
-    // which is mocked in this test. The actual page creation is tested
-    // in integration tests with real Crowi instance.
+    const userPages = await mongoose.model<IPage>('Page').find({
+      path: {
+        $in: [
+          '/user/childGroupUser',
+          '/user/parentGroupUser',
+          '/user/grandParentGroupUser',
+          '/user/previouslySyncedGroupUser',
+        ],
+      },
+    });
+    expect(userPages.length).toBe(4);
   } else {
     expect(grandParentGroupRelations.length).toBe(0);
     expect(parentGroupRelations.length).toBe(0);
@@ -228,6 +240,10 @@ const checkSync = async (autoGenerateUserOnGroupSync = true) => {
 
 describe('ExternalUserGroupSyncService.syncExternalUserGroups', () => {
   let testService: TestExternalUserGroupSyncService;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let Page: PageModel;
+  let rootPageId: Types.ObjectId;
+  let userPageId: Types.ObjectId;
 
   beforeAll(async () => {
     // Initialize configManager
@@ -235,30 +251,14 @@ describe('ExternalUserGroupSyncService.syncExternalUserGroups', () => {
     configManager.setS2sMessagingService(s2sMessagingServiceMock);
     await configManager.loadConfigs();
 
-    // Create mock Crowi with events for User and Page model initialization
-    const crowiMockForModels = {
-      events: {
-        user: {
-          on: vi.fn(),
-          emit: vi.fn(),
-          onActivated: vi.fn(),
-        },
-        page: {
-          on: vi.fn(),
-          emit: vi.fn(),
-          onCreate: vi.fn(),
-          onUpdate: vi.fn(),
-          onCreateMany: vi.fn(),
-        },
-      },
-    };
+    const crowi: Crowi = await getInstance();
 
     // Initialize models with crowi mock
     const pageModule = await import('~/server/models/page');
-    pageModule.default(crowiMockForModels);
+    Page = pageModule.default(crowi);
 
     const userModule = await import('~/server/models/user/index');
-    userModule.default(crowiMockForModels);
+    userModule.default(crowi);
 
     // Initialize services with mocked PassportService
     await configManager.updateConfig('app:isV5Compatible', true);
@@ -269,6 +269,40 @@ describe('ExternalUserGroupSyncService.syncExternalUserGroups', () => {
       isSameEmailTreatedAsIdenticalUser: vi.fn().mockReturnValue(false),
     });
     instanciateExternalAccountService(passportServiceMock);
+
+    // Create root page and /user page for UserEvent.onActivated to work
+    rootPageId = new Types.ObjectId();
+    userPageId = new Types.ObjectId();
+
+    // Check if root page already exists
+    const existingRootPage = await Page.findOne({ path: '/' });
+    if (existingRootPage == null) {
+      await Page.insertMany([
+        {
+          _id: rootPageId,
+          path: '/',
+          grant: Page.GRANT_PUBLIC,
+        },
+      ]);
+    } else {
+      rootPageId = existingRootPage._id;
+    }
+
+    // Check if /user page already exists
+    const existingUserPage = await Page.findOne({ path: '/user' });
+    if (existingUserPage == null) {
+      await Page.insertMany([
+        {
+          _id: userPageId,
+          path: '/user',
+          grant: Page.GRANT_PUBLIC,
+          parent: rootPageId,
+          isEmpty: true,
+        },
+      ]);
+    } else {
+      userPageId = existingUserPage._id;
+    }
   });
 
   beforeEach(async () => {
