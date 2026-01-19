@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
@@ -14,13 +15,11 @@ import { certifyAiService } from './middlewares/certify-ai-service';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:get-ai-assistants');
 
-type GetAiAssistantsFactory = (crowi: Crowi) => RequestHandler[];
-
-type Req = Request<undefined, Response, undefined> & {
-  user: IUserHasId;
+type Req = Request<Record<string, string>, ApiV3Response, undefined> & {
+  user?: IUserHasId;
 };
 
-export const getAiAssistantsFactory: GetAiAssistantsFactory = (crowi) => {
+export const getAiAssistantsFactory = (crowi: Crowi): RequestHandler[] => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   return [
@@ -30,6 +29,12 @@ export const getAiAssistantsFactory: GetAiAssistantsFactory = (crowi) => {
     loginRequiredStrictly,
     certifyAiService,
     async (req: Req, res: ApiV3Response) => {
+      const { user } = req;
+      assert(
+        user != null,
+        'user is required (ensured by loginRequiredStrictly middleware)',
+      );
+
       const openaiService = getOpenaiService();
       if (openaiService == null) {
         return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
@@ -37,7 +42,7 @@ export const getAiAssistantsFactory: GetAiAssistantsFactory = (crowi) => {
 
       try {
         const accessibleAiAssistants =
-          await openaiService.getAccessibleAiAssistants(req.user);
+          await openaiService.getAccessibleAiAssistants(user);
 
         return res.apiv3({ accessibleAiAssistants });
       } catch (err) {

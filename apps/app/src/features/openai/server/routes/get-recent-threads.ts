@@ -1,7 +1,8 @@
+import assert from 'node:assert';
 import { type IUserHasId, SCOPE } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
-import { query, type ValidationChain } from 'express-validator';
+import { query } from 'express-validator';
 import type { PaginateResult } from 'mongoose';
 
 import type Crowi from '~/server/crowi';
@@ -19,21 +20,24 @@ import { certifyAiService } from './middlewares/certify-ai-service';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:get-recent-threads');
 
-type GetRecentThreadsFactory = (crowi: Crowi) => RequestHandler[];
-
 type ReqQuery = {
   page?: number;
   limit?: number;
 };
 
-type Req = Request<undefined, Response, undefined, ReqQuery> & {
-  user: IUserHasId;
+type Req = Request<
+  Record<string, string>,
+  ApiV3Response,
+  undefined,
+  ReqQuery
+> & {
+  user?: IUserHasId;
 };
 
-export const getRecentThreadsFactory: GetRecentThreadsFactory = (crowi) => {
+export const getRecentThreadsFactory = (crowi: Crowi): RequestHandler[] => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
-  const validator: ValidationChain[] = [
+  const validator = [
     query('page')
       .optional()
       .isInt()
@@ -52,9 +56,15 @@ export const getRecentThreadsFactory: GetRecentThreadsFactory = (crowi) => {
     }),
     loginRequiredStrictly,
     certifyAiService,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
+      const { user } = req;
+      assert(
+        user != null,
+        'user is required (ensured by loginRequiredStrictly middleware)',
+      );
+
       const openaiService = getOpenaiService();
       if (openaiService == null) {
         return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
@@ -64,7 +74,7 @@ export const getRecentThreadsFactory: GetRecentThreadsFactory = (crowi) => {
         const paginateResult: PaginateResult<ThreadRelationDocument> =
           await ThreadRelationModel.paginate(
             {
-              userId: req.user._id,
+              userId: user._id,
               type: ThreadType.KNOWLEDGE,
               isActive: true,
             },

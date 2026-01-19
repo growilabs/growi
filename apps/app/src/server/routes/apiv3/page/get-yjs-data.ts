@@ -2,7 +2,6 @@ import type { IPage, IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
-import type { ValidationChain } from 'express-validator';
 import { param } from 'express-validator';
 import mongoose from 'mongoose';
 
@@ -17,20 +16,18 @@ import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:page:get-yjs-data');
 
-type GetYjsDataHandlerFactory = (crowi: Crowi) => RequestHandler[];
-
 type ReqParams = {
   pageId: string;
 };
 interface Req extends Request<ReqParams, ApiV3Response> {
-  user: IUserHasId;
+  user?: IUserHasId;
 }
-export const getYjsDataHandlerFactory: GetYjsDataHandlerFactory = (crowi) => {
+export const getYjsDataHandlerFactory = (crowi: Crowi): RequestHandler[] => {
   const Page = mongoose.model<IPage, PageModel>('Page');
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   // define validators for req.params
-  const validator: ValidationChain[] = [
+  const validator = [
     param('pageId')
       .isMongoId()
       .withMessage('The param "pageId" must be specified'),
@@ -39,7 +36,7 @@ export const getYjsDataHandlerFactory: GetYjsDataHandlerFactory = (crowi) => {
   return [
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
     loginRequiredStrictly,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
       const { pageId } = req.params;

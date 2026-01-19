@@ -1,7 +1,7 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
-import { body, param, type ValidationChain } from 'express-validator';
+import { body, param } from 'express-validator';
 import { isHttpError } from 'http-errors';
 
 import type Crowi from '~/server/crowi';
@@ -20,8 +20,6 @@ const logger = loggerFactory(
   'growi:routes:apiv3:openai:set-default-ai-assistants',
 );
 
-type setDefaultAiAssistantFactory = (crowi: Crowi) => RequestHandler[];
-
 type ReqParams = {
   id: string;
 };
@@ -30,15 +28,15 @@ type ReqBody = {
   isDefault: boolean;
 };
 
-type Req = Request<ReqParams, Response, ReqBody>;
+type Req = Request<ReqParams, ApiV3Response, ReqBody>;
 
-export const setDefaultAiAssistantFactory: setDefaultAiAssistantFactory = (
-  crowi,
-) => {
+export const setDefaultAiAssistantFactory = (
+  crowi: Crowi,
+): RequestHandler[] => {
   const adminRequired = adminRequiredFactory(crowi);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
-  const validator: ValidationChain[] = [
+  const validator = [
     param('id').isMongoId().withMessage('aiAssistant id is required'),
     body('isDefault').isBoolean().withMessage('isDefault is required'),
   ];
@@ -50,7 +48,7 @@ export const setDefaultAiAssistantFactory: setDefaultAiAssistantFactory = (
     loginRequiredStrictly,
     adminRequired,
     certifyAiService,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
       const openaiService = getOpenaiService();

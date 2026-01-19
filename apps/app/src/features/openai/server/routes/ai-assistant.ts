@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
@@ -17,15 +18,13 @@ import { upsertAiAssistantValidator } from './middlewares/upsert-ai-assistant-va
 
 const logger = loggerFactory('growi:routes:apiv3:openai:create-ai-assistant');
 
-type CreateAssistantFactory = (crowi: Crowi) => RequestHandler[];
-
 type ReqBody = UpsertAiAssistantData;
 
-type Req = Request<undefined, Response, ReqBody> & {
-  user: IUserHasId;
+type Req = Request<Record<string, string>, ApiV3Response, ReqBody> & {
+  user?: IUserHasId;
 };
 
-export const createAiAssistantFactory: CreateAssistantFactory = (crowi) => {
+export const createAiAssistantFactory = (crowi: Crowi): RequestHandler[] => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   return [
@@ -34,20 +33,26 @@ export const createAiAssistantFactory: CreateAssistantFactory = (crowi) => {
     }),
     loginRequiredStrictly,
     certifyAiService,
-    upsertAiAssistantValidator,
+    ...upsertAiAssistantValidator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
+      const { user } = req;
+      assert(
+        user != null,
+        'user is required (ensured by loginRequiredStrictly middleware)',
+      );
+
       const openaiService = getOpenaiService();
       if (openaiService == null) {
         return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
       }
 
       try {
-        const aiAssistantData = { ...req.body, owner: req.user._id };
+        const aiAssistantData = { ...req.body, owner: user._id };
 
         const isLearnablePageLimitExceeded =
           await openaiService.isLearnablePageLimitExceeded(
-            req.user,
+            user,
             aiAssistantData.pagePathPatterns,
           );
         if (isLearnablePageLimitExceeded) {
@@ -59,7 +64,7 @@ export const createAiAssistantFactory: CreateAssistantFactory = (crowi) => {
 
         const aiAssistant = await openaiService.createAiAssistant(
           req.body,
-          req.user,
+          user,
         );
 
         return res.apiv3({ aiAssistant });

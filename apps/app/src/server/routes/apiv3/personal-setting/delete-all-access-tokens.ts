@@ -19,41 +19,40 @@ const logger = loggerFactory(
 );
 
 interface DeleteAllAccessTokensRequest
-  extends Request<undefined, ApiV3Response, undefined> {
+  extends Request<Record<string, string>, ApiV3Response, undefined> {
   user: IUserHasId;
 }
 
-type DeleteAllAccessTokensHandlersFactory = (crowi: Crowi) => RequestHandler[];
+export const deleteAllAccessTokensHandlersFactory = (
+  crowi: Crowi,
+): RequestHandler[] => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const addActivity = generateAddActivityMiddleware();
+  const activityEvent = crowi.events.activity;
 
-export const deleteAllAccessTokensHandlersFactory: DeleteAllAccessTokensHandlersFactory =
-  (crowi) => {
-    const loginRequiredStrictly = loginRequiredFactory(crowi);
-    const addActivity = generateAddActivityMiddleware();
-    const activityEvent = crowi.events.activity;
+  return [
+    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.API.ACCESS_TOKEN]),
+    loginRequiredStrictly,
+    excludeReadOnlyUser,
+    addActivity,
+    async (req: DeleteAllAccessTokensRequest, res: ApiV3Response) => {
+      const { user } = req;
 
-    return [
-      accessTokenParser([SCOPE.WRITE.USER_SETTINGS.API.ACCESS_TOKEN]),
-      loginRequiredStrictly,
-      excludeReadOnlyUser,
-      addActivity,
-      async (req: DeleteAllAccessTokensRequest, res: ApiV3Response) => {
-        const { user } = req;
+      try {
+        await AccessToken.deleteAllTokensByUserId(user._id);
 
-        try {
-          await AccessToken.deleteAllTokensByUserId(user._id);
+        const parameters = {
+          action: SupportedAction.ACTION_USER_ACCESS_TOKEN_DELETE,
+        };
+        activityEvent.emit('update', res.locals.activity._id, parameters);
 
-          const parameters = {
-            action: SupportedAction.ACTION_USER_ACCESS_TOKEN_DELETE,
-          };
-          activityEvent.emit('update', res.locals.activity._id, parameters);
-
-          return res.apiv3({});
-        } catch (err) {
-          logger.error(err);
-          return res.apiv3Err(
-            new ErrorV3(err.toString(), 'delete-all-access-token-failed'),
-          );
-        }
-      },
-    ];
-  };
+        return res.apiv3({});
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err(
+          new ErrorV3(err.toString(), 'delete-all-access-token-failed'),
+        );
+      }
+    },
+  ];
+};

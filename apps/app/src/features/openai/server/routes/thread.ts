@@ -1,8 +1,8 @@
+import assert from 'node:assert';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
-import type { ValidationChain } from 'express-validator';
 import { body } from 'express-validator';
 
 import type Crowi from '~/server/crowi';
@@ -24,16 +24,18 @@ type ReqBody = {
   initialUserMessage?: string;
 };
 
-type CreateThreadReq = Request<undefined, ApiV3Response, ReqBody> & {
-  user: IUserHasId;
+type CreateThreadReq = Request<
+  Record<string, string>,
+  ApiV3Response,
+  ReqBody
+> & {
+  user?: IUserHasId;
 };
 
-type CreateThreadFactory = (crowi: Crowi) => RequestHandler[];
-
-export const createThreadHandlersFactory: CreateThreadFactory = (crowi) => {
+export const createThreadHandlersFactory = (crowi: Crowi): RequestHandler[] => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
-  const validator: ValidationChain[] = [
+  const validator = [
     body('type')
       .isIn(Object.values(ThreadType))
       .withMessage('type must be one of "editor" or "knowledge"'),
@@ -53,9 +55,15 @@ export const createThreadHandlersFactory: CreateThreadFactory = (crowi) => {
     }),
     loginRequiredStrictly,
     certifyAiService,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: CreateThreadReq, res: ApiV3Response) => {
+      const { user } = req;
+      assert(
+        user != null,
+        'user is required (ensured by loginRequiredStrictly middleware)',
+      );
+
       const openaiService = getOpenaiService();
       if (openaiService == null) {
         return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
@@ -67,7 +75,7 @@ export const createThreadHandlersFactory: CreateThreadFactory = (crowi) => {
 
       try {
         const thread = await openaiService.createThread(
-          req.user._id,
+          user._id,
           type,
           aiAssistantId,
           initialUserMessage,

@@ -1,8 +1,9 @@
+import assert from 'node:assert';
 import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
-import { param, type ValidationChain } from 'express-validator';
+import { param } from 'express-validator';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -16,34 +17,36 @@ import { certifyAiService } from './middlewares/certify-ai-service';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:get-threads');
 
-type GetThreadsFactory = (crowi: Crowi) => RequestHandler[];
-
-type ReqParams = {
-  aiAssistantId: string;
+type Req = Request<Record<string, string>, ApiV3Response, undefined> & {
+  user?: IUserHasId;
 };
 
-type Req = Request<ReqParams, Response, undefined> & {
-  user: IUserHasId;
-};
-
-export const getThreadsFactory: GetThreadsFactory = (crowi) => {
+export const getThreadsFactory = (crowi: Crowi): RequestHandler[] => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
-  const validator: ValidationChain[] = [
+  const validator = [
     param('aiAssistantId')
       .isMongoId()
       .withMessage('aiAssistantId must be string'),
   ];
 
   return [
+    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+    // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
     accessTokenParser([SCOPE.READ.FEATURES.AI_ASSISTANT], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
     certifyAiService,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
+      const { user } = req;
+      assert(
+        user != null,
+        'user is required (ensured by loginRequiredStrictly middleware)',
+      );
+
       const openaiService = getOpenaiService();
       if (openaiService == null) {
         return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
@@ -51,10 +54,14 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
 
       try {
         const { aiAssistantId } = req.params;
+        assert(
+          aiAssistantId != null,
+          'aiAssistantId is required (validated by express-validator)',
+        );
 
         const isAiAssistantUsable = await openaiService.isAiAssistantUsable(
           aiAssistantId,
-          req.user,
+          user,
         );
         if (!isAiAssistantUsable) {
           return res.apiv3Err(

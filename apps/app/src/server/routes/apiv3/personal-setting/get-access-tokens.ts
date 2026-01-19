@@ -18,15 +18,13 @@ const logger = loggerFactory(
 );
 
 interface GetAccessTokenRequest
-  extends Request<undefined, ApiV3Response, undefined> {
+  extends Request<Record<string, string>, ApiV3Response, undefined> {
   user: IUserHasId;
 }
 
-type GetAccessTokenHandlerFactory = (crowi: Crowi) => RequestHandler[];
-
-export const getAccessTokenHandlerFactory: GetAccessTokenHandlerFactory = (
-  crowi,
-) => {
+export const getAccessTokenHandlerFactory = (
+  crowi: Crowi,
+): RequestHandler[] => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
 

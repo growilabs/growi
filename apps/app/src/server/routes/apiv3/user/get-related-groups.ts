@@ -12,15 +12,13 @@ import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:user:get-related-groups');
 
-type GetRelatedGroupsHandlerFactory = (crowi: Crowi) => RequestHandler[];
-
 interface Req extends Request {
   user: IUserHasId;
 }
 
-export const getRelatedGroupsHandlerFactory: GetRelatedGroupsHandlerFactory = (
-  crowi,
-) => {
+export const getRelatedGroupsHandlerFactory = (
+  crowi: Crowi,
+): RequestHandler[] => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   return [

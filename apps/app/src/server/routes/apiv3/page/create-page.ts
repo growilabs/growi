@@ -11,7 +11,7 @@ import {
   attachTitleHeader,
   normalizePath,
 } from '@growi/core/dist/utils/path-utils';
-import type { Request, RequestHandler } from 'express';
+import type { Request } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
@@ -113,9 +113,7 @@ interface CreatePageRequest extends Request<undefined, ApiV3Response, ReqBody> {
   user: IUserHasId;
 }
 
-type CreatePageHandlersFactory = (crowi: Crowi) => RequestHandler[];
-
-export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
+export const createPageHandlersFactory = (crowi: Crowi) => {
   const Page = mongoose.model<IPage, PageModel>('Page');
   const User = mongoose.model<IUser, { isExistUserByUserPagePath: any }>(
     'User',
@@ -290,7 +288,7 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
     loginRequiredStrictly,
     excludeReadOnlyUser,
     addActivity,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: CreatePageRequest, res: ApiV3Response) => {
       const { body: bodyByParam, pageTags: tagsByParam } = req.body;
