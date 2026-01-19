@@ -2,6 +2,10 @@ import type { IPageInfoForListing, IUserHasId } from '@growi/core';
 import { getIdForRef, isIPageInfoForEntity } from '@growi/core';
 import { type IPageInfoForEmpty, SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import {
+  isUserPage,
+  isUsersTopPage,
+} from '@growi/core/dist/utils/page-path-utils';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { oneOf, query } from 'express-validator';
@@ -169,8 +173,9 @@ const routerFactory = (crowi: Crowi): Router => {
           );
 
         if (hideUserPages === true) {
-          const isUserPagePath = /^\/user(\/|$)/;
-          pages = pages.filter((page) => !isUserPagePath.test(page.path));
+          pages = pages.filter(
+            (page) => !isUserPage(page.path) && !isUsersTopPage(page.path),
+          );
         }
 
         return res.apiv3({ children: pages });
