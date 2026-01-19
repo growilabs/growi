@@ -94,4 +94,4 @@ class CommentService {
   };
 }
 
-module.exports = CommentService;
+export default CommentService;

@@ -209,4 +209,4 @@ class ActivityService {
   };
 }
 
-module.exports = ActivityService;
+export default ActivityService;

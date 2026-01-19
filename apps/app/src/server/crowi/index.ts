@@ -31,8 +31,10 @@ import httpErrorHandler from '../middlewares/http-error-handler';
 import loginRequiredFactory from '../middlewares/login-required';
 import type { AclService } from '../service/acl';
 import { aclService as aclServiceSingletonInstance } from '../service/acl';
+import ActivityService from '../service/activity';
 import AppService from '../service/app';
 import { AttachmentService } from '../service/attachment';
+import CommentService from '../service/comment';
 import { configManager as configManagerSingletonInstance } from '../service/config-manager';
 import type { ConfigManager } from '../service/config-manager/config-manager';
 import instanciateExportService from '../service/export';
@@ -44,6 +46,7 @@ import {
 } from '../service/g2g-transfer';
 import { GrowiBridgeService } from '../service/growi-bridge';
 import { initializeImportService } from '../service/import';
+import InAppNotificationService from '../service/in-app-notification';
 import { InstallerService } from '../service/installer';
 import { normalizeData } from '../service/normalize-data';
 import PageService from '../service/page';
@@ -54,6 +57,7 @@ import PassportService from '../service/passport';
 import SearchService from '../service/search';
 import { SlackIntegrationService } from '../service/slack-integration';
 import { SocketIoService } from '../service/socket-io';
+import SyncPageStatusService from '../service/system-events/sync-page-status';
 import UserGroupService from '../service/user-group';
 import { UserNotificationService } from '../service/user-notification';
 import { initializeYjsService } from '../service/yjs';
@@ -808,14 +812,12 @@ class Crowi {
   }
 
   async setupInAppNotificationService(): Promise<void> {
-    const InAppNotificationService = require('../service/in-app-notification');
     if (this.inAppNotificationService == null) {
       this.inAppNotificationService = new InAppNotificationService(this);
     }
   }
 
   async setupActivityService(): Promise<void> {
-    const ActivityService = require('../service/activity');
     if (this.activityService == null) {
       this.activityService = new ActivityService(this);
       await this.activityService.createTtlIndex();
@@ -823,14 +825,12 @@ class Crowi {
   }
 
   async setupCommentService(): Promise<void> {
-    const CommentService = require('../service/comment');
     if (this.commentService == null) {
       this.commentService = new CommentService(this);
     }
   }
 
   async setupSyncPageStatusService(): Promise<void> {
-    const SyncPageStatusService = require('../service/system-events/sync-page-status');
     if (this.syncPageStatusService == null) {
       this.syncPageStatusService = new SyncPageStatusService(
         this,
