@@ -658,8 +658,12 @@ class Crowi {
    * !! this must be at last because it includes '/*' route !!
    */
   async setupRoutesAtLast(): Promise<void> {
-    const routes = await import('../routes');
-    routes.default(this, this.express);
+    type RoutesSetup = (crowi: Crowi, app: Express) => void;
+    // CommonJS modules are always wrapped in { default } when dynamically imported
+    const { default: setupRoutes } = (await import('../routes')) as unknown as {
+      default: RoutesSetup;
+    };
+    setupRoutes(this, this.express);
   }
 
   /**
