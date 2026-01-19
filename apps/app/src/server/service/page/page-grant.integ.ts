@@ -1,20 +1,20 @@
 import { GroupType, type IPage, PageGrant } from '@growi/core';
 import mongoose from 'mongoose';
+import { beforeAll, describe, expect, it } from 'vitest';
 
-import { ExternalGroupProviderType } from '../../../src/features/external-user-group/interfaces/external-user-group';
+import { getInstance } from '^/test-with-vite/setup/crowi';
+
+import { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
 import ExternalUserGroup, {
   type ExternalUserGroupDocument,
-} from '../../../src/features/external-user-group/server/models/external-user-group';
-import ExternalUserGroupRelation from '../../../src/features/external-user-group/server/models/external-user-group-relation';
-import { UserGroupPageGrantStatus } from '../../../src/interfaces/page';
-import type Crowi from '../../../src/server/crowi';
-import type { PageDocument, PageModel } from '../../../src/server/models/page';
-import UserGroup, {
-  type UserGroupDocument,
-} from '../../../src/server/models/user-group';
-import UserGroupRelation from '../../../src/server/models/user-group-relation';
-import type { IPageGrantService } from '../../../src/server/service/page-grant';
-import { getInstance } from '../setup-crowi';
+} from '~/features/external-user-group/server/models/external-user-group';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
+import { UserGroupPageGrantStatus } from '~/interfaces/page';
+import type Crowi from '~/server/crowi';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import UserGroup, { type UserGroupDocument } from '~/server/models/user-group';
+import UserGroupRelation from '~/server/models/user-group-relation';
+import type { IPageGrantService } from '~/server/service/page-grant';
 
 /*
  * There are 3 grant types to test.
@@ -24,8 +24,8 @@ describe('PageGrantService', () => {
   /*
    * models
    */
-  // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
-  let User;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let User: any;
   let Page: PageModel;
 
   /*
@@ -34,10 +34,10 @@ describe('PageGrantService', () => {
   let crowi: Crowi;
   let pageGrantService: IPageGrantService;
 
-  // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
-  let user1;
-  // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
-  let user2;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let user1: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let user2: any;
 
   let groupParent: UserGroupDocument;
   let groupChild: UserGroupDocument;
@@ -88,8 +88,8 @@ describe('PageGrantService', () => {
   const pageE3User1Path = '/E3/User1';
 
   // getPageGroupGrantData test data
-  // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
-  let user3;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let user3: any;
   let groupGrantDataTestChildPagePath: string;
   let groupGrantDataTestParentUserGroupId: mongoose.Types.ObjectId;
   let groupGrantDataTestChildUserGroupId: mongoose.Types.ObjectId;
@@ -522,18 +522,33 @@ describe('PageGrantService', () => {
     User = mongoose.model('User');
     Page = mongoose.model<IPage, PageModel>('Page');
 
-    rootPage = (await Page.findOne({ path: '/' }))!;
+    // Ensure root page exists (required for page hierarchy)
+    rootPage = await Page.findOne({ path: '/' });
+    if (rootPage == null) {
+      const rootPageId = new mongoose.Types.ObjectId();
+      await Page.insertMany([
+        {
+          _id: rootPageId,
+          path: '/',
+          grant: Page.GRANT_PUBLIC,
+        },
+      ]);
+      rootPage = (await Page.findOne({ path: '/' }))!;
+    }
 
     await createDocumentsToTestIsGrantNormalized();
     await createDocumentsToTestGetPageGroupGrantData();
   });
 
   describe('Test isGrantNormalized method with shouldCheckDescendants false', () => {
-    test('Should return true when Ancestor: root, Target: public', async () => {
+    it('Should return true when Ancestor: root, Target: public', async () => {
       const targetPath = '/NEW';
       const grant = Page.GRANT_PUBLIC;
       const grantedUserIds = undefined;
-      const grantedGroupIds = [];
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
       const shouldCheckDescendants = false;
 
       const result = await pageGrantService.isGrantNormalized(
@@ -548,7 +563,7 @@ describe('PageGrantService', () => {
       expect(result).toBe(true);
     });
 
-    test('Should return true when Ancestor: root, Target: GroupParent', async () => {
+    it('Should return true when Ancestor: root, Target: GroupParent', async () => {
       const targetPath = '/NEW_GroupParent';
       const grant = Page.GRANT_USER_GROUP;
       const grantedUserIds = undefined;
@@ -570,11 +585,14 @@ describe('PageGrantService', () => {
       expect(result).toBe(true);
     });
 
-    test('Should return true when Ancestor: under-root public, Target: public', async () => {
+    it('Should return true when Ancestor: under-root public, Target: public', async () => {
       const targetPath = `${pageRootPublicPath}/NEW`;
       const grant = Page.GRANT_PUBLIC;
       const grantedUserIds = undefined;
-      const grantedGroupIds = [];
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
       const shouldCheckDescendants = false;
 
       const result = await pageGrantService.isGrantNormalized(
@@ -589,7 +607,7 @@ describe('PageGrantService', () => {
       expect(result).toBe(true);
     });
 
-    test('Should return true when Ancestor: under-root GroupParent, Target: GroupParent', async () => {
+    it('Should return true when Ancestor: under-root GroupParent, Target: GroupParent', async () => {
       const targetPath = `${pageRootGroupParentPath}/NEW`;
       const grant = Page.GRANT_USER_GROUP;
       const grantedUserIds = undefined;
@@ -611,11 +629,14 @@ describe('PageGrantService', () => {
       expect(result).toBe(true);
     });
 
-    test('Should return true when Ancestor: public, Target: public', async () => {
+    it('Should return true when Ancestor: public, Target: public', async () => {
       const targetPath = `${pageE1PublicPath}/NEW`;
       const grant = Page.GRANT_PUBLIC;
       const grantedUserIds = undefined;
-      const grantedGroupIds = [];
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
       const shouldCheckDescendants = false;
 
       const result = await pageGrantService.isGrantNormalized(
@@ -630,11 +651,14 @@ describe('PageGrantService', () => {
       expect(result).toBe(true);
     });
 
-    test('Should return true when Ancestor: owned by User1, Target: owned by User1', async () => {
+    it('Should return true when Ancestor: owned by User1, Target: owned by User1', async () => {
       const targetPath = `${pageE2User1Path}/NEW`;
       const grant = Page.GRANT_OWNER;
       const grantedUserIds = [user1._id];
-      const grantedGroupIds = [];
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
       const shouldCheckDescendants = false;
 
       const result = await pageGrantService.isGrantNormalized(
@@ -649,11 +673,14 @@ describe('PageGrantService', () => {
       expect(result).toBe(true);
     });
 
-    test('Should return false when Ancestor: owned by GroupParent, Target: public', async () => {
+    it('Should return false when Ancestor: owned by GroupParent, Target: public', async () => {
       const targetPath = `${pageE3GroupParentPath}/NEW`;
       const grant = Page.GRANT_PUBLIC;
       const grantedUserIds = undefined;
-      const grantedGroupIds = [];
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
       const shouldCheckDescendants = false;
 
       const result = await pageGrantService.isGrantNormalized(
@@ -668,7 +695,7 @@ describe('PageGrantService', () => {
       expect(result).toBe(false);
     });
 
-    test('Should return false when Ancestor: owned by GroupChild, Target: GroupParent', async () => {
+    it('Should return false when Ancestor: owned by GroupChild, Target: GroupParent', async () => {
       const targetPath = `${pageE3GroupChildPath}/NEW`;
       const grant = Page.GRANT_USER_GROUP;
       const grantedUserIds = undefined;
@@ -692,11 +719,14 @@ describe('PageGrantService', () => {
   });
 
   describe('Test isGrantNormalized method with shouldCheckDescendants true', () => {
-    test('Should return true when Target: public, Descendant: public', async () => {
+    it('Should return true when Target: public, Descendant: public', async () => {
       const targetPath = emptyPagePath1;
       const grant = Page.GRANT_PUBLIC;
       const grantedUserIds = undefined;
-      const grantedGroupIds = [];
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
       const shouldCheckDescendants = true;
 
       const result = await pageGrantService.isGrantNormalized(
@@ -711,11 +741,14 @@ describe('PageGrantService', () => {
       expect(result).toBe(true);
     });
 
-    test('Should return true when Target: owned by User1, Descendant: User1 only', async () => {
+    it('Should return true when Target: owned by User1, Descendant: User1 only', async () => {
       const targetPath = emptyPagePath2;
       const grant = Page.GRANT_OWNER;
       const grantedUserIds = [user1._id];
-      const grantedGroupIds = [];
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
       const shouldCheckDescendants = true;
 
       const result = await pageGrantService.isGrantNormalized(
@@ -730,7 +763,7 @@ describe('PageGrantService', () => {
       expect(result).toBe(true);
     });
 
-    test('Should return true when Target: owned by GroupParent, Descendant: GroupParent, GroupChild and User1', async () => {
+    it('Should return true when Target: owned by GroupParent, Descendant: GroupParent, GroupChild and User1', async () => {
       const targetPath = emptyPagePath3;
       const grant = Page.GRANT_USER_GROUP;
       const grantedUserIds = undefined;
@@ -752,11 +785,14 @@ describe('PageGrantService', () => {
       expect(result).toBe(true);
     });
 
-    test('Should return false when Target: owned by User1, Descendant: public', async () => {
+    it('Should return false when Target: owned by User1, Descendant: public', async () => {
       const targetPath = emptyPagePath1;
       const grant = Page.GRANT_OWNER;
       const grantedUserIds = [user1._id];
-      const grantedGroupIds = [];
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
       const shouldCheckDescendants = true;
 
       const result = await pageGrantService.isGrantNormalized(
@@ -773,9 +809,12 @@ describe('PageGrantService', () => {
   });
 
   describe('Test validateGrantChange method', () => {
-    test('Should return true when Target: completely owned by User1 (belongs to all groups)', async () => {
+    it('Should return true when Target: completely owned by User1 (belongs to all groups)', async () => {
       const grant = Page.GRANT_PUBLIC;
-      const grantedGroupIds = [];
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
 
       const result = await pageGrantService.validateGrantChange(
         user1,
@@ -787,9 +826,12 @@ describe('PageGrantService', () => {
       expect(result).toBe(true);
     });
 
-    test('Should return false when Target: partially owned by User2 (belongs to one of the groups), and change to public grant', async () => {
+    it('Should return false when Target: partially owned by User2 (belongs to one of the groups), and change to public grant', async () => {
       const grant = Page.GRANT_PUBLIC;
-      const grantedGroupIds = [];
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
 
       const result = await pageGrantService.validateGrantChange(
         user2,
@@ -801,9 +843,12 @@ describe('PageGrantService', () => {
       expect(result).toBe(false);
     });
 
-    test('Should return false when Target: partially owned by User2 (belongs to one of the groups), and change to owner grant', async () => {
+    it('Should return false when Target: partially owned by User2 (belongs to one of the groups), and change to owner grant', async () => {
       const grant = Page.GRANT_OWNER;
-      const grantedGroupIds = [];
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
 
       const result = await pageGrantService.validateGrantChange(
         user2,
@@ -815,9 +860,12 @@ describe('PageGrantService', () => {
       expect(result).toBe(false);
     });
 
-    test('Should return false when Target: partially owned by User2 (belongs to one of the groups), and change to restricted grant', async () => {
+    it('Should return false when Target: partially owned by User2 (belongs to one of the groups), and change to restricted grant', async () => {
       const grant = Page.GRANT_RESTRICTED;
-      const grantedGroupIds = [];
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
 
       const result = await pageGrantService.validateGrantChange(
         user2,
@@ -829,7 +877,7 @@ describe('PageGrantService', () => {
       expect(result).toBe(false);
     });
 
-    test('Should return false when Target: partially owned by User2, and change to group grant without any groups of user2', async () => {
+    it('Should return false when Target: partially owned by User2, and change to group grant without any groups of user2', async () => {
       const grant = Page.GRANT_USER_GROUP;
       const grantedGroupIds = [
         { item: differentTreeGroup._id, type: GroupType.userGroup },
@@ -847,7 +895,7 @@ describe('PageGrantService', () => {
   });
 
   describe('Test for calcApplicableGrantData', () => {
-    test('Only Public is Applicable in case of top page', async () => {
+    it('Only Public is Applicable in case of top page', async () => {
       const result = await pageGrantService.calcApplicableGrantData(
         rootPage,
         user1,
@@ -859,7 +907,7 @@ describe('PageGrantService', () => {
     });
 
     // parent property of all private pages is null
-    test('Any grant is allowed if parent is null', async () => {
+    it('Any grant is allowed if parent is null', async () => {
       const userRelatedUserGroups =
         await UserGroupRelation.findAllGroupsForUser(user1);
       const userRelatedExternalUserGroups =
@@ -921,7 +969,7 @@ describe('PageGrantService', () => {
       });
     });
 
-    test('Any grant is allowed if parent is public', async () => {
+    it('Any grant is allowed if parent is public', async () => {
       const userRelatedUserGroups =
         await UserGroupRelation.findAllGroupsForUser(user1);
       const userRelatedExternalUserGroups =
@@ -983,7 +1031,7 @@ describe('PageGrantService', () => {
       });
     });
 
-    test('Only "GRANT_OWNER" is allowed if the user is the parent page\'s grantUser', async () => {
+    it('Only "GRANT_OWNER" is allowed if the user is the parent page\'s grantUser', async () => {
       // Public
       const onlyMePublicPage = await Page.findOne({
         path: pageOnlyMePublicPath,
@@ -1026,7 +1074,7 @@ describe('PageGrantService', () => {
       });
     });
 
-    test('"GRANT_OWNER" is not allowed if the user is not the parent page\'s grantUser', async () => {
+    it('"GRANT_OWNER" is not allowed if the user is not the parent page\'s grantUser', async () => {
       // Public
       const onlyMePublicPage = await Page.findOne({
         path: pageOnlyMePublicPath,
@@ -1066,7 +1114,7 @@ describe('PageGrantService', () => {
       });
     });
 
-    test('"GRANT_USER_GROUP" is allowed if the parent\'s grant is GRANT_USER_GROUP and the user is included in the group', async () => {
+    it('"GRANT_USER_GROUP" is allowed if the parent\'s grant is GRANT_USER_GROUP and the user is included in the group', async () => {
       const userGroups =
         await UserGroupRelation.findGroupsWithDescendantsByGroupAndUser(
           groupParent,
@@ -1132,8 +1180,9 @@ describe('PageGrantService', () => {
       });
     });
   });
+
   describe('Test for getPageGroupGrantData', () => {
-    test('return expected group grant data', async () => {
+    it('return expected group grant data', async () => {
       const groupGrantDataTestChildPage = await Page.findOne({
         path: groupGrantDataTestChildPagePath,
       });
@@ -1176,7 +1225,7 @@ describe('PageGrantService', () => {
       });
     });
 
-    test('return empty arrays when page is root', async () => {
+    it('return empty arrays when page is root', async () => {
       const result = await pageGrantService.getPageGroupGrantData(
         rootPage,
         user1,

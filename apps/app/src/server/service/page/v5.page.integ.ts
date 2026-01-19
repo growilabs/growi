@@ -1,30 +1,29 @@
 import type { IPage } from '@growi/core';
 import { addSeconds } from 'date-fns/addSeconds';
 import mongoose from 'mongoose';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-import {
-  PageActionStage,
-  PageActionType,
-} from '../../../src/interfaces/page-operation';
-import type Crowi from '../../../src/server/crowi';
-import type { PageDocument, PageModel } from '../../../src/server/models/page';
+import { getInstance } from '^/test-with-vite/setup/crowi';
+
+import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
+import type Crowi from '~/server/crowi';
+import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
   PageOperationModel,
-} from '../../../src/server/models/page-operation';
-import { getInstance } from '../setup-crowi';
+} from '~/server/models/page-operation';
 
 describe('Test page service methods', () => {
   let crowi: Crowi;
   let Page: PageModel;
-  // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
-  let User;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let User: any;
   let PageOperation: PageOperationModel;
 
   let rootPage: PageDocument;
 
-  // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
-  let dummyUser1;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let dummyUser1: any;
 
   let pageOpId1: mongoose.Types.ObjectId;
   let pageOpId2: mongoose.Types.ObjectId;
@@ -41,17 +40,32 @@ describe('Test page service methods', () => {
       'PageOperation',
     );
 
-    /*
-     * Common
-     */
+    // Ensure root page exists
+    rootPage = await Page.findOne({ path: '/' });
+    if (rootPage == null) {
+      const rootPageId = new mongoose.Types.ObjectId();
+      await Page.insertMany([
+        {
+          _id: rootPageId,
+          path: '/',
+          grant: Page.GRANT_PUBLIC,
+        },
+      ]);
+      rootPage = (await Page.findOne({ path: '/' }))!;
+    }
 
-    // ***********************************************************************************************************
-    // * Do NOT change properties of globally used documents. Otherwise, it might cause some errors in other tests
-    // ***********************************************************************************************************
-    // users
+    // Create dummy user for tests
+    const existingUser = await User.findOne({ username: 'v5DummyUser1' });
+    if (existingUser == null) {
+      await User.insertMany([
+        {
+          name: 'v5DummyUser1',
+          username: 'v5DummyUser1',
+          email: 'v5dummyuser1@example.com',
+        },
+      ]);
+    }
     dummyUser1 = await User.findOne({ username: 'v5DummyUser1' });
-    // page
-    rootPage = (await Page.findOne({ path: '/' }))!;
 
     /**
      * pages
@@ -460,10 +474,15 @@ describe('Test page service methods', () => {
   });
 
   describe('restart renameOperation', () => {
-    const resumeRenameSubOperation = async (renamePage, pageOp, activity?) => {
-      const mockedPathsAndDescendantCountOfAncestors = jest
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resumeRenameSubOperation = async (
+      renamePage: any,
+      pageOp: any,
+      activity?: any,
+    ) => {
+      const mockedPathsAndDescendantCountOfAncestors = vi
         .spyOn(crowi.pageService, 'fixPathsAndDescendantCountOfAncestors')
-        .mockReturnValue(null);
+        .mockReturnValue(null as any);
       await crowi.pageService.resumeRenameSubOperation(
         renamePage,
         pageOp,
@@ -475,11 +494,12 @@ describe('Test page service methods', () => {
 
       mockedPathsAndDescendantCountOfAncestors.mockRestore();
       await crowi.pageService.fixPathsAndDescendantCountOfAncestors(
-        ...argsForRenameSubOperation,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...(argsForRenameSubOperation as any),
       );
     };
 
-    test('it should successfully restart rename operation', async () => {
+    it('it should successfully restart rename operation', async () => {
       // paths before renaming
       const _path0 = '/resume_rename_0'; // out of renaming scope
       const _path1 = '/resume_rename_0/resume_rename_1'; // renamed already
@@ -551,7 +571,8 @@ describe('Test page service methods', () => {
       expect(page2?.descendantCount).toBe(1);
       expect(page3?.descendantCount).toBe(0);
     });
-    test('it should successfully restart rename operation when unprocessableExpiryDate is null', async () => {
+
+    it('it should successfully restart rename operation when unprocessableExpiryDate is null', async () => {
       // paths before renaming
       const _path0 = '/resume_rename_8'; // out of renaming scope
       const _path1 = '/resume_rename_8/resume_rename_9'; // renamed already
@@ -624,7 +645,8 @@ describe('Test page service methods', () => {
       expect(page1?.descendantCount).toBe(1);
       expect(page2?.descendantCount).toBe(0);
     });
-    test('it should fail and throw error if the current time is behind unprocessableExpiryDate', async () => {
+
+    it('it should fail and throw error if the current time is behind unprocessableExpiryDate', async () => {
       // path before renaming
       const _path0 = '/resume_rename_4'; // out of renaming scope
       const _path1 = '/resume_rename_4/resume_rename_5'; // renamed already
@@ -668,7 +690,8 @@ describe('Test page service methods', () => {
       // cleanup
       await PageOperation.findByIdAndDelete(pageOperation?._id);
     });
-    test('Missing property(toPath) for PageOperation should throw error', async () => {
+
+    it('Missing property(toPath) for PageOperation should throw error', async () => {
       // page
       const _path1 = '/resume_rename_7';
       const _page1 = await Page.findOne({ path: _path1 });
@@ -694,8 +717,9 @@ describe('Test page service methods', () => {
       await PageOperation.findByIdAndDelete(pageOperation?._id);
     });
   });
+
   describe('updateDescendantCountOfPagesWithPaths', () => {
-    test('should fix descendantCount of pages with one of the given paths', async () => {
+    it('should fix descendantCount of pages with one of the given paths', async () => {
       // path
       const _path1 = '/fix_descendantCount_1';
       const _path2 = '/fix_descendantCount_1/fix_descendantCount_2'; // empty

@@ -1,19 +1,21 @@
 import type { IGrantedGroup } from '@growi/core';
 import { GroupType, getIdForRef, type IPage, PageGrant } from '@growi/core';
 import mongoose from 'mongoose';
+import { beforeAll, describe, expect, it } from 'vitest';
 
-import { PageActionOnGroupDelete } from '../../../src/interfaces/user-group';
-import type Crowi from '../../../src/server/crowi';
-import type { PageDocument, PageModel } from '../../../src/server/models/page';
-import UserGroup from '../../../src/server/models/user-group';
-import UserGroupRelation from '../../../src/server/models/user-group-relation';
-import type { IUserGroupService } from '../../../src/server/service/user-group';
-import { getInstance } from '../setup-crowi';
+import { getInstance } from '^/test-with-vite/setup/crowi';
+
+import { PageActionOnGroupDelete } from '~/interfaces/user-group';
+import type Crowi from '~/server/crowi';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import UserGroup from '~/server/models/user-group';
+import UserGroupRelation from '~/server/models/user-group-relation';
+import type { IUserGroupService } from '~/server/service/user-group';
 
 describe('UserGroupService', () => {
   let crowi: Crowi;
-  // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
-  let User;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let User: any;
   let Page: PageModel;
 
   let userGroupService: IUserGroupService;
@@ -35,8 +37,8 @@ describe('UserGroupService', () => {
   const groupId15 = new mongoose.Types.ObjectId();
 
   const userId1 = new mongoose.Types.ObjectId();
-  // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
-  let user1;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let user1: any;
 
   const pageId1 = new mongoose.Types.ObjectId();
   const pageId2 = new mongoose.Types.ObjectId();
@@ -231,7 +233,7 @@ describe('UserGroupService', () => {
    * Update UserGroup
    */
   describe('updateGroup', () => {
-    test('Updated values should be reflected. (name, description, parent)', async () => {
+    it('Updated values should be reflected. (name, description, parent)', async () => {
       const userGroup2 = await UserGroup.findOne({ _id: groupId2 });
 
       const newGroupName = 'v5_group1_new';
@@ -250,7 +252,7 @@ describe('UserGroupService', () => {
       expect(updatedUserGroup.parent).toStrictEqual(newParentId);
     });
 
-    test('Should throw an error when trying to set existing group name', async () => {
+    it('Should throw an error when trying to set existing group name', async () => {
       const userGroup2 = await UserGroup.findOne({ _id: groupId2 });
 
       const result = userGroupService.updateGroup(groupId1, userGroup2?.name);
@@ -258,7 +260,7 @@ describe('UserGroupService', () => {
       await expect(result).rejects.toThrow('The group name is already taken');
     });
 
-    test('Parent should be null when parent group is released', async () => {
+    it('Parent should be null when parent group is released', async () => {
       const userGroup = await UserGroup.findOne({ _id: groupId3 });
       const updatedUserGroup = await userGroupService.updateGroup(
         userGroup?._id,
@@ -273,7 +275,7 @@ describe('UserGroupService', () => {
     /*
      * forceUpdateParents: false
      */
-    test('Should throw an error when users in child group do not exist in parent group', async () => {
+    it('Should throw an error when users in child group do not exist in parent group', async () => {
       const userGroup4 = await UserGroup.findOne({
         _id: groupId4,
         parent: null,
@@ -293,7 +295,7 @@ describe('UserGroupService', () => {
     /*
      * forceUpdateParents: true
      */
-    test('User should be included to parent group (2 groups ver)', async () => {
+    it('User should be included to parent group (2 groups ver)', async () => {
       const userGroup4 = await UserGroup.findOne({
         _id: groupId4,
         parent: null,
@@ -335,7 +337,7 @@ describe('UserGroupService', () => {
       expect(userGroupRelation5AfterUpdate).not.toBeNull();
     });
 
-    test('User should be included to parent group (3 groups ver)', async () => {
+    it('User should be included to parent group (3 groups ver)', async () => {
       const userGroup8 = await UserGroup.findOne({
         _id: groupId8,
         parent: null,
@@ -387,7 +389,7 @@ describe('UserGroupService', () => {
       expect(userGroupRelation8AfterUpdate).not.toBeNull();
     });
 
-    test('Should throw an error when trying to choose parent from descendant groups.', async () => {
+    it('Should throw an error when trying to choose parent from descendant groups.', async () => {
       const userGroup9 = await UserGroup.findOne({
         _id: groupId9,
         parent: null,
@@ -421,7 +423,7 @@ describe('UserGroupService', () => {
   });
 
   describe('removeUserByUsername', () => {
-    test('User should be deleted from child groups when the user excluded from the parent group', async () => {
+    it('User should be deleted from child groups when the user excluded from the parent group', async () => {
       const userGroup11 = await UserGroup.findOne({
         _id: groupId11,
         parent: null,
@@ -458,14 +460,14 @@ describe('UserGroupService', () => {
         relatedGroup: userGroup12?._id,
         relatedUser: userId1,
       });
-      await expect(userGroupRelation11AfterRemove).toBeNull();
-      await expect(userGroupRelation12AfterRemove).toBeNull();
+      expect(userGroupRelation11AfterRemove).toBeNull();
+      expect(userGroupRelation12AfterRemove).toBeNull();
     });
   });
 
   describe('removeCompletelyByRootGroupId', () => {
     describe('when action is public', () => {
-      test('Should remove the group and its descendants and publicize pages that are only visible to the groups to be removed', async () => {
+      it('Should remove the group and its descendants and publicize pages that are only visible to the groups to be removed', async () => {
         const userGroup13 = await UserGroup.findOne({ _id: groupId13 });
         const userGroup14 = await UserGroup.findOne({ _id: groupId14 });
         expect(userGroup13).not.toBeNull();
