@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { PageModel } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
@@ -32,8 +33,7 @@ interface Req extends Request<undefined, ApiV3Response, undefined, ReqQuery> {
 export const getPagePathsWithDescendantCountFactory: GetPagePathsWithDescendantCountFactory =
   (crowi) => {
     const Page = mongoose.model<IPage, PageModel>('Page');
-    const loginRequiredStrictly =
-      require('../../../middlewares/login-required')(crowi);
+    const loginRequiredStrictly = loginRequiredFactory(crowi);
 
     const validator: ValidationChain[] = [
       query('paths').isArray().withMessage('paths must be an array of strings'),

@@ -10,6 +10,8 @@ import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
@@ -316,10 +318,8 @@ const router = express.Router();
  *            description: is enable internal stream system for azure file request
  */
 module.exports = (crowi: Crowi) => {
-  const loginRequiredStrictly = require('../../../middlewares/login-required')(
-    crowi,
-  );
-  const adminRequired = require('../../../middlewares/admin-required')(crowi);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
 
   const activityEvent = crowi.events.activity;

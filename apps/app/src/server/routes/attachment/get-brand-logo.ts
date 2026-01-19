@@ -4,6 +4,7 @@ import express from 'express';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
@@ -17,10 +18,7 @@ const logger = loggerFactory('growi:routes:attachment:get-brand-logo');
 
 export const getBrandLogoRouterFactory = (crowi: Crowi): Router => {
   const certifyBrandLogo = generateCertifyBrandLogoMiddleware(crowi);
-  const loginRequired = require('../../middlewares/login-required')(
-    crowi,
-    true,
-  );
+  const loginRequired = loginRequiredFactory(crowi, true);
 
   const router = express.Router();
 

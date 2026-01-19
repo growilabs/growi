@@ -7,6 +7,7 @@ import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { AccessToken } from '~/server/models/access-token';
 import { isValidScope } from '~/server/util/scope-utils';
 import loggerFactory from '~/utils/logger';
@@ -76,8 +77,7 @@ const validator = [
 
 export const generateAccessTokenHandlerFactory: GenerateAccessTokenHandlerFactory =
   (crowi) => {
-    const loginRequiredStrictly =
-      require('../../../middlewares/login-required')(crowi);
+    const loginRequiredStrictly = loginRequiredFactory(crowi);
     const activityEvent = crowi.events.activity;
     const addActivity = generateAddActivityMiddleware();
 

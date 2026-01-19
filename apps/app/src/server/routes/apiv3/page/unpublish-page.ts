@@ -8,6 +8,7 @@ import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { PageModel } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
@@ -31,9 +32,7 @@ export const unpublishPageHandlersFactory: UnpublishPageHandlersFactory = (
 ) => {
   const Page = mongoose.model<IPage, PageModel>('Page');
 
-  const loginRequiredStrictly = require('../../../middlewares/login-required')(
-    crowi,
-  );
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   // define validators for req.body
   const validator: ValidationChain[] = [

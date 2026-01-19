@@ -6,7 +6,9 @@ import { isHttpError } from 'http-errors';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
@@ -33,10 +35,8 @@ type Req = Request<ReqParams, Response, ReqBody>;
 export const setDefaultAiAssistantFactory: setDefaultAiAssistantFactory = (
   crowi,
 ) => {
-  const adminRequired = require('~/server/middlewares/admin-required')(crowi);
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
+  const adminRequired = adminRequiredFactory(crowi);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   const validator: ValidationChain[] = [
     param('id').isMongoId().withMessage('aiAssistant id is required'),

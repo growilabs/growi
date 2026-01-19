@@ -28,6 +28,7 @@ import UserEvent from '../events/user';
 import type { AccessTokenParser } from '../middlewares/access-token-parser';
 import { accessTokenParser } from '../middlewares/access-token-parser';
 import httpErrorHandler from '../middlewares/http-error-handler';
+import loginRequiredFactory from '../middlewares/login-required';
 import type { AclService } from '../service/acl';
 import { aclService as aclServiceSingletonInstance } from '../service/acl';
 import AppService from '../service/app';
@@ -106,6 +107,8 @@ class Crowi {
    * For retrieving other packages
    */
   accessTokenParser: AccessTokenParser;
+
+  loginRequiredFactory: typeof loginRequiredFactory;
 
   nextApp!: ReturnType<typeof next>;
 
@@ -222,6 +225,7 @@ class Crowi {
     this.cacheDir = path.join(this.tmpDir, 'cache');
 
     this.accessTokenParser = accessTokenParser;
+    this.loginRequiredFactory = loginRequiredFactory;
 
     this.config = {};
     this.s2sMessagingService = null;
@@ -588,7 +592,7 @@ class Crowi {
 
     // setup Express Routes
     this.setupRoutesForPlugins();
-    this.setupRoutesAtLast();
+    await this.setupRoutesAtLast();
 
     // setup Global Error Handlers
     this.setupGlobalErrorHandlers();
@@ -649,8 +653,9 @@ class Crowi {
    * setup Express Routes
    * !! this must be at last because it includes '/*' route !!
    */
-  setupRoutesAtLast(): void {
-    require('../routes')(this, this.express);
+  async setupRoutesAtLast(): Promise<void> {
+    const routes = await import('../routes');
+    routes.default(this, this.express);
   }
 
   /**
@@ -659,16 +664,6 @@ class Crowi {
    */
   setupGlobalErrorHandlers(): void {
     this.express.use(httpErrorHandler);
-  }
-
-  /**
-   * require API for plugins
-   *
-   * @param modulePath relative path from /lib/crowi/index.js
-   * @return module
-   */
-  require(modulePath: string): unknown {
-    return require(modulePath);
   }
 
   /**

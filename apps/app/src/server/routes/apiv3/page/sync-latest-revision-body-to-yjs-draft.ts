@@ -8,6 +8,7 @@ import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { PageModel } from '~/server/models/page';
 import { getYjsService } from '~/server/service/yjs';
 import loggerFactory from '~/utils/logger';
@@ -35,8 +36,7 @@ interface Req extends Request<ReqParams, ApiV3Response, ReqBody> {
 export const syncLatestRevisionBodyToYjsDraftHandlerFactory: SyncLatestRevisionBodyToYjsDraftHandlerFactory =
   (crowi) => {
     const Page = mongoose.model<IPage, PageModel>('Page');
-    const loginRequiredStrictly =
-      require('../../../middlewares/login-required')(crowi);
+    const loginRequiredStrictly = loginRequiredFactory(crowi);
 
     // define validators for req.params
     const validator: ValidationChain[] = [

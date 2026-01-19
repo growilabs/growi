@@ -1,10 +1,25 @@
+import type { IUserHasId } from '@growi/core';
+import type { NextFunction, Request, Response } from 'express';
+
 import loggerFactory from '~/utils/logger';
+
+import type Crowi from '../crowi';
 
 const logger = loggerFactory('growi:middleware:admin-required');
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi, fallback = null) => {
-  return (req, res, next) => {
+type RequestWithUser = Request & { user?: IUserHasId };
+
+type FallbackFunction = (
+  req: RequestWithUser,
+  res: Response,
+  next: NextFunction,
+) => void;
+
+const adminRequiredFactory = (
+  _crowi: Crowi,
+  fallback: FallbackFunction | null = null,
+) => {
+  return (req: RequestWithUser, res: Response, next: NextFunction) => {
     if (req.user != null && req.user instanceof Object && '_id' in req.user) {
       if (req.user.admin) {
         return next();
@@ -26,3 +41,5 @@ module.exports = (crowi, fallback = null) => {
     return res.redirect('/login');
   };
 };
+
+export default adminRequiredFactory;

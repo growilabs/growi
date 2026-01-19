@@ -8,6 +8,7 @@ import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { AccessToken } from '~/server/models/access-token';
 import loggerFactory from '~/utils/logger';
 
@@ -26,8 +27,7 @@ type DeleteAllAccessTokensHandlersFactory = (crowi: Crowi) => RequestHandler[];
 
 export const deleteAllAccessTokensHandlersFactory: DeleteAllAccessTokensHandlersFactory =
   (crowi) => {
-    const loginRequiredStrictly =
-      require('../../../middlewares/login-required')(crowi);
+    const loginRequiredStrictly = loginRequiredFactory(crowi);
     const addActivity = generateAddActivityMiddleware();
     const activityEvent = crowi.events.activity;
 

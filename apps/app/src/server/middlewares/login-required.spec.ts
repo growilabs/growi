@@ -1,3 +1,4 @@
+import type Crowi from '../crowi';
 import { UserStatus } from '../models/user/conts';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -11,11 +12,12 @@ describe('loginRequired', () => {
   let loginRequiredWithFallback: LoginRequiredMiddleware;
 
   // Mock Crowi with only the required aclService
-  const crowiMock = {
-    aclService: {
-      isGuestAllowedToRead: vi.fn(),
-    },
+  const aclServiceMock = {
+    isGuestAllowedToRead: vi.fn(),
   };
+  const crowiMock = {
+    aclService: aclServiceMock,
+  } as unknown as Crowi;
 
   beforeEach(async () => {
     vi.resetAllMocks();
@@ -53,7 +55,7 @@ describe('loginRequired', () => {
         };
         next = vi.fn().mockReturnValue('next');
         // prepare mock for AclService.isGuestAllowedToRead
-        crowiMock.aclService.isGuestAllowedToRead.mockReturnValue(false);
+        aclServiceMock.isGuestAllowedToRead.mockReturnValue(false);
       });
 
       test.each`
@@ -132,7 +134,7 @@ describe('loginRequired', () => {
         };
         next = vi.fn().mockReturnValue('next');
         // prepare mock for AclService.isGuestAllowedToRead
-        crowiMock.aclService.isGuestAllowedToRead.mockReturnValue(true);
+        aclServiceMock.isGuestAllowedToRead.mockReturnValue(true);
       });
 
       test.each`

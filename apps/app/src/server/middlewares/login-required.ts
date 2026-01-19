@@ -1,18 +1,39 @@
+import type { IUserHasId } from '@growi/core';
+import type { NextFunction, Request, Response } from 'express';
+
 import { createRedirectToForUnauthenticated } from '~/server/util/createRedirectToForUnauthenticated';
 import loggerFactory from '~/utils/logger';
 
+import type Crowi from '../crowi';
 import { UserStatus } from '../models/user/conts';
 
 const logger = loggerFactory('growi:middleware:login-required');
 
+type RequestWithUser = Request & {
+  user?: IUserHasId;
+  isSharedPage?: boolean;
+  isBrandLogo?: boolean;
+  session?: { redirectTo?: string };
+};
+
+type FallbackFunction = (
+  req: RequestWithUser,
+  res: Response,
+  next: NextFunction,
+) => void;
+
 /**
  * require login handler
- * @param {import('~/server/crowi').default} crowi Crowi instance
- * @param {boolean} isGuestAllowed whether guest user is allowed (default false)
- * @param {function} fallback fallback function which will be triggered when the check cannot be passed
+ * @param crowi Crowi instance
+ * @param isGuestAllowed whether guest user is allowed (default false)
+ * @param fallback fallback function which will be triggered when the check cannot be passed
  */
-module.exports = (crowi, isGuestAllowed = false, fallback = null) => {
-  return (req, res, next) => {
+const loginRequiredFactory = (
+  crowi: Crowi,
+  isGuestAllowed = false,
+  fallback: FallbackFunction | null = null,
+) => {
+  return (req: RequestWithUser, res: Response, next: NextFunction) => {
     // check the user logged in
     if (req.user != null && req.user instanceof Object && '_id' in req.user) {
       if (req.user.status === UserStatus.STATUS_ACTIVE) {
@@ -55,7 +76,11 @@ module.exports = (crowi, isGuestAllowed = false, fallback = null) => {
     if (fallback != null) {
       return fallback(req, res, next);
     }
-    req.session.redirectTo = req.originalUrl;
+    if (req.session != null) {
+      req.session.redirectTo = req.originalUrl;
+    }
     return res.redirect('/login');
   };
 };
+
+export default loginRequiredFactory;

@@ -5,6 +5,7 @@ import type { Request, RequestHandler } from 'express';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
@@ -20,9 +21,7 @@ type Req = Request<undefined, Response, undefined> & {
 };
 
 export const getAiAssistantsFactory: GetAiAssistantsFactory = (crowi) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   return [
     accessTokenParser([SCOPE.READ.FEATURES.AI_ASSISTANT], {

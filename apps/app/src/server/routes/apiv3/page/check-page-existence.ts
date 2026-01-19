@@ -10,6 +10,7 @@ import mongoose from 'mongoose';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { PageModel } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
@@ -32,10 +33,7 @@ export const checkPageExistenceHandlersFactory: CreatePageHandlersFactory = (
 ) => {
   const Page = mongoose.model<IPage, PageModel>('Page');
 
-  const loginRequired = require('../../../middlewares/login-required')(
-    crowi,
-    true,
-  );
+  const loginRequired = loginRequiredFactory(crowi, true);
 
   // define validators for req.body
   const validator: ValidationChain[] = [

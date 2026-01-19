@@ -50,9 +50,8 @@ const paramValidator = (req: Request, res: Response, next: NextFunction) => {
   res.status(400).json({ errors: errs.map((err) => err.message) });
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: ignore
 const middleware = (crowi: any, app: any): void => {
-  const loginRequired = crowi.require('../middlewares/login-required')(
+  const loginRequired = crowi.loginRequiredFactory(
     crowi,
     true,
     loginRequiredFallback,

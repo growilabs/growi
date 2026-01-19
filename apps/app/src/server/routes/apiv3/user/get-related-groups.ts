@@ -5,6 +5,7 @@ import type { Request, RequestHandler } from 'express';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 
 import type { ApiV3Response } from '../interfaces/apiv3-response';
@@ -20,9 +21,7 @@ interface Req extends Request {
 export const getRelatedGroupsHandlerFactory: GetRelatedGroupsHandlerFactory = (
   crowi,
 ) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   return [
     accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }),
