@@ -10,8 +10,14 @@ import type {
   ISelectableAndIndeterminatable,
 } from '~/client/interfaces/selectable-all';
 import type { IFormattedSearchResult } from '~/interfaces/search';
+import type { RendererConfig } from '~/interfaces/services/renderer';
+import type { ServerConfigurationProps } from '~/pages/_search/types';
+import { useHydrateServerConfigurationAtoms } from '~/pages/_search/use-hydrate-server-configurations';
 import { useSearchKeyword, useSetSearchKeyword } from '~/states/search';
-import { showPageLimitationLAtom } from '~/states/server-configurations';
+import {
+  isHidingUserPagesAtom,
+  showPageLimitationLAtom,
+} from '~/states/server-configurations';
 import {
   type ISearchConditions,
   type ISearchConfigurations,
@@ -105,6 +111,8 @@ export const SearchPage = (): JSX.Element => {
 
   const keyword = useSearchKeyword();
   const setSearchKeyword = useSetSearchKeyword();
+
+  const isHidingUserPages = useAtomValue(isHidingUserPagesAtom);
 
   const [offset, setOffset] = useState<number>(0);
   const [limit, setLimit] = useState<number>(
@@ -286,6 +294,7 @@ export const SearchPage = (): JSX.Element => {
       <SearchControl
         isEnableSort
         isEnableFilter
+        isHidingUserPages={isHidingUserPages}
         initialSearchConditions={initialSearchConditions}
         onSearchInvoked={searchInvokedHandler}
         extraControls={extraControls}
@@ -298,6 +307,7 @@ export const SearchPage = (): JSX.Element => {
     collapseContents,
     initialSearchConditions,
     isCollapsed,
+    isHidingUserPages,
     searchInvokedHandler,
   ]);
 
