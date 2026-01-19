@@ -95,7 +95,7 @@ export const listPages = ({ excludedPaths }: { excludedPaths: string[] }) => {
       if (excludedPaths.length > 0) {
         const escapedPaths = excludedPaths.map((p) => {
           const cleanPath = p.startsWith('/') ? p.substring(1) : p;
-          return cleanPath.replace(/\//g, '\\/');
+          return escapeStringRegexp(cleanPath);
         });
 
         const regex = new RegExp(`^\\/(${escapedPaths.join('|')})(\\/|$)`);
