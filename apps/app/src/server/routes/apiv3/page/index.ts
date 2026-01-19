@@ -228,22 +228,14 @@ module.exports = (crowi: Crowi) => {
         }
 
         if (isHidingUserPages && page != null) {
-          const pagePath = page.path;
           const isTargetUserPage =
             isUserPage(page.path) || isUsersTopPage(page.path);
 
           if (isTargetUserPage) {
-            const isOwnPage =
-              user != null &&
-              (pagePath === `/user/${user.username}` ||
-                pagePath.startsWith(`/user/${user.username}/`));
-
-            if (!isOwnPage) {
-              return res.apiv3Err(
-                new ErrorV3('Page is forbidden', 'page-is-forbidden'),
-                403,
-              );
-            }
+            return res.apiv3Err(
+              new ErrorV3('Page is forbidden', 'page-is-forbidden'),
+              403,
+            );
           }
         }
 

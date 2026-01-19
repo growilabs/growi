@@ -173,28 +173,21 @@ export async function getPageDataForInitial(
     const isTargetUserPage = isUserPage(pagePath) || isUsersTopPage(pagePath);
 
     if (isTargetUserPage) {
-      const isOwnPage =
-        user != null &&
-        (pagePath === `/user/${user.username}` ||
-          pagePath.startsWith(`/user/${user.username}/`));
-
-      if (!isOwnPage) {
-        return {
-          props: {
-            currentPathname: resolvedPagePath,
-            isIdenticalPathPage: false,
-            pageWithMeta: {
-              data: null,
-              meta: {
-                isNotFound: true,
-                isForbidden: true,
-              },
-            } satisfies IDataWithRequiredMeta<null, IPageNotFoundInfo>,
-            skipSSR: false,
-            redirectFrom,
-          },
-        };
-      }
+      return {
+        props: {
+          currentPathname: resolvedPagePath,
+          isIdenticalPathPage: false,
+          pageWithMeta: {
+            data: null,
+            meta: {
+              isNotFound: true,
+              isForbidden: true,
+            },
+          } satisfies IDataWithRequiredMeta<null, IPageNotFoundInfo>,
+          skipSSR: false,
+          redirectFrom,
+        },
+      };
     }
   }
 
