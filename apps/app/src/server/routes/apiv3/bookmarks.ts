@@ -247,7 +247,7 @@ module.exports = (crowi) => {
           _id: { $nin: bookmarkIdsInFolders },
           user: userId,
         })
-          .populate<{ page: PageDocument }>({
+          .populate<{ page: PageDocument | null }>({
             path: 'page',
             model: 'Page',
             populate: {
