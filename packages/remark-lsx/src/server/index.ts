@@ -57,7 +57,10 @@ const middleware = (crowi: any, app: any): void => {
     loginRequiredFallback,
   );
   const accessTokenParser = crowi.accessTokenParser;
-  const excludedPaths = crowi.pageService.getExcludedPathsBySystem();
+
+  // Use a callback to get excludedPaths at request time, not at server startup.
+  // This ensures config changes are reflected without server restart.
+  const getExcludedPaths = () => crowi.pageService.getExcludedPathsBySystem();
 
   app.get(
     '/_api/lsx',
@@ -65,7 +68,7 @@ const middleware = (crowi: any, app: any): void => {
     loginRequired,
     lsxValidator,
     paramValidator,
-    listPages({ excludedPaths }),
+    listPages({ getExcludedPaths }),
   );
 };
 
