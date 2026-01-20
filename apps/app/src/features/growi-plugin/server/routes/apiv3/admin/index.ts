@@ -37,6 +37,8 @@ module.exports = (crowi: Crowi): Router => {
 
   router.get(
     '/',
+    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+    // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
     accessTokenParser([SCOPE.READ.ADMIN.PLUGIN]),
     loginRequiredStrictly,
     adminRequired,
