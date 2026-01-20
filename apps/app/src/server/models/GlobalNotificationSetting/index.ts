@@ -1,12 +1,38 @@
-const nodePath = require('path');
+import nodePath from 'node:path';
+import { pathUtils } from '@growi/core/dist/utils';
+import type { HydratedDocument, Model } from 'mongoose';
+import mongoose from 'mongoose';
 
-const { pathUtils } = require('@growi/core/dist/utils');
-const mongoose = require('mongoose');
+import type Crowi from '~/server/crowi';
+
+export interface IGlobalNotificationSetting {
+  isEnabled: boolean;
+  triggerPath: string;
+  triggerEvents: string[];
+}
+
+export type GlobalNotificationSettingDocument =
+  HydratedDocument<IGlobalNotificationSetting>;
+
+export interface GlobalNotificationSettingModel
+  extends Model<IGlobalNotificationSetting> {
+  enable(id: string): Promise<GlobalNotificationSettingDocument>;
+  disable(id: string): Promise<GlobalNotificationSettingDocument>;
+  findAll(): Promise<GlobalNotificationSettingDocument[]>;
+  findSettingByPathAndEvent(
+    event: string,
+    path: string,
+    type: string,
+  ): Promise<GlobalNotificationSettingDocument[]>;
+}
 
 /**
  * parent schema for GlobalNotificationSetting model
  */
-const globalNotificationSettingSchema = new mongoose.Schema({
+const globalNotificationSettingSchema = new mongoose.Schema<
+  IGlobalNotificationSetting,
+  GlobalNotificationSettingModel
+>({
   isEnabled: { type: Boolean, required: true, default: true },
   triggerPath: { type: String, required: true },
   triggerEvents: { type: [String] },
@@ -15,7 +41,7 @@ const globalNotificationSettingSchema = new mongoose.Schema({
 /*
  * e.g. "/a/b/c" => ["/a/b/c", "/a/b", "/a", "/"]
  */
-const generatePathsOnTree = (path, pathList) => {
+const generatePathsOnTree = (path: string, pathList: string[]): string[] => {
   pathList.push(path);
 
   if (path === '/') {
@@ -30,7 +56,7 @@ const generatePathsOnTree = (path, pathList) => {
 /*
  * e.g. "/a/b/c" => ["/a/b/c", "/a/b", "/a", "/"]
  */
-const generatePathsToMatch = (originalPath) => {
+const generatePathsToMatch = (originalPath: string): string[] => {
   const pathList = generatePathsOnTree(originalPath, []);
   return pathList.map((path) => {
     // except for the original trigger path ("/a/b/c"), append "*" to find all matches
@@ -48,38 +74,50 @@ const generatePathsToMatch = (originalPath) => {
  * @class GlobalNotificationSetting
  */
 class GlobalNotificationSetting {
-  /** @type {import('~/server/crowi').default} Crowi instance */
-  crowi;
+  static crowi: Crowi;
 
-  /** @param {import('~/server/crowi').default} crowi Crowi instance */
-  constructor(crowi) {
+  crowi: Crowi;
+
+  constructor(crowi: Crowi) {
     this.crowi = crowi;
   }
 
   /**
    * enable notification setting
-   * @param {string} id
    */
-  static async enable(id) {
+  static async enable(
+    this: GlobalNotificationSettingModel,
+    id: string,
+  ): Promise<GlobalNotificationSettingDocument> {
     // biome-ignore lint/complexity/noThisInStatic: 'this' refers to the mongoose model here, not the class defined in this file
     const setting = await this.findOne({ _id: id });
 
+    if (setting == null) {
+      throw new Error(`GlobalNotificationSetting with id ${id} not found`);
+    }
+
     setting.isEnabled = true;
-    setting.save();
+    await setting.save();
 
     return setting;
   }
 
   /**
    * disable notification setting
-   * @param {string} id
    */
-  static async disable(id) {
+  static async disable(
+    this: GlobalNotificationSettingModel,
+    id: string,
+  ): Promise<GlobalNotificationSettingDocument> {
     // biome-ignore lint/complexity/noThisInStatic: 'this' refers to the mongoose model here, not the class defined in this file
     const setting = await this.findOne({ _id: id });
 
+    if (setting == null) {
+      throw new Error(`GlobalNotificationSetting with id ${id} not found`);
+    }
+
     setting.isEnabled = false;
-    setting.save();
+    await setting.save();
 
     return setting;
   }
@@ -87,7 +125,9 @@ class GlobalNotificationSetting {
   /**
    * find all notification settings
    */
-  static async findAll() {
+  static async findAll(
+    this: GlobalNotificationSettingModel,
+  ): Promise<GlobalNotificationSettingDocument[]> {
     // biome-ignore lint/complexity/noThisInStatic: 'this' refers to the mongoose model here, not the class defined in this file
     const settings = await this.find().sort({
       triggerPath: 1,
@@ -98,10 +138,13 @@ class GlobalNotificationSetting {
 
   /**
    * find a list of notification settings by path and a list of events
-   * @param {string} path
-   * @param {string} event
    */
-  static async findSettingByPathAndEvent(event, path, type) {
+  static async findSettingByPathAndEvent(
+    this: GlobalNotificationSettingModel,
+    event: string,
+    path: string,
+    type: string,
+  ): Promise<GlobalNotificationSettingDocument[]> {
     const pathsToMatch = generatePathsToMatch(path);
 
     // biome-ignore lint/complexity/noThisInStatic: 'this' refers to the mongoose model here, not the class defined in this file
@@ -116,7 +159,7 @@ class GlobalNotificationSetting {
   }
 }
 
-module.exports = {
-  class: GlobalNotificationSetting,
-  schema: globalNotificationSettingSchema,
+export {
+  GlobalNotificationSetting as class,
+  globalNotificationSettingSchema as schema,
 };

@@ -1,9 +1,14 @@
-const mongoose = require('mongoose');
+import type { Model } from 'mongoose';
+import mongoose from 'mongoose';
 
-const GlobalNotificationSetting = require('./GlobalNotificationSetting/index');
+import type Crowi from '~/server/crowi';
 
-const GlobalNotificationSettingClass = GlobalNotificationSetting.class;
-const GlobalNotificationSettingSchema = GlobalNotificationSetting.schema;
+import {
+  class as GlobalNotificationSettingClass,
+  type GlobalNotificationSettingModel,
+  schema as GlobalNotificationSettingSchema,
+  type IGlobalNotificationSetting,
+} from './GlobalNotificationSetting/index';
 
 /**
  * global notifcation event master
@@ -15,7 +20,7 @@ export const GlobalNotificationSettingEvent = {
   PAGE_MOVE: 'pageMove',
   PAGE_LIKE: 'pageLike',
   COMMENT: 'comment',
-};
+} as const;
 
 /**
  * global notifcation type master
@@ -23,16 +28,15 @@ export const GlobalNotificationSettingEvent = {
 export const GlobalNotificationSettingType = {
   MAIL: 'mail',
   SLACK: 'slack',
-};
+} as const;
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-const factory = (crowi) => {
+const factory = (crowi: Crowi): GlobalNotificationSettingModel => {
   GlobalNotificationSettingClass.crowi = crowi;
   GlobalNotificationSettingSchema.loadClass(GlobalNotificationSettingClass);
-  return mongoose.model(
-    'GlobalNotificationSetting',
-    GlobalNotificationSettingSchema,
-  );
+  return mongoose.model<
+    IGlobalNotificationSetting,
+    GlobalNotificationSettingModel
+  >('GlobalNotificationSetting', GlobalNotificationSettingSchema);
 };
 
 export default factory;
