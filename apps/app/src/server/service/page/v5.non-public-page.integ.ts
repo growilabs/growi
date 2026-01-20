@@ -3,7 +3,9 @@ import {
   type IGrantedGroup,
   type IPage,
   type IRevision,
+  type IUser,
 } from '@growi/core';
+import type { Model } from 'mongoose';
 import mongoose from 'mongoose';
 
 import { getInstance } from '^/test-with-vite/setup/crowi';
@@ -51,7 +53,7 @@ describe('PageService page operations with non-public pages', () => {
   let crowi: Crowi;
   let Page: PageModel;
   let Revision: IRevisionModel;
-  let User: UserModel;
+  let User: Model<IUser>;
   let PageOperation: PageOperationModel;
   let generalXssFilterProcessSpy: ReturnType<typeof vi.spyOn>;
 
@@ -118,7 +120,7 @@ describe('PageService page operations with non-public pages', () => {
   const create = async (path, body, user, options = {}) => {
     const mockedCreateSubOperation = vi
       .spyOn(crowi.pageService, 'createSubOperation')
-      .mockReturnValue(null);
+      .mockReturnValue(Promise.resolve());
 
     const createdPage = await crowi.pageService.create(
       path,

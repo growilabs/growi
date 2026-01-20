@@ -1,4 +1,11 @@
-import type { IPage, IRevision } from '@growi/core';
+import assert from 'node:assert';
+import {
+  type IPage,
+  type IRevision,
+  type IUser,
+  isPopulated,
+} from '@growi/core';
+import type { Model } from 'mongoose';
 import mongoose from 'mongoose';
 
 import { getInstance } from '^/test-with-vite/setup/crowi';
@@ -9,6 +16,7 @@ import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
 import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
 import type { IShareLink } from '~/interfaces/share-link';
 import type Crowi from '~/server/crowi';
+import type { BookmarkDocument, BookmarkModel } from '~/server/models/bookmark';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
@@ -36,7 +44,7 @@ describe('PageService page operations with only public pages', () => {
   let crowi: Crowi;
   let Page: PageModel;
   let Revision: IRevisionModel;
-  let User: UserModel;
+  let User: Model<IUser>;
   let Bookmark: BookmarkModel;
   let Comment: CommentModel;
   let ShareLink: ShareLinkModel;
@@ -52,7 +60,7 @@ describe('PageService page operations with only public pages', () => {
   const create = async (path, body, user, options = {}) => {
     const mockedCreateSubOperation = vi
       .spyOn(crowi.pageService, 'createSubOperation')
-      .mockReturnValue(null);
+      .mockReturnValue(Promise.resolve());
 
     const createdPage = await crowi.pageService.create(
       path,
@@ -81,7 +89,7 @@ describe('PageService page operations with only public pages', () => {
     User = mongoose.model('User');
     Page = mongoose.model<IPage, PageModel>('Page');
     Revision = mongoose.model<IRevision, IRevisionModel>('Revision');
-    Bookmark = mongoose.model('Bookmark');
+    Bookmark = mongoose.model<BookmarkDocument, BookmarkModel>('Bookmark');
     Comment = mongoose.model<IComment, CommentModel>('Comment');
     ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
     PageRedirect = mongoose.model<IPageRedirect, PageRedirectModel>(
@@ -1216,6 +1224,9 @@ describe('PageService page operations with only public pages', () => {
 
       expect(childPage).toBeTruthy();
       expect(childPage.isEmpty).toBe(false);
+      assert(childPage.revision != null);
+      expect(isPopulated(childPage.revision)).toBeTruthy();
+      assert(isPopulated(childPage.revision));
       expect(childPage.revision.body).toBe('body');
       expect(grandchildPage).toBeTruthy();
       expect(childPage.parent).toStrictEqual(rootPage._id);
@@ -1284,6 +1295,9 @@ describe('PageService page operations with only public pages', () => {
 
       expect(childPage).toBeTruthy();
       expect(childPage.isEmpty).toBe(false);
+      assert(childPage.revision != null);
+      expect(isPopulated(childPage.revision)).toBeTruthy();
+      assert(isPopulated(childPage.revision));
       expect(childPage.revision.body).toBe('body');
       expect(grandchildPage).toBeTruthy();
       expect(childPage.parent).toStrictEqual(rootPage._id);
@@ -1359,7 +1373,7 @@ describe('PageService page operations with only public pages', () => {
       // mock return value
       const mockedRenameSubOperation = vi
         .spyOn(crowi.pageService, 'renameSubOperation')
-        .mockReturnValue(null);
+        .mockReturnValue(Promise.resolve());
       const renamedPage = await crowi.pageService.renameMainOperation(
         page,
         newPagePath,
@@ -1417,6 +1431,7 @@ describe('PageService page operations with only public pages', () => {
         path: '/v5_ChildForRename1',
       });
 
+      assert(renamedPage != null);
       expect(generalXssFilterProcessSpy).toHaveBeenCalled();
       expect(renamedPage.path).toBe(newPath);
       expect(renamedPage.parent).toStrictEqual(parentPage?._id);
@@ -1445,6 +1460,7 @@ describe('PageService page operations with only public pages', () => {
         path: '/v5_ChildForRename2',
       });
 
+      assert(renamedPage != null);
       expect(generalXssFilterProcessSpy).toHaveBeenCalled();
       expect(renamedPage.path).toBe(newPath);
       expect(parentPage?.isEmpty).toBe(true);
@@ -1457,10 +1473,11 @@ describe('PageService page operations with only public pages', () => {
       const childPage = await Page.findOne({ path: '/v5_ChildForRename3' });
       expect(childPage).toBeTruthy();
       expect(parentPage).toBeTruthy();
-      expect(childPage?.lastUpdateUser).toStrictEqual(dummyUser1._id);
+      assert(childPage != null);
+      expect(childPage.lastUpdateUser).toStrictEqual(dummyUser1._id);
 
       const newPath = '/v5_ParentForRename3/renamedChildForRename3';
-      const oldUpdateAt = childPage?.updatedAt;
+      const oldUpdateAt = childPage.updatedAt;
       const renamedPage = await renamePage(
         childPage,
         newPath,
@@ -1472,12 +1489,13 @@ describe('PageService page operations with only public pages', () => {
         },
       );
 
+      assert(renamedPage != null);
       expect(generalXssFilterProcessSpy).toHaveBeenCalled();
       expect(renamedPage.path).toBe(newPath);
       expect(renamedPage.parent).toStrictEqual(parentPage?._id);
       expect(renamedPage.lastUpdateUser).toStrictEqual(dummyUser2._id);
       expect(renamedPage.updatedAt.getFullYear()).toBeGreaterThan(
-        oldUpdateAt?.getFullYear(),
+        oldUpdateAt.getFullYear(),
       );
     });
 
@@ -1499,6 +1517,7 @@ describe('PageService page operations with only public pages', () => {
           endpoint: '/_api/v3/pages/rename',
         },
       );
+      assert(renamedPage != null);
       const pageRedirect = await PageRedirect.findOne({
         fromPath: oldPath,
         toPath: renamedPage.path,
@@ -1533,6 +1552,7 @@ describe('PageService page operations with only public pages', () => {
           endpoint: '/_api/v3/pages/rename',
         },
       );
+      assert(renamedPage != null);
       // find child of renamed page
       const renamedGrandchild = await Page.findOne({ parent: renamedPage._id });
       const childPageBeforeRename = await Page.findOne({
@@ -1580,6 +1600,7 @@ describe('PageService page operations with only public pages', () => {
           endpoint: '/_api/v3/pages/rename',
         },
       );
+      assert(renamedPage != null);
       const grandchildAfterRename = await Page.findOne({
         parent: renamedPage._id,
       });
@@ -1643,6 +1664,7 @@ describe('PageService page operations with only public pages', () => {
         },
       );
 
+      assert(renamedPage != null);
       expect(generalXssFilterProcessSpy).toHaveBeenCalled();
       expect(renamedPage.path).toBe(newPath);
       expect(renamedPage.isEmpty).toBe(false);
@@ -2689,7 +2711,7 @@ describe('PageService page operations with only public pages', () => {
       const deletedPageTagRelations = await PageTagRelation.find({
         _id: { $in: [pageTagRelation1?._id, pageTagRelation2?._id] },
       });
-      const remainingBookmarks = await Bookmark.find({ _id: bookmark._id });
+      const remainingBookmarks = await Bookmark.find({ _id: bookmark?._id });
       const deletedComments = await Comment.find({ _id: comment?._id });
       const deletedPageRedirects = await PageRedirect.find({
         _id: { $in: [pageRedirect1?._id, pageRedirect2?._id] },
@@ -2784,7 +2806,7 @@ describe('PageService page operations with only public pages', () => {
       // mock return value
       const mockedRevertRecursivelyMainOperation = vi
         .spyOn(crowi.pageService, 'revertRecursivelyMainOperation')
-        .mockReturnValue(null);
+        .mockReturnValue(Promise.resolve());
       const revertedPage = await crowi.pageService.revertDeletedPage(
         page,
         user,
