@@ -796,6 +796,16 @@ class PageService implements IPageService {
     return renamedPage;
   }
 
+  getExcludedPathsBySystem(): string[] {
+    const excludedPaths: string[] = [];
+
+    if (configManager.getConfig('security:isHidingUserPages')) {
+      excludedPaths.push('/user');
+    }
+
+    return excludedPaths;
+  }
+
   async renameSubOperation(
     page,
     newPagePathSanitized: string,
