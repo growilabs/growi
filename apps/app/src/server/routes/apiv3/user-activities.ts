@@ -248,6 +248,7 @@ module.exports = (crowi: Crowi): Router => {
                       {
                         $and: [
                           { 'targetPage.path': { $not: USER_PAGE_REGEXP } },
+                          { 'targetPage.path': { $ne: '/user' } },
                         ],
                       },
                     ],
