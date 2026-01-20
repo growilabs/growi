@@ -1,7 +1,10 @@
 import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
-import { USER_PAGE_REGEXP } from '@growi/core/dist/utils/page-path-utils';
+import {
+  isUserPage,
+  isUsersTopPage,
+} from '@growi/core/dist/utils/page-path-utils';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
@@ -260,7 +263,9 @@ module.exports = (crowi) => {
 
         const filteredBookmarks = isHidingUserPages
           ? userRootBookmarks.filter(
-              (bookmark) => !USER_PAGE_REGEXP.test(bookmark.page.path),
+              (bookmark) =>
+                !isUserPage(bookmark.page.path) &&
+                !isUsersTopPage(bookmark.page.path),
             )
           : userRootBookmarks;
 
