@@ -1,12 +1,17 @@
 import type { Collection } from 'mongodb';
 import * as mongoose from 'mongoose';
 
-const migrate = require('./20210913153942-migrate-slack-app-integration-schema');
-
 describe('migrate-slack-app-integration-schema', () => {
   let collection: Collection;
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
+  let migrate: any;
 
   beforeAll(async () => {
+    // Use dynamic import for ESM/CJS interop - Vitest handles the mixed syntax
+    const migrateModule = await import(
+      './20210913153942-migrate-slack-app-integration-schema.js'
+    );
+    migrate = migrateModule.default || migrateModule;
     collection = mongoose.connection.collection('slackappintegrations');
 
     await collection.insertMany([
