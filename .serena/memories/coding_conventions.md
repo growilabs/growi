@@ -49,13 +49,8 @@ vitest.workspace.mts の設定に基づく：
 
 ## ディレクトリ構造の規則
 - `src/`: ソースコード
-- `test/`: Jest用の古いテストファイル（廃止予定）
-- `test-with-vite/`: Vitest用の新しいテストファイル
+- `test-with-vite/`: Vitest用のファイル
 - `playwright/`: E2Eテストファイル
 - `config/`: 設定ファイル
 - `public/`: 静的ファイル
 - `dist/`: ビルド出力
-
-## 移行ガイドライン
-- 新規開発: Biome + Vitest を使用
-- 既存コード: 段階的に Jest → Vitest に移行
