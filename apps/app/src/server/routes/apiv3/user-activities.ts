@@ -1,5 +1,6 @@
 import type { IUserHasId } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import { USER_PAGE_REGEXP } from '@growi/core/dist/utils/page-path-utils';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
@@ -210,6 +211,10 @@ module.exports = (crowi: Crowi): Router => {
       }
 
       try {
+        const isHidingUserPages = configManager.getConfig(
+          'security:isHidingUserPages',
+        );
+
         const userObjectId = new Types.ObjectId(targetUserId);
 
         const userActivityPipeline: PipelineStage[] = [
@@ -220,26 +225,44 @@ module.exports = (crowi: Crowi): Router => {
             },
           },
           {
+            $lookup: {
+              from: 'pages',
+              localField: 'target',
+              foreignField: '_id',
+              as: 'targetPage',
+            },
+          },
+          {
+            $unwind: {
+              path: '$targetPage',
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+          ...(isHidingUserPages
+            ? [
+                {
+                  $match: {
+                    $or: [
+                      { targetPage: { $exists: false } },
+                      { 'targetPage.path': { $exists: false } },
+                      {
+                        $and: [
+                          { 'targetPage.path': { $not: USER_PAGE_REGEXP } },
+                          { 'targetPage.path': { $ne: '/user' } },
+                        ],
+                      },
+                    ],
+                  },
+                },
+              ]
+            : []),
+          {
             $facet: {
               totalCount: [{ $count: 'count' }],
               docs: [
                 { $sort: { createdAt: -1 } },
                 { $skip: offset },
                 { $limit: limit },
-                {
-                  $lookup: {
-                    from: 'pages',
-                    localField: 'target',
-                    foreignField: '_id',
-                    as: 'target',
-                  },
-                },
-                {
-                  $unwind: {
-                    path: '$target',
-                    preserveNullAndEmptyArrays: true,
-                  },
-                },
                 {
                   $lookup: {
                     from: 'users',
@@ -263,7 +286,7 @@ module.exports = (crowi: Crowi): Router => {
                     'user.imageUrlCached': 1,
                     action: 1,
                     createdAt: 1,
-                    target: 1,
+                    target: '$targetPage',
                     targetModel: 1,
                   },
                 },

@@ -9,6 +9,12 @@ export const isTopPage = _isTopPage;
 export * from './generate-children-regexp';
 
 /**
+ * Regexp pattern for user page path
+ * @see https://regex101.com/r/MwifLR/1
+ */
+export const USER_PAGE_REGEXP = /^\/user\/.*?$/;
+
+/**
  * Whether path is the top page of users
  * @param path
  */
@@ -58,8 +64,7 @@ export const isMovablePage = (path: string): boolean => {
  * @param path
  */
 export const isUserPage = (path: string): boolean => {
-  // https://regex101.com/r/MwifLR/1
-  if (path.match(/^\/user\/.*?$/)) {
+  if (path.match(USER_PAGE_REGEXP)) {
     return true;
   }
 
