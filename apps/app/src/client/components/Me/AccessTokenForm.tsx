@@ -16,8 +16,6 @@ type AccessTokenFormProps = {
 type FormInputs = {
   expiredAt: string;
   description: string;
-  // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
-  // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
   scopes: Scope[];
 };
 

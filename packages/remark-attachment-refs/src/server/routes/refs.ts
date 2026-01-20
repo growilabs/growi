@@ -93,8 +93,6 @@ export const routesFactory = (crowi): Promise<Router> => {
    */
   router.get(
     '/ref',
-    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
-    // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
     // loginRequired,
     async (req: RequestWithUser, res) => {
