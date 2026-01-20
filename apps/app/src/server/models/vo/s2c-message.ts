@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import type { IPage, IUser } from '@growi/core/dist/interfaces';
 import { isPopulated } from '@growi/core/dist/interfaces';
 
