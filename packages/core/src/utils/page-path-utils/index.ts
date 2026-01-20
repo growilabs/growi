@@ -37,7 +37,7 @@ export const isPermalink = (path: string): boolean => {
  */
 export const isUsersHomepage = (path: string): boolean => {
   // https://regex101.com/r/utVQct/1
-  if (path.match(USER_PAGE_REGEXP)) {
+  if (path.match(/^\/user\/[^/]+$/)) {
     return true;
   }
   return false;
@@ -64,8 +64,7 @@ export const isMovablePage = (path: string): boolean => {
  * @param path
  */
 export const isUserPage = (path: string): boolean => {
-  // https://regex101.com/r/MwifLR/1
-  if (path.match(/^\/user\/.*?$/)) {
+  if (path.match(USER_PAGE_REGEXP)) {
     return true;
   }
 
