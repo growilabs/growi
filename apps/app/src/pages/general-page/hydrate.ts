@@ -13,6 +13,7 @@ import {
   isContainerFluidAtom,
   isEnabledAttachTitleHeaderAtom,
   isEnabledStaleNotificationAtom,
+  isHidingUserPagesAtom,
   isIndentSizeForcedAtom,
   isLocalAccountRegistrationEnabledAtom,
   isPdfBulkExportEnabledAtom,
@@ -84,6 +85,7 @@ export const useHydrateGeneralPageConfigurationAtoms = (
             serverConfig.isLocalAccountRegistrationEnabled,
           ],
           [rendererConfigAtom, rendererConfigs],
+          [isHidingUserPagesAtom, serverConfig.isHidingUserPages],
         ],
   );
 };
