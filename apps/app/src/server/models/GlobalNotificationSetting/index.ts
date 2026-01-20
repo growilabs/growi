@@ -4,10 +4,13 @@ import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 
+import type { GlobalNotificationSettingType } from './consts';
 import type {
   GlobalNotificationSettingDocument,
   GlobalNotificationSettingModel,
+  IGlobalNotificationMailSetting,
   IGlobalNotificationSetting,
+  IGlobalNotificationSlackSetting,
 } from './types';
 
 /**
@@ -123,6 +126,22 @@ class GlobalNotificationSetting {
   /**
    * find a list of notification settings by path and a list of events
    */
+  static async findSettingByPathAndEvent(
+    this: GlobalNotificationSettingModel,
+    event: string,
+    path: string,
+    type: typeof GlobalNotificationSettingType.SLACK,
+  ): Promise<
+    (GlobalNotificationSettingDocument & IGlobalNotificationSlackSetting)[]
+  >;
+  static async findSettingByPathAndEvent(
+    this: GlobalNotificationSettingModel,
+    event: string,
+    path: string,
+    type: typeof GlobalNotificationSettingType.MAIL,
+  ): Promise<
+    (GlobalNotificationSettingDocument & IGlobalNotificationMailSetting)[]
+  >;
   static async findSettingByPathAndEvent(
     this: GlobalNotificationSettingModel,
     event: string,

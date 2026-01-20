@@ -2,6 +2,8 @@ import type { HydratedDocument, Model } from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 
+import type { GlobalNotificationSettingType } from './consts';
+
 export interface IGlobalNotificationSetting {
   isEnabled: boolean;
   triggerPath: string;
@@ -19,8 +21,17 @@ export interface GlobalNotificationSettingModel
   findSettingByPathAndEvent(
     event: string,
     path: string,
-    type: string,
-  ): Promise<GlobalNotificationSettingDocument[]>;
+    type: typeof GlobalNotificationSettingType.SLACK,
+  ): Promise<
+    (GlobalNotificationSettingDocument & IGlobalNotificationSlackSetting)[]
+  >;
+  findSettingByPathAndEvent(
+    event: string,
+    path: string,
+    type: typeof GlobalNotificationSettingType.MAIL,
+  ): Promise<
+    (GlobalNotificationSettingDocument & IGlobalNotificationMailSetting)[]
+  >;
 }
 
 export interface IGlobalNotificationMailSetting

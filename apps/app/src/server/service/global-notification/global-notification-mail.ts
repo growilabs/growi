@@ -1,9 +1,10 @@
+import nodePath from 'node:path';
 import type { IUser } from '@growi/core/dist/interfaces';
-import nodePath from 'path';
 
 import type Crowi from '~/server/crowi';
 import {
   GlobalNotificationSettingEvent,
+  type GlobalNotificationSettingModel,
   GlobalNotificationSettingType,
 } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument } from '~/server/models/page';
@@ -49,20 +50,23 @@ class GlobalNotificationMailService {
   ): Promise<void> {
     const { mailService } = this.crowi;
 
-    const { GlobalNotificationSetting } = this.crowi.models;
-    const notifications = await (
-      GlobalNotificationSetting as any
-    ).findSettingByPathAndEvent(
-      event,
-      page.path,
-      GlobalNotificationSettingType.MAIL,
-    );
+    const GlobalNotificationSetting = this.crowi.models
+      .GlobalNotificationSetting as GlobalNotificationSettingModel;
+    const notifications =
+      await GlobalNotificationSetting.findSettingByPathAndEvent(
+        event,
+        page.path,
+        GlobalNotificationSettingType.MAIL,
+      );
 
     const option = this.generateOption(event, page, triggeredBy, vars);
 
     await Promise.all(
-      notifications.map((notification: { toEmail: string }) => {
-        return mailService?.send({ ...option, to: notification.toEmail });
+      notifications.map((notification) => {
+        return mailService?.send({
+          ...option,
+          to: notification.toEmail,
+        });
       }),
     );
   }
@@ -171,4 +175,4 @@ class GlobalNotificationMailService {
   }
 }
 
-export default GlobalNotificationMailService;
+export { GlobalNotificationMailService };
