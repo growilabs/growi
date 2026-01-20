@@ -39,16 +39,9 @@ const initCrowi = async (crowi: Crowi): Promise<void> => {
  * Get a Crowi instance for integration testing.
  * By default, returns a singleton instance. Pass true to create a new instance.
  *
- * @param isNewInstance - If true, creates a new Crowi instance instead of returning singleton
  * @returns Promise resolving to a Crowi instance
  */
-export async function getInstance(isNewInstance?: boolean): Promise<Crowi> {
-  if (isNewInstance) {
-    const crowi = new Crowi();
-    await initCrowi(crowi);
-    return crowi;
-  }
-
+export async function getInstance(): Promise<Crowi> {
   // Initialize singleton instance
   if (_instance == null) {
     _instance = new Crowi();

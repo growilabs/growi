@@ -2,13 +2,10 @@
  * Integration test to verify Crowi setup works correctly in Vitest environment.
  * This ensures the test-with-vite/setup/crowi.ts utility functions properly.
  */
-import { beforeAll, describe, expect, it } from 'vitest';
 
-import {
-  getInstance,
-  resetInstance,
-} from '../../../test-with-vite/setup/crowi';
-import type Crowi from './index';
+import type Crowi from '~/server/crowi';
+
+import { getInstance, resetInstance } from './crowi';
 
 describe('Crowi Setup for Integration Tests', () => {
   let crowi: Crowi;
@@ -44,14 +41,5 @@ describe('Crowi Setup for Integration Tests', () => {
   it('should return singleton instance on subsequent calls', async () => {
     const crowi2 = await getInstance();
     expect(crowi2).toBe(crowi);
-  });
-
-  // Skip: Creating a new instance causes mongoose discriminator conflicts
-  // because models are registered globally. In practice, tests should use
-  // the singleton instance for isolation.
-  it.skip('should create new instance when isNewInstance is true', async () => {
-    const newCrowi = await getInstance(true);
-    expect(newCrowi).not.toBe(crowi);
-    expect(newCrowi.version).toBeDefined();
   });
 });
