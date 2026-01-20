@@ -42,12 +42,10 @@ const CustomizeLogoSetting = (): JSX.Element => {
     isSystemError || isLogoSettingIncomplete;
 
   const onSelectFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files: FileList | null = e.target.files;
-
-    if (files != null && files.length > 0) {
+    if (e.target.files != null && e.target.files.length > 0) {
       const reader = new FileReader();
       reader.addEventListener('load', () => setUploadLogoSrc(reader.result));
-      reader.readAsDataURL(files[0]);
+      reader.readAsDataURL(e.target.files[0]);
       setIsImageCropModalShow(true);
     }
   }, []);
@@ -79,14 +77,10 @@ const CustomizeLogoSetting = (): JSX.Element => {
     setUploadLogoSrc(null);
   }, [clearFileInput]);
 
-  const onModalStateClose = useCallback(() => {
-    setIsImageCropModalShow(false);
-  }, []);
-
   const onCloseCropModal = useCallback(() => {
     resetFileSelectionState();
-    onModalStateClose();
-  }, [resetFileSelectionState, onModalStateClose]);
+    setIsImageCropModalShow(false);
+  }, [resetFileSelectionState]);
 
   const onClickDeleteBtn = useCallback(async () => {
     try {
@@ -112,7 +106,6 @@ const CustomizeLogoSetting = (): JSX.Element => {
         const formData = new FormData();
         formData.append('file', croppedImage);
         await apiv3PostForm('/customize-setting/upload-brand-logo', formData);
-        setIsImageCropModalShow(false);
         setIsCustomizedLogoUploaded(true);
         toastSuccess(
           t('toaster.update_successed', {
