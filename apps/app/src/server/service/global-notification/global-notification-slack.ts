@@ -1,10 +1,12 @@
 import type { IUser } from '@growi/core/dist/interfaces';
 import { pagePathUtils } from '@growi/core/dist/utils';
+import type { ChatPostMessageArguments } from '@slack/web-api';
 import urljoin from 'url-join';
 
 import type Crowi from '~/server/crowi';
 import {
   GlobalNotificationSettingEvent,
+  type GlobalNotificationSettingModel,
   GlobalNotificationSettingType,
 } from '~/server/models/GlobalNotificationSetting';
 import loggerFactory from '~/utils/logger';
@@ -16,10 +18,6 @@ import type { GlobalNotificationEventVars } from './types';
 const _logger = loggerFactory('growi:service:GlobalNotificationSlackService');
 
 const { encodeSpaces } = pagePathUtils;
-
-interface GlobalNotificationSlackSetting {
-  slackChannels: string;
-}
 
 /**
  * sub service class of GlobalNotificationSetting
@@ -53,14 +51,14 @@ class GlobalNotificationSlackService {
   ): Promise<void> {
     const { appService, slackIntegrationService } = this.crowi;
 
-    const { GlobalNotificationSetting } = this.crowi.models;
-    const notifications = (
-      GlobalNotificationSetting as any
-    ).findSettingByPathAndEvent(
-      event,
-      path,
-      GlobalNotificationSettingType.SLACK,
-    );
+    const GlobalNotificationSetting = this.crowi.models
+      .GlobalNotificationSetting as GlobalNotificationSettingModel;
+    const notifications =
+      await GlobalNotificationSetting.findSettingByPathAndEvent(
+        event,
+        path,
+        GlobalNotificationSettingType.SLACK,
+      );
 
     const messageBody = this.generateMessageBody(
       event,
@@ -80,15 +78,16 @@ class GlobalNotificationSlackService {
     const appTitle = appService.getAppTitle();
 
     await Promise.all(
-      notifications.map((notification: GlobalNotificationSlackSetting) => {
+      notifications.map((notification) => {
         const messageObj = prepareSlackMessageForGlobalNotification(
           messageBody,
           attachmentBody,
           appTitle,
           notification.slackChannels,
         );
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return slackIntegrationService.postMessage(messageObj as any);
+        return slackIntegrationService.postMessage(
+          messageObj as unknown as ChatPostMessageArguments,
+        );
       }),
     );
   }
@@ -106,6 +105,7 @@ class GlobalNotificationSlackService {
    *
    * @return slack message body
    */
+  // biome-ignore lint/nursery/useMaxParams: event vars needed for different notification types
   generateMessageBody(
     event: string,
     id: string,
@@ -170,6 +170,7 @@ class GlobalNotificationSlackService {
    *
    * @return slack attachment body
    */
+  // biome-ignore lint/nursery/useMaxParams: event vars needed for different notification types
   generateAttachmentBody(
     _event: string,
     _id: string,
@@ -203,4 +204,4 @@ class GlobalNotificationSlackService {
   }
 }
 
-export default GlobalNotificationSlackService;
+export { GlobalNotificationSlackService };

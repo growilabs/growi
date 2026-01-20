@@ -678,9 +678,9 @@ class Crowi {
    * setup GlobalNotificationService
    */
   async setUpGlobalNotification(): Promise<void> {
-    const GlobalNotificationService = (
-      await import('../service/global-notification')
-    ).default;
+    const { GlobalNotificationService } = await import(
+      '../service/global-notification'
+    );
     if (this.globalNotificationService == null) {
       this.globalNotificationService = new GlobalNotificationService(this);
     }
