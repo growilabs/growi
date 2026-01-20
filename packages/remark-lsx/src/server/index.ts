@@ -61,8 +61,6 @@ const middleware = (crowi: any, app: any): void => {
 
   app.get(
     '/_api/lsx',
-    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
-    // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
     loginRequired,
     lsxValidator,
