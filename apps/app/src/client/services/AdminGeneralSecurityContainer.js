@@ -314,7 +314,7 @@ export default class AdminGeneralSecurityContainer extends Container {
               this.state.currentGroupRestrictionDisplayMode === 'Hidden',
             hideRestrictedByOwner:
               this.state.currentOwnerRestrictionDisplayMode === 'Hidden',
-            isUserPagesVisible: this.state.isUserPagesVisible,
+            isHidingUserPages: this.state.isHidingUserPages,
             isUsersHomepageDeletionEnabled:
               this.state.isUsersHomepageDeletionEnabled,
             isForceDeleteUserHomepageOnUserDeletion:
