@@ -56,6 +56,11 @@
       "enable_force_delete_user_homepage_on_user_deletion": "When you delete a user, the user's homepage and all its sub pages will be completely deleted",
       "desc": "You will be able to delete a deleted user's homepage."
     },
+    "user_page_visibility": {
+      "user_page_visibility": "User page visibility",
+      "hide_user_pages": "Hide user pages",
+      "desc": "When enabled, all pages under /user will be hidden. Accessing hidden pages will return a 403 error, and they will not appear in page lists or search results."
+    },
     "session": "Session",
     "max_age": "Max age (msec)",
     "max_age_desc": "Specifies the number (in milliseconds) to expire users session.<br>Default: 2592000000 (30days)",
