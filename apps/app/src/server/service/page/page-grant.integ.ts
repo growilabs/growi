@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { GroupType, type IPage, PageGrant } from '@growi/core';
 import mongoose from 'mongoose';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -164,12 +165,16 @@ describe('PageGrantService', () => {
       },
     ]);
 
-    externalGroupParent = await ExternalUserGroup.findOne({
+    const _externalGroupParent = await ExternalUserGroup.findOne({
       name: 'ExternalGroupParent',
     });
-    externalGroupChild = await ExternalUserGroup.findOne({
+    assert(_externalGroupParent != null); // should not be null
+    externalGroupParent = _externalGroupParent;
+    const _externalGroupChild = await ExternalUserGroup.findOne({
       name: 'ExternalGroupChild',
     });
+    assert(_externalGroupChild != null); // should not be null
+    externalGroupChild = _externalGroupChild;
 
     await ExternalUserGroupRelation.insertMany([
       {
@@ -523,17 +528,16 @@ describe('PageGrantService', () => {
     Page = mongoose.model<IPage, PageModel>('Page');
 
     // Ensure root page exists (required for page hierarchy)
-    rootPage = await Page.findOne({ path: '/' });
-    if (rootPage == null) {
+    const existingRootPage = await Page.findOne({ path: '/' });
+    if (existingRootPage == null) {
       const rootPageId = new mongoose.Types.ObjectId();
-      await Page.insertMany([
-        {
-          _id: rootPageId,
-          path: '/',
-          grant: Page.GRANT_PUBLIC,
-        },
-      ]);
-      rootPage = (await Page.findOne({ path: '/' }))!;
+      rootPage = await Page.create({
+        _id: rootPageId,
+        path: '/',
+        grant: Page.GRANT_PUBLIC,
+      });
+    } else {
+      rootPage = existingRootPage;
     }
 
     await createDocumentsToTestIsGrantNormalized();
@@ -1186,6 +1190,7 @@ describe('PageGrantService', () => {
       const groupGrantDataTestChildPage = await Page.findOne({
         path: groupGrantDataTestChildPagePath,
       });
+      assert(groupGrantDataTestChildPage != null);
       const result = await pageGrantService.getPageGroupGrantData(
         groupGrantDataTestChildPage,
         user3,

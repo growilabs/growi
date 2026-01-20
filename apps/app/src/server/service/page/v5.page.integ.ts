@@ -41,17 +41,16 @@ describe('Test page service methods', () => {
     );
 
     // Ensure root page exists
-    rootPage = await Page.findOne({ path: '/' });
-    if (rootPage == null) {
+    const existingRootPage = await Page.findOne({ path: '/' });
+    if (existingRootPage == null) {
       const rootPageId = new mongoose.Types.ObjectId();
-      await Page.insertMany([
-        {
-          _id: rootPageId,
-          path: '/',
-          grant: Page.GRANT_PUBLIC,
-        },
-      ]);
-      rootPage = (await Page.findOne({ path: '/' }))!;
+      rootPage = await Page.create({
+        _id: rootPageId,
+        path: '/',
+        grant: Page.GRANT_PUBLIC,
+      });
+    } else {
+      rootPage = existingRootPage;
     }
 
     // Create dummy user for tests
@@ -480,9 +479,14 @@ describe('Test page service methods', () => {
       pageOp: any,
       activity?: any,
     ) => {
+      // Access private method for testing purposes
+      const pageServiceWithPrivate = crowi.pageService as unknown as Record<
+        string,
+        (...args: unknown[]) => unknown
+      >;
       const mockedPathsAndDescendantCountOfAncestors = vi
-        .spyOn(crowi.pageService, 'fixPathsAndDescendantCountOfAncestors')
-        .mockReturnValue(null as any);
+        .spyOn(pageServiceWithPrivate, 'fixPathsAndDescendantCountOfAncestors')
+        .mockReturnValue(null);
       await crowi.pageService.resumeRenameSubOperation(
         renamePage,
         pageOp,
@@ -493,9 +497,8 @@ describe('Test page service methods', () => {
         mockedPathsAndDescendantCountOfAncestors.mock.calls[0];
 
       mockedPathsAndDescendantCountOfAncestors.mockRestore();
-      await crowi.pageService.fixPathsAndDescendantCountOfAncestors(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ...(argsForRenameSubOperation as any),
+      await pageServiceWithPrivate.fixPathsAndDescendantCountOfAncestors(
+        ...argsForRenameSubOperation,
       );
     };
 
