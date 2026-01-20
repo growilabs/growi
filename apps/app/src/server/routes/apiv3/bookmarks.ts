@@ -247,7 +247,7 @@ module.exports = (crowi) => {
           _id: { $nin: bookmarkIdsInFolders },
           user: userId,
         })
-          .populate<{ page: PageDocument }>({
+          .populate<{ page: PageDocument | null }>({
             path: 'page',
             model: 'Page',
             populate: {
@@ -264,6 +264,7 @@ module.exports = (crowi) => {
         const filteredBookmarks = isHidingUserPages
           ? userRootBookmarks.filter(
               (bookmark) =>
+                bookmark.page != null &&
                 !isUserPage(bookmark.page.path) &&
                 !isUsersTopPage(bookmark.page.path),
             )
