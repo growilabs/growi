@@ -59,7 +59,7 @@
     "user_page_visibility": {
       "user_page_visibility": "User page visibility",
       "hide_user_pages": "Hide user pages",
-      "desc": "Hides all user related pages for general users"
+      "desc": "When enabled, all pages under /user will be hidden. Accessing hidden pages will return a 403 error, and they will not appear in page lists or search results."
     },
     "session": "Session",
     "max_age": "Max age (msec)",
