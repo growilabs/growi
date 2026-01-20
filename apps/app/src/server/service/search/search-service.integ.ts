@@ -1,31 +1,34 @@
-/*
- * !! TODO: https://redmine.weseek.co.jp/issues/92050 Fix & adjust test !!
- */
+import type { IPage, IUser } from '@growi/core';
+import mongoose, { type Model } from 'mongoose';
 
-import mongoose from 'mongoose';
+import { getInstance } from '^/test-with-vite/setup/crowi';
 
+import type Crowi from '~/server/crowi';
+import type { QueryTerms, SearchDelegator } from '~/server/interfaces/search';
 import NamedQuery from '~/server/models/named-query';
+import type { PageDocument, PageModel } from '~/server/models/page';
 import SearchService from '~/server/service/search';
 
-const { getInstance } = require('../../setup-crowi');
-
 describe('SearchService test', () => {
-  let crowi;
-  let searchService;
+  let crowi: Crowi;
+  let searchService: SearchService;
 
   const DEFAULT = 'FullTextSearch';
   const PRIVATE_LEGACY_PAGES = 'PrivateLegacyPages';
 
-  // let NamedQuery;
+  let dummyAliasOf: string;
 
-  let dummyAliasOf;
-
-  let namedQuery1;
-  let namedQuery2;
-
-  const dummyFullTextSearchDelegator = {
+  const dummyFullTextSearchDelegator: SearchDelegator = {
     search() {
-      return;
+      return Promise.resolve({ data: [], meta: { total: 0, hitsCount: 0 } });
+    },
+    isTermsNormalized(
+      terms: Partial<QueryTerms>,
+    ): terms is Partial<QueryTerms> {
+      return true;
+    },
+    validateTerms() {
+      return [];
     },
   };
 
@@ -40,17 +43,23 @@ describe('SearchService test', () => {
     dummyAliasOf =
       'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2';
 
-    await NamedQuery.insertMany([
-      { name: 'named_query1', delegatorName: PRIVATE_LEGACY_PAGES },
-      { name: 'named_query2', aliasOf: dummyAliasOf },
-    ]);
-
-    namedQuery1 = await NamedQuery.findOne({ name: 'named_query1' });
-    namedQuery2 = await NamedQuery.findOne({ name: 'named_query2' });
+    // Check if named queries already exist
+    const existingNQ1 = await NamedQuery.findOne({
+      name: 'search_svc_named_query1',
+    });
+    if (existingNQ1 == null) {
+      await NamedQuery.insertMany([
+        {
+          name: 'search_svc_named_query1',
+          delegatorName: PRIVATE_LEGACY_PAGES,
+        },
+        { name: 'search_svc_named_query2', aliasOf: dummyAliasOf },
+      ]);
+    }
   });
 
   describe('parseQueryString()', () => {
-    test('should parse queryString', async () => {
+    it('should parse queryString', async () => {
       const queryString =
         'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2';
       const terms = await searchService.parseQueryString(queryString);
@@ -72,9 +81,9 @@ describe('SearchService test', () => {
   });
 
   describe('parseSearchQuery()', () => {
-    test('should return result with delegatorName', async () => {
+    it('should return result with delegatorName', async () => {
       const queryString = '/';
-      const nqName = 'named_query1';
+      const nqName = 'search_svc_named_query1';
       const parsedQuery = await searchService.parseSearchQuery(
         queryString,
         nqName,
@@ -98,9 +107,9 @@ describe('SearchService test', () => {
       expect(parsedQuery).toStrictEqual(expected);
     });
 
-    test('should return result with expanded aliasOf value', async () => {
+    it('should return result with expanded aliasOf value', async () => {
       const queryString = '/';
-      const nqName = 'named_query2';
+      const nqName = 'search_svc_named_query2';
       const parsedQuery = await searchService.parseSearchQuery(
         queryString,
         nqName,
@@ -124,7 +133,7 @@ describe('SearchService test', () => {
   });
 
   describe('resolve()', () => {
-    test('should resolve as full-text search delegator', async () => {
+    it('should resolve as full-text search delegator', async () => {
       const parsedQuery = {
         queryString: dummyAliasOf,
         terms: {
@@ -147,7 +156,7 @@ describe('SearchService test', () => {
       expect(typeof delegator.search).toBe('function');
     });
 
-    test('should resolve as custom search delegator', async () => {
+    it('should resolve as custom search delegator', async () => {
       const queryString = '/';
       const parsedQuery = {
         queryString,
@@ -177,61 +186,76 @@ describe('SearchService test', () => {
   });
 
   describe('searchKeyword()', () => {
-    test('should search with custom search delegator', async () => {
-      const Page = mongoose.model('Page');
-      const User = mongoose.model('User');
-      await User.insertMany([
-        {
-          name: 'dummyuser1',
-          username: 'dummyuser1',
-          email: 'dummyuser1@example.com',
-        },
-        {
-          name: 'dummyuser2',
-          username: 'dummyuser2',
-          email: 'dummyuser2@example.com',
-        },
-      ]);
+    it('should search with custom search delegator', async () => {
+      const Page = mongoose.model<PageDocument, PageModel>('Page');
+      const User: Model<IUser> = mongoose.model('User');
 
-      const testUser1 = await User.findOne({ username: 'dummyuser1' });
-      const testUser2 = await User.findOne({ username: 'dummyuser2' });
+      // Create users if they don't exist
+      const existingUser1 = await User.findOne({
+        username: 'searchSvcDummyUser1',
+      });
+      if (existingUser1 == null) {
+        await User.insertMany([
+          {
+            name: 'searchSvcDummyUser1',
+            username: 'searchSvcDummyUser1',
+            email: 'searchSvcDummyUser1@example.com',
+          },
+          {
+            name: 'searchSvcDummyUser2',
+            username: 'searchSvcDummyUser2',
+            email: 'searchSvcDummyUser2@example.com',
+          },
+        ]);
+      }
 
-      await Page.insertMany([
-        {
-          path: '/user1',
-          grant: Page.GRANT_PUBLIC,
-          creator: testUser1,
-          lastUpdateUser: testUser1,
-        },
-        {
-          path: '/user1_owner',
-          grant: Page.GRANT_OWNER,
-          creator: testUser1,
-          lastUpdateUser: testUser1,
-          grantedUsers: [testUser1._id],
-        },
-        {
-          path: '/user2_public',
-          grant: Page.GRANT_PUBLIC,
-          creator: testUser2,
-          lastUpdateUser: testUser2,
-        },
-      ]);
+      const testUser1 = await User.findOne({ username: 'searchSvcDummyUser1' });
+      const testUser2 = await User.findOne({ username: 'searchSvcDummyUser2' });
 
-      const page1 = await Page.findOne({ path: '/user1' });
+      if (testUser1 == null || testUser2 == null) {
+        throw new Error('Test users not found');
+      }
 
-      await Page.insertMany([
-        {
-          path: '/user1/hasParent',
-          grant: Page.GRANT_PUBLIC,
-          creator: testUser1,
-          lastUpdateUser: testUser1,
-          parent: page1,
-        },
-      ]);
+      // Create pages if they don't exist
+      const existingPage = await Page.findOne({ path: '/searchSvc_user1' });
+      if (existingPage == null) {
+        await Page.insertMany([
+          {
+            path: '/searchSvc_user1',
+            grant: Page.GRANT_PUBLIC,
+            creator: testUser1,
+            lastUpdateUser: testUser1,
+          },
+          {
+            path: '/searchSvc_user1_owner',
+            grant: Page.GRANT_OWNER,
+            creator: testUser1,
+            lastUpdateUser: testUser1,
+            grantedUsers: [testUser1._id],
+          },
+          {
+            path: '/searchSvc_user2_public',
+            grant: Page.GRANT_PUBLIC,
+            creator: testUser2,
+            lastUpdateUser: testUser2,
+          },
+        ]);
+
+        const page1 = await Page.findOne({ path: '/searchSvc_user1' });
+
+        await Page.insertMany([
+          {
+            path: '/searchSvc_user1/hasParent',
+            grant: Page.GRANT_PUBLIC,
+            creator: testUser1,
+            lastUpdateUser: testUser1,
+            parent: page1,
+          },
+        ]);
+      }
 
       const queryString = '/';
-      const nqName = 'named_query1';
+      const nqName = 'search_svc_named_query1';
 
       const [result, delegatorName] = await searchService.searchKeyword(
         queryString,
@@ -241,11 +265,11 @@ describe('SearchService test', () => {
         { offset: 0, limit: 100 },
       );
 
-      const resultPaths = result.data.map((page) => page.path);
+      const resultPaths = result.data.map((page: IPage) => page.path);
       const flag =
-        resultPaths.includes('/user1') &&
-        resultPaths.includes('/user1_owner') &&
-        resultPaths.includes('/user2_public');
+        resultPaths.includes('/searchSvc_user1') &&
+        resultPaths.includes('/searchSvc_user1_owner') &&
+        resultPaths.includes('/searchSvc_user2_public');
 
       expect(flag).toBe(true);
       expect(delegatorName).toBe(PRIVATE_LEGACY_PAGES);
