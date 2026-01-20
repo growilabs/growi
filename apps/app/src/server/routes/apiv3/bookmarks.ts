@@ -264,7 +264,7 @@ module.exports = (crowi) => {
         const filteredBookmarks = isHidingUserPages
           ? userRootBookmarks.filter(
               (bookmark) =>
-                !isUserPage(bookmark.page.path) ||
+                !isUserPage(bookmark.page.path) &&
                 !isUsersTopPage(bookmark.page.path),
             )
           : userRootBookmarks;
