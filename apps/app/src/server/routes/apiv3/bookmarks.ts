@@ -1,6 +1,7 @@
 import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import { USER_PAGE_REGEXP } from '@growi/core/dist/utils/page-path-utils';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
@@ -10,6 +11,7 @@ import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity
 import type { BookmarkDocument, BookmarkModel } from '~/server/models/bookmark';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer';
+import { configManager } from '~/server/service/config-manager';
 import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
 
@@ -237,11 +239,12 @@ module.exports = (crowi) => {
           'bookmarks',
           { owner: userId },
         );
+
         const userRootBookmarks = await Bookmark.find({
           _id: { $nin: bookmarkIdsInFolders },
           user: userId,
         })
-          .populate({
+          .populate<{ page: PageDocument }>({
             path: 'page',
             model: 'Page',
             populate: {
@@ -251,8 +254,18 @@ module.exports = (crowi) => {
           })
           .exec();
 
+        const isHidingUserPages = configManager.getConfig(
+          'security:isHidingUserPages',
+        );
+
+        const filteredBookmarks = isHidingUserPages
+          ? userRootBookmarks.filter(
+              (bookmark) => !USER_PAGE_REGEXP.test(bookmark.page.path),
+            )
+          : userRootBookmarks;
+
         // serialize Bookmark
-        const serializedUserRootBookmarks = userRootBookmarks.map((bookmark) =>
+        const serializedUserRootBookmarks = filteredBookmarks.map((bookmark) =>
           serializeBookmarkSecurely(bookmark),
         );
 
