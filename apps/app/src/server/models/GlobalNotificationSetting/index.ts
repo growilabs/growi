@@ -1,30 +1,14 @@
 import nodePath from 'node:path';
 import { pathUtils } from '@growi/core/dist/utils';
-import type { HydratedDocument, Model } from 'mongoose';
 import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 
-export interface IGlobalNotificationSetting {
-  isEnabled: boolean;
-  triggerPath: string;
-  triggerEvents: string[];
-}
-
-export type GlobalNotificationSettingDocument =
-  HydratedDocument<IGlobalNotificationSetting>;
-
-export interface GlobalNotificationSettingModel
-  extends Model<IGlobalNotificationSetting> {
-  enable(id: string): Promise<GlobalNotificationSettingDocument>;
-  disable(id: string): Promise<GlobalNotificationSettingDocument>;
-  findAll(): Promise<GlobalNotificationSettingDocument[]>;
-  findSettingByPathAndEvent(
-    event: string,
-    path: string,
-    type: string,
-  ): Promise<GlobalNotificationSettingDocument[]>;
-}
+import type {
+  GlobalNotificationSettingDocument,
+  GlobalNotificationSettingModel,
+  IGlobalNotificationSetting,
+} from './types';
 
 /**
  * parent schema for GlobalNotificationSetting model
@@ -159,6 +143,33 @@ class GlobalNotificationSetting {
   }
 }
 
+const factory = (crowi: Crowi): GlobalNotificationSettingModel => {
+  GlobalNotificationSetting.crowi = crowi;
+  globalNotificationSettingSchema.loadClass(GlobalNotificationSetting);
+  return mongoose.model<
+    IGlobalNotificationSetting,
+    GlobalNotificationSettingModel
+  >('GlobalNotificationSetting', globalNotificationSettingSchema);
+};
+
+export default factory;
+
+// Re-export types and constants for external use
+export {
+  GlobalNotificationSettingEvent,
+  GlobalNotificationSettingType,
+} from './consts';
+export type {
+  GlobalNotificationMailSettingModel,
+  GlobalNotificationSettingDocument,
+  GlobalNotificationSettingModel,
+  GlobalNotificationSlackSettingModel,
+  IGlobalNotificationMailSetting,
+  IGlobalNotificationSetting,
+  IGlobalNotificationSlackSetting,
+} from './types';
+
+// Internal use only
 export {
   GlobalNotificationSetting as class,
   globalNotificationSettingSchema as schema,

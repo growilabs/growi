@@ -1,23 +1,18 @@
-import type { Model } from 'mongoose';
 import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 
-import { GlobalNotificationSettingType } from '../GlobalNotificationSetting';
+import { GlobalNotificationSettingType } from './consts';
 import {
   class as GlobalNotificationSettingClass,
-  type GlobalNotificationSettingModel,
   schema as GlobalNotificationSettingSchema,
-  type IGlobalNotificationSetting,
 } from './index';
-
-export interface IGlobalNotificationSlackSetting
-  extends IGlobalNotificationSetting {
-  slackChannels: string;
-}
-
-export type GlobalNotificationSlackSettingModel =
-  Model<IGlobalNotificationSlackSetting> & GlobalNotificationSettingModel;
+import type {
+  GlobalNotificationSettingModel,
+  GlobalNotificationSlackSettingModel,
+  IGlobalNotificationSetting,
+  IGlobalNotificationSlackSetting,
+} from './types';
 
 const factory = (crowi: Crowi): GlobalNotificationSlackSettingModel => {
   GlobalNotificationSettingClass.crowi = crowi;
