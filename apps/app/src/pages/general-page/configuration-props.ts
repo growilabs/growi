@@ -28,7 +28,6 @@ export const getServerSideRendererConfigProps: GetServerSideProps<
         isIndentSizeForced: configManager.getConfig(
           'markdown:isIndentSizeForced',
         ),
-
         drawioUri: configManager.getConfig('app:drawioUri'),
         plantumlUri: configManager.getConfig('app:plantumlUri'),
 
@@ -120,6 +119,9 @@ export const getServerSideGeneralPageProps: GetServerSideProps<
         ),
         isEnabledAttachTitleHeader: configManager.getConfig(
           'customize:isEnabledAttachTitleHeader',
+        ),
+        isHidingUserPages: configManager.getConfig(
+          'security:isHidingUserPages',
         ),
       },
     },
