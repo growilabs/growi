@@ -1,4 +1,5 @@
 import type { HasObjectId, IAttachment, IUser, Ref } from '@growi/core';
+
 import type { SupportedActionType } from '~/interfaces/activity';
 
 export const AuditLogBulkExportFormat = {

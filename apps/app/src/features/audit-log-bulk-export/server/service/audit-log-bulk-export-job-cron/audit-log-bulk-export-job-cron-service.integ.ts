@@ -15,6 +15,7 @@ import {
   it,
   vi,
 } from 'vitest';
+
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { ResponseMode } from '~/server/interfaces/attachment';

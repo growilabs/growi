@@ -9,7 +9,6 @@ import {
   AuditLogBulkExportJobStatus,
 } from '../../interfaces/audit-log-bulk-export';
 import AuditLogBulkExportJob from '../models/audit-log-bulk-export-job';
-
 import instantiateAuditLogBulkExportJobCleanUpCronService, {
   auditLogBulkExportJobCleanUpCronService,
 } from './audit-log-bulk-export-job-clean-up-cron';

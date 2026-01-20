@@ -1,5 +1,6 @@
 import type { HydratedDocument } from 'mongoose';
 import { type Model, Schema } from 'mongoose';
+
 import { AllSupportedActions } from '~/interfaces/activity';
 import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
