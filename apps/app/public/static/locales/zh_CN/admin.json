@@ -68,7 +68,7 @@
     "user_page_visibility": {
       "user_page_visibility": "用户页面可见性",
       "hide_user_pages": "隐藏用户页面",
-      "desc": "对一般用户隐藏所有用户相关页面"
+      "desc": "启用后，/user 下的所有页面都将被隐藏。访问隐藏页面时将返回403错误，并且这些页面不会出现在页面列表或搜索结果中。"
     },
     "session": "会议",
     "max_age": "有效期间  (msec)",

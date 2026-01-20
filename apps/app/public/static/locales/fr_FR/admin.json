@@ -59,7 +59,7 @@
     "user_page_visibility": {
       "user_page_visibility": "Visibilité de la page utilisateur",
       "hide_user_pages": "Masquer les pages utilisateur",
-      "desc": "Masque toutes les pages liées aux utilisateurs pour les utilisateurs généraux"
+      "desc": "Lorsque cette option est activée, toutes les pages sous /user seront masquées. L'accès aux pages masquées renverra une erreur 403, et elles n'apparaîtront pas dans les listes de pages ni dans les résultats de recherche."
     },
     "session": "Session",
     "max_age": "Âge maximal (ms)",
