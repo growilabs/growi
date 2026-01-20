@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+
 import type { SupportedActionType } from '~/interfaces/activity';
 import { configManager } from '~/server/service/config-manager';
 
@@ -7,7 +8,6 @@ import {
   AuditLogBulkExportJobStatus,
 } from '../../interfaces/audit-log-bulk-export';
 import AuditLogBulkExportJob from '../models/audit-log-bulk-export-job';
-
 import {
   auditLogBulkExportService,
   DuplicateAuditLogBulkExportJobError,
