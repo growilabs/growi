@@ -11,7 +11,6 @@ import {
 } from '../../interfaces/audit-log-bulk-export';
 import type { AuditLogBulkExportJobDocument } from '../models/audit-log-bulk-export-job';
 import AuditLogBulkExportJob from '../models/audit-log-bulk-export-job';
-
 import { auditLogBulkExportJobCronService } from './audit-log-bulk-export-job-cron';
 
 const logger = loggerFactory(
