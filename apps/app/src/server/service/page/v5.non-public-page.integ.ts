@@ -6,22 +6,28 @@ import {
 } from '@growi/core';
 import mongoose from 'mongoose';
 
-import { ExternalGroupProviderType } from '../../../src/features/external-user-group/interfaces/external-user-group';
-import ExternalUserGroup from '../../../src/features/external-user-group/server/models/external-user-group';
-import ExternalUserGroupRelation from '../../../src/features/external-user-group/server/models/external-user-group-relation';
-import type { IPageTagRelation } from '../../../src/interfaces/page-tag-relation';
-import type Crowi from '../../../src/server/crowi';
-import type { PageDocument, PageModel } from '../../../src/server/models/page';
-import PageTagRelation from '../../../src/server/models/page-tag-relation';
+import { getInstance } from '^/test-with-vite/setup/crowi';
+
+import { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
+import { PageActionType } from '~/interfaces/page-operation';
+import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
+import type Crowi from '~/server/crowi';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import type {
+  IPageOperation,
+  PageOperationModel,
+} from '~/server/models/page-operation';
+import PageTagRelation from '~/server/models/page-tag-relation';
 import type {
   IRevisionDocument,
   IRevisionModel,
-} from '../../../src/server/models/revision';
-import Tag from '../../../src/server/models/tag';
-import UserGroup from '../../../src/server/models/user-group';
-import UserGroupRelation from '../../../src/server/models/user-group-relation';
-import { generalXssFilter } from '../../../src/services/general-xss-filter';
-import { getInstance } from '../setup-crowi';
+} from '~/server/models/revision';
+import Tag from '~/server/models/tag';
+import UserGroup from '~/server/models/user-group';
+import UserGroupRelation from '~/server/models/user-group-relation';
+import { generalXssFilter } from '~/services/general-xss-filter';
 
 describe('PageService page operations with non-public pages', () => {
   // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
@@ -45,9 +51,9 @@ describe('PageService page operations with non-public pages', () => {
   let crowi: Crowi;
   let Page: PageModel;
   let Revision: IRevisionModel;
-  // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
-  let User;
-  let generalXssFilterProcessSpy: jest.SpyInstance;
+  let User: UserModel;
+  let PageOperation: PageOperationModel;
+  let generalXssFilterProcessSpy: ReturnType<typeof vi.spyOn>;
 
   let rootPage: PageDocument;
 
@@ -110,7 +116,7 @@ describe('PageService page operations with non-public pages', () => {
   const tagIdRevert2 = new mongoose.Types.ObjectId();
 
   const create = async (path, body, user, options = {}) => {
-    const mockedCreateSubOperation = jest
+    const mockedCreateSubOperation = vi
       .spyOn(crowi.pageService, 'createSubOperation')
       .mockReturnValue(null);
 
@@ -145,6 +151,31 @@ describe('PageService page operations with non-public pages', () => {
     });
   };
 
+  // Common helper to wait for PageOperation completion
+  const waitForPageOperationComplete = async (
+    fromPath: string,
+    actionType?: PageActionType,
+    maxWaitMs = 5000,
+  ) => {
+    const startTime = Date.now();
+    while (Date.now() - startTime < maxWaitMs) {
+      const query: { fromPath: string; actionType?: PageActionType } = {
+        fromPath,
+      };
+      if (actionType != null) {
+        query.actionType = actionType;
+      }
+      const op = await PageOperation.findOne(query);
+      if (op == null) {
+        return; // Operation completed
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error(
+      `PageOperation for ${fromPath} did not complete within ${maxWaitMs}ms`,
+    );
+  };
+
   beforeAll(async () => {
     crowi = await getInstance();
     await crowi.configManager.updateConfig('app:isV5Compatible', true);
@@ -152,6 +183,9 @@ describe('PageService page operations with non-public pages', () => {
     User = mongoose.model('User');
     Page = mongoose.model<IPage, PageModel>('Page');
     Revision = mongoose.model<IRevision, IRevisionModel>('Revision');
+    PageOperation = mongoose.model<IPageOperation, PageOperationModel>(
+      'PageOperation',
+    );
 
     /*
      * Common
@@ -329,21 +363,47 @@ describe('PageService page operations with non-public pages', () => {
       },
     ]);
 
-    generalXssFilterProcessSpy = jest.spyOn(generalXssFilter, 'process');
+    generalXssFilterProcessSpy = vi.spyOn(generalXssFilter, 'process');
 
+    // Ensure root page exists
+    const existingRootPage = await Page.findOne({ path: '/' });
+    if (existingRootPage == null) {
+      const rootPageId = new mongoose.Types.ObjectId();
+      rootPage = await Page.create({
+        _id: rootPageId,
+        path: '/',
+        grant: Page.GRANT_PUBLIC,
+      });
+    } else {
+      rootPage = existingRootPage;
+    }
+
+    // Create dummy users if they do not exist
+    const usersToCreate = [
+      {
+        name: 'v5DummyUser1',
+        username: 'v5DummyUser1',
+        email: 'v5dummyuser1@example.com',
+      },
+      {
+        name: 'v5DummyUser2',
+        username: 'v5DummyUser2',
+        email: 'v5dummyuser2@example.com',
+      },
+    ];
+    for (const userData of usersToCreate) {
+      const existing = await User.findOne({ username: userData.username });
+      if (existing == null) {
+        await User.insertMany([userData]);
+      }
+    }
+
+    // Assign dummy users to variables
     dummyUser1 = await User.findOne({ username: 'v5DummyUser1' });
     dummyUser2 = await User.findOne({ username: 'v5DummyUser2' });
     npDummyUser1 = await User.findOne({ username: 'npUser1' });
     npDummyUser2 = await User.findOne({ username: 'npUser2' });
     npDummyUser3 = await User.findOne({ username: 'npUser3' });
-
-    rootPage = (await Page.findOne({ path: '/' }))!;
-    if (rootPage == null) {
-      const pages = await Page.insertMany([
-        { path: '/', grant: Page.GRANT_PUBLIC },
-      ]);
-      rootPage = pages[0];
-    }
 
     /**
      * create
@@ -1003,8 +1063,8 @@ describe('PageService page operations with non-public pages', () => {
 
   describe('create', () => {
     describe('Creating a page using existing path', () => {
-      test('with grant RESTRICTED should only create the page and change nothing else', async () => {
-        const isGrantNormalizedSpy = jest.spyOn(
+      it('with grant RESTRICTED should only create the page and change nothing else', async () => {
+        const isGrantNormalizedSpy = vi.spyOn(
           crowi.pageGrantService,
           'isGrantNormalized',
         );
@@ -1051,8 +1111,8 @@ describe('PageService page operations with non-public pages', () => {
       });
     });
     describe('Creating a page under a page with grant RESTRICTED', () => {
-      test('will create a new empty page with the same path as the grant RESTRECTED page and become a parent', async () => {
-        const isGrantNormalizedSpy = jest.spyOn(
+      it('will create a new empty page with the same path as the grant RESTRECTED page and become a parent', async () => {
+        const isGrantNormalizedSpy = vi.spyOn(
           crowi.pageGrantService,
           'isGrantNormalized',
         );
@@ -1102,7 +1162,7 @@ describe('PageService page operations with non-public pages', () => {
     });
     describe('Creating a page under a page with grant USER_GROUP', () => {
       describe('When onlyInheritUserRelatedGrantedGroups is true', () => {
-        test('Only user related groups should be inherited', async () => {
+        it('Only user related groups should be inherited', async () => {
           const pathT = '/mc6_top';
           const pageT = await Page.findOne({ path: pathT });
           expect(pageT).toBeTruthy();
@@ -1129,7 +1189,7 @@ describe('PageService page operations with non-public pages', () => {
       });
 
       describe('When onlyInheritUserRelatedGrantedGroups is false', () => {
-        test('All groups should be inherited', async () => {
+        it('All groups should be inherited', async () => {
           const pathT = '/mc6_top';
           const pageT = await Page.findOne({ path: pathT });
           expect(pageT).toBeTruthy();
@@ -1160,8 +1220,8 @@ describe('PageService page operations with non-public pages', () => {
 
   describe('create by system', () => {
     describe('Creating a page using existing path', () => {
-      test('with grant RESTRICTED should only create the page and change nothing else', async () => {
-        const isGrantNormalizedSpy = jest.spyOn(
+      it('with grant RESTRICTED should only create the page and change nothing else', async () => {
+        const isGrantNormalizedSpy = vi.spyOn(
           crowi.pageGrantService,
           'isGrantNormalized',
         );
@@ -1208,8 +1268,8 @@ describe('PageService page operations with non-public pages', () => {
       });
     });
     describe('Creating a page under a page with grant RESTRICTED', () => {
-      test('will create a new empty page with the same path as the grant RESTRECTED page and become a parent', async () => {
-        const isGrantNormalizedSpy = jest.spyOn(
+      it('will create a new empty page with the same path as the grant RESTRECTED page and become a parent', async () => {
+        const isGrantNormalizedSpy = vi.spyOn(
           crowi.pageGrantService,
           'isGrantNormalized',
         );
@@ -1267,10 +1327,7 @@ describe('PageService page operations with non-public pages', () => {
       options,
       activityParameters?,
     ) => {
-      // mock return value
-      const mockedRenameSubOperation = jest
-        .spyOn(crowi.pageService, 'renameSubOperation')
-        .mockReturnValue(null);
+      const fromPath = page.path;
       const renamedPage = await crowi.pageService.renamePage(
         page,
         newPagePath,
@@ -1279,25 +1336,16 @@ describe('PageService page operations with non-public pages', () => {
         activityParameters,
       );
 
-      // retrieve the arguments passed when calling method renameSubOperation inside renamePage method
-      const argsForRenameSubOperation = mockedRenameSubOperation.mock.calls[0];
-
-      // restores the original implementation
-      mockedRenameSubOperation.mockRestore();
-
-      // rename descendants
+      // Wait for the async renameSubOperation to complete
+      // renameSubOperation is called without await in production, so we need to wait for it
       if (page.grant !== Page.GRANT_RESTRICTED) {
-        await crowi.pageService.renameSubOperation(
-          ...(argsForRenameSubOperation as Parameters<
-            typeof crowi.pageService.renameSubOperation
-          >),
-        );
+        await waitForPageOperationComplete(fromPath);
       }
 
       return renamedPage;
     };
 
-    test('Should rename/move with descendants with grant normalized pages', async () => {
+    it('Should rename/move with descendants with grant normalized pages', async () => {
       const _pathD = '/np_rename1_destination';
       const _path2 = '/np_rename2';
       const _path3 = '/np_rename2/np_rename3';
@@ -1359,7 +1407,7 @@ describe('PageService page operations with non-public pages', () => {
       );
       expect(generalXssFilterProcessSpy).toHaveBeenCalled();
     });
-    test('Should throw with NOT grant normalized pages', async () => {
+    it('Should throw with NOT grant normalized pages', async () => {
       const _pathD = '/np_rename4_destination';
       const _path2 = '/np_rename5';
       const _path3 = '/np_rename5/np_rename6';
@@ -1414,7 +1462,7 @@ describe('PageService page operations with non-public pages', () => {
       expect(page2Renamed).toBeNull();
       expect(page3Renamed).toBeNull();
     });
-    test('Should rename/move multiple pages: child page with GRANT_RESTRICTED should NOT be renamed.', async () => {
+    it('Should rename/move multiple pages: child page with GRANT_RESTRICTED should NOT be renamed.', async () => {
       const _pathD = '/np_rename7_destination';
       const _path2 = '/np_rename8';
       const _path3 = '/np_rename8/np_rename9';
@@ -1469,10 +1517,7 @@ describe('PageService page operations with non-public pages', () => {
       isRecursively: boolean,
       onlyDuplicateUserRelatedResources: boolean,
     ) => {
-      // mock return value
-      const mockedDuplicateRecursivelyMainOperation = jest
-        .spyOn(crowi.pageService, 'duplicateRecursivelyMainOperation')
-        .mockReturnValue(null);
+      const fromPath = page.path;
       const duplicatedPage = await crowi.pageService.duplicate(
         page,
         newPagePath,
@@ -1481,25 +1526,14 @@ describe('PageService page operations with non-public pages', () => {
         onlyDuplicateUserRelatedResources,
       );
 
-      // retrieve the arguments passed when calling method duplicateRecursivelyMainOperation inside duplicate method
-      const argsForDuplicateRecursivelyMainOperation =
-        mockedDuplicateRecursivelyMainOperation.mock.calls[0];
-
-      // restores the original implementation
-      mockedDuplicateRecursivelyMainOperation.mockRestore();
-
-      // duplicate descendants
+      // Wait for the async duplicateRecursivelyMainOperation to complete
       if (page.grant !== Page.GRANT_RESTRICTED && isRecursively) {
-        await crowi.pageService.duplicateRecursivelyMainOperation(
-          ...(argsForDuplicateRecursivelyMainOperation as Parameters<
-            typeof crowi.pageService.duplicateRecursivelyMainOperation
-          >),
-        );
+        await waitForPageOperationComplete(fromPath, PageActionType.Duplicate);
       }
 
       return duplicatedPage;
     };
-    test('Duplicate single page with GRANT_RESTRICTED', async () => {
+    it('Duplicate single page with GRANT_RESTRICTED', async () => {
       const _page = await Page.findOne({
         path: '/np_duplicate1',
         grant: Page.GRANT_RESTRICTED,
@@ -1528,7 +1562,7 @@ describe('PageService page operations with non-public pages', () => {
       expect(duplicatedRevision?.body).toBe(_revision?.body);
     });
 
-    test('Should duplicate multiple pages with GRANT_USER_GROUP', async () => {
+    it('Should duplicate multiple pages with GRANT_USER_GROUP', async () => {
       const _path1 = '/np_duplicate2';
       const _path2 = '/np_duplicate2/np_duplicate3';
       const _page1 = await Page.findOne({
@@ -1595,7 +1629,7 @@ describe('PageService page operations with non-public pages', () => {
       expect(duplicatedRevision1?.pageId).toStrictEqual(duplicatedPage1?._id);
       expect(duplicatedRevision2?.pageId).toStrictEqual(duplicatedPage2?._id);
     });
-    test('Should duplicate multiple pages. Page with GRANT_RESTRICTED should NOT be duplicated', async () => {
+    it('Should duplicate multiple pages. Page with GRANT_RESTRICTED should NOT be duplicated', async () => {
       const _path1 = '/np_duplicate4';
       const _path2 = '/np_duplicate4/np_duplicate5';
       const _path3 = '/np_duplicate4/np_duplicate6';
@@ -1668,7 +1702,7 @@ describe('PageService page operations with non-public pages', () => {
       expect(duplicatedRevision1?.pageId).toStrictEqual(duplicatedPage1?._id);
       expect(duplicatedRevision3?.pageId).toStrictEqual(duplicatedPage3?._id);
     });
-    test('Should duplicate only user related pages and granted groups when onlyDuplicateUserRelatedResources is true', async () => {
+    it('Should duplicate only user related pages and granted groups when onlyDuplicateUserRelatedResources is true', async () => {
       const _path1 = '/np_duplicate7';
       const _path2 = '/np_duplicate7/np_duplicate8';
       const _path3 = '/np_duplicate7/np_duplicate9';
@@ -1724,7 +1758,7 @@ describe('PageService page operations with non-public pages', () => {
       expect(duplicatedRevision1?.body).toBe(_revision1?.body);
       expect(duplicatedRevision1?.pageId).toStrictEqual(duplicatedPage1?._id);
     });
-    test('Should duplicate all pages and granted groups when onlyDuplicateUserRelatedResources is false', async () => {
+    it('Should duplicate all pages and granted groups when onlyDuplicateUserRelatedResources is false', async () => {
       const _path1 = '/np_duplicate7';
       const _path2 = '/np_duplicate7/np_duplicate8';
       const _path3 = '/np_duplicate7/np_duplicate9';
@@ -1824,10 +1858,7 @@ describe('PageService page operations with non-public pages', () => {
       isRecursively,
       activityParameters?,
     ) => {
-      const mockedDeleteRecursivelyMainOperation = jest
-        .spyOn(crowi.pageService, 'deleteRecursivelyMainOperation')
-        .mockReturnValue(null);
-
+      const fromPath = page.path;
       const deletedPage = await crowi.pageService.deletePage(
         page,
         user,
@@ -1836,23 +1867,15 @@ describe('PageService page operations with non-public pages', () => {
         activityParameters,
       );
 
-      const argsForDeleteRecursivelyMainOperation =
-        mockedDeleteRecursivelyMainOperation.mock.calls[0];
-
-      mockedDeleteRecursivelyMainOperation.mockRestore();
-
+      // Wait for the async deleteRecursivelyMainOperation to complete
       if (isRecursively) {
-        await crowi.pageService.deleteRecursivelyMainOperation(
-          ...(argsForDeleteRecursivelyMainOperation as Parameters<
-            typeof crowi.pageService.deleteRecursivelyMainOperation
-          >),
-        );
+        await waitForPageOperationComplete(fromPath, PageActionType.Delete);
       }
 
       return deletedPage;
     };
     describe('Delete single page with grant RESTRICTED', () => {
-      test('should be able to delete', async () => {
+      it('should be able to delete', async () => {
         const _pathT = '/npdel1_awl';
         const _pageT = await Page.findOne({
           path: _pathT,
@@ -1875,7 +1898,7 @@ describe('PageService page operations with non-public pages', () => {
       });
     });
     describe('Delete single page with grant USER_GROUP', () => {
-      test('should be able to delete', async () => {
+      it('should be able to delete', async () => {
         const _path = '/npdel2_ug';
         const _page1 = await Page.findOne({
           path: _path,
@@ -1905,7 +1928,7 @@ describe('PageService page operations with non-public pages', () => {
       });
     });
     describe('Delete multiple pages with grant USER_GROUP', () => {
-      test('should be able to delete all descendants except page with GRANT_RESTRICTED', async () => {
+      it('should be able to delete all descendants except page with GRANT_RESTRICTED', async () => {
         const _pathT = '/npdel3_top';
         const _path1 = '/npdel3_top/npdel4_ug';
         const _path2 = '/npdel3_top/npdel4_ug/npdel5_ug';
@@ -2001,10 +2024,7 @@ describe('PageService page operations with non-public pages', () => {
       preventEmitting = false,
       activityParameters?,
     ) => {
-      const mockedDeleteCompletelyRecursivelyMainOperation = jest
-        .spyOn(crowi.pageService, 'deleteCompletelyRecursivelyMainOperation')
-        .mockReturnValue(null);
-
+      const fromPath = page.path;
       await crowi.pageService.deleteCompletely(
         page,
         user,
@@ -2014,16 +2034,11 @@ describe('PageService page operations with non-public pages', () => {
         activityParameters,
       );
 
-      const argsForDeleteCompletelyRecursivelyMainOperation =
-        mockedDeleteCompletelyRecursivelyMainOperation.mock.calls[0];
-
-      mockedDeleteCompletelyRecursivelyMainOperation.mockRestore();
-
+      // Wait for the async deleteCompletelyRecursivelyMainOperation to complete
       if (isRecursively) {
-        await crowi.pageService.deleteCompletelyRecursivelyMainOperation(
-          ...(argsForDeleteCompletelyRecursivelyMainOperation as Parameters<
-            typeof crowi.pageService.deleteCompletelyRecursivelyMainOperation
-          >),
+        await waitForPageOperationComplete(
+          fromPath,
+          PageActionType.DeleteCompletely,
         );
       }
 
@@ -2031,7 +2046,7 @@ describe('PageService page operations with non-public pages', () => {
     };
 
     describe('Delete single page with grant RESTRICTED', () => {
-      test('should be able to delete completely', async () => {
+      it('should be able to delete completely', async () => {
         const _path = '/npdc1_awl';
         const _page = await Page.findOne({
           path: _path,
@@ -2052,7 +2067,7 @@ describe('PageService page operations with non-public pages', () => {
       });
     });
     describe('Delete single page with grant USER_GROUP', () => {
-      test('should be able to delete completely', async () => {
+      it('should be able to delete completely', async () => {
         const _path = '/npdc2_ug';
         const _page = await Page.findOne({
           path: _path,
@@ -2075,7 +2090,7 @@ describe('PageService page operations with non-public pages', () => {
       });
     });
     describe('Delete multiple pages with grant USER_GROUP', () => {
-      test('should be able to delete all descendants completely except page with GRANT_RESTRICTED', async () => {
+      it('should be able to delete all descendants completely except page with GRANT_RESTRICTED', async () => {
         const _path1 = '/npdc3_ug';
         const _path2 = '/npdc3_ug/npdc4_ug';
         const _path3 = '/npdc3_ug/npdc4_ug/npdc5_ug';
@@ -2143,10 +2158,7 @@ describe('PageService page operations with non-public pages', () => {
       isRecursively = false,
       activityParameters?,
     ) => {
-      // mock return value
-      const mockedRevertRecursivelyMainOperation = jest
-        .spyOn(crowi.pageService, 'revertRecursivelyMainOperation')
-        .mockReturnValue(null);
+      const fromPath = page.path;
       const revertedPage = await crowi.pageService.revertDeletedPage(
         page,
         user,
@@ -2155,22 +2167,14 @@ describe('PageService page operations with non-public pages', () => {
         activityParameters,
       );
 
-      const argsForRecursivelyMainOperation =
-        mockedRevertRecursivelyMainOperation.mock.calls[0];
-
-      // restores the original implementation
-      mockedRevertRecursivelyMainOperation.mockRestore();
+      // Wait for the async revertRecursivelyMainOperation to complete
       if (isRecursively) {
-        await crowi.pageService.revertRecursivelyMainOperation(
-          ...(argsForRecursivelyMainOperation as Parameters<
-            typeof crowi.pageService.revertRecursivelyMainOperation
-          >),
-        );
+        await waitForPageOperationComplete(fromPath, PageActionType.Revert);
       }
 
       return revertedPage;
     };
-    test('should revert single deleted page with GRANT_RESTRICTED', async () => {
+    it('should revert single deleted page with GRANT_RESTRICTED', async () => {
       const trashedPage = await Page.findOne({
         path: '/trash/np_revert1',
         status: Page.STATUS_DELETED,
@@ -2211,7 +2215,7 @@ describe('PageService page operations with non-public pages', () => {
       expect(revertedPage?.grant).toBe(Page.GRANT_RESTRICTED);
       expect(pageTagRelation?.isPageTrashed).toBe(false);
     });
-    test('should revert single deleted page with GRANT_USER_GROUP', async () => {
+    it('should revert single deleted page with GRANT_USER_GROUP', async () => {
       const beforeRevertPath = '/trash/np_revert2';
       const user1 = await User.findOne({ name: 'npUser1' });
       const trashedPage = await Page.findOne({
@@ -2307,7 +2311,7 @@ describe('PageService page operations with non-public pages', () => {
       expect(revertedPage?.status).toBe(Page.STATUS_PUBLISHED);
       expect(revertedPage?.grant).toBe(Page.GRANT_PUBLIC);
     });
-    test('revert multiple pages: target page, initially non-existant page and leaf page with GRANT_USER_GROUP shoud be reverted', async () => {
+    it('revert multiple pages: target page, initially non-existant page and leaf page with GRANT_USER_GROUP shoud be reverted', async () => {
       const user = await User.findOne({ _id: npDummyUser3 });
       const beforeRevertPath1 = '/trash/np_revert5';
       const beforeRevertPath2 = '/trash/np_revert5/middle/np_revert6';
