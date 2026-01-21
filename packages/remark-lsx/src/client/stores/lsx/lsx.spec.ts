@@ -98,6 +98,9 @@ describe('useSWRxLsx integration tests', () => {
         req.user = { _id: '507f1f77bcf86cd799439012', username: 'testuser' };
         next();
       },
+      pageService: {
+        getExcludedPathsBySystem: vi.fn().mockReturnValue(['/user']),
+      },
     };
 
     // Import and setup the LSX middleware

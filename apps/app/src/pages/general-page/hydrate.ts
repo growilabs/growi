@@ -5,6 +5,7 @@ import {
   aiEnabledAtom,
   defaultIndentSizeAtom,
   disableLinkSharingAtom,
+  disableUserPagesAtom,
   drawioUriAtom,
   elasticsearchMaxBodyLengthToIndexAtom,
   isAclEnabledAtom,
@@ -108,6 +109,7 @@ export const useHydrateGeneralPageConfigurationAtoms = (
             serverConfig.isLocalAccountRegistrationEnabled,
           ),
           createAtomTuple(rendererConfigAtom, rendererConfigs),
+          createAtomTuple(disableUserPagesAtom, serverConfig.disableUserPages),
         ];
 
   useHydrateAtoms(tuples);

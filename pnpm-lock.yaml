@@ -768,11 +768,11 @@ importers:
         specifier: '=2.1.0'
         version: 2.1.0(handsontable@6.2.2)
       '@headless-tree/core':
-        specifier: ^1.5.1
-        version: 1.5.1
+        specifier: ^1.5.3
+        version: 1.6.3
       '@headless-tree/react':
-        specifier: ^1.5.1
-        version: 1.5.1(@headless-tree/core@1.5.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        specifier: ^1.5.3
+        version: 1.6.3(@headless-tree/core@1.6.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@next/bundle-analyzer':
         specifier: ^14.1.3
         version: 14.2.4
@@ -3085,11 +3085,11 @@ packages:
     peerDependencies:
       handsontable: '>=6.0.0'
 
-  '@headless-tree/core@1.5.1':
-    resolution: {integrity: sha512-uPoFcjPYdnXwuEDJd2oCMY8a4nnsMKyx6P0G1+is6dIGFpUsoV0qjtJN6ykJtOgTHVhBRR11zRmletER6Qgj/Q==}
+  '@headless-tree/core@1.6.3':
+    resolution: {integrity: sha512-en0EOaZfiCRF2B8DEnhGhSaUf3hVr9Bauye8G8aswPbHOKSyhJiN4bsczz1GvqF4Xb7Ga3LP0vLA6Zih7YLoyw==}
 
-  '@headless-tree/react@1.5.1':
-    resolution: {integrity: sha512-8r34ug5g25peTDgyGoCZf5Ohy4O0FMhdhUNyiaXzGn/1nwUDpmmwsrqh64DVNPereSA9uhY0s39uRibfvdmTqw==}
+  '@headless-tree/react@1.6.3':
+    resolution: {integrity: sha512-aiRwG6e2EPBSec9uLLy9GlTvAuCtSTouU30Nwcr5ZTsYjG/i7B/ouC8f8Zu4unzo/v1h5ztbemp+EH2TPTKh+g==}
     peerDependencies:
       '@headless-tree/core': '*'
       react: '*'
@@ -16695,11 +16695,11 @@ snapshots:
     dependencies:
       handsontable: 6.2.2
 
-  '@headless-tree/core@1.5.1': {}
+  '@headless-tree/core@1.6.3': {}
 
-  '@headless-tree/react@1.5.1(@headless-tree/core@1.5.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
+  '@headless-tree/react@1.6.3(@headless-tree/core@1.6.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
     dependencies:
-      '@headless-tree/core': 1.5.1
+      '@headless-tree/core': 1.6.3
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
 

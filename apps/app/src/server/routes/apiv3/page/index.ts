@@ -17,7 +17,11 @@ import {
   SubscriptionStatusType,
 } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
-import { convertToNewAffiliationPath } from '@growi/core/dist/utils/page-path-utils';
+import {
+  convertToNewAffiliationPath,
+  isUserPage,
+  isUsersTopPage,
+} from '@growi/core/dist/utils/page-path-utils';
 import { normalizePath } from '@growi/core/dist/utils/path-utils';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
@@ -189,6 +193,10 @@ module.exports = (crowi: Crowi) => {
       const { pageId, path, findAll, revisionId, shareLinkId, includeEmpty } =
         req.query;
 
+      const disableUserPages = crowi.configManager.getConfig(
+        'security:disableUserPages',
+      );
+
       const respondWithSinglePage = async (
         pageWithMeta:
           | IDataWithMeta<HydratedDocument<PageDocument>, IPageInfoExt>
@@ -213,6 +221,18 @@ module.exports = (crowi: Crowi) => {
             new ErrorV3('Page is not found', 'page-not-found', undefined, meta),
             404,
           );
+        }
+
+        if (disableUserPages && page != null) {
+          const isTargetUserPage =
+            isUserPage(page.path) || isUsersTopPage(page.path);
+
+          if (isTargetUserPage) {
+            return res.apiv3Err(
+              new ErrorV3('Page is forbidden', 'page-is-forbidden'),
+              403,
+            );
+          }
         }
 
         if (page != null) {

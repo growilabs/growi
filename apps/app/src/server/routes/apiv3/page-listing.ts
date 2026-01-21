@@ -2,6 +2,10 @@ import type { IPageInfoForListing, IUserHasId } from '@growi/core';
 import { getIdForRef, isIPageInfoForEntity } from '@growi/core';
 import { type IPageInfoForEmpty, SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import {
+  isUserPage,
+  isUsersTopPage,
+} from '@growi/core/dist/utils/page-path-utils';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { oneOf, query } from 'express-validator';
@@ -153,15 +157,25 @@ const routerFactory = (crowi: Crowi): Router => {
       const hideRestrictedByGroup = await configManager.getConfig(
         'security:list-policy:hideRestrictedByGroup',
       );
+      const disableUserPages = await configManager.getConfig(
+        'security:disableUserPages',
+      );
 
       try {
-        const pages =
+        let pages =
           await pageListingService.findChildrenByParentPathOrIdAndViewer(
             (id || path) as string,
             req.user,
             !hideRestrictedByOwner,
             !hideRestrictedByGroup,
           );
+
+        if (disableUserPages) {
+          pages = pages.filter(
+            (page) => !isUserPage(page.path) && !isUsersTopPage(page.path),
+          );
+        }
+
         return res.apiv3({ children: pages });
       } catch (err) {
         logger.error('Error occurred while finding children.', err);

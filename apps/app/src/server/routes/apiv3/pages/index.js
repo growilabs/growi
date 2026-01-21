@@ -6,6 +6,7 @@ import {
   isCreatablePage,
   isTrashPage,
   isUserPage,
+  isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import {
   addHeadingSlash,
@@ -189,6 +190,9 @@ module.exports = (crowi) => {
       const hideRestrictedByGroup = configManager.getConfig(
         'security:list-policy:hideRestrictedByGroup',
       );
+      const disableUserPages = configManager.getConfig(
+        'security:disableUserPages',
+      );
 
       /**
        * @type {import('~/server/models/page').FindRecentUpdatedPagesOption}
@@ -203,6 +207,7 @@ module.exports = (crowi) => {
         desc: -1,
         hideRestrictedByOwner,
         hideRestrictedByGroup,
+        disableUserPages,
       };
 
       try {
@@ -774,6 +779,19 @@ module.exports = (crowi) => {
       }
 
       const page = await Page.findByIdAndViewer(pageId, req.user, null, true);
+      const disableUserPages = configManager.getConfig(
+        'security:disableUserPages',
+      );
+      if (disableUserPages) {
+        if (
+          isUsersTopPage(newPagePath) ||
+          isUserPage(newPagePath) ||
+          isUsersTopPage(page.path) ||
+          isUserPage(page.path)
+        ) {
+          return res.apiv3Err('User pages are disabled');
+        }
+      }
 
       const isEmptyAndNotRecursively = page?.isEmpty && !isRecursively;
       if (page == null || isEmptyAndNotRecursively) {
