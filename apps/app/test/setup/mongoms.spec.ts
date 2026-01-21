@@ -1,15 +1,6 @@
-import ConnectionString from 'mongodb-connection-string-url';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Replace the database name in a MongoDB connection URI.
- * Uses mongodb-connection-string-url package for robust parsing.
- */
-function replaceMongoDbName(uri: string, newDbName: string): string {
-  const cs = new ConnectionString(uri);
-  cs.pathname = `/${newDbName}`;
-  return cs.href;
-}
+import { replaceMongoDbName } from './mongoms';
 
 describe('replaceMongoDbName', () => {
   describe('single-host URIs', () => {

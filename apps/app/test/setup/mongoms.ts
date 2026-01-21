@@ -15,7 +15,7 @@ let mongoServer: MongoMemoryServer | undefined;
  * @param newDbName - New database name to use
  * @returns Modified URI with the new database name
  */
-function replaceMongoDbName(uri: string, newDbName: string): string {
+export function replaceMongoDbName(uri: string, newDbName: string): string {
   const cs = new ConnectionString(uri);
   cs.pathname = `/${newDbName}`;
   return cs.href;
