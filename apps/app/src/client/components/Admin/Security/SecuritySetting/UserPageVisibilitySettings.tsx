@@ -15,7 +15,7 @@ export const UserPageVisibilitySettings: React.FC<Props> = ({
   return (
     <>
       <h4 className="mb-3">
-        {t('security_settings.user_page_visibility.user_page_visibility')}
+        {t('security_settings.disable_user_pages.disable_user_pages')}
       </h4>
       <div className="row mb-4">
         <div className="col-md-10 offset-md-2">
@@ -33,12 +33,18 @@ export const UserPageVisibilitySettings: React.FC<Props> = ({
               className="form-label form-check-label"
               htmlFor="is-user-pages-visible"
             >
-              {t('security_settings.user_page_visibility.hide_user_pages')}
+              {t(
+                'security_settings.disable_user_pages.disable_user_pages_label',
+              )}
             </label>
           </div>
-          <p className="form-text text-muted small mt-2">
-            {t('security_settings.user_page_visibility.desc')}
-          </p>
+          <p
+            className="form-text text-muted small mt-2"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: includes <br> and <code> from i18n strings
+            dangerouslySetInnerHTML={{
+              __html: t('security_settings.disable_user_pages.desc'),
+            }}
+          />
         </div>
       </div>
     </>
