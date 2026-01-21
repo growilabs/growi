@@ -2,6 +2,7 @@ import type { JSX } from 'react';
 import Link from 'next/link';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { UserPicture } from '@growi/ui/dist/components';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import {
   DropdownItem,
@@ -13,6 +14,7 @@ import {
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError } from '~/client/util/toastr';
 import { useCurrentUser } from '~/states/global';
+import { disableUserPagesAtom } from '~/states/server-configurations';
 
 import { SkeletonItem } from './SkeletonItem';
 
@@ -21,6 +23,8 @@ import styles from './PersonalDropdown.module.scss';
 export const PersonalDropdown = (): JSX.Element => {
   const { t } = useTranslation('commons');
   const currentUser = useCurrentUser();
+
+  const disableUserPages = useAtomValue(disableUserPagesAtom);
 
   if (currentUser == null) {
     return <SkeletonItem />;
@@ -70,19 +74,23 @@ export const PersonalDropdown = (): JSX.Element => {
 
         <DropdownItem className="my-3" divider />
 
-        <Link
-          href={pagePathUtils.userHomepagePath(currentUser)}
-          data-testid="grw-personal-dropdown-menu-user-home"
-        >
-          <DropdownItem className={`my-1 ${styles['personal-dropdown-item']}`}>
-            <span className="d-flex align-items-center">
-              <span className="item-icon material-symbols-outlined me-2 pb-0 fs-6">
-                home
+        {!disableUserPages && (
+          <Link
+            href={pagePathUtils.userHomepagePath(currentUser)}
+            data-testid="grw-personal-dropdown-menu-user-home"
+          >
+            <DropdownItem
+              className={`my-1 ${styles['personal-dropdown-item']}`}
+            >
+              <span className="d-flex align-items-center">
+                <span className="item-icon material-symbols-outlined me-2 pb-0 fs-6">
+                  home
+                </span>
+                <span className="item-text">{t('personal_dropdown.home')}</span>
               </span>
-              <span className="item-text">{t('personal_dropdown.home')}</span>
-            </span>
-          </DropdownItem>
-        </Link>
+            </DropdownItem>
+          </Link>
+        )}
 
         <Link href="/me" data-testid="grw-personal-dropdown-menu-user-settings">
           <DropdownItem className={`my-1 ${styles['personal-dropdown-item']}`}>
