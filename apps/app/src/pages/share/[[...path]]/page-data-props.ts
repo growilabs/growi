@@ -73,24 +73,25 @@ export const getPageDataForInitial = async (
   }
 
   const disableUserPages = configManager.getConfig('security:disableUserPages');
-  if (disableUserPages) {
-    const pagePath = pageWithMeta.data.path;
-    if (isUserPage(pagePath) || isUsersTopPage(pagePath)) {
-      return {
-        props: {
-          isNotFound: true,
-          pageWithMeta: {
-            data: null,
-            meta: {
-              isNotFound: true,
-              isForbidden: true,
-            },
+  if (
+    disableUserPages &&
+    (isUserPage(pageWithMeta.data.path) ||
+      isUsersTopPage(pageWithMeta.data.path))
+  ) {
+    return {
+      props: {
+        isNotFound: true,
+        pageWithMeta: {
+          data: null,
+          meta: {
+            isNotFound: true,
+            isForbidden: true,
           },
-          isExpired: undefined,
-          shareLink: undefined,
         },
-      };
-    }
+        isExpired: undefined,
+        shareLink: undefined,
+      },
+    };
   }
 
   // expired
