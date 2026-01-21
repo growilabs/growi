@@ -14,8 +14,18 @@ beforeAll(async () => {
     const dbName = `growi_test_${workerId}`;
     
     // Parse base URI and append database name
-    const baseUri = process.env.MONGO_URI.replace(/\/[^/]*$/, '');
-    const mongoUri = `${baseUri}/${dbName}`;
+    // Handle both cases: with and without existing database name in URI
+    let mongoUri: string;
+    if (process.env.MONGO_URI.includes('?')) {
+      // URI has query parameters: mongodb://host:port/dbname?params
+      mongoUri = process.env.MONGO_URI.replace(/\/[^/?]*(\?|$)/, `/${dbName}$1`);
+    } else if (process.env.MONGO_URI.match(/\/[^/]+$/)) {
+      // URI has database name: mongodb://host:port/dbname
+      mongoUri = process.env.MONGO_URI.replace(/\/[^/]+$/, `/${dbName}`);
+    } else {
+      // URI has no database name: mongodb://host:port or mongodb://host:port/
+      mongoUri = process.env.MONGO_URI.replace(/\/?$/, `/${dbName}`);
+    }
     
     // biome-ignore lint/suspicious/noConsole: Allow logging
     console.log(`Using external MongoDB at ${mongoUri} (worker: ${workerId})`);
