@@ -115,7 +115,7 @@ export const CONFIG_KEYS = [
   'security:pageRecursiveDeletionAuthority',
   'security:pageRecursiveCompleteDeletionAuthority',
   'security:isAllGroupMembershipRequiredForPageCompleteDeletion',
-  'security:isHidingUserPages',
+  'security:disable-user-pages',
   'security:user-homepage-deletion:isEnabled',
   'security:user-homepage-deletion:isForceDeleteUserHomepageOnUserDeletion',
   'security:isRomUserAllowedToComment',
@@ -679,7 +679,7 @@ export const CONFIG_DEFINITIONS = {
     defineConfig<boolean>({
       defaultValue: true,
     }),
-  'security:isHidingUserPages': defineConfig<boolean>({
+  'security:disable-user-pages': defineConfig<boolean>({
     defaultValue: false,
   }),
   'security:user-homepage-deletion:isEnabled': defineConfig<boolean>({

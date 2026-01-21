@@ -45,7 +45,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       expandOtherOptionsForCompleteDeletion: false,
       isShowRestrictedByOwner: false,
       isUsersHomepageDeletionEnabled: false,
-      isHidingUserPages: false,
+      disableUserPages: false,
       isForceDeleteUserHomepageOnUserDeletion: false,
       isRomUserAllowedToComment: false,
       isLocalEnabled: false,
@@ -107,7 +107,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       isForceDeleteUserHomepageOnUserDeletion:
         generalSetting.isForceDeleteUserHomepageOnUserDeletion,
       isRomUserAllowedToComment: generalSetting.isRomUserAllowedToComment,
-      isHidingUserPages: generalSetting.isHidingUserPages,
+      disableUserPages: generalSetting.disableUserPages,
       sessionMaxAge: generalSetting.sessionMaxAge,
       wikiMode: generalSetting.wikiMode,
       disableLinkSharing: shareLinkSetting.disableLinkSharing,
@@ -180,7 +180,7 @@ export default class AdminGeneralSecurityContainer extends Container {
   }
 
   changeUserPageVisibility() {
-    this.setState({ isHidingUserPages: !this.state.isHidingUserPages });
+    this.setState({ disableUserPages: !this.state.disableUserPages });
   }
 
   /**
@@ -291,7 +291,7 @@ export default class AdminGeneralSecurityContainer extends Container {
               formData.isAllGroupMembershipRequiredForPageCompleteDeletion,
             hideRestrictedByGroup: formData.hideRestrictedByGroup,
             hideRestrictedByOwner: formData.hideRestrictedByOwner,
-            isHidingUserPages: formData.isHidingUserPages,
+            disableUserPages: formData.disableUserPages,
             isUsersHomepageDeletionEnabled:
               formData.isUsersHomepageDeletionEnabled,
             isForceDeleteUserHomepageOnUserDeletion:
@@ -314,7 +314,7 @@ export default class AdminGeneralSecurityContainer extends Container {
               this.state.currentGroupRestrictionDisplayMode === 'Hidden',
             hideRestrictedByOwner:
               this.state.currentOwnerRestrictionDisplayMode === 'Hidden',
-            isHidingUserPages: this.state.isHidingUserPages,
+            disableUserPages: this.state.disableUserPages,
             isUsersHomepageDeletionEnabled:
               this.state.isUsersHomepageDeletionEnabled,
             isForceDeleteUserHomepageOnUserDeletion:

@@ -89,7 +89,7 @@ export type FindRecentUpdatedPagesOption = {
   desc: number;
   hideRestrictedByOwner: boolean;
   hideRestrictedByGroup: boolean;
-  hideUserPages: boolean;
+  disableUserPages: boolean;
 };
 
 export type CreateMethod = (
@@ -937,7 +937,7 @@ schema.statics.findRecentUpdatedPages = async function (
   const baseQuery = this.find({});
   const queryBuilder = new PageQueryBuilder(baseQuery, includeEmpty);
 
-  if (options.hideUserPages) {
+  if (options.disableUserPages) {
     queryBuilder.addConditionToListByNotMatchPathAndChildren('/user');
   }
 

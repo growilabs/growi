@@ -36,7 +36,7 @@ import type { PageMigrationErrorData } from '~/interfaces/websocket';
 import { SocketEventName } from '~/interfaces/websocket';
 import { useIsAdmin } from '~/states/context';
 import { useSearchKeyword, useSetSearchKeyword } from '~/states/search';
-import { isHidingUserPagesAtom } from '~/states/server-configurations';
+import { disableUserPagesAtom } from '~/states/server-configurations';
 import { useGlobalSocket } from '~/states/socket-io';
 import type { ILegacyPrivatePage } from '~/states/ui/modal/private-legacy-pages-migration';
 import { usePrivateLegacyPagesMigrationModalActions } from '~/states/ui/modal/private-legacy-pages-migration';
@@ -270,7 +270,7 @@ const PrivateLegacyPages = (): JSX.Element => {
   const keyword = useSearchKeyword();
   const setSearchKeyword = useSetSearchKeyword('/_private-legacy-pages');
 
-  const isHidingUserPages = useAtomValue(isHidingUserPagesAtom);
+  const disableUserPages = useAtomValue(disableUserPagesAtom);
 
   const [offset, setOffset] = useState<number>(0);
   const [limit, setLimit] = useState<number>(INITIAL_PAGING_SIZE);
@@ -519,7 +519,7 @@ const PrivateLegacyPages = (): JSX.Element => {
   const searchControl = useMemo(() => {
     return (
       <SearchControl
-        isHidingUserPages={isHidingUserPages}
+        disableUserPages={disableUserPages}
         isEnableSort={false}
         isEnableFilter={false}
         initialSearchConditions={{ keyword: initQ, limit: INITIAL_PAGING_SIZE }}
@@ -527,7 +527,7 @@ const PrivateLegacyPages = (): JSX.Element => {
         extraControls={extraControls}
       />
     );
-  }, [searchInvokedHandler, extraControls, isHidingUserPages]);
+  }, [searchInvokedHandler, extraControls, disableUserPages]);
 
   const searchResultListHead = useMemo(() => {
     if (data == null) {
