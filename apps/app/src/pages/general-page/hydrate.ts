@@ -5,6 +5,7 @@ import {
   aiEnabledAtom,
   defaultIndentSizeAtom,
   disableLinkSharingAtom,
+  disableUserPagesAtom,
   drawioUriAtom,
   elasticsearchMaxBodyLengthToIndexAtom,
   isAclEnabledAtom,
@@ -13,7 +14,6 @@ import {
   isContainerFluidAtom,
   isEnabledAttachTitleHeaderAtom,
   isEnabledStaleNotificationAtom,
-  isHidingUserPagesAtom,
   isIndentSizeForcedAtom,
   isLocalAccountRegistrationEnabledAtom,
   isPdfBulkExportEnabledAtom,
@@ -85,7 +85,7 @@ export const useHydrateGeneralPageConfigurationAtoms = (
             serverConfig.isLocalAccountRegistrationEnabled,
           ],
           [rendererConfigAtom, rendererConfigs],
-          [isHidingUserPagesAtom, serverConfig.isHidingUserPages],
+          [disableUserPagesAtom, serverConfig.disableUserPages],
         ],
   );
 };

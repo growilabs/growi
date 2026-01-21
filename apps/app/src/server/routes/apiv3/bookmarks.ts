@@ -257,11 +257,11 @@ module.exports = (crowi) => {
           })
           .exec();
 
-        const isHidingUserPages = configManager.getConfig(
-          'security:isHidingUserPages',
+        const disabledUserPage = configManager.getConfig(
+          'security:disableUserPages',
         );
 
-        const filteredBookmarks = isHidingUserPages
+        const filteredBookmarks = disabledUserPage
           ? userRootBookmarks.filter(
               (bookmark) =>
                 bookmark.page != null &&

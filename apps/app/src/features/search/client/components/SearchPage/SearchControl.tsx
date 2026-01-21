@@ -12,7 +12,7 @@ import SortControl from './SortControl';
 type Props = {
   isEnableSort: boolean;
   isEnableFilter: boolean;
-  isHidingUserPages: boolean;
+  disableUserPages: boolean;
   initialSearchConditions: Partial<ISearchConditions>;
 
   onSearchInvoked?: (
@@ -30,7 +30,7 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
   const {
     isEnableSort,
     isEnableFilter,
-    isHidingUserPages,
+    disableUserPages,
     initialSearchConditions,
     onSearchInvoked,
     extraControls,
@@ -154,7 +154,7 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
               </button>
             </div>
             <div className="d-none d-lg-flex align-items-center search-control-include-options">
-              {isHidingUserPages === false && (
+              {disableUserPages === false && (
                 <div className="px-2 py-1">
                   <div className="form-check form-check-succsess">
                     <input
@@ -212,7 +212,7 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
       <SearchOptionModalLazyLoaded
         isOpen={isFileterOptionModalShown || false}
         onClose={() => setIsFileterOptionModalShown(false)}
-        isHidingUserPages={isHidingUserPages}
+        disableUserPages={disableUserPages}
         includeUserPages={includeUserPages}
         includeTrashPages={includeTrashPages}
         onIncludeUserPagesSwitched={setIncludeUserPages}

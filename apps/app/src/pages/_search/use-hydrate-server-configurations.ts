@@ -2,8 +2,8 @@ import { useHydrateAtoms } from 'jotai/utils';
 
 import type { RendererConfig } from '~/interfaces/services/renderer';
 import {
+  disableUserPagesAtom,
   isContainerFluidAtom,
-  isHidingUserPagesAtom,
   rendererConfigAtom,
   showPageLimitationLAtom,
 } from '~/states/server-configurations';
@@ -26,7 +26,7 @@ export const useHydrateServerConfigurationAtoms = (
           [isContainerFluidAtom, serverConfig.isContainerFluid],
           [showPageLimitationLAtom, serverConfig.showPageLimitationL],
           [rendererConfigAtom, rendererConfigs],
-          [isHidingUserPagesAtom, serverConfig.isHidingUserPages],
+          [disableUserPagesAtom, serverConfig.disableUserPages],
         ],
   );
 };

@@ -159,8 +159,8 @@ const routerFactory = (crowi: Crowi): Router => {
       const hideRestrictedByGroup = await configManager.getConfig(
         'security:list-policy:hideRestrictedByGroup',
       );
-      const hideUserPages = await configManager.getConfig(
-        'security:isHidingUserPages',
+      const disableUserPages = await configManager.getConfig(
+        'security:disableUserPages',
       );
 
       try {
@@ -172,7 +172,7 @@ const routerFactory = (crowi: Crowi): Router => {
             !hideRestrictedByGroup,
           );
 
-        if (hideUserPages === true) {
+        if (disableUserPages) {
           pages = pages.filter(
             (page) => !isUserPage(page.path) && !isUsersTopPage(page.path),
           );

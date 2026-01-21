@@ -32,7 +32,7 @@ export type ServerConfigurationProps = {
     isEnabledStaleNotification: boolean;
     disableLinkSharing: boolean;
     isIndentSizeForced: boolean;
-    isHidingUserPages: boolean;
+    disableUserPages: boolean;
     isEnabledAttachTitleHeader: boolean;
     isSlackConfigured: boolean;
     isAclEnabled: boolean;

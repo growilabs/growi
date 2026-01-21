@@ -197,8 +197,8 @@ module.exports = (crowi: Crowi) => {
       const { pageId, path, findAll, revisionId, shareLinkId, includeEmpty } =
         req.query;
 
-      const isHidingUserPages = crowi.configManager.getConfig(
-        'security:isHidingUserPages',
+      const disableUserPages = crowi.configManager.getConfig(
+        'security:disableUserPages',
       );
 
       const respondWithSinglePage = async (
@@ -227,7 +227,7 @@ module.exports = (crowi: Crowi) => {
           );
         }
 
-        if (isHidingUserPages && page != null) {
+        if (disableUserPages && page != null) {
           const isTargetUserPage =
             isUserPage(page.path) || isUsersTopPage(page.path);
 
