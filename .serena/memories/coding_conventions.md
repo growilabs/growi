@@ -49,8 +49,8 @@ vitest.workspace.mts の設定に基づく：
 
 ## ディレクトリ構造の規則
 - `src/`: ソースコード
-- `test-with-vite/`: Vitest用のファイル
-- `playwright/`: E2Eテストファイル
+- `test/`: Vitest用のファイル
+- `playwright/`: Playwright を用いた E2E テストファイル
 - `config/`: 設定ファイル
 - `public/`: 静的ファイル
 - `dist/`: ビルド出力

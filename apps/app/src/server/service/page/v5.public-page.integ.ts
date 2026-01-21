@@ -8,7 +8,7 @@ import {
 import type { Model } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { getInstance } from '^/test-with-vite/setup/crowi';
+import { getInstance } from '^/test/setup/crowi';
 
 import type { CommentModel } from '~/features/comment/server/models/comment';
 import type { IComment } from '~/interfaces/comment';

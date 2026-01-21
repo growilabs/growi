@@ -9,7 +9,7 @@ import {
 } from '@growi/core/dist/interfaces';
 import mongoose, { type HydratedDocument, type Model } from 'mongoose';
 
-import { getInstance } from '^/test-with-vite/setup/crowi';
+import { getInstance } from '^/test/setup/crowi';
 
 import type { CommentModel } from '~/features/comment/server';
 import { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';

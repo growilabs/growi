@@ -1,7 +1,7 @@
 import type { IUser } from '@growi/core';
 import mongoose, { type HydratedDocument, type Model } from 'mongoose';
 
-import { getInstance } from '^/test-with-vite/setup/crowi';
+import { getInstance } from '^/test/setup/crowi';
 
 import { PageActionType } from '~/interfaces/page-operation';
 import type Crowi from '~/server/crowi';

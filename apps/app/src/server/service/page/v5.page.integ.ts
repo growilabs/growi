@@ -3,7 +3,7 @@ import { addSeconds } from 'date-fns/addSeconds';
 import mongoose from 'mongoose';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { getInstance } from '^/test-with-vite/setup/crowi';
+import { getInstance } from '^/test/setup/crowi';
 
 import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
 import type Crowi from '~/server/crowi';

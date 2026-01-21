@@ -1,6 +1,6 @@
 /**
  * Integration test to verify Crowi setup works correctly in Vitest environment.
- * This ensures the test-with-vite/setup/crowi.ts utility functions properly.
+ * This ensures the test/setup/crowi.ts utility functions properly.
  */
 
 import type Crowi from '~/server/crowi';

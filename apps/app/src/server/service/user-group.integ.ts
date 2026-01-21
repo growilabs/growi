@@ -3,7 +3,7 @@ import { GroupType, getIdForRef, type IPage, PageGrant } from '@growi/core';
 import mongoose from 'mongoose';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { getInstance } from '^/test-with-vite/setup/crowi';
+import { getInstance } from '^/test/setup/crowi';
 
 import { PageActionOnGroupDelete } from '~/interfaces/user-group';
 import type Crowi from '~/server/crowi';

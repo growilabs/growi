@@ -2,7 +2,7 @@ import ldap, { type Client } from 'ldapjs';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
-import { getInstance } from '^/test-with-vite/setup/crowi';
+import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import { configManager } from '~/server/service/config-manager';

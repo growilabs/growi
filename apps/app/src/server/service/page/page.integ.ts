@@ -7,7 +7,7 @@ import mongoose, {
 } from 'mongoose';
 import type { MockInstance } from 'vitest';
 
-import { getInstance } from '^/test-with-vite/setup/crowi';
+import { getInstance } from '^/test/setup/crowi';
 
 import type { CommentModel } from '~/features/comment/server';
 import type { IBookmark } from '~/interfaces/bookmark-info';

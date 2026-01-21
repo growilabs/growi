@@ -3,7 +3,7 @@ import { GroupType, type IPage, PageGrant } from '@growi/core';
 import mongoose from 'mongoose';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { getInstance } from '^/test-with-vite/setup/crowi';
+import { getInstance } from '^/test/setup/crowi';
 
 import { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
 import ExternalUserGroup, {

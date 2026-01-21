@@ -11,7 +11,7 @@ import {
 } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
-import { getInstance } from '^/test-with-vite/setup/crowi';
+import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import ExternalAccount from '~/server/models/external-account';

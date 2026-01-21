@@ -7,7 +7,7 @@ const configShared = defineConfig({
   test: {
     clearMocks: true,
     globals: true,
-    exclude: ['test/**', 'test-with-vite/**', 'playwright/**'],
+    exclude: ['test/**', 'playwright/**'],
   },
 });
 
@@ -31,7 +31,7 @@ export default defineWorkspace([
       name: 'app-integration',
       environment: 'node',
       include: ['**/*.integ.ts'],
-      setupFiles: ['./test-with-vite/setup/mongoms.ts'],
+      setupFiles: ['./test/setup/mongoms.ts'],
       deps: {
         // Transform inline modules (allows ESM in require context)
         interopDefault: true,
@@ -57,7 +57,7 @@ export default defineWorkspace([
       name: 'app-components',
       environment: 'happy-dom',
       include: ['**/*.spec.{tsx,jsx}'],
-      setupFiles: ['./test-with-vite/setup/jest-dom.ts'],
+      setupFiles: ['./test/setup/jest-dom.ts'],
     },
   }),
 ]);
