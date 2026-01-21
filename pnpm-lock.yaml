@@ -475,6 +475,9 @@ importers:
       mongodb:
         specifier: ^4.17.2
         version: 4.17.2(@aws-sdk/client-sso-oidc@3.600.0)
+      mongodb-connection-string-url:
+        specifier: ^3.0.1
+        version: 3.0.1
       mongoose:
         specifier: ^6.13.6
         version: 6.13.8(@aws-sdk/client-sso-oidc@3.600.0)
