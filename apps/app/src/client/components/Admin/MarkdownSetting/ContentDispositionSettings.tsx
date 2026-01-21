@@ -2,6 +2,8 @@ import React, {
   useState, useCallback, useEffect, useMemo,
 } from 'react';
 
+import { useTranslation } from 'next-i18next';
+
 import { useContentDisposition, type ContentDispositionSettings } from '../../../services/AdminContentDispositionSettings';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 
@@ -13,6 +15,7 @@ const removeMimeTypeFromArray = (array: string[], mimeType: string): string[] =>
 );
 
 const ContentDispositionSettings: React.FC = () => {
+  const { t } = useTranslation('admin');
 
   const {
     currentSettings,
@@ -113,13 +116,13 @@ const ContentDispositionSettings: React.FC = () => {
   return (
     <div className="row">
       <div className="col-12">
-        <h2 className="pb-2">Content-Disposition Mime Type Settings</h2>
+        <h2 className="pb-2">{t('markdown_settings.content-disposition_header')}</h2>
 
         {/* INPUT SECTION */}
         <div className="card shadow-sm mb-4">
           <div className="card-body">
             <div className="form-group">
-              <label className="form-label fw-bold">Add New Mime Type</label>
+              <label className="form-label fw-bold">{t('markdown_settings.content-disposition_options.add_header')}</label>
               <div className="d-flex align-items-center gap-2">
                 <input
                   type="text"
@@ -146,7 +149,7 @@ const ContentDispositionSettings: React.FC = () => {
                 </button>
               </div>
               <small className="form-text text-muted mt-2 d-block">
-                Note: Adding a mime type will <strong>automatically remove it</strong> from the other list.
+                {t('markdown_settings.content-disposition_options.note')}
               </small>
             </div>
           </div>
@@ -160,7 +163,7 @@ const ContentDispositionSettings: React.FC = () => {
           {/* INLINE LIST COLUMN */}
           <div className="col-md-6 col-sm-12 align-self-start">
             <div className="card">
-              <div className="card-header"><span className="fw-bold">Inline Mime Types</span></div>
+              <div className="card-header"><span className="fw-bold">{t('markdown_settings.content-disposition_options.inline_header')}</span></div>
               <div className="card-body">
                 <ul className="list-group list-group-flush">
                   {renderInlineMimeTypes.length === 0 && <li className="list-group-item text-muted">No inline types set.</li>}
@@ -168,12 +171,12 @@ const ContentDispositionSettings: React.FC = () => {
                     <li key={mimeType} className="list-group-item d-flex justify-content-between align-items-center">
                       <code>{mimeType}</code>
                       <button
-                        type="button" // Fixes the lint error
+                        type="button"
                         className="btn btn-sm btn-outline-danger"
                         onClick={() => handleRemove(mimeType, 'inline')}
                         disabled={isUpdating}
                       >
-                        Remove
+                        {t('markdown_settings.content-disposition_options.remove_button')}
                       </button>
                     </li>
                   ))}
@@ -185,7 +188,7 @@ const ContentDispositionSettings: React.FC = () => {
           {/* ATTACHMENT LIST COLUMN */}
           <div className="col-md-6 col-sm-12 align-self-start">
             <div className="card">
-              <div className="card-header"><span className="fw-bold">Attachment Mime Types</span></div>
+              <div className="card-header"><span className="fw-bold">{t('markdown_settings.content-disposition_options.attachment_header')}</span></div>
               <div className="card-body">
                 <ul className="list-group list-group-flush">
                   {renderAttachmentMimeTypes.length === 0 && <li className="list-group-item text-muted">No attachment types set.</li>}
@@ -198,7 +201,7 @@ const ContentDispositionSettings: React.FC = () => {
                         onClick={() => handleRemove(mimeType, 'attachment')}
                         disabled={isUpdating}
                       >
-                        Remove
+                        {t('markdown_settings.content-disposition_options.remove_button')}
                       </button>
                     </li>
                   ))}

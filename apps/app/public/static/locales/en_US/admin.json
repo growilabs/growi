@@ -442,6 +442,16 @@
       "tag_names": "Tag names",
       "tag_attributes": "Tag attributes",
       "import_recommended": "Import recommended {{target}}"
+    },
+    "content-disposition_header": "Content-Disposition Mime Type Settings",
+    "content-disposition_options": {
+      "add_header": "Add Mime Types",
+      "note": "Note: Adding a mime type will automatically remove it from the other list.",
+      "inline_header": "Inline Mime Types",
+      "attachment_header": "Attachment Mime Types",
+      "inline_button": "Inline",
+      "attachment_button": "Attachment",
+      "remove_button": "Remove"
     }
   },
   "customize_settings": {

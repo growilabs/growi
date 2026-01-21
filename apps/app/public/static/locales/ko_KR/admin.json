@@ -442,6 +442,16 @@
       "tag_names": "태그 이름",
       "tag_attributes": "태그 속성",
       "import_recommended": "권장 {{target}} 가져오기"
+    },
+    "content-disposition_header": "Content-Disposition 마임 타입(MIME Type) 설정",
+    "content-disposition_options": {
+      "add_header": "마임 타입 추가",
+      "note": "참고: 마임 타입을 추가하면 다른 리스트에서 자동으로 제거됩니다.",
+      "inline_header": "인라인(Inline) 마임 타입",
+      "attachment_header": "파일 첨부(Attachment) 마임 타입",
+      "inline_button": "인라인",
+      "attachment_button": "파일 첨부",
+      "remove_button": "삭제"
     }
   },
   "customize_settings": {
