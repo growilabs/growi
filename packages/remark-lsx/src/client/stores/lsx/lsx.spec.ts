@@ -87,9 +87,6 @@ describe('useSWRxLsx integration tests', () => {
       pageService: {
         getExcludedPathsBySystem: vi.fn().mockReturnValue(['/user']),
       },
-      configManager: {
-        getConfig: vi.fn().mockReturnValue(false),
-      },
     };
 
     // Import and setup the LSX middleware
