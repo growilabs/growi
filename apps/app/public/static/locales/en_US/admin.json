@@ -59,7 +59,7 @@
     "disable_user_pages": {
       "disable_user_pages": "Disable user pages",
       "disable_user_pages_label": "Disable user pages",
-      "desc": "When enabled, creating, viewing, editing, and duplicating all user pages will be disabled.</br>User pages will also not appear in page trees, recent changes, or search results."
+      "desc": "By disabling user pages, creating, viewing, editing, and duplicating all user pages will be disabled.</br>Additionally, user pages will not appear in page trees, recent changes, or search results."
     },
     "session": "Session",
     "max_age": "Max age (msec)",

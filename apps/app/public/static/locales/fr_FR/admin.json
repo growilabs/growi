@@ -59,7 +59,7 @@
     "disable_user_pages": {
       "disable_user_pages": "Désactiver les pages utilisateur",
       "disable_user_pages_label": "Désactiver les pages utilisateur",
-      "desc": "Lorsque cette option est activée, la création, la consultation, la modification et la duplication de toutes les pages utilisateur seront désactivées.</br>Les pages utilisateur n'apparaîtront pas non plus dans l'arborescence des pages, les modifications récentes ou les résultats de recherche."
+      "desc": "En désactivant les pages utilisateur, la création, la consultation, la modification et la duplication de toutes les pages utilisateur seront désactivées.</br>De plus, les pages utilisateur n'apparaîtront pas dans l'arborescence des pages, les modifications récentes ou les résultats de recherche."
     },
     "session": "Session",
     "max_age": "Âge maximal (ms)",
