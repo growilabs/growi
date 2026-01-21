@@ -231,8 +231,8 @@ export const updatePageHandlersFactory: UpdatePageHandlersFactory = (crowi) => {
         'security:disableUserPages',
       );
       if (
-        (disableUserPages && isUsersTopPage(currentPage.path)) ||
-        isUserPage(currentPage.path)
+        disableUserPages &&
+        (isUsersTopPage(currentPage.path) || isUserPage(currentPage.path))
       ) {
         return res.apiv3Err('User pages are disabled');
       }

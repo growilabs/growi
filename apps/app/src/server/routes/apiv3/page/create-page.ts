@@ -315,8 +315,8 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
         'security:disableUserPages',
       );
       if (
-        (disableUserPages && isUsersTopPage(pathToCreate)) ||
-        isUserPage(pathToCreate)
+        disableUserPages &&
+        (isUsersTopPage(pathToCreate) || isUserPage(pathToCreate))
       ) {
         return res.apiv3Err('User pages are disabled');
       }

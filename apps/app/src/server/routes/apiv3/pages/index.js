@@ -768,8 +768,8 @@ module.exports = (crowi) => {
         'security:disableUserPages',
       );
       if (
-        (disableUserPages && isUsersTopPage(pathToCreate)) ||
-        isUserPage(pathToCreate)
+        disableUserPages &&
+        (isUsersTopPage(newPagePath) || isUserPage(newPagePath))
       ) {
         return res.apiv3Err('User pages are disabled');
       }
