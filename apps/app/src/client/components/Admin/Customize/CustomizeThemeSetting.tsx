@@ -1,4 +1,4 @@
-import React, { type JSX, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { PresetThemes, PresetThemesMetadatas } from '@growi/preset-themes';
 import { useTranslation } from 'next-i18next';
 
@@ -8,11 +8,7 @@ import { useSWRxGrowiThemeSetting } from '~/stores/admin/customize';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 import CustomizeThemeOptions from './CustomizeThemeOptions';
 
-// eslint-disable-next-line @typescript-eslint/ban-types
-type Props = {};
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const CustomizeThemeSetting = (props: Props): JSX.Element => {
+const CustomizeThemeSetting = (): JSX.Element => {
   const { t } = useTranslation();
 
   const { data, error, update } = useSWRxGrowiThemeSetting();

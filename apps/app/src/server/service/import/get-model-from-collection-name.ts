@@ -8,7 +8,6 @@ import mongoose from 'mongoose';
  * @param collectionName collection name
  * @return instance of mongoose model
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getModelFromCollectionName = (
   collectionName: string,
 ): Model<any, unknown, unknown, unknown, any> | undefined => {

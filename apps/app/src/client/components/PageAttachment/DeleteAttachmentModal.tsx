@@ -73,7 +73,6 @@ const DeleteAttachmentModalSubstance = ({
     }
 
     const content = attachment.fileFormat.match(/image\/.+/i) ? (
-      // eslint-disable-next-line @next/next/no-img-element
       <img src={attachment.filePathProxied} alt="deleting attachment" />
     ) : (
       ''

@@ -57,7 +57,6 @@ class S2sMessagingServiceFactory {
     const moduleFileName = envToModuleMappings[type];
 
     const modulePath = `./${moduleFileName}`;
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     this.delegator = require(modulePath)(crowi);
 
     if (this.delegator == null) {

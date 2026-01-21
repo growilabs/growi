@@ -47,6 +47,9 @@ const validator = {
     body('hideRestrictedByGroup')
       .if((value) => value != null)
       .isBoolean(),
+    body('disableUserPages')
+      .if((value) => value != null)
+      .isBoolean(),
     body('isUsersHomepageDeletionEnabled')
       .if((value) => value != null)
       .isBoolean(),
@@ -217,6 +220,9 @@ const validator = {
  *          pageCompleteDeletionAuthority:
  *            type: string
  *            description: type of pageDeletionAuthority
+ *          disableUserPages:
+ *            type: boolean
+ *            description: hide all user pages from general users
  *          hideRestrictedByOwner:
  *            type: boolean
  *            description: enable hide by owner
@@ -504,6 +510,9 @@ module.exports = (crowi) => {
           ),
           hideRestrictedByGroup: await configManager.getConfig(
             'security:list-policy:hideRestrictedByGroup',
+          ),
+          disableUserPages: await configManager.getConfig(
+            'security:disableUserPages',
           ),
           isUsersHomepageDeletionEnabled: await configManager.getConfig(
             'security:user-homepage-deletion:isEnabled',
@@ -796,7 +805,6 @@ module.exports = (crowi) => {
    *                  type: object
    *                  description: updated param
    */
-  // eslint-disable-next-line max-len
   router.put(
     '/authentication/enabled',
     accessTokenParser([SCOPE.WRITE.ADMIN.SECURITY]),
@@ -996,6 +1004,7 @@ module.exports = (crowi) => {
           req.body.hideRestrictedByOwner,
         'security:list-policy:hideRestrictedByGroup':
           req.body.hideRestrictedByGroup,
+        'security:disableUserPages': req.body.disableUserPages,
         'security:user-homepage-deletion:isEnabled':
           req.body.isUsersHomepageDeletionEnabled,
         // Validate user-homepage-deletion config
@@ -1013,7 +1022,6 @@ module.exports = (crowi) => {
           req.body.pageDeletionAuthority,
           req.body.pageRecursiveDeletionAuthority,
         );
-      // eslint-disable-next-line max-len
       const [singleAuthority2, recursiveAuthority2] =
         prepareDeleteConfigValuesForCalc(
           req.body.pageCompleteDeletionAuthority,
@@ -1068,6 +1076,9 @@ module.exports = (crowi) => {
           ),
           hideRestrictedByGroup: await configManager.getConfig(
             'security:list-policy:hideRestrictedByGroup',
+          ),
+          disableUserPages: await configManager.getConfig(
+            'security:disableUserPages',
           ),
           isUsersHomepageDeletionEnabled: await configManager.getConfig(
             'security:user-homepage-deletion:isEnabled',
@@ -1140,7 +1151,6 @@ module.exports = (crowi) => {
             'security:disableLinkSharing',
           ),
         };
-        // eslint-disable-next-line max-len
         const parameters = {
           action: updateData['security:disableLinkSharing']
             ? SupportedAction.ACTION_ADMIN_REJECT_SHARE_LINK

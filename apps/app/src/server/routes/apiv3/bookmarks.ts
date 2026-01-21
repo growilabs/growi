@@ -1,6 +1,10 @@
 import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import {
+  isUserPage,
+  isUsersTopPage,
+} from '@growi/core/dist/utils/page-path-utils';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
@@ -10,13 +14,14 @@ import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity
 import type { BookmarkDocument, BookmarkModel } from '~/server/models/bookmark';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer';
+import { configManager } from '~/server/service/config-manager';
 import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import BookmarkFolder from '../../models/bookmark-folder';
 
-const logger = loggerFactory('growi:routes:apiv3:bookmarks'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:routes:apiv3:bookmarks');
 
 const express = require('express');
 const { body, query, param } = require('express-validator');
@@ -237,11 +242,12 @@ module.exports = (crowi) => {
           'bookmarks',
           { owner: userId },
         );
+
         const userRootBookmarks = await Bookmark.find({
           _id: { $nin: bookmarkIdsInFolders },
           user: userId,
         })
-          .populate({
+          .populate<{ page: PageDocument | null }>({
             path: 'page',
             model: 'Page',
             populate: {
@@ -251,8 +257,21 @@ module.exports = (crowi) => {
           })
           .exec();
 
+        const disabledUserPage = configManager.getConfig(
+          'security:disableUserPages',
+        );
+
+        const filteredBookmarks = disabledUserPage
+          ? userRootBookmarks.filter(
+              (bookmark) =>
+                bookmark.page != null &&
+                !isUserPage(bookmark.page.path) &&
+                !isUsersTopPage(bookmark.page.path),
+            )
+          : userRootBookmarks;
+
         // serialize Bookmark
-        const serializedUserRootBookmarks = userRootBookmarks.map((bookmark) =>
+        const serializedUserRootBookmarks = filteredBookmarks.map((bookmark) =>
           serializeBookmarkSecurely(bookmark),
         );
 
@@ -331,7 +350,6 @@ module.exports = (crowi) => {
             );
           }
         } else {
-          // eslint-disable-next-line no-lonely-if
           if (bool) {
             logger.warn(
               `Adding the bookmark for ${page._id} by ${req.user._id} failed because the bookmark has already exist.`,

@@ -10,7 +10,6 @@ import {
   instructionsForSystem,
 } from './instructions/commons';
 
-/* eslint-disable max-len */
 const instructionsForUserIntentDetection = `# USER INTENT DETECTION:
   First, analyze the user's message to determine their intent:
   - **Consultation Type**: Questions, discussions, explanations, or advice seeking WITHOUT explicit request to edit/modify/generate text
@@ -33,7 +32,6 @@ const instructionsForUserIntentDetection = `# USER INTENT DETECTION:
   - "Generate a new paragraph about..."
   - "Modify this to include..."
   - "Translate this text to English"`;
-/* eslint-enable max-len */
 
 const instructionsForContexts = `## Editing Contexts
 
@@ -74,7 +72,6 @@ export const getOrCreateEditorAssistant =
     editorAssistant = await getOrCreateAssistant({
       type: AssistantType.EDIT,
       model: configManager.getConfig('openai:assistantModel:edit'),
-      /* eslint-disable max-len */
       instructions: `# Your Role
 You are an Editor Assistant for GROWI, a markdown wiki system.
 Your task is to help users edit their markdown content based on their requests.
@@ -98,7 +95,6 @@ ${instructionsForUserIntentDetection}
 
 ${instructionsForFileSearch}
 `,
-      /* eslint-enable max-len */
     });
 
     return editorAssistant;

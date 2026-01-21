@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 
-// eslint-disable-next-line import/no-named-as-default
 import PageRedirectModel from '~/server/models/page-redirect';
 import { createBatchStream } from '~/server/util/batch-stream';
 import {

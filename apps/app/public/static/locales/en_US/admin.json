@@ -56,6 +56,11 @@
       "enable_force_delete_user_homepage_on_user_deletion": "When you delete a user, the user's homepage and all its sub pages will be completely deleted",
       "desc": "You will be able to delete a deleted user's homepage."
     },
+    "disable_user_pages": {
+      "disable_user_pages": "Disable user pages",
+      "disable_user_pages_label": "Disable user pages",
+      "desc": "By disabling user pages, creating, viewing, editing, and duplicating all user pages will be disabled.</br>Additionally, user pages will not appear in page trees, recent changes, or search results."
+    },
     "session": "Session",
     "max_age": "Max age (msec)",
     "max_age_desc": "Specifies the number (in milliseconds) to expire users session.<br>Default: 2592000000 (30days)",
@@ -313,7 +318,7 @@
       "done": "Copied to clipboard!"
     },
     "bug_report": "Submitting a bug report",
-    "submit_bug_report": "<a href='https://github.com/growilabs/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>then submit your issue to GitHub.</a>"
+    "submit_bug_report": "Submit your issue to GitHub."
   },
   "v5_page_migration": {
     "migration_desc": "There are some pages with old v4 compatibility. To take advantage of new features such as page trees and easy renaming, please convert all your pages to v5 compatibility.",

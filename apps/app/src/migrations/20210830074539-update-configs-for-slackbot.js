@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 
-// eslint-disable-next-line import/no-named-as-default
 import { Config } from '~/server/models/config';
 import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
