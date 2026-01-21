@@ -4,7 +4,7 @@ import path from 'node:path';
 import { createTerminus } from '@godaddy/terminus';
 import attachmentRoutes from '@growi/remark-attachment-refs/dist/server';
 import lsxRoutes from '@growi/remark-lsx/dist/server/index.cjs';
-import type { Express, RequestHandler } from 'express';
+import type { Express } from 'express';
 import mongoose from 'mongoose';
 
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
@@ -19,13 +19,22 @@ import { projectRoot } from '~/server/util/project-dir-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
 
+import ActivityEvent from '../events/activity';
+import AdminEvent from '../events/admin';
+import BookmarkEvent from '../events/bookmark';
+import PageEvent from '../events/page';
+import TagEvent from '../events/tag';
 import UserEvent from '../events/user';
 import type { AccessTokenParser } from '../middlewares/access-token-parser';
 import { accessTokenParser } from '../middlewares/access-token-parser';
+import httpErrorHandler from '../middlewares/http-error-handler';
+import loginRequiredFactory from '../middlewares/login-required';
 import type { AclService } from '../service/acl';
 import { aclService as aclServiceSingletonInstance } from '../service/acl';
+import ActivityService from '../service/activity';
 import AppService from '../service/app';
 import { AttachmentService } from '../service/attachment';
+import CommentService from '../service/comment';
 import { configManager as configManagerSingletonInstance } from '../service/config-manager';
 import type { ConfigManager } from '../service/config-manager/config-manager';
 import instanciateExportService from '../service/export';
@@ -37,6 +46,7 @@ import {
 } from '../service/g2g-transfer';
 import { GrowiBridgeService } from '../service/growi-bridge';
 import { initializeImportService } from '../service/import';
+import InAppNotificationService from '../service/in-app-notification';
 import { InstallerService } from '../service/installer';
 import { normalizeData } from '../service/normalize-data';
 import PageService from '../service/page';
@@ -47,6 +57,7 @@ import PassportService from '../service/passport';
 import SearchService from '../service/search';
 import { SlackIntegrationService } from '../service/slack-integration';
 import { SocketIoService } from '../service/socket-io';
+import SyncPageStatusService from '../service/system-events/sync-page-status';
 import UserGroupService from '../service/user-group';
 import { UserNotificationService } from '../service/user-notification';
 import { initializeYjsService } from '../service/yjs';
@@ -55,7 +66,6 @@ import type { ModelsMapDependentOnCrowi } from './setup-models';
 import { setupModelsDependentOnCrowi } from './setup-models';
 
 const logger = loggerFactory('growi:crowi');
-const httpErrorHandler = require('../middlewares/http-error-handler');
 
 const sep = path.sep;
 
@@ -101,6 +111,8 @@ class Crowi {
    * For retrieving other packages
    */
   accessTokenParser: AccessTokenParser;
+
+  loginRequiredFactory: typeof loginRequiredFactory;
 
   nextApp!: ReturnType<typeof next>;
 
@@ -217,6 +229,7 @@ class Crowi {
     this.cacheDir = path.join(this.tmpDir, 'cache');
 
     this.accessTokenParser = accessTokenParser;
+    this.loginRequiredFactory = loginRequiredFactory;
 
     this.config = {};
     this.s2sMessagingService = null;
@@ -242,11 +255,11 @@ class Crowi {
 
     this.events = {
       user: new UserEvent(this),
-      page: new (require('../events/page'))(this),
-      activity: new (require('../events/activity'))(this),
-      bookmark: new (require('../events/bookmark'))(this),
-      tag: new (require('../events/tag'))(this),
-      admin: new (require('../events/admin'))(this),
+      page: new PageEvent(this),
+      activity: new ActivityEvent(this),
+      bookmark: new BookmarkEvent(this),
+      tag: new TagEvent(this),
+      admin: new AdminEvent(this),
     };
   }
 
@@ -583,7 +596,7 @@ class Crowi {
 
     // setup Express Routes
     this.setupRoutesForPlugins();
-    this.setupRoutesAtLast();
+    await this.setupRoutesAtLast();
 
     // setup Global Error Handlers
     this.setupGlobalErrorHandlers();
@@ -644,8 +657,13 @@ class Crowi {
    * setup Express Routes
    * !! this must be at last because it includes '/*' route !!
    */
-  setupRoutesAtLast(): void {
-    require('../routes')(this, this.express);
+  async setupRoutesAtLast(): Promise<void> {
+    type RoutesSetup = (crowi: Crowi, app: Express) => void;
+    // CommonJS modules are always wrapped in { default } when dynamically imported
+    const { default: setupRoutes } = (await import('../routes')) as unknown as {
+      default: RoutesSetup;
+    };
+    setupRoutes(this, this.express);
   }
 
   /**
@@ -653,17 +671,7 @@ class Crowi {
    * !! this must be after the Routes setup !!
    */
   setupGlobalErrorHandlers(): void {
-    this.express.use(httpErrorHandler as RequestHandler);
-  }
-
-  /**
-   * require API for plugins
-   *
-   * @param modulePath relative path from /lib/crowi/index.js
-   * @return module
-   */
-  require(modulePath: string): unknown {
-    return require(modulePath);
+    this.express.use(httpErrorHandler);
   }
 
   /**
@@ -808,14 +816,12 @@ class Crowi {
   }
 
   async setupInAppNotificationService(): Promise<void> {
-    const InAppNotificationService = require('../service/in-app-notification');
     if (this.inAppNotificationService == null) {
       this.inAppNotificationService = new InAppNotificationService(this);
     }
   }
 
   async setupActivityService(): Promise<void> {
-    const ActivityService = require('../service/activity');
     if (this.activityService == null) {
       this.activityService = new ActivityService(this);
       await this.activityService.createTtlIndex();
@@ -823,14 +829,12 @@ class Crowi {
   }
 
   async setupCommentService(): Promise<void> {
-    const CommentService = require('../service/comment');
     if (this.commentService == null) {
       this.commentService = new CommentService(this);
     }
   }
 
   async setupSyncPageStatusService(): Promise<void> {
-    const SyncPageStatusService = require('../service/system-events/sync-page-status');
     if (this.syncPageStatusService == null) {
       this.syncPageStatusService = new SyncPageStatusService(
         this,

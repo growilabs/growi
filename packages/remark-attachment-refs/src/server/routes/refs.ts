@@ -67,13 +67,13 @@ const loginRequiredFallback = (_req, res) => {
   return res.status(403).send('login required');
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: ignore
-export const routesFactory = (crowi): any => {
-  const loginRequired = crowi.require('../middlewares/login-required')(
+export const routesFactory = (crowi): Promise<Router> => {
+  const loginRequired = crowi.loginRequiredFactory(
     crowi,
     true,
     loginRequiredFallback,
   );
+
   const accessTokenParser: AccessTokenParser = crowi.accessTokenParser;
 
   const router = Router();
@@ -94,7 +94,7 @@ export const routesFactory = (crowi): any => {
   router.get(
     '/ref',
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
-    loginRequired,
+    // loginRequired,
     async (req: RequestWithUser, res) => {
       const user = req.user;
       const { pagePath, fileNameOrId } = req.query;

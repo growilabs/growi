@@ -25,8 +25,7 @@ growi/
 ```
 apps/app/
 ├── src/                   # ソースコード
-├── test/                  # 古いJestテストファイル（廃止予定）
-├── test-with-vite/        # 新しいVitestテストファイル
+├── test/                  # Vitest用ファイル
 ├── playwright/            # E2Eテスト（Playwright）
 ├── config/                # 設定ファイル
 ├── public/                # 静的ファイル
@@ -37,24 +36,19 @@ apps/app/
 
 ## テストディレクトリの詳細
 
-### test/ (廃止予定)
-- Jest用の古いテストファイル
-- 段階的にtest-with-vite/に移行予定
-- 新規テストは作成しない
-
-### test-with-vite/
-- Vitest用の新しいテストファイル
-- 新規テストはここに作成
+### test/
+- Vitest用のファイル
+- 新規テスト用のユーティリティはここに作成
 - セットアップファイル: `setup/mongoms.ts` (MongoDB用)
 
 ### playwright/
-- E2Eテスト用ディレクトリ
+- Playwright による E2E テスト用ディレクトリ
 - ブラウザ操作を含むテスト
 
 ## テストファイルの配置ルール
 
 ### Vitestテストファイル
-以下のパターンでソースコードと同じディレクトリまたはtest-with-vite/配下に配置：
+以下のパターンでソースコードと同じディレクトリに配置：
 
 - **単体テスト**: `*.spec.{ts,js}`
 - **統合テスト**: `*.integ.ts` 

@@ -11,7 +11,7 @@ import {
   attachTitleHeader,
   normalizePath,
 } from '@growi/core/dist/utils/path-utils';
-import type { Request, RequestHandler } from 'express';
+import type { Request } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
@@ -25,6 +25,7 @@ import type { IOptionsForCreate } from '~/interfaces/page';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import PageTagRelation from '~/server/models/page-tag-relation';
@@ -112,17 +113,13 @@ interface CreatePageRequest extends Request<undefined, ApiV3Response, ReqBody> {
   user: IUserHasId;
 }
 
-type CreatePageHandlersFactory = (crowi: Crowi) => RequestHandler[];
-
-export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
+export const createPageHandlersFactory = (crowi: Crowi) => {
   const Page = mongoose.model<IPage, PageModel>('Page');
   const User = mongoose.model<IUser, { isExistUserByUserPagePath: any }>(
     'User',
   );
 
-  const loginRequiredStrictly = require('../../../middlewares/login-required')(
-    crowi,
-  );
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   // define validators for req.body
   const validator: ValidationChain[] = [
@@ -291,7 +288,7 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
     loginRequiredStrictly,
     excludeReadOnlyUser,
     addActivity,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: CreatePageRequest, res: ApiV3Response) => {
       const { body: bodyByParam, pageTags: tagsByParam } = req.body;
