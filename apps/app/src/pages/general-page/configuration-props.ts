@@ -120,9 +120,7 @@ export const getServerSideGeneralPageProps: GetServerSideProps<
         isEnabledAttachTitleHeader: configManager.getConfig(
           'customize:isEnabledAttachTitleHeader',
         ),
-        disableUserPages: configManager.getConfig(
-          'security:disable-user-pages',
-        ),
+        disableUserPages: configManager.getConfig('security:disableUserPages'),
       },
     },
   };

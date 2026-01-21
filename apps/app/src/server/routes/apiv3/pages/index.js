@@ -194,7 +194,7 @@ module.exports = (crowi) => {
         'security:list-policy:hideRestrictedByGroup',
       );
       const disableUserPages = configManager.getConfig(
-        'security:disable-user-pages',
+        'security:disableUserPages',
       );
 
       /**

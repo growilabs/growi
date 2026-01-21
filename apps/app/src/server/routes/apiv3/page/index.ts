@@ -198,7 +198,7 @@ module.exports = (crowi: Crowi) => {
         req.query;
 
       const disableUserPages = crowi.configManager.getConfig(
-        'security:disable-user-pages',
+        'security:disableUserPages',
       );
 
       const respondWithSinglePage = async (

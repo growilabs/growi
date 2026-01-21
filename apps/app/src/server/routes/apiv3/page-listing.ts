@@ -160,7 +160,7 @@ const routerFactory = (crowi: Crowi): Router => {
         'security:list-policy:hideRestrictedByGroup',
       );
       const disableUserPages = await configManager.getConfig(
-        'security:disable-user-pages',
+        'security:disableUserPages',
       );
 
       try {

@@ -258,7 +258,7 @@ module.exports = (crowi) => {
           .exec();
 
         const disabledUserPage = configManager.getConfig(
-          'security:disable-user-pages',
+          'security:disableUserPages',
         );
 
         const filteredBookmarks = disabledUserPage

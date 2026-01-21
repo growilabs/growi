@@ -512,7 +512,7 @@ module.exports = (crowi) => {
             'security:list-policy:hideRestrictedByGroup',
           ),
           disableUserPages: await configManager.getConfig(
-            'security:disable-user-pages',
+            'security:disableUserPages',
           ),
           isUsersHomepageDeletionEnabled: await configManager.getConfig(
             'security:user-homepage-deletion:isEnabled',
@@ -1004,7 +1004,7 @@ module.exports = (crowi) => {
           req.body.hideRestrictedByOwner,
         'security:list-policy:hideRestrictedByGroup':
           req.body.hideRestrictedByGroup,
-        'security:disable-user-pages': req.body.disableUserPages,
+        'security:disableUserPages': req.body.disableUserPages,
         'security:user-homepage-deletion:isEnabled':
           req.body.isUsersHomepageDeletionEnabled,
         // Validate user-homepage-deletion config
@@ -1078,7 +1078,7 @@ module.exports = (crowi) => {
             'security:list-policy:hideRestrictedByGroup',
           ),
           disableUserPages: await configManager.getConfig(
-            'security:disable-user-pages',
+            'security:disableUserPages',
           ),
           isUsersHomepageDeletionEnabled: await configManager.getConfig(
             'security:user-homepage-deletion:isEnabled',

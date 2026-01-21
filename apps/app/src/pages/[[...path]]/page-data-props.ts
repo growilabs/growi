@@ -164,9 +164,7 @@ export async function getPageDataForInitial(
     { pageId, path: resolvedPagePath, user },
   );
 
-  const disableUserPages = configManager.getConfig(
-    'security:disable-user-pages',
-  );
+  const disableUserPages = configManager.getConfig('security:disableUserPages');
 
   if (disableUserPages && pageWithMeta.data != null) {
     const pagePath = pageWithMeta.data.path;

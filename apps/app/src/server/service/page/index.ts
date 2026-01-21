@@ -799,7 +799,7 @@ class PageService implements IPageService {
   getExcludedPathsBySystem(): string[] {
     const excludedPaths: string[] = [];
 
-    if (configManager.getConfig('security:disable-user-pages')) {
+    if (configManager.getConfig('security:disableUserPages')) {
       excludedPaths.push('/user');
     }
 
