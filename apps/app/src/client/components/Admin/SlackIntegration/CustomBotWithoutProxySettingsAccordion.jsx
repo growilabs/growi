@@ -31,8 +31,7 @@ const CustomBotWithoutProxySettingsAccordion = (props) => {
   const successMessage = 'Successfully sent to Slack workspace.';
 
   const { t } = useTranslation();
-  // eslint-disable-next-line no-unused-vars
-  const [defaultOpenAccordionKeys, setDefaultOpenAccordionKeys] = useState(
+  const [defaultOpenAccordionKeys, _setDefaultOpenAccordionKeys] = useState(
     new Set([activeStep]),
   );
   const [isLatestConnectionSuccess, setIsLatestConnectionSuccess] =
@@ -177,7 +176,6 @@ const CustomBotWithoutProxySettingsAccordion = (props) => {
         defaultIsActive={defaultOpenAccordionKeys.has(
           botInstallationStep.REGISTER_SLACK_CONFIGURATION,
         )}
-        // eslint-disable-next-line max-len
         title={
           <>
             <span className="me-3">3</span>
@@ -202,7 +200,6 @@ const CustomBotWithoutProxySettingsAccordion = (props) => {
         defaultIsActive={defaultOpenAccordionKeys.has(
           botInstallationStep.CONNECTION_TEST,
         )}
-        // eslint-disable-next-line max-len
         title={
           <>
             <span className="me-3">4</span>
@@ -219,7 +216,6 @@ const CustomBotWithoutProxySettingsAccordion = (props) => {
         defaultIsActive={defaultOpenAccordionKeys.has(
           botInstallationStep.CONNECTION_TEST,
         )}
-        // eslint-disable-next-line max-len
         title={
           <>
             <span className="me-3">5</span>

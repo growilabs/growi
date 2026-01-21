@@ -85,7 +85,6 @@ class PasswordResetModal extends React.Component {
         {!isMailerSetup ? (
           <p
             className="form-label form-text text-muted mb-0"
-            // eslint-disable-next-line react/no-danger
             // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
             dangerouslySetInnerHTML={{
               __html: t('admin:mailer_setup_required'),

@@ -213,7 +213,7 @@ module.exports = (crowi) => {
 
     for (const user of userList) {
       try {
-        // eslint-disable-next-line no-await-in-loop
+        // biome-ignore lint/performance/noAwaitInLoops: Allow for memory consumption control
         await mailService.send({
           to: user.email,
           subject: `Invitation to ${appTitle}`,
@@ -228,7 +228,6 @@ module.exports = (crowi) => {
             appTitle,
           },
         });
-        // eslint-disable-next-line no-await-in-loop
         await User.updateIsInvitationEmailSended(user.user.id);
       } catch (err) {
         logger.error(err);
@@ -1584,7 +1583,6 @@ module.exports = (crowi) => {
           });
         }
 
-        // eslint-disable-next-line max-len
         const canIncludeMixedUsernames =
           (options.isIncludeMixedUsernames && req.user.admin) ||
           (options.isIncludeMixedUsernames &&

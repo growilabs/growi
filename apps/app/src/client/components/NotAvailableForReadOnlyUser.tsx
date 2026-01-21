@@ -8,7 +8,6 @@ import { isRomUserAllowedToCommentAtom } from '~/states/server-configurations';
 
 import { NotAvailable } from './NotAvailable';
 
-// eslint-disable-next-line react/prop-types
 export const NotAvailableForReadOnlyUser: React.FC<{
   children: JSX.Element;
 }> = ({ children }) => {
@@ -28,7 +27,6 @@ export const NotAvailableForReadOnlyUser: React.FC<{
 };
 NotAvailableForReadOnlyUser.displayName = 'NotAvailableForReadOnlyUser';
 
-// eslint-disable-next-line react/prop-types
 export const NotAvailableIfReadOnlyUserNotAllowedToComment: React.FC<{
   children: JSX.Element;
 }> = ({ children }) => {

@@ -1057,7 +1057,6 @@ module.exports = (crowi) => {
    *           200:
    *             description: Succeeded to delete botType setting.
    */
-  // eslint-disable-next-line max-len
   router.post(
     '/slack-app-integrations/:id/relation-test',
     accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]),

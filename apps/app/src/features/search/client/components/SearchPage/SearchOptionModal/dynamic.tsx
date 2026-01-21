@@ -6,6 +6,7 @@ type SearchOptionModalProps = {
   isOpen: boolean;
   includeUserPages: boolean;
   includeTrashPages: boolean;
+  disableUserPages: boolean;
   onClose?: () => void;
   onIncludeUserPagesSwitched?: (isChecked: boolean) => void;
   onIncludeTrashPagesSwitched?: (isChecked: boolean) => void;

@@ -5,8 +5,8 @@ import loggerFactory from '~/utils/logger';
 
 import { apiv3Get, apiv3Put } from '../util/apiv3-client';
 
-// eslint-disable-next-line no-unused-vars
 const logger = loggerFactory('growi:services:AdminLocalSecurityContainer');
+
 /**
  * Service container for admin security page (LocalSecuritySetting.jsx)
  * @extends {Container} unstated Container

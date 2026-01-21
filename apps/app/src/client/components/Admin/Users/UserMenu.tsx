@@ -146,7 +146,6 @@ const UserMenu = (props: UserMenuProps) => {
 /**
  * Wrapper component for using unstated
  */
-// eslint-disable-next-line max-len
 const UserMenuWrapper: React.ForwardRefExoticComponent<
   Pick<any, string | number | symbol> & React.RefAttributes<any>
 > = withUnstatedContainers(UserMenu, [AdminUsersContainer]);

@@ -65,6 +65,11 @@
       "enable_force_delete_user_homepage_on_user_deletion": "删除用户时，该用户的主页及其所有子页面将被完全删除",
       "desc": "您可以删除已删除用户的主页。"
     },
+    "disable_user_pages": {
+      "disable_user_pages": "禁用用户页面",
+      "disable_user_pages_label": "禁用用户页面",
+      "desc": "通过禁用用户页面，将无法创建、查看、编辑和复制所有用户页面。</br>此外，用户页面也不会出现在页面树、最近更改或搜索结果中。"
+    },
     "session": "会议",
     "max_age": "有效期间  (msec)",
     "max_age_desc": "指定使用户会话过期的数量(以毫秒为单位)。<br>默认值: 2592000000 (30天)",
@@ -322,7 +327,7 @@
       "done": "复制到剪贴板!"
     },
     "bug_report": "提交一个错误报告",
-    "submit_bug_report": "<a href='https://github.com/growilabs/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>然后提交你的问题到GitHub。</a>"
+    "submit_bug_report": "将您的问题提交到 GitHub。"
   },
   "v5_page_migration": {
     "migration_desc": "有一些页面具有旧的v4兼容性。为了利用新的功能，如页面树和容易重命名，请将您的所有页面转换为v5兼容性。",

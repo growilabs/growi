@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { GroupType, type HasObjectId, type IPage } from '@growi/core';
 import type {
   IPagePopulatedToShowRevision,
@@ -91,6 +89,7 @@ export type FindRecentUpdatedPagesOption = {
   desc: number;
   hideRestrictedByOwner: boolean;
   hideRestrictedByGroup: boolean;
+  disableUserPages: boolean;
 };
 
 export type CreateMethod = (
@@ -432,6 +431,22 @@ export class PageQueryBuilder {
     return this;
   }
 
+  addConditionToListByNotMatchPathAndChildren(str: string): PageQueryBuilder {
+    const path = normalizePath(str);
+
+    if (isTopPage(path)) {
+      return this;
+    }
+
+    const startsPattern = escapeStringRegexp(path);
+
+    this.query = this.query.and({
+      path: { $not: new RegExp(`^${startsPattern}(/|$)`) },
+    });
+
+    return this;
+  }
+
   addConditionToListByMatch(str: string): PageQueryBuilder {
     // No request is set for "/"
     if (str === '/') {
@@ -560,7 +575,7 @@ export class PageQueryBuilder {
   }
 
   addConditionToPagenate(offset, limit, sortOpt?): PageQueryBuilder {
-    this.query = this.query.sort(sortOpt).skip(offset).limit(limit); // eslint-disable-line newline-per-chained-call
+    this.query = this.query.sort(sortOpt).skip(offset).limit(limit);
 
     return this;
   }
@@ -639,6 +654,7 @@ export class PageQueryBuilder {
   }
 
   populateDataToList(userPublicFields): PageQueryBuilder {
+    // biome-ignore lint/plugin: populating is the purpose of this method
     this.query = this.query.populate({
       path: 'lastUpdateUser',
       select: userPublicFields,
@@ -920,6 +936,10 @@ schema.statics.findRecentUpdatedPages = async function (
 
   const baseQuery = this.find({});
   const queryBuilder = new PageQueryBuilder(baseQuery, includeEmpty);
+
+  if (options.disableUserPages) {
+    queryBuilder.addConditionToListByNotMatchPathAndChildren('/user');
+  }
 
   if (!options.includeTrashed) {
     queryBuilder.addConditionToExcludeTrashed();
@@ -1427,7 +1447,7 @@ schema.methods.calculateAndUpdateLatestRevisionBodyLength = async function (
     return;
   }
 
-  // eslint-disable-next-line rulesdir/no-populate
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   const populatedPageDocument = await this.populate<PageDocument>(
     'revision',
     'body',

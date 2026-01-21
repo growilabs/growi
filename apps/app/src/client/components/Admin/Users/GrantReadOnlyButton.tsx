@@ -37,7 +37,6 @@ const GrantReadOnlyButton: React.FC<{
 /**
  * Wrapper component for using unstated
  */
-// eslint-disable-next-line max-len
 const GrantReadOnlyButtonWrapper: React.ForwardRefExoticComponent<
   Pick<any, string | number | symbol> & React.RefAttributes<any>
 > = withUnstatedContainers(GrantReadOnlyButton, [AdminUsersContainer]);

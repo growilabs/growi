@@ -7,6 +7,8 @@ import {
 
 import loggerFactory from '~/utils/logger';
 
+import type { ConfigManager } from '../service/config-manager';
+
 const logger = loggerFactory('growi:util:slack-legacy');
 
 interface SlackLegacyUtil {
@@ -15,11 +17,12 @@ interface SlackLegacyUtil {
   ): Promise<void>;
 }
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export const slackLegacyUtilFactory = (configManager: any): SlackLegacyUtil => {
+export const slackLegacyUtilFactory = (
+  configManager: ConfigManager,
+): SlackLegacyUtil => {
   const postWithIwh = async (messageObj: IncomingWebhookSendArguments) => {
     const webhook = new IncomingWebhook(
-      configManager.getConfig('slack:incomingWebhookUrl'),
+      configManager.getConfig('slack:incomingWebhookUrl') ?? '',
     );
     try {
       await webhook.send(messageObj);

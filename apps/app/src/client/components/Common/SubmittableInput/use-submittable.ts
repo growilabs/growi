@@ -87,7 +87,6 @@ export const useSubmittable = (
   );
 
   const {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     value: _value,
     onSubmit: _onSubmit,
     onCancel: _onCancel,

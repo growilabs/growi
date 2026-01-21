@@ -110,7 +110,6 @@ class ImportForm extends React.Component {
     const { socket } = this.props;
 
     // websocket event
-    // eslint-disable-next-line object-curly-newline
     socket.on(
       'admin:onProgressForImport',
       ({ collectionName, collectionProgress, appendedErrors }) => {

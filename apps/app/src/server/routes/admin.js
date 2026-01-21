@@ -5,7 +5,6 @@ import { exportService } from '../service/export';
 
 const logger = loggerFactory('growi:routes:admin');
 
-/* eslint-disable no-use-before-define */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi, app) => {
   const ApiResponse = require('../util/apiResponse');

@@ -13,10 +13,10 @@ export type ReqWithPasswordResetOrder = Request & {
   passwordResetOrder: IPasswordResetOrder;
 };
 
-// eslint-disable-next-line import/no-anonymous-default-export
+// biome-ignore lint/style/noDefaultExport: ignore
 export default async (
   req: ReqWithPasswordResetOrder,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ): Promise<void> => {
   const token: string = req.params.token || req.body.token;
