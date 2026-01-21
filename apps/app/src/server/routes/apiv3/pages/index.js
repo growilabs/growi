@@ -6,6 +6,7 @@ import {
   isCreatablePage,
   isTrashPage,
   isUserPage,
+  isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import {
   addHeadingSlash,
@@ -761,6 +762,16 @@ module.exports = (crowi) => {
           new ErrorV3('This page path is invalid', 'invalid_path'),
           400,
         );
+      }
+
+      const disableUserPages = configManager.getConfig(
+        'security:disableUserPages',
+      );
+      if (
+        (disableUserPages && isUsersTopPage(pathToCreate)) ||
+        isUserPage(pathToCreate)
+      ) {
+        return res.apiv3Err('User pages are disabled');
       }
 
       if (isUserPage(newPagePath)) {

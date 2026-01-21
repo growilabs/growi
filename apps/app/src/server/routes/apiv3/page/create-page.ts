@@ -6,6 +6,7 @@ import {
   isCreatablePage,
   isUserPage,
   isUsersHomepage,
+  isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import {
   attachTitleHeader,
@@ -308,6 +309,16 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
         return res.apiv3Err(
           new ErrorV3(err.toString(), 'could_not_create_page'),
         );
+      }
+
+      const disableUserPages = configManager.getConfig(
+        'security:disableUserPages',
+      );
+      if (
+        (disableUserPages && isUsersTopPage(pathToCreate)) ||
+        isUserPage(pathToCreate)
+      ) {
+        return res.apiv3Err('User pages are disabled');
       }
 
       if (isUserPage(pathToCreate)) {

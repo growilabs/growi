@@ -5,7 +5,9 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import {
   isTopPage,
+  isUserPage,
   isUsersProtectedPages,
+  isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import type { Request, RequestHandler } from 'express';
 import type { ValidationChain } from 'express-validator';
@@ -29,6 +31,7 @@ import {
   serializePageSecurely,
   serializeRevisionSecurely,
 } from '~/server/models/serializers';
+import { configManager } from '~/server/service/config-manager/config-manager';
 import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import { getYjsService } from '~/server/service/yjs';
@@ -222,6 +225,16 @@ export const updatePageHandlersFactory: UpdatePageHandlersFactory = (crowi) => {
           ),
           400,
         );
+      }
+
+      const disableUserPages = configManager.getConfig(
+        'security:disableUserPages',
+      );
+      if (
+        (disableUserPages && isUsersTopPage(currentPage.path)) ||
+        isUserPage(currentPage.path)
+      ) {
+        return res.apiv3Err('User pages are disabled');
       }
 
       const isGrantImmutable =
