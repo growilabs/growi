@@ -32,6 +32,8 @@ export default defineWorkspace([
       environment: 'node',
       include: ['**/*.integ.ts'],
       setupFiles: ['./test/setup/mongoms.ts'],
+      // Disable file parallelism to avoid mongodb-memory-server lock conflicts
+      fileParallelism: false,
       deps: {
         // Transform inline modules (allows ESM in require context)
         interopDefault: true,
