@@ -764,16 +764,6 @@ module.exports = (crowi) => {
         );
       }
 
-      const disableUserPages = configManager.getConfig(
-        'security:disableUserPages',
-      );
-      if (
-        disableUserPages &&
-        (isUsersTopPage(newPagePath) || isUserPage(newPagePath))
-      ) {
-        return res.apiv3Err('User pages are disabled');
-      }
-
       if (isUserPage(newPagePath)) {
         const isExistUser = await User.isExistUserByUserPagePath(newPagePath);
         if (!isExistUser) {
@@ -793,6 +783,19 @@ module.exports = (crowi) => {
       }
 
       const page = await Page.findByIdAndViewer(pageId, req.user, null, true);
+      const disableUserPages = configManager.getConfig(
+        'security:disableUserPages',
+      );
+      if (disableUserPages) {
+        if (
+          isUsersTopPage(newPagePath) ||
+          isUserPage(newPagePath) ||
+          isUsersTopPage(page.path) ||
+          isUserPage(page.path)
+        ) {
+          return res.apiv3Err('User pages are disabled');
+        }
+      }
 
       const isEmptyAndNotRecursively = page?.isEmpty && !isRecursively;
       if (page == null || isEmptyAndNotRecursively) {
