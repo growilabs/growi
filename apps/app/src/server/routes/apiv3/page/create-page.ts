@@ -12,7 +12,7 @@ import {
   attachTitleHeader,
   normalizePath,
 } from '@growi/core/dist/utils/path-utils';
-import type { Request } from 'express';
+import type { Request, RequestHandler } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
@@ -110,11 +110,12 @@ async function determinePath(
 
 type ReqBody = IApiv3PageCreateParams;
 
-interface CreatePageRequest extends Request<undefined, ApiV3Response, ReqBody> {
+interface CreatePageRequest
+  extends Request<Record<string, string>, ApiV3Response, ReqBody> {
   user: IUserHasId;
 }
 
-export const createPageHandlersFactory = (crowi: Crowi) => {
+export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
   const Page = mongoose.model<IPage, PageModel>('Page');
   const User = mongoose.model<IUser, { isExistUserByUserPagePath: any }>(
     'User',
