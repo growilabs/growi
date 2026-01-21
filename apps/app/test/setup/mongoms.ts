@@ -1,3 +1,4 @@
+import ConnectionString from 'mongodb-connection-string-url';
 import { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 
@@ -7,43 +8,17 @@ let mongoServer: MongoMemoryServer | undefined;
 
 /**
  * Replace the database name in a MongoDB connection URI.
+ * Uses mongodb-connection-string-url package for robust parsing.
  * Supports various URI formats including authentication, replica sets, and query parameters.
- * Uses a simple string-based approach that handles most MongoDB URI formats correctly.
  * 
  * @param uri - MongoDB connection URI
  * @param newDbName - New database name to use
  * @returns Modified URI with the new database name
  */
 function replaceMongoDbName(uri: string, newDbName: string): string {
-  try {
-    // For standard single-host URIs, use URL API for robust parsing
-    // Format: mongodb://[username:password@]host[:port][/database][?options]
-    if (!uri.includes(',')) {
-      const url = new URL(uri);
-      url.pathname = `/${newDbName}`;
-      return url.toString();
-    }
-    
-    // For replica set URIs with multiple hosts (contains comma)
-    // Format: mongodb://host1:port1,host2:port2[/database][?options]
-    // URL API doesn't support multiple hosts, so use string manipulation
-    const [beforeDb, afterDb] = uri.split('?');
-    const queryString = afterDb ? `?${afterDb}` : '';
-    
-    // Find the last slash before the database name (after all hosts)
-    const lastSlashIndex = beforeDb.lastIndexOf('/');
-    if (lastSlashIndex > 'mongodb://'.length) {
-      // URI has a database name, replace it
-      const baseUri = beforeDb.substring(0, lastSlashIndex);
-      return `${baseUri}/${newDbName}${queryString}`;
-    }
-    
-    // URI has no database name, append it
-    return `${beforeDb}/${newDbName}${queryString}`;
-  } catch (error) {
-    // If parsing fails, throw an error with helpful message
-    throw new Error(`Failed to parse MongoDB URI: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  const cs = new ConnectionString(uri);
+  cs.pathname = `/${newDbName}`;
+  return cs.href;
 }
 
 beforeAll(async () => {
