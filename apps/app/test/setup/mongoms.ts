@@ -8,9 +8,18 @@ let mongoServer: MongoMemoryServer | undefined;
 beforeAll(async () => {
   // Use external MongoDB if MONGO_URI is provided (e.g., in CI with GitHub Actions services)
   if (process.env.MONGO_URI) {
+    // Generate unique database name for each test worker to avoid conflicts in parallel execution
+    // VITEST_POOL_ID is provided by Vitest (e.g., "1", "2", "3"...)
+    const workerId = process.env.VITEST_POOL_ID || '1';
+    const dbName = `growi_test_${workerId}`;
+    
+    // Parse base URI and append database name
+    const baseUri = process.env.MONGO_URI.replace(/\/[^/]*$/, '');
+    const mongoUri = `${baseUri}/${dbName}`;
+    
     // biome-ignore lint/suspicious/noConsole: Allow logging
-    console.log(`Using external MongoDB at ${process.env.MONGO_URI}`);
-    await mongoose.connect(process.env.MONGO_URI, mongoOptions);
+    console.log(`Using external MongoDB at ${mongoUri} (worker: ${workerId})`);
+    await mongoose.connect(mongoUri, mongoOptions);
     return;
   }
 
