@@ -1,151 +1,97 @@
+import mongoose from 'mongoose';
 import {
-  vi, describe, beforeAll, beforeEach, it, expect,
+  describe, beforeAll, afterAll, beforeEach, it, expect,
 } from 'vitest';
+import { MongoMemoryServer } from 'mongodb-memory-server-core';
+import { ActivityLogActions } from '~/interfaces/activity';
+import Activity from '~/server/models/activity';
+import { ContributionAggregationService } from './aggregation-service';
 
+describe('ContributionAggregationService (Essential)', () => {
+  let service: ContributionAggregationService;
+  let mongoServer: MongoMemoryServer;
 
-describe('ContributionAggregationService', { timeout: 15000 }, () => {
-  let service: any;
-  let aggregateMockFn: ReturnType<typeof vi.fn>;
-
-  // --- Setup and Teardown ---
   beforeAll(async() => {
-    aggregateMockFn = vi.fn();
-
-    vi.doMock('~/server/models/activity', () => {
-      const ActivityMock = {
-        aggregate: aggregateMockFn,
-      };
-      return {
-        default: ActivityMock,
-      };
-    });
-
-    vi.doMock('~/interfaces/activity', () => {
-      const MOCK_ACTIONS = {
-        ACTION_PAGE_CREATED: 'PAGE_CREATE',
-        ACTION_PAGE_UPDATED: 'PAGE_UPDATE',
-      };
-      return {
-        ActivityLogActions: MOCK_ACTIONS,
-      };
-    });
-
-    const { ContributionAggregationService } = await import('./aggregation-service');
-
+    mongoServer = await MongoMemoryServer.create();
+    await mongoose.connect(mongoServer.getUri());
     service = new ContributionAggregationService();
   });
 
-  beforeEach(() => {
-    vi.clearAllMocks();
+  afterAll(async() => {
+    await mongoose.disconnect();
+    await mongoServer.stop();
   });
 
-  it('should build a pipeline with correct filtering, UTC grouping, and sorting', () => {
-    const userId = 'user_123';
-    const startDate = new Date('2025-11-01T00:00:00Z');
+  beforeEach(async() => {
+    await Activity.deleteMany({});
+  });
+
+  it('should aggregate real database records into daily counts', async() => {
+    // Arrange
+    const userId = new mongoose.Types.ObjectId();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
+
+    await Activity.insertMany([
+      {
+        user: userId,
+        action: ActivityLogActions.ACTION_PAGE_CREATE,
+        createdAt: new Date('2025-11-01T12:00:00Z'),
+      },
+      {
+        user: userId,
+        action: ActivityLogActions.ACTION_PAGE_UPDATE,
+        createdAt: new Date('2025-11-01T15:00:00Z'),
+      },
+      {
+        user: userId,
+        action: ActivityLogActions.ACTION_PAGE_CREATE,
+        createdAt: new Date('2025-11-02T01:00:00Z'),
+      },
+    ]);
 
     // Act
-    const pipeline = service.buildPipeline({ userId, startDate });
+    const results = await service.runAggregationPipeline({
+      userId: userId.toString(),
+      startDate: new Date('2025-11-01T00:00:00Z'),
+    });
 
-    // 1. Assert Match Stage
-    const match = pipeline.find(s => '$match' in s)?.$match;
-    expect(match.action.$in).toHaveLength(2);
-    expect(match).toMatchObject({
-      userId,
-      action: { $in: ['PAGE_CREATE', 'PAGE_UPDATE'] },
-      timestamp: {
-        $gte: startDate,
-        $lt: expect.any(Date),
+    // Assert: Verify the final outcome
+    expect(results).toHaveLength(2);
+    expect(results).toEqual(expect.arrayContaining([
+      { d: '2025-11-01', c: 2 },
+      { d: '2025-11-02', c: 1 },
+    ]));
+
+    vi.useRealTimers();
+  });
+
+  it('should exclude records before the startDate', async() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
+
+    const userId = new mongoose.Types.ObjectId();
+    await Activity.insertMany([
+      {
+        user: userId,
+        action: ActivityLogActions.ACTION_PAGE_CREATE,
+        createdAt: new Date('2025-10-31T23:59:59Z'), // Before
       },
+      {
+        user: userId,
+        action: ActivityLogActions.ACTION_PAGE_CREATE,
+        createdAt: new Date('2025-11-01T10:00:00Z'), // After
+      },
+    ]);
+
+    const results = await service.runAggregationPipeline({
+      userId: userId.toString(),
+      startDate: new Date('2025-11-01T00:00:00Z'),
     });
 
-    // 2. Assert Group Stage
-    const group = pipeline.find(s => '$group' in s)?.$group;
-    expect(group?._id?.$dateToString).toEqual({
-      format: '%Y-%m-%d',
-      date: '$timestamp',
-      timezone: 'Z',
-    });
-    expect(group?.count).toEqual({ $sum: 1 });
+    expect(results).toHaveLength(1);
+    expect(results[0].d).toBe('2025-11-01');
 
-    // 3. Assert Project Stage
-    const project = pipeline.find(s => '$project' in s)?.$project;
-    expect(project).toEqual({
-      _id: 0,
-      d: '$_id',
-      c: '$count',
-    });
-
-    // 4. Assert Sort Stage
-    const sort = pipeline.find(s => '$sort' in s)?.$sort;
-    expect(sort).toEqual({ d: 1 });
-
-    expect(pipeline).toHaveLength(4);
-  });
-
-  it('should set the endDate to midnight today in UTC', () => {
-    const startDate = new Date('2025-01-01');
-    const pipeline = service.buildPipeline({ userId: '123', startDate });
-
-    const match = pipeline[0].$match;
-    const endDate = match.timestamp.$lt;
-
-    // Verify it's midnight (00:00:00.000)
-    expect(endDate.getUTCHours()).toBe(0);
-    expect(endDate.getUTCMinutes()).toBe(0);
-    expect(endDate.getUTCSeconds()).toBe(0);
-  });
-
-
-  it('should generate the pipeline and pass it directly to the Activity model', async() => {
-  // 1. Arrange: Create a spy on the internal buildPipeline method
-    const buildPipelineSpy = vi.spyOn(service, 'buildPipeline');
-
-    const params = {
-      userId: 'user_789',
-      startDate: new Date('2026-01-01'),
-    };
-
-    // 2. Act
-    service.runAggregationPipeline(params);
-
-    // 3. Assert
-    expect(buildPipelineSpy).toHaveBeenCalledWith(params);
-
-    // Check that the output of buildPipeline was passed to Activity.aggregate
-    const generatedPipeline = buildPipelineSpy.mock.results[0].value;
-    expect(aggregateMockFn).toHaveBeenCalledWith(generatedPipeline);
-  });
-
-  it('should include all required activity actions in the match stage', () => {
-    const pipeline = service.buildPipeline({ userId: '123', startDate: new Date() });
-    const match = pipeline.find(s => '$match' in s)?.$match;
-
-    expect(match.action.$in).toContain('PAGE_CREATE');
-    expect(match.action.$in).toContain('PAGE_UPDATE');
-  });
-
-  it('should exclude activities from today by using a "less than" midnight boundary', () => {
-    const startDate = new Date('2025-01-01');
-    const pipeline = service.buildPipeline({ userId: '123', startDate });
-
-    const match = pipeline.find(s => '$match' in s)?.$match;
-
-    // Verify the operator is specifically $lt and not $lte
-    expect(match.timestamp).toHaveProperty('$lt');
-    expect(match.timestamp).not.toHaveProperty('$lte');
-
-    // Verify the endDate is exactly midnight
-    const endDate = match.timestamp.$lt;
-    expect(endDate.getUTCHours()).toBe(0);
-  });
-
-  it('should use UTC (Z) for both grouping and date formatting', () => {
-    const pipeline = service.buildPipeline({ userId: '123', startDate: new Date() });
-
-    const group = pipeline.find(s => '$group' in s)?.$group;
-
-    // This ensures the "Source of Truth" for the date is UTC
-    expect(group._id.$dateToString.timezone).toBe('Z');
-    expect(group._id.$dateToString.format).toBe('%Y-%m-%d');
+    vi.useRealTimers();
   });
 });
