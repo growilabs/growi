@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$FILE\" == */apps/app/* ]]; then REPO_ROOT=\"${FILE%%/apps/app/*}\"; cd \"$REPO_ROOT/apps/app\" && pnpm run lint:biome:fix \"${FILE#$REPO_ROOT/apps/app/}\"; fi",
+            "timeout": 30,
+            "description": "Auto-format edited files in apps/app with Biome"
+          }
+        ]
+      }
+    ]
+  }
+}
