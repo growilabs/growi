@@ -1,9 +1,9 @@
-import React, { type JSX, useEffect, useState } from 'react';
+import { type JSX, useEffect, useState } from 'react';
 import type { IUser } from '@growi/core/dist/interfaces';
 import { useAtomValue } from 'jotai';
 import { i18n, useTranslation } from 'next-i18next';
 
-import { i18n as i18nConfig } from '^/config/next-i18next.config';
+import * as nextI18nConfig from '^/config/next-i18next.config';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import { registrationWhitelistAtom } from '~/states/server-configurations';
@@ -11,6 +11,8 @@ import {
   useSWRxPersonalSettings,
   useUpdateBasicInfo,
 } from '~/stores/personal-settings';
+
+const i18nConfig = nextI18nConfig.i18n;
 
 export const BasicInfoSettings = (): JSX.Element => {
   const { t } = useTranslation();

@@ -5,16 +5,19 @@ import { userHomepagePath } from '@growi/core/dist/utils/page-path-utils';
 import escapeStringRegexp from 'escape-string-regexp';
 import express from 'express';
 import { body, query } from 'express-validator';
-import path from 'path';
+import path from 'pathe';
 import { isEmail } from 'validator';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { deleteUserAiAssistant } from '~/features/openai/server/services/delete-ai-assistant';
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import Activity from '~/server/models/activity';
 import ExternalAccount from '~/server/models/external-account';
 import { serializePageSecurely } from '~/server/models/serializers';
+import { UserStatus } from '~/server/models/user/conts';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
@@ -109,25 +112,20 @@ const validator = {};
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequired = require('../../middlewares/login-required')(
-    crowi,
-    true,
-  );
-  const loginRequiredStrictly = require('../../middlewares/login-required')(
-    crowi,
-  );
-  const adminRequired = require('../../middlewares/admin-required')(crowi);
+  const loginRequired = loginRequiredFactory(crowi, true);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const { User, Page } = crowi.models;
 
   const statusNo = {
-    registered: User.STATUS_REGISTERED,
-    active: User.STATUS_ACTIVE,
-    suspended: User.STATUS_SUSPENDED,
-    invited: User.STATUS_INVITED,
+    registered: UserStatus.STATUS_REGISTERED,
+    active: UserStatus.STATUS_ACTIVE,
+    suspended: UserStatus.STATUS_SUSPENDED,
+    invited: UserStatus.STATUS_INVITED,
   };
 
   validator.statusList = [
@@ -1535,7 +1533,7 @@ module.exports = (crowi) => {
           const activeUserData =
             await User.findUserByUsernameRegexWithTotalCount(
               q,
-              [User.STATUS_ACTIVE],
+              [UserStatus.STATUS_ACTIVE],
               { offset, limit },
             );
           const activeUsernames = activeUserData.users.map(
@@ -1551,9 +1549,9 @@ module.exports = (crowi) => {
 
         if (options.isIncludeInactiveUser) {
           const inactiveUserStates = [
-            User.STATUS_REGISTERED,
-            User.STATUS_SUSPENDED,
-            User.STATUS_INVITED,
+            UserStatus.STATUS_REGISTERED,
+            UserStatus.STATUS_SUSPENDED,
+            UserStatus.STATUS_INVITED,
           ];
           const inactiveUserData =
             await User.findUserByUsernameRegexWithTotalCount(

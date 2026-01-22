@@ -42,7 +42,7 @@ This guide provides comprehensive documentation for AI coding agents working on 
   - **Unstated**: Legacy (being phased out, replaced by Jotai)
 - **Testing**: 
   - Vitest for unit tests (`*.spec.ts`, `*.spec.tsx`)
-  - Jest for integration tests (`*.integ.ts`)
+  - Vitest for integration tests (`*.integ.ts`)
   - React Testing Library for component testing
   - Playwright for E2E testing
 - **i18n**: next-i18next for internationalization

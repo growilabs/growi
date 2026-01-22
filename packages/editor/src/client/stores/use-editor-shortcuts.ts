@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import type { EditorView } from '@codemirror/view';
 import { type KeyBinding, keymap } from '@codemirror/view';
-import type { KeyMapMode } from 'src/consts';
 
+import type { KeyMapMode } from '../../consts';
 import type { UseCodeMirrorEditor } from '../services';
 import { useAddMultiCursorKeyBindings } from '../services/use-codemirror-editor/utils/editor-shortcuts/add-multi-cursor';
 import { useInsertBlockquoteKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/insert-blockquote';

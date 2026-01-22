@@ -30,6 +30,8 @@
         "editorconfig.editorconfig",
         "shinnn.stylelint",
         "stylelint.vscode-stylelint",
+        // TypeScript (Native Preview)
+        "typescriptteam.native-preview",
         // Test
         "vitest.explorer",
         "ms-playwright.playwright",

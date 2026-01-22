@@ -4,6 +4,7 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import express from 'express';
 
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { Revision } from '~/server/models/revision';
 import {
   getAppliedAtForRevisionFilter,
@@ -59,10 +60,7 @@ module.exports = (crowi) => {
   const certifySharedPage = require('../../middlewares/certify-shared-page')(
     crowi,
   );
-  const loginRequired = require('../../middlewares/login-required')(
-    crowi,
-    true,
-  );
+  const loginRequired = loginRequiredFactory(crowi, true);
 
   const { Page, User } = crowi.models;
 

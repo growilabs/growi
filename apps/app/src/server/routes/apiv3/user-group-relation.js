@@ -3,6 +3,8 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { serializeUserGroupRelationSecurely } from '~/server/models/serializers';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import loggerFactory from '~/utils/logger';
@@ -17,10 +19,8 @@ const validator = {};
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(
-    crowi,
-  );
-  const adminRequired = require('../../middlewares/admin-required')(crowi);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
 
   validator.list = [
     query('groupIds', 'groupIds is required and must be an array').isArray(),

@@ -44,6 +44,7 @@ export interface IPageOperationService {
   autoUpdateExpiryDate(operationId: ObjectIdLike): NodeJS.Timeout;
   clearAutoUpdateInterval(timerObj: NodeJS.Timeout): void;
   getAncestorsPathsByFromAndToPath(fromPath: string, toPath: string): string[];
+  afterExpressServerReady(): Promise<void>;
 }
 
 class PageOperationService implements IPageOperationService {

@@ -7,6 +7,8 @@ import { body, param, query, sanitizeQuery } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { serializeUserGroupRelationSecurely } from '~/server/models/serializers/user-group-relation-serializer';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
@@ -27,13 +29,11 @@ const router = express.Router();
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(
-    crowi,
-  );
-  const adminRequired = require('../../middlewares/admin-required')(crowi);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const { User, Page } = crowi.models;
 

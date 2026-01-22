@@ -7,6 +7,7 @@ import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { AccessToken } from '~/server/models/access-token';
 import loggerFactory from '~/utils/logger';
 
@@ -17,18 +18,14 @@ const logger = loggerFactory(
 );
 
 interface GetAccessTokenRequest
-  extends Request<undefined, ApiV3Response, undefined> {
+  extends Request<Record<string, string>, ApiV3Response, undefined> {
   user: IUserHasId;
 }
 
-type GetAccessTokenHandlerFactory = (crowi: Crowi) => RequestHandler[];
-
-export const getAccessTokenHandlerFactory: GetAccessTokenHandlerFactory = (
-  crowi,
-) => {
-  const loginRequiredStrictly = require('../../../middlewares/login-required')(
-    crowi,
-  );
+export const getAccessTokenHandlerFactory = (
+  crowi: Crowi,
+): RequestHandler[] => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
 
   return [

@@ -179,7 +179,6 @@ export class LinkSharedEventHandler
     pages: any,
     isPermalink: boolean,
   ): DataForUnfurl[] {
-    const Page = this.crowi.model('Page');
     const unfurlData: DataForUnfurl[] = [];
 
     for (const page of pages) {

@@ -36,6 +36,7 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { Revision } from '~/server/models/revision';
@@ -85,23 +86,18 @@ const router = express.Router();
  *
  */
 module.exports = (crowi: Crowi) => {
-  const loginRequired = require('../../../middlewares/login-required')(
-    crowi,
-    true,
-  );
-  const loginRequiredStrictly = require('../../../middlewares/login-required')(
-    crowi,
-  );
+  const loginRequired = loginRequiredFactory(crowi, true);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
   const certifySharedPage = require('../../../middlewares/certify-shared-page')(
     crowi,
   );
   const addActivity = generateAddActivityMiddleware();
 
-  const globalNotificationService = crowi.getGlobalNotificationService();
+  const globalNotificationService = crowi.globalNotificationService;
   const Page = mongoose.model<IPage, PageModel>('Page');
   const { pageService, pageGrantService } = crowi;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const validator = {
     getPage: [
@@ -1122,7 +1118,9 @@ module.exports = (crowi: Crowi) => {
       }
 
       res.set({
-        'Content-Disposition': `attachment;filename*=UTF-8''${encodeURIComponent(fileName)}.${format}`,
+        'Content-Disposition': `attachment;filename*=UTF-8''${encodeURIComponent(
+          fileName,
+        )}.${format}`,
       });
 
       const parameters = {
