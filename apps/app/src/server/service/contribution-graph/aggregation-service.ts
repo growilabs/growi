@@ -1,4 +1,5 @@
 import type { PipelineStage, Aggregate } from 'mongoose';
+import mongoose from 'mongoose';
 
 import { getUTCMidnightToday } from '~/features/contribution-graph/utils/contribution-graph-utils';
 import { ActivityLogActions } from '~/interfaces/activity';
@@ -26,15 +27,15 @@ export class ContributionAggregationService {
     return [
       {
         $match: {
-          userId,
+          user: new mongoose.Types.ObjectId(userId),
           action: { $in: Object.values(ActivityLogActions) },
-          timestamp: { $gte: startDate, $lt: endDate },
+          createdAt: { $gte: startDate, $lt: endDate },
         },
       },
       {
         $group: {
           _id: {
-            $dateToString: { format: '%Y-%m-%d', date: '$timestamp', timezone: 'Z' },
+            $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'UTC' },
           },
           count: { $sum: 1 },
         },
