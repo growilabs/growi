@@ -1,5 +1,6 @@
 import type { HydratedDocument } from 'mongoose';
 import { type Model, Schema } from 'mongoose';
+
 import { AllSupportedActions } from '~/interfaces/activity';
 import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
@@ -43,6 +44,7 @@ const auditLogBulkExportJobSchema = new Schema<IAuditLogBulkExportJob>(
     completedAt: { type: Date },
     restartFlag: { type: Boolean, required: true, default: false },
     totalExportedCount: { type: Number, default: 0 },
+    attachment: { type: Schema.Types.ObjectId, ref: 'Attachment' },
   },
   { timestamps: true },
 );

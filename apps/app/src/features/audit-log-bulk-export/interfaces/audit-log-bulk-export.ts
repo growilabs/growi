@@ -1,4 +1,5 @@
-import type { HasObjectId, IUser, Ref } from '@growi/core';
+import type { HasObjectId, IAttachment, IUser, Ref } from '@growi/core';
+
 import type { SupportedActionType } from '~/interfaces/activity';
 
 export const AuditLogBulkExportFormat = {
@@ -41,6 +42,7 @@ export interface IAuditLogBulkExportJob {
   totalExportedCount?: number; // total number of exported audit log entries
   createdAt?: Date;
   updatedAt?: Date;
+  attachment?: Ref<IAttachment>;
 }
 
 export interface IAuditLogBulkExportJobHasId
