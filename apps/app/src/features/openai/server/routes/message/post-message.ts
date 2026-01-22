@@ -1,8 +1,8 @@
+import assert from 'node:assert';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
-import type { Request, RequestHandler, Response } from 'express';
-import type { ValidationChain } from 'express-validator';
+import type { Request, RequestHandler } from 'express';
 import { body } from 'express-validator';
 import type { AssistantStream } from 'openai/lib/AssistantStream';
 import type { MessageDelta } from 'openai/resources/beta/threads/messages.mjs';
@@ -12,6 +12,7 @@ import { getOrCreateChatAssistant } from '~/features/openai/server/services/assi
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
@@ -55,20 +56,14 @@ type ReqBody = {
   extendedThinkingMode?: boolean;
 };
 
-type Req = Request<undefined, Response, ReqBody> & {
-  user: IUserHasId;
+type Req = Request<Record<string, string>, ApiV3Response, ReqBody> & {
+  user?: IUserHasId;
 };
 
-type PostMessageHandlersFactory = (crowi: Crowi) => RequestHandler[];
+export const postMessageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
-export const postMessageHandlersFactory: PostMessageHandlersFactory = (
-  crowi,
-) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
-
-  const validator: ValidationChain[] = [
+  const validator = [
     body('userMessage')
       .isString()
       .withMessage('userMessage must be string')
@@ -84,14 +79,22 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
   ];
 
   return [
+    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+    // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
     accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
     certifyAiService,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
+      const { user } = req;
+      assert(
+        user != null,
+        'user is required (ensured by loginRequiredStrictly middleware)',
+      );
+
       const { aiAssistantId, threadId } = req.body;
 
       if (threadId == null) {
@@ -111,7 +114,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
 
       const isAiAssistantUsable = await openaiService.isAiAssistantUsable(
         aiAssistantId,
-        req.user,
+        user,
       );
       if (!isAiAssistantUsable) {
         return res.apiv3Err(
@@ -188,7 +191,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
 
         // If annotation is found
         if (content?.type === 'text' && content?.text?.annotations != null) {
-          await replaceAnnotationWithPageLink(content, req.user.lang);
+          await replaceAnnotationWithPageLink(content, user.lang);
         }
 
         res.write(`data: ${JSON.stringify(delta)}\n\n`);

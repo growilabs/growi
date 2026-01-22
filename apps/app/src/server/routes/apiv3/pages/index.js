@@ -18,6 +18,8 @@ import { body, query } from 'express-validator';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { subscribeRuleNames } from '~/interfaces/in-app-notification';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import PageTagRelation from '~/server/models/page-tag-relation';
 import { configManager } from '~/server/service/config-manager';
@@ -38,21 +40,15 @@ const LIMIT_FOR_MULTIPLE_PAGE_OP = 20;
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequired = require('../../../middlewares/login-required')(
-    crowi,
-    true,
-  );
-  const loginRequiredStrictly = require('../../../middlewares/login-required')(
-    crowi,
-  );
-  const adminRequired = require('../../../middlewares/admin-required')(crowi);
+  const loginRequired = loginRequiredFactory(crowi, true);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
 
-  const Page = crowi.model('Page');
-  const User = crowi.model('User');
+  const { Page, User } = crowi.models;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
-  const globalNotificationService = crowi.getGlobalNotificationService();
+  const globalNotificationService = crowi.globalNotificationService;
 
   const addActivity = generateAddActivityMiddleware(crowi);
 

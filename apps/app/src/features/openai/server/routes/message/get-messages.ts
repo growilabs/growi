@@ -1,12 +1,14 @@
+import assert from 'node:assert';
 import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
-import { param, type ValidationChain } from 'express-validator';
+import { param } from 'express-validator';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
@@ -15,26 +17,22 @@ import { certifyAiService } from '../middlewares/certify-ai-service';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:get-message');
 
-type GetMessagesFactory = (crowi: Crowi) => RequestHandler[];
-
 type ReqParam = {
-  threadId: string;
-  aiAssistantId: string;
+  threadId?: string;
+  aiAssistantId?: string;
   before?: string;
   after?: string;
   limit?: number;
 };
 
-type Req = Request<ReqParam, Response, undefined> & {
-  user: IUserHasId;
+type Req = Request<ReqParam, ApiV3Response, undefined> & {
+  user?: IUserHasId;
 };
 
-export const getMessagesFactory: GetMessagesFactory = (crowi) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
+export const getMessagesFactory = (crowi: Crowi): RequestHandler[] => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
-  const validator: ValidationChain[] = [
+  const validator = [
     param('threadId').isString().withMessage('threadId must be string'),
     param('aiAssistantId')
       .isMongoId()
@@ -50,9 +48,15 @@ export const getMessagesFactory: GetMessagesFactory = (crowi) => {
     }),
     loginRequiredStrictly,
     certifyAiService,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
+      const { user } = req;
+      assert(
+        user != null,
+        'user is required (ensured by loginRequiredStrictly middleware)',
+      );
+
       const openaiService = getOpenaiService();
       if (openaiService == null) {
         return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
@@ -61,9 +65,14 @@ export const getMessagesFactory: GetMessagesFactory = (crowi) => {
       try {
         const { threadId, aiAssistantId, limit, before, after } = req.params;
 
+        assert(
+          threadId != null && aiAssistantId != null,
+          'threadId and aiAssistantId are required (validated by express-validator)',
+        );
+
         const isAiAssistantUsable = await openaiService.isAiAssistantUsable(
           aiAssistantId,
-          req.user,
+          user,
         );
         if (!isAiAssistantUsable) {
           return res.apiv3Err(
@@ -74,7 +83,7 @@ export const getMessagesFactory: GetMessagesFactory = (crowi) => {
 
         const messages = await openaiService.getMessageData(
           threadId,
-          req.user.lang,
+          user.lang,
           {
             limit,
             before,

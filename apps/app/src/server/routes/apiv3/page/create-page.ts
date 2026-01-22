@@ -26,6 +26,7 @@ import type { IOptionsForCreate } from '~/interfaces/page';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import PageTagRelation from '~/server/models/page-tag-relation';
@@ -109,21 +110,18 @@ async function determinePath(
 
 type ReqBody = IApiv3PageCreateParams;
 
-interface CreatePageRequest extends Request<undefined, ApiV3Response, ReqBody> {
+interface CreatePageRequest
+  extends Request<Record<string, string>, ApiV3Response, ReqBody> {
   user: IUserHasId;
 }
 
-type CreatePageHandlersFactory = (crowi: Crowi) => RequestHandler[];
-
-export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
+export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
   const Page = mongoose.model<IPage, PageModel>('Page');
   const User = mongoose.model<IUser, { isExistUserByUserPagePath: any }>(
     'User',
   );
 
-  const loginRequiredStrictly = require('../../../middlewares/login-required')(
-    crowi,
-  );
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   // define validators for req.body
   const validator: ValidationChain[] = [
@@ -209,7 +207,7 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
     createdPage: PageDocument;
     pageTags: string[];
   }) {
-    const tagEvent = crowi.event('tag');
+    const tagEvent = crowi.events.tag;
     await PageTagRelation.updatePageTags(createdPage.id, pageTags);
     tagEvent.emit('update', createdPage, pageTags);
     return PageTagRelation.listTagNamesByPage(createdPage.id);
@@ -226,7 +224,7 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
       target: createdPage,
       action: SupportedAction.ACTION_PAGE_CREATE,
     };
-    const activityEvent = crowi.event('activity');
+    const activityEvent = crowi.events.activity;
     activityEvent.emit('update', res.locals.activity._id, parameters);
 
     // global notification
@@ -292,7 +290,7 @@ export const createPageHandlersFactory: CreatePageHandlersFactory = (crowi) => {
     loginRequiredStrictly,
     excludeReadOnlyUser,
     addActivity,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: CreatePageRequest, res: ApiV3Response) => {
       const { body: bodyByParam, pageTags: tagsByParam } = req.body;

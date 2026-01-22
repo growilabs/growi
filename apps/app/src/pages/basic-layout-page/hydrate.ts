@@ -6,6 +6,7 @@ import {
   isSearchServiceReachableAtom,
 } from '~/states/server-configurations';
 import { useHydrateSidebarAtoms } from '~/states/ui/sidebar/hydrate';
+import { createAtomTuple } from '~/utils/jotai-utils';
 
 import type {
   SearchConfigurationProps,
@@ -22,22 +23,25 @@ export const useHydrateBasicLayoutConfigurationAtoms = (
   sidebarConfig: SidebarConfigurationProps['sidebarConfig'] | undefined,
   userUISettings: UserUISettingsProps['userUISettings'] | undefined,
 ): void => {
-  // Hydrate server configuration atoms with server-side data
-  useHydrateAtoms(
+  const tuples =
     searchConfig == null
       ? []
       : [
-          [
+          createAtomTuple(
             isSearchServiceConfiguredAtom,
             searchConfig.isSearchServiceConfigured,
-          ],
-          [isSearchServiceReachableAtom, searchConfig.isSearchServiceReachable],
-          [
+          ),
+          createAtomTuple(
+            isSearchServiceReachableAtom,
+            searchConfig.isSearchServiceReachable,
+          ),
+          createAtomTuple(
             isSearchScopeChildrenAsDefaultAtom,
             searchConfig.isSearchScopeChildrenAsDefault,
-          ],
-        ],
-  );
+          ),
+        ];
+
+  useHydrateAtoms(tuples);
 
   useHydrateSidebarAtoms(sidebarConfig, userUISettings);
 };
