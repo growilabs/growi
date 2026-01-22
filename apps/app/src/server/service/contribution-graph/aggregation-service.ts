@@ -47,7 +47,7 @@ export class ContributionAggregationService {
           count: '$count',
         },
       },
-      { $sort: { d: 1 } },
+      { $sort: { date: 1 } },
     ];
   }
 
