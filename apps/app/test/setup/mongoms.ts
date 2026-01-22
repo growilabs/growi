@@ -10,7 +10,7 @@ let mongoServer: MongoMemoryServer | undefined;
  * Replace the database name in a MongoDB connection URI.
  * Uses mongodb-connection-string-url package for robust parsing.
  * Supports various URI formats including authentication, replica sets, and query parameters.
- * 
+ *
  * @param uri - MongoDB connection URI
  * @param newDbName - New database name to use
  * @returns Modified URI with the new database name
@@ -30,7 +30,7 @@ beforeAll(async () => {
   // Use external MongoDB if MONGO_URI is provided (e.g., in CI with GitHub Actions services)
   if (process.env.MONGO_URI) {
     const mongoUri = replaceMongoDbName(process.env.MONGO_URI, dbName);
-    
+
     // biome-ignore lint/suspicious/noConsole: Allow logging
     console.log(`Using external MongoDB at ${mongoUri} (worker: ${workerId})`);
     await mongoose.connect(mongoUri, mongoOptions);
@@ -44,7 +44,6 @@ beforeAll(async () => {
   // set version
   mongoServer = await MongoMemoryServer.create({
     instance: {
-      // Use unique database name per worker to avoid conflicts in parallel execution
       dbName,
     },
     binary: {
@@ -54,14 +53,16 @@ beforeAll(async () => {
   });
 
   // biome-ignore lint/suspicious/noConsole: Allow logging
-  console.log(`MongoMemoryServer is running on ${mongoServer.getUri()} (worker: ${workerId})`);
+  console.log(
+    `MongoMemoryServer is running on ${mongoServer.getUri()} (worker: ${workerId})`,
+  );
 
   await mongoose.connect(mongoServer.getUri(), mongoOptions);
 });
 
 afterAll(async () => {
   await mongoose.disconnect();
-  
+
   // Stop MongoMemoryServer if it was created
   if (mongoServer) {
     await mongoServer.stop();
