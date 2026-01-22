@@ -75,21 +75,3 @@ pnpm run test:vitest:coverage
 # 特定ファイルのみ実行（coverageあり）
 pnpm run test:vitest src/path/to/test.spec.tsx
 ```
-
-### package.jsonスクリプト参照
-```json
-{
-  "scripts": {
-    "test": "run-p test:*",
-    "test:jest": "cross-env NODE_ENV=test TS_NODE_PROJECT=test/integration/tsconfig.json jest",
-    "test:vitest": "vitest run --coverage"
-  }
-}
-```
-
-## Jest→Vitest移行要点
-- `jest.config.js` → `vitest.config.ts`
-- `@types/jest` → `vitest/globals`
-- ESModulesネイティブサポート → 高速起動・実行
-
-この設定により型安全性と保守性を両立した高品質テストが可能。

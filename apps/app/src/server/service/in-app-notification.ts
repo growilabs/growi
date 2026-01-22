@@ -32,7 +32,7 @@ export default class InAppNotificationService {
 
   constructor(crowi: Crowi) {
     this.crowi = crowi;
-    this.activityEvent = crowi.event('activity');
+    this.activityEvent = crowi.events.activity;
     this.socketIoService = crowi.socketIoService;
 
     this.emitSocketIo = this.emitSocketIo.bind(this);

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { pipeline, Writable } from 'node:stream';
+import { pipeline, Readable, Writable } from 'node:stream';
 import { dynamicImport } from '@cspell/dynamic-import';
 import { isPopulated } from '@growi/core';
 import {
@@ -126,11 +126,13 @@ export async function exportPagesToFsAsync(
           path: { $gt: pageBulkExportJob.lastExportedPagePath },
         }
       : { pageBulkExportJob };
-  const pageSnapshotsReadable = PageBulkExportPageSnapshot.find(findQuery)
+  const pageSnapshotsCursor = PageBulkExportPageSnapshot.find(findQuery)
     .populate('revision')
     .sort({ path: 1 })
     .lean()
     .cursor({ batchSize: this.pageBatchSize });
+  // Wrap Mongoose Cursor with Readable.from() for proper type compatibility
+  const pageSnapshotsReadable = Readable.from(pageSnapshotsCursor);
 
   const pagesWritable = await getPageWritable.bind(this)(pageBulkExportJob);
 

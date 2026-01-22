@@ -8,7 +8,10 @@ import express from 'express';
 import { body } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
+import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
@@ -133,15 +136,12 @@ const validator = {
  *                      type: object
  *                      $ref: '#/components/schemas/FileUploadSettingParams'
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../../middlewares/login-required')(
-    crowi,
-  );
-  const adminRequired = require('../../../middlewares/admin-required')(crowi);
+module.exports = (crowi: Crowi) => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   router.put(
     '/',
