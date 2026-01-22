@@ -5,6 +5,9 @@ import { mongoOptions } from '~/server/util/mongoose-utils';
 
 import { getTestDbConfig } from './mongo';
 
+// Track if migrations have been run for this worker
+let migrationsRun = false;
+
 /**
  * Run database migrations using migrate-mongo API.
  * This is necessary when using external MongoDB in CI to ensure each worker's
@@ -42,6 +45,11 @@ async function runMigrations(mongoUri: string, dbName: string): Promise<void> {
 }
 
 beforeAll(async () => {
+  // Skip if already run (setupFiles run per test file, but we only need to migrate once per worker)
+  if (migrationsRun) {
+    return;
+  }
+
   const { dbName, mongoUri } = getTestDbConfig();
 
   // Only run migrations when using external MongoDB (CI environment)
@@ -53,4 +61,5 @@ beforeAll(async () => {
   console.log(`Running migrations for ${dbName}...`);
 
   await runMigrations(mongoUri, dbName);
+  migrationsRun = true;
 });

@@ -42,6 +42,11 @@ export function getTestDbConfig(): {
 }
 
 beforeAll(async () => {
+  // Skip if already connected (setupFiles run per test file, but connection persists per worker)
+  if (mongoose.connection.readyState === 1) {
+    return;
+  }
+
   const { workerId, dbName, mongoUri } = getTestDbConfig();
 
   // Use external MongoDB if MONGO_URI is provided (e.g., in CI with GitHub Actions services)
