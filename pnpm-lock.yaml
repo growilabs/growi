@@ -475,9 +475,6 @@ importers:
       mongodb:
         specifier: ^4.17.2
         version: 4.17.2(@aws-sdk/client-sso-oidc@3.600.0)
-      mongodb-connection-string-url:
-        specifier: ^3.0.1
-        version: 3.0.1
       mongoose:
         specifier: ^6.13.6
         version: 6.13.8(@aws-sdk/client-sso-oidc@3.600.0)
@@ -914,6 +911,9 @@ importers:
       mdast-util-find-and-replace:
         specifier: ^3.0.1
         version: 3.0.1
+      mongodb-connection-string-url:
+        specifier: ^7.0.0
+        version: 7.0.0
       mongodb-memory-server-core:
         specifier: ^9.1.1
         version: 9.4.0(@aws-sdk/credential-providers@3.600.0(@aws-sdk/client-sso-oidc@3.600.0))
@@ -5606,6 +5606,9 @@ packages:
 
   '@types/whatwg-url@11.0.5':
     resolution: {integrity: sha512-coYR071JRaHa+xoEvvYqvnIHaVqaYrLPbsufM9BF63HkwI5Lgmy2QR8Q5K/lYDYo5AK82wOvSOS0UsLTpTG7uQ==}
+
+  '@types/whatwg-url@13.0.0':
+    resolution: {integrity: sha512-N8WXpbE6Wgri7KUSvrmQcqrMllKZ9uxkYWMt+mCSGwNc0Hsw9VQTW7ApqI4XNrx6/SaM2QQJCzMPDEXE058s+Q==}
 
   '@types/whatwg-url@8.2.1':
     resolution: {integrity: sha512-2YubE1sjj5ifxievI5Ge1sckb9k/Er66HyR2c+3+I6VDUUg1TLPdYYTEbQ+DjRkS4nTxMJhgWfSfMRD2sl2EYQ==}
@@ -10647,6 +10650,10 @@ packages:
 
   mongodb-connection-string-url@3.0.1:
     resolution: {integrity: sha512-XqMGwRX0Lgn05TDB4PyG2h2kKO/FfWJyCzYQbIhXUxz7ETt0I/FqHjUeqj37irJ+Dl1ZtU82uYyj14u2XsZKfg==}
+
+  mongodb-connection-string-url@7.0.0:
+    resolution: {integrity: sha512-irhhjRVLE20hbkRl4zpAYLnDMM+zIZnp0IDB9akAFFUZp/3XdOfwwddc7y6cNvF2WCEtfTYRwYbIfYa2kVY0og==}
+    engines: {node: '>=20.19.0'}
 
   mongodb-memory-server-core@9.4.0:
     resolution: {integrity: sha512-irqdj/RPHJ2M9lgtxrvhXUbqFv/DfmUG+wvcAqtgtBJ8qVq1VGBD5rkKkLP5b3g8OoadP3OzsXTGCi1P2dDBQQ==}
@@ -20268,6 +20275,10 @@ snapshots:
     dependencies:
       '@types/webidl-conversions': 6.1.1
 
+  '@types/whatwg-url@13.0.0':
+    dependencies:
+      '@types/webidl-conversions': 6.1.1
+
   '@types/whatwg-url@8.2.1':
     dependencies:
       '@types/node': 20.19.17
@@ -25909,6 +25920,11 @@ snapshots:
     dependencies:
       '@types/whatwg-url': 11.0.5
       whatwg-url: 13.0.0
+
+  mongodb-connection-string-url@7.0.0:
+    dependencies:
+      '@types/whatwg-url': 13.0.0
+      whatwg-url: 14.2.0
 
   mongodb-memory-server-core@9.4.0(@aws-sdk/credential-providers@3.600.0(@aws-sdk/client-sso-oidc@3.600.0)):
     dependencies:
