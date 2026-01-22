@@ -452,12 +452,15 @@
       "tag_attributes": "タグ属性",
       "import_recommended": "{{target}} のおすすめをインポート"
     },
+    "content-disposition_header": "Content-Disposition マイムタイプ設定",
     "content-disposition_options": {
       "add_header": "マイムタイプを追加する",
       "note": "注意: マイムタイプを追加すると、もう一方のリストからは自動的に削除されます。",
       "inline_header": "インライン マイムタイプ",
       "attachment_header": "添付ファイル マイムタイプ",
       "inline_button": "インライン",
+      "no_inline": "設定済みのインラインタイプはありません。",
+      "no_attachment": "設定済みの添付ファイルタイプはありません。",
       "attachment_button": "添付ファイル",
       "remove_button": "削除"
     }

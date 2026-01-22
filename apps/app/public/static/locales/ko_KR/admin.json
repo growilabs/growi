@@ -451,6 +451,8 @@
       "attachment_header": "파일 첨부(Attachment) 마임 타입",
       "inline_button": "인라인",
       "attachment_button": "파일 첨부",
+      "no_inline": "설정된 인라인 타입이 없습니다.",
+      "no_attachment": "설정된 파일 첨부 타입이 없습니다.",
       "remove_button": "삭제"
     }
   },

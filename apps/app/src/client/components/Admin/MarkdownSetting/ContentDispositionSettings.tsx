@@ -129,23 +129,23 @@ const ContentDispositionSettings: React.FC = () => {
                   className="form-control"
                   value={currentInput}
                   onChange={e => setCurrentInput(e.target.value)}
-                  placeholder="e.g., image/png"
+                  placeholder="e.g. image/png"
                 />
                 <button
-                  className="btn btn-primary px-3"
+                  className="btn btn-primary px-3 flex-shrink-0"
                   type="button"
                   onClick={handleSetInline}
                   disabled={!currentInput.trim() || isUpdating}
                 >
-                  Inline
+                  {t('markdown_settings.content-disposition_options.inline_button')}
                 </button>
                 <button
-                  className="btn btn-primary text-white px-3"
+                  className="btn btn-primary text-white px-3 flex-shrink-0"
                   type="button"
                   onClick={handleSetAttachment}
                   disabled={!currentInput.trim() || isUpdating}
                 >
-                  Attachment
+                  {t('markdown_settings.content-disposition_options.attachment_button')}
                 </button>
               </div>
               <small className="form-text text-muted mt-2 d-block">
@@ -163,16 +163,24 @@ const ContentDispositionSettings: React.FC = () => {
           {/* INLINE LIST COLUMN */}
           <div className="col-md-6 col-sm-12 align-self-start">
             <div className="card">
-              <div className="card-header"><span className="fw-bold">{t('markdown_settings.content-disposition_options.inline_header')}</span></div>
+              <div className="card-header">
+                <span className="fw-bold">
+                  {t('markdown_settings.content-disposition_options.inline_header')}
+                </span>
+              </div>
               <div className="card-body">
                 <ul className="list-group list-group-flush">
-                  {renderInlineMimeTypes.length === 0 && <li className="list-group-item text-muted">No inline types set.</li>}
+                  {renderInlineMimeTypes.length === 0 && (
+                    <li className="list-group-item text-muted">
+                      {t('markdown_settings.content-disposition_options.no_inline')}
+                    </li>
+                  )}
                   {renderInlineMimeTypes.map((mimeType: string) => (
                     <li key={mimeType} className="list-group-item d-flex justify-content-between align-items-center">
                       <code>{mimeType}</code>
                       <button
                         type="button"
-                        className="btn btn-sm btn-outline-danger"
+                        className="btn btn-sm btn-outline-danger rounded-3"
                         onClick={() => handleRemove(mimeType, 'inline')}
                         disabled={isUpdating}
                       >
@@ -188,16 +196,24 @@ const ContentDispositionSettings: React.FC = () => {
           {/* ATTACHMENT LIST COLUMN */}
           <div className="col-md-6 col-sm-12 align-self-start">
             <div className="card">
-              <div className="card-header"><span className="fw-bold">{t('markdown_settings.content-disposition_options.attachment_header')}</span></div>
+              <div className="card-header">
+                <span className="fw-bold">
+                  {t('markdown_settings.content-disposition_options.attachment_header')}
+                </span>
+              </div>
               <div className="card-body">
                 <ul className="list-group list-group-flush">
-                  {renderAttachmentMimeTypes.length === 0 && <li className="list-group-item text-muted">No attachment types set.</li>}
+                  {renderAttachmentMimeTypes.length === 0 && (
+                    <li className="list-group-item text-muted">
+                      {t('markdown_settings.content-disposition_options.no_attachment')}
+                    </li>
+                  )}
                   {renderAttachmentMimeTypes.map((mimeType: string) => (
                     <li key={mimeType} className="list-group-item d-flex justify-content-between align-items-center">
                       <code>{mimeType}</code>
                       <button
                         type="button"
-                        className="btn btn-sm btn-outline-danger"
+                        className="btn btn-sm btn-outline-danger rounded-3"
                         onClick={() => handleRemove(mimeType, 'attachment')}
                         disabled={isUpdating}
                       >

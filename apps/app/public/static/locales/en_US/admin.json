@@ -451,6 +451,8 @@
       "attachment_header": "Attachment Mime Types",
       "inline_button": "Inline",
       "attachment_button": "Attachment",
+      "no_inline": "No inline types set.",
+      "no_attachment": "No attachment types set.",
       "remove_button": "Remove"
     }
   },

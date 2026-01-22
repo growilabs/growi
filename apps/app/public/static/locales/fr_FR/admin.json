@@ -451,6 +451,8 @@
       "attachment_header": "Types MIME en pièce jointe",
       "inline_button": "Inline",
       "attachment_button": "Pièce jointe",
+      "no_inline": "Aucun type inline défini.",
+      "no_attachment": "Aucun type de pièce jointe défini.",
       "remove_button": "Supprimer"
     }
   },
