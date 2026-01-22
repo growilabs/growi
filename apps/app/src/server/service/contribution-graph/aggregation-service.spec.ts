@@ -59,8 +59,8 @@ describe('ContributionAggregationService (Essential)', () => {
     // Assert: Verify the final outcome
     expect(results).toHaveLength(2);
     expect(results).toEqual(expect.arrayContaining([
-      { d: '2025-11-01', c: 2 },
-      { d: '2025-11-02', c: 1 },
+      { date: '2025-11-01', count: 2 },
+      { date: '2025-11-02', count: 1 },
     ]));
 
     vi.useRealTimers();
@@ -90,7 +90,7 @@ describe('ContributionAggregationService (Essential)', () => {
     });
 
     expect(results).toHaveLength(1);
-    expect(results[0].d).toBe('2025-11-01');
+    expect(results[0].date).toBe('2025-11-01');
 
     vi.useRealTimers();
   });
