@@ -19,6 +19,8 @@ describe('GrowiInfoService', () => {
   let User: mongoose.Model<IUser>;
   let Page: PageModel;
 
+  let serviceInstanceId: string;
+
   beforeAll(async () => {
     process.env.APP_SITE_URL = 'http://growi.test.jp';
     process.env.DEPLOYMENT_TYPE = 'growi-docker-compose';
@@ -33,6 +35,8 @@ describe('GrowiInfoService', () => {
       'security:passport-saml:isEnabled': true,
       'security:passport-github:isEnabled': true,
     });
+
+    serviceInstanceId = configManager.getConfig('app:serviceInstanceId');
 
     await Config.create({
       key: 'app:installed',
@@ -79,7 +83,7 @@ describe('GrowiInfoService', () => {
       expect(growiInfo).toEqual({
         version: appVersion,
         appSiteUrl: 'http://growi.test.jp',
-        serviceInstanceId: '',
+        serviceInstanceId,
         type: 'on-premise',
         wikiType: 'closed',
         deploymentType: 'growi-docker-compose',
@@ -109,7 +113,7 @@ describe('GrowiInfoService', () => {
       expect(growiInfo).toEqual({
         version: appVersion,
         appSiteUrl: 'http://growi.test.jp',
-        serviceInstanceId: '',
+        serviceInstanceId,
         type: 'on-premise',
         wikiType: 'closed',
         deploymentType: 'growi-docker-compose',
@@ -222,7 +226,7 @@ describe('GrowiInfoService', () => {
       expect(growiInfo).toEqual({
         version: appVersion,
         appSiteUrl: 'http://growi.test.jp',
-        serviceInstanceId: '',
+        serviceInstanceId,
         type: 'on-premise',
         wikiType: 'closed',
         deploymentType: 'growi-docker-compose',

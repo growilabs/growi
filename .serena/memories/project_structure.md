@@ -39,7 +39,7 @@ apps/app/
 ### test/
 - Vitest用のファイル
 - 新規テスト用のユーティリティはここに作成
-- セットアップファイル: `setup/mongoms.ts` (MongoDB用)
+- セットアップファイル: `setup/mongo.ts` (MongoDB用)
 
 ### playwright/
 - Playwright による E2E テスト用ディレクトリ

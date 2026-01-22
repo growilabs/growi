@@ -7,7 +7,7 @@ const configShared = defineConfig({
   test: {
     clearMocks: true,
     globals: true,
-    exclude: ['test/**', 'playwright/**'],
+    exclude: ['playwright/**'],
   },
 });
 
@@ -31,7 +31,7 @@ export default defineWorkspace([
       name: 'app-integration',
       environment: 'node',
       include: ['**/*.integ.ts'],
-      setupFiles: ['./test/setup/mongoms.ts'],
+      setupFiles: ['./test/setup/migrate-mongo.ts', './test/setup/mongo.ts'],
       deps: {
         // Transform inline modules (allows ESM in require context)
         interopDefault: true,
