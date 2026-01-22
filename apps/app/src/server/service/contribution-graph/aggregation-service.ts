@@ -43,8 +43,8 @@ export class ContributionAggregationService {
       {
         $project: {
           _id: 0,
-          d: '$_id',
-          c: '$count',
+          date: '$_id',
+          count: '$count',
         },
       },
       { $sort: { d: 1 } },
