@@ -7,7 +7,7 @@ const configShared = defineConfig({
   test: {
     clearMocks: true,
     globals: true,
-    exclude: ['test/**', 'playwright/**'],
+    exclude: ['playwright/**'],
   },
 });
 
