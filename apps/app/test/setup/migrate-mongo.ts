@@ -1,7 +1,5 @@
-import path from 'node:path';
+import { execSync } from 'node:child_process';
 import { beforeAll } from 'vitest';
-
-import { mongoOptions } from '~/server/util/mongoose-utils';
 
 import { getTestDbConfig } from './mongo';
 
@@ -9,42 +7,22 @@ import { getTestDbConfig } from './mongo';
 let migrationsRun = false;
 
 /**
- * Run database migrations using migrate-mongo API.
- * This is necessary when using external MongoDB in CI to ensure each worker's
- * database has the required schema and indexes.
+ * Run database migrations using external process.
+ * This uses the existing dev:migrate:up script which has ts-node and tsconfig-paths configured.
  */
-async function runMigrations(mongoUri: string, dbName: string): Promise<void> {
-  // Dynamic import for migrate-mongo (CommonJS module)
-  // @ts-expect-error migrate-mongo does not have type definitions
-  const { config, up, database } = await import('migrate-mongo');
-
-  // Set custom config for this worker's database
-  config.set({
-    mongodb: {
-      url: mongoUri,
-      databaseName: dbName,
-      options: mongoOptions,
+function runMigrations(mongoUri: string): void {
+  // Run migrations using the existing script with custom MONGO_URI
+  execSync('pnpm run dev:migrate:up', {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      MONGO_URI: mongoUri,
     },
-    // Use process.cwd() for reliability in Vitest environment
-    // In CI, tests run from apps/app directory
-    migrationsDir: path.resolve(process.cwd(), 'src/migrations'),
-    changelogCollectionName: 'migrations',
+    stdio: 'inherit',
   });
-
-  // Connect and run migrations
-  const { db, client } = await database.connect();
-  try {
-    const migrated = await up(db, client);
-    if (migrated.length > 0) {
-      // biome-ignore lint/suspicious/noConsole: Allow logging
-      console.log(`Migrations applied: ${migrated.join(', ')}`);
-    }
-  } finally {
-    await client.close();
-  }
 }
 
-beforeAll(async () => {
+beforeAll(() => {
   // Skip if already run (setupFiles run per test file, but we only need to migrate once per worker)
   if (migrationsRun) {
     return;
@@ -60,6 +38,6 @@ beforeAll(async () => {
   // biome-ignore lint/suspicious/noConsole: Allow logging
   console.log(`Running migrations for ${dbName}...`);
 
-  await runMigrations(mongoUri, dbName);
+  runMigrations(mongoUri);
   migrationsRun = true;
 });
