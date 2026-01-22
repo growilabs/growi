@@ -1,6 +1,7 @@
 import ConnectionString from 'mongodb-connection-string-url';
 import { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
+import { afterAll, beforeAll } from 'vitest';
 
 import { mongoOptions } from '~/server/util/mongoose-utils';
 
@@ -21,18 +22,34 @@ export function replaceMongoDbName(uri: string, newDbName: string): string {
   return cs.href;
 }
 
-beforeAll(async () => {
-  // Generate unique database name for each test worker to avoid conflicts in parallel execution
+/**
+ * Get test database configuration for the current Vitest worker.
+ * Each worker gets a unique database name to avoid conflicts in parallel execution.
+ */
+export function getTestDbConfig(): {
+  workerId: string;
+  dbName: string;
+  mongoUri: string | null;
+} {
   // VITEST_WORKER_ID is provided by Vitest (e.g., "1", "2", "3"...)
   const workerId = process.env.VITEST_WORKER_ID || '1';
   const dbName = `growi_test_${workerId}`;
+  const mongoUri = process.env.MONGO_URI
+    ? replaceMongoDbName(process.env.MONGO_URI, dbName)
+    : null;
+
+  return { workerId, dbName, mongoUri };
+}
+
+beforeAll(async () => {
+  const { workerId, dbName, mongoUri } = getTestDbConfig();
 
   // Use external MongoDB if MONGO_URI is provided (e.g., in CI with GitHub Actions services)
-  if (process.env.MONGO_URI) {
-    const mongoUri = replaceMongoDbName(process.env.MONGO_URI, dbName);
-
+  if (mongoUri != null) {
     // biome-ignore lint/suspicious/noConsole: Allow logging
     console.log(`Using external MongoDB at ${mongoUri} (worker: ${workerId})`);
+
+    // Migrations are run by migrate-mongo.ts setup file
     await mongoose.connect(mongoUri, mongoOptions);
     return;
   }

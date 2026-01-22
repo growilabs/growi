@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { replaceMongoDbName } from './mongoms';
+import { replaceMongoDbName } from './mongo';
 
 describe('replaceMongoDbName', () => {
   describe('single-host URIs', () => {
