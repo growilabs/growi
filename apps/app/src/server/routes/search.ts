@@ -162,7 +162,20 @@ module.exports = (crowi: Crowi, app) => {
     // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
     let delegatorName;
     try {
-      const query = decodeURIComponent(q);
+      let query = decodeURIComponent(q);
+
+      const disableUserPages = crowi.configManager.getConfig(
+        'security:disableUserPages',
+      );
+
+      if (disableUserPages) {
+        query = query.replace(/prefix:\/user/g, '');
+
+        if (!query.includes('-prefix:/user')) {
+          query = `${query.trim()} -prefix:/user`;
+        }
+      }
+
       const nqName = nq ?? decodeURIComponent(nq);
       [searchResult, delegatorName] = await searchService.searchKeyword(
         query,
