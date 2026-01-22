@@ -48,7 +48,6 @@ export const useSWRMUTxContentDispositionSettings = (): SWRMutationResponse<
   );
 };
 
-// --- REFACTORED HOOK ---
 export const useContentDisposition = (): {
   currentSettings: ContentDispositionSettings | undefined;
   isLoading: boolean;
@@ -56,7 +55,7 @@ export const useContentDisposition = (): {
   updateSettings: (newSettings: ContentDispositionSettings) => Promise<ContentDispositionSettings>;
 } => {
   const {
-    data, isLoading, mutate, error,
+    data, isLoading, mutate,
   } = useSWRxContentDispositionSettings();
   const { trigger, isMutating } = useSWRMUTxContentDispositionSettings();
 
@@ -67,22 +66,14 @@ export const useContentDisposition = (): {
   const memoizedData = useMemo(() => data, [inlineMimeTypesStr, attachmentMimeTypesStr]);
   const currentSettings = memoizedData;
 
-  // New unified update function
   const updateSettings = useCallback(async(newSettings: ContentDispositionSettings): Promise<ContentDispositionSettings> => {
 
-    // Create the request object matching the backend API
     const request: ContentDispositionUpdateRequest = {
       newInlineMimeTypes: newSettings.inlineMimeTypes,
       newAttachmentMimeTypes: newSettings.attachmentMimeTypes,
     };
 
-    // 1. Trigger the mutation
     const updatedData = await trigger(request);
-
-    // 2. Optimistically update SWR cache with the response from the server,
-    //    or simply re-validate by calling mutate(). Since 'trigger' returns the
-    //    new data, we can use that to update the local cache immediately.
-    //    We don't need to await the full re-fetch from the network.
     mutate(updatedData, { revalidate: true });
 
     return updatedData;
@@ -94,7 +85,5 @@ export const useContentDisposition = (): {
     isLoading,
     isUpdating: isMutating,
     updateSettings,
-    // Note: If you need a function to force a fresh data fetch (for a hard "Reset"),
-    // you can expose `mutate` from useSWRxContentDispositionSettings() as `fetchSettings`
   };
 };
