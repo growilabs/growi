@@ -1,5 +1,13 @@
 # @growi/core
 
+## 2.1.0
+
+### Minor Changes
+
+- [#10717](https://github.com/growilabs/growi/pull/10717) [`cbadb43`](https://github.com/growilabs/growi/commit/cbadb436f12d683de6876510a629265b921ab112) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Add AccessTokenParser type
+
+- [#10717](https://github.com/growilabs/growi/pull/10717) [`36699d6`](https://github.com/growilabs/growi/commit/36699d62cf656ecf777022a0ee118372fac955fc) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Explicitly define scope grouping
+
 ## 2.0.0
 
 ### Major Changes
