@@ -1,5 +1,5 @@
 ---
-name: growi-tech-stack
+name: tech-stack
 description: GROWI technology stack, build tools, and global commands. Auto-invoked for all GROWI development work.
 user-invocable: false
 ---

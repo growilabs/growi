@@ -1,5 +1,5 @@
 ---
-name: growi-testing-patterns
+name: testing-patterns-with-vitest
 description: GROWI testing patterns with Vitest, React Testing Library, and vitest-mock-extended. Auto-invoked for all GROWI development work.
 user-invocable: false
 ---

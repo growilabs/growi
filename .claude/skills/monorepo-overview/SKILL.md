@@ -1,5 +1,5 @@
 ---
-name: growi-monorepo-overview
+name: monorepo-overview
 description: GROWI monorepo structure, workspace organization, and architectural principles. Auto-invoked for all GROWI development work.
 user-invocable: false
 ---

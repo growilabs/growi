@@ -22,9 +22,9 @@ Technical information is available in **Claude Code Skills** (`.claude/skills/`)
 
 | Skill | Description |
 |-------|-------------|
-| **growi-monorepo-overview** | Monorepo structure, workspace organization, Changeset versioning |
-| **growi-tech-stack** | Technology stack, pnpm/Turborepo, TypeScript, Biome |
-| **growi-testing-patterns** | Vitest, React Testing Library, vitest-mock-extended |
+| **monorepo-overview** | Monorepo structure, workspace organization, Changeset versioning |
+| **tech-stack** | Technology stack, pnpm/Turborepo, TypeScript, Biome |
+| **testing-patterns-with-vitest** | Vitest, React Testing Library, vitest-mock-extended |
 
 **Rules** (always applied):
 
