@@ -119,7 +119,7 @@ PASS  ✓ All tests passing!
 ## Step 6: Check Coverage
 
 ```bash
-pnpm --filter @growi/app vitest run --coverage src/utils/page-path-validator.spec.ts
+cd {package_dir} && pnpm vitest run --coverage src/utils/page-path-validator.spec.ts
 
 Coverage: 100% ✅ (Target: 80%)
 ```

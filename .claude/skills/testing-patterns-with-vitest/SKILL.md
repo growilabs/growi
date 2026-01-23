@@ -420,7 +420,7 @@ Before committing tests, ensure:
 turbo run test --filter @growi/app
 
 # Run specific test file
-cd apps/app && pnpm vitest run src/components/Button/Button.spec.tsx
+cd {package_dir} && pnpm vitest run src/components/Button/Button.spec.tsx
 ```
 
 ## Summary: GROWI Testing Philosophy
