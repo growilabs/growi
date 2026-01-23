@@ -31,7 +31,10 @@ export default defineWorkspace([
       name: 'app-integration',
       environment: 'node',
       include: ['**/*.integ.ts'],
-      setupFiles: ['./test/setup/migrate-mongo.ts', './test/setup/mongo.ts'],
+      setupFiles: [
+        './test/setup/migrate-mongo.ts',
+        './test/setup/mongo/index.ts',
+      ],
       deps: {
         // Transform inline modules (allows ESM in require context)
         interopDefault: true,

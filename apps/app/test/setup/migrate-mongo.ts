@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import { beforeAll } from 'vitest';
 
-import { getTestDbConfig } from './mongo';
+import { getTestDbConfig } from './mongo/utils';
 
 // Track if migrations have been run for this worker
 let migrationsRun = false;
