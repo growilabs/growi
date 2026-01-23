@@ -25,7 +25,7 @@ pnpm run dev:migrate            # Run database migrations
 # Quality Checks
 pnpm run lint:typecheck         # TypeScript type check
 pnpm run lint:biome             # Biome linter
-pnpm run test:vitest            # Run tests
+pnpm run test            # Run tests
 
 # Build
 pnpm run build                  # Build for production
@@ -128,7 +128,7 @@ import { Button } from '~/components/Button';
 ```bash
 pnpm run lint:typecheck   # 1. Type check
 pnpm run lint:biome       # 2. Lint
-pnpm run test:vitest      # 3. Run tests
+pnpm run test             # 3. Run tests
 pnpm run build            # 4. Verify build (optional)
 ```
 

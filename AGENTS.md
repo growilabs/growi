@@ -128,7 +128,7 @@ Or from apps/app directory:
 ```bash
 pnpm run lint:typecheck
 pnpm run lint:biome
-pnpm run test:vitest
+pnpm run test
 pnpm run build
 ```
 
