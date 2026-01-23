@@ -6,9 +6,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [[ \"$FILE\" == */apps/app/* ]]; then REPO_ROOT=\"${FILE%%/apps/app/*}\"; cd \"$REPO_ROOT/apps/app\" && pnpm run lint:biome:fix \"${FILE#$REPO_ROOT/apps/app/}\"; fi",
+            "command": "if [[ \"$FILE\" == */apps/* ]] || [[ \"$FILE\" == */packages/* ]]; then REPO_ROOT=$(echo \"$FILE\" | sed 's|/\\(apps\\|packages\\)/.*|/|'); cd \"$REPO_ROOT\" && pnpm biome check --write \"$FILE\" 2>/dev/null || true; fi",
             "timeout": 30,
-            "description": "Auto-format edited files in apps/app with Biome"
+            "description": "Auto-format edited files in apps/* and packages/* with Biome"
           }
         ]
       }
