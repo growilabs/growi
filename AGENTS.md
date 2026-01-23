@@ -52,9 +52,9 @@ Technical information is available in **Claude Code Skills** (`.claude/skills/`)
 
 | Skill | Description |
 |-------|-------------|
-| **growi-app-architecture** | Next.js Pages Router, Express, feature-based structure |
-| **growi-app-commands** | apps/app specific commands (migrate, test, build) |
-| **growi-app-specific-patterns** | Jotai/SWR patterns, router mocking, API routes |
+| **app-architecture** | Next.js Pages Router, Express, feature-based structure |
+| **app-commands** | apps/app specific commands (migrations, OpenAPI, etc.) |
+| **app-specific-patterns** | Jotai/SWR patterns, router mocking, API routes |
 
 ### Package-Specific CLAUDE.md
 
