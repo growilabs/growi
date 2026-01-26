@@ -35,7 +35,11 @@ export class ContributionAggregationService {
       {
         $group: {
           _id: {
-            $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'UTC' },
+            $dateTrunc: {
+              date: '$createdAt',
+              unit: 'day',
+              timezone: 'UTC'
+            },
           },
           count: { $sum: 1 },
         },
@@ -43,7 +47,7 @@ export class ContributionAggregationService {
       {
         $project: {
           _id: 0,
-          date: '$_id',
+          date: { $dateToString: { format: '%Y-%m-%d', date: '$_id' } },
           count: '$count',
         },
       },
