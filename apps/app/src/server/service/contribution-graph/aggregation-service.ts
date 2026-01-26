@@ -38,7 +38,7 @@ export class ContributionAggregationService {
             $dateTrunc: {
               date: '$createdAt',
               unit: 'day',
-              timezone: 'UTC'
+              timezone: 'UTC',
             },
           },
           count: { $sum: 1 },
