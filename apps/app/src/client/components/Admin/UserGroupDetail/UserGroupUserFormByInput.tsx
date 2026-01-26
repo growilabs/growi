@@ -1,26 +1,30 @@
 import type { FC, KeyboardEvent } from 'react';
 import React, { useState } from 'react';
-
 import type { IUserGroupHasId, IUserHasId } from '@growi/core';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import { AsyncTypeahead } from 'react-bootstrap-typeahead';
 
-import { toastSuccess, toastError } from '~/client/util/toastr';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import type { SearchType } from '~/interfaces/user-group';
 
 type Props = {
-  userGroup: IUserGroupHasId,
-  onClickAddUserBtn: (username: string) => Promise<void>,
-  onSearchApplicableUsers: (searchWord: string) => Promise<IUserHasId[]>,
-  isAlsoNameSearched: boolean,
-  isAlsoMailSearched: boolean,
-  searchType: SearchType,
-}
+  userGroup: IUserGroupHasId;
+  onClickAddUserBtn: (username: string) => Promise<void>;
+  onSearchApplicableUsers: (searchWord: string) => Promise<IUserHasId[]>;
+  isAlsoNameSearched: boolean;
+  isAlsoMailSearched: boolean;
+  searchType: SearchType;
+};
 
 export const UserGroupUserFormByInput: FC<Props> = (props) => {
   const {
-    userGroup, onClickAddUserBtn, onSearchApplicableUsers, isAlsoNameSearched, isAlsoMailSearched, searchType,
+    userGroup,
+    onClickAddUserBtn,
+    onSearchApplicableUsers,
+    isAlsoNameSearched,
+    isAlsoMailSearched,
+    searchType,
   } = props;
 
   const { t } = useTranslation();
@@ -29,27 +33,29 @@ export const UserGroupUserFormByInput: FC<Props> = (props) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSearchError, setIsSearchError] = useState(false);
 
-  const addUserBySubmit = async() => {
-    if (inputUser.length === 0) { return }
+  const addUserBySubmit = async () => {
+    if (inputUser.length === 0) {
+      return;
+    }
     const userName = inputUser[0].username;
 
     try {
       await onClickAddUserBtn(userName);
       toastSuccess(`Added "${userName}" to "${userGroup.name}"`);
       setInputUser([]);
-    }
-    catch (err) {
-      toastError(new Error(`Unable to add "${userName}" to "${userGroup.name}"`));
+    } catch (err) {
+      toastError(
+        new Error(`Unable to add "${userName}" to "${userGroup.name}"`),
+      );
     }
   };
 
-  const searchApplicableUsers = async(keyword: string) => {
+  const searchApplicableUsers = async (keyword: string) => {
     try {
       const users = await onSearchApplicableUsers(keyword);
       setApplicableUsers(users);
       setIsLoading(false);
-    }
-    catch (err) {
+    } catch (err) {
       setIsSearchError(true);
       toastError(err);
     }
@@ -59,7 +65,7 @@ export const UserGroupUserFormByInput: FC<Props> = (props) => {
     setInputUser(inputUser);
   };
 
-  const handleSearch = async(keyword: string) => {
+  const handleSearch = async (keyword: string) => {
     setIsLoading(true);
     await searchApplicableUsers(keyword);
   };
@@ -91,13 +97,17 @@ export const UserGroupUserFormByInput: FC<Props> = (props) => {
           id="name-typeahead-asynctypeahead"
           inputProps={{ autoComplete: 'off' }}
           isLoading={isLoading}
-          labelKey={(user: IUserHasId) => `${user.username} ${user.name} ${user.email}`}
+          labelKey={(user: IUserHasId) =>
+            `${user.username} ${user.name} ${user.email}`
+          }
           options={applicableUsers} // Search result
           onSearch={handleSearch}
           onChange={handleChange}
           onKeyDown={onKeyDown}
           minLength={1}
-          searchText={isLoading ? 'Searching...' : (isSearchError && 'Error on searching.')}
+          searchText={
+            isLoading ? 'Searching...' : isSearchError && 'Error on searching.'
+          }
           renderMenuItemChildren={renderMenuItemChildren}
           align="left"
           clearButton

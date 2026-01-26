@@ -11,9 +11,6 @@ import { getOrCreateModel } from '../util/mongoose-utils';
 import type { IdToNamesMap } from './tag';
 import Tag from './tag';
 
-// disable no-return-await for model functions
-/* eslint-disable no-return-await */
-
 const flatMap = require('array.prototype.flatmap');
 
 export interface PageTagRelationDocument extends IPageTagRelation, Document {}
@@ -130,6 +127,7 @@ schema.statics.createTagListWithCount = createTagListWithCount;
 
 const findByPageId: FindByPageId = async function (pageId, options = {}) {
   const isAcceptRelatedTagNull = options.nullable || null;
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   const relations = await this.find({ relatedPage: pageId })
     .populate('relatedTag')
     .select('relatedTag');
@@ -200,7 +198,7 @@ const updatePageTags: UpdatePageTags = async function (pageId, tags) {
   }
 
   // filter empty string
-  // eslint-disable-next-line no-param-reassign
+  // biome-ignore lint/style/noParameterAssign: ignore
   tags = tags.filter((tag) => {
     return tag !== '';
   });

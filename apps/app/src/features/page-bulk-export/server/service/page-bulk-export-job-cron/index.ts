@@ -91,7 +91,7 @@ class PageBulkExportJobCronService
   constructor(crowi: Crowi) {
     super();
     this.crowi = crowi;
-    this.activityEvent = crowi.event('activity');
+    this.activityEvent = crowi.events.activity;
     this.parallelExecLimit = configManager.getConfig(
       'app:pageBulkExportParallelExecLimit',
     );
@@ -344,7 +344,6 @@ class PageBulkExportJobCronService
   }
 }
 
-// eslint-disable-next-line import/no-mutable-exports
 export let pageBulkExportJobCronService:
   | PageBulkExportJobCronService
   | undefined; // singleton instance

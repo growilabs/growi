@@ -1,18 +1,21 @@
+import type React from 'react';
 import type { FC } from 'react';
-import React, { useState, useCallback, useRef } from 'react';
-
+import { useCallback, useRef, useState } from 'react';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { format } from 'date-fns/format';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
 import type { IClearable } from '~/client/interfaces/clearable';
 import { toastError } from '~/client/util/toastr';
 import type { SupportedActionType } from '~/interfaces/activity';
-import { useAuditLogEnabled, useAuditLogAvailableActions } from '~/stores-universal/context';
+import {
+  auditLogAvailableActionsAtom,
+  auditLogEnabledAtom,
+} from '~/states/server-configurations';
 import { useSWRxActivity } from '~/stores/activity';
 
 import PaginationWrapper from '../PaginationWrapper';
-
 import { ActivityTable } from './AuditLog/ActivityTable';
 import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode';
 import { AuditLogSettings } from './AuditLog/AuditLogSettings';
@@ -34,7 +37,9 @@ export const AuditLogManagement: FC = () => {
 
   const typeaheadRef = useRef<IClearable>(null);
 
-  const { data: auditLogAvailableActionsData } = useAuditLogAvailableActions();
+  const auditLogAvailableActionsData = useAtomValue(
+    auditLogAvailableActionsAtom,
+  );
 
   /*
    * State
@@ -47,27 +52,46 @@ export const AuditLogManagement: FC = () => {
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
   const [actionMap, setActionMap] = useState(
-    new Map<SupportedActionType, boolean>(auditLogAvailableActionsData != null ? auditLogAvailableActionsData.map(action => [action, true]) : []),
+    new Map<SupportedActionType, boolean>(
+      auditLogAvailableActionsData != null
+        ? auditLogAvailableActionsData.map((action) => [action, true])
+        : [],
+    ),
   );
 
   /*
    * Fetch
    */
-  const selectedDate = { startDate: formatDate(startDate), endDate: formatDate(endDate) };
-  const selectedActionList = Array.from(actionMap.entries()).filter(v => v[1]).map(v => v[0]);
-  const searchFilter = { actions: selectedActionList, dates: selectedDate, usernames: selectedUsernames };
+  const selectedDate = {
+    startDate: formatDate(startDate),
+    endDate: formatDate(endDate),
+  };
+  const selectedActionList = Array.from(actionMap.entries())
+    .filter((v) => v[1])
+    .map((v) => v[0]);
+  const searchFilter = {
+    actions: selectedActionList,
+    dates: selectedDate,
+    usernames: selectedUsernames,
+  };
 
-  const { data: activityData, mutate: mutateActivity, error } = useSWRxActivity(PAGING_LIMIT, offset, searchFilter);
+  const {
+    data: activityData,
+    mutate: mutateActivity,
+    error,
+  } = useSWRxActivity(PAGING_LIMIT, offset, searchFilter);
   const activityList = activityData?.docs != null ? activityData.docs : [];
-  const totalActivityNum = activityData?.totalDocs != null ? activityData.totalDocs : 0;
-  const totalPagingPages = activityData?.totalPages != null ? activityData.totalPages : 0;
+  const totalActivityNum =
+    activityData?.totalDocs != null ? activityData.totalDocs : 0;
+  const totalPagingPages =
+    activityData?.totalPages != null ? activityData.totalPages : 0;
   const isLoading = activityData === undefined && error == null;
 
   if (error != null) {
     toastError('Failed to get Audit Log');
   }
 
-  const { data: auditLogEnabled } = useAuditLogEnabled();
+  const auditLogEnabled = useAtomValue(auditLogEnabledAtom);
 
   /*
    * Functions
@@ -82,17 +106,25 @@ export const AuditLogManagement: FC = () => {
     setEndDate(dateList[1]);
   }, []);
 
-  const actionCheckboxChangedHandler = useCallback((action: SupportedActionType) => {
-    setActivePageNumber(1);
-    actionMap.set(action, !actionMap.get(action));
-    setActionMap(new Map(actionMap.entries()));
-  }, [actionMap, setActionMap]);
+  const actionCheckboxChangedHandler = useCallback(
+    (action: SupportedActionType) => {
+      setActivePageNumber(1);
+      actionMap.set(action, !actionMap.get(action));
+      setActionMap(new Map(actionMap.entries()));
+    },
+    [actionMap],
+  );
 
-  const multipleActionCheckboxChangedHandler = useCallback((actions: SupportedActionType[], isChecked) => {
-    setActivePageNumber(1);
-    actions.forEach(action => actionMap.set(action, isChecked));
-    setActionMap(new Map(actionMap.entries()));
-  }, [actionMap, setActionMap]);
+  const multipleActionCheckboxChangedHandler = useCallback(
+    (actions: SupportedActionType[], isChecked) => {
+      setActivePageNumber(1);
+      actions.forEach((action) => {
+        actionMap.set(action, isChecked);
+      });
+      setActionMap(new Map(actionMap.entries()));
+    },
+    [actionMap],
+  );
 
   const setUsernamesHandler = useCallback((usernames: string[]) => {
     setActivePageNumber(1);
@@ -107,41 +139,54 @@ export const AuditLogManagement: FC = () => {
     typeaheadRef.current?.clear();
 
     if (auditLogAvailableActionsData != null) {
-      setActionMap(new Map<SupportedActionType, boolean>(auditLogAvailableActionsData.map(action => [action, true])));
+      setActionMap(
+        new Map<SupportedActionType, boolean>(
+          auditLogAvailableActionsData.map((action) => [action, true]),
+        ),
+      );
     }
-  }, [setActivePageNumber, setStartDate, setEndDate, setSelectedUsernames, setActionMap, auditLogAvailableActionsData]);
+  }, [auditLogAvailableActionsData]);
 
   const reloadButtonPushedHandler = useCallback(() => {
     setActivePageNumber(1);
     mutateActivity();
   }, [mutateActivity]);
 
-  const jumpPageInputChangeHandler = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputNumber = Number(e.target.value);
-    const isNan = Number.isNaN(inputNumber);
+  const jumpPageInputChangeHandler = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const inputNumber = Number(e.target.value);
+      const isNan = Number.isNaN(inputNumber);
 
-    if (!isNan) {
-      // eslint-disable-next-line no-nested-ternary
-      const jumpPageNumber = inputNumber > totalPagingPages ? totalPagingPages : inputNumber <= 0 ? activePageNumber : inputNumber;
-      setJumpPageNumber(jumpPageNumber);
-    }
-    else {
-      setJumpPageNumber(activePageNumber);
-    }
-  }, [totalPagingPages, activePageNumber, setJumpPageNumber]);
+      if (!isNan) {
+        const jumpPageNumber =
+          inputNumber > totalPagingPages
+            ? totalPagingPages
+            : inputNumber <= 0
+              ? activePageNumber
+              : inputNumber;
+        setJumpPageNumber(jumpPageNumber);
+      } else {
+        setJumpPageNumber(activePageNumber);
+      }
+    },
+    [totalPagingPages, activePageNumber],
+  );
 
-  const jumpPageInputKeyDownHandler = useCallback((e) => {
-    if (e.key === 'Enter') {
-      setActivePageNumber(jumpPageNumber);
-    }
-  }, [setActivePageNumber, jumpPageNumber]);
+  const jumpPageInputKeyDownHandler = useCallback(
+    (e) => {
+      if (e.key === 'Enter') {
+        setActivePageNumber(jumpPageNumber);
+      }
+    },
+    [jumpPageNumber],
+  );
 
   const jumpPageButtonPushedHandler = useCallback(() => {
     setActivePageNumber(jumpPageNumber);
   }, [jumpPageNumber]);
 
-  // eslint-disable-next-line max-len
-  const activityCounter = `<b>${activityList.length === 0 ? 0 : offset + 1}</b> - <b>${(PAGING_LIMIT * activePageNumber) - (PAGING_LIMIT - activityList.length)}</b> of <b>${totalActivityNum}<b/>`;
+  const startIndex = activityList.length === 0 ? 0 : offset + 1;
+  const endIndex = activityList.length === 0 ? 0 : offset + activityList.length;
 
   if (!auditLogEnabled) {
     return <AuditLogDisableMode />;
@@ -149,20 +194,36 @@ export const AuditLogManagement: FC = () => {
 
   return (
     <div data-testid="admin-auditlog">
-      <button type="button" className="btn btn-outline-secondary mb-4" onClick={() => setIsSettingPage(!isSettingPage)}>
-        {
-          isSettingPage
-            ? <><span className="material-symbols-outlined">arrow_left_alt</span>{t('admin:audit_log_management.return')}</>
-            : <><span className="material-symbols-outlined">settings</span>{t('admin:audit_log_management.settings')}</>
-        }
+      <button
+        type="button"
+        className="btn btn-outline-secondary mb-4"
+        onClick={() => setIsSettingPage(!isSettingPage)}
+      >
+        {isSettingPage ? (
+          <>
+            <span className="material-symbols-outlined">arrow_left_alt</span>
+            {t('admin:audit_log_management.return')}
+          </>
+        ) : (
+          <>
+            <span className="material-symbols-outlined">settings</span>
+            {t('admin:audit_log_management.settings')}
+          </>
+        )}
       </button>
 
       <h2 className="admin-setting-header mb-3">
         <span>
-          {isSettingPage ? t('audit_log_management.audit_log_settings') : t('audit_log_management.audit_log')}
+          {isSettingPage
+            ? t('audit_log_management.audit_log_settings')
+            : t('audit_log_management.audit_log')}
         </span>
-        { !isSettingPage && (
-          <button type="button" className="btn btn-sm ms-auto grw-btn-reload" onClick={reloadButtonPushedHandler}>
+        {!isSettingPage && (
+          <button
+            type="button"
+            className="btn btn-sm ms-auto grw-btn-reload"
+            onClick={reloadButtonPushedHandler}
+          >
             <span className="material-symbols-outlined">refresh</span>
           </button>
         )}
@@ -198,28 +259,28 @@ export const AuditLogManagement: FC = () => {
             </div>
 
             <div className="col-12">
-              <button type="button" className="btn btn-link" onClick={clearButtonPushedHandler}>
+              <button
+                type="button"
+                className="btn btn-link"
+                onClick={clearButtonPushedHandler}
+              >
                 {t('admin:audit_log_management.clear')}
               </button>
             </div>
           </div>
 
-          <p
-            className="ms-2"
-            // eslint-disable-next-line react/no-danger
-            dangerouslySetInnerHTML={{ __html: activityCounter }}
-          />
+          <p className="ms-2">
+            <strong>{startIndex}</strong> - <strong>{endIndex}</strong> of{' '}
+            <strong>{totalActivityNum}</strong>
+          </p>
 
-          { isLoading
-            ? (
-              <div className="text-muted text-center mb-5">
-                <LoadingSpinner className="me-1 fs-3" />
-              </div>
-            )
-            : (
-              <ActivityTable activityList={activityList} />
-            )
-          }
+          {isLoading ? (
+            <div className="text-muted text-center mb-5">
+              <LoadingSpinner className="me-1 fs-3" />
+            </div>
+          ) : (
+            <ActivityTable activityList={activityList} />
+          )}
 
           <div className="d-flex flex-row justify-content-center">
             <PaginationWrapper
@@ -232,7 +293,12 @@ export const AuditLogManagement: FC = () => {
             />
 
             <div className="admin-audit-log ms-3">
-              <label htmlFor="jumpPageInput" className="form-label me-1 text-secondary">Jump To Page</label>
+              <label
+                htmlFor="jumpPageInput"
+                className="form-label me-1 text-secondary"
+              >
+                Jump To Page
+              </label>
               <input
                 id="jumpPageInput"
                 type="text"
@@ -240,7 +306,11 @@ export const AuditLogManagement: FC = () => {
                 onChange={jumpPageInputChangeHandler}
                 onKeyDown={jumpPageInputKeyDownHandler}
               />
-              <button className="btn btn-sm" type="button" onClick={jumpPageButtonPushedHandler}>
+              <button
+                className="btn btn-sm"
+                type="button"
+                onClick={jumpPageButtonPushedHandler}
+              >
                 <b>Go</b>
               </button>
             </div>

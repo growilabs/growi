@@ -5,8 +5,6 @@ import loggerFactory from '~/utils/logger';
 import { Attachment } from '../../models/attachment';
 import { validateImageContentType } from './image-content-type-validator';
 
-/* eslint-disable no-use-before-define */
-
 const logger = loggerFactory('growi:routes:attachment');
 
 const ApiResponse = require('../../util/apiResponse');
@@ -133,12 +131,10 @@ const ApiResponse = require('../../util/apiResponse');
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 export const routesFactory = (crowi) => {
-  const Page = crowi.model('Page');
-  const User = crowi.model('User');
-  const GlobalNotificationSetting = crowi.model('GlobalNotificationSetting');
-  const { attachmentService, globalNotificationService } = crowi;
+  const { Page, User } = crowi.models;
+  const { attachmentService } = crowi;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   /**
    * Check the user is accessible to the related page
@@ -158,7 +154,6 @@ export const routesFactory = (crowi) => {
       return user.id === ownerId.toString();
     }
 
-    // eslint-disable-next-line no-return-await
     return await Page.isAccessiblePageByViewer(attachment.page, user);
   }
 
@@ -318,7 +313,7 @@ export const routesFactory = (crowi) => {
   api.remove = async (req, res) => {
     const id = req.body.attachment_id;
 
-    const attachment = await Attachment.findById(id);
+    const attachment = await Attachment.findOne({ _id: { $eq: id } });
 
     if (attachment == null) {
       return res.json(ApiResponse.error('attachment not found'));

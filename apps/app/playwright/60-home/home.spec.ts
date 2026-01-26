@@ -1,3 +1,5 @@
+/** biome-ignore-all lint/performance/noAwaitInLoops: Allow in tests */
+
 import { expect, test } from '@playwright/test';
 
 test('Visit User home', async ({ page }) => {
@@ -46,12 +48,18 @@ test('Access External account', async ({ page }) => {
   await expect(page.getByTestId('grw-user-settings')).toBeVisible();
   await page.getByTestId('external-accounts-tab-button').first().click();
 
-  // Expect an error toaster to be displayed when the AddExternalAccountsButton is pressed
+  // press AddExternalAccountButton
   await page.getByTestId('grw-external-account-add-button').click();
   await expect(page.getByTestId('grw-associate-modal')).toBeVisible();
   await page.getByTestId('add-external-account-button').click();
-  await expect(page.locator('.Toastify__toast')).toBeVisible();
-  await page.locator('.Toastify__close-button').click();
+
+  // Expect a few failed toasters to be displayed
+  await expect(page.locator('.Toastify__toast').first()).toBeVisible();
+  const toastCloseButtons = page.locator('.Toastify__close-button');
+  const count = await toastCloseButtons.count();
+  for (let i = 0; i < count; i++) {
+    await toastCloseButtons.first().click();
+  }
   await expect(page.locator('.Toastify__toast')).not.toBeVisible();
 });
 
@@ -68,7 +76,6 @@ test('Access Password setting', async ({ page }) => {
 
   const toastElementsCount = await toastElements.count();
   for (let i = 0; i < toastElementsCount; i++) {
-    // eslint-disable-next-line no-await-in-loop
     await toastElements.nth(i).click();
   }
 

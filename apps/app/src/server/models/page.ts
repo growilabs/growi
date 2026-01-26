@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { GroupType, type HasObjectId, type IPage } from '@growi/core';
 import type {
   IPagePopulatedToShowRevision,
@@ -13,6 +11,7 @@ import {
 } from '@growi/core/dist/utils/path-utils';
 import assert from 'assert';
 import escapeStringRegexp from 'escape-string-regexp';
+import type mongoose from 'mongoose';
 import type {
   AnyObject,
   Document,
@@ -20,7 +19,7 @@ import type {
   Model,
   Types,
 } from 'mongoose';
-import mongoose, { Schema } from 'mongoose';
+import { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 import nodePath from 'path';
@@ -42,8 +41,11 @@ import {
   getPageSchema,
   populateDataToShowRevision,
 } from './obsolete-page';
+import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from './user/conts';
 import type { UserGroupDocument } from './user-group';
 import UserGroupRelation from './user-group-relation';
+
+type ObjectId = mongoose.Types.ObjectId;
 
 const logger = loggerFactory('growi:models:page');
 /*
@@ -89,6 +91,7 @@ export type FindRecentUpdatedPagesOption = {
   desc: number;
   hideRestrictedByOwner: boolean;
   hideRestrictedByGroup: boolean;
+  disableUserPages: boolean;
 };
 
 export type CreateMethod = (
@@ -97,6 +100,20 @@ export type CreateMethod = (
   user,
   options: IOptionsForCreate,
 ) => Promise<HydratedDocument<PageDocument>>;
+type FindByPathAndViewerMethod = (
+  this: PageModel,
+  id: string | ObjectId,
+  user,
+  userGroups?,
+  includeEmpty?: boolean,
+) => Promise<HydratedDocument<PageDocument> | null>;
+type CountByPathAndViewerMethod = (
+  this: PageModel,
+  id: string | ObjectId,
+  user,
+  userGroups?,
+  includeEmpty?: boolean,
+) => Promise<number>;
 
 export interface PageModel extends Model<PageDocument> {
   [x: string]: any; // for obsolete static methods
@@ -105,12 +122,8 @@ export interface PageModel extends Model<PageDocument> {
     parent,
     descendantCount?: number,
   ): Promise<HydratedDocument<PageDocument>>;
-  findByIdAndViewer(
-    pageId: ObjectIdLike,
-    user,
-    userGroups?,
-    includeEmpty?: boolean,
-  ): Promise<HydratedDocument<PageDocument> | null>;
+  findByIdAndViewer: FindByPathAndViewerMethod;
+  countByIdAndViewer: CountByPathAndViewerMethod;
   findByIdsAndViewer(
     pageIds: ObjectIdLike[],
     user,
@@ -420,6 +433,22 @@ export class PageQueryBuilder {
     return this;
   }
 
+  addConditionToListByNotMatchPathAndChildren(str: string): PageQueryBuilder {
+    const path = normalizePath(str);
+
+    if (isTopPage(path)) {
+      return this;
+    }
+
+    const startsPattern = escapeStringRegexp(path);
+
+    this.query = this.query.and({
+      path: { $not: new RegExp(`^${startsPattern}(/|$)`) },
+    });
+
+    return this;
+  }
+
   addConditionToListByMatch(str: string): PageQueryBuilder {
     // No request is set for "/"
     if (str === '/') {
@@ -548,7 +577,7 @@ export class PageQueryBuilder {
   }
 
   addConditionToPagenate(offset, limit, sortOpt?): PageQueryBuilder {
-    this.query = this.query.sort(sortOpt).skip(offset).limit(limit); // eslint-disable-line newline-per-chained-call
+    this.query = this.query.sort(sortOpt).skip(offset).limit(limit);
 
     return this;
   }
@@ -627,6 +656,7 @@ export class PageQueryBuilder {
   }
 
   populateDataToList(userPublicFields): PageQueryBuilder {
+    // biome-ignore lint/plugin: populating is the purpose of this method
     this.query = this.query.populate({
       path: 'lastUpdateUser',
       select: userPublicFields,
@@ -662,6 +692,58 @@ schema.statics.createEmptyPage = async function (
 
   return page.save();
 };
+
+const findByIdAndViewer: FindByPathAndViewerMethod = async function (
+  this,
+  id,
+  user,
+  userGroups = null,
+  includeEmpty = false,
+) {
+  const baseQuery = this.findOne({ _id: id });
+
+  const relatedUserGroups =
+    user != null && userGroups == null
+      ? [
+          ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
+          ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
+            user,
+          )),
+        ]
+      : userGroups;
+
+  const queryBuilder = new this.PageQueryBuilder(baseQuery, includeEmpty);
+  queryBuilder.addConditionToFilteringByViewer(user, relatedUserGroups, true);
+
+  return queryBuilder.query.exec();
+};
+schema.statics.findByIdAndViewer = findByIdAndViewer;
+
+const countByIdAndViewer: CountByPathAndViewerMethod = async function (
+  this,
+  id,
+  user,
+  userGroups = null,
+  includeEmpty = false,
+) {
+  const baseQuery = this.countDocuments({ _id: id });
+
+  const relatedUserGroups =
+    user != null && userGroups == null
+      ? [
+          ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
+          ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
+            user,
+          )),
+        ]
+      : userGroups;
+
+  const queryBuilder = new this.PageQueryBuilder(baseQuery, includeEmpty);
+  queryBuilder.addConditionToFilteringByViewer(user, relatedUserGroups, true);
+
+  return queryBuilder.query.exec();
+};
+schema.statics.countByIdAndViewer = countByIdAndViewer;
 
 /**
  * Replace an existing page with an empty page.
@@ -848,7 +930,6 @@ schema.statics.findRecentUpdatedPages = async function (
 ): Promise<PaginatedPages> {
   const sortOpt = {};
   sortOpt[options.sort] = options.desc;
-  const User = mongoose.model('User') as any;
 
   if (path == null) {
     throw new Error('path is required.');
@@ -856,6 +937,10 @@ schema.statics.findRecentUpdatedPages = async function (
 
   const baseQuery = this.find({});
   const queryBuilder = new PageQueryBuilder(baseQuery, includeEmpty);
+
+  if (options.disableUserPages) {
+    queryBuilder.addConditionToListByNotMatchPathAndChildren('/user');
+  }
 
   if (!options.includeTrashed) {
     queryBuilder.addConditionToExcludeTrashed();
@@ -866,7 +951,7 @@ schema.statics.findRecentUpdatedPages = async function (
   }
 
   queryBuilder.addConditionToListWithDescendants(path, options);
-  queryBuilder.populateDataToList(User.USER_FIELDS_EXCEPT_CONFIDENTIAL);
+  queryBuilder.populateDataToList(USER_FIELDS_EXCEPT_CONFIDENTIAL);
   await queryBuilder.addViewerCondition(
     user,
     undefined,
@@ -1363,7 +1448,7 @@ schema.methods.calculateAndUpdateLatestRevisionBodyLength = async function (
     return;
   }
 
-  // eslint-disable-next-line rulesdir/no-populate
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   const populatedPageDocument = await this.populate<PageDocument>(
     'revision',
     'body',

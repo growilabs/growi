@@ -1,12 +1,7 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import path from 'path';
 
-const appendTextToEditorUntilContains = async (page: Page, text: string) => {
-  await page.locator('.cm-content').fill(text);
-  await expect(page.getByTestId('page-editor-preview-body')).toContainText(
-    text,
-  );
-};
+import { appendTextToEditorUntilContains } from '../utils/AppendTextToEditorUntilContains';
 
 test('Successfully create page under specific path', async ({ page }) => {
   const newPagePath = '/child';
@@ -14,8 +9,12 @@ test('Successfully create page under specific path', async ({ page }) => {
 
   await page.goto('/Sandbox');
 
-  await page.keyboard.press(openPageCreateModalShortcutKey);
-  await expect(page.getByTestId('page-create-modal')).toBeVisible();
+  await expect(async () => {
+    await page.keyboard.press(openPageCreateModalShortcutKey);
+    await expect(page.getByTestId('page-create-modal')).toBeVisible({
+      timeout: 1000,
+    });
+  }).toPass();
   page
     .getByTestId('page-create-modal')
     .locator('.rbt-input-main')

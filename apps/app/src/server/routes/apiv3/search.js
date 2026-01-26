@@ -3,12 +3,14 @@ import { ErrorV3 } from '@growi/core/dist/models';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 
-const logger = loggerFactory('growi:routes:apiv3:search'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:routes:apiv3:search');
 
 const express = require('express');
 const { body } = require('express-validator');
@@ -100,11 +102,11 @@ const noCache = require('nocache');
  */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequired = require('../../middlewares/login-required')(crowi);
-  const adminRequired = require('../../middlewares/admin-required')(crowi);
+  const loginRequired = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   /**
    * @swagger
@@ -126,23 +128,36 @@ module.exports = (crowi) => {
    *                    description: Status of indices
    *                    $ref: '#/components/schemas/Indices'
    */
-  router.get('/indices',
-    noCache(), accessTokenParser([SCOPE.READ.ADMIN.FULL_TEXT_SEARCH], { acceptLegacy: true }), loginRequired, adminRequired, async(req, res) => {
+  router.get(
+    '/indices',
+    noCache(),
+    accessTokenParser([SCOPE.READ.ADMIN.FULL_TEXT_SEARCH], {
+      acceptLegacy: true,
+    }),
+    loginRequired,
+    adminRequired,
+    async (req, res) => {
       const { searchService } = crowi;
 
       if (!searchService.isConfigured) {
-        return res.apiv3Err(new ErrorV3('SearchService is not configured', 'search-service-unconfigured'), 503);
+        return res.apiv3Err(
+          new ErrorV3(
+            'SearchService is not configured',
+            'search-service-unconfigured',
+          ),
+          503,
+        );
       }
 
       try {
         const info = await searchService.getInfoForAdmin();
         return res.status(200).send({ info });
-      }
-      catch (err) {
+      } catch (err) {
         logger.error(err);
         return res.apiv3Err(err, 503);
       }
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -156,26 +171,40 @@ module.exports = (crowi) => {
    *        200:
    *          description: Successfully connected
    */
-  router.post('/connection',
-    accessTokenParser([SCOPE.WRITE.ADMIN.FULL_TEXT_SEARCH], { acceptLegacy: true }), loginRequired, adminRequired, addActivity, async(req, res) => {
+  router.post(
+    '/connection',
+    accessTokenParser([SCOPE.WRITE.ADMIN.FULL_TEXT_SEARCH], {
+      acceptLegacy: true,
+    }),
+    loginRequired,
+    adminRequired,
+    addActivity,
+    async (req, res) => {
       const { searchService } = crowi;
 
       if (!searchService.isConfigured) {
-        return res.apiv3Err(new ErrorV3('SearchService is not configured', 'search-service-unconfigured'));
+        return res.apiv3Err(
+          new ErrorV3(
+            'SearchService is not configured',
+            'search-service-unconfigured',
+          ),
+        );
       }
 
       try {
         await searchService.reconnectClient();
 
-        activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SEARCH_CONNECTION });
+        activityEvent.emit('update', res.locals.activity._id, {
+          action: SupportedAction.ACTION_ADMIN_SEARCH_CONNECTION,
+        });
 
         return res.status(200).send();
-      }
-      catch (err) {
+      } catch (err) {
         logger.error(err);
         return res.apiv3Err(err, 503);
       }
-    });
+    },
+  );
 
   const validatorForPutIndices = [
     body('operation').isString().isIn(['rebuild', 'normalize']),
@@ -212,44 +241,70 @@ module.exports = (crowi) => {
    *                    type: string
    *                    description: Operation is successfully processed, or requested
    */
-  router.put('/indices', accessTokenParser([SCOPE.WRITE.ADMIN.FULL_TEXT_SEARCH], { acceptLegacy: true }), loginRequired, adminRequired, addActivity,
-    validatorForPutIndices, apiV3FormValidator,
-    async(req, res) => {
+  router.put(
+    '/indices',
+    accessTokenParser([SCOPE.WRITE.ADMIN.FULL_TEXT_SEARCH], {
+      acceptLegacy: true,
+    }),
+    loginRequired,
+    adminRequired,
+    addActivity,
+    validatorForPutIndices,
+    apiV3FormValidator,
+    async (req, res) => {
       const operation = req.body.operation;
 
       const { searchService } = crowi;
 
       if (!searchService.isConfigured) {
-        return res.apiv3Err(new ErrorV3('SearchService is not configured', 'search-service-unconfigured'));
+        return res.apiv3Err(
+          new ErrorV3(
+            'SearchService is not configured',
+            'search-service-unconfigured',
+          ),
+        );
       }
       if (!searchService.isReachable) {
-        return res.apiv3Err(new ErrorV3('SearchService is not reachable', 'search-service-unreachable'));
+        return res.apiv3Err(
+          new ErrorV3(
+            'SearchService is not reachable',
+            'search-service-unreachable',
+          ),
+        );
       }
 
       try {
         switch (operation) {
           case 'normalize':
-          // wait the processing is terminated
+            // wait the processing is terminated
             await searchService.normalizeIndices();
 
-            activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SEARCH_INDICES_NORMALIZE });
+            activityEvent.emit('update', res.locals.activity._id, {
+              action: SupportedAction.ACTION_ADMIN_SEARCH_INDICES_NORMALIZE,
+            });
 
-            return res.status(200).send({ message: 'Operation is successfully processed.' });
+            return res
+              .status(200)
+              .send({ message: 'Operation is successfully processed.' });
           case 'rebuild':
-          // NOT wait the processing is terminated
+            // NOT wait the processing is terminated
             searchService.rebuildIndex();
 
-            activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_SEARCH_INDICES_REBUILD });
+            activityEvent.emit('update', res.locals.activity._id, {
+              action: SupportedAction.ACTION_ADMIN_SEARCH_INDICES_REBUILD,
+            });
 
-            return res.status(200).send({ message: 'Operation is successfully requested.' });
+            return res
+              .status(200)
+              .send({ message: 'Operation is successfully requested.' });
           default:
             throw new Error(`Unimplemented operation: ${operation}`);
         }
-      }
-      catch (err) {
+      } catch (err) {
         return res.apiv3Err(err, 503);
       }
-    });
+    },
+  );
 
   return router;
 };

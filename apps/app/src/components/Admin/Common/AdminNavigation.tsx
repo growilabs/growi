@@ -4,21 +4,16 @@ import { pathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
 import urljoin from 'url-join';
 
-import {
-  useGrowiAppIdForGrowiCloud,
-  useGrowiCloudUri,
-} from '~/stores-universal/context';
+import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
 
 import styles from './AdminNavigation.module.scss';
 
 const moduleClass = styles['admin-navigation'];
 
-// eslint-disable-next-line react/prop-types
 const MenuLabel = ({ menu }: { menu: string }) => {
   const { t } = useTranslation(['admin', 'commons']);
 
   switch (menu) {
-    /* eslint-disable no-multi-spaces, max-len */
     case 'app':
       return (
         <>
@@ -152,7 +147,6 @@ const MenuLabel = ({ menu }: { menu: string }) => {
           {t('wiki_management_homepage')}
         </>
       );
-    /* eslint-enable no-multi-spaces, max-len */
   }
 };
 
@@ -188,8 +182,8 @@ const MenuLink = ({
 export const AdminNavigation = (): JSX.Element => {
   const pathname = window.location.pathname;
 
-  const { data: growiCloudUri } = useGrowiCloudUri();
-  const { data: growiAppIdForGrowiCloud } = useGrowiAppIdForGrowiCloud();
+  const growiCloudUri = useGrowiCloudUri();
+  const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
 
   const isActiveMenu = useCallback(
     (path: string | string[]) => {
@@ -209,7 +203,6 @@ export const AdminNavigation = (): JSX.Element => {
     (isListGroupItems: boolean) => {
       return (
         <>
-          {/* eslint-disable no-multi-spaces */}
           <MenuLink
             menu="home"
             isListGroupItems={isListGroupItems}
@@ -301,7 +294,6 @@ export const AdminNavigation = (): JSX.Element => {
               <MenuLabel menu="cloud" />
             </a>
           )}
-          {/* eslint-enable no-multi-spaces */}
         </>
       );
     },
@@ -327,7 +319,6 @@ export const AdminNavigation = (): JSX.Element => {
           aria-expanded="false"
         >
           <span className="float-start">
-            {/* eslint-disable no-multi-spaces */}
             {pathname === '/admin' && <MenuLabel menu="home" />}
             {isActiveMenu('/app') && <MenuLabel menu="app" />}
             {isActiveMenu('/security') && <MenuLabel menu="security" />}
@@ -353,7 +344,6 @@ export const AdminNavigation = (): JSX.Element => {
             )}
             {/* Temporarily hiding */}
             {/* {isActiveMenu('/ai-integration')                && <MenuLabel menu="ai-integration" />} */}
-            {/* eslint-enable no-multi-spaces */}
           </span>
         </button>
         <div

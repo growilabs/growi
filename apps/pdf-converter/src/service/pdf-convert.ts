@@ -145,7 +145,7 @@ class PdfConvertService implements OnInit {
     appId?: number,
   ): Promise<void> {
     while (!this.isJobCompleted(jobId)) {
-      // eslint-disable-next-line no-await-in-loop
+      // biome-ignore lint/performance/noAwaitInLoops: Allow in this case to wait between iterations
       await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
 
       try {
@@ -157,7 +157,6 @@ class PdfConvertService implements OnInit {
         const pdfWritable = this.getPdfWritable();
         this.jobList[jobId].currentStream = htmlReadable;
 
-        // eslint-disable-next-line no-await-in-loop
         await pipelinePromise(htmlReadable, pdfWritable);
         this.jobList[jobId].currentStream = undefined;
       } catch (err) {
@@ -223,7 +222,7 @@ class PdfConvertService implements OnInit {
   private getPdfWritable(): Writable {
     return new Writable({
       objectMode: true,
-      write: async (pageInfo: PageInfo, encoding, callback) => {
+      write: async (pageInfo: PageInfo, _encoding, callback) => {
         const pattern = new RegExp(
           `^${this.tmpOutputRootDir}(?:\\/([0-9]+))?\\/html\\/(.+?)\\.html$`,
         );

@@ -14,21 +14,20 @@ import UpdatePost from '../models/update-post';
  *    name: Pages
  */
 
-/* eslint-disable no-use-before-define */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi, app) => {
+module.exports = (crowi, _app) => {
   const logger = loggerFactory('growi:routes:page');
 
   const { pagePathUtils } = require('@growi/core/dist/utils');
 
   /** @type {import('../models/page').PageModel} */
-  const Page = crowi.model('Page');
+  const { Page } = crowi.models;
 
   const PageRedirect = mongoose.model('PageRedirect');
 
   const ApiResponse = require('../util/apiResponse');
 
-  const globalNotificationService = crowi.getGlobalNotificationService();
+  const globalNotificationService = crowi.globalNotificationService;
 
   const actions = {};
 
@@ -225,12 +224,11 @@ module.exports = (crowi, app) => {
 
     UpdatePost.findSettingsByPath(path)
       .then((data) => {
-        // eslint-disable-next-line no-param-reassign
-        data = data.map((e) => {
+        const channels = data.map((e) => {
           return e.channel;
         });
-        logger.debug('Found updatePost data', data);
-        const result = { updatePost: data };
+        logger.debug('Found updatePost data', channels);
+        const result = { updatePost: channels };
         return res.json(ApiResponse.success(result));
       })
       .catch((err) => {

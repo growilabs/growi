@@ -1,23 +1,25 @@
 import type { FC, JSX } from 'react';
 import React from 'react';
-
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { useTranslation } from 'next-i18next';
 
-import { useCurrentPathname } from '~/stores-universal/context';
-import { useSWRxPageInfoForList, useSWRxPagesByPath } from '~/stores/page-listing';
+import { useCurrentPathname } from '~/states/global';
+import {
+  useSWRxPageInfoForList,
+  useSWRxPagesByPath,
+} from '~/stores/page-listing';
 
 import { PageListItemL } from './PageList/PageListItemL';
 
-
 import styles from './IdenticalPathPage.module.scss';
 
-
 type IdenticalPathAlertProps = {
-  path? : string | null,
-}
+  path?: string | null;
+};
 
-const IdenticalPathAlert : FC<IdenticalPathAlertProps> = (props: IdenticalPathAlertProps) => {
+const IdenticalPathAlert: FC<IdenticalPathAlertProps> = (
+  props: IdenticalPathAlertProps,
+) => {
   const { path } = props;
   const { t } = useTranslation();
 
@@ -30,16 +32,26 @@ const IdenticalPathAlert : FC<IdenticalPathAlertProps> = (props: IdenticalPathAl
     _pageName = devidedPath.latter;
   }
 
-
   return (
     <div className="alert alert-warning py-3">
-      <h5 className="fw-bold mt-1">{t('duplicated_page_alert.same_page_name_exists', { pageName: _pageName })}</h5>
+      <h5 className="fw-bold mt-1">
+        {t('duplicated_page_alert.same_page_name_exists', {
+          pageName: _pageName,
+        })}
+      </h5>
       <p>
-        {t('duplicated_page_alert.same_page_name_exists_at_path',
-          { path: _path, pageName: _pageName })}<br />
+        {t('duplicated_page_alert.same_page_name_exists_at_path', {
+          path: _path,
+          pageName: _pageName,
+        })}
+        <br />
         <span
-          // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: t('See_more_detail_on_new_schema', { title: t('GROWI.5.0_new_schema') }) }}
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML link
+          dangerouslySetInnerHTML={{
+            __html: t('See_more_detail_on_new_schema', {
+              title: t('GROWI.5.0_new_schema'),
+            }),
+          }}
         />
       </p>
       <p className="mb-1">{t('duplicated_page_alert.select_page_to_see')}</p>
@@ -47,10 +59,8 @@ const IdenticalPathAlert : FC<IdenticalPathAlertProps> = (props: IdenticalPathAl
   );
 };
 
-
 export const IdenticalPathPage = (): JSX.Element => {
-
-  const { data: currentPath } = useCurrentPathname();
+  const currentPath = useCurrentPathname();
 
   const { data: pages } = useSWRxPagesByPath(currentPath);
   const { injectTo } = useSWRxPageInfoForList(null, currentPath, true, true);
@@ -83,7 +93,6 @@ export const IdenticalPathPage = (): JSX.Element => {
           })}
         </ul>
       </div>
-
     </>
   );
 };

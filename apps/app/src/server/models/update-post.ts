@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import type { Document, Model, Types } from 'mongoose';
 import { Schema } from 'mongoose';
 
@@ -105,8 +103,8 @@ updatePostSchema.statics.findSettingsByPath = async function (path) {
   return validSettings;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-updatePostSchema.statics.findAll = function (offset = 0) {
+updatePostSchema.statics.findAll = function (_offset = 0) {
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   return this.find().sort({ createdAt: 1 }).populate('creator').exec();
 };
 

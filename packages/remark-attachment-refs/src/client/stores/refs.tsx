@@ -2,7 +2,6 @@ import type { IAttachmentHasId } from '@growi/core';
 import type { AxiosError } from 'axios';
 import axios from 'axios';
 import type { SWRResponse } from 'swr';
-// eslint-disable-next-line camelcase
 import useSWR, { unstable_serialize } from 'swr';
 
 export const useSWRxRef = (
@@ -49,7 +48,7 @@ export const useSWRxRefs = (
       isImmutable,
     ],
     async ([endpoint, pagePath, prefix]) => {
-      return axios
+      return await axios
         .get(endpoint, {
           params: {
             pagePath,

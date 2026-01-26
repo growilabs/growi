@@ -1,21 +1,22 @@
-
-import React, { useCallback } from 'react';
-
+import type React from 'react';
+import { useCallback } from 'react';
+import { useRouter } from 'next/router';
 import type { IPageToDeleteWithMeta } from '@growi/core';
 import { useTranslation } from 'next-i18next';
-import { useRouter } from 'next/router';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
 import { toastSuccess } from '~/client/util/toastr';
 import type { OnDeletedFunction } from '~/interfaces/ui';
-import { useIsReadOnlyUser } from '~/stores-universal/context';
+import { useIsReadOnlyUser } from '~/states/context';
+import { useCurrentPageData } from '~/states/page';
+import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
 import {
-  useSWRxUserBookmarks, useSWRMUTxCurrentUserBookmarks,
+  useSWRMUTxCurrentUserBookmarks,
+  useSWRxUserBookmarks,
 } from '~/stores/bookmark';
 import { useSWRxBookmarkFolderAndChild } from '~/stores/bookmark-folder';
-import { usePageDeleteModal } from '~/stores/modal';
-import { mutateAllPageInfo, useSWRMUTxPageInfo, useSWRxCurrentPage } from '~/stores/page';
+import { mutateAllPageInfo, useSWRMUTxPageInfo } from '~/stores/page';
 
 import { BookmarkFolderItem } from './BookmarkFolderItem';
 import { BookmarkItem } from './BookmarkItem';
@@ -29,10 +30,10 @@ import styles from './BookmarkFolderTree.module.scss';
 //  } & IPageHasId
 
 type Props = {
-  isUserHomepage?: boolean,
-  userId?: string,
-  isOperable: boolean,
-}
+  isUserHomepage?: boolean;
+  userId?: string;
+  isOperable: boolean;
+};
 
 export const BookmarkFolderTree: React.FC<Props> = (props: Props) => {
   const { isUserHomepage, userId } = props;
@@ -41,33 +42,61 @@ export const BookmarkFolderTree: React.FC<Props> = (props: Props) => {
   const { t } = useTranslation();
   const router = useRouter();
 
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { data: currentPage } = useSWRxCurrentPage();
-  const { data: bookmarkFolders, mutate: mutateBookmarkFolders } = useSWRxBookmarkFolderAndChild(userId);
-  const { data: userBookmarks, mutate: mutateUserBookmarks } = useSWRxUserBookmarks(userId ?? null);
-  const { trigger: mutatePageInfo } = useSWRMUTxPageInfo(currentPage?._id ?? null);
-  const { trigger: mutateCurrentUserBookmarks } = useSWRMUTxCurrentUserBookmarks();
-  const { open: openDeleteModal } = usePageDeleteModal();
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const currentPage = useCurrentPageData();
+  const { data: bookmarkFolders, mutate: mutateBookmarkFolders } =
+    useSWRxBookmarkFolderAndChild(userId);
+  const { data: userBookmarks, mutate: mutateUserBookmarks } =
+    useSWRxUserBookmarks(userId ?? null);
+  const { trigger: mutatePageInfo } = useSWRMUTxPageInfo(
+    currentPage?._id ?? null,
+  );
+  const { trigger: mutateCurrentUserBookmarks } =
+    useSWRMUTxCurrentUserBookmarks();
+  const { open: openDeleteModal } = usePageDeleteModalActions();
 
   const bookmarkFolderTreeMutation = useCallback(() => {
     mutateUserBookmarks();
     mutateCurrentUserBookmarks();
     mutatePageInfo();
     mutateBookmarkFolders();
-  }, [mutateBookmarkFolders, mutatePageInfo, mutateCurrentUserBookmarks, mutateUserBookmarks]);
+  }, [
+    mutateBookmarkFolders,
+    mutatePageInfo,
+    mutateCurrentUserBookmarks,
+    mutateUserBookmarks,
+  ]);
 
-  const onClickDeleteMenuItemHandler = useCallback((pageToDelete: IPageToDeleteWithMeta) => {
-    const pageDeletedHandler: OnDeletedFunction = (pathOrPathsToDelete, _isRecursively, isCompletely) => {
-      if (typeof pathOrPathsToDelete !== 'string') return;
-      toastSuccess(isCompletely ? t('deleted_pages_completely', { path: pathOrPathsToDelete }) : t('deleted_pages', { path: pathOrPathsToDelete }));
-      bookmarkFolderTreeMutation();
-      mutateAllPageInfo();
-      if (pageToDelete.data._id === currentPage?._id && _isRecursively) {
-        router.push(`/trash${currentPage.path}`);
-      }
-    };
-    openDeleteModal([pageToDelete], { onDeleted: pageDeletedHandler });
-  }, [openDeleteModal, t, bookmarkFolderTreeMutation, currentPage?._id, currentPage?.path, router]);
+  const onClickDeleteMenuItemHandler = useCallback(
+    (pageToDelete: IPageToDeleteWithMeta) => {
+      const pageDeletedHandler: OnDeletedFunction = (
+        pathOrPathsToDelete,
+        _isRecursively,
+        isCompletely,
+      ) => {
+        if (typeof pathOrPathsToDelete !== 'string') return;
+        toastSuccess(
+          isCompletely
+            ? t('deleted_pages_completely', { path: pathOrPathsToDelete })
+            : t('deleted_pages', { path: pathOrPathsToDelete }),
+        );
+        bookmarkFolderTreeMutation();
+        mutateAllPageInfo();
+        if (pageToDelete.data._id === currentPage?._id && _isRecursively) {
+          router.push(`/trash${currentPage.path}`);
+        }
+      };
+      openDeleteModal([pageToDelete], { onDeleted: pageDeletedHandler });
+    },
+    [
+      openDeleteModal,
+      t,
+      bookmarkFolderTreeMutation,
+      currentPage?._id,
+      currentPage?.path,
+      router,
+    ],
+  );
 
   /* TODO: update in bookmarks folder v2. */
   // const itemDropHandler = async(item: DragItemDataType, dragType: string | null | symbol) => {
@@ -105,9 +134,12 @@ export const BookmarkFolderTree: React.FC<Props> = (props: Props) => {
 
   return (
     <DndProvider backend={HTML5Backend}>
-
-      <div className={`grw-folder-tree-container ${styles['grw-folder-tree-container']}`}>
-        <ul className={`grw-foldertree ${styles['grw-foldertree']} list-group py-2`}>
+      <div
+        className={`grw-folder-tree-container ${styles['grw-folder-tree-container']}`}
+      >
+        <ul
+          className={`grw-foldertree ${styles['grw-foldertree']} list-group py-2`}
+        >
           {bookmarkFolders?.map((bookmarkFolder) => {
             return (
               <BookmarkFolderItem
@@ -124,8 +156,11 @@ export const BookmarkFolderTree: React.FC<Props> = (props: Props) => {
               />
             );
           })}
-          {userBookmarks?.map(userBookmark => (
-            <div key={userBookmark?._id} className="grw-foldertree-item-container grw-root-bookmarks">
+          {userBookmarks?.map((userBookmark) => (
+            <div
+              key={userBookmark?._id}
+              className="grw-foldertree-item-container grw-root-bookmarks"
+            >
               <BookmarkItem
                 isReadOnlyUser={!!isReadOnlyUser}
                 isOperable={props.isOperable}
@@ -155,7 +190,6 @@ export const BookmarkFolderTree: React.FC<Props> = (props: Props) => {
           </DragAndDropWrapper>
         )} */}
       </div>
-
     </DndProvider>
   );
 };

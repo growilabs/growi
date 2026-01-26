@@ -4,11 +4,13 @@ import { SupportedAction } from '~/interfaces/activity';
 import type { IInAppNotification } from '~/interfaces/in-app-notification';
 
 export type ActionMsgAndIconType = {
-  actionMsg: string
-  actionIcon: string
-}
+  actionMsg: string;
+  actionIcon: string;
+};
 
-export const useActionMsgAndIconForModelNotification = (notification: IInAppNotification & HasObjectId): ActionMsgAndIconType => {
+export const useActionMsgAndIconForModelNotification = (
+  notification: IInAppNotification & HasObjectId,
+): ActionMsgAndIconType => {
   const actionType: string = notification.action;
   let actionMsg: string;
   let actionIcon: string;

@@ -33,11 +33,14 @@ yarn-error.log*
 # Terraform
 **/.terraform/*
 *.tfstate.*
+/aws/
 
 # IDE, dev #
 .idea
+**/.claude/settings.local.json
 *.orig
 *.code-workspace
+*.timestamp-*.mjs
 
 # turborepo
 .turbo

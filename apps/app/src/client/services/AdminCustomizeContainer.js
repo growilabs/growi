@@ -6,7 +6,6 @@ import loggerFactory from '~/utils/logger';
 
 import { apiv3Get, apiv3Put } from '../util/apiv3-client';
 
-// eslint-disable-next-line no-unused-vars
 const logger = loggerFactory('growi:services:AdminCustomizeContainer');
 
 /**
@@ -14,7 +13,6 @@ const logger = loggerFactory('growi:services:AdminCustomizeContainer');
  * @extends {Container} unstated Container
  */
 export default class AdminCustomizeContainer extends Container {
-
   constructor() {
     super();
 
@@ -45,9 +43,9 @@ export default class AdminCustomizeContainer extends Container {
     this.switchPageListLimitationS = this.switchPageListLimitationS.bind(this);
     this.switchPageListLimitationM = this.switchPageListLimitationM.bind(this);
     this.switchPageListLimitationL = this.switchPageListLimitationL.bind(this);
-    this.switchPageListLimitationXL = this.switchPageListLimitationXL.bind(this);
+    this.switchPageListLimitationXL =
+      this.switchPageListLimitationXL.bind(this);
     this.switchShowPageSideAuthors = this.switchShowPageSideAuthors.bind(this);
-
   }
 
   /**
@@ -74,7 +72,8 @@ export default class AdminCustomizeContainer extends Container {
         pageLimitationXL: customizeParams.pageLimitationXL,
         isEnabledStaleNotification: customizeParams.isEnabledStaleNotification,
         isAllReplyShown: customizeParams.isAllReplyShown,
-        isSearchScopeChildrenAsDefault: customizeParams.isSearchScopeChildrenAsDefault,
+        isSearchScopeChildrenAsDefault:
+          customizeParams.isSearchScopeChildrenAsDefault,
         isEnabledMarp: customizeParams.isEnabledMarp,
         currentCustomizeTitle: customizeParams.customizeTitle,
         currentCustomizeNoscript: customizeParams.customizeNoscript,
@@ -82,29 +81,28 @@ export default class AdminCustomizeContainer extends Container {
         currentCustomizeScript: customizeParams.customizeScript,
         showPageSideAuthors: customizeParams.showPageSideAuthors,
       });
-    }
-    catch (err) {
+    } catch (err) {
       this.setState({ retrieveError: err });
       logger.error(err);
       throw new Error('Failed to fetch data');
     }
   }
 
-
   /**
    * Switch enabledTimeLine
    */
   switchEnableTimeline() {
-    this.setState({ isEnabledTimeline:  !this.state.isEnabledTimeline });
+    this.setState({ isEnabledTimeline: !this.state.isEnabledTimeline });
   }
 
   /**
    * Switch enabledAttachTitleHeader
    */
   switchEnabledAttachTitleHeader() {
-    this.setState({ isEnabledAttachTitleHeader:  !this.state.isEnabledAttachTitleHeader });
+    this.setState({
+      isEnabledAttachTitleHeader: !this.state.isEnabledAttachTitleHeader,
+    });
   }
-
 
   /**
    * S: Switch pageListLimitationS
@@ -138,7 +136,9 @@ export default class AdminCustomizeContainer extends Container {
    * Switch enabledStaleNotification
    */
   switchEnableStaleNotification() {
-    this.setState({ isEnabledStaleNotification:  !this.state.isEnabledStaleNotification });
+    this.setState({
+      isEnabledStaleNotification: !this.state.isEnabledStaleNotification,
+    });
   }
 
   /**
@@ -152,7 +152,10 @@ export default class AdminCustomizeContainer extends Container {
    * Switch isSearchScopeChildrenAsDefault
    */
   switchIsSearchScopeChildrenAsDefault() {
-    this.setState({ isSearchScopeChildrenAsDefault: !this.state.isSearchScopeChildrenAsDefault });
+    this.setState({
+      isSearchScopeChildrenAsDefault:
+        !this.state.isSearchScopeChildrenAsDefault,
+    });
   }
 
   /**
@@ -212,7 +215,8 @@ export default class AdminCustomizeContainer extends Container {
         pageLimitationXL: this.state.pageLimitationXL,
         isEnabledStaleNotification: this.state.isEnabledStaleNotification,
         isAllReplyShown: this.state.isAllReplyShown,
-        isSearchScopeChildrenAsDefault: this.state.isSearchScopeChildrenAsDefault,
+        isSearchScopeChildrenAsDefault:
+          this.state.isSearchScopeChildrenAsDefault,
         showPageSideAuthors: this.state.showPageSideAuthors,
       });
       const { customizedParams } = response.data;
@@ -225,11 +229,11 @@ export default class AdminCustomizeContainer extends Container {
         pageLimitationXL: customizedParams.pageLimitationXL,
         isEnabledStaleNotification: customizedParams.isEnabledStaleNotification,
         isAllReplyShown: customizedParams.isAllReplyShown,
-        isSearchScopeChildrenAsDefault: customizedParams.isSearchScopeChildrenAsDefault,
+        isSearchScopeChildrenAsDefault:
+          customizedParams.isSearchScopeChildrenAsDefault,
         showPageSideAuthors: customizedParams.showPageSideAuthors,
       });
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
       throw new Error('Failed to update data');
     }
@@ -248,8 +252,7 @@ export default class AdminCustomizeContainer extends Container {
       this.setState({
         isEnabledMarp: customizedParams.isEnabledMarp,
       });
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
       throw new Error('Failed to update data');
     }
@@ -268,8 +271,7 @@ export default class AdminCustomizeContainer extends Container {
       this.setState({
         customizeTitle: customizedParams.customizeTitle,
       });
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
       throw new Error('Failed to update data');
     }
@@ -284,8 +286,7 @@ export default class AdminCustomizeContainer extends Container {
       this.setState({
         currentCustomizeNoscript: customizedParams.customizeNoscript,
       });
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
       throw new Error('Failed to update data');
     }
@@ -304,8 +305,7 @@ export default class AdminCustomizeContainer extends Container {
       this.setState({
         currentCustomizeCss: customizedParams.customizeCss,
       });
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
       throw new Error('Failed to update data');
     }
@@ -325,11 +325,9 @@ export default class AdminCustomizeContainer extends Container {
       this.setState({
         currentCustomizeScript: customizedParams.customizeScript,
       });
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
       throw new Error('Failed to update data');
     }
   }
-
 }

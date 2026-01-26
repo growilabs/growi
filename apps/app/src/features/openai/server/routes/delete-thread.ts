@@ -1,13 +1,15 @@
+import assert from 'node:assert';
 import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
-import { param, type ValidationChain } from 'express-validator';
+import { param } from 'express-validator';
 import { isHttpError } from 'http-errors';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
@@ -17,20 +19,16 @@ import { certifyAiService } from './middlewares/certify-ai-service';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:delete-thread');
 
-type DeleteThreadFactory = (crowi: Crowi) => RequestHandler[];
-
 type ReqParams = IApiv3DeleteThreadParams;
 
-type Req = Request<ReqParams, Response, undefined> & {
-  user: IUserHasId;
+type Req = Request<ReqParams, ApiV3Response, undefined> & {
+  user?: IUserHasId;
 };
 
-export const deleteThreadFactory: DeleteThreadFactory = (crowi) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
+export const deleteThreadFactory = (crowi: Crowi): RequestHandler[] => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
-  const validator: ValidationChain[] = [
+  const validator = [
     param('aiAssistantId').isMongoId().withMessage('threadId is required'),
     param('threadRelationId')
       .isMongoId()
@@ -43,11 +41,15 @@ export const deleteThreadFactory: DeleteThreadFactory = (crowi) => {
     }),
     loginRequiredStrictly,
     certifyAiService,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
       const { aiAssistantId, threadRelationId } = req.params;
       const { user } = req;
+      assert(
+        user != null,
+        'user is required (ensured by loginRequiredStrictly middleware)',
+      );
 
       const openaiService = getOpenaiService();
       if (openaiService == null) {

@@ -3,7 +3,6 @@ import loggerFactory from '~/utils/logger';
 const logger = loggerFactory('growi:cli:HotkeyStroke');
 
 export default class HotkeyStroke {
-
   constructor(stroke) {
     this.stroke = stroke;
     this.activeIndices = [];
@@ -42,16 +41,21 @@ export default class HotkeyStroke {
         return nextIndex;
       })
       // exclude null
-      .filter(index => index != null);
+      .filter((index) => index != null);
 
     // reset if completed
     if (isCompleted) {
       this.activeIndices = [];
     }
 
-    logger.debug('activeIndices for [', this.stroke, '] => [', this.activeIndices, ']');
+    logger.debug(
+      'activeIndices for [',
+      this.stroke,
+      '] => [',
+      this.activeIndices,
+      ']',
+    );
 
     return isCompleted;
   }
-
 }
