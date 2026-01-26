@@ -1,4 +1,4 @@
-export function removeUserPages(
+export function excludeUserPagesFromQuery(
   query: string,
   userPagesDisabled: boolean,
 ): string {
@@ -9,7 +9,7 @@ export function removeUserPages(
   const cleanQuery = query.replace(/prefix:\/user/g, '').trim();
 
   if (!cleanQuery.includes('-prefix:/user')) {
-    const queryWithUserPrefix = `${cleanQuery.trim()} -prefix:/user`;
+    const queryWithUserPrefix = `${cleanQuery} -prefix:/user`;
 
     return queryWithUserPrefix;
   }

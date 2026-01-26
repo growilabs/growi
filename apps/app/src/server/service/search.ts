@@ -8,7 +8,7 @@ import {
   isIncludeAiMenthion,
   removeAiMenthion,
 } from '~/features/search/utils/ai';
-import { removeUserPages } from '~/features/search/utils/disableUserPages';
+import { removeUserPages } from '~/features/search/utils/disable-user-pages';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
   IFormattedSearchResult,
@@ -333,7 +333,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     _queryString: string,
     nqName: string | null,
   ): Promise<ParsedQuery> {
-    const disableUserPages = this.crowi.configManager.getConfig(
+    const disableUserPages = configManager.getConfig(
       'security:disableUserPages',
     );
 
