@@ -1,4 +1,4 @@
-export function handleUserPages(
+export function removeUserPages(
   query: string,
   userPagesDisabled: boolean,
 ): string {

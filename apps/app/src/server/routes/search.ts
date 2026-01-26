@@ -163,7 +163,6 @@ module.exports = (crowi: Crowi, app) => {
     let delegatorName;
     try {
       const query = decodeURIComponent(q);
-
       const nqName = nq ?? decodeURIComponent(nq);
       [searchResult, delegatorName] = await searchService.searchKeyword(
         query,
