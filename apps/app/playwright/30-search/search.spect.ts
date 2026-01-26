@@ -242,7 +242,7 @@ test('Search current tree by word is successfully loaded', async ({ page }) => {
 
 test.describe('Search result navigation and repeated search', () => {
   test('Search results redirect to page and repeated search works', async ({ page }) => {
-    // Issue 1 & 2: Search results navigation and repeated search functionality
+    // Issue 1: Clicking search result should navigate and update page content
     // Step 1: Start from the home page
     await page.goto('/');
 
@@ -258,22 +258,29 @@ test.describe('Search result navigation and repeated search', () => {
     const firstResult = page.locator('.search-menu-item').first();
     await firstResult.click();
 
-    // Step 5: Verify that modal is closed (navigation happened)
+    // Step 5: Verify that modal is closed and navigation completed
     await expect(page.getByTestId('search-modal')).not.toBeVisible();
+    
+    // Step 6: Verify page content actually changed (not stuck on home page)
+    // Wait for the page to load - check that we're not on the home page anymore
+    await page.waitForLoadState('networkidle');
+    
+    // Verify URL changed from home page
+    await expect(page).not.toHaveURL('/');
 
     // Issue 2: Verify repeated search works from any page
-    // Step 6: From the navigated page, open search modal again
+    // Step 7: From the navigated page, open search modal again
     await page.getByTestId('open-search-modal-button').click();
     await expect(page.getByTestId('search-modal')).toBeVisible();
 
-    // Step 7: Search for the same keyword ("sandbox")
+    // Step 8: Search for the same keyword ("sandbox")
     await page.locator('.form-control').fill('sandbox');
 
-    // Step 8: Submit the search by clicking on "search in all" menu item
+    // Step 9: Submit the search by clicking on "search in all" menu item
     await expect(page.getByTestId('search-all-menu-item')).toBeVisible();
     await page.getByTestId('search-all-menu-item').click();
 
-    // Step 9: Verify that the search page is displayed with results
+    // Step 10: Verify that the search page is displayed with results
     await expect(page.getByTestId('search-result-base')).toBeVisible();
     await expect(page.getByTestId('search-result-list')).toBeVisible();
     await expect(page.getByTestId('search-result-content')).toBeVisible();
