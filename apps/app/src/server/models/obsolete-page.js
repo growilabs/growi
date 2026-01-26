@@ -425,6 +425,11 @@ export const getPageSchema = (crowi) => {
     includeEmpty = false,
   ) {
     const builder = new this.PageQueryBuilder(this.find(), includeEmpty);
+
+    if (option.disableUserPages) {
+      builder.addConditionToListByNotMatchPathAndChildren('/user');
+    }
+
     builder.addConditionToListWithDescendants(path, option);
 
     return findListFromBuilderAndViewer(builder, user, false, option);
