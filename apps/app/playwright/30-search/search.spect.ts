@@ -239,3 +239,46 @@ test('Search current tree by word is successfully loaded', async ({ page }) => {
   await expect(page.getByTestId('search-result-list')).toBeVisible();
   await expect(page.getByTestId('search-result-content')).toBeVisible();
 });
+
+test.describe('Search result navigation and repeated search', () => {
+  test('Search results redirect to page and repeated search works', async ({ page }) => {
+    // Issue 1 & 2: Search results navigation and repeated search functionality
+    // Step 1: Start from the home page
+    await page.goto('/');
+
+    // Step 2: Open search modal and search for "sandbox"
+    await page.getByTestId('open-search-modal-button').click();
+    await expect(page.getByTestId('search-modal')).toBeVisible();
+    await page.locator('.form-control').fill('sandbox');
+
+    // Step 3: Wait for search results to appear
+    await expect(page.locator('.search-menu-item').first()).toBeVisible();
+
+    // Step 4: Click on the first search result to navigate to a page
+    const firstResult = page.locator('.search-menu-item').first();
+    await firstResult.click();
+
+    // Step 5: Verify that modal is closed (navigation happened)
+    await expect(page.getByTestId('search-modal')).not.toBeVisible();
+
+    // Issue 2: Verify repeated search works from any page
+    // Step 6: From the navigated page, open search modal again
+    await page.getByTestId('open-search-modal-button').click();
+    await expect(page.getByTestId('search-modal')).toBeVisible();
+
+    // Step 7: Search for the same keyword ("sandbox")
+    await page.locator('.form-control').fill('sandbox');
+
+    // Step 8: Submit the search by clicking on "search in all" menu item
+    await expect(page.getByTestId('search-all-menu-item')).toBeVisible();
+    await page.getByTestId('search-all-menu-item').click();
+
+    // Step 9: Verify that the search page is displayed with results
+    await expect(page.getByTestId('search-result-base')).toBeVisible();
+    await expect(page.getByTestId('search-result-list')).toBeVisible();
+    await expect(page.getByTestId('search-result-content')).toBeVisible();
+
+    // Verify we're on the search page with the correct query
+    await expect(page).toHaveURL(/\/_search\?q=sandbox/);
+  });
+});
