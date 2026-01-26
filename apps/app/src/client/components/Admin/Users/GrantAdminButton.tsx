@@ -7,9 +7,12 @@ import { toastError, toastSuccess } from '~/client/util/toastr';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
-type GrantAdminButtonProps = {
-  adminUsersContainer: AdminUsersContainer;
+type GrantAdminButtonExternalProps = {
   user: IUserHasId;
+};
+
+type GrantAdminButtonProps = GrantAdminButtonExternalProps & {
+  adminUsersContainer: AdminUsersContainer;
 };
 
 const GrantAdminButton = (props: GrantAdminButtonProps): JSX.Element => {
@@ -40,8 +43,9 @@ const GrantAdminButton = (props: GrantAdminButtonProps): JSX.Element => {
 /**
  * Wrapper component for using unstated
  */
-const GrantAdminButtonWrapper: React.ForwardRefExoticComponent<
-  Pick<any, string | number | symbol> & React.RefAttributes<any>
-> = withUnstatedContainers(GrantAdminButton, [AdminUsersContainer]);
+const GrantAdminButtonWrapper = withUnstatedContainers<
+  GrantAdminButtonExternalProps,
+  GrantAdminButtonProps
+>(GrantAdminButton, [AdminUsersContainer]);
 
 export default GrantAdminButtonWrapper;

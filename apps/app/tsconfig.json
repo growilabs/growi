@@ -6,7 +6,6 @@
     "resolveJsonModule": true,
     "types": ["vitest/globals", "@testing-library/jest-dom/vitest"],
 
-    "baseUrl": ".",
     "paths": {
       "~/*": ["./src/*"],
       "^/*": ["./*"]

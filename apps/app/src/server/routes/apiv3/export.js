@@ -1,12 +1,14 @@
+import fs from 'node:fs';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import express from 'express';
 import { body, param } from 'express-validator';
-import fs from 'fs';
 import mongoose from 'mongoose';
 import sanitize from 'sanitize-filename';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { exportService } from '~/server/service/export';
 import loggerFactory from '~/utils/logger';
 
@@ -122,14 +124,14 @@ const router = express.Router();
  */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequired = require('../../middlewares/login-required')(crowi);
-  const adminRequired = require('../../middlewares/admin-required')(crowi);
+  const loginRequired = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
   const { socketIoService } = crowi;
 
-  const activityEvent = crowi.event('activity');
-  const adminEvent = crowi.event('admin');
+  const activityEvent = crowi.events.activity;
+  const adminEvent = crowi.events.admin;
 
   // setup event
   adminEvent.on('onProgressForExport', (data) => {

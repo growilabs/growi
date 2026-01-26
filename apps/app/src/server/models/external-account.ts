@@ -13,6 +13,7 @@ import { NullUsernameToBeRegisteredError } from '~/server/models/errors';
 import loggerFactory from '~/utils/logger';
 
 import { getOrCreateModel } from '../util/mongoose-utils';
+import { UserStatus } from './user/conts';
 
 const logger = loggerFactory('growi:models:external-account');
 
@@ -127,7 +128,7 @@ schema.statics.findOrRegister = function (
           mailToBeRegistered,
           undefined,
           undefined,
-          User.STATUS_ACTIVE,
+          UserStatus.STATUS_ACTIVE,
         );
       })
       .then((newUser) => {

@@ -205,9 +205,9 @@ class PageService implements IPageService {
 
   constructor(crowi: Crowi) {
     this.crowi = crowi;
-    this.pageEvent = crowi.event('page');
-    this.tagEvent = crowi.event('tag');
-    this.activityEvent = crowi.event('activity');
+    this.pageEvent = crowi.events.page;
+    this.tagEvent = crowi.events.tag;
+    this.activityEvent = crowi.events.activity;
     this.pageGrantService = crowi.pageGrantService;
 
     // init
@@ -524,7 +524,7 @@ class PageService implements IPageService {
   }
 
   private shouldUseV4ProcessForRevert(page): boolean {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const isV5Compatible = configManager.getConfig('app:isV5Compatible');
     const isPageRestricted = page.grant === Page.GRANT_RESTRICTED;
@@ -535,7 +535,7 @@ class PageService implements IPageService {
   }
 
   private shouldNormalizeParent(page): boolean {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     return (
       page.grant !== Page.GRANT_RESTRICTED &&
@@ -573,7 +573,7 @@ class PageService implements IPageService {
     /*
      * Common Operation
      */
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const parameters = {
       ip: activityParameters.ip,
@@ -815,7 +815,7 @@ class PageService implements IPageService {
     pageOpId: ObjectIdLike,
     activity?,
   ): Promise<void> {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const exParentId = page.parent;
 
@@ -948,7 +948,7 @@ class PageService implements IPageService {
   }
 
   private async getParentAndforceCreateEmptyTree(originalPage, toPath: string) {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const fromPath = originalPage.path;
     const newParentPath = pathlib.dirname(toPath);
@@ -1085,7 +1085,7 @@ class PageService implements IPageService {
       );
     }
 
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const { updateMetadata, createRedirectPage } = options;
 
@@ -1361,7 +1361,7 @@ class PageService implements IPageService {
       throw new Error('Cannot find or duplicate the empty page');
     }
 
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     if (!isRecursively && page.isEmpty) {
       throw Error('Page not found.');
@@ -1817,7 +1817,7 @@ class PageService implements IPageService {
     oldPagePathPrefix,
     newPagePathPrefix,
   ) {
-    const Page = this.crowi.model('Page');
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const pageIds = pages.map((page) => page._id);
     const revisions = await Revision.find({ pageId: { $in: pageIds } });
@@ -2137,7 +2137,7 @@ class PageService implements IPageService {
   }
 
   private async deleteNonEmptyTarget(page, user) {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
     const newPath = Page.getDeletedPageName(page.path);
 
     const deletedPage = await Page.findByIdAndUpdate(
@@ -2258,7 +2258,7 @@ class PageService implements IPageService {
   }
 
   private async deleteDescendants(pages, user) {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const deletePageOperations: any[] = [];
     const insertPageRedirectOperations: any[] = [];
@@ -2380,7 +2380,7 @@ class PageService implements IPageService {
 
   async deleteCompletelyOperation(pageIds, pagePaths): Promise<void> {
     // Delete Attachments, Revisions, Pages and emit delete
-    const Page = this.crowi.model('Page');
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const { attachmentService } = this.crowi;
     const attachments = await Attachment.find({ page: { $in: pageIds } });
@@ -2945,7 +2945,7 @@ class PageService implements IPageService {
     pageOpId: ObjectIdLike,
     activity?,
   ): Promise<void> {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const descendantsSubscribedSets = new Set();
     await this.revertDeletedDescendantsWithStream(
@@ -3002,7 +3002,7 @@ class PageService implements IPageService {
     newPath: string,
     pageOpId: ObjectIdLike,
   ): Promise<void> {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const newTarget = await Page.findOne({ path: newPath }); // only one page will be found since duplicating to existing path is forbidden
 
@@ -3122,7 +3122,7 @@ class PageService implements IPageService {
     userRelatedGroups: PopulatedGrantedGroup[],
     userRelatedParentGrantedGroups: IGrantedGroup[],
   ): Promise<void> {
-    const Page = this.crowi.model('Page');
+    const Page = mongoose.model<IPage, PageModel>('Page');
     const operations: any = [];
 
     pages.forEach((childPage) => {
@@ -3328,7 +3328,7 @@ class PageService implements IPageService {
     pageIds: ObjectIdLike[] = [],
     user?,
   ): Promise<Record<string, string | null>> {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
     const MAX_LENGTH = 350;
 
     // aggregation options
@@ -3523,7 +3523,7 @@ class PageService implements IPageService {
     pageIds: ObjectIdLike[],
     user,
   ): Promise<void> {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const pages = await Page.findByIdsAndViewer(pageIds, user, null);
 
@@ -3543,7 +3543,7 @@ class PageService implements IPageService {
   }
 
   async normalizeParentByPageIds(pageIds: ObjectIdLike[], user): Promise<void> {
-    const Page = (await mongoose.model('Page')) as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const socket = this.crowi.socketIoService.getDefaultSocket();
 
@@ -3584,7 +3584,7 @@ class PageService implements IPageService {
   }
 
   private async normalizeParentByPage(page, user) {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const {
       path,
@@ -3721,7 +3721,7 @@ class PageService implements IPageService {
         );
       }
 
-      const Page = mongoose.model('Page') as unknown as PageModel;
+      const Page = mongoose.model<IPage, PageModel>('Page');
       const { PageQueryBuilder } = Page;
       const builder = new PageQueryBuilder(Page.findOne());
       builder.addConditionAsOnTree();
@@ -3783,7 +3783,7 @@ class PageService implements IPageService {
     pageOpId: ObjectIdLike,
   ): Promise<number> {
     // Save prevDescendantCount for sub-operation
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
     const { PageQueryBuilder } = Page;
     const builder = new PageQueryBuilder(Page.findOne(), true);
     builder.addConditionAsOnTree();
@@ -3826,7 +3826,7 @@ class PageService implements IPageService {
     pageOpId: ObjectIdLike,
     options: { prevDescendantCount: number },
   ): Promise<void> {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     try {
       // update descendantCount of self and descendant pages first
@@ -3865,7 +3865,7 @@ class PageService implements IPageService {
   }
 
   async _isPagePathIndexUnique() {
-    const Page = this.crowi.model('Page');
+    const Page = mongoose.model<IPage, PageModel>('Page');
     const now = new Date().toString();
     const path = `growi_check_is_path_index_unique_${now}`;
 
@@ -3963,7 +3963,7 @@ class PageService implements IPageService {
     isDuplicateOperation = false,
     shouldEmitProgress = false,
   ): Promise<number> {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const ancestorPaths = paths.flatMap((p) => collectAncestorPaths(p, []));
     // targets' descendants
@@ -4002,7 +4002,7 @@ class PageService implements IPageService {
     publicPathsToNormalize: string[],
     grantFiltersByUser?: { $or: any[] } | null,
   ) {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const andFilter: any = {
       $and: [
@@ -4061,7 +4061,7 @@ class PageService implements IPageService {
       ? this.crowi.socketIoService.getAdminSocket()
       : null;
 
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
     const { PageQueryBuilder } = Page;
 
     // Build filter
@@ -4305,7 +4305,7 @@ class PageService implements IPageService {
       throw Error('user is required');
     }
 
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
     const { PageQueryBuilder } = Page;
 
     const builder = new PageQueryBuilder(Page.count(), false);
@@ -4428,7 +4428,7 @@ class PageService implements IPageService {
   ): any[] {
     const aggregationPipeline: any[] = [];
 
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     // -- Filter by paths
     aggregationPipeline.push({ $match: { path: { $in: paths } } });
@@ -4458,7 +4458,7 @@ class PageService implements IPageService {
     onlyMigratedAsExistingPages = true,
     andFilter?,
   ): Promise<any[]> {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const pipeline = this.buildBasePipelineToCreateEmptyPages(
       paths,
@@ -4485,7 +4485,7 @@ class PageService implements IPageService {
   }
 
   private async connectPageTree(path: string): Promise<void> {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
     const { PageQueryBuilder } = Page;
 
     const ancestorPaths = collectAncestorPaths(path);
@@ -4632,7 +4632,7 @@ class PageService implements IPageService {
     path: string,
     user?,
   ): void {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     pageDocument.path = path;
     pageDocument.creator = user;
@@ -4681,7 +4681,7 @@ class PageService implements IPageService {
     user?,
     options?: IOptionsForCreate,
   ): Promise<boolean> {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     // Operatability validation
     const canOperate = await this.crowi.pageOperationService.canOperate(
@@ -5021,7 +5021,7 @@ class PageService implements IPageService {
     body: string,
     options: IOptionsForCreate & { grantUserIds?: ObjectIdLike[] },
   ): Promise<PageDocument> {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     const isV5Compatible = configManager.getConfig('app:isV5Compatible');
     if (!isV5Compatible) {
@@ -5506,7 +5506,7 @@ class PageService implements IPageService {
     user: IUserHasId,
     userGroups = null,
   ): Promise<HydratedDocument<IPage>[]> {
-    const Page = mongoose.model('Page') as unknown as PageModel;
+    const Page = mongoose.model<IPage, PageModel>('Page');
 
     // https://regex101.com/r/KYZWls/1
     // ex. /trash/.*

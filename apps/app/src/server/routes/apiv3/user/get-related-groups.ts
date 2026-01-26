@@ -5,24 +5,21 @@ import type { Request, RequestHandler } from 'express';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:user:get-related-groups');
 
-type GetRelatedGroupsHandlerFactory = (crowi: Crowi) => RequestHandler[];
-
 interface Req extends Request {
   user: IUserHasId;
 }
 
-export const getRelatedGroupsHandlerFactory: GetRelatedGroupsHandlerFactory = (
-  crowi,
-) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
+export const getRelatedGroupsHandlerFactory = (
+  crowi: Crowi,
+): RequestHandler[] => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   return [
     accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }),

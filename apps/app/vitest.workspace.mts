@@ -7,7 +7,7 @@ const configShared = defineConfig({
   test: {
     clearMocks: true,
     globals: true,
-    exclude: ['test/**', 'test-with-vite/**', 'playwright/**'],
+    exclude: ['playwright/**'],
   },
 });
 
@@ -23,11 +23,33 @@ export default defineWorkspace([
 
   // integration test
   mergeConfig(configShared, {
+    resolve: {
+      // Prefer require (CJS) for server-side packages
+      conditions: ['require', 'node', 'default'],
+    },
     test: {
       name: 'app-integration',
       environment: 'node',
       include: ['**/*.integ.ts'],
-      setupFiles: ['./test-with-vite/setup/mongoms.ts'],
+      setupFiles: [
+        './test/setup/migrate-mongo.ts',
+        './test/setup/mongo/index.ts',
+      ],
+      deps: {
+        // Transform inline modules (allows ESM in require context)
+        interopDefault: true,
+      },
+      server: {
+        deps: {
+          // Inline workspace packages that use CJS format
+          inline: [
+            '@growi/remark-attachment-refs',
+            '@growi/remark-drawio',
+            '@growi/remark-lsx',
+            /src\/server\/events/,
+          ],
+        },
+      },
     },
   }),
 
@@ -38,7 +60,7 @@ export default defineWorkspace([
       name: 'app-components',
       environment: 'happy-dom',
       include: ['**/*.spec.{tsx,jsx}'],
-      setupFiles: ['./test-with-vite/setup/jest-dom.ts'],
+      setupFiles: ['./test/setup/jest-dom.ts'],
     },
   }),
 ]);

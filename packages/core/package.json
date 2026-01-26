@@ -1,6 +1,6 @@
 {
   "name": "@growi/core",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "GROWI Core Libraries",
   "license": "MIT",
   "keywords": [
@@ -25,6 +25,10 @@
     "./dist/interfaces": {
       "import": "./dist/interfaces/index.js",
       "require": "./dist/interfaces/index.cjs"
+    },
+    "./dist/interfaces/server": {
+      "import": "./dist/interfaces/server/index.js",
+      "require": "./dist/interfaces/server/index.cjs"
     },
     "./dist/models": {
       "import": "./dist/models/index.js",
@@ -60,8 +64,8 @@
     "clean": "shx rm -rf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
-    "lint:js": "biome check",
-    "lint:typecheck": "vue-tsc --noEmit",
+    "lint:biome": "biome check",
+    "lint:typecheck": "tsgo --noEmit",
     "lint": "npm-run-all -p lint:*",
     "test": "vitest run --coverage"
   },
@@ -73,6 +77,7 @@
     "escape-string-regexp": "^4.0.0"
   },
   "devDependencies": {
+    "@types/express": "^4",
     "mongoose": "^6.13.6",
     "socket.io-client": "^4.7.5",
     "swr": "^2.2.2"

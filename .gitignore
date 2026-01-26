@@ -37,7 +37,7 @@ yarn-error.log*
 
 # IDE, dev #
 .idea
-.claude
+**/.claude/settings.local.json
 *.orig
 *.code-workspace
 *.timestamp-*.mjs

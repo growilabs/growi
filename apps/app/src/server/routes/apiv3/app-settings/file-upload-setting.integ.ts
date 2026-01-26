@@ -1,7 +1,6 @@
 import { toNonBlankString } from '@growi/core/dist/interfaces';
-import type { Request } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
-import mockRequire from 'mock-require';
 import request from 'supertest';
 import { mock } from 'vitest-mock-extended';
 
@@ -10,35 +9,42 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import { configManager } from '~/server/service/config-manager';
 import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
 
-// Mock middlewares using mock-require BEFORE importing the router
 const mockActivityId = '507f1f77bcf86cd799439011';
 
-// Mock the dependencies that login-required.js and admin-required.js need
-mockRequire.stopAll();
+// Passthrough middleware for testing - skips authentication
+const passthroughMiddleware = (
+  _req: Request,
+  _res: Response,
+  next: NextFunction,
+) => next();
 
-mockRequire('~/server/middlewares/access-token-parser', {
-  accessTokenParser:
-    () => (_req: Request, _res: ApiV3Response, next: () => void) =>
-      next(),
-});
+// Add activity middleware mock - sets activity in res.locals
+const mockAddActivityMiddleware = (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  res.locals = res.locals || {};
+  res.locals.activity = { _id: mockActivityId };
+  next();
+};
 
-mockRequire(
-  '../../../middlewares/login-required',
-  () => (_req: Request, _res: ApiV3Response, next: () => void) => next(),
-);
-mockRequire(
-  '../../../middlewares/admin-required',
-  () => (_req: Request, _res: ApiV3Response, next: () => void) => next(),
-);
+// Mock middlewares using vi.mock (hoisted to top)
+vi.mock('~/server/middlewares/access-token-parser', () => ({
+  accessTokenParser: () => passthroughMiddleware,
+}));
 
-mockRequire('../../../middlewares/add-activity', {
-  generateAddActivityMiddleware:
-    () => (_req: Request, res: ApiV3Response, next: () => void) => {
-      res.locals = res.locals || {};
-      res.locals.activity = { _id: mockActivityId };
-      next();
-    },
-});
+vi.mock('~/server/middlewares/login-required', () => ({
+  default: () => passthroughMiddleware,
+}));
+
+vi.mock('~/server/middlewares/admin-required', () => ({
+  default: () => passthroughMiddleware,
+}));
+
+vi.mock('../../../middlewares/add-activity', () => ({
+  generateAddActivityMiddleware: () => mockAddActivityMiddleware,
+}));
 
 describe('file-upload-setting route', () => {
   let app: express.Application;
@@ -52,9 +58,11 @@ describe('file-upload-setting route', () => {
 
     // Mock crowi instance
     crowiMock = mock<Crowi>({
-      event: vi.fn().mockReturnValue({
-        emit: vi.fn(),
-      }),
+      events: {
+        activity: {
+          emit: vi.fn(),
+        },
+      },
       setUpFileUpload: vi.fn().mockResolvedValue(undefined),
       fileUploaderSwitchService: {
         publishUpdatedMessage: vi.fn(),
@@ -82,8 +90,8 @@ describe('file-upload-setting route', () => {
     app.use('/', fileUploadSettingRouter);
   });
 
-  afterAll(() => {
-    mockRequire.stopAll();
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
   it('should update file upload type to local', async () => {

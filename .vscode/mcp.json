@@ -13,7 +13,10 @@
         "serena",
         "start-mcp-server",
         "--context",
-        "ide-assistant"
+        "ide",
+        "--project",
+        ".",
+        "--enable-web-dashboard=false"
       ]
     }
   }

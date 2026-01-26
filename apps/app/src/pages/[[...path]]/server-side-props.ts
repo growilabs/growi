@@ -53,7 +53,7 @@ function emitPageSeenEvent(
     return;
   }
 
-  const pageEvent = crowi.event('page');
+  const pageEvent = crowi.events.page;
   pageEvent.emit('seen', pageId, user);
 }
 

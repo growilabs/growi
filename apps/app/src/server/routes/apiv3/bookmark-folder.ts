@@ -4,8 +4,10 @@ import { body } from 'express-validator';
 import type { Types } from 'mongoose';
 
 import type { BookmarkFolderItems } from '~/interfaces/bookmark-info';
+import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { InvalidParentBookmarkFolderError } from '~/server/models/errors';
 import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer';
 import loggerFactory from '~/utils/logger';
@@ -132,11 +134,8 @@ const validator = {
   ],
 };
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(
-    crowi,
-  );
+module.exports = (crowi: Crowi) => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   /**
    * @swagger

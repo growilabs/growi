@@ -14,7 +14,7 @@ module.exports = (crowi, app) => {
   const passport = require('passport');
   const passportService = crowi.passportService;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const ApiResponse = require('../util/apiResponse');
 

@@ -3,6 +3,7 @@ import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
@@ -25,10 +26,7 @@ const generateActivityParameters = (req: CrowiRequest) => {
 };
 
 export const downloadRouterFactory = (crowi: Crowi): Router => {
-  const loginRequired = require('../../middlewares/login-required')(
-    crowi,
-    true,
-  );
+  const loginRequired = loginRequiredFactory(crowi, true);
 
   const router = express.Router();
 
