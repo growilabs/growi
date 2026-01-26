@@ -5,6 +5,7 @@ import { useTranslation } from 'next-i18next';
 
 import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript';
 import { useSetSearchPage } from '~/states/context';
+import { useHydratePageAtoms } from '~/states/page/hydrate';
 
 import type { NextPageWithLayout } from '../_app.page';
 import type { BasicLayoutConfigurationProps } from '../basic-layout-page';
@@ -40,7 +41,7 @@ const SearchResultPage: NextPageWithLayout<Props> = (props: Props) => {
 
   // clear the cache for the current page
   //  in order to fix https://redmine.weseek.co.jp/issues/135811
-  // useHydratePageAtoms(undefined);
+  useHydratePageAtoms(undefined, undefined);
   // useCurrentPathname('/_search');
 
   // Hydrate server-side data
