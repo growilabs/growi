@@ -39,6 +39,11 @@ export default class AdminAppContainer extends Container {
       sesAccessKeyId: '',
       sesSecretAccessKey: '',
 
+      oauth2ClientId: '',
+      oauth2ClientSecret: '',
+      oauth2RefreshToken: '',
+      oauth2User: '',
+
       isMaintenanceMode: false,
     };
   }
@@ -77,6 +82,11 @@ export default class AdminAppContainer extends Container {
       smtpPassword: appSettingsParams.smtpPassword,
       sesAccessKeyId: appSettingsParams.sesAccessKeyId,
       sesSecretAccessKey: appSettingsParams.sesSecretAccessKey,
+
+      oauth2ClientId: appSettingsParams.oauth2ClientId,
+      oauth2ClientSecret: appSettingsParams.oauth2ClientSecret,
+      oauth2RefreshToken: appSettingsParams.oauth2RefreshToken,
+      oauth2User: appSettingsParams.oauth2User,
 
       isMaintenanceMode: appSettingsParams.isMaintenanceMode,
     });
@@ -188,6 +198,34 @@ export default class AdminAppContainer extends Container {
   }
 
   /**
+   * Change oauth2ClientId
+   */
+  changeOAuth2ClientId(oauth2ClientId) {
+    this.setState({ oauth2ClientId });
+  }
+
+  /**
+   * Change oauth2ClientSecret
+   */
+  changeOAuth2ClientSecret(oauth2ClientSecret) {
+    this.setState({ oauth2ClientSecret });
+  }
+
+  /**
+   * Change oauth2RefreshToken
+   */
+  changeOAuth2RefreshToken(oauth2RefreshToken) {
+    this.setState({ oauth2RefreshToken });
+  }
+
+  /**
+   * Change oauth2User
+   */
+  changeOAuth2User(oauth2User) {
+    this.setState({ oauth2User });
+  }
+
+  /**
    * Update app setting
    * @memberOf AdminAppContainer
    * @return {Array} Appearance
@@ -226,6 +264,9 @@ export default class AdminAppContainer extends Container {
     if (this.state.transmissionMethod === 'smtp') {
       return this.updateSmtpSetting();
     }
+    if (this.state.transmissionMethod === 'oauth2') {
+      return this.updateOAuth2Setting();
+    }
     return this.updateSesSetting();
   }
 
@@ -259,6 +300,25 @@ export default class AdminAppContainer extends Container {
       transmissionMethod: this.state.transmissionMethod,
       sesAccessKeyId: this.state.sesAccessKeyId,
       sesSecretAccessKey: this.state.sesSecretAccessKey,
+    });
+    const { mailSettingParams } = response.data;
+    this.setState({ isMailerSetup: mailSettingParams.isMailerSetup });
+    return mailSettingParams;
+  }
+
+  /**
+   * Update OAuth 2.0 setting
+   * @memberOf AdminAppContainer
+   * @return {Array} Appearance
+   */
+  async updateOAuth2Setting() {
+    const response = await apiv3Put('/app-settings/oauth2-setting', {
+      fromAddress: this.state.fromAddress,
+      transmissionMethod: this.state.transmissionMethod,
+      oauth2ClientId: this.state.oauth2ClientId,
+      oauth2ClientSecret: this.state.oauth2ClientSecret,
+      oauth2RefreshToken: this.state.oauth2RefreshToken,
+      oauth2User: this.state.oauth2User,
     });
     const { mailSettingParams } = response.data;
     this.setState({ isMailerSetup: mailSettingParams.isMailerSetup });
