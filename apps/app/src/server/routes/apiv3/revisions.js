@@ -1,6 +1,7 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import { isUserPage } from '@growi/core/dist/utils/page-path-utils';
 import express from 'express';
 
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -165,6 +166,17 @@ module.exports = (crowi) => {
       try {
         const page = await Page.findOne({ _id: pageId });
 
+        const disabledUserPages = await crowi.configManager.getConfig(
+          'security:disableUserPages',
+        );
+
+        if (disabledUserPages && isUserPage(page.path)) {
+          return res.apiv3Err(
+            new ErrorV3('The user page is disabled.', 'forbidden-user-page'),
+            403,
+          );
+        }
+
         const appliedAt = await getAppliedAtForRevisionFilter();
 
         const queryOpts = {
@@ -268,6 +280,24 @@ module.exports = (crowi) => {
       }
 
       try {
+        const page = Page.findOne({ _id: pageId });
+        const disabledUserPages = crowi.configManager.getConfig(
+          'security:disableUserPages',
+        );
+
+        if (page == null) {
+          return res.apiv3Err(
+            new ErrorV3('Page not found', 'notfound-page'),
+            404,
+          );
+        }
+
+        if (disabledUserPages && isUserPage(page.path)) {
+          return res.apiv3Err(
+            new ErrorV3('The user page is disabled.', 'forbidden-user-page'),
+            403,
+          );
+        }
         const revision = await Revision.findById(revisionId).populate('author');
 
         if (revision.author != null && revision.author instanceof User) {
