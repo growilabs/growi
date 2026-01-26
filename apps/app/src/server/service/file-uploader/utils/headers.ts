@@ -12,7 +12,6 @@ type ContentHeader = ExpressHttpHeader<ContentHeaderField>;
 
 const determineDisposition = (
     fileFormat: string,
-    opts?: { inline?: boolean },
 ): 'inline' | 'attachment' => {
   const inlineMimeTypes = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes').inlineMimeTypes;
   const attachmentMimeTypes = configManager.getConfig('attachments:contentDisposition:attachmentMimeTypes').attachmentMimeTypes;
@@ -29,7 +28,7 @@ const determineDisposition = (
   if (defaultSetting) {
     return defaultSetting;
   }
-  return opts?.inline ? 'inline' : 'attachment';
+  return 'attachment';
 };
 
 /**
