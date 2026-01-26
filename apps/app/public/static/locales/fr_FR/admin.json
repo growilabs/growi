@@ -442,6 +442,18 @@
       "tag_names": "Nom de tags",
       "tag_attributes": "Attributs de tags",
       "import_recommended": "Importer {{target}}"
+    },
+    "content-disposition_header": "Paramètres des types MIME Content-Disposition",
+    "content-disposition_options": {
+      "add_header": "Ajouter des types MIME",
+      "note": "Note : L'ajout d'un type MIME le supprimera automatiquement de l'autre liste.",
+      "inline_header": "Types MIME Inline",
+      "attachment_header": "Types MIME en pièce jointe",
+      "inline_button": "Inline",
+      "attachment_button": "Pièce jointe",
+      "no_inline": "Aucun type inline défini.",
+      "no_attachment": "Aucun type de pièce jointe défini.",
+      "remove_button": "Supprimer"
     }
   },
   "customize_settings": {

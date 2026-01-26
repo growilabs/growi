@@ -6,7 +6,7 @@ import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
 
 import { apiv3Get, apiv3Put } from '../util/apiv3-client';
 
-interface ContentDispositionSettings {
+export interface ContentDispositionSettings {
   inlineMimeTypes: string[];
   attachmentMimeTypes: string[];
 }
@@ -49,55 +49,41 @@ export const useSWRMUTxContentDispositionSettings = (): SWRMutationResponse<
 };
 
 export const useContentDisposition = (): {
-  setInline: (mimeType: string) => Promise<void>;
-  setAttachment: (mimeType: string) => Promise<void>;
+  currentSettings: ContentDispositionSettings | undefined;
+  isLoading: boolean;
+  isUpdating: boolean;
+  updateSettings: (newSettings: ContentDispositionSettings) => Promise<ContentDispositionSettings>;
 } => {
-  const { data, mutate } = useSWRxContentDispositionSettings();
-  const { trigger } = useSWRMUTxContentDispositionSettings();
+  const {
+    data, isLoading, mutate,
+  } = useSWRxContentDispositionSettings();
+  const { trigger, isMutating } = useSWRMUTxContentDispositionSettings();
 
   const inlineMimeTypesStr = data?.inlineMimeTypes?.join(',');
   const attachmentMimeTypesStr = data?.attachmentMimeTypes?.join(',');
+
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally using array contents instead of data object reference
   const memoizedData = useMemo(() => data, [inlineMimeTypesStr, attachmentMimeTypesStr]);
+  const currentSettings = memoizedData;
 
-  const setInline = useCallback(async(mimeType: string): Promise<void> => {
-    if (!memoizedData) return;
+  const updateSettings = useCallback(async(newSettings: ContentDispositionSettings): Promise<ContentDispositionSettings> => {
 
-    const newInlineMimeTypes = [...memoizedData.inlineMimeTypes];
-    const newAttachmentMimeTypes = memoizedData.attachmentMimeTypes.filter(m => m !== mimeType);
+    const request: ContentDispositionUpdateRequest = {
+      newInlineMimeTypes: newSettings.inlineMimeTypes,
+      newAttachmentMimeTypes: newSettings.attachmentMimeTypes,
+    };
 
-    if (!newInlineMimeTypes.includes(mimeType)) {
-      newInlineMimeTypes.push(mimeType);
-    }
+    const updatedData = await trigger(request);
+    mutate(updatedData, { revalidate: true });
 
-    await trigger({
-      newInlineMimeTypes,
-      newAttachmentMimeTypes,
-    });
+    return updatedData;
+  }, [trigger, mutate]);
 
-    mutate();
-  }, [memoizedData, trigger, mutate]);
-
-  const setAttachment = useCallback(async(mimeType: string): Promise<void> => {
-    if (!memoizedData) return;
-
-    const newInlineMimeTypes = memoizedData.inlineMimeTypes.filter(m => m !== mimeType);
-    const newAttachmentMimeTypes = [...memoizedData.attachmentMimeTypes];
-
-    if (!newAttachmentMimeTypes.includes(mimeType)) {
-      newAttachmentMimeTypes.push(mimeType);
-    }
-
-    await trigger({
-      newInlineMimeTypes,
-      newAttachmentMimeTypes,
-    });
-
-    mutate();
-  }, [memoizedData, trigger, mutate]);
 
   return {
-    setInline,
-    setAttachment,
+    currentSettings,
+    isLoading,
+    isUpdating: isMutating,
+    updateSettings,
   };
 };

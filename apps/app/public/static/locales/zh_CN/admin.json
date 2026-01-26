@@ -451,6 +451,18 @@
       "tag_names": "标记名",
       "tag_attributes": "标记属性",
       "import_recommended": "导入建议 {{target}}"
+    },
+    "content-disposition_header": "Content-Disposition MIME 类型设置",
+    "content-disposition_options": {
+      "add_header": "添加 MIME 类型",
+      "note": "注意：添加 MIME 类型将自动从另一个列表中将其删除。",
+      "inline_header": "内联 (Inline) MIME 类型",
+      "attachment_header": "附件 (Attachment) MIME 类型",
+      "inline_button": "内联",
+      "attachment_button": "附件",
+      "no_inline": "未设置内联类型。",
+      "no_attachment": "未设置附件类型。",
+      "remove_button": "移除"
     }
   },
   "customize_settings": {
