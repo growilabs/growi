@@ -668,10 +668,15 @@ module.exports = (crowi) => {
         includeTrashed = true;
       }
 
+      const disableUserPages = configManager.getConfig(
+        'security:disableUserPages',
+      );
+
       const queryOptions = {
         offset,
         limit,
         includeTrashed,
+        disableUserPages,
       };
 
       try {
