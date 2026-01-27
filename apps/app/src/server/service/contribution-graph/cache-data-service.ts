@@ -36,7 +36,7 @@ export function cacheIsFresh(cache: ContributionGraphDocument | null): boolean {
 export async function setContributionCache(
   userId: string,
   cache: ContributionGraphDocument,
-) {
+): Promise<ContributionGraphDocument | null> {
   try {
     if (!userId || !cache) {
       throw new Error(
@@ -66,4 +66,22 @@ export async function setContributionCache(
   }
 }
 
-export function rotatePermanentWeeks() {}
+export async function rotatePermanentWeeks(
+  userId: string,
+  oldestWeekId: string,
+): Promise<ContributionGraphDocument | null> {
+  const updatedCache = await ContributionCache.findOneAndUpdate(
+    { userId },
+    {
+      $unset: {
+        [`permanentWeeks.${oldestWeekId}`]: '',
+      },
+    },
+    {
+      new: true,
+      runValidators: true,
+    },
+  ).exec();
+
+  return updatedCache;
+}
