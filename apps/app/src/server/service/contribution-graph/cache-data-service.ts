@@ -16,7 +16,7 @@ export async function getContributionCache(
       userId,
     }).exec();
     return contributionCache;
-  } catch (error) {
+  } catch (_error) {
     throw new Error(
       'Internal Server Error: Could not retrieve contribution data',
     );
