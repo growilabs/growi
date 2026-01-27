@@ -17,7 +17,7 @@ export async function getContributionCache(
     }).exec();
 
     return contributionCache;
-  } catch (_error) {
+  } catch {
     throw new Error(
       'Internal Server Error: Could not retrieve contribution data',
     );
@@ -61,7 +61,7 @@ export async function setContributionCache(
     ).exec();
 
     return updatedCache;
-  } catch (_error) {
+  } catch {
     throw new Error('Internal Server Error: Could not set contribution cache.');
   }
 }
