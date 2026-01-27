@@ -30,12 +30,10 @@ export function cacheIsFresh(cache: ContributionGraphDocument | null): boolean {
   const lastUpdatedDate = new Date(cache.lastUpdated);
   const todaysDate = getUTCMidnightToday();
 
-  if (lastUpdatedDate <= todaysDate) return false;
-
-  return true;
+  return lastUpdatedDate >= todaysDate;
 }
 
-export function setContributionCache(
+export async function setContributionCache(
   userId: string,
   cache: ContributionGraphDocument,
 ) {
@@ -46,7 +44,7 @@ export function setContributionCache(
       );
     }
 
-    const updatedCache = ContributionCache.findOneAndUpdate(
+    const updatedCache = await ContributionCache.findOneAndUpdate(
       { userId },
       {
         $set: {
