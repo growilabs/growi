@@ -8,7 +8,7 @@ import {
   isIncludeAiMenthion,
   removeAiMenthion,
 } from '~/features/search/utils/ai';
-import { removeUserPages } from '~/features/search/utils/disable-user-pages';
+import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
   IFormattedSearchResult,
@@ -55,7 +55,7 @@ const normalizeQueryString = (
 ): string => {
   let queryString = _queryString.trim();
   queryString = removeAiMenthion(queryString).replace(/\s+/g, ' ');
-  queryString = removeUserPages(queryString, disableUserPages);
+  queryString = excludeUserPagesFromQuery(queryString, disableUserPages);
 
   return queryString;
 };
