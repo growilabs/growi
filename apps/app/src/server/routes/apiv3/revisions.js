@@ -166,7 +166,7 @@ module.exports = (crowi) => {
       try {
         const page = await Page.findOne({ _id: pageId });
 
-        const disabledUserPages = await crowi.configManager.getConfig(
+        const disabledUserPages = crowi.configManager.getConfig(
           'security:disableUserPages',
         );
 
@@ -280,7 +280,7 @@ module.exports = (crowi) => {
       }
 
       try {
-        const page = Page.findOne({ _id: pageId });
+        const page = await Page.findOne({ _id: pageId });
         const disabledUserPages = crowi.configManager.getConfig(
           'security:disableUserPages',
         );
