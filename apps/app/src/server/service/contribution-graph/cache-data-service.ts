@@ -1,8 +1,19 @@
+import type { UpdateQuery } from 'mongoose';
+
+import type { IContributionDay } from '~/interfaces/contribution-graph';
+
 import {
   ContributionCache,
   type ContributionGraphDocument,
 } from './models/contribution-cache-model';
 import { getUTCMidnightToday } from './utils/contribution-graph-utils';
+
+interface SetContributionCachePayload {
+  userId: string;
+  newCurrentWeek: IContributionDay[];
+  weekToFreeze?: { id: string; data: IContributionDay[] };
+  weekIdToDelete?: string;
+}
 
 export async function getContributionCache(
   userId: string,
@@ -33,30 +44,48 @@ export function cacheIsFresh(cache: ContributionGraphDocument | null): boolean {
   return lastUpdatedDate >= todaysDate;
 }
 
-export async function setContributionCache(
-  userId: string,
-  cache: ContributionGraphDocument,
+/**
+ * Updates and rotates the cache
+ *
+ * @returns - Updated cache.
+ */
+export async function updateContributionCache(
+  setContributionCachePayload: SetContributionCachePayload,
 ): Promise<ContributionGraphDocument | null> {
   try {
-    if (!userId || !cache) {
+    const { userId, newCurrentWeek, weekToFreeze, weekIdToDelete } =
+      setContributionCachePayload;
+
+    if (!userId || !newCurrentWeek) {
       throw new Error(
         'UserId and new contribution cache are required to update contribution cache',
       );
     }
 
+    const updateQuery: UpdateQuery<ContributionGraphDocument> = {
+      $set: {
+        currentWeekData: newCurrentWeek,
+        lastUpdated: new Date(),
+      },
+    };
+
+    if (weekToFreeze && updateQuery.$set) {
+      updateQuery.$set[`permanentWeeks.${weekToFreeze.id}`] = weekToFreeze.data;
+    }
+
+    const deleteQuery = weekIdToDelete
+      ? { [`permanentWeeks.${weekIdToDelete}`]: '' }
+      : {};
+
     const updatedCache = await ContributionCache.findOneAndUpdate(
       { userId },
       {
-        $set: {
-          currentWeekData: cache.currentWeekData,
-          permanentWeeks: cache.permanentWeeks,
-          lastUpdated: cache.lastUpdated,
-        },
+        ...updateQuery,
+        ...(weekIdToDelete && { $unset: deleteQuery }),
       },
       {
         new: true,
         upsert: true,
-        runValidators: true,
       },
     ).exec();
 
@@ -64,24 +93,4 @@ export async function setContributionCache(
   } catch {
     throw new Error('Internal Server Error: Could not set contribution cache.');
   }
-}
-
-export async function rotatePermanentWeeks(
-  userId: string,
-  oldestWeekId: string,
-): Promise<ContributionGraphDocument | null> {
-  const updatedCache = await ContributionCache.findOneAndUpdate(
-    { userId },
-    {
-      $unset: {
-        [`permanentWeeks.${oldestWeekId}`]: '',
-      },
-    },
-    {
-      new: true,
-      runValidators: true,
-    },
-  ).exec();
-
-  return updatedCache;
 }
