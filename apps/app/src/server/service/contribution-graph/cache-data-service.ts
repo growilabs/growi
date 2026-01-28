@@ -1,4 +1,5 @@
 import type { UpdateQuery } from 'mongoose';
+import mongoose from 'mongoose';
 
 import type { IContributionDay } from '~/interfaces/contribution-graph';
 
@@ -21,8 +22,8 @@ export async function getContributionCache(
   userId: string,
 ): Promise<ContributionGraphDocument | null> {
   try {
-    if (!userId) {
-      throw new Error('UserId is required to fetch contribution cache');
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return null;
     }
 
     const contributionCache = await ContributionCache.findOne({
@@ -43,10 +44,10 @@ export async function getContributionCache(
 export function cacheIsFresh(lastUpdated: Date | string | number): boolean {
   if (!lastUpdated) return false;
 
-  const lastUpdatedTime = new Date(lastUpdated).getTime();
+  const lastUpdatedDate = new Date(lastUpdated).getTime();
   const todaysDate = getUTCMidnightToday().getTime();
 
-  return lastUpdatedTime >= todaysDate;
+  return lastUpdatedDate >= todaysDate;
 }
 
 /**
