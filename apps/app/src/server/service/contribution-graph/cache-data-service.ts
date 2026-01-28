@@ -11,9 +11,11 @@ import { getUTCMidnightToday } from './utils/contribution-graph-utils';
 interface SetContributionCachePayload {
   userId: string;
   newCurrentWeek: IContributionDay[];
-  weekToFreeze?: { id: string; data: IContributionDay[] };
-  weekIdToDelete?: string;
+  weeksToFreeze?: { id: string; data: IContributionDay[] }[];
+  weekIdsToDelete?: string[];
 }
+
+type SetFields = IContributionDay[] | Date;
 
 export async function getContributionCache(
   userId: string,
@@ -35,6 +37,9 @@ export async function getContributionCache(
   }
 }
 
+/**
+ * Checks if cache is newer than 00:00 today.
+ */
 export function cacheIsFresh(cache: ContributionGraphDocument | null): boolean {
   if (!cache || !cache.lastUpdated) return false;
 
@@ -53,39 +58,47 @@ export async function updateContributionCache(
   setContributionCachePayload: SetContributionCachePayload,
 ): Promise<ContributionGraphDocument | null> {
   try {
-    const { userId, newCurrentWeek, weekToFreeze, weekIdToDelete } =
+    const { userId, newCurrentWeek, weeksToFreeze, weekIdsToDelete } =
       setContributionCachePayload;
 
     if (!userId || !newCurrentWeek) {
       throw new Error(
-        'UserId and new contribution cache are required to update contribution cache',
+        'UserId and current week data are required when updating contribution cache.',
       );
     }
 
-    const updateQuery: UpdateQuery<ContributionGraphDocument> = {
-      $set: {
-        currentWeekData: newCurrentWeek,
-        lastUpdated: new Date(),
-      },
+    const $set: Record<string, SetFields> = {
+      currentWeekData: newCurrentWeek,
+      lastUpdated: new Date(),
     };
 
-    if (weekToFreeze && updateQuery.$set) {
-      updateQuery.$set[`permanentWeeks.${weekToFreeze.id}`] = weekToFreeze.data;
+    const $unset: Record<string, string> = {};
+
+    if (weeksToFreeze && weeksToFreeze.length > 0) {
+      for (const week of weeksToFreeze) {
+        $set[`permanentWeeks.${week.id}`] = week.data;
+      }
     }
 
-    const deleteQuery = weekIdToDelete
-      ? { [`permanentWeeks.${weekIdToDelete}`]: '' }
-      : {};
+    if (weekIdsToDelete && weekIdsToDelete.length > 0) {
+      for (const id of weekIdsToDelete) {
+        $unset[`permanentWeeks.${id}`] = '';
+      }
+    }
+
+    const updateQuery: UpdateQuery<ContributionGraphDocument> = { $set };
+
+    if (Object.keys($unset).length > 0) {
+      updateQuery.$unset = $unset;
+    }
 
     const updatedCache = await ContributionCache.findOneAndUpdate(
       { userId },
-      {
-        ...updateQuery,
-        ...(weekIdToDelete && { $unset: deleteQuery }),
-      },
+      updateQuery,
       {
         new: true,
         upsert: true,
+        runValidators: true,
       },
     ).exec();
 
