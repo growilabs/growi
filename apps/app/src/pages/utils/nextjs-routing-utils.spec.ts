@@ -275,5 +275,57 @@ describe('nextjs-routing-utils', () => {
 
       expect(result).toBe('initial');
     });
+
+    describe('when previousRoutingPage is undefined', () => {
+      it('should return INITIAL when request is not CSR', () => {
+        const context = createMockContext(false);
+
+        const result = detectNextjsRoutingType(context);
+
+        expect(result).toBe('initial');
+      });
+
+      it('should return FROM_OUTSIDE when CSR and no cookie exists', () => {
+        const context = createMockContext(true); // No cookie value
+
+        const result = detectNextjsRoutingType(context);
+
+        expect(result).toBe('from-outside');
+      });
+
+      it('should return FROM_OUTSIDE when CSR and cookie exists', () => {
+        const context = createMockContext(true, '/some-page');
+
+        const result = detectNextjsRoutingType(context);
+
+        expect(result).toBe('from-outside');
+      });
+
+      it('should return FROM_OUTSIDE when CSR and cookie is empty string', () => {
+        const context = createMockContext(true, '');
+
+        const result = detectNextjsRoutingType(context);
+
+        expect(result).toBe('from-outside');
+      });
+    });
+
+    describe('when both cookie and previousRoutingPage are undefined/null', () => {
+      it('should return INITIAL when request is not CSR and both are missing', () => {
+        const context = createMockContext(false);
+
+        const result = detectNextjsRoutingType(context);
+
+        expect(result).toBe('initial');
+      });
+
+      it('should return FROM_OUTSIDE when CSR and both are missing', () => {
+        const context = createMockContext(true); // No cookie
+
+        const result = detectNextjsRoutingType(context);
+
+        expect(result).toBe('from-outside');
+      });
+    });
   });
 });
