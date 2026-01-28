@@ -40,13 +40,13 @@ export async function getContributionCache(
 /**
  * Checks if cache is newer than 00:00 today.
  */
-export function cacheIsFresh(cache: ContributionGraphDocument | null): boolean {
-  if (!cache || !cache.lastUpdated) return false;
+export function cacheIsFresh(lastUpdated: Date | string | number): boolean {
+  if (!lastUpdated) return false;
 
-  const lastUpdatedDate = new Date(cache.lastUpdated);
-  const todaysDate = getUTCMidnightToday();
+  const lastUpdatedTime = new Date(lastUpdated).getTime();
+  const todaysDate = getUTCMidnightToday().getTime();
 
-  return lastUpdatedDate >= todaysDate;
+  return lastUpdatedTime >= todaysDate;
 }
 
 /**
