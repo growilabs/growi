@@ -8,7 +8,7 @@ import {
 } from './models/contribution-cache-model';
 import { getUTCMidnightToday } from './utils/contribution-graph-utils';
 
-interface SetContributionCachePayload {
+export interface SetContributionCachePayload {
   userId: string;
   newCurrentWeek: IContributionDay[];
   weeksToFreeze?: { id: string; data: IContributionDay[] }[];
