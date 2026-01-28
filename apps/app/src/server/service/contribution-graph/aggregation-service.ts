@@ -1,10 +1,9 @@
-import type { PipelineStage, Aggregate } from 'mongoose';
+import type { Aggregate, PipelineStage } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { getUTCMidnightToday } from '~/features/contribution-graph/utils/contribution-graph-utils';
 import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
-
+import { getUTCMidnightToday } from '~/server/service/contribution-graph/utils/contribution-graph-utils';
 
 export interface PipelineParams {
   userId: string;
@@ -12,7 +11,6 @@ export interface PipelineParams {
 }
 
 export class ContributionAggregationService {
-
   public runAggregationPipeline(params: PipelineParams): Aggregate<any[]> {
     const pipeline = this.buildPipeline(params);
     const activityResults = Activity.aggregate(pipeline);
@@ -54,5 +52,4 @@ export class ContributionAggregationService {
       { $sort: { date: 1 } },
     ];
   }
-
 }
