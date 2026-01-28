@@ -1,32 +1,32 @@
-import mongoose from 'mongoose';
-import {
-  describe, beforeAll, afterAll, beforeEach, it, expect,
-} from 'vitest';
 import { MongoMemoryServer } from 'mongodb-memory-server-core';
+import mongoose from 'mongoose';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
 import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
+
 import { ContributionAggregationService } from './aggregation-service';
 
 describe('ContributionAggregationService (Essential)', () => {
   let service: ContributionAggregationService;
   let mongoServer: MongoMemoryServer;
 
-  beforeAll(async() => {
+  beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
     service = new ContributionAggregationService();
   });
 
-  afterAll(async() => {
+  afterAll(async () => {
     await mongoose.disconnect();
     await mongoServer.stop();
   });
 
-  beforeEach(async() => {
+  beforeEach(async () => {
     await Activity.deleteMany({});
   });
 
-  it('should aggregate real database records into daily counts', async() => {
+  it('should aggregate real database records into daily counts', async () => {
     // Arrange
     const userId = new mongoose.Types.ObjectId();
     vi.useFakeTimers();
@@ -58,15 +58,17 @@ describe('ContributionAggregationService (Essential)', () => {
 
     // Assert: Verify the final outcome
     expect(results).toHaveLength(2);
-    expect(results).toEqual(expect.arrayContaining([
-      { date: '2025-11-01', count: 2 },
-      { date: '2025-11-02', count: 1 },
-    ]));
+    expect(results).toEqual(
+      expect.arrayContaining([
+        { date: '2025-11-01', count: 2 },
+        { date: '2025-11-02', count: 1 },
+      ]),
+    );
 
     vi.useRealTimers();
   });
 
-  it('should exclude records before the startDate', async() => {
+  it('should exclude records before the startDate', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
 

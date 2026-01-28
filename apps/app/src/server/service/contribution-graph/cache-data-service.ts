@@ -45,7 +45,7 @@ export function cacheIsFresh(cache: ContributionGraphDocument | null): boolean {
 }
 
 /**
- * Updates and rotates the cache
+ * Updates and rotates the contribution cache
  *
  * @returns - Updated cache.
  */
