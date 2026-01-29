@@ -75,11 +75,18 @@ export const isCommonInitialProps = (
 
   const p = props as Record<string, unknown>;
 
-  // Essential properties validation
-  if (p.isNextjsRoutingTypeInitial !== true) {
+  if ('nextjsRoutingType' in p === false) {
     logger.warn(
-      'isCommonInitialProps: isNextjsRoutingTypeInitial is not true',
-      { isNextjsRoutingTypeInitial: p.isNextjsRoutingTypeInitial },
+      'isCommonInitialProps: props does not have nextjsRoutingType property',
+    );
+    return false;
+  }
+
+  // Essential properties validation
+  if (p.nextjsRoutingType !== NextjsRoutingType.INITIAL) {
+    logger.warn(
+      'isCommonInitialProps: nextjsRoutingType does not equal NextjsRoutingType.INITIAL',
+      { nextjsRoutingType: p.nextjsRoutingType },
     );
     return false;
   }
