@@ -94,7 +94,7 @@ const EditablePageEffects = dynamic(
 type Props = EachProps | InitialProps;
 
 const isInitialProps = (props: Props): props is InitialProps =>
-  props.nextjsRoutingType === NextjsRoutingType.INITIAL;
+  props.nextjsRoutingType !== NextjsRoutingType.SAME_ROUTE;
 
 const Page: NextPageWithLayout<Props> = (props: Props) => {
   // Initialize Jotai atoms with initial data - must be called unconditionally
@@ -124,7 +124,7 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
   useSameRouteNavigation();
   useShallowRouting(props);
 
-  // Fetch page data on client-side
+  // Fetch page data on client-side when SSR is skipped or navigating from outside
   useInitialCSRFetch({
     nextjsRoutingType: props.nextjsRoutingType,
     skipSSR: isInitialProps(props) ? props.skipSSR : false,

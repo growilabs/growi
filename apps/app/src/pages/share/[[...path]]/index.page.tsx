@@ -60,7 +60,7 @@ const SharedPage: NextPageWithLayout<Props> = (props: Props) => {
   // Use custom hooks for navigation and routing
   // useSameRouteNavigation();
 
-  // Fetch page data on client-side
+  // Fetch page data on client-side when SSR is skipped
   useInitialCSRFetch({
     nextjsRoutingType: props.nextjsRoutingType,
     skipSSR: isInitialProps(props) ? props.skipSSR : false,
