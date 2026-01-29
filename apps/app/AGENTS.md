@@ -25,7 +25,7 @@ pnpm run dev:migrate            # Run database migrations
 # Quality Checks
 pnpm run lint:typecheck         # TypeScript type check
 pnpm run lint:biome             # Biome linter
-pnpm run test            # Run tests
+pnpm run test                   # Run tests
 
 # Build
 pnpm run build                  # Build for production
