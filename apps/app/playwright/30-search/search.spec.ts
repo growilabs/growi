@@ -239,3 +239,70 @@ test('Search current tree by word is successfully loaded', async ({ page }) => {
   await expect(page.getByTestId('search-result-list')).toBeVisible();
   await expect(page.getByTestId('search-result-content')).toBeVisible();
 });
+
+test.describe('Search result navigation and repeated search', () => {
+  test('Repeated search works', async ({ page }) => {
+    // Step 1: Start from the home page and reload to clear any state
+    await page.goto('/');
+    await page.reload();
+
+    // Step 2: Open search modal and search for "sandbox"
+    await page.getByTestId('open-search-modal-button').click();
+    await expect(page.getByTestId('search-modal')).toBeVisible();
+    await page.locator('.form-control').fill('sandbox');
+
+    // Step 3: Submit the search by clicking on "search in all" menu item
+    await expect(page.getByTestId('search-all-menu-item')).toBeVisible();
+    await page.getByTestId('search-all-menu-item').click();
+
+    // Step 4: Verify that the search page is displayed with results
+    await expect(page.getByTestId('search-result-base')).toBeVisible();
+    await expect(page.getByTestId('search-result-list')).toBeVisible();
+    await expect(page.getByTestId('search-result-content')).toBeVisible();
+    await expect(page).toHaveURL(/\/_search\?q=sandbox/);
+
+    // Step 5: Click on the first search result to navigate to a page
+    const sandboxPageLink = page
+      .getByTestId('search-result-list')
+      .getByRole('link', { name: 'Sandbox' })
+      .first();
+    await sandboxPageLink.click();
+    await expect(page).toHaveTitle(/Sandbox/);
+
+    // Step 6: Wait for leaving search results and verify page content is displayed
+    await expect(page.getByTestId('search-result-base')).not.toBeVisible();
+    // Verify page body is rendered (not empty due to stale atom data)
+    await expect(page.locator('.wiki')).toBeVisible();
+    await expect(page.locator('.wiki')).not.toBeEmpty();
+
+    // Step 7: From the navigated page, open search modal again
+    await page.getByTestId('open-search-modal-button').click();
+    await expect(page.getByTestId('search-modal')).toBeVisible();
+
+    // Step 8: Search for the same keyword ("sandbox")
+    await page.locator('.form-control').fill('sandbox');
+
+    // Step 9: Submit the search by clicking on "search in all" menu item
+    await expect(page.getByTestId('search-all-menu-item')).toBeVisible();
+    await page.getByTestId('search-all-menu-item').click();
+
+    // Step 10: Verify that the search page is displayed with results
+    await expect(page.getByTestId('search-result-base')).toBeVisible();
+    await expect(page.getByTestId('search-result-list')).toBeVisible();
+    await expect(page.getByTestId('search-result-content')).toBeVisible();
+    await expect(page).toHaveURL(/\/_search\?q=sandbox/);
+
+    // Step 11: Click on the second search result to navigate to a page
+    const mathPageLink = page
+      .getByTestId('search-result-list')
+      .getByRole('link', { name: 'Math' })
+      .first();
+    await mathPageLink.click();
+    // and verify the page that is not Sandbox is loaded
+    await expect(page).not.toHaveTitle(/Sandbox/);
+
+    // Step 12: Verify page body is rendered (not empty due to stale atom data)
+    await expect(page.locator('.wiki')).toBeVisible();
+    await expect(page.locator('.wiki')).not.toBeEmpty();
+  });
+});

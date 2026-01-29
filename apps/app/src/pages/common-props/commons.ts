@@ -6,10 +6,14 @@ import type { CrowiRequest } from '~/interfaces/crowi-request';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
 
+import {
+  detectNextjsRoutingType,
+  type NextjsRoutingType,
+} from '../utils/nextjs-routing-utils';
+
 const logger = loggerFactory('growi:pages:common-props:commons');
 
 export type CommonInitialProps = {
-  isNextjsRoutingTypeInitial: true;
   appTitle: string;
   siteUrl: string | undefined;
   siteUrlWithEmptyValueWarn: string;
@@ -43,7 +47,6 @@ export const getServerSideCommonInitialProps: GetServerSideProps<
 
   return {
     props: {
-      isNextjsRoutingTypeInitial: true,
       appTitle: appService.getAppTitle(),
       siteUrl: configManager.getConfig('app:siteUrl'),
       siteUrlWithEmptyValueWarn: growiInfoService.getSiteUrl(),
@@ -56,7 +59,7 @@ export const getServerSideCommonInitialProps: GetServerSideProps<
         'app:growiAppIdForCloud',
       ),
       forcedColorScheme,
-    },
+    } satisfies CommonInitialProps,
   };
 };
 
@@ -70,11 +73,9 @@ export const isCommonInitialProps = (
 
   const p = props as Record<string, unknown>;
 
-  // Essential properties validation
-  if (p.isNextjsRoutingTypeInitial !== true) {
+  if (!('growiVersion' in p && 'appTitle' in p && 'siteUrl' in p)) {
     logger.warn(
-      'isCommonInitialProps: isNextjsRoutingTypeInitial is not true',
-      { isNextjsRoutingTypeInitial: p.isNextjsRoutingTypeInitial },
+      'isCommonInitialProps: props does not have growiVersion property',
     );
     return false;
   }
@@ -83,6 +84,7 @@ export const isCommonInitialProps = (
 };
 
 export type CommonEachProps = {
+  nextjsRoutingType: NextjsRoutingType;
   currentPathname: string;
   nextjsRoutingPage?: string; // must be set by each page
   currentUser?: IUserHasId;
@@ -179,12 +181,13 @@ export const getServerSideCommonEachProps = async (
   }
 
   const props = {
+    nextjsRoutingType: detectNextjsRoutingType(context, nextjsRoutingPage),
     currentPathname,
     nextjsRoutingPage,
     currentUser,
     isMaintenanceMode,
     redirectDestination,
-  };
+  } satisfies CommonEachProps;
 
   const shouldContainNextjsRoutingPage = nextjsRoutingPage != null;
   if (!isValidCommonEachRouteProps(props, shouldContainNextjsRoutingPage)) {
