@@ -269,8 +269,11 @@ test.describe('Search result navigation and repeated search', () => {
     await sandboxPageLink.click();
     await expect(page).toHaveTitle(/Sandbox/);
 
-    // Step 6: Wait for leaving search results
+    // Step 6: Wait for leaving search results and verify page content is displayed
     await expect(page.getByTestId('search-result-base')).not.toBeVisible();
+    // Verify page body is rendered (not empty due to stale atom data)
+    await expect(page.locator('.wiki')).toBeVisible();
+    await expect(page.locator('.wiki')).not.toBeEmpty();
 
     // Step 7: From the navigated page, open search modal again
     await page.getByTestId('open-search-modal-button').click();
@@ -297,5 +300,9 @@ test.describe('Search result navigation and repeated search', () => {
     await mathPageLink.click();
     // and verify the page that is not Sandbox is loaded
     await expect(page).not.toHaveTitle(/Sandbox/);
+
+    // Step 12: Verify page body is rendered (not empty due to stale atom data)
+    await expect(page.locator('.wiki')).toBeVisible();
+    await expect(page.locator('.wiki')).not.toBeEmpty();
   });
 });
