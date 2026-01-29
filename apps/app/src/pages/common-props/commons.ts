@@ -8,13 +8,12 @@ import loggerFactory from '~/utils/logger';
 
 import {
   detectNextjsRoutingType,
-  NextjsRoutingType,
+  type NextjsRoutingType,
 } from '../utils/nextjs-routing-utils';
 
 const logger = loggerFactory('growi:pages:common-props:commons');
 
 export type CommonInitialProps = {
-  nextjsRoutingType: typeof NextjsRoutingType.INITIAL;
   appTitle: string;
   siteUrl: string | undefined;
   siteUrlWithEmptyValueWarn: string;
@@ -48,7 +47,6 @@ export const getServerSideCommonInitialProps: GetServerSideProps<
 
   return {
     props: {
-      nextjsRoutingType: NextjsRoutingType.INITIAL,
       appTitle: appService.getAppTitle(),
       siteUrl: configManager.getConfig('app:siteUrl'),
       siteUrlWithEmptyValueWarn: growiInfoService.getSiteUrl(),
@@ -61,7 +59,7 @@ export const getServerSideCommonInitialProps: GetServerSideProps<
         'app:growiAppIdForCloud',
       ),
       forcedColorScheme,
-    },
+    } satisfies CommonInitialProps,
   };
 };
 
@@ -75,18 +73,9 @@ export const isCommonInitialProps = (
 
   const p = props as Record<string, unknown>;
 
-  if ('nextjsRoutingType' in p === false) {
+  if (!('growiVersion' in p && 'appTitle' in p && 'siteUrl' in p)) {
     logger.warn(
-      'isCommonInitialProps: props does not have nextjsRoutingType property',
-    );
-    return false;
-  }
-
-  // Essential properties validation
-  if (p.nextjsRoutingType !== NextjsRoutingType.INITIAL) {
-    logger.warn(
-      'isCommonInitialProps: nextjsRoutingType does not equal NextjsRoutingType.INITIAL',
-      { nextjsRoutingType: p.nextjsRoutingType },
+      'isCommonInitialProps: props does not have growiVersion property',
     );
     return false;
   }

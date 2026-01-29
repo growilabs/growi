@@ -18,9 +18,9 @@ export function isValidGeneralPageInitialProps(
 
   // Then validate GeneralPageInitialProps-specific properties
   // CommonPageInitialProps
-  if (p.nextjsRoutingType !== NextjsRoutingType.INITIAL) {
+  if (p.nextjsRoutingType === NextjsRoutingType.SAME_ROUTE) {
     logger.warn(
-      'isValidGeneralPageInitialProps: nextjsRoutingType does not equal to NextjsRoutingType.INITIAL',
+      'isValidGeneralPageInitialProps: nextjsRoutingType must be equal to NextjsRoutingType.INITIAL or NextjsRoutingType.FROM_OUTSIDE',
       { nextjsRoutingType: p.nextjsRoutingType },
     );
     return false;
