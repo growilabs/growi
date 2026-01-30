@@ -139,4 +139,4 @@ class SyncPageStatusService implements S2sMessageHandlable {
   }
 }
 
-module.exports = SyncPageStatusService;
+export default SyncPageStatusService;

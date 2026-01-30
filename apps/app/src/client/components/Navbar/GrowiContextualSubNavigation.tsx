@@ -191,7 +191,7 @@ const PageOperationMenuItems = (
             <DropdownItem
               onClick={openPageBulkExportSelectModal}
               className="grw-page-control-dropdown-item"
-              disabled={!isUploadEnabled ?? true}
+              disabled={!isUploadEnabled}
             >
               <span className="material-symbols-outlined me-1 grw-page-control-dropdown-icon">
                 cloud_download

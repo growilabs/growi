@@ -1,11 +1,7 @@
-import loggerFactory from '~/utils/logger';
+import events from 'node:events';
+import util from 'node:util';
 
 import type Crowi from '../crowi';
-
-const logger = loggerFactory('growi:events:activity');
-
-const events = require('events');
-const util = require('util');
 
 function ActivityEvent(crowi: Crowi) {
   this.crowi = crowi;
@@ -14,4 +10,4 @@ function ActivityEvent(crowi: Crowi) {
 }
 util.inherits(ActivityEvent, events.EventEmitter);
 
-module.exports = ActivityEvent;
+export default ActivityEvent;

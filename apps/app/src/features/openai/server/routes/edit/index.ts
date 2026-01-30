@@ -1,9 +1,9 @@
+import assert from 'node:assert';
 import { getIdStringForRef } from '@growi/core';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
-import type { Request, RequestHandler, Response } from 'express';
-import type { ValidationChain } from 'express-validator';
+import type { Request, RequestHandler } from 'express';
 import { body } from 'express-validator';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import type { MessageDelta } from 'openai/resources/beta/threads/messages.mjs';
@@ -13,6 +13,7 @@ import { z } from 'zod';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
@@ -52,15 +53,9 @@ const LlmEditorAssistantResponseSchema = z
   })
   .describe('The response format for the editor assistant');
 
-type Req = Request<undefined, Response, EditRequestBody> & {
-  user: IUserHasId;
+type Req = Request<Record<string, string>, ApiV3Response, EditRequestBody> & {
+  user?: IUserHasId;
 };
-
-// -----------------------------------------------------------------------------
-// Endpoint handler factory
-// -----------------------------------------------------------------------------
-
-type PostMessageHandlersFactory = (crowi: Crowi) => RequestHandler[];
 
 // -----------------------------------------------------------------------------
 // Instructions
@@ -173,15 +168,13 @@ ${
 /**
  * Create endpoint handlers for editor assistant
  */
-export const postMessageToEditHandlersFactory: PostMessageHandlersFactory = (
-  crowi,
-) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
+export const postMessageToEditHandlersFactory = (
+  crowi: Crowi,
+): RequestHandler[] => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   // Validator setup
-  const validator: ValidationChain[] = [
+  const validator = [
     body('userMessage')
       .isString()
       .withMessage('userMessage must be string')
@@ -214,9 +207,15 @@ export const postMessageToEditHandlersFactory: PostMessageHandlersFactory = (
     }),
     loginRequiredStrictly,
     certifyAiService,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
+      const { user } = req;
+      assert(
+        user != null,
+        'user is required (ensured by loginRequiredStrictly middleware)',
+      );
+
       const {
         userMessage,
         pageBody,
@@ -261,7 +260,7 @@ export const postMessageToEditHandlersFactory: PostMessageHandlersFactory = (
       if (aiAssistantId != null) {
         const isAiAssistantUsable = await openaiService.isAiAssistantUsable(
           aiAssistantId,
-          req.user,
+          user,
         );
         if (!isAiAssistantUsable) {
           return res.apiv3Err(
@@ -339,7 +338,7 @@ export const postMessageToEditHandlersFactory: PostMessageHandlersFactory = (
 
           // Process annotations
           if (content?.type === 'text' && content?.text?.annotations != null) {
-            await replaceAnnotationWithPageLink(content, req.user.lang);
+            await replaceAnnotationWithPageLink(content, user.lang);
           }
 
           // Process text

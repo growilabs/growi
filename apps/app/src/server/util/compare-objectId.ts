@@ -38,29 +38,20 @@ export const hasIntersection = (
 };
 
 /**
- * Exclude ObjectIds which exist in testIds from targetIds
- * @param targetIds Array of mongoose.Types.ObjectId
- * @param testIds Array of mongoose.Types.ObjectId
- * @returns Array of mongoose.Types.ObjectId
+ * Exclude items from target array based on string representation
+ * This handles any array of objects with toString() method (ObjectId, Ref<T>, string, etc.)
+ * Returns ObjectId[] for consistency
  */
-export const excludeTestIdsFromTargetIds = <
-  T extends { toString: any } = IObjectId,
->(
-  targetIds: T[],
-  testIds: ObjectIdLike[],
-): T[] => {
+export function excludeTestIdsFromTargetIds(
+  targetIds: { toString(): string }[],
+  testIds: { toString(): string }[],
+): IObjectId[] {
   // cast to string
   const arr1 = targetIds.map((e) => e.toString());
   const arr2 = testIds.map((e) => e.toString());
 
   // filter
   const excluded = arr1.filter((e) => !arr2.includes(e));
-  // cast to ObjectId
-  const shouldReturnString = (arr: any[]): arr is string[] => {
-    return typeof arr[0] === 'string';
-  };
 
-  return shouldReturnString(targetIds)
-    ? excluded
-    : excluded.map((e) => new ObjectId(e));
-};
+  return excluded.map((e) => new ObjectId(e));
+}
