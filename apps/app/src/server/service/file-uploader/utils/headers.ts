@@ -10,7 +10,7 @@ import { defaultContentDispositionSettings } from './security';
 type ContentHeaderField = 'Content-Type' | 'Content-Security-Policy' | 'Content-Disposition' | 'Content-Length';
 type ContentHeader = ExpressHttpHeader<ContentHeaderField>;
 
-const determineDisposition = (
+export const determineDisposition = (
     fileFormat: string,
 ): 'inline' | 'attachment' => {
   const inlineMimeTypes = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes').inlineMimeTypes;
@@ -25,7 +25,7 @@ const determineDisposition = (
     return 'inline';
   }
   const defaultSetting = defaultContentDispositionSettings[normalizedFileFormat];
-  if (defaultSetting) {
+  if (defaultSetting != null) {
     return defaultSetting;
   }
   return 'attachment';
