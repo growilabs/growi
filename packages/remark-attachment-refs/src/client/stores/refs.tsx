@@ -48,7 +48,7 @@ export const useSWRxRefs = (
       isImmutable,
     ],
     async ([endpoint, pagePath, prefix]) => {
-      return axios
+      return await axios
         .get(endpoint, {
           params: {
             pagePath,

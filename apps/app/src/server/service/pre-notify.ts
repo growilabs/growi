@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 
 import type { ActivityDocument } from '../models/activity';
 import Subscription from '../models/subscription';
+import { UserStatus } from '../models/user/conts';
 
 export type PreNotifyProps = {
   notificationTargetUsers?: Ref<IUser>[];
@@ -38,7 +39,7 @@ class PreNotifyService implements IPreNotifyService {
     const preNotify = async (props: PreNotifyProps) => {
       const { notificationTargetUsers } = props;
 
-      const User = mongoose.model<IUser, { find; STATUS_ACTIVE }>('User');
+      const User = mongoose.model<IUser, { find }>('User');
       const actionUser = activity.user;
       const target = activity.target;
       const subscribedUsers = await Subscription.getSubscription(
@@ -49,7 +50,7 @@ class PreNotifyService implements IPreNotifyService {
       );
       const activeNotificationUsers = await User.find({
         _id: { $in: notificationUsers },
-        status: User.STATUS_ACTIVE,
+        status: UserStatus.STATUS_ACTIVE,
       }).distinct('_id');
 
       if (getAdditionalTargetUsers == null) {

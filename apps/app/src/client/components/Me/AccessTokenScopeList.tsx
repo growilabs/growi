@@ -9,6 +9,8 @@ import styles from './AccessTokenScopeList.module.scss';
 
 const moduleClass = styles['access-token-scope-list'] ?? '';
 
+// biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+// @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
 interface scopeObject {
   [key: string]: Scope | scopeObject;
 }

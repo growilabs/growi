@@ -1,5 +1,6 @@
-import type { NextFunction, Request, Response } from 'express';
+import type { NextFunction, Request } from 'express';
 
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
@@ -8,8 +9,8 @@ import { OpenaiServiceTypes } from '../../../interfaces/ai';
 const logger = loggerFactory('growi:middlewares:certify-ai-service');
 
 export const certifyAiService = (
-  req: Request,
-  res: Response & { apiv3Err },
+  _req: Request,
+  res: ApiV3Response,
   next: NextFunction,
 ): void => {
   const aiEnabled = configManager.getConfig('app:aiEnabled');

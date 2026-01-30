@@ -6,8 +6,10 @@ import express from 'express';
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import ShareLink from '~/server/models/share-link';
 import loggerFactory from '~/utils/logger';
 
@@ -82,13 +84,13 @@ const today = new Date();
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequired = require('../../middlewares/login-required')(crowi);
-  const adminRequired = require('../../middlewares/admin-required')(crowi);
+  const loginRequired = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
-  const Page = crowi.model('Page');
+  const { Page } = crowi.models;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   /**
    * middleware to limit link sharing

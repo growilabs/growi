@@ -10,6 +10,7 @@ import type { CrowiRequest } from '~/interfaces/crowi-request';
 
 import { getServerSideBasicLayoutProps } from '../basic-layout-page';
 import {
+  getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
 } from '../common-props';
@@ -53,7 +54,7 @@ function emitPageSeenEvent(
     return;
   }
 
-  const pageEvent = crowi.event('page');
+  const pageEvent = crowi.events.page;
   pageEvent.emit('seen', pageId, user);
 }
 
@@ -86,6 +87,7 @@ export async function getServerSidePropsForInitial(
   context: GetServerSidePropsContext,
 ): Promise<GetServerSidePropsResult<Stage2InitialProps>> {
   const [
+    commonEachResult,
     commonInitialResult,
     basicLayoutResult,
     generalPageResult,
@@ -93,6 +95,7 @@ export async function getServerSidePropsForInitial(
     i18nPropsResult,
     pageDataResult,
   ] = await Promise.all([
+    getServerSideCommonEachProps(context),
     getServerSideCommonInitialProps(context),
     getServerSideBasicLayoutProps(context),
     getServerSideGeneralPageProps(context),
@@ -102,22 +105,29 @@ export async function getServerSidePropsForInitial(
   ]);
 
   // Merge all results in a type-safe manner (using sequential merging)
-  const mergedResult = mergeGetServerSidePropsResults(
-    commonInitialResult,
+  const mergedResult: GetServerSidePropsResult<Stage2InitialProps> =
     mergeGetServerSidePropsResults(
-      basicLayoutResult,
+      commonEachResult,
       mergeGetServerSidePropsResults(
-        generalPageResult,
+        commonInitialResult,
         mergeGetServerSidePropsResults(
-          rendererConfigResult,
+          basicLayoutResult,
           mergeGetServerSidePropsResults(
-            i18nPropsResult,
-            mergeGetServerSidePropsResults(pageDataResult, nextjsRoutingProps),
+            generalPageResult,
+            mergeGetServerSidePropsResults(
+              rendererConfigResult,
+              mergeGetServerSidePropsResults(
+                i18nPropsResult,
+                mergeGetServerSidePropsResults(
+                  pageDataResult,
+                  nextjsRoutingProps,
+                ),
+              ),
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
 
   // Check for early return (redirect/notFound)
   if ('redirect' in mergedResult || 'notFound' in mergedResult) {
@@ -187,10 +197,8 @@ export async function getServerSidePropsForSameRoute(
   })();
   addActivity(context, activityAction);
 
-  const mergedResult = mergeGetServerSidePropsResults(
-    { props: pageDataProps },
-    i18nPropsResult,
-  );
+  const mergedResult: GetServerSidePropsResult<Stage2EachProps> =
+    mergeGetServerSidePropsResults({ props: pageDataProps }, i18nPropsResult);
 
   return mergedResult;
 }

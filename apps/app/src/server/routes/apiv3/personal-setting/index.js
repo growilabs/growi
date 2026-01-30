@@ -6,6 +6,7 @@ import { i18n } from '^/config/next-i18next.config';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
@@ -73,14 +74,12 @@ const router = express.Router();
  */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../../middlewares/login-required')(
-    crowi,
-  );
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
   const { User } = crowi.models;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const minPasswordLength = crowi.configManager.getConfig(
     'app:minPasswordLength',
