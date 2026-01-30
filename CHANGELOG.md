@@ -1,8 +1,22 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.4.3...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.4.4...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.4.4](https://github.com/growilabs/compare/v7.4.3...v7.4.4) - 2026-01-30
+
+### 🐛 Bug Fixes
+
+* fix: Search navigation (#10749) @[copilot-swe-agent[bot]](https://github.com/apps/copilot-swe-agent)
+* fix: User pages are displayed in page list when 'Disable user pages' is on (#10752) @miya
+* fix: Disable logo update button when no file is selected (#10587) @hikaru-n-cpu
+
+### 🧰 Maintenance
+
+* support: Setup Claude Code environment (#10746) @yuki-takei
+* support: Improve test parallelism (#10747) @yuki-takei
+* support: Typecheck by tsgo (#10717) @yuki-takei
 
 ## [v7.4.3](https://github.com/growilabs/compare/v7.4.2...v7.4.3) - 2026-01-21
 

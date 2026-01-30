@@ -1,6 +1,6 @@
 {
   "name": "growi",
-  "version": "7.4.4-RC.0",
+  "version": "7.4.4",
   "description": "Team collaboration software using markdown",
   "license": "MIT",
   "private": "true",
@@ -39,8 +39,7 @@
     "version:preminor": "pnpm version preminor --preid=RC --no-git-tag-version",
     "version:premajor": "pnpm version premajor --preid=RC --no-git-tag-version"
   },
-  "// comments for devDependencies": {
-  },
+  "// comments for devDependencies": {},
   "devDependencies": {
     "@biomejs/biome": "^2.2.6",
     "@changesets/changelog-github": "^0.5.0",
