@@ -42,3 +42,24 @@ export class S2cMessagePageUpdated {
     }
   }
 }
+
+/**
+ * Server-to-client message VO for page seenUsers update
+ */
+export class S2cMessagePageSeenUsersUpdated {
+  pageId: string;
+
+  seenUserIds: string[];
+
+  seenUsersCount: number;
+
+  constructor(page: IPage) {
+    const serializedPage = serializePageSecurely(page);
+
+    this.pageId = serializedPage._id;
+    this.seenUserIds = serializedPage.seenUsers
+      .slice(0, 15)
+      .map((id: any) => (typeof id === 'string' ? id : id.toString()));
+    this.seenUsersCount = serializedPage.seenUsers.length;
+  }
+}
