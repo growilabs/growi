@@ -2,14 +2,14 @@ import { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { ContributionCache } from '../models/contribution-cache-model';
+import { getUTCMidnightToday } from '../utils/contribution-graph-utils';
 import {
   cacheIsFresh,
   getContributionCache,
   type SetContributionCachePayload,
   updateContributionCache,
 } from './cache-data-service';
-import { ContributionCache } from './models/contribution-cache-model';
-import { getUTCMidnightToday } from './utils/contribution-graph-utils';
 
 const createMockId = () => new mongoose.Types.ObjectId().toString();
 

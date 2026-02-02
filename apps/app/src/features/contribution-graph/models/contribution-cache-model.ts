@@ -1,6 +1,6 @@
 import mongoose, { type Document, Schema } from 'mongoose';
 
-import type { IContributionCache } from '~/interfaces/contribution-graph';
+import type { IContributionCache } from '~/features/contribution-graph/interfaces/contribution-graph';
 
 export interface ContributionGraphDocument
   extends IContributionCache,
