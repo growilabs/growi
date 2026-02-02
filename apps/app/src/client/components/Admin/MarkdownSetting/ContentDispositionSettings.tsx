@@ -1,236 +1,193 @@
-import React, {
-  useState, useCallback, useEffect, useMemo,
-} from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 
 import { useTranslation } from 'next-i18next';
+import { useForm } from 'react-hook-form';
 
 import { useContentDisposition, type ContentDispositionSettings } from '../../../services/AdminContentDispositionSettings';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 
+interface MimeTypeListProps {
+  title: string;
+  items: string[];
+  emptyText: string;
+  onRemove: (mimeType: string) => void;
+  removeLabel: string;
+  isUpdating: boolean;
+}
 
 const normalizeMimeType = (mimeType: string): string => mimeType.trim().toLowerCase();
 
-const removeMimeTypeFromArray = (array: string[], mimeType: string): string[] => (
-  array.filter(m => m !== mimeType)
+const MimeTypeList = ({
+  title, items, emptyText, onRemove, removeLabel, isUpdating,
+}: MimeTypeListProps) => (
+  <div className="col-md-6 col-sm-12 mb-4">
+    <div className="card shadow-sm rounded-3">
+      <div className="card-header bg-transparent fw-bold">{title}</div>
+      <div className="card-body">
+        <ul className="list-group list-group-flush">
+          {items.length === 0 && <li className="list-group-item text-muted small border-0">{emptyText}</li>}
+          {items.map((m: string) => (
+            <li key={m} className="list-group-item d-flex justify-content-between align-items-center border-0 px-0">
+              <code>{m}</code>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-danger rounded-3"
+                onClick={() => onRemove(m)}
+                disabled={isUpdating}
+              >
+                {removeLabel}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </div>
 );
 
 const ContentDispositionSettings: React.FC = () => {
   const { t } = useTranslation('admin');
-
   const {
-    currentSettings,
-    isLoading,
-    isUpdating,
-    updateSettings,
+    currentSettings, isLoading, isUpdating, updateSettings,
   } = useContentDisposition();
 
-  const [pendingSettings, setPendingSettings] = useState<ContentDispositionSettings | null>(null);
   const [currentInput, setCurrentInput] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
+  const {
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { isDirty },
+  } = useForm<ContentDispositionSettings>({
+    defaultValues: {
+      inlineMimeTypes: [],
+      attachmentMimeTypes: [],
+    },
+  });
+
   useEffect(() => {
     if (currentSettings) {
-      setPendingSettings({
-        inlineMimeTypes: [...currentSettings.inlineMimeTypes],
-        attachmentMimeTypes: [...currentSettings.attachmentMimeTypes],
-      });
-      setError(null);
+      reset(currentSettings);
     }
-  }, [currentSettings]);
+  }, [currentSettings, reset]);
 
-  // Use the pending settings for display, falling back to an empty object if not loaded yet
-  const displaySettings = pendingSettings ?? { inlineMimeTypes: [], attachmentMimeTypes: [] };
-
-  // Calculate if there are differences between saved and pending state
-  const hasPendingChanges = useMemo(() => {
-    if (!currentSettings || !pendingSettings) return false;
-    // Check if the mime type lists have changed
-    return JSON.stringify(currentSettings.inlineMimeTypes.sort()) !== JSON.stringify(pendingSettings.inlineMimeTypes.sort())
-           || JSON.stringify(currentSettings.attachmentMimeTypes.sort()) !== JSON.stringify(pendingSettings.attachmentMimeTypes.sort());
-  }, [currentSettings, pendingSettings]);
-
+  const inlineMimeTypes = watch('inlineMimeTypes');
+  const attachmentMimeTypes = watch('attachmentMimeTypes');
 
   const handleSetMimeType = useCallback((disposition: 'inline' | 'attachment') => {
     const mimeType = normalizeMimeType(currentInput);
     if (!mimeType) return;
 
-    setError(null);
-    setPendingSettings((prev) => {
-      if (!prev) return null;
+    const otherDisposition = disposition === 'inline' ? 'attachment' : 'inline';
 
-      const newSettings = { ...prev };
-      const otherDisposition = disposition === 'inline' ? 'attachment' : 'inline';
+    const currentTargetList = watch(`${disposition}MimeTypes`);
+    const currentOtherList = watch(`${otherDisposition}MimeTypes`);
 
-      // Add to the target list (if not already present)
-      const targetKey = `${disposition}MimeTypes` as keyof ContentDispositionSettings;
-      if (!newSettings[targetKey].includes(mimeType)) {
-        newSettings[targetKey] = [...newSettings[targetKey], mimeType];
-      }
+    if (!currentTargetList.includes(mimeType)) {
+      setValue(`${disposition}MimeTypes`, [...currentTargetList, mimeType], { shouldDirty: true });
+    }
 
-      // Remove from the other list
-      const otherKey = `${otherDisposition}MimeTypes` as keyof ContentDispositionSettings;
-      newSettings[otherKey] = removeMimeTypeFromArray(newSettings[otherKey], mimeType);
+    setValue(
+      `${otherDisposition}MimeTypes`,
+      currentOtherList.filter(m => m !== mimeType),
+      { shouldDirty: true },
+    );
 
-      return newSettings;
-    });
     setCurrentInput('');
-  }, [currentInput]);
+    setError(null);
+  }, [currentInput, setValue, watch]);
 
-  const handleSetInline = useCallback(() => handleSetMimeType('inline'), [handleSetMimeType]);
-  const handleSetAttachment = useCallback(() => handleSetMimeType('attachment'), [handleSetMimeType]);
-
-  // Handler for removing from pending state
   const handleRemove = useCallback((mimeType: string, disposition: 'inline' | 'attachment') => {
-    setError(null);
-    setPendingSettings((prev) => {
-      if (!prev) return null;
-      const key = `${disposition}MimeTypes` as keyof ContentDispositionSettings;
-      return {
-        ...prev,
-        [key]: removeMimeTypeFromArray(prev[key], mimeType),
-      };
-    });
-  }, []);
+    const currentList = watch(`${disposition}MimeTypes`);
+    setValue(
+      `${disposition}MimeTypes`,
+      currentList.filter(m => m !== mimeType),
+      { shouldDirty: true },
+    );
+  }, [setValue, watch]);
 
-  // Handler for updating pending change
-  const handleUpdate = useCallback(async(): Promise<void> => {
-    if (!pendingSettings || !hasPendingChanges || isUpdating) return;
-
-    setError(null);
+  const onSubmit = async(data: ContentDispositionSettings) => {
     try {
-      await updateSettings(pendingSettings);
+      setError(null);
+      await updateSettings(data);
+      reset(data);
     }
     catch (err) {
-      const errorMessage = (err instanceof Error) ? err.message : 'An unknown error occurred during update.';
-      setError(`Failed to update settings: ${errorMessage}`);
+      setError((err as Error).message);
     }
-  }, [pendingSettings, hasPendingChanges, isUpdating, updateSettings]);
+  };
 
-  if (isLoading && !currentSettings) {
-    return <div>Loading content disposition settings...</div>;
-  }
-
-  const renderInlineMimeTypes = displaySettings.inlineMimeTypes;
-  const renderAttachmentMimeTypes = displaySettings.attachmentMimeTypes;
+  if (isLoading && !currentSettings) return <div>Loading...</div>;
 
   return (
     <div className="row">
       <div className="col-12">
-        <h2 className="pb-2">{t('markdown_settings.content-disposition_header')}</h2>
+        <h2 className="mb-4 border-0">{t('markdown_settings.content-disposition_header')}</h2>
 
-        {/* INPUT SECTION */}
-        <div className="card shadow-sm mb-4">
+        <div className="card shadow-sm mb-4 rounded-3 border-0">
           <div className="card-body">
             <div className="form-group">
-              <label className="form-label fw-bold">{t('markdown_settings.content-disposition_options.add_header')}</label>
-              <div className="d-flex align-items-center gap-2">
+              <label className="form-label fw-bold">
+                {t('markdown_settings.content-disposition_options.add_header')}
+              </label>
+              <div className="d-flex align-items-center gap-2 mb-3">
                 <input
                   type="text"
-                  className="form-control"
+                  className="form-control rounded-3 w-50"
                   value={currentInput}
                   onChange={e => setCurrentInput(e.target.value)}
                   placeholder="e.g. image/png"
                 />
                 <button
-                  className="btn btn-primary px-3 flex-shrink-0"
+                  className="btn btn-primary px-3 flex-shrink-0 rounded-3 fw-bold"
                   type="button"
-                  onClick={handleSetInline}
+                  onClick={() => handleSetMimeType('inline')}
                   disabled={!currentInput.trim() || isUpdating}
                 >
                   {t('markdown_settings.content-disposition_options.inline_button')}
                 </button>
                 <button
-                  className="btn btn-primary text-white px-3 flex-shrink-0"
+                  className="btn btn-primary text-white px-3 flex-shrink-0 rounded-3 fw-bold"
                   type="button"
-                  onClick={handleSetAttachment}
+                  onClick={() => handleSetMimeType('attachment')}
                   disabled={!currentInput.trim() || isUpdating}
                 >
                   {t('markdown_settings.content-disposition_options.attachment_button')}
                 </button>
               </div>
-              <small className="form-text text-muted mt-2 d-block">
+              <small className="form-text text-muted">
                 {t('markdown_settings.content-disposition_options.note')}
               </small>
             </div>
           </div>
         </div>
 
-        {error && (
-          <div className="alert alert-danger">{error}</div>
-        )}
+        {error && <div className="alert alert-danger rounded-3">{error}</div>}
 
         <div className="row">
-          {/* INLINE LIST COLUMN */}
-          <div className="col-md-6 col-sm-12 align-self-start">
-            <div className="card">
-              <div className="card-header">
-                <span className="fw-bold">
-                  {t('markdown_settings.content-disposition_options.inline_header')}
-                </span>
-              </div>
-              <div className="card-body">
-                <ul className="list-group list-group-flush">
-                  {renderInlineMimeTypes.length === 0 && (
-                    <li className="list-group-item text-muted">
-                      {t('markdown_settings.content-disposition_options.no_inline')}
-                    </li>
-                  )}
-                  {renderInlineMimeTypes.map((mimeType: string) => (
-                    <li key={mimeType} className="list-group-item d-flex justify-content-between align-items-center">
-                      <code>{mimeType}</code>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-danger rounded-3"
-                        onClick={() => handleRemove(mimeType, 'inline')}
-                        disabled={isUpdating}
-                      >
-                        {t('markdown_settings.content-disposition_options.remove_button')}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* ATTACHMENT LIST COLUMN */}
-          <div className="col-md-6 col-sm-12 align-self-start">
-            <div className="card">
-              <div className="card-header">
-                <span className="fw-bold">
-                  {t('markdown_settings.content-disposition_options.attachment_header')}
-                </span>
-              </div>
-              <div className="card-body">
-                <ul className="list-group list-group-flush">
-                  {renderAttachmentMimeTypes.length === 0 && (
-                    <li className="list-group-item text-muted">
-                      {t('markdown_settings.content-disposition_options.no_attachment')}
-                    </li>
-                  )}
-                  {renderAttachmentMimeTypes.map((mimeType: string) => (
-                    <li key={mimeType} className="list-group-item d-flex justify-content-between align-items-center">
-                      <code>{mimeType}</code>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-danger rounded-3"
-                        onClick={() => handleRemove(mimeType, 'attachment')}
-                        disabled={isUpdating}
-                      >
-                        {t('markdown_settings.content-disposition_options.remove_button')}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-
+          <MimeTypeList
+            title={t('markdown_settings.content-disposition_options.inline_header')}
+            items={inlineMimeTypes}
+            emptyText={t('markdown_settings.content-disposition_options.no_inline')}
+            onRemove={m => handleRemove(m, 'inline')}
+            removeLabel={t('markdown_settings.content-disposition_options.remove_button')}
+            isUpdating={isUpdating}
+          />
+          <MimeTypeList
+            title={t('markdown_settings.content-disposition_options.attachment_header')}
+            items={attachmentMimeTypes}
+            emptyText={t('markdown_settings.content-disposition_options.no_attachment')}
+            onRemove={m => handleRemove(m, 'attachment')}
+            removeLabel={t('markdown_settings.content-disposition_options.remove_button')}
+            isUpdating={isUpdating}
+          />
         </div>
 
         <AdminUpdateButtonRow
-          onClick={handleUpdate}
-          disabled={!hasPendingChanges || isUpdating}
+          onClick={handleSubmit(onSubmit)}
+          disabled={!isDirty || isUpdating}
         />
       </div>
     </div>
