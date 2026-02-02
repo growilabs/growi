@@ -1,7 +1,6 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
-import { isUserPage } from '@growi/core/dist/utils/page-path-utils';
 import express from 'express';
 
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
