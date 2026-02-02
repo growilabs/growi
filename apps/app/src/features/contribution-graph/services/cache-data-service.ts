@@ -1,13 +1,13 @@
 import type { UpdateQuery } from 'mongoose';
 import mongoose from 'mongoose';
 
-import type { IContributionDay } from '~/interfaces/contribution-graph';
+import type { IContributionDay } from '~/features/contribution-graph/interfaces/contribution-graph';
 
 import {
   ContributionCache,
   type ContributionGraphDocument,
-} from './models/contribution-cache-model';
-import { getUTCMidnightToday } from './utils/contribution-graph-utils';
+} from '../models/contribution-cache-model';
+import { getUTCMidnightToday } from '../utils/contribution-graph-utils';
 
 export interface SetContributionCachePayload {
   userId: string;
