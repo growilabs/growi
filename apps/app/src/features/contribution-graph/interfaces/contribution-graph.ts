@@ -11,3 +11,7 @@ export interface IContributionCache {
   currentWeekData: IContributionDay[];
   permanentWeeks: Record<string, IContributionDay[]>;
 }
+
+export interface WeeksToFreeze {
+  permanentWeeks: Record<string, IContributionDay[]>;
+}
