@@ -343,6 +343,8 @@ export const getPageSchema = (crowi) => {
   pageSchema.statics.isAccessiblePageByViewer = async function (id, user) {
     const baseQuery = this.count({ _id: id });
 
+    const page = await this.findById(id).select('path');
+
     const disabledUserPages = configManager.getConfig(
       'security:disableUserPages',
     );
