@@ -4,6 +4,7 @@ import {
   pathUtils,
   templateChecker,
 } from '@growi/core/dist/utils';
+import { isUserPage } from '@growi/core/dist/utils/page-path-utils';
 import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import { differenceInYears } from 'date-fns/differenceInYears';
 import escapeStringRegexp from 'escape-string-regexp';
@@ -341,6 +342,14 @@ export const getPageSchema = (crowi) => {
    */
   pageSchema.statics.isAccessiblePageByViewer = async function (id, user) {
     const baseQuery = this.count({ _id: id });
+
+    const disabledUserPages = configManager.getConfig(
+      'security:disableUserPages',
+    );
+
+    if (disabledUserPages && isUserPage(page.path)) {
+      return false;
+    }
 
     const userGroups =
       user != null
