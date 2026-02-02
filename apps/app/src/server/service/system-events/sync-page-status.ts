@@ -1,10 +1,7 @@
 import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
-import {
-  S2cMessagePageSeenUsersUpdated,
-  S2cMessagePageUpdated,
-} from '../../models/vo/s2c-message';
+import { S2cMessagePageUpdated } from '../../models/vo/s2c-message';
 import S2sMessage from '../../models/vo/s2s-message';
 import type { S2sMessagingService } from '../s2s-messaging/base';
 import type { S2sMessageHandlable } from '../s2s-messaging/handlable';
@@ -143,19 +140,15 @@ class SyncPageStatusService implements S2sMessageHandlable {
     this.emitter.on('addSeenUsers', (page) => {
       logger.debug("'addSeenUsers' event emitted.");
 
-      const s2cMessagePageSeenUsersUpdated = new S2cMessagePageSeenUsersUpdated(
-        page,
-      );
+      const pageId = page._id.toString();
 
       // emit to the room for each page
       socketIoService
         .getDefaultSocket()
         .in(getRoomNameWithId(RoomPrefix.PAGE, page._id))
-        .emit('page:seenUsersUpdated', { s2cMessagePageSeenUsersUpdated });
+        .emit('page:seenUsersUpdated', { pageId });
 
-      this.publishToOtherServers('page:seenUsersUpdated', {
-        s2cMessagePageSeenUsersUpdated,
-      });
+      this.publishToOtherServers('page:seenUsersUpdated', { pageId });
     });
   }
 }

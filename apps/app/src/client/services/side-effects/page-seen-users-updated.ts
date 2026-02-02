@@ -11,30 +11,9 @@ export const usePageSeenUsersUpdatedEffect = (): void => {
   const { mutate: mutatePageInfo } = useSWRxPageInfo(currentPageId);
 
   const seenUsersUpdatedHandler = useCallback(
-    (data: {
-      s2cMessagePageSeenUsersUpdated: {
-        pageId: string;
-        seenUserIds: string[];
-        seenUsersCount: number;
-      };
-    }) => {
-      const { s2cMessagePageSeenUsersUpdated } = data;
-
-      if (
-        currentPageId != null &&
-        currentPageId === s2cMessagePageSeenUsersUpdated.pageId
-      ) {
-        mutatePageInfo(
-          (currentData) => {
-            if (currentData == null) return currentData;
-            return {
-              ...currentData,
-              seenUserIds: s2cMessagePageSeenUsersUpdated.seenUserIds,
-              sumOfSeenUsers: s2cMessagePageSeenUsersUpdated.seenUsersCount,
-            };
-          },
-          { revalidate: false },
-        );
+    (data: { pageId: string }) => {
+      if (currentPageId != null && currentPageId === data.pageId) {
+        mutatePageInfo();
       }
     },
     [currentPageId, mutatePageInfo],
