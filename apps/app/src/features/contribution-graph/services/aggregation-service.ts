@@ -1,9 +1,9 @@
 import type { Aggregate, PipelineStage } from 'mongoose';
 import mongoose from 'mongoose';
 
+import { getUTCMidnightToday } from '~/features/contribution-graph/utils/contribution-graph-utils';
 import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
-import { getUTCMidnightToday } from '~/server/service/contribution-graph/utils/contribution-graph-utils';
 
 export interface PipelineParams {
   userId: string;
