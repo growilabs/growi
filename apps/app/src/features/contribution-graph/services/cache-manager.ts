@@ -6,6 +6,8 @@ import type {
 import {
   formatDateKey,
   getCurrentWeekStart,
+  getCutoffWeekId,
+  getExpiredWeekIds,
   getISOWeekId,
   getStartDateFromISOWeek,
 } from '../utils/contribution-graph-utils';
@@ -37,92 +39,59 @@ export class ContributionCacheManager {
     const cacheHit = cacheIsFresh(lastUpdated);
 
     if (cacheHit) {
-      const setContributionCachePayload: SetContributionCachePayload = {
-        userId,
-        newCurrentWeek: currentWeekData,
-      };
-
-      const updatedContributionCache = await updateContributionCache(
-        setContributionCachePayload,
-      );
-      const updatedCurrentWeek = updatedContributionCache?.currentWeekData;
-
-      if (!updatedCurrentWeek) {
-        throw new Error('Could not get updated current week cache');
-      }
-
       const permanentWeeksArray = Object.values(permanentWeeks);
-      const combinedCacheData = [...permanentWeeksArray, ...updatedCurrentWeek];
+      const combinedCacheData = [...permanentWeeksArray, ...currentWeekData];
 
       return combinedCacheData;
     } else {
+      // what if only current week data is needed?
+
       const params: PipelineParams = {
         userId,
         startDate: lastUpdated,
       };
 
-      // array with fresh data
-      /*
-
-      [
-        { "date": "2025-10-20", "count": 4 },
-        { "date": "2025-10-21", "count": 12 },
-        { "date": "2025-10-23", "count": 1 },
-        { "date": "2025-10-24", "count": 7 }
-      ]
-
-      */
-
       const freshCacheData =
         await this.aggregationService.runAggregationPipeline(params);
 
       const currentWeekStart = getCurrentWeekStart();
-      const updatedCurrentWeek: IContributionDay[] = [];
+      const newCurrentWeek: IContributionDay[] = [];
 
-      const weeksToFreeze: IWeeksToFreeze[] = [];
+      const weeksToFreezeMap: Record<string, IContributionDay[]> = {};
 
       for (const contribution of freshCacheData) {
-        // if current week
         if (contribution.date >= currentWeekStart) {
-          // add to current week
-          updatedCurrentWeek.push(contribution);
+          newCurrentWeek.push(contribution);
         } else {
           const weekId = getISOWeekId(new Date(contribution.date));
-          // if weekId doesnt exist
-          if (!weeksToFreeze[weekId]) {
-            weeksToFreeze[weekId] = [];
+          if (!weeksToFreezeMap[weekId]) {
+            weeksToFreezeMap[weekId] = [];
           }
-          // add contribution to permanent weekId
-          weeksToFreeze[weekId].push(contribution);
+          weeksToFreezeMap[weekId].push(contribution);
         }
       }
 
-      const fullCurrentWeek = this.fillGapsInWeek(
-        currentWeekStart,
-        updatedCurrentWeek,
-      );
+      // weeks to freeze
+      const weeksToFreeze: IWeeksToFreeze[] = Object.entries(
+        weeksToFreezeMap,
+      ).map(([id, data]) => ({
+        id,
+        data: this.fillGapsInWeek(getStartDateFromISOWeek(id), data),
+      }));
 
-      for (const weekId of weeksToFreeze) {
-        // You need a utility to get the Monday of a specific ISO Week ID
-        const weekStartDate = getStartDateFromISOWeek(weekId.id);
+      // weeks to delete
+      const existingCache = await getContributionCache(userId);
+      const cutoffWeekId = getCutoffWeekId(52);
 
-        weeksToFreeze[weekId.id] = this.fillGapsInWeek(
-          weekStartDate,
-          weeksToFreeze[weekId.id],
-        );
-      }
-
-      // check missing weeks
-      // check missing
-
-      // freeze weeks older than current week
-      // combine permanent and current weeks
-      // return combined weeks
+      const weekIdsToDelete = existingCache
+        ? getExpiredWeekIds(existingCache.permanentWeeks, cutoffWeekId)
+        : [];
 
       const setContributionCachePayload: SetContributionCachePayload = {
         userId,
-        newCurrentWeek: currentWeekData,
-        weeksToFreeze: [...weeksToFreeze],
+        newCurrentWeek,
+        weeksToFreeze,
+        weekIdsToDelete,
       };
 
       const updatedContributionCache = await updateContributionCache(
