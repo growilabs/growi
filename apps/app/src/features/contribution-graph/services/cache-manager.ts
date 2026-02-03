@@ -1,10 +1,13 @@
 import type {
   IContributionDay,
-  WeeksToFreeze,
+  IWeeksToFreeze,
+  SetContributionCachePayload,
 } from '../interfaces/contribution-graph';
 import {
+  formatDateKey,
   getCurrentWeekStart,
   getISOWeekId,
+  getStartDateFromISOWeek,
 } from '../utils/contribution-graph-utils';
 import {
   ContributionAggregationService,
@@ -13,7 +16,6 @@ import {
 import {
   cacheIsFresh,
   getContributionCache,
-  type SetContributionCachePayload,
   updateContributionCache,
 } from './cache-data-service';
 
@@ -76,9 +78,8 @@ export class ContributionCacheManager {
 
       const currentWeekStart = getCurrentWeekStart();
       const updatedCurrentWeek: IContributionDay[] = [];
-      const weeksToFreeze: WeeksToFreeze = {
-        permanentWeeks: {},
-      };
+
+      const weeksToFreeze: IWeeksToFreeze[] = [];
 
       for (const contribution of freshCacheData) {
         // if current week
@@ -88,33 +89,32 @@ export class ContributionCacheManager {
         } else {
           const weekId = getISOWeekId(new Date(contribution.date));
           // if weekId doesnt exist
-          if (!weeksToFreeze.permanentWeeks[weekId]) {
-            weeksToFreeze.permanentWeeks[weekId] = [];
+          if (!weeksToFreeze[weekId]) {
+            weeksToFreeze[weekId] = [];
           }
           // add contribution to permanent weekId
-          weeksToFreeze.permanentWeeks[weekId].push(contribution);
+          weeksToFreeze[weekId].push(contribution);
         }
       }
 
-      // method for filling gaps in current week
-      const weekStartDate = getCurrentWeekStart(
-        new Date(updatedCurrentWeek[0].date),
+      const fullCurrentWeek = this.fillGapsInWeek(
+        currentWeekStart,
+        updatedCurrentWeek,
       );
-      const weekId = getISOWeekId(new Date(updatedCurrentWeek[i].date));
 
-      for (let i = 0; i <= 7; i++) {
-        weekStartDate.setDate(weekStartDate.getDate() + i);
+      for (const weekId of weeksToFreeze) {
+        // You need a utility to get the Monday of a specific ISO Week ID
+        const weekStartDate = getStartDateFromISOWeek(weekId.id);
+
+        weeksToFreeze[weekId.id] = this.fillGapsInWeek(
+          weekStartDate,
+          weeksToFreeze[weekId.id],
+        );
       }
 
-      // I have one array with updated current weeks contribution and one for the permanent weeks to be added
-      // Missing days?
+      // check missing weeks
+      // check missing
 
-      // array of dates
-      // sort dates into week objects
-      // fill in gaps
-
-      // sort days into weeks
-      // need method for filling in gaps of no contributions in week
       // freeze weeks older than current week
       // combine permanent and current weeks
       // return combined weeks
@@ -122,11 +122,37 @@ export class ContributionCacheManager {
       const setContributionCachePayload: SetContributionCachePayload = {
         userId,
         newCurrentWeek: currentWeekData,
+        weeksToFreeze: [...weeksToFreeze],
       };
 
       const updatedContributionCache = await updateContributionCache(
         setContributionCachePayload,
       );
     }
+  }
+
+  private fillGapsInWeek(
+    startDate: Date,
+    dataToFill: IContributionDay[],
+  ): IContributionDay[] {
+    const contributionMap = new Map(dataToFill.map((c) => [c.date, c.count]));
+    const filledWeek: IContributionDay[] = [];
+
+    const weekStart = getCurrentWeekStart(startDate);
+    const dayOfTheWeek = new Date(weekStart);
+
+    for (let i = 0; i < 7; i++) {
+      const dayOfTheWeekString = formatDateKey(dayOfTheWeek);
+
+      const contribution: IContributionDay = {
+        date: dayOfTheWeekString,
+        count: contributionMap.get(dayOfTheWeekString) || 0,
+      };
+      filledWeek.push(contribution);
+
+      dayOfTheWeek.setUTCDate(dayOfTheWeek.getUTCDate() + 1);
+    }
+
+    return filledWeek;
   }
 }
