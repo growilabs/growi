@@ -1,20 +1,16 @@
 import type { UpdateQuery } from 'mongoose';
 import mongoose from 'mongoose';
 
-import type { IContributionDay } from '~/features/contribution-graph/interfaces/contribution-graph';
+import type {
+  IContributionDay,
+  SetContributionCachePayload,
+} from '~/features/contribution-graph/interfaces/contribution-graph';
 
 import {
   ContributionCache,
   type ContributionGraphDocument,
 } from '../models/contribution-cache-model';
 import { getUTCMidnightToday } from '../utils/contribution-graph-utils';
-
-export interface SetContributionCachePayload {
-  userId: string;
-  newCurrentWeek: IContributionDay[];
-  weeksToFreeze?: { id: string; data: IContributionDay[] }[];
-  weekIdsToDelete?: string[];
-}
 
 type SetFields = IContributionDay[] | Date;
 
