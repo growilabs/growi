@@ -30,6 +30,8 @@
         "editorconfig.editorconfig",
         "shinnn.stylelint",
         "stylelint.vscode-stylelint",
+        // markdown
+        "bierner.markdown-mermaid",
         // TypeScript (Native Preview)
         "typescriptteam.native-preview",
         // Test
