@@ -54,3 +54,19 @@ export function getStartDateFromISOWeek(weekId: string): Date {
 
   return targetMonday;
 }
+
+export function getCutoffWeekId(weeksToKeep = 52): string {
+  const cutoffDate = new Date();
+  cutoffDate.setUTCDate(cutoffDate.getUTCDate() - weeksToKeep * 7);
+
+  return getISOWeekId(cutoffDate);
+}
+
+export function getExpiredWeekIds(
+  existingPermanentWeeks: Record<string, any>,
+  cutoffWeekId: string,
+): string[] {
+  return Object.keys(existingPermanentWeeks).filter(
+    (weekId) => weekId < cutoffWeekId,
+  );
+}
