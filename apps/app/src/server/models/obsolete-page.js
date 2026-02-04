@@ -1,3 +1,4 @@
+import { fa } from '@faker-js/faker';
 import { GroupType, Origin } from '@growi/core';
 import {
   pagePathUtils,
@@ -341,17 +342,7 @@ export const getPageSchema = (crowi) => {
    * @param {User} user
    */
   pageSchema.statics.isAccessiblePageByViewer = async function (id, user) {
-    const baseQuery = this.count({ _id: id });
-
-    const page = await this.findById(id).select('path');
-
-    const disabledUserPages = configManager.getConfig(
-      'security:disableUserPages',
-    );
-
-    if (disabledUserPages && isUserPage(page.path)) {
-      return false;
-    }
+    const baseQuery = this.findOne({ _id: id }).select('path');
 
     const userGroups =
       user != null
@@ -366,8 +357,21 @@ export const getPageSchema = (crowi) => {
     const queryBuilder = new this.PageQueryBuilder(baseQuery);
     queryBuilder.addConditionToFilteringByViewer(user, userGroups, true);
 
-    const count = await queryBuilder.query.exec();
-    return count > 0;
+    const page = await queryBuilder.query.exec();
+
+    if (!page) {
+      return false;
+    }
+
+    const disabledUserPages = configManager.getConfig(
+      'security:disableUserPages',
+    );
+
+    if (disabledUserPages && isUserPage(page.path)) {
+      return false;
+    }
+
+    return true;
   };
 
   // find page by path
