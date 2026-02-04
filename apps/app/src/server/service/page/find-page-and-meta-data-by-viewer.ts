@@ -81,7 +81,7 @@ export async function findPageAndMetaDataByViewer(
   let page: PageDoc | null;
   if (isSharedPage && pageId != null) {
     // Share link access already validated upstream; skip permission filtering
-    page = await Page.findById(pageId);
+    page = await Page.findOne({ _id: { $eq: pageId } });
   } else if (pageId != null) {
     // prioritized
     page = await Page.findByIdAndViewer(pageId, user, null, true);
