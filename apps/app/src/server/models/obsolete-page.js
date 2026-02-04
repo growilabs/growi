@@ -1,4 +1,3 @@
-import { fa } from '@faker-js/faker';
 import { GroupType, Origin } from '@growi/core';
 import {
   pagePathUtils,
