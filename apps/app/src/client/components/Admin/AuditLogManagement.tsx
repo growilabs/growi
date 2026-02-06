@@ -7,7 +7,8 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
 import type { IClearable } from '~/client/interfaces/clearable';
-import { toastError } from '~/client/util/toastr';
+import { apiv3Post } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import type { SupportedActionType } from '~/interfaces/activity';
 import {
   auditLogAvailableActionsAtom,
@@ -185,6 +186,36 @@ export const AuditLogManagement: FC = () => {
     setActivePageNumber(jumpPageNumber);
   }, [jumpPageNumber]);
 
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+
+  const exportHandler = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const filters: {
+        actions?: SupportedActionType[];
+        dateFrom?: Date;
+        dateTo?: Date;
+      } = {};
+
+      if (selectedActionList.length > 0) {
+        filters.actions = selectedActionList;
+      }
+      if (startDate != null) {
+        filters.dateFrom = startDate;
+      }
+      if (endDate != null) {
+        filters.dateTo = endDate;
+      }
+
+      await apiv3Post('/audit-log-bulk-export', { filters });
+      toastSuccess(t('audit_log_management.export_requested'));
+    } catch {
+      toastError(t('audit_log_management.export_failed'));
+    } finally {
+      setIsExporting(false);
+    }
+  }, [selectedActionList, startDate, endDate, t]);
+
   const startIndex = activityList.length === 0 ? 0 : offset + 1;
   const endIndex = activityList.length === 0 ? 0 : offset + activityList.length;
 
@@ -265,6 +296,24 @@ export const AuditLogManagement: FC = () => {
                 onClick={clearButtonPushedHandler}
               >
                 {t('admin:audit_log_management.clear')}
+              </button>
+            </div>
+
+            <div className="col-12">
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={exportHandler}
+                disabled={isExporting}
+              >
+                {isExporting ? (
+                  <LoadingSpinner className="me-1 fs-3" />
+                ) : (
+                  <span className="material-symbols-outlined me-1">
+                    download
+                  </span>
+                )}
+                {t('admin:audit_log_management.export')}
               </button>
             </div>
           </div>
