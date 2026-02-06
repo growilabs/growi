@@ -8,6 +8,51 @@ user-invocable: false
 
 Commands specific to the main GROWI application. For global commands (turbo, pnpm), see the global `tech-stack` skill.
 
+## Quality Check Commands
+
+**IMPORTANT**: Distinguish between Turborepo tasks and package-specific scripts.
+
+### Turbo Tasks vs Package Scripts
+
+| Task | Turborepo (turbo.json) | Package Script (package.json) |
+|------|------------------------|-------------------------------|
+| `lint` | ✅ Yes | ✅ Yes (runs all lint:\*) |
+| `test` | ✅ Yes | ✅ Yes |
+| `build` | ✅ Yes | ✅ Yes |
+| `lint:typecheck` | ❌ No | ✅ Yes |
+| `lint:biome` | ❌ No | ✅ Yes |
+| `lint:styles` | ❌ No | ✅ Yes |
+
+### Recommended Commands
+
+```bash
+# Run ALL quality checks (uses Turborepo caching)
+turbo run lint --filter @growi/app
+turbo run test --filter @growi/app
+turbo run build --filter @growi/app
+
+# Run INDIVIDUAL lint checks (package-specific scripts)
+pnpm --filter @growi/app run lint:typecheck   # TypeScript only
+pnpm --filter @growi/app run lint:biome       # Biome only
+pnpm --filter @growi/app run lint:styles      # Stylelint only
+
+# Alternative: Run from apps/app directory
+cd apps/app
+pnpm run lint:typecheck
+pnpm run lint:biome
+```
+
+### Common Mistake
+
+```bash
+# ❌ WRONG: lint:typecheck is NOT a Turborepo task
+turbo run lint:typecheck --filter @growi/app
+# Error: could not find task `lint:typecheck` in project
+
+# ✅ CORRECT: Use pnpm for package-specific scripts
+pnpm --filter @growi/app run lint:typecheck
+```
+
 ## Quick Reference
 
 | Task | Command |
