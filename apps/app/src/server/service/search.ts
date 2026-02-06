@@ -8,6 +8,7 @@ import {
   isIncludeAiMenthion,
   removeAiMenthion,
 } from '~/features/search/utils/ai';
+import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
   IFormattedSearchResult,
@@ -49,9 +50,13 @@ const filterXssOptions = {
 
 const filterXss = new FilterXSS(filterXssOptions);
 
-const normalizeQueryString = (_queryString: string): string => {
+const normalizeQueryString = (
+  _queryString: string,
+  disableUserPages: boolean,
+): string => {
   let queryString = _queryString.trim();
   queryString = removeAiMenthion(queryString).replace(/\s+/g, ' ');
+  queryString = excludeUserPagesFromQuery(queryString, disableUserPages);
 
   return queryString;
 };
@@ -328,7 +333,11 @@ class SearchService implements SearchQueryParser, SearchResolver {
     _queryString: string,
     nqName: string | null,
   ): Promise<ParsedQuery> {
-    const queryString = normalizeQueryString(_queryString);
+    const disableUserPages = configManager.getConfig(
+      'security:disableUserPages',
+    );
+
+    const queryString = normalizeQueryString(_queryString, disableUserPages);
 
     const terms = this.parseQueryString(queryString);
 
@@ -351,7 +360,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     let parsedQuery: ParsedQuery;
     if (aliasOf != null) {
       parsedQuery = {
-        queryString: normalizeQueryString(aliasOf),
+        queryString: normalizeQueryString(aliasOf, disableUserPages),
         terms: this.parseQueryString(aliasOf),
       };
     } else {
