@@ -44,8 +44,8 @@ export const PageRevisionTable = (
 
   const { data, size, error, setSize, isValidating } = swrInifiniteResponse;
 
-  const revisions = data && data[0].revisions;
-  const oldestRevision = revisions && revisions[revisions.length - 1];
+  const revisions = data?.[0].revisions;
+  const oldestRevision = revisions?.[revisions.length - 1];
 
   // First load
   const isLoadingInitialData = !data && !error;
@@ -166,34 +166,30 @@ export const PageRevisionTable = (
           </div>
         </td>
         <td className="col-1">
-          {(hasDiff || revisionId === sourceRevision?._id) && (
-            <div className="form-check form-check-inline me-0">
-              <input
-                type="radio"
-                className="form-check-input"
-                id={`compareSource-${revisionId}`}
-                name="compareSource"
-                value={revisionId}
-                checked={revisionId === sourceRevision?._id}
-                onChange={() => setSourceRevision(revision)}
-              />
-            </div>
-          )}
+          <div className="form-check form-check-inline me-0">
+            <input
+              type="radio"
+              className="form-check-input"
+              id={`compareSource-${revisionId}`}
+              name="compareSource"
+              value={revisionId}
+              checked={revisionId === sourceRevision?._id}
+              onChange={() => setSourceRevision(revision)}
+            />
+          </div>
         </td>
         <td className="col-2">
-          {(hasDiff || revisionId === targetRevision?._id) && (
-            <div className="form-check form-check-inline me-0">
-              <input
-                type="radio"
-                className="form-check-input"
-                id={`compareTarget-${revisionId}`}
-                name="compareTarget"
-                value={revisionId}
-                checked={revisionId === targetRevision?._id}
-                onChange={() => setTargetRevision(revision)}
-              />
-            </div>
-          )}
+          <div className="form-check form-check-inline me-0">
+            <input
+              type="radio"
+              className="form-check-input"
+              id={`compareTarget-${revisionId}`}
+              name="compareTarget"
+              value={revisionId}
+              checked={revisionId === targetRevision?._id}
+              onChange={() => setTargetRevision(revision)}
+            />
+          </div>
         </td>
       </tr>
     );

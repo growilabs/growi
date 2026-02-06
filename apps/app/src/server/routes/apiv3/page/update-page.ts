@@ -161,11 +161,11 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
           'update',
           option,
         );
-        results.forEach((result) => {
+        for (const result of results) {
           if (result.status === 'rejected') {
             logger.error('Create user notification failed', result.reason);
           }
-        });
+        }
       } catch (err) {
         logger.error('Create user notification failed', err);
       }
@@ -298,7 +298,36 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
           options.grant = grant;
           options.userRelatedGrantUserGroupIds = userRelatedGrantUserGroupIds;
         }
-        previousRevision = await Revision.findById(sanitizeRevisionId);
+
+        // Priority 1: Use provided revisionId (for conflict detection)
+        previousRevision = null;
+        if (sanitizeRevisionId != null) {
+          try {
+            previousRevision = await Revision.findById(sanitizeRevisionId);
+          } catch (error) {
+            logger.error('Failed to fetch previousRevision by revisionId', {
+              revisionId: sanitizeRevisionId,
+              pageId: currentPage._id,
+              error,
+            });
+          }
+        }
+
+        // Priority 2: Fallback to currentPage.revision (for diff detection)
+        if (previousRevision == null && currentPage.revision != null) {
+          try {
+            previousRevision = await Revision.findById(currentPage.revision);
+          } catch (error) {
+            logger.error(
+              'Failed to fetch previousRevision by currentPage.revision',
+              {
+                pageId: currentPage._id,
+                revisionId: currentPage.revision,
+                error,
+              },
+            );
+          }
+        }
 
         // There are cases where "revisionId" is not required for revision updates
         // See: https://dev.growi.org/651a6f4a008fee2f99187431#origin-%E3%81%AE%E5%BC%B7%E5%BC%B1
