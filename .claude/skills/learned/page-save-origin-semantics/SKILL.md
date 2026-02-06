@@ -1,6 +1,6 @@
 ---
 name: page-save-origin-semantics
-description: Auto-invoked when working on page save, revision, or update operations. Explains the two-stage origin check mechanism for conflict detection and its separation from diff detection.
+description: Auto-invoked when modifying origin-based conflict detection, revision validation logic, or isUpdatable() method. Explains the two-stage origin check mechanism for conflict detection and its separation from diff detection.
 ---
 
 # Page Save Origin Semantics
