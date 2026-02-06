@@ -12,13 +12,11 @@ describe('PassportService test', () => {
 
   beforeAll(async () => {
     crowiMock = mock<Crowi>({
-      event: vi.fn().mockImplementation((eventName) => {
-        if (eventName === 'user') {
-          return mock<UserEvent>({
-            on: vi.fn(),
-          });
-        }
-      }),
+      events: {
+        user: mock<UserEvent>({
+          on: vi.fn(),
+        }),
+      },
     });
   });
 
@@ -40,7 +38,6 @@ describe('PassportService test', () => {
       );
     });
 
-    /* eslint-disable indent */
     let i = 0;
     describe.each`
       conditionId | departments   | positions     | ruleStr                                                   | expected

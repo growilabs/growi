@@ -1,22 +1,28 @@
 import { ConfigSource, SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import pathUtils from '@growi/core/dist/utils/path-utils';
+import express from 'express';
 import { body } from 'express-validator';
 
-import { i18n } from '^/config/next-i18next.config';
+import * as nextI18nConfig from '^/config/next-i18next.config';
 
 import { SupportedAction } from '~/interfaces/activity';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
+import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:app-settings');
 
-const { pathUtils } = require('@growi/core/dist/utils');
-const express = require('express');
+const { i18n } = nextI18nConfig;
 
 const router = express.Router();
 
@@ -311,15 +317,12 @@ const router = express.Router();
  *            type: boolean
  *            description: is enable internal stream system for azure file request
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../../middlewares/login-required')(
-    crowi,
-  );
-  const adminRequired = require('../../../middlewares/admin-required')(crowi);
+module.exports = (crowi: Crowi) => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const validator = {
     appSetting: [
@@ -401,7 +404,7 @@ module.exports = (crowi) => {
     accessTokenParser([SCOPE.READ.ADMIN.APP], { acceptLegacy: true }),
     loginRequiredStrictly,
     adminRequired,
-    async (req, res) => {
+    (_req: CrowiRequest, res: ApiV3Response) => {
       const appSettingsParams = {
         title: configManager.getConfig('app:title'),
         confidential: configManager.getConfig('app:confidential'),
@@ -867,11 +870,11 @@ module.exports = (crowi) => {
     loginRequiredStrictly,
     adminRequired,
     addActivity,
-    async (req, res) => {
-      const { t } = await getTranslation({ lang: req.user.lang });
+    async (req: CrowiRequest, res: ApiV3Response) => {
+      const { t } = await getTranslation({ lang: req.user?.lang });
 
       try {
-        await sendTestEmail(req.user.email);
+        await sendTestEmail(req.user?.email);
         const parameters = {
           action: SupportedAction.ACTION_ADMIN_MAIL_TEST_SUBMIT,
         };
@@ -1111,7 +1114,7 @@ module.exports = (crowi) => {
     accessTokenParser([SCOPE.WRITE.ADMIN.APP], { acceptLegacy: true }),
     loginRequiredStrictly,
     adminRequired,
-    async (req, res) => {
+    (_req: CrowiRequest, res: ApiV3Response) => {
       const isMaintenanceMode = crowi.appService.isMaintenanceMode();
       if (!isMaintenanceMode) {
         return res.apiv3Err(

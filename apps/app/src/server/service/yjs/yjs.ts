@@ -47,9 +47,7 @@ class YjsService implements IYjsService {
     const mdb = new MongodbPersistence(
       {
         // TODO: Required upgrading mongoose and unifying the versions of mongodb to omit 'as any'
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         client: mongoose.connection.getClient() as any,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         db: mongoose.connection.db as any,
       },
       {
@@ -113,7 +111,7 @@ class YjsService implements IYjsService {
     const persistece = createMongoDBPersistence(mdb);
 
     // foce set to private property
-    // eslint-disable-next-line dot-notation
+    // biome-ignore lint/complexity/useLiteralKeys: ignore
     ysocketio['persistence'] = persistece;
   }
 

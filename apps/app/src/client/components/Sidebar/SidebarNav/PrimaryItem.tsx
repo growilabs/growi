@@ -86,7 +86,7 @@ export const PrimaryItem = (props: PrimaryItemProps): JSX.Element => {
       <button
         type="button"
         data-testid={`grw-sidebar-nav-primary-${labelForTestId}`}
-        className={`btn btn-primary ${indicatorClass}`}
+        className={`btn btn-primary m-1 rounded ${indicatorClass}`}
         onClick={itemClickedHandler}
         onMouseEnter={mouseEnteredHandler}
         id={labelForTestId}

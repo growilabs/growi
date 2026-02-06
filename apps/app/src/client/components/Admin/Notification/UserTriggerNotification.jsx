@@ -113,7 +113,6 @@ class UserTriggerNotification extends React.Component {
                   }}
                 />
                 <p className="p-2 mb-0">
-                  {/* eslint-disable-next-line react/no-danger */}
                   <span
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
@@ -142,7 +141,6 @@ class UserTriggerNotification extends React.Component {
                   />
                 </div>
                 <p className="p-2 mb-0">
-                  {/* eslint-disable-next-line react/no-danger */}
                   <span
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{

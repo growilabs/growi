@@ -26,11 +26,14 @@
         // AI
         "anthropic.claude-code",
         // linter
-        "dbaeumer.vscode-eslint",
         "biomejs.biome",
         "editorconfig.editorconfig",
         "shinnn.stylelint",
         "stylelint.vscode-stylelint",
+        // markdown
+        "bierner.markdown-mermaid",
+        // TypeScript (Native Preview)
+        "typescriptteam.native-preview",
         // Test
         "vitest.explorer",
         "ms-playwright.playwright",

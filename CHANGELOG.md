@@ -1,8 +1,77 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.4.1...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.4.4...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.4.4](https://github.com/growilabs/compare/v7.4.3...v7.4.4) - 2026-01-30
+
+### 🐛 Bug Fixes
+
+* fix: Search navigation (#10749) @[copilot-swe-agent[bot]](https://github.com/apps/copilot-swe-agent)
+* fix: User pages are displayed in page list when 'Disable user pages' is on (#10752) @miya
+* fix: Disable logo update button when no file is selected (#10587) @hikaru-n-cpu
+
+### 🧰 Maintenance
+
+* support: Setup Claude Code environment (#10746) @yuki-takei
+* support: Improve test parallelism (#10747) @yuki-takei
+* support: Typecheck by tsgo (#10717) @yuki-takei
+
+## [v7.4.3](https://github.com/growilabs/compare/v7.4.2...v7.4.3) - 2026-01-21
+
+### 💎 Features
+
+* feat: Disable user page (#10735) @miya
+* feat: New admin setting for hiding user pages (#10708) @arvid-e
+* feat: Block other user's user pages (#10725) @arvid-e
+
+### 🚀 Improvement
+
+* imprv: New sidebar tool icon appearance (#10672) @satof3
+* imprv: Admin Home (#10692) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Vim keymap insert mode exiting after single keystroke  (#10714) @miya
+* fix: Cannot create `/Sidebar` page from custom sidebar (#10690) @miya
+* fix: PageTree does not auto-scroll to target page path on initial render (#10699) @miya
+
+### 🧰 Maintenance
+
+* support: Upgrade headless-tree (#10733) @miya
+* support: Integrate Lefthook for pre-commit Biome formatting (#10694) @[copilot-swe-agent[bot]](https://github.com/apps/copilot-swe-agent)
+* support: Stop pushing docker image to weseek repository (#10681) @miya
+* support: Migrate the rest of files to Biome from Eslint (#10683) @yuki-takei
+
+## [v7.4.2](https://github.com/growilabs/compare/v7.4.1...v7.4.2) - 2026-01-08
+
+### 🚀 Improvement
+
+* imprv: New help button (#10553) @satof3
+* imprv: PagePathNavTitle spacing and z-index layering (#10665) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Handle blank configurations for SAML settings (#10674) @yuki-takei
+* fix: Text strings inside invitation email modal are incorrect (#10679) @miya
+* fix: Scroll jumps back to current PageTreeItem when creating page from PageTree (#10671) @miya
+
+### 🧰 Maintenance
+
+* support: Update dependencies (#10685) @miya
+* support: Update dependencies (#10682) @miya
+* ci(mergify): upgrade configuration to current format (#10673) @[mergify[bot]](https://github.com/apps/mergify)
+* support: Configure biome for some client components inside app 8 (#10668) @arafubeatbox
+* support: Configure biome for some client components inside app 7 (#10667) @arafubeatbox
+* support: Configure biome for some client components in app 6 (#10636) @arafubeatbox
+* support: Configure biome for some client components in app 4 (#10634) @arafubeatbox
+* support: Configure biome for some client components in app 3 (#10633) @arafubeatbox
+* ci(deps): bump qs from 6.13.0 to 6.14.1 (#10669) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Configure biome for some client components in app 5 (#10635) @arafubeatbox
+* support: Configure biome for some client components in app 2 (#10632) @arafubeatbox
+* support: Configure biome for some client components in app 1 (#10631) @arafubeatbox
+* ci(deps): bump next from 14.2.33 to 14.2.35 (#10597) @[dependabot[bot]](https://github.com/apps/dependabot)
 
 ## [v7.4.1](https://github.com/growilabs/compare/v7.4.0...v7.4.1) - 2025-12-26
 

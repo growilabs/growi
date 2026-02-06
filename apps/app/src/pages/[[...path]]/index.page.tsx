@@ -36,10 +36,7 @@ import { getServerSideCommonEachProps } from '../common-props';
 import { useInitialCSRFetch } from '../general-page';
 import { useHydrateGeneralPageConfigurationAtoms } from '../general-page/hydrate';
 import { registerPageToShowRevisionWithMeta } from '../general-page/superjson';
-import {
-  detectNextjsRoutingType,
-  NextjsRoutingType,
-} from '../utils/nextjs-routing-utils';
+import { NextjsRoutingType } from '../utils/nextjs-routing-utils';
 import { useCustomTitleForPage } from '../utils/page-title-customization';
 import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
 import { NEXT_JS_ROUTING_PAGE } from './consts';
@@ -96,11 +93,8 @@ const EditablePageEffects = dynamic(
 
 type Props = EachProps | InitialProps;
 
-const isInitialProps = (props: Props): props is InitialProps => {
-  return (
-    'isNextjsRoutingTypeInitial' in props && props.isNextjsRoutingTypeInitial
-  );
-};
+const isInitialProps = (props: Props): props is InitialProps =>
+  props.nextjsRoutingType !== NextjsRoutingType.SAME_ROUTE;
 
 const Page: NextPageWithLayout<Props> = (props: Props) => {
   // Initialize Jotai atoms with initial data - must be called unconditionally
@@ -130,8 +124,11 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
   useSameRouteNavigation();
   useShallowRouting(props);
 
-  // If initial props and skipSSR, fetch page data on client-side
-  useInitialCSRFetch(isInitialProps(props) && props.skipSSR);
+  // Fetch page data on client-side when SSR is skipped or navigating from outside
+  useInitialCSRFetch({
+    nextjsRoutingType: props.nextjsRoutingType,
+    skipSSR: isInitialProps(props) ? props.skipSSR : false,
+  });
 
   useEffect(() => {
     // Initialize editing markdown only when page path changes
@@ -269,16 +266,10 @@ export const getServerSideProps: GetServerSideProps<Props> = async (
   // STAGE 2
   //
 
-  // detect Next.js routing type
-  const nextjsRoutingType = detectNextjsRoutingType(
-    context,
-    NEXT_JS_ROUTING_PAGE,
-  );
-
   // Merge all results in a type-safe manner (using sequential merging)
   return mergeGetServerSidePropsResults(
     commonEachPropsResult,
-    nextjsRoutingType === NextjsRoutingType.SAME_ROUTE
+    commonEachProps.nextjsRoutingType === NextjsRoutingType.SAME_ROUTE
       ? await getServerSidePropsForSameRoute(context)
       : await getServerSidePropsForInitial(context),
   );

@@ -7,8 +7,7 @@ import { SlackOauthReq } from '~/interfaces/slack-to-growi/slack-oauth-req';
 import { InstallerService } from '~/services/InstallerService';
 import loggerFactory from '~/utils/logger';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const logger = loggerFactory('@growi/slackbot-proxy:middlewares:authorizer');
+const _logger = loggerFactory('@growi/slackbot-proxy:middlewares:authorizer');
 
 const getCommonMiddleware = (
   query: InstallationQuery<boolean>,

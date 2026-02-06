@@ -2,7 +2,7 @@ import { SupportedAction } from '~/interfaces/activity';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import loggerFactory from '~/utils/logger';
 
-const logger = loggerFactory('growi:routes:apiv3:logout'); // eslint-disable-line no-unused-vars
+const _logger = loggerFactory('growi:routes:apiv3:logout');
 
 const express = require('express');
 
@@ -10,7 +10,7 @@ const router = express.Router();
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
   const addActivity = generateAddActivityMiddleware(crowi);
 
   /**

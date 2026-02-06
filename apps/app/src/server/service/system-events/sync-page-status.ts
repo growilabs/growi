@@ -1,3 +1,4 @@
+import { SocketEventName } from '~/interfaces/websocket';
 import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
@@ -136,7 +137,23 @@ class SyncPageStatusService implements S2sMessageHandlable {
 
       this.publishToOtherServers('page:delete', { s2cMessagePageUpdated });
     });
+
+    this.emitter.on('addSeenUsers', (page) => {
+      logger.debug("'addSeenUsers' event emitted.");
+
+      const pageId = page._id.toString();
+
+      // emit to the room for each page
+      socketIoService
+        .getDefaultSocket()
+        .in(getRoomNameWithId(RoomPrefix.PAGE, page._id))
+        .emit(SocketEventName.PageSeenUsersUpdated, { pageId });
+
+      this.publishToOtherServers(SocketEventName.PageSeenUsersUpdated, {
+        pageId,
+      });
+    });
   }
 }
 
-module.exports = SyncPageStatusService;
+export default SyncPageStatusService;

@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/router';
 import withLoadingProps from 'next-dynamic-loading-props';
 import SimpleBar from 'simplebar-react';
 import { useIsomorphicLayoutEffect } from 'usehooks-ts';
@@ -51,7 +52,6 @@ const ResizableArea = withLoadingProps<ResizableAreaProps>((useLoadingProps) =>
   dynamic(() => import('./ResizableArea').then((mod) => mod.ResizableArea), {
     ssr: false,
     loading: () => {
-      // eslint-disable-next-line react-hooks/rules-of-hooks
       const { children, ...rest } = useLoadingProps();
       return (
         <ResizableAreaFallback {...rest}>{children}</ResizableAreaFallback>
@@ -249,7 +249,20 @@ type DrawableContainerProps = {
 const DrawableContainer = memo((props: DrawableContainerProps): JSX.Element => {
   const { divProps, className, children } = props;
 
+  const router = useRouter();
   const [isDrawerOpened, setIsDrawerOpened] = useDrawerOpened();
+
+  // Close drawer on route change
+  useEffect(() => {
+    const handleRouteChange = () => {
+      setIsDrawerOpened(false);
+    };
+
+    router.events.on('routeChangeStart', handleRouteChange);
+    return () => {
+      router.events.off('routeChangeStart', handleRouteChange);
+    };
+  }, [router.events, setIsDrawerOpened]);
 
   const openClass = `${isDrawerOpened ? 'open' : ''}`;
 
@@ -286,7 +299,6 @@ export const Sidebar = (): JSX.Element => {
 
   // css styles
   const grwSidebarClass = styles['grw-sidebar'];
-  // eslint-disable-next-line no-nested-ternary
   let modeClass = '';
   switch (sidebarMode) {
     case SidebarMode.DRAWER:

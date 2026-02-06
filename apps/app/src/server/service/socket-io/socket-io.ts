@@ -1,6 +1,6 @@
+import type { IncomingMessage } from 'node:http';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import expressSession from 'express-session';
-import type { IncomingMessage } from 'http';
 import passport from 'passport';
 import type { Namespace } from 'socket.io';
 import { Server } from 'socket.io';
@@ -9,6 +9,8 @@ import { SocketEventName } from '~/interfaces/websocket';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
+import adminRequiredFactory from '../../middlewares/admin-required';
+import loginRequiredFactory from '../../middlewares/login-required';
 import { configManager } from '../config-manager';
 import { getRoomNameWithId, RoomPrefix } from './helper';
 
@@ -89,7 +91,7 @@ export class SocketIoService {
    * use loginRequired middleware
    */
   setupLoginRequiredMiddleware() {
-    const loginRequired = require('../../middlewares/login-required')(
+    const loginRequired = loginRequiredFactory(
       this.crowi,
       true,
       (req, res, next) => {
@@ -99,7 +101,7 @@ export class SocketIoService {
 
     // convert Connect/Express middleware to Socket.io middleware
     this.io.use((socket, next) => {
-      loginRequired(socket.request, {}, next);
+      loginRequired(socket.request as any, {} as any, next as any);
     });
   }
 
@@ -107,16 +109,13 @@ export class SocketIoService {
    * use adminRequired middleware
    */
   setupAdminRequiredMiddleware() {
-    const adminRequired = require('../../middlewares/admin-required')(
-      this.crowi,
-      (req, res, next) => {
-        next(new Error('Admin priviledge is required to connect.'));
-      },
-    );
+    const adminRequired = adminRequiredFactory(this.crowi, (req, res, next) => {
+      next(new Error('Admin priviledge is required to connect.'));
+    });
 
     // convert Connect/Express middleware to Socket.io middleware
     this.getAdminSocket().use((socket, next) => {
-      adminRequired(socket.request, {}, next);
+      adminRequired(socket.request as any, {} as any, next as any);
     });
   }
 

@@ -1,6 +1,7 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { format, subSeconds } from 'date-fns';
+import { join } from 'pathe';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
@@ -14,7 +15,7 @@ import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import httpErrorHandler from '../../middlewares/http-error-handler';
 import { checkForgotPasswordEnabledMiddlewareFactory } from '../forgot-password';
 
-const logger = loggerFactory('growi:routes:apiv3:forgotPassword'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:routes:apiv3:forgotPassword');
 
 const express = require('express');
 const { body } = require('express-validator');
@@ -44,12 +45,11 @@ const router = express.Router();
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
   const { appService, mailService } = crowi;
-  const User = crowi.model('User');
-  const path = require('path');
+  const { User } = crowi.models;
 
   const addActivity = generateAddActivityMiddleware(crowi);
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const minPasswordLength = configManager.getConfig('app:minPasswordLength');
 
@@ -95,7 +95,7 @@ module.exports = (crowi) => {
     return mailService.send({
       to: email,
       subject: '[GROWI] Password Reset',
-      template: path.join(
+      template: join(
         crowi.localeDir,
         `${locale}/notifications/${templateFileName}.ejs`,
       ),
@@ -222,7 +222,6 @@ module.exports = (crowi) => {
    *                  userData:
    *                    $ref: '#/components/schemas/User'
    */
-  // eslint-disable-next-line max-len
   router.put(
     '/',
     checkPassportStrategyMiddleware,

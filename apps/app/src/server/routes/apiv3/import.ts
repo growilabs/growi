@@ -6,6 +6,8 @@ import { SupportedAction } from '~/interfaces/activity';
 import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
 import { generateOverwriteParams } from '~/server/service/import/overwrite-params';
@@ -14,7 +16,7 @@ import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 
-const logger = loggerFactory('growi:routes:apiv3:import'); // eslint-disable-line no-unused-vars
+const logger = loggerFactory('growi:routes:apiv3:import');
 
 const path = require('path');
 
@@ -130,12 +132,12 @@ export default function route(crowi: Crowi): Router {
   const { growiBridgeService, socketIoService } = crowi;
   const importService = getImportService();
 
-  const loginRequired = require('../../middlewares/login-required')(crowi);
-  const adminRequired = require('../../middlewares/admin-required')(crowi);
+  const loginRequired = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
 
-  const adminEvent = crowi.event('admin');
-  const activityEvent = crowi.event('activity');
+  const adminEvent = crowi.events.admin;
+  const activityEvent = crowi.events.activity;
 
   // setup event
   adminEvent.on('onProgressForImport', (data) => {
@@ -294,7 +296,6 @@ export default function route(crowi: Crowi): Router {
         // unzip
         await importService.unzip(zipFile);
 
-        // eslint-disable-next-line no-unused-vars
         const parseZipResult = await growiBridgeService.parseZipFile(zipFile);
         if (parseZipResult == null) {
           throw new Error('parseZipFile returns null');

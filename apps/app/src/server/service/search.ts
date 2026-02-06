@@ -1,4 +1,4 @@
-import type { IPageHasId } from '@growi/core';
+import type { IPage, IPageHasId, IUser } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
@@ -14,6 +14,7 @@ import type {
   IPageWithSearchMeta,
   ISearchResult,
 } from '~/interfaces/search';
+import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
@@ -34,7 +35,6 @@ import { configManager } from './config-manager';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const logger = loggerFactory('growi:service:search');
 
 const nonNullable = <T>(value: T): value is NonNullable<T> => value != null;
@@ -61,8 +61,7 @@ const normalizeNQName = (nqName: string): string => {
 };
 
 const findPageListByIds = async (pageIds: ObjectIdLike[], crowi: any) => {
-  const Page = crowi.model('Page') as unknown as PageModel;
-  const User = crowi.model('User');
+  const Page = mongoose.model<IPage, PageModel>('Page');
 
   const builder = new Page.PageQueryBuilder(
     Page.find({ _id: { $in: pageIds } }),
@@ -71,10 +70,10 @@ const findPageListByIds = async (pageIds: ObjectIdLike[], crowi: any) => {
 
   builder.addConditionToPagenate(undefined, undefined); // offset and limit are unnesessary
 
-  builder.populateDataToList(User.USER_FIELDS_EXCEPT_CONFIDENTIAL); // populate lastUpdateUser
+  builder.populateDataToList(USER_FIELDS_EXCEPT_CONFIDENTIAL); // populate lastUpdateUser
   builder.query = builder.query.populate({
     path: 'creator',
-    select: User.USER_FIELDS_EXCEPT_CONFIDENTIAL,
+    select: USER_FIELDS_EXCEPT_CONFIDENTIAL,
   });
 
   const pages = await builder.query.clone().exec('find');
@@ -160,7 +159,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   registerUpdateEvent() {
-    const pageEvent = this.crowi.event('page');
+    const pageEvent = this.crowi.events.page;
     pageEvent.on(
       'create',
       this.fullTextSearchDelegator.syncPageUpdated.bind(
@@ -228,7 +227,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
       );
     });
 
-    const bookmarkEvent = this.crowi.event('bookmark');
+    const bookmarkEvent = this.crowi.events.bookmark;
     bookmarkEvent.on(
       'create',
       this.fullTextSearchDelegator.syncBookmarkChanged.bind(
@@ -242,7 +241,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
       ),
     );
 
-    const tagEvent = this.crowi.event('tag');
+    const tagEvent = this.crowi.events.tag;
     tagEvent.on(
       'update',
       this.fullTextSearchDelegator.syncTagChanged.bind(
@@ -326,11 +325,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   async parseSearchQuery(
-    queryString: string,
+    _queryString: string,
     nqName: string | null,
   ): Promise<ParsedQuery> {
-    // eslint-disable-next-line no-param-reassign
-    queryString = normalizeQueryString(queryString);
+    const queryString = normalizeQueryString(_queryString);
 
     const terms = this.parseQueryString(queryString);
 
@@ -443,7 +441,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
     ];
   }
 
-  parseQueryString(queryString: string): QueryTerms {
+  parseQueryString(_queryString: string): QueryTerms {
+    let queryString = _queryString;
+
     // terms
     const matchWords: string[] = [];
     const notMatchWords: string[] = [];
@@ -459,7 +459,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const phrases = queryString.match(phraseRegExp);
 
     if (phrases !== null) {
-      queryString = queryString.replace(phraseRegExp, ''); // eslint-disable-line no-param-reassign
+      queryString = queryString.replace(phraseRegExp, '');
 
       phrases.forEach((phrase) => {
         phrase.trim();
@@ -549,7 +549,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     /*
      * Format ElasticSearch result
      */
-    const User = this.crowi.model('User');
+    const User = mongoose.model('User') as any; // Cast to any to access static properties
     const result = {} as IFormattedSearchResult;
 
     // get page data
@@ -595,8 +595,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
         const highlightData = data._highlight;
         if (highlightData != null) {
           const snippet = this.canShowSnippet(pageData, user, userGroups)
-            ? // eslint-disable-next-line max-len
-              highlightData.body ||
+            ? highlightData.body ||
               highlightData['body.en'] ||
               highlightData['body.ja'] ||
               highlightData.comments ||

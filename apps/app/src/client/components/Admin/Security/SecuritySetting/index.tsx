@@ -13,6 +13,7 @@ import { PageDeleteRightsSettings } from './PageDeleteRightsSettings';
 import { PageListDisplaySettings } from './PageListDisplaySettings';
 import { SessionMaxAgeSettings } from './SessionMaxAgeSettings';
 import { UserHomepageDeletionSettings } from './UserHomepageDeletionSettings';
+import { UserPageVisibilitySettings } from './UserPageVisibilitySettings';
 
 type FormData = {
   sessionMaxAge: string;
@@ -63,6 +64,8 @@ const SecuritySettingComponent: React.FC<Props> = ({
           hideRestrictedByOwner:
             adminGeneralSecurityContainer.state
               .currentOwnerRestrictionDisplayMode === 'Hidden',
+          disableUserPages:
+            adminGeneralSecurityContainer.state.disableUserPages,
           isUsersHomepageDeletionEnabled:
             adminGeneralSecurityContainer.state.isUsersHomepageDeletionEnabled,
           isForceDeleteUserHomepageOnUserDeletion:
@@ -111,6 +114,10 @@ const SecuritySettingComponent: React.FC<Props> = ({
             t={t}
           />
           <UserHomepageDeletionSettings
+            adminGeneralSecurityContainer={adminGeneralSecurityContainer}
+            t={t}
+          />
+          <UserPageVisibilitySettings
             adminGeneralSecurityContainer={adminGeneralSecurityContainer}
             t={t}
           />

@@ -58,7 +58,7 @@ class ExportService {
     this.growiBridgeService = crowi.growiBridgeService;
     this.baseDir = path.join(crowi.tmpDir, 'downloads');
 
-    this.adminEvent = crowi.event('admin');
+    this.adminEvent = crowi.events.admin;
 
     this.currentProgressingStatus = null;
   }
@@ -427,7 +427,6 @@ class ExportService {
   }
 }
 
-// eslint-disable-next-line import/no-mutable-exports
 export let exportService: ExportService | undefined; // singleton instance
 export default function instanciate(crowi: any): void {
   exportService = new ExportService(crowi);

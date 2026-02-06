@@ -1,5 +1,3 @@
-// disable no-return-await for model functions
-/* eslint-disable no-return-await */
 import type {
   IExternalAccount,
   IUser,
@@ -15,6 +13,7 @@ import { NullUsernameToBeRegisteredError } from '~/server/models/errors';
 import loggerFactory from '~/utils/logger';
 
 import { getOrCreateModel } from '../util/mongoose-utils';
+import { UserStatus } from './user/conts';
 
 const logger = loggerFactory('growi:models:external-account');
 
@@ -74,8 +73,8 @@ schema.statics.findOrRegister = function (
   isSameEmailTreatedAsIdenticalUser: boolean,
   providerType: string,
   accountId: string,
-  usernameToBeRegistered?: string,
-  nameToBeRegistered?: string,
+  usernameToBeRegistered: string | undefined,
+  nameToBeRegistered = '',
   mailToBeRegistered?: string,
 ): Promise<HydratedDocument<IExternalAccount<IExternalAuthProviderType>>> {
   return this.findOne({ providerType, accountId }).then((account) => {
@@ -118,10 +117,6 @@ schema.statics.findOrRegister = function (
             user,
           );
         }
-        if (nameToBeRegistered == null) {
-          // eslint-disable-next-line no-param-reassign
-          nameToBeRegistered = '';
-        }
 
         // create a new User with STATUS_ACTIVE
         logger.debug(
@@ -133,7 +128,7 @@ schema.statics.findOrRegister = function (
           mailToBeRegistered,
           undefined,
           undefined,
-          User.STATUS_ACTIVE,
+          UserStatus.STATUS_ACTIVE,
         );
       })
       .then((newUser) => {

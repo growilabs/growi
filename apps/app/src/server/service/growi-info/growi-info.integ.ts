@@ -1,7 +1,7 @@
+import type { IPage, IUser } from '@growi/core/dist/interfaces';
 import mongoose from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
-import type { IPage, IUser } from '^/../../packages/core/dist';
 import pkg from '^/package.json';
 
 import type UserEvent from '~/server/events/user';
@@ -19,6 +19,8 @@ describe('GrowiInfoService', () => {
   let User: mongoose.Model<IUser>;
   let Page: PageModel;
 
+  let serviceInstanceId: string;
+
   beforeAll(async () => {
     process.env.APP_SITE_URL = 'http://growi.test.jp';
     process.env.DEPLOYMENT_TYPE = 'growi-docker-compose';
@@ -34,6 +36,8 @@ describe('GrowiInfoService', () => {
       'security:passport-github:isEnabled': true,
     });
 
+    serviceInstanceId = configManager.getConfig('app:serviceInstanceId');
+
     await Config.create({
       key: 'app:installed',
       value: true,
@@ -42,16 +46,16 @@ describe('GrowiInfoService', () => {
 
     const crowiMock = mock<Crowi>({
       version: appVersion,
-      event: vi.fn().mockImplementation((eventName) => {
-        if (eventName === 'user') {
-          return mock<UserEvent>({
-            on: vi.fn(),
-          });
-        }
-      }),
+      events: {
+        user: mock<UserEvent>({
+          on: vi.fn(),
+        }),
+      },
     });
 
     const userModelFactory = (await import('~/server/models/user')).default;
+    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+    // @ts-ignore
     User = userModelFactory(crowiMock);
 
     await User.deleteMany({}); // clear users
@@ -74,13 +78,12 @@ describe('GrowiInfoService', () => {
       expect(growiInfo.osInfo?.arch).toBeTruthy();
       expect(growiInfo.osInfo?.totalmem).toBeTruthy();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (growiInfo as any).osInfo;
 
       expect(growiInfo).toEqual({
         version: appVersion,
         appSiteUrl: 'http://growi.test.jp',
-        serviceInstanceId: '',
+        serviceInstanceId,
         type: 'on-premise',
         wikiType: 'closed',
         deploymentType: 'growi-docker-compose',
@@ -105,13 +108,12 @@ describe('GrowiInfoService', () => {
       expect(growiInfo.osInfo?.arch).toBeTruthy();
       expect(growiInfo.osInfo?.totalmem).toBeTruthy();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (growiInfo as any).osInfo;
 
       expect(growiInfo).toEqual({
         version: appVersion,
         appSiteUrl: 'http://growi.test.jp',
-        serviceInstanceId: '',
+        serviceInstanceId,
         type: 'on-premise',
         wikiType: 'closed',
         deploymentType: 'growi-docker-compose',
@@ -224,7 +226,7 @@ describe('GrowiInfoService', () => {
       expect(growiInfo).toEqual({
         version: appVersion,
         appSiteUrl: 'http://growi.test.jp',
-        serviceInstanceId: '',
+        serviceInstanceId,
         type: 'on-premise',
         wikiType: 'closed',
         deploymentType: 'growi-docker-compose',

@@ -124,7 +124,7 @@ const PageOperationMenuItems = (
   const [isBulkExportTooltipOpen, setIsBulkExportTooltipOpen] = useState(false);
 
   const syncLatestRevisionBodyHandler = useCallback(async () => {
-    // eslint-disable-next-line no-alert
+    // biome-ignore lint/suspicious/noAlert: Allow to use confirm dialog here
     const answer = window.confirm(t('sync-latest-revision-body.confirm'));
     if (answer) {
       try {
@@ -137,7 +137,7 @@ const PageOperationMenuItems = (
         }
 
         if (res?.isYjsDataBroken) {
-          // eslint-disable-next-line no-alert
+          // biome-ignore lint/suspicious/noAlert: Allow to use confirm dialog here
           window.alert(t('sync-latest-revision-body.alert'));
           return;
         }
@@ -191,7 +191,7 @@ const PageOperationMenuItems = (
             <DropdownItem
               onClick={openPageBulkExportSelectModal}
               className="grw-page-control-dropdown-item"
-              disabled={!isUploadEnabled ?? true}
+              disabled={!isUploadEnabled}
             >
               <span className="material-symbols-outlined me-1 grw-page-control-dropdown-icon">
                 cloud_download

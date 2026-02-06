@@ -4,7 +4,7 @@ const { isCreatablePage } = pagePathUtils;
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const Page = crowi.model('Page');
+  const { Page } = crowi.models;
 
   /**
    * Create posts from imported data
@@ -18,12 +18,12 @@ module.exports = (crowi) => {
     const promises = [];
     const errors = [];
 
-    /* eslint-disable no-await-in-loop */
     for (const page of pages) {
       const path = page.path;
       const user = page.user;
       const body = page.body;
       const isCreatableName = isCreatablePage(path);
+      // biome-ignore lint/performance/noAwaitInLoops: Allow for memory consumption control
       const isPageNameTaken = await Page.findByPathAndViewer(path, user);
 
       if (isCreatableName && !isPageNameTaken) {
@@ -45,7 +45,6 @@ module.exports = (crowi) => {
         }
       }
     }
-    /* eslint-enable no-await-in-loop */
 
     await Promise.all(promises);
 

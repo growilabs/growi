@@ -5,7 +5,9 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import {
   isTopPage,
+  isUserPage,
   isUsersProtectedPages,
+  isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import type { Request, RequestHandler } from 'express';
 import type { ValidationChain } from 'express-validator';
@@ -23,12 +25,14 @@ import type { IOptionsForUpdate } from '~/interfaces/page';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
 } from '~/server/models/serializers';
+import { configManager } from '~/server/service/config-manager/config-manager';
 import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import { getYjsService } from '~/server/service/yjs';
@@ -43,19 +47,16 @@ const logger = loggerFactory('growi:routes:apiv3:page:update-page');
 
 type ReqBody = IApiv3PageUpdateParams;
 
-interface UpdatePageRequest extends Request<undefined, ApiV3Response, ReqBody> {
+interface UpdatePageRequest
+  extends Request<Record<string, string>, ApiV3Response, ReqBody> {
   user: IUserHasId;
 }
 
-type UpdatePageHandlersFactory = (crowi: Crowi) => RequestHandler[];
-
-export const updatePageHandlersFactory: UpdatePageHandlersFactory = (crowi) => {
+export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
   const Page = mongoose.model<IPage, PageModel>('Page');
   const Revision = mongoose.model<IRevisionHasId>('Revision');
 
-  const loginRequiredStrictly = require('../../../middlewares/login-required')(
-    crowi,
-  );
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   // define validators for req.body
   const validator: ValidationChain[] = [
@@ -127,7 +128,7 @@ export const updatePageHandlersFactory: UpdatePageHandlersFactory = (crowi) => {
       target: updatedPage,
       action: SupportedAction.ACTION_PAGE_UPDATE,
     };
-    const activityEvent = crowi.event('activity');
+    const activityEvent = crowi.events.activity;
     activityEvent.emit(
       'update',
       res.locals.activity._id,
@@ -191,7 +192,7 @@ export const updatePageHandlersFactory: UpdatePageHandlersFactory = (crowi) => {
     loginRequiredStrictly,
     excludeReadOnlyUser,
     addActivity,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: UpdatePageRequest, res: ApiV3Response) => {
       const { pageId, revisionId, body, origin, grant } = req.body;
@@ -222,6 +223,16 @@ export const updatePageHandlersFactory: UpdatePageHandlersFactory = (crowi) => {
           ),
           400,
         );
+      }
+
+      const disableUserPages = configManager.getConfig(
+        'security:disableUserPages',
+      );
+      if (
+        disableUserPages &&
+        (isUsersTopPage(currentPage.path) || isUserPage(currentPage.path))
+      ) {
+        return res.apiv3Err('User pages are disabled');
       }
 
       const isGrantImmutable =

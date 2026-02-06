@@ -65,6 +65,11 @@
       "enable_force_delete_user_homepage_on_user_deletion": "ユーザーを削除したとき、ユーザーホームページとその配下のページを完全削除する",
       "desc": "削除済みユーザーのユーザーホームページを削除できるようになります。"
     },
+    "disable_user_pages": {
+      "disable_user_pages": "ユーザーページの無効化",
+      "disable_user_pages_label": "ユーザーページを無効にする",
+      "desc": "ユーザーページを無効にすることで、すべてのユーザーページに対する作成・閲覧・編集・複製ができなくなります。</br>また、ページツリーや最近の変更、検索結果などでもユーザーページが表示されなくなります。"
+    },
     "session": "セッション",
     "max_age": "有効期間 (ミリ秒)",
     "max_age_desc": "ユーザーのセッション情報の有効期間をミリ秒で指定できます。<br>デフォルト値: 2592000000 (30日間)",
@@ -322,7 +327,7 @@
       "done": "クリップボードにコピーしました！"
     },
     "bug_report": "バグを報告する",
-    "submit_bug_report": "<a href='https://github.com/growilabs/growi/issues/new?assignees=&labels=bug&template=bug-report.md&title=Bug%3A' target='_blank' rel='noreferrer'>次に GitHub で Issue を投稿してください。</a>"
+    "submit_bug_report": "GitHub で Issue を投稿"
   },
   "v5_page_migration": {
     "migration_desc": "公開されているページに 古い v4 互換形式のものが存在します。ページツリーや簡単なリネームなどの新機能を利用するには、全てのページを v5 互換形式に変換してください。",
@@ -459,6 +464,18 @@
       "tag_names": "タグ名",
       "tag_attributes": "タグ属性",
       "import_recommended": "{{target}} のおすすめをインポート"
+    },
+    "content-disposition_header": "Content-Disposition MIMEタイプ設定",
+    "content-disposition_options": {
+      "add_header": "MIMEタイプを追加する",
+      "note": "注意: MIMEタイプを追加すると、もう一方のリストからは自動的に削除されます。",
+      "inline_header": "インライン MIMEタイプ",
+      "attachment_header": "添付ファイル MIMEタイプ",
+      "inline_button": "インライン",
+      "no_inline": "設定済みのインラインタイプはありません。",
+      "no_attachment": "設定済みの添付ファイルタイプはありません。",
+      "attachment_button": "添付ファイル",
+      "remove_button": "削除"
     }
   },
   "customize_settings": {
@@ -748,7 +765,7 @@
       "description1": "メールアドレスを使用して新規ユーザーを仮発行します。",
       "description2": "初回のログイン時に使用する仮パスワードが生成されます。",
       "invite_thru_email": "招待メールを送信する",
-      "mail_setting_link": "<span className='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>メールの設定</a>",
+      "mail_setting_link": "<span class='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>メールの設定</a>",
       "valid_email": "メールアドレスを入力してください。",
       "temporary_password": "作成したユーザーは仮パスワードが設定されています。",
       "send_new_password": "新規発行したパスワードを、対象ユーザーへ連絡してください。",

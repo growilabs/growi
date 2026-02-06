@@ -44,6 +44,7 @@ export interface IPageOperationService {
   autoUpdateExpiryDate(operationId: ObjectIdLike): NodeJS.Timeout;
   clearAutoUpdateInterval(timerObj: NodeJS.Timeout): void;
   getAncestorsPathsByFromAndToPath(fromPath: string, toPath: string): string[];
+  afterExpressServerReady(): Promise<void>;
 }
 
 class PageOperationService implements IPageOperationService {
@@ -266,7 +267,6 @@ class PageOperationService implements IPageOperationService {
   }
 }
 
-// eslint-disable-next-line import/no-mutable-exports
 export let pageOperationService: PageOperationService | undefined; // singleton instance
 export default function instanciate(crowi: Crowi): PageOperationService {
   pageOperationService = new PageOperationService(crowi);

@@ -1,18 +1,14 @@
+import type { ReadStream } from 'node:fs';
+import { createReadStream } from 'node:fs';
 import { ConfigSource } from '@growi/core';
 import type { IUser } from '@growi/core/dist/interfaces';
 // biome-ignore lint/style/noRestrictedImports: TODO: check effects of using custom axios
 import rawAxios, { type AxiosRequestConfig } from 'axios';
-import FormData from 'form-data';
-import type { ReadStream } from 'fs';
-import { createReadStream } from 'fs';
-import mongoose, {
-  type HydratedDocument,
-  Types as MongooseTypes,
-} from 'mongoose';
-import { basename } from 'path';
+import * as FormDataModule from 'form-data';
+import mongoose, { Types as MongooseTypes } from 'mongoose';
+import { basename } from 'pathe';
 
 import { G2G_PROGRESS_STATUS } from '~/interfaces/g2g-transfer';
-import type { ITransferKey } from '~/interfaces/transfer-key';
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { ImportMode } from '~/models/admin/import-mode';
 import TransferKeyModel from '~/server/models/transfer-key';
@@ -35,6 +31,8 @@ import { exportService } from './export';
 import { generateOverwriteParams } from './import/overwrite-params';
 
 const logger = loggerFactory('growi:service:g2g-transfer');
+
+const FormData = FormDataModule.default ?? FormDataModule;
 
 /**
  * Header name for transfer key
@@ -233,8 +231,7 @@ interface Receiver {
 export class G2GTransferPusherService implements Pusher {
   crowi: Crowi;
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  constructor(crowi: any) {
+  constructor(crowi: Crowi) {
     this.crowi = crowi;
   }
 
@@ -287,14 +284,12 @@ export class G2GTransferPusherService implements Pusher {
       };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const User = mongoose.model<IUser, any>('User');
     const activeUserCount = await User.countActiveUsers();
     if ((destGROWIInfo.userUpperLimit ?? Infinity) < activeUserCount) {
       return {
         canTransfer: false,
         // TODO: i18n for reason
-        // eslint-disable-next-line max-len
         reason: `The number of active users (${activeUserCount} users) exceeds the limit of the destination GROWI (up to ${destGROWIInfo.userUpperLimit} users).`,
       };
     }
@@ -336,7 +331,6 @@ export class G2GTransferPusherService implements Pusher {
       return {
         canTransfer: false,
         // TODO: i18n for reason
-        // eslint-disable-next-line max-len
         reason: `The total file size of attachments exceeds the file upload limit of the destination GROWI. Requires ${totalFileSize.toLocaleString()} bytes, but got ${(destGROWIInfo.fileUploadTotalLimit as number).toLocaleString()} bytes.`,
       };
     }
@@ -462,7 +456,6 @@ export class G2GTransferPusherService implements Pusher {
     }
   }
 
-  // eslint-disable-next-line max-len
   public async startTransfer(
     tk: TransferKey,
     user: any,

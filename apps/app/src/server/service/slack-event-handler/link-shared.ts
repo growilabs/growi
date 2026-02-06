@@ -175,12 +175,10 @@ export class LinkSharedEventHandler
     return [...unfurlDataFromNormalLinks, ...unfurlDataFromPermalinks];
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private generateDataForUnfurl(
     pages: any,
     isPermalink: boolean,
   ): DataForUnfurl[] {
-    const Page = this.crowi.model('Page');
     const unfurlData: DataForUnfurl[] = [];
 
     for (const page of pages) {

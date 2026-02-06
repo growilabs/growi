@@ -32,7 +32,7 @@ export default class InAppNotificationService {
 
   constructor(crowi: Crowi) {
     this.crowi = crowi;
-    this.activityEvent = crowi.event('activity');
+    this.activityEvent = crowi.events.activity;
     this.socketIoService = crowi.socketIoService;
 
     this.emitSocketIo = this.emitSocketIo.bind(this);
@@ -137,7 +137,6 @@ export default class InAppNotificationService {
         Object.assign(paginateOptions, { status });
       }
       // TODO: import @types/mongoose-paginate-v2 and use PaginateResult as a type after upgrading mongoose v6.0.0
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const paginationResult = await (InAppNotification as any).paginate(
         paginateOptions,
         {
