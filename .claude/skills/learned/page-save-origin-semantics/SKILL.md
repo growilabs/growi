@@ -56,9 +56,32 @@ return true;
 
 ## Origin Values
 
-- `Origin.View = "view"` - Save from view mode
-- `Origin.Editor = "editor"` - Save from editor mode (collaborative editing via Yjs)
-- `undefined` - API-based saves or legacy pages
+Three types of page update methods (called "origin"):
+
+- **`Origin.Editor = "editor"`** - Save from editor mode (collaborative editing via Yjs)
+- **`Origin.View = "view"`** - Save from view mode
+  - Examples: HandsontableModal, DrawioModal editing
+- **`undefined`** - API-based saves or legacy pages
+
+## Origin Strength (強弱)
+
+**Basic Rule**: Page updates require the previous revision ID in the request. If the latest revision doesn't match, the server rejects the request.
+
+**Exception - Editor origin is stronger than View origin**:
+- **UX Goal**: Avoid `Posted param "revisionId" is outdated` errors when multiple members are using the Editor and View changes interrupt them
+- **Special Case**: When the latest revision's origin is View, Editor origin requests can update WITHOUT requiring revision ID
+
+### Origin Strength Matrix
+
+|        | Latest Revision: Editor | Latest Revision: View | Latest Revision: API |
+| ------ | ----------------------- | --------------------- | -------------------- |
+| **Request: Editor** | ⭕️ Bypass revision check | ⭕️ Bypass revision check | ❌ Strict check |
+| **Request: View**   | ❌ Strict check | ❌ Strict check | ❌ Strict check |
+| **Request: API**    | ❌ Strict check | ❌ Strict check | ❌ Strict check |
+
+**Reading the table**:
+- ⭕️ = Revision check bypassed (revisionId not required)
+- ❌ = Strict revision check required (revisionId must match)
 
 ## Behavior by Scenario
 
