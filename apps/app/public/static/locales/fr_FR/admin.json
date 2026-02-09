@@ -56,6 +56,11 @@
       "enable_force_delete_user_homepage_on_user_deletion": "Supprimer la page d'accueil et ses pages enfants",
       "desc": "Les pages d'accueil utilisateurs pourront être supprimées."
     },
+    "disable_user_pages": {
+      "disable_user_pages": "Désactiver les pages utilisateur",
+      "disable_user_pages_label": "Désactiver les pages utilisateur",
+      "desc": "En désactivant les pages utilisateur, la création, la consultation, la modification et la duplication de toutes les pages utilisateur seront désactivées.</br>De plus, les pages utilisateur n'apparaîtront pas dans l'arborescence des pages, les modifications récentes ou les résultats de recherche."
+    },
     "session": "Session",
     "max_age": "Âge maximal (ms)",
     "max_age_desc": "Spécifie (en milliseconde) l'âge maximal d'une session <br>Par défaut: 2592000000 (30 jours)",

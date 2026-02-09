@@ -1,6 +1,10 @@
 import type { GetServerSidePropsContext, GetServerSidePropsResult } from 'next';
 import type { IPage } from '@growi/core';
 import { getIdStringForRef } from '@growi/core';
+import {
+  isUserPage,
+  isUsersTopPage,
+} from '@growi/core/dist/utils/page-path-utils';
 import type { model } from 'mongoose';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
@@ -66,6 +70,28 @@ export const getPageDataForInitial = async (
   // not found
   if (pageWithMeta.data == null) {
     return notFoundProps;
+  }
+
+  const disableUserPages = configManager.getConfig('security:disableUserPages');
+  if (
+    disableUserPages &&
+    (isUserPage(pageWithMeta.data.path) ||
+      isUsersTopPage(pageWithMeta.data.path))
+  ) {
+    return {
+      props: {
+        isNotFound: true,
+        pageWithMeta: {
+          data: null,
+          meta: {
+            isNotFound: true,
+            isForbidden: true,
+          },
+        },
+        isExpired: undefined,
+        shareLink: undefined,
+      },
+    };
   }
 
   // expired

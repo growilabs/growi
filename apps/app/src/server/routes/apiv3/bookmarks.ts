@@ -1,15 +1,22 @@
 import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import {
+  isUserPage,
+  isUsersTopPage,
+} from '@growi/core/dist/utils/page-path-utils';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IBookmarkInfo } from '~/interfaces/bookmark-info';
+import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { BookmarkDocument, BookmarkModel } from '~/server/models/bookmark';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer';
+import { configManager } from '~/server/service/config-manager';
 import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
 
@@ -87,18 +94,12 @@ const router = express.Router();
  *            items:
  *              $ref: '#/components/schemas/User'
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(
-    crowi,
-  );
-  const loginRequired = require('../../middlewares/login-required')(
-    crowi,
-    true,
-  );
+module.exports = (crowi: Crowi) => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const loginRequired = loginRequiredFactory(crowi, true);
   const addActivity = generateAddActivityMiddleware();
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const validator = {
     bookmarks: [body('pageId').isString(), body('bool').isBoolean()],
@@ -237,11 +238,12 @@ module.exports = (crowi) => {
           'bookmarks',
           { owner: userId },
         );
+
         const userRootBookmarks = await Bookmark.find({
           _id: { $nin: bookmarkIdsInFolders },
           user: userId,
         })
-          .populate({
+          .populate<{ page: PageDocument | null }>({
             path: 'page',
             model: 'Page',
             populate: {
@@ -251,8 +253,21 @@ module.exports = (crowi) => {
           })
           .exec();
 
+        const disabledUserPage = configManager.getConfig(
+          'security:disableUserPages',
+        );
+
+        const filteredBookmarks = disabledUserPage
+          ? userRootBookmarks.filter(
+              (bookmark) =>
+                bookmark.page != null &&
+                !isUserPage(bookmark.page.path) &&
+                !isUsersTopPage(bookmark.page.path),
+            )
+          : userRootBookmarks;
+
         // serialize Bookmark
-        const serializedUserRootBookmarks = userRootBookmarks.map((bookmark) =>
+        const serializedUserRootBookmarks = filteredBookmarks.map((bookmark) =>
           serializeBookmarkSecurely(bookmark),
         );
 

@@ -1,0 +1,23 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$FILE\" == */apps/* ]] || [[ \"$FILE\" == */packages/* ]]; then REPO_ROOT=$(echo \"$FILE\" | sed 's|/\\(apps\\|packages\\)/.*|/|'); cd \"$REPO_ROOT\" && pnpm biome check --write \"$FILE\" 2>/dev/null || true; fi",
+            "timeout": 30,
+            "description": "Auto-format edited files in apps/* and packages/* with Biome"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "context7@claude-plugins-official": true,
+    "github@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "playwright@claude-plugins-official": true
+  }
+}

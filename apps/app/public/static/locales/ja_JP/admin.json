@@ -65,6 +65,11 @@
       "enable_force_delete_user_homepage_on_user_deletion": "ユーザーを削除したとき、ユーザーホームページとその配下のページを完全削除する",
       "desc": "削除済みユーザーのユーザーホームページを削除できるようになります。"
     },
+    "disable_user_pages": {
+      "disable_user_pages": "ユーザーページの無効化",
+      "disable_user_pages_label": "ユーザーページを無効にする",
+      "desc": "ユーザーページを無効にすることで、すべてのユーザーページに対する作成・閲覧・編集・複製ができなくなります。</br>また、ページツリーや最近の変更、検索結果などでもユーザーページが表示されなくなります。"
+    },
     "session": "セッション",
     "max_age": "有効期間 (ミリ秒)",
     "max_age_desc": "ユーザーのセッション情報の有効期間をミリ秒で指定できます。<br>デフォルト値: 2592000000 (30日間)",
@@ -451,6 +456,18 @@
       "tag_names": "タグ名",
       "tag_attributes": "タグ属性",
       "import_recommended": "{{target}} のおすすめをインポート"
+    },
+    "content-disposition_header": "Content-Disposition MIMEタイプ設定",
+    "content-disposition_options": {
+      "add_header": "MIMEタイプを追加する",
+      "note": "注意: MIMEタイプを追加すると、もう一方のリストからは自動的に削除されます。",
+      "inline_header": "インライン MIMEタイプ",
+      "attachment_header": "添付ファイル MIMEタイプ",
+      "inline_button": "インライン",
+      "no_inline": "設定済みのインラインタイプはありません。",
+      "no_attachment": "設定済みの添付ファイルタイプはありません。",
+      "attachment_button": "添付ファイル",
+      "remove_button": "削除"
     }
   },
   "customize_settings": {
