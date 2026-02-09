@@ -31,16 +31,13 @@ turbo run lint --filter @growi/app
 turbo run test --filter @growi/app
 turbo run build --filter @growi/app
 
-# Run INDIVIDUAL lint checks (package-specific scripts)
-pnpm --filter @growi/app run lint:typecheck   # TypeScript only
-pnpm --filter @growi/app run lint:biome       # Biome only
-pnpm --filter @growi/app run lint:styles      # Stylelint only
-
-# Alternative: Run from apps/app directory
-cd apps/app
-pnpm run lint:typecheck
-pnpm run lint:biome
+# Run INDIVIDUAL lint checks (package-specific scripts, from apps/app directory)
+pnpm run lint:typecheck   # TypeScript only
+pnpm run lint:biome       # Biome only
+pnpm run lint:styles      # Stylelint only
 ```
+
+> **Running individual test files**: See the `testing` rule (`.claude/rules/testing.md`).
 
 ### Common Mistake
 

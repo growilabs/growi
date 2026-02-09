@@ -1,5 +1,5 @@
 import { YDocStatus } from '@growi/core/dist/consts';
-import mongoose, { Types } from 'mongoose';
+import { Types } from 'mongoose';
 import type { Server } from 'socket.io';
 import { mock } from 'vitest-mock-extended';
 
@@ -28,15 +28,11 @@ const getPrivateMdbInstance = (yjsService: IYjsService): MongodbPersistence => {
 
 describe('YjsService', () => {
   describe('getYDocStatus()', () => {
-    beforeAll(async () => {
+    beforeAll(() => {
       const ioMock = mock<Server>();
 
       // initialize
       initializeYjsService(ioMock);
-
-      // Wait for index creation to complete to avoid race condition
-      const collection = mongoose.connection.collection('yjs-writings');
-      await collection.listIndexes().toArray();
     });
 
     afterAll(async () => {
@@ -49,9 +45,10 @@ describe('YjsService', () => {
       try {
         await privateMdb.flushDB();
       } catch (error) {
-        // Ignore IndexBuildAborted error (code: 276) which can occur in CI
-        // when cleanup happens while index creation is still in progress
-        if (error.code !== 276) {
+        // Ignore errors that can occur due to async index creation:
+        // - 26: NamespaceNotFound (collection not yet created)
+        // - 276: IndexBuildAborted (cleanup during index creation)
+        if (error.code !== 26 && error.code !== 276) {
           throw error;
         }
       }
