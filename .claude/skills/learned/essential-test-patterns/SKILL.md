@@ -1,7 +1,6 @@
 ---
-name: testing-patterns-with-vitest
-description: GROWI testing patterns with Vitest, React Testing Library, and vitest-mock-extended. Auto-invoked for all GROWI development work.
-user-invocable: false
+name: essential-test-patterns
+description: GROWI testing patterns with Vitest, React Testing Library, and vitest-mock-extended.
 ---
 
 # GROWI Testing Patterns
@@ -415,12 +414,43 @@ Before committing tests, ensure:
 
 ## Running Tests
 
-```bash
-# Run all tests for a package
-turbo run test --filter @growi/app
+### From Monorepo Root (Recommended)
 
-# Run specific test file
-cd {package_dir} && pnpm vitest run src/components/Button/Button.spec.tsx
+```bash
+# Run all tests for a specific package
+turbo run test --filter @growi/app
+turbo run test --filter @growi/core
+
+# Or with Turborepo caching
+pnpm run test --filter @growi/app
+```
+
+### From Package Directory
+
+```bash
+# Run all tests
+pnpm vitest run
+
+# Run specific test file (use partial file name)
+pnpm vitest run yjs.integ
+pnpm vitest run helper.spec
+pnpm vitest run Button.spec
+
+# Run tests matching a pattern
+pnpm vitest run PageService
+```
+
+**File pattern tips**:
+- Use **partial file name** - Vitest automatically finds matching files
+- No need for `src/` prefix or full path
+- No need for `--project` flag - Vitest auto-detects based on file extension
+- Works across all packages (apps/app, packages/core, etc.)
+
+### Running Multiple Times (Flaky Test Detection)
+
+```bash
+# Repeat test execution to verify stability
+pnpm vitest run yjs.integ --repeat=10
 ```
 
 ## Summary: GROWI Testing Philosophy

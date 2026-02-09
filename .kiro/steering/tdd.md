@@ -1,6 +1,6 @@
 # Test-Driven Development
 
-See: `.claude/commands/tdd.md` and `.claude/skills/testing-patterns-with-vitest/SKILL.md` (auto-loaded by Claude Code)
+See: `.claude/commands/tdd.md`, `.claude/skills/learned/essential-test-patterns/SKILL.md` and `.claude/skills/learned/essential-test-design/SKILL.md`
 
 ## cc-sdd Specific Notes
 

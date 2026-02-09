@@ -1,5 +1,5 @@
 import { YDocStatus } from '@growi/core/dist/consts';
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import type { Server } from 'socket.io';
 import { mock } from 'vitest-mock-extended';
 
@@ -33,6 +33,10 @@ describe('YjsService', () => {
 
       // initialize
       initializeYjsService(ioMock);
+
+      // Wait for index creation to complete to avoid race condition
+      const collection = mongoose.connection.collection('yjs-writings');
+      await collection.listIndexes().toArray();
     });
 
     afterAll(async () => {
@@ -42,7 +46,15 @@ describe('YjsService', () => {
       // flush yjs-writings
       const yjsService = getYjsService();
       const privateMdb = getPrivateMdbInstance(yjsService);
-      await privateMdb.flushDB();
+      try {
+        await privateMdb.flushDB();
+      } catch (error) {
+        // Ignore IndexBuildAborted error (code: 276) which can occur in CI
+        // when cleanup happens while index creation is still in progress
+        if (error.code !== 276) {
+          throw error;
+        }
+      }
     });
 
     it('returns ISOLATED when neither revisions nor YDocs exists', async () => {
