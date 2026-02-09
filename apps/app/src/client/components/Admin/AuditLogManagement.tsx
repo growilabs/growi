@@ -7,8 +7,7 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
 import type { IClearable } from '~/client/interfaces/clearable';
-import { apiv3Post } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
+import { toastError } from '~/client/util/toastr';
 import type { SupportedActionType } from '~/interfaces/activity';
 import {
   auditLogAvailableActionsAtom,
@@ -19,6 +18,7 @@ import { useSWRxActivity } from '~/stores/activity';
 import PaginationWrapper from '../PaginationWrapper';
 import { ActivityTable } from './AuditLog/ActivityTable';
 import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode';
+import { AuditLogExportModal } from './AuditLog/AuditLogExportModal';
 import { AuditLogSettings } from './AuditLog/AuditLogSettings';
 import { DateRangePicker } from './AuditLog/DateRangePicker';
 import { SearchUsernameTypeahead } from './AuditLog/SearchUsernameTypeahead';
@@ -186,35 +186,7 @@ export const AuditLogManagement: FC = () => {
     setActivePageNumber(jumpPageNumber);
   }, [jumpPageNumber]);
 
-  const [isExporting, setIsExporting] = useState<boolean>(false);
-
-  const exportHandler = useCallback(async () => {
-    setIsExporting(true);
-    try {
-      const filters: {
-        actions?: SupportedActionType[];
-        dateFrom?: Date;
-        dateTo?: Date;
-      } = {};
-
-      if (selectedActionList.length > 0) {
-        filters.actions = selectedActionList;
-      }
-      if (startDate != null) {
-        filters.dateFrom = startDate;
-      }
-      if (endDate != null) {
-        filters.dateTo = endDate;
-      }
-
-      await apiv3Post('/audit-log-bulk-export', { filters });
-      toastSuccess(t('audit_log_management.export_requested'));
-    } catch {
-      toastError(t('audit_log_management.export_failed'));
-    } finally {
-      setIsExporting(false);
-    }
-  }, [selectedActionList, startDate, endDate, t]);
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
 
   const startIndex = activityList.length === 0 ? 0 : offset + 1;
   const endIndex = activityList.length === 0 ? 0 : offset + activityList.length;
@@ -303,16 +275,9 @@ export const AuditLogManagement: FC = () => {
               <button
                 type="button"
                 className="btn btn-outline-secondary"
-                onClick={exportHandler}
-                disabled={isExporting}
+                onClick={() => setIsExportModalOpen(true)}
               >
-                {isExporting ? (
-                  <LoadingSpinner className="me-1 fs-3" />
-                ) : (
-                  <span className="material-symbols-outlined me-1">
-                    download
-                  </span>
-                )}
+                <span className="material-symbols-outlined me-1">download</span>
                 {t('admin:audit_log_management.export')}
               </button>
             </div>
@@ -364,6 +329,11 @@ export const AuditLogManagement: FC = () => {
               </button>
             </div>
           </div>
+
+          <AuditLogExportModal
+            isOpen={isExportModalOpen}
+            onClose={() => setIsExportModalOpen(false)}
+          />
         </>
       )}
     </div>

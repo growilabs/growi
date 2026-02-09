@@ -860,6 +860,7 @@
     "action_list": "Liste d'actions",
     "disable_mode_explanation": "Cette fonctionnalité est désactivée. Afin de l'activer, mettre à jour <code>AUDIT_LOG_ENABLED</code> pour true.",
     "export": " Exporter",
+    "export_audit_log": "Exporter le journal d'audit",
     "export_requested": " Demande d'exportation acceptée. Vous serez averti lorsque l'exportation sera terminée.",
     "export_failed": "Échec du démarrage de l'exportation",
     "docs_url": {

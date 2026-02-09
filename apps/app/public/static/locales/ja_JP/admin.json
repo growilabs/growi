@@ -870,6 +870,7 @@
     "action_list": "アクション一覧",
     "disable_mode_explanation": "現在、監査ログは無効になっています。有効にする場合は環境変数 <code>AUDIT_LOG_ENABLED</code> を true に設定してください。",
     "export": "エクスポート",
+    "export_audit_log": "監査ログのエクスポート",
     "export_requested": "エクスポートリクエストを受け付けました。完了後に通知されます。",
     "export_failed": "エクスポートの開始に失敗しました",
     "docs_url": {
