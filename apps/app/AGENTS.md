@@ -29,6 +29,10 @@ pnpm run test                   # Run tests
 
 # Build
 pnpm run build                  # Build for production
+
+# Run Specific Tests
+pnpm vitest run yjs.integ       # Use partial file name
+pnpm vitest run helper.spec     # Vitest auto-finds matching files
 ```
 
 ### Key Directories
