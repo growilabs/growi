@@ -1,8 +1,8 @@
 import type {
   IContributionDay,
   IWeeksToFreeze,
-  SetContributionCachePayload,
 } from '../interfaces/contribution-graph';
+import type { ContributionGraphDocument } from '../models/contribution-cache-model';
 import {
   formatDateKey,
   getCurrentWeekStart,
@@ -11,10 +11,7 @@ import {
   getISOWeekId,
   getStartDateFromISOWeek,
 } from '../utils/contribution-graph-utils';
-import {
-  ContributionAggregationService,
-  type PipelineParams,
-} from './aggregation-service';
+import { ContributionAggregationService } from './aggregation-service';
 import {
   cacheIsFresh,
   getContributionCache,
@@ -28,78 +25,127 @@ export class ContributionCacheManager {
     this.aggregationService = new ContributionAggregationService();
   }
 
-  public async getCache(userId: string) {
+  /**
+   * Updated and gets the latest contribution data until today.
+   *
+   * @param userId - ID of user to fetch cache for.
+   * @returns - Full combined array of all contributions until today.
+   */
+  public async getUpdatedCache(userId: string) {
     const contributionCache = await getContributionCache(userId);
 
-    if (!contributionCache?.lastUpdated) {
-      throw new Error('Cache not found.');
+    const isFresh = contributionCache
+      ? cacheIsFresh(contributionCache.lastUpdated)
+      : false;
+
+    if (isFresh && contributionCache) {
+      return this.assembleFullGraph(contributionCache);
     }
 
-    const { lastUpdated, currentWeekData, permanentWeeks } = contributionCache;
-    const cacheHit = cacheIsFresh(lastUpdated);
-
-    if (cacheHit) {
-      const permanentWeeksArray = Object.values(permanentWeeks);
-      const combinedCacheData = [...permanentWeeksArray, ...currentWeekData];
-
-      return combinedCacheData;
+    let aggregationStartDate: Date;
+    if (contributionCache) {
+      aggregationStartDate = contributionCache.lastUpdated;
     } else {
-      // what if only current week data is needed?
-
-      const params: PipelineParams = {
-        userId,
-        startDate: lastUpdated,
-      };
-
-      const freshCacheData =
-        await this.aggregationService.runAggregationPipeline(params);
-
-      const currentWeekStart = getCurrentWeekStart();
-      const newCurrentWeek: IContributionDay[] = [];
-
-      const weeksToFreezeMap: Record<string, IContributionDay[]> = {};
-
-      for (const contribution of freshCacheData) {
-        if (contribution.date >= currentWeekStart) {
-          newCurrentWeek.push(contribution);
-        } else {
-          const weekId = getISOWeekId(new Date(contribution.date));
-          if (!weeksToFreezeMap[weekId]) {
-            weeksToFreezeMap[weekId] = [];
-          }
-          weeksToFreezeMap[weekId].push(contribution);
-        }
-      }
-
-      // weeks to freeze
-      const weeksToFreeze: IWeeksToFreeze[] = Object.entries(
-        weeksToFreezeMap,
-      ).map(([id, data]) => ({
-        id,
-        data: this.fillGapsInWeek(getStartDateFromISOWeek(id), data),
-      }));
-
-      // weeks to delete
-      const existingCache = await getContributionCache(userId);
-      const cutoffWeekId = getCutoffWeekId(52);
-
-      const weekIdsToDelete = existingCache
-        ? getExpiredWeekIds(existingCache.permanentWeeks, cutoffWeekId)
-        : [];
-
-      const setContributionCachePayload: SetContributionCachePayload = {
-        userId,
-        newCurrentWeek,
-        weeksToFreeze,
-        weekIdsToDelete,
-      };
-
-      const updatedContributionCache = await updateContributionCache(
-        setContributionCachePayload,
+      aggregationStartDate = new Date();
+      aggregationStartDate.setUTCFullYear(
+        aggregationStartDate.getUTCFullYear() - 1,
       );
     }
+
+    const freshCacheData = await this.aggregationService.runAggregationPipeline(
+      {
+        userId,
+        startDate: aggregationStartDate,
+      },
+    );
+
+    const currentWeekStart = getCurrentWeekStart();
+    const currentWeekStartStr = formatDateKey(currentWeekStart);
+
+    const mergedCurrentWeekSparse = contributionCache
+      ? [...contributionCache.currentWeekData]
+      : [];
+    const weeksToFreezeMap: Record<string, IContributionDay[]> = {};
+
+    for (const contribution of freshCacheData) {
+      if (contribution.date >= currentWeekStartStr) {
+        const existingDay = mergedCurrentWeekSparse.find(
+          (d) => d.date === contribution.date,
+        );
+
+        // add to count if the day exists
+        if (existingDay) {
+          existingDay.count = contribution.count;
+        } else {
+          mergedCurrentWeekSparse.push(contribution);
+        }
+      } else {
+        const weekId = getISOWeekId(new Date(contribution.date));
+
+        if (!weeksToFreezeMap[weekId]) {
+          weeksToFreezeMap[weekId] = [];
+        }
+        weeksToFreezeMap[weekId].push(contribution);
+      }
+    }
+
+    const finalizedCurrentWeek = this.fillGapsInWeek(
+      currentWeekStart,
+      mergedCurrentWeekSparse,
+    );
+
+    const weeksToFreeze: IWeeksToFreeze[] = Object.entries(
+      weeksToFreezeMap,
+    ).map(([id, data]) => ({
+      id,
+      data: this.fillGapsInWeek(getStartDateFromISOWeek(id), data),
+    }));
+
+    const cutoffWeekId = getCutoffWeekId(52);
+
+    const weekIdsToDelete = contributionCache
+      ? getExpiredWeekIds(contributionCache.permanentWeeks, cutoffWeekId)
+      : [];
+
+    const updatedCache = await updateContributionCache({
+      userId,
+      newCurrentWeek: finalizedCurrentWeek,
+      weeksToFreeze,
+      weekIdsToDelete,
+    });
+
+    if (!updatedCache) {
+      throw new Error('Failed to update cache');
+    }
+
+    return this.assembleFullGraph(updatedCache);
   }
 
+  /**
+   * Takes updated cache and returns an array of all cache data.
+   *
+   * @param contributionCache - Updated cache to be displayed.
+   * @returns - Array of contribution data until today.
+   */
+  private assembleFullGraph(
+    contributionCache: ContributionGraphDocument,
+  ): IContributionDay[] {
+    const { currentWeekData, permanentWeeks } = contributionCache;
+
+    const permamentWeeks = Object.keys(permanentWeeks)
+      .sort()
+      .flatMap((id) => permanentWeeks[id]);
+
+    return [...permamentWeeks, ...currentWeekData];
+  }
+
+  /**
+   * Fills in days which has no contribution with contributions that has 0 count.
+   *
+   * @param startDate - Day from where to start filling gaps.
+   * @param dataToFill - Sparse array of contributions.
+   * @returns - Full week of contributions.
+   */
   private fillGapsInWeek(
     startDate: Date,
     dataToFill: IContributionDay[],
