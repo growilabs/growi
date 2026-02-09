@@ -41,40 +41,64 @@ describe('MailService', () => {
   });
 
   describe('exponentialBackoff', () => {
-    it('should wait 1 second on first attempt', async () => {
-      const startTime = Date.now();
-      await mailService.exponentialBackoff(1);
-      const elapsed = Date.now() - startTime;
-
-      expect(elapsed).toBeGreaterThanOrEqual(1000);
-      expect(elapsed).toBeLessThan(1100);
+    beforeEach(() => {
+      vi.useFakeTimers();
     });
 
-    it('should wait 2 seconds on second attempt', async () => {
-      const startTime = Date.now();
-      await mailService.exponentialBackoff(2);
-      const elapsed = Date.now() - startTime;
-
-      expect(elapsed).toBeGreaterThanOrEqual(2000);
-      expect(elapsed).toBeLessThan(2100);
+    afterEach(() => {
+      vi.useRealTimers();
     });
 
-    it('should wait 4 seconds on third attempt', async () => {
-      const startTime = Date.now();
-      await mailService.exponentialBackoff(3);
-      const elapsed = Date.now() - startTime;
+    it('should not resolve before 1 second on first attempt', async () => {
+      let resolved = false;
+      mailService.exponentialBackoff(1).then(() => {
+        resolved = true;
+      });
 
-      expect(elapsed).toBeGreaterThanOrEqual(4000);
-      expect(elapsed).toBeLessThan(4100);
+      await vi.advanceTimersByTimeAsync(999);
+      expect(resolved).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(resolved).toBe(true);
     });
 
-    it('should default to 4 seconds for attempts beyond 3', async () => {
-      const startTime = Date.now();
-      await mailService.exponentialBackoff(5);
-      const elapsed = Date.now() - startTime;
+    it('should not resolve before 2 seconds on second attempt', async () => {
+      let resolved = false;
+      mailService.exponentialBackoff(2).then(() => {
+        resolved = true;
+      });
 
-      expect(elapsed).toBeGreaterThanOrEqual(4000);
-      expect(elapsed).toBeLessThan(4100);
+      await vi.advanceTimersByTimeAsync(1999);
+      expect(resolved).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(resolved).toBe(true);
+    });
+
+    it('should not resolve before 4 seconds on third attempt', async () => {
+      let resolved = false;
+      mailService.exponentialBackoff(3).then(() => {
+        resolved = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(3999);
+      expect(resolved).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(resolved).toBe(true);
+    });
+
+    it('should cap at 4 seconds for attempts beyond 3', async () => {
+      let resolved = false;
+      mailService.exponentialBackoff(5).then(() => {
+        resolved = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(3999);
+      expect(resolved).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(resolved).toBe(true);
     });
   });
 
