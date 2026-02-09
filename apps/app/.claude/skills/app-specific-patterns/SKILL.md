@@ -6,7 +6,7 @@ user-invocable: false
 
 # App Specific Patterns (apps/app)
 
-For general testing patterns, see the global `testing-patterns-with-vitest` skill.
+For general testing patterns, see the global `learned/essential-test-patterns` and `learned/essential-test-design` skills.
 
 ## Next.js Pages Router
 

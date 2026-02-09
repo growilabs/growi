@@ -154,7 +154,7 @@ When working in this directory, these skills are automatically loaded:
 - **app-commands** - apps/app specific commands (migrations, OpenAPI, etc.)
 - **app-specific-patterns** - Jotai/SWR/Next.js patterns, testing
 
-Plus all global skills (monorepo-overview, tech-stack, testing-patterns-with-vitest).
+Plus all global skills (monorepo-overview, tech-stack).
 
 ---
 
