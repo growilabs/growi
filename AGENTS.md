@@ -24,7 +24,6 @@ Technical information is available in **Claude Code Skills** (`.claude/skills/`)
 |-------|-------------|
 | **monorepo-overview** | Monorepo structure, workspace organization, Changeset versioning |
 | **tech-stack** | Technology stack, pnpm/Turborepo, TypeScript, Biome |
-| **testing-patterns-with-vitest** | Vitest, React Testing Library, vitest-mock-extended |
 
 **Rules** (always applied):
 
