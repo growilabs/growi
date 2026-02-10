@@ -62,6 +62,7 @@
   "dependencies": {
     "@akebifiky/remark-simple-plantuml": "^1.0.2",
     "@aws-sdk/client-s3": "3.454.0",
+    "@aws-sdk/lib-storage": "3.454.0",
     "@aws-sdk/s3-request-presigner": "3.454.0",
     "@azure/identity": "^4.4.1",
     "@azure/openai": "^2.0.0",

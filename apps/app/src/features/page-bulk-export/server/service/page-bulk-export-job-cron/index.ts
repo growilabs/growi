@@ -47,7 +47,7 @@ export interface IPageBulkExportJobCronService {
   handleError(
     err: Error | null,
     pageBulkExportJob: PageBulkExportJobDocument,
-  ): void;
+  ): Promise<void>;
   notifyExportResultAndCleanUp(
     action: SupportedActionType,
     pageBulkExportJob: PageBulkExportJobDocument,
@@ -205,7 +205,7 @@ class PageBulkExportJobCronService
       } else if (
         pageBulkExportJob.status === PageBulkExportJobStatus.uploading
       ) {
-        compressAndUpload.bind(this)(user, pageBulkExportJob);
+        await compressAndUpload.bind(this)(user, pageBulkExportJob);
       }
     } catch (err) {
       logger.error(err);
