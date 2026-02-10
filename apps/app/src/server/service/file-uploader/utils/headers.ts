@@ -35,7 +35,7 @@ export const determineDisposition = (
  * Factory function to generate content headers.
  * This approach avoids creating a class instance for each call, improving memory efficiency.
  */
-export const createContentHeaders = (attachment: IAttachmentDocument, opts?: { inline?: boolean }): ContentHeader[] => {
+export const createContentHeaders = (attachment: IAttachmentDocument, opts?: { forceAttachment?: boolean }): ContentHeader[] => {
   const headers: ContentHeader[] = [];
 
   // Content-Type
@@ -52,7 +52,7 @@ export const createContentHeaders = (attachment: IAttachmentDocument, opts?: { i
   });
 
   // Content-Disposition
-  const disposition = opts?.inline === false
+  const disposition = opts?.forceAttachment
     ? 'attachment'
     : determineDisposition(attachment.fileFormat);
   headers.push({
