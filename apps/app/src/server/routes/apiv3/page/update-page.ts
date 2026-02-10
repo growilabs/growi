@@ -118,10 +118,12 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
     }
 
-    const isFirstSaveAfterCreation = previousRevision == null;
+    const ignoreEditWindow = 60 * 1000; // 60 seconds
+    const pageAgeMs =
+      updatedPage.updatedAt.getTime() - updatedPage.createdAt.getTime();
+    const isWithinIgnoreEditWindow = pageAgeMs < ignoreEditWindow;
 
-    // persist activity
-    if (!isFirstSaveAfterCreation) {
+    if (!isWithinIgnoreEditWindow) {
       const creator =
         updatedPage.creator != null
           ? getIdForRef(updatedPage.creator)
