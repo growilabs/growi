@@ -249,7 +249,8 @@ module.exports = function(crowi: Crowi) {
     const internalPathRoot = configManager.getConfig('fileUpload:local:internalRedirectPath');
     const internalPath = urljoin(internalPathRoot, relativePath);
 
-    const contentHeaders = createContentHeaders(attachment);
+    const isDownload = opts?.download ?? false;
+    const contentHeaders = createContentHeaders(attachment, { inline: !isDownload });
     applyHeaders(res, [
       ...toExpressHttpHeaders(contentHeaders),
       { field: 'X-Accel-Redirect', value: internalPath },
