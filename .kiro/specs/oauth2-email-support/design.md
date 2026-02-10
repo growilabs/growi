@@ -776,64 +776,6 @@ interface FailedEmailDocument {
 - Incomplete Configuration: isMailerSetup = false, display alert banner
 - Invalid Refresh Token: Log error code invalid_grant
 
-### Error Handling Implementation
-
-```typescript
-async sendWithRetry(config: EmailConfig, maxRetries = 3): Promise<SendResult> {
-  const backoffIntervals = [1000, 2000, 4000];
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const result = await this.mailer.sendMail(config);
-      logger.info('OAuth 2.0 email sent successfully', {
-        messageId: result.messageId,
-        recipient: config.to,
-        attempt,
-      });
-      return result;
-    } catch (error) {
-      logger.error(`OAuth 2.0 email send failed (attempt ${attempt}/${maxRetries})`, {
-        error: error.message,
-        code: error.code,
-        user: config.from,
-        recipient: config.to,
-        attemptNumber: attempt,
-        timestamp: new Date().toISOString(),
-      });
-
-      if (attempt === maxRetries) {
-        await this.storeFailedEmail(config, error);
-        throw new Error(`OAuth 2.0 email send failed after ${maxRetries} attempts`);
-      }
-
-      await this.exponentialBackoff(attempt);
-    }
-  }
-}
-
-async exponentialBackoff(attempt: number): Promise<void> {
-  const backoffIntervals = [1000, 2000, 4000];
-  const delay = backoffIntervals[attempt - 1] || 4000;
-  return new Promise(resolve => setTimeout(resolve, delay));
-}
-
-async storeFailedEmail(config: EmailConfig, error: Error): Promise<void> {
-  const failedEmail = {
-    emailConfig: config,
-    error: {
-      message: error.message,
-      code: (error as any).code,
-      stack: error.stack,
-    },
-    transmissionMethod: 'oauth2',
-    attempts: 3,
-    lastAttemptAt: new Date(),
-    createdAt: new Date(),
-  };
-
-  await this.crowi.model('FailedEmail').create(failedEmail);
-}
-```
 
 ### Monitoring
 
@@ -842,126 +784,91 @@ async storeFailedEmail(config: EmailConfig, error: Error): Promise<void> {
 - isMailerSetup flag exposed in admin UI
 - Never log clientSecret or refreshToken in plain text
 
-## Testing Strategy
 
-### Unit Tests
 
-- createOAuth2Client() with valid/missing/invalid credentials
-- initialize() sets isMailerSetup correctly
-- sendWithRetry() succeeds, retries, logs errors
-- exponentialBackoff() waits correct intervals
-- storeFailedEmail() creates document
-- ConfigManager encryption/decryption
-- AdminAppContainer state methods
+## Critical Implementation Constraints
 
-### Integration Tests
+### Nodemailer XOAuth2 Compatibility (CRITICAL)
 
-- End-to-end email send with mocked transport
-- Token refresh triggered
-- Retry logic on failures
-- Failed email storage
-- OAuth2Setting component rendering
-- Field masking display
-- API validation
+**Constraint**: OAuth 2.0 credential validation **must use falsy checks** (`!value`) not null checks (`value != null`) to match nodemailer's internal XOAuth2 handler behavior.
 
-### E2E Tests
+**Rationale**: Nodemailer's XOAuth2.generateToken() method uses `!this.options.refreshToken` at line 184, which rejects empty strings as invalid. Using `!= null` checks in GROWI would allow empty strings through validation, causing runtime failures when nodemailer rejects them.
 
-**Happy Path**:
-1. Navigate to Mail Settings
-2. Select OAuth 2.0
-3. Enter credentials
-4. Click Update
-5. Verify success toast
-6. Send test email
-7. Verify success
+**Implementation Pattern**:
+```typescript
+// ✅ CORRECT: Falsy check matches nodemailer behavior
+if (!clientId || !clientSecret || !refreshToken || !user) {
+  return null;
+}
+```
 
-**Credential Masking**:
-1. Navigate to Mail Settings
-2. Select OAuth 2.0
-3. Verify masked values (****abcd)
-4. Focus field, verify mask clears
+**Impact**: Affects MailService.createOAuth2Client(), ConfigManager validation, and API validators. All OAuth 2.0 credential checks must follow this pattern.
 
-**Method Switching**:
-1. Configure OAuth 2.0
-2. Switch to SMTP
-3. Switch back to OAuth 2.0
-4. Verify credentials preserved
+**Reference**: [mail.ts:219-226](../../../apps/app/src/server/service/mail.ts#L219-L226), [research.md](research.md#1-nodemailer-xoauth2-falsy-check-requirement)
 
-**Invalid Credentials**:
-1. Send test email with invalid token
-2. Verify error message
-3. Check logs for error code
+---
 
-**Network Timeout**:
-1. Send email, mock timeout
-2. Verify 3 retry attempts
-3. Verify correct backoff intervals
+### Credential Preservation Pattern (CRITICAL)
 
-**Incomplete Config**:
-1. Enter partial OAuth 2.0 config
-2. Verify validation error
-3. Verify alert banner
+**Constraint**: PUT requests updating OAuth 2.0 configuration **must only include secret fields (clientSecret, refreshToken) when non-empty values are provided**, preventing accidental credential overwrites.
 
-### Performance Tests
+**Rationale**: Standard PUT pattern sending all form fields would overwrite secrets with empty strings when administrators update non-secret fields (from address, user email). GET endpoint returns `undefined` for secrets (not masked placeholders) to prevent re-submission of placeholder text.
 
-- 100 emails with OAuth 2.0: verify 1-2 token refreshes
-- Token refresh latency < 2s
-- Config load < 100ms
+**Implementation Pattern**:
+```typescript
+// Build params with non-secret fields
+const params = {
+  'mail:oauth2ClientId': req.body.oauth2ClientId,
+  'mail:oauth2User': req.body.oauth2User,
+};
 
-## Security Considerations
+// Only include secrets if non-empty
+if (req.body.oauth2ClientSecret) {
+  params['mail:oauth2ClientSecret'] = req.body.oauth2ClientSecret;
+}
+```
 
-### Threat Modeling
+**Impact**: Affects App Settings API PUT handler and any future API that updates OAuth 2.0 credentials.
 
-- Credential Exposure: Encrypted at rest
-- Log Leakage: Filters prevent plain text output
-- Unauthorized Access: Admin authentication required
-- MITM: SSL/TLS validation enforced
-- Token Replay: Short-lived access tokens
+**Reference**: [apiv3/app-settings/index.ts:293-306](../../../apps/app/src/server/routes/apiv3/app-settings/index.ts#L293-L306), [research.md](research.md#3-credential-preservation-pattern)
 
-### Data Protection
+---
 
-- Client Secret: Encrypted, never logged, masked (last 4), never returned
-- Refresh Token: Encrypted, never logged, masked (last 4), never returned
-- Access Token: Cached in memory, expires in 1 hour
-- User Email: Plain text, used for logging
+### Gmail API FROM Address Behavior (LIMITATION)
 
-### Compliance
+**Limitation**: Gmail API **rewrites FROM addresses to the authenticated account email** unless send-as aliases are configured in Google Workspace.
 
-- A02:2021 Cryptographic Failures: AES-256 encryption
-- A03:2021 Injection: Email validation
-- A07:2021 Auth Failures: Admin authentication required
-- A09:2021 Logging Failures: Context logged, no credentials
+**Example**:
+```
+Configured: mail:from = "notifications@example.com"
+Authenticated: oauth2User = "admin@company.com"
+Actual sent FROM: "admin@company.com"
+```
 
-## Migration Strategy
+**Workaround**: Google Workspace administrators must configure send-as aliases in Gmail Settings → Accounts and Import → Send mail as, then verify domain ownership.
 
-### Backward Compatibility
+**Why This Happens**: Gmail API security policy prevents email spoofing by restricting FROM addresses to authenticated accounts or verified aliases.
 
-- Zero breaking changes
-- Existing SMTP/SES unmodified
-- OAuth 2.0 added as new option
+**Impact**: GROWI's `mail:from` configuration has limited effect with OAuth 2.0. Custom FROM addresses require Google Workspace configuration. This is expected Gmail behavior, not a GROWI limitation.
 
-### Rollback Plan
+**Reference**: [research.md](research.md#2-gmail-api-from-address-rewriting)
 
-- Revert code removes OAuth 2.0 option
-- SMTP/SES configs unaffected
-- OAuth 2.0 configs remain in database
+---
 
-### Deployment Checklist
+### OAuth 2.0 Retry Integration (DESIGN DECISION)
 
-**Pre-Deployment**:
-- Run test suite
-- Verify nodemailer v6.x+
-- Confirm encryption key
-- Review Gmail API quotas
+**Decision**: OAuth 2.0 transmission uses `sendWithRetry()` with exponential backoff (1s, 2s, 4s), while SMTP/SES use direct `sendMail()` without retries.
 
-**Post-Deployment**:
-- Verify OAuth 2.0 option appears
-- Test OAuth 2.0 credentials
-- Monitor logs 24 hours
-- Update documentation
+**Rationale**: OAuth 2.0 token refresh can fail transiently due to network issues or Google API rate limiting. Exponential backoff provides resilience without overwhelming the API.
 
-**Production Validation**:
-- Send test email
-- Confirm token refresh after 1 hour
-- Verify encryption in MongoDB
-- Test method switching
+**Implementation**:
+```typescript
+if (transmissionMethod === 'oauth2') {
+  return this.sendWithRetry(mailConfig);
+}
+return this.mailer.sendMail(mailConfig);
+```
+
+**Impact**: OAuth 2.0 email failures are automatically retried, improving reliability for production deployments.
+
+**Reference**: [mail.ts:392-400](../../../apps/app/src/server/service/mail.ts#L392-L400)

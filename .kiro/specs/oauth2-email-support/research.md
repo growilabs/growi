@@ -231,6 +231,146 @@
 - **Risk**: Breaking changes to existing SMTP/SES functionality
   - **Mitigation**: Preserve all existing code paths; add OAuth2 as isolated branch; comprehensive integration tests for all three methods
 
+## Session 2: Production Implementation Discoveries (2026-02-10)
+
+### Critical Technical Constraints Identified
+
+#### 1. Nodemailer XOAuth2 Falsy Check Requirement
+
+**Discovery**: Production testing revealed "Can't create new access token for user" errors from nodemailer's XOAuth2 handler.
+
+**Root Cause**: Nodemailer's XOAuth2 implementation uses **falsy checks** (`!this.options.refreshToken`) at line 184, not null checks, rejecting empty strings as invalid credentials.
+
+**Implementation Requirement**:
+```typescript
+// ❌ WRONG: Allows empty strings to pass validation
+if (clientId != null && clientSecret != null && refreshToken != null) {
+  // This passes validation but nodemailer will reject it
+}
+
+// ✅ CORRECT: Matches nodemailer's falsy check behavior
+if (!clientId || !clientSecret || !refreshToken || !user) {
+  logger.warn('OAuth 2.0 credentials incomplete, skipping transport creation');
+  return null;
+}
+```
+
+**Why This Matters**: Empty strings (`""`) are falsy in JavaScript. Using `!= null` in GROWI would allow empty strings through validation, but nodemailer's falsy check would then reject them, causing runtime failures.
+
+**Impact**: All credential validation logic in MailService and ConfigManager **must use falsy checks** for OAuth 2.0 credentials to maintain compatibility with nodemailer.
+
+**Reference**: [mail.ts:219-226](../../../apps/app/src/server/service/mail.ts#L219-L226)
+
+---
+
+#### 2. Gmail API FROM Address Rewriting
+
+**Discovery**: Gmail API rewrites the FROM address to the authenticated account email, ignoring GROWI's configured `mail:from` address.
+
+**Gmail API Behavior**: Gmail API enforces that emails are sent FROM the authenticated account unless send-as aliases are explicitly configured in Google Workspace.
+
+**Example**:
+```
+Configured: mail:from = "notifications@example.com"
+Authenticated: oauth2User = "admin@company.com"
+Actual sent FROM: "admin@company.com"
+```
+
+**Workaround**: Google Workspace administrators must configure **send-as aliases**:
+1. Gmail Settings → Accounts and Import → Send mail as
+2. Add desired FROM address as an alias
+3. Verify domain ownership
+
+**Why This Happens**: Gmail API security policy prevents email spoofing by restricting FROM addresses to authenticated account or verified aliases.
+
+**Impact**:
+- GROWI's `mail:from` configuration has **limited effect** with OAuth 2.0
+- Custom FROM addresses require Google Workspace send-as alias configuration
+- This is **expected Gmail behavior**, not a GROWI limitation
+
+**Documentation Note**: This behavior must be documented in admin UI help text and user guides.
+
+---
+
+#### 3. Credential Preservation Pattern
+
+**Discovery**: Initial implementation allowed secret credentials to be accidentally overwritten with empty strings or masked placeholder values when updating non-secret fields.
+
+**Problem**: Standard PUT request pattern sending all form fields would overwrite secrets with empty values when administrators only wanted to update non-secret fields like `from` address or `oauth2User`.
+
+**Solution**: Conditional secret inclusion pattern:
+
+```typescript
+// Build request params with non-secret fields
+const requestOAuth2SettingParams: Record<string, any> = {
+  'mail:from': req.body.fromAddress,
+  'mail:transmissionMethod': req.body.transmissionMethod,
+  'mail:oauth2ClientId': req.body.oauth2ClientId,
+  'mail:oauth2User': req.body.oauth2User,
+};
+
+// Only include secrets if non-empty values provided
+if (req.body.oauth2ClientSecret) {
+  requestOAuth2SettingParams['mail:oauth2ClientSecret'] = req.body.oauth2ClientSecret;
+}
+if (req.body.oauth2RefreshToken) {
+  requestOAuth2SettingParams['mail:oauth2RefreshToken'] = req.body.oauth2RefreshToken;
+}
+```
+
+**Frontend Consideration**: GET endpoint returns `undefined` for secrets (not masked values) to prevent accidental re-submission:
+
+```typescript
+// ❌ WRONG: Returns masked value that could be saved back
+oauth2ClientSecret: '(set)',
+
+// ✅ CORRECT: Returns undefined, frontend shows placeholder
+oauth2ClientSecret: undefined,
+```
+
+**Why This Pattern**: Allows administrators to update non-secret OAuth 2.0 settings without re-entering sensitive credentials every time.
+
+**Impact**: This pattern must be followed for **any API that updates OAuth 2.0 credentials** to prevent accidental secret overwrites.
+
+**Reference**:
+- PUT handler: [apiv3/app-settings/index.ts:293-306](../../../apps/app/src/server/routes/apiv3/app-settings/index.ts#L293-L306)
+- GET response: [apiv3/app-settings/index.ts:273-276](../../../apps/app/src/server/routes/apiv3/app-settings/index.ts#L273-L276)
+
+---
+
+### Type Safety Enhancements
+
+**NonBlankString Type**: OAuth 2.0 config definitions use `NonBlankString | undefined` for compile-time protection against empty string assignments:
+
+```typescript
+'mail:oauth2ClientSecret': defineConfig<NonBlankString | undefined>({
+  defaultValue: undefined,
+  isSecret: true,
+}),
+```
+
+This provides **compile-time protection** complementing runtime falsy checks.
+
+---
+
+### Integration Pattern Discovered
+
+**OAuth 2.0 Retry Logic**: OAuth 2.0 requires retry logic with exponential backoff due to potential token refresh failures:
+
+```typescript
+// OAuth 2.0 uses sendWithRetry() for automatic retry
+if (transmissionMethod === 'oauth2') {
+  return this.sendWithRetry(mailConfig as EmailConfig);
+}
+
+// SMTP/SES use direct sendMail()
+return this.mailer.sendMail(mailConfig);
+```
+
+**Rationale**: OAuth 2.0 token refresh can fail transiently due to network issues or Google API rate limiting. Exponential backoff (1s, 2s, 4s) provides resilience.
+
+---
+
 ## References
 
 - [OAuth2 | Nodemailer](https://nodemailer.com/smtp/oauth2) - Official OAuth2 configuration documentation
