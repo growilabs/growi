@@ -863,6 +863,9 @@
     "export_audit_log": "Exporter le journal d'audit",
     "export_requested": "Demande d'exportation acceptée. Vous serez averti lorsque l'exportation sera terminée.",
     "export_failed": "Échec du démarrage de l'exportation",
+    "duplicate_export_confirm": "Une exportation avec les mêmes conditions est déjà en cours. Voulez-vous la redémarrer ?",
+    "restart_export": "Redémarrer l'exportation",
+    "confirm_export": "Confirmer l'exportation",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }

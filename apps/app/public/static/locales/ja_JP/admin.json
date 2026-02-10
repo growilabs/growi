@@ -873,6 +873,9 @@
     "export_audit_log": "監査ログのエクスポート",
     "export_requested": "エクスポートリクエストを受け付けました。完了後に通知されます。",
     "export_failed": "エクスポートの開始に失敗しました",
+    "duplicate_export_confirm": "同じ条件のエクスポートが進行中です。やり直しますか？",
+    "restart_export": "やり直す",
+    "confirm_export": "エクスポートの確認",
     "docs_url": {
       "log_type": "https://docs.growi.org/ja/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
