@@ -392,6 +392,7 @@
     "oauth2_client_secret": "客户端密钥",
     "oauth2_refresh_token": "刷新令牌",
     "oauth2_refresh_token_help": "从 OAuth 2.0 授权流程获得的刷新令牌",
+    "placeholder_leave_blank": "留空以保留现有值",
     "from_e-mail_address": "邮件发出地址",
     "send_test_email": "发送测试邮件",
     "success_to_send_test_email": "成功发送了一封测试邮件",

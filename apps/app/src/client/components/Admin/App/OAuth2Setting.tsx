@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useTranslation } from 'next-i18next';
 import type { UseFormRegister } from 'react-hook-form';
 
@@ -15,8 +16,13 @@ const OAuth2Setting = (props: Props): JSX.Element => {
   const { t } = useTranslation();
   const { register } = props;
 
+  const userInputId = useId();
+  const clientIdInputId = useId();
+  const clientSecretInputId = useId();
+  const refreshTokenInputId = useId();
+
   return (
-    <div id="mail-oauth2" className="tab-pane active">
+    <div className="tab-pane active">
       <div className="row mb-3">
         <div className="col-md-12">
           <div className="alert alert-info">
@@ -29,7 +35,7 @@ const OAuth2Setting = (props: Props): JSX.Element => {
       <div className="row">
         <label
           className="text-start text-md-end col-md-3 col-form-label"
-          htmlFor="admin-oauth2-user"
+          htmlFor={userInputId}
         >
           {t('admin:app_setting.oauth2_user')}
         </label>
@@ -37,7 +43,7 @@ const OAuth2Setting = (props: Props): JSX.Element => {
           <input
             className="form-control"
             type="email"
-            id="admin-oauth2-user"
+            id={userInputId}
             placeholder="user@example.com"
             {...register('oauth2User')}
           />
@@ -50,7 +56,7 @@ const OAuth2Setting = (props: Props): JSX.Element => {
       <div className="row">
         <label
           className="text-start text-md-end col-md-3 col-form-label"
-          htmlFor="admin-oauth2-client-id"
+          htmlFor={clientIdInputId}
         >
           {t('admin:app_setting.oauth2_client_id')}
         </label>
@@ -58,7 +64,7 @@ const OAuth2Setting = (props: Props): JSX.Element => {
           <input
             className="form-control"
             type="text"
-            id="admin-oauth2-client-id"
+            id={clientIdInputId}
             {...register('oauth2ClientId')}
           />
         </div>
@@ -67,7 +73,7 @@ const OAuth2Setting = (props: Props): JSX.Element => {
       <div className="row">
         <label
           className="text-start text-md-end col-md-3 col-form-label"
-          htmlFor="admin-oauth2-client-secret"
+          htmlFor={clientSecretInputId}
         >
           {t('admin:app_setting.oauth2_client_secret')}
         </label>
@@ -75,7 +81,9 @@ const OAuth2Setting = (props: Props): JSX.Element => {
           <input
             className="form-control"
             type="password"
-            id="admin-oauth2-client-secret"
+            id={clientSecretInputId}
+            placeholder={t('admin:app_setting.placeholder_leave_blank')}
+            autoComplete="new-password"
             {...register('oauth2ClientSecret')}
           />
         </div>
@@ -84,7 +92,7 @@ const OAuth2Setting = (props: Props): JSX.Element => {
       <div className="row">
         <label
           className="text-start text-md-end col-md-3 col-form-label"
-          htmlFor="admin-oauth2-refresh-token"
+          htmlFor={refreshTokenInputId}
         >
           {t('admin:app_setting.oauth2_refresh_token')}
         </label>
@@ -92,7 +100,9 @@ const OAuth2Setting = (props: Props): JSX.Element => {
           <input
             className="form-control"
             type="password"
-            id="admin-oauth2-refresh-token"
+            id={refreshTokenInputId}
+            placeholder={t('admin:app_setting.placeholder_leave_blank')}
+            autoComplete="new-password"
             {...register('oauth2RefreshToken')}
           />
           <small className="form-text text-muted">

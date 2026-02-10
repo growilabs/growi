@@ -393,6 +393,7 @@
     "oauth2_client_secret": "クライアントシークレット",
     "oauth2_refresh_token": "リフレッシュトークン",
     "oauth2_refresh_token_help": "OAuth 2.0認証フローから取得したリフレッシュトークン",
+    "placeholder_leave_blank": "既存の値を保持する場合は空白のままにしてください",
     "send_test_email": "テストメールを送信",
     "success_to_send_test_email": "テストメールを送信しました。",
     "smtp_settings": "SMTP設定",

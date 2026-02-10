@@ -384,6 +384,7 @@
     "oauth2_client_secret": "Client Secret",
     "oauth2_refresh_token": "Refresh Token",
     "oauth2_refresh_token_help": "The refresh token obtained from OAuth 2.0 authorization flow",
+    "placeholder_leave_blank": "Leave blank to keep existing value",
     "send_test_email": "Send a test-email",
     "success_to_send_test_email": "Success to send a test-email",
     "smtp_settings": "SMTP settings",
