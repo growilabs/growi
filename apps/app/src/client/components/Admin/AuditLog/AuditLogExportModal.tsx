@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import type { IClearable } from '~/client/interfaces/clearable';
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import type { SupportedActionType } from '~/interfaces/activity';
@@ -19,13 +18,12 @@ type Props = {
   onClose: () => void;
 };
 
-export const AuditLogExportModal = ({
-  isOpen,
+const AuditLogExportModalSubstance = ({
   onClose,
-}: Props): JSX.Element => {
+}: {
+  onClose: () => void;
+}): JSX.Element => {
   const { t } = useTranslation('admin');
-
-  const typeaheadRef = useRef<IClearable>(null);
 
   const auditLogAvailableActionsData = useAtomValue(
     auditLogAvailableActionsAtom,
@@ -33,26 +31,14 @@ export const AuditLogExportModal = ({
 
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
-  const [selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
+  const [_selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
   const [actionMap, setActionMap] = useState(
-    new Map<SupportedActionType, boolean>(),
+    () =>
+      new Map<SupportedActionType, boolean>(
+        auditLogAvailableActionsData?.map((action) => [action, true]) ?? [],
+      ),
   );
   const [isExporting, setIsExporting] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setStartDate(null);
-      setEndDate(null);
-      setSelectedUsernames([]);
-      setActionMap(
-        new Map<SupportedActionType, boolean>(
-          auditLogAvailableActionsData?.map((action) => [action, true]) ?? [],
-        ),
-      );
-      setIsExporting(false);
-      typeaheadRef.current?.clear();
-    }
-  }, [isOpen, auditLogAvailableActionsData]);
 
   const datePickerChangedHandler = useCallback((dateList: Date[] | null[]) => {
     setStartDate(dateList[0]);
@@ -61,20 +47,26 @@ export const AuditLogExportModal = ({
 
   const actionCheckboxChangedHandler = useCallback(
     (action: SupportedActionType) => {
-      actionMap.set(action, !actionMap.get(action));
-      setActionMap(new Map(actionMap.entries()));
+      setActionMap((prev) => {
+        const next = new Map(prev);
+        next.set(action, !next.get(action));
+        return next;
+      });
     },
-    [actionMap],
+    [],
   );
 
   const multipleActionCheckboxChangedHandler = useCallback(
     (actions: SupportedActionType[], isChecked: boolean) => {
-      actions.forEach((action) => {
-        actionMap.set(action, isChecked);
+      setActionMap((prev) => {
+        const next = new Map(prev);
+        actions.forEach((action) => {
+          next.set(action, isChecked);
+        });
+        return next;
       });
-      setActionMap(new Map(actionMap.entries()));
     },
-    [actionMap],
+    [],
   );
 
   const setUsernamesHandler = useCallback((usernames: string[]) => {
@@ -116,7 +108,7 @@ export const AuditLogExportModal = ({
   }, [actionMap, startDate, endDate, t, onClose]);
 
   return (
-    <Modal isOpen={isOpen} toggle={onClose}>
+    <>
       <ModalHeader tag="h4" toggle={onClose}>
         {t('audit_log_management.export_audit_log')}
       </ModalHeader>
@@ -124,10 +116,7 @@ export const AuditLogExportModal = ({
       <ModalBody>
         <div className="mb-3">
           <div className="form-label">{t('audit_log_management.username')}</div>
-          <SearchUsernameTypeahead
-            ref={typeaheadRef}
-            onChange={setUsernamesHandler}
-          />
+          <SearchUsernameTypeahead onChange={setUsernamesHandler} />
         </div>
 
         <div className="mb-3">
@@ -172,6 +161,17 @@ export const AuditLogExportModal = ({
           {t('audit_log_management.export')}
         </button>
       </ModalFooter>
+    </>
+  );
+};
+
+export const AuditLogExportModal = ({
+  isOpen,
+  onClose,
+}: Props): JSX.Element => {
+  return (
+    <Modal isOpen={isOpen} toggle={onClose}>
+      {isOpen && <AuditLogExportModalSubstance onClose={onClose} />}
     </Modal>
   );
 };
