@@ -963,18 +963,18 @@ export const CONFIG_DEFINITIONS = {
   'mail:sesSecretAccessKey': defineConfig<string | undefined>({
     defaultValue: undefined,
   }),
-  'mail:oauth2ClientId': defineConfig<string | undefined>({
+  'mail:oauth2ClientId': defineConfig<NonBlankString | undefined>({
     defaultValue: undefined,
   }),
-  'mail:oauth2ClientSecret': defineConfig<string | undefined>({
-    defaultValue: undefined,
-    isSecret: true,
-  }),
-  'mail:oauth2RefreshToken': defineConfig<string | undefined>({
+  'mail:oauth2ClientSecret': defineConfig<NonBlankString | undefined>({
     defaultValue: undefined,
     isSecret: true,
   }),
-  'mail:oauth2User': defineConfig<string | undefined>({
+  'mail:oauth2RefreshToken': defineConfig<NonBlankString | undefined>({
+    defaultValue: undefined,
+    isSecret: true,
+  }),
+  'mail:oauth2User': defineConfig<NonBlankString | undefined>({
     defaultValue: undefined,
   }),
 
