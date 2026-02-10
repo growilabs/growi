@@ -216,12 +216,12 @@ class MailService implements S2sMessageHandlable {
       const refreshToken = configManager.getConfig('mail:oauth2RefreshToken');
       const user = configManager.getConfig('mail:oauth2User');
 
-      if (
-        clientId == null ||
-        clientSecret == null ||
-        refreshToken == null ||
-        user == null
-      ) {
+      // Use falsy check (not == null) to match nodemailer's XOAuth2 check:
+      // XOAuth2.generateToken() uses `!this.options.refreshToken` which rejects empty strings
+      if (!clientId || !clientSecret || !refreshToken || !user) {
+        logger.warn(
+          'OAuth 2.0 credentials incomplete, skipping transport creation',
+        );
         return null;
       }
 
@@ -285,6 +285,7 @@ class MailService implements S2sMessageHandlable {
         const result = await this.mailer.sendMail(config);
         logger.info('OAuth 2.0 email sent successfully', {
           messageId: result.messageId,
+          from: config.from,
           recipient: config.to,
           attempt,
           clientId: maskedClientId,
@@ -371,7 +372,7 @@ class MailService implements S2sMessageHandlable {
   async send(config) {
     if (this.mailer == null) {
       throw new Error(
-        'Mailer is not completed to set up. Please set up SMTP or AWS setting.',
+        'Mailer is not completed to set up. Please set up SMTP, SES, or OAuth 2.0 setting.',
       );
     }
 
@@ -383,7 +384,23 @@ class MailService implements S2sMessageHandlable {
     const output = await renderFilePromisified(config.template, templateVars);
 
     config.text = output;
-    return this.mailer.sendMail(this.setupMailConfig(config));
+
+    const mailConfig = this.setupMailConfig(config);
+    const transmissionMethod = this.configManager.getConfig(
+      'mail:transmissionMethod',
+    );
+
+    // Use sendWithRetry for OAuth 2.0 to handle token refresh failures with exponential backoff
+    if (transmissionMethod === 'oauth2') {
+      logger.debug('Sending email via OAuth2 with config:', {
+        from: mailConfig.from,
+        to: mailConfig.to,
+        subject: mailConfig.subject,
+      });
+      return this.sendWithRetry(mailConfig as EmailConfig);
+    }
+
+    return this.mailer.sendMail(mailConfig);
   }
 }
 

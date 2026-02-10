@@ -362,13 +362,18 @@ module.exports = (crowi: Crowi) => {
       body('sesSecretAccessKey').trim(),
     ],
     oauth2Setting: [
-      body('oauth2ClientId').trim(),
+      body('oauth2ClientId')
+        .trim()
+        .notEmpty()
+        .withMessage('OAuth 2.0 Client ID is required'),
       body('oauth2ClientSecret').trim(),
       body('oauth2RefreshToken').trim(),
       body('oauth2User')
         .trim()
-        .if((value) => value !== '')
-        .isEmail(),
+        .notEmpty()
+        .withMessage('OAuth 2.0 User Email is required')
+        .isEmail()
+        .withMessage('OAuth 2.0 User Email must be a valid email address'),
     ],
     pageBulkExportSettings: [
       body('isBulkExportPagesEnabled').isBoolean(),
@@ -435,8 +440,10 @@ module.exports = (crowi: Crowi) => {
         sesAccessKeyId: configManager.getConfig('mail:sesAccessKeyId'),
         sesSecretAccessKey: configManager.getConfig('mail:sesSecretAccessKey'),
         oauth2ClientId: configManager.getConfig('mail:oauth2ClientId'),
-        oauth2ClientSecret: configManager.getConfig('mail:oauth2ClientSecret'),
-        oauth2RefreshToken: configManager.getConfig('mail:oauth2RefreshToken'),
+        // Return undefined for secrets to prevent accidental overwrite with masked values
+        // Frontend will handle placeholder display (design requirement 5.4)
+        oauth2ClientSecret: undefined,
+        oauth2RefreshToken: undefined,
         oauth2User: configManager.getConfig('mail:oauth2User'),
 
         fileUploadType: configManager.getConfig('app:fileUploadType'),
@@ -1009,19 +1016,26 @@ module.exports = (crowi: Crowi) => {
     validator.oauth2Setting,
     apiV3FormValidator,
     async (req, res) => {
-      const { mailService } = crowi;
-
       const requestOAuth2SettingParams = {
         'mail:from': req.body.fromAddress,
         'mail:transmissionMethod': req.body.transmissionMethod,
         'mail:oauth2ClientId': req.body.oauth2ClientId,
-        'mail:oauth2ClientSecret': req.body.oauth2ClientSecret,
-        'mail:oauth2RefreshToken': req.body.oauth2RefreshToken,
         'mail:oauth2User': req.body.oauth2User,
       };
 
+      // Only update secrets if non-empty values are provided
+      if (req.body.oauth2ClientSecret) {
+        requestOAuth2SettingParams['mail:oauth2ClientSecret'] =
+          req.body.oauth2ClientSecret;
+      }
+      if (req.body.oauth2RefreshToken) {
+        requestOAuth2SettingParams['mail:oauth2RefreshToken'] =
+          req.body.oauth2RefreshToken;
+      }
+
       let mailSettingParams: Awaited<ReturnType<typeof updateMailSettinConfig>>;
       try {
+        // updateMailSettinConfig internally calls initialize() and publishUpdatedMessage()
         mailSettingParams = await updateMailSettinConfig(
           requestOAuth2SettingParams,
         );
@@ -1031,8 +1045,6 @@ module.exports = (crowi: Crowi) => {
         return res.apiv3Err(new ErrorV3(msg, 'update-oauth2-setting-failed'));
       }
 
-      await mailService.initialize();
-      mailService.publishUpdatedMessage();
       const parameters = {
         action: SupportedAction.ACTION_ADMIN_MAIL_OAUTH2_UPDATE,
       };
