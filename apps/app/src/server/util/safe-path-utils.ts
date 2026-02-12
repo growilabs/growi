@@ -1,5 +1,15 @@
 import path from 'pathe';
 
+function isStringSafe(input: any): input is string {
+  return typeof input === 'string' && input.length > 0 && !input.includes('\0');
+}
+
+function getSafeBasePrefix(resolvedBase: string): string {
+  return resolvedBase.endsWith(path.sep)
+    ? resolvedBase
+    : resolvedBase + path.sep;
+}
+
 /**
  * Validates that the given file path is within the base directory.
  * This prevents path traversal attacks where an attacker could use sequences
@@ -10,6 +20,7 @@ import path from 'pathe';
  * @returns true if the path is valid, false otherwise
  */
 export function isPathWithinBase(filePath: string, baseDir: string): boolean {
+  if (!isStringSafe(filePath) || !isStringSafe(baseDir)) return false;
   const resolvedBaseDir = path.resolve(baseDir);
   const resolvedFilePath = path.resolve(filePath);
 
@@ -17,7 +28,7 @@ export function isPathWithinBase(filePath: string, baseDir: string): boolean {
   // We add path.sep to ensure we're checking a directory boundary
   // (e.g., /tmp/foo should not match /tmp/foobar)
   return (
-    resolvedFilePath.startsWith(resolvedBaseDir + path.sep) ||
+    resolvedFilePath.startsWith(getSafeBasePrefix(resolvedBaseDir)) ||
     resolvedFilePath === resolvedBaseDir
   );
 }
@@ -35,14 +46,7 @@ export function assertFileNameSafeForBaseDir(
   fileName: string,
   baseDir: string,
 ): void {
-  const resolvedBaseDir = path.resolve(baseDir);
-  const resolvedFilePath = path.resolve(baseDir, fileName);
-
-  const isValid =
-    resolvedFilePath.startsWith(resolvedBaseDir + path.sep) ||
-    resolvedFilePath === resolvedBaseDir;
-
-  if (!isValid) {
+  if (!isFileNameSafeForBaseDir(fileName, baseDir)) {
     throw new Error('Invalid file path: path traversal detected');
   }
 }
@@ -59,11 +63,12 @@ export function isFileNameSafeForBaseDir(
   fileName: string,
   baseDir: string,
 ): boolean {
+  if (!isStringSafe(fileName) || !isStringSafe(baseDir)) return false;
   const resolvedBaseDir = path.resolve(baseDir);
   const resolvedFilePath = path.resolve(baseDir, fileName);
 
   return (
-    resolvedFilePath.startsWith(resolvedBaseDir + path.sep) ||
+    resolvedFilePath.startsWith(getSafeBasePrefix(resolvedBaseDir)) ||
     resolvedFilePath === resolvedBaseDir
   );
 }
