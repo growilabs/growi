@@ -341,6 +341,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
     const terms = this.parseQueryString(queryString);
 
+    if (disableUserPages) {
+      excludeUserPagesFromQuery(terms);
+    }
+
     if (nqName == null) {
       return { queryString, terms };
     }

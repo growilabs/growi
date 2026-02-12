@@ -1,18 +1,8 @@
-export function excludeUserPagesFromQuery(
-  query: string,
-  userPagesDisabled: boolean,
-): string {
-  if (!userPagesDisabled) {
-    return query;
-  }
+import type { QueryTerms } from '~/server/interfaces/search';
 
-  const cleanQuery = query.replace(/prefix:\/user/g, '').trim();
+export function applyUserExclusion(terms: QueryTerms): void {
+  terms.prefix = terms.prefix.filter((p) => !p.startsWith('/user'));
+  terms.not_prefix = terms.not_prefix.filter((p) => !p.startsWith('/user'));
 
-  if (!cleanQuery.includes('-prefix:/user')) {
-    const queryWithUserPrefix = `${cleanQuery} -prefix:/user`;
-
-    return queryWithUserPrefix;
-  }
-
-  return cleanQuery;
+  terms.not_prefix.push('/user');
 }
