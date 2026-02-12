@@ -217,7 +217,8 @@ class GcsFileUploader extends AbstractFileUploader {
 
     // issue signed url (default: expires 120 seconds)
     // https://cloud.google.com/storage/docs/access-control/signed-urls
-    const contentHeaders = createContentHeaders(attachment);
+    const isDownload = opts?.download ?? false;
+    const contentHeaders = createContentHeaders(attachment, { forceAttachment: isDownload });
     const [signedUrl] = await file.getSignedUrl({
       action: 'read',
       expires: Date.now() + lifetimeSecForTemporaryUrl * 1000,

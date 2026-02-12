@@ -286,7 +286,8 @@ class AwsFileUploader extends AbstractFileUploader {
 
     // issue signed url (default: expires 120 seconds)
     // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#getSignedUrl-property
-    const contentHeaders = createContentHeaders(attachment);
+    const isDownload = opts?.download ?? false;
+    const contentHeaders = createContentHeaders(attachment, { forceAttachment: isDownload });
     const params: GetObjectCommandInput = {
       Bucket: getS3Bucket(),
       Key: filePath,
