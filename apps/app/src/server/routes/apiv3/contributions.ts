@@ -1,13 +1,10 @@
-import { SCOPE } from '@growi/core/dist/interfaces';
+import type { IUserHasId } from '@growi/core';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
 
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import adminRequiredFactory from '~/server/middlewares/admin-required';
+import { CacheManager } from '~/features/contribution-graph/services/cache-manager';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import Activity from '~/server/models/activity';
-import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
@@ -18,38 +15,50 @@ const logger = loggerFactory('growi:routes:apiv3:activity');
 
 const validator = {
   list: [
-    query('limit')
+    query('targetUserId')
       .optional()
-      .isInt({ max: 100 })
-      .withMessage('limit must be a number less than or equal to 100'),
-    query('offset').optional().isInt().withMessage('page must be a number'),
-    query('searchFilter')
-      .optional()
-      .isString()
-      .withMessage('query must be a string'),
+      .isMongoId()
+      .withMessage('user ID must be a MongoDB ID'),
   ],
 };
 
+interface AuthorizedRequest extends Request {
+  user?: IUserHasId;
+}
+
 module.exports = (crowi: Crowi): Router => {
-  const adminRequired = adminRequiredFactory(crowi);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   const router = express.Router();
 
   router.get(
     '/',
-    accessTokenParser([SCOPE.READ.ADMIN.AUDIT_LOG], { acceptLegacy: true }),
     loginRequiredStrictly,
-    adminRequired,
     validator.list,
     apiV3FormValidator,
-    async (req: Request, res: ApiV3Response) => {
-      // const auditLogEnabled = configManager.getConfig('app:auditLogEnabled');
-      // if (!auditLogEnabled) {
-      //   const msg = 'AuditLog is not enabled';
-      //   logger.error(msg);
-      //   return res.apiv3Err(msg, 405);
-      // }
+    async (req: AuthorizedRequest, res: ApiV3Response) => {
+      let targetUserId = req.query.targetUserId;
+
+      if (typeof targetUserId !== 'string') {
+        targetUserId = req.user?._id;
+      }
+
+      if (!targetUserId) {
+        return res.apiv3Err(
+          'Target user ID is missing and authenticated user ID is unavailable.',
+          400,
+        );
+      }
+
+      try {
+        const cacheManager = new CacheManager();
+        const contributions = await cacheManager.getCache(targetUserId);
+
+        return res.apiv3({ contributions });
+      } catch (err) {
+        logger.error('Failed to get contributions', err);
+        return res.apiv3Err(err, 500);
+      }
     },
   );
 
