@@ -49,13 +49,9 @@ const filterXssOptions = {
 
 const filterXss = new FilterXSS(filterXssOptions);
 
-const normalizeQueryString = (
-  _queryString: string,
-  disableUserPages: boolean,
-): string => {
+const normalizeQueryString = (_queryString: string): string => {
   let queryString = _queryString.trim();
   queryString = removeAiMenthion(queryString).replace(/\s+/g, ' ');
-  queryString = excludeUserPagesFromQuery(queryString, disableUserPages);
 
   return queryString;
 };
@@ -337,7 +333,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
       'security:disableUserPages',
     );
 
-    const queryString = normalizeQueryString(_queryString, disableUserPages);
+    const queryString = normalizeQueryString(_queryString);
 
     const terms = this.parseQueryString(queryString);
 
@@ -364,7 +360,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     let parsedQuery: ParsedQuery;
     if (aliasOf != null) {
       parsedQuery = {
-        queryString: normalizeQueryString(aliasOf, disableUserPages),
+        queryString: normalizeQueryString(aliasOf),
         terms: this.parseQueryString(aliasOf),
       };
     } else {
