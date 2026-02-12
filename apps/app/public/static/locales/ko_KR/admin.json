@@ -860,6 +860,10 @@
     "available_action_list_explanation": "현재 설정에서 검색/볼 수 있는 작업 목록",
     "action_list": "작업 목록",
     "disable_mode_explanation": "감사 로그가 현재 비활성화되어 있습니다. 활성화하려면 환경 변수 <code>AUDIT_LOG_ENABLED</code>를 true로 설정하십시오.",
+    "export": "내보내기",
+    "export_audit_log": "감사 로그 내보내기",
+    "export_requested": "내보내기 요청이 접수되었습니다. 내보내기가 완료되면 알림을 받게 됩니다.",
+    "export_failed": "내보내기 시작에 실패했습니다",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }

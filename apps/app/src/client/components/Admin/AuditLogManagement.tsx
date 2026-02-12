@@ -18,6 +18,7 @@ import { useSWRxActivity } from '~/stores/activity';
 import PaginationWrapper from '../PaginationWrapper';
 import { ActivityTable } from './AuditLog/ActivityTable';
 import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode';
+import { AuditLogExportModal } from './AuditLog/AuditLogExportModal';
 import { AuditLogSettings } from './AuditLog/AuditLogSettings';
 import { DateRangePicker } from './AuditLog/DateRangePicker';
 import { SearchUsernameTypeahead } from './AuditLog/SearchUsernameTypeahead';
@@ -185,6 +186,8 @@ export const AuditLogManagement: FC = () => {
     setActivePageNumber(jumpPageNumber);
   }, [jumpPageNumber]);
 
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+
   const startIndex = activityList.length === 0 ? 0 : offset + 1;
   const endIndex = activityList.length === 0 ? 0 : offset + activityList.length;
 
@@ -267,6 +270,17 @@ export const AuditLogManagement: FC = () => {
                 {t('admin:audit_log_management.clear')}
               </button>
             </div>
+
+            <div className="col-12">
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={() => setIsExportModalOpen(true)}
+              >
+                <span className="material-symbols-outlined me-1">download</span>
+                {t('admin:audit_log_management.export')}
+              </button>
+            </div>
           </div>
 
           <p className="ms-2">
@@ -315,6 +329,11 @@ export const AuditLogManagement: FC = () => {
               </button>
             </div>
           </div>
+
+          <AuditLogExportModal
+            isOpen={isExportModalOpen}
+            onClose={() => setIsExportModalOpen(false)}
+          />
         </>
       )}
     </div>

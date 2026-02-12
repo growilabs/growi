@@ -860,6 +860,10 @@
     "available_action_list_explanation": "List of actions that can be searched/viewed in the current settings",
     "action_list": "Action List",
     "disable_mode_explanation": "Audit log is currently disabled. To enable it, set the environment variable <code>AUDIT_LOG_ENABLED</code> to true.",
+    "export": "Export",
+    "export_audit_log": "Export Audit Log",
+    "export_requested": "Export request accepted. You will be notified when the export is complete.",
+    "export_failed": "Failed to start export",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
