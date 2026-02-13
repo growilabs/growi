@@ -7,6 +7,25 @@
  *        description: Page path
  *        type: string
  *        example: /path/to/page
+ *      GetPageResponse:
+ *        description: Response for GET /page endpoint
+ *        type: object
+ *        properties:
+ *          page:
+ *            allOf:
+ *              - $ref: '#/components/schemas/Page'
+ *              - description: The requested page. Null if pages array is returned instead.
+ *            nullable: true
+ *          pages:
+ *            type: array
+ *            items:
+ *              $ref: '#/components/schemas/Page'
+ *            description: Array of pages when findAll parameter is used. Null otherwise.
+ *            nullable: true
+ *          meta:
+ *            type: object
+ *            description: Metadata about the page request
+ *            nullable: true
  *      PageGrant:
  *        description: Grant for page
  *        type: number
