@@ -13,6 +13,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { NonBlankString } from '@growi/core/dist/interfaces';
 import { toNonBlankStringOrUndefined } from '@growi/core/dist/interfaces';
@@ -251,42 +252,43 @@ class AwsFileUploader extends AbstractFileUploader {
 
     const filePath = getFilePathOnStorage(attachment);
     const contentHeaders = createContentHeaders(attachment);
+    const uploadTimeout = configManager.getConfig('app:fileUploadTimeout');
+
+    // Use @aws-sdk/lib-storage Upload for streaming support
+    // PutObjectCommand fails with streams from readable-stream (npm) due to instanceof Readable check
+    const upload = new Upload({
+      client: s3,
+      params: {
+        Bucket: getS3Bucket(),
+        Key: filePath,
+        Body: readable,
+        ACL: getS3PutObjectCannedAcl(),
+        ContentType: getContentHeaderValue(contentHeaders, 'Content-Type'),
+        ContentDisposition: getContentHeaderValue(
+          contentHeaders,
+          'Content-Disposition',
+        ),
+      },
+    });
+
+    const timeoutId = setTimeout(() => {
+      logger.warn(`Upload timeout: fileName=${attachment.fileName}`);
+      upload.abort();
+    }, uploadTimeout);
 
     try {
-      const uploadTimeout = configManager.getConfig('app:fileUploadTimeout');
-
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: getS3Bucket(),
-          Key: filePath,
-          Body: readable,
-          ACL: getS3PutObjectCannedAcl(),
-          // put type and the file name for reference information when uploading
-          ContentType: getContentHeaderValue(contentHeaders, 'Content-Type'),
-          ContentDisposition: getContentHeaderValue(
-            contentHeaders,
-            'Content-Disposition',
-          ),
-        }),
-        { abortSignal: AbortSignal.timeout(uploadTimeout) },
-      );
-
+      await upload.done();
       logger.debug(
         `File upload completed successfully: fileName=${attachment.fileName}`,
       );
     } catch (error) {
-      // Handle timeout error specifically
-      if (error.name === 'AbortError') {
-        logger.warn(`Upload timeout: fileName=${attachment.fileName}`, error);
-      } else {
-        logger.error(
-          `File upload failed: fileName=${attachment.fileName}`,
-          error,
-        );
-      }
-      // Re-throw the error to be handled by the caller.
-      // The pipeline automatically handles stream cleanup on error.
+      logger.error(
+        `File upload failed: fileName=${attachment.fileName}`,
+        error,
+      );
       throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 

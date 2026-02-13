@@ -1,3 +1,4 @@
+import { PassThrough } from 'node:stream';
 import type { Archiver } from 'archiver';
 import archiver from 'archiver';
 
@@ -79,11 +80,16 @@ export async function compressAndUpload(
   pageArchiver.finalize();
   this.setStreamsInExecution(pageBulkExportJob._id, pageArchiver);
 
+  // Wrap archiver with PassThrough (Node.js built-in) to ensure instanceof Readable check passes in AWS SDK
+  const uploadStream = new PassThrough();
+  pageArchiver.pipe(uploadStream);
+
   try {
-    await fileUploadService.uploadAttachment(pageArchiver, attachment);
+    await fileUploadService.uploadAttachment(uploadStream, attachment);
   } catch (e) {
     logger.error(e);
-    this.handleError(e, pageBulkExportJob);
+    await this.handleError(e, pageBulkExportJob);
+    return;
   }
   await postProcess.bind(this)(
     pageBulkExportJob,
