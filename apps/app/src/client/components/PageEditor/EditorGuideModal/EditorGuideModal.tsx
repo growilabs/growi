@@ -5,6 +5,7 @@ import {
 
 import { useEditorGuideModalStatus, useEditorGuideModalActions } from '@growi/editor/dist/states/modal/editor-guide';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 
 import { CustomNavTab } from '../../CustomNavigation/CustomNav';
 import CustomTabContent from '../../CustomNavigation/CustomTabContent';
@@ -17,6 +18,9 @@ type TabType = 'textstyle' | 'layout' | 'decoration';
 type Props = {
   containerRef: RefObject<HTMLDivElement | null>,
 };
+const isTabType = (key: string): key is TabType => {
+  return ['textstyle', 'layout', 'decoration'].includes(key);
+};
 
 /**
  * EditorGuideModal
@@ -25,29 +29,29 @@ type Props = {
  * not the entire screen. Uses createPortal to render into document.body.
  */
 export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
+  const { t } = useTranslation();
   const { isOpened } = useEditorGuideModalStatus();
   const { close } = useEditorGuideModalActions();
   const [isShown, setIsShown] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   const [activeTab, setActiveTab] = useState<TabType>('textstyle');
-
-  const navTabMapping = useMemo(() => {
+  const navTabMapping = useMemo((): Record<TabType, { i18n: string, Content: () => JSX.Element }> => {
     return {
       textstyle: {
-        i18n: 'テキストスタイル',
+        i18n: t('editor_guide.tabs.textstyle'),
         Content: () => <TextStyleTab />,
       },
       layout: {
-        i18n: 'レイアウト',
+        i18n: t('editor_guide.tabs.layout'),
         Content: () => <LayoutTab />,
       },
       decoration: {
-        i18n: '装飾',
+        i18n: t('editor_guide.tabs.decoration'),
         Content: () => <DecorationTab />,
       },
     };
-  }, []);
+  }, [t]);
 
   // Get rect on open and on resize
   useLayoutEffect(() => {
@@ -89,7 +93,11 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
               <CustomNavTab
                 activeTab={activeTab}
                 navTabMapping={navTabMapping}
-                onNavSelected={tab => setActiveTab(tab as TabType)}
+                onNavSelected={(tabKey) => {
+                  if (isTabType(tabKey)) {
+                    setActiveTab(tabKey);
+                  }
+                }}
                 hideBorderBottom
               />
             </div>

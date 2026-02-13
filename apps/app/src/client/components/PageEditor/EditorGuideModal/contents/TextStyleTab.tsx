@@ -57,7 +57,15 @@ const GuideRow = ({
               width: 'fit-content',
             }}
           >
-            <pre className="m-0 small font-monospace" style={{ whiteSpace: 'pre', color: '#ABB2BF', lineHeight: '1.5' }}>
+            <pre
+              className="m-0 small font-monospace"
+              style={{
+                whiteSpace: 'pre',
+                color: '#ABB2BF',
+                fontWeight: 400,
+                fontSize: '14px',
+              }}
+            >
               {code}
             </pre>
             <small className="position-absolute badge bg-secondary opacity-50" style={{ fontSize: '0.4rem', top: '2px', right: '4px' }}>
@@ -66,7 +74,13 @@ const GuideRow = ({
           </div>
         </div>
         <div className="flex-grow-1" style={{ whiteSpace: 'nowrap' }}>
-          <div className="wiki-content small">
+          <div
+            className="wiki-content"
+            style={{
+              fontWeight: 400,
+              fontSize: '14px',
+            }}
+          >
             {preview}
           </div>
         </div>
@@ -78,96 +92,98 @@ const GuideRow = ({
 
 export const TextStyleTab: React.FC = () => {
   const { t } = useTranslation();
-  const ts = 'editor_guide.textstyle';
+  const i18nKey = 'editor_guide.textstyle';
 
   const TEXT_STYLE_GUIDES = [
     {
       id: 'bold',
-      title: t(`${ts}.bold`),
-      code: `${t(`${ts}.is_text`, { val: `**${t(`${ts}.bold`)}**` })}\n${t(`${ts}.is_text`, { val: `__${t(`${ts}.bold`)}__` })}`,
+      title: t(`${i18nKey}.bold`),
+      code: `${
+        t(`${i18nKey}.this`)} **${t(`${i18nKey}.bold`)}** ${t(`${i18nKey}.is`)}\n${t(`${i18nKey}.this`)} __${t(`${i18nKey}.bold`)}__ ${t(`${i18nKey}.is`)}`,
       preview: (
         <div className="lh-base">
-          {t(`${ts}.this`)} <strong>{t(`${ts}.bold`)}</strong> {t(`${ts}.is`)}<br />
-          {t(`${ts}.this`)} <strong>{t(`${ts}.bold`)}</strong> {t(`${ts}.is`)}
+          {t(`${i18nKey}.this`)} <strong>{t(`${i18nKey}.bold`)}</strong> {t(`${i18nKey}.is`)}<br />
+          {t(`${i18nKey}.this`)} <strong>{t(`${i18nKey}.bold`)}</strong> {t(`${i18nKey}.is`)}
         </div>
       ),
     },
     {
       id: 'italic',
-      title: t(`${ts}.italic`),
-      code: `${t(`${ts}.this`)} *${t(`${ts}.italic`)}* ${t(`${ts}.is`)}\n${t(`${ts}.this`)} _${t(`${ts}.italic`)}_ ${t(`${ts}.is`)}`,
+      title: t(`${i18nKey}.italic`),
+      code: `${
+        t(`${i18nKey}.this`)} *${t(`${i18nKey}.italic`)}*${t(`${i18nKey}.is`)}\n${t(`${i18nKey}.this`)} _${t(`${i18nKey}.italic`)}_${t(`${i18nKey}.is`)}`,
       preview: (
         <div className="lh-base">
-          {t(`${ts}.this`)} <em>{t(`${ts}.italic`)}</em> {t(`${ts}.is`)}<br />
-          {t(`${ts}.this`)} <em>{t(`${ts}.italic`)}</em> {t(`${ts}.is`)}
+          {t(`${i18nKey}.this`)} <em>{t(`${i18nKey}.italic`)}</em> {t(`${i18nKey}.is`)}<br />
+          {t(`${i18nKey}.this`)} <em>{t(`${i18nKey}.italic`)}</em> {t(`${i18nKey}.is`)}
         </div>
       ),
     },
     {
       id: 'strikethrough',
-      title: t(`${ts}.strikethrough`),
-      code: `~~${t(`${ts}.strikethrough`)}~~`,
-      preview: <del>{t(`${ts}.strikethrough`)}</del>,
+      title: t(`${i18nKey}.strikethrough`),
+      code: `~~${t(`${i18nKey}.strikethrough`)}~~`,
+      preview: <del>{t(`${i18nKey}.strikethrough`)}</del>,
     },
     {
       id: 'inline-code',
-      title: t(`${ts}.inline_code`),
-      code: `\`${t(`${ts}.inline_code`)}\` \n~~~${t(`${ts}.inline_code`)}~~~`,
+      title: t(`${i18nKey}.inline_code`),
+      code: `\`${t(`${i18nKey}.inline_code`)}\` \n~~~${t(`${i18nKey}.inline_code`)}~~~`,
       preview: (
         <div className="d-flex flex-column gap-2">
           <code
             className="rounded px-1"
             style={{
               width: 'fit-content',
-              color: '#D63384', // 文字の色
-              border: '1px solid #D63384', // 枠線の色（太さ1px、実線、指定の色）
-              backgroundColor: 'transparent', // 背景を透明にする場合（必要に応じて）
+              color: '#D63384',
+              border: '1px solid #D63384',
+              backgroundColor: 'transparent',
             }}
           >
-            {t(`${ts}.inline_code`)}
+            {t(`${i18nKey}.inline_code`)}
           </code>
           <code
             className="rounded px-1"
             style={{
               width: 'fit-content',
-              color: '#D63384', // 文字の色
-              border: '1px solid #D63384', // 枠線の色
+              color: '#D63384',
+              border: '1px solid #D63384',
               backgroundColor: 'transparent',
             }}
           >
-            {t(`${ts}.inline_code`)}
+            {t(`${i18nKey}.inline_code`)}
           </code>
         </div>
       ),
     },
     {
       id: 'bold-italic',
-      title: t(`${ts}.bold_italic`),
-      code: `***${t(`${ts}.all_important`)}***`,
-      preview: <strong><u>{t(`${ts}.all_important`).replace('\n', '')}</u></strong>,
+      title: t(`${i18nKey}.bold_italic`),
+      code: `***${t(`${i18nKey}.all_important`)}***`,
+      preview: <strong><u>{t(`${i18nKey}.all_important`).replace('\n', '')}</u></strong>,
     },
     {
       id: 'emoji',
-      title: t(`${ts}.emoji`),
+      title: t(`${i18nKey}.emoji`),
       code: ':+1:\n:white_check_mark:\n:lock:',
       preview: <span style={{ fontSize: '1.2rem' }}>👍✅🔒</span>,
     },
     {
       id: 'sub',
-      title: t(`${ts}.sub_sup`),
-      code: t(`${ts}.is_text`, { val: `<sub>${t(`${ts}.sub_text`)}</sub>` }),
-      preview: <span>{t(`${ts}.this`)} <sub>{t(`${ts}.sub_text`)}</sub> {t(`${ts}.is`)}</span>,
+      title: t(`${i18nKey}.sub_sup`),
+      code: t(`${i18nKey}.is_text`, { val: `<sub>${t(`${i18nKey}.sub_text`)}</sub>` }),
+      preview: <span>{t(`${i18nKey}.this`)} <sub>{t(`${i18nKey}.sub_text`)}</sub> {t(`${i18nKey}.is`)}</span>,
     },
     {
       id: 'sup',
       title: '',
-      code: t(`${ts}.is_text`, { val: `<sup>${t(`${ts}.sup_text`)}</sup>` }),
-      preview: <span>{t(`${ts}.this`)} <sup>{t(`${ts}.sup_text`)}</sup> {t(`${ts}.is`)}</span>,
+      code: t(`${i18nKey}.is_text`, { val: `<sup>${t(`${i18nKey}.sup_text`)}</sup>` }),
+      preview: <span>{t(`${i18nKey}.this`)} <sup>{t(`${i18nKey}.sup_text`)}</sup> {t(`${i18nKey}.is`)}</span>,
     },
     {
       id: 'link-docs',
-      title: t(`${ts}.link_label`),
-      code: `[${t(`${ts}.link_docs`)}](https://docs.growi.org/ja/g)`,
+      title: t(`${i18nKey}.link_label`),
+      code: `[${t(`${i18nKey}.link_docs`)}](https://docs.growi.org/ja/g)`,
       preview: (
         <a
           href="https://docs.growi.org/ja/g"
@@ -177,7 +193,7 @@ export const TextStyleTab: React.FC = () => {
           style={{ color: '#777570' }}
           onClick={e => e.stopPropagation()}
         >
-          {t(`${ts}.link_growi`)}
+          {t(`${i18nKey}.link_growi`)}
           <ExternalLinkIcon />
         </a>
       ),
@@ -185,7 +201,7 @@ export const TextStyleTab: React.FC = () => {
     {
       id: 'link-sandbox',
       title: '',
-      code: `[${t(`${ts}.link_sandbox`)}](/Sandbox)`,
+      code: `[${t(`${i18nKey}.link_sandbox`)}](/Sandbox)`,
       preview: (
         <a
           href="/Sandbox"
@@ -193,7 +209,7 @@ export const TextStyleTab: React.FC = () => {
           style={{ color: '#777570' }}
           onClick={e => e.stopPropagation()}
         >
-          {t(`${ts}.link_sandbox`)}
+          {t(`${i18nKey}.link_sandbox`)}
           <ExternalLinkIcon />
         </a>
       ),
