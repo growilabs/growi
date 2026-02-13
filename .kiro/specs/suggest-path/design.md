@@ -13,7 +13,7 @@
 - Provide a single POST endpoint that returns path suggestions with metadata (type, path, label, description, grant)
 - Phase 1 (MVP): Return personal memo path with fixed metadata — zero external dependencies
 - Phase 2: Add search-based and category-based suggestions using GROWI AI keyword extraction and search service
-- Enable GROWI.cloud paid-plan gating via separate namespace from `/page`
+- Enable independent access control via separate namespace from `/page`
 
 ### Non-Goals
 

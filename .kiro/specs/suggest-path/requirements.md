@@ -29,7 +29,7 @@ The following are explicitly **not** part of this feature:
 1. When the client sends a POST request with a `body` field containing page content, the Suggest Path Service shall return a response containing an array of path suggestions.
 2. The Suggest Path Service shall include `type`, `path`, `label`, `description`, and `grant` fields in each suggestion.
 3. The Suggest Path Service shall return `path` values as directory paths with a trailing slash (`/`).
-4. The Suggest Path Service shall expose the endpoint under a namespace separate from `/_api/v3/page/` to support independent access control (e.g., GROWI.cloud paid-plan gating).
+4. The Suggest Path Service shall expose the endpoint under a namespace separate from `/_api/v3/page/` to support independent access control.
 
 ### Requirement 2: Memo Path Suggestion (Phase 1 MVP)
 

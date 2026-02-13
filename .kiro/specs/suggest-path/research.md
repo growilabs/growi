@@ -73,21 +73,21 @@
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
 |--------|-------------|-----------|---------------------|-------|
-| Route under `routes/apiv3/ai-tools/` | New namespace in standard routes | Clean separation, follows `ai-tools` naming decision from review | New directory, needs registration in index.js | Aligns with GROWI.cloud access control needs |
-| Route under `features/openai/` | Extend existing AI feature module | Reuses AI infrastructure, minimal setup | Provider-specific name, harder to separate for GC billing | Rejected in review — namespace should be provider-agnostic |
-| Route under `routes/apiv3/page/` | Add to existing page routes | Close to page creation | Cannot gate independently for GC paid plans | Rejected in review — yuki requested separation |
+| Route under `routes/apiv3/ai-tools/` | New namespace in standard routes | Clean separation, follows `ai-tools` naming decision from review | New directory, needs registration in index.js | Aligns with independent access control needs |
+| Route under `features/openai/` | Extend existing AI feature module | Reuses AI infrastructure, minimal setup | Provider-specific name, harder to separate for independent access control | Rejected in review — namespace should be provider-agnostic |
+| Route under `routes/apiv3/page/` | Add to existing page routes | Close to page creation | Cannot gate independently for access control | Rejected in review — yuki requested separation |
 
 ## Design Decisions
 
 ### Decision: Route Namespace Placement
 
-- **Context**: Endpoint needs independent access control for GROWI.cloud paid plans
+- **Context**: Endpoint needs independent access control
 - **Alternatives Considered**:
   1. `/openai/suggest-path` — groups with AI features but provider-specific
   2. `/page/suggest-path` — close to page creation but cannot gate independently
   3. `/ai-tools/suggest-path` — new provider-agnostic namespace
 - **Selected Approach**: `/_api/v3/ai-tools/suggest-path` under `routes/apiv3/ai-tools/`
-- **Rationale**: Matches existing unmerged PR naming, provider-agnostic, enables independent GC access control
+- **Rationale**: Matches existing unmerged PR naming, provider-agnostic, enables independent access control
 - **Trade-offs**: Requires new directory and route registration. Namespace is tentative (pending yuki confirmation)
 - **Follow-up**: Confirm `ai-tools` namespace with yuki
 
