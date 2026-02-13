@@ -1,20 +1,19 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 
+import type { IConfigManagerForApp } from '../config-manager';
 import { createSESClient } from './ses';
 
 describe('createSESClient', () => {
-  let mockConfigManager: any;
+  let mockConfigManager: DeepMockProxy<IConfigManagerForApp>;
 
   beforeEach(() => {
-    mockConfigManager = {
-      getConfig: vi.fn(),
-    };
+    mockConfigManager = mockDeep<IConfigManagerForApp>();
   });
 
   describe('credential validation', () => {
     it('should return null when accessKeyId is missing', () => {
       mockConfigManager.getConfig.mockImplementation((key: string) => {
-        if (key === 'mail:sesAccessKeyId') return null;
+        if (key === 'mail:sesAccessKeyId') return undefined;
         if (key === 'mail:sesSecretAccessKey') return 'secretKey123';
         return undefined;
       });
@@ -27,7 +26,7 @@ describe('createSESClient', () => {
     it('should return null when secretAccessKey is missing', () => {
       mockConfigManager.getConfig.mockImplementation((key: string) => {
         if (key === 'mail:sesAccessKeyId') return 'AKIAIOSFODNN7EXAMPLE';
-        if (key === 'mail:sesSecretAccessKey') return null;
+        if (key === 'mail:sesSecretAccessKey') return undefined;
         return undefined;
       });
 
@@ -38,8 +37,8 @@ describe('createSESClient', () => {
 
     it('should return null when both credentials are missing', () => {
       mockConfigManager.getConfig.mockImplementation((key: string) => {
-        if (key === 'mail:sesAccessKeyId') return null;
-        if (key === 'mail:sesSecretAccessKey') return null;
+        if (key === 'mail:sesAccessKeyId') return undefined;
+        if (key === 'mail:sesSecretAccessKey') return undefined;
         return undefined;
       });
 

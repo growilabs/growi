@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 
 import type Crowi from '../../crowi';
+import type { IConfigManagerForApp } from '../config-manager';
 import MailService from './mail';
 import { createOAuth2Client } from './oauth2';
 
@@ -14,15 +15,12 @@ vi.mock('../../models/failed-email', () => ({
 describe('MailService', () => {
   let mailService: MailService;
   let mockCrowi: Crowi;
-  let mockConfigManager: any;
-  let mockS2sMessagingService: any;
-  let mockAppService: any;
+  let mockConfigManager: DeepMockProxy<IConfigManagerForApp>;
+  let mockS2sMessagingService: { publish: ReturnType<typeof vi.fn> };
+  let mockAppService: { getAppTitle: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
-    mockConfigManager = {
-      getConfig: vi.fn(),
-      loadConfigs: vi.fn(),
-    };
+    mockConfigManager = mockDeep<IConfigManagerForApp>();
 
     mockS2sMessagingService = {
       publish: vi.fn(),
@@ -36,7 +34,7 @@ describe('MailService', () => {
       configManager: mockConfigManager,
       s2sMessagingService: mockS2sMessagingService,
       appService: mockAppService,
-    } as any;
+    } as unknown as Crowi;
 
     mailService = new MailService(mockCrowi);
   });

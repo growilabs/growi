@@ -1,20 +1,19 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 
+import type { IConfigManagerForApp } from '../config-manager';
 import { createSMTPClient } from './smtp';
 
 describe('createSMTPClient', () => {
-  let mockConfigManager: any;
+  let mockConfigManager: DeepMockProxy<IConfigManagerForApp>;
 
   beforeEach(() => {
-    mockConfigManager = {
-      getConfig: vi.fn(),
-    };
+    mockConfigManager = mockDeep<IConfigManagerForApp>();
   });
 
   describe('credential validation', () => {
     it('should return null when host is missing', () => {
       mockConfigManager.getConfig.mockImplementation((key: string) => {
-        if (key === 'mail:smtpHost') return null;
+        if (key === 'mail:smtpHost') return undefined;
         if (key === 'mail:smtpPort') return 587;
         return undefined;
       });
@@ -27,7 +26,7 @@ describe('createSMTPClient', () => {
     it('should return null when port is missing', () => {
       mockConfigManager.getConfig.mockImplementation((key: string) => {
         if (key === 'mail:smtpHost') return 'smtp.example.com';
-        if (key === 'mail:smtpPort') return null;
+        if (key === 'mail:smtpPort') return undefined;
         return undefined;
       });
 
@@ -38,8 +37,8 @@ describe('createSMTPClient', () => {
 
     it('should return null when both host and port are missing', () => {
       mockConfigManager.getConfig.mockImplementation((key: string) => {
-        if (key === 'mail:smtpHost') return null;
-        if (key === 'mail:smtpPort') return null;
+        if (key === 'mail:smtpHost') return undefined;
+        if (key === 'mail:smtpPort') return undefined;
         return undefined;
       });
 

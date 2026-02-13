@@ -1,5 +1,6 @@
 import type { Transporter } from 'nodemailer';
 import nodemailer from 'nodemailer';
+import ses from 'nodemailer-ses-transport';
 
 import loggerFactory from '~/utils/logger';
 
@@ -36,7 +37,6 @@ export function createSESClient(
     };
   }
 
-  const ses = require('nodemailer-ses-transport');
   const client = nodemailer.createTransport(ses(option));
 
   logger.debug('mailer set up for SES', client);

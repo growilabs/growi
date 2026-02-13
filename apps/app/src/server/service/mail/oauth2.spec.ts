@@ -1,18 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 
+import type { IConfigManagerForApp } from '../config-manager';
 import { createOAuth2Client } from './oauth2';
 
 describe('createOAuth2Client', () => {
-  let mockConfigManager: any;
+  let mockConfigManager: DeepMockProxy<IConfigManagerForApp>;
 
   beforeEach(() => {
-    mockConfigManager = {
-      getConfig: vi.fn(),
-    };
+    mockConfigManager = mockDeep<IConfigManagerForApp>();
   });
 
   const validCredentials = (
-    overrides: Record<string, string | null> = {},
+    overrides: Record<string, string | undefined> = {},
   ): void => {
     mockConfigManager.getConfig.mockImplementation((key: string) => {
       const defaults: Record<string, string> = {
@@ -27,7 +26,7 @@ describe('createOAuth2Client', () => {
 
   describe('credential validation with type guards', () => {
     it('should return null when clientId is missing', () => {
-      validCredentials({ 'mail:oauth2ClientId': null });
+      validCredentials({ 'mail:oauth2ClientId': undefined });
 
       const result = createOAuth2Client(mockConfigManager);
 
@@ -35,7 +34,7 @@ describe('createOAuth2Client', () => {
     });
 
     it('should return null when clientSecret is missing', () => {
-      validCredentials({ 'mail:oauth2ClientSecret': null });
+      validCredentials({ 'mail:oauth2ClientSecret': undefined });
 
       const result = createOAuth2Client(mockConfigManager);
 
@@ -43,7 +42,7 @@ describe('createOAuth2Client', () => {
     });
 
     it('should return null when refreshToken is missing', () => {
-      validCredentials({ 'mail:oauth2RefreshToken': null });
+      validCredentials({ 'mail:oauth2RefreshToken': undefined });
 
       const result = createOAuth2Client(mockConfigManager);
 
@@ -51,7 +50,7 @@ describe('createOAuth2Client', () => {
     });
 
     it('should return null when user is missing', () => {
-      validCredentials({ 'mail:oauth2User': null });
+      validCredentials({ 'mail:oauth2User': undefined });
 
       const result = createOAuth2Client(mockConfigManager);
 
