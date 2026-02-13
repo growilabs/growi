@@ -371,6 +371,74 @@ return this.mailer.sendMail(mailConfig);
 
 ---
 
+## Session 3: Post-Refactoring Architecture (2026-02-10)
+
+### MailService Modular Structure
+
+The MailService was refactored from a single monolithic file (`mail.ts`, ~408 lines) into a feature-based directory structure with separate transport modules. This is the current production architecture.
+
+#### Directory Structure
+
+```
+src/server/service/mail/
+├── index.ts              # Barrel export (default: MailService, backward-compatible)
+├── mail.ts               # MailService class (orchestration, S2S, retry logic)
+├── mail.spec.ts          # MailService tests
+├── smtp.ts               # SMTP transport factory: createSMTPClient()
+├── smtp.spec.ts          # SMTP transport tests
+├── ses.ts                # SES transport factory: createSESClient()
+├── ses.spec.ts           # SES transport tests
+├── oauth2.ts             # OAuth2 transport factory: createOAuth2Client()
+├── oauth2.spec.ts        # OAuth2 transport tests
+└── types.ts              # Shared types (StrictOAuth2Options, MailConfig, etc.)
+```
+
+#### Transport Factory Pattern
+
+Each transport module exports a factory function with a consistent signature:
+
+```typescript
+export function create[Transport]Client(
+  configManager: IConfigManagerForApp,
+  option?: TransportOptions
+): Transporter | null;
+```
+
+- Returns `null` if required credentials are missing (logs warning)
+- MailService delegates transport creation based on `mail:transmissionMethod` config
+
+#### StrictOAuth2Options Type
+
+Defined in `types.ts`, this branded type prevents empty string credentials at compile time:
+
+```typescript
+import type { NonBlankString } from '@growi/core/dist/interfaces';
+
+export type StrictOAuth2Options = {
+  service: 'gmail';
+  auth: {
+    type: 'OAuth2';
+    user: NonBlankString;
+    clientId: NonBlankString;
+    clientSecret: NonBlankString;
+    refreshToken: NonBlankString;
+  };
+};
+```
+
+This is stricter than nodemailer's default `XOAuth2.Options` which allows `string | undefined`. The branded type ensures compile-time validation complementing runtime falsy checks.
+
+#### Backward Compatibility
+
+The barrel export at `mail/index.ts` maintains the existing import pattern:
+```typescript
+import MailService from '~/server/service/mail';  // Still works
+```
+
+**Source**: Migrated from `.kiro/specs/refactor-mailer-service/` (spec deleted after implementation completion).
+
+---
+
 ## References
 
 - [OAuth2 | Nodemailer](https://nodemailer.com/smtp/oauth2) - Official OAuth2 configuration documentation
