@@ -855,6 +855,11 @@
     "started_on": "Commencé le",
     "file_upload_not_configured": "Les paramètres de téléchargement de fichiers ne sont pas configurés"
   },
+  "audit_log_bulk_export": {
+    "download_expired": "La période de téléchargement a expiré",
+    "job_expired": "Le processus d'exportation a été annulé car il a pris trop de temps",
+    "no_results": "Aucun journal d'audit ne correspondait aux filtres spécifiés"
+  },
   "message": {
     "successfully_connected": "Connecté!",
     "fail_to_save_access_token": "Échec de la sauvegarde de access_token.",

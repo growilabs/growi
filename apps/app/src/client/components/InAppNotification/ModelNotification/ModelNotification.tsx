@@ -15,6 +15,7 @@ type Props = {
   actionIcon: string;
   actionUsers: string;
   hideActionUsers?: boolean;
+  hidePath?: boolean;
   subMsg?: JSX.Element;
 };
 
@@ -24,6 +25,7 @@ export const ModelNotification: FC<Props> = ({
   actionIcon,
   actionUsers,
   hideActionUsers = false,
+  hidePath = false,
   subMsg,
 }: Props) => {
   return (
@@ -31,7 +33,9 @@ export const ModelNotification: FC<Props> = ({
       <div className="text-truncate page-title">
         {hideActionUsers ? <></> : <b>{actionUsers}</b>}
         {` ${actionMsg}`}
-        <PagePathLabel path={notification.parsedSnapshot?.path ?? ''} />
+        {!hidePath && (
+          <PagePathLabel path={notification.parsedSnapshot?.path ?? ''} />
+        )}
       </div>
       {subMsg}
       <span className="material-symbols-outlined me-2">{actionIcon}</span>
