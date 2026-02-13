@@ -386,18 +386,6 @@ interface SendResult {
   - Token refresh handled transparently by nodemailer
   - Retry backoff: 1s, 2s, 4s
 
-**Implementation Notes**
-- **Integration**: Add OAuth 2.0 branch to initialize() method
-- **Validation**: createOAuth2Client() validates all four credentials present
-- **Error Handling**:
-  - Extract Google API error codes (invalid_grant, insufficient_permission)
-  - Log context: error, code, user, clientId (last 4 chars), timestamp
-  - Implement sendWithRetry() wrapper with exponential backoff
-  - Store failed emails in MongoDB failedEmails collection
-- **Token Refresh**: Nodemailer handles refresh automatically
-- **Encryption**: Credentials loaded from ConfigManager (handles decryption)
-- **Testing**: Mock nodemailer OAuth 2.0 transport; test invalid credentials, expired tokens, network failures, retry logic
-- **Risks**: Google rate limiting (mitigated by backoff), refresh token revocation (logged for admin action)
 
 #### ConfigManager
 
@@ -442,10 +430,6 @@ interface ConfigManagerOAuth2Extension {
 - **Consistency**: Atomic writes per config key
 - **Concurrency**: Last-write-wins; S2S messaging for eventual consistency
 
-**Implementation Notes**
-- Add config definitions following mail:smtp* pattern
-- Use isSecret: true for clientSecret and refreshToken
-- Define transmissionMethod as 'smtp' | 'ses' | 'oauth2' | undefined
 
 ### Client / UI Layer
 
@@ -493,16 +477,6 @@ interface MailSettingsFormData {
 }
 ```
 
-**Implementation Notes**
-- **Help Text**: Include for all four fields
-  - oauth2User: "The email address of the authorized Google account"
-  - oauth2ClientId: "Obtain from Google Cloud Console → APIs & Services → Credentials"
-  - oauth2ClientSecret: "Found in the same OAuth 2.0 Client ID details page"
-  - oauth2RefreshToken: "The refresh token obtained from OAuth 2.0 authorization flow"
-- **Field Masking**:
-  - Display ****abcd (last 4 characters) when field not edited
-  - Clear mask on focus for full edit
-  - Applies to oauth2ClientSecret, oauth2RefreshToken
 
 #### AdminAppContainer (Extension)
 
@@ -551,11 +525,6 @@ interface AdminAppContainerOAuth2Methods {
 }
 ```
 
-**Implementation Notes**
-- Add OAuth 2.0 state properties to constructor
-- Follow pattern of existing changeSmtpHost() methods
-- Email validation: /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-- Field-specific error messages in toast
 
 ### Server / API Layer
 
@@ -629,18 +598,6 @@ interface TestEmailResponse {
 }
 ```
 
-**Validation Rules**:
-- oauth2User: Email regex /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-- oauth2ClientId: Non-empty string, max 1024 characters
-- oauth2ClientSecret: Non-empty string, max 1024 characters
-- oauth2RefreshToken: Non-empty string, max 2048 characters
-- When transmissionMethod is oauth2, all four fields required
-
-**Implementation Notes**
-- Never return oauth2ClientSecret or oauth2RefreshToken in GET response
-- Call mailService.publishUpdatedMessage() after config save
-- Support OAuth 2.0 in test email functionality
-- Field-specific validation error messages
 
 ### Server / Config Layer
 
@@ -704,42 +661,9 @@ const CONFIG_KEYS = [
 
 ### Physical Data Model
 
-```typescript
-interface ConfigDocument {
-  ns: string;
-  key: string;
-  value: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface FailedEmailDocument {
-  emailConfig: {
-    to: string;
-    from: string;
-    subject: string;
-    template: string;
-    vars: Record<string, unknown>;
-  };
-  error: {
-    message: string;
-    code?: string;
-    stack?: string;
-  };
-  transmissionMethod: 'smtp' | 'ses' | 'oauth2';
-  attempts: number;
-  lastAttemptAt: Date;
-  createdAt: Date;
-}
-```
-
-**Index Definitions**:
-- Config ns field (unique)
-- FailedEmail createdAt field
-
-**Encryption Strategy**:
-- AES-256 for clientSecret and refreshToken
-- Encryption key from environment variable
+- Config documents stored in MongoDB with ns/key/value pattern
+- FailedEmail documents track failed email attempts with error context
+- **Encryption**: AES-256 for clientSecret and refreshToken via environment-provided key
 
 ### Data Contracts & Integration
 
@@ -750,40 +674,6 @@ interface FailedEmailDocument {
 **Cross-Service Data Management**:
 - S2S messaging broadcasts mailServiceUpdated event
 - Eventual consistency across instances
-
-## Error Handling
-
-### Error Strategy
-
-**Retry Strategy**: Exponential backoff with 3 attempts (1s, 2s, 4s) for transient failures
-
-**Failed Email Storage**: After retry exhaustion, store in MongoDB failedEmails collection
-
-### Error Categories and Responses
-
-**User Errors (4xx)**:
-- Invalid Email Format: 400 "OAuth 2.0 User Email must be valid email format"
-- Missing Credentials: 400 "OAuth 2.0 Client ID, Client Secret, and Refresh Token are required"
-- Unauthorized: 401 "Admin authentication required"
-
-**System Errors (5xx)**:
-- Token Refresh Failure: Log with Google API error code
-- Network Timeout: Retry with exponential backoff
-- Account Suspension: Log critical error with full context
-- Encryption Failure: 500 "Failed to encrypt OAuth 2.0 credentials"
-
-**Business Logic Errors (422)**:
-- Incomplete Configuration: isMailerSetup = false, display alert banner
-- Invalid Refresh Token: Log error code invalid_grant
-
-
-### Monitoring
-
-- All OAuth 2.0 errors logged with context
-- Error codes tagged: oauth2_token_refresh_failure, oauth2_invalid_credentials, gmail_api_error
-- isMailerSetup flag exposed in admin UI
-- Never log clientSecret or refreshToken in plain text
-
 
 
 ## Critical Implementation Constraints
