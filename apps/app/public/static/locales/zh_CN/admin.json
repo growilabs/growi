@@ -873,6 +873,9 @@
     "export_audit_log": "导出审核日志",
     "export_requested": "导出请求已接受。导出完成后将通知您。",
     "export_failed": "导出启动失败",
+    "duplicate_export_confirm": "已有相同条件的导出正在进行中。是否要重新启动它？",
+    "restart_export": "重新启动导出",
+    "confirm_export": "确认导出",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
