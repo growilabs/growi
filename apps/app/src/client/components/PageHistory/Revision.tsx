@@ -45,13 +45,18 @@ export const Revision = (props: RevisionProps): JSX.Element => {
     return (
       <div
         className={`${styles['revision-history-main']} ${styles['revision-history-main-nodiff']}
-        revision-history-main revision-history-main-nodiff my-1 d-flex align-items-center`}
+        revision-history-main revision-history-main-nodiff my-1 flex-grow-1 d-flex`}
       >
-        <div className="picture-container">{pic}</div>
-        <div className="ms-3">
-          <span className="text-muted small">
-            <UserDate dateTime={revision.createdAt} /> {t('No diff')}
-          </span>
+        <div className="d-flex align-items-center">
+          <div className="picture-container">{pic}</div>
+          <div className="ms-2">
+            <span className="text-muted small">
+              <UserDate dateTime={revision.createdAt} />
+            </span>
+          </div>
+        </div>
+        <div className="flex-grow-1 text-center">
+          <span className="text-muted small">{t('No diff')}</span>
         </div>
       </div>
     );
@@ -75,7 +80,7 @@ export const Revision = (props: RevisionProps): JSX.Element => {
         <div className="ms-2">
           <div className="revision-history-author mb-1">
             <strong>
-              <Username user={author}></Username>
+              <Username user={author} />
             </strong>
             {isLatestRevision && (
               <span className="badge bg-info ms-2">{t('Latest')}</span>

@@ -33,6 +33,7 @@ Kiro-style Spec Driven Development implementation on AI-DLC (AI Development Life
   - `/kiro:spec-tasks {feature} [-y]`
 - Phase 2 (Implementation): `/kiro:spec-impl {feature} [tasks]`
   - `/kiro:validate-impl {feature}` (optional: after implementation)
+  - `/kiro:spec-cleanup {feature}` (optional: organize specs post-implementation)
 - Progress check: `/kiro:spec-status {feature}` (use anytime)
 
 ## Development Rules
