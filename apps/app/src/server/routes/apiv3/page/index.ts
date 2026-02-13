@@ -161,7 +161,7 @@ module.exports = (crowi: Crowi) => {
    *      get:
    *        tags: [Page]
    *        summary: Get page
-   *        description: get page by pagePath or pageId
+   *        description: Get page by pagePath or pageId. Returns a single page or multiple pages based on parameters.
    *        parameters:
    *          - name: pageId
    *            in: query
@@ -173,13 +173,33 @@ module.exports = (crowi: Crowi) => {
    *            description: page path
    *            schema:
    *              $ref: '#/components/schemas/PagePath'
+   *          - name: findAll
+   *            in: query
+   *            description: If set, returns all pages matching the path (returns pages array instead of single page)
+   *            schema:
+   *              type: boolean
+   *          - name: revisionId
+   *            in: query
+   *            description: Specific revision ID to retrieve
+   *            schema:
+   *              $ref: '#/components/schemas/ObjectId'
+   *          - name: shareLinkId
+   *            in: query
+   *            description: Share link ID for shared page access
+   *            schema:
+   *              $ref: '#/components/schemas/ObjectId'
+   *          - name: includeEmpty
+   *            in: query
+   *            description: Include empty pages in results when using findAll
+   *            schema:
+   *              type: boolean
    *        responses:
    *          200:
    *            description: Page data
    *            content:
    *              application/json:
    *                schema:
-   *                  $ref: '#/components/schemas/Page'
+   *                  $ref: '#/components/schemas/GetPageResponse'
    */
   router.get(
     '/',
