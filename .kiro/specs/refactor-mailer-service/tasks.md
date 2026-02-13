@@ -8,14 +8,14 @@ This refactoring follows a three-phase approach: establishing type safety founda
 
 ## Phase 1: Type Safety Foundation
 
-- [ ] 1. Establish type infrastructure for mail module
-- [ ] 1.1 Install nodemailer type definitions
+- [x] 1. Establish type infrastructure for mail module
+- [x] 1.1 Install nodemailer type definitions
   - Add @types/nodemailer@6.4.22 as devDependency in package.json
   - Run `pnpm install` to install the package
   - Verify package appears in devDependencies
   - _Requirements: 3.1_
 
-- [ ] 1.2 Create shared type definitions module
+- [x] 1.2 Create shared type definitions module
   - Create src/server/service/mail/ directory
   - Define StrictOAuth2Options type with NonBlankString credential fields (user, clientId, clientSecret, refreshToken)
   - Define MailConfig, EmailConfig, SendResult types
@@ -23,7 +23,7 @@ This refactoring follows a three-phase approach: establishing type safety founda
   - Include type assertion verifying StrictOAuth2Options compatibility with SMTPTransport.Options
   - _Requirements: 3.2, 3.3, 3.9_
 
-- [ ] 1.3 Verify type safety infrastructure
+- [x] 1.3 Verify type safety infrastructure
   - Run `pnpm run lint:typecheck` to verify type compilation
   - Confirm no new type errors introduced
   - Run `pnpm run test` to verify existing tests still pass
@@ -34,8 +34,8 @@ This refactoring follows a three-phase approach: establishing type safety founda
 
 ## Phase 2: Module Extraction
 
-- [ ] 2. Extract transport modules with type-safe implementations
-- [ ] 2.1 (P) Extract SMTP transport module
+- [x] 2. Extract transport modules with type-safe implementations
+- [x] 2.1 (P) Extract SMTP transport module
   - Create smtp.ts with createSMTPClient factory function
   - Accept configManager parameter and optional SMTPTransport.Options
   - Read mail:smtpHost, mail:smtpPort, mail:smtpUser, mail:smtpPassword from config
@@ -45,7 +45,7 @@ This refactoring follows a three-phase approach: establishing type safety founda
   - Use named exports following GROWI conventions
   - _Requirements: 2.1, 2.5, 2.6, 2.7, 5.2, 5.6_
 
-- [ ] 2.2 (P) Extract SES transport module
+- [x] 2.2 (P) Extract SES transport module
   - Create ses.ts with createSESClient factory function
   - Accept configManager parameter and optional SES configuration object
   - Read mail:sesAccessKeyId, mail:sesSecretAccessKey from config
@@ -55,7 +55,7 @@ This refactoring follows a three-phase approach: establishing type safety founda
   - Use named exports following GROWI conventions
   - _Requirements: 2.2, 2.5, 2.6, 2.7, 5.3, 5.6_
 
-- [ ] 2.3 (P) Extract OAuth2 transport module with type-safe credentials
+- [x] 2.3 (P) Extract OAuth2 transport module with type-safe credentials
   - Create oauth2.ts with createOAuth2Client factory function
   - Accept configManager parameter and optional SMTPTransport.Options
   - Read mail:oauth2User, mail:oauth2ClientId, mail:oauth2ClientSecret, mail:oauth2RefreshToken from config
@@ -76,8 +76,8 @@ This refactoring follows a three-phase approach: establishing type safety founda
 
 ## Phase 3: Integration & Barrel Export
 
-- [ ] 3. Integrate transport modules and establish barrel export
-- [ ] 3.1 Refactor MailService to delegate transport creation
+- [x] 3. Integrate transport modules and establish barrel export
+- [x] 3.1 Refactor MailService to delegate transport creation
   - Import createSMTPClient, createSESClient, createOAuth2Client from respective modules
   - Update initialize() method to delegate transport creation based on mail:transmissionMethod config
   - Remove inline createSMTPClient(), createSESClient(), createOAuth2Client() method implementations
@@ -88,7 +88,7 @@ This refactoring follows a three-phase approach: establishing type safety founda
   - Verify MailService behavior identical to pre-refactoring implementation
   - _Requirements: 2.4, 4.1, 4.2, 4.3, 4.4, 4.6_
 
-- [ ] 3.2 Reorganize files into mail/ directory structure
+- [x] 3.2 Reorganize files into mail/ directory structure
   - Move src/server/service/mail.ts to src/server/service/mail/mail.ts
   - Move src/server/service/mail.spec.ts to src/server/service/mail/mail.spec.ts
   - Update import paths in mail.spec.ts to reference local modules (./mail, ./smtp, ./ses, ./oauth2, ./types)
@@ -96,7 +96,7 @@ This refactoring follows a three-phase approach: establishing type safety founda
   - Verify all imports resolve correctly after file moves
   - _Requirements: 1.1, 1.2, 5.1_
 
-- [ ] 3.3 Create barrel export for backward compatibility
+- [x] 3.3 Create barrel export for backward compatibility
   - Create src/server/service/mail/index.ts
   - Export MailService as default export (maintains existing import pattern)
   - Export MailConfig, EmailConfig, SendResult, StrictOAuth2Options as named exports
@@ -104,7 +104,7 @@ This refactoring follows a three-phase approach: establishing type safety founda
   - Verify import path ~/server/service/mail resolves to barrel export
   - _Requirements: 1.3, 1.4, 1.5_
 
-- [ ] 3.4 Verify backward compatibility and test coverage
+- [x] 3.4 Verify backward compatibility and test coverage
   - Run full test suite with `pnpm run test`
   - Verify all existing MailService tests pass without modification
   - Confirm Config API (src/server/routes/apiv3/app-settings/index.ts) imports MailService successfully

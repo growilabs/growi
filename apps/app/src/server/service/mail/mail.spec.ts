@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type Crowi from '../crowi';
+import type Crowi from '../../crowi';
 import MailService from './mail';
+import { createOAuth2Client } from './oauth2';
 
 // Mock the FailedEmail model
-vi.mock('../models/failed-email', () => ({
+vi.mock('../../models/failed-email', () => ({
   FailedEmail: {
     create: vi.fn(),
   },
@@ -237,13 +238,13 @@ describe('MailService', () => {
 
   describe('storeFailedEmail', () => {
     beforeEach(async () => {
-      const { FailedEmail } = await import('../models/failed-email');
+      const { FailedEmail } = await import('../../models/failed-email');
       vi.mocked(FailedEmail.create).mockClear();
       vi.mocked(FailedEmail.create).mockResolvedValue({} as never);
     });
 
     it('should store failed email with all required fields', async () => {
-      const { FailedEmail } = await import('../models/failed-email');
+      const { FailedEmail } = await import('../../models/failed-email');
 
       const config = {
         to: 'recipient@example.com',
@@ -275,7 +276,7 @@ describe('MailService', () => {
     });
 
     it('should store OAuth 2.0 error code if present', async () => {
-      const { FailedEmail } = await import('../models/failed-email');
+      const { FailedEmail } = await import('../../models/failed-email');
 
       const config = {
         to: 'recipient@example.com',
@@ -301,7 +302,7 @@ describe('MailService', () => {
     });
 
     it('should handle model creation errors gracefully', async () => {
-      const { FailedEmail } = await import('../models/failed-email');
+      const { FailedEmail } = await import('../../models/failed-email');
 
       const config = {
         to: 'recipient@example.com',
@@ -354,7 +355,7 @@ describe('MailService', () => {
         return undefined;
       });
 
-      const mailer = mailService.createOAuth2Client();
+      const mailer = createOAuth2Client(mockConfigManager);
 
       expect(mailer).not.toBeNull();
       // Credentials should never be exposed in logs

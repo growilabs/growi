@@ -1,41 +1,19 @@
 import ejs from 'ejs';
-import nodemailer from 'nodemailer';
 import { promisify } from 'util';
 
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi';
-import { FailedEmail } from '../models/failed-email';
-import S2sMessage from '../models/vo/s2s-message';
-import type { IConfigManagerForApp } from './config-manager';
-import type { S2sMessageHandlable } from './s2s-messaging/handlable';
+import type Crowi from '../../crowi';
+import { FailedEmail } from '../../models/failed-email';
+import S2sMessage from '../../models/vo/s2s-message';
+import type { IConfigManagerForApp } from '../config-manager';
+import type { S2sMessageHandlable } from '../s2s-messaging/handlable';
+import { createOAuth2Client } from './oauth2';
+import { createSESClient } from './ses';
+import { createSMTPClient } from './smtp';
+import type { EmailConfig, MailConfig, SendResult } from './types';
 
 const logger = loggerFactory('growi:service:mail');
-
-type MailConfig = {
-  to?: string;
-  from?: string;
-  text?: string;
-  subject?: string;
-};
-
-type EmailConfig = {
-  to: string;
-  from?: string;
-  subject?: string;
-  text?: string;
-  template?: string;
-  vars?: Record<string, unknown>;
-};
-
-type SendResult = {
-  messageId: string;
-  response: string;
-  envelope: {
-    from: string;
-    to: string[];
-  };
-};
 
 class MailService implements S2sMessageHandlable {
   appService!: any;
@@ -126,11 +104,11 @@ class MailService implements S2sMessageHandlable {
     );
 
     if (transmissionMethod === 'smtp') {
-      this.mailer = this.createSMTPClient();
+      this.mailer = createSMTPClient(configManager);
     } else if (transmissionMethod === 'ses') {
-      this.mailer = this.createSESClient();
+      this.mailer = createSESClient(configManager);
     } else if (transmissionMethod === 'oauth2') {
-      this.mailer = this.createOAuth2Client();
+      this.mailer = createOAuth2Client(configManager);
     } else {
       this.mailer = null;
     }
@@ -143,106 +121,6 @@ class MailService implements S2sMessageHandlable {
     this.mailConfig.subject = `${appService.getAppTitle()}からのメール`;
 
     logger.debug('mailer initialized');
-  }
-
-  createSMTPClient(option?) {
-    const { configManager } = this;
-
-    logger.debug('createSMTPClient option', option);
-    if (!option) {
-      const host = configManager.getConfig('mail:smtpHost');
-      const port = configManager.getConfig('mail:smtpPort');
-
-      if (host == null || port == null) {
-        return null;
-      }
-
-      // biome-ignore lint/style/noParameterAssign: ignore
-      option = {
-        host,
-        port,
-      };
-
-      if (configManager.getConfig('mail:smtpPassword')) {
-        option.auth = {
-          user: configManager.getConfig('mail:smtpUser'),
-          pass: configManager.getConfig('mail:smtpPassword'),
-        };
-      }
-      if (option.port === 465) {
-        option.secure = true;
-      }
-    }
-    option.tls = { rejectUnauthorized: false };
-
-    const client = nodemailer.createTransport(option);
-
-    logger.debug('mailer set up for SMTP', client);
-
-    return client;
-  }
-
-  createSESClient(option?) {
-    const { configManager } = this;
-
-    if (!option) {
-      const accessKeyId = configManager.getConfig('mail:sesAccessKeyId');
-      const secretAccessKey = configManager.getConfig(
-        'mail:sesSecretAccessKey',
-      );
-      if (accessKeyId == null || secretAccessKey == null) {
-        return null;
-      }
-      option = {
-        accessKeyId,
-        secretAccessKey,
-      };
-    }
-
-    const ses = require('nodemailer-ses-transport');
-    const client = nodemailer.createTransport(ses(option));
-
-    logger.debug('mailer set up for SES', client);
-
-    return client;
-  }
-
-  createOAuth2Client(option?) {
-    const { configManager } = this;
-
-    if (!option) {
-      const clientId = configManager.getConfig('mail:oauth2ClientId');
-      const clientSecret = configManager.getConfig('mail:oauth2ClientSecret');
-      const refreshToken = configManager.getConfig('mail:oauth2RefreshToken');
-      const user = configManager.getConfig('mail:oauth2User');
-
-      // Use falsy check (not == null) to match nodemailer's XOAuth2 check:
-      // XOAuth2.generateToken() uses `!this.options.refreshToken` which rejects empty strings
-      if (!clientId || !clientSecret || !refreshToken || !user) {
-        logger.warn(
-          'OAuth 2.0 credentials incomplete, skipping transport creation',
-        );
-        return null;
-      }
-
-      option = {
-        // eslint-disable-line no-param-reassign
-        service: 'gmail',
-        auth: {
-          type: 'OAuth2',
-          user,
-          clientId,
-          clientSecret,
-          refreshToken,
-        },
-      };
-    }
-
-    const client = nodemailer.createTransport(option);
-
-    logger.debug('mailer set up for OAuth2', client);
-
-    return client;
   }
 
   setupMailConfig(overrideConfig) {
