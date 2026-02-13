@@ -1072,5 +1072,33 @@
     "success-toaster": "Latest text synchronized",
     "skipped-toaster": "Skipped synchronizing since the editor is not activated. Please open the editor and try again.",
     "error-toaster": "Synchronization of the latest text failed"
+  },
+
+  "editor_guide": {
+    "title": "Editor Guide",
+    "tabs": {
+      "textstyle": "Text Style",
+      "layout": "Layout",
+      "decoration": "Decoration"
+    },
+    "textstyle": {
+      "copy_done": "Copied!",
+      "this": "This is",
+      "is": "",
+      "bold": "bold",
+      "italic": "italic",
+      "strikethrough": "strikethrough",
+      "inline_code": "inline code",
+      "bold_italic": "Bold or italic all",
+      "emoji": "Emoji",
+      "sub_sup": "Subscript / Superscript",
+      "link_label": "Link with label",
+      "link_docs": "GROWI Documentation",
+      "link_growi": "GROWI Link",
+      "link_sandbox": "Sandbox page is here",
+      "all_important": "This text is all\nimportant",
+      "sub_text": "subscript",
+      "sup_text": "superscript"
+    }
   }
 }

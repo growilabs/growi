@@ -1,9 +1,13 @@
 import {
-  useState, useEffect, useLayoutEffect, type JSX, type RefObject,
+  useState, useEffect, useLayoutEffect, type JSX, type RefObject, useMemo,
 } from 'react';
+
 
 import { useEditorGuideModalStatus, useEditorGuideModalActions } from '@growi/editor/dist/states/modal/editor-guide';
 import { createPortal } from 'react-dom';
+
+import { CustomNavTab } from '../../CustomNavigation/CustomNav';
+import CustomTabContent from '../../CustomNavigation/CustomTabContent';
 
 import { DecorationTab } from './contents/DecorationTab';
 import { LayoutTab } from './contents/LayoutTab';
@@ -27,6 +31,23 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   const [activeTab, setActiveTab] = useState<TabType>('textstyle');
+
+  const navTabMapping = useMemo(() => {
+    return {
+      textstyle: {
+        i18n: 'テキストスタイル',
+        Content: () => <TextStyleTab />,
+      },
+      layout: {
+        i18n: 'レイアウト',
+        Content: () => <LayoutTab />,
+      },
+      decoration: {
+        i18n: '装飾',
+        Content: () => <DecorationTab />,
+      },
+    };
+  }, []);
 
   // Get rect on open and on resize
   useLayoutEffect(() => {
@@ -64,26 +85,19 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
               <h5 className="mb-0">Editor Guide</h5>
               <button type="button" className="btn-close" onClick={close} aria-label="Close" />
             </div>
-            <ul className="nav nav-tabs nav-fill border-bottom-0 mt-2">
-              {(['textstyle', 'layout', 'decoration'] as TabType[]).map(tab => (
-                <li key={tab} className="nav-item">
-                  <button
-                    type="button"
-                    className={`nav-link border-0 border-bottom border-3 py-2 ${
-                      activeTab === tab ? 'active border-primary fw-bold' : 'border-transparent text-secondary'}`}
-                    onClick={() => setActiveTab(tab)}
-                  >
-                    {tab === 'textstyle' && 'テキストスタイル'}
-                    {tab === 'layout' && 'レイアウト'}
-                    {tab === 'decoration' && '装飾'}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-2 px-3">
+              <CustomNavTab
+                activeTab={activeTab}
+                navTabMapping={navTabMapping}
+                onNavSelected={tab => setActiveTab(tab as TabType)}
+                hideBorderBottom
+              />
+            </div>
             <div className="card-body overflow-auto">
-              {activeTab === 'textstyle' && <TextStyleTab />}
-              {activeTab === 'layout' && <LayoutTab />}
-              {activeTab === 'decoration' && <DecorationTab />}
+              <CustomTabContent
+                activeTab={activeTab}
+                navTabMapping={navTabMapping}
+              />
             </div>
           </div>
         </div>
