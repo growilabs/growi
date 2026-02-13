@@ -1105,5 +1105,33 @@
     "success-toaster": "最新の本文を同期しました",
     "skipped-toaster": "エディターがアクティブではないため、同期をスキップしました。エディターを開いて再度お試しください。",
     "error-toaster": "最新の本文の同期に失敗しました"
+  },
+
+  "editor_guide": {
+    "title": "エディターガイド",
+    "tabs": {
+      "textstyle": "テキストスタイル",
+      "layout": "レイアウト",
+      "decoration": "装飾"
+    },
+    "textstyle": {
+      "copy_done": "コピーしました！",
+      "this": "これは",
+      "is": "です",
+      "bold": "太字",
+      "italic": "斜体",
+      "strikethrough": "取り消し線",
+      "inline_code": "インラインコード",
+      "bold_italic": "全体が太字か斜体",
+      "emoji": "絵文字",
+      "sub_sup": "下付き・上付き",
+      "link_label": "ラベル付きリンク",
+      "link_docs": "GROWI ドキュメント",
+      "link_growi": "GROWIのリンク",
+      "link_sandbox": "砂場ページはこちら",
+      "all_important": "このテキストはすべて\n重要です",
+      "sub_text": "下付き",
+      "sup_text": "上付き"
+    }
   }
 }

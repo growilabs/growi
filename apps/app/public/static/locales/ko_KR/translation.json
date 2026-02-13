@@ -1032,5 +1032,32 @@
     "success-toaster": "최신 텍스트 동기화됨",
     "skipped-toaster": "편집기가 활성화되지 않아 동기화 건너뜀. 편집기를 열고 다시 시도하십시오.",
     "error-toaster": "최신 텍스트 동기화 실패"
+  },
+  "editor_guide": {
+    "title": "에디터 가이드",
+    "tabs": {
+      "textstyle": "텍스트 스타일",
+      "layout": "레이아웃",
+      "decoration": "데코레이션"
+    },
+    "textstyle": {
+      "copy_done": "복사되었습니다!",
+      "this": "이것은",
+      "is": "입니다",
+      "bold": "굵게",
+      "italic": "기울임꼴",
+      "strikethrough": "취소선",
+      "inline_code": "인라인 코드",
+      "bold_italic": "전체가 굵게 또는 기울임꼴",
+      "emoji": "이모지",
+      "sub_sup": "아래 첨자 / 위 첨자",
+      "link_label": "라벨이 있는 링크",
+      "link_docs": "GROWI 문서",
+      "link_growi": "GROWI 링크",
+      "link_sandbox": "연습장 페이지는 여기입니다",
+      "all_important": "이 텍스트는 모두\n중요합니다",
+      "sub_text": "아래 첨자",
+      "sup_text": "위 첨자"
+    }
   }
 }

@@ -1063,5 +1063,33 @@
     "success-toaster": "Dernier texte synchronisé",
     "skipped-toaster": "L'éditeur n'est pas actif. Synchronisation annulée.",
     "error-toaster": "Synchronisation échouée"
+  },
+
+  "editor_guide": {
+    "title": "Guide de l'Éditeur",
+    "tabs": {
+      "textstyle": "Style de Texte",
+      "layout": "Mise en Page",
+      "decoration": "Décoration"
+    },
+    "textstyle": {
+      "copy_done": "Copié !",
+      "this": "Ceci est du",
+      "is": "",
+      "bold": "gras",
+      "italic": "italique",
+      "strikethrough": "barré",
+      "inline_code": "code en ligne",
+      "bold_italic": "Tout en gras ou italique",
+      "emoji": "Émoticône",
+      "sub_sup": "Indice / Exposant",
+      "link_label": "Lien avec étiquette",
+      "link_docs": "Documentation GROWI",
+      "link_growi": "Lien GROWI",
+      "link_sandbox": "La page bac à sable est ici",
+      "all_important": "Tout ce texte est\nimportant",
+      "sub_text": "indice",
+      "sup_text": "exposant"
+    }
   }
 }
