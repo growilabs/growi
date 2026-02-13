@@ -866,6 +866,11 @@
     "started_on": "开始于",
     "file_upload_not_configured": "未配置文件上传设置"
   },
+  "audit_log_bulk_export": {
+    "download_expired": "下载期限已过期",
+    "job_expired": "导出过程因耗时过长被取消",
+    "no_results": "没有审计日志符合指定筛选条件"
+  },
   "message": {
     "successfully_connected": "连接成功！",
     "fail_to_save_access_token": "无法保存访问令牌。请再试一次。",

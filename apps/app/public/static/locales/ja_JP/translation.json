@@ -894,6 +894,11 @@
     "started_on": "開始日時",
     "file_upload_not_configured": "ファイルアップロード設定が完了していません"
   },
+  "audit_log_bulk_export": {
+    "download_expired": "ダウンロード期限が切れました",
+    "job_expired": "エクスポート時間が長すぎるため、処理が中断されました",
+    "no_results": "指定されたフィルターに一致する監査ログはありませんでした"
+  },
   "message": {
     "successfully_connected": "接続に成功しました!",
     "fail_to_save_access_token": "アクセストークンの保存に失敗しました、再度お試しください。",
