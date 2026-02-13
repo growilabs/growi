@@ -284,6 +284,7 @@
     "@types/ldapjs": "^2.2.5",
     "@types/mdast": "^4.0.4",
     "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "6.4.22",
     "@types/react": "^18.2.14",
     "@types/react-dom": "^18.2.6",
     "@types/react-input-autosize": "^2.2.4",

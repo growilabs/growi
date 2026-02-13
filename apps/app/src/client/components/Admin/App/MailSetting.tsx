@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 
@@ -6,6 +6,7 @@ import AdminAppContainer from '~/client/services/AdminAppContainer';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
+import { OAuth2Setting } from './OAuth2Setting';
 import { SesSetting } from './SesSetting';
 import { SmtpSetting } from './SmtpSetting';
 
@@ -17,7 +18,7 @@ const MailSetting = (props: Props) => {
   const { t } = useTranslation(['admin', 'commons']);
   const { adminAppContainer } = props;
 
-  const transmissionMethods = ['smtp', 'ses'];
+  const transmissionMethods = ['smtp', 'ses', 'oauth2'];
 
   const { register, handleSubmit, reset, watch } = useForm();
 
@@ -38,6 +39,10 @@ const MailSetting = (props: Props) => {
       smtpPassword: adminAppContainer.state.smtpPassword || '',
       sesAccessKeyId: adminAppContainer.state.sesAccessKeyId || '',
       sesSecretAccessKey: adminAppContainer.state.sesSecretAccessKey || '',
+      oauth2ClientId: adminAppContainer.state.oauth2ClientId || '',
+      oauth2ClientSecret: adminAppContainer.state.oauth2ClientSecret || '',
+      oauth2RefreshToken: adminAppContainer.state.oauth2RefreshToken || '',
+      oauth2User: adminAppContainer.state.oauth2User || '',
     });
   }, [
     adminAppContainer.state.fromAddress,
@@ -48,6 +53,10 @@ const MailSetting = (props: Props) => {
     adminAppContainer.state.smtpPassword,
     adminAppContainer.state.sesAccessKeyId,
     adminAppContainer.state.sesSecretAccessKey,
+    adminAppContainer.state.oauth2ClientId,
+    adminAppContainer.state.oauth2ClientSecret,
+    adminAppContainer.state.oauth2RefreshToken,
+    adminAppContainer.state.oauth2User,
     reset,
   ]);
 
@@ -64,6 +73,10 @@ const MailSetting = (props: Props) => {
           adminAppContainer.changeSmtpPassword(data.smtpPassword),
           adminAppContainer.changeSesAccessKeyId(data.sesAccessKeyId),
           adminAppContainer.changeSesSecretAccessKey(data.sesSecretAccessKey),
+          adminAppContainer.changeOAuth2ClientId(data.oauth2ClientId),
+          adminAppContainer.changeOAuth2ClientSecret(data.oauth2ClientSecret),
+          adminAppContainer.changeOAuth2RefreshToken(data.oauth2RefreshToken),
+          adminAppContainer.changeOAuth2User(data.oauth2User),
         ]);
 
         await adminAppContainer.updateMailSettingHandler();
@@ -148,6 +161,9 @@ const MailSetting = (props: Props) => {
       )}
       {currentTransmissionMethod === 'ses' && (
         <SesSetting register={register} />
+      )}
+      {currentTransmissionMethod === 'oauth2' && (
+        <OAuth2Setting register={register} />
       )}
 
       <div className="row my-3">
