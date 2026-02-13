@@ -8,6 +8,7 @@ import {
   isIncludeAiMenthion,
   removeAiMenthion,
 } from '~/features/search/utils/ai';
+import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
   IFormattedSearchResult,
@@ -328,9 +329,17 @@ class SearchService implements SearchQueryParser, SearchResolver {
     _queryString: string,
     nqName: string | null,
   ): Promise<ParsedQuery> {
+    const disableUserPages = configManager.getConfig(
+      'security:disableUserPages',
+    );
+
     const queryString = normalizeQueryString(_queryString);
 
     const terms = this.parseQueryString(queryString);
+
+    if (disableUserPages) {
+      excludeUserPagesFromQuery(terms);
+    }
 
     if (nqName == null) {
       return { queryString, terms };
