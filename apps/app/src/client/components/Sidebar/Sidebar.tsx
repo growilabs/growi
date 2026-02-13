@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/router';
 import withLoadingProps from 'next-dynamic-loading-props';
 import SimpleBar from 'simplebar-react';
 import { useIsomorphicLayoutEffect } from 'usehooks-ts';
@@ -248,7 +249,20 @@ type DrawableContainerProps = {
 const DrawableContainer = memo((props: DrawableContainerProps): JSX.Element => {
   const { divProps, className, children } = props;
 
+  const router = useRouter();
   const [isDrawerOpened, setIsDrawerOpened] = useDrawerOpened();
+
+  // Close drawer on route change
+  useEffect(() => {
+    const handleRouteChange = () => {
+      setIsDrawerOpened(false);
+    };
+
+    router.events.on('routeChangeStart', handleRouteChange);
+    return () => {
+      router.events.off('routeChangeStart', handleRouteChange);
+    };
+  }, [router.events, setIsDrawerOpened]);
 
   const openClass = `${isDrawerOpened ? 'open' : ''}`;
 

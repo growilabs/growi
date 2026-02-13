@@ -172,10 +172,11 @@ turbo run bootstrap
 # Start all dev servers (apps/app + dependencies)
 turbo run dev
 
-# Run tests for specific package
-turbo run test --filter @growi/app
+# Run a specific test file (from package directory)
+pnpm vitest run yjs.integ
 
-# Lint specific package
+# Run ALL tests / lint for a package
+turbo run test --filter @growi/app
 turbo run lint --filter @growi/core
 ```
 

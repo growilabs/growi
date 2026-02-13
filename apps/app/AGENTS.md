@@ -29,6 +29,10 @@ pnpm run test                   # Run tests
 
 # Build
 pnpm run build                  # Build for production
+
+# Run Specific Tests
+pnpm vitest run yjs.integ       # Use partial file name
+pnpm vitest run helper.spec     # Vitest auto-finds matching files
 ```
 
 ### Key Directories
@@ -150,7 +154,7 @@ When working in this directory, these skills are automatically loaded:
 - **app-commands** - apps/app specific commands (migrations, OpenAPI, etc.)
 - **app-specific-patterns** - Jotai/SWR/Next.js patterns, testing
 
-Plus all global skills (monorepo-overview, tech-stack, testing-patterns-with-vitest).
+Plus all global skills (monorepo-overview, tech-stack).
 
 ---
 

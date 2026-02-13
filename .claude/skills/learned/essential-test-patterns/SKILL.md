@@ -1,7 +1,6 @@
 ---
-name: testing-patterns-with-vitest
-description: GROWI testing patterns with Vitest, React Testing Library, and vitest-mock-extended. Auto-invoked for all GROWI development work.
-user-invocable: false
+name: essential-test-patterns
+description: GROWI testing patterns with Vitest, React Testing Library, and vitest-mock-extended.
 ---
 
 # GROWI Testing Patterns
@@ -415,13 +414,7 @@ Before committing tests, ensure:
 
 ## Running Tests
 
-```bash
-# Run all tests for a package
-turbo run test --filter @growi/app
-
-# Run specific test file
-cd {package_dir} && pnpm vitest run src/components/Button/Button.spec.tsx
-```
+See the `testing` rule (`.claude/rules/testing.md`) for test execution commands.
 
 ## Summary: GROWI Testing Philosophy
 

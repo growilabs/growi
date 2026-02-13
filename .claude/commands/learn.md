@@ -25,7 +25,18 @@ Focus on four key areas:
 
 ## Skill File Structure
 
-Extracted patterns are saved in `.claude/skills/learned/{topic-name}/SKILL.md` with:
+Extracted patterns are saved in **appropriate skill directories** based on the scope of the pattern:
+
+**Workspace-specific patterns**:
+- `apps/{workspace}/.claude/skills/learned/{topic-name}/SKILL.md`
+- `packages/{package}/.claude/skills/learned/{topic-name}/SKILL.md`
+- Examples: patterns specific to a single app or package
+
+**Global patterns** (monorepo-wide):
+- `.claude/skills/learned/{topic-name}/SKILL.md`
+- Examples: patterns applicable across all workspaces
+
+### File Template
 
 ```yaml
 ---
@@ -49,11 +60,18 @@ description: Brief description (auto-invoked when working on related code)
 ## GROWI-Specific Examples
 
 Topics commonly learned in GROWI development:
-- `virtualized-tree-patterns` — @headless-tree + @tanstack/react-virtual optimizations
+
+**Apps/app-specific** (`apps/app/.claude/skills/learned/`):
+- `page-save-origin-semantics` — Origin-based conflict detection for collaborative editing
 - `socket-jotai-integration` — Real-time state synchronization patterns
 - `api-v3-error-handling` — RESTful API error response patterns
-- `jotai-atom-composition` — Derived atoms and state composition
 - `mongodb-query-optimization` — Mongoose indexing and aggregation patterns
+
+**Global monorepo patterns** (`.claude/skills/learned/`):
+- `virtualized-tree-patterns` — @headless-tree + @tanstack/react-virtual optimizations (if used across apps)
+- `jotai-atom-composition` — Derived atoms and state composition (if shared pattern)
+- `turborepo-cache-invalidation` — Build cache debugging techniques
+- `pnpm-workspace-dependencies` — Workspace dependency resolution issues
 
 ## Quality Guidelines
 
@@ -74,7 +92,25 @@ Topics commonly learned in GROWI development:
 1. User triggers `/learn` after solving a complex problem
 2. Review the session to identify valuable patterns
 3. Draft skill file(s) with clear structure
-4. Save to `.claude/skills/learned/{topic-name}/SKILL.md`
+4. **Autonomously determine the appropriate directory**:
+   - Analyze the pattern's scope (which files/modules were involved)
+   - If pattern is specific to a workspace in `apps/*` or `packages/*`:
+     - Save to `{workspace}/.claude/skills/learned/{topic-name}/SKILL.md`
+   - If pattern is applicable across multiple workspaces:
+     - Save to `.claude/skills/learned/{topic-name}/SKILL.md`
 5. Skills automatically apply in future sessions when working on related code
+
+### Directory Selection Logic
+
+**Workspace-specific** (save to `{workspace}/.claude/skills/learned/`):
+- Pattern involves workspace-specific concepts, models, or APIs
+- References files primarily in one `apps/*` or `packages/*` directory
+- Example: Page save logic in `apps/app` → `apps/app/.claude/skills/learned/`
+
+**Global** (save to `.claude/skills/learned/`):
+- Pattern applies across multiple workspaces
+- Involves monorepo-wide tools (Turborepo, pnpm, Biome, Vitest)
+- Shared coding patterns or architectural principles
+- Example: Turborepo caching pitfall → `.claude/skills/learned/`
 
 Learned skills are automatically invoked based on their description when working on related code.
