@@ -26,8 +26,8 @@ const GuideRow = ({
     <section className={title !== '' ? 'mt-4 mb-2' : 'mb-2'}>
       {title !== '' && (
         <h3
-        className="fw-bold mb-2"
-        style={{ fontSize: '20px', color: '#223246' }}
+          className="fw-bold mb-2"
+          style={{ fontSize: '20px', color: '#223246' }}
         >
           {title}
         </h3>
@@ -55,7 +55,7 @@ const GuideRow = ({
             className="flex-grow-1"
             style={{
               minWidth: '250px',
-              flexBasis: '0'
+              flexBasis: '0',
             }}
           >
             <div className="wiki-content small">
@@ -84,7 +84,14 @@ export const LayoutTab: React.FC = () => {
   {
     id: 'header',
     title: t(`${i18nKey}.header`),
-    code: `# ${t(`${i18nKey}.header_text`)}1\n## ${t(`${i18nKey}.header_text`)}2\n### ${t(`${i18nKey}.header_text`)}3\n#### ${t(`${i18nKey}.header_text`)}4\n##### ${t(`${i18nKey}.header_text`)}5\n###### ${t(`${i18nKey}.header_text`)}6`,
+    code: [
+      `# ${t(`${i18nKey}.header_text`)}1`,
+      `## ${t(`${i18nKey}.header_text`)}2`,
+      `### ${t(`${i18nKey}.header_text`)}3`,
+      `#### ${t(`${i18nKey}.header_text`)}4`,
+      `##### ${t(`${i18nKey}.header_text`)}5`,
+      `###### ${t(`${i18nKey}.header_text`)}6`,
+    ].join('\n'),
     preview: (
         <div style={{ color: '#223246', fontFamily: 'Noto Sans CJK JP', lineHeight: '1.5' }}>
           <h1
@@ -329,9 +336,11 @@ export const LayoutTab: React.FC = () => {
           </div>
         )}
         underContent={(
-          <div style={{
-            color: '#777570',
-          }}>
+          <div
+            style={{
+              color: '#777570',
+            }}
+          >
             1. {t(`${i18nKey}.footnote_desc`)}
           </div>
         )}
