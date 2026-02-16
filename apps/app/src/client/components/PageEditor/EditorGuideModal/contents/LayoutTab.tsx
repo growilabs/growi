@@ -345,7 +345,7 @@ export const LayoutTab: React.FC = () => {
 
   return (
     <div className="px-4 py-3 overflow-y-auto" style={{ maxHeight: '80vh', minWidth: '650px' }}>
-      {LAYOUT_GUIDES.map((item) => (
+      {LAYOUT_GUIDES.map(item => (
         <GuideRow key={item.id} {...item} />
       ))}
 
