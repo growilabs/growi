@@ -36,60 +36,57 @@ describe('Contribution Cache Manager Integration Test', () => {
     it('should return an array of all combined contribution cache for a user', async () => {
       const userId = createMockId();
 
-      // REMINDER: Make test that works with future dates
+      const today = new Date();
+
+      // Start of the 365-day window
+      const runner = new Date(today);
+      runner.setUTCDate(runner.getUTCDate() - 364);
+      const oldestDateInWindow = formatDateKey(runner);
+
+      // A date near the beginning of the window
+      const earlyDate = new Date(runner);
+      earlyDate.setUTCDate(earlyDate.getUTCDate() + 5);
+      const earlyDateStr = formatDateKey(earlyDate);
+
+      // A date near the end of the window
+      const recentDate = new Date(today);
+      recentDate.setUTCDate(recentDate.getUTCDate() - 1);
+      const recentDateStr = formatDateKey(recentDate);
 
       await Activity.create([
         {
           user: userId,
           action: ActivityLogActions.ACTION_PAGE_CREATE,
-          createdAt: new Date('2025-03-06'),
+          createdAt: new Date(recentDateStr),
         },
         {
           user: userId,
           action: ActivityLogActions.ACTION_PAGE_UPDATE,
-          createdAt: new Date('2025-03-01'),
-        },
-        {
-          user: userId,
-          action: ActivityLogActions.ACTION_PAGE_UPDATE,
-          createdAt: new Date('2025-12-23'),
-        },
-        {
-          user: userId,
-          action: ActivityLogActions.ACTION_PAGE_UPDATE,
-          createdAt: new Date('2025-12-24'),
+          createdAt: new Date(earlyDateStr),
         },
       ]);
 
       await ContributionCache.create({
         userId,
-        lastUpdated: new Date('2025-03-01'),
-        currentWeekData: [{ date: '2025-03-06', count: 1 }],
+        lastUpdated: new Date(earlyDateStr),
+        currentWeekData: [{ date: recentDateStr, count: 1 }],
         permanentWeeks: {
-          '2025-W52': [
-            { date: '2025-12-23', count: 1 },
-            { date: '2025-12-24', count: 1 },
-          ],
+          'dynamic-week-id': [{ date: earlyDateStr, count: 1 }],
         },
       });
 
       const result = await cacheManager.getUpdatedCache(userId);
-      const runner = new Date();
-      runner.setUTCDate(runner.getUTCDate() - 364);
-      const oldestDate = formatDateKey(runner);
 
-      const oldDay = result.find((d) => d.date === '2025-12-23');
+      expect(result[0].date).toBe(oldestDateInWindow);
+      expect(result.length).toBe(365);
+
+      const oldDay = result.find((d) => d.date === earlyDateStr);
       expect(oldDay).toBeDefined();
       expect(oldDay?.count).toBe(1);
 
-      // Check if the new current week data is present
-      const newDay = result.find((d) => d.date === '2025-03-06');
+      const newDay = result.find((d) => d.date === recentDateStr);
       expect(newDay).toBeDefined();
       expect(newDay?.count).toBe(1);
-
-      // Check Order: The first element should be the oldest date
-      expect(result[0].date).toBe(oldestDate);
-      expect(result.length).toBeGreaterThanOrEqual(14);
     });
   });
 });
