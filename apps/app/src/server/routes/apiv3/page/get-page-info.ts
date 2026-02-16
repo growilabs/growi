@@ -1,8 +1,9 @@
-import type { IUserHasId } from '@growi/core';
+import type { IUser } from '@growi/core';
 import { isIPageNotFoundInfo, SCOPE } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 import { query } from 'express-validator';
+import type { HydratedDocument } from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -15,8 +16,9 @@ import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:page:get-page-info');
 
-interface Req extends Request {
-  user?: IUserHasId;
+// Extend Request to include middleware-added properties
+interface RequestWithAuth extends Request {
+  user?: HydratedDocument<IUser>;
   isSharedPage?: boolean;
 }
 
@@ -71,18 +73,21 @@ export const getPageInfoHandlerFactory = (crowi: Crowi): RequestHandler[] => {
     loginRequired,
     ...validator,
     apiV3FormValidator,
-    async (req: Req, res: ApiV3Response) => {
+    async (req: RequestWithAuth, res: ApiV3Response) => {
       const { user, isSharedPage } = req;
       const { pageId } = req.query;
+
+      // pageId is validated by express-validator as MongoId, so it's a string
+      const pageIdString = typeof pageId === 'string' ? pageId : String(pageId);
 
       try {
         const { meta } = await findPageAndMetaDataByViewer(
           pageService,
           pageGrantService,
           {
-            pageId: pageId as string,
+            pageId: pageIdString,
             path: null,
-            user: user as any,
+            user,
             isSharedPage,
           },
         );
