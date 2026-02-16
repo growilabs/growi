@@ -79,11 +79,34 @@ graph TB
 
 **Architecture Integration**:
 
-- **Selected pattern**: Layered handler following existing GROWI route conventions. Phase 1 uses inline logic in handler; Phase 2 extracts suggestion generation into a service
+- **Selected pattern**: Layered handler following existing GROWI route conventions. Phase 1 uses inline logic in handler; Phase 2 adds generator functions called by the handler (see [Implementation Paradigm](#implementation-paradigm) for function vs class rationale)
 - **Domain boundaries**: Route layer (`ai-tools/`) owns the endpoint. Suggestion logic delegates to existing services (search, grant, AI) without modifying them
 - **Existing patterns preserved**: Handler factory pattern, middleware chain, `res.apiv3()` response format
 - **New components**: `ai-tools/` route directory (new namespace), `suggest-path.ts` handler
 - **Steering compliance**: Feature-based separation, named exports, TypeScript strict typing
+
+### Implementation Paradigm
+
+**Default**: All components are implemented as pure functions with immutable data. No classes unless explicitly justified.
+
+**Class adoption criteria** — a class is permitted only when at least one of the following applies AND a function-based alternative would be clearly inferior:
+
+1. **Shared dependency management**: Multiple exported functions within a module depend on the same external services (e.g., SearchService), making argument passing across all functions verbose. A class with dependency fields reduces repetition.
+2. **Singleton state/cache management**: The module must maintain mutable state or cached data in a singleton instance, where immutability is not feasible.
+
+**Component assessment**:
+
+| Component                             | Paradigm | Rationale                                                                                                                                                                                                        |
+| ------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MemoSuggestionGenerator               | Function | No external service dependencies beyond `user`. Single function.                                                                                                                                                 |
+| DescriptionGenerator                  | Function | Stateless, no dependencies. Pure transformation functions.                                                                                                                                                       |
+| GrantResolver                         | Function | Single function. Page Model accessed via argument.                                                                                                                                                               |
+| KeywordExtractor (Phase 2)            | Function | Single function delegating to OpenAI Feature.                                                                                                                                                                    |
+| SearchSuggestionGenerator (Phase 2)   | Function | Single function. SearchService and GrantResolver passed as arguments.                                                                                                                                            |
+| CategorySuggestionGenerator (Phase 2) | Function | Single function. Same dependency pattern as SearchSuggestionGenerator.                                                                                                                                           |
+| SuggestPathService (Phase 2)          | Function | Single public function. No state or cache. Dependencies as arguments. May adopt class if public functions grow and shared dependency passing becomes verbose.                                                    |
+
+No component currently meets the class adoption criteria. All are implemented as exported functions.
 
 ### Technology Stack
 
@@ -264,14 +287,17 @@ sequenceDiagram
 
 ```typescript
 // Phase 1: Handler contains inline logic
-// Phase 2: Extracted to SuggestPathService
+// Phase 2: Handler calls generateSuggestions with explicit dependencies
 
-interface SuggestPathService {
-  generateSuggestions(
-    user: IUserHasId,
-    body: string,
-  ): Promise<PathSuggestion[]>;
-}
+function generateSuggestions(
+  user: IUserHasId,
+  body: string,
+  deps: {
+    searchService: SearchService;
+    extractKeywords: (body: string) => Promise<string[]>;
+    resolveParentGrant: (path: string) => Promise<number>;
+  },
+): Promise<PathSuggestion[]>;
 ```
 
 - Preconditions: `user` is authenticated, `body` is non-empty string
@@ -281,7 +307,7 @@ interface SuggestPathService {
 **Implementation Notes**
 
 - Phase 1: Logic is inline in handler (memo generation is ~10 lines). The `body` field is required but unused in Phase 1 — this maintains API contract stability so the transition to Phase 2 introduces no breaking changes. The MCP client always has content body available in the save workflow
-- Phase 2: Extract to `SuggestPathService` class when adding search/category generators
+- Phase 2: Extract orchestration logic to a `generateSuggestions` function. Dependencies (SearchService, KeywordExtractor, GrantResolver) are passed as arguments. See [Implementation Paradigm](#implementation-paradigm) for class adoption criteria
 - Error handling: Catch Phase 2 failures, log, return memo-only response
 
 ### Service Layer
@@ -410,9 +436,7 @@ function generateCategorySuggestion(
 ##### Service Interface
 
 ```typescript
-interface KeywordExtractor {
-  extract(body: string): Promise<string[]>;
-}
+function extractKeywords(body: string): Promise<string[]>;
 ```
 
 - Preconditions: `body` is non-empty string
