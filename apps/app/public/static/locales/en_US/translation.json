@@ -1099,6 +1099,36 @@
       "all_important": "This text is all\nimportant",
       "sub_text": "subscript",
       "sup_text": "superscript"
+    },
+    "layout": {
+      "copy_done": "Copied!",
+      "header": "Headers",
+      "header_text": "Heading",
+      "list": "Unordered List",
+      "list_text": "This is a list item",
+      "ordered_list": "Ordered List",
+      "ordered_list_text": "This is a numbered item",
+      "checkbox": "Checkboxes",
+      "task": "Task ",
+      "quote": "Blockquotes",
+      "quote_text": "Quote",
+      "multi_quote": "Nested Quote",
+      "hr": "Horizontal Rule",
+      "br": "Line Break",
+      "br_code": "Add two spaces  to break\nthe line",
+      "br_preview_1": "Add two spaces to",
+      "br_preview_2": "break the line",
+      "code_block": "Code Blocks",
+      "code_block_text": "Insert code here",
+      "table": "Tables",
+      "left": "Align Left",
+      "right": "Align Right",
+      "center": "Align Center",
+      "row_text": "This column is",
+      "row_display": "aligned",
+      "footnote": "Footnotes",
+      "footnote_label": "Footnote text",
+      "footnote_desc": "Write the note content like this"
     }
   }
 }

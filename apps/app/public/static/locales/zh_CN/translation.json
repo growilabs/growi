@@ -1104,6 +1104,36 @@
       "all_important": "这段文字非常\n重要",
       "sub_text": "下标",
       "sup_text": "上标"
+    },
+    "layout": {
+      "copy_done": "已复制！",
+      "header": "标题",
+      "header_text": "标题",
+      "list": "无序列表",
+      "list_text": "这是一个列表项",
+      "ordered_list": "有序列表",
+      "ordered_list_text": "这是一个编号项",
+      "checkbox": "复选框",
+      "task": "任务 ",
+      "quote": "引用",
+      "quote_text": "引用",
+      "multi_quote": "多重引用",
+      "hr": "分割线",
+      "br": "换行",
+      "br_code": "输入两个空格  即可\n换行",
+      "br_preview_1": "输入两个空格即可",
+      "br_preview_2": "换行",
+      "code_block": "代码块",
+      "code_block_text": "在此处插入代码",
+      "table": "表格",
+      "left": "左对齐",
+      "right": "右对齐",
+      "center": "居中对齐",
+      "row_text": "本列将",
+      "row_display": "显示",
+      "footnote": "脚注",
+      "footnote_label": "带有脚注的文本",
+      "footnote_desc": "注记的写法如下"
     }
   }
 }
