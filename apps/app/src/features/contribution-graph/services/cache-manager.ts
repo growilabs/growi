@@ -132,12 +132,10 @@ export class ContributionCacheManager {
   ): IContributionDay[] {
     const { currentWeekData, permanentWeeks } = contributionCache;
 
-    const sortedPermanentData = Array.from(permanentWeeks.keys())
-      .sort()
-      .flatMap((id) => {
-        const weekData = permanentWeeks.get(id);
-        return weekData ?? [];
-      });
+    const combinedData = [
+      ...Array.from(permanentWeeks.values()).flat(),
+      ...currentWeekData,
+    ];
 
     const runner = new Date();
     runner.setUTCDate(runner.getUTCDate() - 364);
@@ -147,10 +145,10 @@ export class ContributionCacheManager {
       const dateKey = formatDateKey(runner);
       allCache.set(dateKey, 0);
 
-      runner.setUTCDate(runner.getUTCDate() - 1);
+      runner.setUTCDate(runner.getUTCDate() + 1);
     }
 
-    for (const cache of sortedPermanentData) {
+    for (const cache of combinedData) {
       if (allCache.has(cache.date)) {
         allCache.set(cache.date, cache.count);
       }
@@ -162,10 +160,9 @@ export class ContributionCacheManager {
       }
     }
 
-    return Array.from(allCache.entries()).map(([date, count]) => ({
-      date,
-      count,
-    }));
+    return Array.from(allCache.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
   }
 
   /**
