@@ -272,7 +272,7 @@ export const LayoutTab: React.FC = () => {
         <div className="lh-base" style={{ color: '#24292e' }}>
           {t(`${i18nKey}.br_preview_1`)}
           <br />
-          {t(`${i18nKey}.br_preview_2`)}
+          {t(`${t(`${i18nKey}.br_preview_2`)}`)}
         </div>
       ),
     },
