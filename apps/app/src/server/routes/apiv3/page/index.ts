@@ -108,7 +108,10 @@ module.exports = (crowi: Crowi) => {
       query('includeEmpty').optional().isBoolean(),
     ],
     likes: [body('pageId').isString(), body('bool').isBoolean()],
-    info: [query('pageId').isMongoId().withMessage('pageId is required')],
+    info: [
+      query('pageId').isMongoId().withMessage('pageId is required'),
+      query('shareLinkId').optional().isMongoId(),
+    ],
     getGrantData: [
       query('pageId').isMongoId().withMessage('pageId is required'),
     ],
