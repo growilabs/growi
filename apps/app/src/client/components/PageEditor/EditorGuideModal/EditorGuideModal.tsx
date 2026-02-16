@@ -14,12 +14,13 @@ import { DecorationTab } from './contents/DecorationTab';
 import { LayoutTab } from './contents/LayoutTab';
 import { TextStyleTab } from './contents/TextStyleTab';
 
-type TabType = 'textstyle' | 'layout' | 'decoration';
+const TAB_TYPES = ['textstyle', 'layout', 'decoration'] as const;
+type TabType = (typeof TAB_TYPES)[number];
 type Props = {
   containerRef: RefObject<HTMLDivElement | null>,
 };
 const isTabType = (key: string): key is TabType => {
-  return ['textstyle', 'layout', 'decoration'].includes(key);
+  return (TAB_TYPES as readonly string[]).includes(key);
 };
 
 /**
