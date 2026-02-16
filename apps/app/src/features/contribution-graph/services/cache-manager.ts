@@ -139,7 +139,33 @@ export class ContributionCacheManager {
         return weekData ?? [];
       });
 
-    return [...sortedPermanentData, ...currentWeekData];
+    const runner = new Date();
+    runner.setUTCDate(runner.getUTCDate() - 364);
+
+    const allCache = new Map();
+    for (let i = 0; i < 365; i++) {
+      const dateKey = formatDateKey(runner);
+      allCache.set(dateKey, 0);
+
+      runner.setUTCDate(runner.getUTCDate() - 1);
+    }
+
+    for (const cache of sortedPermanentData) {
+      if (allCache.has(cache.date)) {
+        allCache.set(cache.date, cache.count);
+      }
+    }
+
+    for (const cache of currentWeekData) {
+      if (allCache.has(cache.date)) {
+        allCache.set(cache.date, cache.count);
+      }
+    }
+
+    return Array.from(allCache.entries()).map(([date, count]) => ({
+      date,
+      count,
+    }));
   }
 
   /**
