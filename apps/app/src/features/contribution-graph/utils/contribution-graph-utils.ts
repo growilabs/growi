@@ -1,10 +1,23 @@
-import { differenceInDays, format, startOfWeek } from 'date-fns';
+import {
+  differenceInDays,
+  format,
+  getISOWeek,
+  getISOWeekYear,
+  setISOWeek,
+  setISOWeekYear,
+  startOfISOWeek,
+  startOfWeek,
+  subWeeks,
+} from 'date-fns';
 
 /**
  * Gets current week's ISO week ID, e.g 2025-W32
  */
 export const getISOWeekId = (date: Date): string => {
-  return format(date, "RRRR-'W'II");
+  const week = getISOWeek(date);
+  const year = getISOWeekYear(date);
+
+  return `${year}-W${String(week).padStart(2, '0')}`;
 };
 
 export const getDaysDifference = (
@@ -32,33 +45,22 @@ export const getUTCMidnightToday = () => {
 };
 
 export const formatDateKey = (date: Date): string => {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return format(date, 'yyyy-MM-dd');
 };
 
 export function getStartDateFromISOWeek(weekId: string): Date {
-  const [yearStr, weekStr] = weekId.split('-W');
-  const year = parseInt(yearStr, 10);
-  const week = parseInt(weekStr, 10);
+  const [year, week] = weekId.split('-W').map(Number);
 
-  // Week 1 is the week with the first Thursday of the year.
-  const jan4 = new Date(Date.UTC(year, 0, 4));
-  const dayOfWeek = jan4.getUTCDay() || 7;
-  const mondayOfFirstWeek = new Date(jan4);
-  mondayOfFirstWeek.setUTCDate(jan4.getUTCDate() - (dayOfWeek - 1));
+  let date = new Date(year, 0, 4, 12, 0, 0);
 
-  const targetMonday = new Date(mondayOfFirstWeek);
-  targetMonday.setUTCDate(mondayOfFirstWeek.getUTCDate() + (week - 1) * 7);
+  date = setISOWeekYear(date, year);
+  date = setISOWeek(date, week);
 
-  return targetMonday;
+  return startOfISOWeek(date);
 }
 
 export function getCutoffWeekId(weeksToKeep = 52): string {
-  const cutoffDate = new Date();
-  cutoffDate.setUTCDate(cutoffDate.getUTCDate() - weeksToKeep * 7);
-
+  const cutoffDate = subWeeks(new Date(), weeksToKeep);
   return getISOWeekId(cutoffDate);
 }
 
