@@ -864,6 +864,9 @@
     "export_audit_log": "감사 로그 내보내기",
     "export_requested": "내보내기 요청이 접수되었습니다. 내보내기가 완료되면 알림을 받게 됩니다.",
     "export_failed": "내보내기 시작에 실패했습니다",
+    "duplicate_export_confirm": "동일한 조건의 내보내기가 이미 진행 중입니다. 다시 시작하시겠습니까?",
+    "restart_export": "내보내기 다시 시작",
+    "confirm_export": "내보내기 확인",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }

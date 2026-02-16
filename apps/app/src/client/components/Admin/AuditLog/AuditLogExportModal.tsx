@@ -4,14 +4,14 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import type { SupportedActionType } from '~/interfaces/activity';
 import { auditLogAvailableActionsAtom } from '~/states/server-configurations';
 
 import { DateRangePicker } from './DateRangePicker';
+import { DuplicateExportConfirmModal } from './DuplicateExportConfirmModal';
 import { SearchUsernameTypeahead } from './SearchUsernameTypeahead';
 import { SelectActionDropdown } from './SelectActionDropdown';
+import { useAuditLogExport } from './useAuditLogExport';
 
 type Props = {
   isOpen: boolean;
@@ -38,7 +38,6 @@ const AuditLogExportModalSubstance = ({
         auditLogAvailableActionsData?.map((action) => [action, true]) ?? [],
       ),
   );
-  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   const datePickerChangedHandler = useCallback((dateList: Date[] | null[]) => {
     setStartDate(dateList[0]);
@@ -73,39 +72,38 @@ const AuditLogExportModalSubstance = ({
     setSelectedUsernames(usernames);
   }, []);
 
-  const exportHandler = useCallback(async () => {
-    setIsExporting(true);
-    try {
-      const selectedActionList = Array.from(actionMap.entries())
-        .filter((v) => v[1])
-        .map((v) => v[0]);
+  const buildFilters = useCallback(() => {
+    const selectedActionList = Array.from(actionMap.entries())
+      .filter((v) => v[1])
+      .map((v) => v[0]);
 
-      const filters: {
-        actions?: SupportedActionType[];
-        dateFrom?: Date;
-        dateTo?: Date;
-        // TODO: Add users filter after implementing username-to-userId conversion
-      } = {};
+    const filters: {
+      actions?: SupportedActionType[];
+      dateFrom?: Date;
+      dateTo?: Date;
+      // TODO: Add users filter after implementing username-to-userId conversion
+    } = {};
 
-      if (selectedActionList.length > 0) {
-        filters.actions = selectedActionList;
-      }
-      if (startDate != null) {
-        filters.dateFrom = startDate;
-      }
-      if (endDate != null) {
-        filters.dateTo = endDate;
-      }
-
-      await apiv3Post('/audit-log-bulk-export', { filters });
-      toastSuccess(t('audit_log_management.export_requested'));
-      onClose();
-    } catch {
-      toastError(t('audit_log_management.export_failed'));
-    } finally {
-      setIsExporting(false);
+    if (selectedActionList.length > 0) {
+      filters.actions = selectedActionList;
     }
-  }, [actionMap, startDate, endDate, t, onClose]);
+    if (startDate != null) {
+      filters.dateFrom = startDate;
+    }
+    if (endDate != null) {
+      filters.dateTo = endDate;
+    }
+
+    return filters;
+  }, [actionMap, startDate, endDate]);
+
+  const {
+    isExporting,
+    isDuplicateConfirmOpen,
+    exportHandler,
+    restartExportHandler,
+    closeDuplicateConfirm,
+  } = useAuditLogExport(buildFilters, onClose);
 
   return (
     <>
@@ -161,6 +159,12 @@ const AuditLogExportModalSubstance = ({
           {t('audit_log_management.export')}
         </button>
       </ModalFooter>
+
+      <DuplicateExportConfirmModal
+        isOpen={isDuplicateConfirmOpen}
+        onClose={closeDuplicateConfirm}
+        onRestart={restartExportHandler}
+      />
     </>
   );
 };
