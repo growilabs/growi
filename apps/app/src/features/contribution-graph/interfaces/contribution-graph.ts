@@ -9,7 +9,7 @@ export interface IContributionCache {
   userId: mongoose.Types.ObjectId;
   lastUpdated: Date;
   currentWeekData: IContributionDay[];
-  permanentWeeks: Record<string, IContributionDay[]>;
+  permanentWeeks: Map<string, IContributionDay[]>;
 }
 
 export interface IWeeksToFreeze {

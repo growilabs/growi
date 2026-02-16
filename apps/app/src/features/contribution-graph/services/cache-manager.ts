@@ -132,11 +132,11 @@ export class ContributionCacheManager {
   ): IContributionDay[] {
     const { currentWeekData, permanentWeeks } = contributionCache;
 
-    const sortedPermanentData = Object.keys(permanentWeeks)
+    const sortedPermanentData = Array.from(permanentWeeks.keys())
       .sort()
       .flatMap((id) => {
-        const weekData = permanentWeeks[id];
-        return Array.isArray(weekData) ? weekData : [];
+        const weekData = permanentWeeks.get(id);
+        return weekData ?? [];
       });
 
     return [...sortedPermanentData, ...currentWeekData];
