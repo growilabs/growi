@@ -7,6 +7,71 @@ description: Enforce test-driven development workflow. Scaffold interfaces, gene
 
 This command enforces test-driven development methodology for GROWI.
 
+---
+
+## ⚠️ CRITICAL: MANDATORY TDD PROTOCOL
+
+**THIS IS NOT OPTIONAL. THIS IS A TEAM REQUIREMENT.**
+
+### Non-Negotiable Rules
+
+1. **ALL phases of TDD MUST be followed: RED → GREEN → REFACTOR**
+2. **Tests MUST be written BEFORE any implementation code (RED phase)**
+3. **Implementation MUST be minimal and only to pass tests (GREEN phase)**
+4. **Tests MUST remain passing during refactoring (REFACTOR phase)**
+5. **NEVER skip any phase of the TDD cycle**
+6. **If you believe you cannot follow TDD, STOP and ask the user IMMEDIATELY**
+
+### Violation Protocol
+
+If you find yourself about to deviate from the TDD cycle:
+
+1. **STOP IMMEDIATELY** - Do not proceed with any phase out of order
+2. **ASK THE USER** - Explain why you think following TDD is difficult
+3. **WAIT FOR APPROVAL** - Do not proceed without explicit user consent
+4. **DOCUMENT THE EXCEPTION** - If approved, document why TDD was skipped
+
+**Example of required user confirmation:**
+
+```
+"This task requires writing integration tests with complex setup
+(database mocks, authentication, etc.).
+
+I have two options:
+
+Option A: Follow strict TDD (recommended)
+- RED: Write failing integration test first
+- GREEN: Implement minimal code to pass
+- REFACTOR: Improve code while keeping tests green
+- May take 15-30 minutes for test setup
+- Ensures proper test coverage
+
+Option B: Skip TDD for this specific change
+- Implement directly
+- Verify with existing test suite only
+- Risk: No specific test for this change
+
+Which approach would you prefer?"
+```
+
+**Never assume. Always ask.**
+
+---
+
+## Pre-Implementation Checklist
+
+Before writing ANY code, confirm:
+
+- [ ] I have read and understood the task requirements
+- [ ] I am starting with Step 1: Write a FAILING test (RED phase)
+- [ ] I have NOT written any implementation code yet
+- [ ] I will follow all phases: RED → GREEN → REFACTOR
+- [ ] If I cannot follow the complete TDD cycle, I have ASKED THE USER for guidance
+
+**If any checkbox is unchecked, STOP and ask the user.**
+
+---
+
 ## What This Command Does
 
 1. **Scaffold Interfaces** - Define types/interfaces first
@@ -61,6 +126,8 @@ export function validatePagePath(path: string): ValidationResult {
 
 ## Step 2: Write Failing Test (RED)
 
+**⚠️ CHECKPOINT: Confirm you have NOT written any implementation code yet.**
+
 ```typescript
 // src/utils/page-path-validator.spec.ts
 describe('validatePagePath', () => {
@@ -84,6 +151,8 @@ describe('validatePagePath', () => {
 
 ## Step 3: Run Tests - Verify FAIL
 
+**⚠️ MANDATORY: Tests MUST fail before proceeding to implementation.**
+
 ```bash
 turbo run test --filter @growi/app -- src/utils/page-path-validator.spec.ts
 
@@ -92,9 +161,13 @@ FAIL src/utils/page-path-validator.spec.ts
     Error: Not implemented
 ```
 
-✅ Tests fail as expected. Ready to implement.
+**✅ CHECKPOINT PASSED: Tests fail as expected. Ready to implement.**
+
+**❌ If tests pass or don't run: STOP. Fix the test first.**
 
 ## Step 4: Implement Minimal Code (GREEN)
+
+**⚠️ CHECKPOINT: Only write the MINIMUM code needed to pass the tests.**
 
 ```typescript
 export function validatePagePath(path: string): ValidationResult {
@@ -110,19 +183,34 @@ export function validatePagePath(path: string): ValidationResult {
 
 ## Step 5: Run Tests - Verify PASS
 
+**⚠️ MANDATORY: ALL tests MUST pass before proceeding to refactoring.**
+
 ```bash
 turbo run test --filter @growi/app -- src/utils/page-path-validator.spec.ts
 
 PASS  ✓ All tests passing!
 ```
 
+**✅ CHECKPOINT PASSED: Ready to refactor if needed.**
+
+**❌ If tests fail: Fix implementation, do NOT move to refactoring.**
+
 ## Step 6: Check Coverage
+
+**⚠️ MANDATORY: Verify test coverage meets requirements (80% minimum).**
 
 ```bash
 cd {package_dir} && pnpm vitest run --coverage src/utils/page-path-validator.spec.ts
 
 Coverage: 100% ✅ (Target: 80%)
 ```
+
+**✅ TDD CYCLE COMPLETE: All phases completed successfully.**
+
+- ✅ RED: Failing tests written
+- ✅ GREEN: Implementation passes tests
+- ✅ REFACTOR: Code improved (if needed)
+- ✅ COVERAGE: 80%+ achieved
 
 ## TDD Best Practices
 
@@ -172,13 +260,26 @@ Coverage: 100% ✅ (Target: 80%)
 
 ## Important Notes
 
-**MANDATORY**: Tests must be written BEFORE implementation. The TDD cycle is:
+**MANDATORY - NO EXCEPTIONS**: The complete TDD cycle MUST be followed:
 
-1. **RED** - Write failing test
-2. **GREEN** - Implement to pass
-3. **REFACTOR** - Improve code
+1. **RED** - Write failing test FIRST
+2. **GREEN** - Implement minimal code to pass the test
+3. **REFACTOR** - Improve code while keeping tests green
 
-Never skip the RED phase. Never write code before tests.
+**Absolute Requirements:**
+- ❌ NEVER skip the RED phase
+- ❌ NEVER skip the GREEN phase
+- ❌ NEVER skip the REFACTOR phase
+- ❌ NEVER write implementation code before tests
+- ❌ NEVER proceed without explicit user approval if you cannot follow TDD
+
+**If you violate these rules:**
+1. STOP immediately
+2. Discard any implementation code written before tests
+3. Inform the user of the violation
+4. Start over with RED phase
+
+**This is a team development standard. Violations are not acceptable.**
 
 ## Related Skills
 
