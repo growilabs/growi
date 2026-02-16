@@ -72,7 +72,9 @@ describe('GET /info', () => {
     );
 
     // Mock findPageAndMetaDataByViewer to return minimal successful response
-    vi.spyOn(findPageModule, 'findPageAndMetaDataByViewer').mockResolvedValue({
+    const mockSpy = vi.spyOn(findPageModule, 'findPageAndMetaDataByViewer');
+    // Type assertion needed for test mock objects
+    mockSpy.mockResolvedValue({
       data: {
         _id: validPageId,
         path: '/test-page',
@@ -80,12 +82,20 @@ describe('GET /info', () => {
           _id: '507f1f77bcf86cd799439013',
           body: 'Test page content',
         },
-      } as any,
+      },
       meta: {
         isNotFound: false,
         isForbidden: false,
-      } as any,
-    });
+        isEmpty: false,
+        isMovable: true,
+        isDeletable: true,
+        isAbleToDeleteCompletely: true,
+        isRevertible: true,
+        bookmarkCount: 0,
+      },
+    } as unknown as Awaited<
+      ReturnType<typeof findPageModule.findPageAndMetaDataByViewer>
+    >);
 
     // Setup express app
     app = express();
@@ -99,9 +109,21 @@ describe('GET /info', () => {
         // Check if error is validation error (array of ErrorV3)
         const isValidationError =
           Array.isArray(error) &&
-          error.some((e: unknown) => (e as any)?.code === 'validation_failed');
+          error.some(
+            (e: unknown) =>
+              typeof e === 'object' &&
+              e !== null &&
+              'code' in e &&
+              e.code === 'validation_failed',
+          );
         const status = statusCode ?? (isValidationError ? 400 : 500);
-        const errorMessage = (error as any)?.message || error;
+        const errorMessage =
+          typeof error === 'object' &&
+          error !== null &&
+          'message' in error &&
+          typeof error.message === 'string'
+            ? error.message
+            : String(error);
         return res.status(status).json({ error: errorMessage });
       };
       next();
@@ -115,14 +137,31 @@ describe('GET /info', () => {
 
     // Import and mount the actual router
     const pageModule = await import('./index');
-    const pageRouterFactory = (pageModule as any).default || pageModule;
-    const pageRouter = pageRouterFactory(crowi);
+
+    // Type guard to ensure we have a router factory function
+    type RouterFactory = (crowi: Crowi) => express.Router;
+    const isRouterFactory = (value: unknown): value is RouterFactory => {
+      return typeof value === 'function';
+    };
+
+    const factoryCandidate =
+      'default' in pageModule ? pageModule.default : pageModule;
+    if (!isRouterFactory(factoryCandidate)) {
+      throw new Error('Module does not export a router factory function');
+    }
+
+    const pageRouter = factoryCandidate(crowi);
     app.use('/', pageRouter);
 
     // Error handling middleware (must be after router)
     app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
       const apiRes = res as ApiV3Response;
-      const statusCode = (err as any).statusCode || (err as any).status || 500;
+      const statusCode =
+        'statusCode' in err && typeof err.statusCode === 'number'
+          ? err.statusCode
+          : 'status' in err && typeof err.status === 'number'
+            ? err.status
+            : 500;
       return apiRes.apiv3Err(err, statusCode);
     });
   });
@@ -148,15 +187,16 @@ describe('GET /info', () => {
     });
 
     it('should return 403 when page is forbidden', async () => {
-      vi.spyOn(findPageModule, 'findPageAndMetaDataByViewer').mockResolvedValue(
-        {
-          data: null,
-          meta: {
-            isNotFound: true,
-            isForbidden: true,
-          } as any,
+      const mockSpy = vi.spyOn(findPageModule, 'findPageAndMetaDataByViewer');
+      mockSpy.mockResolvedValue({
+        data: null,
+        meta: {
+          isNotFound: true,
+          isForbidden: true,
         },
-      );
+      } as unknown as Awaited<
+        ReturnType<typeof findPageModule.findPageAndMetaDataByViewer>
+      >);
 
       const response = await request(app)
         .get('/info')
@@ -167,16 +207,17 @@ describe('GET /info', () => {
     });
 
     it('should return 200 when page is empty (not found but not forbidden)', async () => {
-      vi.spyOn(findPageModule, 'findPageAndMetaDataByViewer').mockResolvedValue(
-        {
-          data: null,
-          meta: {
-            isNotFound: true,
-            isForbidden: false,
-            isEmpty: true,
-          } as any,
+      const mockSpy = vi.spyOn(findPageModule, 'findPageAndMetaDataByViewer');
+      mockSpy.mockResolvedValue({
+        data: null,
+        meta: {
+          isNotFound: true,
+          isForbidden: false,
+          isEmpty: true,
         },
-      );
+      } as Awaited<
+        ReturnType<typeof findPageModule.findPageAndMetaDataByViewer>
+      >);
 
       const response = await request(app)
         .get('/info')
