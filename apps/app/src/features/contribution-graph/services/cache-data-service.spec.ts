@@ -87,7 +87,7 @@ describe('Contribution Cache Integration Test', () => {
 
       const doc = await ContributionCache.findOne({ userId: userId });
 
-      expect(doc?.permanentWeeks.old_week).toBeUndefined();
+      expect(doc?.permanentWeeks.get('old_week')).toBeUndefined();
       expect(doc?.currentWeekData[0].count).toBe(2);
     });
 
