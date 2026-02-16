@@ -38,9 +38,10 @@ The following are explicitly **not** part of this feature:
 #### Acceptance Criteria
 
 1. When the client sends a valid request, the Suggest Path Service shall include a suggestion with type `memo`.
-2. The Suggest Path Service shall generate the memo path based on the authenticated user's identity (pattern: `/user/{username}/memo/`).
-3. The Suggest Path Service shall set `grant` to `4` (owner only) for memo type suggestions.
-4. The Suggest Path Service shall provide a fixed descriptive text in the `description` field for memo type suggestions.
+2. When user pages are enabled (default), the Suggest Path Service shall generate the memo path under the user's home directory (pattern: `/user/{username}/memo/`).
+3. When user pages are disabled (`disableUserPages` is true), the Suggest Path Service shall generate the memo path under an alternative namespace (e.g., `/memo/{username}/`). The exact alternative path and grant handling are subject to confirmation.
+4. The Suggest Path Service shall set `grant` to `4` (owner only) for memo type suggestions when using the user home directory path.
+5. The Suggest Path Service shall provide a fixed descriptive text in the `description` field for memo type suggestions.
 
 ### Requirement 3: Search-Based Path Suggestion (Phase 2)
 

@@ -161,9 +161,10 @@ sequenceDiagram
 | 1.3 | Path values as directory paths with trailing slash | SuggestPathHandler | PathSuggestion type | — |
 | 1.4 | Separate namespace from /page | SuggestPathRouter | Route registration | — |
 | 2.1 | Include memo type suggestion | MemoSuggestionGenerator | PathSuggestion type | Phase 1 |
-| 2.2 | Memo path from authenticated user | MemoSuggestionGenerator | — | Phase 1 |
-| 2.3 | Memo grant = 4 (owner only) | MemoSuggestionGenerator | — | — |
-| 2.4 | Fixed description for memo | MemoSuggestionGenerator, DescriptionGenerator | — | — |
+| 2.2 | Memo path under user home directory (user pages enabled) | MemoSuggestionGenerator | — | Phase 1 |
+| 2.3 | Memo path under alternative namespace (user pages disabled) | MemoSuggestionGenerator | — | Phase 1 |
+| 2.4 | Memo grant = 4 when user pages enabled; resolve from parent when disabled | MemoSuggestionGenerator, GrantResolver | — | — |
+| 2.5 | Fixed description for memo | MemoSuggestionGenerator, DescriptionGenerator | — | — |
 | 3.1 | Search related pages by keywords | SearchSuggestionGenerator | SearchService | Phase 2 |
 | 3.2 | Return parent directory of most relevant page | SearchSuggestionGenerator | — | Phase 2 |
 | 3.3 | Include related page titles in description | SearchSuggestionGenerator, DescriptionGenerator | — | — |
@@ -290,14 +291,15 @@ interface SuggestPathService {
 | Field | Detail |
 |-------|--------|
 | Intent | Generate personal memo area path suggestion |
-| Requirements | 2.1, 2.2, 2.3, 2.4 |
+| Requirements | 2.1, 2.2, 2.3, 2.4, 2.5 |
 
 **Responsibilities & Constraints**
 
-- Generate path: `/user/{username}/memo/` using `userHomepagePath(user)` utility
-- Set fixed grant value: `PageGrant.GRANT_OWNER` (4)
+- Check `disableUserPages` configuration via `crowi.configManager`
+- When user pages are enabled (default): Generate path `/user/{username}/memo/` using `userHomepagePath(user)` utility, set grant to `PageGrant.GRANT_OWNER` (4)
+- When user pages are disabled: Generate path under alternative namespace (e.g., `/memo/{username}/`), resolve grant from parent page. The exact alternative path is subject to confirmation
 - Set fixed description and label text
-- Always succeeds (no external dependencies)
+- Always succeeds (path can be determined from either configuration)
 
 **Contracts**: Service [x]
 
@@ -310,7 +312,7 @@ function generateMemoSuggestion(user: IUserHasId): PathSuggestion {
 ```
 
 - Preconditions: `user` has valid `username` field
-- Postconditions: Returns a `PathSuggestion` with `type: 'memo'`, `grant: 4`
+- Postconditions: Returns a `PathSuggestion` with `type: 'memo'`. When user pages are enabled, `grant: 4`; when disabled, grant is resolved from the parent page
 
 #### SearchSuggestionGenerator (Phase 2)
 
