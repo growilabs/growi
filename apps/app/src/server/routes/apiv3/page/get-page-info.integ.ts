@@ -65,15 +65,14 @@ describe('GET /info', () => {
   });
 
   beforeEach(async () => {
-    // Mock certify-shared-page using mock-require
+    // Mock certify-shared-page middleware
     mockRequire(
       '../../../middlewares/certify-shared-page',
       () => mockCertifySharedPage,
     );
 
-    // Mock findPageAndMetaDataByViewer to return minimal successful response
+    // Mock findPageAndMetaDataByViewer with default successful response
     const mockSpy = vi.spyOn(findPageModule, 'findPageAndMetaDataByViewer');
-    // Type assertion needed for test mock objects
     mockSpy.mockResolvedValue({
       data: {
         _id: validPageId,
@@ -97,26 +96,17 @@ describe('GET /info', () => {
       ReturnType<typeof findPageModule.findPageAndMetaDataByViewer>
     >);
 
-    // Setup express app
+    // Setup express app with middleware
     app = express();
     app.use(express.json());
 
-    // Mock apiv3 response methods
+    // Add apiv3 response helpers
     app.use((_req, res, next) => {
       const apiRes = res as ApiV3Response;
       apiRes.apiv3 = (data: unknown) => res.json(data);
       apiRes.apiv3Err = (error: unknown, statusCode?: number) => {
-        // Check if error is validation error (array of ErrorV3)
-        const isValidationError =
-          Array.isArray(error) &&
-          error.some(
-            (e: unknown) =>
-              typeof e === 'object' &&
-              e !== null &&
-              'code' in e &&
-              e.code === 'validation_failed',
-          );
-        const status = statusCode ?? (isValidationError ? 400 : 500);
+        // Validation errors come as arrays and should return 400
+        const status = statusCode ?? (Array.isArray(error) ? 400 : 500);
         const errorMessage =
           typeof error === 'object' &&
           error !== null &&
@@ -135,35 +125,15 @@ describe('GET /info', () => {
       next();
     });
 
-    // Import and mount the actual router
+    // Mount the page router
     const pageModule = await import('./index');
-
-    // Type guard to ensure we have a router factory function
-    type RouterFactory = (crowi: Crowi) => express.Router;
-    const isRouterFactory = (value: unknown): value is RouterFactory => {
-      return typeof value === 'function';
-    };
-
     const factoryCandidate =
       'default' in pageModule ? pageModule.default : pageModule;
-    if (!isRouterFactory(factoryCandidate)) {
+    if (typeof factoryCandidate !== 'function') {
       throw new Error('Module does not export a router factory function');
     }
-
     const pageRouter = factoryCandidate(crowi);
     app.use('/', pageRouter);
-
-    // Error handling middleware (must be after router)
-    app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-      const apiRes = res as ApiV3Response;
-      const statusCode =
-        'statusCode' in err && typeof err.statusCode === 'number'
-          ? err.statusCode
-          : 'status' in err && typeof err.status === 'number'
-            ? err.status
-            : 500;
-      return apiRes.apiv3Err(err, statusCode);
-    });
   });
 
   afterEach(() => {
