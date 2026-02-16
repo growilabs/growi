@@ -1,11 +1,14 @@
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import mockRequire from 'mock-require';
+import { Types } from 'mongoose';
 import request from 'supertest';
+import { mockDeep } from 'vitest-mock-extended';
 
 import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
+import type { PageDocument } from '~/server/models/page';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import * as findPageModule from '~/server/service/page/find-page-and-meta-data-by-viewer';
 
@@ -73,38 +76,51 @@ describe('GET /info', () => {
 
     // Mock findPageAndMetaDataByViewer with default successful response
     const mockSpy = vi.spyOn(findPageModule, 'findPageAndMetaDataByViewer');
+
+    // Create type-safe mock PageDocument using vitest-mock-extended
+    // Note: mockDeep makes all properties optional, but _id must be required
+    const mockPageDoc = mockDeep<PageDocument>({
+      _id: new Types.ObjectId(validPageId),
+      path: '/test-page',
+      status: 'published',
+      isEmpty: false,
+      grant: 1,
+      descendantCount: 0,
+      commentCount: 0,
+    });
+
+    type PageInfoExt = Exclude<
+      Awaited<
+        ReturnType<typeof findPageModule.findPageAndMetaDataByViewer>
+      >['meta'],
+      { isNotFound: true }
+    >;
+
     mockSpy.mockResolvedValue({
-      data: {
-        _id: validPageId,
-        path: '/test-page',
-        revision: {
-          _id: '507f1f77bcf86cd799439013',
-          body: 'Test page content',
-        },
-      },
+      // mockDeep creates DeepMockProxy which conflicts with Required<{_id}>
+      // so we acknowledge this limitation for Mongoose documents
+      data: mockPageDoc as typeof mockPageDoc &
+        Required<{ _id: Types.ObjectId }>,
       meta: {
         isNotFound: false,
-        isForbidden: false,
+        isV5Compatible: true,
         isEmpty: false,
-        isMovable: true,
-        isDeletable: true,
-        isAbleToDeleteCompletely: true,
-        isRevertible: true,
+        isMovable: false,
+        isDeletable: false,
+        isAbleToDeleteCompletely: false,
+        isRevertible: false,
         bookmarkCount: 0,
-      },
-    } as unknown as Awaited<
-      ReturnType<typeof findPageModule.findPageAndMetaDataByViewer>
-    >);
+      } satisfies PageInfoExt,
+    });
 
     // Setup express app with middleware
     app = express();
     app.use(express.json());
 
     // Add apiv3 response helpers
-    app.use((_req, res, next) => {
-      const apiRes = res as ApiV3Response;
-      apiRes.apiv3 = (data: unknown) => res.json(data);
-      apiRes.apiv3Err = (error: unknown, statusCode?: number) => {
+    app.use((_req, res: ApiV3Response, next) => {
+      res.apiv3 = (data: unknown) => res.json(data);
+      res.apiv3Err = (error: unknown, statusCode?: number) => {
         // Validation errors come as arrays and should return 400
         const status = statusCode ?? (Array.isArray(error) ? 400 : 500);
         const errorMessage =
@@ -151,9 +167,10 @@ describe('GET /info', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('isNotFound');
-      expect(response.body).toHaveProperty('isForbidden');
+      expect(response.body).toHaveProperty('isV5Compatible');
+      expect(response.body).toHaveProperty('isEmpty');
+      expect(response.body).toHaveProperty('bookmarkCount');
       expect(response.body.isNotFound).toBe(false);
-      expect(response.body.isForbidden).toBe(false);
     });
 
     it('should return 403 when page is forbidden', async () => {
@@ -164,7 +181,7 @@ describe('GET /info', () => {
           isNotFound: true,
           isForbidden: true,
         },
-      } as unknown as Awaited<
+      } satisfies Awaited<
         ReturnType<typeof findPageModule.findPageAndMetaDataByViewer>
       >);
 
@@ -176,16 +193,15 @@ describe('GET /info', () => {
       expect(response.body).toHaveProperty('error');
     });
 
-    it('should return 200 when page is empty (not found but not forbidden)', async () => {
+    it('should return 200 when page is not found but not forbidden', async () => {
       const mockSpy = vi.spyOn(findPageModule, 'findPageAndMetaDataByViewer');
       mockSpy.mockResolvedValue({
         data: null,
         meta: {
           isNotFound: true,
           isForbidden: false,
-          isEmpty: true,
         },
-      } as Awaited<
+      } satisfies Awaited<
         ReturnType<typeof findPageModule.findPageAndMetaDataByViewer>
       >);
 
@@ -194,8 +210,9 @@ describe('GET /info', () => {
         .query({ pageId: validPageId });
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('isEmpty');
-      expect(response.body.isEmpty).toBe(true);
+      expect(response.body).toHaveProperty('isNotFound');
+      expect(response.body.isNotFound).toBe(true);
+      expect(response.body.isForbidden).toBe(false);
     });
   });
 
@@ -207,7 +224,8 @@ describe('GET /info', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('isNotFound');
-      expect(response.body).toHaveProperty('isForbidden');
+      expect(response.body).toHaveProperty('bookmarkCount');
+      expect(response.body.isNotFound).toBe(false);
     });
 
     it('should accept shareLinkId as optional parameter', async () => {
