@@ -307,7 +307,13 @@ export const LayoutTab: React.FC = () => {
       ].join('\n'),
       preview: null,
       underContent: (
-        <div className="table-responsive" style={{ marginTop: '0.5rem', width: 'fit-content' }}>
+        <div
+          className="table-responsive"
+          style={{
+            marginTop: '0.5rem',
+            width: 'fit-content',
+          }}
+        >
           <table
             className="table table-sm table-bordered mb-0 small"
             style={{ tableLayout: 'auto', width: '100%', minWidth: '580px' }}
@@ -339,7 +345,7 @@ export const LayoutTab: React.FC = () => {
 
   return (
     <div className="px-4 py-3 overflow-y-auto" style={{ maxHeight: '80vh', minWidth: '650px' }}>
-      {LAYOUT_GUIDES.map(item => (
+      {LAYOUT_GUIDES.map((item) => (
         <GuideRow key={item.id} {...item} />
       ))}
 
@@ -347,7 +353,14 @@ export const LayoutTab: React.FC = () => {
         title={t(`${i18nKey}.footnote`)}
         code={`${t(`${i18nKey}.footnote_label`)}[^1].\n\n[^1]: ${t(`${i18nKey}.footnote_desc`)}.`}
         preview={(
-          <div style={{ color: '#223246', fontSize: '16px', lineHeight: '27px', fontFamily: 'Noto Sans CJK JP' }}>
+          <div
+            style={{
+              color: '#223246',
+              fontSize: '16px',
+              lineHeight: '27px',
+              fontFamily: 'Noto Sans CJK JP',
+            }}
+          >
             {t(`${i18nKey}.footnote_label`)}
             <sup style={{ fontSize: '0.6em', color: '#223246', marginLeft: '1px' }}>[1]</sup>
           </div>
