@@ -221,7 +221,7 @@ export const LayoutTab: React.FC = () => {
             color: '#223246',
             fontSize: '16px',
             lineHeight: '27px',
-            fontFamily: 'Noto Sans CJK JP'
+            fontFamily: 'Noto Sans CJK JP',
           }}
         >
           <div className="d-flex align-items-center mb-1">
