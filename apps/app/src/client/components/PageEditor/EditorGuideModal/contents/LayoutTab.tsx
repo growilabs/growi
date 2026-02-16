@@ -216,7 +216,14 @@ export const LayoutTab: React.FC = () => {
       title: t(`${i18nKey}.checkbox`),
       code: `[x] ${t(`${i18nKey}.task`)}1\n  [] ${t(`${i18nKey}.task`)}1-1\n  [x] ${t(`${i18nKey}.task`)}1-2`,
       preview: (
-        <div style={{ color: '#223246', fontSize: '16px', lineHeight: '27px', fontFamily: 'Noto Sans CJK JP' }}>
+        <div
+          style={{
+            color: '#223246',
+            fontSize: '16px',
+            lineHeight: '27px',
+            fontFamily: 'Noto Sans CJK JP'
+          }}
+        >
           <div className="d-flex align-items-center mb-1">
             <span style={{ fontSize: '16px', marginRight: '10px', userSelect: 'none' }}>☑️</span>
             <span>{t(`${i18nKey}.task`)}1</span>
