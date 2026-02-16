@@ -53,6 +53,7 @@ import loggerFactory from '~/utils/logger';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 import { checkPageExistenceHandlersFactory } from './check-page-existence';
 import { createPageHandlersFactory } from './create-page';
+import { getPageInfoHandlerFactory } from './get-page-info';
 import { getPagePathsWithDescendantCountFactory } from './get-page-paths-with-descendant-count';
 import { getYjsDataHandlerFactory } from './get-yjs-data';
 import { publishPageHandlersFactory } from './publish-page';
@@ -108,10 +109,6 @@ module.exports = (crowi: Crowi) => {
       query('includeEmpty').optional().isBoolean(),
     ],
     likes: [body('pageId').isString(), body('bool').isBoolean()],
-    info: [
-      query('pageId').isMongoId().withMessage('pageId is required'),
-      query('shareLinkId').optional().isMongoId(),
-    ],
     getGrantData: [
       query('pageId').isMongoId().withMessage('pageId is required'),
     ],
@@ -590,72 +587,7 @@ module.exports = (crowi: Crowi) => {
     },
   );
 
-  /**
-   * @swagger
-   *
-   *    /page/info:
-   *      get:
-   *        tags: [Page]
-   *        summary: /page/info
-   *        description: Get summary informations for a page
-   *        parameters:
-   *          - name: pageId
-   *            in: query
-   *            required: true
-   *            description: page id
-   *            schema:
-   *              $ref: '#/components/schemas/ObjectId'
-   *        responses:
-   *          200:
-   *            description: Successfully retrieved current page info.
-   *            content:
-   *              application/json:
-   *                schema:
-   *                  $ref: '#/components/schemas/PageInfoExt'
-   *          500:
-   *            description: Internal server error.
-   */
-  router.get(
-    '/info',
-    accessTokenParser([SCOPE.READ.FEATURES.PAGE]),
-    certifySharedPage,
-    loginRequired,
-    validator.info,
-    apiV3FormValidator,
-    async (req, res) => {
-      const { user, isSharedPage } = req;
-      const { pageId } = req.query;
-
-      try {
-        const { meta } = await findPageAndMetaDataByViewer(
-          pageService,
-          pageGrantService,
-          { pageId, path: null, user, isSharedPage },
-        );
-
-        if (isIPageNotFoundInfo(meta)) {
-          // Return error only when the page is forbidden
-          if (meta.isForbidden) {
-            return res.apiv3Err(
-              new ErrorV3(
-                'Page is forbidden',
-                'page-is-forbidden',
-                undefined,
-                meta,
-              ),
-              403,
-            );
-          }
-        }
-
-        // Empty pages (isEmpty: true) should return page info for UI operations
-        return res.apiv3(meta);
-      } catch (err) {
-        logger.error('get-page-info', err);
-        return res.apiv3Err(err, 500);
-      }
-    },
-  );
+  router.get('/info', getPageInfoHandlerFactory(crowi));
 
   /**
    * @swagger
