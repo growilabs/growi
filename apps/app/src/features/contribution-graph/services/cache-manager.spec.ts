@@ -6,6 +6,7 @@ import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 
 import { ContributionCache } from '../models/contribution-cache-model';
+import { formatDateKey } from '../utils/contribution-graph-utils';
 import { ContributionCacheManager } from './cache-manager';
 
 const createMockId = () => new mongoose.Types.ObjectId().toString();
@@ -35,59 +36,59 @@ describe('Contribution Cache Manager Integration Test', () => {
     it('should return an array of all combined contribution cache for a user', async () => {
       const userId = createMockId();
 
+      // REMINDER: Make test that works with future dates
+
       await Activity.create([
         {
           user: userId,
-          action: ActivityLogActions.ACTION_PAGE_CREATE, // Or any valid action from your enum
-          createdAt: new Date('2025-01-06'),
+          action: ActivityLogActions.ACTION_PAGE_CREATE,
+          createdAt: new Date('2025-03-06'),
         },
         {
           user: userId,
           action: ActivityLogActions.ACTION_PAGE_UPDATE,
-          createdAt: new Date('2025-01-01'),
+          createdAt: new Date('2025-03-01'),
         },
         {
           user: userId,
           action: ActivityLogActions.ACTION_PAGE_UPDATE,
-          createdAt: new Date('2024-12-23'),
+          createdAt: new Date('2025-12-23'),
         },
         {
           user: userId,
           action: ActivityLogActions.ACTION_PAGE_UPDATE,
-          createdAt: new Date('2024-12-24'),
+          createdAt: new Date('2025-12-24'),
         },
       ]);
 
       await ContributionCache.create({
         userId,
-        lastUpdated: new Date('2025-01-01'),
-        currentWeekData: [
-          { date: '2025-01-06', count: 1 }, // Monday of a later week
-        ],
+        lastUpdated: new Date('2025-03-01'),
+        currentWeekData: [{ date: '2025-03-06', count: 1 }],
         permanentWeeks: {
-          '2024-W52': [
-            { date: '2024-12-23', count: 1 },
-            { date: '2024-12-24', count: 1 },
+          '2025-W52': [
+            { date: '2025-12-23', count: 1 },
+            { date: '2025-12-24', count: 1 },
           ],
         },
       });
 
       const result = await cacheManager.getUpdatedCache(userId);
+      const runner = new Date();
+      runner.setUTCDate(runner.getUTCDate() - 364);
+      const oldestDate = formatDateKey(runner);
 
-      const oldDay = result.find((d) => d.date === '2024-12-23');
+      const oldDay = result.find((d) => d.date === '2025-12-23');
       expect(oldDay).toBeDefined();
-      expect(oldDay?.count).toBe(10);
+      expect(oldDay?.count).toBe(1);
 
       // Check if the new current week data is present
-      const newDay = result.find((d) => d.date === '2025-01-06');
+      const newDay = result.find((d) => d.date === '2025-03-06');
       expect(newDay).toBeDefined();
-      expect(newDay?.count).toBe(5);
+      expect(newDay?.count).toBe(1);
 
       // Check Order: The first element should be the oldest date
-      expect(result[0].date).toBe('2024-12-23');
-
-      // Check that gaps were filled (fillGapsInWeek should have added the rest of the week)
-      // 7 days from permanent week + 7 days from current week = 14 total
+      expect(result[0].date).toBe(oldestDate);
       expect(result.length).toBeGreaterThanOrEqual(14);
     });
   });
