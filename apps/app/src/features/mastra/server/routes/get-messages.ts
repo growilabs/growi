@@ -27,9 +27,8 @@ export type Req = Request<ReqParam, Response, undefined> & {
 export const getMessagesHandlersFactory: GetMessagesHandlersFactory = (
   crowi,
 ) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
+  const loginRequiredStrictly =
+    require('~/server/middlewares/login-required').default(crowi);
 
   const validator: ValidationChain[] = [
     param('threadId')
@@ -60,12 +59,12 @@ export const getMessagesHandlersFactory: GetMessagesHandlersFactory = (
         }
 
         // TODO: Pagination
-        const message = await memory.query({
+        const messages = await memory.recall({
           threadId,
-          resourceId: req.user._id.toString(),
+          perPage: false,
         });
 
-        return res.apiv3({ message });
+        return res.apiv3({ messages });
       } catch (err) {
         logger.error(err);
         return res.apiv3Err(new ErrorV3('Failed to get messages'));

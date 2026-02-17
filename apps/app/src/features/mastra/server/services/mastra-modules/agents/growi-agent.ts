@@ -9,6 +9,7 @@ import { fileSearchTool } from '../tools/file-search-tool';
 const model = configManager.getConfig('openai:assistantModel:chat');
 
 export const growiAgent = new Agent({
+  id: 'growiAgent',
   name: 'GROWI Agent',
   instructions: `You are an AI assistant that shows detailed reasoning.
 

@@ -1,8 +1,10 @@
 import type { IUserHasId } from '@growi/core';
 import { isPopulated, SCOPE } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
-import { RuntimeContext } from '@mastra/core/runtime-context';
+import { toAISdkStream } from '@mastra/ai-sdk';
+import { RequestContext } from '@mastra/core/request-context';
 import {
+  createUIMessageStream,
   pipeUIMessageStreamToResponse,
   type UIMessage,
   validateUIMessages,
@@ -36,7 +38,7 @@ type Req = Request<undefined, Response, ReqBody> & {
 
 type PostMessageHandlersFactory = (crowi: Crowi) => RequestHandler[];
 
-const runtimeContext = new RuntimeContext<{ vectorStoreId: string }>();
+const requestContext = new RequestContext<{ vectorStoreId: string }>();
 
 const reasoningSchema = z.object({
   thoughtProcess: z.array(
@@ -52,9 +54,8 @@ const reasoningSchema = z.object({
 export const postMessageHandlersFactory: PostMessageHandlersFactory = (
   crowi,
 ) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
+  const loginRequiredStrictly =
+    require('~/server/middlewares/login-required').default(crowi);
 
   const validator: ValidationChain[] = [
     body('threadId')
@@ -110,7 +111,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
 
       const vectorStoreId =
         aiAssistantWithPopulatedVectorStore.vectorStore.vectorStoreId;
-      runtimeContext.set('vectorStoreId', vectorStoreId);
+      requestContext.set('vectorStoreId', vectorStoreId);
 
       const growiAgent = mastra.getAgent('growiAgent');
       const memory = await growiAgent.getMemory();
@@ -125,10 +126,11 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       );
 
       try {
-        const stream = await growiAgent.streamVNext(messages, {
-          format: 'aisdk',
-          output: reasoningSchema,
-          runtimeContext,
+        const stream = await growiAgent.stream(messages, {
+          structuredOutput: {
+            schema: reasoningSchema,
+          },
+          requestContext,
           memory: {
             thread: thread.id,
             resource: thread.resourceId,
@@ -144,9 +146,18 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
         // Express requires piping to ServerResponse object, not returning Web API Response
         // See: https://ai-sdk.dev/cookbook/api-servers/express#ui-message-stream
         // Example: https://github.com/vercel/ai/blob/c5e2a7c22eb8d9392705d1e87458b1d4af9c6ec9/examples/express/src/server.ts
+        const uiMessageStream = createUIMessageStream({
+          originalMessages: messages,
+          execute: async ({ writer }) => {
+            for await (const part of toAISdkStream(stream, { from: 'agent' })) {
+              await writer.write(part);
+            }
+          },
+        });
+
         return pipeUIMessageStreamToResponse({
           response: res,
-          stream: stream.toUIMessageStream(),
+          stream: uiMessageStream,
         });
       } catch (error) {
         logger.error(error);

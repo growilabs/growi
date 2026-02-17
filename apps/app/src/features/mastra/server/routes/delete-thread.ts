@@ -28,9 +28,8 @@ type Req = Request<ReqParams, Response, undefined> & {
 export const deleteThreadHandlersFactory: DeleteThreadHandlersFactory = (
   crowi,
 ) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
+  const loginRequiredStrictly =
+    require('~/server/middlewares/login-required').default(crowi);
 
   const validator: ValidationChain[] = [
     param('threadId').isUUID().withMessage('threadId is required'),
@@ -61,15 +60,18 @@ export const deleteThreadHandlersFactory: DeleteThreadHandlersFactory = (
           return res.apiv3Err(new ErrorV3('Thread not found'), 404);
         }
 
-        const { uiMessages } = await memory.query({ threadId });
-        const messageIds = uiMessages.map((message) => message.id);
+        const messages = await memory.recall({ threadId, perPage: false });
+
+        // TODO: https://redmine.weseek.co.jp/issues/173988
+
+        // const uiMessages = toAISdkV5Messages(messages);
+
+        // const messageIds = uiMessages.map((message) => message.id);
 
         // The deleteMessage method is not implemented
         // Refs:
         // https://github.com/mastra-ai/mastra/tree/35667834530f6fee2cc4f68adf7c7b9ca1122b14/stores/mongodb#storage-methods
         // https://github.com/mastra-ai/mastra/blob/35667834530f6fee2cc4f68adf7c7b9ca1122b14/stores/mongodb/src/storage/index.ts#L86
-
-        // TODO: https://redmine.weseek.co.jp/issues/174091
 
         // await memory.deleteMessages([...messageIds]);
         // await thread.delete();
