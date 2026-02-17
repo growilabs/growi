@@ -2,7 +2,7 @@
 
 ## Phase 1 (MVP)
 
-- [ ] 1. Phase 1 MVP — Shared types and memo path suggestion
+- [x] 1. Phase 1 MVP — Shared types and memo path suggestion
 - [x] 1.1 Define suggestion types and implement memo path generation
   - Define the suggestion response types used across both phases: suggestion type discriminator, individual suggestion structure with type/path/label/description/grant fields, and the response wrapper
   - Implement memo path generation: when user pages are enabled (default), generate path under the user's home directory with owner-only grant; when user pages are disabled, generate path under an alternative namespace with hardcoded owner-only grant (actual parent grant resolution deferred to Phase 2 task 2)
@@ -19,7 +19,7 @@
   - Register the new namespace route in the central API router
   - _Requirements: 1.1, 1.4, 8.1, 8.2, 8.3, 9.1, 9.2_
 
-- [ ] 1.3 Phase 1 integration verification
+- [x] 1.3 Phase 1 integration verification
   - Verify the complete request-response cycle for the memo suggestion endpoint with valid authentication
   - Verify authentication enforcement: unauthenticated requests receive appropriate error responses
   - Verify input validation: requests with missing or empty body field receive validation errors
