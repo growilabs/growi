@@ -90,6 +90,20 @@ export const mutateAllPageInfo = (): Promise<void[]> => {
   return mutate((key) => Array.isArray(key) && key[0] === '/page/info');
 };
 
+/**
+ * Build query params for /page/info endpoint.
+ * Only includes shareLinkId when it is a non-empty string.
+ */
+const buildPageInfoParams = (
+  pageId: string,
+  shareLinkId: string | null | undefined,
+): { pageId: string; shareLinkId?: string } => {
+  if (shareLinkId != null && shareLinkId.trim().length > 0) {
+    return { pageId, shareLinkId };
+  }
+  return { pageId };
+};
+
 export const useSWRxPageInfo = (
   pageId: string | null | undefined,
   shareLinkId?: string | null,
@@ -98,19 +112,20 @@ export const useSWRxPageInfo = (
   // Cache remains from guest mode when logging in via the Login lead, so add 'isGuestUser' key
   const isGuestUser = useIsGuestUser();
 
-  // assign null if shareLinkId is undefined in order to identify SWR key only by pageId
-  const fixedShareLinkId = shareLinkId ?? null;
-
   const key = useMemo(() => {
     return pageId != null
-      ? ['/page/info', pageId, fixedShareLinkId, isGuestUser]
+      ? ['/page/info', pageId, shareLinkId, isGuestUser]
       : null;
-  }, [fixedShareLinkId, isGuestUser, pageId]);
+  }, [shareLinkId, isGuestUser, pageId]);
 
   const swrResult = useSWRImmutable(
     key,
-    ([endpoint, pageId, shareLinkId]: [string, string, string | null]) =>
-      apiv3Get(endpoint, { pageId, shareLinkId }).then(
+    ([endpoint, pageId, shareLinkId]: [
+      string,
+      string,
+      string | null | undefined,
+    ]) =>
+      apiv3Get(endpoint, buildPageInfoParams(pageId, shareLinkId)).then(
         (response) => response.data,
       ),
     { fallbackData: initialData },
@@ -136,19 +151,20 @@ export const useSWRMUTxPageInfo = (
   // Cache remains from guest mode when logging in via the Login lead, so add 'isGuestUser' key
   const isGuestUser = useIsGuestUser();
 
-  // assign null if shareLinkId is undefined in order to identify SWR key only by pageId
-  const fixedShareLinkId = shareLinkId ?? null;
-
   const key = useMemo(() => {
     return pageId != null
-      ? ['/page/info', pageId, fixedShareLinkId, isGuestUser]
+      ? ['/page/info', pageId, shareLinkId, isGuestUser]
       : null;
-  }, [fixedShareLinkId, isGuestUser, pageId]);
+  }, [shareLinkId, isGuestUser, pageId]);
 
   return useSWRMutation(
     key,
-    ([endpoint, pageId, shareLinkId]: [string, string, string | null]) =>
-      apiv3Get(endpoint, { pageId, shareLinkId }).then(
+    ([endpoint, pageId, shareLinkId]: [
+      string,
+      string,
+      string | null | undefined,
+    ]) =>
+      apiv3Get(endpoint, buildPageInfoParams(pageId, shareLinkId)).then(
         (response) => response.data,
       ),
   );
