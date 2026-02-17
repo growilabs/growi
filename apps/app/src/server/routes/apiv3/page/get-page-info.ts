@@ -64,7 +64,7 @@ export const getPageInfoHandlerFactory = (crowi: Crowi): RequestHandler[] => {
   // define validators for req.query
   const validator = [
     query('pageId').isMongoId().withMessage('pageId is required'),
-    query('shareLinkId').optional().isMongoId(),
+    query('shareLinkId').optional({ checkFalsy: true }).isMongoId(),
   ];
 
   return [
