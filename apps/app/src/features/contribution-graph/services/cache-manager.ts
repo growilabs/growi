@@ -73,7 +73,7 @@ export class ContributionCacheManager {
           (d) => d.date === contribution.date,
         );
 
-        // add to count if the day exists
+        // override count if the day exists
         if (existingDay) {
           existingDay.count = contribution.count;
         } else {
