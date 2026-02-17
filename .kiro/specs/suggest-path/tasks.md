@@ -3,7 +3,7 @@
 ## Phase 1 (MVP)
 
 - [ ] 1. Phase 1 MVP — Shared types and memo path suggestion
-- [ ] 1.1 Define suggestion types and implement memo path generation
+- [x] 1.1 Define suggestion types and implement memo path generation
   - Define the suggestion response types used across both phases: suggestion type discriminator, individual suggestion structure with type/path/label/description/grant fields, and the response wrapper
   - Implement memo path generation: when user pages are enabled (default), generate path under the user's home directory with owner-only grant; when user pages are disabled, generate path under an alternative namespace with hardcoded owner-only grant (actual parent grant resolution deferred to Phase 2 task 2)
   - Enforce directory path format with trailing slash for all generated paths

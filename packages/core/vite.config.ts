@@ -22,7 +22,9 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
     lib: {
-      entry: glob.sync(path.resolve(__dirname, 'src/**/*.ts'), {
+      entry: glob.sync('src/**/*.ts', {
+        cwd: __dirname,
+        absolute: true,
         ignore: '**/*.spec.ts',
       }),
       name: 'core-libs',
