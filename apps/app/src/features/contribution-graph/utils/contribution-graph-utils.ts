@@ -10,6 +10,8 @@ import {
   subWeeks,
 } from 'date-fns';
 
+import type { IContributionDay } from '../interfaces/contribution-graph';
+
 /**
  * Gets current week's ISO week ID, e.g 2025-W32
  */
@@ -65,10 +67,10 @@ export function getCutoffWeekId(weeksToKeep = 52): string {
 }
 
 export function getExpiredWeekIds(
-  existingPermanentWeeks: Record<string, any>,
+  existingPermanentWeeks: Map<string, IContributionDay[]>,
   cutoffWeekId: string,
 ): string[] {
-  return Object.keys(existingPermanentWeeks).filter(
-    (weekId) => weekId < cutoffWeekId,
-  );
+  const weeksArray = [...existingPermanentWeeks.keys()];
+
+  return weeksArray.filter((weekId) => weekId < cutoffWeekId);
 }
