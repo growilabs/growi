@@ -4,14 +4,14 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import type { SupportedActionType } from '~/interfaces/activity';
 import { auditLogAvailableActionsAtom } from '~/states/server-configurations';
 
 import { DateRangePicker } from './DateRangePicker';
+import { DuplicateExportConfirmModal } from './DuplicateExportConfirmModal';
 import { SearchUsernameTypeahead } from './SearchUsernameTypeahead';
 import { SelectActionDropdown } from './SelectActionDropdown';
+import { useAuditLogExport } from './useAuditLogExport';
 
 type Props = {
   isOpen: boolean;
@@ -38,9 +38,6 @@ const AuditLogExportModalSubstance = ({
         auditLogAvailableActionsData?.map((action) => [action, true]) ?? [],
       ),
   );
-  const [isExporting, setIsExporting] = useState<boolean>(false);
-  const [isDuplicateConfirmOpen, setIsDuplicateConfirmOpen] =
-    useState<boolean>(false);
 
   const datePickerChangedHandler = useCallback((dateList: Date[] | null[]) => {
     setStartDate(dateList[0]);
@@ -100,44 +97,13 @@ const AuditLogExportModalSubstance = ({
     return filters;
   }, [actionMap, startDate, endDate]);
 
-  const exportHandler = useCallback(async () => {
-    setIsExporting(true);
-    try {
-      const filters = buildFilters();
-      await apiv3Post('/audit-log-bulk-export', { filters });
-      toastSuccess(t('audit_log_management.export_requested'));
-      onClose();
-    } catch (errs) {
-      const isDuplicate =
-        Array.isArray(errs) &&
-        errs.some(
-          (e) => e.code === 'audit_log_bulk_export.duplicate_export_job_error',
-        );
-
-      if (isDuplicate) {
-        setIsDuplicateConfirmOpen(true);
-      } else {
-        toastError(t('audit_log_management.export_failed'));
-      }
-    } finally {
-      setIsExporting(false);
-    }
-  }, [buildFilters, t, onClose]);
-
-  const restartExportHandler = useCallback(async () => {
-    setIsDuplicateConfirmOpen(false);
-    setIsExporting(true);
-    try {
-      const filters = buildFilters();
-      await apiv3Post('/audit-log-bulk-export', { filters, restartJob: true });
-      toastSuccess(t('audit_log_management.export_requested'));
-      onClose();
-    } catch {
-      toastError(t('audit_log_management.export_failed'));
-    } finally {
-      setIsExporting(false);
-    }
-  }, [buildFilters, t, onClose]);
+  const {
+    isExporting,
+    isDuplicateConfirmOpen,
+    exportHandler,
+    restartExportHandler,
+    closeDuplicateConfirm,
+  } = useAuditLogExport(buildFilters, onClose);
 
   return (
     <>
@@ -194,33 +160,11 @@ const AuditLogExportModalSubstance = ({
         </button>
       </ModalFooter>
 
-      <Modal
+      <DuplicateExportConfirmModal
         isOpen={isDuplicateConfirmOpen}
-        toggle={() => setIsDuplicateConfirmOpen(false)}
-      >
-        <ModalHeader tag="h4" toggle={() => setIsDuplicateConfirmOpen(false)}>
-          {t('audit_log_management.confirm_export')}
-        </ModalHeader>
-        <ModalBody>
-          {t('audit_log_management.duplicate_export_confirm')}
-        </ModalBody>
-        <ModalFooter>
-          <button
-            type="button"
-            className="btn btn-outline-secondary"
-            onClick={() => setIsDuplicateConfirmOpen(false)}
-          >
-            {t('export_management.cancel')}
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={restartExportHandler}
-          >
-            {t('audit_log_management.restart_export')}
-          </button>
-        </ModalFooter>
-      </Modal>
+        onClose={closeDuplicateConfirm}
+        onRestart={restartExportHandler}
+      />
     </>
   );
 };
