@@ -11,7 +11,7 @@
   - Include unit tests covering both user-pages-enabled and user-pages-disabled paths, verifying correct path format, grant value, and description
   - _Requirements: 1.2, 1.3, 2.1, 2.2, 2.3, 2.4, 2.5, 6.1, 6.2_
 
-- [ ] 1.2 Register route endpoint with authentication and validation
+- [x] 1.2 Register route endpoint with authentication and validation
   - Create the route under a new namespace separate from the page API, following the existing handler factory pattern
   - Apply the standard middleware chain: access token parsing, strict login requirement, AI service gating, request body validation
   - Implement the handler to invoke memo suggestion generation for the authenticated user and return the suggestions array using the standard API response format
