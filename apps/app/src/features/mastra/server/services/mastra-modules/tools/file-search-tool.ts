@@ -1,4 +1,4 @@
-import { createTool, type ToolExecutionContext } from '@mastra/core/tools';
+import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 
 import { fileSearch } from '../../ai-sdk-modules/file-search';
@@ -8,8 +8,6 @@ const inputSchema = z.object({
   instruction: z.string().describe('instruction for file search'),
 });
 
-type FileSearchToolExecutionContext = ToolExecutionContext<typeof inputSchema>;
-
 export const fileSearchTool = createTool({
   id: 'file-search-tool',
   description: "Get results based on user prompts using OpenAI's fileSearch'",
@@ -18,18 +16,15 @@ export const fileSearchTool = createTool({
     output: z.any().describe('file search results'),
   }),
 
-  execute: async ({
-    context,
-    runtimeContext,
-  }: FileSearchToolExecutionContext) => {
-    const vectorStoreId = runtimeContext.get('vectorStoreId');
+  execute: async (inputData, context) => {
+    const vectorStoreId = context?.requestContext?.get('vectorStoreId');
 
-    // Type-safe access to runtimeContext variables
+    // Type-safe access to requestContext variables
     if (typeof vectorStoreId !== 'string') {
-      throw new Error('vectorStoreId is required in runtimeContext');
+      throw new Error('vectorStoreId is required in requestContext');
     }
 
-    const result = await fileSearch({ ...context, vectorStoreId });
+    const result = await fileSearch({ ...inputData, vectorStoreId });
 
     return { output: result.text };
   },

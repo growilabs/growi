@@ -1,4 +1,4 @@
-import type { MastraMemory, StorageThreadType } from '@mastra/core';
+import type { MastraMemory, StorageThreadType } from '@mastra/core/memory';
 import { v7 as uuid } from 'uuid';
 
 export const getOrCreateThread = async (
@@ -14,7 +14,7 @@ export const getOrCreateThread = async (
     return newThread;
   }
 
-  const thread = await memory?.getThreadById({ threadId });
+  const thread = await memory.getThreadById({ threadId });
   if (thread == null) {
     throw new Error('Thread not found');
   }
