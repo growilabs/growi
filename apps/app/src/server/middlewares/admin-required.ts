@@ -1,5 +1,6 @@
-import type { IUserHasId } from '@growi/core';
+import type { IUser } from '@growi/core';
 import type { NextFunction, Request, Response } from 'express';
+import type { HydratedDocument } from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
 
@@ -7,7 +8,7 @@ import type Crowi from '../crowi';
 
 const logger = loggerFactory('growi:middleware:admin-required');
 
-type RequestWithUser = Request & { user?: IUserHasId };
+type RequestWithUser = Request & { user?: HydratedDocument<IUser> };
 
 type FallbackFunction = (
   req: RequestWithUser,
