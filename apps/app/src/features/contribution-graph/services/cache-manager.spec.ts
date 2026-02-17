@@ -6,7 +6,7 @@ import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 
 import { ContributionCache } from '../models/contribution-cache-model';
-import { formatDateKey } from '../utils/contribution-graph-utils';
+import { formatDateKey, getISOWeekId } from '../utils/contribution-graph-utils';
 import { ContributionCacheManager } from './cache-manager';
 
 const createMockId = () => new mongoose.Types.ObjectId().toString();
@@ -87,6 +87,72 @@ describe('Contribution Cache Manager Integration Test', () => {
       const newDay = result.find((d) => d.date === recentDateStr);
       expect(newDay).toBeDefined();
       expect(newDay?.count).toBe(1);
+    });
+
+    it('should remove cache weeks outside range and replace it with new cache', async () => {
+      const userId = createMockId();
+
+      const today = new Date();
+
+      // Start of the 365-day window
+      const startDateOfWindow = new Date(today);
+      startDateOfWindow.setUTCDate(startDateOfWindow.getUTCDate() - 364);
+
+      // An old date just outside the graph windows
+      const outsideDate = new Date(startDateOfWindow);
+      outsideDate.setUTCDate(outsideDate.getUTCDate() - 2);
+      const outsideDateStr = formatDateKey(outsideDate);
+
+      const weekIdToDelete = getISOWeekId(outsideDate);
+
+      // A date during current week
+      const newDate = new Date(today);
+      newDate.setUTCDate(newDate.getUTCDate() - 2);
+      const newDateStr = formatDateKey(newDate);
+
+      await Activity.create([
+        {
+          user: userId,
+          action: ActivityLogActions.ACTION_PAGE_CREATE,
+          createdAt: new Date(outsideDateStr),
+        },
+        {
+          user: userId,
+          action: ActivityLogActions.ACTION_PAGE_UPDATE,
+          createdAt: new Date(outsideDateStr),
+        },
+      ]);
+
+      await ContributionCache.create({
+        userId,
+        lastUpdated: new Date(newDateStr),
+        currentWeekData: [{ date: newDateStr, count: 1 }],
+        permanentWeeks: {
+          [weekIdToDelete]: [{ date: outsideDateStr, count: 2 }],
+        },
+      });
+
+      const result = await cacheManager.getUpdatedCache(userId);
+
+      const oldDay = result.find((d) => d.date === outsideDateStr);
+      const newDay = result.find((d) => d.date === newDateStr);
+
+      const updatedCache = await ContributionCache.findOne({ userId });
+
+      let hasOldWeek: boolean;
+      if (updatedCache) {
+        hasOldWeek =
+          updatedCache.permanentWeeks instanceof Map
+            ? updatedCache.permanentWeeks.has(weekIdToDelete)
+            : weekIdToDelete in updatedCache.permanentWeeks;
+      } else {
+        hasOldWeek = false;
+      }
+
+      expect(hasOldWeek).toBe(false);
+      expect(result.length).toBe(365);
+      expect(oldDay).toBeUndefined();
+      expect(newDay).toBeDefined();
     });
   });
 });
