@@ -29,7 +29,7 @@
 
 ## Phase 2
 
-- [ ] 2. (P) Implement parent page grant resolution
+- [x] 2. (P) Implement parent page grant resolution
   - Implement a function that accepts a directory path and returns the corresponding page's grant value as the upper bound for child page permissions
   - When the parent page exists, return its grant value; when not found, return owner-only grant as a safe default
   - Update memo suggestion generation for the user-pages-disabled case to use actual parent grant resolution instead of the Phase 1 hardcoded value

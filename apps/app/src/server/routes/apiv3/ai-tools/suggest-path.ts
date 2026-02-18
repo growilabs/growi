@@ -48,7 +48,7 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     certifyAiService,
     ...validator,
     apiV3FormValidator,
-    (req: SuggestPathReq, res: ApiV3Response) => {
+    async (req: SuggestPathReq, res: ApiV3Response) => {
       const { user } = req;
       assert(
         user != null,
@@ -56,7 +56,7 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       );
 
       try {
-        const memoSuggestion = generateMemoSuggestion(user);
+        const memoSuggestion = await generateMemoSuggestion(user);
         return res.apiv3({ suggestions: [memoSuggestion] });
       } catch (err) {
         logger.error(err);

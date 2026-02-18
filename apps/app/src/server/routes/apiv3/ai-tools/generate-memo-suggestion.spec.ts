@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => {
     configManagerMock: {
       getConfig: vi.fn(),
     },
+    resolveParentGrantMock: vi.fn(),
   };
 });
 
@@ -25,7 +26,13 @@ vi.mock('~/server/service/config-manager', () => {
   return { configManager: mocks.configManagerMock };
 });
 
+vi.mock('./resolve-parent-grant', () => ({
+  resolveParentGrant: mocks.resolveParentGrantMock,
+}));
+
+const GRANT_PUBLIC = 1;
 const GRANT_OWNER = 4;
+const GRANT_USER_GROUP = 5;
 
 describe('generateMemoSuggestion', () => {
   beforeEach(() => {
@@ -40,33 +47,38 @@ describe('generateMemoSuggestion', () => {
       });
     });
 
-    it('should return a suggestion with type "memo"', () => {
-      const result = generateMemoSuggestion({ username: 'alice' });
+    it('should return a suggestion with type "memo"', async () => {
+      const result = await generateMemoSuggestion({ username: 'alice' });
       expect(result.type).toBe('memo');
     });
 
-    it('should generate path under user home directory', () => {
-      const result = generateMemoSuggestion({ username: 'alice' });
+    it('should generate path under user home directory', async () => {
+      const result = await generateMemoSuggestion({ username: 'alice' });
       expect(result.path).toBe('/user/alice/memo/');
     });
 
-    it('should set grant to GRANT_OWNER (4)', () => {
-      const result = generateMemoSuggestion({ username: 'alice' });
+    it('should set grant to GRANT_OWNER (4)', async () => {
+      const result = await generateMemoSuggestion({ username: 'alice' });
       expect(result.grant).toBe(GRANT_OWNER);
     });
 
-    it('should include a fixed description', () => {
-      const result = generateMemoSuggestion({ username: 'alice' });
+    it('should not call resolveParentGrant', async () => {
+      await generateMemoSuggestion({ username: 'alice' });
+      expect(mocks.resolveParentGrantMock).not.toHaveBeenCalled();
+    });
+
+    it('should include a fixed description', async () => {
+      const result = await generateMemoSuggestion({ username: 'alice' });
       expect(result.description).toBe('Save to your personal memo area');
     });
 
-    it('should include a label', () => {
-      const result = generateMemoSuggestion({ username: 'alice' });
+    it('should include a label', async () => {
+      const result = await generateMemoSuggestion({ username: 'alice' });
       expect(result.label).toBe('Save as memo');
     });
 
-    it('should generate path with trailing slash', () => {
-      const result = generateMemoSuggestion({ username: 'alice' });
+    it('should generate path with trailing slash', async () => {
+      const result = await generateMemoSuggestion({ username: 'alice' });
       expect(result.path).toMatch(/\/$/);
     });
   });
@@ -79,28 +91,45 @@ describe('generateMemoSuggestion', () => {
       });
     });
 
-    it('should generate path under alternative namespace', () => {
-      const result = generateMemoSuggestion({ username: 'bob' });
+    it('should generate path under alternative namespace', async () => {
+      mocks.resolveParentGrantMock.mockResolvedValue(GRANT_OWNER);
+      const result = await generateMemoSuggestion({ username: 'bob' });
       expect(result.path).toBe('/memo/bob/');
     });
 
-    it('should set grant to GRANT_OWNER (4) as hardcoded default in Phase 1', () => {
-      const result = generateMemoSuggestion({ username: 'bob' });
-      expect(result.grant).toBe(GRANT_OWNER);
+    it('should resolve grant from parent page via resolveParentGrant', async () => {
+      mocks.resolveParentGrantMock.mockResolvedValue(GRANT_PUBLIC);
+      const result = await generateMemoSuggestion({ username: 'bob' });
+      expect(result.grant).toBe(GRANT_PUBLIC);
     });
 
-    it('should return a suggestion with type "memo"', () => {
-      const result = generateMemoSuggestion({ username: 'bob' });
+    it('should call resolveParentGrant with the generated path', async () => {
+      mocks.resolveParentGrantMock.mockResolvedValue(GRANT_OWNER);
+      await generateMemoSuggestion({ username: 'bob' });
+      expect(mocks.resolveParentGrantMock).toHaveBeenCalledWith('/memo/bob/');
+    });
+
+    it('should use GRANT_USER_GROUP when parent has user group grant', async () => {
+      mocks.resolveParentGrantMock.mockResolvedValue(GRANT_USER_GROUP);
+      const result = await generateMemoSuggestion({ username: 'bob' });
+      expect(result.grant).toBe(GRANT_USER_GROUP);
+    });
+
+    it('should return a suggestion with type "memo"', async () => {
+      mocks.resolveParentGrantMock.mockResolvedValue(GRANT_OWNER);
+      const result = await generateMemoSuggestion({ username: 'bob' });
       expect(result.type).toBe('memo');
     });
 
-    it('should generate path with trailing slash', () => {
-      const result = generateMemoSuggestion({ username: 'bob' });
+    it('should generate path with trailing slash', async () => {
+      mocks.resolveParentGrantMock.mockResolvedValue(GRANT_OWNER);
+      const result = await generateMemoSuggestion({ username: 'bob' });
       expect(result.path).toMatch(/\/$/);
     });
 
-    it('should include same fixed description as enabled case', () => {
-      const result = generateMemoSuggestion({ username: 'bob' });
+    it('should include same fixed description as enabled case', async () => {
+      mocks.resolveParentGrantMock.mockResolvedValue(GRANT_OWNER);
+      const result = await generateMemoSuggestion({ username: 'bob' });
       expect(result.description).toBe('Save to your personal memo area');
     });
   });
