@@ -23,6 +23,7 @@ const ContributionGraphSchema = new Schema<ContributionGraphDocument>({
     ref: 'User',
     required: true,
     index: true,
+    unique: true,
   },
   lastUpdated: {
     type: Date,
