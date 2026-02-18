@@ -197,9 +197,7 @@ describe('Contribution Cache Manager Integration Test', () => {
       const frozenCurrentWeekDate = result.find(
         (d) => d.date === lastUpdatedDateStr,
       );
-      const frozenOldWeekDate = result.find(
-        (d) => d.date === lastUpdatedDateStr,
-      );
+      const frozenOldWeekDate = result.find((d) => d.date === recentDateStr);
 
       const updatedCache = await ContributionCache.findOne({ userId });
 
