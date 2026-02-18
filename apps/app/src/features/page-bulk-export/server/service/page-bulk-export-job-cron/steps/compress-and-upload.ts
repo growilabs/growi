@@ -76,27 +76,33 @@ export async function compressAndUpload(
 
   const fileUploadService: FileUploader = this.crowi.fileUploadService;
 
-  pageArchiver.directory(this.getTmpOutputDir(pageBulkExportJob), false);
-  pageArchiver.finalize();
-
   // Wrap with Node.js native PassThrough so that AWS SDK recognizes the stream as a native Readable
   const uploadStream = new PassThrough();
+
+  // Establish pipe before finalize to ensure data flows correctly
   pageArchiver.pipe(uploadStream);
   pageArchiver.on('error', (err) => {
     uploadStream.destroy(err);
+    pageArchiver.destroy();
   });
+
+  pageArchiver.directory(this.getTmpOutputDir(pageBulkExportJob), false);
+  pageArchiver.finalize();
 
   this.setStreamsInExecution(pageBulkExportJob._id, pageArchiver, uploadStream);
 
   try {
     await fileUploadService.uploadAttachment(uploadStream, attachment);
+    await postProcess.bind(this)(
+      pageBulkExportJob,
+      attachment,
+      pageArchiver.pointer(),
+    );
   } catch (e) {
     logger.error(e);
     this.handleError(e, pageBulkExportJob);
+  } finally {
+    pageArchiver.destroy();
+    uploadStream.destroy();
   }
-  await postProcess.bind(this)(
-    pageBulkExportJob,
-    attachment,
-    pageArchiver.pointer(),
-  );
 }
