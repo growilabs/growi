@@ -1,19 +1,22 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
+interface LayoutGuideItem {
+  id: string;
+  title: string;
+  code: string;
+  preview: React.ReactNode;
+  minWidth?: string;
+  underContent?: React.ReactNode;
+}
+type GuideRowProps = Omit<LayoutGuideItem, 'id'>;
 const GuideRow = ({
   title,
   code,
   preview,
   minWidth = '230px',
   underContent,
-}: {
-  title: string;
-  code: string;
-  preview: React.ReactNode;
-  minWidth?: string;
-  underContent?: React.ReactNode;
-}) => {
+}: GuideRowProps) => {
   const { t } = useTranslation();
   const handleCopy = async () => {
     await navigator.clipboard.writeText(code);
@@ -86,7 +89,7 @@ export const LayoutTab: React.FC = () => {
   const { t } = useTranslation();
   const i18nKey = 'editor_guide.layout';
 
-  const LAYOUT_GUIDES = [
+  const LAYOUT_GUIDES : LayoutGuideItem[] = [
     {
       id: 'header',
       title: t(`${i18nKey}.header`),
@@ -348,6 +351,29 @@ export const LayoutTab: React.FC = () => {
         </div>
       ),
     },
+    {
+      id: 'footnote',
+      title: t(`${i18nKey}.footnote`),
+      code: `${t(`${i18nKey}.footnote_label`)}[^1].\n\n[^1]: ${t(`${i18nKey}.footnote_desc`)}.`,
+      preview: (
+        <div
+          style={{
+            color: '#223246',
+            fontSize: '16px',
+            lineHeight: '27px',
+            fontFamily: 'Noto Sans CJK JP',
+          }}
+        >
+          {t(`${i18nKey}.footnote_label`)}
+          <sup style={{ fontSize: '0.6em', color: '#223246', marginLeft: '1px' }}>[1]</sup>
+        </div>
+      ),
+      underContent: (
+        <div style={{ color: '#777570' }}>
+          1. {t(`${i18nKey}.footnote_desc`)}
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -355,33 +381,6 @@ export const LayoutTab: React.FC = () => {
       {LAYOUT_GUIDES.map(item => (
         <GuideRow key={item.id} {...item} />
       ))}
-
-      <GuideRow
-        title={t(`${i18nKey}.footnote`)}
-        code={`${t(`${i18nKey}.footnote_label`)}[^1].\n\n[^1]: ${t(`${i18nKey}.footnote_desc`)}.`}
-        preview={(
-          <div
-            style={{
-              color: '#223246',
-              fontSize: '16px',
-              lineHeight: '27px',
-              fontFamily: 'Noto Sans CJK JP',
-            }}
-          >
-            {t(`${i18nKey}.footnote_label`)}
-            <sup style={{ fontSize: '0.6em', color: '#223246', marginLeft: '1px' }}>[1]</sup>
-          </div>
-        )}
-        underContent={(
-          <div
-            style={{
-              color: '#777570',
-            }}
-          >
-            1. {t(`${i18nKey}.footnote_desc`)}
-          </div>
-        )}
-      />
     </div>
   );
 };
