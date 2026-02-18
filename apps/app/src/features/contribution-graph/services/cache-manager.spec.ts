@@ -89,7 +89,7 @@ describe('Contribution Cache Manager Integration Test', () => {
       expect(newDay?.count).toBe(1);
     });
 
-    it('should remove cache weeks outside range and replace it with new cache', async () => {
+    it('should remove cache weeks outside range', async () => {
       const userId = createMockId();
 
       const today = new Date();
@@ -100,14 +100,13 @@ describe('Contribution Cache Manager Integration Test', () => {
 
       // An old date just outside the graph windows
       const outsideDate = new Date(startDateOfWindow);
-      outsideDate.setUTCDate(outsideDate.getUTCDate() - 2);
+      outsideDate.setUTCDate(outsideDate.getUTCDate() - 7);
       const outsideDateStr = formatDateKey(outsideDate);
-
       const weekIdToDelete = getISOWeekId(outsideDate);
 
-      // A date during current week
+      // A recent date
       const newDate = new Date(today);
-      newDate.setUTCDate(newDate.getUTCDate() - 2);
+      newDate.setUTCDate(newDate.getUTCDate() - 7);
       const newDateStr = formatDateKey(newDate);
 
       await Activity.create([
@@ -153,6 +152,85 @@ describe('Contribution Cache Manager Integration Test', () => {
       expect(result.length).toBe(365);
       expect(oldDay).toBeUndefined();
       expect(newDay).toBeDefined();
+    });
+
+    it('should freeze weeks between start of the graph until last week', async () => {
+      const userId = createMockId();
+
+      const today = new Date();
+
+      // Date one week ago to be frozen
+      const recentDate = new Date(today);
+      recentDate.setUTCDate(recentDate.getUTCDate() - 7);
+      const recentDateStr = formatDateKey(recentDate);
+
+      const weekIdToFreeze = getISOWeekId(recentDate);
+
+      // Date at least one week older than the week to be frozen
+      const lastUpdatedDate = new Date(today);
+      lastUpdatedDate.setUTCDate(lastUpdatedDate.getUTCDate() - 20);
+      const lastUpdatedDateStr = formatDateKey(lastUpdatedDate);
+
+      const currentWeekIdToFreeze = getISOWeekId(lastUpdatedDate);
+
+      await Activity.create([
+        {
+          user: userId,
+          action: ActivityLogActions.ACTION_PAGE_CREATE,
+          createdAt: new Date(recentDateStr),
+        },
+        {
+          user: userId,
+          action: ActivityLogActions.ACTION_PAGE_UPDATE,
+          createdAt: new Date(lastUpdatedDateStr),
+        },
+      ]);
+
+      await ContributionCache.create({
+        userId,
+        lastUpdated: new Date(lastUpdatedDateStr),
+        currentWeekData: [{ date: lastUpdatedDateStr, count: 1 }],
+        permanentWeeks: {},
+      });
+
+      const result = await cacheManager.getUpdatedCache(userId);
+      const frozenCurrentWeekDate = result.find(
+        (d) => d.date === lastUpdatedDateStr,
+      );
+      const frozenOldWeekDate = result.find(
+        (d) => d.date === lastUpdatedDateStr,
+      );
+
+      const updatedCache = await ContributionCache.findOne({ userId });
+
+      let hasFrozenOldWeek: boolean;
+      if (updatedCache) {
+        hasFrozenOldWeek =
+          updatedCache.permanentWeeks instanceof Map
+            ? updatedCache.permanentWeeks.has(weekIdToFreeze)
+            : weekIdToFreeze in updatedCache.permanentWeeks;
+      } else {
+        hasFrozenOldWeek = false;
+      }
+
+      let hasFrozenCurrentWeek: boolean;
+      if (updatedCache) {
+        hasFrozenCurrentWeek =
+          updatedCache.permanentWeeks instanceof Map
+            ? updatedCache.permanentWeeks.has(currentWeekIdToFreeze)
+            : currentWeekIdToFreeze in updatedCache.permanentWeeks;
+      } else {
+        hasFrozenCurrentWeek = false;
+      }
+
+      expect(hasFrozenOldWeek).toBe(true);
+      expect(hasFrozenCurrentWeek).toBe(true);
+
+      expect(frozenOldWeekDate).toBeDefined();
+      expect(frozenOldWeekDate?.count).toBe(1);
+
+      expect(frozenCurrentWeekDate).toBeDefined();
+      expect(frozenCurrentWeekDate?.count).toBe(1);
     });
   });
 });
