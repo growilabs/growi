@@ -36,7 +36,7 @@
   - Include unit tests for grant lookup with existing page, missing page, and various grant values
   - _Requirements: 7.1, 7.2, 2.4_
 
-- [ ] 3. (P) Implement content keyword extraction via GROWI AI
+- [x] 3. (P) Implement content keyword extraction via GROWI AI
   - Implement a function that accepts content body and delegates keyword extraction to the existing AI feature module
   - Return 3-5 keywords prioritizing proper nouns and technical terms, avoiding generic words
   - On extraction failure, throw an error so the caller can handle fallback logic
