@@ -6,14 +6,21 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 
 const mocks = vi.hoisted(() => {
   return {
-    generateMemoSuggestionMock: vi.fn(),
+    generateSuggestionsMock: vi.fn(),
+    extractKeywordsMock: vi.fn(),
     loginRequiredFactoryMock: vi.fn(),
     certifyAiServiceMock: vi.fn(),
+    findAllUserGroupIdsMock: vi.fn(),
+    findAllExternalUserGroupIdsMock: vi.fn(),
   };
 });
 
-vi.mock('./generate-memo-suggestion', () => ({
-  generateMemoSuggestion: mocks.generateMemoSuggestionMock,
+vi.mock('./generate-suggestions', () => ({
+  generateSuggestions: mocks.generateSuggestionsMock,
+}));
+
+vi.mock('./extract-keywords', () => ({
+  extractKeywords: mocks.extractKeywordsMock,
 }));
 
 vi.mock('~/server/middlewares/login-required', () => ({
@@ -35,12 +42,32 @@ vi.mock('~/server/middlewares/apiv3-form-validator', () => ({
   apiV3FormValidator: vi.fn(),
 }));
 
+vi.mock('~/server/models/user-group-relation', () => ({
+  default: {
+    findAllUserGroupIdsRelatedToUser: mocks.findAllUserGroupIdsMock,
+  },
+}));
+
+vi.mock(
+  '~/features/external-user-group/server/models/external-user-group-relation',
+  () => ({
+    default: {
+      findAllUserGroupIdsRelatedToUser: mocks.findAllExternalUserGroupIdsMock,
+    },
+  }),
+);
+
 describe('suggestPathHandlersFactory', () => {
-  const mockCrowi = {} as unknown as Crowi;
+  const mockSearchService = { searchKeyword: vi.fn() };
+  const mockCrowi = {
+    searchService: mockSearchService,
+  } as unknown as Crowi;
 
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.loginRequiredFactoryMock.mockReturnValue(vi.fn());
+    mocks.findAllUserGroupIdsMock.mockResolvedValue(['group1']);
+    mocks.findAllExternalUserGroupIdsMock.mockResolvedValue(['extGroup1']);
   });
 
   describe('middleware chain', () => {
@@ -73,15 +100,17 @@ describe('suggestPathHandlersFactory', () => {
       return { req, res };
     };
 
-    it('should call generateMemoSuggestion with the authenticated user', async () => {
-      const memoSuggestion = {
-        type: 'memo',
-        path: '/user/alice/memo/',
-        label: 'Save as memo',
-        description: 'Save to your personal memo area',
-        grant: 4,
-      };
-      mocks.generateMemoSuggestionMock.mockReturnValue(memoSuggestion);
+    it('should call generateSuggestions with user, body, userGroups, and deps', async () => {
+      const suggestions = [
+        {
+          type: 'memo',
+          path: '/user/alice/memo/',
+          label: 'Save as memo',
+          description: 'Save to your personal memo area',
+          grant: 4,
+        },
+      ];
+      mocks.generateSuggestionsMock.mockResolvedValue(suggestions);
 
       const { suggestPathHandlersFactory } = await import('./suggest-path');
       const handlers = suggestPathHandlersFactory(mockCrowi);
@@ -90,18 +119,28 @@ describe('suggestPathHandlersFactory', () => {
       const { req, res } = createMockReqRes();
       await handler(req, res, vi.fn());
 
-      expect(mocks.generateMemoSuggestionMock).toHaveBeenCalledWith(req.user);
+      expect(mocks.generateSuggestionsMock).toHaveBeenCalledWith(
+        { _id: 'user123', username: 'alice' },
+        'Some page content',
+        ['group1', 'extGroup1'],
+        {
+          searchService: mockSearchService,
+          extractKeywords: mocks.extractKeywordsMock,
+        },
+      );
     });
 
     it('should return suggestions array via res.apiv3', async () => {
-      const memoSuggestion = {
-        type: 'memo',
-        path: '/user/alice/memo/',
-        label: 'Save as memo',
-        description: 'Save to your personal memo area',
-        grant: 4,
-      };
-      mocks.generateMemoSuggestionMock.mockReturnValue(memoSuggestion);
+      const suggestions = [
+        {
+          type: 'memo',
+          path: '/user/alice/memo/',
+          label: 'Save as memo',
+          description: 'Save to your personal memo area',
+          grant: 4,
+        },
+      ];
+      mocks.generateSuggestionsMock.mockResolvedValue(suggestions);
 
       const { suggestPathHandlersFactory } = await import('./suggest-path');
       const handlers = suggestPathHandlersFactory(mockCrowi);
@@ -110,15 +149,13 @@ describe('suggestPathHandlersFactory', () => {
       const { req, res } = createMockReqRes();
       await handler(req, res, vi.fn());
 
-      expect(res.apiv3).toHaveBeenCalledWith({
-        suggestions: [memoSuggestion],
-      });
+      expect(res.apiv3).toHaveBeenCalledWith({ suggestions });
     });
 
-    it('should return error when generateMemoSuggestion throws', async () => {
-      mocks.generateMemoSuggestionMock.mockImplementation(() => {
-        throw new Error('Unexpected error');
-      });
+    it('should return error when generateSuggestions throws', async () => {
+      mocks.generateSuggestionsMock.mockRejectedValue(
+        new Error('Unexpected error'),
+      );
 
       const { suggestPathHandlersFactory } = await import('./suggest-path');
       const handlers = suggestPathHandlersFactory(mockCrowi);
@@ -132,6 +169,22 @@ describe('suggestPathHandlersFactory', () => {
       const apiv3ErrMock = res.apiv3Err as Mock;
       const errorCall = apiv3ErrMock.mock.calls[0];
       expect(errorCall[0].message).not.toContain('Unexpected error');
+    });
+
+    it('should combine internal and external user groups', async () => {
+      mocks.findAllUserGroupIdsMock.mockResolvedValue(['g1', 'g2']);
+      mocks.findAllExternalUserGroupIdsMock.mockResolvedValue(['eg1']);
+      mocks.generateSuggestionsMock.mockResolvedValue([]);
+
+      const { suggestPathHandlersFactory } = await import('./suggest-path');
+      const handlers = suggestPathHandlersFactory(mockCrowi);
+      const handler = handlers[handlers.length - 1] as RequestHandler;
+
+      const { req, res } = createMockReqRes();
+      await handler(req, res, vi.fn());
+
+      const call = mocks.generateSuggestionsMock.mock.calls[0];
+      expect(call[2]).toEqual(['g1', 'g2', 'eg1']);
     });
   });
 });

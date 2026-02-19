@@ -5,15 +5,18 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 import { body } from 'express-validator';
 
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
+import UserGroupRelation from '~/server/models/user-group-relation';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
-import { generateMemoSuggestion } from './generate-memo-suggestion';
+import { extractKeywords } from './extract-keywords';
+import { generateSuggestions } from './generate-suggestions';
 
 const logger = loggerFactory('growi:routes:apiv3:ai-tools:suggest-path');
 
@@ -56,8 +59,21 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       );
 
       try {
-        const memoSuggestion = await generateMemoSuggestion(user);
-        return res.apiv3({ suggestions: [memoSuggestion] });
+        const { searchService } = crowi;
+        const userGroups = [
+          ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
+          ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
+            user,
+          )),
+        ];
+
+        const suggestions = await generateSuggestions(
+          user,
+          req.body.body,
+          userGroups,
+          { searchService, extractKeywords },
+        );
+        return res.apiv3({ suggestions });
       } catch (err) {
         logger.error(err);
         return res.apiv3Err(

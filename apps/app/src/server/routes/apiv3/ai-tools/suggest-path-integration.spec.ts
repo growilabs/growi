@@ -55,6 +55,27 @@ vi.mock('~/server/service/config-manager', () => ({
   },
 }));
 
+// Mock user group relations — needed for user group resolution in handler
+vi.mock('~/server/models/user-group-relation', () => ({
+  default: {
+    findAllUserGroupIdsRelatedToUser: vi.fn().mockResolvedValue([]),
+  },
+}));
+
+vi.mock(
+  '~/features/external-user-group/server/models/external-user-group-relation',
+  () => ({
+    default: {
+      findAllUserGroupIdsRelatedToUser: vi.fn().mockResolvedValue([]),
+    },
+  }),
+);
+
+// Mock extractKeywords — return empty array so Phase 2 falls back to memo-only
+vi.mock('./extract-keywords', () => ({
+  extractKeywords: vi.fn().mockResolvedValue([]),
+}));
+
 describe('POST /suggest-path — Phase 1 integration', () => {
   let app: express.Application;
 
@@ -82,7 +103,9 @@ describe('POST /suggest-path — Phase 1 integration', () => {
 
     // Import and mount the handler factory with real middleware chain
     const { suggestPathHandlersFactory } = await import('./suggest-path');
-    const mockCrowi = {} as Crowi;
+    const mockCrowi = {
+      searchService: { searchKeyword: vi.fn() },
+    } as unknown as Crowi;
     app.post('/suggest-path', suggestPathHandlersFactory(mockCrowi));
   });
 
