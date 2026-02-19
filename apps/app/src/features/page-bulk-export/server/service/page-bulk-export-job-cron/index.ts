@@ -91,7 +91,7 @@ class PageBulkExportJobCronService
   constructor(crowi: Crowi) {
     super();
     this.crowi = crowi;
-    this.activityEvent = crowi.event('activity');
+    this.activityEvent = crowi.events.activity;
     this.parallelExecLimit = configManager.getConfig(
       'app:pageBulkExportParallelExecLimit',
     );

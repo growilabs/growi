@@ -47,11 +47,6 @@ type Props = CommonInitialProps &
   RendererConfigProps;
 
 const TrashPage: NextPageWithLayout<Props> = (props: Props) => {
-  // // clear the cache for the current page
-  // //  in order to fix https://redmine.weseek.co.jp/issues/135811
-  // useHydratePageAtoms(undefined);
-  // useCurrentPathname('/trash');
-
   // Hydrate server-side data
   useHydrateServerConfigurationAtoms(props.serverConfig);
 

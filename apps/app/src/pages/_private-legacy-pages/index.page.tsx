@@ -36,11 +36,6 @@ type Props = CommonInitialProps &
 const PrivateLegacyPage: NextPage<Props> = (props: Props) => {
   const { t } = useTranslation();
 
-  // clear the cache for the current page
-  //  in order to fix https://redmine.weseek.co.jp/issues/135811
-  // useHydratePageAtoms(undefined);
-  // useCurrentPathname('/_private-legacy-pages');
-
   // Hydrate server-side data
   useHydrateBasicLayoutConfigurationAtoms(
     props.searchConfig,

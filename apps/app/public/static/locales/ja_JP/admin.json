@@ -65,6 +65,11 @@
       "enable_force_delete_user_homepage_on_user_deletion": "ユーザーを削除したとき、ユーザーホームページとその配下のページを完全削除する",
       "desc": "削除済みユーザーのユーザーホームページを削除できるようになります。"
     },
+    "disable_user_pages": {
+      "disable_user_pages": "ユーザーページの無効化",
+      "disable_user_pages_label": "ユーザーページを無効にする",
+      "desc": "ユーザーページを無効にすることで、すべてのユーザーページに対する作成・閲覧・編集・複製ができなくなります。</br>また、ページツリーや最近の変更、検索結果などでもユーザーページが表示されなくなります。"
+    },
     "session": "セッション",
     "max_age": "有効期間 (ミリ秒)",
     "max_age_desc": "ユーザーのセッション情報の有効期間をミリ秒で指定できます。<br>デフォルト値: 2592000000 (30日間)",
@@ -380,6 +385,15 @@
     "transmission_method": "送信方法",
     "smtp_label": "SMTP",
     "ses_label": "SES(AWS)",
+    "oauth2_label": "OAuth 2.0 (Google Workspace)",
+    "oauth2_description": "Google Workspaceを使用してメールを送信するためのOAuth 2.0認証を設定します。Google Cloud ConsoleでOAuth 2.0認証情報を作成し、リフレッシュトークンを取得する必要があります。",
+    "oauth2_user": "メールアドレス",
+    "oauth2_user_help": "認証されたGoogleアカウントのメールアドレス",
+    "oauth2_client_id": "クライアントID",
+    "oauth2_client_secret": "クライアントシークレット",
+    "oauth2_refresh_token": "リフレッシュトークン",
+    "oauth2_refresh_token_help": "OAuth 2.0認証フローから取得したリフレッシュトークン",
+    "placeholder_leave_blank": "既存の値を保持する場合は空白のままにしてください",
     "send_test_email": "テストメールを送信",
     "success_to_send_test_email": "テストメールを送信しました。",
     "smtp_settings": "SMTP設定",
@@ -451,6 +465,18 @@
       "tag_names": "タグ名",
       "tag_attributes": "タグ属性",
       "import_recommended": "{{target}} のおすすめをインポート"
+    },
+    "content-disposition_header": "Content-Disposition MIMEタイプ設定",
+    "content-disposition_options": {
+      "add_header": "MIMEタイプを追加する",
+      "note": "注意: MIMEタイプを追加すると、もう一方のリストからは自動的に削除されます。",
+      "inline_header": "インライン MIMEタイプ",
+      "attachment_header": "添付ファイル MIMEタイプ",
+      "inline_button": "インライン",
+      "no_inline": "設定済みのインラインタイプはありません。",
+      "no_attachment": "設定済みの添付ファイルタイプはありません。",
+      "attachment_button": "添付ファイル",
+      "remove_button": "削除"
     }
   },
   "customize_settings": {

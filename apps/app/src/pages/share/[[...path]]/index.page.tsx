@@ -9,10 +9,7 @@ import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript';
 import { ShareLinkPageView } from '~/components/ShareLinkPageView';
 import type { CommonEachProps } from '~/pages/common-props';
 import { getServerSideCommonEachProps } from '~/pages/common-props';
-import {
-  detectNextjsRoutingType,
-  NextjsRoutingType,
-} from '~/pages/utils/nextjs-routing-utils';
+import { NextjsRoutingType } from '~/pages/utils/nextjs-routing-utils';
 import { useCustomTitleForPage } from '~/pages/utils/page-title-customization';
 import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props';
 import { useCurrentPageData, useCurrentPagePath } from '~/states/page';
@@ -41,11 +38,8 @@ const GrowiContextualSubNavigation = dynamic(
 
 type Props = CommonEachProps | InitialProps;
 
-const isInitialProps = (props: Props): props is InitialProps => {
-  return (
-    'isNextjsRoutingTypeInitial' in props && props.isNextjsRoutingTypeInitial
-  );
-};
+const isInitialProps = (props: Props): props is InitialProps =>
+  props.nextjsRoutingType === NextjsRoutingType.INITIAL;
 
 const SharedPage: NextPageWithLayout<Props> = (props: Props) => {
   // Initialize Jotai atoms with initial data - must be called unconditionally
@@ -66,8 +60,11 @@ const SharedPage: NextPageWithLayout<Props> = (props: Props) => {
   // Use custom hooks for navigation and routing
   // useSameRouteNavigation();
 
-  // If initial props and skipSSR, fetch page data on client-side
-  useInitialCSRFetch(isInitialProps(props) && props.skipSSR);
+  // Fetch page data on client-side when SSR is skipped
+  useInitialCSRFetch({
+    nextjsRoutingType: props.nextjsRoutingType,
+    skipSSR: isInitialProps(props) ? props.skipSSR : false,
+  });
 
   // If the data on the page changes without router.push, pageWithMeta remains old because getServerSideProps() is not executed
   // So preferentially take page data from useSWRxCurrentPage
@@ -162,16 +159,12 @@ export const getServerSideProps: GetServerSideProps<Props> = async (
   // STAGE 2
   //
 
-  // detect Next.js routing type
-  const nextjsRoutingType = detectNextjsRoutingType(
-    context,
-    NEXT_JS_ROUTING_PAGE,
-  );
+  const commonEachProps = await commonEachPropsResult.props;
 
   // Merge all results in a type-safe manner (using sequential merging)
   return mergeGetServerSidePropsResults(
     commonEachPropsResult,
-    nextjsRoutingType === NextjsRoutingType.INITIAL
+    commonEachProps.nextjsRoutingType === NextjsRoutingType.INITIAL
       ? await getServerSidePropsForInitial(context)
       : emptyProps,
   );

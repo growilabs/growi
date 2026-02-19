@@ -32,12 +32,16 @@ type RadioListItemProps = {
   icon?: React.ReactNode;
   text: string;
   checked?: boolean;
+  dataTestid?: string;
 };
 
 const RadioListItem = (props: RadioListItemProps): JSX.Element => {
   const { onClick, icon, text, checked } = props;
   return (
-    <li className="list-group-item border-0 d-flex align-items-center">
+    <li
+      className="list-group-item border-0 d-flex align-items-center"
+      data-testid={props.dataTestid}
+    >
       <input
         onClick={onClick}
         className="form-check-input me-3"
@@ -177,6 +181,7 @@ const KeymapSelector = memo(
                 icon={icon}
                 text={keymapLabel}
                 checked={keymapMode === selectedKeymapMode}
+                dataTestid={`keymap_radio_item_${keymapMode}`}
               />
             );
           })}
@@ -337,6 +342,7 @@ type ChangeStateButtonProps = {
   header: string;
   data: string;
   disabled?: boolean;
+  dataTestid?: string;
 };
 const ChangeStateButton = memo((props: ChangeStateButtonProps): JSX.Element => {
   const { onClick, header, data, disabled } = props;
@@ -346,6 +352,7 @@ const ChangeStateButton = memo((props: ChangeStateButtonProps): JSX.Element => {
       className="d-flex align-items-center btn btn-sm border-0 my-1"
       disabled={disabled}
       onClick={onClick}
+      data-testid={props.dataTestid}
     >
       <span className="ms-2 me-auto">{header}</span>
       <span className="text-muted d-flex align-items-center ms-2 me-1">
@@ -397,6 +404,7 @@ export const OptionsSelector = (): JSX.Element => {
       className=""
     >
       <DropdownToggle
+        data-testid="options-selector-btn"
         className={`btn btn-sm btn-outline-neutral-secondary d-flex align-items-center justify-content-center
               ${isDeviceLargerThanMd ? '' : 'border-0'}
               ${dropdownOpen ? 'active' : ''}
@@ -409,7 +417,7 @@ export const OptionsSelector = (): JSX.Element => {
           <></>
         )}
       </DropdownToggle>
-      <DropdownMenu container="body">
+      <DropdownMenu container="body" data-testid="options-selector-menu">
         {status === OptionsStatus.Home && (
           <div className="d-flex flex-column">
             <span className="text-muted ms-3">
@@ -426,6 +434,7 @@ export const OptionsSelector = (): JSX.Element => {
               onClick={() => setStatus(OptionsStatus.Keymap)}
               header={t('page_edit.keymap')}
               data={KEYMAP_LABEL_MAP[editorSettings.keymapMode ?? ''] ?? ''}
+              dataTestid="keymap_current_selection"
             />
             <hr className="my-1" />
             <ChangeStateButton

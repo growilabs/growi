@@ -65,6 +65,11 @@
       "enable_force_delete_user_homepage_on_user_deletion": "删除用户时，该用户的主页及其所有子页面将被完全删除",
       "desc": "您可以删除已删除用户的主页。"
     },
+    "disable_user_pages": {
+      "disable_user_pages": "禁用用户页面",
+      "disable_user_pages_label": "禁用用户页面",
+      "desc": "通过禁用用户页面，将无法创建、查看、编辑和复制所有用户页面。</br>此外，用户页面也不会出现在页面树、最近更改或搜索结果中。"
+    },
     "session": "会议",
     "max_age": "有效期间  (msec)",
     "max_age_desc": "指定使用户会话过期的数量(以毫秒为单位)。<br>默认值: 2592000000 (30天)",
@@ -379,6 +384,15 @@
     "transmission_method": "传送方法",
     "smtp_label": "SMTP",
     "ses_label": "SES(AWS)",
+    "oauth2_label": "OAuth 2.0 (Google Workspace)",
+    "oauth2_description": "配置 OAuth 2.0 身份验证以使用 Google Workspace 发送电子邮件。您需要在 Google Cloud Console 中创建 OAuth 2.0 凭据并获取刷新令牌。",
+    "oauth2_user": "电子邮件地址",
+    "oauth2_user_help": "已授权的 Google 帐户的电子邮件地址",
+    "oauth2_client_id": "客户端 ID",
+    "oauth2_client_secret": "客户端密钥",
+    "oauth2_refresh_token": "刷新令牌",
+    "oauth2_refresh_token_help": "从 OAuth 2.0 授权流程获得的刷新令牌",
+    "placeholder_leave_blank": "留空以保留现有值",
     "from_e-mail_address": "邮件发出地址",
     "send_test_email": "发送测试邮件",
     "success_to_send_test_email": "成功发送了一封测试邮件",

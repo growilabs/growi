@@ -31,6 +31,7 @@ const getServerSideConfigurationProps: GetServerSideProps<
         showPageLimitationL: configManager.getConfig(
           'customize:showPageLimitationL',
         ),
+        disableUserPages: configManager.getConfig('security:disableUserPages'),
       },
     },
   };

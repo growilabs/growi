@@ -1,8 +1,8 @@
 import { PlatformTest } from '@tsed/platform-http/testing';
-import { JobStatus, JobStatusSharedWithGrowi } from 'src/service/pdf-convert';
 import SuperTest from 'supertest';
 
 import Server from '../server';
+import { JobStatus, JobStatusSharedWithGrowi } from '../service/pdf-convert';
 
 describe('PdfCtrl', () => {
   beforeAll(PlatformTest.bootstrap(Server));

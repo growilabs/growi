@@ -52,6 +52,7 @@ const StatusActivateFormWrapperFC = (props) => {
 
 /**
  * Wrapper component for using unstated
+ * @type {React.ComponentType<{ user: import('@growi/core').IUserHasId }>}
  */
 const StatusActivateFormWrapper = withUnstatedContainers(
   StatusActivateFormWrapperFC,

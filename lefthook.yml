@@ -5,6 +5,6 @@ pre-commit:
   parallel: true
   commands:
     biome-format:
-      glob: "*.{js,jsx,ts,tsx,json,jsonc}"
+      glob: "*.{js,jsx,ts,tsx,mts,cts,json,jsonc}"
       run: pnpm biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
       stage_fixed: true

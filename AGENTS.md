@@ -1,74 +1,139 @@
 # AGENTS.md
 
-GROWI is a team collaboration wiki platform built with Next.js, Express, and MongoDB. This guide helps AI coding agents navigate the monorepo and work effectively with GROWI's architecture.
+GROWI is a team collaboration wiki platform built with Next.js, Express, and MongoDB. This guide provides essential instructions for AI coding agents working with the GROWI codebase.
 
-## Language
+## Language Policy
 
-If we detect at the beginning of a conversation that the user's primary language is not English, we will always respond in that language. However, we may retain technical terms in English if necessary.
+**Response Language**: If the user writes in a non-English language at any point in the conversation, always respond in that language from that point onward. This rule takes **absolute priority** over any other language instructions, including skill/command prompts or context documents written in English.
 
-When generating source code, all comments and explanations within the code will be written in English.
+**Code Comments**: When generating source code, all comments and explanations within the code must be written in English, regardless of the conversation language.
 
 ## Project Overview
 
-GROWI is a team collaboration software using markdown - a wiki platform with hierarchical page organization. It's built with Next.js, Express, MongoDB, and includes features like real-time collaborative editing, authentication integrations, and plugin support.
+GROWI is a team collaboration wiki platform using Markdown, featuring hierarchical page organization, real-time collaborative editing, authentication integrations, and plugin support. Built as a monorepo with Next.js, Express, and MongoDB.
 
-## Development Tools
-- **Package Manager**: pnpm with workspace support
-- **Build System**: Turborepo for monorepo orchestration
-- **Code Quality**: 
-  - Biome for linting and formatting
-  - Stylelint for SCSS/CSS
+## Knowledge Base
 
-## Development Commands
+### Claude Code Skills (Auto-Invoked)
 
-### Core Development
-- `turbo run bootstrap` - Install dependencies for all workspace packages
-- `turbo run dev` - Start development server (automatically runs migrations and pre-builds styles)
+Technical information is available in **Claude Code Skills** (`.claude/skills/`), which are automatically invoked during development.
 
-### Production Commands
-- `pnpm run app:build` - Build GROWI app client and server for production
-- `pnpm run app:server` - Launch GROWI app server in production mode
-- `pnpm start` - Build and start the application (runs both build and server commands)
+**Global Skills** (always loaded):
 
-### Database Migrations
-- `pnpm run migrate` - Run MongoDB migrations (production)
-- `turbo run dev:migrate @apps/app` - Run migrations in development (or wait for automatic execution with dev)
-- `cd apps/app && pnpm run dev:migrate:status` - Check migration status
-- `cd apps/app && pnpm run dev:migrate:down` - Rollback last migration
+| Skill | Description |
+|-------|-------------|
+| **monorepo-overview** | Monorepo structure, workspace organization, Changeset versioning |
+| **tech-stack** | Technology stack, pnpm/Turborepo, TypeScript, Biome |
 
-### Testing and Quality
-- `turbo run test @apps/app` - Run Jest and Vitest test suites with coverage
-- `turbo run lint @apps/app` - Run all linters (TypeScript, Biome, Stylelint, OpenAPI)
-- `cd apps/app && pnpm run lint:typecheck` - TypeScript type checking only
-- `cd apps/app && pnpm run test:vitest` - Run Vitest unit tests
-- `cd apps/app && pnpm run test:jest` - Run Jest integration tests
+**Rules** (always applied):
 
-### Development Utilities  
-- `cd apps/app && pnpm run repl` - Start Node.js REPL with application context loaded
-- `turbo run pre:styles @apps/app` - Pre-build styles with Vite
+| Rule | Description |
+|------|-------------|
+| **coding-style** | Coding conventions, naming, exports, immutability, comments |
+| **security** | Security checklist, secret management, OWASP vulnerability prevention |
+| **performance** | Model selection, context management, build troubleshooting |
 
-## Architecture Overview
+**Agents** (specialized):
 
-### Monorepo Structure
-- `/apps/app/` - Main GROWI application (Next.js frontend + Express backend)
-- `/apps/pdf-converter/` - PDF conversion microservice
-- `/apps/slackbot-proxy/` - Slack integration proxy service
-- `/packages/` - Shared libraries and components
+| Agent | Description |
+|-------|-------------|
+| **build-error-resolver** | TypeScript/build error resolution with minimal diffs |
+| **security-reviewer** | Security vulnerability detection, OWASP Top 10 |
 
-## File Organization Patterns
+**Commands** (user-invocable):
 
-### Components
-- Use TypeScript (.tsx) for React components
-- Co-locate styles as `.module.scss` files
-- Export components through `index.ts` files where appropriate
-- Group related components in feature-based directories
+| Command | Description |
+|---------|-------------|
+| **/tdd** | Test-driven development workflow |
+| **/learn** | Extract reusable patterns from sessions |
 
-### Tests
-- Unit Test: `*.spec.ts`
-- Integration Test: `*.integ.ts`
-- Component Test: `*.spec.tsx`
+**apps/app Skills** (loaded when working in apps/app):
 
+| Skill | Description |
+|-------|-------------|
+| **app-architecture** | Next.js Pages Router, Express, feature-based structure |
+| **app-commands** | apps/app specific commands (migrations, OpenAPI, etc.) |
+| **app-specific-patterns** | Jotai/SWR patterns, router mocking, API routes |
+
+### Package-Specific CLAUDE.md
+
+Each application has its own CLAUDE.md with detailed instructions:
+
+- `apps/app/CLAUDE.md` - Main GROWI application
+- `apps/pdf-converter/CLAUDE.md` - PDF conversion microservice
+- `apps/slackbot-proxy/CLAUDE.md` - Slack integration proxy
+
+### Serena Memories
+
+Additional detailed specifications are stored in **Serena memories** and can be referenced when needed for specific features or subsystems.
+
+## Quick Reference
+
+### Essential Commands (Global)
+
+```bash
+# Development
+turbo run dev                    # Start all dev servers
+
+# Quality Checks (use Turborepo for caching)
+turbo run lint --filter @growi/app
+turbo run test --filter @growi/app
+
+# Production
+pnpm run app:build              # Build main app
+pnpm start                      # Build and start
+```
+
+### Key Directories
+
+```
+growi/
+├── apps/
+│   ├── app/                # Main GROWI application (Next.js + Express)
+│   ├── pdf-converter/      # PDF conversion microservice
+│   └── slackbot-proxy/     # Slack integration proxy
+├── packages/               # Shared libraries (@growi/core, @growi/ui, etc.)
+└── .claude/
+    ├── skills/             # Claude Code skills (auto-loaded)
+    ├── rules/              # Coding standards (always applied)
+    ├── agents/             # Specialized agents
+    └── commands/           # User-invocable commands (/tdd, /learn)
+```
+
+## Development Guidelines
+
+1. **Feature-Based Architecture**: Create new features in `features/{feature-name}/`
+2. **Server-Client Separation**: Keep server and client code separate
+3. **State Management**: Jotai for UI state, SWR for data fetching
+4. **Named Exports**: Prefer named exports (except Next.js pages)
+5. **Test Co-location**: Place test files next to source files
+6. **Type Safety**: Use strict TypeScript throughout
+7. **Changeset**: Use `npx changeset` for version management
+
+## Before Committing
+
+Always execute these checks:
+
+```bash
+# From workspace root (recommended)
+turbo run lint:typecheck --filter @growi/app
+turbo run lint:biome --filter @growi/app
+turbo run test --filter @growi/app
+turbo run build --filter @growi/app
+```
+
+Or from apps/app directory:
+
+```bash
+pnpm run lint:typecheck
+pnpm run lint:biome
+pnpm run test
+pnpm run build
+```
 
 ---
 
-When working with this codebase, always run the appropriate linting and testing commands before committing changes. The application uses strict TypeScript checking and comprehensive test coverage requirements.
+For detailed information, refer to:
+- **Rules**: `.claude/rules/` (coding standards)
+- **Skills**: `.claude/skills/` (technical knowledge)
+- **Package docs**: `apps/*/CLAUDE.md` (package-specific)

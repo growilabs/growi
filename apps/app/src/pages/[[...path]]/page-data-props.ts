@@ -10,6 +10,8 @@ import { isIPageInfo, isIPageNotFoundInfo } from '@growi/core';
 import {
   isPermalink as _isPermalink,
   isTopPage,
+  isUserPage,
+  isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import assert from 'assert';
@@ -161,6 +163,31 @@ export async function getPageDataForInitial(
     pageGrantService,
     { pageId, path: resolvedPagePath, user },
   );
+
+  const disableUserPages = configManager.getConfig('security:disableUserPages');
+
+  if (disableUserPages && pageWithMeta.data != null) {
+    const pagePath = pageWithMeta.data.path;
+    const isTargetUserPage = isUserPage(pagePath) || isUsersTopPage(pagePath);
+
+    if (isTargetUserPage) {
+      return {
+        props: {
+          currentPathname: resolvedPagePath,
+          isIdenticalPathPage: false,
+          pageWithMeta: {
+            data: null,
+            meta: {
+              isNotFound: true,
+              isForbidden: true,
+            },
+          } satisfies IDataWithRequiredMeta<null, IPageNotFoundInfo>,
+          skipSSR: false,
+          redirectFrom,
+        },
+      };
+    }
+  }
 
   // Handle URL conversion
   const currentPathname = resolveFinalizedPathname(

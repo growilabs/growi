@@ -56,6 +56,11 @@
       "enable_force_delete_user_homepage_on_user_deletion": "사용자를 삭제할 때, 사용자의 홈페이지와 모든 하위 페이지가 완전히 삭제됩니다.",
       "desc": "삭제된 사용자의 홈페이지를 삭제할 수 있습니다."
     },
+    "disable_user_pages": {
+      "disable_user_pages": "사용자 페이지 비활성화",
+      "disable_user_pages_label": "사용자 페이지 비활성화",
+      "desc": "사용자 페이지를 비활성화하면 모든 사용자 페이지의 생성, 조회, 편집 및 복제가 비활성화됩니다.</br>또한, 사용자 페이지는 페이지 트리, 최근 변경 사항 또는 검색 결과에도 표시되지 않습니다."
+    },
     "session": "세션",
     "max_age": "최대 수명 (밀리초)",
     "max_age_desc": "사용자 세션이 만료되는 시간(밀리초)을 지정합니다.<br>기본값: 2592000000 (30일)",
@@ -371,6 +376,15 @@
     "transmission_method": "전송 방식",
     "smtp_label": "SMTP",
     "ses_label": "SES(AWS)",
+    "oauth2_label": "OAuth 2.0 (Google Workspace)",
+    "oauth2_description": "Google Workspace를 사용하여 이메일을 보내기 위한 OAuth 2.0 인증을 구성합니다. Google Cloud Console에서 OAuth 2.0 자격 증명을 생성하고 갱신 토큰을 얻어야 합니다.",
+    "oauth2_user": "이메일 주소",
+    "oauth2_user_help": "인증된 Google 계정의 이메일 주소",
+    "oauth2_client_id": "클라이언트 ID",
+    "oauth2_client_secret": "클라이언트 시크릿",
+    "oauth2_refresh_token": "갱신 토큰",
+    "oauth2_refresh_token_help": "OAuth 2.0 인증 흐름에서 얻은 갱신 토큰",
+    "placeholder_leave_blank": "기존 값을 유지하려면 비워두세요",
     "send_test_email": "테스트 이메일 전송",
     "success_to_send_test_email": "테스트 이메일 전송 성공",
     "smtp_settings": "SMTP 설정",

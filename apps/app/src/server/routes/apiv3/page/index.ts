@@ -17,7 +17,11 @@ import {
   SubscriptionStatusType,
 } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
-import { convertToNewAffiliationPath } from '@growi/core/dist/utils/page-path-utils';
+import {
+  convertToNewAffiliationPath,
+  isUserPage,
+  isUsersTopPage,
+} from '@growi/core/dist/utils/page-path-utils';
 import { normalizePath } from '@growi/core/dist/utils/path-utils';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
@@ -32,6 +36,7 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { Revision } from '~/server/models/revision';
@@ -48,6 +53,7 @@ import loggerFactory from '~/utils/logger';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 import { checkPageExistenceHandlersFactory } from './check-page-existence';
 import { createPageHandlersFactory } from './create-page';
+import { getPageInfoHandlerFactory } from './get-page-info';
 import { getPagePathsWithDescendantCountFactory } from './get-page-paths-with-descendant-count';
 import { getYjsDataHandlerFactory } from './get-yjs-data';
 import { publishPageHandlersFactory } from './publish-page';
@@ -81,23 +87,18 @@ const router = express.Router();
  *
  */
 module.exports = (crowi: Crowi) => {
-  const loginRequired = require('../../../middlewares/login-required')(
-    crowi,
-    true,
-  );
-  const loginRequiredStrictly = require('../../../middlewares/login-required')(
-    crowi,
-  );
+  const loginRequired = loginRequiredFactory(crowi, true);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
   const certifySharedPage = require('../../../middlewares/certify-shared-page')(
     crowi,
   );
   const addActivity = generateAddActivityMiddleware();
 
-  const globalNotificationService = crowi.getGlobalNotificationService();
+  const globalNotificationService = crowi.globalNotificationService;
   const Page = mongoose.model<IPage, PageModel>('Page');
   const { pageService, pageGrantService } = crowi;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const validator = {
     getPage: [
@@ -108,7 +109,6 @@ module.exports = (crowi: Crowi) => {
       query('includeEmpty').optional().isBoolean(),
     ],
     likes: [body('pageId').isString(), body('bool').isBoolean()],
-    info: [query('pageId').isMongoId().withMessage('pageId is required')],
     getGrantData: [
       query('pageId').isMongoId().withMessage('pageId is required'),
     ],
@@ -161,7 +161,7 @@ module.exports = (crowi: Crowi) => {
    *      get:
    *        tags: [Page]
    *        summary: Get page
-   *        description: get page by pagePath or pageId
+   *        description: Get page by pagePath or pageId. Returns a single page or multiple pages based on parameters.
    *        parameters:
    *          - name: pageId
    *            in: query
@@ -173,13 +173,33 @@ module.exports = (crowi: Crowi) => {
    *            description: page path
    *            schema:
    *              $ref: '#/components/schemas/PagePath'
+   *          - name: findAll
+   *            in: query
+   *            description: If set, returns all pages matching the path (returns pages array instead of single page)
+   *            schema:
+   *              type: boolean
+   *          - name: revisionId
+   *            in: query
+   *            description: Specific revision ID to retrieve
+   *            schema:
+   *              $ref: '#/components/schemas/ObjectId'
+   *          - name: shareLinkId
+   *            in: query
+   *            description: Share link ID for shared page access
+   *            schema:
+   *              $ref: '#/components/schemas/ObjectId'
+   *          - name: includeEmpty
+   *            in: query
+   *            description: Include empty pages in results when using findAll
+   *            schema:
+   *              type: boolean
    *        responses:
    *          200:
    *            description: Page data
    *            content:
    *              application/json:
    *                schema:
-   *                  $ref: '#/components/schemas/Page'
+   *                  $ref: '#/components/schemas/GetPageResponse'
    */
   router.get(
     '/',
@@ -192,6 +212,10 @@ module.exports = (crowi: Crowi) => {
       const { user, isSharedPage } = req;
       const { pageId, path, findAll, revisionId, shareLinkId, includeEmpty } =
         req.query;
+
+      const disableUserPages = crowi.configManager.getConfig(
+        'security:disableUserPages',
+      );
 
       const respondWithSinglePage = async (
         pageWithMeta:
@@ -217,6 +241,18 @@ module.exports = (crowi: Crowi) => {
             new ErrorV3('Page is not found', 'page-not-found', undefined, meta),
             404,
           );
+        }
+
+        if (disableUserPages && page != null) {
+          const isTargetUserPage =
+            isUserPage(page.path) || isUsersTopPage(page.path);
+
+          if (isTargetUserPage) {
+            return res.apiv3Err(
+              new ErrorV3('Page is forbidden', 'page-is-forbidden'),
+              403,
+            );
+          }
         }
 
         if (page != null) {
@@ -551,72 +587,7 @@ module.exports = (crowi: Crowi) => {
     },
   );
 
-  /**
-   * @swagger
-   *
-   *    /page/info:
-   *      get:
-   *        tags: [Page]
-   *        summary: /page/info
-   *        description: Get summary informations for a page
-   *        parameters:
-   *          - name: pageId
-   *            in: query
-   *            required: true
-   *            description: page id
-   *            schema:
-   *              $ref: '#/components/schemas/ObjectId'
-   *        responses:
-   *          200:
-   *            description: Successfully retrieved current page info.
-   *            content:
-   *              application/json:
-   *                schema:
-   *                  $ref: '#/components/schemas/PageInfoExt'
-   *          500:
-   *            description: Internal server error.
-   */
-  router.get(
-    '/info',
-    accessTokenParser([SCOPE.READ.FEATURES.PAGE]),
-    certifySharedPage,
-    loginRequired,
-    validator.info,
-    apiV3FormValidator,
-    async (req, res) => {
-      const { user, isSharedPage } = req;
-      const { pageId } = req.query;
-
-      try {
-        const { meta } = await findPageAndMetaDataByViewer(
-          pageService,
-          pageGrantService,
-          { pageId, path: null, user, isSharedPage },
-        );
-
-        if (isIPageNotFoundInfo(meta)) {
-          // Return error only when the page is forbidden
-          if (meta.isForbidden) {
-            return res.apiv3Err(
-              new ErrorV3(
-                'Page is forbidden',
-                'page-is-forbidden',
-                undefined,
-                meta,
-              ),
-              403,
-            );
-          }
-        }
-
-        // Empty pages (isEmpty: true) should return page info for UI operations
-        return res.apiv3(meta);
-      } catch (err) {
-        logger.error('get-page-info', err);
-        return res.apiv3Err(err, 500);
-      }
-    },
-  );
+  router.get('/info', getPageInfoHandlerFactory(crowi));
 
   /**
    * @swagger
@@ -1102,7 +1073,9 @@ module.exports = (crowi: Crowi) => {
       }
 
       res.set({
-        'Content-Disposition': `attachment;filename*=UTF-8''${encodeURIComponent(fileName)}.${format}`,
+        'Content-Disposition': `attachment;filename*=UTF-8''${encodeURIComponent(
+          fileName,
+        )}.${format}`,
       });
 
       const parameters = {

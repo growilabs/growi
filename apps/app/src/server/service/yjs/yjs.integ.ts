@@ -28,7 +28,7 @@ const getPrivateMdbInstance = (yjsService: IYjsService): MongodbPersistence => {
 
 describe('YjsService', () => {
   describe('getYDocStatus()', () => {
-    beforeAll(async () => {
+    beforeAll(() => {
       const ioMock = mock<Server>();
 
       // initialize
@@ -42,7 +42,16 @@ describe('YjsService', () => {
       // flush yjs-writings
       const yjsService = getYjsService();
       const privateMdb = getPrivateMdbInstance(yjsService);
-      await privateMdb.flushDB();
+      try {
+        await privateMdb.flushDB();
+      } catch (error) {
+        // Ignore errors that can occur due to async index creation:
+        // - 26: NamespaceNotFound (collection not yet created)
+        // - 276: IndexBuildAborted (cleanup during index creation)
+        if (error.code !== 26 && error.code !== 276) {
+          throw error;
+        }
+      }
     });
 
     it('returns ISOLATED when neither revisions nor YDocs exists', async () => {

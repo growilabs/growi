@@ -1,7 +1,7 @@
 import type React from 'react';
 import type { FC } from 'react';
 import { Suspense } from 'react';
-import { render, waitFor } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 
 import type { IPageForTreeItem } from '~/interfaces/page';
 
@@ -179,7 +179,9 @@ describe('ItemsTree', () => {
       });
 
       // Give time for any additional API calls that might happen
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
 
       // Key assertion: API should only be called for:
       // 1. root-page-id (the only expanded node by default)
@@ -241,7 +243,9 @@ describe('ItemsTree', () => {
         expect(mockApiv3Get).toHaveBeenCalled();
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
 
       const childrenApiCalls = mockApiv3Get.mock.calls.filter(
         (call) => call[0] === '/page-listing/children',
@@ -306,7 +310,9 @@ describe('ItemsTree', () => {
       });
 
       // Wait for any potential additional API calls
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      });
 
       // Critical assertion: Only root-page-id should have children fetched
       // folder-1 and folder-2 should NOT be fetched even though they are folders (descendantCount > 0)
@@ -385,7 +391,9 @@ describe('ItemsTree', () => {
       );
 
       // Give some extra time for any unwanted calls
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      });
 
       // Should fetch: root-page-id (initial), sandbox-id (ancestor of target)
       // Should NOT fetch: other-id (not an ancestor of target)
@@ -469,7 +477,9 @@ describe('ItemsTree', () => {
 
       // Wait a reasonable amount of time to detect infinite loops
       // If there's an infinite loop, we'd see many API calls within this time
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      });
 
       // Force re-render to simulate React re-renders that could trigger the loop
       rerender(
@@ -485,7 +495,9 @@ describe('ItemsTree', () => {
       );
 
       // Wait more time for potential infinite loop to manifest
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      });
 
       // Key assertion: API calls for parent-1 should be bounded
       // An infinite loop would cause this count to be very high (100+)
@@ -555,7 +567,9 @@ describe('ItemsTree', () => {
       await waitFor(() => {
         expect(mockApiv3Get).toHaveBeenCalled();
       });
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      });
 
       const callsAfterInitialLoad = totalApiCalls;
 
@@ -564,7 +578,9 @@ describe('ItemsTree', () => {
       // we're mainly testing the initial render with creatingParentId set
 
       // Wait to ensure no more calls happen
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      });
 
       // Verify API calls stabilized
       expect(totalApiCalls).toBeLessThanOrEqual(callsAfterInitialLoad + 2);
@@ -624,7 +640,9 @@ describe('ItemsTree', () => {
       await waitFor(() => {
         expect(mockApiv3Get).toHaveBeenCalled();
       });
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      });
 
       const callsBeforeReset = apiCallCount;
 
@@ -647,7 +665,9 @@ describe('ItemsTree', () => {
         </TestWrapper>,
       );
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      });
 
       // API calls should be bounded even after state changes
       // The difference should be minimal (just the initial load after remount)

@@ -25,97 +25,68 @@ const mockAttachment = {
   fileSize: 1024000,
 };
 
-// Mock PageQueryBuilder
-const mockPageQueryBuilder = {
-  addConditionToListWithDescendants: vi.fn().mockReturnThis(),
-  addConditionToExcludeTrashed: vi.fn().mockReturnThis(),
-  query: {
-    select: vi.fn().mockReturnValue({
-      exec: vi.fn().mockResolvedValue([{ id: '507f1f77bcf86cd799439013' }]),
-    }),
-    and: vi.fn().mockReturnThis(),
-  },
-};
-
 vi.mock('mongoose', async (importOriginal) => {
   const actual = await importOriginal<typeof import('mongoose')>();
+
+  // Create a mock constructor for PageQueryBuilder
+  class MockPageQueryBuilder {
+    addConditionToListWithDescendants = vi.fn().mockReturnThis();
+    addConditionToExcludeTrashed = vi.fn().mockReturnThis();
+    query = {
+      select: vi.fn().mockReturnValue({
+        exec: vi.fn().mockResolvedValue([{ id: '507f1f77bcf86cd799439013' }]),
+      }),
+      and: vi.fn().mockImplementation(function () {
+        return this;
+      }),
+    };
+  }
+
+  // Create Attachment model mock
+  const createAttachmentModel = () => ({
+    findOne: vi.fn().mockReturnValue({
+      populate: vi.fn().mockResolvedValue(mockAttachment),
+    }),
+    find: vi.fn().mockReturnValue({
+      and: vi.fn().mockReturnThis(),
+      populate: vi.fn().mockReturnThis(),
+      exec: vi.fn().mockResolvedValue([mockAttachment]),
+    }),
+  });
+
+  // Create Page model mock
+  const createPageModel = () => ({
+    findByPathAndViewer: vi.fn().mockResolvedValue({
+      _id: '507f1f77bcf86cd799439013',
+      path: '/test-page',
+    }),
+    isAccessiblePageByViewer: vi.fn().mockResolvedValue(true),
+    find: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        exec: vi.fn().mockResolvedValue([{ id: '507f1f77bcf86cd799439013' }]),
+      }),
+      and: vi.fn().mockReturnThis(),
+    }),
+    addConditionToFilteringByViewerForList: vi.fn(),
+    PageQueryBuilder: MockPageQueryBuilder,
+  });
+
+  // Create a shared mock model factory that returns new instances
+  const createMockModel = (modelName: string) => {
+    if (modelName === 'Attachment') {
+      return createAttachmentModel();
+    }
+    return createPageModel();
+  };
+
   return {
     ...actual,
     default: {
       ...actual.default,
-      model: vi.fn().mockImplementation((modelName) => {
-        const mockModel = {
-          findByPathAndViewer: vi.fn().mockResolvedValue({
-            _id: '507f1f77bcf86cd799439013',
-            path: '/test-page',
-          }),
-          isAccessiblePageByViewer: vi.fn().mockResolvedValue(true),
-          find: vi.fn().mockReturnValue({
-            select: vi.fn().mockReturnValue({
-              exec: vi
-                .fn()
-                .mockResolvedValue([{ id: '507f1f77bcf86cd799439013' }]),
-            }),
-            and: vi.fn().mockReturnThis(),
-          }),
-          addConditionToFilteringByViewerForList: vi.fn(),
-          PageQueryBuilder: vi
-            .fn()
-            .mockImplementation(() => mockPageQueryBuilder),
-        };
-
-        if (modelName === 'Attachment') {
-          return {
-            findOne: vi.fn().mockReturnValue({
-              populate: vi.fn().mockResolvedValue(mockAttachment),
-            }),
-            find: vi.fn().mockReturnValue({
-              and: vi.fn().mockReturnThis(),
-              populate: vi.fn().mockReturnThis(),
-              exec: vi.fn().mockResolvedValue([mockAttachment]),
-            }),
-          };
-        }
-
-        return mockModel;
-      }),
+      model: createMockModel,
     },
-    model: vi.fn().mockImplementation((modelName) => {
-      const mockModel = {
-        findByPathAndViewer: vi.fn().mockResolvedValue({
-          _id: '507f1f77bcf86cd799439013',
-          path: '/test-page',
-        }),
-        isAccessiblePageByViewer: vi.fn().mockResolvedValue(true),
-        find: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            exec: vi
-              .fn()
-              .mockResolvedValue([{ id: '507f1f77bcf86cd799439013' }]),
-          }),
-          and: vi.fn().mockReturnThis(),
-        }),
-        addConditionToFilteringByViewerForList: vi.fn(),
-        PageQueryBuilder: vi
-          .fn()
-          .mockImplementation(() => mockPageQueryBuilder),
-      };
-
-      if (modelName === 'Attachment') {
-        return {
-          findOne: vi.fn().mockReturnValue({
-            populate: vi.fn().mockResolvedValue(mockAttachment),
-          }),
-          find: vi.fn().mockReturnValue({
-            and: vi.fn().mockReturnThis(),
-            populate: vi.fn().mockReturnThis(),
-            exec: vi.fn().mockResolvedValue([mockAttachment]),
-          }),
-        };
-      }
-
-      return mockModel;
-    }),
+    model: createMockModel,
+    Types: actual.Types,
   };
 });
 
@@ -181,7 +152,7 @@ describe('useSWRxRef and useSWRxRefs integration tests', () => {
     });
 
     const mockCrowi = {
-      require: () => () => (req: any, res: any, next: any) => next(),
+      loginRequiredFactory: () => (req: any, res: any, next: any) => next(),
       accessTokenParser: () => (req: any, res: any, next: any) => {
         req.user = { _id: '507f1f77bcf86cd799439012', username: 'testuser' };
         next();
@@ -190,23 +161,26 @@ describe('useSWRxRef and useSWRxRefs integration tests', () => {
 
     refsMiddleware(mockCrowi, app);
 
-    return new Promise<void>((resolve) => {
+    return await new Promise<void>((resolve) => {
       server = app.listen(TEST_PORT, () => {
         resolve();
       });
     });
   });
 
-  afterAll(() => {
-    return new Promise<void>((resolve) => {
-      if (server) {
+  afterAll(async () => {
+    if (server) {
+      server.closeAllConnections?.();
+      await new Promise<void>((resolve) => {
         server.close(() => {
           resolve();
         });
-      } else {
-        resolve();
-      }
-    });
+      });
+    }
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('useSWRxRef', () => {
@@ -246,9 +220,14 @@ describe('useSWRxRef and useSWRxRefs integration tests', () => {
         useSWRxRefs('/test-page', undefined, {}, false),
       );
 
-      await waitFor(() => expect(result.current.data).toBeDefined(), {
-        timeout: 5000,
-      });
+      await waitFor(
+        () => {
+          expect(result.current.data).toBeDefined();
+        },
+        {
+          timeout: 5000,
+        },
+      );
 
       expect(axiosGetSpy).toHaveBeenCalledWith(
         '/_api/attachment-refs/refs',
@@ -274,9 +253,14 @@ describe('useSWRxRef and useSWRxRefs integration tests', () => {
         useSWRxRefs('', '/test-prefix', { depth: '2' }, false),
       );
 
-      await waitFor(() => expect(result.current.data).toBeDefined(), {
-        timeout: 5000,
-      });
+      await waitFor(
+        () => {
+          expect(result.current.data).toBeDefined();
+        },
+        {
+          timeout: 5000,
+        },
+      );
 
       expect(axiosGetSpy).toHaveBeenCalledWith(
         '/_api/attachment-refs/refs',

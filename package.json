@@ -1,6 +1,6 @@
 {
   "name": "growi",
-  "version": "7.4.3-RC.0",
+  "version": "7.4.5-RC.0",
   "description": "Team collaboration software using markdown",
   "license": "MIT",
   "private": "true",
@@ -39,9 +39,7 @@
     "version:preminor": "pnpm version preminor --preid=RC --no-git-tag-version",
     "version:premajor": "pnpm version premajor --preid=RC --no-git-tag-version"
   },
-  "// comments for defDependencies": {
-    "vite-plugin-dts": "v4.2.1 causes the unexpected error 'Cannot find package 'vue-tsc''"
-  },
+  "// comments for devDependencies": {},
   "devDependencies": {
     "@biomejs/biome": "^2.2.6",
     "@changesets/changelog-github": "^0.5.0",
@@ -58,6 +56,7 @@
     "@types/estree": "^1.0.1",
     "@types/glob": "^8.1.0",
     "@types/node": "^20.18.3",
+    "@typescript/native-preview": "7.0.0-dev.20260114.1",
     "@vitejs/plugin-react": "^4.3.1",
     "@vitest/coverage-v8": "^2.1.1",
     "@vitest/ui": "^2.1.1",
@@ -90,8 +89,7 @@
     "vite-plugin-dts": "^3.9.1",
     "vite-tsconfig-paths": "^5.0.1",
     "vitest": "^2.1.1",
-    "vitest-mock-extended": "^2.0.2",
-    "vue-tsc": "^2.1.10"
+    "vitest-mock-extended": "^2.0.2"
   },
   "// comments for pnpm.overrides": {
     "@lykmapipo/common>flat": "flat v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version",

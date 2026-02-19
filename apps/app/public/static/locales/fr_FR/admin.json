@@ -56,6 +56,11 @@
       "enable_force_delete_user_homepage_on_user_deletion": "Supprimer la page d'accueil et ses pages enfants",
       "desc": "Les pages d'accueil utilisateurs pourront être supprimées."
     },
+    "disable_user_pages": {
+      "disable_user_pages": "Désactiver les pages utilisateur",
+      "disable_user_pages_label": "Désactiver les pages utilisateur",
+      "desc": "En désactivant les pages utilisateur, la création, la consultation, la modification et la duplication de toutes les pages utilisateur seront désactivées.</br>De plus, les pages utilisateur n'apparaîtront pas dans l'arborescence des pages, les modifications récentes ou les résultats de recherche."
+    },
     "session": "Session",
     "max_age": "Âge maximal (ms)",
     "max_age_desc": "Spécifie (en milliseconde) l'âge maximal d'une session <br>Par défaut: 2592000000 (30 jours)",
@@ -371,6 +376,15 @@
     "transmission_method": "Mode",
     "smtp_label": "SMTP",
     "ses_label": "SES(AWS)",
+    "oauth2_label": "OAuth 2.0 (Google Workspace)",
+    "oauth2_description": "Configurez l'authentification OAuth 2.0 pour envoyer des courriels en utilisant Google Workspace. Vous devez créer des identifiants OAuth 2.0 dans la console Google Cloud et obtenir un jeton de rafraîchissement.",
+    "oauth2_user": "Adresse courriel",
+    "oauth2_user_help": "L'adresse courriel du compte Google autorisé",
+    "oauth2_client_id": "ID client",
+    "oauth2_client_secret": "Secret client",
+    "oauth2_refresh_token": "Jeton de rafraîchissement",
+    "oauth2_refresh_token_help": "Le jeton de rafraîchissement obtenu à partir du flux d'autorisation OAuth 2.0",
+    "placeholder_leave_blank": "Laisser vide pour conserver la valeur existante",
     "send_test_email": "Courriel d'essai",
     "success_to_send_test_email": "Courriel d'essai envoyé",
     "smtp_settings": "Configuration SMTP",

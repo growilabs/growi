@@ -9,6 +9,8 @@ import path from 'pathe';
 
 import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { isG2GTransferError } from '~/server/models/vo/g2g-transfer-error';
 import { configManager } from '~/server/service/config-manager';
 import { exportService } from '~/server/service/export';
@@ -131,10 +133,8 @@ module.exports = (crowi: Crowi): Router => {
 
   const isInstalled = configManager.getConfig('app:installed');
 
-  const adminRequired = require('../../middlewares/admin-required')(crowi);
-  const loginRequiredStrictly = require('../../middlewares/login-required')(
-    crowi,
-  );
+  const adminRequired = adminRequiredFactory(crowi);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   // Middleware
   const adminRequiredIfInstalled = (

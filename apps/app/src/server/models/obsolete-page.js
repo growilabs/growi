@@ -4,6 +4,7 @@ import {
   pathUtils,
   templateChecker,
 } from '@growi/core/dist/utils';
+import { isUserPage } from '@growi/core/dist/utils/page-path-utils';
 import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import { differenceInYears } from 'date-fns/differenceInYears';
 import escapeStringRegexp from 'escape-string-regexp';
@@ -14,6 +15,7 @@ import ExternalUserGroupRelation from '~/features/external-user-group/server/mod
 import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../service/config-manager';
+import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from './user/conts';
 import UserGroup from './user-group';
 import UserGroupRelation from './user-group-relation';
 
@@ -97,7 +99,7 @@ export const getPageSchema = (crowi) => {
 
   // init event
   if (crowi != null) {
-    pageEvent = crowi.event('page');
+    pageEvent = crowi.events.page;
     pageEvent.on('create', pageEvent.onCreate);
     pageEvent.on('update', pageEvent.onUpdate);
     pageEvent.on('createMany', pageEvent.onCreateMany);
@@ -254,7 +256,7 @@ export const getPageSchema = (crowi) => {
     return this.save();
   };
 
-  pageSchema.methods.initLatestRevisionField = async function (revisionId) {
+  pageSchema.methods.initLatestRevisionField = function (revisionId) {
     this.latestRevision = this.revision;
     if (revisionId != null) {
       this.revision = revisionId;
@@ -266,10 +268,9 @@ export const getPageSchema = (crowi) => {
   ) {
     validateCrowi();
 
-    const User = crowi.model('User');
-    return populateDataToShowRevision(
+    return await populateDataToShowRevision(
       this,
-      User.USER_FIELDS_EXCEPT_CONFIDENTIAL,
+      USER_FIELDS_EXCEPT_CONFIDENTIAL,
       shouldExcludeBody,
     );
   };
@@ -282,7 +283,7 @@ export const getPageSchema = (crowi) => {
       this.revision = revisionId;
     }
     // biome-ignore lint/plugin: populating is the purpose of this method
-    return this.populate('revision');
+    return await this.populate('revision');
   };
 
   pageSchema.methods.applyScope = function (user, grant, grantUserGroupIds) {
@@ -340,7 +341,7 @@ export const getPageSchema = (crowi) => {
    * @param {User} user
    */
   pageSchema.statics.isAccessiblePageByViewer = async function (id, user) {
-    const baseQuery = this.count({ _id: id });
+    const baseQuery = this.findOne({ _id: id }).select('path');
 
     const userGroups =
       user != null
@@ -355,8 +356,21 @@ export const getPageSchema = (crowi) => {
     const queryBuilder = new this.PageQueryBuilder(baseQuery);
     queryBuilder.addConditionToFilteringByViewer(user, userGroups, true);
 
-    const count = await queryBuilder.query.exec();
-    return count > 0;
+    const page = await queryBuilder.query.exec();
+
+    if (!page) {
+      return false;
+    }
+
+    const disabledUserPages = configManager.getConfig(
+      'security:disableUserPages',
+    );
+
+    if (disabledUserPages && isUserPage(page.path)) {
+      return false;
+    }
+
+    return true;
   };
 
   // find page by path
@@ -425,6 +439,11 @@ export const getPageSchema = (crowi) => {
     includeEmpty = false,
   ) {
     const builder = new this.PageQueryBuilder(this.find(), includeEmpty);
+
+    if (option.disableUserPages) {
+      builder.addConditionToListByNotMatchPathAndChildren('/user');
+    }
+
     builder.addConditionToListWithDescendants(path, option);
 
     return findListFromBuilderAndViewer(builder, user, false, option);
@@ -525,7 +544,6 @@ export const getPageSchema = (crowi) => {
   ) {
     validateCrowi();
 
-    const User = crowi.model('User');
     const opt = Object.assign({ sort: 'updatedAt', desc: -1 }, option);
     const sortOpt = {};
     sortOpt[opt.sort] = opt.desc;
@@ -547,7 +565,7 @@ export const getPageSchema = (crowi) => {
 
     // find
     builder.addConditionToPagenate(opt.offset, opt.limit, sortOpt);
-    builder.populateDataToList(User.USER_FIELDS_EXCEPT_CONFIDENTIAL);
+    builder.populateDataToList(USER_FIELDS_EXCEPT_CONFIDENTIAL);
     const pages = await builder.query.lean().clone().exec('find');
     const result = {
       pages,

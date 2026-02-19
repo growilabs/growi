@@ -1,4 +1,4 @@
-import React, { type JSX, useCallback, useState } from 'react';
+import React, { type JSX, useCallback, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
@@ -32,6 +32,14 @@ const CustomizeLogoSetting = (): JSX.Element => {
     isDefaultLogo ?? true,
   );
   const [retrieveError, setRetrieveError] = useState<any>();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const isSystemError: boolean = retrieveError != null;
+  const isLogoSettingIncomplete: boolean =
+    !isDefaultLogoSelected &&
+    uploadLogoSrc == null &&
+    !isCustomizedLogoUploaded;
+  const isUpdateButtonDisabled: boolean =
+    isSystemError || isLogoSettingIncomplete;
 
   const onSelectFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files != null && e.target.files.length > 0) {
@@ -58,6 +66,22 @@ const CustomizeLogoSetting = (): JSX.Element => {
     }
   }, [t, isDefaultLogoSelected]);
 
+  const clearFileInput = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
+  const resetFileSelectionState = useCallback(() => {
+    clearFileInput();
+    setUploadLogoSrc(null);
+  }, [clearFileInput]);
+
+  const onCloseCropModal = useCallback(() => {
+    resetFileSelectionState();
+    setIsImageCropModalShow(false);
+  }, [resetFileSelectionState]);
+
   const onClickDeleteBtn = useCallback(async () => {
     try {
       await apiv3Delete('/customize-setting/delete-brand-logo');
@@ -68,12 +92,13 @@ const CustomizeLogoSetting = (): JSX.Element => {
           ns: 'commons',
         }),
       );
+      resetFileSelectionState();
     } catch (err) {
       toastError(err);
       setRetrieveError(err);
       throw new Error('Failed to delete logo');
     }
-  }, [setIsCustomizedLogoUploaded, t]);
+  }, [setIsCustomizedLogoUploaded, t, resetFileSelectionState]);
 
   const processImageCompletedHandler = useCallback(
     async (croppedImage) => {
@@ -196,6 +221,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
                       onChange={onSelectFile}
                       name="brandLogo"
                       accept="image/*"
+                      ref={fileInputRef}
                     />
                   </div>
                 </div>
@@ -203,7 +229,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
             </div>
             <AdminUpdateButtonRow
               onClick={onClickSubmit}
-              disabled={retrieveError != null}
+              disabled={isUpdateButtonDisabled}
             />
           </div>
         </div>
@@ -212,7 +238,7 @@ const CustomizeLogoSetting = (): JSX.Element => {
       <ImageCropModal
         isShow={isImageCropModalShow}
         src={uploadLogoSrc}
-        onModalClose={() => setIsImageCropModalShow(false)}
+        onModalClose={onCloseCropModal}
         onImageProcessCompleted={processImageCompletedHandler}
         isCircular={false}
         showCropOption={false}

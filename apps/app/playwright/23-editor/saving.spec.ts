@@ -1,12 +1,7 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import path from 'path';
 
-const appendTextToEditorUntilContains = async (page: Page, text: string) => {
-  await page.locator('.cm-content').fill(text);
-  await expect(page.getByTestId('page-editor-preview-body')).toContainText(
-    text,
-  );
-};
+import { appendTextToEditorUntilContains } from '../utils/AppendTextToEditorUntilContains';
 
 test('Successfully create page under specific path', async ({ page }) => {
   const newPagePath = '/child';

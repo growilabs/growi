@@ -45,6 +45,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       expandOtherOptionsForCompleteDeletion: false,
       isShowRestrictedByOwner: false,
       isUsersHomepageDeletionEnabled: false,
+      disableUserPages: false,
       isForceDeleteUserHomepageOnUserDeletion: false,
       isRomUserAllowedToComment: false,
       isLocalEnabled: false,
@@ -67,6 +68,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       this.changeGroupRestrictionDisplayMode.bind(this);
     this.changePageDeletionAuthority =
       this.changePageDeletionAuthority.bind(this);
+    this.changeUserPageVisibility = this.changeUserPageVisibility.bind(this);
     this.changePageCompleteDeletionAuthority =
       this.changePageCompleteDeletionAuthority.bind(this);
     this.changePageRecursiveDeletionAuthority =
@@ -105,6 +107,7 @@ export default class AdminGeneralSecurityContainer extends Container {
       isForceDeleteUserHomepageOnUserDeletion:
         generalSetting.isForceDeleteUserHomepageOnUserDeletion,
       isRomUserAllowedToComment: generalSetting.isRomUserAllowedToComment,
+      disableUserPages: generalSetting.disableUserPages,
       sessionMaxAge: generalSetting.sessionMaxAge,
       wikiMode: generalSetting.wikiMode,
       disableLinkSharing: shareLinkSetting.disableLinkSharing,
@@ -174,6 +177,10 @@ export default class AdminGeneralSecurityContainer extends Container {
    */
   changePageDeletionAuthority(val) {
     this.setState({ currentPageDeletionAuthority: val });
+  }
+
+  changeUserPageVisibility() {
+    this.setState({ disableUserPages: !this.state.disableUserPages });
   }
 
   /**
@@ -284,6 +291,7 @@ export default class AdminGeneralSecurityContainer extends Container {
               formData.isAllGroupMembershipRequiredForPageCompleteDeletion,
             hideRestrictedByGroup: formData.hideRestrictedByGroup,
             hideRestrictedByOwner: formData.hideRestrictedByOwner,
+            disableUserPages: formData.disableUserPages,
             isUsersHomepageDeletionEnabled:
               formData.isUsersHomepageDeletionEnabled,
             isForceDeleteUserHomepageOnUserDeletion:
@@ -306,6 +314,7 @@ export default class AdminGeneralSecurityContainer extends Container {
               this.state.currentGroupRestrictionDisplayMode === 'Hidden',
             hideRestrictedByOwner:
               this.state.currentOwnerRestrictionDisplayMode === 'Hidden',
+            disableUserPages: this.state.disableUserPages,
             isUsersHomepageDeletionEnabled:
               this.state.isUsersHomepageDeletionEnabled,
             isForceDeleteUserHomepageOnUserDeletion:

@@ -66,78 +66,91 @@ interface IListPagesRequest
   user: IUser;
 }
 
-export const listPages = async (
-  req: IListPagesRequest,
-  res: Response,
-): Promise<Response> => {
-  const user = req.user;
-
-  if (req.query.pagePath == null) {
-    return res.status(400).send("the 'pagepath' query must not be null.");
-  }
-
-  const params: LsxApiParams = {
-    pagePath: removeTrailingSlash(req.query.pagePath),
-    offset: req.query?.offset,
-    limit: req.query?.limit,
-    options: req.query?.options ?? {},
-  };
-
-  const { pagePath, offset, limit, options } = params;
-  const builder = await generateBaseQuery(params.pagePath, user);
-
-  // count viewers of `/`
-  let toppageViewersCount: number;
-  try {
-    toppageViewersCount = await getToppageViewersCount();
-  } catch (error) {
-    // biome-ignore lint/suspicious/noConsole: Allow to use console.error here
-    console.error('Error occurred in getToppageViewersCount:', error);
-    return res.status(500).send('An internal server error occurred.');
-  }
-
-  let query = builder.query;
-  try {
-    // depth
-    if (options?.depth != null) {
-      query = addDepthCondition(
-        query,
-        params.pagePath,
-        OptionParser.parseRange(options.depth),
-      );
-    }
-    // filter
-    if (options?.filter != null) {
-      query = addFilterCondition(query, pagePath, options.filter);
-    }
-    if (options?.except != null) {
-      query = addExceptCondition(query, pagePath, options.except);
-    }
-
-    // get total num before adding num/sort conditions
-    const total = await query.clone().count();
-
-    // num
-    query = addNumCondition(query, offset, limit);
-    // sort
-    query = addSortCondition(query, options?.sort, options?.reverse);
-
-    const pages = await query.exec();
-    const cursor = (offset ?? 0) + pages.length;
-
-    const responseData: LsxApiResponseData = {
-      pages,
-      cursor,
-      total,
-      toppageViewersCount,
+export const listPages = ({
+  getExcludedPaths,
+}: {
+  getExcludedPaths: () => string[];
+}) => {
+  return async (req: IListPagesRequest, res: Response): Promise<Response> => {
+    const params: LsxApiParams = {
+      pagePath: removeTrailingSlash(req.query.pagePath),
+      offset: req.query?.offset,
+      limit: req.query?.limit,
+      options: req.query?.options ?? {},
     };
-    return res.status(200).send(responseData);
-  } catch (error) {
-    // biome-ignore lint/suspicious/noConsole: Allow to use console.error here
-    console.error('Error occurred while processing listPages request:', error);
-    if (isHttpError(error)) {
-      return res.status(error.status).send(error.message);
+
+    const { pagePath, offset, limit, options } = params;
+
+    // count viewers of `/`
+    let toppageViewersCount: number;
+    try {
+      toppageViewersCount = await getToppageViewersCount();
+    } catch (error) {
+      // biome-ignore lint/suspicious/noConsole: Allow to use console.error here
+      console.error('Error occurred in getToppageViewersCount:', error);
+      return res.status(500).send('An internal server error occurred.');
     }
-    return res.status(500).send('An internal server error occurred.');
-  }
+
+    try {
+      const user = req.user;
+      const builder = await generateBaseQuery(params.pagePath, user);
+      let query = builder.query;
+
+      const excludedPaths = getExcludedPaths();
+      if (excludedPaths.length > 0) {
+        const escapedPaths = excludedPaths.map((p) => {
+          const cleanPath = p.startsWith('/') ? p.substring(1) : p;
+          return escapeStringRegexp(cleanPath);
+        });
+
+        const regex = new RegExp(`^\\/(${escapedPaths.join('|')})(\\/|$)`);
+        query = query.and([{ path: { $not: regex } }]);
+      }
+
+      // depth
+      if (options?.depth != null) {
+        query = addDepthCondition(
+          query,
+          params.pagePath,
+          OptionParser.parseRange(options.depth),
+        );
+      }
+      // filter
+      if (options?.filter != null) {
+        query = addFilterCondition(query, pagePath, options.filter);
+      }
+      if (options?.except != null) {
+        query = addExceptCondition(query, pagePath, options.except);
+      }
+
+      // get total num before adding num/sort conditions
+      const total = await query.clone().count();
+
+      // num
+      query = addNumCondition(query, offset, limit);
+      // sort
+      query = addSortCondition(query, options?.sort, options?.reverse);
+
+      const pages = await query.exec();
+      const cursor = (offset ?? 0) + pages.length;
+
+      const responseData: LsxApiResponseData = {
+        pages,
+        cursor,
+        total,
+        toppageViewersCount,
+      };
+      return res.status(200).send(responseData);
+    } catch (error) {
+      // biome-ignore lint/suspicious/noConsole: Allow to use console.error here
+      console.error(
+        'Error occurred while processing listPages request:',
+        error,
+      );
+      if (isHttpError(error)) {
+        return res.status(error.status).send(error.message);
+      }
+      return res.status(500).send('An internal server error occurred.');
+    }
+  };
 };

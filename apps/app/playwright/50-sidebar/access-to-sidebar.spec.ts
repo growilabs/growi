@@ -29,9 +29,12 @@ test.describe('Access to sidebar', () => {
   test('Successfully access to custom sidebar', async ({ page }) => {
     await page.getByTestId('grw-sidebar-nav-primary-custom-sidebar').click();
     await expect(page.getByTestId('grw-sidebar-contents')).toBeVisible();
-    await expect(
-      page.locator('.grw-sidebar-content-header > h3').locator('a'),
-    ).toBeVisible();
+
+    // Check if edit_note icon is visible within the button
+    const editNoteIcon = page
+      .locator('.grw-custom-sidebar-content button .material-symbols-outlined')
+      .filter({ hasText: 'edit_note' });
+    await expect(editNoteIcon).toBeVisible();
   });
 
   test('Successfully access to GROWI Docs page', async ({ page }) => {

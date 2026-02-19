@@ -61,7 +61,7 @@ export const FixPageGrantAlert = (): JSX.Element => {
   const currentUser = useCurrentUser();
   const pageData = useCurrentPageData();
 
-  const hasParent = pageData?.parent != null ?? false;
+  const hasParent = pageData?.parent != null;
   const pageId = pageData?._id;
 
   const { data: dataIsGrantNormalized } = useSWRxCurrentGrantData(

@@ -55,6 +55,9 @@ const SendInvitationEmailButton = (props) => {
   );
 };
 
+/**
+ * @type {React.ComponentType<{ user: import('@growi/core').IUserHasId, isInvitationEmailSended: boolean, onSuccessfullySentInvitationEmail: () => void }>}
+ */
 const SendInvitationEmailButtonWrapper = withUnstatedContainers(
   SendInvitationEmailButton,
   [AdminUsersContainer],

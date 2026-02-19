@@ -1,11 +1,12 @@
+import type { IPage, IUser } from '@growi/core';
 import type { Types } from 'mongoose';
+import mongoose from 'mongoose';
 
 import { Comment, CommentEvent, commentEvent } from '~/features/comment/server';
-import pageModelFactory from '~/server/models/page';
 
 import loggerFactory from '../../utils/logger';
 import type Crowi from '../crowi';
-import userModelFactory from '../models/user';
+import type { PageModel } from '../models/page';
 
 // https://regex101.com/r/Ztxj2j/1
 const USERNAME_PATTERN = new RegExp(/\B@[\w@.-]+/g);
@@ -32,7 +33,7 @@ class CommentService {
     // create
     commentEvent.on(CommentEvent.CREATE, async (savedComment) => {
       try {
-        const Page = pageModelFactory(this.crowi);
+        const Page = mongoose.model<IPage, PageModel>('Page');
         await Page.updateCommentCount(savedComment.page);
       } catch (err) {
         logger.error(
@@ -48,7 +49,7 @@ class CommentService {
     // remove
     commentEvent.on(CommentEvent.DELETE, async (removedComment) => {
       try {
-        const Page = pageModelFactory(this.crowi);
+        const Page = mongoose.model<IPage, PageModel>('Page');
         await Page.updateCommentCount(removedComment.page);
       } catch (err) {
         logger.error('Error occurred while updating the comment count:\n', err);
@@ -59,7 +60,7 @@ class CommentService {
   getMentionedUsers = async (
     commentId: Types.ObjectId,
   ): Promise<Types.ObjectId[]> => {
-    const User = userModelFactory(this.crowi);
+    const User = mongoose.model<IUser>('User');
 
     // Get comment by comment ID
     const commentData = await Comment.findOne({ _id: commentId });
@@ -84,13 +85,13 @@ class CommentService {
     ];
 
     // Get mentioned users ID
-    const mentionedUserIDs = await User.find({
+    const mentionedUsers = await User.find({
       username: { $in: mentionedUsernames },
-    });
-    return mentionedUserIDs?.map((user) => {
+    }).select('_id');
+    return mentionedUsers.map((user) => {
       return user._id;
     });
   };
 }
 
-module.exports = CommentService;
+export default CommentService;

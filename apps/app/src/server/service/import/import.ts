@@ -1,5 +1,8 @@
+import fs from 'node:fs';
+import type { EventEmitter } from 'node:stream';
+import { Transform, Writable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import gc from 'expose-gc/function';
-import fs from 'fs';
 import type {
   BulkOperationBase,
   BulkWriteResult,
@@ -9,10 +12,7 @@ import type {
 } from 'mongodb';
 import type { Document } from 'mongoose';
 import mongoose from 'mongoose';
-import path from 'path';
-import type { EventEmitter } from 'stream';
-import { Transform, Writable } from 'stream';
-import { pipeline } from 'stream/promises';
+import path from 'pathe';
 import unzipStream from 'unzip-stream';
 
 import { ImportMode } from '~/models/admin/import-mode';
@@ -31,7 +31,7 @@ import { getModelFromCollectionName } from './get-model-from-collection-name';
 import type { ImportSettings, OverwriteParams } from './import-settings';
 import { keepOriginal } from './overwrite-function';
 
-import JSONStream from 'JSONStream';
+import * as JSONStream from 'JSONStream';
 
 const logger = loggerFactory('growi:services:ImportService');
 
@@ -63,7 +63,7 @@ export class ImportService {
     this.crowi = crowi;
     this.growiBridgeService = crowi.growiBridgeService;
 
-    this.adminEvent = crowi.event('admin');
+    this.adminEvent = crowi.events.admin;
 
     this.currentProgressingStatus = null;
   }

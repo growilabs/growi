@@ -4,7 +4,7 @@ import type { NextFunction, Response } from 'express';
 import loggerFactory from '../../utils/logger';
 import { configManager } from '../service/config-manager';
 import isSimpleRequest from '../util/is-simple-request';
-import type { AccessTokenParserReq } from './access-token-parser/interfaces';
+import type { AccessTokenParserReq } from './access-token-parser';
 
 const logger = loggerFactory('growi:middleware:certify-origin');
 

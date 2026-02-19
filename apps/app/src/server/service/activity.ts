@@ -37,7 +37,7 @@ class ActivityService {
 
   constructor(crowi: Crowi) {
     this.crowi = crowi;
-    this.activityEvent = crowi.event('activity');
+    this.activityEvent = crowi.events.activity;
 
     this.getAvailableActions = this.getAvailableActions.bind(this);
     this.shoudUpdateActivity = this.shoudUpdateActivity.bind(this);
@@ -209,4 +209,4 @@ class ActivityService {
   };
 }
 
-module.exports = ActivityService;
+export default ActivityService;

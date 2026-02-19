@@ -17,8 +17,9 @@ function parseSubScope(
 
   for (const action of actions) {
     if (typeof subObjForActions[action] === 'string') {
+      // Safe: parseScopes only accepts SCOPE constant which contains valid Scope strings
       result[`${action.toLowerCase()}:${parentKey.toLowerCase()}`] =
-        subObjForActions[action];
+        subObjForActions[action] as Scope;
       subObjForActions[action] = undefined;
     }
   }
@@ -38,6 +39,7 @@ function parseSubScope(
       for (const action of actions) {
         const val = subObjForActions[action]?.[ck];
         if (typeof val === 'string') {
+          // Safe: parseScopes only accepts SCOPE constant which contains valid Scope strings
           result[`${action.toLowerCase()}:${parentKey.toLowerCase()}:all`] =
             val as Scope;
         }
@@ -87,6 +89,7 @@ export function parseScopes({
       for (const action of actions) {
         const val = scopes[action]?.[key];
         if (typeof val === 'string') {
+          // Safe: parseScopes only accepts SCOPE constant which contains valid Scope strings
           allObj[`${action.toLowerCase()}:all`] = val as Scope;
         }
       }

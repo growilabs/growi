@@ -6,6 +6,7 @@ type Props = {
   isOpen: boolean;
   includeUserPages: boolean;
   includeTrashPages: boolean;
+  disableUserPages: boolean;
   onClose?: () => void;
   onIncludeUserPagesSwitched?: (isChecked: boolean) => void;
   onIncludeTrashPagesSwitched?: (isChecked: boolean) => void;
@@ -18,6 +19,7 @@ export const SearchOptionModal: FC<Props> = (props: Props) => {
     isOpen,
     includeUserPages,
     includeTrashPages,
+    disableUserPages,
     onClose,
     onIncludeUserPagesSwitched,
     onIncludeTrashPagesSwitched,
@@ -31,9 +33,9 @@ export const SearchOptionModal: FC<Props> = (props: Props) => {
   }, [onClose]);
 
   const includeUserPagesChangeHandler = useCallback(
-    (isChecked: boolean) => {
+    (e: React.ChangeEvent<HTMLInputElement>) => {
       if (onIncludeUserPagesSwitched != null) {
-        onIncludeUserPagesSwitched(isChecked);
+        onIncludeUserPagesSwitched(e.target.checked);
       }
     },
     [onIncludeUserPagesSwitched],
@@ -55,20 +57,19 @@ export const SearchOptionModal: FC<Props> = (props: Props) => {
       </ModalHeader>
       <ModalBody>
         <div className="d-flex p-2">
-          <div className="me-3">
-            <label className="form-label px-3 py-2 mb-0 d-flex align-items-center">
-              <input
-                className="me-2"
-                type="checkbox"
-                onChange={useCallback(
-                  (e) => includeUserPagesChangeHandler(e.target.checked),
-                  [includeUserPagesChangeHandler],
-                )}
-                checked={includeUserPages}
-              />
-              {t('Include Subordinated Target Page', { target: '/user' })}
-            </label>
-          </div>
+          {!disableUserPages && (
+            <div className="me-3">
+              <label className="form-label px-3 py-2 mb-0 d-flex align-items-center">
+                <input
+                  className="me-2"
+                  type="checkbox"
+                  onChange={includeUserPagesChangeHandler}
+                  checked={includeUserPages}
+                />
+                {t('Include Subordinated Target Page', { target: '/user' })}
+              </label>
+            </div>
+          )}
           <div className="">
             <label className="form-label px-3 py-2 mb-0 d-flex align-items-center">
               <input

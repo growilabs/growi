@@ -56,6 +56,11 @@
       "enable_force_delete_user_homepage_on_user_deletion": "When you delete a user, the user's homepage and all its sub pages will be completely deleted",
       "desc": "You will be able to delete a deleted user's homepage."
     },
+    "disable_user_pages": {
+      "disable_user_pages": "Disable user pages",
+      "disable_user_pages_label": "Disable user pages",
+      "desc": "By disabling user pages, creating, viewing, editing, and duplicating all user pages will be disabled.</br>Additionally, user pages will not appear in page trees, recent changes, or search results."
+    },
     "session": "Session",
     "max_age": "Max age (msec)",
     "max_age_desc": "Specifies the number (in milliseconds) to expire users session.<br>Default: 2592000000 (30days)",
@@ -371,6 +376,15 @@
     "transmission_method": "Transmission Method",
     "smtp_label": "SMTP",
     "ses_label": "SES(AWS)",
+    "oauth2_label": "OAuth 2.0 (Google Workspace)",
+    "oauth2_description": "Configure OAuth 2.0 authentication for sending emails using Google Workspace. You need to create OAuth 2.0 credentials in Google Cloud Console and obtain a refresh token.",
+    "oauth2_user": "Email Address",
+    "oauth2_user_help": "The email address of the authorized Google account",
+    "oauth2_client_id": "Client ID",
+    "oauth2_client_secret": "Client Secret",
+    "oauth2_refresh_token": "Refresh Token",
+    "oauth2_refresh_token_help": "The refresh token obtained from OAuth 2.0 authorization flow",
+    "placeholder_leave_blank": "Leave blank to keep existing value",
     "send_test_email": "Send a test-email",
     "success_to_send_test_email": "Success to send a test-email",
     "smtp_settings": "SMTP settings",

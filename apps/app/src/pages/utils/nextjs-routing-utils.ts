@@ -27,7 +27,7 @@ export type NextjsRoutingType =
 
 export const detectNextjsRoutingType = (
   context: GetServerSidePropsContext,
-  previousRoutingPage: string,
+  previousRoutingPage?: string,
 ): NextjsRoutingType => {
   const isCSR = !!context.req.headers['x-nextjs-data'];
 
@@ -38,7 +38,11 @@ export const detectNextjsRoutingType = (
   // Read cookie from server-side context
   const nextjsRoutingPage = context.req.cookies[COOKIE_NAME];
 
-  if (nextjsRoutingPage != null && nextjsRoutingPage === previousRoutingPage) {
+  if (
+    nextjsRoutingPage != null &&
+    previousRoutingPage != null &&
+    nextjsRoutingPage === previousRoutingPage
+  ) {
     return NextjsRoutingType.SAME_ROUTE;
   }
 

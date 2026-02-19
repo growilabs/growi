@@ -12,6 +12,7 @@ import SortControl from './SortControl';
 type Props = {
   isEnableSort: boolean;
   isEnableFilter: boolean;
+  disableUserPages: boolean;
   initialSearchConditions: Partial<ISearchConditions>;
 
   onSearchInvoked?: (
@@ -29,6 +30,7 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
   const {
     isEnableSort,
     isEnableFilter,
+    disableUserPages,
     initialSearchConditions,
     onSearchInvoked,
     extraControls,
@@ -152,25 +154,29 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
               </button>
             </div>
             <div className="d-none d-lg-flex align-items-center search-control-include-options">
-              <div className="px-2 py-1">
-                <div className="form-check form-check-succsess">
-                  <input
-                    className="form-check-input me-2"
-                    type="checkbox"
-                    id="flexCheckDefault"
-                    defaultChecked={includeUserPages}
-                    onChange={(e) =>
-                      changeIncludeUserPagesHandler(e.target.checked)
-                    }
-                  />
-                  <label
-                    className="form-label form-check-label mb-0 d-flex align-items-center text-secondary with-no-font-weight"
-                    htmlFor="flexCheckDefault"
-                  >
-                    {t('Include Subordinated Target Page', { target: '/user' })}
-                  </label>
+              {disableUserPages === false && (
+                <div className="px-2 py-1">
+                  <div className="form-check form-check-succsess">
+                    <input
+                      className="form-check-input me-2"
+                      type="checkbox"
+                      id="flexCheckDefault"
+                      defaultChecked={includeUserPages}
+                      onChange={(e) =>
+                        changeIncludeUserPagesHandler(e.target.checked)
+                      }
+                    />
+                    <label
+                      className="form-label form-check-label mb-0 d-flex align-items-center text-secondary with-no-font-weight"
+                      htmlFor="flexCheckDefault"
+                    >
+                      {t('Include Subordinated Target Page', {
+                        target: '/user',
+                      })}
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="px-2 py-1">
                 <div className="form-check form-check-succsess">
                   <input
@@ -206,6 +212,7 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
       <SearchOptionModalLazyLoaded
         isOpen={isFileterOptionModalShown || false}
         onClose={() => setIsFileterOptionModalShown(false)}
+        disableUserPages={disableUserPages}
         includeUserPages={includeUserPages}
         includeTrashPages={includeTrashPages}
         onIncludeUserPagesSwitched={setIncludeUserPages}

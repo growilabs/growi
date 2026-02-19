@@ -13,8 +13,8 @@
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
     "serve": "vite",
-    "lint:js": "biome check",
-    "lint:typecheck": "vue-tsc --noEmit",
+    "lint:biome": "biome check",
+    "lint:typecheck": "tsgo --noEmit",
     "lint": "npm-run-all -p lint:*"
   },
   "dependencies": {

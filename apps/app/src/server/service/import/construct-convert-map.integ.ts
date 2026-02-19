@@ -6,17 +6,18 @@ import {
   setupIndependentModels,
   setupModelsDependentOnCrowi,
 } from '~/server/crowi/setup-models';
+import type UserEvent from '~/server/events/user';
 
 import { constructConvertMap } from './construct-convert-map';
 
 describe('constructConvertMap', () => {
   beforeAll(async () => {
-    const events = {
-      page: mock<EventEmitter>(),
-      user: mock<EventEmitter>(),
-    };
+    // PageEvent is a JS file with type 'any' in Crowi interface
     const crowiMock = mock<Crowi>({
-      event: (name: string) => events[name],
+      events: {
+        page: mock<EventEmitter>(),
+        user: mock<UserEvent>(),
+      },
     });
 
     await setupModelsDependentOnCrowi(crowiMock);

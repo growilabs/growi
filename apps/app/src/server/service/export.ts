@@ -58,7 +58,7 @@ class ExportService {
     this.growiBridgeService = crowi.growiBridgeService;
     this.baseDir = path.join(crowi.tmpDir, 'downloads');
 
-    this.adminEvent = crowi.event('admin');
+    this.adminEvent = crowi.events.admin;
 
     this.currentProgressingStatus = null;
   }

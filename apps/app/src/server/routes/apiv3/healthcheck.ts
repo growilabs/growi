@@ -2,6 +2,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 import nocache from 'nocache';
 
+import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
 import { Config } from '../../models/config';
@@ -75,8 +76,7 @@ const router = express.Router();
  *                format: float
  *                example: 66.66666666666666
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+module.exports = (crowi: Crowi) => {
   async function checkMongo(errors, info) {
     try {
       await Config.findOne({});

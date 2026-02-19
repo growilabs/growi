@@ -8,6 +8,7 @@ import { Types } from 'mongoose';
 
 import type { IActivity } from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
@@ -143,9 +144,7 @@ type ActivityPaginationResult = PaginateResult<IActivity>;
  */
 
 module.exports = (crowi: Crowi): Router => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(
-    crowi,
-  );
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   const router = express.Router();
 

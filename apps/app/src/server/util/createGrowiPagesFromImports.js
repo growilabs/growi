@@ -4,7 +4,7 @@ const { isCreatablePage } = pagePathUtils;
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const Page = crowi.model('Page');
+  const { Page } = crowi.models;
 
   /**
    * Create posts from imported data
