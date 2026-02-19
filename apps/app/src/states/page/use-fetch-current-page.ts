@@ -136,23 +136,28 @@ const buildApiParams = ({
     shareLinkId?: string;
   } = {};
 
-  if (shareLinkId != null) {
+  if (shareLinkId != null && shareLinkId.length > 0) {
     params.shareLinkId = shareLinkId;
   }
   if (revisionId != null) {
     params.revisionId = revisionId;
   }
 
-  // priority A: pageId > permalink > path
+  // priority A: fetchPageArgs.pageId
   if (fetchPageArgs?.pageId != null) {
     params.pageId = fetchPageArgs.pageId;
+  }
+  // priority B: currentPageId for share link (required by certifySharedPage middleware)
+  else if (shareLinkId != null && currentPageId != null) {
+    params.pageId = currentPageId;
   } else if (decodedPathname != null) {
+    // priority C: permalink > path
     if (isPermalink(decodedPathname)) {
       params.pageId = removeHeadingSlash(decodedPathname);
     } else {
       params.path = decodedPathname;
     }
-    // priority B: currentPageId > permalink(by location) > path(by location)
+    // priority D: currentPageId > permalink(by location) > path(by location)
   } else if (currentPageId != null) {
     params.pageId = currentPageId;
   } else if (isClient()) {
