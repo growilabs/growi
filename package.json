@@ -95,7 +95,7 @@
     "@lykmapipo/common>flat": "flat v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
     "@lykmapipo/common>mime": "mime v4 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
     "@lykmapipo/common>parse-json": "parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
-    "p-map": "p-map v5+ is provided only by ESM, but @mastra/core and del require CommonJS version",
+    "p-map": "p-map v5+ is provided only by ESM, but @mastra/core requires CommonJS version",
     "uuid": "uuid v11+ is provided only by ESM, but @mastra/mongodb requires CommonJS version"
   },
   "pnpm": {
