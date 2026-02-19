@@ -1,10 +1,12 @@
 {
   "Show": "Afficher",
+  "View": "Lecture",
+  "Edit": "Écriture",
   "Hide": "Cacher",
   "Add": "Ajouter",
   "Insert": "Insérer",
   "Reset": "Réinitialiser",
-  "Sign out": "Se déconnecter",
+  "Sign out": "Déconnexion",
   "New": "Nouveau",
   "Delete": "Supprimer",
   "meta": {

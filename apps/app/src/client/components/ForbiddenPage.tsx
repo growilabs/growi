@@ -16,7 +16,7 @@ const ForbiddenPage = React.memo((props: Props): JSX.Element => {
             <span className="material-symbols-outlined" aria-hidden="true">
               block
             </span>
-            Forbidden
+            {t('Forbidden')}
           </h2>
         </div>
       </div>
