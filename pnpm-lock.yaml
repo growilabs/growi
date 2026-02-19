@@ -9,7 +9,7 @@ overrides:
   '@lykmapipo/common>mime': 3.0.0
   '@lykmapipo/common>parse-json': 5.2.0
   '@mastra/core>p-map': 4.0.0
-  '@mastra/mongodb>uuid': 9.0.1
+  '@mastra/mongodb>uuid': 11.1.0
 
 importers:
 
@@ -11543,6 +11543,7 @@ packages:
     resolution: {integrity: sha512-Quz3MvAwHxVYNXsOByL7xI5EB2WYOeFswqaHIA3qOK3isRWTxiplBEocmmru6XmxDB2L7jDNYtYA4FyimoAFEw==}
     engines: {node: '>=8.17.0'}
     hasBin: true
+    bundledDependencies: []
 
   jsonfile@3.0.1:
     resolution: {integrity: sha512-oBko6ZHlubVB5mRFkur5vgYR1UyqX+S6Y/oCfLhqNdcc2fYFlDpIoNc7AfKS1KOGcnNAkvsr0grLck9ANM815w==}
@@ -11790,7 +11791,6 @@ packages:
 
   libsql@0.5.22:
     resolution: {integrity: sha512-NscWthMQt7fpU8lqd7LXMvT9pi+KhhmTHAJWUB/Lj6MWa0MKFv0F2V4C6WKKpjCVZl0VwcDz4nOI3CyaT1DDiA==}
-    cpu: [x64, arm64, wasm32, arm]
     os: [darwin, linux, win32]
 
   lightningcss-android-arm64@1.30.2:
@@ -20122,7 +20122,7 @@ snapshots:
       '@types/mongodb': 4.0.7(@aws-sdk/client-sso-oidc@3.600.0)
       cloudflare: 4.5.0(encoding@0.1.13)
       mongodb: 7.1.0
-      uuid: 9.0.1
+      uuid: 11.1.0
     transitivePeerDependencies:
       - '@aws-sdk/client-sso-oidc'
       - '@aws-sdk/credential-providers'

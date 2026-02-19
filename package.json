@@ -96,7 +96,7 @@
     "@lykmapipo/common>mime": "mime v4 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
     "@lykmapipo/common>parse-json": "parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
     "p-map": "p-map v5+ is provided only by ESM, but @mastra/core requires CommonJS version",
-    "uuid": "uuid v11+ is provided only by ESM, but @mastra/mongodb requires CommonJS version"
+    "uuid": "uuid v12+ is provided only by ESM, but @mastra/mongodb requires CommonJS version"
   },
   "pnpm": {
     "overrides": {
@@ -104,7 +104,7 @@
       "@lykmapipo/common>mime": "3.0.0",
       "@lykmapipo/common>parse-json": "5.2.0",
       "@mastra/core>p-map": "4.0.0",
-      "@mastra/mongodb>uuid": "9.0.1"
+      "@mastra/mongodb>uuid": "11.1.0"
     },
     "ignoredBuiltDependencies": [
       "@swc/core",
