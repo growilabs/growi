@@ -1132,6 +1132,36 @@
       "all_important": "このテキストはすべて\n重要です",
       "sub_text": "下付き",
       "sup_text": "上付き"
+    },
+    "layout": {
+      "copy_done": "コピーしました！",
+      "header": "ヘッダー",
+      "header_text": "見出し",
+      "list": "箇条書きリスト",
+      "list_text": "箇条書きリストです",
+      "ordered_list": "番号付きリスト",
+      "ordered_list_text": "番号付きリストです",
+      "checkbox": "チェックボックス",
+      "task": "タスク",
+      "quote": "引用",
+      "quote_text": "引用",
+      "multi_quote": "多重引用",
+      "hr": "水平線",
+      "br": "改行",
+      "br_code": "スペース2つ入れると  改行\nできます",
+      "br_preview_1": "スペース2つ入れると",
+      "br_preview_2": "改行できます",
+      "code_block": "コードブロック",
+      "code_block_text": "ここにコードを追加",
+      "table": "表",
+      "left": "左揃え",
+      "right": "右揃え",
+      "center": "中央揃え",
+      "row_text": "この列は",
+      "row_display": "で表示されます",
+      "footnote": "脚注",
+      "footnote_label": "脚注つきテキスト",
+      "footnote_desc": "注記はこのように書きます"
     }
   }
 }

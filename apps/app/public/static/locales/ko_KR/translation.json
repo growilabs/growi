@@ -1058,6 +1058,36 @@
       "all_important": "이 텍스트는 모두\n중요합니다",
       "sub_text": "아래 첨자",
       "sup_text": "위 첨자"
+    },
+    "layout": {
+      "copy_done": "복사되었습니다!",
+      "header": "헤더",
+      "header_text": "제목",
+      "list": "글머리 기호 목록",
+      "list_text": "목록 항목입니다",
+      "ordered_list": "번호 매기기 목록",
+      "ordered_list_text": "번호 항목입니다",
+      "checkbox": "체크박스",
+      "task": "할 일 ",
+      "quote": "인용구",
+      "quote_text": "인용",
+      "multi_quote": "중첩 인용",
+      "hr": "가로줄",
+      "br": "줄바꿈",
+      "br_code": "스페이스를 두 번 입력하면  줄바꿈을\n할 수 있습니다",
+      "br_preview_1": "스페이스를 두 번 입력하면",
+      "br_preview_2": "줄바꿈을 할 수 있습니다",
+      "code_block": "코드 블록",
+      "code_block_text": "여기에 코드를 추가하세요",
+      "table": "표",
+      "left": "왼쪽 정렬",
+      "right": "오른쪽 정렬",
+      "center": "가운데 정렬",
+      "row_text": "이 열은",
+      "row_display": "됩니다",
+      "footnote": "각주",
+      "footnote_label": "각주가 있는 텍스트",
+      "footnote_desc": "주석은 이와 같이 작성합니다"
     }
   }
 }
