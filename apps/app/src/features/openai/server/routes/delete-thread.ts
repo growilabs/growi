@@ -68,8 +68,10 @@ export const deleteThreadFactory = (crowi: Crowi): RequestHandler[] => {
       }
 
       try {
-        const deletedThreadRelation =
-          await openaiService.deleteThread(threadRelationId);
+        const deletedThreadRelation = await openaiService.deleteThread(
+          threadRelationId,
+          user._id,
+        );
         return res.apiv3({ deletedThreadRelation });
       } catch (err) {
         logger.error(err);

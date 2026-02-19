@@ -128,7 +128,10 @@ export const postMessageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         return res.apiv3Err(new ErrorV3('AI assistant not found'), 404);
       }
 
-      const threadRelation = await ThreadRelationModel.findOne({ threadId });
+      const threadRelation = await ThreadRelationModel.findOne({
+        threadId,
+        userId: user._id,
+      });
       if (threadRelation == null) {
         return res.apiv3Err(new ErrorV3('ThreadRelation not found'), 404);
       }

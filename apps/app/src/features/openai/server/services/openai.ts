@@ -98,8 +98,12 @@ export interface IOpenaiService {
   ): Promise<ThreadRelationDocument>;
   getThreadsByAiAssistantId(
     aiAssistantId: string,
+    userId: string,
   ): Promise<ThreadRelationDocument[]>;
-  deleteThread(threadRelationId: string): Promise<ThreadRelationDocument>;
+  deleteThread(
+    threadRelationId: string,
+    userId: string,
+  ): Promise<ThreadRelationDocument>;
   deleteExpiredThreads(limit: number, apiCallInterval: number): Promise<void>; // for CronJob
   deleteObsoletedVectorStoreRelations(): Promise<void>; // for CronJob
   deleteVectorStore(vectorStoreRelationId: string): Promise<void>;
@@ -274,7 +278,10 @@ class OpenaiService implements IOpenaiService {
     aiAssistantId: string,
     vectorStoreId: string,
   ): Promise<void> {
-    const threadRelations = await this.getThreadsByAiAssistantId(aiAssistantId);
+    const threadRelations = await ThreadRelationModel.find({
+      aiAssistant: aiAssistantId,
+      type: ThreadType.KNOWLEDGE,
+    }).sort({ updatedAt: -1 });
     for await (const threadRelation of threadRelations) {
       try {
         const updatedThreadResponse = await this.client.updateThread(
@@ -290,10 +297,12 @@ class OpenaiService implements IOpenaiService {
 
   async getThreadsByAiAssistantId(
     aiAssistantId: string,
+    userId: string,
     type: ThreadType = ThreadType.KNOWLEDGE,
   ): Promise<ThreadRelationDocument[]> {
     const threadRelations = await ThreadRelationModel.find({
       aiAssistant: aiAssistantId,
+      userId,
       type,
     }).sort({ updatedAt: -1 });
     return threadRelations;
@@ -301,8 +310,12 @@ class OpenaiService implements IOpenaiService {
 
   async deleteThread(
     threadRelationId: string,
+    userId: string,
   ): Promise<ThreadRelationDocument> {
-    const threadRelation = await ThreadRelationModel.findById(threadRelationId);
+    const threadRelation = await ThreadRelationModel.findOne({
+      _id: threadRelationId,
+      userId,
+    });
     if (threadRelation == null) {
       throw createError(404, 'ThreadRelation document does not exist');
     }

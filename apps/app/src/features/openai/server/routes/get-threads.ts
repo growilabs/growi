@@ -70,8 +70,10 @@ export const getThreadsFactory = (crowi: Crowi): RequestHandler[] => {
           );
         }
 
-        const threads =
-          await openaiService.getThreadsByAiAssistantId(aiAssistantId);
+        const threads = await openaiService.getThreadsByAiAssistantId(
+          aiAssistantId,
+          user._id,
+        );
 
         return res.apiv3({ threads });
       } catch (err) {
