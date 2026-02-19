@@ -44,7 +44,7 @@
   - _Requirements: 5.1, 5.2_
 
 - [ ] 4. Search and category suggestion generators
-- [ ] 4.1 (P) Implement search-based path suggestion
+- [x] 4.1 (P) Implement search-based path suggestion
   - Implement a function that accepts extracted keywords and searches for related existing pages using the search service
   - Select the most relevant result and extract its parent directory as the suggested save location
   - Generate a description by listing titles of up to 3 top-scoring related pages found under the suggested directory — purely mechanical, no AI
