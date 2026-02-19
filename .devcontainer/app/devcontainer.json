@@ -9,7 +9,8 @@
   "features": {
     "ghcr.io/devcontainers/features/node:1": {
       "version": "20.18.3"
-    }
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
   },
 
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
@@ -30,6 +31,8 @@
         "editorconfig.editorconfig",
         "shinnn.stylelint",
         "stylelint.vscode-stylelint",
+        // markdown
+        "bierner.markdown-mermaid",
         // TypeScript (Native Preview)
         "typescriptteam.native-preview",
         // Test

@@ -1,14 +1,8 @@
 # Project Structure
 
-@.claude/skills/monorepo-overview/SKILL.md
+See: `.claude/skills/monorepo-overview/SKILL.md` (auto-loaded by Claude Code)
 
 ## cc-sdd Specific Notes
 
-### Specification Storage
-- All specifications are stored in `.kiro/specs/{feature-name}/`
-- Each spec contains: `spec.json`, `requirements.md`, `design.md`, `tasks.md`
-
-### Feature Placement
-When implementing new features via `/kiro:spec-impl`:
-- Create feature modules in `src/features/{feature-name}/`
-- Follow the server-client separation pattern documented in the skill above
+Currently, there are no additional instructions specific to Kiro.
+If instructions specific to the cc-sdd workflow are needed in the future, add them to this section.

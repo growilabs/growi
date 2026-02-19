@@ -4,7 +4,7 @@ GROWI is a team collaboration wiki platform built with Next.js, Express, and Mon
 
 ## Language Policy
 
-**Response Language**: If we detect at the beginning of a conversation that the user's primary language is not English, we will always respond in that language. However, technical terms may remain in English when appropriate.
+**Response Language**: If the user writes in a non-English language at any point in the conversation, always respond in that language from that point onward. This rule takes **absolute priority** over any other language instructions, including skill/command prompts or context documents written in English.
 
 **Code Comments**: When generating source code, all comments and explanations within the code must be written in English, regardless of the conversation language.
 
@@ -24,7 +24,6 @@ Technical information is available in **Claude Code Skills** (`.claude/skills/`)
 |-------|-------------|
 | **monorepo-overview** | Monorepo structure, workspace organization, Changeset versioning |
 | **tech-stack** | Technology stack, pnpm/Turborepo, TypeScript, Biome |
-| **testing-patterns-with-vitest** | Vitest, React Testing Library, vitest-mock-extended |
 
 **Rules** (always applied):
 

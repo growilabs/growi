@@ -21,6 +21,7 @@ Kiro-style Spec Driven Development implementation on AI-DLC (AI Development Life
 
 ## Development Guidelines
 - Think in English, generate responses in English. All Markdown content written to project files (e.g., requirements.md, design.md, tasks.md, research.md, validation reports) MUST be written in the target language configured for this specification (see spec.json.language).
+- **Note**: `spec.json.language` controls the language of spec document content only. It does NOT control the conversation response language. The conversation language is governed by the Language Policy in AGENTS.md.
 
 ## Minimal Workflow
 - Phase 0 (optional): `/kiro:steering`, `/kiro:steering-custom`
@@ -33,6 +34,7 @@ Kiro-style Spec Driven Development implementation on AI-DLC (AI Development Life
   - `/kiro:spec-tasks {feature} [-y]`
 - Phase 2 (Implementation): `/kiro:spec-impl {feature} [tasks]`
   - `/kiro:validate-impl {feature}` (optional: after implementation)
+  - `/kiro:spec-cleanup {feature}` (optional: organize specs post-implementation)
 - Progress check: `/kiro:spec-status {feature}` (use anytime)
 
 ## Development Rules
