@@ -1,12 +1,26 @@
 import {
-  useState, useEffect, useLayoutEffect, type JSX, type RefObject,
+  useState, useEffect, useLayoutEffect, type JSX, type RefObject, useMemo,
 } from 'react';
+
 
 import { useEditorGuideModalStatus, useEditorGuideModalActions } from '@growi/editor/dist/states/modal/editor-guide';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 
+import { CustomNavTab } from '../../CustomNavigation/CustomNav';
+import CustomTabContent from '../../CustomNavigation/CustomTabContent';
+
+import { DecorationTab } from './contents/DecorationTab';
+import { LayoutTab } from './contents/LayoutTab';
+import { TextStyleTab } from './contents/TextStyleTab';
+
+const TAB_TYPES = ['textstyle', 'layout', 'decoration'] as const;
+type TabType = (typeof TAB_TYPES)[number];
 type Props = {
   containerRef: RefObject<HTMLDivElement | null>,
+};
+const isTabType = (key: string): key is TabType => {
+  return (TAB_TYPES as readonly string[]).includes(key);
 };
 
 /**
@@ -16,10 +30,29 @@ type Props = {
  * not the entire screen. Uses createPortal to render into document.body.
  */
 export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
+  const { t } = useTranslation();
   const { isOpened } = useEditorGuideModalStatus();
   const { close } = useEditorGuideModalActions();
   const [isShown, setIsShown] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
+
+  const [activeTab, setActiveTab] = useState<TabType>('textstyle');
+  const navTabMapping = useMemo((): Record<TabType, { i18n: string, Content: () => JSX.Element }> => {
+    return {
+      textstyle: {
+        i18n: t('editor_guide.tabs.textstyle'),
+        Content: () => <TextStyleTab />,
+      },
+      layout: {
+        i18n: t('editor_guide.tabs.layout'),
+        Content: () => <LayoutTab />,
+      },
+      decoration: {
+        i18n: t('editor_guide.tabs.decoration'),
+        Content: () => <DecorationTab />,
+      },
+    };
+  }, [t]);
 
   // Get rect on open and on resize
   useLayoutEffect(() => {
@@ -57,11 +90,23 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
               <h5 className="mb-0">Editor Guide</h5>
               <button type="button" className="btn-close" onClick={close} aria-label="Close" />
             </div>
+            <div className="mt-2 px-3">
+              <CustomNavTab
+                activeTab={activeTab}
+                navTabMapping={navTabMapping}
+                onNavSelected={(tabKey) => {
+                  if (isTabType(tabKey)) {
+                    setActiveTab(tabKey);
+                  }
+                }}
+                hideBorderBottom
+              />
+            </div>
             <div className="card-body overflow-auto">
-              <p>This is a test modal.</p>
-              <p>It appears in the center of the preview area on the right side.</p>
-              <p>The background is darkened to emphasize the modal.</p>
-              <p className="mb-0">Click the close button or the background to close.</p>
+              <CustomTabContent
+                activeTab={activeTab}
+                navTabMapping={navTabMapping}
+              />
             </div>
           </div>
         </div>

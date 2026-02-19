@@ -1077,5 +1077,33 @@
     "success-toaster": "同步最新文本",
     "skipped-toaster": "由于编辑器未激活，因此跳过同步。 请打开编辑器并重试。",
     "error-toaster": "同步最新文本失败"
+  },
+
+  "editor_guide": {
+    "title": "编辑器指南",
+    "tabs": {
+      "textstyle": "文本样式",
+      "layout": "页面布局",
+      "decoration": "装饰"
+    },
+    "textstyle": {
+      "copy_done": "已复制！",
+      "this": "这是",
+      "is": "效果",
+      "bold": "加粗",
+      "italic": "斜体",
+      "strikethrough": "删除线",
+      "inline_code": "行内代码",
+      "bold_italic": "全体加粗或斜体",
+      "emoji": "表情符号",
+      "sub_sup": "下标 / 上标",
+      "link_label": "带有标签的链接",
+      "link_docs": "GROWI 文档",
+      "link_growi": "GROWI 链接",
+      "link_sandbox": "沙盒页面在这里",
+      "all_important": "这段文字非常\n重要",
+      "sub_text": "下标",
+      "sup_text": "上标"
+    }
   }
 }
