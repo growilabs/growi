@@ -4,6 +4,7 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
+import type { IAuditLogBulkExportFilters } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import type { SupportedActionType } from '~/interfaces/activity';
 import { auditLogAvailableActionsAtom } from '~/states/server-configurations';
 
@@ -77,12 +78,8 @@ const AuditLogExportModalSubstance = ({
       .filter((v) => v[1])
       .map((v) => v[0]);
 
-    const filters: {
-      actions?: SupportedActionType[];
-      dateFrom?: Date;
-      dateTo?: Date;
-      // TODO: Add users filter after implementing username-to-userId conversion
-    } = {};
+    const filters: IAuditLogBulkExportFilters = {};
+    // TODO: Add users filter after implementing username-to-userId conversion
 
     if (selectedActionList.length > 0) {
       filters.actions = selectedActionList;

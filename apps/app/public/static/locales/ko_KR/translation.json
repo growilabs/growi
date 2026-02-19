@@ -821,6 +821,11 @@
     "started_on": "시작일",
     "file_upload_not_configured": "파일 업로드 설정이 구성되지 않았습니다."
   },
+  "audit_log_bulk_export": {
+    "download_expired": "다운로드 기간이 만료되었습니다",
+    "job_expired": "수출 프로세스가 너무 오래 걸려 취소되었습니다",
+    "no_results": "지정된 필터에 일치하는 감사 로그가 없습니다"
+  },
   "message": {
     "successfully_connected": "성공적으로 연결되었습니다!",
     "fail_to_save_access_token": "액세스 토큰 저장 실패. 다시 시도하십시오.",

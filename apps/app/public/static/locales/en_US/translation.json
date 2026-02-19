@@ -861,6 +861,11 @@
     "started_on": "Started on",
     "file_upload_not_configured": "File upload settings are not configured"
   },
+  "audit_log_bulk_export": {
+    "download_expired": "Download period has expired",
+    "job_expired": "Export process was canceled because it took too long",
+    "no_results": "No audit logs matched the specified filters"
+  },
   "message": {
     "successfully_connected": "Successfully Connected!",
     "fail_to_save_access_token": "Failed to save access_token. Please try again.",

@@ -81,6 +81,19 @@ export const useActionMsgAndIconForModelNotification = (
       actionMsg = 'export failed for';
       actionIcon = 'error';
       break;
+    case SupportedAction.ACTION_AUDIT_LOG_BULK_EXPORT_COMPLETED:
+      actionMsg = 'audit log export completed';
+      actionIcon = 'download';
+      break;
+    case SupportedAction.ACTION_AUDIT_LOG_BULK_EXPORT_FAILED:
+    case SupportedAction.ACTION_AUDIT_LOG_BULK_EXPORT_JOB_EXPIRED:
+      actionMsg = 'audit log export failed';
+      actionIcon = 'error';
+      break;
+    case SupportedAction.ACTION_AUDIT_LOG_BULK_EXPORT_NO_RESULTS:
+      actionMsg = 'audit log export had no results';
+      actionIcon = 'error';
+      break;
     default:
       actionMsg = '';
       actionIcon = '';
