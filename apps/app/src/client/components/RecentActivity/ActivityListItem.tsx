@@ -7,7 +7,7 @@ import type {
   SupportedActivityActionType,
 } from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
-import { getLocale } from '~/server/util/locale-utils';
+import { getLocale } from '~/utils/locale-utils';
 
 export const ActivityActionTranslationMap: Record<
   SupportedActivityActionType,
