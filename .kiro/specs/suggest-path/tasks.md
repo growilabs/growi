@@ -62,7 +62,7 @@
   - Include unit tests for top-level segment extraction, description generation, grant resolution, and empty-result handling
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 5.2, 6.4, 6.5_
 
-- [ ] 5. Phase 2 orchestration and integration
+- [x] 5. Phase 2 orchestration and integration
 - [x] 5.1 Wire suggestion generators into unified orchestration with graceful degradation
   - Implement the orchestration function that invokes all suggestion generators: memo (always), then keyword extraction followed by search and category generators in parallel
   - On keyword extraction or search service failure, fall back to memo-only response while logging the error
@@ -71,7 +71,7 @@
   - Include unit tests for successful multi-suggestion response, partial failures with graceful degradation, and complete Phase 2 failure falling back to memo only
   - _Requirements: 5.3, 6.1, 9.2_
 
-- [ ] 5.2 Phase 2 integration verification
+- [x] 5.2 Phase 2 integration verification
   - Verify the complete flow: content body to keyword extraction to parallel search and category suggestions to unified response with all suggestion types
   - Verify graceful degradation: when search returns no results, those suggestion types are omitted; when keyword extraction fails, memo-only response is returned
   - Verify response structure across all suggestion types: correct fields, descriptions, grant values, and trailing slashes

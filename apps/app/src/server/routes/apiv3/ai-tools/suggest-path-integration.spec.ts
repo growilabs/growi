@@ -11,6 +11,10 @@ const testState = vi.hoisted(() => ({
   aiEnabled: true,
   openaiServiceType: 'openai' as string | null,
   disableUserPages: false,
+  // Phase 2 controls
+  extractedKeywords: [] as string[],
+  extractKeywordsError: null as Error | null,
+  parentGrant: 1,
 }));
 
 const mockUser = {
@@ -71,13 +75,26 @@ vi.mock(
   }),
 );
 
-// Mock extractKeywords — return empty array so Phase 2 falls back to memo-only
+// Mock extractKeywords — configurable per test via testState
 vi.mock('./extract-keywords', () => ({
-  extractKeywords: vi.fn().mockResolvedValue([]),
+  extractKeywords: vi.fn().mockImplementation(() => {
+    if (testState.extractKeywordsError != null) {
+      return Promise.reject(testState.extractKeywordsError);
+    }
+    return Promise.resolve(testState.extractedKeywords);
+  }),
 }));
 
-describe('POST /suggest-path — Phase 1 integration', () => {
+// Mock resolveParentGrant — returns configurable grant value via testState
+vi.mock('./resolve-parent-grant', () => ({
+  resolveParentGrant: vi.fn().mockImplementation(() => {
+    return Promise.resolve(testState.parentGrant);
+  }),
+}));
+
+describe('POST /suggest-path integration', () => {
   let app: express.Application;
+  let mockSearchKeyword: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     // Reset test state to defaults
@@ -85,6 +102,11 @@ describe('POST /suggest-path — Phase 1 integration', () => {
     testState.aiEnabled = true;
     testState.openaiServiceType = 'openai';
     testState.disableUserPages = false;
+    testState.extractedKeywords = [];
+    testState.extractKeywordsError = null;
+    testState.parentGrant = 1;
+
+    mockSearchKeyword = vi.fn().mockResolvedValue([{ data: [] }, undefined]);
 
     // Setup express app with ApiV3Response methods
     app = express();
@@ -104,96 +126,309 @@ describe('POST /suggest-path — Phase 1 integration', () => {
     // Import and mount the handler factory with real middleware chain
     const { suggestPathHandlersFactory } = await import('./suggest-path');
     const mockCrowi = {
-      searchService: { searchKeyword: vi.fn() },
+      searchService: { searchKeyword: mockSearchKeyword },
     } as unknown as Crowi;
     app.post('/suggest-path', suggestPathHandlersFactory(mockCrowi));
   });
 
-  describe('valid request with authentication', () => {
-    it('should return 200 with suggestions array containing one memo suggestion', async () => {
-      const response = await request(app)
-        .post('/suggest-path')
-        .send({ body: 'Some page content about React hooks' })
-        .expect(200);
+  describe('Phase 1 — memo-only', () => {
+    describe('valid request with authentication', () => {
+      it('should return 200 with suggestions array containing one memo suggestion', async () => {
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Some page content about React hooks' })
+          .expect(200);
 
-      expect(response.body.suggestions).toBeDefined();
-      expect(Array.isArray(response.body.suggestions)).toBe(true);
-      expect(response.body.suggestions).toHaveLength(1);
-    });
+        expect(response.body.suggestions).toBeDefined();
+        expect(Array.isArray(response.body.suggestions)).toBe(true);
+        expect(response.body.suggestions).toHaveLength(1);
+      });
 
-    it('should return memo suggestion with all required fields and correct values', async () => {
-      const response = await request(app)
-        .post('/suggest-path')
-        .send({ body: 'Some page content' })
-        .expect(200);
+      it('should return memo suggestion with all required fields and correct values', async () => {
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Some page content' })
+          .expect(200);
 
-      const suggestion = response.body.suggestions[0];
-      expect(suggestion).toEqual({
-        type: 'memo',
-        path: '/user/alice/memo/',
-        label: 'Save as memo',
-        description: 'Save to your personal memo area',
-        grant: 4,
+        const suggestion = response.body.suggestions[0];
+        expect(suggestion).toEqual({
+          type: 'memo',
+          path: '/user/alice/memo/',
+          label: 'Save as memo',
+          description: 'Save to your personal memo area',
+          grant: 4,
+        });
+      });
+
+      it('should return path with trailing slash', async () => {
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Some page content' })
+          .expect(200);
+
+        expect(response.body.suggestions[0].path).toMatch(/\/$/);
+      });
+
+      it('should return grant value of 4 (GRANT_OWNER)', async () => {
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Some page content' })
+          .expect(200);
+
+        expect(response.body.suggestions[0].grant).toBe(4);
       });
     });
 
-    it('should return path with trailing slash', async () => {
-      const response = await request(app)
-        .post('/suggest-path')
-        .send({ body: 'Some page content' })
-        .expect(200);
+    describe('authentication enforcement', () => {
+      it('should return 403 when user is not authenticated', async () => {
+        testState.authenticateUser = false;
 
-      expect(response.body.suggestions[0].path).toMatch(/\/$/);
+        await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Some page content' })
+          .expect(403);
+      });
     });
 
-    it('should return grant value of 4 (GRANT_OWNER)', async () => {
-      const response = await request(app)
-        .post('/suggest-path')
-        .send({ body: 'Some page content' })
-        .expect(200);
+    describe('input validation', () => {
+      it('should return 400 when body field is missing', async () => {
+        await request(app).post('/suggest-path').send({}).expect(400);
+      });
 
-      expect(response.body.suggestions[0].grant).toBe(4);
+      it('should return 400 when body field is empty string', async () => {
+        await request(app).post('/suggest-path').send({ body: '' }).expect(400);
+      });
+    });
+
+    describe('AI service gating', () => {
+      it('should return 403 when AI is not enabled', async () => {
+        testState.aiEnabled = false;
+
+        await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Some page content' })
+          .expect(403);
+      });
+
+      it('should return 403 when openai service type is not configured', async () => {
+        testState.openaiServiceType = null;
+
+        await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Some page content' })
+          .expect(403);
+      });
     });
   });
 
-  describe('authentication enforcement', () => {
-    it('should return 403 when user is not authenticated', async () => {
-      testState.authenticateUser = false;
+  describe('Phase 2 — multi-suggestion response', () => {
+    const searchResults = [
+      { _score: 10, _source: { path: '/tech-notes/React/hooks-guide' } },
+      { _score: 8, _source: { path: '/tech-notes/React/state-management' } },
+      { _score: 5, _source: { path: '/tech-notes/React/best-practices' } },
+    ];
 
-      await request(app)
-        .post('/suggest-path')
-        .send({ body: 'Some page content' })
-        .expect(403);
+    describe('complete flow with all suggestion types', () => {
+      it('should return memo, search, and category suggestions when keywords extracted and search results found', async () => {
+        testState.extractedKeywords = ['React', 'hooks'];
+        mockSearchKeyword.mockResolvedValue([
+          { data: searchResults },
+          undefined,
+        ]);
+
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Content about React hooks and state management' })
+          .expect(200);
+
+        expect(response.body.suggestions).toHaveLength(3);
+        expect(response.body.suggestions[0].type).toBe('memo');
+        expect(response.body.suggestions[1].type).toBe('search');
+        expect(response.body.suggestions[2].type).toBe('category');
+      });
+
+      it('should return correct memo suggestion alongside Phase 2 suggestions', async () => {
+        testState.extractedKeywords = ['React', 'hooks'];
+        mockSearchKeyword.mockResolvedValue([
+          { data: searchResults },
+          undefined,
+        ]);
+
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Content about React hooks' })
+          .expect(200);
+
+        expect(response.body.suggestions[0]).toEqual({
+          type: 'memo',
+          path: '/user/alice/memo/',
+          label: 'Save as memo',
+          description: 'Save to your personal memo area',
+          grant: 4,
+        });
+      });
+
+      it('should return search suggestion with parent directory path and related page titles in description', async () => {
+        testState.extractedKeywords = ['React', 'hooks'];
+        mockSearchKeyword.mockResolvedValue([
+          { data: searchResults },
+          undefined,
+        ]);
+
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Content about React hooks' })
+          .expect(200);
+
+        const searchSuggestion = response.body.suggestions[1];
+        expect(searchSuggestion.type).toBe('search');
+        expect(searchSuggestion.path).toBe('/tech-notes/React/');
+        expect(searchSuggestion.label).toBe('Save near related pages');
+        expect(searchSuggestion.description).toBe(
+          'Related pages under this directory: hooks-guide, state-management, best-practices',
+        );
+        expect(searchSuggestion.grant).toBe(1);
+      });
+
+      it('should return category suggestion with top-level segment path and category name in description', async () => {
+        testState.extractedKeywords = ['React', 'hooks'];
+        mockSearchKeyword.mockResolvedValue([
+          { data: searchResults },
+          undefined,
+        ]);
+
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Content about React hooks' })
+          .expect(200);
+
+        const categorySuggestion = response.body.suggestions[2];
+        expect(categorySuggestion.type).toBe('category');
+        expect(categorySuggestion.path).toBe('/tech-notes/');
+        expect(categorySuggestion.label).toBe('Save under category');
+        expect(categorySuggestion.description).toBe(
+          'Top-level category: tech-notes',
+        );
+        expect(categorySuggestion.grant).toBe(1);
+      });
     });
-  });
 
-  describe('input validation', () => {
-    it('should return 400 when body field is missing', async () => {
-      await request(app).post('/suggest-path').send({}).expect(400);
+    describe('response structure verification', () => {
+      it('should have trailing slashes on all suggestion paths', async () => {
+        testState.extractedKeywords = ['React', 'hooks'];
+        mockSearchKeyword.mockResolvedValue([
+          { data: searchResults },
+          undefined,
+        ]);
+
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Content about React hooks' })
+          .expect(200);
+
+        for (const suggestion of response.body.suggestions) {
+          expect(suggestion.path).toMatch(/\/$/);
+        }
+      });
+
+      it('should include all required fields in every suggestion', async () => {
+        testState.extractedKeywords = ['React', 'hooks'];
+        mockSearchKeyword.mockResolvedValue([
+          { data: searchResults },
+          undefined,
+        ]);
+
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Content about React hooks' })
+          .expect(200);
+
+        const requiredFields = [
+          'type',
+          'path',
+          'label',
+          'description',
+          'grant',
+        ];
+        for (const suggestion of response.body.suggestions) {
+          for (const field of requiredFields) {
+            expect(suggestion).toHaveProperty(field);
+          }
+        }
+      });
+
+      it('should include grant values as numbers for all suggestion types', async () => {
+        testState.extractedKeywords = ['React', 'hooks'];
+        mockSearchKeyword.mockResolvedValue([
+          { data: searchResults },
+          undefined,
+        ]);
+
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Content about React hooks' })
+          .expect(200);
+
+        for (const suggestion of response.body.suggestions) {
+          expect(typeof suggestion.grant).toBe('number');
+        }
+      });
     });
 
-    it('should return 400 when body field is empty string', async () => {
-      await request(app).post('/suggest-path').send({ body: '' }).expect(400);
-    });
-  });
+    describe('graceful degradation', () => {
+      it('should return memo-only when keyword extraction fails', async () => {
+        testState.extractKeywordsError = new Error('AI service unavailable');
 
-  describe('AI service gating', () => {
-    it('should return 403 when AI is not enabled', async () => {
-      testState.aiEnabled = false;
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Content about React hooks' })
+          .expect(200);
 
-      await request(app)
-        .post('/suggest-path')
-        .send({ body: 'Some page content' })
-        .expect(403);
-    });
+        expect(response.body.suggestions).toHaveLength(1);
+        expect(response.body.suggestions[0].type).toBe('memo');
+      });
 
-    it('should return 403 when openai service type is not configured', async () => {
-      testState.openaiServiceType = null;
+      it('should return memo-only when keyword extraction returns empty array', async () => {
+        // testState.extractedKeywords is [] by default
 
-      await request(app)
-        .post('/suggest-path')
-        .send({ body: 'Some page content' })
-        .expect(403);
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Content about React hooks' })
+          .expect(200);
+
+        expect(response.body.suggestions).toHaveLength(1);
+        expect(response.body.suggestions[0].type).toBe('memo');
+      });
+
+      it('should omit search and category suggestions when search returns no results', async () => {
+        testState.extractedKeywords = ['React', 'hooks'];
+        mockSearchKeyword.mockResolvedValue([{ data: [] }, undefined]);
+
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Content about React hooks' })
+          .expect(200);
+
+        expect(response.body.suggestions).toHaveLength(1);
+        expect(response.body.suggestions[0].type).toBe('memo');
+      });
+
+      it('should return correct memo structure even when Phase 2 degrades', async () => {
+        testState.extractKeywordsError = new Error('AI service unavailable');
+
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: 'Content about React hooks' })
+          .expect(200);
+
+        expect(response.body.suggestions[0]).toEqual({
+          type: 'memo',
+          path: '/user/alice/memo/',
+          label: 'Save as memo',
+          description: 'Save to your personal memo area',
+          grant: 4,
+        });
+      });
     });
   });
 });
