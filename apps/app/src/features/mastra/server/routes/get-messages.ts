@@ -61,7 +61,7 @@ export const getMessagesHandlersFactory: GetMessagesHandlersFactory = (
         // TODO: Pagination
         const messages = await memory.recall({
           threadId,
-          perPage: false,
+          resourceId: req.user._id.toString(),
         });
 
         return res.apiv3({ messages });
