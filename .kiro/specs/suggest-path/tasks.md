@@ -43,7 +43,7 @@
   - Include unit tests for successful extraction, empty results, and failure scenarios
   - _Requirements: 5.1, 5.2_
 
-- [ ] 4. Search and category suggestion generators
+- [x] 4. Search and category suggestion generators
 - [x] 4.1 (P) Implement search-based path suggestion
   - Implement a function that accepts extracted keywords and searches for related existing pages using the search service
   - Select the most relevant result and extract its parent directory as the suggested save location
@@ -53,7 +53,7 @@
   - Include unit tests for result selection, parent directory extraction, description generation, grant resolution, and empty-result handling
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 5.2, 6.3, 6.5_
 
-- [ ] 4.2 (P) Implement category-based path suggestion
+- [x] 4.2 (P) Implement category-based path suggestion
   - Implement a function that accepts extracted keywords and searches for matching pages scoped to top-level directories
   - Extract the top-level path segment from the most relevant result as the suggested category directory
   - Generate a description from the top-level segment name — purely mechanical, no AI
