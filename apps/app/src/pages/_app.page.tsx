@@ -27,6 +27,7 @@ import { registerTransformerForObjectId } from './utils/objectid-transformer';
 
 import '~/styles/prebuilt/vendor.css';
 import '~/styles/style-app.scss';
+import '~/styles/tailwind.css';
 
 // register custom serializer
 registerTransformerForObjectId();
