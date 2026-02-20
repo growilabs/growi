@@ -94,7 +94,7 @@ const optimizePackageImports = [
   '@growi/ui',
 ];
 
-module.exports = async (phase) => {
+module.exports = (phase) => {
   const { i18n, localePath } = require('./config/next-i18next.config');
 
   /** @type {import('next').NextConfig} */
@@ -150,6 +150,14 @@ module.exports = async (phase) => {
       if (!options.isServer && options.dev) {
         const { I18NextHMRPlugin } = require('i18next-hmr/webpack');
         config.plugins.push(new I18NextHMRPlugin({ localesDir: localePath }));
+      }
+
+      // Log eager vs lazy module counts for dev compilation analysis
+      if (!options.isServer && options.dev) {
+        const {
+          createChunkModuleStatsPlugin,
+        } = require('./src/utils/next.config.utils');
+        config.plugins.push(createChunkModuleStatsPlugin());
       }
 
       return config;

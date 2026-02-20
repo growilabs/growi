@@ -51,6 +51,39 @@ exports.listScopedPackages = (scopes, opts = defaultOpts) => {
 /**
  * @param prefixes {string[]}
  */
+/**
+ * Webpack plugin that logs eager (initial) vs lazy (async-only) module counts.
+ * Attach to client-side dev builds only.
+ */
+exports.createChunkModuleStatsPlugin = () => ({
+  apply(compiler) {
+    compiler.hooks.done.tap('ChunkModuleStatsPlugin', (stats) => {
+      const { compilation } = stats;
+      const initialModuleIds = new Set();
+      const asyncModuleIds = new Set();
+
+      for (const chunk of compilation.chunks) {
+        const target = chunk.canBeInitial() ? initialModuleIds : asyncModuleIds;
+        for (const module of compilation.chunkGraph.getChunkModulesIterable(
+          chunk,
+        )) {
+          target.add(module.identifier());
+        }
+      }
+
+      // Modules that appear ONLY in async chunks
+      const asyncOnlyCount = [...asyncModuleIds].filter(
+        (id) => !initialModuleIds.has(id),
+      ).length;
+
+      // biome-ignore lint/suspicious/noConsole: Dev-only module stats for compilation analysis
+      console.log(
+        `[ChunkModuleStats] initial: ${initialModuleIds.size}, async-only: ${asyncOnlyCount}, total: ${compilation.modules.size}`,
+      );
+    });
+  },
+});
+
 exports.listPrefixedPackages = (prefixes, opts = defaultOpts) => {
   /** @type {string[]} */
   const prefixedPackages = [];
