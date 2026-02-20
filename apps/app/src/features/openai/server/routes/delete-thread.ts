@@ -14,6 +14,7 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 
 import type { IApiv3DeleteThreadParams } from '../../interfaces/thread-relation';
+import ThreadRelationModel from '../models/thread-relation';
 import { getOpenaiService } from '../services/openai';
 import { certifyAiService } from './middlewares/certify-ai-service';
 
@@ -68,10 +69,16 @@ export const deleteThreadFactory = (crowi: Crowi): RequestHandler[] => {
       }
 
       try {
-        const deletedThreadRelation = await openaiService.deleteThread(
-          threadRelationId,
-          user._id,
-        );
+        const threadRelation = await ThreadRelationModel.findOne({
+          _id: threadRelationId,
+          userId: user._id,
+        });
+        if (threadRelation == null) {
+          return res.apiv3Err(new ErrorV3('Thread not found'), 404);
+        }
+
+        const deletedThreadRelation =
+          await openaiService.deleteThread(threadRelationId);
         return res.apiv3({ deletedThreadRelation });
       } catch (err) {
         logger.error(err);

@@ -12,6 +12,8 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import { ThreadType } from '../../interfaces/thread-relation';
+import ThreadRelationModel from '../models/thread-relation';
 import { getOpenaiService } from '../services/openai';
 import { certifyAiService } from './middlewares/certify-ai-service';
 
@@ -70,10 +72,11 @@ export const getThreadsFactory = (crowi: Crowi): RequestHandler[] => {
           );
         }
 
-        const threads = await openaiService.getThreadsByAiAssistantId(
-          aiAssistantId,
-          user._id,
-        );
+        const threads = await ThreadRelationModel.find({
+          aiAssistant: aiAssistantId,
+          userId: user._id,
+          type: ThreadType.KNOWLEDGE,
+        }).sort({ updatedAt: -1 });
 
         return res.apiv3({ threads });
       } catch (err) {
