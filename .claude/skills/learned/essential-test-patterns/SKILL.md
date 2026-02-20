@@ -1,7 +1,6 @@
 ---
-name: testing-patterns-with-vitest
-description: GROWI testing patterns with Vitest, React Testing Library, and vitest-mock-extended. Auto-invoked for all GROWI development work.
-user-invocable: false
+name: essential-test-patterns
+description: GROWI testing patterns with Vitest, React Testing Library, and vitest-mock-extended.
 ---
 
 # GROWI Testing Patterns
@@ -373,6 +372,71 @@ vi.mock('~/utils/myUtils', () => ({
 }));
 ```
 
+### Mocking CommonJS Modules with mock-require
+
+**IMPORTANT**: When `vi.mock()` fails with ESModule/CommonJS compatibility issues, use `mock-require` instead:
+
+```typescript
+import mockRequire from 'mock-require';
+
+describe('Service with CommonJS dependencies', () => {
+  beforeEach(() => {
+    // Mock CommonJS module before importing the code under test
+    mockRequire('legacy-module', {
+      someFunction: vi.fn().mockReturnValue('mocked'),
+      someProperty: 'mocked-value',
+    });
+  });
+
+  afterEach(() => {
+    // Clean up mocks to avoid leakage between tests
+    mockRequire.stopAll();
+  });
+
+  it('should use mocked module', async () => {
+    // Import AFTER mocking (dynamic import if needed)
+    const { MyService } = await import('~/services/MyService');
+
+    const result = MyService.doSomething();
+    expect(result).toBe('mocked');
+  });
+});
+```
+
+**When to use `mock-require`**:
+- Legacy CommonJS modules that don't work with `vi.mock()`
+- Mixed ESM/CJS environments causing module resolution issues
+- Third-party libraries with complex module systems
+- When `vi.mock()` fails with "Cannot redefine property" or "Module is not defined"
+
+**Key points**:
+- ✅ Mock **before** importing the code under test
+- ✅ Use `mockRequire.stopAll()` in `afterEach()` to prevent test leakage
+- ✅ Use dynamic imports (`await import()`) when needed
+- ✅ Works with both CommonJS and ESModule targets
+
+### Choosing the Right Mocking Strategy
+
+```typescript
+// ✅ Prefer vi.mock() for ESModules (simplest)
+vi.mock('~/modern-module', () => ({
+  myFunction: vi.fn(),
+}));
+
+// ✅ Use mock-require for CommonJS or mixed environments
+import mockRequire from 'mock-require';
+mockRequire('legacy-module', { myFunction: vi.fn() });
+
+// ✅ Use vitest-mock-extended for type-safe object mocks
+import { mockDeep } from 'vitest-mock-extended';
+const mockService = mockDeep<MyService>();
+```
+
+**Decision tree**:
+1. Can use `vi.mock()`? → Use it (simplest)
+2. CommonJS or module error? → Use `mock-require`
+3. Need type-safe object mock? → Use `vitest-mock-extended`
+
 ## Integration Tests (with Database)
 
 Integration tests (*.integ.ts) can access in-memory databases:
@@ -415,13 +479,7 @@ Before committing tests, ensure:
 
 ## Running Tests
 
-```bash
-# Run all tests for a package
-turbo run test --filter @growi/app
-
-# Run specific test file
-cd {package_dir} && pnpm vitest run src/components/Button/Button.spec.tsx
-```
+See the `testing` rule (`.claude/rules/testing.md`) for test execution commands.
 
 ## Summary: GROWI Testing Philosophy
 

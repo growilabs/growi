@@ -101,7 +101,12 @@ turbo run bootstrap
 ### Testing & Quality
 
 ```bash
-# Run tests for specific package
+# Run a specific test file (from package directory, e.g. apps/app)
+pnpm vitest run yjs.integ          # Partial file name match
+pnpm vitest run helper.spec        # Works for any test file
+pnpm vitest run yjs.integ --repeat=10  # Repeat for flaky test detection
+
+# Run ALL tests for a package (uses Turborepo caching)
 turbo run test --filter @growi/app
 
 # Run linters for specific package
@@ -182,9 +187,12 @@ Package-specific tsconfig.json example:
 
 ### Command Usage
 
-1. **Always use Turborepo for cross-package tasks**:
+1. **Use Turborepo for full-package tasks** (all tests, lint, build):
    - ✅ `turbo run test --filter @growi/app`
    - ❌ `cd apps/app && pnpm test` (bypasses Turborepo caching)
+2. **Use vitest directly for individual test files** (from package directory):
+   - ✅ `pnpm vitest run yjs.integ` (simple, fast)
+   - ❌ `turbo run test --filter @growi/app -- yjs.integ` (unnecessary overhead)
 
 2. **Use pnpm for package management**:
    - ✅ `pnpm install`

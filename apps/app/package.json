@@ -1,6 +1,6 @@
 {
   "name": "@growi/app",
-  "version": "7.4.5-RC.0",
+  "version": "7.4.6-RC.0",
   "license": "MIT",
   "private": "true",
   "scripts": {
@@ -219,7 +219,7 @@
     "passport-saml": "^3.2.0",
     "pathe": "^2.0.3",
     "prop-types": "^15.8.1",
-    "qs": "^6.14.1",
+    "qs": "^6.14.2",
     "rate-limiter-flexible": "^2.3.7",
     "react": "^18.2.0",
     "react-bootstrap-typeahead": "^6.3.2",
@@ -317,6 +317,7 @@
     "@types/ldapjs": "^2.2.5",
     "@types/mdast": "^4.0.4",
     "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "6.4.22",
     "@types/react": "^18.2.14",
     "@types/react-dom": "^18.2.6",
     "@types/react-input-autosize": "^2.2.4",
