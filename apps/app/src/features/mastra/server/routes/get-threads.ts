@@ -19,8 +19,8 @@ type GetThreadsFactory = (crowi: Crowi) => RequestHandler[];
 type ReqQuery = {
   page: number;
   perPage: number;
-  orderBy?: 'updatedAt' | 'createdAt';
-  sortDirection?: 'ASC' | 'DESC';
+  field?: 'updatedAt' | 'createdAt';
+  direction?: 'ASC' | 'DESC';
 };
 
 type Req = Request<undefined, Response, undefined, ReqQuery> & {
@@ -28,9 +28,8 @@ type Req = Request<undefined, Response, undefined, ReqQuery> & {
 };
 
 export const getThreadsFactory: GetThreadsFactory = (crowi) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
+  const loginRequiredStrictly =
+    require('~/server/middlewares/login-required').default(crowi);
 
   const validator: ValidationChain[] = [
     query('page')
@@ -43,15 +42,15 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
       .toInt()
       .withMessage('"perPage" must be a number between 1 and 20'),
 
-    query('orderBy')
+    query('field')
       .optional()
       .isIn(['updatedAt', 'createdAt'])
-      .withMessage('"orderBy" must be one of "updatedAt" or "createdAt"'),
+      .withMessage('"field" must be one of "updatedAt" or "createdAt"'),
 
-    query('sortDirection')
+    query('direction')
       .optional()
       .isIn(['ASC', 'DESC'])
-      .withMessage('"sortDirection" must be one of "ASC" or "DESC"'),
+      .withMessage('"direction" must be one of "ASC" or "DESC"'),
   ];
 
   return [
@@ -73,14 +72,17 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
           );
         }
 
-        const paginatedThread = await memory.getThreadsByResourceIdPaginated({
-          resourceId: req.user._id.toString(),
+        const paginatedThread = await memory.listThreads({
+          filter: {
+            resourceId: req.user._id.toString(),
+          },
           page: req.query.page,
           perPage: req.query.perPage,
-          orderBy: req.query.orderBy,
-          sortDirection: req.query.sortDirection,
+          orderBy: {
+            field: req.query.field,
+            direction: req.query.direction,
+          },
         });
-
         return res.apiv3({ paginatedThread });
       } catch (err) {
         logger.error(err);

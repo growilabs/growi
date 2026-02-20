@@ -18,11 +18,13 @@ try {
 }
 
 export const memory = new Memory({
-  storage: new MongoDBStore({ url, dbName }),
+  storage: new MongoDBStore({
+    id: 'growi-mastra-storage',
+    url,
+    dbName,
+  }),
   options: {
-    threads: {
-      generateTitle: true,
-    },
+    generateTitle: true,
     lastMessages: 30,
   },
 });
