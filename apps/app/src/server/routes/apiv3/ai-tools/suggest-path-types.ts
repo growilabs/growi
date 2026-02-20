@@ -22,6 +22,12 @@ export type ContentAnalysis = {
   informationType: InformationType;
 };
 
+export type SearchCandidate = {
+  pagePath: string;
+  snippet: string;
+  score: number;
+};
+
 export type SuggestPathResponse = {
   suggestions: PathSuggestion[];
 };

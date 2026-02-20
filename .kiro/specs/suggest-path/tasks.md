@@ -46,7 +46,7 @@
   - Include unit tests for: successful keyword extraction with quality verification, correct flow/stock classification for representative content samples, edge cases (very short content, ambiguous content), and failure propagation
   - _Requirements: 5.1, 5.2, 5.4_
 
-- [ ] 4. (P) Search candidate retrieval with score threshold filtering
+- [x] 4. (P) Search candidate retrieval with score threshold filtering
   - Implement search candidate retrieval that searches for related pages using extracted keywords via the existing search service
   - Use extracted keywords (not raw content body) for search operations
   - Filter search results using an Elasticsearch score threshold to retain only sufficiently relevant candidates
