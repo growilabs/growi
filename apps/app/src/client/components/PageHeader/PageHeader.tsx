@@ -1,6 +1,7 @@
-import { type JSX, useCallback, useEffect, useRef, useState } from 'react';
+import { type JSX, useCallback, useRef } from 'react';
 
 import { useCurrentPageData } from '~/states/page';
+import { useDeviceLargerThanSm } from '~/states/ui/device';
 import { usePageControlsX } from '~/states/ui/page';
 
 import { PagePathHeader } from './PagePathHeader';
@@ -13,31 +14,35 @@ const moduleClass = styles['page-header'] ?? '';
 export const PageHeader = (): JSX.Element => {
   const currentPage = useCurrentPageData();
   const pageControlsX = usePageControlsX();
+  const [isLargerThanSm] = useDeviceLargerThanSm();
   const pageHeaderRef = useRef<HTMLDivElement>(null);
 
-  const [maxWidth, setMaxWidth] = useState<number>();
-
   const calcMaxWidth = useCallback(() => {
-    if (pageControlsX == null || pageHeaderRef.current == null) {
-      // Length that allows users to use PageHeader functionality.
-      setMaxWidth(300);
+    if (pageHeaderRef.current == null) {
       return;
     }
 
-    // PageControls.x - PageHeader.x
-    const maxWidth =
-      pageControlsX - pageHeaderRef.current.getBoundingClientRect().x;
+    const pageHeaderX = pageHeaderRef.current.getBoundingClientRect().x;
+    const maxWidth = !isLargerThanSm
+      ? window.innerWidth - pageHeaderX
+      : pageControlsX != null
+        ? pageControlsX - pageHeaderX
+        : 300;
 
-    setMaxWidth(maxWidth);
-  }, [pageControlsX]);
-
-  useEffect(() => {
-    calcMaxWidth();
-  }, [calcMaxWidth]);
+    // Update the style directly if needed, or use state management
+    // setMaxWidth(maxWidth);
+  }, [isLargerThanSm, pageControlsX]);
 
   if (currentPage == null) {
     return <></>;
   }
+
+  const pageHeaderX = pageHeaderRef.current?.getBoundingClientRect().x ?? 0;
+  const maxWidth = !isLargerThanSm
+    ? window.innerWidth - pageHeaderX
+    : pageControlsX != null
+      ? pageControlsX - pageHeaderX
+      : 300;
 
   return (
     <div className={`${moduleClass} w-100`} ref={pageHeaderRef}>

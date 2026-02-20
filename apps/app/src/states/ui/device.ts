@@ -10,6 +10,7 @@ import { atom, useAtom } from 'jotai';
 export const isDeviceLargerThanXlAtom = atom(false);
 export const isDeviceLargerThanLgAtom = atom(false);
 export const isDeviceLargerThanMdAtom = atom(false);
+export const isDeviceLargerThanSmAtom = atom(false);
 export const isMobileAtom = atom(false);
 
 export const useDeviceLargerThanXl = () => {
@@ -76,6 +77,28 @@ export const useDeviceLargerThanMd = () => {
   }, [setIsLargerThanMd]);
 
   return [isLargerThanMd, setIsLargerThanMd] as const;
+};
+
+export const useDeviceLargerThanSm = () => {
+  const [isLargerThanSm, setIsLargerThanSm] = useAtom(isDeviceLargerThanSmAtom);
+
+  useEffect(() => {
+    const smOrAboveHandler = function (this: MediaQueryList): void {
+      // xs -> sm: matches will be true
+      // sm -> xs: matches will be false
+      setIsLargerThanSm(this.matches);
+    };
+    const mql = addBreakpointListener(Breakpoint.SM, smOrAboveHandler);
+
+    // initialize
+    setIsLargerThanSm(mql.matches);
+
+    return () => {
+      cleanupBreakpointListener(mql, smOrAboveHandler);
+    };
+  }, [setIsLargerThanSm]);
+
+  return [isLargerThanSm, setIsLargerThanSm] as const;
 };
 
 export const useIsMobile = () => {
