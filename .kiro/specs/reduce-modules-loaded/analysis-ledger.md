@@ -29,32 +29,30 @@ Measured via `ChunkModuleStatsPlugin` in `next.config.utils.js`. The `initial` c
 
 ### Measurement Method
 
-The following method was used for all measurements on 2026-02-19:
+**Automated (Phase 2+)**:
 
 ```bash
-# 1. Clean .next cache
+# One-command measurement — cleans .next, starts next dev, triggers compilation, outputs results
+./apps/app/bin/measure-chunk-stats.sh        # default port 3099
+./apps/app/bin/measure-chunk-stats.sh 3001   # custom port
+```
+
+Output: `[ChunkModuleStats] initial: N, async-only: N, total: N` + `Compiled /[[...path]] in Xs (N modules)`
+
+**Manual (Phase 1, legacy)**:
+
+```bash
 rm -rf apps/app/.next
-
-# 2. Start Next.js dev server directly (bypassing Express/MongoDB)
 cd apps/app && node_modules/.bin/next dev -p 3000 &
-
-# 3. Wait for "Ready" in log, then trigger on-demand compilation
 curl -s http://localhost:3000/
-
-# 4. Read compilation result from terminal log
-#    e.g. "✓ Compiled /[[...path]] in 31s (10066 modules)"
-
-# 5. Kill dev server
-pkill -f "next dev"
+# Read log output, then: pkill -f "next dev"
 ```
 
 **Key details**:
 - `next dev` can be started without MongoDB — it compiles pages on-demand via webpack regardless of database connectivity
 - Compilation is triggered by HTTP access (curl), not by server startup alone (Next.js uses on-demand compilation)
-- For A/B bisection, files were backed up and swapped between measurements using `cp` to isolate each change group
-- Single measurement per configuration (not 3x median) due to consistent results (~0.5s variance between runs)
-
-> **Measurement Protocol**: Clean `.next` → `next dev` → `curl localhost:3000` → read `Compiled /[[...path]] in Xs (N modules)` from log
+- `ChunkModuleStatsPlugin` (in `src/utils/next.config.utils.js`) separates modules into initial (eager) vs async-only (lazy) chunks
+- The `initial` count is the primary KPI — modules the browser must load on first page access
 
 ## Import Violations (Task 3)
 | # | File | Violation | Fix Strategy | Status |

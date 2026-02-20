@@ -137,44 +137,56 @@ Create `.kiro/specs/reduce-modules-loaded/analysis-ledger.md` during task 1.2 an
   - Production build: Succeeds
   - _Requirements: 6.2, 6.3_
 
-## Phase 2: Next.js Version Upgrade Evaluation
+## Phase 2: Iterative Module Reduction (Dynamic Import & Import Optimization)
 
-- [ ] 8. Evaluate Phase 1 results and Next.js upgrade decision
-- [x] 8.1 Assess whether Phase 1 reduction is sufficient
-  - **Actual measurement results (A/B bisection):**
-    - Baseline (no changes): 10,066 modules / ~31s
-    - All Phase 1 changes: 10,281 modules / ~31.6s (optimizePackageImports caused +213 modules)
-    - Committed changes only (without optimizePackageImports): 10,068 modules / ~31s
-    - Each change group tested independently — none produced measurable compilation time improvement
+### KPI
+
+- **Primary**: `[ChunkModuleStats] initial` — modules in eager (initial) chunks
+- **Baseline**: initial: 2,704 (before Phase 2 changes)
+- Measured via `bin/measure-chunk-stats.sh` (cleans `.next`, starts `next dev`, triggers compilation, outputs ChunkModuleStats)
+
+### Reduction Loop
+
+The following loop repeats until the user declares completion:
+
+1. **Measure** — Run `bin/measure-chunk-stats.sh`, record `initial` / `async-only` / `total` in `analysis-ledger.md`
+2. **Analyze & Propose** — Analyze the initial chunk module graph, identify the top contributors, and propose one or more reduction approaches (e.g., `next/dynamic`, import refactoring, dependency replacement). Alternatively, if further reduction is impractical, propose ending the loop.
+3. **User Decision** — The user approves the proposed approach, adjusts it, or declares the loop complete.
+4. **Implement & Verify** — Apply the approved changes, then run `turbo run lint:typecheck --filter @growi/app && turbo run lint:biome --filter @growi/app`. Fix any errors before returning to step 1.
+
+### Task Log
+
+- [x] 8.1 Phase 1 sufficiency assessment
   - **Assessment: Phase 1 is insufficient for compilation time reduction.** Changes are code quality improvements only.
-  - **optimizePackageImports rejected**: Adding reactstrap/react-hook-form/react-markdown increased module count by 213 with no time benefit — reverted
-  - Recommendation: Proceed with Next.js upgrade evaluation (Task 8.2) or Turbopack/route splitting
   - Full assessment documented in `analysis-ledger.md`
   - _Requirements: 5.1_
 
-- [ ] 8.2 Document Next.js 15+ feature evaluation
+- [x] 8.2 Establish ChunkModuleStats KPI and measurement tooling
+  - Created `ChunkModuleStatsPlugin` in `src/utils/next.config.utils.js`
+  - Created `bin/measure-chunk-stats.sh` for one-command measurement
+  - Baseline recorded: initial: 2,704 / async-only: 4,146 / total: 6,850
+  - _Requirements: 2.1, 6.1_
+
+- [x] 8.3 Loop iteration 1: MermaidViewer dynamic import + date-fns subpath imports
+  - MermaidViewer → `next/dynamic({ ssr: false })` in client renderer
+  - date-fns barrel → subpath imports (12 files)
+  - Result: initial: 2,128 (-576, -21.3%) / async-only: 4,717 / total: 6,845
+  - _Requirements: 7.2, 4.1, 6.1_
+
+- [ ] 8.N Loop iteration N: (next iteration — measure, analyze, propose, implement)
+
+## Phase 3: Next.js Version Upgrade Evaluation (Deferred)
+
+- [ ] 9.1 Document Next.js 15+ feature evaluation
   - Document which Next.js 15+ features (`bundlePagesRouterDependencies`, `serverExternalPackages`, Turbopack, improved tree-shaking) are relevant to further module reduction
-  - Document which features are applicable to the current GROWI Pages Router architecture vs. those that require additional migration
-  - Assess the `next-superjson` compatibility blocker and identify mitigation options (manual superjson, direct usage without SWC plugin, or alternative serialization)
-  - If the upgrade is not beneficial or too risky, document the reasoning and confirm that Phase 1 optimizations are the final solution
+  - Assess the `next-superjson` compatibility blocker and identify mitigation options
   - _Requirements: 1.1, 1.2, 1.3, 5.1, 5.4_
 
-- [ ] 9. Execute Next.js 15 upgrade (conditional on task 8 decision)
-- [ ] 9.1 Run upgrade codemod and address breaking changes
-  - Run the official `@next/codemod` upgrade tool to apply automated migrations
-  - Address any breaking changes specific to the Pages Router (e.g., `@next/font` → `next/font`, renamed config options)
-  - Resolve the `next-superjson` compatibility issue using the mitigation strategy selected in task 8.2
+- [ ] 9.2 Execute Next.js 15 upgrade (conditional on 9.1 decision)
   - _Requirements: 5.2, 5.3_
 
-- [ ] 9.2 Enable v15-specific module optimization features
-  - Enable `bundlePagesRouterDependencies: true` in `next.config.js` for automatic server-side dependency bundling
-  - Configure `serverExternalPackages` to exclude heavy server-only packages from bundling
-  - Measure the dev compilation module count after enabling these features
+- [ ] 9.3 Enable v15-specific module optimization features
   - _Requirements: 3.4, 5.2_
 
-- [ ] 9.3 Run full regression test suite after upgrade
-  - Execute type checking, linting, unit tests, and production build
-  - Verify `getServerSideProps` superjson serialization works correctly across all page routes
-  - Verify i18n HMR still functions in development mode (may degrade if I18NextHMRPlugin is affected)
-  - Perform a manual smoke test for full functionality
+- [ ] 9.4 Run full regression test suite after upgrade
   - _Requirements: 5.3, 6.2, 6.3_
