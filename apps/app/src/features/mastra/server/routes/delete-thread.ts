@@ -60,23 +60,11 @@ export const deleteThreadHandlersFactory: DeleteThreadHandlersFactory = (
           return res.apiv3Err(new ErrorV3('Thread not found'), 404);
         }
 
-        const messages = await memory.recall({ threadId, perPage: false });
+        await memory.deleteThread(threadId);
 
-        // TODO: https://redmine.weseek.co.jp/issues/173988
-
-        // const uiMessages = toAISdkV5Messages(messages);
-
-        // const messageIds = uiMessages.map((message) => message.id);
-
-        // The deleteMessage method is not implemented
-        // Refs:
-        // https://github.com/mastra-ai/mastra/tree/35667834530f6fee2cc4f68adf7c7b9ca1122b14/stores/mongodb#storage-methods
-        // https://github.com/mastra-ai/mastra/blob/35667834530f6fee2cc4f68adf7c7b9ca1122b14/stores/mongodb/src/storage/index.ts#L86
-
-        // await memory.deleteMessages([...messageIds]);
-        // await thread.delete();
-
-        return res.apiv3({});
+        return res.apiv3({
+          deletedThreadId: threadId,
+        });
       } catch (err) {
         logger.error(err);
 
