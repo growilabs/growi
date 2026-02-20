@@ -28,6 +28,12 @@ export type SearchCandidate = {
   score: number;
 };
 
+export type EvaluatedSuggestion = {
+  path: string;
+  label: string;
+  description: string;
+};
+
 export type SuggestPathResponse = {
   suggestions: PathSuggestion[];
 };

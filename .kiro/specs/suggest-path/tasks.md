@@ -56,7 +56,7 @@
   - Include unit tests for: multi-result retrieval, threshold filtering (candidates above/below/at threshold), empty result handling, and correct candidate structure
   - _Requirements: 3.1, 3.2, 3.5, 5.3_
 
-- [ ] 5. (P) AI-based candidate evaluation and path proposal (2nd AI call)
+- [x] 5. (P) AI-based candidate evaluation and path proposal (2nd AI call)
   - Implement candidate evaluation that delegates to GROWI AI for a single AI call evaluating search candidates for content-destination fit
   - Evaluate each candidate's suitability by passing the content body, the content analysis results (keywords and informationType from the 1st AI call), and each candidate's path and search snippet
   - For each suitable candidate, propose a save location using one of three structural patterns relative to the matching page: (a) parent directory, (b) subdirectory under the matching page, (c) sibling directory alongside the matching page
