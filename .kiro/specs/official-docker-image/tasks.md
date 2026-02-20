@@ -150,21 +150,22 @@ DHI runtime イメージ (`dhi.io/node:24-debian13`) には `/bin/sh` が存在�
 
 > Phase 1 で runtime が安定した後に実施する。現行の `COPY . .` + 3 ステージ構成を `turbo prune --docker` + 5 ステージ構成に移行し、ビルドキャッシュ効率を向上させる。
 
-- [ ] 7. turbo prune --docker パターンの導入
-- [ ] 7.1 pruner ステージの新設
-  - base ステージの直後に pruner ステージを追加し、`turbo prune @growi/app --docker` でモノレポを Docker 用に最小化する
-  - pnpm workspace との互換性を検証する（非互換の場合は Phase 1 の `COPY . .` パターンを維持）
-  - 出力（json ディレクトリ、lockfile、full ディレクトリ）が正しく生成されることを確認する
+- [x] 7. turbo prune --docker パターンの導入
+- [x] 7.1 pruner ステージの新設
+  - base ステージの直後に pruner ステージを追加し、`turbo prune @growi/app @growi/pdf-converter --docker` でモノレポを Docker 用に最小化する
+  - `@growi/pdf-converter` を含める理由: `@growi/pdf-converter-client/turbo.json` が `@growi/pdf-converter#gen:swagger-spec` タスク依存を持つため、pruned workspace に含めないと turbo がタスク依存を解決できない
+  - pnpm workspace との互換性を検証済み（18 パッケージが正しく出力される）
+  - 出力（json ディレクトリ、lockfile、full ディレクトリ）が正しく生成されることを確認済み
   - _Requirements: 3.1_
 
-- [ ] 7.2 deps ステージの分離と builder の再構成
+- [x] 7.2 deps ステージの分離と builder の再構成
   - builder ステージから依存インストールを分離し、deps ステージとして独立させる
   - pruner の出力から package.json 群と lockfile のみをコピーして依存をインストールする（レイヤーキャッシュ効率化）
   - builder ステージは deps をベースにソースコードをコピーしてビルドのみを行う構成に変更する
   - 依存変更なし・ソースコードのみ変更の場合に、依存インストールレイヤーがキャッシュされることを検証する
   - _Requirements: 3.1, 3.2_
 
-- [ ] 7.3 5 ステージ構成の統合検証
+- [x] 7.3 5 ステージ構成の統合検証
   - base → pruner → deps → builder → release の 5 ステージ全てが正常完了することを確認する
   - Phase 1 の 3 ステージ構成と同等の runtime 動作を維持していることを確認する
   - ビルドキャッシュの効率改善（ソースコード変更時に依存インストールがスキップされること）を検証する

@@ -1,54 +1,79 @@
-# Dependencies and build caches
+# ============================================================
+# Build artifacts and caches
+# ============================================================
 **/node_modules
-**/coverage
-**/.pnpm-store
 **/.next
 **/.turbo
+**/.pnpm-store
+**/coverage
 out
 
-# Docker files (prevent recursive context)
+# ============================================================
+# Version control
+# ============================================================
+.git
+
+# ============================================================
+# Docker files (prevent recursive inclusion)
+# ============================================================
 **/Dockerfile
 **/*.dockerignore
 
-# Git
-.git
+# ============================================================
+# Unrelated apps
+# ============================================================
+apps/slackbot-proxy
 
-# IDE and editor settings
-.vscode
-.idea
-**/.DS_Store
-
+# ============================================================
 # Test files
+# ============================================================
 **/*.spec.*
 **/*.test.*
 **/test/
 **/__tests__/
 **/playwright/
 
-# Documentation (not needed for build)
+# ============================================================
+# Documentation (no .md files are needed for build)
+# ============================================================
 **/*.md
-!**/README.md
 
-# Environment files for local development
+# ============================================================
+# Local environment overrides
+# ============================================================
 .env.local
 .env.*.local
 
-# Unrelated apps
-apps/slackbot-proxy
+# ============================================================
+# IDE and editor settings
+# ============================================================
+.vscode
+.idea
+**/.DS_Store
 
-# CI/CD and config
+# ============================================================
+# CI/CD, DevOps, and project management
+# ============================================================
+.changeset
+.devcontainer
 .github
+aws
+bin
+
+# ============================================================
+# Linter, formatter, and tool configs (not needed for build)
+# ============================================================
 **/.editorconfig
 **/.markdownlint.yml
-**/.mcp.json
 **/.prettier*
 **/.stylelintrc*
 **/biome.json
 **/lefthook.yml
 
-# AI related files
+# ============================================================
+# AI agent configuration
+# ============================================================
 **/.claude
 **/.kiro
+**/.mcp.json
 **/.serena
-**/AGENTS.md
-**/CLAUDE.md
