@@ -947,9 +947,6 @@ importers:
       react-hook-form:
         specifier: ^7.45.4
         version: 7.52.0(react@18.2.0)
-      react-hotkeys:
-        specifier: ^2.0.0
-        version: 2.0.0(react@18.2.0)
       react-input-autosize:
         specifier: ^3.0.0
         version: 3.0.0(react@18.2.0)
@@ -980,6 +977,9 @@ importers:
       swagger2openapi:
         specifier: ^7.0.8
         version: 7.0.8(encoding@0.1.13)
+      tinykeys:
+        specifier: ^3.0.0
+        version: 3.0.0
       unist-util-is:
         specifier: ^6.0.0
         version: 6.0.0
@@ -11920,11 +11920,6 @@ packages:
     peerDependencies:
       react: ^16.8.0 || ^17 || ^18 || ^19
 
-  react-hotkeys@2.0.0:
-    resolution: {integrity: sha512-3n3OU8vLX/pfcJrR3xJ1zlww6KS1kEJt0Whxc4FiGV+MJrQ1mYSYI3qS/11d2MJDFm8IhOXMTFQirfu6AVOF6Q==}
-    peerDependencies:
-      react: '>= 0.14.0'
-
   react-i18next@15.1.1:
     resolution: {integrity: sha512-R/Vg9wIli2P3FfeI8o1eNJUJue5LWpFsQePCHdQDmX0Co3zkr6kdT8gAseb/yGeWbNz1Txc4bKDQuZYsC0kQfw==}
     peerDependencies:
@@ -13321,6 +13316,9 @@ packages:
   tinyglobby@0.2.6:
     resolution: {integrity: sha512-NbBoFBpqfcgd1tCiO8Lkfdk+xrA7mlLR9zgvZcZWQQwU63XAfUePyd6wZBaU93Hqw347lHnwFzttAkemHzzz4g==}
     engines: {node: '>=12.0.0'}
+
+  tinykeys@3.0.0:
+    resolution: {integrity: sha512-nazawuGv5zx6MuDfDY0rmfXjuOGhD5XU2z0GLURQ1nzl0RUe9OuCJq+0u8xxJZINHe+mr7nw8PWYYZ9WhMFujw==}
 
   tinypool@1.0.1:
     resolution: {integrity: sha512-URZYihUbRPcGv95En+sz6MfghfIc2OJ1sv/RmhWZLouPY0/8Vo80viwPvg3dlaS9fuq7fQMEfgRRK7BBZThBEA==}
@@ -27370,11 +27368,6 @@ snapshots:
     dependencies:
       react: 18.2.0
 
-  react-hotkeys@2.0.0(react@18.2.0):
-    dependencies:
-      prop-types: 15.8.1
-      react: 18.2.0
-
   react-i18next@15.1.1(i18next@23.16.5)(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
     dependencies:
       '@babel/runtime': 7.25.4
@@ -29222,6 +29215,8 @@ snapshots:
     dependencies:
       fdir: 6.3.0(picomatch@4.0.2)
       picomatch: 4.0.2
+
+  tinykeys@3.0.0: {}
 
   tinypool@1.0.1: {}
 

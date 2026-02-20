@@ -329,7 +329,6 @@
     "react-dnd-html5-backend": "^14.1.0",
     "react-dropzone": "^14.2.3",
     "react-hook-form": "^7.45.4",
-    "react-hotkeys": "^2.0.0",
     "react-input-autosize": "^3.0.0",
     "react-toastify": "^9.1.3",
     "rehype-rewrite": "^4.0.2",
@@ -340,6 +339,7 @@
     "source-map-loader": "^4.0.1",
     "supertest": "^7.1.4",
     "swagger2openapi": "^7.0.8",
+    "tinykeys": "^3.0.0",
     "unist-util-is": "^6.0.0",
     "unist-util-visit-parents": "^6.0.0"
   }
