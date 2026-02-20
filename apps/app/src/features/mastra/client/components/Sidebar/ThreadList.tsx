@@ -11,7 +11,7 @@ import {
 import { useSWRMUTxThreads } from '~/features/openai/client/stores/thread';
 import loggerFactory from '~/utils/logger';
 
-import { deleteThread } from '../../../../openai/client/services/thread';
+import { deleteThread } from '../../services/thread';
 import { useSWRINFxRecentThreads } from '../../stores/thread';
 
 const logger = loggerFactory('growi:openai:client:components:ThreadList');
@@ -32,35 +32,30 @@ export const ThreadList: React.FC = () => {
     isEmpty || (data != null && data[data.length - 1]?.hasMore === false);
 
   const deleteThreadHandler = useCallback(
-    async (aiAssistantId: string, threadRelationId: string) => {
+    async (threadId: string) => {
       try {
-        await deleteThread({ aiAssistantId, threadRelationId });
+        await deleteThread({ threadId });
         toastSuccess(
           t('ai_assistant_substance.toaster.thread_deleted_success'),
         );
 
-        await Promise.all([mutateAssistantThreadData(), mutateRecentThreads()]);
+        mutateRecentThreads();
 
-        // Close if the thread to be deleted is open in right sidebar
-        if (
-          aiAssistantSidebarData?.isOpened &&
-          aiAssistantSidebarData?.threadData?._id === threadRelationId
-        ) {
-          closeAiAssistantSidebar();
-        }
+        // TODO:　After moving useAiAssistantSidebarStatus to the features/mastra directory, we plan to address this.
+        // Promise.all([mutateAssistantThreadData(), mutateRecentThreads()]);
+        // // Close if the thread to be deleted is open in right sidebar
+        // if (
+        //   aiAssistantSidebarData?.isOpened &&
+        //   aiAssistantSidebarData?.threadData?._id === threadRelationId
+        // ) {
+        //   closeAiAssistantSidebar();
+        // }
       } catch (err) {
         logger.error(err);
         toastError(t('ai_assistant_substance.toaster.thread_deleted_failed'));
       }
     },
-    [
-      aiAssistantSidebarData?.isOpened,
-      aiAssistantSidebarData?.threadData?._id,
-      closeAiAssistantSidebar,
-      mutateAssistantThreadData,
-      mutateRecentThreads,
-      t,
-    ],
+    [mutateRecentThreads, t],
   );
 
   return (
@@ -98,13 +93,10 @@ export const ThreadList: React.FC = () => {
                   <button
                     type="button"
                     className="btn btn-link text-secondary p-0"
-                    // onClick={(e) => {
-                    //   e.stopPropagation();
-                    //   deleteThreadHandler(
-                    //     getIdStringForRef(thread.aiAssistant),
-                    //     thread._id,
-                    //   );
-                    // }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteThreadHandler(thread.id);
+                    }}
                   >
                     <span className="material-symbols-outlined fs-5">
                       delete
