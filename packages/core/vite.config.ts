@@ -1,4 +1,3 @@
-import path from 'node:path';
 import glob from 'glob';
 import { nodeExternals } from 'rollup-plugin-node-externals';
 import { defineConfig } from 'vite';
@@ -22,7 +21,9 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
     lib: {
-      entry: glob.sync(path.resolve(__dirname, 'src/**/*.ts'), {
+      entry: glob.sync('src/**/*.ts', {
+        cwd: __dirname,
+        absolute: true,
         ignore: '**/*.spec.ts',
       }),
       name: 'core-libs',

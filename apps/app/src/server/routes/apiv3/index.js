@@ -7,6 +7,7 @@ import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import injectUserRegistrationOrderByTokenMiddleware from '../../middlewares/inject-user-registration-order-by-token-middleware';
 import * as loginFormValidator from '../../middlewares/login-form-validator';
 import * as registerFormValidator from '../../middlewares/register-form-validator';
+import { factory as aiToolsRouteFactory } from './ai-tools';
 import g2gTransfer from './g2g-transfer';
 import importRoute from './import';
 import pageListing from './page-listing';
@@ -183,6 +184,8 @@ module.exports = (crowi, app) => {
   );
 
   router.use('/openai', openaiRouteFactory(crowi));
+
+  router.use('/ai-tools', aiToolsRouteFactory(crowi));
 
   router.use('/user', userRouteFactory(crowi));
 
