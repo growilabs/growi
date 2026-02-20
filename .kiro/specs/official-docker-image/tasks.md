@@ -127,6 +127,25 @@
   - 実用上の影響は低い（Docker コンテナ内の node ユーザーは通常 supplementary groups を持たない）
   - _Requirements: 4.1, 6.2_
 
+## Design からの意図的な逸脱（Phase 1 E2E 検証で発覚・対応済み）
+
+### DHI dev イメージの最小構成への対応
+
+DHI dev イメージ (`dhi.io/node:24-debian13-dev`) は想定より最小構成であり、`which` コマンドが未同梱だった。以下の修正を実施済み：
+
+1. **pnpm インストール**: `SHELL="$(which sh)"` → `SHELL=/bin/sh` に変更（`which` コマンド不在のため）
+
+### DHI runtime イメージのシェル完全不在への対応
+
+DHI runtime イメージ (`dhi.io/node:24-debian13`) には `/bin/sh` が存在しなかった。Design では `--mount=type=bind,from=builder` + `RUN tar -zxf` でアーティファクトを展開する設計だったが、`RUN` 命令は `/bin/sh` を必要とするため実行不可。
+
+**対応**:
+- **builder ステージ**: `tar -zcf` → ステージングディレクトリ `/tmp/release/` に `cp -a` でコピー
+- **release ステージ**: `RUN --mount=type=bind... tar -zxf` → `COPY --from=builder --chown=node:node` に変更
+- `COPY`, `WORKDIR`, `ENV`, `LABEL`, `ENTRYPOINT` はすべて Docker デーモンが直接処理するためシェル不要
+
+**影響**: Design の Req 3.5（`--mount=type=bind,from=builder` パターン）は `COPY --from=builder` パターンに代替。runtime にシェルが不要という Design のセキュリティ目標（Req 4.2, 4.5）はより強固に達成された。
+
 ## Phase 2: turbo prune --docker ビルド最適化（次フェーズ）
 
 > Phase 1 で runtime が安定した後に実施する。現行の `COPY . .` + 3 ステージ構成を `turbo prune --docker` + 5 ステージ構成に移行し、ビルドキャッシュ効率を向上させる。

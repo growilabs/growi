@@ -16,7 +16,7 @@ WORKDIR $OPT_DIR
 # Install build dependencies
 RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
     --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  apt-get update && apt-get install -y --no-install-recommends ca-certificates gzip wget
+  apt-get update && apt-get install -y --no-install-recommends ca-certificates wget
 
 # Install pnpm (standalone script, no version hardcoding)
 RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL=/bin/sh sh -
