@@ -12,6 +12,7 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import ThreadRelationModel from '../../models/thread-relation';
 import { getOpenaiService } from '../../services/openai';
 import { certifyAiService } from '../middlewares/certify-ai-service';
 
@@ -79,6 +80,14 @@ export const getMessagesFactory = (crowi: Crowi): RequestHandler[] => {
             new ErrorV3('The specified AI assistant is not usable'),
             400,
           );
+        }
+
+        const threadRelation = await ThreadRelationModel.findOne({
+          threadId: { $eq: threadId },
+          userId: user._id,
+        });
+        if (threadRelation == null) {
+          return res.apiv3Err(new ErrorV3('Thread not found'), 404);
         }
 
         const messages = await openaiService.getMessageData(
