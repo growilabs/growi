@@ -81,54 +81,67 @@ exports.createChunkModuleStatsPlugin = () => ({
         `[ChunkModuleStats] initial: ${initialModuleIds.size}, async-only: ${asyncOnlyCount}, total: ${compilation.modules.size}`,
       );
 
-      // Dump initial module details to file for analysis (only for large compilations)
+      // Dump module details to file for analysis (only for large compilations)
       if (
         initialModuleIds.size > 500 &&
         process.env.DUMP_INITIAL_MODULES === '1'
       ) {
-        const packageCounts = {};
-        const appModules = [];
-        for (const id of initialModuleIds) {
-          const nmIdx = id.lastIndexOf('node_modules/');
-          if (nmIdx !== -1) {
-            const rest = id.slice(nmIdx + 'node_modules/'.length);
-            const pkg = rest.startsWith('@')
-              ? rest.split('/').slice(0, 2).join('/')
-              : rest.split('/')[0];
-            packageCounts[pkg] = (packageCounts[pkg] || 0) + 1;
-          } else {
-            appModules.push(id);
-          }
-        }
-        const sorted = Object.entries(packageCounts).sort(
-          (a, b) => b[1] - a[1],
+        const asyncOnlyIds = [...asyncModuleIds].filter(
+          (id) => !initialModuleIds.has(id),
         );
-        const lines = ['# Initial Chunk Module Analysis', ''];
-        lines.push(`Total initial modules: ${initialModuleIds.size}`);
-        lines.push(`App modules (non-node_modules): ${appModules.length}`);
-        lines.push(`node_modules packages: ${sorted.length}`);
-        lines.push('');
-        lines.push('## Top Packages by Module Count');
-        lines.push('| # | Package | Modules |');
-        lines.push('|---|---------|---------|');
-        for (let i = 0; i < sorted.length; i++) {
-          const [pkg, count] = sorted[i];
-          lines.push(`| ${i + 1} | ${pkg} | ${count} |`);
-        }
-        lines.push('');
-        lines.push('## App Modules (first 200)');
-        for (const m of appModules.slice(0, 200)) {
-          lines.push(`- ${m}`);
-        }
-        const outPath = path.resolve(
-          compiler.outputPath,
-          '..',
+
+        const analyzeModuleSet = (moduleIds, title, filename) => {
+          const packageCounts = {};
+          const appModules = [];
+          for (const id of moduleIds) {
+            const nmIdx = id.lastIndexOf('node_modules/');
+            if (nmIdx !== -1) {
+              const rest = id.slice(nmIdx + 'node_modules/'.length);
+              const pkg = rest.startsWith('@')
+                ? rest.split('/').slice(0, 2).join('/')
+                : rest.split('/')[0];
+              packageCounts[pkg] = (packageCounts[pkg] || 0) + 1;
+            } else {
+              appModules.push(id);
+            }
+          }
+          const sorted = Object.entries(packageCounts).sort(
+            (a, b) => b[1] - a[1],
+          );
+          const lines = [`# ${title}`, ''];
+          lines.push(`Total modules: ${moduleIds.length ?? moduleIds.size}`);
+          lines.push(`App modules (non-node_modules): ${appModules.length}`);
+          lines.push(`node_modules packages: ${sorted.length}`);
+          lines.push('');
+          lines.push('## Top Packages by Module Count');
+          lines.push('| # | Package | Modules |');
+          lines.push('|---|---------|---------|');
+          for (let i = 0; i < sorted.length; i++) {
+            const [pkg, count] = sorted[i];
+            lines.push(`| ${i + 1} | ${pkg} | ${count} |`);
+          }
+          lines.push('');
+          lines.push('## App Modules (first 200)');
+          for (const m of appModules.slice(0, 200)) {
+            lines.push(`- ${m}`);
+          }
+          const outPath = path.resolve(compiler.outputPath, '..', filename);
+          fs.writeFileSync(outPath, lines.join('\n'));
+          // biome-ignore lint/suspicious/noConsole: Dev-only module stats dump path
+          console.log(
+            `[ChunkModuleStats] Dumped ${title.toLowerCase()} to ${outPath}`,
+          );
+        };
+
+        analyzeModuleSet(
+          initialModuleIds,
+          'Initial Chunk Module Analysis',
           'initial-modules-analysis.md',
         );
-        fs.writeFileSync(outPath, lines.join('\n'));
-        // biome-ignore lint/suspicious/noConsole: Dev-only module stats dump path
-        console.log(
-          `[ChunkModuleStats] Dumped initial module analysis to ${outPath}`,
+        analyzeModuleSet(
+          asyncOnlyIds,
+          'Async-Only Chunk Module Analysis',
+          'async-modules-analysis.md',
         );
       }
     });
