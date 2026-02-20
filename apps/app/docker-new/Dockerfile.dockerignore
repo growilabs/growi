@@ -1,7 +1,7 @@
 # Dependencies and build caches
 **/node_modules
-**/.pnpm-store
 **/coverage
+**/.pnpm-store
 **/.next
 **/.turbo
 out
@@ -29,22 +29,26 @@ out
 **/*.md
 !**/README.md
 
-# Environment files (secrets)
-.env
-.env.*
-!.env.production
-!.env.production.local
+# Environment files for local development
+.env.local
+.env.*.local
 
 # Unrelated apps
 apps/slackbot-proxy
-apps/pdf-converter
 
 # CI/CD and config
 .github
-.circleci
-**/.eslintrc*
-**/.prettierrc*
+**/.editorconfig
+**/.markdownlint.yml
+**/.mcp.json
+**/.prettier*
+**/.stylelintrc*
 **/biome.json
-**/tsconfig*.json
-!apps/app/tsconfig*.json
-!packages/*/tsconfig*.json
+**/lefthook.yml
+
+# AI related files
+**/.claude
+**/.kiro
+**/.serena
+**/AGENTS.md
+**/CLAUDE.md

@@ -16,10 +16,10 @@ WORKDIR $OPT_DIR
 # Install build dependencies
 RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
     --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  apt-get update && apt-get install -y --no-install-recommends ca-certificates wget
+  apt-get update && apt-get install -y --no-install-recommends ca-certificates gzip wget
 
 # Install pnpm (standalone script, no version hardcoding)
-RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" sh -
+RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL=/bin/sh sh -
 ENV PNPM_HOME=$PNPM_HOME
 ENV PATH="$PNPM_HOME:$PATH"
 
@@ -57,18 +57,15 @@ RUN turbo run build --filter @growi/app
 RUN pnpm deploy out --prod --filter @growi/app
 RUN rm -rf apps/app/node_modules && mv out/node_modules apps/app/node_modules
 RUN rm -rf apps/app/.next/cache
-RUN tar -zcf /tmp/packages.tar.gz \
-  package.json \
-  apps/app/.next \
-  apps/app/config \
-  apps/app/dist \
-  apps/app/public \
-  apps/app/resource \
-  apps/app/tmp \
-  apps/app/.env.production* \
-  apps/app/next.config.js \
-  apps/app/package.json \
-  apps/app/node_modules
+
+# Stage artifacts into a clean directory for COPY --from
+RUN mkdir -p /tmp/release/apps/app && \
+  cp package.json /tmp/release/ && \
+  cp -a apps/app/.next apps/app/config apps/app/dist apps/app/public \
+       apps/app/resource apps/app/tmp apps/app/next.config.js \
+       apps/app/package.json apps/app/node_modules \
+       /tmp/release/apps/app/ && \
+  (cp apps/app/.env.production* /tmp/release/apps/app/ 2>/dev/null || true)
 
 
 
@@ -82,11 +79,9 @@ ARG OPT_DIR
 ENV NODE_ENV="production"
 ENV appDir="$OPT_DIR/growi"
 
-# Extract artifacts as node user
-USER node
+# Copy artifacts from builder (no shell required)
 WORKDIR ${appDir}
-RUN --mount=type=bind,from=builder,source=/tmp/packages.tar.gz,target=/tmp/packages.tar.gz \
-  tar -zxf /tmp/packages.tar.gz -C ${appDir}/
+COPY --from=builder --chown=node:node /tmp/release/ ${appDir}/
 
 # Copy TypeScript entrypoint
 COPY --chown=node:node apps/app/docker-new/docker-entrypoint.ts /docker-entrypoint.ts
