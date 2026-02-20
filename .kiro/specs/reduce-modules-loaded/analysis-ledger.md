@@ -1,6 +1,8 @@
 # Analysis Ledger
 
 ## Measurements
+
+### Legacy KPI (total modules from `Compiled ... (N modules)`)
 | Step | Task | Modules | Time | Date |
 |------|------|---------|------|------|
 | Baseline (no changes) | 1.1 | 10,066 | ~31s | 2026-02-19 |
@@ -11,6 +13,17 @@
 | Revert only locale-utils fix | bisect | 10,279 | ~31.2s | 2026-02-19 |
 | Revert only serializer fix | bisect | 10,281 | ~31.2s | 2026-02-19 |
 | Revert only axios fix | bisect | 10,281 | ~31.1s | 2026-02-19 |
+
+> **Note**: Total module count includes both initial (eager) and async (lazy) chunks. Dynamic imports move modules to async chunks without reducing the total, so this metric does NOT reflect lazy-loading improvements. Replaced by ChunkModuleStats KPI below.
+
+### New KPI: ChunkModuleStats (initial / async-only / total)
+
+Measured via `ChunkModuleStatsPlugin` in `next.config.utils.js`. The `initial` count represents modules loaded eagerly on page access — this is the primary reduction target.
+
+| Step | Task | initial | async-only | total | Compiled modules | Date |
+|------|------|---------|------------|-------|------------------|------|
+| **Baseline (no Phase 2 changes)** | 8.1 | **2,704** | 4,146 | 6,850 | 10,068 | 2026-02-20 |
+| + MermaidViewer dynamic + date-fns subpath | 8.1 | **2,128** | 4,717 | 6,845 | 10,058 | 2026-02-20 |
 
 > **Note**: Originally reported baseline was 51.5s, but automated measurement on the same machine consistently shows ~31s. The 51.5s figure may reflect cold cache, different system load, or an earlier codebase state.
 
@@ -131,3 +144,61 @@ The following approaches can actually reduce compilation time for `[[...path]]`:
 3. `I18NextHMRPlugin` — webpack-specific; may need alternative
 
 **Decision**: Phase 1 committed changes are kept as code quality improvements (server/client boundary enforcement, dead code removal). Phase 2 evaluation is needed for actual compilation time reduction.
+
+## Phase 2: Module Graph Analysis and Dynamic Import Optimization (Task 8.1 continued)
+
+### Module Composition Analysis
+
+Client bundle module paths extracted from `.next/static/chunks/` — 6,822 unique modules total.
+
+**Top 10 module-heavy packages in [[...path]] compilation:**
+
+| Package | Modules | % of Total | Source |
+|---------|---------|-----------|--------|
+| lodash-es | 640 | 9.4% | Transitive via mermaid → chevrotain |
+| date-fns | 627 | 9.2% | Direct (barrel imports) + react-datepicker (v2) |
+| highlight.js | 385 | 5.6% | react-syntax-highlighter → CodeBlock |
+| refractor | 279 | 4.1% | react-syntax-highlighter → CodeBlock |
+| core-js | 227 | 3.3% | Next.js polyfills (not controllable via imports) |
+| @codemirror | 127 | 1.9% | Editor components |
+| lodash | 127 | 1.9% | Transitive via express-validator |
+| d3-array | 120 | 1.8% | Transitive via mermaid |
+| react-bootstrap-typeahead | 106 | 1.6% | Search/autocomplete UI |
+| **Top 10 total** | **2,752** | **40%** | |
+
+### Changes Applied
+
+1. **MermaidViewer → `next/dynamic({ ssr: false })`**
+   - Split `import * as mermaid from '~/features/mermaid'` into:
+     - Static: `remarkPlugin` + `sanitizeOption` from `~/features/mermaid/services` (lightweight, no npm mermaid)
+     - Dynamic: `MermaidViewer` via `next/dynamic` (loads mermaid npm + lodash-es + chevrotain on demand)
+   - SSR impact: None — client renderer only (`assert(isClient())`)
+
+2. **CodeBlock → `next/dynamic({ ssr: false })`**
+   - Removed static `import { CodeBlock }` from shared renderer (`src/services/renderer/renderer.tsx`)
+   - Added `DynamicCodeBlock` via `next/dynamic` in client renderer only
+   - SSR impact: Code blocks render without syntax highlighting during SSR (accepted trade-off)
+
+3. **date-fns barrel → subpath imports (12 files)**
+   - Converted all `import { ... } from 'date-fns'` to specific subpath imports
+   - e.g., `import { format } from 'date-fns/format'`
+   - Files: Comment.tsx, ShareLinkForm.tsx, ActivityListItem.tsx, DateRangePicker.tsx, FormattedDistanceDate.jsx, create-custom-axios.ts, activity.ts, user-activation.ts, forgot-password.js, thread-relation.ts, normalize-thread-relation-expired-at.ts, normalize-thread-relation-expired-at.integ.ts
+
+4. **core-js — no action possible**
+   - 227 modules come from Next.js automatic polyfill injection, not application imports
+   - Can only be reduced by `.browserslistrc` (targeting modern browsers) or Next.js 15+ upgrade
+
+### Measurement Results
+
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| Modules | 10,066 | 10,054 | -12 |
+| Compile time (run 1) | ~31s | 26.9s | -4.1s |
+| Compile time (run 2) | ~31s | 26.7s | -4.3s |
+| **Average compile time** | **~31s** | **~26.8s** | **-4.2s (14%)** |
+
+### Analysis
+
+- **Module count decreased only 12**: Dynamic imports still count as modules in the webpack graph, but they're compiled into separate chunks (lazy). The "10,054 modules" includes the lazy chunks' modules in the count.
+- **Compile time decreased ~14%**: The significant improvement suggests webpack's per-module overhead is not uniform — mermaid (with chevrotain parser generator) and react-syntax-highlighter (with highlight.js language definitions) are particularly expensive to compile despite their module count.
+- **date-fns subpath imports**: Contributed to the module count reduction but likely minimal time impact (consistent with Phase 1 findings).
