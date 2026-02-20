@@ -55,9 +55,16 @@ export const deleteThreadHandlersFactory: DeleteThreadHandlersFactory = (
           );
         }
 
-        const thread = memory.getThreadById({ threadId });
+        const thread = await memory.getThreadById({ threadId });
         if (thread == null) {
           return res.apiv3Err(new ErrorV3('Thread not found'), 404);
+        }
+
+        if (thread.resourceId !== req.user._id.toString()) {
+          return res.apiv3Err(
+            new ErrorV3('Users cannot delete threads created by others'),
+            403,
+          );
         }
 
         await memory.deleteThread(threadId);
