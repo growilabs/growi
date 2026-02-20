@@ -23,10 +23,6 @@ CreatePage.propTypes = {
   onDeleteRender: PropTypes.func.isRequired,
 };
 
-CreatePage.getHotkeyStrokes = () => {
-  return [['c']];
-};
-
 CreatePage.displayName = 'CreatePage';
 
 export default CreatePage;

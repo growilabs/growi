@@ -17,8 +17,4 @@ SwitchToMirrorMode.propTypes = {
   onDeleteRender: PropTypes.func.isRequired,
 };
 
-SwitchToMirrorMode.getHotkeyStrokes = () => {
-  return [['x', 'x', 'b', 'b', 'a', 'y', 'a', 'y', 'ArrowDown', 'ArrowLeft']];
-};
-
 export default SwitchToMirrorMode;

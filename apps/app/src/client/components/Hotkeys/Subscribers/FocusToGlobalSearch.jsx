@@ -27,8 +27,4 @@ const FocusToGlobalSearch = (props) => {
   return null;
 };
 
-FocusToGlobalSearch.getHotkeyStrokes = () => {
-  return [['/']];
-};
-
 export default FocusToGlobalSearch;

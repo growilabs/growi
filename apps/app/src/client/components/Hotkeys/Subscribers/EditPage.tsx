@@ -68,8 +68,4 @@ const EditPage = (props: Props): null => {
   return null;
 };
 
-EditPage.getHotkeyStrokes = () => {
-  return [['e']];
-};
-
 export default EditPage;

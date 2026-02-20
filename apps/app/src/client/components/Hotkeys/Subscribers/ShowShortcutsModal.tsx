@@ -30,8 +30,4 @@ const ShowShortcutsModal = (props: Props): JSX.Element => {
   return <></>;
 };
 
-ShowShortcutsModal.getHotkeyStrokes = () => {
-  return [['/+ctrl'], ['/+meta']];
-};
-
 export default ShowShortcutsModal;
