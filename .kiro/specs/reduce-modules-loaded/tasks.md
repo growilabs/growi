@@ -187,6 +187,13 @@ The following loop repeats until the user declares completion:
   - Result: initial: 1,572 (-58, -3.6%) / async-only: 4,720 / total: 6,292 / compiled: 9,007
   - _Requirements: 3.1, 3.2, 6.1_
 
+- [x] 8.6 Loop iteration 4: validator → isMongoId regex replacement in LinkEditModal
+  - Replaced `import validator from 'validator'` with lightweight `isMongoId()` regex utility (`/^[0-9a-f]{24}$/i`)
+  - Created `src/client/util/mongo-id.ts` with `isMongoId()` and `mongo-id.spec.ts` with 8 unit tests (TDD)
+  - Eliminated all 113 `validator` modules from async-only chunks (single usage: `validator.isMongoId()` in LinkEditModal.tsx)
+  - Result: initial: 1,572 (unchanged) / async-only: 4,608 (-112, -2.4%) / total: 6,180 (-112) / compiled: 8,895 (-112)
+  - _Requirements: 4.1, 6.1_
+
 - [ ] 8.N Loop iteration N: (next iteration — measure, analyze, propose, implement)
 
 ## Phase 3: Next.js Version Upgrade Evaluation (Deferred)
