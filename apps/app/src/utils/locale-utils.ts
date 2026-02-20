@@ -1,4 +1,9 @@
-import { enUS, fr, ja, ko, type Locale, zhCN } from 'date-fns/locale';
+import type { Locale } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale/en-US';
+import { fr } from 'date-fns/locale/fr';
+import { ja } from 'date-fns/locale/ja';
+import { ko } from 'date-fns/locale/ko';
+import { zhCN } from 'date-fns/locale/zh-CN';
 
 const DATE_FNS_LOCALE_MAP: Record<string, Locale | undefined> = {
   en: enUS,

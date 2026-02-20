@@ -173,6 +173,14 @@ The following loop repeats until the user declares completion:
   - Result: initial: 2,128 (-576, -21.3%) / async-only: 4,717 / total: 6,845
   - _Requirements: 7.2, 4.1, 6.1_
 
+- [x] 8.4 Loop iteration 2: date-fns locale barrel → individual subpath imports
+  - Converted `locale-utils.ts` import from `date-fns/locale` barrel (96 locales × 6 modules = ~576 modules) to individual subpath imports (`date-fns/locale/en-US`, `/fr`, `/ja`, `/ko`, `/zh-CN`)
+  - Updated `locale-utils.spec.ts` import paths to match
+  - Enhanced `ChunkModuleStatsPlugin` with `DUMP_INITIAL_MODULES=1` diagnostic mode for per-package breakdown
+  - Result: initial: 1,630 (-498, -23.4%) / async-only: 4,717 / total: 6,347 / compiled: 9,062
+  - date-fns: 560 → 62 modules in initial chunks
+  - _Requirements: 4.1, 6.1_
+
 - [ ] 8.N Loop iteration N: (next iteration — measure, analyze, propose, implement)
 
 ## Phase 3: Next.js Version Upgrade Evaluation (Deferred)

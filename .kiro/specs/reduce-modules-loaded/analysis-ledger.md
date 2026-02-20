@@ -23,7 +23,8 @@ Measured via `ChunkModuleStatsPlugin` in `next.config.utils.js`. The `initial` c
 | Step | Task | initial | async-only | total | Compiled modules | Date |
 |------|------|---------|------------|-------|------------------|------|
 | **Baseline (no Phase 2 changes)** | 8.1 | **2,704** | 4,146 | 6,850 | 10,068 | 2026-02-20 |
-| + MermaidViewer dynamic + date-fns subpath | 8.1 | **2,128** | 4,717 | 6,845 | 10,058 | 2026-02-20 |
+| + MermaidViewer dynamic + date-fns subpath | 8.3 | **2,128** | 4,717 | 6,845 | 10,058 | 2026-02-20 |
+| + date-fns locale subpath imports | 8.N | **1,630** | 4,717 | 6,347 | 9,062 | 2026-02-20 |
 
 > **Note**: Originally reported baseline was 51.5s, but automated measurement on the same machine consistently shows ~31s. The 51.5s figure may reflect cold cache, different system load, or an earlier codebase state.
 
