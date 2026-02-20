@@ -129,7 +129,7 @@ export const postMessageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       }
 
       const threadRelation = await ThreadRelationModel.findOne({
-        threadId,
+        threadId: { $eq: threadId },
         userId: user._id,
       });
       if (threadRelation == null) {
