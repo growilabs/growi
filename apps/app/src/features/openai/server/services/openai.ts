@@ -274,10 +274,7 @@ class OpenaiService implements IOpenaiService {
     aiAssistantId: string,
     vectorStoreId: string,
   ): Promise<void> {
-    const threadRelations = await ThreadRelationModel.find({
-      aiAssistant: aiAssistantId,
-      type: ThreadType.KNOWLEDGE,
-    }).sort({ updatedAt: -1 });
+    const threadRelations = await this.getThreadsByAiAssistantId(aiAssistantId);
     for await (const threadRelation of threadRelations) {
       try {
         const updatedThreadResponse = await this.client.updateThread(
