@@ -185,6 +185,42 @@
 - **Trade-offs**: CMD が不要になる（entrypoint が全ての起動処理を行う）。docker run でのコマンド上書きが entrypoint 内のロジックには影響しない
 - **Follow-up**: なし
 
+### DHI レジストリ認証と CI/CD 統合
+
+- **Context**: DHI ベースイメージの pull に必要な認証方式と、既存 CodeBuild パイプラインへの統合方法を調査
+- **Sources Consulted**:
+  - [DHI How to Use an Image](https://docs.docker.com/dhi/how-to/use/) — DHI の利用手順
+  - 既存 `apps/app/docker/codebuild/buildspec.yml` — 現行の CodeBuild ビルド定義
+  - 既存 `apps/app/docker/codebuild/secretsmanager.tf` — AWS Secrets Manager 設定
+- **Findings**:
+  - DHI は Docker Hub 認証情報を使用（DHI は Docker Business/Team サブスクリプションの機能）
+  - `docker login dhi.io --username <dockerhub-user> --password-stdin` で認証可能
+  - 既存 buildspec.yml は `DOCKER_REGISTRY_PASSWORD` シークレットで docker.io にログイン済み
+  - 同じ認証情報で `dhi.io` にもログイン可能（追加シークレットは不要）
+  - CodeBuild の `reusable-app-build-image.yml` → CodeBuild Project → buildspec.yml の流れは変更不要
+- **Implications**:
+  - buildspec.yml の pre_build に `docker login dhi.io` を 1 行追加するだけで対応可能
+  - `secretsmanager.tf` の変更は不要
+  - Docker Hub と DHI の両方にログインが必要（docker.io は push 用、dhi.io は pull 用）
+
+### ディレクトリ置換の影響範囲（コードベース調査）
+
+- **Context**: `apps/app/docker-new/` → `apps/app/docker/` への置換時に、既存の参照が壊れないことを確認
+- **Sources Consulted**: コードベース全体を `apps/app/docker` キーワードで grep 調査
+- **Findings**:
+  - `buildspec.yml`: `-f ./apps/app/docker/Dockerfile` — 置換後も同一パス（変更不要）
+  - `codebuild.tf`: `buildspec = "apps/app/docker/codebuild/buildspec.yml"` — 同一（変更不要）
+  - `.github/workflows/release.yml`: `readme-filepath: ./apps/app/docker/README.md` — 同一（変更不要）
+  - `.github/workflows/ci-app.yml` / `ci-app-prod.yml`: `!apps/app/docker/**` 除外パターン — 同一（変更不要）
+  - `apps/app/bin/github-actions/update-readme.sh`: `cd docker` + sed — 同一（変更不要）
+  - Dockerfile 内: line 122 `apps/app/docker-new/docker-entrypoint.ts` — **要更新**（自己参照パス）
+  - `package.json` や `vitest.config` に docker 関連の参照 — なし
+  - `lefthook.yml` に docker 関連フック — なし
+- **Implications**:
+  - 置換時に更新が必要なのは Dockerfile 内の自己参照パス 1 箇所のみ
+  - 外部参照（CI/CD、GitHub Actions）は全て `apps/app/docker/` パスを使用しており変更不要
+  - `codebuild/` ディレクトリと `README.md` は `docker/` 内にそのまま維持
+
 ## Risks & Mitigations
 
 - **Node.js 24 TypeScript ネイティブ実行の安定性**: type stripping は Node.js 23 で unflag 済み。Node.js 24 では安定機能。ただし enum 等の非 erasable syntax は使用不可 → interface/type のみ使用

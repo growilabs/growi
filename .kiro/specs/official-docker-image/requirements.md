@@ -119,3 +119,14 @@ GROWI 公式 Docker イメージの Dockerfile (`apps/app/docker/Dockerfile`) �
 3. The Docker イメージ shall ポート 3000 でリッスンする現行動作を維持する
 4. While メモリ管理の環境変数（`GROWI_HEAP_SIZE`、`GROWI_OPTIMIZE_MEMORY`、`GROWI_LITE_MODE`）が未設定の場合, the Docker イメージ shall 既存の動作（Node.js 24 のデフォルト）と実質的に同等に動作する
 5. The Docker イメージ shall `docker-compose.yml` / `compose.yaml` からの利用パターンを維持する
+
+### Requirement 8: 本番置換と CI/CD 対応
+
+**Objective:** As an インフラ管理者, I want docker-new ディレクトリの成果物が既存の docker ディレクトリを正式に置き換え、CI/CD パイプラインが新しい Dockerfile で動作すること, so that 本番ビルドで DHI ベースのイメージが使用される
+
+#### Acceptance Criteria
+
+1. The Docker ビルド構成 shall `apps/app/docker-new/` の全ファイル（`Dockerfile`、`docker-entrypoint.ts`、`docker-entrypoint.spec.ts`、`Dockerfile.dockerignore`）を `apps/app/docker/` に移動し、旧ファイル（旧 `Dockerfile`、`docker-entrypoint.sh`、旧 `Dockerfile.dockerignore`）を削除する。`codebuild/` ディレクトリと `README.md` は維持する
+2. The Dockerfile shall ファイル内の自己参照パス `apps/app/docker-new/docker-entrypoint.ts` を `apps/app/docker/docker-entrypoint.ts` に更新する
+3. The buildspec.yml shall DHI レジストリ（`dhi.io`）へのログインコマンドを pre_build フェーズに追加する。DHI は Docker Hub 認証情報を使用するため、既存の `DOCKER_REGISTRY_PASSWORD` シークレットを再利用する
+4. The buildspec.yml shall 新しい Dockerfile のパス（`./apps/app/docker/Dockerfile`）を正しく参照する（現行パスと同一のため変更不要であることを確認する）

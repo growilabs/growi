@@ -194,14 +194,19 @@ flowchart LR
 | 6.7 | フラグログ出力 | docker-entrypoint.ts | console.log | Entrypoint フロー |
 | 6.8 | TypeScript で記述 | docker-entrypoint.ts | Node.js type stripping | — |
 | 7.1-7.5 | 後方互換性 | 全コンポーネント | — | — |
+| 8.1 | docker-new → docker 置換 | ディレクトリ構造 | ファイルシステム | — |
+| 8.2 | Dockerfile パス参照更新 | Dockerfile | — | — |
+| 8.3 | DHI レジストリログイン | buildspec.yml | secrets-manager | Build フロー |
+| 8.4 | buildspec Dockerfile パス確認 | buildspec.yml | — | Build フロー |
 
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|-------------|--------|-------------|-----------------|-----------|
-| Dockerfile | Infrastructure | Docker イメージビルド定義 | 1.1-1.5, 3.1-3.5, 4.1-4.5, 5.1-5.3, 6.5 | DHI images (P0), turbo (P0), pnpm (P0) | — |
+| Dockerfile | Infrastructure | Docker イメージビルド定義 | 1.1-1.5, 3.1-3.5, 4.1-4.5, 5.1-5.3, 6.5, 8.2 | DHI images (P0), turbo (P0), pnpm (P0) | — |
 | docker-entrypoint.ts | Infrastructure | コンテナ起動時の初期化（TypeScript） | 2.1-2.7, 6.1-6.4, 6.6-6.8 | Node.js fs/child_process (P0), cgroup fs (P1) | Batch |
 | Dockerfile.dockerignore | Infrastructure | ビルドコンテキストフィルタ | 4.3 | — | — |
+| buildspec.yml | CI/CD | CodeBuild ビルド定義 | 8.3, 8.4 | AWS Secrets Manager (P0), dhi.io (P0) | Batch |
 
 ### Infrastructure Layer
 
@@ -504,3 +509,60 @@ entrypoint は try-catch で各フェーズのエラーを捕捉。致命的エ�
 - **ビルドキャッシュ**: `turbo prune --docker` により dependency install レイヤーをキャッシュ。ソースコード変更時の再ビルドで依存インストールをスキップ
 - **イメージサイズ**: DHI runtime に追加バイナリなし。node:24-slim 比でベースレイヤーが縮小
 - **メモリ効率**: `--max-heap-size` による total heap 制御で、v24 の trusted_space overhead 問題を回避。マルチテナントでのメモリ圧迫を防止
+
+## Phase 3: 本番置換と CI/CD 対応
+
+### ディレクトリ置換
+
+`apps/app/docker-new/` の成果物を `apps/app/docker/` に移動し、旧ファイルを削除する。
+
+**置換対象:**
+
+| 操作 | ファイル | 備考 |
+|------|---------|------|
+| 削除 | `apps/app/docker/Dockerfile` | 旧 3 ステージ Dockerfile（node:20-slim） |
+| 削除 | `apps/app/docker/docker-entrypoint.sh` | 旧 shell entrypoint（gosu 使用） |
+| 削除 | `apps/app/docker/Dockerfile.dockerignore` | 旧 dockerignore |
+| 移動 | `docker-new/Dockerfile` → `docker/Dockerfile` | 新 5 ステージ DHI Dockerfile |
+| 移動 | `docker-new/docker-entrypoint.ts` → `docker/docker-entrypoint.ts` | 新 TypeScript entrypoint |
+| 移動 | `docker-new/docker-entrypoint.spec.ts` → `docker/docker-entrypoint.spec.ts` | テストファイル |
+| 移動 | `docker-new/Dockerfile.dockerignore` → `docker/Dockerfile.dockerignore` | 新 dockerignore |
+| 維持 | `apps/app/docker/codebuild/` | CodeBuild 設定（変更なし） |
+| 維持 | `apps/app/docker/README.md` | Docker Hub README |
+
+**パス参照の更新:**
+- Dockerfile line 122: `apps/app/docker-new/docker-entrypoint.ts` → `apps/app/docker/docker-entrypoint.ts`
+
+**影響を受けない既存参照（コードベース調査済み）:**
+- `buildspec.yml`: `-f ./apps/app/docker/Dockerfile` — パスは同一のまま
+- `codebuild.tf`: `buildspec = "apps/app/docker/codebuild/buildspec.yml"` — 同一
+- `.github/workflows/release.yml`: `./apps/app/docker/README.md` — 同一
+- `.github/workflows/ci-app.yml`: `!apps/app/docker/**` 除外パターン — 同一
+- `apps/app/bin/github-actions/update-readme.sh`: `cd docker` — 同一
+
+### buildspec.yml の DHI レジストリ認証
+
+DHI イメージの pull に `docker login dhi.io` が必要。[DHI ドキュメント](https://docs.docker.com/dhi/how-to/use/)によると、DHI は Docker Hub 認証情報を使用する。
+
+**現行 buildspec.yml:**
+```yaml
+phases:
+  pre_build:
+    commands:
+      - echo ${DOCKER_REGISTRY_PASSWORD} | docker login --username growimoogle --password-stdin
+```
+
+**更新後:**
+```yaml
+phases:
+  pre_build:
+    commands:
+      # login to docker.io (for push)
+      - echo ${DOCKER_REGISTRY_PASSWORD} | docker login --username growimoogle --password-stdin
+      # login to dhi.io (for DHI base image pull)
+      - echo ${DOCKER_REGISTRY_PASSWORD} | docker login dhi.io --username growimoogle --password-stdin
+```
+
+- Docker Hub と同一の認証情報を使用（DHI は Docker Hub アカウントで認証）
+- 既存の `DOCKER_REGISTRY_PASSWORD` シークレットを再利用
+- `secretsmanager.tf` の変更は不要
