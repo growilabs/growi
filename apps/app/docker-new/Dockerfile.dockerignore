@@ -1,0 +1,50 @@
+# Dependencies and build caches
+**/node_modules
+**/.pnpm-store
+**/coverage
+**/.next
+**/.turbo
+out
+
+# Docker files (prevent recursive context)
+**/Dockerfile
+**/*.dockerignore
+
+# Git
+.git
+
+# IDE and editor settings
+.vscode
+.idea
+**/.DS_Store
+
+# Test files
+**/*.spec.*
+**/*.test.*
+**/test/
+**/__tests__/
+**/playwright/
+
+# Documentation (not needed for build)
+**/*.md
+!**/README.md
+
+# Environment files (secrets)
+.env
+.env.*
+!.env.production
+!.env.production.local
+
+# Unrelated apps
+apps/slackbot-proxy
+apps/pdf-converter
+
+# CI/CD and config
+.github
+.circleci
+**/.eslintrc*
+**/.prettierrc*
+**/biome.json
+**/tsconfig*.json
+!apps/app/tsconfig*.json
+!packages/*/tsconfig*.json
