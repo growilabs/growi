@@ -118,6 +118,15 @@
   - `docker compose up` での起動と SIGTERM による graceful shutdown を確認する
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
+## Known Issues
+
+- [ ] `process.initgroups()` による supplementary groups 初期化の追加
+  - design.md では `process.initgroups('node', 1000)` を呼ぶ設計だが、`@types/node` に型定義が存在しないため Phase 1 では実装を見送った
+  - ランタイムには `process.initgroups` は存在する（Node.js 24 で確認済み）
+  - 対応方法: `@types/node` の修正を待つか、`(process as any).initgroups('node', 1000)` で回避
+  - 実用上の影響は低い（Docker コンテナ内の node ユーザーは通常 supplementary groups を持たない）
+  - _Requirements: 4.1, 6.2_
+
 ## Phase 2: turbo prune --docker ビルド最適化（次フェーズ）
 
 > Phase 1 で runtime が安定した後に実施する。現行の `COPY . .` + 3 ステージ構成を `turbo prune --docker` + 5 ステージ構成に移行し、ビルドキャッシュ効率を向上させる。
