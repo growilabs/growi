@@ -1,6 +1,7 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
-import { format, subSeconds } from 'date-fns';
+import { format } from 'date-fns/format';
+import { subSeconds } from 'date-fns/subSeconds';
 import { join } from 'pathe';
 
 import { SupportedAction } from '~/interfaces/activity';

@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/style/noRestrictedImports: This file provides a factory method for custom axios instance */
 import type { AxiosRequestConfig } from 'axios';
 import axios from 'axios';
-import { formatISO } from 'date-fns';
+import { formatISO } from 'date-fns/formatISO';
 import qs from 'qs';
 
 import { convertStringsToDates } from './convert-strings-to-dates';
