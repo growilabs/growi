@@ -181,6 +181,12 @@ The following loop repeats until the user declares completion:
   - date-fns: 560 → 62 modules in initial chunks
   - _Requirements: 4.1, 6.1_
 
+- [x] 8.5 Loop iteration 3: null-loader expansion for server-only package leaks
+  - Added null-loader rules for `i18next-fs-backend` (server-only filesystem translation backend leaking via next-i18next), `bunyan` (server-only logging; client uses browser-bunyan via universal-bunyan), and `bunyan-format` (server-only log formatter)
+  - Null-loading bunyan eliminated its entire transitive dependency tree: mv, ncp, mkdirp, rimraf, glob, source-map, source-map-support, and other Node.js utilities
+  - Result: initial: 1,572 (-58, -3.6%) / async-only: 4,720 / total: 6,292 / compiled: 9,007
+  - _Requirements: 3.1, 3.2, 6.1_
+
 - [ ] 8.N Loop iteration N: (next iteration — measure, analyze, propose, implement)
 
 ## Phase 3: Next.js Version Upgrade Evaluation (Deferred)

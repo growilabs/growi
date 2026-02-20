@@ -127,6 +127,9 @@ module.exports = (phase) => {
             /dtrace-provider/,
             /mongoose/,
             /mathjax-full/, // required from marp
+            /i18next-fs-backend/, // server-only filesystem translation backend (leaks via next-i18next)
+            /\/bunyan\//, // server-only logging (client uses browser-bunyan via universal-bunyan)
+            /bunyan-format/, // server-only log formatter (client uses @browser-bunyan/console-formatted-stream)
           ].map((packageRegExp) => {
             return {
               test: packageRegExp,
