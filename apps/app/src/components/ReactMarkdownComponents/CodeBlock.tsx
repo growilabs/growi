@@ -1,41 +1,9 @@
-import type { ComponentType, CSSProperties, JSX, ReactNode } from 'react';
+import type { ComponentType, JSX, ReactNode } from 'react';
 import { startTransition, useEffect, useState } from 'react';
 
+import { LightweightCodeBlock } from './LightweightCodeBlock';
+
 import styles from './CodeBlock.module.scss';
-
-// Hardcoded container styles from the oneDark Prism theme.
-// fontFamily is intentionally omitted so the page's default monospace font is used.
-const preStyle: CSSProperties = {
-  background: 'hsl(220, 13%, 18%)',
-  color: 'hsl(220, 14%, 71%)',
-  textShadow: '0 1px rgba(0, 0, 0, 0.3)',
-  direction: 'ltr',
-  textAlign: 'left',
-  whiteSpace: 'pre',
-  wordSpacing: 'normal',
-  wordBreak: 'normal',
-  lineHeight: '1.5',
-  tabSize: 2,
-  hyphens: 'none',
-  padding: '1em',
-  margin: '0.5em 0',
-  overflow: 'auto',
-  borderRadius: '0.3em',
-};
-
-const codeStyle: CSSProperties = {
-  background: 'hsl(220, 13%, 18%)',
-  color: 'hsl(220, 14%, 71%)',
-  textShadow: '0 1px rgba(0, 0, 0, 0.3)',
-  direction: 'ltr',
-  textAlign: 'left',
-  whiteSpace: 'pre',
-  wordSpacing: 'normal',
-  wordBreak: 'normal',
-  lineHeight: '1.5',
-  tabSize: 2,
-  hyphens: 'none',
-};
 
 type PrismHighlighterProps = { lang: string; children: ReactNode };
 
@@ -82,30 +50,17 @@ function extractChildrenToIgnoreReactNode(children: ReactNode): ReactNode {
       .join('');
   }
 
-  // object
+  // React element or object with nested children
   if (typeof children === 'object') {
-    const grandChildren =
-      (children as any).children ?? (children as any).props.children;
+    const childObj = children as {
+      children?: ReactNode;
+      props?: { children?: ReactNode };
+    };
+    const grandChildren = childObj.children ?? childObj.props?.children;
     return extractChildrenToIgnoreReactNode(grandChildren);
   }
 
   return String(children).replace(/\n$/, '');
-}
-
-function LightweightCodeBlock({
-  lang,
-  children,
-}: {
-  lang: string;
-  children: ReactNode;
-}): JSX.Element {
-  return (
-    <div style={preStyle}>
-      <code className={`language-${lang}`} style={codeStyle}>
-        {children}
-      </code>
-    </div>
-  );
 }
 
 function CodeBlockSubstance({
@@ -171,8 +126,8 @@ export const CodeBlock = (props: CodeBlockProps): JSX.Element => {
   }
 
   const match = /language-(\w+)(:?.+)?/.exec(className || '');
-  const lang = match && match[1] ? match[1] : '';
-  const name = match && match[2] ? match[2].slice(1) : null;
+  const lang = match?.[1] ? match[1] : '';
+  const name = match?.[2] ? match[2].slice(1) : null;
 
   return (
     <>
