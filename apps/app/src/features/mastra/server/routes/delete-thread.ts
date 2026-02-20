@@ -55,28 +55,23 @@ export const deleteThreadHandlersFactory: DeleteThreadHandlersFactory = (
           );
         }
 
-        const thread = memory.getThreadById({ threadId });
+        const thread = await memory.getThreadById({ threadId });
         if (thread == null) {
           return res.apiv3Err(new ErrorV3('Thread not found'), 404);
         }
 
-        const messages = await memory.recall({ threadId, perPage: false });
+        if (thread.resourceId !== req.user._id.toString()) {
+          return res.apiv3Err(
+            new ErrorV3('Users cannot delete threads created by others'),
+            403,
+          );
+        }
 
-        // TODO: https://redmine.weseek.co.jp/issues/173988
+        await memory.deleteThread(threadId);
 
-        // const uiMessages = toAISdkV5Messages(messages);
-
-        // const messageIds = uiMessages.map((message) => message.id);
-
-        // The deleteMessage method is not implemented
-        // Refs:
-        // https://github.com/mastra-ai/mastra/tree/35667834530f6fee2cc4f68adf7c7b9ca1122b14/stores/mongodb#storage-methods
-        // https://github.com/mastra-ai/mastra/blob/35667834530f6fee2cc4f68adf7c7b9ca1122b14/stores/mongodb/src/storage/index.ts#L86
-
-        // await memory.deleteMessages([...messageIds]);
-        // await thread.delete();
-
-        return res.apiv3({});
+        return res.apiv3({
+          deletedThreadId: threadId,
+        });
       } catch (err) {
         logger.error(err);
 
