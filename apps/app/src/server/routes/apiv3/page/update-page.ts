@@ -118,24 +118,30 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
     }
 
-    // persist activity
-    const creator =
-      updatedPage.creator != null
-        ? getIdForRef(updatedPage.creator)
-        : undefined;
-    const parameters = {
-      targetModel: SupportedTargetModel.MODEL_PAGE,
-      target: updatedPage,
-      action: SupportedAction.ACTION_PAGE_UPDATE,
-    };
-    const activityEvent = crowi.events.activity;
-    activityEvent.emit(
-      'update',
-      res.locals.activity._id,
-      parameters,
-      { path: updatedPage.path, creator },
-      preNotifyService.generatePreNotify,
-    );
+    const ignoreEditWindow = 60 * 1000; // 60 seconds
+    const pageAgeMs =
+      updatedPage.updatedAt.getTime() - updatedPage.createdAt.getTime();
+    const isWithinIgnoreEditWindow = pageAgeMs < ignoreEditWindow;
+
+    if (!isWithinIgnoreEditWindow) {
+      const creator =
+        updatedPage.creator != null
+          ? getIdForRef(updatedPage.creator)
+          : undefined;
+      const parameters = {
+        targetModel: SupportedTargetModel.MODEL_PAGE,
+        target: updatedPage,
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+      };
+      const activityEvent = crowi.events.activity;
+      activityEvent.emit(
+        'update',
+        res.locals.activity._id,
+        parameters,
+        { path: updatedPage.path, creator },
+        preNotifyService.generatePreNotify,
+      );
+    }
 
     // global notification
     try {
