@@ -56,9 +56,82 @@ describe('resolveParentGrant', () => {
     });
   });
 
-  describe('when parent page does not exist', () => {
+  describe('ancestor path traversal', () => {
+    it('should find ancestor grant when direct parent does not exist', async () => {
+      // /tech-notes/React/state-management → null, /tech-notes/React → found
+      mocks.findOneMock.mockImplementation((query: { path: string }) => ({
+        lean: vi
+          .fn()
+          .mockResolvedValue(
+            query.path === '/tech-notes/React' ? { grant: GRANT_PUBLIC } : null,
+          ),
+      }));
+
+      const result = await resolveParentGrant(
+        '/tech-notes/React/state-management/',
+      );
+      expect(result).toBe(GRANT_PUBLIC);
+    });
+
+    it('should traverse multiple levels to find ancestor grant', async () => {
+      // /a/b/c/d → null, /a/b/c → null, /a/b → null, /a → found
+      mocks.findOneMock.mockImplementation((query: { path: string }) => ({
+        lean: vi
+          .fn()
+          .mockResolvedValue(
+            query.path === '/a' ? { grant: GRANT_USER_GROUP } : null,
+          ),
+      }));
+
+      const result = await resolveParentGrant('/a/b/c/d/');
+      expect(result).toBe(GRANT_USER_GROUP);
+    });
+
+    it('should find root page grant when no intermediate ancestor exists', async () => {
+      // /nonexistent/deep → null, /nonexistent → null, / → found
+      mocks.findOneMock.mockImplementation((query: { path: string }) => ({
+        lean: vi
+          .fn()
+          .mockResolvedValue(
+            query.path === '/' ? { grant: GRANT_PUBLIC } : null,
+          ),
+      }));
+
+      const result = await resolveParentGrant('/nonexistent/deep/');
+      expect(result).toBe(GRANT_PUBLIC);
+    });
+
+    it('should return GRANT_OWNER when no ancestor exists at any level', async () => {
+      mocks.findOneMock.mockImplementation(() => ({
+        lean: vi.fn().mockResolvedValue(null),
+      }));
+
+      const result = await resolveParentGrant('/nonexistent/deep/path/');
+      expect(result).toBe(GRANT_OWNER);
+    });
+
+    it('should stop at direct parent when it exists without further traversal', async () => {
+      mocks.findOneMock.mockImplementation((query: { path: string }) => ({
+        lean: vi
+          .fn()
+          .mockResolvedValue(
+            query.path === '/tech-notes/React/hooks'
+              ? { grant: GRANT_USER_GROUP }
+              : { grant: GRANT_PUBLIC },
+          ),
+      }));
+
+      const result = await resolveParentGrant('/tech-notes/React/hooks/');
+      expect(result).toBe(GRANT_USER_GROUP);
+      expect(mocks.findOneMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('when no ancestor page exists', () => {
     it('should return GRANT_OWNER (4) as safe default', async () => {
-      mocks.leanMock.mockResolvedValue(null);
+      mocks.findOneMock.mockImplementation(() => ({
+        lean: vi.fn().mockResolvedValue(null),
+      }));
 
       const result = await resolveParentGrant('/memo/bob/');
       expect(result).toBe(GRANT_OWNER);

@@ -29,7 +29,7 @@
 
 ## Phase 2 — Revised
 
-- [ ] 2. (P) Enhance grant resolver for ancestor path traversal
+- [x] 2. (P) Enhance grant resolver for ancestor path traversal
   - Enhance the existing grant resolution to support paths that may not yet exist in GROWI, as required by the sibling pattern where new directory names are generated
   - When the direct parent page exists, return its grant value as the upper bound for child page permissions
   - When the direct parent page is not found, traverse upward through ancestor paths to find the nearest existing page's grant
