@@ -15,6 +15,13 @@ export type PathSuggestion = {
   grant: number;
 };
 
+export type InformationType = 'flow' | 'stock';
+
+export type ContentAnalysis = {
+  keywords: string[];
+  informationType: InformationType;
+};
+
 export type SuggestPathResponse = {
   suggestions: PathSuggestion[];
 };
