@@ -1,9 +1,11 @@
 # syntax = docker/dockerfile:1
 
+ARG NODE_VERSION=24
+
 ##
 ## base
 ##
-FROM node:20-slim AS base
+FROM node:${NODE_VERSION}-slim AS base
 
 ENV optDir="/opt"
 
@@ -52,7 +54,8 @@ RUN tar -zcf packages.tar.gz \
 ##
 ## release
 ##
-FROM node:20-slim
+ARG NODE_VERSION=24
+FROM node:${NODE_VERSION}-slim
 LABEL maintainer="Yuki Takei <yuki@weseek.co.jp>"
 
 ENV NODE_ENV="production"
