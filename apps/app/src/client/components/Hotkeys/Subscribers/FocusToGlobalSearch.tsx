@@ -6,12 +6,22 @@ import {
 } from '~/features/search/client/states/modal/search';
 import { useIsEditable } from '~/states/page';
 
-const FocusToGlobalSearch = (props) => {
+import type { HotkeyBindingDef } from '../HotkeysManager';
+
+type Props = {
+  onDeleteRender: () => void;
+};
+
+export const hotkeyBindings: HotkeyBindingDef = {
+  keys: '/',
+  category: 'single',
+};
+
+const FocusToGlobalSearch = ({ onDeleteRender }: Props): null => {
   const isEditable = useIsEditable();
   const searchModalData = useSearchModalStatus();
   const { open: openSearchModal } = useSearchModalActions();
 
-  // setup effect
   useEffect(() => {
     if (!isEditable) {
       return;
@@ -19,16 +29,11 @@ const FocusToGlobalSearch = (props) => {
 
     if (!searchModalData.isOpened) {
       openSearchModal();
-      // remove this
-      props.onDeleteRender();
+      onDeleteRender();
     }
-  }, [isEditable, openSearchModal, props, searchModalData.isOpened]);
+  }, [isEditable, openSearchModal, onDeleteRender, searchModalData.isOpened]);
 
   return null;
 };
 
-FocusToGlobalSearch.getHotkeyStrokes = () => {
-  return [['/']];
-};
-
-export default FocusToGlobalSearch;
+export { FocusToGlobalSearch };
