@@ -13,6 +13,7 @@ export type PathSuggestion = {
   label: string;
   description: string;
   grant: number;
+  informationType?: InformationType;
 };
 
 export type InformationType = 'flow' | 'stock';

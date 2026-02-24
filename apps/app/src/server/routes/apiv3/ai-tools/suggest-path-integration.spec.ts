@@ -12,8 +12,17 @@ const testState = vi.hoisted(() => ({
   openaiServiceType: 'openai' as string | null,
   disableUserPages: false,
   // Phase 2 controls
-  extractedKeywords: [] as string[],
-  extractKeywordsError: null as Error | null,
+  contentAnalysis: null as {
+    keywords: string[];
+    informationType: 'flow' | 'stock';
+  } | null,
+  contentAnalysisError: null as Error | null,
+  evaluatedSuggestions: [] as Array<{
+    path: string;
+    label: string;
+    description: string;
+  }>,
+  evaluateCandidatesError: null as Error | null,
   parentGrant: 1,
 }));
 
@@ -75,13 +84,26 @@ vi.mock(
   }),
 );
 
-// Mock extractKeywords — configurable per test via testState
-vi.mock('./extract-keywords', () => ({
-  extractKeywords: vi.fn().mockImplementation(() => {
-    if (testState.extractKeywordsError != null) {
-      return Promise.reject(testState.extractKeywordsError);
+// Mock analyzeContent — configurable per test via testState
+vi.mock('./analyze-content', () => ({
+  analyzeContent: vi.fn().mockImplementation(() => {
+    if (testState.contentAnalysisError != null) {
+      return Promise.reject(testState.contentAnalysisError);
     }
-    return Promise.resolve(testState.extractedKeywords);
+    if (testState.contentAnalysis == null) {
+      return Promise.resolve({ keywords: [], informationType: 'stock' });
+    }
+    return Promise.resolve(testState.contentAnalysis);
+  }),
+}));
+
+// Mock evaluateCandidates — configurable per test via testState
+vi.mock('./evaluate-candidates', () => ({
+  evaluateCandidates: vi.fn().mockImplementation(() => {
+    if (testState.evaluateCandidatesError != null) {
+      return Promise.reject(testState.evaluateCandidatesError);
+    }
+    return Promise.resolve(testState.evaluatedSuggestions);
   }),
 }));
 
@@ -102,8 +124,10 @@ describe('POST /suggest-path integration', () => {
     testState.aiEnabled = true;
     testState.openaiServiceType = 'openai';
     testState.disableUserPages = false;
-    testState.extractedKeywords = [];
-    testState.extractKeywordsError = null;
+    testState.contentAnalysis = null;
+    testState.contentAnalysisError = null;
+    testState.evaluatedSuggestions = [];
+    testState.evaluateCandidatesError = null;
     testState.parentGrant = 1;
 
     mockSearchKeyword = vi.fn().mockResolvedValue([{ data: [] }, undefined]);
@@ -223,14 +247,39 @@ describe('POST /suggest-path integration', () => {
 
   describe('Phase 2 — multi-suggestion response', () => {
     const searchResults = [
-      { _score: 10, _source: { path: '/tech-notes/React/hooks-guide' } },
-      { _score: 8, _source: { path: '/tech-notes/React/state-management' } },
-      { _score: 5, _source: { path: '/tech-notes/React/best-practices' } },
+      {
+        _score: 10,
+        _source: { path: '/tech-notes/React/hooks-guide' },
+        _highlight: { body: ['React hooks overview'] },
+      },
+      {
+        _score: 8,
+        _source: { path: '/tech-notes/React/state-management' },
+        _highlight: { body: ['State management'] },
+      },
+      {
+        _score: 5,
+        _source: { path: '/tech-notes/React/best-practices' },
+        _highlight: { body: ['Best practices'] },
+      },
+    ];
+
+    const evaluatedResults = [
+      {
+        path: '/tech-notes/React/',
+        label: 'Save near related pages',
+        description:
+          'This area contains React documentation. Your stock content fits well here.',
+      },
     ];
 
     describe('complete flow with all suggestion types', () => {
-      it('should return memo, search, and category suggestions when keywords extracted and search results found', async () => {
-        testState.extractedKeywords = ['React', 'hooks'];
+      it('should return memo, search, and category suggestions when analysis succeeds and search results found', async () => {
+        testState.contentAnalysis = {
+          keywords: ['React', 'hooks'],
+          informationType: 'stock',
+        };
+        testState.evaluatedSuggestions = evaluatedResults;
         mockSearchKeyword.mockResolvedValue([
           { data: searchResults },
           undefined,
@@ -241,14 +290,21 @@ describe('POST /suggest-path integration', () => {
           .send({ body: 'Content about React hooks and state management' })
           .expect(200);
 
-        expect(response.body.suggestions).toHaveLength(3);
+        expect(response.body.suggestions.length).toBeGreaterThanOrEqual(3);
         expect(response.body.suggestions[0].type).toBe('memo');
         expect(response.body.suggestions[1].type).toBe('search');
-        expect(response.body.suggestions[2].type).toBe('category');
+        // Category is the last suggestion
+        const lastSuggestion =
+          response.body.suggestions[response.body.suggestions.length - 1];
+        expect(lastSuggestion.type).toBe('category');
       });
 
       it('should return correct memo suggestion alongside Phase 2 suggestions', async () => {
-        testState.extractedKeywords = ['React', 'hooks'];
+        testState.contentAnalysis = {
+          keywords: ['React', 'hooks'],
+          informationType: 'stock',
+        };
+        testState.evaluatedSuggestions = evaluatedResults;
         mockSearchKeyword.mockResolvedValue([
           { data: searchResults },
           undefined,
@@ -268,8 +324,12 @@ describe('POST /suggest-path integration', () => {
         });
       });
 
-      it('should return search suggestion with parent directory path and related page titles in description', async () => {
-        testState.extractedKeywords = ['React', 'hooks'];
+      it('should return search suggestion with AI-evaluated path and description', async () => {
+        testState.contentAnalysis = {
+          keywords: ['React', 'hooks'],
+          informationType: 'stock',
+        };
+        testState.evaluatedSuggestions = evaluatedResults;
         mockSearchKeyword.mockResolvedValue([
           { data: searchResults },
           undefined,
@@ -285,13 +345,18 @@ describe('POST /suggest-path integration', () => {
         expect(searchSuggestion.path).toBe('/tech-notes/React/');
         expect(searchSuggestion.label).toBe('Save near related pages');
         expect(searchSuggestion.description).toBe(
-          'Related pages under this directory: hooks-guide, state-management, best-practices',
+          'This area contains React documentation. Your stock content fits well here.',
         );
         expect(searchSuggestion.grant).toBe(1);
+        expect(searchSuggestion.informationType).toBe('stock');
       });
 
       it('should return category suggestion with top-level segment path and category name in description', async () => {
-        testState.extractedKeywords = ['React', 'hooks'];
+        testState.contentAnalysis = {
+          keywords: ['React', 'hooks'],
+          informationType: 'stock',
+        };
+        testState.evaluatedSuggestions = evaluatedResults;
         mockSearchKeyword.mockResolvedValue([
           { data: searchResults },
           undefined,
@@ -302,7 +367,8 @@ describe('POST /suggest-path integration', () => {
           .send({ body: 'Content about React hooks' })
           .expect(200);
 
-        const categorySuggestion = response.body.suggestions[2];
+        const categorySuggestion =
+          response.body.suggestions[response.body.suggestions.length - 1];
         expect(categorySuggestion.type).toBe('category');
         expect(categorySuggestion.path).toBe('/tech-notes/');
         expect(categorySuggestion.label).toBe('Save under category');
@@ -315,7 +381,11 @@ describe('POST /suggest-path integration', () => {
 
     describe('response structure verification', () => {
       it('should have trailing slashes on all suggestion paths', async () => {
-        testState.extractedKeywords = ['React', 'hooks'];
+        testState.contentAnalysis = {
+          keywords: ['React', 'hooks'],
+          informationType: 'stock',
+        };
+        testState.evaluatedSuggestions = evaluatedResults;
         mockSearchKeyword.mockResolvedValue([
           { data: searchResults },
           undefined,
@@ -332,7 +402,11 @@ describe('POST /suggest-path integration', () => {
       });
 
       it('should include all required fields in every suggestion', async () => {
-        testState.extractedKeywords = ['React', 'hooks'];
+        testState.contentAnalysis = {
+          keywords: ['React', 'hooks'],
+          informationType: 'stock',
+        };
+        testState.evaluatedSuggestions = evaluatedResults;
         mockSearchKeyword.mockResolvedValue([
           { data: searchResults },
           undefined,
@@ -358,7 +432,11 @@ describe('POST /suggest-path integration', () => {
       });
 
       it('should include grant values as numbers for all suggestion types', async () => {
-        testState.extractedKeywords = ['React', 'hooks'];
+        testState.contentAnalysis = {
+          keywords: ['React', 'hooks'],
+          informationType: 'stock',
+        };
+        testState.evaluatedSuggestions = evaluatedResults;
         mockSearchKeyword.mockResolvedValue([
           { data: searchResults },
           undefined,
@@ -376,8 +454,8 @@ describe('POST /suggest-path integration', () => {
     });
 
     describe('graceful degradation', () => {
-      it('should return memo-only when keyword extraction fails', async () => {
-        testState.extractKeywordsError = new Error('AI service unavailable');
+      it('should return memo-only when content analysis fails', async () => {
+        testState.contentAnalysisError = new Error('AI service unavailable');
 
         const response = await request(app)
           .post('/suggest-path')
@@ -388,8 +466,8 @@ describe('POST /suggest-path integration', () => {
         expect(response.body.suggestions[0].type).toBe('memo');
       });
 
-      it('should return memo-only when keyword extraction returns empty array', async () => {
-        // testState.extractedKeywords is [] by default
+      it('should return memo-only when content analysis returns empty keywords', async () => {
+        // testState.contentAnalysis is null by default → returns { keywords: [], informationType: 'stock' }
 
         const response = await request(app)
           .post('/suggest-path')
@@ -400,8 +478,12 @@ describe('POST /suggest-path integration', () => {
         expect(response.body.suggestions[0].type).toBe('memo');
       });
 
-      it('should omit search and category suggestions when search returns no results', async () => {
-        testState.extractedKeywords = ['React', 'hooks'];
+      it('should omit search suggestions when search returns no results above threshold', async () => {
+        testState.contentAnalysis = {
+          keywords: ['React', 'hooks'],
+          informationType: 'stock',
+        };
+        testState.evaluatedSuggestions = [];
         mockSearchKeyword.mockResolvedValue([{ data: [] }, undefined]);
 
         const response = await request(app)
@@ -414,7 +496,7 @@ describe('POST /suggest-path integration', () => {
       });
 
       it('should return correct memo structure even when Phase 2 degrades', async () => {
-        testState.extractKeywordsError = new Error('AI service unavailable');
+        testState.contentAnalysisError = new Error('AI service unavailable');
 
         const response = await request(app)
           .post('/suggest-path')

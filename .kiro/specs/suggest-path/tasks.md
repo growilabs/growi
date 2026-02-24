@@ -79,7 +79,7 @@
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
 - [ ] 7. Phase 2 revised orchestration and integration
-- [ ] 7.1 Rewrite orchestration for revised Phase 2 pipeline
+- [x] 7.1 Rewrite orchestration for revised Phase 2 pipeline
   - Rewrite the orchestration function to implement the revised Phase 2 pipeline: always generate memo suggestion first as guaranteed fallback, then invoke content analysis (1st AI call), pass keywords to search candidate retrieval, pass candidates to candidate evaluation (2nd AI call), and run category generation in parallel with the search-evaluate pipeline
   - After candidate evaluation returns, resolve grant for each proposed path via grant resolver
   - Map the informationType from content analysis onto each search-type suggestion in the final response, and add informationType as an optional field on the suggestion type

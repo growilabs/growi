@@ -15,8 +15,14 @@ import UserGroupRelation from '~/server/models/user-group-relation';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
-import { extractKeywords } from './extract-keywords';
+import { analyzeContent } from './analyze-content';
+import { evaluateCandidates } from './evaluate-candidates';
+import { generateCategorySuggestion } from './generate-category-suggestion';
+import type { SearchService as CategorySearchService } from './generate-search-suggestion';
 import { generateSuggestions } from './generate-suggestions';
+import { resolveParentGrant } from './resolve-parent-grant';
+import type { SearchService } from './retrieve-search-candidates';
+import { retrieveSearchCandidates } from './retrieve-search-candidates';
 
 const logger = loggerFactory('growi:routes:apiv3:ai-tools:suggest-path');
 
@@ -71,7 +77,22 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
           user,
           req.body.body,
           userGroups,
-          { searchService, extractKeywords },
+          {
+            analyzeContent,
+            retrieveSearchCandidates: (keywords, u, groups) =>
+              retrieveSearchCandidates(keywords, u, groups, {
+                searchService: searchService as unknown as SearchService,
+              }),
+            evaluateCandidates,
+            generateCategorySuggestion: (keywords, u, groups) =>
+              generateCategorySuggestion(
+                keywords,
+                u,
+                groups,
+                searchService as unknown as CategorySearchService,
+              ),
+            resolveParentGrant,
+          },
         );
         return res.apiv3({ suggestions });
       } catch (err) {

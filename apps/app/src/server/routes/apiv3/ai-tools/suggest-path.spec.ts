@@ -7,7 +7,6 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 const mocks = vi.hoisted(() => {
   return {
     generateSuggestionsMock: vi.fn(),
-    extractKeywordsMock: vi.fn(),
     loginRequiredFactoryMock: vi.fn(),
     certifyAiServiceMock: vi.fn(),
     findAllUserGroupIdsMock: vi.fn(),
@@ -19,9 +18,16 @@ vi.mock('./generate-suggestions', () => ({
   generateSuggestions: mocks.generateSuggestionsMock,
 }));
 
-vi.mock('./extract-keywords', () => ({
-  extractKeywords: mocks.extractKeywordsMock,
+// Mock modules imported by the handler for dependency injection
+vi.mock('./analyze-content', () => ({ analyzeContent: vi.fn() }));
+vi.mock('./evaluate-candidates', () => ({ evaluateCandidates: vi.fn() }));
+vi.mock('./generate-category-suggestion', () => ({
+  generateCategorySuggestion: vi.fn(),
 }));
+vi.mock('./retrieve-search-candidates', () => ({
+  retrieveSearchCandidates: vi.fn(),
+}));
+vi.mock('./resolve-parent-grant', () => ({ resolveParentGrant: vi.fn() }));
 
 vi.mock('~/server/middlewares/login-required', () => ({
   default: mocks.loginRequiredFactoryMock,
@@ -123,10 +129,13 @@ describe('suggestPathHandlersFactory', () => {
         { _id: 'user123', username: 'alice' },
         'Some page content',
         ['group1', 'extGroup1'],
-        {
-          searchService: mockSearchService,
-          extractKeywords: mocks.extractKeywordsMock,
-        },
+        expect.objectContaining({
+          analyzeContent: expect.any(Function),
+          retrieveSearchCandidates: expect.any(Function),
+          evaluateCandidates: expect.any(Function),
+          generateCategorySuggestion: expect.any(Function),
+          resolveParentGrant: expect.any(Function),
+        }),
       );
     });
 
