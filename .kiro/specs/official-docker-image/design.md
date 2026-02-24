@@ -2,48 +2,48 @@
 
 ## Overview
 
-**Purpose**: GROWI 公式 Docker イメージの Dockerfile と entrypoint を 2025-2026 年のベストプラクティスに基づきモダナイズし、セキュリティ強化・メモリ管理最適化・ビルド効率向上を実現する。
+**Purpose**: Modernize the Dockerfile and entrypoint for the GROWI official Docker image based on 2025-2026 best practices, achieving enhanced security, optimized memory management, and improved build efficiency.
 
-**Users**: インフラ管理者（ビルド・デプロイ）、GROWI 運用者（メモリチューニング）、Docker image エンドユーザー（docker-compose での利用）が対象。
+**Users**: Infrastructure administrators (build/deploy), GROWI operators (memory tuning), and Docker image end users (usage via docker-compose).
 
-**Impact**: 既存の 3 ステージ Dockerfile を 5 ステージ構成に再設計。ベースイメージを Docker Hardened Images (DHI) に移行。entrypoint を shell script から TypeScript に変更し（Node.js 24 のネイティブ TypeScript 実行）、シェル不要の完全ハードニング構成を実現。
+**Impact**: Redesign the existing 3-stage Dockerfile into a 5-stage configuration. Migrate the base image to Docker Hardened Images (DHI). Change the entrypoint from a shell script to TypeScript (using Node.js 24 native TypeScript execution), achieving a fully hardened configuration that requires no shell.
 
 ### Goals
 
-- DHI ベースイメージ採用による CVE 最大 95% 削減
-- **シェル完全不要の TypeScript entrypoint** — Node.js 24 のネイティブ TypeScript 実行（type stripping）、DHI runtime の攻撃面最小化をそのまま維持
-- `GROWI_HEAP_SIZE` / cgroup 自動算出 / V8 デフォルトの 3 段フォールバックによるメモリ管理
-- `turbo prune --docker` パターンによるビルドキャッシュ効率向上
-- gosu → `process.setuid/setgid`（Node.js ネイティブ）による権限ドロップ
+- Up to 95% CVE reduction through DHI base image adoption
+- **Fully shell-free TypeScript entrypoint** — Node.js 24 native TypeScript execution (type stripping), maintaining the minimized attack surface of the DHI runtime as-is
+- Memory management via 3-tier fallback: `GROWI_HEAP_SIZE` / cgroup auto-calculation / V8 default
+- Improved build cache efficiency through the `turbo prune --docker` pattern
+- Privilege drop via gosu → `process.setuid/setgid` (Node.js native)
 
 ### Non-Goals
 
-- Kubernetes マニフェスト / Helm chart の変更（GROWI.cloud 側の `GROWI_HEAP_SIZE` 設定は対象外）
-- アプリケーションコードの変更（gc() 追加、.pipe() 移行等は別 spec）
-- docker-compose.yml の更新（ドキュメント更新のみ）
-- Node.js 24 未満のバージョンサポート
-- HEALTHCHECK 命令の追加（k8s は独自 probe を使用、Docker Compose ユーザーは自前で設定可能）
+- Changes to Kubernetes manifests / Helm charts (GROWI.cloud `GROWI_HEAP_SIZE` configuration is out of scope)
+- Application code changes (adding gc(), migrating to .pipe(), etc. are separate specs)
+- Updating docker-compose.yml (documentation updates only)
+- Support for Node.js versions below 24
+- Adding HEALTHCHECK instructions (k8s uses its own probes, Docker Compose users can configure their own)
 
 ## Architecture
 
 ### Existing Architecture Analysis
 
-**現行 Dockerfile の 3 ステージ構成:**
+**Current Dockerfile 3-stage configuration:**
 
-| Stage | Base Image | 役割 |
+| Stage | Base Image | Role |
 |-------|-----------|------|
-| `base` | `node:20-slim` | pnpm + turbo のインストール |
+| `base` | `node:20-slim` | Install pnpm + turbo |
 | `builder` | `base` | `COPY . .` → install → build → artifacts |
-| release (unnamed) | `node:20-slim` | gosu install → artifacts 展開 → 実行 |
+| release (unnamed) | `node:20-slim` | gosu install → artifact extraction → execution |
 
-**主な課題:**
-- `COPY . .` でモノレポ全体がビルドレイヤーに含まれる
-- pnpm バージョンがハードコード (`PNPM_VERSION="10.4.1"`)
-- `---frozen-lockfile` の typo
-- ベースイメージが node:20-slim（CVE が蓄積しやすい）
-- メモリ管理フラグなし
-- OCI ラベルなし
-- gosu のインストールに apt-get が必要（runtime に apt 依存）
+**Main issues:**
+- `COPY . .` includes the entire monorepo in the build layer
+- pnpm version is hardcoded (`PNPM_VERSION="10.4.1"`)
+- Typo in `---frozen-lockfile`
+- Base image is node:20-slim (prone to CVE accumulation)
+- No memory management flags
+- No OCI labels
+- gosu installation requires apt-get (runtime dependency on apt)
 
 ### Architecture Pattern & Boundary Map
 
@@ -75,27 +75,27 @@ graph TB
 **Architecture Integration:**
 - Selected pattern: Multi-stage build with dependency caching separation
 - Domain boundaries: Build concerns (stages 1-4) vs Runtime concerns (stage 5 + entrypoint)
-- Existing patterns preserved: pnpm deploy による本番依存抽出、tar.gz アーティファクト転送
-- New components: pruner ステージ（turbo prune）、TypeScript entrypoint
-- **Key change**: gosu + shell script → TypeScript entrypoint（`process.setuid/setgid` + `fs` module + `child_process.execFileSync/spawn`）。busybox/bash のコピーが不要になり、DHI runtime の攻撃面最小化をそのまま維持。Node.js 24 の type stripping で `.ts` を直接実行
-- Steering compliance: Debian ベース維持（glibc パフォーマンス）、モノレポビルドパターン維持
+- Existing patterns preserved: Production dependency extraction via pnpm deploy, tar.gz artifact transfer
+- New components: pruner stage (turbo prune), TypeScript entrypoint
+- **Key change**: gosu + shell script → TypeScript entrypoint (`process.setuid/setgid` + `fs` module + `child_process.execFileSync/spawn`). Eliminates the need for copying busybox/bash, maintaining the minimized attack surface of the DHI runtime as-is. Executes `.ts` directly via Node.js 24 type stripping
+- Steering compliance: Maintains Debian base (glibc performance), maintains monorepo build pattern
 
 ### Technology Stack
 
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
-| Base Image (build) | `dhi.io/node:24-debian13-dev` | ビルドステージのベース | apt/bash/git/util-linux 利用可能 |
-| Base Image (runtime) | `dhi.io/node:24-debian13` | リリースステージのベース | 極小構成、CVE 95% 削減、**シェルなし** |
-| Entrypoint | Node.js (TypeScript) | 初期化・ヒープ算出・権限ドロップ・プロセス起動 | Node.js 24 native type stripping、busybox/bash 不要 |
-| Privilege Drop | `process.setuid/setgid` (Node.js) | root → node ユーザー切替 | 外部バイナリ不要 |
-| Build Tool | `turbo prune --docker` | モノレポ最小化 | Turborepo 公式推奨 |
-| Package Manager | pnpm (wget standalone) | 依存管理 | corepack 不採用（Node.js 25+ で廃止予定） |
+| Base Image (build) | `dhi.io/node:24-debian13-dev` | Base for build stages | apt/bash/git/util-linux available |
+| Base Image (runtime) | `dhi.io/node:24-debian13` | Base for release stage | Minimal configuration, 95% CVE reduction, **no shell** |
+| Entrypoint | Node.js (TypeScript) | Initialization, heap calculation, privilege drop, process startup | Node.js 24 native type stripping, no busybox/bash needed |
+| Privilege Drop | `process.setuid/setgid` (Node.js) | root → node user switch | No external binaries needed |
+| Build Tool | `turbo prune --docker` | Monorepo minimization | Official Turborepo recommendation |
+| Package Manager | pnpm (wget standalone) | Dependency management | corepack not adopted (scheduled for removal in Node.js 25+) |
 
-> TypeScript entrypoint 採用の経緯、busybox-static/setpriv との比較は `research.md` を参照。
+> For the rationale behind adopting the TypeScript entrypoint and comparison with busybox-static/setpriv, see `research.md`.
 
 ## System Flows
 
-### Entrypoint 実行フロー
+### Entrypoint Execution Flow
 
 ```mermaid
 flowchart TD
@@ -116,13 +116,13 @@ flowchart TD
 ```
 
 **Key Decisions:**
-- cgroup v2 (`/sys/fs/cgroup/memory.max`) を優先、v1 にフォールバック
-- cgroup v1 の unlimited 値（巨大な数値）はフラグなしとして扱う（閾値: 64GB）
-- `--max-heap-size` は entrypoint プロセスではなく、spawn される子プロセス（アプリ本体）に渡される
-- migration は `child_process.execFileSync` で直接 node を呼び出す（`npm run` 不使用、シェル不要）
-- アプリ起動は `child_process.spawn` + シグナルフォワーディングで PID 1 の責務を果たす
+- Prioritize cgroup v2 (`/sys/fs/cgroup/memory.max`), fall back to v1
+- Treat cgroup v1 unlimited value (very large number) as no flag (threshold: 64GB)
+- `--max-heap-size` is passed to the spawned child process (the application itself), not the entrypoint process
+- Migration is invoked directly via `child_process.execFileSync` calling node (no `npm run`, no shell needed)
+- App startup uses `child_process.spawn` + signal forwarding to fulfill PID 1 responsibilities
 
-### Docker Build フロー
+### Docker Build Flow
 
 ```mermaid
 flowchart LR
@@ -160,53 +160,53 @@ flowchart LR
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1 | DHI ベースイメージ | base, release ステージ | — | Build フロー |
-| 1.2 | syntax ディレクティブ更新 | Dockerfile ヘッダ | — | — |
-| 1.3 | pnpm wget インストール維持 | base ステージ | — | Build フロー |
-| 1.4 | frozen-lockfile typo 修正 | deps ステージ | — | — |
-| 1.5 | pnpm バージョン非ハードコード | base ステージ | — | — |
-| 2.1 | GROWI_HEAP_SIZE | docker-entrypoint.ts | 環境変数 I/F | Entrypoint フロー |
-| 2.2 | cgroup 自動算出 | docker-entrypoint.ts | cgroup fs I/F | Entrypoint フロー |
-| 2.3 | フラグなしフォールバック | docker-entrypoint.ts | — | Entrypoint フロー |
-| 2.4 | GROWI_OPTIMIZE_MEMORY | docker-entrypoint.ts | 環境変数 I/F | Entrypoint フロー |
-| 2.5 | GROWI_LITE_MODE | docker-entrypoint.ts | 環境変数 I/F | Entrypoint フロー |
-| 2.6 | --max-heap-size 使用 | docker-entrypoint.ts | spawn args | Entrypoint フロー |
-| 2.7 | NODE_OPTIONS 不使用 | docker-entrypoint.ts | — | Entrypoint フロー |
-| 3.1 | COPY . . 廃止 | pruner + deps ステージ | — | Build フロー |
-| 3.2 | pnpm cache mount 維持 | deps, builder ステージ | — | Build フロー |
-| 3.3 | apt cache mount 維持 | base ステージ | — | Build フロー |
-| 3.4 | .next/cache 除外 | builder ステージ | — | — |
-| 3.5 | bind from=builder パターン | release ステージ | — | Build フロー |
-| 4.1 | 非 root 実行 | docker-entrypoint.ts | process.setuid/setgid | Entrypoint フロー |
-| 4.2 | 不要パッケージ排除 | release ステージ | — | — |
-| 4.3 | .dockerignore 強化 | Dockerfile.dockerignore | — | — |
-| 4.4 | --no-install-recommends | base ステージ | — | — |
-| 4.5 | ビルドツール排除 | release ステージ | — | — |
-| 5.1 | OCI ラベル | release ステージ | — | — |
-| 5.2 | EXPOSE 維持 | release ステージ | — | — |
-| 5.3 | VOLUME 維持 | release ステージ | — | — |
-| 6.1 | ヒープサイズ算出ロジック | docker-entrypoint.ts | — | Entrypoint フロー |
-| 6.2 | 権限ドロップ exec | docker-entrypoint.ts | process.setuid/setgid | Entrypoint フロー |
-| 6.3 | /data/uploads 維持 | docker-entrypoint.ts | fs module | Entrypoint フロー |
-| 6.4 | /tmp/page-bulk-export 維持 | docker-entrypoint.ts | fs module | Entrypoint フロー |
-| 6.5 | CMD migrate 維持 | docker-entrypoint.ts | execFileSync | Entrypoint フロー |
-| 6.6 | --expose_gc 維持 | docker-entrypoint.ts | spawn args | Entrypoint フロー |
-| 6.7 | フラグログ出力 | docker-entrypoint.ts | console.log | Entrypoint フロー |
-| 6.8 | TypeScript で記述 | docker-entrypoint.ts | Node.js type stripping | — |
-| 7.1-7.5 | 後方互換性 | 全コンポーネント | — | — |
-| 8.1 | docker-new → docker 置換 | ディレクトリ構造 | ファイルシステム | — |
-| 8.2 | Dockerfile パス参照更新 | Dockerfile | — | — |
-| 8.3 | DHI レジストリログイン | buildspec.yml | secrets-manager | Build フロー |
-| 8.4 | buildspec Dockerfile パス確認 | buildspec.yml | — | Build フロー |
+| 1.1 | DHI base image | base, release stages | — | Build flow |
+| 1.2 | Update syntax directive | Dockerfile header | — | — |
+| 1.3 | Maintain pnpm wget installation | base stage | — | Build flow |
+| 1.4 | Fix frozen-lockfile typo | deps stage | — | — |
+| 1.5 | Non-hardcoded pnpm version | base stage | — | — |
+| 2.1 | GROWI_HEAP_SIZE | docker-entrypoint.ts | Environment variable I/F | Entrypoint flow |
+| 2.2 | cgroup auto-calculation | docker-entrypoint.ts | cgroup fs I/F | Entrypoint flow |
+| 2.3 | No-flag fallback | docker-entrypoint.ts | — | Entrypoint flow |
+| 2.4 | GROWI_OPTIMIZE_MEMORY | docker-entrypoint.ts | Environment variable I/F | Entrypoint flow |
+| 2.5 | GROWI_LITE_MODE | docker-entrypoint.ts | Environment variable I/F | Entrypoint flow |
+| 2.6 | Use --max-heap-size | docker-entrypoint.ts | spawn args | Entrypoint flow |
+| 2.7 | Do not use NODE_OPTIONS | docker-entrypoint.ts | — | Entrypoint flow |
+| 3.1 | Eliminate COPY . . | pruner + deps stages | — | Build flow |
+| 3.2 | Maintain pnpm cache mount | deps, builder stages | — | Build flow |
+| 3.3 | Maintain apt cache mount | base stage | — | Build flow |
+| 3.4 | Exclude .next/cache | builder stage | — | — |
+| 3.5 | bind from=builder pattern | release stage | — | Build flow |
+| 4.1 | Non-root execution | docker-entrypoint.ts | process.setuid/setgid | Entrypoint flow |
+| 4.2 | Exclude unnecessary packages | release stage | — | — |
+| 4.3 | Enhanced .dockerignore | Dockerfile.dockerignore | — | — |
+| 4.4 | --no-install-recommends | base stage | — | — |
+| 4.5 | Exclude build tools | release stage | — | — |
+| 5.1 | OCI labels | release stage | — | — |
+| 5.2 | Maintain EXPOSE | release stage | — | — |
+| 5.3 | Maintain VOLUME | release stage | — | — |
+| 6.1 | Heap size calculation logic | docker-entrypoint.ts | — | Entrypoint flow |
+| 6.2 | Privilege drop exec | docker-entrypoint.ts | process.setuid/setgid | Entrypoint flow |
+| 6.3 | Maintain /data/uploads | docker-entrypoint.ts | fs module | Entrypoint flow |
+| 6.4 | Maintain /tmp/page-bulk-export | docker-entrypoint.ts | fs module | Entrypoint flow |
+| 6.5 | Maintain CMD migrate | docker-entrypoint.ts | execFileSync | Entrypoint flow |
+| 6.6 | Maintain --expose_gc | docker-entrypoint.ts | spawn args | Entrypoint flow |
+| 6.7 | Flag log output | docker-entrypoint.ts | console.log | Entrypoint flow |
+| 6.8 | Written in TypeScript | docker-entrypoint.ts | Node.js type stripping | — |
+| 7.1-7.5 | Backward compatibility | All components | — | — |
+| 8.1 | Replace docker-new → docker | Directory structure | Filesystem | — |
+| 8.2 | Update Dockerfile path references | Dockerfile | — | — |
+| 8.3 | DHI registry login | buildspec.yml | secrets-manager | Build flow |
+| 8.4 | Verify buildspec Dockerfile path | buildspec.yml | — | Build flow |
 
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|-------------|--------|-------------|-----------------|-----------|
-| Dockerfile | Infrastructure | Docker イメージビルド定義 | 1.1-1.5, 3.1-3.5, 4.1-4.5, 5.1-5.3, 6.5, 8.2 | DHI images (P0), turbo (P0), pnpm (P0) | — |
-| docker-entrypoint.ts | Infrastructure | コンテナ起動時の初期化（TypeScript） | 2.1-2.7, 6.1-6.4, 6.6-6.8 | Node.js fs/child_process (P0), cgroup fs (P1) | Batch |
-| Dockerfile.dockerignore | Infrastructure | ビルドコンテキストフィルタ | 4.3 | — | — |
-| buildspec.yml | CI/CD | CodeBuild ビルド定義 | 8.3, 8.4 | AWS Secrets Manager (P0), dhi.io (P0) | Batch |
+| Dockerfile | Infrastructure | Docker image build definition | 1.1-1.5, 3.1-3.5, 4.1-4.5, 5.1-5.3, 6.5, 8.2 | DHI images (P0), turbo (P0), pnpm (P0) | — |
+| docker-entrypoint.ts | Infrastructure | Container startup initialization (TypeScript) | 2.1-2.7, 6.1-6.4, 6.6-6.8 | Node.js fs/child_process (P0), cgroup fs (P1) | Batch |
+| Dockerfile.dockerignore | Infrastructure | Build context filter | 4.3 | — | — |
+| buildspec.yml | CI/CD | CodeBuild build definition | 8.3, 8.4 | AWS Secrets Manager (P0), dhi.io (P0) | Batch |
 
 ### Infrastructure Layer
 
@@ -214,20 +214,20 @@ flowchart LR
 
 | Field | Detail |
 |-------|--------|
-| Intent | 5 ステージの Docker イメージビルド定義 |
+| Intent | 5-stage Docker image build definition |
 | Requirements | 1.1-1.5, 3.1-3.5, 4.1-4.5, 5.1-5.3, 6.5, 7.1-7.5 |
 
 **Responsibilities & Constraints**
-- 5 ステージ構成: `base` → `pruner` → `deps` → `builder` → `release`
-- DHI ベースイメージの使用（`dhi.io/node:24-debian13-dev` / `dhi.io/node:24-debian13`）
-- **runtime にシェル・追加バイナリのコピーなし**（Node.js entrypoint で全て完結）
-- OCI ラベルの付与
+- 5-stage configuration: `base` → `pruner` → `deps` → `builder` → `release`
+- Use of DHI base images (`dhi.io/node:24-debian13-dev` / `dhi.io/node:24-debian13`)
+- **No shell or additional binary copying in runtime** (everything is handled by the Node.js entrypoint)
+- OCI label assignment
 
 **Dependencies**
-- External: `dhi.io/node:24-debian13-dev` — ビルドベースイメージ (P0)
-- External: `dhi.io/node:24-debian13` — ランタイムベースイメージ (P0)
-- Outbound: pnpm — 依存管理 (P0)
-- Outbound: turbo — ビルドオーケストレーション (P0)
+- External: `dhi.io/node:24-debian13-dev` — Build base image (P0)
+- External: `dhi.io/node:24-debian13` — Runtime base image (P0)
+- Outbound: pnpm — Dependency management (P0)
+- Outbound: turbo — Build orchestration (P0)
 
 **Contracts**: Batch [x]
 
@@ -237,93 +237,93 @@ flowchart LR
 ```
 FROM dhi.io/node:24-debian13-dev AS base
 ```
-- apt-get で `ca-certificates`, `wget` をインストール（ビルド専用）
-- wget スタンドアロンスクリプトで pnpm をインストール（バージョンはスクリプトのデフォルト）
+- Install `ca-certificates`, `wget` via apt-get (build-only)
+- Install pnpm via wget standalone script (version uses script default)
 - pnpm add turbo --global
 
 **Stage 2: `pruner`**
 ```
 FROM base AS pruner
 ```
-- `COPY . .` でモノレポ全体をコピー
-- `turbo prune @growi/app --docker` で Docker 最適化ファイルを生成
-- 出力: `out/json/`（package.json 群）、`out/pnpm-lock.yaml`、`out/full/`（ソース）
+- `COPY . .` to copy the entire monorepo
+- `turbo prune @growi/app --docker` to generate Docker-optimized files
+- Output: `out/json/` (package.json files), `out/pnpm-lock.yaml`, `out/full/` (source)
 
 **Stage 3: `deps`**
 ```
 FROM base AS deps
 ```
-- `COPY --from=pruner` で json/ と lockfile のみコピー（キャッシュ効率化）
-- `pnpm install --frozen-lockfile` で依存インストール
-- `pnpm add node-gyp --global`（native modules 用）
+- `COPY --from=pruner` to copy only json/ and lockfile (for cache efficiency)
+- `pnpm install --frozen-lockfile` for dependency installation
+- `pnpm add node-gyp --global` (for native modules)
 
 **Stage 4: `builder`**
 ```
 FROM deps AS builder
 ```
-- `COPY --from=pruner` で full/ ソースをコピー
+- `COPY --from=pruner` to copy full/ source
 - `turbo run build --filter @growi/app`
 - `pnpm deploy out --prod --filter @growi/app`
-- artifacts を tar.gz にパッケージング（現行の内容を維持、`apps/app/tmp` 含む）
+- Package artifacts into tar.gz (maintaining current contents, including `apps/app/tmp`)
 
 **Stage 5: `release`**
 ```
 FROM dhi.io/node:24-debian13 AS release
 ```
-- **追加バイナリのコピーなし**（シェル・gosu・setpriv・busybox 一切不要）
-- artifacts を `--mount=type=bind,from=builder` で展開
-- `docker-entrypoint.ts` を COPY
-- OCI ラベル、EXPOSE、VOLUME を設定
+- **No additional binary copying** (no shell, gosu, setpriv, or busybox needed at all)
+- Extract artifacts via `--mount=type=bind,from=builder`
+- COPY `docker-entrypoint.ts`
+- Set OCI labels, EXPOSE, VOLUME
 - `ENTRYPOINT ["node", "/docker-entrypoint.ts"]`
 
 **Implementation Notes**
-- `turbo prune --docker` が pnpm workspace と互換でない場合のフォールバック: 最適化 COPY パターン（lockfile + package.json 群を先にコピー → install → ソースコピー → build）
-- DHI イメージの pull には `docker login dhi.io` が必要（CI/CD での認証設定が必要）
-- release ステージに apt-get は一切不要（現行の gosu install が完全に排除される）
+- Fallback if `turbo prune --docker` is incompatible with pnpm workspace: optimized COPY pattern (copy lockfile + package.json files first → install → copy source → build)
+- Pulling DHI images requires `docker login dhi.io` (authentication setup needed in CI/CD)
+- No apt-get is needed at all in the release stage (the current gosu installation is completely eliminated)
 
 #### docker-entrypoint.ts
 
 | Field | Detail |
 |-------|--------|
-| Intent | コンテナ起動時の初期化処理（ディレクトリ設定、ヒープサイズ算出、権限ドロップ、migration 実行、アプリ起動）。TypeScript で記述、Node.js 24 のネイティブ type stripping で直接実行 |
+| Intent | Container startup initialization processing (directory setup, heap size calculation, privilege drop, migration execution, app startup). Written in TypeScript, executed directly via Node.js 24 native type stripping |
 | Requirements | 2.1-2.7, 6.1-6.8 |
 
 **Responsibilities & Constraints**
-- **TypeScript で記述**: Node.js 24 のネイティブ type stripping で直接実行（`node docker-entrypoint.ts`）。enum は使用不可（erasable syntax のみ使用）
-- root 権限での初期化処理（`fs.mkdirSync`、`fs.symlinkSync`、`fs.chownSync` で実装）
-- 3 段フォールバックによるヒープサイズ決定（`fs.readFileSync` で cgroup 読み取り）
-- Node.js ネイティブの `process.setgid()` + `process.setuid()` で権限ドロップ
-- `child_process.execFileSync` で migration を直接実行（npm run 不使用、シェル不要）
-- `child_process.spawn` でアプリプロセスを起動し、SIGTERM/SIGINT をフォワード
-- **外部バイナリ依存なし**（Node.js の標準ライブラリのみ使用）
+- **Written in TypeScript**: Executed directly via Node.js 24 native type stripping (`node docker-entrypoint.ts`). Enums cannot be used (only erasable syntax is allowed)
+- Root privilege initialization processing (implemented with `fs.mkdirSync`, `fs.symlinkSync`, `fs.chownSync`)
+- Heap size determination via 3-tier fallback (cgroup reading via `fs.readFileSync`)
+- Privilege drop via Node.js native `process.setgid()` + `process.setuid()`
+- Direct migration execution via `child_process.execFileSync` (no npm run, no shell needed)
+- App process startup via `child_process.spawn` with SIGTERM/SIGINT forwarding
+- **No external binary dependencies** (uses only Node.js standard library)
 
 **Dependencies**
-- External: Node.js `fs` module — ファイルシステム操作 (P0)
-- External: Node.js `child_process` module — プロセス起動 (P0)
-- External: cgroup filesystem — メモリリミット取得 (P1)
+- External: Node.js `fs` module — Filesystem operations (P0)
+- External: Node.js `child_process` module — Process startup (P0)
+- External: cgroup filesystem — Memory limit retrieval (P1)
 - Inbound: Environment variables — GROWI_HEAP_SIZE, GROWI_OPTIMIZE_MEMORY, GROWI_LITE_MODE
 
 **Contracts**: Batch [x]
 
 ##### Batch / Job Contract
 
-- **Trigger**: コンテナ起動時（`ENTRYPOINT ["node", "/docker-entrypoint.ts"]` として実行）
+- **Trigger**: On container startup (executed as `ENTRYPOINT ["node", "/docker-entrypoint.ts"]`)
 - **Input / validation**:
-  - `GROWI_HEAP_SIZE`: 正の整数（MB 単位）。空文字列は未設定として扱う
-  - `GROWI_OPTIMIZE_MEMORY`: `"true"` のみ有効。それ以外は無視
-  - `GROWI_LITE_MODE`: `"true"` のみ有効。それ以外は無視
-  - cgroup v2: `/sys/fs/cgroup/memory.max` — 数値または `"max"`（unlimited）
-  - cgroup v1: `/sys/fs/cgroup/memory/memory.limit_in_bytes` — 数値（unlimited 時は巨大値）
-- **Output / destination**: `child_process.spawn` の引数として node フラグを直接渡す
-- **Idempotency & recovery**: コンテナ再起動時に毎回実行。冪等（`fs.mkdirSync` の `recursive: true` で安全）
+  - `GROWI_HEAP_SIZE`: Positive integer (in MB). Empty string is treated as unset
+  - `GROWI_OPTIMIZE_MEMORY`: Only `"true"` is valid. Anything else is ignored
+  - `GROWI_LITE_MODE`: Only `"true"` is valid. Anything else is ignored
+  - cgroup v2: `/sys/fs/cgroup/memory.max` — Numeric or `"max"` (unlimited)
+  - cgroup v1: `/sys/fs/cgroup/memory/memory.limit_in_bytes` — Numeric (very large value when unlimited)
+- **Output / destination**: Node flags are passed directly as arguments to `child_process.spawn`
+- **Idempotency & recovery**: Executed on every container restart. Idempotent (`fs.mkdirSync` with `recursive: true` ensures safety)
 
 ##### Environment Variable Interface
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `GROWI_HEAP_SIZE` | int (MB) | (未設定) | Node.js の --max-heap-size 値を明示指定 |
-| `GROWI_OPTIMIZE_MEMORY` | `"true"` / (未設定) | (未設定) | --optimize-for-size フラグを有効化 |
-| `GROWI_LITE_MODE` | `"true"` / (未設定) | (未設定) | --lite-mode フラグを有効化 |
+| `GROWI_HEAP_SIZE` | int (MB) | (unset) | Explicitly specify the --max-heap-size value for Node.js |
+| `GROWI_OPTIMIZE_MEMORY` | `"true"` / (unset) | (unset) | Enable the --optimize-for-size flag |
+| `GROWI_LITE_MODE` | `"true"` / (unset) | (unset) | Enable the --lite-mode flag |
 
 ##### Heap Size Calculation Logic
 
@@ -394,7 +394,7 @@ chownRecursive('/tmp/page-bulk-export', 1000, 1000);
 fs.chmodSync('/tmp/page-bulk-export', 0o700);
 ```
 
-`chownRecursive` は `fs.readdirSync` + `fs.chownSync` で再帰的に所有者を変更するヘルパー関数。
+`chownRecursive` is a helper function that recursively changes ownership using `fs.readdirSync` + `fs.chownSync`.
 
 ##### Privilege Drop
 
@@ -404,7 +404,7 @@ process.setgid(1000);
 process.setuid(1000);
 ```
 
-`setgid` → `setuid` の順序は必須（setuid 後は setgid できない）。`initgroups` で supplementary groups も初期化。
+The order `setgid` → `setuid` is mandatory (setgid cannot be called after setuid). `initgroups` also initializes supplementary groups.
 
 ##### Migration Execution
 
@@ -418,7 +418,7 @@ execFileSync(process.execPath, [
 ], { stdio: 'inherit', env: { ...process.env, NODE_ENV: 'production' } });
 ```
 
-`execFileSync` はシェルを介さず直接 node バイナリを実行。`npm run migrate` と同等の動作をシェル不要で実現。
+`execFileSync` directly executes the node binary without going through a shell. This achieves equivalent behavior to `npm run migrate` without requiring a shell.
 
 ##### App Process Spawn
 
@@ -443,108 +443,108 @@ child.on('exit', (code: number | null, signal: NodeJS.Signals | null) => {
 ```
 
 **Implementation Notes**
-- TypeScript で記述し、Node.js 24 のネイティブ type stripping で直接実行。`ENTRYPOINT ["node", "/docker-entrypoint.ts"]`
-- enum は使用不可（非 erasable syntax）。interface/type/type annotation のみ使用
-- entrypoint は `process.execPath`（= `/usr/local/bin/node`）を使って migration と app を実行するため、シェルが一切不要
-- `--max-heap-size` は spawn の引数として直接渡されるため、NODE_OPTIONS の制約を回避
-- migration コマンドは `apps/app/package.json` の `migrate` スクリプトの中身を直接記述。package.json の変更時は entrypoint の更新も必要
-- PID 1 の責務: シグナルフォワーディング、子プロセスの reap、正常終了コードの伝播
+- Written in TypeScript and executed directly via Node.js 24 native type stripping. `ENTRYPOINT ["node", "/docker-entrypoint.ts"]`
+- Enums cannot be used (non-erasable syntax). Only interface/type/type annotation are used
+- The entrypoint uses `process.execPath` (= `/usr/local/bin/node`) to execute migration and app, so no shell is needed at all
+- `--max-heap-size` is passed directly as a spawn argument, bypassing NODE_OPTIONS restrictions
+- The migration command directly describes the contents of the `migrate` script from `apps/app/package.json`. When package.json changes, the entrypoint also needs to be updated
+- PID 1 responsibilities: signal forwarding, child process reaping, proper exit code propagation
 
 #### Dockerfile.dockerignore
 
 | Field | Detail |
 |-------|--------|
-| Intent | ビルドコンテキストから不要ファイルを除外 |
+| Intent | Exclude unnecessary files from the build context |
 | Requirements | 4.3 |
 
 **Implementation Notes**
-- 現行に追加すべきエントリ: `.git`, `.env*`（production 以外）, `*.md`, `test/`, `**/*.spec.*`, `**/*.test.*`, `.vscode/`, `.idea/`
-- 現行維持: `**/node_modules`, `**/coverage`, `**/Dockerfile`, `**/*.dockerignore`, `**/.pnpm-store`, `**/.next`, `**/.turbo`, `out`, `apps/slackbot-proxy`
+- Entries to add to current: `.git`, `.env*` (except production), `*.md`, `test/`, `**/*.spec.*`, `**/*.test.*`, `.vscode/`, `.idea/`
+- Maintain current: `**/node_modules`, `**/coverage`, `**/Dockerfile`, `**/*.dockerignore`, `**/.pnpm-store`, `**/.next`, `**/.turbo`, `out`, `apps/slackbot-proxy`
 
 ## Error Handling
 
 ### Error Strategy
 
-entrypoint は try-catch で各フェーズのエラーを捕捉。致命的エラーは `process.exit(1)` でコンテナの起動失敗として Docker/k8s に通知。
+The entrypoint catches errors at each phase using try-catch. Fatal errors notify Docker/k8s of container startup failure via `process.exit(1)`.
 
 ### Error Categories and Responses
 
 | Error | Category | Response |
 |-------|----------|----------|
-| cgroup ファイル読み取り失敗 | System | `console.warn` で警告し、フラグなし（V8 デフォルト）で続行 |
-| GROWI_HEAP_SIZE が不正値（NaN 等） | User | `console.error` で警告し、フラグなしで続行（コンテナは起動する） |
-| ディレクトリ作成/権限設定失敗 | System | `process.exit(1)` でコンテナ起動失敗。ボリュームマウント設定を確認 |
-| Migration 失敗 | Business Logic | `execFileSync` が例外を throw → `process.exit(1)`。Docker/k8s が再起動 |
-| アプリプロセス異常終了 | System | 子プロセスの exit code を伝播して `process.exit(code)` |
+| cgroup file read failure | System | Warn with `console.warn` and continue with no flag (V8 default) |
+| GROWI_HEAP_SIZE is invalid (NaN, etc.) | User | Warn with `console.error` and continue with no flag (container still starts) |
+| Directory creation/permission setup failure | System | Container startup failure via `process.exit(1)`. Check volume mount configuration |
+| Migration failure | Business Logic | `execFileSync` throws an exception → `process.exit(1)`. Docker/k8s will restart |
+| App process abnormal exit | System | Propagate child process exit code via `process.exit(code)` |
 
 ## Testing Strategy
 
 ### Unit Tests
-- docker-entrypoint.ts のヒープサイズ算出ロジック: cgroup v2/v1/なし の 3 パターン（TypeScript で型安全にテスト）
-- docker-entrypoint.ts の環境変数組み合わせ: GROWI_HEAP_SIZE + GROWI_OPTIMIZE_MEMORY + GROWI_LITE_MODE
-- docker-entrypoint.ts の chownRecursive ヘルパー: ネストされたディレクトリ構造で正しく再帰 chown されること
-- Node.js 24 の type stripping で docker-entrypoint.ts が直接実行可能なこと
+- Heap size calculation logic in docker-entrypoint.ts: 3 patterns for cgroup v2/v1/none (type-safe testing in TypeScript)
+- Environment variable combinations in docker-entrypoint.ts: GROWI_HEAP_SIZE + GROWI_OPTIMIZE_MEMORY + GROWI_LITE_MODE
+- chownRecursive helper in docker-entrypoint.ts: Verify correct recursive chown on nested directory structures
+- Verify that docker-entrypoint.ts can be directly executed via Node.js 24 type stripping
 
 ### Integration Tests
-- Docker build が成功し、全 5 ステージが完了すること
-- `GROWI_HEAP_SIZE=250` を設定してコンテナ起動し、node プロセスの `--max-heap-size=250` を確認
-- cgroup memory limit 付きでコンテナ起動し、自動算出の `--max-heap-size` が正しいことを確認
-- migration が正常に実行されること（`execFileSync` 経由）
+- Docker build succeeds and all 5 stages complete
+- Start container with `GROWI_HEAP_SIZE=250` set and verify `--max-heap-size=250` on the node process
+- Start container with cgroup memory limit and verify that the auto-calculated `--max-heap-size` is correct
+- Migration executes successfully (via `execFileSync`)
 
 ### E2E Tests
-- `docker compose up` で GROWI + MongoDB が起動し、ブラウザアクセスが可能なこと
-- `FILE_UPLOAD=local` でファイルアップロードが動作すること（/data/uploads の symlink 確認）
-- SIGTERM 送信でコンテナが graceful に停止すること
+- GROWI + MongoDB start via `docker compose up` and browser access is possible
+- File upload works with `FILE_UPLOAD=local` (verify /data/uploads symlink)
+- Container shuts down gracefully when SIGTERM is sent
 
 ## Security Considerations
 
-- **DHI ベースイメージ**: CVE 最大 95% 削減、SLSA Build Level 3 の provenance
-- **シェル不要**: runtime に bash/sh/busybox なし。コマンドインジェクションの攻撃ベクターを排除
-- **gosu/setpriv 不要**: Node.js ネイティブの `process.setuid/setgid` で権限ドロップ。追加バイナリの攻撃面なし
-- **非 root 実行**: アプリケーションは node (UID 1000) で実行。root は entrypoint の初期化（mkdir/chown）のみ
-- **DHI レジストリ認証**: CI/CD で `docker login dhi.io` が必要。Docker Hub 認証情報を使用
+- **DHI base image**: Up to 95% CVE reduction, SLSA Build Level 3 provenance
+- **No shell needed**: No bash/sh/busybox in runtime. Eliminates command injection attack vectors
+- **No gosu/setpriv needed**: Privilege drop via Node.js native `process.setuid/setgid`. No additional binary attack surface
+- **Non-root execution**: Application runs as node (UID 1000). Root is used only for entrypoint initialization (mkdir/chown)
+- **DHI registry authentication**: `docker login dhi.io` is required in CI/CD. Uses Docker Hub credentials
 
 ## Performance & Scalability
 
-- **ビルドキャッシュ**: `turbo prune --docker` により dependency install レイヤーをキャッシュ。ソースコード変更時の再ビルドで依存インストールをスキップ
-- **イメージサイズ**: DHI runtime に追加バイナリなし。node:24-slim 比でベースレイヤーが縮小
-- **メモリ効率**: `--max-heap-size` による total heap 制御で、v24 の trusted_space overhead 問題を回避。マルチテナントでのメモリ圧迫を防止
+- **Build cache**: `turbo prune --docker` caches the dependency install layer. Skips dependency installation during rebuilds when only source code changes
+- **Image size**: No additional binaries in DHI runtime. Base layer is smaller compared to node:24-slim
+- **Memory efficiency**: Total heap control via `--max-heap-size` avoids the v24 trusted_space overhead issue. Prevents memory pressure in multi-tenant environments
 
-## Phase 3: 本番置換と CI/CD 対応
+## Phase 3: Production Replacement and CI/CD Support
 
-### ディレクトリ置換
+### Directory Replacement
 
-`apps/app/docker-new/` の成果物を `apps/app/docker/` に移動し、旧ファイルを削除する。
+Move the artifacts from `apps/app/docker-new/` to `apps/app/docker/` and delete the old files.
 
-**置換対象:**
+**Replacement targets:**
 
-| 操作 | ファイル | 備考 |
+| Operation | File | Notes |
 |------|---------|------|
-| 削除 | `apps/app/docker/Dockerfile` | 旧 3 ステージ Dockerfile（node:20-slim） |
-| 削除 | `apps/app/docker/docker-entrypoint.sh` | 旧 shell entrypoint（gosu 使用） |
-| 削除 | `apps/app/docker/Dockerfile.dockerignore` | 旧 dockerignore |
-| 移動 | `docker-new/Dockerfile` → `docker/Dockerfile` | 新 5 ステージ DHI Dockerfile |
-| 移動 | `docker-new/docker-entrypoint.ts` → `docker/docker-entrypoint.ts` | 新 TypeScript entrypoint |
-| 移動 | `docker-new/docker-entrypoint.spec.ts` → `docker/docker-entrypoint.spec.ts` | テストファイル |
-| 移動 | `docker-new/Dockerfile.dockerignore` → `docker/Dockerfile.dockerignore` | 新 dockerignore |
-| 維持 | `apps/app/docker/codebuild/` | CodeBuild 設定（変更なし） |
-| 維持 | `apps/app/docker/README.md` | Docker Hub README |
+| Delete | `apps/app/docker/Dockerfile` | Old 3-stage Dockerfile (node:20-slim) |
+| Delete | `apps/app/docker/docker-entrypoint.sh` | Old shell entrypoint (uses gosu) |
+| Delete | `apps/app/docker/Dockerfile.dockerignore` | Old dockerignore |
+| Move | `docker-new/Dockerfile` → `docker/Dockerfile` | New 5-stage DHI Dockerfile |
+| Move | `docker-new/docker-entrypoint.ts` → `docker/docker-entrypoint.ts` | New TypeScript entrypoint |
+| Move | `docker-new/docker-entrypoint.spec.ts` → `docker/docker-entrypoint.spec.ts` | Test file |
+| Move | `docker-new/Dockerfile.dockerignore` → `docker/Dockerfile.dockerignore` | New dockerignore |
+| Maintain | `apps/app/docker/codebuild/` | CodeBuild configuration (no changes) |
+| Maintain | `apps/app/docker/README.md` | Docker Hub README |
 
-**パス参照の更新:**
+**Path reference updates:**
 - Dockerfile line 122: `apps/app/docker-new/docker-entrypoint.ts` → `apps/app/docker/docker-entrypoint.ts`
 
-**影響を受けない既存参照（コードベース調査済み）:**
-- `buildspec.yml`: `-f ./apps/app/docker/Dockerfile` — パスは同一のまま
-- `codebuild.tf`: `buildspec = "apps/app/docker/codebuild/buildspec.yml"` — 同一
-- `.github/workflows/release.yml`: `./apps/app/docker/README.md` — 同一
-- `.github/workflows/ci-app.yml`: `!apps/app/docker/**` 除外パターン — 同一
-- `apps/app/bin/github-actions/update-readme.sh`: `cd docker` — 同一
+**Existing references not affected (verified via codebase investigation):**
+- `buildspec.yml`: `-f ./apps/app/docker/Dockerfile` — Path remains the same
+- `codebuild.tf`: `buildspec = "apps/app/docker/codebuild/buildspec.yml"` — Same
+- `.github/workflows/release.yml`: `./apps/app/docker/README.md` — Same
+- `.github/workflows/ci-app.yml`: `!apps/app/docker/**` exclusion pattern — Same
+- `apps/app/bin/github-actions/update-readme.sh`: `cd docker` — Same
 
-### buildspec.yml の DHI レジストリ認証
+### buildspec.yml DHI Registry Authentication
 
-DHI イメージの pull に `docker login dhi.io` が必要。[DHI ドキュメント](https://docs.docker.com/dhi/how-to/use/)によると、DHI は Docker Hub 認証情報を使用する。
+`docker login dhi.io` is required for pulling DHI images. According to the [DHI documentation](https://docs.docker.com/dhi/how-to/use/), DHI uses Docker Hub credentials.
 
-**現行 buildspec.yml:**
+**Current buildspec.yml:**
 ```yaml
 phases:
   pre_build:
@@ -552,7 +552,7 @@ phases:
       - echo ${DOCKER_REGISTRY_PASSWORD} | docker login --username growimoogle --password-stdin
 ```
 
-**更新後:**
+**Updated:**
 ```yaml
 phases:
   pre_build:
@@ -563,6 +563,6 @@ phases:
       - echo ${DOCKER_REGISTRY_PASSWORD} | docker login dhi.io --username growimoogle --password-stdin
 ```
 
-- Docker Hub と同一の認証情報を使用（DHI は Docker Hub アカウントで認証）
-- 既存の `DOCKER_REGISTRY_PASSWORD` シークレットを再利用
-- `secretsmanager.tf` の変更は不要
+- Uses the same credentials as Docker Hub (DHI authenticates with Docker Hub accounts)
+- Reuses the existing `DOCKER_REGISTRY_PASSWORD` secret
+- No changes needed to `secretsmanager.tf`

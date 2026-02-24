@@ -1,196 +1,196 @@
 # Implementation Plan
 
-> **タスク順序の設計方針**:
-> - **Phase 1（本フェーズ）**: DHI ベースイメージ + TypeScript entrypoint で、現行と同一仕様のイメージを再現する。ビルドパイプライン（`COPY . .` による 3 ステージ構成）は現行を維持し、**runtime の安全な移行を優先**する。
-> - **Phase 2（次フェーズ）**: `turbo prune --docker` パターンの導入によるビルド最適化。Phase 1 で runtime が安定してから実施する。pruner/deps ステージの追加で 5 ステージ化。
+> **Task ordering design policy**:
+> - **Phase 1 (this phase)**: Reproduce an image with the same specifications as the current one using a DHI base image + TypeScript entrypoint. The build pipeline (3-stage structure using `COPY . .`) is kept as-is, **prioritizing a safe runtime migration**.
+> - **Phase 2 (next phase)**: Introduction of build optimization via the `turbo prune --docker` pattern. This will be done after runtime is stable in Phase 1. Adding pruner/deps stages to create a 5-stage structure.
 >
-> **実装ディレクトリ**: `apps/app/docker-new/` に新規作成する。現行の `apps/app/docker/` は一切変更しない。並行して比較・検証可能な状態を維持する。
+> **Implementation directory**: Create new files in `apps/app/docker-new/`. The existing `apps/app/docker/` will not be modified at all. Maintain a state where parallel comparison and verification is possible.
 >
-> ディレクトリ権限周りは最優先で実装・テストし、デグレを早期に検出する。entrypoint（TypeScript）と Dockerfile は独立したファイルのため、一部タスクは並行実行可能。
+> Directory permission handling is implemented and tested as the highest priority to detect regressions early. Since the entrypoint (TypeScript) and Dockerfile are independent files, some tasks can be executed in parallel.
 
-## Phase 1: DHI + TypeScript entrypoint（現行ビルドパターン維持）
+## Phase 1: DHI + TypeScript entrypoint (maintaining current build pattern)
 
-- [x] 1. (P) ビルドコンテキストフィルタの強化
-  - 現行の除外ルールに `.git`、`.env*`（production 以外）、テストファイル、IDE 設定ファイル等を追加する
-  - セキュリティ上の機密ファイル（シークレット、認証情報）がコンテキストに含まれないことを確認する
-  - 現行の除外ルール（`node_modules`、`.next`、`.turbo`、`apps/slackbot-proxy` 等）は維持する
+- [x] 1. (P) Strengthen build context filter
+  - Add `.git`, `.env*` (except production), test files, IDE configuration files, etc. to the current exclusion rules
+  - Verify that security-sensitive files (secrets, credentials) are not included in the context
+  - Maintain the current exclusion rules (`node_modules`, `.next`, `.turbo`, `apps/slackbot-proxy`, etc.)
   - _Requirements: 4.3_
 
-- [x] 2. TypeScript entrypoint のディレクトリ初期化と権限管理
-- [x] 2.1 (P) entrypoint スケルトンと再帰 chown ヘルパーの作成
-  - Node.js 24 の type stripping で直接実行可能な TypeScript ファイルを新規作成する（enum 不使用、erasable syntax のみ）
-  - メインの実行フローを `main()` 関数として構造化し、エラーハンドリングのトップレベル try-catch を設ける
-  - ディレクトリ内のファイル・サブディレクトリを再帰的に所有者変更するヘルパー関数を実装する
-  - ヘルパー関数のユニットテストを作成する（ネストされたディレクトリ構造での再帰動作を検証）
+- [x] 2. TypeScript entrypoint directory initialization and permission management
+- [x] 2.1 (P) Create entrypoint skeleton and recursive chown helper
+  - Create a new TypeScript file that can be directly executed with Node.js 24 type stripping (no enums, erasable syntax only)
+  - Structure the main execution flow as a `main()` function with top-level try-catch for error handling
+  - Implement a helper function that recursively changes ownership of files and subdirectories within a directory
+  - Create unit tests for the helper function (verify recursive behavior with nested directory structures)
   - _Requirements: 6.8_
 
-- [x] 2.2 ディレクトリ初期化処理の実装
-  - `/data/uploads` の作成、`./public/uploads` へのシンボリックリンク作成、再帰的な所有者変更を実装する
-  - `/tmp/page-bulk-export` の作成、再帰的な所有者変更、パーミッション 700 の設定を実装する
-  - 冪等性を確保する（`recursive: true` による mkdir、既存シンボリックリンクの重複作成防止）
-  - **現行 `docker-entrypoint.sh` と同一の振る舞い**を保証するユニットテストを作成する（fs モック使用、ディレクトリ・シンボリックリンク・所有者・パーミッションの各状態を検証）
-  - 失敗時（ボリュームマウント未設定等）にプロセス終了（exit code 1）することを検証する
+- [x] 2.2 Implement directory initialization processing
+  - Implement creation of `/data/uploads`, symlink creation to `./public/uploads`, and recursive ownership change
+  - Implement creation of `/tmp/page-bulk-export`, recursive ownership change, and permission 700 setting
+  - Ensure idempotency (`recursive: true` for mkdir, prevent duplicate symlink creation)
+  - Create unit tests that **guarantee the same behavior as the current `docker-entrypoint.sh`** (using fs mocks, verifying each state of directories, symlinks, ownership, and permissions)
+  - Verify that the process exits (exit code 1) on failure (e.g., volume mount not configured)
   - _Requirements: 6.3, 6.4_
 
-- [x] 2.3 権限ドロップの実装
-  - root から node ユーザー（UID 1000, GID 1000）への降格処理を実装する
-  - supplementary groups の初期化を行い、setgid → setuid の順序を厳守する（逆順だと setgid が失敗する）
-  - 権限ドロップ失敗時にエラーメッセージを出力してプロセスを終了する
+- [x] 2.3 Implement privilege dropping
+  - Implement demotion from root to node user (UID 1000, GID 1000)
+  - Initialize supplementary groups, strictly following the order of setgid then setuid (reverse order causes setgid to fail)
+  - Output an error message and exit the process on privilege drop failure
   - _Requirements: 4.1, 6.2_
 
-- [x] 3. ヒープサイズ算出とノードフラグ組み立て
-- [x] 3.1 (P) cgroup メモリリミット検出の実装
-  - cgroup v2 ファイルの読み取りと数値パースを実装する（`"max"` 文字列は unlimited として扱う）
-  - cgroup v1 ファイルへのフォールバックを実装する（64GB 超は unlimited として扱う）
-  - メモリリミットの 60% をヒープサイズ（MB 単位）として算出する
-  - ファイル読み取り失敗時は警告ログを出力し、フラグなし（V8 デフォルト）で続行する
-  - 各パターン（v2 正常検出、v2 unlimited、v1 フォールバック、v1 unlimited、検出不可）のユニットテストを作成する
+- [x] 3. Heap size calculation and node flag assembly
+- [x] 3.1 (P) Implement cgroup memory limit detection
+  - Implement reading and numeric parsing of cgroup v2 files (treat the `"max"` string as unlimited)
+  - Implement fallback to cgroup v1 files (treat values exceeding 64GB as unlimited)
+  - Calculate 60% of the memory limit as the heap size (in MB)
+  - On file read failure, output a warning log and continue without flags (V8 default)
+  - Create unit tests for each pattern (v2 normal detection, v2 unlimited, v1 fallback, v1 unlimited, detection unavailable)
   - _Requirements: 2.2, 2.3_
 
-- [x] 3.2 (P) 環境変数によるヒープサイズ指定の実装
-  - `GROWI_HEAP_SIZE` 環境変数のパースとバリデーションを実装する（正の整数、MB 単位）
-  - 不正値（NaN、負数、空文字列）の場合は警告ログを出力してフラグなしにフォールバックする
-  - 環境変数指定が cgroup 自動算出より優先されることをテストで確認する
+- [x] 3.2 (P) Implement heap size specification via environment variable
+  - Implement parsing and validation of the `GROWI_HEAP_SIZE` environment variable (positive integer, in MB)
+  - On invalid values (NaN, negative numbers, empty string), output a warning log and fall back to no flags
+  - Confirm via tests that the environment variable takes priority over cgroup auto-calculation
   - _Requirements: 2.1_
 
-- [x] 3.3 ノードフラグの組み立てとログ出力の実装
-  - 3 段フォールバック（環境変数 → cgroup 算出 → V8 デフォルト）の統合ロジックを実装する
-  - `--expose_gc` フラグを常時付与する
-  - `GROWI_OPTIMIZE_MEMORY=true` で `--optimize-for-size`、`GROWI_LITE_MODE=true` で `--lite-mode` を追加する
-  - `--max-heap-size` を spawn 引数として直接渡す構造にする（`--max_old_space_size` は不使用、`NODE_OPTIONS` には含めない）
-  - 適用されたフラグの内容を標準出力にログ出力する（どの段で決定されたかを含む）
-  - 環境変数の各組み合わせパターン（全未設定、HEAP_SIZE のみ、全有効等）のユニットテストを作成する
+- [x] 3.3 Implement node flag assembly and log output
+  - Implement the 3-tier fallback integration logic (environment variable -> cgroup calculation -> V8 default)
+  - Always include the `--expose_gc` flag
+  - Add `--optimize-for-size` when `GROWI_OPTIMIZE_MEMORY=true`, and `--lite-mode` when `GROWI_LITE_MODE=true`
+  - Pass `--max-heap-size` directly as a spawn argument (do not use `--max_old_space_size`, do not include in `NODE_OPTIONS`)
+  - Log the applied flags to stdout (including which tier determined the value)
+  - Create unit tests for each combination of environment variables (all unset, HEAP_SIZE only, all enabled, etc.)
   - _Requirements: 2.4, 2.5, 2.6, 2.7, 6.1, 6.6, 6.7_
 
-- [x] 4. マイグレーション実行とアプリプロセス管理
-- [x] 4.1 マイグレーションの直接実行
-  - node バイナリを直接呼び出して migrate-mongo を実行する（npm run を使用しない、シェルを介さない）
-  - 標準入出力を inherit して migration のログを表示する
-  - migration 失敗時は例外をキャッチしてプロセスを終了し、コンテナオーケストレーターによる再起動を促す
+- [x] 4. Migration execution and app process management
+- [x] 4.1 Direct migration execution
+  - Execute migrate-mongo by directly calling the node binary (do not use npm run, do not go through a shell)
+  - Inherit stdio to display migration logs
+  - On migration failure, catch the exception and exit the process, prompting restart by the container orchestrator
   - _Requirements: 6.5_
 
-- [x] 4.2 アプリプロセスの起動とシグナル管理
-  - 算出済みノードフラグを引数に含めた子プロセスとしてアプリケーションを起動する
-  - SIGTERM、SIGINT、SIGHUP を子プロセスにフォワードする
-  - 子プロセスの終了コード（またはシグナル）を entrypoint の終了コードとして伝播する
-  - PID 1 としての責務（シグナルフォワーディング、子プロセス reap、graceful shutdown）を検証するテストを作成する
+- [x] 4.2 App process startup and signal management
+  - Start the application as a child process with the calculated node flags included in the arguments
+  - Forward SIGTERM, SIGINT, and SIGHUP to the child process
+  - Propagate the child process exit code (or signal) as the entrypoint exit code
+  - Create tests to verify PID 1 responsibilities (signal forwarding, child process reaping, graceful shutdown)
   - _Requirements: 6.2, 6.5_
 
-- [x] 5. Dockerfile の再構築（現行 3 ステージパターン + DHI）
-- [x] 5.1 (P) base ステージの構築
-  - DHI dev イメージをベースに設定し、syntax ディレクティブを最新安定版自動追従に更新する
-  - wget スタンドアロンスクリプトで pnpm をインストールする（バージョンのハードコードを排除する）
-  - turbo をグローバルにインストールする
-  - ビルドに必要なパッケージを `--no-install-recommends` 付きでインストールし、apt キャッシュマウントを適用する
+- [x] 5. Dockerfile reconstruction (current 3-stage pattern + DHI)
+- [x] 5.1 (P) Build the base stage
+  - Set the DHI dev image as the base and update the syntax directive to auto-follow the latest stable version
+  - Install pnpm via wget standalone script (eliminate hardcoded versions)
+  - Install turbo globally
+  - Install packages required for building with `--no-install-recommends` and apply apt cache mounts
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 3.3, 4.4_
 
-- [x] 5.2 builder ステージの構築
-  - 現行の `COPY . .` パターンを維持してモノレポ全体をコピーし、依存インストール・ビルド・本番依存抽出を行う
-  - `--frozen-lockfile` の typo（ダッシュ3つ → 2つ）を修正する
-  - pnpm store のキャッシュマウントを設定してリビルド時間を短縮する
-  - 本番依存のみを抽出し、tar.gz にパッケージングする（`apps/app/tmp` ディレクトリを含む）
-  - `.next/cache` がアーティファクトに含まれないことを保証する
+- [x] 5.2 Build the builder stage
+  - Maintain the current `COPY . .` pattern to copy the entire monorepo, then install dependencies, build, and extract production dependencies
+  - Fix the `--frozen-lockfile` typo (3 dashes -> 2 dashes)
+  - Configure pnpm store cache mounts to reduce rebuild time
+  - Extract only production dependencies and package them into tar.gz (including the `apps/app/tmp` directory)
+  - Guarantee that `.next/cache` is not included in the artifact
   - _Requirements: 1.4, 3.2, 3.4_
 
-- [x] 5.3 release ステージの構築
-  - DHI ランタイムイメージをベースに設定し、追加バイナリのコピーを一切行わない
-  - ビルドステージのアーティファクトをバインドマウント経由で展開する
-  - TypeScript entrypoint ファイルを COPY し、ENTRYPOINT に node 経由の直接実行を設定する
-  - リリースステージにビルドツール（turbo、pnpm、node-gyp 等）やビルド用パッケージ（wget、curl 等）が含まれないことを確認する
+- [x] 5.3 Build the release stage
+  - Set the DHI runtime image as the base with no additional binary copying
+  - Extract build stage artifacts via bind mount
+  - COPY the TypeScript entrypoint file and set ENTRYPOINT to direct execution via node
+  - Verify that build tools (turbo, pnpm, node-gyp, etc.) and build packages (wget, curl, etc.) are not included in the release stage
   - _Requirements: 1.1, 3.5, 4.2, 4.5_
 
-- [x] 5.4 (P) OCI ラベルとポート・ボリューム宣言の設定
-  - OCI 標準ラベル（source、title、description、vendor）を設定する
-  - `EXPOSE 3000` と `VOLUME /data` を維持する
+- [x] 5.4 (P) Configure OCI labels and port/volume declarations
+  - Set OCI standard labels (source, title, description, vendor)
+  - Maintain `EXPOSE 3000` and `VOLUME /data`
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [x] 6. 統合検証と後方互換性の確認
-- [x] 6.1 Docker ビルドの E2E 検証
-  - 3 ステージ全てが正常完了する Docker ビルドを実行し、ビルドエラーがないことを確認する
-  - リリースイメージにシェル、apt、ビルドツールが含まれていないことを確認する
+- [x] 6. Integration verification and backward compatibility confirmation
+- [x] 6.1 Docker build E2E verification
+  - Execute a Docker build where all 3 stages complete successfully and confirm there are no build errors
+  - Verify that the release image does not contain a shell, apt, or build tools
   - _Requirements: 1.1, 4.2, 4.5_
 
-- [x] 6.2 ランタイム動作と後方互換性の検証
-  - 環境変数（`MONGO_URI`、`FILE_UPLOAD` 等）が従来通りアプリケーションに透過されることを確認する
-  - `/data` ボリュームマウントとの互換性およびファイルアップロード動作を確認する
-  - ポート 3000 でのリッスン動作を確認する
-  - メモリ管理環境変数が未設定の場合に V8 デフォルト動作となることを確認する
-  - `docker compose up` での起動と SIGTERM による graceful shutdown を確認する
+- [x] 6.2 Runtime behavior and backward compatibility verification
+  - Verify that environment variables (`MONGO_URI`, `FILE_UPLOAD`, etc.) are transparently passed to the application as before
+  - Verify compatibility with `/data` volume mounts and file upload functionality
+  - Verify listening on port 3000
+  - Verify that V8 default behavior is used when memory management environment variables are not set
+  - Verify startup with `docker compose up` and graceful shutdown via SIGTERM
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
 ## Known Issues
 
-- [ ] `process.initgroups()` による supplementary groups 初期化の追加
-  - design.md では `process.initgroups('node', 1000)` を呼ぶ設計だが、`@types/node` に型定義が存在しないため Phase 1 では実装を見送った
-  - ランタイムには `process.initgroups` は存在する（Node.js 24 で確認済み）
-  - 対応方法: `@types/node` の修正を待つか、`(process as any).initgroups('node', 1000)` で回避
-  - 実用上の影響は低い（Docker コンテナ内の node ユーザーは通常 supplementary groups を持たない）
+- [ ] Addition of supplementary groups initialization via `process.initgroups()`
+  - The design in design.md calls for `process.initgroups('node', 1000)`, but implementation was deferred in Phase 1 because the type definition does not exist in `@types/node`
+  - `process.initgroups` does exist at runtime (confirmed in Node.js 24)
+  - Workaround options: Wait for the `@types/node` fix, or use `(process as any).initgroups('node', 1000)` as a workaround
+  - Practical impact is low (the node user in a Docker container typically has no supplementary groups)
   - _Requirements: 4.1, 6.2_
 
-## Design からの意図的な逸脱（Phase 1 E2E 検証で発覚・対応済み）
+## Intentional deviations from Design (discovered and addressed during Phase 1 E2E verification)
 
-### DHI dev イメージの最小構成への対応
+### Adaptation to DHI dev image minimal configuration
 
-DHI dev イメージ (`dhi.io/node:24-debian13-dev`) は想定より最小構成であり、`which` コマンドが未同梱だった。以下の修正を実施済み：
+The DHI dev image (`dhi.io/node:24-debian13-dev`) was more minimal than expected, and the `which` command was not included. The following fix was applied:
 
-1. **pnpm インストール**: `SHELL="$(which sh)"` → `SHELL=/bin/sh` に変更（`which` コマンド不在のため）
+1. **pnpm installation**: Changed from `SHELL="$(which sh)"` to `SHELL=/bin/sh` (due to absence of the `which` command)
 
-### DHI runtime イメージのシェル完全不在への対応
+### Adaptation to complete absence of shell in DHI runtime image
 
-DHI runtime イメージ (`dhi.io/node:24-debian13`) には `/bin/sh` が存在しなかった。Design では `--mount=type=bind,from=builder` + `RUN tar -zxf` でアーティファクトを展開する設計だったが、`RUN` 命令は `/bin/sh` を必要とするため実行不可。
+The DHI runtime image (`dhi.io/node:24-debian13`) did not have `/bin/sh`. The Design planned to extract artifacts using `--mount=type=bind,from=builder` + `RUN tar -zxf`, but `RUN` instructions require `/bin/sh` and thus could not be executed.
 
-**対応**:
-- **builder ステージ**: `tar -zcf` → ステージングディレクトリ `/tmp/release/` に `cp -a` でコピー
-- **release ステージ**: `RUN --mount=type=bind... tar -zxf` → `COPY --from=builder --chown=node:node` に変更
-- `COPY`, `WORKDIR`, `ENV`, `LABEL`, `ENTRYPOINT` はすべて Docker デーモンが直接処理するためシェル不要
+**Resolution**:
+- **builder stage**: Changed from `tar -zcf` to copying with `cp -a` into a staging directory `/tmp/release/`
+- **release stage**: Changed from `RUN --mount=type=bind... tar -zxf` to `COPY --from=builder --chown=node:node`
+- `COPY`, `WORKDIR`, `ENV`, `LABEL`, `ENTRYPOINT` are all processed directly by the Docker daemon and do not require a shell
 
-**影響**: Design の Req 3.5（`--mount=type=bind,from=builder` パターン）は `COPY --from=builder` パターンに代替。runtime にシェルが不要という Design のセキュリティ目標（Req 4.2, 4.5）はより強固に達成された。
+**Impact**: Design Req 3.5 (`--mount=type=bind,from=builder` pattern) was replaced with the `COPY --from=builder` pattern. The Design's security goal of not requiring a shell at runtime (Req 4.2, 4.5) was achieved even more robustly.
 
-## Phase 2: turbo prune --docker ビルド最適化（次フェーズ）
+## Phase 2: turbo prune --docker build optimization (next phase)
 
-> Phase 1 で runtime が安定した後に実施する。現行の `COPY . .` + 3 ステージ構成を `turbo prune --docker` + 5 ステージ構成に移行し、ビルドキャッシュ効率を向上させる。
+> To be done after runtime is stable in Phase 1. Migrate from the current `COPY . .` + 3-stage structure to a `turbo prune --docker` + 5-stage structure to improve build cache efficiency.
 
-- [x] 7. turbo prune --docker パターンの導入
-- [x] 7.1 pruner ステージの新設
-  - base ステージの直後に pruner ステージを追加し、`turbo prune @growi/app @growi/pdf-converter --docker` でモノレポを Docker 用に最小化する
-  - `@growi/pdf-converter` を含める理由: `@growi/pdf-converter-client/turbo.json` が `@growi/pdf-converter#gen:swagger-spec` タスク依存を持つため、pruned workspace に含めないと turbo がタスク依存を解決できない
-  - pnpm workspace との互換性を検証済み（18 パッケージが正しく出力される）
-  - 出力（json ディレクトリ、lockfile、full ディレクトリ）が正しく生成されることを確認済み
+- [x] 7. Introduction of turbo prune --docker pattern
+- [x] 7.1 Create pruner stage
+  - Add a pruner stage immediately after the base stage, minimizing the monorepo for Docker with `turbo prune @growi/app @growi/pdf-converter --docker`
+  - Reason for including `@growi/pdf-converter`: `@growi/pdf-converter-client/turbo.json` has a task dependency on `@growi/pdf-converter#gen:swagger-spec`, so turbo cannot resolve task dependencies unless it is included in the pruned workspace
+  - Verified compatibility with pnpm workspace (18 packages are correctly output)
+  - Confirmed that the output (json directory, lockfile, full directory) is generated correctly
   - _Requirements: 3.1_
 
-- [x] 7.2 deps ステージの分離と builder の再構成
-  - builder ステージから依存インストールを分離し、deps ステージとして独立させる
-  - pruner の出力から package.json 群と lockfile のみをコピーして依存をインストールする（レイヤーキャッシュ効率化）
-  - builder ステージは deps をベースにソースコードをコピーしてビルドのみを行う構成に変更する
-  - 依存変更なし・ソースコードのみ変更の場合に、依存インストールレイヤーがキャッシュされることを検証する
+- [x] 7.2 Separate deps stage and restructure builder
+  - Separate dependency installation from the builder stage into an independent deps stage
+  - Copy only the package.json files and lockfile from pruner output to install dependencies (layer cache optimization)
+  - Change the builder stage to a structure that uses deps as a base and only copies source code and builds
+  - Verify that the dependency installation layer is cached when there are no dependency changes and only source code changes
   - _Requirements: 3.1, 3.2_
 
-- [x] 7.3 5 ステージ構成の統合検証
-  - base → pruner → deps → builder → release の 5 ステージ全てが正常完了することを確認する
-  - Phase 1 の 3 ステージ構成と同等の runtime 動作を維持していることを確認する
-  - ビルドキャッシュの効率改善（ソースコード変更時に依存インストールがスキップされること）を検証する
+- [x] 7.3 Integration verification of 5-stage structure
+  - Confirm that all 5 stages (base -> pruner -> deps -> builder -> release) complete successfully
+  - Confirm that the same runtime behavior as the Phase 1 3-stage structure is maintained
+  - Verify improvement in build cache efficiency (dependency installation is skipped when only source code changes)
   - _Requirements: 3.1, 3.2, 3.4_
 
-## Phase 3: 本番置換と CI/CD 対応
+## Phase 3: Production replacement and CI/CD support
 
-> Phase 2 で 5 ステージ構成が安定した後に実施する。`apps/app/docker-new/` の成果物を `apps/app/docker/` に移動して旧ファイルを削除し、CI/CD パイプラインを DHI 対応に更新する。
+> To be done after the 5-stage structure is stable in Phase 2. Move the artifacts from `apps/app/docker-new/` to `apps/app/docker/`, delete the old files, and update the CI/CD pipeline for DHI support.
 
-- [x] 8. 本番置換と CI/CD 対応
-- [x] 8.1 (P) docker-new ディレクトリから docker ディレクトリへの置換
-  - `apps/app/docker/` 内の旧ファイル（旧 `Dockerfile`、`docker-entrypoint.sh`、旧 `Dockerfile.dockerignore`）を削除する
-  - `apps/app/docker-new/` 内の全ファイル（`Dockerfile`、`docker-entrypoint.ts`、`docker-entrypoint.spec.ts`、`Dockerfile.dockerignore`）を `apps/app/docker/` に移動する
-  - `apps/app/docker-new/` ディレクトリを削除する
-  - `codebuild/` ディレクトリと `README.md` が `apps/app/docker/` 内に維持されていることを確認する
-  - Dockerfile 内の entrypoint コピーパス（`apps/app/docker-new/docker-entrypoint.ts`）を `apps/app/docker/docker-entrypoint.ts` に更新する
+- [x] 8. Production replacement and CI/CD support
+- [x] 8.1 (P) Replace docker-new directory with docker directory
+  - Delete old files in `apps/app/docker/` (old `Dockerfile`, `docker-entrypoint.sh`, old `Dockerfile.dockerignore`)
+  - Move all files in `apps/app/docker-new/` (`Dockerfile`, `docker-entrypoint.ts`, `docker-entrypoint.spec.ts`, `Dockerfile.dockerignore`) to `apps/app/docker/`
+  - Delete the `apps/app/docker-new/` directory
+  - Confirm that the `codebuild/` directory and `README.md` are maintained within `apps/app/docker/`
+  - Update the entrypoint copy path in the Dockerfile (from `apps/app/docker-new/docker-entrypoint.ts` to `apps/app/docker/docker-entrypoint.ts`)
   - _Requirements: 8.1, 8.2_
 
-- [x] 8.2 (P) buildspec.yml の DHI レジストリログイン追加
-  - `apps/app/docker/codebuild/buildspec.yml` の pre_build フェーズに `docker login dhi.io` コマンドを追加する
-  - DHI は Docker Hub 認証情報を使用するため、既存の `DOCKER_REGISTRY_PASSWORD` シークレットと `growimoogle` ユーザー名を再利用する
-  - buildspec.yml の Dockerfile パス（`./apps/app/docker/Dockerfile`）が置換後も正しいことを確認する
+- [x] 8.2 (P) Add DHI registry login to buildspec.yml
+  - Add a `docker login dhi.io` command to the pre_build phase of `apps/app/docker/codebuild/buildspec.yml`
+  - DHI uses Docker Hub credentials, so reuse the existing `DOCKER_REGISTRY_PASSWORD` secret and `growimoogle` username
+  - Confirm that the Dockerfile path in buildspec.yml (`./apps/app/docker/Dockerfile`) is correct after replacement
   - _Requirements: 8.3, 8.4_
 
-- [x] 8.3 置換後の統合検証
-  - 置換後の `apps/app/docker/Dockerfile` で Docker ビルドが正常完了することを確認する
-  - 既存の外部参照（`codebuild.tf`、`.github/workflows/release.yml`、`ci-app.yml`、`update-readme.sh`）が正しく動作することを確認する
+- [x] 8.3 Integration verification after replacement
+  - Confirm that Docker build completes successfully with the replaced `apps/app/docker/Dockerfile`
+  - Confirm that existing external references (`codebuild.tf`, `.github/workflows/release.yml`, `ci-app.yml`, `update-readme.sh`) work correctly
   - _Requirements: 8.1, 8.2, 8.3, 8.4_

@@ -6,236 +6,236 @@
 
 ## Summary
 - **Feature**: `official-docker-image`
-- **Discovery Scope**: Extension（既存 Dockerfile の大幅な改善）
+- **Discovery Scope**: Extension (major improvement of existing Dockerfile)
 - **Key Findings**:
-  - DHI runtime image (`dhi.io/node:24-debian13`) はシェル・パッケージマネージャ・coreutils を含まない極小構成。Node.js entrypoint（TypeScript）を採用し、シェル・追加バイナリ一切不要の構成を実現
-  - `--mount=type=bind` はモノレポのマルチステップビルドでは非実用的。`turbo prune --docker` が Turborepo 公式推奨のDocker最適化手法
-  - gosu は Node.js ネイティブの `process.setuid/setgid` で置き換え。外部バイナリ（gosu/setpriv/busybox）が完全に不要
-  - HEALTHCHECK は不採用（k8s は独自 probe を使用。Docker Compose ユーザーは自前で設定可能）
-  - Node.js 24 は TypeScript ネイティブ実行（type stripping）をサポート。entrypoint を TypeScript で記述可能
+  - The DHI runtime image (`dhi.io/node:24-debian13`) is a minimal configuration that does not include a shell, package manager, or coreutils. By adopting a Node.js entrypoint (TypeScript), a configuration requiring no shell or additional binaries is achieved
+  - `--mount=type=bind` is impractical for monorepo multi-step builds. `turbo prune --docker` is the officially recommended Docker optimization approach by Turborepo
+  - gosu is replaced by Node.js native `process.setuid/setgid`. External binaries (gosu/setpriv/busybox) are completely unnecessary
+  - HEALTHCHECK is not adopted (k8s uses its own probes. Docker Compose users can configure it themselves)
+  - Node.js 24 supports native TypeScript execution (type stripping). The entrypoint can be written in TypeScript
 
 ## Research Log
 
-### DHI Runtime Image の構成
+### DHI Runtime Image Configuration
 
-- **Context**: `dhi.io/node:24-debian13` をリリースステージのベースイメージとして採用する際の制約調査
+- **Context**: Investigation of constraints when adopting `dhi.io/node:24-debian13` as the base image for the release stage
 - **Sources Consulted**:
-  - [DHI Catalog GitHub](https://github.com/docker-hardened-images/catalog) — `image/node/debian-13/` ディレクトリ
+  - [DHI Catalog GitHub](https://github.com/docker-hardened-images/catalog) — `image/node/debian-13/` directory
   - [DHI Documentation](https://docs.docker.com/dhi/)
   - [DHI Use an Image](https://docs.docker.com/dhi/how-to/use/)
 - **Findings**:
-  - Runtime image のプリインストールパッケージ: `base-files`, `ca-certificates`, `libc6`, `libgomp1`, `libstdc++6`, `netbase`, `tzdata` のみ
-  - **シェルなし**、**apt なし**、**coreutils なし**、**curl/wget なし**
-  - デフォルトユーザー: `node` (UID 1000, GID 1000)
-  - Dev image (`-dev`): `apt`, `bash`, `git`, `util-linux`, `coreutils` 等がプリインストール
-  - 利用可能タグ: `dhi.io/node:24-debian13`, `dhi.io/node:24-debian13-dev`
-  - プラットフォーム: `linux/amd64`, `linux/arm64`
+  - Pre-installed packages in the runtime image: only `base-files`, `ca-certificates`, `libc6`, `libgomp1`, `libstdc++6`, `netbase`, `tzdata`
+  - **No shell**, **no apt**, **no coreutils**, **no curl/wget**
+  - Default user: `node` (UID 1000, GID 1000)
+  - Dev image (`-dev`): `apt`, `bash`, `git`, `util-linux`, `coreutils`, etc. are pre-installed
+  - Available tags: `dhi.io/node:24-debian13`, `dhi.io/node:24-debian13-dev`
+  - Platforms: `linux/amd64`, `linux/arm64`
 - **Implications**:
-  - entrypoint を Node.js（TypeScript）で記述することで、シェルも追加バイナリも完全に不要
-  - gosu/setpriv は Node.js ネイティブの `process.setuid/setgid` で代替。外部バイナリのコピーが不要
-  - HEALTHCHECK は不採用（k8s は独自 probe を使用）。curl/Node.js http モジュールによるヘルスチェックは不要
+  - By writing the entrypoint in Node.js (TypeScript), neither a shell nor additional binaries are needed at all
+  - gosu/setpriv are replaced by Node.js native `process.setuid/setgid`. No need to copy external binaries
+  - HEALTHCHECK is not adopted (k8s uses its own probes). Health checks via curl/Node.js http module are unnecessary
 
-### `--mount=type=bind` のモノレポビルドでの適用性
+### Applicability of `--mount=type=bind` in Monorepo Builds
 
-- **Context**: Requirement 3.1「builder ステージで `COPY . .` の代わりに `--mount=type=bind` を使用」の実現可能性調査
+- **Context**: Investigation of the feasibility of Requirement 3.1 "Use `--mount=type=bind` instead of `COPY . .` in the builder stage"
 - **Sources Consulted**:
   - [Docker Build Cache Optimization](https://docs.docker.com/build/cache/optimize/)
   - [Dockerfile Reference - RUN --mount](https://docs.docker.com/reference/dockerfile/)
   - [pnpm Docker Documentation](https://pnpm.io/docker)
   - [Turborepo Docker Guide](https://turbo.build/repo/docs/handbook/deploying-with-docker)
 - **Findings**:
-  - `--mount=type=bind` は **RUN 命令の実行中のみ有効** で、次の RUN 命令には引き継がれない
-  - モノレポビルドの multi-step プロセス（install → build → deploy）では、各ステップが前のステップの成果物に依存するため、bind mount だけでは実現困難
-  - 全ステップを単一 RUN にまとめることは可能だが、レイヤーキャッシュの利点が失われる
-  - **Turborepo 公式推奨**: `turbo prune --docker` で Docker 用にモノレポを最小化
-    - `out/json/` — dependency install に必要な package.json のみ
+  - `--mount=type=bind` is **only valid during the execution of a RUN instruction** and is not carried over to the next RUN instruction
+  - In the multi-step process of monorepo builds (install -> build -> deploy), each step depends on artifacts from the previous step, making it difficult to achieve with bind mounts alone
+  - It is possible to combine all steps into a single RUN, but this loses the benefits of layer caching
+  - **Turborepo official recommendation**: Use `turbo prune --docker` to minimize the monorepo for Docker
+    - `out/json/` — only package.json files needed for dependency install
     - `out/pnpm-lock.yaml` — lockfile
-    - `out/full/` — ビルドに必要なソースコード
-  - この方式により `COPY . .` を回避しつつ、レイヤーキャッシュを活用可能
+    - `out/full/` — source code needed for the build
+  - This approach avoids `COPY . .` while leveraging layer caching
 - **Implications**:
-  - Requirement 3.1 は `--mount=type=bind` ではなく `turbo prune --docker` パターンで実現すべき
-  - 目標（ソースコードのレイヤー最小化・キャッシュ効率向上）は同等に達成可能
-  - **ただし** `turbo prune --docker` の pnpm workspace との互換性は実装時に検証が必要
+  - Requirement 3.1 should be achieved using the `turbo prune --docker` pattern instead of `--mount=type=bind`
+  - The goal (minimizing source code layers / improving cache efficiency) can be equally achieved
+  - **However**, compatibility of `turbo prune --docker` with pnpm workspaces needs to be verified during implementation
 
-### gosu の代替手段
+### Alternatives to gosu
 
-- **Context**: DHI runtime image で gosu が利用できないため、代替手段を調査
+- **Context**: Investigation of alternatives since gosu is not available in the DHI runtime image
 - **Sources Consulted**:
-  - [gosu GitHub](https://github.com/tianon/gosu) — 代替ツール一覧
+  - [gosu GitHub](https://github.com/tianon/gosu) — list of alternative tools
   - [Debian Packages - gosu in trixie](https://packages.debian.org/trixie/admin/gosu)
   - [PhotoPrism: Switch from gosu to setpriv](https://github.com/photoprism/photoprism/pull/2730)
   - [MongoDB Docker: Replace gosu by setpriv](https://github.com/docker-library/mongo/pull/714)
   - Node.js `process.setuid/setgid` documentation
 - **Findings**:
-  - `setpriv` は `util-linux` の一部で、DHI dev image にプリインストール済み
-  - `gosu node command` → `setpriv --reuid=node --regid=node --init-groups -- command` に置換可能
-  - PhotoPrism、MongoDB 公式 Docker image が gosu → setpriv に移行済み
-  - **Node.js ネイティブ**: `process.setgid(1000)` + `process.setuid(1000)` + `process.initgroups('node', 1000)` で完全に代替可能
-  - Node.js entrypoint を採用する場合、外部バイナリ（gosu/setpriv/busybox）が一切不要
+  - `setpriv` is part of `util-linux` and is pre-installed in the DHI dev image
+  - `gosu node command` can be replaced with `setpriv --reuid=node --regid=node --init-groups -- command`
+  - PhotoPrism and the official MongoDB Docker image have already migrated from gosu to setpriv
+  - **Node.js native**: Can be fully replaced with `process.setgid(1000)` + `process.setuid(1000)` + `process.initgroups('node', 1000)`
+  - When adopting a Node.js entrypoint, no external binaries (gosu/setpriv/busybox) are needed at all
 - **Implications**:
-  - **最終決定**: Node.js ネイティブの `process.setuid/setgid` を採用（setpriv も不要）
-  - gosu/setpriv バイナリのコピーが不要になり、release ステージに追加バイナリなし
-  - DHI runtime の攻撃面最小化をそのまま維持
+  - **Final decision**: Adopt Node.js native `process.setuid/setgid` (setpriv is also unnecessary)
+  - No need to copy gosu/setpriv binaries, resulting in no additional binaries in the release stage
+  - Maintains the minimized attack surface of the DHI runtime as-is
 
-### HEALTHCHECK の実装方式（不採用）
+### HEALTHCHECK Implementation Approach (Not Adopted)
 
-- **Context**: DHI runtime image に curl がないため、HEALTHCHECK の実装方式を調査
+- **Context**: Investigation of HEALTHCHECK implementation approaches since curl is not available in the DHI runtime image
 - **Sources Consulted**:
   - [Docker Healthchecks in Distroless Node.js](https://www.mattknight.io/blog/docker-healthchecks-in-distroless-node-js)
   - [Docker Healthchecks: Why Not to Use curl](https://blog.sixeyed.com/docker-healthchecks-why-not-to-use-curl-or-iwr/)
   - GROWI healthcheck endpoint: `apps/app/src/server/routes/apiv3/healthcheck.ts`
 - **Findings**:
-  - Node.js の `http` モジュールで十分（curl は不要）
-  - GROWI の `/_api/v3/healthcheck` エンドポイントはパラメータなしで `{ status: 'OK' }` を返す
-  - Docker HEALTHCHECK は Docker Compose の `depends_on: service_healthy` 依存順序制御に有用
-  - k8s 環境では独自 probe（liveness/readiness）を使用するため Dockerfile の HEALTHCHECK は不要
+  - Node.js `http` module is sufficient (curl is unnecessary)
+  - GROWI's `/_api/v3/healthcheck` endpoint returns `{ status: 'OK' }` without any parameters
+  - Docker HEALTHCHECK is useful for Docker Compose's `depends_on: service_healthy` dependency order control
+  - In k8s environments, custom probes (liveness/readiness) are used, so the Dockerfile's HEALTHCHECK is unnecessary
 - **Implications**:
-  - **最終決定: 不採用**。k8s は独自 probe を使用し、Docker Compose ユーザーは compose.yaml で自前設定可能
-  - Dockerfile に HEALTHCHECK を含めないことで、シンプルさを維持
+  - **Final decision: Not adopted**. k8s uses its own probes, and Docker Compose users can configure it themselves in compose.yaml
+  - By not including HEALTHCHECK in the Dockerfile, simplicity is maintained
 
-### npm run migrate のシェル依存性
+### Shell Dependency of npm run migrate
 
-- **Context**: CMD 内の `npm run migrate` が shell を必要とするかの調査
+- **Context**: Investigation of whether `npm run migrate` within CMD requires a shell
 - **Sources Consulted**:
-  - GROWI `apps/app/package.json` の `migrate` スクリプト
+  - GROWI `apps/app/package.json`'s `migrate` script
 - **Findings**:
-  - `migrate` スクリプトの実態: `node -r dotenv-flow/config node_modules/migrate-mongo/bin/migrate-mongo up -f config/migrate-mongo-config.js`
-  - `npm run` は内部で `sh -c` を使用するため、shell が必要
-  - 代替: スクリプトの中身を直接 node で実行すれば npm/sh は不要
-  - ただし、npm run を使用する方が保守性が高い（package.json の変更に追従可能）
+  - The actual `migrate` script content: `node -r dotenv-flow/config node_modules/migrate-mongo/bin/migrate-mongo up -f config/migrate-mongo-config.js`
+  - `npm run` internally uses `sh -c`, so a shell is required
+  - Alternative: Running the script contents directly with node eliminates the need for npm/sh
+  - However, using npm run is more maintainable (can track changes in package.json)
 - **Implications**:
-  - **最終決定**: Node.js entrypoint で `child_process.execFileSync` を使用し、migration コマンドを直接実行（npm run 不使用、シェル不要）
-  - package.json の `migrate` スクリプトの中身を entrypoint 内で直接記述する方式を採用
-  - package.json の変更時は entrypoint の更新も必要だが、DHI runtime の完全シェルレスを優先
+  - **Final decision**: Use `child_process.execFileSync` in the Node.js entrypoint to directly execute the migration command (not using npm run, no shell needed)
+  - Adopt the approach of directly writing the `migrate` script contents within the entrypoint
+  - When package.json changes, the entrypoint also needs to be updated, but priority is given to fully shell-less DHI runtime
 
-### Node.js 24 TypeScript ネイティブ実行
+### Node.js 24 Native TypeScript Execution
 
-- **Context**: entrypoint を TypeScript で記述する場合、Node.js 24 のネイティブ TypeScript 実行機能を利用可能か調査
+- **Context**: Investigation of whether Node.js 24's native TypeScript execution feature can be used when writing the entrypoint in TypeScript
 - **Sources Consulted**:
-  - [Node.js 23 Release Notes](https://nodejs.org/en/blog/release/v23.0.0) — `--experimental-strip-types` が unflag
+  - [Node.js 23 Release Notes](https://nodejs.org/en/blog/release/v23.0.0) — `--experimental-strip-types` unflagged
   - [Node.js Type Stripping Documentation](https://nodejs.org/docs/latest/api/typescript.html)
 - **Findings**:
-  - Node.js 23 から type stripping がデフォルト有効（`--experimental-strip-types` フラグ不要）
-  - Node.js 24 では安定機能として利用可能
-  - **制約**: enum、namespace 等の「非 erasable syntax」は使用不可。`--experimental-transform-types` が必要
-  - interface、type alias、type annotation（`: string`、`: number` 等）は問題なく使用可能
-  - `ENTRYPOINT ["node", "docker-entrypoint.ts"]` で直接実行可能
+  - From Node.js 23, type stripping is enabled by default (no `--experimental-strip-types` flag needed)
+  - Available as a stable feature in Node.js 24
+  - **Constraint**: "Non-erasable syntax" such as enum and namespace cannot be used. `--experimental-transform-types` is required for those
+  - interface, type alias, and type annotations (`: string`, `: number`, etc.) can be used without issues
+  - Can be executed directly with `ENTRYPOINT ["node", "docker-entrypoint.ts"]`
 - **Implications**:
-  - entrypoint を TypeScript で記述し、型安全な実装が可能
-  - enum は使用せず、union type (`type Foo = 'a' | 'b'`) で代替
-  - tsconfig.json は不要（type stripping は独立動作）
+  - The entrypoint can be written in TypeScript, enabling type-safe implementation
+  - Do not use enum; use union types (`type Foo = 'a' | 'b'`) as alternatives
+  - tsconfig.json is not required (type stripping operates independently)
 
 ## Architecture Pattern Evaluation
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
 |--------|-------------|-----------|---------------------|-------|
-| DHI runtime + busybox-static | busybox-static をコピーして sh/coreutils を提供 | 最小限の追加（~1MB）で全機能動作 | DHI 採用の本来の意図（攻撃面最小化）と矛盾。追加バイナリは攻撃ベクター | 却下 |
-| DHI runtime + bash/coreutils コピー | dev stage から bash と各種バイナリを個別コピー | bash の全機能が使える | 共有ライブラリ依存が複雑、コピー対象が多い | 却下 |
-| DHI dev image を runtime に使用 | dev image をそのまま本番利用 | 設定変更最小 | apt/git 等が含まれ攻撃面が増大、DHI の意味が薄れる | 却下 |
-| Node.js entrypoint（TypeScript、シェルレス） | entrypoint を TypeScript で記述。Node.js 24 のネイティブ TypeScript 実行で動作 | 完全にシェル不要、DHI runtime の攻撃面をそのまま維持、型安全 | migration コマンドを直接記述（npm run 不使用）、package.json 変更時に更新必要 | **採用** |
+| DHI runtime + busybox-static | Copy busybox-static to provide sh/coreutils | Minimal addition (~1MB) enables full functionality | Contradicts the original intent of DHI adoption (minimizing attack surface). Additional binaries are attack vectors | Rejected |
+| DHI runtime + bash/coreutils copy | Copy bash and various binaries individually from the dev stage | Full bash functionality available | Shared library dependencies are complex, many files need to be copied | Rejected |
+| DHI dev image as runtime | Use the dev image as-is for production | Minimal configuration changes | Increased attack surface due to apt/git etc., diminishes the meaning of DHI | Rejected |
+| Node.js entrypoint (TypeScript, shell-less) | Write the entrypoint in TypeScript. Runs with Node.js 24's native TypeScript execution | Completely shell-free, maintains DHI runtime's attack surface as-is, type-safe | Migration command written directly (not using npm run), updates needed when package.json changes | **Adopted** |
 
 ## Design Decisions
 
-### Decision: Node.js TypeScript entrypoint（シェル完全不要）
+### Decision: Node.js TypeScript Entrypoint (Completely Shell-Free)
 
-- **Context**: DHI runtime image にはシェルも coreutils も含まれない。busybox-static のコピーは DHI 採用の意図（攻撃面最小化）と矛盾する
+- **Context**: The DHI runtime image contains neither a shell nor coreutils. Copying busybox-static contradicts the intent of DHI adoption (minimizing attack surface)
 - **Alternatives Considered**:
-  1. busybox-static をコピーして shell + coreutils を提供 — DHI の攻撃面最小化と矛盾
-  2. bash + coreutils を個別コピー — 依存関係が複雑
-  3. Node.js TypeScript entrypoint — `fs`、`child_process`、`process.setuid/setgid` で全て完結
-- **Selected Approach**: entrypoint を TypeScript で記述（`docker-entrypoint.ts`）。Node.js 24 のネイティブ TypeScript 実行（type stripping）で直接実行
-- **Rationale**: DHI runtime に追加バイナリ一切不要。fs module でディレクトリ操作、process.setuid/setgid で権限ドロップ、execFileSync で migration、spawn でアプリ起動。型安全による保守性向上
-- **Trade-offs**: migration コマンドを直接記述（npm run 不使用）。package.json の migrate スクリプト変更時に entrypoint の更新も必要
-- **Follow-up**: Node.js 24 の type stripping が entrypoint の import 文なしの単一ファイルで正常動作することを検証
+  1. Copy busybox-static to provide shell + coreutils — Contradicts DHI's attack surface minimization
+  2. Copy bash + coreutils individually — Complex dependencies
+  3. Node.js TypeScript entrypoint — Everything can be accomplished with `fs`, `child_process`, and `process.setuid/setgid`
+- **Selected Approach**: Write the entrypoint in TypeScript (`docker-entrypoint.ts`). Execute directly using Node.js 24's native TypeScript execution (type stripping)
+- **Rationale**: No additional binaries needed in the DHI runtime whatsoever. Directory operations via fs module, privilege dropping via process.setuid/setgid, migration via execFileSync, and app startup via spawn. Improved maintainability through type safety
+- **Trade-offs**: Migration command is written directly (not using npm run). When the migrate script in package.json changes, the entrypoint also needs to be updated
+- **Follow-up**: Verify that Node.js 24's type stripping works correctly with a single-file entrypoint without import statements
 
-### Decision: Node.js ネイティブの process.setuid/setgid による権限ドロップ
+### Decision: Privilege Dropping via Node.js Native process.setuid/setgid
 
-- **Context**: gosu は DHI runtime にインストールできない。busybox-static/setpriv も不採用（追加バイナリ排除方針）
+- **Context**: gosu cannot be installed in the DHI runtime. busybox-static/setpriv are also not adopted (policy of eliminating additional binaries)
 - **Alternatives Considered**:
-  1. gosu バイナリをコピー — 動作するが、業界トレンドに逆行
-  2. setpriv バイナリをコピー — 動作するが、追加バイナリ排除方針に反する
-  3. Node.js `process.setuid/setgid` — Node.js の標準 API
-  4. Docker `--user` フラグ — entrypoint の動的処理に対応できない
-- **Selected Approach**: `process.initgroups('node', 1000)` + `process.setgid(1000)` + `process.setuid(1000)` で権限ドロップ
-- **Rationale**: 外部バイナリ完全不要。Node.js entrypoint 内で直接呼び出し可能。setgid → setuid の順序で安全に権限ドロップ
-- **Trade-offs**: entrypoint が Node.js プロセスとして root で起動し、アプリもその子プロセスとなる（gosu のような exec ではない）。ただし spawn でアプリプロセスを分離し、シグナルフォワーディングで PID 1 の責務を果たす
-- **Follow-up**: なし
+  1. Copy gosu binary — Works but goes against industry trends
+  2. Copy setpriv binary — Works but goes against the policy of eliminating additional binaries
+  3. Node.js `process.setuid/setgid` — Standard Node.js API
+  4. Docker `--user` flag — Cannot handle dynamic processing in the entrypoint
+- **Selected Approach**: Drop privileges with `process.initgroups('node', 1000)` + `process.setgid(1000)` + `process.setuid(1000)`
+- **Rationale**: No external binaries needed at all. Can be called directly within the Node.js entrypoint. Safe privilege dropping in the order setgid -> setuid
+- **Trade-offs**: The entrypoint starts as a Node.js process running as root, and the app becomes its child process (not an exec like gosu). However, the app process is separated via spawn, and signal forwarding fulfills PID 1 responsibilities
+- **Follow-up**: None
 
-### Decision: turbo prune --docker パターン
+### Decision: turbo prune --docker Pattern
 
-- **Context**: Requirement 3.1 で `COPY . .` の廃止が求められているが、`--mount=type=bind` はモノレポビルドで非実用的
+- **Context**: Requirement 3.1 requires eliminating `COPY . .`, but `--mount=type=bind` is impractical for monorepo builds
 - **Alternatives Considered**:
-  1. `--mount=type=bind` — RUN 間で永続化しないため multi-step ビルドに不向き
-  2. 単一 RUN に全ステップをまとめる — キャッシュ効率が悪い
-  3. `turbo prune --docker` — Turborepo 公式推奨
-- **Selected Approach**: `turbo prune --docker` で Docker 用にモノレポを最小化し、最適化された COPY パターンを使用
-- **Rationale**: Turborepo 公式推奨。dependency install と source copy を分離してレイヤーキャッシュを最大活用。`COPY . .` を排除しつつ実用的
-- **Trade-offs**: ビルドステージが 1 つ増える（pruner ステージ）が、キャッシュ効率の改善で相殺
-- **Follow-up**: `turbo prune --docker` の pnpm workspace 互換性を実装時に検証
+  1. `--mount=type=bind` — Does not persist across RUN instructions, unsuitable for multi-step builds
+  2. Combine all steps into a single RUN — Poor cache efficiency
+  3. `turbo prune --docker` — Officially recommended by Turborepo
+- **Selected Approach**: Use `turbo prune --docker` to minimize the monorepo for Docker, using optimized COPY patterns
+- **Rationale**: Officially recommended by Turborepo. Separates dependency install and source copy to maximize layer cache utilization. Eliminates `COPY . .` while remaining practical
+- **Trade-offs**: One additional build stage (pruner stage), but offset by improved cache efficiency
+- **Follow-up**: Verify `turbo prune --docker` compatibility with pnpm workspaces during implementation
 
-### Decision: spawn 引数によるフラグ注入
+### Decision: Flag Injection via spawn Arguments
 
-- **Context**: `--max-heap-size` は `NODE_OPTIONS` では使用不可。node コマンドの直接引数として渡す必要がある
+- **Context**: `--max-heap-size` cannot be used in `NODE_OPTIONS`. It needs to be passed as a direct argument to the node command
 - **Alternatives Considered**:
-  1. 環境変数 `GROWI_NODE_FLAGS` を export し、CMD 内の shell 変数展開で注入 — shell が必要
-  2. entrypoint 内で CMD 文字列を sed で書き換え — fragile
-  3. Node.js entrypoint で `child_process.spawn` の引数として直接渡す — シェル不要
-- **Selected Approach**: entrypoint 内でフラグ配列を組み立て、`spawn(process.execPath, [...nodeFlags, ...appArgs])` で直接渡す
-- **Rationale**: シェル変数展開不要。配列として直接渡すためシェルインジェクションのリスクゼロ。Node.js entrypoint との自然な統合
-- **Trade-offs**: CMD が不要になる（entrypoint が全ての起動処理を行う）。docker run でのコマンド上書きが entrypoint 内のロジックには影響しない
-- **Follow-up**: なし
+  1. Export environment variable `GROWI_NODE_FLAGS` and inject via shell variable expansion in CMD — Requires a shell
+  2. Rewrite CMD string with sed in the entrypoint — Fragile
+  3. Pass directly as arguments to `child_process.spawn` in the Node.js entrypoint — No shell needed
+- **Selected Approach**: Build a flag array within the entrypoint and pass it directly with `spawn(process.execPath, [...nodeFlags, ...appArgs])`
+- **Rationale**: No shell variable expansion needed. Passed directly as an array, resulting in zero risk of shell injection. Natural integration with the Node.js entrypoint
+- **Trade-offs**: CMD becomes unnecessary (the entrypoint handles all startup processing). Overriding the command with docker run does not affect the logic within the entrypoint
+- **Follow-up**: None
 
-### DHI レジストリ認証と CI/CD 統合
+### DHI Registry Authentication and CI/CD Integration
 
-- **Context**: DHI ベースイメージの pull に必要な認証方式と、既存 CodeBuild パイプラインへの統合方法を調査
+- **Context**: Investigation of the authentication method required for pulling DHI base images and how to integrate with the existing CodeBuild pipeline
 - **Sources Consulted**:
-  - [DHI How to Use an Image](https://docs.docker.com/dhi/how-to/use/) — DHI の利用手順
-  - 既存 `apps/app/docker/codebuild/buildspec.yml` — 現行の CodeBuild ビルド定義
-  - 既存 `apps/app/docker/codebuild/secretsmanager.tf` — AWS Secrets Manager 設定
+  - [DHI How to Use an Image](https://docs.docker.com/dhi/how-to/use/) — DHI usage instructions
+  - Existing `apps/app/docker/codebuild/buildspec.yml` — Current CodeBuild build definition
+  - Existing `apps/app/docker/codebuild/secretsmanager.tf` — AWS Secrets Manager configuration
 - **Findings**:
-  - DHI は Docker Hub 認証情報を使用（DHI は Docker Business/Team サブスクリプションの機能）
-  - `docker login dhi.io --username <dockerhub-user> --password-stdin` で認証可能
-  - 既存 buildspec.yml は `DOCKER_REGISTRY_PASSWORD` シークレットで docker.io にログイン済み
-  - 同じ認証情報で `dhi.io` にもログイン可能（追加シークレットは不要）
-  - CodeBuild の `reusable-app-build-image.yml` → CodeBuild Project → buildspec.yml の流れは変更不要
+  - DHI uses Docker Hub credentials (DHI is a feature of Docker Business/Team subscriptions)
+  - Authentication is possible with `docker login dhi.io --username <dockerhub-user> --password-stdin`
+  - The existing buildspec.yml is already logged into docker.io with the `DOCKER_REGISTRY_PASSWORD` secret
+  - The same credentials can be used to log into `dhi.io` as well (no additional secrets required)
+  - The flow of CodeBuild's `reusable-app-build-image.yml` -> CodeBuild Project -> buildspec.yml does not need to change
 - **Implications**:
-  - buildspec.yml の pre_build に `docker login dhi.io` を 1 行追加するだけで対応可能
-  - `secretsmanager.tf` の変更は不要
-  - Docker Hub と DHI の両方にログインが必要（docker.io は push 用、dhi.io は pull 用）
+  - Can be addressed by simply adding one line of `docker login dhi.io` to the pre_build in buildspec.yml
+  - No changes to `secretsmanager.tf` are needed
+  - Login to both Docker Hub and DHI is required (docker.io for push, dhi.io for pull)
 
-### ディレクトリ置換の影響範囲（コードベース調査）
+### Impact Scope of Directory Replacement (Codebase Investigation)
 
-- **Context**: `apps/app/docker-new/` → `apps/app/docker/` への置換時に、既存の参照が壊れないことを確認
-- **Sources Consulted**: コードベース全体を `apps/app/docker` キーワードで grep 調査
+- **Context**: Confirming that existing references will not break when replacing `apps/app/docker-new/` with `apps/app/docker/`
+- **Sources Consulted**: Grep investigation of the entire codebase with the `apps/app/docker` keyword
 - **Findings**:
-  - `buildspec.yml`: `-f ./apps/app/docker/Dockerfile` — 置換後も同一パス（変更不要）
-  - `codebuild.tf`: `buildspec = "apps/app/docker/codebuild/buildspec.yml"` — 同一（変更不要）
-  - `.github/workflows/release.yml`: `readme-filepath: ./apps/app/docker/README.md` — 同一（変更不要）
-  - `.github/workflows/ci-app.yml` / `ci-app-prod.yml`: `!apps/app/docker/**` 除外パターン — 同一（変更不要）
-  - `apps/app/bin/github-actions/update-readme.sh`: `cd docker` + sed — 同一（変更不要）
-  - Dockerfile 内: line 122 `apps/app/docker-new/docker-entrypoint.ts` — **要更新**（自己参照パス）
-  - `package.json` や `vitest.config` に docker 関連の参照 — なし
-  - `lefthook.yml` に docker 関連フック — なし
+  - `buildspec.yml`: `-f ./apps/app/docker/Dockerfile` — Same path after replacement (no change needed)
+  - `codebuild.tf`: `buildspec = "apps/app/docker/codebuild/buildspec.yml"` — Same (no change needed)
+  - `.github/workflows/release.yml`: `readme-filepath: ./apps/app/docker/README.md` — Same (no change needed)
+  - `.github/workflows/ci-app.yml` / `ci-app-prod.yml`: `!apps/app/docker/**` exclusion pattern — Same (no change needed)
+  - `apps/app/bin/github-actions/update-readme.sh`: `cd docker` + sed — Same (no change needed)
+  - Within Dockerfile: line 122 `apps/app/docker-new/docker-entrypoint.ts` — **Needs updating** (self-referencing path)
+  - `package.json` and `vitest.config` for docker-related references — None
+  - `lefthook.yml` for docker-related hooks — None
 - **Implications**:
-  - 置換時に更新が必要なのは Dockerfile 内の自己参照パス 1 箇所のみ
-  - 外部参照（CI/CD、GitHub Actions）は全て `apps/app/docker/` パスを使用しており変更不要
-  - `codebuild/` ディレクトリと `README.md` は `docker/` 内にそのまま維持
+  - Only one location within the Dockerfile (self-referencing path) needs to be updated during replacement
+  - All external references (CI/CD, GitHub Actions) already use the `apps/app/docker/` path and require no changes
+  - The `codebuild/` directory and `README.md` are maintained as-is within `docker/`
 
 ## Risks & Mitigations
 
-- **Node.js 24 TypeScript ネイティブ実行の安定性**: type stripping は Node.js 23 で unflag 済み。Node.js 24 では安定機能。ただし enum 等の非 erasable syntax は使用不可 → interface/type のみ使用
-- **migration コマンドの直接記述**: package.json の `migrate` スクリプトを entrypoint 内に直接記述するため、変更時に同期が必要 → 実装時にコメントで明記
-- **turbo prune の pnpm workspace 互換性**: 実装時に検証。非互換の場合は最適化された COPY パターンにフォールバック
-- **process.setuid/setgid の制限**: supplementary groups の初期化に `process.initgroups` が必要。setgid → setuid の順序厳守
-- **DHI イメージの docker login 要件**: CI/CD で `docker login dhi.io` が必要。認証情報管理のセキュリティ考慮が必要
+- **Stability of Node.js 24 native TypeScript execution**: Type stripping was unflagged in Node.js 23. It is a stable feature in Node.js 24. However, non-erasable syntax such as enum cannot be used -> Use only interface/type
+- **Direct description of migration command**: The `migrate` script from package.json is written directly in the entrypoint, so synchronization is needed when changes occur -> Clearly noted in comments during implementation
+- **turbo prune compatibility with pnpm workspaces**: Verify during implementation. If incompatible, fall back to an optimized COPY pattern
+- **Limitations of process.setuid/setgid**: `process.initgroups` is required for supplementary group initialization. The order setgid -> setuid must be strictly followed
+- **docker login requirement for DHI images**: `docker login dhi.io` is required in CI/CD. Security considerations for credential management are needed
 
 ## References
 
-- [Docker Hardened Images Documentation](https://docs.docker.com/dhi/) — DHI の全体像と利用方法
-- [DHI Catalog GitHub](https://github.com/docker-hardened-images/catalog) — イメージ定義とタグ一覧
-- [Turborepo Docker Guide](https://turbo.build/repo/docs/handbook/deploying-with-docker) — turbo prune --docker パターン
-- [pnpm Docker Documentation](https://pnpm.io/docker) — pnpm のDockerビルド推奨
-- [Future Architect: 2024年版 Dockerfile ベストプラクティス](https://future-architect.github.io/articles/20240726a/) — モダンな Dockerfile 構文
-- [MongoDB Docker: gosu → setpriv](https://github.com/docker-library/mongo/pull/714) — setpriv 移行の先行事例
-- [Docker Healthchecks in Distroless](https://www.mattknight.io/blog/docker-healthchecks-in-distroless-node-js) — curl なしのヘルスチェック
-- GROWI メモリ使用量調査レポート (`apps/app/tmp/memory-results/REPORT.md`) — ヒープサイズ制御の根拠
+- [Docker Hardened Images Documentation](https://docs.docker.com/dhi/) — Overview and usage of DHI
+- [DHI Catalog GitHub](https://github.com/docker-hardened-images/catalog) — Image definitions and tag list
+- [Turborepo Docker Guide](https://turbo.build/repo/docs/handbook/deploying-with-docker) — turbo prune --docker pattern
+- [pnpm Docker Documentation](https://pnpm.io/docker) — pnpm Docker build recommendations
+- [Future Architect: 2024 Edition Dockerfile Best Practices](https://future-architect.github.io/articles/20240726a/) — Modern Dockerfile syntax
+- [MongoDB Docker: gosu -> setpriv](https://github.com/docker-library/mongo/pull/714) — Precedent for setpriv migration
+- [Docker Healthchecks in Distroless](https://www.mattknight.io/blog/docker-healthchecks-in-distroless-node-js) — Health checks without curl
+- GROWI memory usage investigation report (`apps/app/tmp/memory-results/REPORT.md`) — Basis for heap size control

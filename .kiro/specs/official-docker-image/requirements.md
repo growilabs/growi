@@ -2,131 +2,131 @@
 
 ## Introduction
 
-GROWI 公式 Docker イメージの Dockerfile (`apps/app/docker/Dockerfile`) および `docker-entrypoint.sh` を、2025-2026 年のベストプラクティスに基づきモダナイズ・最適化する。Node.js 24 をターゲットとし、メモリレポート (`apps/app/tmp/memory-results/REPORT.md`) の知見を反映してメモリ管理を改善する。
+Modernize and optimize the GROWI official Docker image's Dockerfile (`apps/app/docker/Dockerfile`) and `docker-entrypoint.sh` based on 2025-2026 best practices. Target Node.js 24 and incorporate findings from the memory report (`apps/app/tmp/memory-results/REPORT.md`) to improve memory management.
 
-### 現状分析の要約
+### Summary of Current State Analysis
 
-**現行 Dockerfile の構成:**
-- 3 ステージ構成: `base` → `builder` → `release`（node:20-slim ベース）
-- pnpm + turbo によるモノレポビルド、`pnpm deploy` による本番依存抽出
-- gosu を使った root → node ユーザーへの権限ドロップ（entrypoint でディレクトリ作成後）
-- `COPY . .` でコンテキスト全体をビルダーにコピー
-- CMD 内で `npm run migrate` 実行後にアプリ起動
+**Current Dockerfile structure:**
+- 3-stage structure: `base` → `builder` → `release` (based on node:20-slim)
+- Monorepo build with pnpm + turbo, production dependency extraction via `pnpm deploy`
+- Privilege drop from root to node user using gosu (after directory creation in entrypoint)
+- `COPY . .` copies the entire context into the builder
+- Application starts after running `npm run migrate` in CMD
 
-**GROWI 固有の設計意図（維持すべき事項）:**
-- 権限ドロップパターン: entrypoint が root 権限で `/data/uploads` や `/tmp/page-bulk-export` を作成・権限設定した後、node ユーザーに降格して実行する必要がある
-- `pnpm deploy --prod`: pnpm モノレポから本番依存のみを抽出するための公式手法
-- tar.gz によるステージ間アーティファクト受け渡し: ビルド成果物を cleanly に release ステージに転送
-- `apps/app/tmp` ディレクトリ: 運用中にファイルが配置されるため本番イメージに必要
-- `--expose_gc` フラグ: バッチ処理（ES rebuild、import 等）で明示的に `gc()` を呼び出すために必要
-- CMD 内の `npm run migrate`: Docker image ユーザーの利便性のため、起動時にマイグレーションを自動実行
+**GROWI-specific design intentions (items to maintain):**
+- Privilege drop pattern: The entrypoint must create and set permissions for `/data/uploads` and `/tmp/page-bulk-export` with root privileges, then drop to the node user for execution
+- `pnpm deploy --prod`: The official method for extracting only production dependencies from a pnpm monorepo
+- Inter-stage artifact transfer via tar.gz: Cleanly transfers build artifacts to the release stage
+- `apps/app/tmp` directory: Required in the production image as files are placed there during operation
+- `--expose_gc` flag: Required for explicitly calling `gc()` in batch processing (ES rebuild, import, etc.)
+- `npm run migrate` in CMD: Automatically runs migrations at startup for the convenience of Docker image users
 
-**参考資料:**
-- [Future Architect: 2024年版 Dockerfile ベストプラクティス](https://future-architect.github.io/articles/20240726a/)
+**References:**
+- [Future Architect: 2024 Dockerfile Best Practices](https://future-architect.github.io/articles/20240726a/)
 - [Snyk: 10 best practices to containerize Node.js](https://snyk.io/blog/10-best-practices-to-containerize-nodejs-web-applications-with-docker/)
 - [ByteScrum: Dockerfile Best Practices 2025](https://blog.bytescrum.com/dockerfile-best-practices-2025-secure-fast-and-modern)
 - [OneUptime: Docker Health Check Best Practices 2026](https://oneuptime.com/blog/post/2026-01-30-docker-health-check-best-practices/view)
 - [Docker: Introduction to heredocs in Dockerfiles](https://www.docker.com/blog/introduction-to-heredocs-in-dockerfiles/)
-- [Docker Hardened Images: Node.js 移行ガイド](https://docs.docker.com/dhi/migration/examples/node/)
-- [Docker Hardened Images カタログ: Node.js](https://hub.docker.com/hardened-images/catalog/dhi/node)
-- GROWI メモリ使用量調査レポート (`apps/app/tmp/memory-results/REPORT.md`)
+- [Docker Hardened Images: Node.js Migration Guide](https://docs.docker.com/dhi/migration/examples/node/)
+- [Docker Hardened Images Catalog: Node.js](https://hub.docker.com/hardened-images/catalog/dhi/node)
+- GROWI Memory Usage Investigation Report (`apps/app/tmp/memory-results/REPORT.md`)
 
 ## Requirements
 
-### Requirement 1: ベースイメージとビルド環境のモダナイズ
+### Requirement 1: Modernize Base Image and Build Environment
 
-**Objective:** As an インフラ管理者, I want Dockerfile のベースイメージと構文が最新のベストプラクティスに準拠していること, so that セキュリティパッチの適用・パフォーマンス向上・メンテナンス性の改善が得られる
-
-#### Acceptance Criteria
-
-1. The Dockerfile shall ベースイメージとして Docker Hardened Images（DHI）を使用する。ビルドステージには `dhi.io/node:24-debian13-dev`、リリースステージには `dhi.io/node:24-debian13` を使用する（glibc ベースでパフォーマンス維持、CVE 最大 95% 削減）
-2. The Dockerfile shall syntax ディレクティブを `# syntax=docker/dockerfile:1`（最新安定版を自動追従）に更新する
-3. The Dockerfile shall pnpm のインストールに wget スタンドアロンスクリプト方式を維持する（corepack は Node.js 25 以降で同梱廃止のため不採用）
-4. The Dockerfile shall `pnpm install ---frozen-lockfile`（ダッシュ3つ）の typo を `--frozen-lockfile`（ダッシュ2つ）に修正する
-5. The Dockerfile shall pnpm バージョンのハードコードを避け、`package.json` の `packageManager` フィールドまたはインストールスクリプトの最新版取得を活用する
-
-### Requirement 2: メモリ管理の最適化
-
-**Objective:** As a GROWI 運用者, I want コンテナのメモリ制約に応じて Node.js のヒープサイズが適切に制御されること, so that OOMKilled のリスクが低減し、マルチテナント環境でのメモリ効率が向上する
+**Objective:** As an infrastructure administrator, I want the Dockerfile's base image and syntax to comply with the latest best practices, so that security patch application, performance improvements, and maintainability enhancements are achieved
 
 #### Acceptance Criteria
 
-1. The docker-entrypoint.ts shall `GROWI_HEAP_SIZE` 環境変数が設定されている場合、その値を `--max-heap-size` フラグとして node プロセスに渡す
-2. While `GROWI_HEAP_SIZE` 環境変数が未設定の場合, the docker-entrypoint.ts shall cgroup メモリリミット（v2: `/sys/fs/cgroup/memory.max`、v1: `/sys/fs/cgroup/memory/memory.limit_in_bytes`）を読み取り、その 60% を `--max-heap-size` として自動算出する
-3. While cgroup メモリリミットが検出できない（ベアメタル等）かつ `GROWI_HEAP_SIZE` が未設定の場合, the docker-entrypoint.ts shall `--max-heap-size` フラグを付与せず、V8 のデフォルト動作に委ねる
-4. When `GROWI_OPTIMIZE_MEMORY` 環境変数が `true` に設定された場合, the docker-entrypoint.ts shall `--optimize-for-size` フラグを node プロセスに追加する
-5. When `GROWI_LITE_MODE` 環境変数が `true` に設定された場合, the docker-entrypoint.ts shall `--lite-mode` フラグを node プロセスに追加する（TurboFan 無効化により RSS を v20 同等まで削減。OOMKilled 頻発時の最終手段として使用）
-6. The docker-entrypoint.ts shall `--max-heap-size` を使用し、`--max_old_space_size` は使用しない（Node.js 24 の trusted_space overhead 問題を回避するため）
-7. The docker-entrypoint.ts shall `--max-heap-size` を `NODE_OPTIONS` ではなく node コマンドの直接引数として渡す（Node.js の制約）
+1. The Dockerfile shall use Docker Hardened Images (DHI) as the base image. Use `dhi.io/node:24-debian13-dev` for the build stage and `dhi.io/node:24-debian13` for the release stage (glibc-based for performance retention, up to 95% CVE reduction)
+2. The Dockerfile shall update the syntax directive to `# syntax=docker/dockerfile:1` (automatically follows the latest stable version)
+3. The Dockerfile shall maintain the wget standalone script method for pnpm installation (corepack is not adopted because it will be removed from Node.js 25 onwards)
+4. The Dockerfile shall fix the typo `pnpm install ---frozen-lockfile` (three dashes) to `--frozen-lockfile` (two dashes)
+5. The Dockerfile shall avoid hardcoding the pnpm version and leverage the `packageManager` field in `package.json` or the latest version retrieval from the install script
 
-### Requirement 3: ビルド効率とキャッシュの最適化
+### Requirement 2: Memory Management Optimization
 
-**Objective:** As a 開発者, I want Docker ビルドが高速かつ効率的であること, so that CI/CD パイプラインのビルド時間が短縮され、イメージサイズが最小化される
+**Objective:** As a GROWI operator, I want the Node.js heap size to be appropriately controlled according to container memory constraints, so that the risk of OOMKilled is reduced and memory efficiency in multi-tenant environments is improved
 
 #### Acceptance Criteria
 
-1. The Dockerfile shall builder ステージで `COPY . .` の代わりに `--mount=type=bind` を使用し、ソースコードをレイヤーに含めない
-2. The Dockerfile shall pnpm store のキャッシュマウント (`--mount=type=cache,target=...`) を維持する
-3. The Dockerfile shall ビルドステージで apt-get のキャッシュマウントを維持する
-4. The Dockerfile shall release ステージで `.next/cache` が含まれないことを保証する
-5. The Dockerfile shall ビルドステージからリリースステージへのアーティファクト転送に `--mount=type=bind,from=builder` パターンを使用する
+1. The docker-entrypoint.ts shall pass the value of the `GROWI_HEAP_SIZE` environment variable as the `--max-heap-size` flag to the node process when it is set
+2. While the `GROWI_HEAP_SIZE` environment variable is not set, the docker-entrypoint.ts shall read the cgroup memory limit (v2: `/sys/fs/cgroup/memory.max`, v1: `/sys/fs/cgroup/memory/memory.limit_in_bytes`) and automatically calculate 60% of it as `--max-heap-size`
+3. While the cgroup memory limit cannot be detected (e.g., bare metal) and `GROWI_HEAP_SIZE` is not set, the docker-entrypoint.ts shall not add the `--max-heap-size` flag and defer to V8's default behavior
+4. When the `GROWI_OPTIMIZE_MEMORY` environment variable is set to `true`, the docker-entrypoint.ts shall add the `--optimize-for-size` flag to the node process
+5. When the `GROWI_LITE_MODE` environment variable is set to `true`, the docker-entrypoint.ts shall add the `--lite-mode` flag to the node process (disables TurboFan to reduce RSS to v20-equivalent levels. Used as a last resort when OOMKilled occurs frequently)
+6. The docker-entrypoint.ts shall use `--max-heap-size` and shall not use `--max_old_space_size` (to avoid the trusted_space overhead issue in Node.js 24)
+7. The docker-entrypoint.ts shall pass `--max-heap-size` as a direct argument to the node command, not via `NODE_OPTIONS` (due to Node.js constraints)
 
-### Requirement 4: セキュリティ強化
+### Requirement 3: Build Efficiency and Cache Optimization
 
-**Objective:** As a セキュリティ担当者, I want Docker イメージがセキュリティベストプラクティスに準拠していること, so that 攻撃面が最小化され、本番環境の安全性が向上する
-
-#### Acceptance Criteria
-
-1. The Dockerfile shall 非 root ユーザー（node）でアプリケーションを実行する（Node.js entrypoint で `process.setuid/setgid` を使用）
-2. The Dockerfile shall release ステージに不要なパッケージ（wget、curl 等のビルドツール）をインストールしない
-3. The Dockerfile shall `.dockerignore` により、`.git`、`node_modules`、テストファイル、シークレットファイル等がビルドコンテキストに含まれないことを保証する
-4. The Dockerfile shall `apt-get install` で `--no-install-recommends` を使用して不要な推奨パッケージのインストールを防ぐ
-5. The Dockerfile shall release ステージのイメージに、ビルド時にのみ必要なツール（turbo、node-gyp、pnpm 等）を含めない
-
-### Requirement 5: 運用性・可観測性の向上
-
-**Objective:** As a 運用担当者, I want Docker イメージに適切なメタデータが設定されていること, so that コンテナオーケストレーターによる管理が容易になる
+**Objective:** As a developer, I want Docker builds to be fast and efficient, so that CI/CD pipeline build times are reduced and image size is minimized
 
 #### Acceptance Criteria
 
-1. The Dockerfile shall OCI 標準の LABEL アノテーション（`org.opencontainers.image.source`、`org.opencontainers.image.title`、`org.opencontainers.image.description`、`org.opencontainers.image.vendor`）を含める
-2. The Dockerfile shall `EXPOSE 3000` を維持してポートをドキュメント化する
-3. The Dockerfile shall `VOLUME /data` を維持してデータ永続化ポイントをドキュメント化する
+1. The Dockerfile shall use `--mount=type=bind` instead of `COPY . .` in the builder stage to avoid including source code in layers
+2. The Dockerfile shall maintain pnpm store cache mounts (`--mount=type=cache,target=...`)
+3. The Dockerfile shall maintain apt-get cache mounts in the build stage
+4. The Dockerfile shall ensure that `.next/cache` is not included in the release stage
+5. The Dockerfile shall use the `--mount=type=bind,from=builder` pattern for artifact transfer from the build stage to the release stage
 
-### Requirement 6: entrypoint と CMD のリファクタリング
+### Requirement 4: Security Hardening
 
-**Objective:** As a 開発者, I want entrypoint スクリプトと CMD が明確で保守しやすい構造であること, so that メモリフラグの動的組み立てや将来の拡張が容易になる
-
-#### Acceptance Criteria
-
-1. The docker-entrypoint.ts shall ヒープサイズ算出ロジック（Requirement 2 の 3 段フォールバック）を含める
-2. The docker-entrypoint.ts shall 算出されたフラグを node コマンドの引数として組み立て、`process.setgid` + `process.setuid` で権限ドロップ後に `child_process.spawn` で実行する
-3. The docker-entrypoint.ts shall `/data/uploads` のディレクトリ作成・シンボリックリンク・権限設定（FILE_UPLOAD=local サポート）を維持する
-4. The docker-entrypoint.ts shall `/tmp/page-bulk-export` のディレクトリ作成・権限設定を維持する
-5. The docker-entrypoint.ts shall マイグレーション実行後にアプリケーションを起動する現行動作を維持する
-6. The docker-entrypoint.ts shall `--expose_gc` フラグを維持する（バッチ処理での明示的 GC 呼び出しに必要）
-7. When `GROWI_HEAP_SIZE`、cgroup 算出値、または各種最適化フラグが設定された場合, the docker-entrypoint.ts shall 適用されたフラグの内容を標準出力にログ出力する
-8. The docker-entrypoint.ts shall TypeScript で記述し、Node.js 24 のネイティブ TypeScript 実行機能（type stripping）で直接実行する
-
-### Requirement 7: 後方互換性
-
-**Objective:** As a 既存の Docker image ユーザー, I want 新しい Dockerfile に移行しても既存の運用が壊れないこと, so that アップグレード時のリスクが最小化される
+**Objective:** As a security officer, I want the Docker image to comply with security best practices, so that the attack surface is minimized and the safety of the production environment is improved
 
 #### Acceptance Criteria
 
-1. The Docker イメージ shall 環境変数によるアプリケーション設定（`MONGO_URI`、`FILE_UPLOAD` 等）を従来通りサポートする
-2. The Docker イメージ shall `VOLUME /data` を維持し、既存のデータボリュームマウントとの互換性を保つ
-3. The Docker イメージ shall ポート 3000 でリッスンする現行動作を維持する
-4. While メモリ管理の環境変数（`GROWI_HEAP_SIZE`、`GROWI_OPTIMIZE_MEMORY`、`GROWI_LITE_MODE`）が未設定の場合, the Docker イメージ shall 既存の動作（Node.js 24 のデフォルト）と実質的に同等に動作する
-5. The Docker イメージ shall `docker-compose.yml` / `compose.yaml` からの利用パターンを維持する
+1. The Dockerfile shall run the application as a non-root user (node) (using `process.setuid/setgid` in the Node.js entrypoint)
+2. The Dockerfile shall not install unnecessary packages (build tools such as wget, curl, etc.) in the release stage
+3. The Dockerfile shall ensure that `.git`, `node_modules`, test files, secret files, etc. are not included in the build context via `.dockerignore`
+4. The Dockerfile shall use `--no-install-recommends` with `apt-get install` to prevent installation of unnecessary recommended packages
+5. The Dockerfile shall not include tools only needed at build time (turbo, node-gyp, pnpm, etc.) in the release stage image
 
-### Requirement 8: 本番置換と CI/CD 対応
+### Requirement 5: Operability and Observability Improvement
 
-**Objective:** As an インフラ管理者, I want docker-new ディレクトリの成果物が既存の docker ディレクトリを正式に置き換え、CI/CD パイプラインが新しい Dockerfile で動作すること, so that 本番ビルドで DHI ベースのイメージが使用される
+**Objective:** As an operations engineer, I want the Docker image to have appropriate metadata configured, so that management by container orchestrators is facilitated
 
 #### Acceptance Criteria
 
-1. The Docker ビルド構成 shall `apps/app/docker-new/` の全ファイル（`Dockerfile`、`docker-entrypoint.ts`、`docker-entrypoint.spec.ts`、`Dockerfile.dockerignore`）を `apps/app/docker/` に移動し、旧ファイル（旧 `Dockerfile`、`docker-entrypoint.sh`、旧 `Dockerfile.dockerignore`）を削除する。`codebuild/` ディレクトリと `README.md` は維持する
-2. The Dockerfile shall ファイル内の自己参照パス `apps/app/docker-new/docker-entrypoint.ts` を `apps/app/docker/docker-entrypoint.ts` に更新する
-3. The buildspec.yml shall DHI レジストリ（`dhi.io`）へのログインコマンドを pre_build フェーズに追加する。DHI は Docker Hub 認証情報を使用するため、既存の `DOCKER_REGISTRY_PASSWORD` シークレットを再利用する
-4. The buildspec.yml shall 新しい Dockerfile のパス（`./apps/app/docker/Dockerfile`）を正しく参照する（現行パスと同一のため変更不要であることを確認する）
+1. The Dockerfile shall include OCI standard LABEL annotations (`org.opencontainers.image.source`, `org.opencontainers.image.title`, `org.opencontainers.image.description`, `org.opencontainers.image.vendor`)
+2. The Dockerfile shall maintain `EXPOSE 3000` to document the port
+3. The Dockerfile shall maintain `VOLUME /data` to document the data persistence point
+
+### Requirement 6: Entrypoint and CMD Refactoring
+
+**Objective:** As a developer, I want the entrypoint script and CMD to have a clear and maintainable structure, so that dynamic assembly of memory flags and future extensions are facilitated
+
+#### Acceptance Criteria
+
+1. The docker-entrypoint.ts shall include the heap size calculation logic (3-tier fallback from Requirement 2)
+2. The docker-entrypoint.ts shall assemble the calculated flags as node command arguments and execute via `child_process.spawn` after dropping privileges with `process.setgid` + `process.setuid`
+3. The docker-entrypoint.ts shall maintain directory creation, symbolic link setup, and permission configuration for `/data/uploads` (FILE_UPLOAD=local support)
+4. The docker-entrypoint.ts shall maintain directory creation and permission configuration for `/tmp/page-bulk-export`
+5. The docker-entrypoint.ts shall maintain the current behavior of starting the application after running migrations
+6. The docker-entrypoint.ts shall maintain the `--expose_gc` flag (required for explicit GC calls in batch processing)
+7. When `GROWI_HEAP_SIZE`, cgroup-calculated value, or various optimization flags are set, the docker-entrypoint.ts shall log the content of the applied flags to standard output
+8. The docker-entrypoint.ts shall be written in TypeScript and executed directly using Node.js 24's native TypeScript execution feature (type stripping)
+
+### Requirement 7: Backward Compatibility
+
+**Objective:** As an existing Docker image user, I want existing operations to not break when migrating to the new Dockerfile, so that the risk during upgrades is minimized
+
+#### Acceptance Criteria
+
+1. The Docker image shall support application configuration via environment variables (`MONGO_URI`, `FILE_UPLOAD`, etc.) as before
+2. The Docker image shall maintain `VOLUME /data` and preserve compatibility with existing data volume mounts
+3. The Docker image shall maintain the current behavior of listening on port 3000
+4. While memory management environment variables (`GROWI_HEAP_SIZE`, `GROWI_OPTIMIZE_MEMORY`, `GROWI_LITE_MODE`) are not set, the Docker image shall behave substantially equivalent to the existing behavior (Node.js 24 defaults)
+5. The Docker image shall maintain the usage pattern from `docker-compose.yml` / `compose.yaml`
+
+### Requirement 8: Production Replacement and CI/CD Support
+
+**Objective:** As an infrastructure administrator, I want the artifacts in the docker-new directory to officially replace the existing docker directory and the CI/CD pipeline to operate with the new Dockerfile, so that DHI-based images are used in production builds
+
+#### Acceptance Criteria
+
+1. The Docker build configuration shall move all files from `apps/app/docker-new/` (`Dockerfile`, `docker-entrypoint.ts`, `docker-entrypoint.spec.ts`, `Dockerfile.dockerignore`) to `apps/app/docker/`, and delete the old files (old `Dockerfile`, `docker-entrypoint.sh`, old `Dockerfile.dockerignore`). The `codebuild/` directory and `README.md` shall be maintained
+2. The Dockerfile shall update the self-referencing path `apps/app/docker-new/docker-entrypoint.ts` to `apps/app/docker/docker-entrypoint.ts`
+3. The buildspec.yml shall add a login command to the DHI registry (`dhi.io`) in the pre_build phase. Since DHI uses Docker Hub credentials, the existing `DOCKER_REGISTRY_PASSWORD` secret shall be reused
+4. The buildspec.yml shall correctly reference the new Dockerfile path (`./apps/app/docker/Dockerfile`) (verify that no change is needed as it is the same as the current path)
