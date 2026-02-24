@@ -1,12 +1,13 @@
 # syntax = docker/dockerfile:1.4
 
+ARG NODE_VERSION=24
 ARG OPT_DIR="/opt"
 ARG PNPM_HOME="/root/.local/share/pnpm"
 
 ##
 ## base
 ##
-FROM node:20-slim AS base
+FROM node:${NODE_VERSION}-slim AS base
 
 ARG OPT_DIR
 ARG PNPM_HOME
@@ -63,7 +64,8 @@ RUN tar -zcf /tmp/packages.tar.gz \
 ##
 ## release
 ##
-FROM node:20-slim
+ARG NODE_VERSION=24
+FROM node:${NODE_VERSION}-slim
 LABEL maintainer="Yuki Takei <yuki@weseek.co.jp>"
 
 ARG OPT_DIR

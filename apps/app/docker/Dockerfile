@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
 
+ARG NODE_VERSION=24
 ARG OPT_DIR="/opt"
 ARG PNPM_HOME="/root/.local/share/pnpm"
 

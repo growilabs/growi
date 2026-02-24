@@ -1,6 +1,6 @@
 {
   "name": "growi",
-  "version": "7.4.6-RC.0",
+  "version": "7.5.0-RC.0",
   "description": "Team collaboration software using markdown",
   "license": "MIT",
   "private": "true",
@@ -117,6 +117,6 @@
     ]
   },
   "engines": {
-    "node": "^18 || ^20"
+    "node": "^24"
   }
 }
