@@ -151,13 +151,3 @@ const subscribers: HotkeySubscriber[] = [
 
 > Note: The current implementation uses explicit `Control+/` and `Meta+/` rather than `$mod+/` to match the original behavior.
 
-## Test Strategy
-
-Tests are in `HotkeysManager.spec.tsx` using Vitest + @testing-library/react.
-
-**Key testing concern**: jsdom does not properly implement `KeyboardEvent.getModifierState()`. The test helper `pressKey()` uses `Object.defineProperty` to override `getModifierState` so that tinykeys can correctly detect modifier keys in the test environment.
-
-**Coverage**:
-- Single-key triggers (e, c, /)
-- Modifier-key trigger (Ctrl+/)
-- Input element suppression (input, textarea)
