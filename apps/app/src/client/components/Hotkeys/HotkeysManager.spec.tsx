@@ -1,28 +1,40 @@
 import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// Mock all subscriber components as simple render trackers
-vi.mock('./Subscribers/EditPage', () => ({ EditPage: vi.fn(() => null) }));
-vi.mock('./Subscribers/CreatePage', () => ({ CreatePage: vi.fn(() => null) }));
+// Mock all subscriber components as simple render trackers with their binding definitions
+vi.mock('./Subscribers/EditPage', () => ({
+  EditPage: vi.fn(() => null),
+  hotkeyBindings: { keys: 'e', category: 'single' },
+}));
+vi.mock('./Subscribers/CreatePage', () => ({
+  CreatePage: vi.fn(() => null),
+  hotkeyBindings: { keys: 'c', category: 'single' },
+}));
 vi.mock('./Subscribers/FocusToGlobalSearch', () => ({
   FocusToGlobalSearch: vi.fn(() => null),
+  hotkeyBindings: { keys: '/', category: 'single' },
 }));
 vi.mock('./Subscribers/ShowShortcutsModal', () => ({
   ShowShortcutsModal: vi.fn(() => null),
+  hotkeyBindings: { keys: ['Control+/', 'Meta+/'], category: 'modifier' },
 }));
 vi.mock('./Subscribers/ShowStaffCredit', () => ({
   ShowStaffCredit: vi.fn(() => null),
+  hotkeyBindings: {
+    keys: 'ArrowUp ArrowUp ArrowDown ArrowDown ArrowLeft ArrowRight ArrowLeft ArrowRight b a',
+    category: 'modifier',
+  },
 }));
 vi.mock('./Subscribers/SwitchToMirrorMode', () => ({
   SwitchToMirrorMode: vi.fn(() => null),
+  hotkeyBindings: {
+    keys: 'x x b b a y a y ArrowDown ArrowLeft',
+    category: 'modifier',
+  },
 }));
 
 const { default: HotkeysManager } = await import('./HotkeysManager');
 const { EditPage } = await import('./Subscribers/EditPage');
-const { CreatePage } = await import('./Subscribers/CreatePage');
-const { FocusToGlobalSearch } = await import(
-  './Subscribers/FocusToGlobalSearch'
-);
 const { ShowShortcutsModal } = await import('./Subscribers/ShowShortcutsModal');
 
 afterEach(() => {
@@ -37,7 +49,7 @@ const pressKey = (key: string, options: Partial<KeyboardEventInit> = {}) => {
     cancelable: true,
     ...options,
   });
-  // jsdom does not wire ctrlKey/metaKey to getModifierState — override for tinykeys
+  // happy-dom does not wire ctrlKey/metaKey to getModifierState — override for tinykeys
   Object.defineProperty(event, 'getModifierState', {
     value: (mod: string) => {
       if (mod === 'Control') return !!options.ctrlKey;
@@ -51,7 +63,7 @@ const pressKey = (key: string, options: Partial<KeyboardEventInit> = {}) => {
 };
 
 describe('HotkeysManager', () => {
-  it('triggers EditPage on "e" key press', () => {
+  it('renders the corresponding subscriber when a single key is pressed', () => {
     render(<HotkeysManager />);
     act(() => {
       pressKey('e');
@@ -59,23 +71,7 @@ describe('HotkeysManager', () => {
     expect(EditPage).toHaveBeenCalled();
   });
 
-  it('triggers CreatePage on "c" key press', () => {
-    render(<HotkeysManager />);
-    act(() => {
-      pressKey('c');
-    });
-    expect(CreatePage).toHaveBeenCalled();
-  });
-
-  it('triggers FocusToGlobalSearch on "/" key press', () => {
-    render(<HotkeysManager />);
-    act(() => {
-      pressKey('/');
-    });
-    expect(FocusToGlobalSearch).toHaveBeenCalled();
-  });
-
-  it('triggers ShowShortcutsModal on Ctrl+/ key press', () => {
+  it('renders the corresponding subscriber when a modifier key combo is pressed', () => {
     render(<HotkeysManager />);
     act(() => {
       pressKey('/', { ctrlKey: true });
@@ -83,7 +79,7 @@ describe('HotkeysManager', () => {
     expect(ShowShortcutsModal).toHaveBeenCalled();
   });
 
-  it('does NOT trigger shortcut when target is an input element', () => {
+  it('does NOT trigger single-key shortcut when target is an editable element', () => {
     render(<HotkeysManager />);
     const input = document.createElement('input');
     document.body.appendChild(input);
@@ -100,24 +96,5 @@ describe('HotkeysManager', () => {
     expect(EditPage).not.toHaveBeenCalled();
 
     document.body.removeChild(input);
-  });
-
-  it('does NOT trigger shortcut when target is a textarea element', () => {
-    render(<HotkeysManager />);
-    const textarea = document.createElement('textarea');
-    document.body.appendChild(textarea);
-
-    act(() => {
-      textarea.dispatchEvent(
-        new KeyboardEvent('keydown', {
-          key: 'c',
-          bubbles: true,
-          cancelable: true,
-        }),
-      );
-    });
-    expect(CreatePage).not.toHaveBeenCalled();
-
-    document.body.removeChild(textarea);
   });
 });

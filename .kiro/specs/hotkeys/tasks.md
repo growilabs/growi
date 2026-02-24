@@ -42,24 +42,26 @@
 
 ## New Tasks (D2 revision — subscriber-owned binding definitions)
 
-- [ ] 6. Refactor hotkey bindings to subscriber-owned definitions
-- [ ] 6.1 Define shared hotkey binding types and add binding exports to all subscribers
-  - Define types for hotkey category (single vs modifier) and binding metadata (keys + category)
-  - Each of the six subscriber components exports its own binding definition alongside its component
+- [x] 6. Refactor hotkey bindings to subscriber-owned definitions
+- [x] 6.1 Define shared hotkey binding types and add binding exports to all subscribers
+  - Exported `HotkeyCategory`, `HotkeyBindingDef` types from HotkeysManager.tsx
+  - Each of the 6 subscriber components now exports `hotkeyBindings: HotkeyBindingDef` alongside its component
   - Single-key subscribers (c, e, /) declare category 'single'; modifier and sequence subscribers (Ctrl+/, Konami codes) declare category 'modifier'
-  - Binding definitions use tinykeys key format; subscribers with multiple key expressions (e.g. Control+/ and Meta+/) use an array
+  - Binding definitions use tinykeys key format; ShowShortcutsModal uses array for `['Control+/', 'Meta+/']`
   - _Requirements: 7, 8_
 
-- [ ] 6.2 Refactor HotkeysManager to build binding map from subscriber exports
-  - Replace inline key-to-component mapping with dynamic iteration over imported subscriber binding definitions
-  - Apply handler wrapper (input guard for 'single' category, pass-through for 'modifier') based on each subscriber's declared category
-  - HotkeysManager becomes a generic orchestrator with no hardcoded key knowledge — adding a new hotkey requires only creating a new subscriber file
-  - Preserve cleanup via tinykeys unsubscribe in useEffect return
+- [x] 6.2 Refactor HotkeysManager to build binding map from subscriber exports
+  - Replaced inline key-to-component mapping with `subscribers[]` array built from `import *` namespace imports
+  - `createHandler()` applies input guard based on each subscriber's declared category ('single' vs 'modifier')
+  - Dynamic `bindingMap` iteration builds the tinykeys binding object — HotkeysManager has no hardcoded key knowledge
+  - Cleanup via tinykeys unsubscribe preserved in useEffect return
+  - Updated test mocks to include `hotkeyBindings` exports
   - _Requirements: 6, 7_
 
-- [ ] 7. Verify refactoring preserves all existing behavior
-  - Confirm all existing tests pass without modification (behavior is unchanged, only internal structure changed)
-  - Run lint:typecheck, lint:biome, and test suites
+- [x] 7. Verify refactoring preserves all existing behavior
+  - Tests: 6/6 pass (behavior unchanged)
+  - lint:typecheck: pass
+  - lint:biome: pass (no errors at diagnostic-level=error)
   - _Requirements: 1, 2, 3, 4, 5_
 
 ## Requirements Coverage

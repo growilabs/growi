@@ -6,8 +6,15 @@ import {
 } from '~/features/search/client/states/modal/search';
 import { useIsEditable } from '~/states/page';
 
+import type { HotkeyBindingDef } from '../HotkeysManager';
+
 type Props = {
   onDeleteRender: () => void;
+};
+
+export const hotkeyBindings: HotkeyBindingDef = {
+  keys: '/',
+  category: 'single',
 };
 
 const FocusToGlobalSearch = ({ onDeleteRender }: Props): null => {

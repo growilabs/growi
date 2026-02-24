@@ -5,8 +5,15 @@ import {
   useShortcutsModalStatus,
 } from '~/states/ui/modal/shortcuts';
 
+import type { HotkeyBindingDef } from '../HotkeysManager';
+
 type Props = {
   onDeleteRender: () => void;
+};
+
+export const hotkeyBindings: HotkeyBindingDef = {
+  keys: ['Control+/', 'Meta+/'],
+  category: 'modifier',
 };
 
 const ShowShortcutsModal = ({ onDeleteRender }: Props): null => {

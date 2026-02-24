@@ -6,8 +6,15 @@ import { toastError } from '~/client/util/toastr';
 import { useCurrentPathname } from '~/states/global';
 import { useCurrentPagePath, useIsEditable } from '~/states/page';
 
+import type { HotkeyBindingDef } from '../HotkeysManager';
+
 type Props = {
   onDeleteRender: () => void;
+};
+
+export const hotkeyBindings: HotkeyBindingDef = {
+  keys: 'e',
+  category: 'single',
 };
 
 /**

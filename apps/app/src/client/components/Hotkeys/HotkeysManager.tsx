@@ -2,14 +2,47 @@ import type { JSX } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { tinykeys } from 'tinykeys';
 
-import { CreatePage } from './Subscribers/CreatePage';
-import { EditPage } from './Subscribers/EditPage';
-import { FocusToGlobalSearch } from './Subscribers/FocusToGlobalSearch';
-import { ShowShortcutsModal } from './Subscribers/ShowShortcutsModal';
-import { ShowStaffCredit } from './Subscribers/ShowStaffCredit';
-import { SwitchToMirrorMode } from './Subscribers/SwitchToMirrorMode';
+import * as createPage from './Subscribers/CreatePage';
+import * as editPage from './Subscribers/EditPage';
+import * as focusToGlobalSearch from './Subscribers/FocusToGlobalSearch';
+import * as showShortcutsModal from './Subscribers/ShowShortcutsModal';
+import * as showStaffCredit from './Subscribers/ShowStaffCredit';
+import * as switchToMirrorMode from './Subscribers/SwitchToMirrorMode';
+
+export type HotkeyCategory = 'single' | 'modifier';
+
+export type HotkeyBindingDef = {
+  keys: string | string[];
+  category: HotkeyCategory;
+};
 
 type SubscriberComponent = React.ComponentType<{ onDeleteRender: () => void }>;
+
+type HotkeySubscriber = {
+  component: SubscriberComponent;
+  bindings: HotkeyBindingDef;
+};
+
+const subscribers: HotkeySubscriber[] = [
+  { component: editPage.EditPage, bindings: editPage.hotkeyBindings },
+  { component: createPage.CreatePage, bindings: createPage.hotkeyBindings },
+  {
+    component: focusToGlobalSearch.FocusToGlobalSearch,
+    bindings: focusToGlobalSearch.hotkeyBindings,
+  },
+  {
+    component: showShortcutsModal.ShowShortcutsModal,
+    bindings: showShortcutsModal.hotkeyBindings,
+  },
+  {
+    component: showStaffCredit.ShowStaffCredit,
+    bindings: showStaffCredit.hotkeyBindings,
+  },
+  {
+    component: switchToMirrorMode.SwitchToMirrorMode,
+    bindings: switchToMirrorMode.hotkeyBindings,
+  },
+];
 
 const isEditableTarget = (event: KeyboardEvent): boolean => {
   const target = event.target as HTMLElement | null;
@@ -37,31 +70,26 @@ const HotkeysManager = (): JSX.Element => {
   }, []);
 
   useEffect(() => {
-    const singleKeyHandler =
-      (Component: SubscriberComponent) => (event: KeyboardEvent) => {
-        if (isEditableTarget(event)) return;
+    const createHandler =
+      (component: SubscriberComponent, category: HotkeyCategory) =>
+      (event: KeyboardEvent) => {
+        if (category === 'single' && isEditableTarget(event)) return;
         event.preventDefault();
-        addView(Component);
+        addView(component);
       };
 
-    const modifierKeyHandler =
-      (Component: SubscriberComponent) => (event: KeyboardEvent) => {
-        event.preventDefault();
-        addView(Component);
-      };
+    const bindingMap: Record<string, (event: KeyboardEvent) => void> = {};
+    for (const { component, bindings } of subscribers) {
+      const handler = createHandler(component, bindings.category);
+      const keys = Array.isArray(bindings.keys)
+        ? bindings.keys
+        : [bindings.keys];
+      for (const key of keys) {
+        bindingMap[key] = handler;
+      }
+    }
 
-    const unsubscribe = tinykeys(window, {
-      e: singleKeyHandler(EditPage),
-      c: singleKeyHandler(CreatePage),
-      '/': singleKeyHandler(FocusToGlobalSearch),
-      'Control+/': modifierKeyHandler(ShowShortcutsModal),
-      'Meta+/': modifierKeyHandler(ShowShortcutsModal),
-      'ArrowUp ArrowUp ArrowDown ArrowDown ArrowLeft ArrowRight ArrowLeft ArrowRight b a':
-        modifierKeyHandler(ShowStaffCredit),
-      'x x b b a y a y ArrowDown ArrowLeft':
-        modifierKeyHandler(SwitchToMirrorMode),
-    });
-
+    const unsubscribe = tinykeys(window, bindingMap);
     return unsubscribe;
   }, [addView]);
 
