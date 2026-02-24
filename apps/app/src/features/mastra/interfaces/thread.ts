@@ -1,4 +1,5 @@
 import type { StorageThreadType } from '@mastra/core/memory';
+import type { PaginationInfo } from '@mastra/core/storage';
 
 export type ThreadWithMeta = Omit<StorageThreadType, 'metadata'> & {
   metadata: {
@@ -15,4 +16,8 @@ export const isThreadWithMeta = (
     'aiAssistantId' in thread.metadata &&
     typeof thread.metadata.aiAssistantId === 'string'
   );
+};
+
+export type ThreadListOutput = PaginationInfo & {
+  threads: ThreadWithMeta[];
 };
