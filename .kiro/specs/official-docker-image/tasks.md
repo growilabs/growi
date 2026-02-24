@@ -166,3 +166,28 @@
   - Confirm that Docker build completes successfully with the replaced `apps/app/docker/Dockerfile`
   - Confirm that existing external references (`codebuild.tf`, `.github/workflows/release.yml`, `ci-app.yml`, `update-readme.sh`) work correctly
   - _Requirements: 8.1, 8.2, 8.3, 8.4_
+
+## Phase 4: Environment variable renaming and README documentation
+
+> Rename the `GROWI_`-prefixed memory management environment variables to `V8_`-prefixed names aligned with V8 option names, and add documentation to the Docker Hub README.
+
+- [ ] 9. Rename environment variables to align with V8 option names
+- [ ] 9.1 (P) Rename all GROWI_-prefixed environment variables to V8_-prefixed names in the entrypoint
+  - Rename `GROWI_HEAP_SIZE` to `V8_MAX_HEAP_SIZE` in the heap size detection function, validation logic, and error messages
+  - Rename `GROWI_OPTIMIZE_MEMORY` to `V8_OPTIMIZE_FOR_SIZE` in the node flag assembly function
+  - Rename `GROWI_LITE_MODE` to `V8_LITE_MODE` in the node flag assembly function
+  - Update the heap size source log message to reflect the new variable name
+  - Update the file header comment documenting the heap size detection fallback chain
+  - _Requirements: 2.1, 2.5, 2.6, 2.7, 6.1, 6.6, 6.7_
+
+- [ ] 9.2 (P) Update all environment variable references in entrypoint unit tests
+  - Update heap size detection tests: replace all `GROWI_HEAP_SIZE` references with `V8_MAX_HEAP_SIZE`
+  - Update node flag assembly tests: replace `GROWI_OPTIMIZE_MEMORY` with `V8_OPTIMIZE_FOR_SIZE` and `GROWI_LITE_MODE` with `V8_LITE_MODE`
+  - Verify all tests pass with the new environment variable names
+  - _Requirements: 2.1, 2.5, 2.6_
+
+- [ ] 10. Add V8 memory management environment variable documentation to README
+  - Add a subsection under Configuration > Environment Variables documenting the three V8 memory management variables
+  - Include variable name, type, default value, and description for each: `V8_MAX_HEAP_SIZE`, `V8_OPTIMIZE_FOR_SIZE`, `V8_LITE_MODE`
+  - Describe the 3-tier heap size fallback behavior (env var → cgroup auto-calculation → V8 default)
+  - _Requirements: 5.1_

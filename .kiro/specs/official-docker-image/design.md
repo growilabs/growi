@@ -12,13 +12,14 @@
 
 - Up to 95% CVE reduction through DHI base image adoption
 - **Fully shell-free TypeScript entrypoint** — Node.js 24 native TypeScript execution (type stripping), maintaining the minimized attack surface of the DHI runtime as-is
-- Memory management via 3-tier fallback: `GROWI_HEAP_SIZE` / cgroup auto-calculation / V8 default
+- Memory management via 3-tier fallback: `V8_MAX_HEAP_SIZE` / cgroup auto-calculation / V8 default
+- Environment variable names aligned with V8 option names (`V8_MAX_HEAP_SIZE`, `V8_OPTIMIZE_FOR_SIZE`, `V8_LITE_MODE`)
 - Improved build cache efficiency through the `turbo prune --docker` pattern
 - Privilege drop via gosu → `process.setuid/setgid` (Node.js native)
 
 ### Non-Goals
 
-- Changes to Kubernetes manifests / Helm charts (GROWI.cloud `GROWI_HEAP_SIZE` configuration is out of scope)
+- Changes to Kubernetes manifests / Helm charts (GROWI.cloud `V8_MAX_HEAP_SIZE` configuration is out of scope)
 - Application code changes (adding gc(), migrating to .pipe(), etc. are separate specs)
 - Updating docker-compose.yml (documentation updates only)
 - Support for Node.js versions below 24
@@ -100,12 +101,12 @@ graph TB
 ```mermaid
 flowchart TD
     Start[Container Start<br>as root via node entrypoint.ts] --> Setup[Directory Setup<br>fs.mkdirSync + symlinkSync + chownSync]
-    Setup --> HeapCalc{GROWI_HEAP_SIZE<br>is set?}
-    HeapCalc -->|Yes| UseEnv[Use GROWI_HEAP_SIZE]
+    Setup --> HeapCalc{V8_MAX_HEAP_SIZE<br>is set?}
+    HeapCalc -->|Yes| UseEnv[Use V8_MAX_HEAP_SIZE]
     HeapCalc -->|No| CgroupCheck{cgroup limit<br>detectable?}
     CgroupCheck -->|Yes| AutoCalc[Auto-calculate<br>60% of cgroup limit]
     CgroupCheck -->|No| NoFlag[No heap flag<br>V8 default]
-    UseEnv --> OptFlags[Check GROWI_OPTIMIZE_MEMORY<br>and GROWI_LITE_MODE]
+    UseEnv --> OptFlags[Check V8_OPTIMIZE_FOR_SIZE<br>and V8_LITE_MODE]
     AutoCalc --> OptFlags
     NoFlag --> OptFlags
     OptFlags --> LogFlags[console.log applied flags]
@@ -162,7 +163,9 @@ flowchart LR
 |-----------|-------------|--------|-----------------|
 | Dockerfile | Infrastructure | 5-stage Docker image build definition | DHI images, turbo, pnpm |
 | docker-entrypoint.ts | Infrastructure | Container startup initialization (TypeScript) | Node.js fs/child_process, cgroup fs |
+| docker-entrypoint.spec.ts | Infrastructure | Unit tests for entrypoint | vitest |
 | Dockerfile.dockerignore | Infrastructure | Build context filter | — |
+| README.md | Documentation | Docker Hub image documentation | — |
 | buildspec.yml | CI/CD | CodeBuild build definition | AWS Secrets Manager, dhi.io |
 
 ### Dockerfile
@@ -194,22 +197,31 @@ flowchart LR
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `GROWI_HEAP_SIZE` | int (MB) | (unset) | Explicitly specify the --max-heap-size value for Node.js |
-| `GROWI_OPTIMIZE_MEMORY` | `"true"` / (unset) | (unset) | Enable the --optimize-for-size flag |
-| `GROWI_LITE_MODE` | `"true"` / (unset) | (unset) | Enable the --lite-mode flag |
+| `V8_MAX_HEAP_SIZE` | int (MB) | (unset) | Explicitly specify the --max-heap-size value for Node.js |
+| `V8_OPTIMIZE_FOR_SIZE` | `"true"` / (unset) | (unset) | Enable the --optimize-for-size flag |
+| `V8_LITE_MODE` | `"true"` / (unset) | (unset) | Enable the --lite-mode flag |
+
+> **Naming Convention**: Environment variable names are aligned with their corresponding V8 option names (`--max-heap-size`, `--optimize-for-size`, `--lite-mode`) prefixed with `V8_`. This improves discoverability and self-documentation compared to the previous `GROWI_`-prefixed names.
 
 **Batch Contract**
 - **Trigger**: On container startup (`ENTRYPOINT ["node", "/docker-entrypoint.ts"]`)
-- **Input validation**: GROWI_HEAP_SIZE (positive int, empty = unset), GROWI_OPTIMIZE_MEMORY/GROWI_LITE_MODE (only `"true"` is valid), cgroup v2 (`memory.max`: numeric or `"max"`), cgroup v1 (`memory.limit_in_bytes`: numeric, large value = unlimited)
+- **Input validation**: V8_MAX_HEAP_SIZE (positive int, empty = unset), V8_OPTIMIZE_FOR_SIZE/V8_LITE_MODE (only `"true"` is valid), cgroup v2 (`memory.max`: numeric or `"max"`), cgroup v1 (`memory.limit_in_bytes`: numeric, large value = unlimited)
 - **Output**: Node flags passed directly as arguments to `child_process.spawn`
 - **Idempotency**: Executed on every restart, safe via `fs.mkdirSync({ recursive: true })`
+
+### README.md
+
+**Responsibilities & Constraints**
+- Docker Hub image documentation (published to hub.docker.com/r/growilabs/growi)
+- Document the V8 memory management environment variables under Configuration > Environment Variables section
+- Include variable name, type, default, and description for each: `V8_MAX_HEAP_SIZE`, `V8_OPTIMIZE_FOR_SIZE`, `V8_LITE_MODE`
 
 ## Error Handling
 
 | Error | Category | Response |
 |-------|----------|----------|
 | cgroup file read failure | System | Warn and continue with no flag (V8 default) |
-| GROWI_HEAP_SIZE is invalid | User | Warn and continue with no flag (container still starts) |
+| V8_MAX_HEAP_SIZE is invalid | User | Warn and continue with no flag (container still starts) |
 | Directory creation/permission failure | System | `process.exit(1)` — check volume mount configuration |
 | Migration failure | Business Logic | `execFileSync` throws → `process.exit(1)` — Docker/k8s restarts |
 | App process abnormal exit | System | Propagate child process exit code |

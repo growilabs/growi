@@ -221,6 +221,28 @@
   - All external references (CI/CD, GitHub Actions) already use the `apps/app/docker/` path and require no changes
   - The `codebuild/` directory and `README.md` are maintained as-is within `docker/`
 
+### Environment Variable Renaming: GROWI_ prefix → V8_ prefix
+
+- **Context**: The initial implementation used `GROWI_HEAP_SIZE`, `GROWI_OPTIMIZE_MEMORY`, and `GROWI_LITE_MODE` as environment variable names. These names obscure the relationship between the env var and the underlying V8 flag it controls
+- **Motivation**: Align environment variable names with the actual V8 option names they map to, improving discoverability and self-documentation
+- **Mapping**:
+  | Old Name | New Name | V8 Flag |
+  |----------|----------|---------|
+  | `GROWI_HEAP_SIZE` | `V8_MAX_HEAP_SIZE` | `--max-heap-size` |
+  | `GROWI_OPTIMIZE_MEMORY` | `V8_OPTIMIZE_FOR_SIZE` | `--optimize-for-size` |
+  | `GROWI_LITE_MODE` | `V8_LITE_MODE` | `--lite-mode` |
+- **Benefits**:
+  - Users can immediately understand which V8 flag each variable controls
+  - Naming convention is consistent: `V8_` prefix + option name in UPPER_SNAKE_CASE
+  - No need to consult documentation to understand the mapping
+- **Impact scope**:
+  - `docker-entrypoint.ts`: Code changes (env var reads, comments, log messages)
+  - `docker-entrypoint.spec.ts`: Test updates (env var references in test cases)
+  - `README.md`: Add documentation for the new environment variables
+  - `design.md`, `requirements.md`, `tasks.md`: Spec document updates
+- **Breaking change**: Yes — users who have configured `GROWI_HEAP_SIZE`, `GROWI_OPTIMIZE_MEMORY`, or `GROWI_LITE_MODE` in their docker-compose.yml or deployment configs will need to update to the new names. This is acceptable as these variables were introduced in the same release (v7.5.x) and have not been published yet
+- **Implications**: No backward compatibility shim needed since the variables are new in this version
+
 ## Risks & Mitigations
 
 - **Stability of Node.js 24 native TypeScript execution**: Type stripping was unflagged in Node.js 23. It is a stable feature in Node.js 24. However, non-erasable syntax such as enum cannot be used -> Use only interface/type
