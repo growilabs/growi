@@ -44,6 +44,7 @@ import {
   SourcesContent,
   SourcesTrigger,
 } from '~/components/ai-elements/sources';
+import { useAiAssistantSidebarStatus } from '~/features/openai/client/states/ai-assistant-sidebar';
 
 import styles from './ChatSidebar.module.scss';
 
@@ -68,6 +69,8 @@ export const ChatSidebar = (): JSX.Element => {
     transport: new DefaultChatTransport({ api: '/_api/v3/mastra/message' }),
   });
 
+  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
+
   const handleSubmit = (message: PromptInputMessage) => {
     sendMessage(
       {
@@ -76,7 +79,7 @@ export const ChatSidebar = (): JSX.Element => {
       },
       {
         body: {
-          aiAssistantId: '699413fabdd1c85e5e3d2aed',
+          aiAssistantId: aiAssistantSidebarData?.aiAssistantData?._id,
         },
       },
     );
