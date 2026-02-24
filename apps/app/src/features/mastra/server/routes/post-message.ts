@@ -121,6 +121,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
 
       const thread = await getOrCreateThread(
         memory,
+        aiAssistantId,
         req.user._id.toString(),
         threadId,
       );
