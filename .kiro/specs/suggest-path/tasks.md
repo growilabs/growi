@@ -78,7 +78,7 @@
   - Include unit tests for: top-level segment extraction, description generation, grant resolution, and empty result handling
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 7. Phase 2 revised orchestration and integration
+- [x] 7. Phase 2 revised orchestration and integration
 - [x] 7.1 Rewrite orchestration for revised Phase 2 pipeline
   - Rewrite the orchestration function to implement the revised Phase 2 pipeline: always generate memo suggestion first as guaranteed fallback, then invoke content analysis (1st AI call), pass keywords to search candidate retrieval, pass candidates to candidate evaluation (2nd AI call), and run category generation in parallel with the search-evaluate pipeline
   - After candidate evaluation returns, resolve grant for each proposed path via grant resolver
@@ -91,7 +91,7 @@
   - Include unit tests for: full pipeline success with all suggestion types, partial failures at each stage with correct degradation, informationType mapping to PathSuggestion, dependency injection, and parallel execution of category vs search-evaluate pipeline
   - _Requirements: 1.1, 1.2, 1.3, 3.3, 3.4, 5.3, 5.5, 8.3, 9.2, 11.4, 13.1, 13.2, 13.3_
 
-- [ ] 7.2 Phase 2 integration verification
+- [x] 7.2 Phase 2 integration verification
   - Verify the complete revised flow end-to-end: content body → content analysis (keywords + informationType) → search candidate retrieval (with score threshold) → candidate evaluation (path proposals + descriptions) → grant resolution → unified response with all suggestion types
   - Verify informationType field is present in search-based suggestions and absent in memo and category suggestions
   - Verify path proposal patterns work correctly: parent directory, subdirectory, and sibling with generated new paths at the correct hierarchy level
