@@ -3,12 +3,19 @@ import { v7 as uuid } from 'uuid';
 
 import { isThreadWithMeta, type ThreadWithMeta } from '../../interfaces/thread';
 
-export const getOrCreateThread = async (
-  memory: MastraMemory,
-  aiAssistantId: string,
-  resourceId: string,
-  threadId?: string,
-): Promise<ThreadWithMeta> => {
+type GetOrCreateThreadParams = {
+  memory: MastraMemory;
+  aiAssistantId: string;
+  resourceId: string;
+  threadId?: string;
+};
+
+export const getOrCreateThread = async ({
+  memory,
+  aiAssistantId,
+  resourceId,
+  threadId,
+}: GetOrCreateThreadParams): Promise<ThreadWithMeta> => {
   if (threadId == null) {
     const newThread = await memory.createThread({
       resourceId: resourceId,
