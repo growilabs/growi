@@ -68,4 +68,4 @@ const EditPage = (props: Props): null => {
   return null;
 };
 
-export default EditPage;
+export { EditPage };

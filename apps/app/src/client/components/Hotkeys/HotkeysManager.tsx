@@ -2,12 +2,12 @@ import type { JSX } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { tinykeys } from 'tinykeys';
 
-import CreatePage from './Subscribers/CreatePage';
-import EditPage from './Subscribers/EditPage';
-import FocusToGlobalSearch from './Subscribers/FocusToGlobalSearch';
-import ShowShortcutsModal from './Subscribers/ShowShortcutsModal';
-import ShowStaffCredit from './Subscribers/ShowStaffCredit';
-import SwitchToMirrorMode from './Subscribers/SwitchToMirrorMode';
+import { CreatePage } from './Subscribers/CreatePage';
+import { EditPage } from './Subscribers/EditPage';
+import { FocusToGlobalSearch } from './Subscribers/FocusToGlobalSearch';
+import { ShowShortcutsModal } from './Subscribers/ShowShortcutsModal';
+import { ShowStaffCredit } from './Subscribers/ShowStaffCredit';
+import { SwitchToMirrorMode } from './Subscribers/SwitchToMirrorMode';
 
 type SubscriberComponent = React.ComponentType<{ onDeleteRender: () => void }>;
 

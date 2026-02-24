@@ -24,7 +24,7 @@ BasicLayout / AdminLayout
 | File | Role |
 |------|------|
 | `src/client/components/Hotkeys/HotkeysManager.tsx` | Core orchestrator — binds all keys via tinykeys, renders subscribers |
-| `src/client/components/Hotkeys/Subscribers/*.{tsx,jsx}` | Individual action handlers rendered when their hotkey fires |
+| `src/client/components/Hotkeys/Subscribers/*.tsx` | Individual action handlers rendered when their hotkey fires |
 | `src/components/Layout/BasicLayout.tsx` | Mounts HotkeysManager via `next/dynamic({ ssr: false })` |
 | `src/components/Layout/AdminLayout.tsx` | Mounts HotkeysManager via `next/dynamic({ ssr: false })` |
 
@@ -85,6 +85,8 @@ BasicLayout / AdminLayout
 |-------------|-----------|---------------|
 | Req 7 AC 2: "define hotkey without modifying core detection logic" | Adding a new hotkey requires editing HotkeysManager.tsx's binding map | Binding map is a trivial object literal; the simplification from removing HotkeysDetector + getHotkeyStrokes outweighs the minor editing cost |
 | Req 8 AC 2: "export typed interfaces for hotkey definitions" | `SubscriberComponent` type is internal only, not exported | No external consumers need the type; exporting it would be unnecessary API surface |
+
+> **Note (task 5)**: Req 8 AC 1 is now fully satisfied — all 6 subscriber components converted from `.jsx` to `.tsx` with TypeScript `Props` types and named exports.
 
 ## Key Binding Format (tinykeys)
 

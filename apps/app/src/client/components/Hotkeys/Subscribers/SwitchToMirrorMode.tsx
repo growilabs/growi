@@ -1,20 +1,16 @@
-import React, { useEffect } from 'react';
-import PropTypes from 'prop-types';
+import { useEffect } from 'react';
 
-const SwitchToMirrorMode = (props) => {
-  // setup effect
+type Props = {
+  onDeleteRender: () => void;
+};
+
+const SwitchToMirrorMode = ({ onDeleteRender }: Props): null => {
   useEffect(() => {
     document.body.classList.add('mirror');
+    onDeleteRender();
+  }, [onDeleteRender]);
 
-    // remove this
-    props.onDeleteRender(this);
-  }, [props]);
-
-  return <></>;
+  return null;
 };
 
-SwitchToMirrorMode.propTypes = {
-  onDeleteRender: PropTypes.func.isRequired,
-};
-
-export default SwitchToMirrorMode;
+export { SwitchToMirrorMode };

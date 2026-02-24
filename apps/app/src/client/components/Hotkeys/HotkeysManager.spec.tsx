@@ -2,30 +2,28 @@ import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Mock all subscriber components as simple render trackers
-vi.mock('./Subscribers/EditPage', () => ({ default: vi.fn(() => null) }));
-vi.mock('./Subscribers/CreatePage', () => ({ default: vi.fn(() => null) }));
+vi.mock('./Subscribers/EditPage', () => ({ EditPage: vi.fn(() => null) }));
+vi.mock('./Subscribers/CreatePage', () => ({ CreatePage: vi.fn(() => null) }));
 vi.mock('./Subscribers/FocusToGlobalSearch', () => ({
-  default: vi.fn(() => null),
+  FocusToGlobalSearch: vi.fn(() => null),
 }));
 vi.mock('./Subscribers/ShowShortcutsModal', () => ({
-  default: vi.fn(() => null),
+  ShowShortcutsModal: vi.fn(() => null),
 }));
 vi.mock('./Subscribers/ShowStaffCredit', () => ({
-  default: vi.fn(() => null),
+  ShowStaffCredit: vi.fn(() => null),
 }));
 vi.mock('./Subscribers/SwitchToMirrorMode', () => ({
-  default: vi.fn(() => null),
+  SwitchToMirrorMode: vi.fn(() => null),
 }));
 
 const { default: HotkeysManager } = await import('./HotkeysManager');
-const { default: EditPage } = await import('./Subscribers/EditPage');
-const { default: CreatePage } = await import('./Subscribers/CreatePage');
-const { default: FocusToGlobalSearch } = await import(
+const { EditPage } = await import('./Subscribers/EditPage');
+const { CreatePage } = await import('./Subscribers/CreatePage');
+const { FocusToGlobalSearch } = await import(
   './Subscribers/FocusToGlobalSearch'
 );
-const { default: ShowShortcutsModal } = await import(
-  './Subscribers/ShowShortcutsModal'
-);
+const { ShowShortcutsModal } = await import('./Subscribers/ShowShortcutsModal');
 
 afterEach(() => {
   cleanup();

@@ -1,13 +1,13 @@
-import PropTypes from 'prop-types';
+import type { JSX } from 'react';
 
 import StaffCredit from '../../StaffCredit/StaffCredit';
 
-const ShowStaffCredit = (props) => {
-  return <StaffCredit onClosed={() => props.onDeleteRender(this)} />;
+type Props = {
+  onDeleteRender: () => void;
 };
 
-ShowStaffCredit.propTypes = {
-  onDeleteRender: PropTypes.func.isRequired,
+const ShowStaffCredit = ({ onDeleteRender }: Props): JSX.Element => {
+  return <StaffCredit onClosed={onDeleteRender} />;
 };
 
-export default ShowStaffCredit;
+export { ShowStaffCredit };

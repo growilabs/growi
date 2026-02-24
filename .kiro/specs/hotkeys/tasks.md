@@ -31,3 +31,13 @@ All tasks completed as part of `reduce-modules-loaded` spec (iteration 8.7).
   - Tests: 6/6 pass
   - ChunkModuleStats: async-only 4,608 → 4,516 (-92 modules)
   - _Requirements: 1_
+
+- [x] 5. Refactor subscriber components to match ideal patterns
+  - Converted 4 JSX files to TypeScript: CreatePage, FocusToGlobalSearch, ShowStaffCredit, SwitchToMirrorMode
+  - Fixed `onDeleteRender(this)` bug in 3 files — `this` is undefined in functional components; changed to `onDeleteRender()`
+  - Replaced PropTypes with TypeScript `Props` type in all subscribers
+  - Removed unnecessary `React.memo` wrapper from CreatePage
+  - Unified return values: `return null` for logic-only components (ShowShortcutsModal also updated)
+  - Converted all 6 subscribers from default exports to named exports; updated HotkeysManager imports
+  - Tests: 6/6 pass, lint:typecheck: pass, lint:biome: pass
+  - _Requirements: 7, 8_

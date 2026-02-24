@@ -1,4 +1,4 @@
-import React, { type JSX, useEffect } from 'react';
+import { useEffect } from 'react';
 
 import {
   useShortcutsModalActions,
@@ -8,13 +8,11 @@ import {
 type Props = {
   onDeleteRender: () => void;
 };
-const ShowShortcutsModal = (props: Props): JSX.Element => {
+
+const ShowShortcutsModal = ({ onDeleteRender }: Props): null => {
   const status = useShortcutsModalStatus();
   const { open } = useShortcutsModalActions();
 
-  const { onDeleteRender } = props;
-
-  // setup effect
   useEffect(() => {
     if (status == null) {
       return;
@@ -22,12 +20,11 @@ const ShowShortcutsModal = (props: Props): JSX.Element => {
 
     if (!status.isOpened) {
       open();
-      // remove this
       onDeleteRender();
     }
   }, [onDeleteRender, open, status]);
 
-  return <></>;
+  return null;
 };
 
-export default ShowShortcutsModal;
+export { ShowShortcutsModal };
