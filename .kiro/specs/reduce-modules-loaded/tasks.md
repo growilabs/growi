@@ -194,6 +194,23 @@ The following loop repeats until the user declares completion:
   - Result: initial: 1,572 (unchanged) / async-only: 4,608 (-112, -2.4%) / total: 6,180 (-112) / compiled: 8,895 (-112)
   - _Requirements: 4.1, 6.1_
 
+- [x] 8.7 Loop iteration 5: react-hotkeys → tinykeys migration
+  - Replaced `react-hotkeys` (91 async modules) with `tinykeys` (~400 byte, 1 module)
+  - Rewrote `HotkeysManager.tsx` to use tinykeys directly with inline key bindings
+  - Deleted `HotkeysDetector.jsx` (unused), `HotkeyStroke.js` (unused model)
+  - Removed `getHotkeyStrokes()` static methods from all 6 subscriber components
+  - Removed `react-hotkeys` dependency, added `tinykeys` dependency
+  - Added `HotkeysManager.spec.tsx` with 6 tests (single keys, modifier keys, editable target suppression)
+  - Refactored all 6 subscriber components to align with ideal patterns:
+    - Converted 4 JSX files to TypeScript (CreatePage, FocusToGlobalSearch, ShowStaffCredit, SwitchToMirrorMode)
+    - Fixed `onDeleteRender(this)` bug in 3 files (`this` is undefined in functional components)
+    - Replaced PropTypes with TypeScript `Props` type in all subscribers
+    - Removed unnecessary `React.memo` wrapper from CreatePage
+    - Unified return values: `return null` for logic-only components
+    - Converted all 6 subscribers from default exports to named exports
+  - Result: initial: 1,573 (+1) / async-only: 4,516 (-92) / total: 6,089 (-91) / compiled: 8,802 (-93)
+  - _Requirements: 4.1, 6.1_
+
 - [ ] 8.N Loop iteration N: (next iteration — measure, analyze, propose, implement)
 
 ## Phase 3: Next.js Version Upgrade Evaluation (Deferred)

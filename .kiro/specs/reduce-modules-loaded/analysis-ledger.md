@@ -27,6 +27,7 @@ Measured via `ChunkModuleStatsPlugin` in `next.config.utils.js`. The `initial` c
 | + date-fns locale subpath imports | 8.4 | **1,630** | 4,717 | 6,347 | 9,062 | 2026-02-20 |
 | + null-loader: i18next-fs-backend, bunyan, bunyan-format | 8.5 | **1,572** | 4,720 | 6,292 | 9,007 | 2026-02-20 |
 | + validator → isMongoId regex in LinkEditModal | 8.6 | **1,572** | 4,608 (-112) | 6,180 (-112) | 8,895 (-112) | 2026-02-20 |
+| + react-hotkeys → tinykeys migration | 8.7 | **1,573** (+1) | 4,516 (-92) | 6,089 (-91) | 8,802 (-93) | 2026-02-24 |
 
 > **Note**: Originally reported baseline was 51.5s, but automated measurement on the same machine consistently shows ~31s. The 51.5s figure may reflect cold cache, different system load, or an earlier codebase state.
 
