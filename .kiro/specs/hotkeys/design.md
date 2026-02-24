@@ -41,16 +41,68 @@ BasicLayout / AdminLayout
 
 **Trade-off**: tinykeys has no React integration — key binding is done imperatively in a `useEffect` hook rather than declaratively via JSX props. This is acceptable given the simplicity of the binding map.
 
-### D2: Centralized Binding Map
+### D2: Subscriber-Owned Binding Definitions
 
-**Decision**: All key bindings are defined inline in `HotkeysManager.tsx` rather than distributed across subscriber components.
+**Decision**: Each subscriber component exports its own `hotkeyBindings` metadata alongside its React component. `HotkeysManager` imports these definitions and auto-builds the tinykeys binding map — it never hardcodes specific keys or subscriber references.
 
 **Rationale**:
-- Eliminates the need for `getHotkeyStrokes()` static methods on each subscriber
-- Removes the `HotkeysDetector` intermediary layer
-- All bindings are visible in one place, making the mapping easy to audit
+- True "1 module = 1 hotkey" encapsulation: each subscriber owns its key binding, handler category, and action logic
+- Adding a new hotkey requires creating only one file (the new subscriber); `HotkeysManager` needs no modification
+- Fully satisfies Req 7 AC 2 ("define hotkey without modifying core detection logic")
+- Self-documenting: looking at a subscriber file tells you everything about that hotkey
 
-**Trade-off**: Adding a new hotkey requires editing `HotkeysManager.tsx` (violates Req 7 AC 2's ideal of zero-touch core). This is an acceptable trade-off — the binding map is a simple object literal and changes are trivial.
+**Type contract**:
+```typescript
+// Shared type definition in HotkeysManager.tsx or a shared types file
+type HotkeyCategory = 'single' | 'modifier';
+
+type HotkeyBindingDef = {
+  keys: string | string[];   // tinykeys key expression(s)
+  category: HotkeyCategory;  // determines handler wrapper (single = input guard, modifier = no guard)
+};
+
+type HotkeySubscriber = {
+  component: React.ComponentType<{ onDeleteRender: () => void }>;
+  bindings: HotkeyBindingDef;
+};
+```
+
+**Subscriber example**:
+```typescript
+// CreatePage.tsx
+export const hotkeyBindings: HotkeyBindingDef = {
+  keys: 'c',
+  category: 'single',
+};
+
+export const CreatePage = ({ onDeleteRender }: Props): null => { /* ... */ };
+```
+
+```typescript
+// ShowShortcutsModal.tsx
+export const hotkeyBindings: HotkeyBindingDef = {
+  keys: ['Control+/', 'Meta+/'],
+  category: 'modifier',
+};
+```
+
+**HotkeysManager usage**:
+```typescript
+// HotkeysManager.tsx
+import * as createPage from './Subscribers/CreatePage';
+import * as editPage from './Subscribers/EditPage';
+// ... other subscribers
+
+const subscribers: HotkeySubscriber[] = [
+  { component: createPage.CreatePage, bindings: createPage.hotkeyBindings },
+  { component: editPage.EditPage, bindings: editPage.hotkeyBindings },
+  // ...
+];
+
+// In useEffect: iterate subscribers to build tinykeys binding map
+```
+
+**Trade-off**: Slightly more structure than a plain object literal, but the pattern is minimal and each subscriber file is fully self-contained.
 
 ### D3: Subscriber Render-on-Fire Pattern
 
@@ -83,10 +135,10 @@ BasicLayout / AdminLayout
 
 | Requirement | Deviation | Justification |
 |-------------|-----------|---------------|
-| Req 7 AC 2: "define hotkey without modifying core detection logic" | Adding a new hotkey requires editing HotkeysManager.tsx's binding map | Binding map is a trivial object literal; the simplification from removing HotkeysDetector + getHotkeyStrokes outweighs the minor editing cost |
-| Req 8 AC 2: "export typed interfaces for hotkey definitions" | `SubscriberComponent` type is internal only, not exported | No external consumers need the type; exporting it would be unnecessary API surface |
+| Req 8 AC 2: "export typed interfaces for hotkey definitions" | `HotkeyBindingDef` and `HotkeySubscriber` types are exported for subscriber use but not published as a package API | These types are internal to the Hotkeys module; no external consumers need them |
 
 > **Note (task 5)**: Req 8 AC 1 is now fully satisfied — all 6 subscriber components converted from `.jsx` to `.tsx` with TypeScript `Props` types and named exports.
+> **Note (D2 revision)**: Req 7 AC 2 is now fully satisfied — subscriber-owned binding definitions mean adding a hotkey requires only creating a new subscriber file.
 
 ## Key Binding Format (tinykeys)
 
