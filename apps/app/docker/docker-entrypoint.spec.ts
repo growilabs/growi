@@ -108,8 +108,8 @@ describe('detectHeapSize', () => {
     process.env = originalEnv;
   });
 
-  it('should use GROWI_HEAP_SIZE when set', () => {
-    process.env.GROWI_HEAP_SIZE = '512';
+  it('should use V8_MAX_HEAP_SIZE when set', () => {
+    process.env.V8_MAX_HEAP_SIZE = '512';
     const readSpy = vi.spyOn(fs, 'readFileSync');
     const result = detectHeapSize();
     expect(result).toBe(512);
@@ -118,8 +118,8 @@ describe('detectHeapSize', () => {
     readSpy.mockRestore();
   });
 
-  it('should return undefined for invalid GROWI_HEAP_SIZE', () => {
-    process.env.GROWI_HEAP_SIZE = 'abc';
+  it('should return undefined for invalid V8_MAX_HEAP_SIZE', () => {
+    process.env.V8_MAX_HEAP_SIZE = 'abc';
     const readSpy = vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
       throw new Error('ENOENT');
     });
@@ -128,8 +128,8 @@ describe('detectHeapSize', () => {
     readSpy.mockRestore();
   });
 
-  it('should return undefined for empty GROWI_HEAP_SIZE', () => {
-    process.env.GROWI_HEAP_SIZE = '';
+  it('should return undefined for empty V8_MAX_HEAP_SIZE', () => {
+    process.env.V8_MAX_HEAP_SIZE = '';
     const readSpy = vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
       throw new Error('ENOENT');
     });
@@ -139,7 +139,7 @@ describe('detectHeapSize', () => {
   });
 
   it('should auto-calculate from cgroup v2 at 60%', () => {
-    delete process.env.GROWI_HEAP_SIZE;
+    delete process.env.V8_MAX_HEAP_SIZE;
     // 1GB = 1073741824 bytes → 60% ≈ 614 MB
     const readSpy = vi
       .spyOn(fs, 'readFileSync')
@@ -153,7 +153,7 @@ describe('detectHeapSize', () => {
   });
 
   it('should fallback to cgroup v1 when v2 is unlimited', () => {
-    delete process.env.GROWI_HEAP_SIZE;
+    delete process.env.V8_MAX_HEAP_SIZE;
     // v2 = max (unlimited), v1 = 2GB
     const readSpy = vi
       .spyOn(fs, 'readFileSync')
@@ -169,7 +169,7 @@ describe('detectHeapSize', () => {
   });
 
   it('should treat cgroup v1 > 64GB as unlimited', () => {
-    delete process.env.GROWI_HEAP_SIZE;
+    delete process.env.V8_MAX_HEAP_SIZE;
     const hugeValue = 128 * 1024 * 1024 * 1024; // 128GB
     const readSpy = vi
       .spyOn(fs, 'readFileSync')
@@ -185,7 +185,7 @@ describe('detectHeapSize', () => {
   });
 
   it('should return undefined when no cgroup limits detected', () => {
-    delete process.env.GROWI_HEAP_SIZE;
+    delete process.env.V8_MAX_HEAP_SIZE;
     const readSpy = vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
       throw new Error('ENOENT');
     });
@@ -194,8 +194,8 @@ describe('detectHeapSize', () => {
     readSpy.mockRestore();
   });
 
-  it('should prioritize GROWI_HEAP_SIZE over cgroup', () => {
-    process.env.GROWI_HEAP_SIZE = '256';
+  it('should prioritize V8_MAX_HEAP_SIZE over cgroup', () => {
+    process.env.V8_MAX_HEAP_SIZE = '256';
     const readSpy = vi
       .spyOn(fs, 'readFileSync')
       .mockReturnValue('1073741824\n');
@@ -233,33 +233,33 @@ describe('buildNodeFlags', () => {
     expect(flags.some((f) => f.startsWith('--max-heap-size'))).toBe(false);
   });
 
-  it('should include --optimize-for-size when GROWI_OPTIMIZE_MEMORY=true', () => {
-    process.env.GROWI_OPTIMIZE_MEMORY = 'true';
+  it('should include --optimize-for-size when V8_OPTIMIZE_FOR_SIZE=true', () => {
+    process.env.V8_OPTIMIZE_FOR_SIZE = 'true';
     const flags = buildNodeFlags(undefined);
     expect(flags).toContain('--optimize-for-size');
   });
 
-  it('should not include --optimize-for-size when GROWI_OPTIMIZE_MEMORY is not true', () => {
-    process.env.GROWI_OPTIMIZE_MEMORY = 'false';
+  it('should not include --optimize-for-size when V8_OPTIMIZE_FOR_SIZE is not true', () => {
+    process.env.V8_OPTIMIZE_FOR_SIZE = 'false';
     const flags = buildNodeFlags(undefined);
     expect(flags).not.toContain('--optimize-for-size');
   });
 
-  it('should include --lite-mode when GROWI_LITE_MODE=true', () => {
-    process.env.GROWI_LITE_MODE = 'true';
+  it('should include --lite-mode when V8_LITE_MODE=true', () => {
+    process.env.V8_LITE_MODE = 'true';
     const flags = buildNodeFlags(undefined);
     expect(flags).toContain('--lite-mode');
   });
 
-  it('should not include --lite-mode when GROWI_LITE_MODE is not true', () => {
-    delete process.env.GROWI_LITE_MODE;
+  it('should not include --lite-mode when V8_LITE_MODE is not true', () => {
+    delete process.env.V8_LITE_MODE;
     const flags = buildNodeFlags(undefined);
     expect(flags).not.toContain('--lite-mode');
   });
 
   it('should combine all flags when all options enabled', () => {
-    process.env.GROWI_OPTIMIZE_MEMORY = 'true';
-    process.env.GROWI_LITE_MODE = 'true';
+    process.env.V8_OPTIMIZE_FOR_SIZE = 'true';
+    process.env.V8_LITE_MODE = 'true';
     const flags = buildNodeFlags(256);
     expect(flags).toContain('--expose_gc');
     expect(flags).toContain('--max-heap-size=256');

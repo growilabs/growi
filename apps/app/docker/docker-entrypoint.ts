@@ -6,7 +6,7 @@
  *
  * Responsibilities:
  * - Directory setup (as root): /data/uploads, symlinks, /tmp/page-bulk-export
- * - Heap size detection: GROWI_HEAP_SIZE → cgroup auto-calc → V8 default
+ * - Heap size detection: V8_MAX_HEAP_SIZE → cgroup auto-calc → V8 default
  * - Privilege drop: process.setgid + process.setuid (root → node)
  * - Migration execution: execFileSync (no shell)
  * - App process spawn: spawn with signal forwarding
@@ -66,18 +66,18 @@ export function readCgroupLimit(filePath: string): number | undefined {
 
 /**
  * Detect heap size (MB) using 3-level fallback:
- * 1. GROWI_HEAP_SIZE env var
+ * 1. V8_MAX_HEAP_SIZE env var
  * 2. cgroup v2/v1 auto-calculation (60% of limit)
  * 3. undefined (V8 default)
  */
 export function detectHeapSize(): number | undefined {
-  // Priority 1: GROWI_HEAP_SIZE env
-  const envValue = process.env.GROWI_HEAP_SIZE;
+  // Priority 1: V8_MAX_HEAP_SIZE env
+  const envValue = process.env.V8_MAX_HEAP_SIZE;
   if (envValue != null && envValue !== '') {
     const parsed = parseInt(envValue, 10);
     if (Number.isNaN(parsed)) {
       console.error(
-        `[entrypoint] GROWI_HEAP_SIZE="${envValue}" is not a valid number, ignoring`,
+        `[entrypoint] V8_MAX_HEAP_SIZE="${envValue}" is not a valid number, ignoring`,
       );
       return undefined;
     }
@@ -110,11 +110,11 @@ export function buildNodeFlags(heapSize: number | undefined): string[] {
     flags.push(`--max-heap-size=${heapSize}`);
   }
 
-  if (process.env.GROWI_OPTIMIZE_MEMORY === 'true') {
+  if (process.env.V8_OPTIMIZE_FOR_SIZE === 'true') {
     flags.push('--optimize-for-size');
   }
 
-  if (process.env.GROWI_LITE_MODE === 'true') {
+  if (process.env.V8_LITE_MODE === 'true') {
     flags.push('--lite-mode');
   }
 
@@ -163,10 +163,10 @@ export function dropPrivileges(): void {
 function logFlags(heapSize: number | undefined, flags: string[]): void {
   const source = (() => {
     if (
-      process.env.GROWI_HEAP_SIZE != null &&
-      process.env.GROWI_HEAP_SIZE !== ''
+      process.env.V8_MAX_HEAP_SIZE != null &&
+      process.env.V8_MAX_HEAP_SIZE !== ''
     ) {
-      return 'GROWI_HEAP_SIZE env';
+      return 'V8_MAX_HEAP_SIZE env';
     }
     if (heapSize != null) return 'cgroup auto-detection';
     return 'V8 default (no heap limit)';
