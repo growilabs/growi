@@ -130,6 +130,7 @@ module.exports = (phase) => {
             /i18next-fs-backend/, // server-only filesystem translation backend (leaks via next-i18next)
             /\/bunyan\//, // server-only logging (client uses browser-bunyan via universal-bunyan)
             /bunyan-format/, // server-only log formatter (client uses @browser-bunyan/console-formatted-stream)
+            /[\\/]core-js[\\/]/, // polyfills baked into next-i18next/react-stickynode dist; all APIs natively supported by target browsers (Chrome 64+, Safari 12+)
           ].map((packageRegExp) => {
             return {
               test: packageRegExp,

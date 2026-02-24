@@ -219,6 +219,13 @@ The following loop repeats until the user declares completion:
   - Result: initial: 1,073 (-500, -31.8%) / async-only: 5,016 (+500) / total: 6,089 (unchanged) / compiled: 8,803 (+1)
   - _Requirements: 7.2, 6.1_
 
+- [x] 8.9 Loop iteration 7: core-js null-load + ChunkModuleStatsPlugin analysis fix
+  - Added null-loader rule for `core-js` on client side — polyfills baked into next-i18next/react-stickynode dist files; all APIs natively supported by target browsers (Chrome 64+, Safari 12+)
+  - Null-loading eliminates 179 core-js transitive dependency modules; 37 entry-point modules remain as empty stubs
+  - Fixed `ChunkModuleStatsPlugin` to strip webpack loader prefixes (e.g., `source-map-loader!/path`) before package attribution — corrects 82 previously misattributed modules
+  - Result: initial: 894 (-179, -16.7%) / async-only: 5,011 (-5) / total: 5,905 (-184) / compiled: 8,619 (-184)
+  - _Requirements: 3.1, 3.2, 6.1_
+
 - [ ] 8.N Loop iteration N: (next iteration — measure, analyze, propose, implement)
 
 ## Phase 3: Next.js Version Upgrade Evaluation (Deferred)

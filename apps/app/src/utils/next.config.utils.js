@@ -93,7 +93,11 @@ exports.createChunkModuleStatsPlugin = () => ({
         const analyzeModuleSet = (moduleIds, title, filename) => {
           const packageCounts = {};
           const appModules = [];
-          for (const id of moduleIds) {
+          for (const rawId of moduleIds) {
+            // Strip webpack loader prefixes (e.g., "source-map-loader!/path/to/file" → "/path/to/file")
+            const id = rawId.includes('!')
+              ? rawId.slice(rawId.lastIndexOf('!') + 1)
+              : rawId;
             const nmIdx = id.lastIndexOf('node_modules/');
             if (nmIdx !== -1) {
               const rest = id.slice(nmIdx + 'node_modules/'.length);
