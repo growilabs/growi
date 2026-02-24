@@ -34,7 +34,8 @@ import {
   useAiAssistantSidebarStatus,
 } from '../states';
 import { useSWRMUTxMessages } from '../stores/message';
-import { useSWRMUTxThreads } from '../stores/thread';
+
+// import { useSWRMUTxThreads } from '../stores/thread';
 
 type CreateThread = (
   aiAssistantId: string,
@@ -86,7 +87,7 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
   const { aiAssistantData, threadData } = useAiAssistantSidebarStatus();
   const { refreshThreadData } = useAiAssistantSidebarActions();
   const { mutate: mutateRecentThreads } = useSWRINFxRecentThreads();
-  const { trigger: mutateThreadData } = useSWRMUTxThreads(aiAssistantData?._id);
+  // const { trigger: mutateThreadData } = useSWRMUTxThreads(aiAssistantData?._id);
   const { t } = useTranslation();
 
   const form = useForm<FormData>({
@@ -117,11 +118,11 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
       const thread = response.data;
 
       // No need to await because data is not used
-      mutateThreadData();
+      // mutateThreadData();
 
       return thread;
     },
-    [mutateThreadData],
+    [],
   );
 
   const postMessage: PostMessage = useCallback(

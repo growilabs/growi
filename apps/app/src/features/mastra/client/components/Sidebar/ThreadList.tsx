@@ -9,7 +9,6 @@ import {
   useAiAssistantSidebarStatus,
 } from '~/features/openai/client/states';
 import { useSWRxAiAssistants } from '~/features/openai/client/stores/ai-assistant';
-import { useSWRMUTxThreads } from '~/features/openai/client/stores/thread';
 import loggerFactory from '~/utils/logger';
 
 import { deleteThread } from '../../services/thread';
@@ -24,9 +23,6 @@ export const ThreadList: React.FC = () => {
   const aiAssistantSidebarData = useAiAssistantSidebarStatus();
   const { openChat, close: closeAiAssistantSidebar } =
     useAiAssistantSidebarActions();
-  const { trigger: mutateAssistantThreadData } = useSWRMUTxThreads(
-    aiAssistantSidebarData?.aiAssistantData?._id,
-  );
   const { data: aiAssistants, mutate: mutateAiAssistants } =
     useSWRxAiAssistants();
 
