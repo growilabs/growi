@@ -211,6 +211,14 @@ The following loop repeats until the user declares completion:
   - Result: initial: 1,573 (+1) / async-only: 4,516 (-92) / total: 6,089 (-91) / compiled: 8,802 (-93)
   - _Requirements: 4.1, 6.1_
 
+- [x] 8.8 Loop iteration 6: markdown rendering pipeline → next/dynamic({ ssr: true })
+  - Created `PageContentRenderer` wrapper component encapsulating `RevisionRenderer` + `generateSSRViewOptions`
+  - Converted `PageContentRenderer` to `next/dynamic({ ssr: true })` in both `PageView.tsx` and `ShareLinkPageView.tsx`
+  - Moves entire markdown pipeline (react-markdown, katex, remark-gfm, rehype-katex, mdast-util-to-markdown, etc.) to async chunks while preserving SSR rendering
+  - Added `PageContentRenderer.spec.tsx` with 3 tests (null markdown, generated options, explicit options)
+  - Result: initial: 1,073 (-500, -31.8%) / async-only: 5,016 (+500) / total: 6,089 (unchanged) / compiled: 8,803 (+1)
+  - _Requirements: 7.2, 6.1_
+
 - [ ] 8.N Loop iteration N: (next iteration — measure, analyze, propose, implement)
 
 ## Phase 3: Next.js Version Upgrade Evaluation (Deferred)
