@@ -229,6 +229,31 @@
 - **Limitations of process.setuid/setgid**: `process.initgroups` is required for supplementary group initialization. The order setgid -> setuid must be strictly followed
 - **docker login requirement for DHI images**: `docker login dhi.io` is required in CI/CD. Security considerations for credential management are needed
 
+## Production Implementation Discoveries
+
+### DHI Dev Image Minimal Configuration (Phase 1 E2E)
+
+- **Issue**: The DHI dev image (`dhi.io/node:24-debian13-dev`) did not include the `which` command
+- **Resolution**: Changed pnpm installation from `SHELL="$(which sh)"` to `SHELL=/bin/sh`
+- **Impact**: Minor — only affects the pnpm install script invocation
+
+### Complete Absence of Shell in DHI Runtime Image (Phase 1 E2E)
+
+- **Issue**: The DHI runtime image (`dhi.io/node:24-debian13`) did not have `/bin/sh`. The design planned `--mount=type=bind,from=builder` + `RUN tar -zxf`, but `RUN` instructions require `/bin/sh`
+- **Resolution**:
+  - **builder stage**: Changed from `tar -zcf` to `cp -a` into a staging directory `/tmp/release/`
+  - **release stage**: Changed from `RUN --mount=type=bind... tar -zxf` to `COPY --from=builder --chown=node:node`
+- **Impact**: Design Req 3.5 (`--mount=type=bind,from=builder` pattern) was replaced with `COPY --from=builder`. The security goal of not requiring a shell at runtime was achieved even more robustly
+- **Lesson**: DHI runtime images are truly minimal — `COPY`, `WORKDIR`, `ENV`, `LABEL`, `ENTRYPOINT` are processed by the Docker daemon and do not require a shell
+
+### process.initgroups() Type Definition Gap
+
+- **Issue**: `process.initgroups('node', 1000)` was called for in the design, but implementation was deferred because the type definition does not exist in `@types/node`
+- **Status**: Deferred (Known Issue)
+- **Runtime**: `process.initgroups` does exist at runtime in Node.js 24
+- **Workaround options**: Wait for `@types/node` fix, or use `(process as any).initgroups('node', 1000)`
+- **Practical impact**: Low — the node user in a Docker container typically has no supplementary groups
+
 ## References
 
 - [Docker Hardened Images Documentation](https://docs.docker.com/dhi/) — Overview and usage of DHI

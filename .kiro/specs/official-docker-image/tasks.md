@@ -118,35 +118,7 @@
   - Verify startup with `docker compose up` and graceful shutdown via SIGTERM
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-## Known Issues
-
-- [ ] Addition of supplementary groups initialization via `process.initgroups()`
-  - The design in design.md calls for `process.initgroups('node', 1000)`, but implementation was deferred in Phase 1 because the type definition does not exist in `@types/node`
-  - `process.initgroups` does exist at runtime (confirmed in Node.js 24)
-  - Workaround options: Wait for the `@types/node` fix, or use `(process as any).initgroups('node', 1000)` as a workaround
-  - Practical impact is low (the node user in a Docker container typically has no supplementary groups)
-  - _Requirements: 4.1, 6.2_
-
-## Intentional deviations from Design (discovered and addressed during Phase 1 E2E verification)
-
-### Adaptation to DHI dev image minimal configuration
-
-The DHI dev image (`dhi.io/node:24-debian13-dev`) was more minimal than expected, and the `which` command was not included. The following fix was applied:
-
-1. **pnpm installation**: Changed from `SHELL="$(which sh)"` to `SHELL=/bin/sh` (due to absence of the `which` command)
-
-### Adaptation to complete absence of shell in DHI runtime image
-
-The DHI runtime image (`dhi.io/node:24-debian13`) did not have `/bin/sh`. The Design planned to extract artifacts using `--mount=type=bind,from=builder` + `RUN tar -zxf`, but `RUN` instructions require `/bin/sh` and thus could not be executed.
-
-**Resolution**:
-- **builder stage**: Changed from `tar -zcf` to copying with `cp -a` into a staging directory `/tmp/release/`
-- **release stage**: Changed from `RUN --mount=type=bind... tar -zxf` to `COPY --from=builder --chown=node:node`
-- `COPY`, `WORKDIR`, `ENV`, `LABEL`, `ENTRYPOINT` are all processed directly by the Docker daemon and do not require a shell
-
-**Impact**: Design Req 3.5 (`--mount=type=bind,from=builder` pattern) was replaced with the `COPY --from=builder` pattern. The Design's security goal of not requiring a shell at runtime (Req 4.2, 4.5) was achieved even more robustly.
-
-## Phase 2: turbo prune --docker build optimization (next phase)
+## Phase 2: turbo prune --docker build optimization
 
 > To be done after runtime is stable in Phase 1. Migrate from the current `COPY . .` + 3-stage structure to a `turbo prune --docker` + 5-stage structure to improve build cache efficiency.
 
