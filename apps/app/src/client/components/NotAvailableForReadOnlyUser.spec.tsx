@@ -1,28 +1,52 @@
+import type { ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
-import {
-  describe, it, expect, vi,
-} from 'vitest';
+import { Provider } from 'jotai';
+import { useHydrateAtoms } from 'jotai/utils';
+import { describe, expect, it, vi } from 'vitest';
+
+import { isRomUserAllowedToCommentAtom } from '~/states/server-configurations';
 
 import { NotAvailableIfReadOnlyUserNotAllowedToComment } from './NotAvailableForReadOnlyUser';
 
-const useIsReadOnlyUser = vi.hoisted(() => vi.fn().mockReturnValue({ data: true }));
-const useIsRomUserAllowedToComment = vi.hoisted(() => vi.fn().mockReturnValue({ data: true }));
+const useIsReadOnlyUser = vi.hoisted(() => vi.fn().mockReturnValue(true));
 
-vi.mock('~/stores-universal/context', () => ({
+vi.mock('~/states/context', () => ({
   useIsReadOnlyUser,
-  useIsRomUserAllowedToComment,
 }));
 
-describe('NotAvailableForReadOnlyUser.tsx', () => {
+vi.mock('react-disable', () => ({
+  Disable: ({
+    children,
+    disabled,
+  }: {
+    children: ReactNode;
+    disabled: boolean;
+  }) => <div aria-hidden={disabled ? 'true' : undefined}>{children}</div>,
+}));
 
-  it('renders NotAvailable component as enable when user is read-only and comments by rom users is allowed', async() => {
-    useIsReadOnlyUser.mockReturnValue({ data: true });
-    useIsRomUserAllowedToComment.mockReturnValue({ data: true });
+const HydrateAtoms = ({
+  children,
+  initialValues,
+}: {
+  children: ReactNode;
+  initialValues: Array<[typeof isRomUserAllowedToCommentAtom, boolean]>;
+}) => {
+  useHydrateAtoms(initialValues);
+  return <>{children}</>;
+};
+
+describe('NotAvailableForReadOnlyUser.tsx', () => {
+  it('renders NotAvailable component as enable when user is read-only and comments by rom users is allowed', async () => {
+    useIsReadOnlyUser.mockReturnValue(true);
 
     render(
-      <NotAvailableIfReadOnlyUserNotAllowedToComment>
-        <div data-testid="test-child">Test Child</div>
-      </NotAvailableIfReadOnlyUserNotAllowedToComment>,
+      <Provider>
+        <HydrateAtoms initialValues={[[isRomUserAllowedToCommentAtom, true]]}>
+          <NotAvailableIfReadOnlyUserNotAllowedToComment>
+            <div data-testid="test-child">Test Child</div>
+          </NotAvailableIfReadOnlyUserNotAllowedToComment>
+        </HydrateAtoms>
+      </Provider>,
     );
 
     // when
@@ -33,14 +57,17 @@ describe('NotAvailableForReadOnlyUser.tsx', () => {
     expect(wrapperElement).not.toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('renders NotAvailable component as disable when user is read-only and comments by rom users is not allowed', async() => {
-    useIsReadOnlyUser.mockReturnValue({ data: true });
-    useIsRomUserAllowedToComment.mockReturnValue({ data: false });
+  it('renders NotAvailable component as disable when user is read-only and comments by rom users is not allowed', async () => {
+    useIsReadOnlyUser.mockReturnValue(true);
 
     render(
-      <NotAvailableIfReadOnlyUserNotAllowedToComment>
-        <div data-testid="test-child">Test Child</div>
-      </NotAvailableIfReadOnlyUserNotAllowedToComment>,
+      <Provider>
+        <HydrateAtoms initialValues={[[isRomUserAllowedToCommentAtom, false]]}>
+          <NotAvailableIfReadOnlyUserNotAllowedToComment>
+            <div data-testid="test-child">Test Child</div>
+          </NotAvailableIfReadOnlyUserNotAllowedToComment>
+        </HydrateAtoms>
+      </Provider>,
     );
 
     // when
@@ -51,14 +78,17 @@ describe('NotAvailableForReadOnlyUser.tsx', () => {
     expect(wrapperElement).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('renders NotAvailable component as enable when user is not read-only and comments by rom users is allowed', async() => {
-    useIsReadOnlyUser.mockReturnValue({ data: false });
-    useIsRomUserAllowedToComment.mockReturnValue({ data: true });
+  it('renders NotAvailable component as enable when user is not read-only and comments by rom users is allowed', async () => {
+    useIsReadOnlyUser.mockReturnValue(false);
 
     render(
-      <NotAvailableIfReadOnlyUserNotAllowedToComment>
-        <div data-testid="test-child">Test Child</div>
-      </NotAvailableIfReadOnlyUserNotAllowedToComment>,
+      <Provider>
+        <HydrateAtoms initialValues={[[isRomUserAllowedToCommentAtom, true]]}>
+          <NotAvailableIfReadOnlyUserNotAllowedToComment>
+            <div data-testid="test-child">Test Child</div>
+          </NotAvailableIfReadOnlyUserNotAllowedToComment>
+        </HydrateAtoms>
+      </Provider>,
     );
 
     // when
@@ -69,14 +99,17 @@ describe('NotAvailableForReadOnlyUser.tsx', () => {
     expect(wrapperElement).not.toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('renders NotAvailable component as enable when user is not read-only and comments by rom users is not allowed', async() => {
-    useIsReadOnlyUser.mockReturnValue({ data: false });
-    useIsRomUserAllowedToComment.mockReturnValue({ data: false });
+  it('renders NotAvailable component as enable when user is not read-only and comments by rom users is not allowed', async () => {
+    useIsReadOnlyUser.mockReturnValue(false);
 
     render(
-      <NotAvailableIfReadOnlyUserNotAllowedToComment>
-        <div data-testid="test-child">Test Child</div>
-      </NotAvailableIfReadOnlyUserNotAllowedToComment>,
+      <Provider>
+        <HydrateAtoms initialValues={[[isRomUserAllowedToCommentAtom, false]]}>
+          <NotAvailableIfReadOnlyUserNotAllowedToComment>
+            <div data-testid="test-child">Test Child</div>
+          </NotAvailableIfReadOnlyUserNotAllowedToComment>
+        </HydrateAtoms>
+      </Provider>,
     );
 
     // when
@@ -86,5 +119,4 @@ describe('NotAvailableForReadOnlyUser.tsx', () => {
     // then
     expect(wrapperElement).not.toHaveAttribute('aria-hidden', 'true');
   });
-
 });

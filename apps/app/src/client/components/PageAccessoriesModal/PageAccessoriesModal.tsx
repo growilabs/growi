@@ -1,101 +1,151 @@
-import React, { useMemo, useState, type JSX } from 'react';
-
-import { useTranslation } from 'next-i18next';
+import React, { type JSX, useCallback, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import {
-  Modal, ModalBody, ModalHeader,
-} from 'reactstrap';
+import { useAtomValue } from 'jotai';
+import { useTranslation } from 'next-i18next';
+import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import {
-  useDisableLinkSharing, useIsGuestUser, useIsReadOnlyUser, useIsSharedUser,
-} from '~/stores-universal/context';
-import { usePageAccessoriesModal, PageAccessoriesModalContents } from '~/stores/modal';
-import { useIsDeviceLargerThanLg } from '~/stores/ui';
+  useIsGuestUser,
+  useIsReadOnlyUser,
+  useIsSharedUser,
+} from '~/states/context';
+import { disableLinkSharingAtom } from '~/states/server-configurations';
+import { useDeviceLargerThanLg } from '~/states/ui/device';
+import {
+  PageAccessoriesModalContents,
+  usePageAccessoriesModalActions,
+  usePageAccessoriesModalStatus,
+} from '~/states/ui/modal/page-accessories';
 
 import { CustomNavDropdown, CustomNavTab } from '../CustomNavigation/CustomNav';
 import CustomTabContent from '../CustomNavigation/CustomTabContent';
 import ExpandOrContractButton from '../ExpandOrContractButton';
 
-import { useAutoOpenModalByQueryParam } from './hooks';
-
 import styles from './PageAccessoriesModal.module.scss';
 
+const PageAttachment = dynamic(() => import('./PageAttachment'), {
+  ssr: false,
+});
+const PageHistory = dynamic(
+  () => import('./PageHistory').then((mod) => mod.PageHistory),
+  { ssr: false },
+);
+const ShareLink = dynamic(
+  () => import('./ShareLink').then((mod) => mod.ShareLink),
+  { ssr: false },
+);
 
-const PageAttachment = dynamic(() => import('./PageAttachment'), { ssr: false });
-const PageHistory = dynamic(() => import('./PageHistory').then(mod => mod.PageHistory), { ssr: false });
-const ShareLink = dynamic(() => import('./ShareLink').then(mod => mod.ShareLink), { ssr: false });
+const PageHistoryIcon = (): JSX.Element => (
+  <span className="material-symbols-outlined">history</span>
+);
+const PageAttachmentIcon = (): JSX.Element => (
+  <span className="material-symbols-outlined">attachment</span>
+);
+const ShareLinkIcon = (): JSX.Element => (
+  <span className="material-symbols-outlined">share</span>
+);
 
+const PageHistoryContent = (): JSX.Element => {
+  const { close } = usePageAccessoriesModalActions();
 
-export const PageAccessoriesModal = (): JSX.Element => {
+  return <PageHistory onClose={close} />;
+};
 
+const PageAttachmentContent = (): JSX.Element => {
+  return <PageAttachment />;
+};
+
+const ShareLinkContent = (): JSX.Element => {
+  return <ShareLink />;
+};
+
+interface PageAccessoriesModalSubstanceProps {
+  isWindowExpanded: boolean;
+  setIsWindowExpanded: (expanded: boolean) => void;
+}
+
+const PageAccessoriesModalSubstance = ({
+  isWindowExpanded,
+  setIsWindowExpanded,
+}: PageAccessoriesModalSubstanceProps): JSX.Element => {
   const { t } = useTranslation();
 
-  const [isWindowExpanded, setIsWindowExpanded] = useState(false);
+  const isSharedUser = useIsSharedUser();
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const isLinkSharingDisabled = useAtomValue(disableLinkSharingAtom);
+  const [isDeviceLargerThanLg] = useDeviceLargerThanLg();
 
-  const { data: isSharedUser } = useIsSharedUser();
-  const { data: isGuestUser } = useIsGuestUser();
-  const { data: isReadOnlyUser } = useIsReadOnlyUser();
-  const { data: isLinkSharingDisabled } = useDisableLinkSharing();
-  const { data: isDeviceLargerThanLg } = useIsDeviceLargerThanLg();
+  const status = usePageAccessoriesModalStatus();
+  const { close, selectContents } = usePageAccessoriesModalActions();
 
-  const { data: status, close, selectContents } = usePageAccessoriesModal();
-
-  useAutoOpenModalByQueryParam();
-
+  // Memoize heavy navTabMapping calculation
   const navTabMapping = useMemo(() => {
     return {
       [PageAccessoriesModalContents.PageHistory]: {
-        Icon: () => <span className="material-symbols-outlined">history</span>,
-        Content: () => {
-          return <PageHistory onClose={close} />;
-        },
+        Icon: PageHistoryIcon,
+        Content: PageHistoryContent,
         i18n: t('History'),
         isLinkEnabled: () => !isGuestUser && !isSharedUser,
       },
       [PageAccessoriesModalContents.Attachment]: {
-        Icon: () => <span className="material-symbols-outlined">attachment</span>,
-        Content: () => {
-          return <PageAttachment />;
-        },
+        Icon: PageAttachmentIcon,
+        Content: PageAttachmentContent,
         i18n: t('attachment_data'),
       },
       [PageAccessoriesModalContents.ShareLink]: {
-        Icon: () => <span className="material-symbols-outlined">share</span>,
-        Content: () => {
-          return <ShareLink />;
-        },
+        Icon: ShareLinkIcon,
+        Content: ShareLinkContent,
         i18n: t('share_links.share_link_management'),
-        isLinkEnabled: () => !isGuestUser && !isReadOnlyUser && !isSharedUser && !isLinkSharingDisabled,
+        isLinkEnabled: () =>
+          !isGuestUser &&
+          !isReadOnlyUser &&
+          !isSharedUser &&
+          !isLinkSharingDisabled,
       },
     };
-  }, [t, close, isGuestUser, isReadOnlyUser, isSharedUser, isLinkSharingDisabled]);
+  }, [t, isGuestUser, isReadOnlyUser, isSharedUser, isLinkSharingDisabled]);
 
-  const buttons = useMemo(() => (
-    <span className="me-3">
-      <ExpandOrContractButton
-        isWindowExpanded={isWindowExpanded}
-        expandWindow={() => setIsWindowExpanded(true)}
-        contractWindow={() => setIsWindowExpanded(false)}
-      />
-      <button type="button" className="btn btn-close ms-2" onClick={close} aria-label="Close"></button>
-    </span>
-  ), [close, isWindowExpanded]);
+  // Memoize expand/contract handlers
+  const expandWindow = useCallback(
+    () => setIsWindowExpanded(true),
+    [setIsWindowExpanded],
+  );
+  const contractWindow = useCallback(
+    () => setIsWindowExpanded(false),
+    [setIsWindowExpanded],
+  );
+
+  const buttons = useMemo(
+    () => (
+      <span className="me-3">
+        <ExpandOrContractButton
+          isWindowExpanded={isWindowExpanded}
+          expandWindow={expandWindow}
+          contractWindow={contractWindow}
+        />
+        <button
+          type="button"
+          className="btn btn-close ms-2"
+          onClick={close}
+          aria-label="Close"
+        ></button>
+      </span>
+    ),
+    [close, isWindowExpanded, expandWindow, contractWindow],
+  );
 
   if (status == null || status.activatedContents == null) {
     return <></>;
   }
 
-  const { isOpened } = status;
-
   return (
-    <Modal
-      size="xl"
-      isOpen={isOpened}
-      toggle={close}
-      data-testid="page-accessories-modal"
-      className={`grw-page-accessories-modal ${styles['grw-page-accessories-modal']} ${isWindowExpanded ? 'grw-modal-expanded' : ''} `}
-    >
-      <ModalHeader className={isDeviceLargerThanLg ? 'p-0' : ''} toggle={close} close={buttons}>
+    <>
+      <ModalHeader
+        className={isDeviceLargerThanLg ? 'p-0' : ''}
+        toggle={close}
+        close={buttons}
+      >
         {isDeviceLargerThanLg && (
           <CustomNavTab
             activeTab={status.activatedContents}
@@ -117,9 +167,40 @@ export const PageAccessoriesModal = (): JSX.Element => {
         <CustomTabContent
           activeTab={status.activatedContents}
           navTabMapping={navTabMapping}
-          additionalClassNames={!isDeviceLargerThanLg ? ['grw-tab-content-style-md-down'] : undefined}
+          additionalClassNames={
+            !isDeviceLargerThanLg
+              ? ['grw-tab-content-style-md-down']
+              : undefined
+          }
         />
       </ModalBody>
+    </>
+  );
+};
+
+export const PageAccessoriesModal = (): JSX.Element => {
+  const status = usePageAccessoriesModalStatus();
+  const { close } = usePageAccessoriesModalActions();
+  const [isWindowExpanded, setIsWindowExpanded] = useState(false);
+
+  if (status == null) {
+    return <></>;
+  }
+
+  return (
+    <Modal
+      size="xl"
+      isOpen={status.isOpened}
+      toggle={close}
+      data-testid="page-accessories-modal"
+      className={`grw-page-accessories-modal ${styles['grw-page-accessories-modal']} ${isWindowExpanded ? 'grw-modal-expanded' : ''} `}
+    >
+      {status.isOpened && (
+        <PageAccessoriesModalSubstance
+          isWindowExpanded={isWindowExpanded}
+          setIsWindowExpanded={setIsWindowExpanded}
+        />
+      )}
     </Modal>
   );
 };

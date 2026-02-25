@@ -6,14 +6,19 @@ import loggerFactory from '~/utils/logger';
 const logger = loggerFactory('growi:middlewares:ApiV3FormValidator');
 const { validationResult } = require('express-validator');
 
-export const apiV3FormValidator = (req: Request, res: Response & { apiv3Err }, next: NextFunction): void => {
+export const apiV3FormValidator = (
+  req: Request,
+  res: Response & { apiv3Err },
+  next: NextFunction,
+): void => {
   logger.debug('req.query', req.query);
   logger.debug('req.params', req.params);
   logger.debug('req.body', req.body);
 
   const errObjArray = validationResult(req);
   if (errObjArray.isEmpty()) {
-    return next();
+    next();
+    return;
   }
 
   const errs = errObjArray.array().map((err) => {
@@ -21,5 +26,5 @@ export const apiV3FormValidator = (req: Request, res: Response & { apiv3Err }, n
     return new ErrorV3(`${err.param}: ${err.msg}`, 'validation_failed');
   });
 
-  return res.apiv3Err(errs);
+  res.apiv3Err(errs);
 };

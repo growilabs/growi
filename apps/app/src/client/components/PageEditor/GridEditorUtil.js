@@ -2,7 +2,6 @@
  * Utility for grid editor
  */
 class GridEditorUtil {
-
   constructor() {
     // https://regex101.com/r/7BN2fR/11
     this.lineBeginPartOfGridRE = /^:::(\s.*)editable-row$/;
@@ -10,19 +9,42 @@ class GridEditorUtil {
     this.mappingAllGridDivisionPatterns = [
       {
         numberOfGridDivisions: 2,
-        mapping: [[2, 10], [4, 8], [6, 6], [8, 4], [10, 2]],
+        mapping: [
+          [2, 10],
+          [4, 8],
+          [6, 6],
+          [8, 4],
+          [10, 2],
+        ],
       },
       {
         numberOfGridDivisions: 3,
-        mapping: [[2, 5, 5], [5, 2, 5], [5, 5, 2], [4, 4, 4], [3, 3, 6], [3, 6, 3], [6, 3, 3]],
+        mapping: [
+          [2, 5, 5],
+          [5, 2, 5],
+          [5, 5, 2],
+          [4, 4, 4],
+          [3, 3, 6],
+          [3, 6, 3],
+          [6, 3, 3],
+        ],
       },
       {
         numberOfGridDivisions: 4,
-        mapping: [[2, 2, 4, 4], [4, 4, 2, 2], [2, 4, 2, 4], [4, 2, 4, 2], [3, 3, 3, 3], [2, 2, 2, 6], [6, 2, 2, 2]],
+        mapping: [
+          [2, 2, 4, 4],
+          [4, 4, 2, 2],
+          [2, 4, 2, 4],
+          [4, 2, 4, 2],
+          [3, 3, 3, 3],
+          [2, 2, 2, 6],
+          [6, 2, 2, 2],
+        ],
       },
     ];
     this.isInGridBlock = this.isInGridBlock.bind(this);
-    this.replaceGridWithHtmlWithEditor = this.replaceGridWithHtmlWithEditor.bind(this);
+    this.replaceGridWithHtmlWithEditor =
+      this.replaceGridWithHtmlWithEditor.bind(this);
   }
 
   /**
@@ -34,7 +56,7 @@ class GridEditorUtil {
     if (bog === null || eog === null) {
       return false;
     }
-    return (JSON.stringify(bog) !== JSON.stringify(eog));
+    return JSON.stringify(bog) !== JSON.stringify(eog);
   }
 
   /**
@@ -98,7 +120,10 @@ class GridEditorUtil {
     const lastLine = editor.getDoc().lastLine();
 
     if (this.lineEndPartOfGridRE.test(editor.getDoc().getLine(curPos.line))) {
-      return { line: curPos.line, ch: editor.getDoc().getLine(curPos.line).length };
+      return {
+        line: curPos.line,
+        ch: editor.getDoc().getLine(curPos.line).length,
+      };
     }
 
     let line = curPos.line + 1;
@@ -147,7 +172,6 @@ class GridEditorUtil {
     });
     return cols.join('\n');
   }
-
 }
 
 // singleton pattern

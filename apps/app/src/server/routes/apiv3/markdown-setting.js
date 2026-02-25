@@ -4,6 +4,8 @@ import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
@@ -31,7 +33,6 @@ const validator = {
     body('attrWhitelist').isString(),
   ],
 };
-
 
 /**
  * @swagger
@@ -121,11 +122,11 @@ const validator = {
  */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(crowi);
-  const adminRequired = require('../../middlewares/admin-required')(crowi);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   /**
    * @swagger
@@ -148,20 +149,42 @@ module.exports = (crowi) => {
    *                      description: markdown params
    *                      $ref: '#/components/schemas/MarkdownParams'
    */
-  router.get('/', accessTokenParser([SCOPE.READ.ADMIN.MARKDOWN]), loginRequiredStrictly, adminRequired, async(req, res) => {
-    const markdownParams = {
-      isEnabledLinebreaks: await crowi.configManager.getConfig('markdown:isEnabledLinebreaks'),
-      isEnabledLinebreaksInComments: await crowi.configManager.getConfig('markdown:isEnabledLinebreaksInComments'),
-      adminPreferredIndentSize: await crowi.configManager.getConfig('markdown:adminPreferredIndentSize'),
-      isIndentSizeForced: await crowi.configManager.getConfig('markdown:isIndentSizeForced'),
-      isEnabledXss: await crowi.configManager.getConfig('markdown:rehypeSanitize:isEnabledPrevention'),
-      xssOption: await crowi.configManager.getConfig('markdown:rehypeSanitize:option'),
-      tagWhitelist: await crowi.configManager.getConfig('markdown:rehypeSanitize:tagNames'),
-      attrWhitelist: await crowi.configManager.getConfig('markdown:rehypeSanitize:attributes'),
-    };
+  router.get(
+    '/',
+    accessTokenParser([SCOPE.READ.ADMIN.MARKDOWN]),
+    loginRequiredStrictly,
+    adminRequired,
+    async (req, res) => {
+      const markdownParams = {
+        isEnabledLinebreaks: await crowi.configManager.getConfig(
+          'markdown:isEnabledLinebreaks',
+        ),
+        isEnabledLinebreaksInComments: await crowi.configManager.getConfig(
+          'markdown:isEnabledLinebreaksInComments',
+        ),
+        adminPreferredIndentSize: await crowi.configManager.getConfig(
+          'markdown:adminPreferredIndentSize',
+        ),
+        isIndentSizeForced: await crowi.configManager.getConfig(
+          'markdown:isIndentSizeForced',
+        ),
+        isEnabledXss: await crowi.configManager.getConfig(
+          'markdown:rehypeSanitize:isEnabledPrevention',
+        ),
+        xssOption: await crowi.configManager.getConfig(
+          'markdown:rehypeSanitize:option',
+        ),
+        tagWhitelist: await crowi.configManager.getConfig(
+          'markdown:rehypeSanitize:tagNames',
+        ),
+        attrWhitelist: await crowi.configManager.getConfig(
+          'markdown:rehypeSanitize:attributes',
+        ),
+      };
 
-    return res.apiv3({ markdownParams });
-  });
+      return res.apiv3({ markdownParams });
+    },
+  );
 
   /**
    * @swagger
@@ -190,33 +213,45 @@ module.exports = (crowi) => {
    *                      type: object
    *                      $ref: '#/components/schemas/LineBreakParams'
    */
-  router.put('/lineBreak', accessTokenParser([SCOPE.WRITE.ADMIN.MARKDOWN]),
-    loginRequiredStrictly, adminRequired, addActivity, validator.lineBreak, apiV3FormValidator, async(req, res) => {
-
+  router.put(
+    '/lineBreak',
+    accessTokenParser([SCOPE.WRITE.ADMIN.MARKDOWN]),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    validator.lineBreak,
+    apiV3FormValidator,
+    async (req, res) => {
       const requestLineBreakParams = {
         'markdown:isEnabledLinebreaks': req.body.isEnabledLinebreaks,
-        'markdown:isEnabledLinebreaksInComments': req.body.isEnabledLinebreaksInComments,
+        'markdown:isEnabledLinebreaksInComments':
+          req.body.isEnabledLinebreaksInComments,
       };
 
       try {
         await configManager.updateConfigs(requestLineBreakParams);
         const lineBreaksParams = {
-          isEnabledLinebreaks: await crowi.configManager.getConfig('markdown:isEnabledLinebreaks'),
-          isEnabledLinebreaksInComments: await crowi.configManager.getConfig('markdown:isEnabledLinebreaksInComments'),
+          isEnabledLinebreaks: await crowi.configManager.getConfig(
+            'markdown:isEnabledLinebreaks',
+          ),
+          isEnabledLinebreaksInComments: await crowi.configManager.getConfig(
+            'markdown:isEnabledLinebreaksInComments',
+          ),
         };
 
-        const parameters = { action: SupportedAction.ACTION_ADMIN_MARKDOWN_LINE_BREAK_UPDATE };
+        const parameters = {
+          action: SupportedAction.ACTION_ADMIN_MARKDOWN_LINE_BREAK_UPDATE,
+        };
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
         return res.apiv3({ lineBreaksParams });
-      }
-      catch (err) {
+      } catch (err) {
         const msg = 'Error occurred in updating lineBreak';
         logger.error('Error', err);
         return res.apiv3Err(new ErrorV3(msg, 'update-lineBreak-failed'));
       }
-
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -246,9 +281,15 @@ module.exports = (crowi) => {
    *                      description: indent params
    *                      $ref: '#/components/schemas/IndentParams'
    */
-  router.put('/indent', accessTokenParser([SCOPE.WRITE.ADMIN.MARKDOWN]),
-    loginRequiredStrictly, adminRequired, addActivity, validator.indent, apiV3FormValidator, async(req, res) => {
-
+  router.put(
+    '/indent',
+    accessTokenParser([SCOPE.WRITE.ADMIN.MARKDOWN]),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    validator.indent,
+    apiV3FormValidator,
+    async (req, res) => {
       const requestIndentParams = {
         'markdown:adminPreferredIndentSize': req.body.adminPreferredIndentSize,
         'markdown:isIndentSizeForced': req.body.isIndentSizeForced,
@@ -257,22 +298,27 @@ module.exports = (crowi) => {
       try {
         await configManager.updateConfigs(requestIndentParams);
         const indentParams = {
-          adminPreferredIndentSize: await crowi.configManager.getConfig('markdown:adminPreferredIndentSize'),
-          isIndentSizeForced: await crowi.configManager.getConfig('markdown:isIndentSizeForced'),
+          adminPreferredIndentSize: await crowi.configManager.getConfig(
+            'markdown:adminPreferredIndentSize',
+          ),
+          isIndentSizeForced: await crowi.configManager.getConfig(
+            'markdown:isIndentSizeForced',
+          ),
         };
 
-        const parameters = { action: SupportedAction.ACTION_ADMIN_MARKDOWN_INDENT_UPDATE };
+        const parameters = {
+          action: SupportedAction.ACTION_ADMIN_MARKDOWN_INDENT_UPDATE,
+        };
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
         return res.apiv3({ indentParams });
-      }
-      catch (err) {
+      } catch (err) {
         const msg = 'Error occurred in updating indent';
         logger.error('Error', err);
         return res.apiv3Err(new ErrorV3(msg, 'update-indent-failed'));
       }
-
-    });
+    },
+  );
 
   /**
    * @swagger
@@ -298,16 +344,22 @@ module.exports = (crowi) => {
    *                schema:
    *                  $ref: '#/components/schemas/XssParams'
    */
-  router.put('/xss', accessTokenParser([SCOPE.WRITE.ADMIN.MARKDOWN]),
-    loginRequiredStrictly, adminRequired, addActivity, validator.xssSetting, apiV3FormValidator, async(req, res) => {
+  router.put(
+    '/xss',
+    accessTokenParser([SCOPE.WRITE.ADMIN.MARKDOWN]),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    validator.xssSetting,
+    apiV3FormValidator,
+    async (req, res) => {
       if (req.body.isEnabledXss && req.body.xssOption == null) {
         return res.apiv3Err(new ErrorV3('xss option is required'));
       }
 
       try {
         JSON.parse(req.body.attrWhitelist);
-      }
-      catch (err) {
+      } catch (err) {
         const msg = 'Error occurred in updating xss';
         logger.error('Error', err);
         return res.apiv3Err(new ErrorV3(msg, 'update-xss-failed'));
@@ -323,24 +375,33 @@ module.exports = (crowi) => {
       try {
         await configManager.updateConfigs(reqestXssParams);
         const xssParams = {
-          isEnabledXss: await crowi.configManager.getConfig('markdown:rehypeSanitize:isEnabledPrevention'),
-          xssOption: await crowi.configManager.getConfig('markdown:rehypeSanitize:option'),
-          tagWhitelist: await crowi.configManager.getConfig('markdown:rehypeSanitize:tagNames'),
-          attrWhitelist: await crowi.configManager.getConfig('markdown:rehypeSanitize:attributes'),
+          isEnabledXss: await crowi.configManager.getConfig(
+            'markdown:rehypeSanitize:isEnabledPrevention',
+          ),
+          xssOption: await crowi.configManager.getConfig(
+            'markdown:rehypeSanitize:option',
+          ),
+          tagWhitelist: await crowi.configManager.getConfig(
+            'markdown:rehypeSanitize:tagNames',
+          ),
+          attrWhitelist: await crowi.configManager.getConfig(
+            'markdown:rehypeSanitize:attributes',
+          ),
         };
 
-        const parameters = { action: SupportedAction.ACTION_ADMIN_MARKDOWN_XSS_UPDATE };
+        const parameters = {
+          action: SupportedAction.ACTION_ADMIN_MARKDOWN_XSS_UPDATE,
+        };
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
         return res.apiv3({ xssParams });
-      }
-      catch (err) {
+      } catch (err) {
         const msg = 'Error occurred in updating xss';
         logger.error('Error', err);
         return res.apiv3Err(new ErrorV3(msg, 'update-xss-failed'));
       }
-
-    });
+    },
+  );
 
   return router;
 };

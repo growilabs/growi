@@ -1,12 +1,12 @@
 import React, { type JSX, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useSWRMUTxCurrentPage, useSWRxCurrentPage } from '~/stores/page';
+import { useCurrentPageData, useFetchCurrentPage } from '~/states/page';
 
 export const WipPageAlert = (): JSX.Element => {
   const { t } = useTranslation();
-  const { data: currentPage } = useSWRxCurrentPage();
-  const { trigger: mutateCurrentPage } = useSWRMUTxCurrentPage();
+  const currentPage = useCurrentPageData();
+  const { fetchCurrentPage } = useFetchCurrentPage();
 
   const clickPagePublishButton = useCallback(async () => {
     const pageId = currentPage?._id;
@@ -16,11 +16,12 @@ export const WipPageAlert = (): JSX.Element => {
     }
 
     try {
+      // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
       const publish = (await import('~/client/services/page-operation'))
         .publish;
       await publish(pageId);
 
-      await mutateCurrentPage();
+      await fetchCurrentPage({ force: true });
 
       const mutatePageTree = (await import('~/stores/page-listing'))
         .mutatePageTree;
@@ -30,13 +31,15 @@ export const WipPageAlert = (): JSX.Element => {
         .mutateRecentlyUpdated;
       await mutateRecentlyUpdated();
 
+      // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
       const toastSuccess = (await import('~/client/util/toastr')).toastSuccess;
       toastSuccess(t('wip_page.success_publish_page'));
     } catch {
+      // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
       const toastError = (await import('~/client/util/toastr')).toastError;
       toastError(t('wip_page.fail_publish_page'));
     }
-  }, [currentPage?._id, mutateCurrentPage, t]);
+  }, [currentPage?._id, fetchCurrentPage, t]);
 
   if (!currentPage?.wip) {
     return <></>;

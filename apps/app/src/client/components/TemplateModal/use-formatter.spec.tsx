@@ -1,21 +1,19 @@
-import { useFormatter } from './use-formatter';
+import { renderHook } from '@testing-library/react';
 
+import { useFormatter } from './use-formatter';
 
 const mocks = vi.hoisted(() => {
   return {
-    useCurrentPagePathMock: vi.fn(() => { return {} }),
+    useCurrentPagePathMock: vi.fn<() => string | undefined>(() => undefined),
   };
 });
 
-vi.mock('~/stores/page', () => {
+vi.mock('~/states/page', () => {
   return { useCurrentPagePath: mocks.useCurrentPagePathMock };
 });
 
-
 describe('useFormatter', () => {
-
   describe('format()', () => {
-
     it('returns an empty string when the argument is undefined', () => {
       // setup
       const mastacheMock = {
@@ -24,7 +22,8 @@ describe('useFormatter', () => {
       vi.doMock('mustache', () => mastacheMock);
 
       // when
-      const { format } = useFormatter();
+      const { result } = renderHook(() => useFormatter());
+      const { format } = result.current;
       // call with undefined
       const markdown = format(undefined);
 
@@ -32,18 +31,20 @@ describe('useFormatter', () => {
       expect(markdown).toBe('');
       expect(mastacheMock.render).not.toHaveBeenCalled();
     });
-
   });
 
   it('returns markdown as-is when mustache.render throws an error', () => {
     // setup
     const mastacheMock = {
-      render: vi.fn(() => { throw new Error() }),
+      render: vi.fn(() => {
+        throw new Error();
+      }),
     };
     vi.doMock('mustache', () => mastacheMock);
 
     // when
-    const { format } = useFormatter();
+    const { result } = renderHook(() => useFormatter());
+    const { format } = result.current;
     const markdown = 'markdown body';
     const formatted = format(markdown);
 
@@ -53,7 +54,8 @@ describe('useFormatter', () => {
 
   it('returns markdown formatted when currentPagePath is undefined', () => {
     // when
-    const { format } = useFormatter();
+    const { result } = renderHook(() => useFormatter());
+    const { format } = result.current;
     const markdown = `
 title: {{{title}}}{{^title}}(empty){{/title}}
 path: {{{path}}}
@@ -69,14 +71,13 @@ path: /
 
   it('returns markdown formatted', () => {
     // setup
-    mocks.useCurrentPagePathMock.mockImplementation(() => {
-      return { data: '/Sandbox' };
-    });
+    mocks.useCurrentPagePathMock.mockReturnValue('/Sandbox');
     // 2023/5/31 15:01:xx
     vi.setSystemTime(new Date(2023, 4, 31, 15, 1));
 
     // when
-    const { format } = useFormatter();
+    const { result } = renderHook(() => useFormatter());
+    const { format } = result.current;
     const markdown = `
 title: {{{title}}}
 path: {{{path}}}
@@ -91,5 +92,4 @@ path: /Sandbox
 date: 2023/05/31 15:01
 `);
   });
-
 });

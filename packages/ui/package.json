@@ -32,9 +32,9 @@
     "clean": "shx rm -rf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
-    "lint:js": "biome check",
+    "lint:biome": "biome check",
     "lint:styles": "stylelint \"./scss/**/*\"",
-    "lint:typecheck": "vue-tsc --noEmit",
+    "lint:typecheck": "tsgo --noEmit",
     "lint": "npm-run-all -p lint:*"
   },
   "dependencies": {},

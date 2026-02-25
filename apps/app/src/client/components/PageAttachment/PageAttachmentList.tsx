@@ -1,22 +1,20 @@
 import React, { type JSX } from 'react';
-
 import type { IAttachmentHasId } from '@growi/core';
 import { Attachment } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 
 type Props = {
-  attachments: (IAttachmentHasId)[],
-  inUse: { [id: string]: boolean },
-  onAttachmentDeleteClicked: (attachment: IAttachmentHasId) => void,
-  isUserLoggedIn?: boolean,
-}
+  attachments: IAttachmentHasId[];
+  inUse: { [id: string]: boolean };
+  onAttachmentDeleteClicked: (attachment: IAttachmentHasId) => void;
+  isUserLoggedIn?: boolean;
+};
 
 export const PageAttachmentList = (props: Props): JSX.Element => {
   const { t } = useTranslation();
 
-  const {
-    attachments, inUse, onAttachmentDeleteClicked, isUserLoggedIn,
-  } = props;
+  const { attachments, inUse, onAttachmentDeleteClicked, isUserLoggedIn } =
+    props;
 
   if (attachments.length === 0) {
     return <>{t('No_attachments_yet')}</>;
@@ -39,5 +37,4 @@ export const PageAttachmentList = (props: Props): JSX.Element => {
       </ul>
     </div>
   );
-
 };

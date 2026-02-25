@@ -1,0 +1,1 @@
+export { DrawioModalLazyLoaded } from './dynamic';

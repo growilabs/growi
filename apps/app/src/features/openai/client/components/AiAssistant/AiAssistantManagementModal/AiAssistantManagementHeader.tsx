@@ -4,8 +4,8 @@ import { ModalHeader } from 'reactstrap';
 
 import {
   AiAssistantManagementModalPageMode,
-  useAiAssistantManagementModal,
-} from '../../../stores/ai-assistant';
+  useAiAssistantManagementModalActions,
+} from '../../../states/modal/ai-assistant-management';
 
 type Props = {
   labelTranslationKey: string;
@@ -23,7 +23,7 @@ export const AiAssistantManagementHeader = (props: Props): JSX.Element => {
   } = props;
 
   const { t } = useTranslation();
-  const { close, changePageMode } = useAiAssistantManagementModal();
+  const { close, changePageMode } = useAiAssistantManagementModalActions();
 
   return (
     <ModalHeader

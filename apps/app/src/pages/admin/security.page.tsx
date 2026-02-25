@@ -1,142 +1,108 @@
-import { useEffect, useMemo } from 'react';
-import type {
-  GetServerSideProps,
-  GetServerSidePropsContext,
-  NextPage,
-} from 'next';
+import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
-import Head from 'next/head';
-import { useTranslation } from 'next-i18next';
-import type { Container } from 'unstated';
-import { Provider } from 'unstated';
+import { useHydrateAtoms } from 'jotai/utils';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { CommonProps } from '~/pages/utils/commons';
-import { generateCustomTitle } from '~/pages/utils/commons';
+import { _atomsForAdminPagesHydration as atoms } from '~/states/global';
+import { isMailerSetupAtom } from '~/states/server-configurations';
+
+import type { NextPageWithLayout } from '../_app.page';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+import type { AdminCommonProps } from './_shared';
 import {
-  useCurrentUser,
-  useIsMailerSetup,
-  useSiteUrl,
-} from '~/stores-universal/context';
+  createAdminPageLayout,
+  getServerSideAdminCommonProps,
+} from './_shared';
 
-import { retrieveServerSideProps } from '../../utils/admin-page-util';
-
-const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), {
-  ssr: false,
-});
 const SecurityManagement = dynamic(
+  // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
   () => import('~/client/components/Admin/Security/SecurityManagement'),
   { ssr: false },
 );
-const ForbiddenPage = dynamic(
-  () =>
-    import('~/client/components/Admin/ForbiddenPage').then(
-      (mod) => mod.ForbiddenPage,
-    ),
-  { ssr: false },
-);
 
-type Props = CommonProps & {
+type ExtraProps = {
   isMailerSetup: boolean;
-  siteUrl: string;
 };
+type Props = AdminCommonProps & ExtraProps;
 
-const AdminSecuritySettingsPage: NextPage<Props> = (props) => {
-  const { t } = useTranslation('admin');
-  useCurrentUser(props.currentUser ?? null);
-  useSiteUrl(props.siteUrl);
-  useIsMailerSetup(props.isMailerSetup);
-
-  const componentTitle = t('security_settings.security_settings');
-  const pageTitle = generateCustomTitle(props, componentTitle);
-
-  const adminSecurityContainers: Container<any>[] = useMemo(() => [], []);
-
-  useEffect(() => {
-    (async () => {
-      const AdminGeneralSecurityContainer = (
-        await import('~/client/services/AdminGeneralSecurityContainer')
-      ).default;
-      const adminGeneralSecurityContainer = new AdminGeneralSecurityContainer();
-
-      const AdminLocalSecurityContainer = (
-        await import('~/client/services/AdminLocalSecurityContainer')
-      ).default;
-      const adminLocalSecurityContainer = new AdminLocalSecurityContainer();
-
-      const AdminLdapSecurityContainer = (
-        await import('~/client/services/AdminLdapSecurityContainer')
-      ).default;
-      const adminLdapSecurityContainer = new AdminLdapSecurityContainer();
-
-      const AdminSamlSecurityContainer = (
-        await import('~/client/services/AdminSamlSecurityContainer')
-      ).default;
-      const adminSamlSecurityContainer = new AdminSamlSecurityContainer();
-
-      const AdminOidcSecurityContainer = (
-        await import('~/client/services/AdminOidcSecurityContainer')
-      ).default;
-      const adminOidcSecurityContainer = new AdminOidcSecurityContainer();
-
-      const AdminGoogleSecurityContainer = (
-        await import('~/client/services/AdminGoogleSecurityContainer')
-      ).default;
-      const adminGoogleSecurityContainer = new AdminGoogleSecurityContainer();
-
-      const AdminGitHubSecurityContainer = (
-        await import('~/client/services/AdminGitHubSecurityContainer')
-      ).default;
-      const adminGitHubSecurityContainer = new AdminGitHubSecurityContainer();
-
-      adminSecurityContainers.push(
-        adminGeneralSecurityContainer,
-        adminLocalSecurityContainer,
-        adminLdapSecurityContainer,
-        adminSamlSecurityContainer,
-        adminOidcSecurityContainer,
-        adminGoogleSecurityContainer,
-        adminGitHubSecurityContainer,
-      );
-    })();
-  }, [adminSecurityContainers]);
-
-  if (props.isAccessDeniedForNonAdminUser) {
-    return <ForbiddenPage />;
-  }
-
-  return (
-    <Provider inject={[...adminSecurityContainers]}>
-      <AdminLayout componentTitle={componentTitle}>
-        <Head>
-          <title>{pageTitle}</title>
-        </Head>
-        <SecurityManagement />
-      </AdminLayout>
-    </Provider>
+const AdminSecuritySettingsPage: NextPageWithLayout<Props> = (props: Props) => {
+  // hydrate
+  useHydrateAtoms(
+    [
+      [isMailerSetupAtom, props.isMailerSetup],
+      [atoms.siteUrlWithEmptyValueWarnAtom, props.siteUrlWithEmptyValueWarn],
+    ],
+    { dangerouslyForceHydrate: true },
   );
+
+  return <SecurityManagement />;
 };
 
-const injectServerConfigurations = async (
-  context: GetServerSidePropsContext,
-  props: Props,
-): Promise<void> => {
-  const req: CrowiRequest = context.req as CrowiRequest;
-  const { crowi } = req;
-  const { growiInfoService, mailService } = crowi;
+// biome-ignore-start lint/style/noRestrictedImports: no-problem dynamic import
+AdminSecuritySettingsPage.getLayout = createAdminPageLayout<Props>({
+  title: (_p, t) => t('security_settings.security_settings'),
+  containerFactories: [
+    async () => {
+      const { default: C } = await import(
+        '~/client/services/AdminGeneralSecurityContainer'
+      );
+      return new C();
+    },
+    async () => {
+      const { default: C } = await import(
+        '~/client/services/AdminLocalSecurityContainer'
+      );
+      return new C();
+    },
+    async () => {
+      const { default: C } = await import(
+        '~/client/services/AdminLdapSecurityContainer'
+      );
+      return new C();
+    },
+    async () => {
+      const { default: C } = await import(
+        '~/client/services/AdminSamlSecurityContainer'
+      );
+      return new C();
+    },
+    async () => {
+      const { default: C } = await import(
+        '~/client/services/AdminOidcSecurityContainer'
+      );
+      return new C();
+    },
+    async () => {
+      const { default: C } = await import(
+        '~/client/services/AdminGoogleSecurityContainer'
+      );
+      return new C();
+    },
+    async () => {
+      const { default: C } = await import(
+        '~/client/services/AdminGitHubSecurityContainer'
+      );
+      return new C();
+    },
+  ],
+});
+// biome-ignore-end lint/style/noRestrictedImports: no-problem dynamic import
 
-  props.siteUrl = growiInfoService.getSiteUrl();
-  props.isMailerSetup = mailService.isMailerSetup;
-};
-
-export const getServerSideProps: GetServerSideProps = async (
+export const getServerSideProps: GetServerSideProps<Props> = async (
   context: GetServerSidePropsContext,
 ) => {
-  const props = await retrieveServerSideProps(
-    context,
-    injectServerConfigurations,
-  );
-  return props;
+  const commonResult = await getServerSideAdminCommonProps(context);
+
+  const req: CrowiRequest = context.req as CrowiRequest;
+  const { crowi } = req;
+  const { mailService } = crowi;
+  const extraProps = {
+    props: {
+      isMailerSetup: mailService.isMailerSetup,
+    },
+  } satisfies { props: ExtraProps };
+
+  return mergeGetServerSidePropsResults(commonResult, extraProps);
 };
 
 export default AdminSecuritySettingsPage;

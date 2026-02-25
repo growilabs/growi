@@ -1,2 +1,2 @@
-export * from './SubmittableInput';
 export * from './AutosizeSubmittableInput';
+export * from './SubmittableInput';

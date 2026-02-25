@@ -1,13 +1,14 @@
-import React, {
+import {
   type JSX,
+  memo,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
-  useState,
 } from 'react';
 import dynamic from 'next/dynamic';
-import type { IPagePopulatedToShowRevision } from '@growi/core';
+import { isDeepEquals } from '@growi/core/dist/utils/is-deep-equals';
 import { isUsersHomepage } from '@growi/core/dist/utils/page-path-utils';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 
@@ -15,13 +16,15 @@ import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle';
 import type { RendererConfig } from '~/interfaces/services/renderer';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
 import { generateSSRViewOptions } from '~/services/renderer/renderer';
-import { useIsNotFound, useSWRxCurrentPage } from '~/stores/page';
-import { useViewOptions } from '~/stores/renderer';
 import {
+  useCurrentPageData,
+  useCurrentPageId,
   useIsForbidden,
   useIsIdenticalPath,
   useIsNotCreatable,
-} from '~/stores-universal/context';
+  usePageNotFound,
+} from '~/states/page';
+import { useViewOptions } from '~/stores/renderer';
 
 import { UserInfo } from '../User/UserInfo';
 import { PageAlerts } from './PageAlerts/PageAlerts';
@@ -29,6 +32,7 @@ import { PageContentFooter } from './PageContentFooter';
 import { PageViewLayout } from './PageViewLayout';
 import RevisionRenderer from './RevisionRenderer';
 
+// biome-ignore-start lint/style/noRestrictedImports: no-problem dynamic import
 const NotCreatablePage = dynamic(
   () =>
     import('~/client/components/NotCreatablePage').then(
@@ -82,28 +86,36 @@ const SlideRenderer = dynamic(
     ),
   { ssr: false },
 );
+// biome-ignore-end lint/style/noRestrictedImports: no-problem dynamic import
 
 type Props = {
   pagePath: string;
   rendererConfig: RendererConfig;
-  initialPage?: IPagePopulatedToShowRevision;
   className?: string;
 };
 
-export const PageView = (props: Props): JSX.Element => {
+// Custom comparison function for memo to prevent unnecessary re-renders
+const arePropsEqual = (prevProps: Props, nextProps: Props): boolean =>
+  prevProps.pagePath === nextProps.pagePath &&
+  prevProps.className === nextProps.className &&
+  isDeepEquals(prevProps.rendererConfig, nextProps.rendererConfig);
+
+const PageViewComponent = (props: Props): JSX.Element => {
   const commentsContainerRef = useRef<HTMLDivElement>(null);
 
-  const { pagePath, initialPage, rendererConfig, className } = props;
+  const { pagePath, rendererConfig, className } = props;
 
-  const { data: isIdenticalPathPage } = useIsIdenticalPath();
-  const { data: isForbidden } = useIsForbidden();
-  const { data: isNotCreatable } = useIsNotCreatable();
-  const { data: isNotFoundMeta } = useIsNotFound();
+  const currentPageId = useCurrentPageId();
+  const isIdenticalPathPage = useIsIdenticalPath();
+  const isForbidden = useIsForbidden();
+  const isNotCreatable = useIsNotCreatable();
+  const isNotFoundMeta = usePageNotFound();
 
-  const { data: pageBySWR } = useSWRxCurrentPage();
+  const contentContainerId = useId();
+
+  const page = useCurrentPageData();
   const { data: viewOptions } = useViewOptions();
 
-  const page = pageBySWR ?? initialPage;
   const isNotFound = isNotFoundMeta || page == null;
   const isUsersHomepagePath = isUsersHomepage(pagePath);
 
@@ -114,16 +126,6 @@ export const PageView = (props: Props): JSX.Element => {
     markdown,
     rendererConfig.isEnabledMarp,
   );
-
-  const [currentPageId, setCurrentPageId] = useState<string | undefined>(
-    page?._id,
-  );
-
-  useEffect(() => {
-    if (page?._id !== undefined) {
-      setCurrentPageId(page._id);
-    }
-  }, [page?._id]);
 
   // ***************************  Auto Scroll  ***************************
   useEffect(() => {
@@ -137,9 +139,7 @@ export const PageView = (props: Props): JSX.Element => {
       return;
     }
 
-    const contentContainer = document.getElementById(
-      'page-view-content-container',
-    );
+    const contentContainer = document.getElementById(contentContainerId);
     if (contentContainer == null) return;
 
     const targetId = decodeURIComponent(hash.slice(1));
@@ -160,7 +160,7 @@ export const PageView = (props: Props): JSX.Element => {
     observer.observe(contentContainer, { childList: true, subtree: true });
 
     return () => observer.disconnect();
-  }, [currentPageId]);
+  }, [currentPageId, contentContainerId]);
 
   // *******************************  end  *******************************
 
@@ -241,6 +241,7 @@ export const PageView = (props: Props): JSX.Element => {
     viewOptions,
     isSlide,
     isIdenticalPathPage,
+    page,
   ]);
 
   return (
@@ -259,7 +260,7 @@ export const PageView = (props: Props): JSX.Element => {
           {isUsersHomepagePath && page?.creator != null && (
             <UserInfo author={page.creator} />
           )}
-          <div id="page-view-content-container" className="flex-expand-vert">
+          <div id={contentContainerId} className="flex-expand-vert">
             <Contents />
           </div>
         </>
@@ -267,3 +268,6 @@ export const PageView = (props: Props): JSX.Element => {
     </PageViewLayout>
   );
 };
+
+export const PageView = memo(PageViewComponent, arePropsEqual);
+PageView.displayName = 'PageView';

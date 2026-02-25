@@ -14,7 +14,8 @@ export default (req: Request, res: Response, next: NextFunction): void => {
 
   const errObjArray = validationResult(req);
   if (errObjArray.isEmpty()) {
-    return next();
+    next();
+    return;
   }
 
   const errs = errObjArray.array().map((err) => {

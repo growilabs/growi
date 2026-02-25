@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-
 import { flushSync } from 'react-dom';
 
 export const usePrintMode = (): boolean => {
@@ -7,9 +6,10 @@ export const usePrintMode = (): boolean => {
 
   useEffect(() => {
     // force re-render on beforeprint
-    const handleBeforePrint = () => flushSync(() => {
-      setIsPrinting(true);
-    });
+    const handleBeforePrint = () =>
+      flushSync(() => {
+        setIsPrinting(true);
+      });
 
     const handleAfterPrint = () => {
       setIsPrinting(false);

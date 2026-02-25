@@ -1,9 +1,7 @@
-import {
-  useCallback, useEffect, useRef, useState, type JSX,
-} from 'react';
+import { type JSX, useCallback, useEffect, useRef, useState } from 'react';
 
-import { useSWRxCurrentPage } from '~/stores/page';
-import { usePageControlsX } from '~/stores/ui';
+import { useCurrentPageData } from '~/states/page';
+import { usePageControlsX } from '~/states/ui/page';
 
 import { PagePathHeader } from './PagePathHeader';
 import { PageTitleHeader } from './PageTitleHeader';
@@ -13,9 +11,8 @@ import styles from './PageHeader.module.scss';
 const moduleClass = styles['page-header'] ?? '';
 
 export const PageHeader = (): JSX.Element => {
-
-  const { data: currentPage } = useSWRxCurrentPage();
-  const { data: pageControlsX } = usePageControlsX();
+  const currentPage = useCurrentPageData();
+  const pageControlsX = usePageControlsX();
   const pageHeaderRef = useRef<HTMLDivElement>(null);
 
   const [maxWidth, setMaxWidth] = useState<number>();
@@ -28,7 +25,8 @@ export const PageHeader = (): JSX.Element => {
     }
 
     // PageControls.x - PageHeader.x
-    const maxWidth = pageControlsX - pageHeaderRef.current.getBoundingClientRect().x;
+    const maxWidth =
+      pageControlsX - pageHeaderRef.current.getBoundingClientRect().x;
 
     setMaxWidth(maxWidth);
   }, [pageControlsX]);

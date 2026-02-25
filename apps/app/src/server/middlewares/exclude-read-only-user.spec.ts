@@ -1,20 +1,22 @@
 import { ErrorV3 } from '@growi/core/dist/models';
+import type { NextFunction, Response } from 'express';
+import type { Request } from 'express-validator/src/base';
 
 import { excludeReadOnlyUser } from './exclude-read-only-user';
 
 describe('excludeReadOnlyUser', () => {
-  let req;
-  let res;
-  let next;
+  let req: Request;
+  let res: Response & { apiv3Err: ReturnType<typeof vi.fn> };
+  let next: NextFunction;
 
   beforeEach(() => {
     req = {
       user: {},
-    };
+    } as unknown as Request;
     res = {
       apiv3Err: vi.fn(),
-    };
-    next = vi.fn();
+    } as unknown as Response & { apiv3Err: ReturnType<typeof vi.fn> };
+    next = vi.fn() as unknown as NextFunction;
   });
 
   test('should call next if user is not found', () => {

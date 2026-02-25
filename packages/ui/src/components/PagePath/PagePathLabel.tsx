@@ -48,7 +48,6 @@ export const PagePathLabel: FC<Props> = (props: Props) => {
     );
   } else if (isFormerOnly) {
     textElem = dPagePath.isFormerRoot ? (
-      // biome-ignore lint/complexity/noUselessFragments: ignore
       <>/</>
     ) : (
       <TextElement isHTML={isPathIncludedHtml}>{dPagePath.former}</TextElement>

@@ -4,27 +4,43 @@ import type { ExpressHttpHeader } from '~/server/interfaces/attachment';
 import type { IAttachmentDocument } from '~/server/models/attachment';
 
 import { configManager } from '../../config-manager';
-
 import { defaultContentDispositionSettings } from './security';
 
-type ContentHeaderField = 'Content-Type' | 'Content-Security-Policy' | 'Content-Disposition' | 'Content-Length';
+type ContentHeaderField =
+  | 'Content-Type'
+  | 'Content-Security-Policy'
+  | 'Content-Disposition'
+  | 'Content-Length';
 type ContentHeader = ExpressHttpHeader<ContentHeaderField>;
 
 export const determineDisposition = (
-    fileFormat: string,
+  fileFormat: string,
 ): 'inline' | 'attachment' => {
-  const inlineMimeTypes = configManager.getConfig('attachments:contentDisposition:inlineMimeTypes').inlineMimeTypes;
-  const attachmentMimeTypes = configManager.getConfig('attachments:contentDisposition:attachmentMimeTypes').attachmentMimeTypes;
+  const inlineMimeTypes = configManager.getConfig(
+    'attachments:contentDisposition:inlineMimeTypes',
+  ).inlineMimeTypes;
+  const attachmentMimeTypes = configManager.getConfig(
+    'attachments:contentDisposition:attachmentMimeTypes',
+  ).attachmentMimeTypes;
 
   const normalizedFileFormat = fileFormat.toLowerCase();
 
-  if (attachmentMimeTypes.some(mimeType => mimeType.toLowerCase() === normalizedFileFormat)) {
+  if (
+    attachmentMimeTypes.some(
+      (mimeType) => mimeType.toLowerCase() === normalizedFileFormat,
+    )
+  ) {
     return 'attachment';
   }
-  if (inlineMimeTypes.some(mimeType => mimeType.toLowerCase() === normalizedFileFormat)) {
+  if (
+    inlineMimeTypes.some(
+      (mimeType) => mimeType.toLowerCase() === normalizedFileFormat,
+    )
+  ) {
     return 'inline';
   }
-  const defaultSetting = defaultContentDispositionSettings[normalizedFileFormat];
+  const defaultSetting =
+    defaultContentDispositionSettings[normalizedFileFormat];
   if (defaultSetting != null) {
     return defaultSetting;
   }
@@ -35,7 +51,10 @@ export const determineDisposition = (
  * Factory function to generate content headers.
  * This approach avoids creating a class instance for each call, improving memory efficiency.
  */
-export const createContentHeaders = (attachment: IAttachmentDocument, opts?: { forceAttachment?: boolean }): ContentHeader[] => {
+export const createContentHeaders = (
+  attachment: IAttachmentDocument,
+  opts?: { forceAttachment?: boolean },
+): ContentHeader[] => {
   const headers: ContentHeader[] = [];
 
   // Content-Type
@@ -47,8 +66,8 @@ export const createContentHeaders = (attachment: IAttachmentDocument, opts?: { f
   // Content-Security-Policy
   headers.push({
     field: 'Content-Security-Policy',
-    // eslint-disable-next-line max-len
-    value: "script-src 'unsafe-hashes'; style-src 'self' 'unsafe-inline'; object-src 'none'; require-trusted-types-for 'script'; media-src 'self'; default-src 'none';",
+    value:
+      "script-src 'unsafe-hashes'; style-src 'self' 'unsafe-inline'; object-src 'none'; require-trusted-types-for 'script'; media-src 'self'; default-src 'none';",
   });
 
   // Content-Disposition
@@ -71,27 +90,45 @@ export const createContentHeaders = (attachment: IAttachmentDocument, opts?: { f
   return headers;
 };
 
-export const getContentHeaderValue = (contentHeaders: ContentHeader[], field: ContentHeaderField): string | undefined => {
-  const header = contentHeaders.find(h => h.field === field);
+export const getContentHeaderValue = (
+  contentHeaders: ContentHeader[],
+  field: ContentHeaderField,
+): string | undefined => {
+  const header = contentHeaders.find((h) => h.field === field);
   return header?.value.toString();
 };
 
 /**
  * Convert to ExpressHttpHeader[]
  */
-export function toExpressHttpHeaders(records: Record<string, string | string[]>): ExpressHttpHeader[];
-export function toExpressHttpHeaders(contentHeaders: ContentHeader[]): ExpressHttpHeader[];
-export function toExpressHttpHeaders(arg: Record<string, string | string[]> | ContentHeader[]): ExpressHttpHeader[] {
+export function toExpressHttpHeaders(
+  records: Record<string, string | string[]>,
+): ExpressHttpHeader[];
+export function toExpressHttpHeaders(
+  contentHeaders: ContentHeader[],
+): ExpressHttpHeader[];
+export function toExpressHttpHeaders(
+  arg: Record<string, string | string[]> | ContentHeader[],
+): ExpressHttpHeader[] {
   if (Array.isArray(arg)) {
-    return arg
-      // exclude undefined
-      .filter((member): member is NonNullable<typeof member> => member != null);
+    return (
+      arg
+        // exclude undefined
+        .filter(
+          (member): member is NonNullable<typeof member> => member != null,
+        )
+    );
   }
 
-  return Object.entries(arg).map(([field, value]) => { return { field, value } });
+  return Object.entries(arg).map(([field, value]) => {
+    return { field, value };
+  });
 }
 
-export const applyHeaders = (res: Response, headers: ExpressHttpHeader[]): void => {
+export const applyHeaders = (
+  res: Response,
+  headers: ExpressHttpHeader[],
+): void => {
   headers.forEach((header) => {
     res.header(header.field, header.value);
   });

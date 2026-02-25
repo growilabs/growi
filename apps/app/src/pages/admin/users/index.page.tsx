@@ -1,96 +1,60 @@
-import { useEffect, useMemo } from 'react';
-import type {
-  GetServerSideProps,
-  GetServerSidePropsContext,
-  NextPage,
-} from 'next';
+import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
-import Head from 'next/head';
-import { useTranslation } from 'next-i18next';
-import type { Container } from 'unstated';
-import { Provider } from 'unstated';
+import { useHydrateAtoms } from 'jotai/utils';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { CommonProps } from '~/pages/utils/commons';
-import { generateCustomTitle } from '~/pages/utils/commons';
-import { useCurrentUser, useIsMailerSetup } from '~/stores-universal/context';
+import { isMailerSetupAtom } from '~/states/server-configurations';
 
-import { retrieveServerSideProps } from '../../../utils/admin-page-util';
+import type { NextPageWithLayout } from '../../_app.page';
+import { mergeGetServerSidePropsResults } from '../../utils/server-side-props';
+import type { AdminCommonProps } from '../_shared';
+import {
+  createAdminPageLayout,
+  getServerSideAdminCommonProps,
+} from '../_shared';
 
-const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), {
-  ssr: false,
-});
 const UserManagement = dynamic(
+  // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
   () => import('~/client/components/Admin/UserManagement'),
   { ssr: false },
 );
-const ForbiddenPage = dynamic(
-  () =>
-    import('~/client/components/Admin/ForbiddenPage').then(
-      (mod) => mod.ForbiddenPage,
-    ),
-  { ssr: false },
-);
 
-type Props = CommonProps & {
-  isMailerSetup: boolean;
+type PageProps = { isMailerSetup: boolean };
+type Props = AdminCommonProps & PageProps;
+
+const AdminUserManagementPage: NextPageWithLayout<Props> = (props: Props) => {
+  // hydrate
+  useHydrateAtoms([[isMailerSetupAtom, props.isMailerSetup]], {
+    dangerouslyForceHydrate: true,
+  });
+  return <UserManagement />;
 };
 
-const AdminUserManagementPage: NextPage<Props> = (props) => {
-  const { t } = useTranslation('admin');
-  useCurrentUser(props.currentUser ?? null);
-  useIsMailerSetup(props.isMailerSetup);
+AdminUserManagementPage.getLayout = createAdminPageLayout<Props>({
+  title: (_p, t) => t('user_management.user_management'),
+  containerFactories: [
+    async () => {
+      const AdminUsersContainer =
+        // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
+        (await import('~/client/services/AdminUsersContainer')).default;
+      return new AdminUsersContainer();
+    },
+  ],
+});
 
-  const title = t('user_management.user_management');
-  const headTitle = generateCustomTitle(props, title);
-
-  const injectableContainers: Container<any>[] = useMemo(() => [], []);
-
-  useEffect(() => {
-    (async () => {
-      const AdminUsersContainer = (
-        await import('~/client/services/AdminUsersContainer')
-      ).default;
-      const adminUsersContainer = new AdminUsersContainer();
-      injectableContainers.push(adminUsersContainer);
-    })();
-  }, [injectableContainers]);
-
-  if (props.isAccessDeniedForNonAdminUser) {
-    return <ForbiddenPage />;
-  }
-
-  return (
-    <Provider inject={[...injectableContainers]}>
-      <AdminLayout componentTitle={title}>
-        <Head>
-          <title>{headTitle}</title>
-        </Head>
-        <UserManagement />
-      </AdminLayout>
-    </Provider>
-  );
-};
-
-const injectServerConfigurations = async (
+export const getServerSideProps: GetServerSideProps<Props> = async (
   context: GetServerSidePropsContext,
-  props: Props,
-): Promise<void> => {
+) => {
+  const baseResult = await getServerSideAdminCommonProps(context);
+
   const req: CrowiRequest = context.req as CrowiRequest;
   const { crowi } = req;
   const { mailService } = crowi;
 
-  props.isMailerSetup = mailService.isMailerSetup;
-};
-
-export const getServerSideProps: GetServerSideProps = async (
-  context: GetServerSidePropsContext,
-) => {
-  const props = await retrieveServerSideProps(
-    context,
-    injectServerConfigurations,
-  );
-  return props;
+  const fragment = {
+    props: { isMailerSetup: mailService.isMailerSetup },
+  } satisfies { props: PageProps };
+  return mergeGetServerSidePropsResults(baseResult, fragment);
 };
 
 export default AdminUserManagementPage;

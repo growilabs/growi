@@ -1,5 +1,9 @@
 import { ErrorV3 } from '@growi/core/dist/models';
-import { body, validationResult, type ValidationChain } from 'express-validator';
+import {
+  body,
+  type ValidationChain,
+  validationResult,
+} from 'express-validator';
 
 // form rules
 export const registerRules = (minPasswordLength: number): ValidationChain[] => {
@@ -10,7 +14,10 @@ export const registerRules = (minPasswordLength: number): ValidationChain[] => {
       .not()
       .isEmpty()
       .withMessage('message.Username field is required'),
-    body('registerForm.name').not().isEmpty().withMessage('message.Name field is required'),
+    body('registerForm.name')
+      .not()
+      .isEmpty()
+      .withMessage('message.Name field is required'),
     body('registerForm.email')
       .isEmail()
       .withMessage('message.Email format is invalid')
@@ -20,7 +27,14 @@ export const registerRules = (minPasswordLength: number): ValidationChain[] => {
       .matches(/^[\x20-\x7F]*$/)
       .withMessage('message.Password has invalid character')
       .isLength({ min: minPasswordLength })
-      .withMessage(new ErrorV3('message.Password minimum character should be more than n characters', undefined, undefined, { number: minPasswordLength }))
+      .withMessage(
+        new ErrorV3(
+          'message.Password minimum character should be more than n characters',
+          undefined,
+          undefined,
+          { number: minPasswordLength },
+        ),
+      )
       .not()
       .isEmpty()
       .withMessage('message.Password field is required'),
@@ -40,7 +54,7 @@ export const registerValidation = (req, res, next): ValidationChain[] => {
   }
 
   const extractedErrors: string[] = [];
-  errors.array().map(err => extractedErrors.push(err.msg));
+  errors.array().map((err) => extractedErrors.push(err.msg));
 
   Object.assign(form, {
     isValid: false,

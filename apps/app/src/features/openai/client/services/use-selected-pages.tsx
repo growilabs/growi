@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { SelectablePage } from '../../interfaces/selectable-page';
-import { useAiAssistantManagementModal } from '../stores/ai-assistant';
+import { useAiAssistantManagementModalStatus } from '../states/modal/ai-assistant-management';
 
 type UseSelectedPages = {
   selectedPages: Map<string, SelectablePage>;
@@ -17,8 +17,7 @@ export const useSelectedPages = (
   const [selectedPages, setSelectedPages] = useState<
     Map<string, SelectablePage>
   >(new Map());
-  const { data: aiAssistantManagementModalData } =
-    useAiAssistantManagementModal();
+  const aiAssistantManagementModalData = useAiAssistantManagementModalStatus();
 
   const selectedPagesRef = useRef(selectedPages);
 

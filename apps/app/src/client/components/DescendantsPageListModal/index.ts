@@ -1,0 +1,1 @@
+export { DescendantsPageListModalLazyLoaded } from './dynamic';

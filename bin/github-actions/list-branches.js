@@ -1,5 +1,3 @@
-/* eslint-disable no-console */
-
 /*
  * USAGE:
  *  node list-branches [OPTION]
@@ -9,8 +7,8 @@
  *  --illegal : Return illegal named branches
  */
 
-const { execSync } = require('child_process');
-const url = require('url');
+const { execSync } = require('node:child_process');
+const url = require('node:url');
 
 const EXCLUDE_TERM_DAYS = 14;
 const EXCLUDE_PATTERNS = [
@@ -28,7 +26,6 @@ const LEGAL_PATTERNS = [
 const GITHUB_REPOS_URI = 'https://github.com/growilabs/growi/';
 
 class BranchSummary {
-
   constructor(line) {
     const splitted = line.split('\t'); // split with '%09'
 
@@ -37,7 +34,6 @@ class BranchSummary {
     this.branchName = splitted[2].trim().replace(/^origin\//, '');
     this.subject = splitted[3].trim();
   }
-
 }
 
 function getExcludeTermDate() {
@@ -57,10 +53,13 @@ function getBranchSummaries() {
   // parse
   const summaries = out
     .split('\n')
-    .filter(v => v !== '') // trim empty string
-    .map(line => new BranchSummary(line))
-    .filter((summary) => { // exclude branches that matches to patterns
-      return !EXCLUDE_PATTERNS.some(pattern => pattern.test(summary.branchName));
+    .filter((v) => v !== '') // trim empty string
+    .map((line) => new BranchSummary(line))
+    .filter((summary) => {
+      // exclude branches that matches to patterns
+      return !EXCLUDE_PATTERNS.some((pattern) =>
+        pattern.test(summary.branchName),
+      );
     });
 
   return summaries;
@@ -84,12 +83,10 @@ function getGitHubComparingLink(branchName) {
  * @param {BranchSummary} summaries
  */
 function printSlackAttachments(mode, summaries) {
-  const color = (mode === 'illegal') ? 'warning' : '#999999';
+  const color = mode === 'illegal' ? 'warning' : '#999999';
 
   const attachments = summaries.map((summary) => {
-    const {
-      authorName, authorDate, branchName, subject,
-    } = summary;
+    const { authorName, authorDate, branchName, subject } = summary;
 
     return {
       color,
@@ -121,24 +118,25 @@ function printSlackAttachments(mode, summaries) {
   console.log(JSON.stringify(attachments));
 }
 
-async function main(mode) {
+function main(mode) {
   const summaries = getBranchSummaries();
 
   let filteredSummaries;
 
   switch (mode) {
     case 'illegal':
-      filteredSummaries = summaries
-        .filter((summary) => { // exclude branches that matches to patterns
-          return !LEGAL_PATTERNS.some(pattern => pattern.test(summary.branchName));
-        });
+      filteredSummaries = summaries.filter((summary) => {
+        // exclude branches that matches to patterns
+        return !LEGAL_PATTERNS.some((pattern) =>
+          pattern.test(summary.branchName),
+        );
+      });
       break;
     default: {
       const excludeTermDate = getExcludeTermDate();
-      filteredSummaries = summaries
-        .filter((summary) => {
-          return summary.authorDate < excludeTermDate;
-        });
+      filteredSummaries = summaries.filter((summary) => {
+        return summary.authorDate < excludeTermDate;
+      });
       break;
     }
   }

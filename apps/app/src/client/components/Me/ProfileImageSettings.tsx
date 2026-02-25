@@ -1,86 +1,111 @@
-import React, { useCallback, useState, type JSX } from 'react';
-
-
+import React, { type JSX, useCallback, useState } from 'react';
 import { isPopulated } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
 import ImageCropModal from '~/client/components/Common/ImageCropModal';
 import { apiPost, apiPostForm } from '~/client/util/apiv1-client';
 import { apiv3Put } from '~/client/util/apiv3-client';
-import { toastSuccess, toastError } from '~/client/util/toastr';
-import { useCurrentUser } from '~/stores-universal/context';
-import { generateGravatarSrc, GRAVATAR_DEFAULT } from '~/utils/gravatar';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useCurrentUser } from '~/states/global';
+import { GRAVATAR_DEFAULT, generateGravatarSrc } from '~/utils/gravatar';
 
 const DEFAULT_IMAGE = '/images/icons/user.svg';
-
 
 const ProfileImageSettings = (): JSX.Element => {
   const { t } = useTranslation();
 
-  const { data: currentUser } = useCurrentUser();
+  const currentUser = useCurrentUser();
 
-  const [isGravatarEnabled, setGravatarEnabled] = useState(currentUser?.isGravatarEnabled);
+  const [isGravatarEnabled, setGravatarEnabled] = useState(
+    currentUser?.isGravatarEnabled,
+  );
   const [uploadedPictureSrc, setUploadedPictureSrc] = useState(() => {
-    if (currentUser?.imageAttachment != null && isPopulated(currentUser.imageAttachment)) {
+    if (
+      currentUser?.imageAttachment != null &&
+      isPopulated(currentUser.imageAttachment)
+    ) {
       return currentUser.imageAttachment.filePathProxied ?? currentUser.image;
     }
     return currentUser?.image;
   });
 
   const [showImageCropModal, setShowImageCropModal] = useState(false);
-  const [imageCropSrc, setImageCropSrc] = useState<string|ArrayBuffer|null>(null);
+  const [imageCropSrc, setImageCropSrc] = useState<string | ArrayBuffer | null>(
+    null,
+  );
 
-  const selectFileHandler = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files == null || e.target.files.length === 0) {
-      return;
-    }
+  const selectFileHandler = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files == null || e.target.files.length === 0) {
+        return;
+      }
 
-    const reader = new FileReader();
-    reader.addEventListener('load', () => setImageCropSrc(reader.result));
-    reader.readAsDataURL(e.target.files[0]);
+      const reader = new FileReader();
+      reader.addEventListener('load', () => setImageCropSrc(reader.result));
+      reader.readAsDataURL(e.target.files[0]);
 
-    setShowImageCropModal(true);
-  }, []);
+      setShowImageCropModal(true);
+    },
+    [],
+  );
 
-  const processImageCompletedHandler = useCallback(async(croppedImage) => {
-    try {
-      const formData = new FormData();
-      formData.append('file', croppedImage);
-      const response = await apiPostForm('/attachments.uploadProfileImage', formData);
+  const processImageCompletedHandler = useCallback(
+    async (croppedImage) => {
+      try {
+        const formData = new FormData();
+        formData.append('file', croppedImage);
+        const response = await apiPostForm(
+          '/attachments.uploadProfileImage',
+          formData,
+        );
 
-      toastSuccess(t('toaster.update_successed', { target: t('Current Image'), ns: 'commons' }));
+        toastSuccess(
+          t('toaster.update_successed', {
+            target: t('Current Image'),
+            ns: 'commons',
+          }),
+        );
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setUploadedPictureSrc((response as any).attachment.filePathProxied);
+        setUploadedPictureSrc((response as any).attachment.filePathProxied);
+      } catch (err) {
+        toastError(err);
+      }
+    },
+    [t],
+  );
 
-    }
-    catch (err) {
-      toastError(err);
-    }
-  }, [t]);
-
-  const deleteImageHandler = useCallback(async() => {
+  const deleteImageHandler = useCallback(async () => {
     try {
       await apiPost('/attachments.removeProfileImage');
 
       setUploadedPictureSrc(undefined);
-      toastSuccess(t('toaster.update_successed', { target: t('Current Image'), ns: 'commons' }));
-    }
-    catch (err) {
+      toastSuccess(
+        t('toaster.update_successed', {
+          target: t('Current Image'),
+          ns: 'commons',
+        }),
+      );
+    } catch (err) {
       toastError(err);
     }
   }, [t]);
 
-  const submit = useCallback(async() => {
+  const submit = useCallback(async () => {
     try {
-      const response = await apiv3Put('/personal-setting/image-type', { isGravatarEnabled });
+      const response = await apiv3Put('/personal-setting/image-type', {
+        isGravatarEnabled,
+      });
 
       const { userData } = response.data;
       setGravatarEnabled(userData.isGravatarEnabled);
 
-      toastSuccess(t('toaster.update_successed', { target: t('Set Profile Image'), ns: 'commons' }));
-    }
-    catch (err) {
+      toastSuccess(
+        t('toaster.update_successed', {
+          target: t('Set Profile Image'),
+          ns: 'commons',
+        }),
+      );
+    } catch (err) {
       toastError(err);
     }
   }, [isGravatarEnabled, t]);
@@ -104,15 +129,42 @@ const ProfileImageSettings = (): JSX.Element => {
                 checked={isGravatarEnabled}
                 onChange={() => setGravatarEnabled(true)}
               />
-              <label className="form-label form-check-label" htmlFor="radioGravatar">
-                <img src={GRAVATAR_DEFAULT} className="me-1" data-vrt-blackout-profile /> Gravatar
+              <label
+                className="form-label form-check-label"
+                htmlFor="radioGravatar"
+              >
+                <img
+                  src={GRAVATAR_DEFAULT}
+                  alt="Gravatar"
+                  className="me-1"
+                  data-vrt-blackout-profile
+                />{' '}
+                Gravatar
               </label>
-              <a href="https://gravatar.com/" target="_blank" rel="noopener noreferrer">
-                <small><span className="material-symbols-outlined ms-2 text-secondary" aria-hidden="true">info</span></small>
+              <a
+                href="https://gravatar.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <small>
+                  <span
+                    className="material-symbols-outlined ms-2 text-secondary"
+                    aria-hidden="true"
+                  >
+                    info
+                  </span>
+                </small>
               </a>
             </div>
           </h5>
-          <img src={generateGravatarSrc(currentUser.email)} className="rounded-pill" width="64" height="64" data-vrt-blackout-profile />
+          <img
+            src={generateGravatarSrc(currentUser.email)}
+            alt="Gravatar"
+            className="rounded-pill"
+            width="64"
+            height="64"
+            data-vrt-blackout-profile
+          />
         </div>
 
         <div className="col-md-7 mt-5 mt-md-0">
@@ -127,26 +179,44 @@ const ProfileImageSettings = (): JSX.Element => {
                 checked={!isGravatarEnabled}
                 onChange={() => setGravatarEnabled(false)}
               />
-              <label className="form-label form-check-label" htmlFor="radioUploadPicture">
-                { t('Upload Image') }
+              <label
+                className="form-label form-check-label"
+                htmlFor="radioUploadPicture"
+              >
+                {t('Upload Image')}
               </label>
             </div>
           </h5>
           <div className="row mt-3">
-            <label className="col-md-6 col-lg-4 col-form-label text-start">
-              { t('Current Image') }
-            </label>
+            <span className="col-md-6 col-lg-4 col-form-label text-start">
+              {t('Current Image')}
+            </span>
             <div className="col-md-6 col-lg-8">
               <p className="mb-0">
-                <img src={uploadedPictureSrc ?? DEFAULT_IMAGE} width="64" height="64" className="rounded-circle" id="settingUserPicture" />
+                <img
+                  src={uploadedPictureSrc ?? DEFAULT_IMAGE}
+                  alt={t('Current Image')}
+                  width="64"
+                  height="64"
+                  className="rounded-circle"
+                  id="settingUserPicture"
+                />
               </p>
-              {uploadedPictureSrc && <button type="button" className="btn btn-danger mt-2" onClick={deleteImageHandler}>{ t('Delete Image') }</button>}
+              {uploadedPictureSrc && (
+                <button
+                  type="button"
+                  className="btn btn-danger mt-2"
+                  onClick={deleteImageHandler}
+                >
+                  {t('Delete Image')}
+                </button>
+              )}
             </div>
           </div>
           <div className="row align-items-center mt-3 mt-md-5">
-            <label className="col-md-6 col-lg-4 col-form-label text-start mt-3 mt-md-0">
+            <span className="col-md-6 col-lg-4 col-form-label text-start mt-3 mt-md-0">
               {t('Upload new image')}
-            </label>
+            </span>
             <div className="col-md-6 col-lg-8">
               <input
                 type="file"
@@ -175,10 +245,8 @@ const ProfileImageSettings = (): JSX.Element => {
           </button>
         </div>
       </div>
-
     </>
   );
-
 };
 
 export default ProfileImageSettings;

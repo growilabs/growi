@@ -1,17 +1,23 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import type { FileUploadFormValues, FileUploadSettingsData } from './FileUploadSetting.types';
+import type {
+  FileUploadFormValues,
+  FileUploadSettingsData,
+} from './FileUploadSetting.types';
 
 /**
  * Helper function to build settings data (mimics useFileUploadSettings fetchData logic)
  */
-function buildSettingsData(appSettingsParams: Record<string, any>): FileUploadSettingsData {
+function buildSettingsData(
+  appSettingsParams: Record<string, any>,
+): FileUploadSettingsData {
   return {
     // File upload type
     fileUploadType: appSettingsParams.useOnlyEnvVarForFileUploadType
       ? appSettingsParams.envFileUploadType
       : appSettingsParams.fileUploadType,
-    isFixedFileUploadByEnvVar: appSettingsParams.useOnlyEnvVarForFileUploadType || false,
+    isFixedFileUploadByEnvVar:
+      appSettingsParams.useOnlyEnvVarForFileUploadType || false,
     envFileUploadType: appSettingsParams.envFileUploadType,
 
     // AWS S3
@@ -20,13 +26,15 @@ function buildSettingsData(appSettingsParams: Record<string, any>): FileUploadSe
     s3Bucket: appSettingsParams.s3Bucket || '',
     s3AccessKeyId: appSettingsParams.s3AccessKeyId || '',
     s3SecretAccessKey: appSettingsParams.s3SecretAccessKey || '',
-    s3ReferenceFileWithRelayMode: appSettingsParams.s3ReferenceFileWithRelayMode || false,
+    s3ReferenceFileWithRelayMode:
+      appSettingsParams.s3ReferenceFileWithRelayMode || false,
 
     // GCS
     gcsApiKeyJsonPath: appSettingsParams.gcsApiKeyJsonPath || '',
     gcsBucket: appSettingsParams.gcsBucket || '',
     gcsUploadNamespace: appSettingsParams.gcsUploadNamespace || '',
-    gcsReferenceFileWithRelayMode: appSettingsParams.gcsReferenceFileWithRelayMode || false,
+    gcsReferenceFileWithRelayMode:
+      appSettingsParams.gcsReferenceFileWithRelayMode || false,
     gcsUseOnlyEnvVars: appSettingsParams.gcsUseOnlyEnvVars || false,
     envGcsApiKeyJsonPath: appSettingsParams.envGcsApiKeyJsonPath,
     envGcsBucket: appSettingsParams.envGcsBucket,
@@ -37,14 +45,17 @@ function buildSettingsData(appSettingsParams: Record<string, any>): FileUploadSe
     azureClientId: appSettingsParams.azureClientId || '',
     azureClientSecret: appSettingsParams.azureClientSecret || '',
     azureStorageAccountName: appSettingsParams.azureStorageAccountName || '',
-    azureStorageContainerName: appSettingsParams.azureStorageContainerName || '',
-    azureReferenceFileWithRelayMode: appSettingsParams.azureReferenceFileWithRelayMode || false,
+    azureStorageContainerName:
+      appSettingsParams.azureStorageContainerName || '',
+    azureReferenceFileWithRelayMode:
+      appSettingsParams.azureReferenceFileWithRelayMode || false,
     azureUseOnlyEnvVars: appSettingsParams.azureUseOnlyEnvVars || false,
     envAzureTenantId: appSettingsParams.envAzureTenantId,
     envAzureClientId: appSettingsParams.envAzureClientId,
     envAzureClientSecret: appSettingsParams.envAzureClientSecret,
     envAzureStorageAccountName: appSettingsParams.envAzureStorageAccountName,
-    envAzureStorageContainerName: appSettingsParams.envAzureStorageContainerName,
+    envAzureStorageContainerName:
+      appSettingsParams.envAzureStorageContainerName,
   };
 }
 
@@ -52,8 +63,8 @@ function buildSettingsData(appSettingsParams: Record<string, any>): FileUploadSe
  * Helper function to build request params (mimics useFileUploadSettings updateSettings logic)
  */
 function buildRequestParams(
-    formData: FileUploadFormValues,
-    dirtyFields: Partial<Record<keyof FileUploadFormValues, boolean>>,
+  formData: FileUploadFormValues,
+  dirtyFields: Partial<Record<keyof FileUploadFormValues, boolean>>,
 ): Record<string, any> {
   const { fileUploadType } = formData;
 
@@ -70,14 +81,16 @@ function buildRequestParams(
     if (dirtyFields.s3SecretAccessKey) {
       requestParams.s3SecretAccessKey = formData.s3SecretAccessKey;
     }
-    requestParams.s3ReferenceFileWithRelayMode = formData.s3ReferenceFileWithRelayMode;
+    requestParams.s3ReferenceFileWithRelayMode =
+      formData.s3ReferenceFileWithRelayMode;
   }
 
   if (fileUploadType === 'gcs') {
     requestParams.gcsApiKeyJsonPath = formData.gcsApiKeyJsonPath;
     requestParams.gcsBucket = formData.gcsBucket;
     requestParams.gcsUploadNamespace = formData.gcsUploadNamespace;
-    requestParams.gcsReferenceFileWithRelayMode = formData.gcsReferenceFileWithRelayMode;
+    requestParams.gcsReferenceFileWithRelayMode =
+      formData.gcsReferenceFileWithRelayMode;
   }
 
   if (fileUploadType === 'azure') {
@@ -92,8 +105,10 @@ function buildRequestParams(
       requestParams.azureClientSecret = formData.azureClientSecret;
     }
     requestParams.azureStorageAccountName = formData.azureStorageAccountName;
-    requestParams.azureStorageContainerName = formData.azureStorageContainerName;
-    requestParams.azureReferenceFileWithRelayMode = formData.azureReferenceFileWithRelayMode;
+    requestParams.azureStorageContainerName =
+      formData.azureStorageContainerName;
+    requestParams.azureReferenceFileWithRelayMode =
+      formData.azureReferenceFileWithRelayMode;
   }
 
   return requestParams;
@@ -309,8 +324,14 @@ describe('useFileUploadSettings - secret field dirty tracking', () => {
     expect(requestParams).not.toHaveProperty('azureTenantId');
     expect(requestParams).not.toHaveProperty('azureClientId');
     expect(requestParams).not.toHaveProperty('azureClientSecret');
-    expect(requestParams).toHaveProperty('azureStorageAccountName', 'new-account');
-    expect(requestParams).toHaveProperty('azureStorageContainerName', 'new-container');
+    expect(requestParams).toHaveProperty(
+      'azureStorageAccountName',
+      'new-account',
+    );
+    expect(requestParams).toHaveProperty(
+      'azureStorageContainerName',
+      'new-container',
+    );
   });
 
   it('should include Azure secret fields in request when they are dirty', () => {
@@ -390,6 +411,9 @@ describe('useFileUploadSettings - secret field dirty tracking', () => {
 
     expect(requestParams).toHaveProperty('azureTenantId', 'new-tenant-id');
     expect(requestParams).not.toHaveProperty('azureClientId');
-    expect(requestParams).toHaveProperty('azureClientSecret', 'new-client-secret');
+    expect(requestParams).toHaveProperty(
+      'azureClientSecret',
+      'new-client-secret',
+    );
   });
 });

@@ -3,15 +3,14 @@ import { addSeconds } from 'date-fns/addSeconds';
 import { type Document, type Model, Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
-import path from 'path';
+import path from 'pathe';
 
 import loggerFactory from '~/utils/logger';
 
 import { AttachmentType } from '../interfaces/attachment';
 import { getOrCreateModel } from '../util/mongoose-utils';
 
-// eslint-disable-next-line no-unused-vars
-const logger = loggerFactory('growi:models:attachment');
+const _logger = loggerFactory('growi:models:attachment');
 
 function generateFileHash(fileName) {
   const hash = require('crypto').createHash('md5');

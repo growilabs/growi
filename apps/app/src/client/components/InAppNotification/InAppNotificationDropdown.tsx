@@ -1,15 +1,18 @@
-import React, {
-  useState, useEffect, useRef, type JSX,
-} from 'react';
-
+import React, { type JSX, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useRipple } from 'react-use-ripple';
 import {
-  Dropdown, DropdownToggle, DropdownMenu, DropdownItem,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
 } from 'reactstrap';
 
-import { useSWRxInAppNotifications, useSWRxInAppNotificationStatus } from '~/stores/in-app-notification';
-import { useDefaultSocket } from '~/stores/socket-io';
+import { useGlobalSocket } from '~/states/socket-io';
+import {
+  useSWRxInAppNotificationStatus,
+  useSWRxInAppNotifications,
+} from '~/stores/in-app-notification';
 
 import InAppNotificationList from './InAppNotificationList';
 
@@ -19,12 +22,15 @@ export const InAppNotificationDropdown = (): JSX.Element => {
   const [isOpen, setIsOpen] = useState(false);
   const limit = 6;
 
-  const { data: socket } = useDefaultSocket();
-  const { data: inAppNotificationData, mutate: mutateInAppNotificationData } = useSWRxInAppNotifications(
-    limit, undefined, undefined,
-    { revalidateOnFocus: isOpen },
-  );
-  const { data: inAppNotificationUnreadStatusCount, mutate: mutateInAppNotificationUnreadStatusCount } = useSWRxInAppNotificationStatus();
+  const socket = useGlobalSocket();
+  const { data: inAppNotificationData, mutate: mutateInAppNotificationData } =
+    useSWRxInAppNotifications(limit, undefined, undefined, {
+      revalidateOnFocus: isOpen,
+    });
+  const {
+    data: inAppNotificationUnreadStatusCount,
+    mutate: mutateInAppNotificationUnreadStatusCount,
+  } = useSWRxInAppNotificationStatus();
 
   // ripple
   const buttonRef = useRef(null);
@@ -43,9 +49,12 @@ export const InAppNotificationDropdown = (): JSX.Element => {
     }
   }, [mutateInAppNotificationUnreadStatusCount, socket]);
 
-
-  const toggleDropdownHandler = async() => {
-    if (!isOpen && inAppNotificationUnreadStatusCount != null && inAppNotificationUnreadStatusCount > 0) {
+  const toggleDropdownHandler = async () => {
+    if (
+      !isOpen &&
+      inAppNotificationUnreadStatusCount != null &&
+      inAppNotificationUnreadStatusCount > 0
+    ) {
       mutateInAppNotificationUnreadStatusCount();
     }
 
@@ -56,34 +65,45 @@ export const InAppNotificationDropdown = (): JSX.Element => {
     setIsOpen(newIsOpenState);
   };
 
-  let badge;
-  if (inAppNotificationUnreadStatusCount != null && inAppNotificationUnreadStatusCount > 0) {
-    badge = <span className="badge rounded-pill bg-danger grw-notification-badge">{inAppNotificationUnreadStatusCount}</span>;
-  }
-  else {
-    badge = '';
-  }
+  const badge =
+    inAppNotificationUnreadStatusCount != null &&
+    inAppNotificationUnreadStatusCount > 0 ? (
+      <span className="badge rounded-pill bg-danger grw-notification-badge">
+        {inAppNotificationUnreadStatusCount}
+      </span>
+    ) : null;
 
   return (
-    <Dropdown className="notification-wrapper grw-notification-dropdown" isOpen={isOpen} toggle={toggleDropdownHandler} direction="end">
+    <Dropdown
+      className="notification-wrapper grw-notification-dropdown"
+      isOpen={isOpen}
+      toggle={toggleDropdownHandler}
+      direction="end"
+    >
       <DropdownToggle className="px-3" color="primary" innerRef={buttonRef}>
         <span className="material-symbols-outlined">notifications</span> {badge}
       </DropdownToggle>
 
-      { isOpen && (
+      {isOpen && (
         <DropdownMenu end>
-          { inAppNotificationData != null && inAppNotificationData.docs.length === 0
-          // no items
-            ? <DropdownItem disabled>{t('in_app_notification.no_unread_messages')}</DropdownItem>
-          // render DropdownItem
-            : <InAppNotificationList inAppNotificationData={inAppNotificationData} />
-          }
+          {inAppNotificationData != null &&
+          inAppNotificationData.docs.length === 0 ? (
+            // no items
+            <DropdownItem disabled>
+              {t('in_app_notification.no_unread_messages')}
+            </DropdownItem>
+          ) : (
+            // render DropdownItem
+            <InAppNotificationList
+              inAppNotificationData={inAppNotificationData}
+            />
+          )}
           <DropdownItem divider />
           <DropdownItem tag="a" href="/me/all-in-app-notifications">
-            { t('in_app_notification.see_all') }
+            {t('in_app_notification.see_all')}
           </DropdownItem>
         </DropdownMenu>
-      ) }
+      )}
     </Dropdown>
   );
 };

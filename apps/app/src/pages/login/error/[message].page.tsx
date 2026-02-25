@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 import type {
   GetServerSideProps,
   GetServerSidePropsContext,
@@ -6,72 +6,73 @@ import type {
 } from 'next';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'next-i18next';
-import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 import { NoLoginLayout } from '~/components/Layout/NoLoginLayout';
-import type { CommonProps } from '~/pages/utils/commons';
+import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props';
 import {
-  getNextI18NextConfig,
-  getServerSideCommonProps,
-} from '~/pages/utils/commons';
+  getServerSideCommonEachProps,
+  getServerSideCommonInitialProps,
+  getServerSideI18nProps,
+} from '~/pages/common-props';
+import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props';
 
-type Props = CommonProps;
+type Props = CommonInitialProps & CommonEachProps;
 const classNames: string[] = ['login-page'];
 
-const ApprovalPendingUserError = () => {
-  const { t } = useTranslation();
-  return (
-    <>
-      <div className="alert alert-warning">
-        <h2>{t('login.sign_in_error')}</h2>
-      </div>
-      <p>Wait for approved by administrators.</p>
-    </>
-  );
-};
-
-const SuspendedUserError = () => {
-  const { t } = useTranslation();
-  return (
-    <>
-      <div className="alert alert-warning">
-        <h2>{t('login.sign_in_error')}</h2>
-      </div>
-      <p>This account is suspended.</p>
-    </>
-  );
-};
-
-const PasswordResetOrderError = () => {
-  const { t } = useTranslation();
-  return (
-    <>
-      <div className="alert alert-warning mb-3">
-        <h2>{t('forgot_password.incorrect_token_or_expired_url')}</h2>
-      </div>
-      <a href="/forgot-password" className="link-switch">
-        <span className="material-symbols-outlined">key</span>{' '}
-        {t('forgot_password.forgot_password')}
-      </a>
-    </>
-  );
-};
-
-const DefaultLoginError = () => {
-  const { t } = useTranslation();
-  return (
-    <div className="alert alert-warning">
-      <h2>{t('login.sign_in_error')}</h2>
-    </div>
-  );
-};
-
-const LoginPage: NextPage<CommonProps> = () => {
+const LoginErrorPage: NextPage<Props> = () => {
   const { t } = useTranslation();
   const router = useRouter();
   const { message } = router.query;
 
-  let loginErrorElm: JSX.Element;
+  let loginErrorElm: React.ReactElement;
+
+  // biome-ignore lint/correctness/noNestedComponentDefinitions: ignore
+  const ApprovalPendingUserError = () => {
+    return (
+      <>
+        <div className="alert alert-warning">
+          <h2>{t('login.sign_in_error')}</h2>
+        </div>
+        <p>Wait for approved by administrators.</p>
+      </>
+    );
+  };
+
+  // biome-ignore lint/correctness/noNestedComponentDefinitions: ignore
+  const SuspendedUserError = () => {
+    return (
+      <>
+        <div className="alert alert-warning">
+          <h2>{t('login.sign_in_error')}</h2>
+        </div>
+        <p>This account is suspended.</p>
+      </>
+    );
+  };
+
+  // biome-ignore lint/correctness/noNestedComponentDefinitions: ignore
+  const PasswordResetOrderError = () => {
+    return (
+      <>
+        <div className="alert alert-warning mb-3">
+          <h2>{t('forgot_password.incorrect_token_or_expired_url')}</h2>
+        </div>
+        <a href="/forgot-password" className="link-switch">
+          <span className="material-symbols-outlined">key</span>{' '}
+          {t('forgot_password.forgot_password')}
+        </a>
+      </>
+    );
+  };
+
+  // biome-ignore lint/correctness/noNestedComponentDefinitions: ignore
+  const DefaultLoginError = () => {
+    return (
+      <div className="alert alert-warning">
+        <h2>{t('login.sign_in_error')}</h2>
+      </div>
+    );
+  };
 
   switch (message) {
     case 'registered':
@@ -103,43 +104,20 @@ const LoginPage: NextPage<CommonProps> = () => {
   );
 };
 
-/**
- * for Server Side Translations
- * @param context
- * @param props
- * @param namespacesRequired
- */
-async function injectNextI18NextConfigurations(
-  context: GetServerSidePropsContext,
-  props: Props,
-  namespacesRequired?: string[] | undefined,
-): Promise<void> {
-  const nextI18NextConfig = await getNextI18NextConfig(
-    serverSideTranslations,
-    context,
-    namespacesRequired,
-  );
-  props._nextI18Next = nextI18NextConfig._nextI18Next;
-}
-
 export const getServerSideProps: GetServerSideProps = async (
   context: GetServerSidePropsContext,
 ) => {
-  const result = await getServerSideCommonProps(context);
+  const [commonInitialResult, commonEachResult, i18nPropsResult] =
+    await Promise.all([
+      getServerSideCommonInitialProps(context),
+      getServerSideCommonEachProps(context),
+      getServerSideI18nProps(context, ['translation']),
+    ]);
 
-  // check for presence
-  // see: https://github.com/vercel/next.js/issues/19271#issuecomment-730006862
-  if (!('props' in result)) {
-    throw new Error('invalid getSSP result');
-  }
-
-  const props: Props = result.props as Props;
-
-  await injectNextI18NextConfigurations(context, props, ['translation']);
-
-  return {
-    props,
-  };
+  return mergeGetServerSidePropsResults(
+    commonInitialResult,
+    mergeGetServerSidePropsResults(commonEachResult, i18nPropsResult),
+  );
 };
 
-export default LoginPage;
+export default LoginErrorPage;

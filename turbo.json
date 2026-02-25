@@ -72,6 +72,8 @@
     },
     "lint": {
     },
+    "//#lint": {
+    },
 
     "@growi/preset-templates#test": {
       "dependsOn": ["@growi/pluginkit#dev"],

@@ -1,6 +1,9 @@
 import loggerFactory from '~/utils/logger';
 
-const { ReconnectContext, nextTick } = require('../service/search-reconnect-context/reconnect-context');
+const {
+  ReconnectContext,
+  nextTick,
+} = require('../service/search-reconnect-context/reconnect-context');
 
 const logger = loggerFactory('growi:middlewares:auto-reconnect-to-search');
 
@@ -9,12 +12,11 @@ module.exports = (crowi) => {
   const { searchService } = crowi;
   const reconnectContext = new ReconnectContext();
 
-  const reconnectHandler = async() => {
+  const reconnectHandler = async () => {
     try {
       logger.info('Auto reconnection is started.');
       await searchService.reconnectClient();
-    }
-    catch (err) {
+    } catch (err) {
       logger.error('Auto reconnection failed.', err);
     }
 
@@ -22,7 +24,11 @@ module.exports = (crowi) => {
   };
 
   return (req, res, next) => {
-    if (searchService != null && searchService.isConfigured && !searchService.isReachable) {
+    if (
+      searchService != null &&
+      searchService.isConfigured &&
+      !searchService.isReachable
+    ) {
       // NON-BLOCKING CALL
       // for the latency of the response
       nextTick(reconnectContext, reconnectHandler);

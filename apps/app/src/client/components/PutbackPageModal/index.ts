@@ -1,0 +1,1 @@
+export { PutBackPageModalLazyLoaded } from './dynamic';

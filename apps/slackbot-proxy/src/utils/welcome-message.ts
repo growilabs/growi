@@ -24,7 +24,6 @@ export const postWelcomeMessageOnce = async (
       ),
       markdownSectionBlock(
         'Looking for additional help? ' +
-          // eslint-disable-next-line max-len
           'See <https://docs.growi.org/en/admin-guide/management-cookbook/slack-integration/official-bot-settings.html#official-bot-settings | Docs>.',
       ),
     ],
@@ -44,7 +43,6 @@ export const postInstallSuccessMessage = async (
       ),
       markdownSectionBlock(
         'Looking for additional help? ' +
-          // eslint-disable-next-line max-len
           'See <https://docs.growi.org/en/admin-guide/management-cookbook/slack-integration/official-bot-settings.html#official-bot-settings | Docs>.',
       ),
     ],

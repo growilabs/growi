@@ -147,7 +147,6 @@ class PageBulkExportJobCleanUpCronService extends CronService {
   }
 }
 
-// eslint-disable-next-line import/no-mutable-exports
 export let pageBulkExportJobCleanUpCronService:
   | PageBulkExportJobCleanUpCronService
   | undefined; // singleton instance

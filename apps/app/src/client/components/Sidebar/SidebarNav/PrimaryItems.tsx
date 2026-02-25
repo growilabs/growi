@@ -1,10 +1,11 @@
 import { memo } from 'react';
-
 import dynamic from 'next/dynamic';
+import { useAtomValue } from 'jotai';
 
 import { SidebarContentsType } from '~/interfaces/ui';
-import { useIsAiEnabled, useIsGuestUser } from '~/stores-universal/context';
-import { useSidebarMode } from '~/stores/ui';
+import { useIsGuestUser } from '~/states/context';
+import { aiEnabledAtom } from '~/states/server-configurations';
+import { useSidebarMode } from '~/states/ui/sidebar';
 
 import { PrimaryItem } from './PrimaryItem';
 
@@ -12,32 +13,71 @@ import styles from './PrimaryItems.module.scss';
 
 // Do not SSR Socket.io to make it work
 const PrimaryItemForNotification = dynamic(
-  () => import('../InAppNotification/PrimaryItemForNotification').then(mod => mod.PrimaryItemForNotification), { ssr: false },
+  () =>
+    import('../InAppNotification/PrimaryItemForNotification').then(
+      (mod) => mod.PrimaryItemForNotification,
+    ),
+  { ssr: false },
 );
 
 type Props = {
-  onItemHover?: (contents: SidebarContentsType) => void,
-}
+  onItemHover?: (contents: SidebarContentsType) => void;
+};
 
 export const PrimaryItems = memo((props: Props) => {
   const { onItemHover } = props;
 
-  const { data: sidebarMode } = useSidebarMode();
-  const { data: isAiEnabled } = useIsAiEnabled();
-  const { data: isGuestUser } = useIsGuestUser();
+  const { sidebarMode } = useSidebarMode();
+  const isAiEnabled = useAtomValue(aiEnabledAtom);
+  const isGuestUser = useIsGuestUser();
 
   if (sidebarMode == null) {
     return <></>;
   }
 
   return (
-    <div className={styles['grw-primary-items']}>
-      <PrimaryItem sidebarMode={sidebarMode} contents={SidebarContentsType.TREE} label="Page Tree" iconName="list" onHover={onItemHover} />
-      <PrimaryItem sidebarMode={sidebarMode} contents={SidebarContentsType.CUSTOM} label="Custom Sidebar" iconName="code" onHover={onItemHover} />
-      <PrimaryItem sidebarMode={sidebarMode} contents={SidebarContentsType.RECENT} label="Recent Changes" iconName="update" onHover={onItemHover} />
-      <PrimaryItem sidebarMode={sidebarMode} contents={SidebarContentsType.BOOKMARKS} label="Bookmarks" iconName="bookmarks" onHover={onItemHover} />
-      <PrimaryItem sidebarMode={sidebarMode} contents={SidebarContentsType.TAG} label="Tags" iconName="local_offer" onHover={onItemHover} />
-      {isGuestUser === false && <PrimaryItemForNotification sidebarMode={sidebarMode} onHover={onItemHover} />}
+    <div className={`${styles['grw-primary-items']} mt-1`}>
+      <PrimaryItem
+        sidebarMode={sidebarMode}
+        contents={SidebarContentsType.TREE}
+        label="Page Tree"
+        iconName="list"
+        onHover={onItemHover}
+      />
+      <PrimaryItem
+        sidebarMode={sidebarMode}
+        contents={SidebarContentsType.CUSTOM}
+        label="Custom Sidebar"
+        iconName="code"
+        onHover={onItemHover}
+      />
+      <PrimaryItem
+        sidebarMode={sidebarMode}
+        contents={SidebarContentsType.RECENT}
+        label="Recent Changes"
+        iconName="update"
+        onHover={onItemHover}
+      />
+      <PrimaryItem
+        sidebarMode={sidebarMode}
+        contents={SidebarContentsType.BOOKMARKS}
+        label="Bookmarks"
+        iconName="bookmarks"
+        onHover={onItemHover}
+      />
+      <PrimaryItem
+        sidebarMode={sidebarMode}
+        contents={SidebarContentsType.TAG}
+        label="Tags"
+        iconName="local_offer"
+        onHover={onItemHover}
+      />
+      {isGuestUser === false && (
+        <PrimaryItemForNotification
+          sidebarMode={sidebarMode}
+          onHover={onItemHover}
+        />
+      )}
       {isAiEnabled && (
         <PrimaryItem
           sidebarMode={sidebarMode}

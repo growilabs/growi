@@ -1,30 +1,28 @@
-import {
-  memo, useCallback, useMemo, type JSX,
-} from 'react';
+import { type JSX, memo, useCallback, useMemo } from 'react';
 
 import {
-  useCollapsedContentsOpened, usePreferCollapsedMode, useDrawerOpened, useSidebarMode,
-} from '~/stores/ui';
-
+  useCollapsedContentsOpened,
+  useDrawerOpened,
+  useSetPreferCollapsedMode,
+  useSidebarMode,
+} from '~/states/ui/sidebar';
 
 import styles from './ToggleCollapseButton.module.scss';
 
-
 export const ToggleCollapseButton = memo((): JSX.Element => {
-
   const { isDrawerMode, isCollapsedMode } = useSidebarMode();
-  const { data: isDrawerOpened, mutate: mutateDrawerOpened } = useDrawerOpened();
-  const { mutateAndSave: mutatePreferCollapsedMode } = usePreferCollapsedMode();
-  const { mutate: mutateCollapsedContentsOpened } = useCollapsedContentsOpened();
+  const [isDrawerOpened, setIsDrawerOpened] = useDrawerOpened();
+  const setPreferCollapsedMode = useSetPreferCollapsedMode();
+  const [, setCollapsedContentsOpened] = useCollapsedContentsOpened();
 
   const toggleDrawer = useCallback(() => {
-    mutateDrawerOpened(!isDrawerOpened);
-  }, [isDrawerOpened, mutateDrawerOpened]);
+    setIsDrawerOpened(!isDrawerOpened);
+  }, [isDrawerOpened, setIsDrawerOpened]);
 
   const toggleCollapsed = useCallback(() => {
-    mutatePreferCollapsedMode(!isCollapsedMode());
-    mutateCollapsedContentsOpened(false);
-  }, [isCollapsedMode, mutateCollapsedContentsOpened, mutatePreferCollapsedMode]);
+    setPreferCollapsedMode(!isCollapsedMode());
+    setCollapsedContentsOpened(false);
+  }, [isCollapsedMode, setCollapsedContentsOpened, setPreferCollapsedMode]);
 
   const rotationClass = isCollapsedMode() ? 'rotate180' : '';
   const icon = useMemo(() => {
@@ -41,7 +39,9 @@ export const ToggleCollapseButton = memo((): JSX.Element => {
       onClick={isDrawerMode() ? toggleDrawer : toggleCollapsed}
       data-testid="btn-toggle-collapse"
     >
-      <span className={`material-symbols-outlined fs-2 ${rotationClass}`}>{icon}</span>
+      <span className={`material-symbols-outlined fs-2 ${rotationClass}`}>
+        {icon}
+      </span>
     </button>
   );
 });

@@ -1,11 +1,6 @@
 import React from 'react';
-
-import {
-  render, screen, fireEvent, waitFor,
-} from '@testing-library/react';
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
@@ -89,7 +84,9 @@ describe('LoginForm - Error Display', () => {
 
       render(<LoginForm {...props} />);
 
-      expect(screen.getByText('jwks must be a JSON Web Key Set formatted object')).toBeInTheDocument();
+      expect(
+        screen.getByText('jwks must be a JSON Web Key Set formatted object'),
+      ).toBeInTheDocument();
     });
   });
 
@@ -110,7 +107,9 @@ describe('LoginForm - Error Display', () => {
 
       render(<LoginForm {...props} />);
 
-      expect(screen.getByText('jwks must be a JSON Web Key Set formatted object')).toBeInTheDocument();
+      expect(
+        screen.getByText('jwks must be a JSON Web Key Set formatted object'),
+      ).toBeInTheDocument();
     });
 
     it('should not render local/LDAP form but should still show errors', () => {
@@ -129,9 +128,15 @@ describe('LoginForm - Error Display', () => {
 
       render(<LoginForm {...props} />);
 
-      expect(screen.queryByTestId('tiUsernameForLogin')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('tiPasswordForLogin')).not.toBeInTheDocument();
-      expect(screen.getByText('OIDC authentication failed')).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('tiUsernameForLogin'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId('tiPasswordForLogin'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByText('OIDC authentication failed'),
+      ).toBeInTheDocument();
     });
   });
 
@@ -153,7 +158,7 @@ describe('LoginForm - Error Display', () => {
       expect(screen.getByText('External error message')).toBeInTheDocument();
     });
 
-    it('should prioritize login errors over external account login errors after failed login', async() => {
+    it('should prioritize login errors over external account login errors after failed login', async () => {
       const externalAccountLoginError = {
         message: 'External error message',
         name: 'ExternalAccountLoginError',
@@ -190,18 +195,23 @@ describe('LoginForm - Error Display', () => {
 
       // Wait for login error to appear and external error to be replaced
       await waitFor(() => {
-        expect(screen.getByText('Invalid username or password')).toBeInTheDocument();
+        expect(
+          screen.getByText('Invalid username or password'),
+        ).toBeInTheDocument();
       });
 
       // External error should no longer be visible when login error exists
-      expect(screen.queryByText('External error message')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('External error message'),
+      ).not.toBeInTheDocument();
     });
 
-    it('should display dangerouslySetInnerHTML errors for PROVIDER_DUPLICATED_USERNAME_EXCEPTION', async() => {
+    it('should display dangerouslySetInnerHTML errors for PROVIDER_DUPLICATED_USERNAME_EXCEPTION', async () => {
       // Mock API call to return PROVIDER_DUPLICATED_USERNAME_EXCEPTION error
       mockApiv3Post.mockRejectedValueOnce([
         {
-          message: 'This username is already taken by <a href="/login">another provider</a>',
+          message:
+            'This username is already taken by <a href="/login">another provider</a>',
           code: 'provider-duplicated-username-exception',
           args: {},
         },
@@ -226,11 +236,13 @@ describe('LoginForm - Error Display', () => {
       // Wait for the dangerouslySetInnerHTML error to appear
       await waitFor(() => {
         // Check that the error with HTML content is rendered
-        expect(screen.getByText(/This username is already taken by/)).toBeInTheDocument();
+        expect(
+          screen.getByText(/This username is already taken by/),
+        ).toBeInTheDocument();
       });
     });
 
-    it('should handle multiple login errors correctly', async() => {
+    it('should handle multiple login errors correctly', async () => {
       // Mock API call to return multiple errors
       mockApiv3Post.mockRejectedValueOnce([
         {
@@ -281,7 +293,9 @@ describe('LoginForm - Error Display', () => {
 
       render(<LoginForm {...props} />);
 
-      expect(screen.getByText('Authentication service unavailable')).toBeInTheDocument();
+      expect(
+        screen.getByText('Authentication service unavailable'),
+      ).toBeInTheDocument();
     });
   });
 });

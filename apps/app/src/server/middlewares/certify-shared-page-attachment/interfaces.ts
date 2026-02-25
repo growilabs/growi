@@ -1,4 +1,4 @@
 export type ValidReferer = {
-  referer: string,
-  shareLinkId: string,
+  referer: string;
+  shareLinkId: string;
 };

@@ -1,4 +1,4 @@
-import { memo, type JSX } from 'react';
+import { type JSX, memo } from 'react';
 
 export const EditorSettings = memo((): JSX.Element => {
   // const { t } = useTranslation();
@@ -21,7 +21,6 @@ export const EditorSettings = memo((): JSX.Element => {
 
   return (
     <div data-testid="grw-editor-settings">
-
       {/*
       <div className="row my-3">
         <div className="offset-4 col-5">

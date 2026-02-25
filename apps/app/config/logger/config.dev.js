@@ -15,6 +15,7 @@ module.exports = {
   'growi:routes:login': 'debug',
   'growi:routes:login-passport': 'debug',
   'growi:middleware:safe-redirect': 'debug',
+  'growi:services:page': 'debug',
   'growi:service:PassportService': 'debug',
   'growi:service:s2s-messaging:*': 'debug',
   'growi:service:yjs': 'debug',
@@ -31,6 +32,7 @@ module.exports = {
   'growi:service:g2g-transfer': 'debug',
 
   'growi:migration:add-installed-date-to-config': 'debug',
+  'growi:events:page:seen': 'debug',
 
   /*
    * configure level for client

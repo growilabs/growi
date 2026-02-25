@@ -1,39 +1,42 @@
 import type { FC } from 'react';
 import React, { useCallback, useEffect, useState } from 'react';
-
 import { useTranslation } from 'next-i18next';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useAdminSocket } from '~/features/admin/states/socket-io';
 import type {
-  PMStartedData, PMMigratingData, PMErrorCountData, PMEndedData,
+  PMEndedData,
+  PMErrorCountData,
+  PMMigratingData,
+  PMStartedData,
 } from '~/interfaces/websocket';
-import {
-  SocketEventName,
-} from '~/interfaces/websocket';
-import { useGlobalAdminSocket } from '~/stores/websocket';
+import { SocketEventName } from '~/interfaces/websocket';
 
 import AdminAppContainer from '../../../services/AdminAppContainer';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import LabeledProgressBar from '../Common/LabeledProgressBar';
-
 import { ConfirmModal } from './ConfirmModal';
 
-
 type Props = {
-  adminAppContainer: typeof AdminAppContainer & { v5PageMigrationHandler: () => Promise<{ isV5Compatible: boolean }> },
-}
+  adminAppContainer: typeof AdminAppContainer & {
+    v5PageMigrationHandler: () => Promise<{ isV5Compatible: boolean }>;
+  };
+};
 
 const V5PageMigration: FC<Props> = (props: Props) => {
   // Modal
-  const [isV5PageMigrationModalShown, setIsV5PageMigrationModalShown] = useState(false);
+  const [isV5PageMigrationModalShown, setIsV5PageMigrationModalShown] =
+    useState(false);
   // Progress bar
-  const [isInProgress, setProgressing] = useState<boolean | undefined>(undefined); // use false as ended
+  const [isInProgress, setProgressing] = useState<boolean | undefined>(
+    undefined,
+  ); // use false as ended
   const [total, setTotal] = useState<number>(0);
   const [skip, setSkip] = useState<number>(0);
   const [current, setCurrent] = useState<number>(0);
   const [isSucceeded, setSucceeded] = useState<boolean | undefined>(undefined);
 
-  const { data: adminSocket } = useGlobalAdminSocket();
+  const adminSocket = useAdminSocket();
   const { t } = useTranslation();
 
   const { adminAppContainer } = props;
@@ -41,17 +44,24 @@ const V5PageMigration: FC<Props> = (props: Props) => {
   /*
    * Local components
    */
-  const renderResultMessage = useCallback((isSucceeded: boolean) => {
-    return (
-      <>
-        {
-          isSucceeded
-            ? <p className="text-success p-1">{t('admin:v5_page_migration.migration_succeeded')}</p>
-            : <p className="text-danger p-1">{t('admin:v5_page_migration.migration_failed')}</p>
-        }
-      </>
-    );
-  }, [t]);
+  const renderResultMessage = useCallback(
+    (isSucceeded: boolean) => {
+      return (
+        <>
+          {isSucceeded ? (
+            <p className="text-success p-1">
+              {t('admin:v5_page_migration.migration_succeeded')}
+            </p>
+          ) : (
+            <p className="text-danger p-1">
+              {t('admin:v5_page_migration.migration_failed')}
+            </p>
+          )}
+        </>
+      );
+    },
+    [t],
+  );
 
   const renderProgressBar = () => {
     if (isInProgress == null) {
@@ -60,9 +70,7 @@ const V5PageMigration: FC<Props> = (props: Props) => {
 
     return (
       <>
-        {
-          isSucceeded != null && renderResultMessage(isSucceeded)
-        }
+        {isSucceeded != null && renderResultMessage(isSucceeded)}
         <LabeledProgressBar
           header={t('admin:v5_page_migration.header_upgrading_progress')}
           currentCount={current}
@@ -76,17 +84,16 @@ const V5PageMigration: FC<Props> = (props: Props) => {
   /*
    * Functions
    */
-  const onConfirm = async() => {
+  const onConfirm = async () => {
     setIsV5PageMigrationModalShown(false);
     try {
-      const { isV5Compatible } = await adminAppContainer.v5PageMigrationHandler();
+      const { isV5Compatible } =
+        await adminAppContainer.v5PageMigrationHandler();
       if (isV5Compatible) {
-
         return toastSuccess(t('admin:v5_page_migration.already_upgraded'));
       }
       toastSuccess(t('admin:v5_page_migration.successfully_started'));
-    }
-    catch (err) {
+    } catch (err) {
       toastError(err);
     }
   };
@@ -146,7 +153,12 @@ const V5PageMigration: FC<Props> = (props: Props) => {
       {renderProgressBar()}
       <div className="row my-3">
         <div className="mx-auto">
-          <button type="button" className="btn btn-warning" onClick={() => setIsV5PageMigrationModalShown(true)} disabled={isInProgress != null}>
+          <button
+            type="button"
+            className="btn btn-warning"
+            onClick={() => setIsV5PageMigrationModalShown(true)}
+            disabled={isInProgress != null}
+          >
             {t('admin:v5_page_migration.upgrade_to_v5')}
           </button>
         </div>

@@ -1,8 +1,0 @@
-
-@use '@growi/core-styles/scss/bootstrap/init' as bs;
-@use '@growi/ui/scss/atoms/btn-muted';
-
-// == Colors
-.btn-delete {
-  @include btn-muted.colorize(bs.$red);
-}

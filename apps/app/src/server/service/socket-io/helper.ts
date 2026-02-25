@@ -3,6 +3,9 @@ export const RoomPrefix = {
   PAGE: 'page',
 };
 
-export const getRoomNameWithId = (roomPrefix: string, roomId: string): string => {
+export const getRoomNameWithId = (
+  roomPrefix: string,
+  roomId: string,
+): string => {
   return `${roomPrefix}:${roomId}`;
 };

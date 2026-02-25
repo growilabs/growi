@@ -1,0 +1,1 @@
+export { CreateTemplateModalLazyLoaded } from './dynamic';

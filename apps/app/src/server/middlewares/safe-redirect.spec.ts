@@ -1,12 +1,11 @@
 import type { Request } from 'express';
 
-import registerSafeRedirectFactory, { type ResWithSafeRedirect } from './safe-redirect';
+import registerSafeRedirectFactory, {
+  type ResWithSafeRedirect,
+} from './safe-redirect';
 
 describe('safeRedirect', () => {
-  const whitelistOfHosts = [
-    'white1.example.com:8080',
-    'white2.example.com',
-  ];
+  const whitelistOfHosts = ['white1.example.com:8080', 'white2.example.com'];
   const registerSafeRedirect = registerSafeRedirectFactory(whitelistOfHosts);
 
   describe('res.safeRedirect', () => {
@@ -24,7 +23,7 @@ describe('safeRedirect', () => {
     } as any as ResWithSafeRedirect;
     const next = vi.fn();
 
-    test('redirects to \'/\' because specified url causes open redirect vulnerability', () => {
+    test("redirects to '/' because specified url causes open redirect vulnerability", () => {
       registerSafeRedirect(req, res, next);
 
       res.safeRedirect('//evil.example.com');
@@ -35,7 +34,7 @@ describe('safeRedirect', () => {
       expect(res.redirect).toHaveBeenCalledWith('/');
     });
 
-    test('redirects to \'/\' because specified host without port is not in whitelist', () => {
+    test("redirects to '/' because specified host without port is not in whitelist", () => {
       registerSafeRedirect(req, res, next);
 
       res.safeRedirect('http://white1.example.com/path/to/page');
@@ -54,7 +53,9 @@ describe('safeRedirect', () => {
       expect(next).toHaveBeenCalledTimes(1);
       expect(req.get).toHaveBeenCalledWith('host');
       expect(res.redirect).toHaveBeenCalledTimes(1);
-      expect(res.redirect).toHaveBeenCalledWith('http://example.com/path/to/page');
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://example.com/path/to/page',
+      );
     });
 
     test('redirects to the specified local url (fqdn)', () => {
@@ -65,7 +66,9 @@ describe('safeRedirect', () => {
       expect(next).toHaveBeenCalledTimes(1);
       expect(req.get).toHaveBeenCalledWith('host');
       expect(res.redirect).toHaveBeenCalledTimes(1);
-      expect(res.redirect).toHaveBeenCalledWith('http://example.com/path/to/page');
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://example.com/path/to/page',
+      );
     });
 
     test('redirects to the specified whitelisted url (white1.example.com:8080)', () => {
@@ -76,7 +79,9 @@ describe('safeRedirect', () => {
       expect(next).toHaveBeenCalledTimes(1);
       expect(req.get).toHaveBeenCalledWith('host');
       expect(res.redirect).toHaveBeenCalledTimes(1);
-      expect(res.redirect).toHaveBeenCalledWith('http://white1.example.com:8080/path/to/page');
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://white1.example.com:8080/path/to/page',
+      );
     });
 
     test('redirects to the specified whitelisted url (white2.example.com:8080)', () => {
@@ -87,9 +92,9 @@ describe('safeRedirect', () => {
       expect(next).toHaveBeenCalledTimes(1);
       expect(req.get).toHaveBeenCalledWith('host');
       expect(res.redirect).toHaveBeenCalledTimes(1);
-      expect(res.redirect).toHaveBeenCalledWith('http://white2.example.com:8080/path/to/page');
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://white2.example.com:8080/path/to/page',
+      );
     });
-
   });
-
 });

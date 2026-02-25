@@ -3,16 +3,17 @@ import { debounce } from 'throttle-debounce';
 import { Container } from 'unstated';
 
 import {
-  apiv3Delete, apiv3Get, apiv3Post, apiv3Put,
+  apiv3Delete,
+  apiv3Get,
+  apiv3Post,
+  apiv3Put,
 } from '../util/apiv3-client';
-
 
 /**
  * Service container for admin users page (Users.jsx)
  * @extends {Container} unstated Container
  */
 export default class AdminUsersContainer extends Container {
-
   constructor(appContainer) {
     super();
 
@@ -34,13 +35,16 @@ export default class AdminUsersContainer extends Container {
       pagingLimit: Infinity,
       selectedStatusList: new Set(['all']),
       searchText: '',
+      userStatistics: null,
     };
 
     this.showPasswordResetModal = this.showPasswordResetModal.bind(this);
     this.hidePasswordResetModal = this.hidePasswordResetModal.bind(this);
     this.toggleUserInviteModal = this.toggleUserInviteModal.bind(this);
 
-    this.handleChangeSearchTextDebouce = debounce(3000, () => this.retrieveUsersByPagingNum(1));
+    this.handleChangeSearchTextDebouce = debounce(3000, () =>
+      this.retrieveUsersByPagingNum(1),
+    );
   }
 
   /**
@@ -61,12 +65,10 @@ export default class AdminUsersContainer extends Container {
     const all = 'all';
     if (this.isSelected(statusType)) {
       this.deleteStatusFromList(statusType);
-    }
-    else {
+    } else {
       if (statusType === all) {
         this.clearStatusList();
-      }
-      else {
+      } else {
         this.deleteStatusFromList(all);
       }
       this.addStatusToList(statusType);
@@ -131,7 +133,6 @@ export default class AdminUsersContainer extends Container {
    * @param {number} selectedPage
    */
   async retrieveUsersByPagingNum(selectedPage) {
-
     const params = {
       page: selectedPage,
       sort: this.state.sort,
@@ -144,10 +145,14 @@ export default class AdminUsersContainer extends Container {
     const { data } = await apiv3Get('/users', params);
 
     if (data.paginateResult == null) {
-      throw new Error('data must conclude \'paginateResult\' property.');
+      throw new Error("data must conclude 'paginateResult' property.");
     }
 
-    const { docs: users, totalDocs: totalUsers, limit: pagingLimit } = data.paginateResult;
+    const {
+      docs: users,
+      totalDocs: totalUsers,
+      limit: pagingLimit,
+    } = data.paginateResult;
 
     this.setState({
       users,
@@ -155,7 +160,15 @@ export default class AdminUsersContainer extends Container {
       pagingLimit,
       activePage: selectedPage,
     });
+  }
 
+  /**
+   * retrieve user statistics
+   */
+  async retrieveUserStatistics() {
+    const statsRes = await apiv3Get('/statistics/user');
+    const userStatistics = statsRes.data.data;
+    this.setState({ userStatistics });
   }
 
   /**
@@ -201,7 +214,9 @@ export default class AdminUsersContainer extends Container {
    * @memberOf AdminUsersContainer
    */
   async toggleUserInviteModal() {
-    await this.setState({ isUserInviteModalShown: !this.state.isUserInviteModalShown });
+    await this.setState({
+      isUserInviteModalShown: !this.state.isUserInviteModalShown,
+    });
   }
 
   /**
@@ -294,5 +309,4 @@ export default class AdminUsersContainer extends Container {
     await this.retrieveUsersByPagingNum(this.state.activePage);
     return removedUserData;
   }
-
 }

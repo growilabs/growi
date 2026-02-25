@@ -5,6 +5,7 @@ import type { IPage, IPagePopulatedToShowRevision } from '@growi/core';
 import styles from './PageContentFooter.module.scss';
 
 const AuthorInfo = dynamic(
+  // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
   () => import('~/client/components/AuthorInfo').then((mod) => mod.AuthorInfo),
   { ssr: false },
 );
@@ -26,7 +27,7 @@ export const PageContentFooter = (
   }
 
   return (
-    <div className={`${styles['page-content-footer']} my-4 pt-4 d-edit-none`}>
+    <div className={`${styles['page-content-footer']} py-4 d-edit-none`}>
       <div className="page-meta">
         <AuthorInfo
           user={creator}

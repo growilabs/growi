@@ -1,23 +1,24 @@
 import React from 'react';
-
-import type { IUser, HasObjectId } from '@growi/core';
 import { useRouter } from 'next/router';
+import type { HasObjectId, IUser } from '@growi/core';
 
 import { SupportedTargetModel } from '~/interfaces/activity';
 import type { IInAppNotification } from '~/interfaces/in-app-notification';
 
+import type { ModelNotificationUtils } from '.';
 import { ModelNotification } from './ModelNotification';
 import { useActionMsgAndIconForModelNotification } from './useActionAndMsg';
 
-import type { ModelNotificationUtils } from '.';
-
-
-export const useUserModelNotification = (notification: IInAppNotification & HasObjectId): ModelNotificationUtils | null => {
-
-  const { actionMsg, actionIcon } = useActionMsgAndIconForModelNotification(notification);
+export const useUserModelNotification = (
+  notification: IInAppNotification & HasObjectId,
+): ModelNotificationUtils | null => {
+  const { actionMsg, actionIcon } =
+    useActionMsgAndIconForModelNotification(notification);
   const router = useRouter();
 
-  const isUserModelNotification = (notification: IInAppNotification & HasObjectId): notification is IInAppNotification<IUser> & HasObjectId => {
+  const isUserModelNotification = (
+    notification: IInAppNotification & HasObjectId,
+  ): notification is IInAppNotification<IUser> & HasObjectId => {
     return notification.targetModel === SupportedTargetModel.MODEL_USER;
   };
 
@@ -46,5 +47,4 @@ export const useUserModelNotification = (notification: IInAppNotification & HasO
     Notification,
     publishOpen,
   };
-
 };

@@ -34,9 +34,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const isOfficialMode = process.env.OFFICIAL_MODE === 'true';
 
 export type RegisterCommandBody = {
-  // eslint-disable-next-line camelcase
   trigger_id: string;
-  // eslint-disable-next-line camelcase
   channel_name: string;
 };
 
@@ -124,7 +122,6 @@ export class RegisterService
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleInteraction(
     interactionPayloadAccessor: InteractionPayloadAccessor,
   ): boolean {
@@ -136,7 +133,6 @@ export class RegisterService
   }
 
   async processInteraction(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     authorizeResult: AuthorizeResult,
     interactionPayload: any,
     interactionPayloadAccessor: InteractionPayloadAccessor,
@@ -158,7 +154,6 @@ export class RegisterService
   }
 
   async handleRegisterInteraction(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     authorizeResult: AuthorizeResult,
     interactionPayload: any,
     interactionPayloadAccessor: InteractionPayloadAccessor,
@@ -182,7 +177,6 @@ export class RegisterService
   }
 
   async insertOrderRecord(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     authorizeResult: AuthorizeResult,
     interactionPayloadAccessor: InteractionPayloadAccessor,
   ): Promise<void> {
@@ -192,17 +186,16 @@ export class RegisterService
     const tokenGtoP = inputValues.tokenGtoP.contents_input.value;
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const url = new URL(growiUrl);
+      const _url = new URL(growiUrl);
     } catch (error) {
       throw new InvalidUrlError(growiUrl);
     }
 
     const installationId =
       authorizeResult.enterpriseId || authorizeResult.teamId;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const installation =
       await this.installationRepository.findByTeamIdOrEnterpriseId(
+        // biome-ignore lint/style/noNonNullAssertion: installationId must be set --- IGNORE ---
         installationId!,
       );
 
@@ -215,7 +208,6 @@ export class RegisterService
   }
 
   async notifyServerUriToSlack(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     interactionPayloadAccessor: InteractionPayloadAccessor,
   ): Promise<void> {
     const serverUri = process.env.SERVER_URI;

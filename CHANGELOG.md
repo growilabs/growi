@@ -1,8 +1,192 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.3.5...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.4.5...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.4.5](https://github.com/growilabs/compare/v7.4.4...v7.4.5) - 2026-02-19
+
+### 💎 Features
+
+* feat: Realtime Increment View Count Without Refreshing Pages (#10760) @ryotaro-nagahara
+
+### 🚀 Improvement
+
+* imprv: Unchanged revision (#10770) @yuki-takei
+* imprv: Close the Sidebar in drawer mode when the route changes (#10763) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Use currentPageId for share link page fetching (#10797) @yuki-takei
+* fix: Allow viewing shared pages regardless of page permissions (#10762) @ryotaro-nagahara
+* fix: Bulk export fails due to S3 upload minimal version (#10782) @ryotaro-nagahara
+* fix: Block revisions API from returning info about user pages when user pages are disabled (#10751) @arvid-e
+* fix: OpenAPI spec mismatch for GET /page endpoint response format (#10787) @[copilot-swe-agent[bot]](https://github.com/apps/copilot-swe-agent)
+
+### 🧰 Maintenance
+
+* support: Extract `/page/info` endpoint handler into a dedicated module (#10795) @yuki-takei
+* ci(deps): bump qs from 6.14.1 to 6.14.2 (#10785) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.4.4](https://github.com/growilabs/compare/v7.4.3...v7.4.4) - 2026-01-30
+
+### 🐛 Bug Fixes
+
+* fix: Search navigation (#10749) @[copilot-swe-agent[bot]](https://github.com/apps/copilot-swe-agent)
+* fix: User pages are displayed in page list when 'Disable user pages' is on (#10752) @miya
+* fix: Disable logo update button when no file is selected (#10587) @hikaru-n-cpu
+
+### 🧰 Maintenance
+
+* support: Setup Claude Code environment (#10746) @yuki-takei
+* support: Improve test parallelism (#10747) @yuki-takei
+* support: Typecheck by tsgo (#10717) @yuki-takei
+
+## [v7.4.3](https://github.com/growilabs/compare/v7.4.2...v7.4.3) - 2026-01-21
+
+### 💎 Features
+
+* feat: Disable user page (#10735) @miya
+* feat: New admin setting for hiding user pages (#10708) @arvid-e
+* feat: Block other user's user pages (#10725) @arvid-e
+
+### 🚀 Improvement
+
+* imprv: New sidebar tool icon appearance (#10672) @satof3
+* imprv: Admin Home (#10692) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Vim keymap insert mode exiting after single keystroke  (#10714) @miya
+* fix: Cannot create `/Sidebar` page from custom sidebar (#10690) @miya
+* fix: PageTree does not auto-scroll to target page path on initial render (#10699) @miya
+
+### 🧰 Maintenance
+
+* support: Upgrade headless-tree (#10733) @miya
+* support: Integrate Lefthook for pre-commit Biome formatting (#10694) @[copilot-swe-agent[bot]](https://github.com/apps/copilot-swe-agent)
+* support: Stop pushing docker image to weseek repository (#10681) @miya
+* support: Migrate the rest of files to Biome from Eslint (#10683) @yuki-takei
+
+## [v7.4.2](https://github.com/growilabs/compare/v7.4.1...v7.4.2) - 2026-01-08
+
+### 🚀 Improvement
+
+* imprv: New help button (#10553) @satof3
+* imprv: PagePathNavTitle spacing and z-index layering (#10665) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Handle blank configurations for SAML settings (#10674) @yuki-takei
+* fix: Text strings inside invitation email modal are incorrect (#10679) @miya
+* fix: Scroll jumps back to current PageTreeItem when creating page from PageTree (#10671) @miya
+
+### 🧰 Maintenance
+
+* support: Update dependencies (#10685) @miya
+* support: Update dependencies (#10682) @miya
+* ci(mergify): upgrade configuration to current format (#10673) @[mergify[bot]](https://github.com/apps/mergify)
+* support: Configure biome for some client components inside app 8 (#10668) @arafubeatbox
+* support: Configure biome for some client components inside app 7 (#10667) @arafubeatbox
+* support: Configure biome for some client components in app 6 (#10636) @arafubeatbox
+* support: Configure biome for some client components in app 4 (#10634) @arafubeatbox
+* support: Configure biome for some client components in app 3 (#10633) @arafubeatbox
+* ci(deps): bump qs from 6.13.0 to 6.14.1 (#10669) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Configure biome for some client components in app 5 (#10635) @arafubeatbox
+* support: Configure biome for some client components in app 2 (#10632) @arafubeatbox
+* support: Configure biome for some client components in app 1 (#10631) @arafubeatbox
+* ci(deps): bump next from 14.2.33 to 14.2.35 (#10597) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.4.1](https://github.com/growilabs/compare/v7.4.0...v7.4.1) - 2025-12-26
+
+### 🚀 Improvement
+
+* imprv: Show page name and link for affected pages in Activity Log (#10590) @arvid-e
+
+### 🧰 Maintenance
+
+* support: Update terraform settings and the policy for OIDC GitHub (#10653) @yuki-takei
+
+## [v7.4.0](https://github.com/growilabs/compare/v7.3.9...v7.4.0) - 2025-12-24
+
+### 💎 Features
+
+* feat: PageTree Virtualization (#10581) @yuki-takei
+* feat: Can set default user role as read-only for new users (#10623) @Ryosei-Fukushima
+* feat: Can create page when executing page edit shortcut key on empty page (#10594) @miya
+
+### 🚀 Improvement
+
+* imprv: Admin sidebar mode setting (#10617) @miya
+* imprv: Empty page operation (#10604) @yuki-takei
+* imprv: Support target attribute for anchor links (#10566) @yuki-takei
+* imprv: Use EventTarget instead of EventEmitter on the client side (#10472) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Aftercare for Revisions migration script-bug (#10620) @yuki-takei
+* fix: Omit file upload restriction feature for non image files (#10602) @miya
+
+### 🧰 Maintenance
+
+* support: Use jotai for state management (#10474) @yuki-takei
+* support: Omit importers for esa.io and Qiita (#10584) @yuki-takei
+* support: Configure biome for app client services (#10600) @arafubeatbox
+* support: Configure biome for app client utils (#10601) @arafubeatbox
+* support: Configure biome for app client models/interfaces (#10599) @arafubeatbox
+* support: Configure biome for app server services 4 (#10583) @arafubeatbox
+* support: Configure biome for app server services 3 (#10578) @arafubeatbox
+* ci(mergify): upgrade configuration to current format (#10372) @[mergify[bot]](https://github.com/apps/mergify)
+* support: Configure biome for app server services 2 (#10575) @arafubeatbox
+* support: Configure biome for some app server services (#10574) @arafubeatbox
+* support: Configure biome for apiv3 js files (#10537) @arafubeatbox
+* support: Reapply biome configuration for app apiv3 routes (app-settings, page) (#10555) @arafubeatbox
+* support: Configure biome for apiv3 routes (remaining ts files) (#10536) @arafubeatbox
+* support: Configure biome for app apiv3 routes (app-settings, page) (#10532) @arafubeatbox
+* support: Configure biome for app apiv3 routes (personal-setting, security-settings, interfaces, pages, user) (#10500) @arafubeatbox
+* support: Configure biome for app server middlewares (#10507) @arafubeatbox
+
+## [v7.3.9](https://github.com/growilabs/compare/v7.3.8...v7.3.9) - 2025-12-09
+
+### 🐛 Bug Fixes
+
+* fix: Change the name of maintenance mode. (#10559) @hikaru-n-cpu
+
+### 🧰 Maintenance
+
+* support: Add new intern names to staff credits (#10556) @riona-k
+
+## [v7.3.8](https://github.com/growilabs/compare/v7.3.7...v7.3.8) - 2025-12-04
+
+### 💎 Features
+
+* feat: Enable page bulk export for GROWI.cloud (#10292) @arafubeatbox
+* feat: Users statistics table for admin (#10539) @riona-k
+
+### 🧰 Maintenance
+
+* ci(deps): bump validator from 13.15.20 to 13.15.22 (#10560) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.3.7](https://github.com/growilabs/compare/v7.3.6...v7.3.7) - 2025-11-25
+
+### 💎 Features
+
+* feat(pdf-converter): Enable puppeteer-cluster config of pdf-converter from env var (#10516) @arafubeatbox
+
+### 🐛 Bug Fixes
+
+* fix: Admin form degradation (#10540) @yuki-takei
+
+## [v7.3.6](https://github.com/growilabs/compare/v7.3.5...v7.3.6) - 2025-11-18
+
+### 🐛 Bug Fixes
+
+* fix: Printing styles (#10505) @yuki-takei
+
+### 🧰 Maintenance
+
+* ci(deps): bump js-yaml from 4.1.0 to 4.1.1 (#10511) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Configure biome for app routes excluding apiv3 (#10496) @arafubeatbox
 
 ## [v7.3.5](https://github.com/growilabs/compare/v7.3.4...v7.3.5) - 2025-11-10
 

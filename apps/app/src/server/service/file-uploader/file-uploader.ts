@@ -1,55 +1,77 @@
-import type { Readable } from 'stream';
-
 import type { Response } from 'express';
+import type { HydratedDocument } from 'mongoose';
+import type { Readable } from 'stream';
 import { v4 as uuidv4 } from 'uuid';
 
 import type { ICheckLimitResult } from '~/interfaces/attachment';
 import type Crowi from '~/server/crowi';
-import { type RespondOptions, ResponseMode } from '~/server/interfaces/attachment';
-import { Attachment, type IAttachmentDocument } from '~/server/models/attachment';
+import {
+  type RespondOptions,
+  ResponseMode,
+} from '~/server/interfaces/attachment';
+import {
+  Attachment,
+  type IAttachmentDocument,
+} from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../config-manager';
-
 import type { MultipartUploader } from './multipart-uploader';
 
 const logger = loggerFactory('growi:service:fileUploader');
 
-
 export type SaveFileParam = {
-  filePath: string,
-  contentType: string,
-  data,
-}
+  filePath: string;
+  contentType: string;
+  data;
+};
 
 export type TemporaryUrl = {
-  url: string,
-  lifetimeSec: number,
-}
+  url: string;
+  lifetimeSec: number;
+};
 
 export interface FileUploader {
-  getIsUploadable(): boolean,
-  isWritable(): Promise<boolean>,
-  getIsReadable(): boolean,
-  isValidUploadSettings(): boolean,
-  getFileUploadEnabled(): boolean,
-  listFiles(): any,
-  saveFile(param: SaveFileParam): Promise<any>,
-  deleteFiles(): void,
-  getFileUploadTotalLimit(): number,
-  getTotalFileSize(): Promise<number>,
-  doCheckLimit(uploadFileSize: number, maxFileSize: number, totalLimit: number): Promise<ICheckLimitResult>,
-  determineResponseMode(): ResponseMode,
-  uploadAttachment(readable: Readable, attachment: IAttachmentDocument): Promise<void>,
-  respond(res: Response, attachment: IAttachmentDocument, opts?: RespondOptions): void,
-  findDeliveryFile(attachment: IAttachmentDocument): Promise<NodeJS.ReadableStream>,
-  generateTemporaryUrl(attachment: IAttachmentDocument, opts?: RespondOptions): Promise<TemporaryUrl>,
-  createMultipartUploader: (uploadKey: string, maxPartSize: number) => MultipartUploader,
-  abortPreviousMultipartUpload: (uploadKey: string, uploadId: string) => Promise<void>
+  getIsUploadable(): boolean;
+  isWritable(): Promise<boolean>;
+  getIsReadable(): boolean;
+  isValidUploadSettings(): boolean;
+  getFileUploadEnabled(): boolean;
+  listFiles(): any;
+  saveFile(param: SaveFileParam): Promise<any>;
+  deleteFile(attachment: HydratedDocument<IAttachmentDocument>): void;
+  deleteFiles(attachments: HydratedDocument<IAttachmentDocument>[]): void;
+  getFileUploadTotalLimit(): number;
+  getTotalFileSize(): Promise<number>;
+  checkLimit(uploadFileSize: number): Promise<ICheckLimitResult>;
+  determineResponseMode(): ResponseMode;
+  uploadAttachment(
+    readable: Readable,
+    attachment: IAttachmentDocument,
+  ): Promise<void>;
+  respond(
+    res: Response,
+    attachment: IAttachmentDocument,
+    opts?: RespondOptions,
+  ): void;
+  findDeliveryFile(
+    attachment: IAttachmentDocument,
+  ): Promise<NodeJS.ReadableStream>;
+  generateTemporaryUrl(
+    attachment: IAttachmentDocument,
+    opts?: RespondOptions,
+  ): Promise<TemporaryUrl>;
+  createMultipartUploader: (
+    uploadKey: string,
+    maxPartSize: number,
+  ) => MultipartUploader;
+  abortPreviousMultipartUpload: (
+    uploadKey: string,
+    uploadId: string,
+  ) => Promise<void>;
 }
 
 export abstract class AbstractFileUploader implements FileUploader {
-
   private crowi: Crowi;
 
   constructor(crowi: Crowi) {
@@ -57,7 +79,10 @@ export abstract class AbstractFileUploader implements FileUploader {
   }
 
   getIsUploadable() {
-    return !configManager.getConfig('app:fileUploadDisabled') && this.isValidUploadSettings();
+    const isFileUploadDisabled =
+      configManager.getConfig('app:fileUploadType') === 'none';
+
+    return !isFileUploadDisabled && this.isValidUploadSettings();
   }
 
   /**
@@ -66,7 +91,8 @@ export abstract class AbstractFileUploader implements FileUploader {
    */
   async isWritable() {
     const filePath = `${uuidv4()}.growi`;
-    const data = 'This file was created during g2g transfer to check write permission. You can safely remove this file.';
+    const data =
+      'This file was created during g2g transfer to check write permission. You can safely remove this file.';
 
     try {
       await this.saveFile({
@@ -77,8 +103,7 @@ export abstract class AbstractFileUploader implements FileUploader {
       // TODO: delete tmp file in background
 
       return true;
-    }
-    catch (err) {
+    } catch (err) {
       logger.error(err);
       return false;
     }
@@ -92,31 +117,25 @@ export abstract class AbstractFileUploader implements FileUploader {
   abstract isValidUploadSettings(): boolean;
 
   getFileUploadEnabled() {
-    if (!this.getIsUploadable()) {
-      return false;
-    }
-
-    return !!configManager.getConfig('app:fileUpload');
+    return this.getIsUploadable();
   }
 
   abstract listFiles();
 
   abstract saveFile(param: SaveFileParam);
 
-  abstract deleteFiles();
+  abstract deleteFile(attachment: HydratedDocument<IAttachmentDocument>): void;
+
+  abstract deleteFiles(
+    attachments: HydratedDocument<IAttachmentDocument>[],
+  ): void;
 
   /**
    * Returns file upload total limit in bytes.
-   * Reference to previous implementation is
-   * {@link https://github.com/growilabs/growi/blob/798e44f14ad01544c1d75ba83d4dfb321a94aa0b/src/server/service/file-uploader/gridfs.js#L86-L88}
    * @returns file upload total limit in bytes
    */
-  getFileUploadTotalLimit() {
-    const fileUploadTotalLimit = configManager.getConfig('app:fileUploadType') === 'mongodb'
-      // Use app:fileUploadTotalLimit if gridfs:totalLimit is null (default for gridfs:totalLimit is null)
-      ? configManager.getConfig('app:fileUploadTotalLimit')
-      : configManager.getConfig('app:fileUploadTotalLimit');
-    return fileUploadTotalLimit;
+  getFileUploadTotalLimit(): number {
+    return configManager.getConfig('app:fileUploadTotalLimit');
   }
 
   /**
@@ -135,17 +154,36 @@ export abstract class AbstractFileUploader implements FileUploader {
   }
 
   /**
+   * check the file size limit
+   */
+  checkLimit(uploadFileSize: number): Promise<ICheckLimitResult> {
+    const maxFileSize = configManager.getConfig('app:maxFileSize');
+    const totalLimit = this.getFileUploadTotalLimit();
+    return this.doCheckLimit(uploadFileSize, maxFileSize, totalLimit);
+  }
+
+  /**
    * Check files size limits for all uploaders
    *
    */
-  async doCheckLimit(uploadFileSize: number, maxFileSize: number, totalLimit: number): Promise<ICheckLimitResult> {
+  protected async doCheckLimit(
+    uploadFileSize: number,
+    maxFileSize: number,
+    totalLimit: number,
+  ): Promise<ICheckLimitResult> {
     if (uploadFileSize > maxFileSize) {
-      return { isUploadable: false, errorMessage: 'File size exceeds the size limit per file' };
+      return {
+        isUploadable: false,
+        errorMessage: 'File size exceeds the size limit per file',
+      };
     }
 
     const usingFilesSize = await this.getTotalFileSize();
     if (usingFilesSize + uploadFileSize > totalLimit) {
-      return { isUploadable: false, errorMessage: 'Uploading files reaches limit' };
+      return {
+        isUploadable: false,
+        errorMessage: 'Uploading files reaches limit',
+      };
     }
 
     return { isUploadable: true };
@@ -161,32 +199,49 @@ export abstract class AbstractFileUploader implements FileUploader {
   /**
    * Create a multipart uploader for cloud storage
    */
-  createMultipartUploader(uploadKey: string, maxPartSize: number): MultipartUploader {
+  createMultipartUploader(
+    uploadKey: string,
+    maxPartSize: number,
+  ): MultipartUploader {
     throw new Error('Multipart upload not available for file upload type');
   }
 
-  abstract uploadAttachment(readable: Readable, attachment: IAttachmentDocument): Promise<void>;
+  abstract uploadAttachment(
+    readable: Readable,
+    attachment: IAttachmentDocument,
+  ): Promise<void>;
 
   /**
    * Abort an existing multipart upload without creating a MultipartUploader instance
    */
-  abortPreviousMultipartUpload(uploadKey: string, uploadId: string): Promise<void> {
+  abortPreviousMultipartUpload(
+    uploadKey: string,
+    uploadId: string,
+  ): Promise<void> {
     throw new Error('Multipart upload not available for file upload type');
   }
 
   /**
    * Respond to the HTTP request.
    */
-  abstract respond(res: Response, attachment: IAttachmentDocument, opts?: RespondOptions): void;
+  abstract respond(
+    res: Response,
+    attachment: IAttachmentDocument,
+    opts?: RespondOptions,
+  ): void;
 
   /**
    * Find the file and Return ReadStream
    */
-  abstract findDeliveryFile(attachment: IAttachmentDocument): Promise<NodeJS.ReadableStream>;
+  abstract findDeliveryFile(
+    attachment: IAttachmentDocument,
+  ): Promise<NodeJS.ReadableStream>;
 
   /**
    * Generate temporaryUrl that is valid for a very short time
    */
-  abstract generateTemporaryUrl(attachment: IAttachmentDocument, opts?: RespondOptions): Promise<TemporaryUrl>;
-
+  abstract generateTemporaryUrl(
+    attachment: IAttachmentDocument,
+    opts?: RespondOptions,
+  ): Promise<TemporaryUrl>;
 }

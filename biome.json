@@ -3,34 +3,28 @@
   "files": {
     "includes": [
       "**",
-      "!**/dist",
-      "!**/node_modules",
       "!**/.pnpm-store",
-      "!**/coverage",
-      "!**/vite.config.ts.timestamp-*",
-      "!**/vite.server.config.ts.timestamp-*",
-      "!**/vite.client.config.ts.timestamp-*",
-      "!**/.turbo",
-      "!**/.vscode",
-      "!**/turbo.json",
-      "!**/.claude",
-      "!**/.next",
       "!**/.terraform",
-      "!bin",
-      "!tsconfig.base.json",
+      "!**/coverage",
+      "!**/dist",
+      "!**/.next",
+      "!**/node_modules",
+      "!**/vite.*.ts.timestamp-*",
+      "!**/*.grit",
+      "!**/turbo.json",
       "!**/.devcontainer",
-      "!**/.eslintrc.js",
       "!**/.stylelintrc.json",
       "!**/package.json",
+      "!.turbo",
+      "!.vscode",
+      "!.claude",
+      "!tsconfig.base.json",
       "!apps/app/src/styles/prebuilt",
       "!apps/app/tmp",
+      "!apps/pdf-converter/specs",
       "!apps/slackbot-proxy/src/public/bootstrap",
       "!packages/pdf-converter-client/src/index.ts",
-      "!packages/pdf-converter-client/specs",
-      "!apps/app/src/client",
-      "!apps/app/src/server/middlewares",
-      "!apps/app/src/server/routes/apiv3",
-      "!apps/app/src/server/service"
+      "!packages/pdf-converter-client/specs"
     ]
   },
   "formatter": {
@@ -65,8 +59,25 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "style": {
+        "useThrowOnlyError": "error",
+        "noParameterAssign": "warn",
+        "noDefaultExport": "warn"
+      },
+      "suspicious": {
+        "noConsole": "error",
+        "noAlert": "error",
+        "noVar": "error",
+        "useAwait": "warn"
+      },
+      "performance": {
+        "noAwaitInLoops": "warn"
+      },
       "correctness": {
         "useUniqueElementIds": "warn"
+      },
+      "nursery": {
+        "useMaxParams": "warn"
       }
     }
   },
@@ -79,6 +90,39 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["**/vite*.config.ts", "vitest*.config.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["bin/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["bin/data-migrations/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noVar": "off"
+          },
+          "correctness": {
+            "noInnerDeclarations": "off"
+          }
+        }
+      }
+    },
     {
       "includes": ["apps/pdf-converter/**", "./apps/slackbot-proxy/**"],
       "linter": {
@@ -127,7 +171,7 @@
                 },
                 "patterns": [
                   {
-                    "group": ["~/client/*", "client/*"],
+                    "group": ["~/client/**", "**/client/**", "client/**"],
                     "message": "Importing from client/ directories is restricted."
                   }
                 ]
@@ -136,6 +180,10 @@
           }
         }
       }
+    },
+    {
+      "includes": ["apps/app/src/server/models/**"],
+      "plugins": ["apps/app/src/server/models/.biome/plugins/no-populate.grit"]
     }
   ]
 }

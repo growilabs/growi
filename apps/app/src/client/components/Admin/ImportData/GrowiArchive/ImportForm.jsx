@@ -1,31 +1,31 @@
 import React from 'react';
-
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
-import { toastSuccess, toastError } from '~/client/util/toastr';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useAdminSocket } from '~/features/admin/states/socket-io';
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { ImportOptionForPages } from '~/models/admin/import-option-for-pages';
 import { ImportOptionForRevisions } from '~/models/admin/import-option-for-revisions';
-import { useAdminSocket } from '~/stores/socket-io';
-
 
 import ErrorViewer from './ErrorViewer';
 import ImportCollectionConfigurationModal from './ImportCollectionConfigurationModal';
-import ImportCollectionItem, { DEFAULT_MODE, MODE_RESTRICTED_COLLECTION } from './ImportCollectionItem';
+import ImportCollectionItem, {
+  DEFAULT_MODE,
+  MODE_RESTRICTED_COLLECTION,
+} from './ImportCollectionItem';
 
-
-const GROUPS_PAGE = [
-  'pages', 'revisions', 'tags', 'pagetagrelations',
-];
+const GROUPS_PAGE = ['pages', 'revisions', 'tags', 'pagetagrelations'];
 const GROUPS_USER = [
-  'users', 'externalaccounts', 'usergroups', 'usergrouprelations',
+  'users',
+  'externalaccounts',
+  'usergroups',
+  'usergrouprelations',
 ];
-const GROUPS_CONFIG = [
-  'configs', 'updateposts', 'globalnotificationsettings',
-];
-const ALL_GROUPED_COLLECTIONS = GROUPS_PAGE.concat(GROUPS_USER).concat(GROUPS_CONFIG);
+const GROUPS_CONFIG = ['configs', 'updateposts', 'globalnotificationsettings'];
+const ALL_GROUPED_COLLECTIONS =
+  GROUPS_PAGE.concat(GROUPS_USER).concat(GROUPS_CONFIG);
 
 /** @type Record<string, typeof GrowiArchiveImportOption> */
 const IMPORT_OPTION_CLASS_MAPPING = {
@@ -34,7 +34,6 @@ const IMPORT_OPTION_CLASS_MAPPING = {
 };
 
 class ImportForm extends React.Component {
-
   constructor(props) {
     super(props);
 
@@ -69,12 +68,17 @@ class ImportForm extends React.Component {
       this.initialState.collectionNameToFileNameMap[collectionName] = fileName;
 
       // determine initial mode
-      const initialMode = (MODE_RESTRICTED_COLLECTION[collectionName] != null)
-        ? MODE_RESTRICTED_COLLECTION[collectionName][0]
-        : DEFAULT_MODE;
+      const initialMode =
+        MODE_RESTRICTED_COLLECTION[collectionName] != null
+          ? MODE_RESTRICTED_COLLECTION[collectionName][0]
+          : DEFAULT_MODE;
       // create GrowiArchiveImportOption instance
-      const ImportOption = IMPORT_OPTION_CLASS_MAPPING[collectionName] || GrowiArchiveImportOption;
-      this.initialState.optionsMap[collectionName] = new ImportOption(collectionName, initialMode);
+      const ImportOption =
+        IMPORT_OPTION_CLASS_MAPPING[collectionName] || GrowiArchiveImportOption;
+      this.initialState.optionsMap[collectionName] = new ImportOption(
+        collectionName,
+        initialMode,
+      );
     });
 
     this.state = this.initialState;
@@ -93,6 +97,7 @@ class ImportForm extends React.Component {
     return Object.keys(this.state.collectionNameToFileNameMap);
   }
 
+  // biome-ignore lint/correctness/noNestedComponentDefinitions: lifecycle method on a class component
   UNSAFE_componentWillMount() {
     this.setupWebsocketEventHandler();
   }
@@ -105,22 +110,24 @@ class ImportForm extends React.Component {
     const { socket } = this.props;
 
     // websocket event
-    // eslint-disable-next-line object-curly-newline
-    socket.on('admin:onProgressForImport', ({ collectionName, collectionProgress, appendedErrors }) => {
-      const { progressMap, errorsMap } = this.state;
-      progressMap[collectionName] = collectionProgress;
+    socket.on(
+      'admin:onProgressForImport',
+      ({ collectionName, collectionProgress, appendedErrors }) => {
+        const { progressMap, errorsMap } = this.state;
+        progressMap[collectionName] = collectionProgress;
 
-      if (appendedErrors != null) {
-        const errors = errorsMap[collectionName] || [];
-        errorsMap[collectionName] = errors.concat(appendedErrors);
-      }
+        if (appendedErrors != null) {
+          const errors = errorsMap[collectionName] || [];
+          errorsMap[collectionName] = errors.concat(appendedErrors);
+        }
 
-      this.setState({
-        isImporting: true,
-        progressMap,
-        errorsMap,
-      });
-    });
+        this.setState({
+          isImporting: true,
+          progressMap,
+          errorsMap,
+        });
+      },
+    );
 
     // websocket event
     socket.on('admin:onTerminateForImport', () => {
@@ -154,8 +161,7 @@ class ImportForm extends React.Component {
     const selectedCollections = new Set(this.state.selectedCollections);
     if (bool) {
       selectedCollections.add(collectionName);
-    }
-    else {
+    } else {
       selectedCollections.delete(collectionName);
     }
 
@@ -165,7 +171,9 @@ class ImportForm extends React.Component {
   }
 
   async checkAll() {
-    await this.setState({ selectedCollections: new Set(this.allCollectionNames) });
+    await this.setState({
+      selectedCollections: new Set(this.allCollectionNames),
+    });
     this.validate();
   }
 
@@ -186,11 +194,17 @@ class ImportForm extends React.Component {
   }
 
   openConfigurationModal(collectionName) {
-    this.setState({ isConfigurationModalOpen: true, collectionNameForConfiguration: collectionName });
+    this.setState({
+      isConfigurationModalOpen: true,
+      collectionNameForConfiguration: collectionName,
+    });
   }
 
   showErrorsViewer(collectionName) {
-    this.setState({ isErrorsViewerOpen: true, collectionNameForErrorsViewer: collectionName });
+    this.setState({
+      isErrorsViewerOpen: true,
+      collectionNameForErrorsViewer: collectionName,
+    });
   }
 
   async validate() {
@@ -224,7 +238,9 @@ class ImportForm extends React.Component {
     const { warnForOtherGroups, selectedCollections } = this.state;
 
     if (selectedCollections.size === 0) {
-      warnForOtherGroups.push(t('admin:importer_management.growi_settings.errors.at_least_one'));
+      warnForOtherGroups.push(
+        t('admin:importer_management.growi_settings.errors.at_least_one'),
+      );
     }
 
     this.setState({ warnForOtherGroups });
@@ -234,13 +250,20 @@ class ImportForm extends React.Component {
     const { t } = this.props;
     const { warnForPageGroups, selectedCollections } = this.state;
 
-    const pageRelatedCollectionsLength = ['pages', 'revisions'].filter((collectionName) => {
-      return selectedCollections.has(collectionName);
-    }).length;
+    const pageRelatedCollectionsLength = ['pages', 'revisions'].filter(
+      (collectionName) => {
+        return selectedCollections.has(collectionName);
+      },
+    ).length;
 
     // MUST be included both or neither when importing
-    if (pageRelatedCollectionsLength !== 0 && pageRelatedCollectionsLength !== 2) {
-      warnForPageGroups.push(t('admin:importer_management.growi_settings.errors.page_and_revision'));
+    if (
+      pageRelatedCollectionsLength !== 0 &&
+      pageRelatedCollectionsLength !== 2
+    ) {
+      warnForPageGroups.push(
+        t('admin:importer_management.growi_settings.errors.page_and_revision'),
+      );
     }
 
     this.setState({ warnForPageGroups });
@@ -253,7 +276,12 @@ class ImportForm extends React.Component {
     // MUST include also 'users' if 'externalaccounts' is selected
     if (selectedCollections.has('externalaccounts')) {
       if (!selectedCollections.has('users')) {
-        warnForUserGroups.push(t('admin:importer_management.growi_settings.errors.depends', { target: 'Users', condition: 'Externalaccounts' }));
+        warnForUserGroups.push(
+          t('admin:importer_management.growi_settings.errors.depends', {
+            target: 'Users',
+            condition: 'Externalaccounts',
+          }),
+        );
       }
     }
 
@@ -267,7 +295,12 @@ class ImportForm extends React.Component {
     // MUST include also 'users' if 'usergroups' is selected
     if (selectedCollections.has('usergroups')) {
       if (!selectedCollections.has('users')) {
-        warnForUserGroups.push(t('admin:importer_management.growi_settings.errors.depends', { target: 'Users', condition: 'Usergroups' }));
+        warnForUserGroups.push(
+          t('admin:importer_management.growi_settings.errors.depends', {
+            target: 'Users',
+            condition: 'Usergroups',
+          }),
+        );
       }
     }
 
@@ -281,7 +314,12 @@ class ImportForm extends React.Component {
     // MUST include also 'usergroups' if 'usergrouprelations' is selected
     if (selectedCollections.has('usergrouprelations')) {
       if (!selectedCollections.has('usergroups')) {
-        warnForUserGroups.push(t('admin:importer_management.growi_settings.errors.depends', { target: 'Usergroups', condition: 'Usergrouprelations' }));
+        warnForUserGroups.push(
+          t('admin:importer_management.growi_settings.errors.depends', {
+            target: 'Usergroups',
+            condition: 'Usergrouprelations',
+          }),
+        );
       }
     }
 
@@ -289,9 +327,7 @@ class ImportForm extends React.Component {
   }
 
   async import() {
-    const {
-      fileName, onPostImport, t,
-    } = this.props;
+    const { fileName, onPostImport, t } = this.props;
     const { selectedCollections, optionsMap } = this.state;
 
     // init progress data
@@ -314,8 +350,7 @@ class ImportForm extends React.Component {
       }
 
       toastSuccess(undefined, 'Import process has requested.');
-    }
-    catch (err) {
+    } catch (err) {
       if (err.code === 'only_upsert_available') {
         toastError(t('admin:importer_management.error.only_upsert_available'));
       }
@@ -331,9 +366,8 @@ class ImportForm extends React.Component {
     return (
       <div key={key} className="alert alert-warning">
         <ul>
-          {errors.map((error, index) => {
-            // eslint-disable-next-line react/no-array-index-key
-            return <li key={`${key}-${index}`}>{error}</li>;
+          {errors.map((error) => {
+            return <li key={`${key}-${String(error)}`}>{error}</li>;
           })}
         </ul>
       </div>
@@ -363,7 +397,11 @@ class ImportForm extends React.Component {
       return !ALL_GROUPED_COLLECTIONS.includes(collectionName);
     });
 
-    return this.renderGroups(collectionNames, 'Other', this.state.warnForOtherGroups);
+    return this.renderGroups(
+      collectionNames,
+      'Other',
+      this.state.warnForOtherGroups,
+    );
   }
 
   renderImportItems(collectionNames) {
@@ -382,15 +420,21 @@ class ImportForm extends React.Component {
         {collectionNames.map((collectionName) => {
           const collectionProgress = progressMap[collectionName];
           const errorsCount = errorsMap[collectionName]?.length ?? 0;
-          const isConfigButtonAvailable = Object.keys(IMPORT_OPTION_CLASS_MAPPING).includes(collectionName);
+          const isConfigButtonAvailable = Object.keys(
+            IMPORT_OPTION_CLASS_MAPPING,
+          ).includes(collectionName);
 
           return (
             <div className="col-md-6 my-1" key={collectionName}>
               <ImportCollectionItem
                 isImporting={isImporting}
                 isImported={collectionProgress ? isImported : false}
-                insertedCount={collectionProgress ? collectionProgress.insertedCount : 0}
-                modifiedCount={collectionProgress ? collectionProgress.modifiedCount : 0}
+                insertedCount={
+                  collectionProgress ? collectionProgress.insertedCount : 0
+                }
+                modifiedCount={
+                  collectionProgress ? collectionProgress.modifiedCount : 0
+                }
                 errorsCount={errorsCount}
                 collectionName={collectionName}
                 isSelected={selectedCollections.has(collectionName)}
@@ -410,7 +454,11 @@ class ImportForm extends React.Component {
   }
 
   renderConfigurationModal() {
-    const { isConfigurationModalOpen, collectionNameForConfiguration: collectionName, optionsMap } = this.state;
+    const {
+      isConfigurationModalOpen,
+      collectionNameForConfiguration: collectionName,
+      optionsMap,
+    } = this.state;
 
     if (collectionName == null) {
       return null;
@@ -428,7 +476,8 @@ class ImportForm extends React.Component {
   }
 
   renderErrorsViewer() {
-    const { isErrorsViewerOpen, errorsMap, collectionNameForErrorsViewer } = this.state;
+    const { isErrorsViewerOpen, errorsMap, collectionNameForErrorsViewer } =
+      this.state;
     const errors = errorsMap[collectionNameForErrorsViewer];
 
     return (
@@ -443,32 +492,63 @@ class ImportForm extends React.Component {
   render() {
     const { t } = this.props;
     const {
-      canImport, isImporting,
-      warnForPageGroups, warnForUserGroups, warnForConfigGroups,
+      canImport,
+      isImporting,
+      warnForPageGroups,
+      warnForUserGroups,
+      warnForConfigGroups,
     } = this.state;
 
     return (
       <>
         <form className="row row-cols-lg-auto g-3 align-items-center">
           <div className="col-12">
-            <button type="button" className="btn btn-sm btn-outline-secondary me-2" onClick={this.checkAll}>
-              <span className="material-symbols-outlined">check_box</span> {t('admin:export_management.check_all')}
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary me-2"
+              onClick={this.checkAll}
+            >
+              <span className="material-symbols-outlined">check_box</span>{' '}
+              {t('admin:export_management.check_all')}
             </button>
           </div>
           <div className="col-12">
-            <button type="button" className="btn btn-sm btn-outline-secondary me-2" onClick={this.uncheckAll}>
-              <span className="material-symbols-outlined">check_box_outline_blank</span> {t('admin:export_management.uncheck_all')}
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary me-2"
+              onClick={this.uncheckAll}
+            >
+              <span className="material-symbols-outlined">
+                check_box_outline_blank
+              </span>{' '}
+              {t('admin:export_management.uncheck_all')}
             </button>
           </div>
         </form>
 
         <div className="card custom-card small my-4">
           <ul>
-            <li>{t('admin:importer_management.growi_settings.description_of_import_mode.about')}</li>
+            <li>
+              {t(
+                'admin:importer_management.growi_settings.description_of_import_mode.about',
+              )}
+            </li>
             <ul>
-              <li>{t('admin:importer_management.growi_settings.description_of_import_mode.insert')}</li>
-              <li>{t('admin:importer_management.growi_settings.description_of_import_mode.upsert')}</li>
-              <li>{t('admin:importer_management.growi_settings.description_of_import_mode.flash_and_insert')}</li>
+              <li>
+                {t(
+                  'admin:importer_management.growi_settings.description_of_import_mode.insert',
+                )}
+              </li>
+              <li>
+                {t(
+                  'admin:importer_management.growi_settings.description_of_import_mode.upsert',
+                )}
+              </li>
+              <li>
+                {t(
+                  'admin:importer_management.growi_settings.description_of_import_mode.flash_and_insert',
+                )}
+              </li>
             </ul>
           </ul>
         </div>
@@ -479,10 +559,19 @@ class ImportForm extends React.Component {
         {this.renderOthers()}
 
         <div className="mt-4 text-center">
-          <button type="button" className="btn btn-outline-secondary mx-1" onClick={this.props.onDiscard}>
+          <button
+            type="button"
+            className="btn btn-outline-secondary mx-1"
+            onClick={this.props.onDiscard}
+          >
             {t('admin:importer_management.growi_settings.discard')}
           </button>
-          <button type="button" className="btn btn-primary mx-1" onClick={this.import} disabled={!canImport || isImporting}>
+          <button
+            type="button"
+            className="btn btn-primary mx-1"
+            onClick={this.import}
+            disabled={!canImport || isImporting}
+          >
             {t('admin:importer_management.import')}
           </button>
         </div>
@@ -492,7 +581,6 @@ class ImportForm extends React.Component {
       </>
     );
   }
-
 }
 
 ImportForm.propTypes = {
@@ -507,7 +595,7 @@ ImportForm.propTypes = {
 
 const ImportFormWrapperFc = (props) => {
   const { t } = useTranslation('admin');
-  const { data: socket } = useAdminSocket();
+  const socket = useAdminSocket();
 
   if (socket == null) {
     return;
@@ -515,6 +603,5 @@ const ImportFormWrapperFc = (props) => {
 
   return <ImportForm t={t} socket={socket} {...props} />;
 };
-
 
 export default ImportFormWrapperFc;

@@ -1,10 +1,7 @@
 import React, { useCallback } from 'react';
-
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
-import {
-  Button, Modal, ModalHeader, ModalBody, ModalFooter,
-} from 'reactstrap';
+import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 const DeleteAllShareLinksModal = React.memo((props) => {
   const { t, onClickDeleteButton, onClose } = props;
@@ -19,16 +16,18 @@ const DeleteAllShareLinksModal = React.memo((props) => {
   }, [onClose]);
 
   return (
-    <Modal isOpen={props.isOpen} toggle={closeButtonHandler} className="page-comment-delete-modal">
+    <Modal
+      isOpen={props.isOpen}
+      toggle={closeButtonHandler}
+      className="page-comment-delete-modal"
+    >
       <ModalHeader tag="h4" toggle={closeButtonHandler} className="text-danger">
         <span>
           <span className="material-symbols-outlined">delete_forever</span>
           {t('security_settings.delete_all_share_links')}
         </span>
       </ModalHeader>
-      <ModalBody>
-        { t('security_settings.share_link_notice')}
-      </ModalBody>
+      <ModalBody>{t('security_settings.share_link_notice')}</ModalBody>
       <ModalFooter>
         <Button onClick={closeButtonHandler}>{t('Cancel')}</Button>
         <Button color="danger" onClick={deleteAllLinkHandler}>
@@ -38,10 +37,8 @@ const DeleteAllShareLinksModal = React.memo((props) => {
       </ModalFooter>
     </Modal>
   );
-
 });
 DeleteAllShareLinksModal.displayName = 'DeleteAllShareLinksModal';
-
 
 DeleteAllShareLinksModal.propTypes = {
   t: PropTypes.func.isRequired, // i18next
@@ -51,7 +48,7 @@ DeleteAllShareLinksModal.propTypes = {
   onClickDeleteButton: PropTypes.func,
 };
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+// biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
 const DeleteAllShareLinksModalWrapperFC = (props) => {
   const { t } = useTranslation('admin');
 

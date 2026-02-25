@@ -3,15 +3,14 @@ import { useTranslation } from 'next-i18next';
 import { useUpdateStateAfterSave } from '~/client/services/page-operation';
 import { useDrawioModalLauncherForView } from '~/client/services/side-effects/drawio-modal-launcher-for-view';
 import { useHandsontableModalLauncherForView } from '~/client/services/side-effects/handsontable-modal-launcher-for-view';
-import { toastSuccess, toastError, toastWarning } from '~/client/util/toastr';
+import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
 import { PageUpdateErrorCode } from '~/interfaces/apiv3';
-import { useCurrentPageId } from '~/stores/page';
-
+import { useCurrentPageId } from '~/states/page';
 
 export const PageContentsUtilities = (): null => {
   const { t } = useTranslation();
 
-  const { data: pageId } = useCurrentPageId();
+  const pageId = useCurrentPageId();
   const updateStateAfterSave = useUpdateStateAfterSave(pageId);
 
   useHandsontableModalLauncherForView({
@@ -23,7 +22,9 @@ export const PageContentsUtilities = (): null => {
     onSaveError: (errors) => {
       for (const error of errors) {
         if (error.code === PageUpdateErrorCode.CONFLICT) {
-          toastWarning(t('modal_resolve_conflict.conflicts_with_new_body_on_server_side'));
+          toastWarning(
+            t('modal_resolve_conflict.conflicts_with_new_body_on_server_side'),
+          );
           return;
         }
       }
@@ -41,7 +42,9 @@ export const PageContentsUtilities = (): null => {
     onSaveError: (errors) => {
       for (const error of errors) {
         if (error.code === PageUpdateErrorCode.CONFLICT) {
-          toastWarning(t('modal_resolve_conflict.conflicts_with_new_body_on_server_side'));
+          toastWarning(
+            t('modal_resolve_conflict.conflicts_with_new_body_on_server_side'),
+          );
           return;
         }
       }

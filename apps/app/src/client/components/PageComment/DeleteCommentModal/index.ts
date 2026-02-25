@@ -1,0 +1,1 @@
+export { DeleteCommentModalLazyLoaded } from './dynamic';

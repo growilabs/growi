@@ -1,0 +1,1 @@
+export { TagEditModalLazyLoaded } from './dynamic';

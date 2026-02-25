@@ -5,10 +5,10 @@ GROWI PDF Converter Official docker image
 [![Node CI for pdf-converter](https://github.com/growilabs/growi/actions/workflows/ci-pdf-converter.yml/badge.svg)](https://github.com/growilabs/growi/actions/workflows/ci-pdf-converter.yml) [![docker-pulls](https://img.shields.io/docker/pulls/growilabs/pdf-converter.svg)](https://hub.docker.com/r/growilabs/pdf-converter/)
 
 
-Supported tags and respective Dockerfile links
+Dockerfile link
 ------------------------------------------------
 
-* [`1.0.0`, `latest` (Dockerfile)](https://github.com/growilabs/growi/blob/master/apps/pdf-converter/docker/Dockerfile)
+https://github.com/growilabs/growi/blob/master/apps/pdf-converter/docker/Dockerfile
 
 
 What is GROWI PDF Converter used for?

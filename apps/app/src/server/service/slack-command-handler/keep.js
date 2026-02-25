@@ -1,5 +1,8 @@
 import {
-  inputBlock, actionsBlock, buttonElement, markdownSectionBlock,
+  actionsBlock,
+  buttonElement,
+  inputBlock,
+  markdownSectionBlock,
 } from '@growi/slack/dist/utils/block-kit-builder';
 import { format } from 'date-fns/format';
 import { parse } from 'date-fns/parse';
@@ -17,7 +20,12 @@ module.exports = (crowi) => {
   const handler = new BaseSlackCommandHandler();
   const { User } = crowi.models;
 
-  handler.handleCommand = async function(growiCommand, client, body, respondUtil) {
+  handler.handleCommand = async function (
+    growiCommand,
+    client,
+    body,
+    respondUtil,
+  ) {
     await respondUtil.respond({
       text: 'Select messages to use.',
       blocks: this.keepMessageBlocks(body.channel_name),
@@ -25,21 +33,46 @@ module.exports = (crowi) => {
     return;
   };
 
-  handler.handleInteractions = async function(client, interactionPayload, interactionPayloadAccessor, handlerMethodName, respondUtil) {
-    await this[handlerMethodName](client, interactionPayload, interactionPayloadAccessor, respondUtil);
+  handler.handleInteractions = async function (
+    client,
+    interactionPayload,
+    interactionPayloadAccessor,
+    handlerMethodName,
+    respondUtil,
+  ) {
+    await this[handlerMethodName](
+      client,
+      interactionPayload,
+      interactionPayloadAccessor,
+      respondUtil,
+    );
   };
 
-  handler.cancel = async function(client, payload, interactionPayloadAccessor, respondUtil) {
+  handler.cancel = async (
+    client,
+    payload,
+    interactionPayloadAccessor,
+    respondUtil,
+  ) => {
     await respondUtil.deleteOriginal();
   };
 
-  handler.createPage = async function(client, payload, interactionPayloadAccessor, respondUtil) {
+  handler.createPage = async function (
+    client,
+    payload,
+    interactionPayloadAccessor,
+    respondUtil,
+  ) {
     let result = [];
     const channelId = payload.channel.id; // this must exist since the type is always block_actions
     const user = await User.findUserBySlackMemberId(payload.user.id);
 
     // validate form
-    const { path, oldest, newest } = await this.keepValidateForm(client, payload, interactionPayloadAccessor);
+    const { path, oldest, newest } = await this.keepValidateForm(
+      client,
+      payload,
+      interactionPayloadAccessor,
+    );
     // get messages
     result = await this.keepGetMessages(client, channelId, newest, oldest);
     // clean messages
@@ -47,37 +80,66 @@ module.exports = (crowi) => {
 
     const contentsBody = cleanedContents.join('');
     // create and send url message
-    await this.keepCreatePageAndSendPreview(client, interactionPayloadAccessor, path, user, contentsBody, respondUtil);
+    await this.keepCreatePageAndSendPreview(
+      client,
+      interactionPayloadAccessor,
+      path,
+      user,
+      contentsBody,
+      respondUtil,
+    );
   };
 
-  handler.keepValidateForm = async function(client, payload, interactionPayloadAccessor) {
+  handler.keepValidateForm = async (
+    client,
+    payload,
+    interactionPayloadAccessor,
+  ) => {
     const grwTzoffset = crowi.appService.getTzoffset() * 60;
-    const path = interactionPayloadAccessor.getStateValues()?.page_path.page_path.value;
-    let oldest = interactionPayloadAccessor.getStateValues()?.oldest.oldest.value;
-    let newest = interactionPayloadAccessor.getStateValues()?.newest.newest.value;
+    const path =
+      interactionPayloadAccessor.getStateValues()?.page_path.page_path.value;
+    let oldest =
+      interactionPayloadAccessor.getStateValues()?.oldest.oldest.value;
+    let newest =
+      interactionPayloadAccessor.getStateValues()?.newest.newest.value;
 
     if (oldest == null || newest == null || path == null) {
-      throw new SlackCommandHandlerError('All parameters are required. (Oldest datetime, Newst datetime and Page path)');
+      throw new SlackCommandHandlerError(
+        'All parameters are required. (Oldest datetime, Newst datetime and Page path)',
+      );
     }
 
     /**
      * RegExp for datetime yyyy/MM/dd-HH:mm
      * @see https://regex101.com/r/XbxdNo/1
      */
-    const regexpDatetime = new RegExp(/^[12]\d\d\d\/(0[1-9]|1[012])\/(0[1-9]|[12][0-9]|3[01])-([01][0-9]|2[0123]):[0-5][0-9]$/);
+    const regexpDatetime = new RegExp(
+      /^[12]\d\d\d\/(0[1-9]|1[012])\/(0[1-9]|[12][0-9]|3[01])-([01][0-9]|2[0123]):[0-5][0-9]$/,
+    );
 
     if (!regexpDatetime.test(oldest.trim())) {
-      throw new SlackCommandHandlerError('Datetime format for oldest must be yyyy/MM/dd-HH:mm');
+      throw new SlackCommandHandlerError(
+        'Datetime format for oldest must be yyyy/MM/dd-HH:mm',
+      );
     }
     if (!regexpDatetime.test(newest.trim())) {
-      throw new SlackCommandHandlerError('Datetime format for newest must be yyyy/MM/dd-HH:mm');
+      throw new SlackCommandHandlerError(
+        'Datetime format for newest must be yyyy/MM/dd-HH:mm',
+      );
     }
-    oldest = parse(oldest, 'yyyy/MM/dd-HH:mm', new Date()).getTime() / 1000 + grwTzoffset;
+    oldest =
+      parse(oldest, 'yyyy/MM/dd-HH:mm', new Date()).getTime() / 1000 +
+      grwTzoffset;
     // + 60s in order to include messages between hh:mm.00s and hh:mm.59s
-    newest = parse(newest, 'yyyy/MM/dd-HH:mm', new Date()).getTime() / 1000 + grwTzoffset + 60;
+    newest =
+      parse(newest, 'yyyy/MM/dd-HH:mm', new Date()).getTime() / 1000 +
+      grwTzoffset +
+      60;
 
     if (oldest > newest) {
-      throw new SlackCommandHandlerError('Oldest datetime must be older than the newest date time.');
+      throw new SlackCommandHandlerError(
+        'Oldest datetime must be older than the newest date time.',
+      );
     }
 
     return { path, oldest, newest };
@@ -93,14 +155,13 @@ module.exports = (crowi) => {
     });
   }
 
-  handler.keepGetMessages = async function(client, channelId, newest, oldest) {
+  handler.keepGetMessages = async (client, channelId, newest, oldest) => {
     let result;
 
     // first attempt
     try {
       result = await retrieveHistory(client, channelId, newest, oldest);
-    }
-    catch (err) {
+    } catch (err) {
       const errorCode = err.data?.errorCode;
 
       if (errorCode === 'not_in_channel') {
@@ -109,12 +170,11 @@ module.exports = (crowi) => {
           channel: channelId,
         });
         result = await retrieveHistory(client, channelId, newest, oldest);
-      }
-      else if (errorCode === 'channel_not_found') {
-
-        const message = ':cry: GROWI Bot couldn\'t get history data because *this channel was private*.'
-          + '\nPlease add GROWI bot to this channel.'
-          + '\n';
+      } else if (errorCode === 'channel_not_found') {
+        const message =
+          ":cry: GROWI Bot couldn't get history data because *this channel was private*." +
+          '\nPlease add GROWI bot to this channel.' +
+          '\n';
         throw new SlackCommandHandlerError(message, {
           respondBody: {
             text: message,
@@ -122,21 +182,23 @@ module.exports = (crowi) => {
               markdownSectionBlock(message),
               {
                 type: 'image',
-                image_url: 'https://user-images.githubusercontent.com/1638767/135658794-a8d2dbc8-580f-4203-b368-e74e2f3c7b3a.png',
+                image_url:
+                  'https://user-images.githubusercontent.com/1638767/135658794-a8d2dbc8-580f-4203-b368-e74e2f3c7b3a.png',
                 alt_text: 'Add app to this channel',
               },
             ],
           },
         });
-      }
-      else {
+      } else {
         throw err;
       }
     }
 
     // return if no message found
     if (result.messages.length === 0) {
-      throw new SlackCommandHandlerError('No message found from keep command. Try different datetime.');
+      throw new SlackCommandHandlerError(
+        'No message found from keep command. Try different datetime.',
+      );
     }
     return result;
   };
@@ -146,7 +208,7 @@ module.exports = (crowi) => {
    * @param {*} messages (array of messages)
    * @returns users object with matching Slack Member ID
    */
-  handler.getGrowiUsersFromMessages = async function(messages) {
+  handler.getGrowiUsersFromMessages = async (messages) => {
     const users = messages.map((message) => {
       return message.user;
     });
@@ -157,21 +219,22 @@ module.exports = (crowi) => {
    * Convert slack member ID to growi user if slack member ID is found in messages
    * @param {*} messages
    */
-  handler.injectGrowiUsernameToMessages = async function(messages) {
+  handler.injectGrowiUsernameToMessages = async function (messages) {
     const growiUsers = await this.getGrowiUsersFromMessages(messages);
 
-    messages.map(async(message) => {
-      const growiUser = growiUsers.find(user => user.slackMemberId === message.user);
+    messages.map(async (message) => {
+      const growiUser = growiUsers.find(
+        (user) => user.slackMemberId === message.user,
+      );
       if (growiUser != null) {
         message.user = `${growiUser.name} (@${growiUser.username})`;
-      }
-      else {
+      } else {
         message.user = `This slack member ID is not registered (${message.user})`;
       }
     });
   };
 
-  handler.keepCleanMessages = async function(messages) {
+  handler.keepCleanMessages = async function (messages) {
     const cleanedContents = [];
     let lastMessage = {};
     const grwTzoffset = crowi.appService.getTzoffset() * 60;
@@ -199,8 +262,21 @@ module.exports = (crowi) => {
     return cleanedContents;
   };
 
-  handler.keepCreatePageAndSendPreview = async function(client, interactionPayloadAccessor, path, user, contentsBody, respondUtil) {
-    await createPageService.createPageInGrowi(interactionPayloadAccessor, path, contentsBody, respondUtil, user);
+  handler.keepCreatePageAndSendPreview = async (
+    client,
+    interactionPayloadAccessor,
+    path,
+    user,
+    contentsBody,
+    respondUtil,
+  ) => {
+    await createPageService.createPageInGrowi(
+      interactionPayloadAccessor,
+      path,
+      contentsBody,
+      respondUtil,
+      user,
+    );
 
     // TODO: contentsBody text characters must be less than 3001
     // send preview to dm
@@ -219,7 +295,7 @@ module.exports = (crowi) => {
     await respondUtil.deleteOriginal();
   };
 
-  handler.keepMessageBlocks = function(channelName) {
+  handler.keepMessageBlocks = (channelName) => {
     const tzDateSec = new Date().getTime();
     const grwTzoffset = crowi.appService.getTzoffset() * 60 * 1000;
 
@@ -233,29 +309,47 @@ module.exports = (crowi) => {
 
     return [
       markdownSectionBlock('*The keep command is in alpha.*'),
-      markdownSectionBlock('Select the oldest and newest datetime of the messages to use.'),
-      inputBlock({
-        type: 'plain_text_input',
-        action_id: 'oldest',
-        initial_value: initialOldest,
-      }, 'oldest', 'Oldest datetime'),
-      inputBlock({
-        type: 'plain_text_input',
-        action_id: 'newest',
-        initial_value: initialNewest,
-      }, 'newest', 'Newest datetime'),
-      inputBlock({
-        type: 'plain_text_input',
-        placeholder: {
-          type: 'plain_text',
-          text: 'Input page path to create.',
+      markdownSectionBlock(
+        'Select the oldest and newest datetime of the messages to use.',
+      ),
+      inputBlock(
+        {
+          type: 'plain_text_input',
+          action_id: 'oldest',
+          initial_value: initialOldest,
         },
-        initial_value: initialPagePath,
-        action_id: 'page_path',
-      }, 'page_path', 'Page path'),
+        'oldest',
+        'Oldest datetime',
+      ),
+      inputBlock(
+        {
+          type: 'plain_text_input',
+          action_id: 'newest',
+          initial_value: initialNewest,
+        },
+        'newest',
+        'Newest datetime',
+      ),
+      inputBlock(
+        {
+          type: 'plain_text_input',
+          placeholder: {
+            type: 'plain_text',
+            text: 'Input page path to create.',
+          },
+          initial_value: initialPagePath,
+          action_id: 'page_path',
+        },
+        'page_path',
+        'Page path',
+      ),
       actionsBlock(
         buttonElement({ text: 'Cancel', actionId: 'keep:cancel' }),
-        buttonElement({ text: 'Create page', actionId: 'keep:createPage', style: 'primary' }),
+        buttonElement({
+          text: 'Create page',
+          actionId: 'keep:createPage',
+          style: 'primary',
+        }),
       ),
     ];
   };

@@ -1,48 +1,47 @@
-import React, {
-  useCallback, useEffect, memo, type JSX,
-} from 'react';
-
-import { useTranslation } from 'next-i18next';
+import { type JSX, memo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { useTranslation } from 'next-i18next';
 
-import { useIsEnabledUnsavedWarning } from '~/stores/editor';
+import { useUnsavedWarning } from '~/states/ui/unsaved-warning';
 
 const UnsavedAlertDialog = (): JSX.Element => {
   const { t } = useTranslation();
   const router = useRouter();
-  const { data: isEnabledUnsavedWarning, mutate: mutateIsEnabledUnsavedWarning } = useIsEnabledUnsavedWarning();
+  const { isEnabled: isEnabledUnsavedWarning, reset } = useUnsavedWarning();
 
-  const alertUnsavedWarningByBrowser = useCallback((e) => {
-    if (isEnabledUnsavedWarning) {
-      e.preventDefault();
-      // returnValue should be set to show alert dialog
-      // default alert message cannot be changed.
-      // See -> https://developer.mozilla.org/ja/docs/Web/API/Window/beforeunload_event
-      e.returnValue = '';
-      return;
-    }
-  }, [isEnabledUnsavedWarning]);
+  const alertUnsavedWarningByBrowser = useCallback(
+    (e) => {
+      if (isEnabledUnsavedWarning) {
+        e.preventDefault();
+        // returnValue should be set to show alert dialog
+        // default alert message cannot be changed.
+        // See -> https://developer.mozilla.org/ja/docs/Web/API/Window/beforeunload_event
+        e.returnValue = '';
+        return;
+      }
+    },
+    [isEnabledUnsavedWarning],
+  );
 
   const alertUnsavedWarningByNextRouter = useCallback(() => {
     if (isEnabledUnsavedWarning) {
       // see: https://zenn.dev/qaynam/articles/c4794537a163d2
-      // eslint-disable-next-line no-alert
+      // biome-ignore lint/suspicious/noAlert: Allow to use confirm dialog here
       const answer = window.confirm(t('page_edit.changes_not_saved'));
       if (!answer) {
-      // eslint-disable-next-line no-throw-literal
-        throw 'Abort route';
+        throw new Error('Abort route');
       }
     }
   }, [isEnabledUnsavedWarning, t]);
 
   const onRouterChangeComplete = useCallback(() => {
-    mutateIsEnabledUnsavedWarning(false);
-  }, [mutateIsEnabledUnsavedWarning]);
+    reset();
+  }, [reset]);
 
   /*
-  * Route changes by Browser
-  * Example: window.location.href, F5
-  */
+   * Route changes by Browser
+   * Example: window.location.href, F5
+   */
   useEffect(() => {
     window.addEventListener('beforeunload', alertUnsavedWarningByBrowser);
     return () => {
@@ -50,11 +49,10 @@ const UnsavedAlertDialog = (): JSX.Element => {
     };
   }, [alertUnsavedWarningByBrowser]);
 
-
   /*
-  * Route changes by Next Router
-  * https://nextjs.org/docs/api-reference/next/router
-  */
+   * Route changes by Next Router
+   * https://nextjs.org/docs/api-reference/next/router
+   */
   useEffect(() => {
     router.events.on('routeChangeStart', alertUnsavedWarningByNextRouter);
     return () => {
@@ -62,14 +60,12 @@ const UnsavedAlertDialog = (): JSX.Element => {
     };
   }, [alertUnsavedWarningByNextRouter, router.events]);
 
-
   useEffect(() => {
     router.events.on('routeChangeComplete', onRouterChangeComplete);
     return () => {
       router.events.off('routeChangeComplete', onRouterChangeComplete);
     };
   }, [onRouterChangeComplete, router.events]);
-
 
   return <></>;
 };

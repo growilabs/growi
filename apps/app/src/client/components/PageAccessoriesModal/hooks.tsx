@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
 
-import { usePageAccessoriesModal, PageAccessoriesModalContents } from '~/stores/modal';
+import {
+  PageAccessoriesModalContents,
+  usePageAccessoriesModalActions,
+  usePageAccessoriesModalStatus,
+} from '~/states/ui/modal/page-accessories';
 
 function getURLQueryParamValue(key: string) {
-// window.location.href is page URL;
+  // window.location.href is page URL;
   const queryStr: URLSearchParams = new URL(window.location.href).searchParams;
   return queryStr.get(key);
 }
@@ -11,11 +15,11 @@ function getURLQueryParamValue(key: string) {
 // https://regex101.com/r/YHTDsr/1
 const queryCompareFormat = /^([0-9a-f]{24})...([0-9a-f]{24})$/i;
 
-
 export const useAutoOpenModalByQueryParam = (): void => {
   const [isArleadyMounted, setIsArleadyMounted] = useState(false);
 
-  const { data: status, open: openPageAccessories } = usePageAccessoriesModal();
+  const status = usePageAccessoriesModalStatus();
+  const { open: openPageAccessories } = usePageAccessoriesModalActions();
 
   useEffect(() => {
     if (isArleadyMounted) {
@@ -40,40 +44,40 @@ export const useAutoOpenModalByQueryParam = (): void => {
 
     setIsArleadyMounted(true);
   }, [openPageAccessories, status, isArleadyMounted]);
-
 };
 
 type ComparingRevisionIds = {
-  sourceRevisionId: string,
-  targetRevisionId: string,
-}
-
-export const useAutoComparingRevisionsByQueryParam = (): ComparingRevisionIds | null => {
-  const [isArleadyMounted, setIsArleadyMounted] = useState(false);
-
-  const [sourceRevisionId, setSourceRevisionId] = useState<string>();
-  const [targetRevisionId, setTargetRevisionId] = useState<string>();
-
-  useEffect(() => {
-    if (isArleadyMounted) {
-      return;
-    }
-
-    const pageIdParams = getURLQueryParamValue('compare');
-    if (pageIdParams != null) {
-      const matches = pageIdParams.match(queryCompareFormat);
-
-      if (matches != null) {
-        const [, source, target] = matches;
-        setSourceRevisionId(source);
-        setTargetRevisionId(target);
-      }
-    }
-
-    setIsArleadyMounted(true);
-  }, [isArleadyMounted]);
-
-  return sourceRevisionId != null && targetRevisionId != null
-    ? { sourceRevisionId, targetRevisionId }
-    : null;
+  sourceRevisionId: string;
+  targetRevisionId: string;
 };
+
+export const useAutoComparingRevisionsByQueryParam =
+  (): ComparingRevisionIds | null => {
+    const [isArleadyMounted, setIsArleadyMounted] = useState(false);
+
+    const [sourceRevisionId, setSourceRevisionId] = useState<string>();
+    const [targetRevisionId, setTargetRevisionId] = useState<string>();
+
+    useEffect(() => {
+      if (isArleadyMounted) {
+        return;
+      }
+
+      const pageIdParams = getURLQueryParamValue('compare');
+      if (pageIdParams != null) {
+        const matches = pageIdParams.match(queryCompareFormat);
+
+        if (matches != null) {
+          const [, source, target] = matches;
+          setSourceRevisionId(source);
+          setTargetRevisionId(target);
+        }
+      }
+
+      setIsArleadyMounted(true);
+    }, [isArleadyMounted]);
+
+    return sourceRevisionId != null && targetRevisionId != null
+      ? { sourceRevisionId, targetRevisionId }
+      : null;
+  };

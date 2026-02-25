@@ -57,7 +57,7 @@ export const scanTemplate = async (
     }
   }
 
-  // eslint-disable-next-line no-console
+  // biome-ignore lint/suspicious/noConsole: Allow to use
   console.debug(`Template directory (${projectDirRoot}) has scanned`, {
     status,
   });

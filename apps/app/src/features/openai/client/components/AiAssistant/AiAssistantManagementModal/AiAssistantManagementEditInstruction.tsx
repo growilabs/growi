@@ -11,8 +11,8 @@ import {
 
 import {
   AiAssistantManagementModalPageMode,
-  useAiAssistantManagementModal,
-} from '../../../stores/ai-assistant';
+  useAiAssistantManagementModalActions,
+} from '../../../states/modal/ai-assistant-management';
 import { AiAssistantManagementHeader } from './AiAssistantManagementHeader';
 
 type Props = {
@@ -26,7 +26,7 @@ export const AiAssistantManagementEditInstruction = (
 ): JSX.Element => {
   const { instruction, onChange, onReset } = props;
   const { t } = useTranslation();
-  const { changePageMode } = useAiAssistantManagementModal();
+  const { changePageMode } = useAiAssistantManagementModalActions();
 
   const handleComplete = () => {
     changePageMode(AiAssistantManagementModalPageMode.HOME);

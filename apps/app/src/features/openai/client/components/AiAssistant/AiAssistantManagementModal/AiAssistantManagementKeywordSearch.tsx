@@ -19,8 +19,9 @@ import type { SelectablePage } from '../../../../interfaces/selectable-page';
 import { useSelectedPages } from '../../../services/use-selected-pages';
 import {
   AiAssistantManagementModalPageMode,
-  useAiAssistantManagementModal,
-} from '../../../stores/ai-assistant';
+  useAiAssistantManagementModalActions,
+  useAiAssistantManagementModalStatus,
+} from '../../../states/modal/ai-assistant-management';
 import { AiAssistantManagementHeader } from './AiAssistantManagementHeader';
 import { SelectablePageList } from './SelectablePageList';
 
@@ -98,8 +99,8 @@ export const AiAssistantKeywordSearch = (props: Props): JSX.Element => {
     );
   }, [searchResult, selectedSearchKeywords.length]);
 
-  const { data: aiAssistantManagementModalData, changePageMode } =
-    useAiAssistantManagementModal();
+  const aiAssistantManagementModalData = useAiAssistantManagementModalStatus();
+  const { changePageMode } = useAiAssistantManagementModalActions();
   const isNewAiAssistant =
     aiAssistantManagementModalData?.aiAssistantData == null;
 

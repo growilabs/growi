@@ -819,6 +819,11 @@
       "updatedAt": "更新日時"
     }
   },
+  "help_dropdown": {
+    "show_shortcuts": "ショートカットを表示",
+    "growi_cloud_help": "GROWI.cloud ヘルプ",
+    "growi_version": "GROWI バージョン"
+  },
   "private_legacy_pages": {
     "title": "旧形式のプライベートページ",
     "bulk_operation": "一括操作",
