@@ -26,10 +26,7 @@ const GuideRow = ({
   return (
     <section className={title !== '' ? 'mt-4 mb-2' : 'mb-2'}>
       {title !== '' && (
-        <h3
-          className="fw-bold mb-2"
-          style={{ fontSize: '20px', color: '#223246' }}
-        >
+        <h3 className="fw-bold mb-2 fs-4 text-body">
           {title}
         </h3>
       )}
@@ -40,16 +37,16 @@ const GuideRow = ({
           className="flex-grow-0 flex-shrink-0"
         >
           <div
-            className="bg-dark text-light p-2 ps-3 pe-5 rounded position-relative"
+            className="text-light p-2 ps-3 pe-5 rounded position-relative"
             style={{
-              backgroundColor: '#2D2E32',
+              backgroundColor: 'var(--bs-dark)',
               minWidth,
               width: 'fit-content',
             }}
           >
             <pre
-              className="m-0 small font-monospace"
-              style={{ whiteSpace: 'pre', color: '#ccc', lineHeight: '1.5' }}
+              className="m-0 small font-monospace text-white-50"
+              style={{ whiteSpace: 'pre', lineHeight: '1.5' }}
             >
               {code}
             </pre>
@@ -102,81 +99,23 @@ export const LayoutTab: React.FC = () => {
         `###### ${t(`${i18nKey}.header_text`)}6`,
       ].join('\n'),
       preview: (
-        <div style={{ color: '#223246', fontFamily: 'Noto Sans CJK JP', lineHeight: '1.5' }}>
-          <h1
-            className="h2 border-bottom pb-1 mb-2"
-            style={{
-              color: '#223246',
-              fontSize: '30px',
-              fontWeight: 400,
-              borderBottom: '2px solid #E6E5E3',
-            }}
-          >
+        <div className="text-body lh-base">
+          <h1 className="h2 border-bottom pb-1 mb-2 fw-normal">
             {t(`${i18nKey}.header_text`)}1
           </h1>
-          <h2
-            className="border-bottom pb-1 mb-2"
-            style={{
-              color: '#223246',
-              fontFamily: 'Noto Sans CJK JP',
-              fontWeight: 700,
-              fontSize: '26px',
-              lineHeight: '100%',
-              borderBottom: '2px solid #E6E5E3',
-            }}
-          >
+          <h2 className="h3 border-bottom pb-1 mb-2 fw-bold">
             {t(`${i18nKey}.header_text`)}2
           </h2>
-          <h3
-            className="mb-2"
-            style={{
-              color: '#223246',
-              fontFamily: 'Noto Sans CJK JP',
-              fontWeight: 700,
-              fontSize: '22px',
-              lineHeight: '100%',
-              letterSpacing: '0%',
-            }}
-          >
+          <h3 className="fs-5 mb-2 fw-bold">
             {t(`${i18nKey}.header_text`)}3
           </h3>
-          <h4
-            className="h5 border-start border-4 ps-2 mb-2"
-            style={{
-              color: '#223246',
-              fontSize: '22px',
-              borderLeft: '4px solid #E6E5E3',
-              fontWeight: 400,
-              lineHeight: '100%',
-              letterSpacing: '0%',
-            }}
-          >
+          <h4 className="fs-5 border-start border-4 ps-2 mb-2 fw-normal border-secondary-subtle">
             {t(`${i18nKey}.header_text`)}4
           </h4>
-          <h5
-            className="h6 border-start border-4 ps-2 mb-2"
-            style={{
-              color: '#223246',
-              fontSize: '22px',
-              borderLeft: '4px solid #E6E5E3',
-              fontWeight: 400,
-              lineHeight: '100%',
-              letterSpacing: '0%',
-            }}
-          >
+          <h5 className="fs-5 border-start border-4 ps-2 mb-2 fw-normal border-secondary-subtle">
             {t(`${i18nKey}.header_text`)}5
           </h5>
-          <h6
-            className="small border-start border-4 ps-2 mb-0"
-            style={{
-              fontSize: '19px',
-              borderLeft: '4px solid #E6E5E3',
-              color: '#223246',
-              fontWeight: 400,
-              lineHeight: '100%',
-              letterSpacing: '0%',
-            }}
-          >
+          <h6 className="fs-6 border-start border-4 ps-2 mb-0 fw-normal border-secondary-subtle">
             {t(`${i18nKey}.header_text`)}6
           </h6>
         </div>
@@ -207,7 +146,7 @@ export const LayoutTab: React.FC = () => {
       title: t(`${i18nKey}.ordered_list`),
       code: `1. ${t(`${i18nKey}.ordered_list_text`)}\n1. ${t(`${i18nKey}.ordered_list_text`)}\n1. ${t(`${i18nKey}.ordered_list_text`)}`,
       preview: (
-        <ol className="ps-3 mb-0" style={{ color: '#24292e' }}>
+        <ol className="ps-3 mb-0 text-body">
           <li className="mb-2">{t(`${i18nKey}.ordered_list_text`)}</li>
           <li className="mb-2">{t(`${i18nKey}.ordered_list_text`)}</li>
           <li className="mb-0">{t(`${i18nKey}.ordered_list_text`)}</li>
@@ -219,33 +158,17 @@ export const LayoutTab: React.FC = () => {
       title: t(`${i18nKey}.checkbox`),
       code: `[x] ${t(`${i18nKey}.task`)}1\n  [] ${t(`${i18nKey}.task`)}1-1\n  [x] ${t(`${i18nKey}.task`)}1-2`,
       preview: (
-        <div
-          style={{
-            color: '#223246',
-            fontSize: '16px',
-            lineHeight: '27px',
-            fontFamily: 'Noto Sans CJK JP',
-          }}
-        >
+        <div className="text-body fs-6 lh-lg">
           <div className="d-flex align-items-center mb-1">
-            <span style={{ fontSize: '16px', marginRight: '10px', userSelect: 'none' }}>☑️</span>
+            <span className="me-2 user-select-none">☑️</span>
             <span>{t(`${i18nKey}.task`)}1</span>
           </div>
           <div className="d-flex align-items-center mb-1 ps-4">
-            <span
-              style={{
-                display: 'inline-block',
-                width: '18px',
-                height: '18px',
-                border: '1px solid #757575',
-                borderRadius: '2px',
-                marginRight: '10px',
-              }}
-            />
+            <span className="d-inline-block border border-secondary rounded me-2" style={{ width: '18px', height: '18px' }} />
             <span>{t(`${i18nKey}.task`)}1-1</span>
           </div>
           <div className="d-flex align-items-center ps-4">
-            <span style={{ fontSize: '16px', marginRight: '10px', userSelect: 'none' }}>☑️</span>
+            <span className="me-2 user-select-none">☑️</span>
             <span>{t(`${i18nKey}.task`)}1-2</span>
           </div>
         </div>
@@ -256,7 +179,7 @@ export const LayoutTab: React.FC = () => {
       title: t(`${i18nKey}.quote`),
       code: `> ${t(`${i18nKey}.quote_text`)}\n>> ${t(`${i18nKey}.multi_quote`)}`,
       preview: (
-        <blockquote className="border-start border-4 ps-3 text-muted italic">
+        <blockquote className="border-start border-4 ps-3 text-muted fst-italic border-secondary-subtle">
           {t(`${i18nKey}.quote_text`)}
           <blockquote className="border-start border-2 ps-3 mt-2">{t(`${i18nKey}.multi_quote`)}</blockquote>
         </blockquote>
@@ -268,9 +191,9 @@ export const LayoutTab: React.FC = () => {
       code: '***\n\n―――\n\n---',
       preview: (
         <div className="d-flex flex-column gap-4 w-100">
-          <hr className="my-0 opacity-75" style={{ borderTop: '1px solid #E6E5E3' }} />
-          <hr className="my-0 opacity-75" style={{ borderTop: '1px solid #E6E5E3' }} />
-          <hr className="my-0 opacity-75" style={{ borderTop: '1px solid #E6E5E3' }} />
+          <hr className="my-0 opacity-25" />
+          <hr className="my-0 opacity-25" />
+          <hr className="my-0 opacity-25" />
         </div>
       ),
     },
@@ -279,10 +202,10 @@ export const LayoutTab: React.FC = () => {
       title: t(`${i18nKey}.br`),
       code: t(`${i18nKey}.br_code`),
       preview: (
-        <div className="lh-base" style={{ color: '#24292e' }}>
+        <div className="text-body lh-base">
           {t(`${i18nKey}.br_preview_1`)}
           <br />
-          {t(`${t(`${i18nKey}.br_preview_2`)}`)}
+          {t(`${i18nKey}.br_preview_2`)}
         </div>
       ),
     },
@@ -292,16 +215,15 @@ export const LayoutTab: React.FC = () => {
       code: `\`\`\`\n${t(`${i18nKey}.code_block_text`)}\n\`\`\``,
       preview: (
         <div
-          className="rounded p-3 w-100"
+          className="rounded p-3 w-100 font-monospace"
           style={{
-            backgroundColor: '#22272e',
-            color: '#ABB2BF',
-            fontFamily: 'monospace',
-            fontSize: '0.9rem',
             minWidth: '200px',
+            backgroundColor: 'var(--bs-dark)',
           }}
         >
-          {t(`${i18nKey}.code_block_text`)}
+          <div className="small text-white-50 lh-base">
+            {t(`${i18nKey}.code_block_text`)}
+          </div>
         </div>
       ),
     },
@@ -318,18 +240,15 @@ export const LayoutTab: React.FC = () => {
       preview: null,
       underContent: (
         <div
-          className="table-responsive"
-          style={{
-            marginTop: '0.5rem',
-            width: 'fit-content',
-          }}
+          className="table-responsive mt-2"
+          style={{ width: 'fit-content'}}
         >
           <table
-            className="table table-sm table-bordered mb-0 small"
-            style={{ tableLayout: 'auto', width: '100%', minWidth: '580px' }}
+            className="table table-sm table-bordered mb-0 small text-body"
+            style={{ minWidth: '580px' }}
           >
             <thead>
-              <tr className="bg-white">
+              <tr className="table-light">
                 <th className="text-start fw-bold p-2 align-middle">{t(`${i18nKey}.left`)}</th>
                 <th className="text-end fw-bold p-2 align-middle">{t(`${i18nKey}.right`)}</th>
                 <th className="text-center fw-bold p-2 align-middle">{t(`${i18nKey}.center`)}</th>
@@ -356,20 +275,13 @@ export const LayoutTab: React.FC = () => {
       title: t(`${i18nKey}.footnote`),
       code: `${t(`${i18nKey}.footnote_label`)}[^1].\n\n[^1]: ${t(`${i18nKey}.footnote_desc`)}.`,
       preview: (
-        <div
-          style={{
-            color: '#223246',
-            fontSize: '16px',
-            lineHeight: '27px',
-            fontFamily: 'Noto Sans CJK JP',
-          }}
-        >
+        <div className="text-body fs-6 lh-base">
           {t(`${i18nKey}.footnote_label`)}
-          <sup style={{ fontSize: '0.6em', color: '#223246', marginLeft: '1px' }}>[1]</sup>
+          <sup className="ms-1 text-body small">[1]</sup>
         </div>
       ),
       underContent: (
-        <div style={{ color: '#777570' }}>
+        <div className="text-body-secondary small mt-1">
           1. {t(`${i18nKey}.footnote_desc`)}
         </div>
       ),
