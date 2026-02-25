@@ -41,6 +41,17 @@ export const SearchForm = (props: Props): JSX.Element => {
     [searchKeyword, onSubmit],
   );
 
+  // Prevent Downshift from intercepting Home/End keys so they move
+  // the cursor within the input field instead of navigating the list
+  const keyDownHandler = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Home' || e.key === 'End') {
+        (e.nativeEvent as { preventDownshiftDefault?: boolean }).preventDownshiftDefault = true;
+      }
+    },
+    [],
+  );
+
   const inputOptions = useMemo(() => {
     return getInputProps({
       type: 'text',
@@ -49,8 +60,9 @@ export const SearchForm = (props: Props): JSX.Element => {
       ref: inputRef,
       value: searchKeyword,
       onChange: changeSearchTextHandler,
+      onKeyDown: keyDownHandler,
     });
-  }, [getInputProps, searchKeyword, changeSearchTextHandler]);
+  }, [getInputProps, searchKeyword, changeSearchTextHandler, keyDownHandler]);
 
   useEffect(() => {
     if (inputRef.current != null) {
