@@ -241,7 +241,7 @@ export const LayoutTab: React.FC = () => {
       underContent: (
         <div
           className="table-responsive mt-2"
-          style={{ width: 'fit-content'}}
+          style={{ width: 'fit-content' }}
         >
           <table
             className="table table-sm table-bordered mb-0 small text-body"
