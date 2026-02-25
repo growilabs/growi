@@ -11,6 +11,7 @@ import {
 } from 'reactstrap';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
+import { useSWRINFxRecentThreads } from '~/features/mastra/client/stores/thread';
 import {
   type SseMessage,
   SseMessageSchema,
@@ -25,13 +26,16 @@ import type {
 } from '../../interfaces/message';
 import type { IThreadRelationHasId } from '../../interfaces/thread-relation';
 import { ThreadType } from '../../interfaces/thread-relation';
-import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
+// import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
+// import { useAiAssistantSidebar } from '../stores/ai-assistant';
+// import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
 } from '../states';
 import { useSWRMUTxMessages } from '../stores/message';
-import { useSWRINFxRecentThreads, useSWRMUTxThreads } from '../stores/thread';
+
+// import { useSWRMUTxThreads } from '../stores/thread';
 
 type CreateThread = (
   aiAssistantId: string,
@@ -83,7 +87,7 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
   const { aiAssistantData, threadData } = useAiAssistantSidebarStatus();
   const { refreshThreadData } = useAiAssistantSidebarActions();
   const { mutate: mutateRecentThreads } = useSWRINFxRecentThreads();
-  const { trigger: mutateThreadData } = useSWRMUTxThreads(aiAssistantData?._id);
+  // const { trigger: mutateThreadData } = useSWRMUTxThreads(aiAssistantData?._id);
   const { t } = useTranslation();
 
   const form = useForm<FormData>({
@@ -114,11 +118,11 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
       const thread = response.data;
 
       // No need to await because data is not used
-      mutateThreadData();
+      // mutateThreadData();
 
       return thread;
     },
-    [mutateThreadData],
+    [],
   );
 
   const postMessage: PostMessage = useCallback(
@@ -179,10 +183,11 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
     }
 
     return (
-      <AiAssistantChatInitialView
-        description={aiAssistantData.description}
-        pagePathPatterns={aiAssistantData.pagePathPatterns}
-      />
+      // <AiAssistantChatInitialView
+      //   description={aiAssistantSidebarData.aiAssistantData.description}
+      //   pagePathPatterns={aiAssistantSidebarData.aiAssistantData.pagePathPatterns}
+      // />
+      <></>
     );
   }, [aiAssistantData]);
 
