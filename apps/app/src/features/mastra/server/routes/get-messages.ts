@@ -1,6 +1,7 @@
 import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import { convertMessages } from '@mastra/core/agent';
 import type { Request, RequestHandler } from 'express';
 import { param, type ValidationChain } from 'express-validator';
 
@@ -59,10 +60,12 @@ export const getMessagesHandlersFactory: GetMessagesHandlersFactory = (
         }
 
         // TODO: Pagination
-        const messages = await memory.recall({
+        const recallResult = await memory.recall({
           threadId,
           resourceId: req.user._id.toString(),
         });
+
+        const messages = convertMessages(recallResult.messages).to('AIV5.UI');
 
         return res.apiv3({ messages });
       } catch (err) {
