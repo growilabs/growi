@@ -1090,6 +1090,36 @@
       "all_important": "Tout ce texte est\nimportant",
       "sub_text": "indice",
       "sup_text": "exposant"
+    },
+    "layout": {
+      "copy_done": "Copié !",
+      "header": "En-têtes",
+      "header_text": "Titre",
+      "list": "Liste à puces",
+      "list_text": "Ceci est un élément de liste",
+      "ordered_list": "Liste ordonnée",
+      "ordered_list_text": "Ceci est un élément numéroté",
+      "checkbox": "Cases à cocher",
+      "task": "Tâche ",
+      "quote": "Citations",
+      "quote_text": "Citation",
+      "multi_quote": "Citation imbriquée",
+      "hr": "Ligne horizontale",
+      "br": "Saut de ligne",
+      "br_code": "Ajoutez deux espaces  pour\nrompre la ligne",
+      "br_preview_1": "Ajoutez deux espaces pour",
+      "br_preview_2": "rompre la ligne",
+      "code_block": "Blocs de code",
+      "code_block_text": "Insérez le code ici",
+      "table": "Tableaux",
+      "left": "Aligner à gauche",
+      "right": "Aligner à droite",
+      "center": "Aligner au centre",
+      "row_text": "Cette colonne est",
+      "row_display": "alignée",
+      "footnote": "Notes de bas de page",
+      "footnote_label": "Texte avec note",
+      "footnote_desc": "Écrivez le contenu de la note comme ceci"
     }
   }
 }
