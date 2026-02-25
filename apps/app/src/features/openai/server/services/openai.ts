@@ -98,6 +98,7 @@ export interface IOpenaiService {
   ): Promise<ThreadRelationDocument>;
   getThreadsByAiAssistantId(
     aiAssistantId: string,
+    userId?: string,
   ): Promise<ThreadRelationDocument[]>;
   deleteThread(threadRelationId: string): Promise<ThreadRelationDocument>;
   deleteExpiredThreads(limit: number, apiCallInterval: number): Promise<void>; // for CronJob
@@ -290,10 +291,12 @@ class OpenaiService implements IOpenaiService {
 
   async getThreadsByAiAssistantId(
     aiAssistantId: string,
+    userId?: string,
     type: ThreadType = ThreadType.KNOWLEDGE,
   ): Promise<ThreadRelationDocument[]> {
     const threadRelations = await ThreadRelationModel.find({
       aiAssistant: aiAssistantId,
+      ...(userId != null && { userId }),
       type,
     }).sort({ updatedAt: -1 });
     return threadRelations;
