@@ -107,4 +107,44 @@ describe('excludeUserPagesFromQuery()', () => {
     expect(query.prefix).toContain(doubleSlashSub);
     expect(query.not_prefix).not.toContain(doubleSlashSub);
   });
+
+  it('should add /user to not_prefix when it is empty', () => {
+    const query: QueryTerms = {
+      match: [],
+      not_match: [],
+      phrase: [],
+      not_phrase: [],
+      prefix: [],
+      not_prefix: [],
+      tag: [],
+      not_tag: [],
+    };
+
+    excludeUserPagesFromQuery(query);
+
+    expect(query.prefix).toHaveLength(0);
+    expect(query.not_prefix).toContain('/user');
+    expect(query.not_prefix).toHaveLength(1);
+  });
+
+  it('should remove existing /user strings and leave not_prefix with just one /user string', () => {
+    const userString = '/user';
+
+    const query: QueryTerms = {
+      match: [],
+      not_match: [],
+      phrase: [],
+      not_phrase: [],
+      prefix: [userString, userString],
+      not_prefix: [userString, userString],
+      tag: [],
+      not_tag: [],
+    };
+
+    excludeUserPagesFromQuery(query);
+
+    expect(query.prefix).toHaveLength(0);
+    expect(query.not_prefix).toContain('/user');
+    expect(query.not_prefix).toHaveLength(1);
+  });
 });
