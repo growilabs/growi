@@ -1,6 +1,7 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { format, subSeconds } from 'date-fns';
+import { join } from 'pathe';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
@@ -44,12 +45,11 @@ const router = express.Router();
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
   const { appService, mailService } = crowi;
-  const User = crowi.model('User');
-  const path = require('path');
+  const { User } = crowi.models;
 
   const addActivity = generateAddActivityMiddleware(crowi);
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const minPasswordLength = configManager.getConfig('app:minPasswordLength');
 
@@ -95,7 +95,7 @@ module.exports = (crowi) => {
     return mailService.send({
       to: email,
       subject: '[GROWI] Password Reset',
-      template: path.join(
+      template: join(
         crowi.localeDir,
         `${locale}/notifications/${templateFileName}.ejs`,
       ),

@@ -1,6 +1,8 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 
 const _logger = loggerFactory('growi:routes:apiv3:mongo');
@@ -12,10 +14,8 @@ const router = express.Router();
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(
-    crowi,
-  );
-  const adminRequired = require('../../middlewares/admin-required')(crowi);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
 
   /**
    * @swagger

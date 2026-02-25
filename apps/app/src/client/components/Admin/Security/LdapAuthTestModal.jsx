@@ -56,6 +56,9 @@ LdapAuthTestModal.propTypes = {
   onClose: PropTypes.func.isRequired,
 };
 
+/**
+ * @type {React.ComponentType<{ isOpen: boolean, onClose: () => void }>}
+ */
 const LdapAuthTestModalWrapper = withUnstatedContainers(LdapAuthTestModal, []);
 
 export default LdapAuthTestModalWrapper;

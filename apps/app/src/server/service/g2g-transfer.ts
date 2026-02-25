@@ -1,12 +1,12 @@
+import type { ReadStream } from 'node:fs';
+import { createReadStream } from 'node:fs';
 import { ConfigSource } from '@growi/core';
 import type { IUser } from '@growi/core/dist/interfaces';
 // biome-ignore lint/style/noRestrictedImports: TODO: check effects of using custom axios
 import rawAxios, { type AxiosRequestConfig } from 'axios';
-import FormData from 'form-data';
-import type { ReadStream } from 'fs';
-import { createReadStream } from 'fs';
+import * as FormDataModule from 'form-data';
 import mongoose, { Types as MongooseTypes } from 'mongoose';
-import { basename } from 'path';
+import { basename } from 'pathe';
 
 import { G2G_PROGRESS_STATUS } from '~/interfaces/g2g-transfer';
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
@@ -31,6 +31,8 @@ import { exportService } from './export';
 import { generateOverwriteParams } from './import/overwrite-params';
 
 const logger = loggerFactory('growi:service:g2g-transfer');
+
+const FormData = FormDataModule.default ?? FormDataModule;
 
 /**
  * Header name for transfer key

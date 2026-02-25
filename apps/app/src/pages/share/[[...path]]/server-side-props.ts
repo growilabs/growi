@@ -7,6 +7,7 @@ import {
 import type { IShareLinkHasId } from '~/interfaces/share-link';
 
 import {
+  getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
 } from '../../common-props';
@@ -47,12 +48,14 @@ export async function getServerSidePropsForInitial(
   context: GetServerSidePropsContext,
 ): Promise<GetServerSidePropsResult<Stage2InitialProps>> {
   const [
+    commonEachResult,
     commonInitialResult,
     generalPageResult,
     rendererConfigResult,
     i18nPropsResult,
     pageDataResult,
   ] = await Promise.all([
+    getServerSideCommonEachProps(context),
     getServerSideCommonInitialProps(context),
     getServerSideGeneralPageProps(context),
     getServerSideRendererConfigProps(context),
@@ -62,14 +65,17 @@ export async function getServerSidePropsForInitial(
 
   // Merge all results in a type-safe manner (using sequential merging)
   const mergedResult = mergeGetServerSidePropsResults(
-    commonInitialResult,
+    commonEachResult,
     mergeGetServerSidePropsResults(
-      generalPageResult,
+      commonInitialResult,
       mergeGetServerSidePropsResults(
-        rendererConfigResult,
+        generalPageResult,
         mergeGetServerSidePropsResults(
-          i18nPropsResult,
-          mergeGetServerSidePropsResults(pageDataResult, basisProps),
+          rendererConfigResult,
+          mergeGetServerSidePropsResults(
+            i18nPropsResult,
+            mergeGetServerSidePropsResults(pageDataResult, basisProps),
+          ),
         ),
       ),
     ),

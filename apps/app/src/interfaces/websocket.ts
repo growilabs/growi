@@ -48,6 +48,7 @@ export const SocketEventName = {
   PageCreated: 'page:create',
   PageUpdated: 'page:update',
   PageDeleted: 'page:delete',
+  PageSeenUsersUpdated: 'page:seenUsersUpdated',
 
   // Yjs
   YjsAwarenessStateSizeUpdated: 'yjs:awareness-state-size-update',

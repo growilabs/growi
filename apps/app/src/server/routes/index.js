@@ -5,6 +5,7 @@ import { middlewareFactory as rateLimiterFactory } from '~/features/rate-limiter
 
 import { accessTokenParser } from '../middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '../middlewares/add-activity';
+import adminRequiredFactory from '../middlewares/admin-required';
 import apiV1FormValidator from '../middlewares/apiv1-form-validator';
 import * as applicationNotInstalled from '../middlewares/application-not-installed';
 import {
@@ -14,6 +15,7 @@ import {
 import injectResetOrderByTokenMiddleware from '../middlewares/inject-reset-order-by-token-middleware';
 import injectUserRegistrationOrderByTokenMiddleware from '../middlewares/inject-user-registration-order-by-token-middleware';
 import * as loginFormValidator from '../middlewares/login-form-validator';
+import loginRequiredFactory from '../middlewares/login-required';
 import {
   generateUnavailableWhenMaintenanceModeMiddleware,
   generateUnavailableWhenMaintenanceModeMiddlewareForApi,
@@ -36,9 +38,9 @@ module.exports = (crowi, app) => {
   const applicationInstalled = require('../middlewares/application-installed')(
     crowi,
   );
-  const loginRequiredStrictly = require('../middlewares/login-required')(crowi);
-  const loginRequired = require('../middlewares/login-required')(crowi, true);
-  const adminRequired = require('../middlewares/admin-required')(crowi);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const loginRequired = loginRequiredFactory(crowi, true);
+  const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
   const uploads = multer({ dest: `${crowi.tmpDir}uploads` });

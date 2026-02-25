@@ -10,7 +10,7 @@ const router = express.Router();
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
   const addActivity = generateAddActivityMiddleware(crowi);
 
   /**

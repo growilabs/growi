@@ -3,13 +3,13 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { normalizePath } from '@growi/core/dist/utils/path-utils';
 import type { Request, RequestHandler } from 'express';
-import type { ValidationChain } from 'express-validator';
 import { query } from 'express-validator';
 import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { PageModel } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
@@ -22,30 +22,25 @@ type ReqQuery = {
 };
 
 interface Req extends Request<ReqQuery, ApiV3Response> {
-  user: IUserHasId;
+  user?: IUserHasId;
 }
 
-type CreatePageHandlersFactory = (crowi: Crowi) => RequestHandler[];
-
-export const checkPageExistenceHandlersFactory: CreatePageHandlersFactory = (
-  crowi,
-) => {
+export const checkPageExistenceHandlersFactory = (
+  crowi: Crowi,
+): RequestHandler[] => {
   const Page = mongoose.model<IPage, PageModel>('Page');
 
-  const loginRequired = require('../../../middlewares/login-required')(
-    crowi,
-    true,
-  );
+  const loginRequired = loginRequiredFactory(crowi, true);
 
   // define validators for req.body
-  const validator: ValidationChain[] = [
+  const validator = [
     query('path').isString().withMessage('The param "path" must be specified'),
   ];
 
   return [
     accessTokenParser([SCOPE.WRITE.FEATURES.PAGE], { acceptLegacy: true }),
     loginRequired,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
       const { path } = req.query;

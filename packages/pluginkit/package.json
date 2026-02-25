@@ -1,6 +1,6 @@
 {
   "name": "@growi/pluginkit",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Plugin kit for GROWI",
   "license": "MIT",
   "main": "dist/index.cjs",
@@ -15,8 +15,8 @@
     "clean": "shx rm -rf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
-    "lint:js": "biome check",
-    "lint:typecheck": "vue-tsc --noEmit",
+    "lint:biome": "biome check",
+    "lint:typecheck": "tsgo --noEmit",
     "lint": "npm-run-all -p lint:*",
     "test": "vitest run --coverage"
   },

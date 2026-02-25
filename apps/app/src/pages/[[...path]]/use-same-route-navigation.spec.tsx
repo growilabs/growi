@@ -57,11 +57,15 @@ describe('useSameRouteNavigation', () => {
   });
 
   it('should call fetchCurrentPage and mutateEditingMarkdown on path change', async () => {
-    // Arrange
+    // Arrange: Initial render (SSR case - no fetch on initial render)
     mockRouter.asPath = '/initial-path';
     const { rerender } = renderHook(() => useSameRouteNavigation());
 
-    // Act: Simulate navigation
+    // Assert: No fetch on initial render (useRef previousPath is null)
+    expect(mockFetchCurrentPage).not.toHaveBeenCalled();
+    expect(mockSetEditingMarkdown).not.toHaveBeenCalled();
+
+    // Act: Simulate CSR navigation to a new path
     mockRouter.asPath = '/new-path';
     rerender();
 
@@ -78,49 +82,46 @@ describe('useSameRouteNavigation', () => {
   });
 
   it('should not trigger effects if the path does not change', async () => {
-    // Arrange
+    // Arrange: Initial render
     mockRouter.asPath = '/same-path';
     const { rerender } = renderHook(() => useSameRouteNavigation());
-    // call on initial render
-    await waitFor(() => {
-      expect(mockFetchCurrentPage).toHaveBeenCalledTimes(1);
-      expect(mockSetEditingMarkdown).toHaveBeenCalledTimes(1);
-    });
 
-    // Act: Rerender with the same path
+    // Initial render should not trigger fetch (previousPath is null initially)
+    expect(mockFetchCurrentPage).not.toHaveBeenCalled();
+    expect(mockSetEditingMarkdown).not.toHaveBeenCalled();
+
+    // Act: Rerender with the same path (simulates a non-navigation re-render)
     rerender();
 
-    // Assert
-    // A short delay to ensure no async operations are triggered
+    // Assert: Still no fetch because path hasn't changed
     await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(mockFetchCurrentPage).toHaveBeenCalledTimes(1); // Should not be called again
-    expect(mockSetEditingMarkdown).toHaveBeenCalledTimes(1);
+    expect(mockFetchCurrentPage).not.toHaveBeenCalled();
+    expect(mockSetEditingMarkdown).not.toHaveBeenCalled();
   });
 
   it('should not call mutateEditingMarkdown if pageData or revision is null', async () => {
-    // Arrange: first, fetch successfully
+    // Arrange: Initial render
     mockRouter.asPath = '/initial-path';
     const { rerender } = renderHook(() => useSameRouteNavigation());
-    await waitFor(() => {
-      expect(mockFetchCurrentPage).toHaveBeenCalledTimes(1);
-      expect(mockSetEditingMarkdown).toHaveBeenCalledTimes(1);
-    });
 
-    // Arrange: next, fetch fails (returns null)
+    // Initial render should not trigger fetch
+    expect(mockFetchCurrentPage).not.toHaveBeenCalled();
+
+    // Arrange: Mock fetch to return null for the next navigation
     mockFetchCurrentPage.mockResolvedValue(null);
 
-    // Act
+    // Act: Navigate to a new path
     mockRouter.asPath = '/path-with-no-data';
     rerender();
 
     // Assert
     await waitFor(() => {
-      // fetch should be called again
+      // fetch should be called
       expect(mockFetchCurrentPage).toHaveBeenCalledWith({
         path: '/path-with-no-data',
       });
-      // but mutate should not be called again
-      expect(mockSetEditingMarkdown).toHaveBeenCalledTimes(1);
+      // but mutate should not be called because pageData is null
+      expect(mockSetEditingMarkdown).not.toHaveBeenCalled();
     });
   });
 });

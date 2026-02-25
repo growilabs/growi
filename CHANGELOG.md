@@ -1,8 +1,46 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.4.3...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.4.5...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.4.5](https://github.com/growilabs/compare/v7.4.4...v7.4.5) - 2026-02-19
+
+### 💎 Features
+
+* feat: Realtime Increment View Count Without Refreshing Pages (#10760) @ryotaro-nagahara
+
+### 🚀 Improvement
+
+* imprv: Unchanged revision (#10770) @yuki-takei
+* imprv: Close the Sidebar in drawer mode when the route changes (#10763) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Use currentPageId for share link page fetching (#10797) @yuki-takei
+* fix: Allow viewing shared pages regardless of page permissions (#10762) @ryotaro-nagahara
+* fix: Bulk export fails due to S3 upload minimal version (#10782) @ryotaro-nagahara
+* fix: Block revisions API from returning info about user pages when user pages are disabled (#10751) @arvid-e
+* fix: OpenAPI spec mismatch for GET /page endpoint response format (#10787) @[copilot-swe-agent[bot]](https://github.com/apps/copilot-swe-agent)
+
+### 🧰 Maintenance
+
+* support: Extract `/page/info` endpoint handler into a dedicated module (#10795) @yuki-takei
+* ci(deps): bump qs from 6.14.1 to 6.14.2 (#10785) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.4.4](https://github.com/growilabs/compare/v7.4.3...v7.4.4) - 2026-01-30
+
+### 🐛 Bug Fixes
+
+* fix: Search navigation (#10749) @[copilot-swe-agent[bot]](https://github.com/apps/copilot-swe-agent)
+* fix: User pages are displayed in page list when 'Disable user pages' is on (#10752) @miya
+* fix: Disable logo update button when no file is selected (#10587) @hikaru-n-cpu
+
+### 🧰 Maintenance
+
+* support: Setup Claude Code environment (#10746) @yuki-takei
+* support: Improve test parallelism (#10747) @yuki-takei
+* support: Typecheck by tsgo (#10717) @yuki-takei
 
 ## [v7.4.3](https://github.com/growilabs/compare/v7.4.2...v7.4.3) - 2026-01-21
 

@@ -2,6 +2,7 @@ import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
+import { UserStatus } from '../models/user/conts';
 import { growiInfoService } from '../service/growi-info';
 
 // disable all of linting
@@ -11,9 +12,9 @@ import { growiInfoService } from '../service/growi-info';
 module.exports = (crowi, app) => {
   const logger = loggerFactory('growi:routes:login');
   const path = require('path');
-  const User = crowi.model('User');
+  const { User } = crowi.models;
   const { appService, aclService, mailService, activityService } = crowi;
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const actions = {};
 
@@ -157,7 +158,7 @@ module.exports = (crowi, app) => {
   actions.preLogin = (req, res, next) => {
     // user has already logged in
     const { user } = req;
-    if (user != null && user.status === User.STATUS_ACTIVE) {
+    if (user != null && user.status === UserStatus.STATUS_ACTIVE) {
       const { redirectTo } = req.session;
       // remove session.redirectTo
       delete req.session.redirectTo;

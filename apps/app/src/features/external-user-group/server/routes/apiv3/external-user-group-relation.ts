@@ -6,6 +6,8 @@ import type { IExternalUserGroupRelationHasId } from '~/features/external-user-g
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { serializeUserGroupRelationSecurely } from '~/server/models/serializers/user-group-relation-serializer';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
@@ -14,14 +16,11 @@ const logger = loggerFactory('growi:routes:apiv3:user-group-relation');
 
 const express = require('express');
 const { query } = require('express-validator');
-
 const router = express.Router();
 
 module.exports = (crowi: Crowi): Router => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
-  const adminRequired = require('~/server/middlewares/admin-required')(crowi);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
 
   const validators = {
     list: [
