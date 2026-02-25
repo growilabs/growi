@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { CopyIcon, GlobeIcon, RefreshCcwIcon } from 'lucide-react';
@@ -46,6 +46,7 @@ import {
 } from '~/components/ai-elements/sources';
 
 import { useChatSidebarStatus } from '../../status/chat-sidebar';
+import { useSWRMUTxMessages } from '../../stores/message';
 
 import styles from './ChatSidebar.module.scss';
 
@@ -66,11 +67,26 @@ export const ChatSidebar = (): JSX.Element => {
   const [input, setInput] = useState('');
   const [model, setModel] = useState<string>(models[0].value);
   const [webSearch, setWebSearch] = useState(false);
-  const { messages, sendMessage, status, regenerate } = useChat({
+
+  const chatSidebarStatus = useChatSidebarStatus();
+  const threadId = chatSidebarStatus?.threadId;
+
+  const { trigger: mutateMessages } = useSWRMUTxMessages(threadId);
+
+  const { messages, sendMessage, status, regenerate, setMessages } = useChat({
+    id: threadId ?? 'new',
     transport: new DefaultChatTransport({ api: '/_api/v3/mastra/message' }),
   });
 
-  const chatSidebarStatus = useChatSidebarStatus();
+  useEffect(() => {
+    (async () => {
+      if (threadId == null) return;
+      const messages = await mutateMessages();
+      if (messages == null) return;
+
+      setMessages(messages);
+    })();
+  }, [mutateMessages, setMessages, threadId]);
 
   const handleSubmit = (message: PromptInputMessage) => {
     sendMessage(
@@ -81,6 +97,7 @@ export const ChatSidebar = (): JSX.Element => {
       {
         body: {
           aiAssistantId: chatSidebarStatus?.aiAssistantData?._id,
+          threadId,
         },
       },
     );
