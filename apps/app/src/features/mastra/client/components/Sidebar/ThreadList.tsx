@@ -8,7 +8,7 @@ import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
 } from '~/features/openai/client/states';
-import { useSWRMUTxThreads } from '~/features/openai/client/stores/thread';
+import { useSWRxAiAssistants } from '~/features/openai/client/stores/ai-assistant';
 import loggerFactory from '~/utils/logger';
 
 import { deleteThread } from '../../services/thread';
@@ -23,9 +23,8 @@ export const ThreadList: React.FC = () => {
   const aiAssistantSidebarData = useAiAssistantSidebarStatus();
   const { openChat, close: closeAiAssistantSidebar } =
     useAiAssistantSidebarActions();
-  const { trigger: mutateAssistantThreadData } = useSWRMUTxThreads(
-    aiAssistantSidebarData?.aiAssistantData?._id,
-  );
+  const { data: aiAssistants, mutate: mutateAiAssistants } =
+    useSWRxAiAssistants();
 
   const isEmpty = data?.[0]?.total === 0;
   const isReachingEnd =
@@ -58,6 +57,29 @@ export const ThreadList: React.FC = () => {
     [mutateRecentThreads, t],
   );
 
+  const findAiAssistantById = useCallback(
+    (aiAssistantId: string) => {
+      if (aiAssistants == null) return;
+
+      const allAssistants = [
+        ...aiAssistants.myAiAssistants,
+        ...aiAssistants.teamAiAssistants,
+      ];
+      return allAssistants.find((assistant) => assistant._id === aiAssistantId);
+    },
+    [aiAssistants],
+  );
+
+  const handleOpenChat = useCallback(
+    (aiAssistantId: string) => {
+      const aiAssistant = findAiAssistantById(aiAssistantId);
+      if (aiAssistant != null) {
+        openChat(aiAssistant);
+      }
+    },
+    [findAiAssistantById, openChat],
+  );
+
   return (
     <ul className="list-group">
       <InfiniteScroll
@@ -71,10 +93,10 @@ export const ThreadList: React.FC = () => {
               <button
                 type="button"
                 className="btn btn-link list-group-item-action border-0 d-flex align-items-center rounded-1"
-                // onClick={(e) => {
-                //   e.stopPropagation();
-                //   openChat(thread.aiAssistant, thread);
-                // }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenChat(thread.metadata.aiAssistantId);
+                }}
                 onMouseDown={(e) => {
                   e.preventDefault();
                 }}

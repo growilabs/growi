@@ -119,11 +119,12 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
         return res.apiv3Err(new ErrorV3('Mastra Memory is not available'), 500);
       }
 
-      const thread = await getOrCreateThread(
+      const thread = await getOrCreateThread({
         memory,
-        req.user._id.toString(),
+        aiAssistantId,
+        resourceId: req.user._id.toString(),
         threadId,
-      );
+      });
 
       try {
         const stream = await growiAgent.stream(messages, {
