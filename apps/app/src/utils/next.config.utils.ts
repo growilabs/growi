@@ -1,26 +1,21 @@
 // workaround by https://github.com/martpie/next-transpile-modules/issues/143#issuecomment-817467144
 
-const fs = require('node:fs');
-const path = require('node:path');
+import fs from 'node:fs';
+import path from 'node:path';
 
 const nodeModulesPaths = [
   path.resolve(__dirname, '../../node_modules'),
   path.resolve(__dirname, '../../../../node_modules'),
 ];
 
-/**
- * @typedef { { ignorePackageNames: string[] } } Opts
- */
+interface Opts {
+  ignorePackageNames: string[];
+}
 
-/** @type {Opts} */
-const defaultOpts = { ignorePackageNames: [] };
+const defaultOpts: Opts = { ignorePackageNames: [] };
 
-/**
- * @param scopes {string[]}
- */
-exports.listScopedPackages = (scopes, opts = defaultOpts) => {
-  /** @type {string[]} */
-  const scopedPackages = [];
+export const listScopedPackages = (scopes: string[], opts: Opts = defaultOpts): string[] => {
+  const scopedPackages: string[] = [];
 
   nodeModulesPaths.forEach((nodeModulesPath) => {
     fs.readdirSync(nodeModulesPath)
@@ -36,7 +31,7 @@ exports.listScopedPackages = (scopes, opts = defaultOpts) => {
               'package.json',
             );
             if (fs.existsSync(packageJsonPath)) {
-              const { name } = require(packageJsonPath);
+              const { name } = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')) as { name: string };
               if (!opts.ignorePackageNames.includes(name)) {
                 scopedPackages.push(name);
               }
@@ -48,19 +43,25 @@ exports.listScopedPackages = (scopes, opts = defaultOpts) => {
   return scopedPackages;
 };
 
-/**
- * @param prefixes {string[]}
- */
+type WebpackCompiler = {
+  outputPath: string;
+  hooks: {
+    done: {
+      tap(name: string, callback: (stats: any) => void): void;
+    };
+  };
+};
+
 /**
  * Webpack plugin that logs eager (initial) vs lazy (async-only) module counts.
  * Attach to client-side dev builds only.
  */
-exports.createChunkModuleStatsPlugin = () => ({
-  apply(compiler) {
+export const createChunkModuleStatsPlugin = () => ({
+  apply(compiler: WebpackCompiler) {
     compiler.hooks.done.tap('ChunkModuleStatsPlugin', (stats) => {
       const { compilation } = stats;
-      const initialModuleIds = new Set();
-      const asyncModuleIds = new Set();
+      const initialModuleIds = new Set<string>();
+      const asyncModuleIds = new Set<string>();
 
       for (const chunk of compilation.chunks) {
         const target = chunk.canBeInitial() ? initialModuleIds : asyncModuleIds;
@@ -90,9 +91,9 @@ exports.createChunkModuleStatsPlugin = () => ({
           (id) => !initialModuleIds.has(id),
         );
 
-        const analyzeModuleSet = (moduleIds, title, filename) => {
-          const packageCounts = {};
-          const appModules = [];
+        const analyzeModuleSet = (moduleIds: Set<string> | string[], title: string, filename: string): void => {
+          const packageCounts: Record<string, number> = {};
+          const appModules: string[] = [];
           for (const rawId of moduleIds) {
             // Strip webpack loader prefixes (e.g., "source-map-loader!/path/to/file" → "/path/to/file")
             const id = rawId.includes('!')
@@ -113,7 +114,8 @@ exports.createChunkModuleStatsPlugin = () => ({
             (a, b) => b[1] - a[1],
           );
           const lines = [`# ${title}`, ''];
-          lines.push(`Total modules: ${moduleIds.length ?? moduleIds.size}`);
+          const totalCount = Array.isArray(moduleIds) ? moduleIds.length : moduleIds.size;
+          lines.push(`Total modules: ${totalCount}`);
           lines.push(`App modules (non-node_modules): ${appModules.length}`);
           lines.push(`node_modules packages: ${sorted.length}`);
           lines.push('');
@@ -152,9 +154,8 @@ exports.createChunkModuleStatsPlugin = () => ({
   },
 });
 
-exports.listPrefixedPackages = (prefixes, opts = defaultOpts) => {
-  /** @type {string[]} */
-  const prefixedPackages = [];
+export const listPrefixedPackages = (prefixes: string[], opts: Opts = defaultOpts): string[] => {
+  const prefixedPackages: string[] = [];
 
   nodeModulesPaths.forEach((nodeModulesPath) => {
     fs.readdirSync(nodeModulesPath)
@@ -167,7 +168,7 @@ exports.listPrefixedPackages = (prefixes, opts = defaultOpts) => {
           'package.json',
         );
         if (fs.existsSync(packageJsonPath)) {
-          const { name } = require(packageJsonPath);
+          const { name } = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')) as { name: string };
           if (!opts.ignorePackageNames.includes(name)) {
             prefixedPackages.push(name);
           }
