@@ -245,7 +245,9 @@ class AwsFileUploader extends AbstractFileUploader {
       throw new Error('AWS is not configured.');
     }
 
-    logger.debug(`File uploading: fileName=${attachment.fileName}`);
+    logger.info(
+      `uploadAttachment: starting, fileName=${attachment.fileName}, readableType=${readable.constructor.name}, isReadable=${readable.readable}`,
+    );
 
     const s3 = S3Factory();
 
@@ -254,6 +256,9 @@ class AwsFileUploader extends AbstractFileUploader {
 
     try {
       const uploadTimeout = configManager.getConfig('app:fileUploadTimeout');
+      logger.info(
+        `uploadAttachment: sending PutObjectCommand, bucket=${getS3Bucket()}, key=${filePath}, timeout=${uploadTimeout}`,
+      );
 
       await s3.send(
         new PutObjectCommand({
@@ -271,21 +276,14 @@ class AwsFileUploader extends AbstractFileUploader {
         { abortSignal: AbortSignal.timeout(uploadTimeout) },
       );
 
-      logger.debug(
-        `File upload completed successfully: fileName=${attachment.fileName}`,
+      logger.info(
+        `uploadAttachment: completed successfully, fileName=${attachment.fileName}`,
       );
     } catch (error) {
-      // Handle timeout error specifically
-      if (error.name === 'AbortError') {
-        logger.warn(`Upload timeout: fileName=${attachment.fileName}`, error);
-      } else {
-        logger.error(
-          `File upload failed: fileName=${attachment.fileName}`,
-          error,
-        );
-      }
-      // Re-throw the error to be handled by the caller.
-      // The pipeline automatically handles stream cleanup on error.
+      logger.error(
+        `uploadAttachment: failed, fileName=${attachment.fileName}, errorName=${error.name}, errorMessage=${error.message}`,
+        error,
+      );
       throw error;
     }
   }
