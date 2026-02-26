@@ -33,7 +33,6 @@ import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
 } from '../states';
-import { useSWRMUTxMessages } from '../stores/message';
 
 // import { useSWRMUTxThreads } from '../stores/thread';
 
@@ -357,55 +356,55 @@ const transformApiMessagesToLogs = (
     });
 };
 
-export const useFetchAndSetMessageDataEffect = (
-  setMessageLogs: Dispatch<SetStateAction<MessageLog[]>>,
-  threadId?: string,
-): void => {
-  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
-  const { trigger: mutateMessageData } = useSWRMUTxMessages(
-    aiAssistantSidebarData?.aiAssistantData?._id,
-    threadId,
-  );
+// export const useFetchAndSetMessageDataEffect = (
+//   setMessageLogs: Dispatch<SetStateAction<MessageLog[]>>,
+//   threadId?: string,
+// ): void => {
+//   const aiAssistantSidebarData = useAiAssistantSidebarStatus();
+//   const { trigger: mutateMessageData } = useSWRMUTxMessages(
+//     aiAssistantSidebarData?.aiAssistantData?._id,
+//     threadId,
+//   );
 
-  useEffect(() => {
-    if (aiAssistantSidebarData?.isEditorAssistant) {
-      return;
-    }
+//   useEffect(() => {
+//     if (aiAssistantSidebarData?.isEditorAssistant) {
+//       return;
+//     }
 
-    if (threadId == null) {
-      setMessageLogs([]);
-      return; // Early return if no threadId
-    }
+//     if (threadId == null) {
+//       setMessageLogs([]);
+//       return; // Early return if no threadId
+//     }
 
-    const fetchAndSetLogs = async () => {
-      try {
-        // Assuming mutateMessageData() returns a Promise<MessageWithCustomMetaData | null | undefined>
-        const rawApiMessageData: MessageWithCustomMetaData | null | undefined =
-          await mutateMessageData();
-        const fetchedLogs = transformApiMessagesToLogs(rawApiMessageData);
+//     const fetchAndSetLogs = async () => {
+//       try {
+//         // Assuming mutateMessageData() returns a Promise<MessageWithCustomMetaData | null | undefined>
+//         const rawApiMessageData: MessageWithCustomMetaData | null | undefined =
+//           await mutateMessageData();
+//         const fetchedLogs = transformApiMessagesToLogs(rawApiMessageData);
 
-        setMessageLogs((currentLogs) => {
-          // Preserve current logs if they represent a single, user-submitted message
-          // AND the newly fetched logs are empty (common for new threads).
-          const shouldPreserveCurrentMessage =
-            currentLogs.length === 1 &&
-            currentLogs[0].isUserMessage &&
-            fetchedLogs.length === 0;
+//         setMessageLogs((currentLogs) => {
+//           // Preserve current logs if they represent a single, user-submitted message
+//           // AND the newly fetched logs are empty (common for new threads).
+//           const shouldPreserveCurrentMessage =
+//             currentLogs.length === 1 &&
+//             currentLogs[0].isUserMessage &&
+//             fetchedLogs.length === 0;
 
-          // Update with fetched logs, or preserve current if applicable
-          return shouldPreserveCurrentMessage ? currentLogs : fetchedLogs;
-        });
-      } catch (error) {
-        // console.error('Failed to fetch or process message data:', error); // Optional: for debugging
-        setMessageLogs([]); // Clear logs on error to avoid inconsistent state
-      }
-    };
+//           // Update with fetched logs, or preserve current if applicable
+//           return shouldPreserveCurrentMessage ? currentLogs : fetchedLogs;
+//         });
+//       } catch (error) {
+//         // console.error('Failed to fetch or process message data:', error); // Optional: for debugging
+//         setMessageLogs([]); // Clear logs on error to avoid inconsistent state
+//       }
+//     };
 
-    fetchAndSetLogs();
-  }, [
-    threadId,
-    mutateMessageData,
-    setMessageLogs,
-    aiAssistantSidebarData?.isEditorAssistant,
-  ]); // Dependencies
-};
+//     fetchAndSetLogs();
+//   }, [
+//     threadId,
+//     mutateMessageData,
+//     setMessageLogs,
+//     aiAssistantSidebarData?.isEditorAssistant,
+//   ]); // Dependencies
+// };
