@@ -47,6 +47,7 @@ import {
 
 import { useChatSidebarStatus } from '../../status/chat-sidebar';
 import { useSWRxMessages } from '../../stores/message';
+import { useSWRINFxRecentThreads } from '../../stores/thread';
 
 import styles from './ChatSidebar.module.scss';
 
@@ -72,6 +73,8 @@ export const ChatSidebar = (): JSX.Element => {
   const threadId = chatSidebarStatus?.threadId;
 
   const { data: savedMessages } = useSWRxMessages(threadId);
+  const swrInfiniteThreads = useSWRINFxRecentThreads();
+  const { mutate: mutateRecentThreads } = swrInfiniteThreads;
 
   const { messages, sendMessage, status, regenerate, setMessages } = useChat({
     id: threadId ?? 'new',
@@ -97,6 +100,8 @@ export const ChatSidebar = (): JSX.Element => {
       },
     );
     setInput('');
+
+    mutateRecentThreads();
   };
 
   return (
