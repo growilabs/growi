@@ -337,11 +337,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
     const terms = this.parseQueryString(queryString);
 
-    if (disableUserPages) {
-      excludeUserPagesFromQuery(terms);
-    }
-
     if (nqName == null) {
+      if (disableUserPages) {
+        excludeUserPagesFromQuery(terms);
+      }
       return { queryString, terms };
     }
 
@@ -365,6 +364,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
       };
     } else {
       parsedQuery = { queryString, terms, delegatorName };
+    }
+
+    if (disableUserPages) {
+      excludeUserPagesFromQuery(parsedQuery.terms);
     }
 
     return parsedQuery;
