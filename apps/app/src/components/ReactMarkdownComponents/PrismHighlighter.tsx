@@ -1,6 +1,6 @@
 import type { JSX, ReactNode } from 'react';
-import { PrismAsyncLight } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import PrismAsyncLight from 'react-syntax-highlighter/dist/esm/prism-async-light';
+import oneDark from 'react-syntax-highlighter/dist/esm/styles/prism/one-dark';
 
 // Remove font-family to use the page's default monospace font
 Object.entries<object>(oneDark).forEach(([key, value]) => {
