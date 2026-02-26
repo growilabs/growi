@@ -7,7 +7,6 @@
 
 const path = require('node:path');
 
-const { withSuperjson } = require('next-superjson');
 const {
   PHASE_PRODUCTION_BUILD,
   PHASE_PRODUCTION_SERVER,
@@ -104,6 +103,14 @@ module.exports = (phase) => {
     pageExtensions: ['page.tsx', 'page.ts', 'page.jsx', 'page.js'],
     i18n,
 
+    // Bundle server-side dependencies for Pages Router (Next.js 15+)
+    // Matches App Router behavior: all deps are bundled except those in serverExternalPackages
+    // Auto-excluded: mongoose, mongodb, express, sharp, and 68 other packages with native bindings
+    bundlePagesRouterDependencies: true,
+    serverExternalPackages: [
+      'handsontable', // Legacy v6.2.2 requires @babel/polyfill which is unavailable; client-only via dynamic import
+    ],
+
     // for build
     typescript: {
       tsconfigPath: 'tsconfig.build.client.json',
@@ -116,6 +123,14 @@ module.exports = (phase) => {
 
     /** @param config {import('next').NextConfig} */
     webpack(config, options) {
+      // Auto-wrap getServerSideProps with superjson serialization (replaces next-superjson SWC plugin)
+      if (options.isServer) {
+        config.module.rules.push({
+          test: /\.page\.(tsx|ts)$/,
+          use: [path.resolve(__dirname, 'src/utils/superjson-ssr-loader.js')],
+        });
+      }
+
       if (!options.isServer) {
         // Avoid "Module not found: Can't resolve 'fs'"
         // See: https://stackoverflow.com/a/68511591
@@ -168,9 +183,7 @@ module.exports = (phase) => {
     },
   };
 
-  // production server
-  // Skip withSuperjson() in production server phase because the pages directory
-  // doesn't exist in the production build and withSuperjson() tries to find it
+  // production server — skip bundle analyzer
   if (phase === PHASE_PRODUCTION_SERVER) {
     return nextConfig;
   }
@@ -181,5 +194,5 @@ module.exports = (phase) => {
       (process.env.ANALYZE === 'true' || process.env.ANALYZE === '1'),
   });
 
-  return withBundleAnalyzer(withSuperjson()(nextConfig));
+  return withBundleAnalyzer(nextConfig);
 };

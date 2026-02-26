@@ -239,16 +239,39 @@ The following loop repeats until the user declares completion:
 
 ## Phase 3: Next.js Version Upgrade Evaluation (Deferred)
 
-- [ ] 9.1 Document Next.js 15+ feature evaluation
-  - Document which Next.js 15+ features (`bundlePagesRouterDependencies`, `serverExternalPackages`, Turbopack, improved tree-shaking) are relevant to further module reduction
-  - Assess the `next-superjson` compatibility blocker and identify mitigation options
+- [x] 9.1 Document Next.js 15+ feature evaluation
+  - Documented all Next.js 15+ features relevant to module reduction: `bundlePagesRouterDependencies`, `serverExternalPackages`, Turbopack (stable dev), improved tree-shaking
+  - Assessed `next-superjson` blocker: 4 options evaluated (A: v1.0.8 upgrade, B: superjson-next fork, C: manual per-page wrapping, D: custom webpack loader)
+  - **Option A (`next-superjson` v1.0.8) rejected** — achieves "v15 support" via fragile `@swc/core@1.4.17` pinning with double SWC compilation; depends on unmaintained WASM binary
+  - **Option D (custom webpack loader) selected** — zero-dependency regex-based source transform; same transparent DX as original plugin with no per-page changes
+  - Breaking changes for Pages Router are minimal (no async API changes, React 18 backward compat confirmed)
+  - **Decision: Proceed with Next.js 15 upgrade** — benefits outweigh minimal risk
+  - Full evaluation documented in `research.md` under "Phase 3: Next.js 15+ Feature Evaluation"
   - _Requirements: 1.1, 1.2, 1.3, 5.1, 5.4_
 
-- [ ] 9.2 Execute Next.js 15 upgrade (conditional on 9.1 decision)
+- [ ] 9.2 Execute Next.js 15 upgrade
+  - Migrated from `next-superjson` SWC plugin to custom webpack loader approach:
+    - Created `withSuperJSONProps()` and `deserializeSuperJSONProps()` in `src/pages/utils/superjson-ssr.ts` (10 tests)
+    - Created `src/utils/superjson-ssr-loader.js` — regex-based webpack loader that auto-wraps `getServerSideProps` exports
+    - Added loader rule in `next.config.js` targeting `.page.{ts,tsx}` files
+    - Added centralized deserialization in `_app.page.tsx`
+    - Removed `next-superjson` dependency and `withSuperjson()` from `next.config.js`
+    - **Zero per-page file changes** — loader transparently handles all 38 pages
+  - Upgraded Next.js 14.2.35 → 15.5.12, `@next/bundle-analyzer` 14.1.3 → 15.5.12
+  - Updated peer deps in `@growi/presentation`, `@growi/remark-lsx`, `@growi/ui` to `^14 || ^15`
   - _Requirements: 5.2, 5.3_
 
-- [ ] 9.3 Enable v15-specific module optimization features
+- [x] 9.3 Enable v15-specific module optimization features
+  - Added `bundlePagesRouterDependencies: true` to `next.config.js` — bundles server-side dependencies for Pages Router, matching App Router behavior
+  - Added `serverExternalPackages: ['handsontable']` — legacy `handsontable@6.2.2` requires unavailable `@babel/polyfill`; client-only via dynamic import, kept external on server
+  - Auto-excluded packages (mongoose, mongodb, express, sharp, and 68 others) handled by Next.js built-in list
+  - `serverExternalPackages` replaces `experimental.serverComponentsExternalPackages` (now stable in v15)
+  - Production build passes with new configuration
   - _Requirements: 3.4, 5.2_
 
-- [ ] 9.4 Run full regression test suite after upgrade
+- [x] 9.4 Run full regression test suite after upgrade
+  - Type checking: Zero errors (tsgo --noEmit)
+  - Biome lint: 1,791 files checked, no errors
+  - Tests: 127 test files, 1,375 tests — all passed
+  - Production build: Passes with `bundlePagesRouterDependencies: true` + `serverExternalPackages`
   - _Requirements: 5.3, 6.2, 6.3_

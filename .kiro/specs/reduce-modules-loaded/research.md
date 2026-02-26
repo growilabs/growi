@@ -135,6 +135,153 @@
 - **Risk**: Module count reduction is insufficient from config-only changes → **Mitigation**: Bundle analysis will reveal if server module leakage is the primary cause, guiding whether upgrade is needed
 - **Risk**: I18NextHMRPlugin has no Turbopack equivalent → **Mitigation**: Use `--webpack` flag for dev until alternative is available; Turbopack adoption is Phase 2b
 
+## Phase 3: Next.js 15+ Feature Evaluation (Task 9.1)
+
+### Context
+
+Phase 2 achieved significant module reduction (initial: 2,704 → 895, -67%) through dynamic imports, null-loader expansion, and dependency replacement. Phase 3 evaluates whether upgrading to Next.js 15 provides additional meaningful optimization via `bundlePagesRouterDependencies` and `serverExternalPackages`.
+
+### Current State
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| Next.js | 14.2.35 | Pages Router, Webpack 5 |
+| React | 18.2.0 | |
+| next-superjson | 1.0.7 | SWC plugin wrapper for superjson serialization |
+| Node.js | 24.13.1 | Exceeds v15 minimum (18.18.0) |
+
+### Next.js 15 Features Relevant to Module Reduction
+
+#### 1. `bundlePagesRouterDependencies` (Stable)
+
+- **What it does**: Enables automatic server-side dependency bundling for Pages Router, matching App Router default behavior. All server-side dependencies are bundled into the server output instead of using native Node.js `require()` at runtime.
+- **Impact**: Improved cold start (pre-resolved deps), smaller deployment footprint via tree-shaking of server bundles. Does NOT directly reduce client-side initial module count (our primary KPI), but improves overall server-side build efficiency.
+- **Configuration**: `bundlePagesRouterDependencies: true` in `next.config.js`
+- **Risk**: Low — Next.js maintains an auto-exclude list for packages with native bindings (mongoose, mongodb, express, @aws-sdk/*, sharp are all auto-excluded)
+
+#### 2. `serverExternalPackages` (Stable)
+
+- **What it does**: Opt-out specific packages from server-side bundling when `bundlePagesRouterDependencies` is enabled. These packages use native `require()`.
+- **Auto-excluded packages relevant to GROWI**: `mongoose`, `mongodb`, `express`, `@aws-sdk/client-s3`, `@aws-sdk/s3-presigned-post`, `sharp`, `pino`, `ts-node`, `typescript`, `webpack`
+- **GROWI packages that may need manual addition**: `passport`, `ldapjs`, `nodemailer`, `multer`, `redis`, `connect-redis`, `@elastic/elasticsearch*`
+- **Configuration**: `serverExternalPackages: ['passport', ...]`
+
+#### 3. Turbopack (Stable for Dev in v15)
+
+- **Status**: Turbopack Dev is stable in Next.js 15. Default bundler in Next.js 16.
+- **Benefits**: Automatic import optimization (eliminates need for `optimizePackageImports`), 14x faster cold starts, 28x faster HMR
+- **GROWI blockers**: Does NOT support `webpack()` config. GROWI's null-loader rules, I18NextHMRPlugin, source-map-loader, and ChunkModuleStatsPlugin all require webpack config.
+- **Mitigation**: Can run with `--webpack` flag in dev to keep Webpack while upgrading Next.js. Turbopack adoption deferred to separate task.
+
+#### 4. Improved Tree-shaking and Module Resolution
+
+- **Better dead code elimination** in both Webpack and Turbopack modes
+- **SWC improvements** for barrel file optimization
+- **Not directly measurable** without upgrading — included as potential secondary benefit
+
+### `next-superjson` Compatibility Assessment
+
+#### Current Architecture
+
+GROWI uses `withSuperjson()` in `next.config.js` (line 184) which:
+1. Injects a custom webpack loader targeting `pages/` directory files
+2. The loader runs `@swc/core` with `next-superjson-plugin` to AST-transform each page
+3. **Auto-wraps** `getServerSideProps` with `withSuperJSONProps()` (serializes props via superjson)
+4. **Auto-wraps** page default export with `withSuperJSONPage()` (deserializes props on client)
+
+Custom serializers registered in `_app.page.tsx`:
+- `registerTransformerForObjectId()` — handles MongoDB ObjectId serialization (no mongoose dependency)
+- `registerPageToShowRevisionWithMeta()` — handles page revision data (called in `[[...path]]` page)
+
+#### Compatibility Options
+
+| Option | Approach | Risk | Effort |
+|--------|----------|------|--------|
+| A. Upgrade `next-superjson` to 1.0.8 | Claims v15 support via frozen `@swc/core@1.4.17` | Medium — fragile SWC binary pinning; underlying plugin unmaintained | Minimal (version bump) |
+| B. Use `superjson-next@0.7.x` fork | Community SWC plugin with native v15 support | Medium — third-party fork, SWC plugins inherently fragile | Low (config change) |
+| C. Manual superjson (per-page wrapping) | Remove plugin; use helper functions + wrap each page's `getServerSideProps` | Low — no SWC plugin dependency | Medium (create helpers, wrap 38 pages) |
+| **D. Custom webpack loader (Recommended)** | **Remove plugin; use a simple regex-based webpack loader to auto-wrap `getServerSideProps`** | **Low — no SWC/Babel dependency, webpack loader API is stable** | **Low (create loader + config, no per-page changes)** |
+
+#### Detailed Assessment of Option A: `next-superjson` v1.0.8 / v2.0.0
+
+Both v1.0.8 and v2.0.0 were published on the same day (Oct 18, 2025). They share identical code — the only difference is the peer dependency declaration (`next >= 10` vs `next >= 16`).
+
+**How v1.0.8 achieves "Next.js 15 support"**:
+1. Does NOT use Next.js's built-in SWC plugin system
+2. Registers a custom webpack/turbopack loader targeting `pages/` directory files
+3. This loader uses a **bundled `@swc/core` pinned to v1.4.17 (March 2024)** to run a separate SWC compilation
+4. The pinned SWC loads the `next-superjson-plugin` v0.6.3 WASM binary
+
+**Risks**:
+- **Double SWC compilation**: Page files are compiled by both Next.js's SWC and the plugin's frozen SWC — potential for conflicts and performance overhead
+- **Pinned binary fragility**: `@swc/core@1.4.17` is from early 2024; SWC plugin ABI is notoriously unstable across versions
+- **Unmaintained upstream**: The `next-superjson-plugin` v0.6.3 WASM binary comes from `blitz-js/next-superjson-plugin`, which has unmerged PRs and open issues for v15 compatibility
+- **Low adoption**: Published Oct 2025, minimal community usage
+
+**Conclusion**: The "support" is a fragile workaround, not genuine compatibility. Rejected.
+
+#### Recommended: Option D — Custom Webpack Loader
+
+**Why**: Achieves the same zero-page-change DX as the original `next-superjson` plugin, but without any SWC/Babel dependency. The loader is a simple regex-based source transform (~15 lines) that auto-wraps `getServerSideProps` exports with `withSuperJSONProps()`. Webpack's loader API is stable across versions, making this future-proof.
+
+**How it works**:
+1. A webpack loader targets `.page.{ts,tsx}` files
+2. If the file exports `getServerSideProps`, the loader:
+   - Prepends `import { withSuperJSONProps } from '~/pages/utils/superjson-ssr'`
+   - Renames `export const getServerSideProps` → `const __getServerSideProps__`
+   - Appends `export const getServerSideProps = __withSuperJSONProps__(__getServerSideProps__)`
+3. Deserialization is centralized in `_app.page.tsx` (same as Option C)
+
+**Migration plan**:
+1. Create `withSuperJSONProps()` and `deserializeSuperJSONProps()` helpers in `src/pages/utils/superjson-ssr.ts`
+2. Create `src/utils/superjson-ssr-loader.js` — simple regex-based webpack loader
+3. Add loader rule in `next.config.js` webpack config (targets `.page.{ts,tsx}` files)
+4. Add centralized deserialization in `_app.page.tsx`
+5. Remove `next-superjson` dependency and `withSuperjson()` from `next.config.js`
+6. Keep `superjson` as direct dependency; keep all `registerCustom` calls unchanged
+
+**Advantages over Option C**:
+- Zero per-page file changes (38 fewer files modified)
+- Diff is ~20 lines total instead of ~660 lines
+- Closer to the original `next-superjson` DX (config-only, transparent to page authors)
+- New pages automatically get superjson serialization without manual wrapping
+
+**Scope**: 3 files changed (loader, next.config.js, _app.page.tsx) + 1 new file (superjson-ssr.ts with helpers)
+
+### Breaking Changes Affecting GROWI (Pages Router)
+
+| Change | Impact | Action Required |
+|--------|--------|-----------------|
+| Node.js ≥ 18.18.0 required | None — GROWI uses Node 24.x | No action |
+| `@next/font` → `next/font` | None — GROWI does not use `@next/font` | No action |
+| `swcMinify` enabled by default | Low — already effective | No action |
+| `next/dynamic` `suspense` prop removed | Verify — GROWI uses `next/dynamic` extensively | Check all `dynamic()` calls for `suspense` prop |
+| `eslint-plugin-react-hooks` v5.0.0 | Low — may trigger new lint warnings | Run lint after upgrade |
+| Config renames (`experimental.bundlePagesExternals` → `bundlePagesRouterDependencies`) | None — GROWI doesn't use the experimental names | No action |
+| `next/image` `Content-Disposition` changed | None — GROWI uses standard `next/image` | No action |
+| Async Request APIs (cookies, headers) | None — App Router only | No action |
+| React 19 peer dependency | None — Pages Router supports React 18 backward compat | Stay on React 18 |
+
+### Decision: Proceed with Next.js 15 Upgrade
+
+**Rationale**:
+1. **`bundlePagesRouterDependencies` + `serverExternalPackages`** provide proper server-side dependency bundling, completing the optimization work started in Phase 2
+2. **Breaking changes for Pages Router are minimal** — no async API changes, no React 19 requirement
+3. **`next-superjson` blocker is resolved** via custom webpack loader (Option D) — zero per-page changes, same transparent DX as original plugin
+4. **No Turbopack migration needed** — continue using Webpack with `--webpack` flag in dev
+5. **Phase 2 results (initial: 895 modules)** are already strong; v15 features provide server-side improvements and lay groundwork for future Turbopack adoption
+
+**Expected benefits**:
+- Server-side bundle optimization via `bundlePagesRouterDependencies`
+- Proper `serverExternalPackages` support (replaces null-loader workaround for some packages)
+- Modern Next.js foundation for future improvements (Turbopack, App Router migration path)
+- Elimination of fragile SWC plugin dependency (`next-superjson`) — replaced by simple webpack loader with no external dependencies
+
+**Risks and mitigations**:
+- `I18NextHMRPlugin` — Keep using Webpack bundler in dev (`--webpack` flag if needed)
+- Test regressions — Full test suite + typecheck + lint + build verification
+- Superjson serialization — Test all page routes for correct data serialization/deserialization
+
 ## References
 - [Next.js v15 Upgrade Guide](https://nextjs.org/docs/app/guides/upgrading/version-15) — Breaking changes inventory
 - [Turbopack API Reference](https://nextjs.org/docs/app/api-reference/turbopack) — Supported features and known gaps
@@ -142,3 +289,7 @@
 - [Package Bundling Guide (Pages Router)](https://nextjs.org/docs/pages/guides/package-bundling) — bundlePagesRouterDependencies, serverExternalPackages
 - [How we optimized package imports in Next.js](https://vercel.com/blog/how-we-optimized-package-imports-in-next-js) — Benchmarks and approach
 - [next-superjson GitHub](https://github.com/remorses/next-superjson) — Compatibility status
+- [next-superjson-plugin GitHub](https://github.com/blitz-js/next-superjson-plugin) — SWC plugin (unmaintained)
+- [superjson-next fork](https://github.com/serg-and/superjson-next) — Community fork with v15 support
+- [Next.js 15.5 Blog Post](https://nextjs.org/blog/next-15-5) — Latest features
+- [server-external-packages.jsonc](https://github.com/vercel/next.js/blob/canary/packages/next/src/lib/server-external-packages.jsonc) — Auto-excluded server packages
