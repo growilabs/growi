@@ -491,7 +491,7 @@ class Crowi {
   }
 
   async setupMailer(): Promise<void> {
-    const MailService = require('~/server/service/mail');
+    const MailService = require('~/server/service/mail').default;
     this.mailService = new MailService(this);
 
     // add as a message handler
