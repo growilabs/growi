@@ -91,7 +91,7 @@ RUN turbo run clean
 RUN turbo run build --filter @growi/app
 
 # Produce artifacts
-RUN pnpm deploy out --prod --filter @growi/app
+RUN pnpm deploy out --prod --legacy --filter @growi/app
 RUN rm -rf apps/app/node_modules && mv out/node_modules apps/app/node_modules
 RUN rm -rf apps/app/.next/cache
 
