@@ -1,3 +1,6 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# see: https://pnpm.io/next/npmrc#force-legacy-deploy
+forceLegacyDeploy: true
