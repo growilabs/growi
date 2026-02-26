@@ -1120,6 +1120,24 @@
       "footnote": "Notes de bas de page",
       "footnote_label": "Texte avec note",
       "footnote_desc": "Écrivez le contenu de la note comme ceci"
+    },
+    "decoration": {
+      "copy_done": "Copié dans le presse-papiers !",
+      "style": "Style",
+      "alert": "Alerte",
+      "badge": "Badge",
+      "text_color": "Couleur du texte",
+      "back_color": "Couleur d'arrière-plan",
+      "alert_block": "Bloc d'alerte",
+      "important_label": "Important",
+      "important_text": "Informations importantes",
+      "caution_label": "Attention",
+      "caution_text": "Avertissements ou éléments interdits",
+      "placeholder": "Le texte s'affiche ici",
+      "docs_title": "Documentation officielle de Bootstrap 5",
+      "docs_badge": "En savoir plus sur les Badges",
+      "docs_color": "En savoir plus sur les Couleurs",
+      "docs_alert": "En savoir plus sur les Blocs d'alerte"
     }
   }
 }
