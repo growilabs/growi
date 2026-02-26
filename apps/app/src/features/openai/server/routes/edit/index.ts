@@ -246,6 +246,7 @@ export const postMessageToEditHandlersFactory = (
 
       const threadRelation = await ThreadRelationModel.findOne({
         threadId: { $eq: threadId },
+        userId: user._id,
       });
       if (threadRelation == null) {
         return res.apiv3Err(new ErrorV3('ThreadRelation not found'), 404);
