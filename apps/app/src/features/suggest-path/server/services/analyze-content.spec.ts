@@ -1,5 +1,5 @@
+import type { ContentAnalysis } from '../../interfaces/suggest-path-types';
 import { analyzeContent } from './analyze-content';
-import type { ContentAnalysis } from './suggest-path-types';
 
 const mocks = vi.hoisted(() => {
   return {

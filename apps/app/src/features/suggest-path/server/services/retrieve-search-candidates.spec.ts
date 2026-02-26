@@ -1,7 +1,7 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 
+import type { SearchCandidate } from '../../interfaces/suggest-path-types';
 import { retrieveSearchCandidates } from './retrieve-search-candidates';
-import type { SearchCandidate } from './suggest-path-types';
 
 type HighlightData = Record<string, string[]>;
 

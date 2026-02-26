@@ -10,7 +10,7 @@ import type {
   ContentAnalysis,
   EvaluatedSuggestion,
   SearchCandidate,
-} from './suggest-path-types';
+} from '../../interfaces/suggest-path-types';
 
 const SYSTEM_PROMPT = [
   'You are a page save location evaluator for a wiki system. ',

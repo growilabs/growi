@@ -104,6 +104,46 @@ graph TB
 - **New components**: ContentAnalyzer and CandidateEvaluator wrap GROWI AI calls with suggest-path-specific prompting
 - **Steering compliance**: Feature-based separation, named exports, TypeScript strict typing
 
+### Code Organization (Directory Structure)
+
+All suggest-path code resides in `features/suggest-path/` following the project's feature-based architecture pattern (reference: `features/openai/`).
+
+**Target structure**:
+
+```text
+apps/app/src/features/suggest-path/
+├── interfaces/
+│   └── suggest-path-types.ts           # Shared types (PathSuggestion, ContentAnalysis, etc.)
+├── server/
+│   ├── routes/
+│   │   └── apiv3/
+│   │       └── index.ts                # Router factory, handler + middleware chain
+│   ├── services/
+│   │   ├── generate-suggestions.ts     # Orchestrator
+│   │   ├── generate-suggestions.spec.ts
+│   │   ├── generate-memo-suggestion.ts
+│   │   ├── generate-memo-suggestion.spec.ts
+│   │   ├── analyze-content.ts          # AI call #1
+│   │   ├── analyze-content.spec.ts
+│   │   ├── evaluate-candidates.ts      # AI call #2
+│   │   ├── evaluate-candidates.spec.ts
+│   │   ├── retrieve-search-candidates.ts
+│   │   ├── retrieve-search-candidates.spec.ts
+│   │   ├── generate-category-suggestion.ts
+│   │   ├── generate-category-suggestion.spec.ts
+│   │   ├── resolve-parent-grant.ts
+│   │   └── resolve-parent-grant.spec.ts
+│   └── integration-tests/
+│       └── suggest-path-integration.spec.ts
+```
+
+**Key decisions**:
+
+- **No barrel export**: Consumers import directly from subpaths (following `features/openai/` convention)
+- **Aggregation router retained**: The `ai-tools` router remains in `server/routes/apiv3/` as an aggregation point, importing the suggest-path route factory from `~/features/suggest-path/server/routes/apiv3`. This allows future ai-tools features to register under the same namespace
+- **R4 (CategorySuggestionGenerator)**: Migrated as-is. The "under review" status is a requirements-level decision deferred to post-implementation reviewer discussion; the migration does not change its behavior
+- **`generate-search-suggestion.ts`**: Superseded by the `retrieveSearchCandidates` → `evaluateCandidates` pipeline and already removed from the codebase. Not part of the migration
+
 ### Implementation Paradigm
 
 **Default**: All components are implemented as pure functions with immutable data. No classes unless explicitly justified.
@@ -307,9 +347,10 @@ sequenceDiagram
 
 **Implementation Notes**
 
-- Route registered in `apps/app/src/server/routes/apiv3/index.js` as `router.use('/ai-tools', ...)`
+- Route handler lives in `features/suggest-path/server/routes/apiv3/index.ts`
+- Aggregation router in `apps/app/src/server/routes/apiv3/ai-tools/index.ts` imports the feature's route factory and mounts it: `router.use('/suggest-path', suggestPathRouteFactory(crowi))`
+- Aggregation router registered in `apps/app/src/server/routes/apiv3/index.js` as `router.use('/ai-tools', ...)`
 - Middleware chain: `accessTokenParser` → `loginRequiredStrictly` → `certifyAiService` → validators → `apiV3FormValidator` → handler
-- Namespace `ai-tools` is tentative pending yuki confirmation; change requires single line edit in `index.js`
 
 ### Service Layer
 

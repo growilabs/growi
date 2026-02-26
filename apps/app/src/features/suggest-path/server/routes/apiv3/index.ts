@@ -15,15 +15,15 @@ import UserGroupRelation from '~/server/models/user-group-relation';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
-import { analyzeContent } from './analyze-content';
-import { evaluateCandidates } from './evaluate-candidates';
-import { generateCategorySuggestion } from './generate-category-suggestion';
-import { generateSuggestions } from './generate-suggestions';
-import { resolveParentGrant } from './resolve-parent-grant';
-import { retrieveSearchCandidates } from './retrieve-search-candidates';
-import type { SearchService } from './suggest-path-types';
+import type { SearchService } from '../../../interfaces/suggest-path-types';
+import { analyzeContent } from '../../services/analyze-content';
+import { evaluateCandidates } from '../../services/evaluate-candidates';
+import { generateCategorySuggestion } from '../../services/generate-category-suggestion';
+import { generateSuggestions } from '../../services/generate-suggestions';
+import { resolveParentGrant } from '../../services/resolve-parent-grant';
+import { retrieveSearchCandidates } from '../../services/retrieve-search-candidates';
 
-const logger = loggerFactory('growi:routes:apiv3:ai-tools:suggest-path');
+const logger = loggerFactory('growi:features:suggest-path:routes');
 
 type ReqBody = {
   body: string;

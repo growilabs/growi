@@ -1,8 +1,11 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 
+import type {
+  PathSuggestion,
+  SearchService,
+} from '../../interfaces/suggest-path-types';
+import { SuggestionType } from '../../interfaces/suggest-path-types';
 import { resolveParentGrant } from './resolve-parent-grant';
-import type { PathSuggestion, SearchService } from './suggest-path-types';
-import { SuggestionType } from './suggest-path-types';
 
 const CATEGORY_LABEL = 'Save under category';
 const SEARCH_RESULT_LIMIT = 10;

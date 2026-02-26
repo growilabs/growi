@@ -6,7 +6,10 @@ import {
 } from '~/features/openai/server/services/client-delegator';
 import { configManager } from '~/server/service/config-manager';
 
-import type { ContentAnalysis, InformationType } from './suggest-path-types';
+import type {
+  ContentAnalysis,
+  InformationType,
+} from '../../interfaces/suggest-path-types';
 
 const VALID_INFORMATION_TYPES: readonly InformationType[] = ['flow', 'stock'];
 

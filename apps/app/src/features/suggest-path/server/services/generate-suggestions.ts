@@ -2,17 +2,17 @@ import type { IUserHasId } from '@growi/core/dist/interfaces';
 
 import loggerFactory from '~/utils/logger';
 
-import { generateMemoSuggestion } from './generate-memo-suggestion';
 import type {
   ContentAnalysis,
   EvaluatedSuggestion,
   PathSuggestion,
   SearchCandidate,
-} from './suggest-path-types';
-import { SuggestionType } from './suggest-path-types';
+} from '../../interfaces/suggest-path-types';
+import { SuggestionType } from '../../interfaces/suggest-path-types';
+import { generateMemoSuggestion } from './generate-memo-suggestion';
 
 const logger = loggerFactory(
-  'growi:routes:apiv3:ai-tools:generate-suggestions',
+  'growi:features:suggest-path:generate-suggestions',
 );
 
 export type GenerateSuggestionsDeps = {

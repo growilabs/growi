@@ -4,7 +4,7 @@ import type {
   SearchCandidate,
   SearchResultItem,
   SearchService,
-} from './suggest-path-types';
+} from '../../interfaces/suggest-path-types';
 
 const DEFAULT_SCORE_THRESHOLD = 5.0;
 const SEARCH_RESULT_LIMIT = 20;

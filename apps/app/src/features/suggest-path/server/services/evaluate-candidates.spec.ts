@@ -1,9 +1,9 @@
-import { evaluateCandidates } from './evaluate-candidates';
 import type {
   ContentAnalysis,
   EvaluatedSuggestion,
   SearchCandidate,
-} from './suggest-path-types';
+} from '../../interfaces/suggest-path-types';
+import { evaluateCandidates } from './evaluate-candidates';
 
 const mocks = vi.hoisted(() => {
   return {

@@ -3,9 +3,9 @@ import { userHomepagePath } from '@growi/core/dist/utils/page-path-utils';
 
 import { configManager } from '~/server/service/config-manager';
 
+import type { PathSuggestion } from '../../interfaces/suggest-path-types';
+import { SuggestionType } from '../../interfaces/suggest-path-types';
 import { resolveParentGrant } from './resolve-parent-grant';
-import type { PathSuggestion } from './suggest-path-types';
-import { SuggestionType } from './suggest-path-types';
 
 const MEMO_LABEL = 'Save as memo';
 const MEMO_DESCRIPTION = 'Save to your personal memo area';

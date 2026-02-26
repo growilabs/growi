@@ -14,20 +14,24 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('./generate-suggestions', () => ({
+vi.mock('../../services/generate-suggestions', () => ({
   generateSuggestions: mocks.generateSuggestionsMock,
 }));
 
 // Mock modules imported by the handler for dependency injection
-vi.mock('./analyze-content', () => ({ analyzeContent: vi.fn() }));
-vi.mock('./evaluate-candidates', () => ({ evaluateCandidates: vi.fn() }));
-vi.mock('./generate-category-suggestion', () => ({
+vi.mock('../../services/analyze-content', () => ({ analyzeContent: vi.fn() }));
+vi.mock('../../services/evaluate-candidates', () => ({
+  evaluateCandidates: vi.fn(),
+}));
+vi.mock('../../services/generate-category-suggestion', () => ({
   generateCategorySuggestion: vi.fn(),
 }));
-vi.mock('./retrieve-search-candidates', () => ({
+vi.mock('../../services/retrieve-search-candidates', () => ({
   retrieveSearchCandidates: vi.fn(),
 }));
-vi.mock('./resolve-parent-grant', () => ({ resolveParentGrant: vi.fn() }));
+vi.mock('../../services/resolve-parent-grant', () => ({
+  resolveParentGrant: vi.fn(),
+}));
 
 vi.mock('~/server/middlewares/login-required', () => ({
   default: mocks.loginRequiredFactoryMock,
@@ -78,14 +82,14 @@ describe('suggestPathHandlersFactory', () => {
 
   describe('middleware chain', () => {
     it('should return an array of request handlers', async () => {
-      const { suggestPathHandlersFactory } = await import('./suggest-path');
+      const { suggestPathHandlersFactory } = await import('.');
       const handlers = suggestPathHandlersFactory(mockCrowi);
       expect(Array.isArray(handlers)).toBe(true);
       expect(handlers.length).toBeGreaterThanOrEqual(5);
     });
 
     it('should include certifyAiService in the middleware chain', async () => {
-      const { suggestPathHandlersFactory } = await import('./suggest-path');
+      const { suggestPathHandlersFactory } = await import('.');
       const handlers = suggestPathHandlersFactory(mockCrowi);
       expect(handlers).toContain(mocks.certifyAiServiceMock);
     });
@@ -118,7 +122,7 @@ describe('suggestPathHandlersFactory', () => {
       ];
       mocks.generateSuggestionsMock.mockResolvedValue(suggestions);
 
-      const { suggestPathHandlersFactory } = await import('./suggest-path');
+      const { suggestPathHandlersFactory } = await import('.');
       const handlers = suggestPathHandlersFactory(mockCrowi);
       const handler = handlers[handlers.length - 1] as RequestHandler;
 
@@ -151,7 +155,7 @@ describe('suggestPathHandlersFactory', () => {
       ];
       mocks.generateSuggestionsMock.mockResolvedValue(suggestions);
 
-      const { suggestPathHandlersFactory } = await import('./suggest-path');
+      const { suggestPathHandlersFactory } = await import('.');
       const handlers = suggestPathHandlersFactory(mockCrowi);
       const handler = handlers[handlers.length - 1] as RequestHandler;
 
@@ -166,7 +170,7 @@ describe('suggestPathHandlersFactory', () => {
         new Error('Unexpected error'),
       );
 
-      const { suggestPathHandlersFactory } = await import('./suggest-path');
+      const { suggestPathHandlersFactory } = await import('.');
       const handlers = suggestPathHandlersFactory(mockCrowi);
       const handler = handlers[handlers.length - 1] as RequestHandler;
 
@@ -185,7 +189,7 @@ describe('suggestPathHandlersFactory', () => {
       mocks.findAllExternalUserGroupIdsMock.mockResolvedValue(['eg1']);
       mocks.generateSuggestionsMock.mockResolvedValue([]);
 
-      const { suggestPathHandlersFactory } = await import('./suggest-path');
+      const { suggestPathHandlersFactory } = await import('.');
       const handlers = suggestPathHandlersFactory(mockCrowi);
       const handler = handlers[handlers.length - 1] as RequestHandler;
 

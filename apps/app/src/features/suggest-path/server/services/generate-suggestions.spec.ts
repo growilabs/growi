@@ -5,7 +5,7 @@ import type {
   EvaluatedSuggestion,
   PathSuggestion,
   SearchCandidate,
-} from './suggest-path-types';
+} from '../../interfaces/suggest-path-types';
 
 const mocks = vi.hoisted(() => {
   return {

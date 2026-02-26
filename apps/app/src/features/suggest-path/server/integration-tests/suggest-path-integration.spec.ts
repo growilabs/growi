@@ -103,7 +103,7 @@ vi.mock(
 );
 
 // Mock analyzeContent — configurable per test via testState
-vi.mock('./analyze-content', () => ({
+vi.mock('../services/analyze-content', () => ({
   analyzeContent: vi.fn().mockImplementation(() => {
     if (testState.contentAnalysisError != null) {
       return Promise.reject(testState.contentAnalysisError);
@@ -116,7 +116,7 @@ vi.mock('./analyze-content', () => ({
 }));
 
 // Mock retrieveSearchCandidates — configurable per test via testState
-vi.mock('./retrieve-search-candidates', () => ({
+vi.mock('../services/retrieve-search-candidates', () => ({
   retrieveSearchCandidates: vi.fn().mockImplementation(() => {
     if (testState.searchCandidatesError != null) {
       return Promise.reject(testState.searchCandidatesError);
@@ -126,7 +126,7 @@ vi.mock('./retrieve-search-candidates', () => ({
 }));
 
 // Mock evaluateCandidates — configurable per test via testState
-vi.mock('./evaluate-candidates', () => ({
+vi.mock('../services/evaluate-candidates', () => ({
   evaluateCandidates: vi.fn().mockImplementation(() => {
     if (testState.evaluateCandidatesError != null) {
       return Promise.reject(testState.evaluateCandidatesError);
@@ -136,7 +136,7 @@ vi.mock('./evaluate-candidates', () => ({
 }));
 
 // Mock generateCategorySuggestion — configurable per test via testState
-vi.mock('./generate-category-suggestion', () => ({
+vi.mock('../services/generate-category-suggestion', () => ({
   generateCategorySuggestion: vi.fn().mockImplementation(() => {
     if (testState.categorySuggestionError != null) {
       return Promise.reject(testState.categorySuggestionError);
@@ -146,7 +146,7 @@ vi.mock('./generate-category-suggestion', () => ({
 }));
 
 // Mock resolveParentGrant — returns configurable grant value via testState
-vi.mock('./resolve-parent-grant', () => ({
+vi.mock('../services/resolve-parent-grant', () => ({
   resolveParentGrant: vi.fn().mockImplementation(() => {
     return Promise.resolve(testState.parentGrant);
   }),
@@ -187,7 +187,7 @@ describe('POST /suggest-path integration', () => {
     });
 
     // Import and mount the handler factory with real middleware chain
-    const { suggestPathHandlersFactory } = await import('./suggest-path');
+    const { suggestPathHandlersFactory } = await import('../routes/apiv3');
     const mockCrowi = {
       searchService: { searchKeyword: vi.fn() },
     } as unknown as Crowi;
