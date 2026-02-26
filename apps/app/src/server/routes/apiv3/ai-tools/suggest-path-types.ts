@@ -1,3 +1,5 @@
+import type { IUserHasId } from '@growi/core/dist/interfaces';
+
 export const SuggestionType = {
   MEMO: 'memo',
   SEARCH: 'search',
@@ -37,4 +39,22 @@ export type EvaluatedSuggestion = {
 
 export type SuggestPathResponse = {
   suggestions: PathSuggestion[];
+};
+
+export type SearchResultItem = {
+  _score: number;
+  _source: {
+    path: string;
+  };
+  _highlight?: Record<string, string[]>;
+};
+
+export type SearchService = {
+  searchKeyword(
+    keyword: string,
+    nqName: string | null,
+    user: IUserHasId,
+    userGroups: unknown,
+    opts: Record<string, unknown>,
+  ): Promise<[{ data: SearchResultItem[] }, unknown]>;
 };

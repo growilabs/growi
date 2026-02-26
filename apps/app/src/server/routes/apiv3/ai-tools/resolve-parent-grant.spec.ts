@@ -138,6 +138,23 @@ describe('resolveParentGrant', () => {
     });
   });
 
+  describe('recursion depth guard', () => {
+    it('should return GRANT_OWNER when path exceeds maximum depth without finding ancestor', async () => {
+      // Create a deeply nested path that exceeds the max depth guard
+      const deepSegments = Array.from({ length: 60 }, (_, i) => `level${i}`);
+      const deepPath = `/${deepSegments.join('/')}/`;
+
+      mocks.findOneMock.mockImplementation(() => ({
+        lean: vi.fn().mockResolvedValue(null),
+      }));
+
+      const result = await resolveParentGrant(deepPath);
+      expect(result).toBe(GRANT_OWNER);
+      // Should not recurse more than MAX_DEPTH times (50)
+      expect(mocks.findOneMock.mock.calls.length).toBeLessThanOrEqual(51);
+    });
+  });
+
   describe('path normalization', () => {
     it('should strip trailing slash for database lookup', async () => {
       mocks.leanMock.mockResolvedValue({ grant: GRANT_PUBLIC });

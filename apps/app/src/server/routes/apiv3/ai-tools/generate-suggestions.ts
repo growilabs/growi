@@ -52,10 +52,6 @@ export const generateSuggestions = async (
     return [memoSuggestion];
   }
 
-  if (analysis.keywords.length === 0) {
-    return [memoSuggestion];
-  }
-
   // Run search-evaluate pipeline and category generation in parallel
   const [searchResult, categoryResult] = await Promise.allSettled([
     // Search-evaluate pipeline: search → evaluate → grant resolution

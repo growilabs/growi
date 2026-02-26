@@ -1,27 +1,13 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 
-import type { SearchCandidate } from './suggest-path-types';
+import type {
+  SearchCandidate,
+  SearchResultItem,
+  SearchService,
+} from './suggest-path-types';
 
 const DEFAULT_SCORE_THRESHOLD = 5.0;
 const SEARCH_RESULT_LIMIT = 20;
-
-type SearchResultItem = {
-  _score: number;
-  _source: {
-    path: string;
-  };
-  _highlight?: Record<string, string[]>;
-};
-
-export type SearchService = {
-  searchKeyword(
-    keyword: string,
-    nqName: string | null,
-    user: IUserHasId,
-    userGroups: unknown,
-    opts: Record<string, unknown>,
-  ): Promise<[{ data: SearchResultItem[] }, unknown]>;
-};
 
 export type RetrieveSearchCandidatesOptions = {
   searchService: SearchService;

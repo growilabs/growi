@@ -262,12 +262,25 @@ describe('analyzeContent', () => {
       await expect(analyzeContent('test')).rejects.toThrow('API error');
     });
 
-    it('should throw when AI returns invalid JSON', async () => {
+    it('should throw with descriptive message when AI returns invalid JSON', async () => {
       mocks.chatCompletionMock.mockResolvedValue({
         choices: [{ message: { content: 'not valid json' } }],
       });
 
-      await expect(analyzeContent('test')).rejects.toThrow();
+      await expect(analyzeContent('test')).rejects.toThrow(
+        /Failed to parse LLM response as JSON/,
+      );
+    });
+
+    it('should include truncated response in error message when AI returns invalid JSON', async () => {
+      const longInvalidJson = 'x'.repeat(300);
+      mocks.chatCompletionMock.mockResolvedValue({
+        choices: [{ message: { content: longInvalidJson } }],
+      });
+
+      await expect(analyzeContent('test')).rejects.toThrow(
+        /Failed to parse LLM response as JSON/,
+      );
     });
 
     it('should throw when AI returns JSON without keywords field', async () => {

@@ -244,18 +244,6 @@ describe('generateSuggestions', () => {
       expect(mocks.loggerErrorMock).toHaveBeenCalled();
     });
 
-    it('should fall back to memo only when content analysis returns empty keywords', async () => {
-      mockDeps.analyzeContent.mockResolvedValue({
-        keywords: [],
-        informationType: 'stock',
-      });
-
-      const result = await callGenerateSuggestions();
-
-      expect(result).toEqual([memoSuggestion]);
-      expect(mockDeps.retrieveSearchCandidates).not.toHaveBeenCalled();
-    });
-
     it('should return memo + category when search candidate retrieval fails', async () => {
       mockDeps.analyzeContent.mockResolvedValue(mockAnalysis);
       mockDeps.retrieveSearchCandidates.mockRejectedValue(

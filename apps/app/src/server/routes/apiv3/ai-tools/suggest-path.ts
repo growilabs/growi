@@ -18,11 +18,10 @@ import loggerFactory from '~/utils/logger';
 import { analyzeContent } from './analyze-content';
 import { evaluateCandidates } from './evaluate-candidates';
 import { generateCategorySuggestion } from './generate-category-suggestion';
-import type { SearchService as CategorySearchService } from './generate-search-suggestion';
 import { generateSuggestions } from './generate-suggestions';
 import { resolveParentGrant } from './resolve-parent-grant';
-import type { SearchService } from './retrieve-search-candidates';
 import { retrieveSearchCandidates } from './retrieve-search-candidates';
+import type { SearchService } from './suggest-path-types';
 
 const logger = loggerFactory('growi:routes:apiv3:ai-tools:suggest-path');
 
@@ -38,12 +37,16 @@ type SuggestPathReq = Request<
   user?: IUserHasId;
 };
 
+const MAX_BODY_LENGTH = 100_000;
+
 const validator = [
   body('body')
     .isString()
     .withMessage('body must be a string')
     .notEmpty()
-    .withMessage('body must not be empty'),
+    .withMessage('body must not be empty')
+    .isLength({ max: MAX_BODY_LENGTH })
+    .withMessage(`body must not exceed ${MAX_BODY_LENGTH} characters`),
 ];
 
 export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
@@ -66,6 +69,14 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
 
       try {
         const { searchService } = crowi;
+        assert(
+          searchService != null &&
+            typeof (searchService as Record<string, unknown>).searchKeyword ===
+              'function',
+          'searchService must have searchKeyword method',
+        );
+        const typedSearchService = searchService as unknown as SearchService;
+
         const userGroups = [
           ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
           ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
@@ -81,7 +92,7 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
             analyzeContent,
             retrieveSearchCandidates: (keywords, u, groups) =>
               retrieveSearchCandidates(keywords, u, groups, {
-                searchService: searchService as unknown as SearchService,
+                searchService: typedSearchService,
               }),
             evaluateCandidates,
             generateCategorySuggestion: (keywords, u, groups) =>
@@ -89,7 +100,7 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
                 keywords,
                 u,
                 groups,
-                searchService as unknown as CategorySearchService,
+                typedSearchService,
               ),
             resolveParentGrant,
           },

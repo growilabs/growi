@@ -73,7 +73,14 @@ export const analyzeContent = async (
     throw new Error('No content returned from chatCompletion');
   }
 
-  const parsed: unknown = JSON.parse(content);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error(
+      `Failed to parse LLM response as JSON: ${content.slice(0, 200)}`,
+    );
+  }
 
   if (!isValidContentAnalysis(parsed)) {
     throw new Error(

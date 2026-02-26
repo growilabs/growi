@@ -261,6 +261,23 @@ describe('POST /suggest-path integration', () => {
       it('should return 400 when body field is empty string', async () => {
         await request(app).post('/suggest-path').send({ body: '' }).expect(400);
       });
+
+      it('should return 400 when body exceeds maximum length', async () => {
+        const oversizedBody = 'x'.repeat(100_001);
+        await request(app)
+          .post('/suggest-path')
+          .send({ body: oversizedBody })
+          .expect(400);
+      });
+
+      it('should accept body at the maximum length boundary', async () => {
+        const maxBody = 'x'.repeat(100_000);
+        const response = await request(app)
+          .post('/suggest-path')
+          .send({ body: maxBody });
+        // Should not be rejected by validation (may be 200 or other non-400 status)
+        expect(response.status).not.toBe(400);
+      });
     });
 
     describe('AI service gating', () => {
