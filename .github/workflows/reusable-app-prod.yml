@@ -16,7 +16,7 @@ on:
       node-version:
         required: true
         type: string
-        default: 22.x
+        default: 24.x
       skip-e2e-test:
         type: boolean
         default: false
