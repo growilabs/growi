@@ -46,9 +46,7 @@ export const SearchForm = (props: Props): JSX.Element => {
   const keyDownHandler = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Home' || e.key === 'End') {
-        (
-          e.nativeEvent as { preventDownshiftDefault?: boolean }
-        ).preventDownshiftDefault = true;
+        e.nativeEvent.preventDownshiftDefault = true;
       }
     },
     [],
