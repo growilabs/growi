@@ -1,9 +1,6 @@
-import {
-  vi, describe, it, expect, beforeEach,
-} from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { configManager } from '../../config-manager';
-
 import { determineDisposition } from './headers';
 
 vi.mock('../../config-manager', () => ({
@@ -17,7 +14,10 @@ describe('determineDisposition', () => {
     vi.resetAllMocks();
   });
 
-  const setupMocks = (inlineMimeTypes: string[], attachmentMimeTypes: string[]) => {
+  const setupMocks = (
+    inlineMimeTypes: string[],
+    attachmentMimeTypes: string[],
+  ) => {
     vi.mocked(configManager.getConfig).mockImplementation(((key: string) => {
       if (key === 'attachments:contentDisposition:inlineMimeTypes') {
         return { inlineMimeTypes };

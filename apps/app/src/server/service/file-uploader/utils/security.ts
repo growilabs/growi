@@ -1,4 +1,7 @@
-export const defaultContentDispositionSettings: Record<string, 'inline' | 'attachment'> = {
+export const defaultContentDispositionSettings: Record<
+  string,
+  'inline' | 'attachment'
+> = {
   // Image Types
   'image/jpeg': 'inline',
   'image/png': 'inline',
@@ -31,11 +34,14 @@ export const defaultContentDispositionSettings: Record<string, 'inline' | 'attac
 
   // Other Common Document Formats
   'application/msword': 'attachment',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'attachment',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+    'attachment',
   'application/vnd.ms-excel': 'attachment',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'attachment',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+    'attachment',
   'application/vnd.ms-powerpoint': 'attachment',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'attachment',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+    'attachment',
   'application/zip': 'attachment',
   'application/x-rar-compressed': 'attachment',
   'text/csv': 'attachment',
@@ -67,7 +73,6 @@ export const strictMimeTypeSettings: Record<string, 'inline' | 'attachment'> = {
   'font/ttf': 'attachment',
   'font/otf': 'attachment',
 };
-
 
 export const laxMimeTypeSettings: Record<string, 'inline' | 'attachment'> = {
   // Documents
