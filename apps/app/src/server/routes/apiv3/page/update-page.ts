@@ -118,6 +118,11 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
     }
 
+    // REMINDER: values I need
+    // - The user's latest edit was on current page or not
+    // - Time since last edit on current page (5 min)
+    // - If it is the first edit
+
     // persist activity
     const creator =
       updatedPage.creator != null
