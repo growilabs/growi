@@ -343,7 +343,7 @@ module.exports = (crowi: Crowi) => {
         .trim()
         .if((value) => value !== '')
         .isEmail(),
-      body('transmissionMethod').isIn(['smtp', 'ses']),
+      body('transmissionMethod').isIn(['smtp', 'ses', 'oauth2']),
     ],
     smtpSetting: [
       body('smtpHost').trim(),
@@ -360,6 +360,20 @@ module.exports = (crowi: Crowi) => {
         .if((value) => value !== '')
         .matches(/^[\da-zA-Z]+$/),
       body('sesSecretAccessKey').trim(),
+    ],
+    oauth2Setting: [
+      body('oauth2ClientId')
+        .trim()
+        .notEmpty()
+        .withMessage('OAuth 2.0 Client ID is required'),
+      body('oauth2ClientSecret').trim(),
+      body('oauth2RefreshToken').trim(),
+      body('oauth2User')
+        .trim()
+        .notEmpty()
+        .withMessage('OAuth 2.0 User Email is required')
+        .isEmail()
+        .withMessage('OAuth 2.0 User Email must be a valid email address'),
     ],
     pageBulkExportSettings: [
       body('isBulkExportPagesEnabled').isBoolean(),
@@ -425,6 +439,12 @@ module.exports = (crowi: Crowi) => {
         smtpPassword: configManager.getConfig('mail:smtpPassword'),
         sesAccessKeyId: configManager.getConfig('mail:sesAccessKeyId'),
         sesSecretAccessKey: configManager.getConfig('mail:sesSecretAccessKey'),
+        oauth2ClientId: configManager.getConfig('mail:oauth2ClientId'),
+        // Return undefined for secrets to prevent accidental overwrite with masked values
+        // Frontend will handle placeholder display (design requirement 5.4)
+        oauth2ClientSecret: undefined,
+        oauth2RefreshToken: undefined,
+        oauth2User: configManager.getConfig('mail:oauth2User'),
 
         fileUploadType: configManager.getConfig('app:fileUploadType'),
         envFileUploadType: configManager.getConfig(
@@ -762,6 +782,10 @@ module.exports = (crowi: Crowi) => {
       smtpPassword: configManager.getConfig('mail:smtpPassword'),
       sesAccessKeyId: configManager.getConfig('mail:sesAccessKeyId'),
       sesSecretAccessKey: configManager.getConfig('mail:sesSecretAccessKey'),
+      oauth2ClientId: configManager.getConfig('mail:oauth2ClientId'),
+      oauth2ClientSecret: configManager.getConfig('mail:oauth2ClientSecret'),
+      oauth2RefreshToken: configManager.getConfig('mail:oauth2RefreshToken'),
+      oauth2User: configManager.getConfig('mail:oauth2User'),
     };
   };
 
@@ -929,6 +953,100 @@ module.exports = (crowi: Crowi) => {
       mailService.publishUpdatedMessage();
       const parameters = {
         action: SupportedAction.ACTION_ADMIN_MAIL_SES_UPDATE,
+      };
+      activityEvent.emit('update', res.locals.activity._id, parameters);
+      return res.apiv3({ mailSettingParams });
+    },
+  );
+
+  /**
+   * @swagger
+   *
+   *    /app-settings/oauth2-setting:
+   *      put:
+   *        tags: [AppSettings]
+   *        security:
+   *          - cookieAuth: []
+   *        summary: /app-settings/oauth2-setting
+   *        description: Update OAuth 2.0 setting for email
+   *        requestBody:
+   *          required: true
+   *          content:
+   *            application/json:
+   *              schema:
+   *                type: object
+   *                properties:
+   *                  fromAddress:
+   *                    type: string
+   *                    description: e-mail address used as from address
+   *                    example: 'info@growi.org'
+   *                  transmissionMethod:
+   *                    type: string
+   *                    description: transmission method
+   *                    example: 'oauth2'
+   *                  oauth2ClientId:
+   *                    type: string
+   *                    description: OAuth 2.0 Client ID
+   *                  oauth2ClientSecret:
+   *                    type: string
+   *                    description: OAuth 2.0 Client Secret
+   *                  oauth2RefreshToken:
+   *                    type: string
+   *                    description: OAuth 2.0 Refresh Token
+   *                  oauth2User:
+   *                    type: string
+   *                    description: Email address of the authorized account
+   *        responses:
+   *          200:
+   *            description: Succeeded to update OAuth 2.0 setting
+   *            content:
+   *              application/json:
+   *                schema:
+   *                  type: object
+   *                  properties:
+   *                    mailSettingParams:
+   *                      type: object
+   */
+  router.put(
+    '/oauth2-setting',
+    accessTokenParser([SCOPE.WRITE.ADMIN.APP]),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    validator.oauth2Setting,
+    apiV3FormValidator,
+    async (req, res) => {
+      const requestOAuth2SettingParams = {
+        'mail:from': req.body.fromAddress,
+        'mail:transmissionMethod': req.body.transmissionMethod,
+        'mail:oauth2ClientId': req.body.oauth2ClientId,
+        'mail:oauth2User': req.body.oauth2User,
+      };
+
+      // Only update secrets if non-empty values are provided
+      if (req.body.oauth2ClientSecret) {
+        requestOAuth2SettingParams['mail:oauth2ClientSecret'] =
+          req.body.oauth2ClientSecret;
+      }
+      if (req.body.oauth2RefreshToken) {
+        requestOAuth2SettingParams['mail:oauth2RefreshToken'] =
+          req.body.oauth2RefreshToken;
+      }
+
+      let mailSettingParams: Awaited<ReturnType<typeof updateMailSettinConfig>>;
+      try {
+        // updateMailSettinConfig internally calls initialize() and publishUpdatedMessage()
+        mailSettingParams = await updateMailSettinConfig(
+          requestOAuth2SettingParams,
+        );
+      } catch (err) {
+        const msg = 'Error occurred in updating OAuth 2.0 setting';
+        logger.error('Error', err);
+        return res.apiv3Err(new ErrorV3(msg, 'update-oauth2-setting-failed'));
+      }
+
+      const parameters = {
+        action: SupportedAction.ACTION_ADMIN_MAIL_OAUTH2_UPDATE,
       };
       activityEvent.emit('update', res.locals.activity._id, parameters);
       return res.apiv3({ mailSettingParams });
