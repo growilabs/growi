@@ -8,7 +8,10 @@ import { useSWRxAiAssistants } from '~/features/openai/client/stores/ai-assistan
 import loggerFactory from '~/utils/logger';
 
 import { deleteThread } from '../../services/thread';
-import { useChatSidebarActions } from '../../status/chat-sidebar';
+import {
+  useChatSidebarActions,
+  useChatSidebarStatus,
+} from '../../status/chat-sidebar';
 import { useSWRINFxRecentThreads } from '../../stores/thread';
 
 const logger = loggerFactory('growi:openai:client:components:ThreadList');
@@ -17,14 +20,9 @@ export const ThreadList: React.FC = () => {
   const swrInfiniteThreads = useSWRINFxRecentThreads();
   const { t } = useTranslation();
   const { data, mutate: mutateRecentThreads } = swrInfiniteThreads;
-  // const aiAssistantSidebarData = useAiAssistantSidebarStatus();
-  //   const { openChat, close: closeAiAssistantSidebar } =
-  //     useAiAssistantSidebarActions();
-
-  const { openChat } = useChatSidebarActions();
-
-  const { data: aiAssistants, mutate: mutateAiAssistants } =
-    useSWRxAiAssistants();
+  const { openChat, close: closeChatSidebar } = useChatSidebarActions();
+  const chatSidebarStatus = useChatSidebarStatus();
+  const { data: aiAssistants } = useSWRxAiAssistants();
 
   const isEmpty = data?.[0]?.total === 0;
   const isReachingEnd =
@@ -38,23 +36,30 @@ export const ThreadList: React.FC = () => {
           t('ai_assistant_substance.toaster.thread_deleted_success'),
         );
 
-        mutateRecentThreads();
-
         // TODO:　After moving useAiAssistantSidebarStatus to the features/mastra directory, we plan to address this.
         // Promise.all([mutateAssistantThreadData(), mutateRecentThreads()]);
-        // // Close if the thread to be deleted is open in right sidebar
-        // if (
-        //   aiAssistantSidebarData?.isOpened &&
-        //   aiAssistantSidebarData?.threadData?._id === threadRelationId
-        // ) {
-        //   closeAiAssistantSidebar();
-        // }
+        mutateRecentThreads();
+
+        // Close if the thread to be deleted is open in right sidebars
+        if (
+          chatSidebarStatus?.isOpened &&
+          chatSidebarStatus?.threadId === threadId
+        ) {
+          closeChatSidebar();
+        }
       } catch (err) {
         logger.error(err);
         toastError(t('ai_assistant_substance.toaster.thread_deleted_failed'));
       }
     },
-    [mutateRecentThreads, t],
+    [
+      mutateRecentThreads,
+      t,
+      chatSidebarStatus?.isOpened,
+      chatSidebarStatus?.threadId,
+      closeChatSidebar,
+      chatSidebarStatus,
+    ],
   );
 
   const findAiAssistantById = useCallback(
