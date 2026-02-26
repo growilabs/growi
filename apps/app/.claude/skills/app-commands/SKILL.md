@@ -39,17 +39,6 @@ pnpm run lint:styles      # Stylelint only
 
 > **Running individual test files**: See the `testing` rule (`.claude/rules/testing.md`).
 
-### Common Mistake
-
-```bash
-# ❌ WRONG: lint:typecheck is NOT a Turborepo task
-turbo run lint:typecheck --filter @growi/app
-# Error: could not find task `lint:typecheck` in project
-
-# ✅ CORRECT: Use pnpm for package-specific scripts
-pnpm --filter @growi/app run lint:typecheck
-```
-
 ## Quick Reference
 
 | Task | Command |
