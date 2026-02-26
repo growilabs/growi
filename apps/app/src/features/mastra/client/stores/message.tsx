@@ -1,13 +1,13 @@
 import type { UIMessage } from 'ai';
-import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
+import useSWR, { type SWRResponse } from 'swr';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
 
-export const useSWRMUTxMessages = (
+export const useSWRxMessages = (
   threadId?: string,
-): SWRMutationResponse<UIMessage[] | null> => {
-  const key = threadId != null ? [`/mastra/messages/${threadId}`] : null;
-  return useSWRMutation(key, ([endpoint]) =>
+): SWRResponse<UIMessage[] | null> => {
+  const key = threadId != null ? `/mastra/messages/${threadId}` : null;
+  return useSWR(key, (endpoint) =>
     apiv3Get(endpoint).then((response) => response.data.messages),
   );
 };

@@ -46,7 +46,7 @@ import {
 } from '~/components/ai-elements/sources';
 
 import { useChatSidebarStatus } from '../../status/chat-sidebar';
-import { useSWRMUTxMessages } from '../../stores/message';
+import { useSWRxMessages } from '../../stores/message';
 
 import styles from './ChatSidebar.module.scss';
 
@@ -71,7 +71,7 @@ export const ChatSidebar = (): JSX.Element => {
   const chatSidebarStatus = useChatSidebarStatus();
   const threadId = chatSidebarStatus?.threadId;
 
-  const { trigger: mutateMessages } = useSWRMUTxMessages(threadId);
+  const { data: savedMessages } = useSWRxMessages(threadId);
 
   const { messages, sendMessage, status, regenerate, setMessages } = useChat({
     id: threadId ?? 'new',
@@ -79,14 +79,9 @@ export const ChatSidebar = (): JSX.Element => {
   });
 
   useEffect(() => {
-    (async () => {
-      if (threadId == null) return;
-      const messages = await mutateMessages();
-      if (messages == null) return;
-
-      setMessages(messages);
-    })();
-  }, [mutateMessages, setMessages, threadId]);
+    if (savedMessages == null) return;
+    setMessages(savedMessages);
+  }, [savedMessages, setMessages]);
 
   const handleSubmit = (message: PromptInputMessage) => {
     sendMessage(
