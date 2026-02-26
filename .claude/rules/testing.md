@@ -35,4 +35,4 @@ pnpm vitest run yjs.integ --repeat=10
 turbo run test --filter @growi/app
 ```
 
-For testing patterns (mocking, assertions, structure), see the `essential-test-patterns` skill.
+For testing patterns (mocking, assertions, structure), see the `.claude/skills/learned/essential-test-patterns` skill.
