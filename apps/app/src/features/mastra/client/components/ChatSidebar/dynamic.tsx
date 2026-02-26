@@ -17,7 +17,7 @@ export const ChatSidebarLazyLoaded: FC = memo(() => {
     isOpened,
   );
 
-  if (ComponentToRender == null) {
+  if (ComponentToRender == null || !isOpened) {
     return null;
   }
 
