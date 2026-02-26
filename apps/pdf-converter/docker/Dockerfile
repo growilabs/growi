@@ -50,7 +50,7 @@ RUN turbo run clean
 RUN turbo run build --filter @growi/pdf-converter
 
 # make artifacts
-RUN pnpm deploy out --prod --filter @growi/pdf-converter
+RUN pnpm deploy out --prod --legacy --filter @growi/pdf-converter
 RUN rm -rf apps/pdf-converter/node_modules && mv out/node_modules apps/pdf-converter/node_modules
 RUN tar -zcf /tmp/packages.tar.gz \
   package.json \

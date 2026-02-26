@@ -1,6 +1,9 @@
 import type { FC } from 'react';
-import React, { useCallback, useState } from 'react';
-import { addDays, format, parse, set } from 'date-fns';
+import { useCallback, useState } from 'react';
+import { addDays } from 'date-fns/addDays';
+import { format } from 'date-fns/format';
+import { parse } from 'date-fns/parse';
+import { set } from 'date-fns/set';
 import { useTranslation } from 'next-i18next';
 
 import { apiv3Post } from '~/client/util/apiv3-client';

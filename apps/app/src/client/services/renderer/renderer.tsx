@@ -1,3 +1,4 @@
+import dynamic from 'next/dynamic';
 import { isClient } from '@growi/core/dist/utils/browser-utils';
 import * as presentation from '@growi/presentation/dist/client/services/sanitize-option';
 import * as refsGrowiDirective from '@growi/remark-attachment-refs/dist/client';
@@ -20,7 +21,10 @@ import { LightBox } from '~/client/components/ReactMarkdownComponents/LightBox';
 import { RichAttachment } from '~/client/components/ReactMarkdownComponents/RichAttachment';
 import { TableWithEditButton } from '~/client/components/ReactMarkdownComponents/TableWithEditButton';
 import * as callout from '~/features/callout';
-import * as mermaid from '~/features/mermaid';
+import {
+  remarkPlugin as mermaidRemarkPlugin,
+  sanitizeOption as mermaidSanitizeOption,
+} from '~/features/mermaid/services';
 import * as plantuml from '~/features/plantuml';
 import type { RendererOptions } from '~/interfaces/renderer-options';
 import type { RendererConfigExt } from '~/interfaces/services/renderer';
@@ -46,6 +50,14 @@ const logger = loggerFactory('growi:cli:services:renderer');
 
 assert(isClient(), 'This module must be loaded only from client modules.');
 
+const MermaidViewer = dynamic(
+  () =>
+    import('~/features/mermaid/components/MermaidViewer').then(
+      (mod) => mod.MermaidViewer,
+    ),
+  { ssr: false },
+);
+
 export const generateViewOptions = (
   pagePath: string,
   config: RendererConfigExt,
@@ -63,7 +75,7 @@ export const generateViewOptions = (
       { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode },
     ],
     [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
-    mermaid.remarkPlugin,
+    mermaidRemarkPlugin,
     xsvToTable.remarkPlugin,
     attachment.remarkPlugin,
     remarkGithubAdmonitionsToDirectives,
@@ -83,7 +95,7 @@ export const generateViewOptions = (
             getCommonSanitizeOption(config),
             presentation.sanitizeOption,
             drawio.sanitizeOption,
-            mermaid.sanitizeOption,
+            mermaidSanitizeOption,
             callout.sanitizeOption,
             attachment.sanitizeOption,
             lsxGrowiDirective.sanitizeOption,
@@ -122,7 +134,7 @@ export const generateViewOptions = (
     components.gallery = refsGrowiDirective.Gallery;
     components.drawio = DrawioViewerWithEditButton;
     components.table = TableWithEditButton;
-    components.mermaid = mermaid.MermaidViewer;
+    components.mermaid = MermaidViewer;
     components.callout = callout.CalloutViewer;
     components.attachment = RichAttachment;
     components.img = LightBox;
@@ -184,7 +196,7 @@ export const generateSimpleViewOptions = (
       { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode },
     ],
     [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
-    mermaid.remarkPlugin,
+    mermaidRemarkPlugin,
     xsvToTable.remarkPlugin,
     attachment.remarkPlugin,
     remarkGithubAdmonitionsToDirectives,
@@ -208,7 +220,7 @@ export const generateSimpleViewOptions = (
             getCommonSanitizeOption(config),
             presentation.sanitizeOption,
             drawio.sanitizeOption,
-            mermaid.sanitizeOption,
+            mermaidSanitizeOption,
             callout.sanitizeOption,
             attachment.sanitizeOption,
             lsxGrowiDirective.sanitizeOption,
@@ -239,7 +251,7 @@ export const generateSimpleViewOptions = (
     components.refsimg = refsGrowiDirective.RefsImgImmutable;
     components.gallery = refsGrowiDirective.GalleryImmutable;
     components.drawio = drawio.DrawioViewer;
-    components.mermaid = mermaid.MermaidViewer;
+    components.mermaid = MermaidViewer;
     components.callout = callout.CalloutViewer;
     components.attachment = RichAttachment;
     components.img = LightBox;
@@ -290,7 +302,7 @@ export const generatePreviewOptions = (
       { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode },
     ],
     [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
-    mermaid.remarkPlugin,
+    mermaidRemarkPlugin,
     xsvToTable.remarkPlugin,
     attachment.remarkPlugin,
     remarkGithubAdmonitionsToDirectives,
@@ -309,7 +321,7 @@ export const generatePreviewOptions = (
           deepmerge(
             getCommonSanitizeOption(config),
             drawio.sanitizeOption,
-            mermaid.sanitizeOption,
+            mermaidSanitizeOption,
             callout.sanitizeOption,
             attachment.sanitizeOption,
             lsxGrowiDirective.sanitizeOption,
@@ -341,7 +353,7 @@ export const generatePreviewOptions = (
     components.refsimg = refsGrowiDirective.RefsImgImmutable;
     components.gallery = refsGrowiDirective.GalleryImmutable;
     components.drawio = drawio.DrawioViewer;
-    components.mermaid = mermaid.MermaidViewer;
+    components.mermaid = MermaidViewer;
     components.callout = callout.CalloutViewer;
     components.attachment = RichAttachment;
     components.img = LightBox;
