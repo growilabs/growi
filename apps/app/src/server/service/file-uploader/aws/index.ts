@@ -290,11 +290,10 @@ class AwsFileUploader extends AbstractFileUploader {
     }
   }
 
-  override async respond(
-    res: Response,
-    attachment: IAttachmentDocument,
-    opts?: RespondOptions,
-  ): Promise<void> {
+  /**
+   * @inheritdoc
+   */
+  override respond(): void {
     throw new Error('AwsFileUploader does not support ResponseMode.DELEGATE.');
   }
 
