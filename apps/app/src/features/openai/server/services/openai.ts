@@ -294,11 +294,18 @@ class OpenaiService implements IOpenaiService {
     userId?: string,
     type: ThreadType = ThreadType.KNOWLEDGE,
   ): Promise<ThreadRelationDocument[]> {
-    const threadRelations = await ThreadRelationModel.find({
+    const query: { aiAssistant: string; type: ThreadType; userId?: string } = {
       aiAssistant: aiAssistantId,
-      ...(userId != null && { userId }),
       type,
-    }).sort({ updatedAt: -1 });
+    };
+
+    if (userId != null) {
+      query.userId = userId;
+    }
+
+    const threadRelations = await ThreadRelationModel.find(query).sort({
+      updatedAt: -1,
+    });
     return threadRelations;
   }
 
