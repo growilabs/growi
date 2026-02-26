@@ -226,6 +226,15 @@ The following loop repeats until the user declares completion:
   - Result: initial: 894 (-179, -16.7%) / async-only: 5,011 (-5) / total: 5,905 (-184) / compiled: 8,619 (-184)
   - _Requirements: 3.1, 3.2, 6.1_
 
+- [x] 8.10 Loop iteration 8: react-syntax-highlighter deep ESM import + v16 upgrade
+  - Changed barrel import `import { PrismAsyncLight } from 'react-syntax-highlighter'` to deep ESM import `import PrismAsyncLight from 'react-syntax-highlighter/dist/esm/prism-async-light'` in all 4 usage files
+  - Changed style import from `dist/cjs/styles/prism` barrel to `dist/esm/styles/prism/one-dark` direct import
+  - Upgraded react-syntax-highlighter from 15.5.0 to 16.1.0 (refractor v3→v5 security fix, webpack 5 improvements, API unchanged)
+  - Deep import bypasses barrel that re-exports all engines (highlight.js, Prism, etc.); only Prism/refractor engine is bundled
+  - Remaining highlight.js modules (~149) still present via other paths (diff2html, lowlight)
+  - Result: initial: 895 (+1) / async-only: 4,775 (-236, -4.7%) / total: 5,670 (-235)
+  - _Requirements: 4.1, 6.1_
+
 - [ ] 8.N Loop iteration N: (next iteration — measure, analyze, propose, implement)
 
 ## Phase 3: Next.js Version Upgrade Evaluation (Deferred)

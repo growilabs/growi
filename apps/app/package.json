@@ -206,7 +206,7 @@
     "react-multiline-clamp": "^2.0.0",
     "react-scroll": "^1.8.7",
     "react-stickynode": "^4.1.1",
-    "react-syntax-highlighter": "^15.5.0",
+    "react-syntax-highlighter": "^16.1.0",
     "react-use-ripple": "^1.5.2",
     "reactstrap": "^9.2.2",
     "reconnecting-websocket": "^4.4.0",
