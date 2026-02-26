@@ -22,7 +22,7 @@ module.exports = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const validateUpdateMimeTypes = [
     body('newInlineMimeTypes')
