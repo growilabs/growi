@@ -1,11 +1,12 @@
 import React from 'react';
+
 import { useTranslation } from 'react-i18next';
 
 interface LayoutGuideItem {
   id: string;
   title: string;
   code: string;
-  preview: React.ReactNode;
+  preview?: React.ReactNode;
   minWidth?: string;
   underContent?: React.ReactNode;
 }
@@ -237,7 +238,6 @@ export const LayoutTab: React.FC = () => {
         `| ${t(`${i18nKey}.left`)}${t(`${i18nKey}.row_display`)} | ${t(`${i18nKey}.right`)}${t(`${i18nKey}.row_display`)} | `
         + `${t(`${i18nKey}.center`)}${t(`${i18nKey}.row_display`)} |`,
       ].join('\n'),
-      preview: null,
       underContent: (
         <div
           className="table-responsive mt-2"
