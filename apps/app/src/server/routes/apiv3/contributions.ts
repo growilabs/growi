@@ -3,7 +3,7 @@ import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
 
-import { CacheManager } from '~/features/contribution-graph/services/cache-manager';
+import { ContributionCacheManager } from '~/features/contribution-graph/services/cache-manager';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 
@@ -51,8 +51,8 @@ module.exports = (crowi: Crowi): Router => {
       }
 
       try {
-        const cacheManager = new CacheManager();
-        const contributions = await cacheManager.getCache(targetUserId);
+        const cacheManager = new ContributionCacheManager();
+        const contributions = await cacheManager.getUpdatedCache(targetUserId);
 
         return res.apiv3({ contributions });
       } catch (err) {
