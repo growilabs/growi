@@ -14,7 +14,7 @@ export const contributionDataAtom = atom<Promise<IContributionDay[]>>(
     }
 
     try {
-      const response = await apiv3Get('/activity/contribution', {
+      const response = await apiv3Get('/contributions', {
         targetUserId: userId,
       });
       return response.data.contributions;
