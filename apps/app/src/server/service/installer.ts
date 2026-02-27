@@ -8,6 +8,7 @@ import path from 'path';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
+import { assertFileNameSafeForBaseDir } from '../util/safe-path-utils';
 import { configManager } from './config-manager';
 
 const logger = loggerFactory('growi:service:installer');
@@ -62,6 +63,7 @@ export class InstallerService {
      *   1. avoid creating the same pages
      *   2. avoid difference for order in VRT
      */
+    assertFileNameSafeForBaseDir(lang, localeDir);
     await this.createPage(path.join(localeDir, lang, 'sandbox.md'), '/Sandbox');
     await this.createPage(
       path.join(localeDir, lang, 'sandbox-markdown.md'),
@@ -150,7 +152,7 @@ export class InstallerService {
     options?: AutoInstallOptions,
   ): Promise<IUser> {
     await this.initDB(globalLang, options);
-
+    assertFileNameSafeForBaseDir(globalLang, this.crowi.localeDir);
     const User = mongoose.model<IUser, { createUser }>('User');
 
     // create portal page for '/' before creating admin user
