@@ -1,7 +1,5 @@
 import { vi } from 'vitest';
 
-import config from '^/config/next-i18next.config';
-
 import { configManager } from '~/server/service/config-manager/config-manager';
 
 import NamedQuery from '../models/named-query';
