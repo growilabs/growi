@@ -12,6 +12,7 @@ import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
 
+import { assertFileNameSafeForBaseDir } from '../util/safe-path-utils';
 import type { GlobalNotificationEventVars } from './types';
 
 const _logger = loggerFactory('growi:service:GlobalNotificationMailService');
@@ -89,12 +90,21 @@ class GlobalNotificationMailService {
     triggeredBy: IUser,
     { comment, oldPath }: GlobalNotificationEventVars,
   ): MailOption {
-    const locale = configManager.getConfig('app:globalLang');
+    let locale = configManager.getConfig('app:globalLang');
     // validate for all events
     if (event == null || page == null || triggeredBy == null) {
       throw new Error(
         `invalid vars supplied to GlobalNotificationMailService.generateOption for event ${event}`,
       );
+    }
+
+    try {
+      assertFileNameSafeForBaseDir(locale, this.crowi.localeDir);
+    } catch (err) {
+      _logger.error(
+        `Path traversal attempt detected in app:globalLang: '${locale}'. Fallback to 'en_US'.`,
+      );
+      locale = 'en_US';
     }
 
     const template = nodePath.join(

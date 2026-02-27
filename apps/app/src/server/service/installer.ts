@@ -152,7 +152,7 @@ export class InstallerService {
     options?: AutoInstallOptions,
   ): Promise<IUser> {
     await this.initDB(globalLang, options);
-
+    assertFileNameSafeForBaseDir(globalLang, this.crowi.localeDir);
     const User = mongoose.model<IUser, { createUser }>('User');
 
     // create portal page for '/' before creating admin user
