@@ -18,7 +18,7 @@ import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import { isFileNameSafeForBaseDir } from '../../util/safe-path-utils';
+import { isFileNameSafeForBaseDir } from '../../../util/safe-path-utils';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:app-settings');

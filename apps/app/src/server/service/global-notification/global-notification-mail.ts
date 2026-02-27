@@ -12,7 +12,7 @@ import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
 
-import { assertFileNameSafeForBaseDir } from '../util/safe-path-utils';
+import { assertFileNameSafeForBaseDir } from '../../util/safe-path-utils';
 import type { GlobalNotificationEventVars } from './types';
 
 const _logger = loggerFactory('growi:service:GlobalNotificationMailService');
