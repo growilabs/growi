@@ -1,5 +1,5 @@
-import React from 'react';
-
+import type React from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface LayoutGuideItem {
@@ -19,23 +19,23 @@ const GuideRow = ({
   underContent,
 }: GuideRowProps) => {
   const { t } = useTranslation();
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(code);
-    alert(t('editor_guide.textstyle.copy_done'));
-  };
-
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toastSuccess(t('editor_guide.textstyle.copy_done'));
+    } catch (err) {
+      toastError(t('common:failed_to_copy'));
+    }
+  }, [code, t]);
   return (
     <section className={title !== '' ? 'mt-4 mb-2' : 'mb-2'}>
-      {title !== '' && (
-        <h3 className="fw-bold mb-2 fs-4 text-body">
-          {title}
-        </h3>
-      )}
+      {title !== '' && <h3 className="fw-bold mb-2 fs-4 text-body">{title}</h3>}
       <div className="d-flex flex-row flex-wrap align-items-center gap-4 py-1">
-        <div
+        <button
+          type="button"
           onClick={handleCopy}
+          className="btn-none p-0 text-start border-0 bg-transparent"
           style={{ cursor: 'pointer' }}
-          className="flex-grow-0 flex-shrink-0"
         >
           <div
             className="text-light p-2 ps-3 pe-5 rounded position-relative"
@@ -58,7 +58,7 @@ const GuideRow = ({
               Click
             </small>
           </div>
-        </div>
+        </button>
         {preview && (
           <div
             className="flex-grow-1"
@@ -67,18 +67,12 @@ const GuideRow = ({
               flexBasis: '0',
             }}
           >
-            <div className="wiki-content small">
-              {preview}
-            </div>
+            <div className="wiki-content small">{preview}</div>
           </div>
         )}
       </div>
 
-      {underContent && (
-        <div className="mt-2 w-100">
-          {underContent}
-        </div>
-      )}
+      {underContent && <div className="mt-2 w-100">{underContent}</div>}
     </section>
   );
 };
@@ -87,7 +81,7 @@ export const LayoutTab: React.FC = () => {
   const { t } = useTranslation();
   const i18nKey = 'editor_guide.layout';
 
-  const LAYOUT_GUIDES : LayoutGuideItem[] = [
+  const LAYOUT_GUIDES: LayoutGuideItem[] = [
     {
       id: 'header',
       title: t(`${i18nKey}.header`),
@@ -107,9 +101,7 @@ export const LayoutTab: React.FC = () => {
           <h2 className="h3 border-bottom pb-1 mb-2 fw-bold">
             {t(`${i18nKey}.header_text`)}2
           </h2>
-          <h3 className="fs-5 mb-2 fw-bold">
-            {t(`${i18nKey}.header_text`)}3
-          </h3>
+          <h3 className="fs-5 mb-2 fw-bold">{t(`${i18nKey}.header_text`)}3</h3>
           <h4 className="fs-5 border-start border-4 ps-2 mb-2 fw-normal border-secondary-subtle">
             {t(`${i18nKey}.header_text`)}4
           </h4>
@@ -165,7 +157,10 @@ export const LayoutTab: React.FC = () => {
             <span>{t(`${i18nKey}.task`)}1</span>
           </div>
           <div className="d-flex align-items-center mb-1 ps-4">
-            <span className="d-inline-block border border-secondary rounded me-2" style={{ width: '18px', height: '18px' }} />
+            <span
+              className="d-inline-block border border-secondary rounded me-2"
+              style={{ width: '18px', height: '18px' }}
+            />
             <span>{t(`${i18nKey}.task`)}1-1</span>
           </div>
           <div className="d-flex align-items-center ps-4">
@@ -182,7 +177,9 @@ export const LayoutTab: React.FC = () => {
       preview: (
         <blockquote className="border-start border-4 ps-3 text-muted fst-italic border-secondary-subtle">
           {t(`${i18nKey}.quote_text`)}
-          <blockquote className="border-start border-2 ps-3 mt-2">{t(`${i18nKey}.multi_quote`)}</blockquote>
+          <blockquote className="border-start border-2 ps-3 mt-2">
+            {t(`${i18nKey}.multi_quote`)}
+          </blockquote>
         </blockquote>
       ),
     },
@@ -235,23 +232,26 @@ export const LayoutTab: React.FC = () => {
         `| ${t(`${i18nKey}.left`)} | ${t(`${i18nKey}.right`)} | ${t(`${i18nKey}.center`)} |`,
         '|:-------------- | --------------:| :--------------: |',
         `| ${t(`${i18nKey}.row_text`)} | ${t(`${i18nKey}.row_text`)} | ${t(`${i18nKey}.row_text`)} |`,
-        `| ${t(`${i18nKey}.left`)}${t(`${i18nKey}.row_display`)} | ${t(`${i18nKey}.right`)}${t(`${i18nKey}.row_display`)} | `
-        + `${t(`${i18nKey}.center`)}${t(`${i18nKey}.row_display`)} |`,
+        `| ${t(`${i18nKey}.left`)}${t(`${i18nKey}.row_display`)} | ${t(`${i18nKey}.right`)}${t(`${i18nKey}.row_display`)} | ` +
+          `${t(`${i18nKey}.center`)}${t(`${i18nKey}.row_display`)} |`,
       ].join('\n'),
       underContent: (
-        <div
-          className="table-responsive mt-2"
-          style={{ width: 'fit-content' }}
-        >
+        <div className="table-responsive mt-2" style={{ width: 'fit-content' }}>
           <table
             className="table table-sm table-bordered mb-0 small text-body"
             style={{ minWidth: '580px' }}
           >
             <thead>
               <tr className="table-light">
-                <th className="text-start fw-bold p-2 align-middle">{t(`${i18nKey}.left`)}</th>
-                <th className="text-end fw-bold p-2 align-middle">{t(`${i18nKey}.right`)}</th>
-                <th className="text-center fw-bold p-2 align-middle">{t(`${i18nKey}.center`)}</th>
+                <th className="text-start fw-bold p-2 align-middle">
+                  {t(`${i18nKey}.left`)}
+                </th>
+                <th className="text-end fw-bold p-2 align-middle">
+                  {t(`${i18nKey}.right`)}
+                </th>
+                <th className="text-center fw-bold p-2 align-middle">
+                  {t(`${i18nKey}.center`)}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -261,9 +261,18 @@ export const LayoutTab: React.FC = () => {
                 <td className="text-center p-2">{t(`${i18nKey}.row_text`)}</td>
               </tr>
               <tr>
-                <td className="text-start p-2">{t(`${i18nKey}.left`)}{t(`${i18nKey}.row_display`)}</td>
-                <td className="text-end p-2">{t(`${i18nKey}.right`)}{t(`${i18nKey}.row_display`)}</td>
-                <td className="text-center p-2">{t(`${i18nKey}.center`)}{t(`${i18nKey}.row_display`)}</td>
+                <td className="text-start p-2">
+                  {t(`${i18nKey}.left`)}
+                  {t(`${i18nKey}.row_display`)}
+                </td>
+                <td className="text-end p-2">
+                  {t(`${i18nKey}.right`)}
+                  {t(`${i18nKey}.row_display`)}
+                </td>
+                <td className="text-center p-2">
+                  {t(`${i18nKey}.center`)}
+                  {t(`${i18nKey}.row_display`)}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -289,8 +298,11 @@ export const LayoutTab: React.FC = () => {
   ];
 
   return (
-    <div className="px-4 py-3 overflow-y-auto" style={{ maxHeight: '80vh', minWidth: '650px' }}>
-      {LAYOUT_GUIDES.map(item => (
+    <div
+      className="px-4 py-3 overflow-y-auto"
+      style={{ maxHeight: '80vh', minWidth: '650px' }}
+    >
+      {LAYOUT_GUIDES.map((item) => (
         <GuideRow key={item.id} {...item} />
       ))}
     </div>
