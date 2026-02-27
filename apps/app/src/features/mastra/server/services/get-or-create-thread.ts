@@ -37,6 +37,10 @@ export const getOrCreateThread = async ({
     throw new Error('Thread not found');
   }
 
+  if (thread.resourceId !== resourceId) {
+    throw new Error('Thread does not belong to the resource');
+  }
+
   if (!isThreadWithMeta(thread)) {
     throw new Error('Thread metadata is invalid');
   }
