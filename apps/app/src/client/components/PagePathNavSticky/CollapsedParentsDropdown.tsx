@@ -1,8 +1,10 @@
-import { useMemo, type JSX } from 'react';
-
+import { type JSX, useMemo } from 'react';
 import Link from 'next/link';
 import {
-  DropdownItem, DropdownMenu, DropdownToggle, UncontrolledDropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
+  UncontrolledDropdown,
 } from 'reactstrap';
 
 import type LinkedPagePath from '~/models/linked-page-path';
@@ -10,11 +12,14 @@ import type LinkedPagePath from '~/models/linked-page-path';
 import styles from './CollapsedParentsDropdown.module.scss';
 
 const getAncestorPathAndPathNames = (linkedPagePath: LinkedPagePath) => {
-  const pathAndPathName: Array<{ path: string, pathName: string }> = [];
+  const pathAndPathName: Array<{ path: string; pathName: string }> = [];
   let currentLinkedPagePath = linkedPagePath;
 
   while (currentLinkedPagePath.parent != null) {
-    pathAndPathName.unshift({ path: currentLinkedPagePath.path, pathName: currentLinkedPagePath.pathName });
+    pathAndPathName.unshift({
+      path: currentLinkedPagePath.path,
+      pathName: currentLinkedPagePath.pathName,
+    });
     currentLinkedPagePath = currentLinkedPagePath.parent;
   }
 
@@ -22,22 +27,30 @@ const getAncestorPathAndPathNames = (linkedPagePath: LinkedPagePath) => {
 };
 
 type Props = {
-  linkedPagePath: LinkedPagePath,
-}
+  linkedPagePath: LinkedPagePath;
+};
 
 export const CollapsedParentsDropdown = (props: Props): JSX.Element => {
   const { linkedPagePath } = props;
 
-  const ancestorPathAndPathNames = useMemo(() => getAncestorPathAndPathNames(linkedPagePath), [linkedPagePath]);
+  const ancestorPathAndPathNames = useMemo(
+    () => getAncestorPathAndPathNames(linkedPagePath),
+    [linkedPagePath],
+  );
 
   return (
     <UncontrolledDropdown className="d-inline-block">
       <DropdownToggle color="transparent">...</DropdownToggle>
-      <DropdownMenu className={`dropdown-menu ${styles['collapsed-parents-dropdown-menu']}`} container="body">
-        {ancestorPathAndPathNames.map(data => (
+      <DropdownMenu
+        className={`dropdown-menu ${styles['collapsed-parents-dropdown-menu']}`}
+        container="body"
+      >
+        {ancestorPathAndPathNames.map((data) => (
           <DropdownItem key={data.path}>
             <Link href={data.path} legacyBehavior>
-              <a role="menuitem">{data.pathName}</a>
+              <a role="menuitem" href={data.path}>
+                {data.pathName}
+              </a>
             </Link>
           </DropdownItem>
         ))}

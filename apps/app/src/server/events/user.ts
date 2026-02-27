@@ -7,15 +7,15 @@ import mongoose from 'mongoose';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
+import type Crowi from '../crowi';
 import { deleteCompletelyUserHomeBySystem } from '../service/page/delete-completely-user-home-by-system';
 
 const logger = loggerFactory('growi:events:user');
 
 class UserEvent extends EventEmitter {
-  crowi: any;
+  crowi: Crowi;
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  constructor(crowi: any) {
+  constructor(crowi: Crowi) {
     super();
     this.crowi = crowi;
   }

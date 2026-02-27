@@ -233,7 +233,7 @@ export function measureNormalization<T>(
 
   // Log slow normalizations for optimization
   if (duration > 10) {
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: Allow warn
     console.warn(
       `${label} took ${duration.toFixed(2)}ms for ${text.length} characters`,
     );

@@ -1,9 +1,9 @@
 import React, { type JSX } from 'react';
 
 type Props = {
-  template: any,
-  onChangeHandler: any,
-}
+  template: any;
+  onChangeHandler: any;
+};
 
 // const onChangeHandler = () => {
 

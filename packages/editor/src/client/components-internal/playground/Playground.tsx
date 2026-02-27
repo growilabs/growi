@@ -48,7 +48,7 @@ export const Playground = (): JSX.Element => {
 
   // set handler to save with shortcut key
   const saveHandler = useCallback(() => {
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: Allow to use
     console.log({ doc: codeMirrorEditor?.getDocString() });
     toast.success('Saved.', { autoClose: 2000 });
   }, [codeMirrorEditor]);

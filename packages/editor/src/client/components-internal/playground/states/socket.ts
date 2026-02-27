@@ -31,18 +31,18 @@ export const useSetupPlaygroundSocket = (): void => {
 
       // Error handling
       newSocket.on('error', (err) => {
-        // eslint-disable-next-line no-console
+        // biome-ignore lint/suspicious/noConsole: Allow to use
         console.error(err);
       });
       newSocket.on('connect_error', (err) => {
-        // eslint-disable-next-line no-console
+        // biome-ignore lint/suspicious/noConsole: Allow to use
         console.error('Failed to connect with websocket.', err);
       });
 
       // Store connection in atom
       setSocket(newSocket);
     } catch (error) {
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: Allow to use
       console.error('Failed to initialize WebSocket:', error);
     }
   }, [setSocket]);

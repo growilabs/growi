@@ -1,12 +1,10 @@
-import React, { useCallback, type JSX } from 'react';
-
+import React, { type JSX, useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 
 type EmptyTrashButtonProps = {
-  onEmptyTrashButtonClick: () => void,
-  disableEmptyButton: boolean
+  onEmptyTrashButtonClick: () => void;
+  disableEmptyButton: boolean;
 };
-
 
 const EmptyTrashButton = (props: EmptyTrashButtonProps): JSX.Element => {
   const { onEmptyTrashButtonClick, disableEmptyButton } = props;

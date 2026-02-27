@@ -32,6 +32,7 @@ export type ServerConfigurationProps = {
     isEnabledStaleNotification: boolean;
     disableLinkSharing: boolean;
     isIndentSizeForced: boolean;
+    disableUserPages: boolean;
     isEnabledAttachTitleHeader: boolean;
     isSlackConfigured: boolean;
     isAclEnabled: boolean;
@@ -44,7 +45,7 @@ export type ServerConfigurationProps = {
 };
 
 // Do not include CommonEachProps for multi stage
-// eslint-disable-next-line @typescript-eslint/ban-types
+// biome-ignore lint/complexity/noBannedTypes: Define empty interface to extend later
 export type GeneralPageEachProps = {};
 
 // Do not include CommonEachProps for multi stage

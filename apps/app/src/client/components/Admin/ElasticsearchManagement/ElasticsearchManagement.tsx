@@ -1,10 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
-
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
 import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
-import { toastSuccess, toastError } from '~/client/util/toastr';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useAdminSocket } from '~/features/admin/states/socket-io';
 import { SocketEventName } from '~/interfaces/websocket';
 import { isSearchServiceReachableAtom } from '~/states/server-configurations';
@@ -24,7 +23,8 @@ const ElasticsearchManagement = (): JSX.Element => {
 
   const [isConnected, setIsConnected] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
-  const [isReconnectingProcessing, setIsReconnectingProcessing] = useState(false);
+  const [isReconnectingProcessing, setIsReconnectingProcessing] =
+    useState(false);
   const [isRebuildingProcessing, setIsRebuildingProcessing] = useState(false);
   const [isRebuildingCompleted, setIsRebuildingCompleted] = useState(false);
 
@@ -32,8 +32,7 @@ const ElasticsearchManagement = (): JSX.Element => {
   const [indicesData, setIndicesData] = useState(null);
   const [aliasesData, setAliasesData] = useState(null);
 
-
-  const retrieveIndicesStatus = useCallback(async() => {
+  const retrieveIndicesStatus = useCallback(async () => {
     try {
       const { data } = await apiv3Get('/search/indices');
       const { info } = data;
@@ -46,8 +45,7 @@ const ElasticsearchManagement = (): JSX.Element => {
       setIsNormalized(info.isNormalized);
 
       return info.isNormalized;
-    }
-    catch (errors: unknown) {
+    } catch (errors: unknown) {
       setIsConnected(false);
 
       // evaluate whether configured or not
@@ -58,14 +56,12 @@ const ElasticsearchManagement = (): JSX.Element => {
           }
         }
         toastError(errors as Error[]);
-      }
-      else {
+      } else {
         toastError(errors as Error);
       }
 
       return false;
-    }
-    finally {
+    } finally {
       setIsInitialized(true);
     }
   }, []);
@@ -82,12 +78,12 @@ const ElasticsearchManagement = (): JSX.Element => {
       setIsRebuildingProcessing(true);
     });
 
-    socket.on(SocketEventName.FinishAddPage, async(data) => {
+    socket.on(SocketEventName.FinishAddPage, async (data) => {
       let retryCount = 0;
       const maxRetries = 5;
       const retryDelay = 500;
 
-      const retrieveIndicesStatusWithRetry = async() => {
+      const retrieveIndicesStatusWithRetry = async () => {
         const isNormalizedResult = await retrieveIndicesStatus();
         if (!isNormalizedResult && retryCount < maxRetries) {
           retryCount++;
@@ -111,13 +107,12 @@ const ElasticsearchManagement = (): JSX.Element => {
     };
   }, [retrieveIndicesStatus, socket]);
 
-  const reconnect = async() => {
+  const reconnect = async () => {
     setIsReconnectingProcessing(true);
 
     try {
       await apiv3Post('/search/connection');
-    }
-    catch (e) {
+    } catch (e) {
       toastError(e);
       return;
     }
@@ -126,12 +121,10 @@ const ElasticsearchManagement = (): JSX.Element => {
     window.location.reload();
   };
 
-  const normalizeIndices = async() => {
-
+  const normalizeIndices = async () => {
     try {
       await apiv3Put('/search/indices', { operation: 'normalize' });
-    }
-    catch (e) {
+    } catch (e) {
       toastError(e);
     }
 
@@ -140,14 +133,13 @@ const ElasticsearchManagement = (): JSX.Element => {
     toastSuccess('Normalizing has succeeded');
   };
 
-  const rebuildIndices = async() => {
+  const rebuildIndices = async () => {
     setIsRebuildingProcessing(true);
 
     try {
       await apiv3Put('/search/indices', { operation: 'rebuild' });
       toastSuccess('Rebuilding is requested');
-    }
-    catch (e) {
+    } catch (e) {
       toastError(e);
     }
 
@@ -156,7 +148,9 @@ const ElasticsearchManagement = (): JSX.Element => {
 
   const isErrorOccuredOnSearchService = !isSearchServiceReachable;
 
-  const isReconnectBtnEnabled = !isReconnectingProcessing && (!isInitialized || !isConnected || isErrorOccuredOnSearchService);
+  const isReconnectBtnEnabled =
+    !isReconnectingProcessing &&
+    (!isInitialized || !isConnected || isErrorOccuredOnSearchService);
 
   return (
     <>
@@ -178,7 +172,9 @@ const ElasticsearchManagement = (): JSX.Element => {
 
       {/* Controls */}
       <div className="row">
-        <label className="col-md-3 col-form-label text-start text-md-end">{ t('full_text_search_management.reconnect') }</label>
+        <div className="col-md-3 col-form-label text-start text-md-end">
+          {t('full_text_search_management.reconnect')}
+        </div>
         <div className="col-md-6">
           <ReconnectControls
             isEnabled={isReconnectBtnEnabled}
@@ -191,7 +187,9 @@ const ElasticsearchManagement = (): JSX.Element => {
       <hr />
 
       <div className="row">
-        <label className="col-md-3 col-form-label text-start text-md-end">{ t('full_text_search_management.normalize') }</label>
+        <div className="col-md-3 col-form-label text-start text-md-end">
+          {t('full_text_search_management.normalize')}
+        </div>
         <div className="col-md-6">
           <NormalizeIndicesControls
             isRebuildingProcessing={isRebuildingProcessing}
@@ -204,7 +202,9 @@ const ElasticsearchManagement = (): JSX.Element => {
       <hr />
 
       <div className="row">
-        <label className="col-md-3 col-form-label text-start text-md-end">{ t('full_text_search_management.rebuild') }</label>
+        <div className="col-md-3 col-form-label text-start text-md-end">
+          {t('full_text_search_management.rebuild')}
+        </div>
         <div className="col-md-6">
           <RebuildIndexControls
             isRebuildingProcessing={isRebuildingProcessing}
@@ -214,15 +214,10 @@ const ElasticsearchManagement = (): JSX.Element => {
           />
         </div>
       </div>
-
     </>
   );
-
 };
 
-
-ElasticsearchManagement.propTypes = {
-
-};
+ElasticsearchManagement.propTypes = {};
 
 export default ElasticsearchManagement;

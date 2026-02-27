@@ -38,8 +38,8 @@ const SearchModalSubstance = (props: Props): JSX.Element => {
   }, []);
 
   const selectSearchMenuItemHandler = useCallback(
-    (selectedItem: DownshiftItem) => {
-      router.push(selectedItem.url);
+    async (selectedItem: DownshiftItem) => {
+      await router.push(selectedItem.url);
       closeSearchModal();
     },
     [closeSearchModal, router],

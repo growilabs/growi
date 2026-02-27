@@ -1,7 +1,6 @@
-import path from 'path';
-
 // biome-ignore lint/style/noRestrictedImports: Direct axios usage for external S2S messaging
 import axios from 'axios';
+import path from 'path';
 import ReconnectingWebSocket from 'reconnecting-websocket';
 import WebSocket from 'ws';
 
@@ -9,14 +8,11 @@ import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
 import S2sMessage from '../../models/vo/s2s-message';
-
 import { AbstractS2sMessagingService } from './base';
 
 const logger = loggerFactory('growi:service:s2s-messaging:nchan');
 
-
 class NchanDelegator extends AbstractS2sMessagingService {
-
   /**
    * A list of S2sMessageHandlable instance
    */
@@ -24,7 +20,12 @@ class NchanDelegator extends AbstractS2sMessagingService {
 
   socket: any = null;
 
-  constructor(uri, private publishPath: string, private subscribePath: string, private channelId: any) {
+  constructor(
+    uri,
+    private publishPath: string,
+    private subscribePath: string,
+    private channelId: any,
+  ) {
     super(uri);
   }
 
@@ -41,9 +42,10 @@ class NchanDelegator extends AbstractS2sMessagingService {
   subscribe(forceReconnect = false) {
     if (forceReconnect) {
       logger.info('Force reconnecting is requested. Try to reconnect...');
-    }
-    else if (this.socket != null && this.shouldResubscribe()) {
-      logger.info('The connection to config pubsub server is offline. Try to reconnect...');
+    } else if (this.socket != null && this.shouldResubscribe()) {
+      logger.info(
+        'The connection to config pubsub server is offline. Try to reconnect...',
+      );
     }
 
     // init client
@@ -111,9 +113,10 @@ class NchanDelegator extends AbstractS2sMessagingService {
   }
 
   constructUrl(basepath) {
-    const pathname = this.channelId == null
-      ? basepath //                                 /pubsub
-      : path.join(basepath, this.channelId); //     /pubsub/my-channel-id
+    const pathname =
+      this.channelId == null
+        ? basepath //                                 /pubsub
+        : path.join(basepath, this.channelId); //     /pubsub/my-channel-id
 
     return new URL(pathname, this.uri);
   }
@@ -138,7 +141,9 @@ class NchanDelegator extends AbstractS2sMessagingService {
       logger.info('WebSocket client connected.');
     });
 
-    this.handlableList.forEach(handlable => this.registerMessageHandlerToSocket(handlable));
+    this.handlableList.forEach((handlable) => {
+      this.registerMessageHandlerToSocket(handlable);
+    });
 
     this.socket = socket;
   }
@@ -157,26 +162,31 @@ class NchanDelegator extends AbstractS2sMessagingService {
 
       // check uid
       if (s2sMessage.publisherUid === this.uid) {
-        logger.debug(`Skip processing by ${handlable.constructor.name} because this message is sent by the publisher itself:`, `from ${this.uid}`);
+        logger.debug(
+          `Skip processing by ${handlable.constructor.name} because this message is sent by the publisher itself:`,
+          `from ${this.uid}`,
+        );
         return;
       }
 
       // check shouldHandleS2sMessage
       const shouldHandle = handlable.shouldHandleS2sMessage(s2sMessage);
-      logger.debug(`${handlable.constructor.name}.shouldHandleS2sMessage(`, s2sMessage, `) => ${shouldHandle}`);
+      logger.debug(
+        `${handlable.constructor.name}.shouldHandleS2sMessage(`,
+        s2sMessage,
+        `) => ${shouldHandle}`,
+      );
 
       if (shouldHandle) {
         handlable.handleS2sMessage(s2sMessage);
       }
-    }
-    catch (err) {
+    } catch (err) {
       logger.warn('Could not handle a message: ', err.message);
     }
   }
-
 }
 
-module.exports = function(crowi: Crowi) {
+module.exports = (crowi: Crowi) => {
   const { configManager } = crowi;
 
   const uri = configManager.getConfig('app:nchanUri');
@@ -187,9 +197,15 @@ module.exports = function(crowi: Crowi) {
     return;
   }
 
-  const publishPath = configManager.getConfig('s2sMessagingPubsub:nchan:publishPath');
-  const subscribePath = configManager.getConfig('s2sMessagingPubsub:nchan:subscribePath');
-  const channelId = configManager.getConfig('s2sMessagingPubsub:nchan:channelId');
+  const publishPath = configManager.getConfig(
+    's2sMessagingPubsub:nchan:publishPath',
+  );
+  const subscribePath = configManager.getConfig(
+    's2sMessagingPubsub:nchan:subscribePath',
+  );
+  const channelId = configManager.getConfig(
+    's2sMessagingPubsub:nchan:channelId',
+  );
 
   return new NchanDelegator(uri, publishPath, subscribePath, channelId);
 };

@@ -1,22 +1,26 @@
 import React, { type JSX } from 'react';
-
-import type { ConnectionStatus } from '@growi/slack';
 import Image from 'next/image';
+import type { ConnectionStatus } from '@growi/slack';
 
 import { Bridge } from './Bridge';
 
 type CustomBotWithoutProxyConnectionStatusProps = {
-  siteName: string,
-  connectionStatuses: any,
-}
+  siteName: string;
+  connectionStatuses: any;
+};
 
-export const CustomBotWithoutProxyConnectionStatus = (props: CustomBotWithoutProxyConnectionStatusProps): JSX.Element => {
+export const CustomBotWithoutProxyConnectionStatus = (
+  props: CustomBotWithoutProxyConnectionStatusProps,
+): JSX.Element => {
   const { siteName, connectionStatuses } = props;
 
-  const connectionStatusValues: ConnectionStatus[] = Object.values(connectionStatuses);
+  const connectionStatusValues: ConnectionStatus[] =
+    Object.values(connectionStatuses);
 
   const totalCount = connectionStatusValues.length;
-  const errorCount = connectionStatusValues.filter(connectionStatus => connectionStatus.error != null).length;
+  const errorCount = connectionStatusValues.filter(
+    (connectionStatus) => connectionStatus.error != null,
+  ).length;
   const workspaceName = connectionStatusValues[0]?.workspaceName;
 
   return (
@@ -30,10 +34,17 @@ export const CustomBotWithoutProxyConnectionStatus = (props: CustomBotWithoutPro
                 <h5 className="fw-bold">
                   {workspaceName != null ? workspaceName : 'Settings #1'}
                 </h5>
-                <Image width={20} height={20} src="/images/slack-integration/growi-bot-kun-icon.png" alt="" />
+                <Image
+                  width={20}
+                  height={20}
+                  src="/images/slack-integration/growi-bot-kun-icon.png"
+                  alt=""
+                />
               </div>
             </div>
-          ) : ''}
+          ) : (
+            ''
+          )}
         </div>
       </div>
 
@@ -49,9 +60,9 @@ export const CustomBotWithoutProxyConnectionStatus = (props: CustomBotWithoutPro
           </div>
         </div>
       </div>
-
     </div>
   );
 };
 
-CustomBotWithoutProxyConnectionStatus.displayName = 'CustomBotWithoutProxyConnectionStatus';
+CustomBotWithoutProxyConnectionStatus.displayName =
+  'CustomBotWithoutProxyConnectionStatus';

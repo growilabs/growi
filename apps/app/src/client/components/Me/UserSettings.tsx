@@ -1,5 +1,4 @@
 import React, { type JSX } from 'react';
-
 import { useTranslation } from 'next-i18next';
 
 import { BasicInfoSettings } from './BasicInfoSettings';
@@ -15,7 +14,9 @@ const UserSettings = React.memo((): JSX.Element => {
         <BasicInfoSettings />
       </div>
       <div className="mb-5">
-        <h2 className="border-bottom fs-4 mt-3 mt-md-5 pb-1">{t('Set Profile Image')}</h2>
+        <h2 className="border-bottom fs-4 mt-3 mt-md-5 pb-1">
+          {t('Set Profile Image')}
+        </h2>
         <ProfileImageSettings />
       </div>
     </div>

@@ -40,7 +40,7 @@ jobs:
       with:
         aws-region: ap-northeast-1
         role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_FOR_OIDC }}
-        role-session-name: SessionForReleaseGROWI-RC
+        role-session-name: GitHubActions-SessionForReleaseGROWI-${{ github.run_id }}
 
     - name: Run CodeBuild
       uses: dark-mechanicum/aws-codebuild@v1

@@ -160,7 +160,6 @@ const AiAssistantManagementModalSubstance = (): JSX.Element => {
       setSelectedUserGroupsForShareScope(populatedGrantedGroupsForShareScope);
       setSelectedUserGroupsForAccessScope(populatedGrantedGroupsForAccessScope);
     }
-    // eslint-disable-next-line max-len
   }, [
     aiAssistant?.accessScope,
     aiAssistant?.additionalInstruction,

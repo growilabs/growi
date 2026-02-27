@@ -1,5 +1,5 @@
 import { getIdForRef, isPopulated } from '@growi/core';
-import type { IUserGroupRelation } from '@growi/core/dist/interfaces';
+import type { IUser, IUserGroupRelation } from '@growi/core/dist/interfaces';
 import type { Document, Model } from 'mongoose';
 import mongoose, { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
@@ -9,6 +9,7 @@ import loggerFactory from '~/utils/logger';
 
 import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 import { getOrCreateModel } from '../util/mongoose-utils';
+import { UserStatus } from './user/conts';
 import type { UserGroupDocument } from './user-group';
 
 const logger = loggerFactory('growi:models:userGroupRelation');
@@ -90,6 +91,7 @@ schema.statics.removeAllInvalidRelations = function () {
  * @memberof UserGroupRelation
  */
 schema.statics.findAllRelation = function () {
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   return this.find().populate('relatedUser').populate('relatedGroup').exec();
 };
 
@@ -103,6 +105,7 @@ schema.statics.findAllRelation = function () {
  */
 schema.statics.findAllRelationForUserGroup = function (userGroup) {
   logger.debug('findAllRelationForUserGroup is called', userGroup);
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   return this.find({ relatedGroup: userGroup }).populate('relatedUser').exec();
 };
 
@@ -126,6 +129,7 @@ schema.statics.findAllUserIdsForUserGroups = async function (
  * @memberof UserGroupRelation
  */
 schema.statics.findAllRelationForUserGroups = function (userGroups) {
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   return this.find({ relatedGroup: { $in: userGroups } })
     .populate('relatedUser')
     .exec();
@@ -142,6 +146,7 @@ schema.statics.findAllRelationForUserGroups = function (userGroups) {
 schema.statics.findAllGroupsForUser = async function (
   user,
 ): Promise<UserGroupDocument[]> {
+  // biome-ignore lint/plugin: allow populate for backward compatibility
   const userGroupRelations = await this.find({
     relatedUser: user._id,
   }).populate('relatedGroup');
@@ -203,7 +208,7 @@ schema.statics.countByGroupIdsAndUser = async function (
  * @memberof UserGroupRelation
  */
 schema.statics.findUserByNotRelatedGroup = function (userGroup, queryOptions) {
-  const User = mongoose.model('User') as any;
+  const User = mongoose.model<IUser>('User');
   let searchWord = new RegExp(`${queryOptions.searchWord}`);
   switch (queryOptions.searchType) {
     case 'forward':
@@ -227,7 +232,7 @@ schema.statics.findUserByNotRelatedGroup = function (userGroup, queryOptions) {
     });
     const query = {
       _id: { $nin: relatedUserIds },
-      status: User.STATUS_ACTIVE,
+      status: UserStatus.STATUS_ACTIVE,
       $or: searthField,
     };
 

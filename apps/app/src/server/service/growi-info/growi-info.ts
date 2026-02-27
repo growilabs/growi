@@ -1,9 +1,8 @@
 import * as os from 'node:os';
-
 import type {
-  IGrowiInfo,
   GrowiInfoOptions,
   IGrowiAdditionalInfoResult,
+  IGrowiInfo,
 } from '@growi/core';
 import type { IUser } from '@growi/core/dist/interfaces';
 import { GrowiWikiType } from '@growi/core/dist/interfaces';
@@ -26,9 +25,7 @@ const FULL_ADDITIONAL_INFO_OPTIONS = {
   includePageCountInfo: true,
 } as const;
 
-
 export class GrowiInfoService {
-
   /**
    * get the site url
    *
@@ -55,23 +52,36 @@ export class GrowiInfoService {
    * Get GROWI information with flexible options
    * @param options options to determine what additional information to include
    */
-  getGrowiInfo<T extends GrowiInfoOptions>(options: T): Promise<IGrowiInfo<IGrowiAdditionalInfoResult<T>>>;
+  getGrowiInfo<T extends GrowiInfoOptions>(
+    options: T,
+  ): Promise<IGrowiInfo<IGrowiAdditionalInfoResult<T>>>;
 
   /**
    * Get GROWI information with additional information (legacy)
    * @param includeAdditionalInfo whether to include additional information
    * @deprecated Use getGrowiInfo(options) instead
    */
-  getGrowiInfo(includeAdditionalInfo: true): Promise<IGrowiInfo<IGrowiAdditionalInfoResult<typeof FULL_ADDITIONAL_INFO_OPTIONS>>>;
+  getGrowiInfo(
+    includeAdditionalInfo: true,
+  ): Promise<
+    IGrowiInfo<IGrowiAdditionalInfoResult<typeof FULL_ADDITIONAL_INFO_OPTIONS>>
+  >;
 
   async getGrowiInfo<T extends GrowiInfoOptions>(
-      optionsOrLegacyFlag?: T | true,
-  ): Promise<IGrowiInfo<IGrowiAdditionalInfoResult<T>> | IGrowiInfo<undefined> | IGrowiInfo<IGrowiAdditionalInfoResult<typeof FULL_ADDITIONAL_INFO_OPTIONS>>> {
-
+    optionsOrLegacyFlag?: T | true,
+  ): Promise<
+    | IGrowiInfo<IGrowiAdditionalInfoResult<T>>
+    | IGrowiInfo<undefined>
+    | IGrowiInfo<
+        IGrowiAdditionalInfoResult<typeof FULL_ADDITIONAL_INFO_OPTIONS>
+      >
+  > {
     const appSiteUrl = this.getSiteUrl();
 
     const isGuestAllowedToRead = aclService.isGuestAllowedToRead();
-    const wikiType = isGuestAllowedToRead ? GrowiWikiType.open : GrowiWikiType.closed;
+    const wikiType = isGuestAllowedToRead
+      ? GrowiWikiType.open
+      : GrowiWikiType.closed;
 
     const baseInfo = {
       serviceInstanceId: configManager.getConfig('app:serviceInstanceId'),
@@ -98,8 +108,7 @@ export class GrowiInfoService {
     if (typeof optionsOrLegacyFlag === 'boolean') {
       // Legacy boolean parameter
       options = optionsOrLegacyFlag ? FULL_ADDITIONAL_INFO_OPTIONS : {};
-    }
-    else {
+    } else {
       // GrowiInfoOptions parameter
       options = optionsOrLegacyFlag;
     }
@@ -116,21 +125,28 @@ export class GrowiInfoService {
     } as IGrowiInfo<IGrowiAdditionalInfoResult<T>>;
   }
 
-  private async getAdditionalInfoByOptions<T extends GrowiInfoOptions>(options: T): Promise<IGrowiAdditionalInfoResult<T>> {
+  private async getAdditionalInfoByOptions<T extends GrowiInfoOptions>(
+    options: T,
+  ): Promise<IGrowiAdditionalInfoResult<T>> {
     const User = mongoose.model<IUser, Model<IUser>>('User');
     const Page = mongoose.model<PageDocument, PageModel>('Page');
 
     // Check if any option is enabled to determine if we should return additional info
-    const hasAnyOption = options.includeAttachmentInfo || options.includeInstalledInfo || options.includeUserCountInfo || options.includePageCountInfo;
+    const hasAnyOption =
+      options.includeAttachmentInfo ||
+      options.includeInstalledInfo ||
+      options.includeUserCountInfo ||
+      options.includePageCountInfo;
 
     if (!hasAnyOption) {
       return undefined as IGrowiAdditionalInfoResult<T>;
     }
 
     // Include attachment info (required for all additional info)
-    const activeExternalAccountTypes: IExternalAuthProviderType[] = Object.values(IExternalAuthProviderType).filter((type) => {
-      return configManager.getConfig(`security:passport-${type}:isEnabled`);
-    });
+    const activeExternalAccountTypes: IExternalAuthProviderType[] =
+      Object.values(IExternalAuthProviderType).filter((type) => {
+        return configManager.getConfig(`security:passport-${type}:isEnabled`);
+      });
 
     // Build result incrementally with proper typing
     const partialResult: Partial<{
@@ -148,12 +164,18 @@ export class GrowiInfoService {
 
     if (options.includeInstalledInfo) {
       // Get the oldest user who probably installed this GROWI.
-      const user = await User.findOne({ createdAt: { $ne: null } }).sort({ createdAt: 1 });
+      const user = await User.findOne({ createdAt: { $ne: null } }).sort({
+        createdAt: 1,
+      });
       const installedAtByOldestUser = user ? user.createdAt : null;
 
       const appInstalledConfig = await Config.findOne({ key: 'app:installed' });
       const oldestConfig = await Config.findOne().sort({ createdAt: 1 });
-      const installedAt = installedAtByOldestUser ?? appInstalledConfig?.createdAt ?? oldestConfig?.createdAt ?? null;
+      const installedAt =
+        installedAtByOldestUser ??
+        appInstalledConfig?.createdAt ??
+        oldestConfig?.createdAt ??
+        null;
 
       partialResult.installedAt = installedAt;
       partialResult.installedAtByOldestUser = installedAtByOldestUser;
@@ -161,7 +183,9 @@ export class GrowiInfoService {
 
     if (options.includeUserCountInfo) {
       const currentUsersCount = await User.countDocuments();
-      const currentActiveUsersCount = await (User as unknown as { countActiveUsers: () => Promise<number> }).countActiveUsers();
+      const currentActiveUsersCount = await (
+        User as unknown as { countActiveUsers: () => Promise<number> }
+      ).countActiveUsers();
 
       partialResult.currentUsersCount = currentUsersCount;
       partialResult.currentActiveUsersCount = currentActiveUsersCount;
@@ -175,7 +199,6 @@ export class GrowiInfoService {
 
     return partialResult as IGrowiAdditionalInfoResult<T>;
   }
-
 }
 
 export const growiInfoService = new GrowiInfoService();

@@ -7,11 +7,7 @@ import type { ISidebarConfig } from '~/interfaces/sidebar-config';
 
 type SidebarConfigOption = {
   update: () => Promise<void>;
-
   setIsSidebarCollapsedMode: (isSidebarCollapsedMode: boolean) => void;
-  setIsSidebarClosedAtDockMode: (
-    isSidebarClosedAtDockMode: boolean | undefined,
-  ) => void;
 };
 
 export const useSWRxSidebarConfig = (): SWRResponse<ISidebarConfig, Error> &
@@ -47,19 +43,6 @@ export const useSWRxSidebarConfig = (): SWRResponse<ISidebarConfig, Error> &
           }
 
           return { ...prevData, isSidebarCollapsedMode };
-        }, false);
-      },
-      [mutate],
-    ),
-
-    setIsSidebarClosedAtDockMode: useCallback(
-      (isSidebarClosedAtDockMode) => {
-        // update isSidebarClosedAtDockMode in cache, not revalidate
-        mutate((prevData) => {
-          if (prevData == null) {
-            return;
-          }
-          return { ...prevData, isSidebarClosedAtDockMode };
         }, false);
       },
       [mutate],

@@ -66,7 +66,9 @@ export const useSetSearchKeyword = (
   return useCallback(
     (newKeyword: string) => {
       setKeyword((prevKeyword) => {
-        if (prevKeyword !== newKeyword) {
+        const isOnSearchPage = routerRef.current.pathname === pathname;
+        // Navigate if keyword changed OR if not currently on search page
+        if (prevKeyword !== newKeyword || !isOnSearchPage) {
           const newUrl = new URL(pathname, 'http://example.com');
           newUrl.searchParams.append('q', newKeyword);
           routerRef.current.push(`${newUrl.pathname}${newUrl.search}`, '');

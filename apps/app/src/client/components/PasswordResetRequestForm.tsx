@@ -1,12 +1,11 @@
 import type { FC } from 'react';
-import React, { useState, useCallback } from 'react';
-
+import React, { useCallback, useState } from 'react';
+import Link from 'next/link';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
-import Link from 'next/link';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
-import { toastSuccess, toastError } from '~/client/util/toastr';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import { isMailerSetupAtom } from '~/states/server-configurations';
 
 const PasswordResetRequestForm: FC = () => {
@@ -18,21 +17,23 @@ const PasswordResetRequestForm: FC = () => {
     setEmail(inputValue);
   }, []);
 
-  const sendPasswordResetRequestMail = useCallback(async(e) => {
-    e.preventDefault();
-    if (email === '') {
-      toastError(t('forgot_password.email_is_required'));
-      return;
-    }
+  const sendPasswordResetRequestMail = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (email === '') {
+        toastError(t('forgot_password.email_is_required'));
+        return;
+      }
 
-    try {
-      await apiv3Post('/forgot-password', { email });
-      toastSuccess(t('forgot_password.success_to_send_email'));
-    }
-    catch (err) {
-      toastError(err);
-    }
-  }, [t, email]);
+      try {
+        await apiv3Post('/forgot-password', { email });
+        toastSuccess(t('forgot_password.success_to_send_email'));
+      } catch (err) {
+        toastError(err);
+      }
+    },
+    [t, email],
+  );
 
   return (
     <form onSubmit={sendPasswordResetRequestMail}>
@@ -43,8 +44,12 @@ const PasswordResetRequestForm: FC = () => {
       ) : (
         <>
           {/* lock-icon large */}
-          <h1><span className="material-symbols-outlined">lock</span></h1>
-          <h1 className="text-center">{ t('forgot_password.forgot_password') }</h1>
+          <h1>
+            <span className="material-symbols-outlined">lock</span>
+          </h1>
+          <h1 className="text-center">
+            {t('forgot_password.forgot_password')}
+          </h1>
           <h3>{t('forgot_password.password_reset_request_desc')}</h3>
           <div>
             <div className="input-group">
@@ -54,7 +59,7 @@ const PasswordResetRequestForm: FC = () => {
                 className="form-control"
                 type="email"
                 disabled={!isMailerSetup}
-                onChange={e => changeEmail(e.target.value)}
+                onChange={(e) => changeEmail(e.target.value)}
               />
             </div>
           </div>
@@ -70,7 +75,8 @@ const PasswordResetRequestForm: FC = () => {
         </>
       )}
       <Link href="/login" prefetch={false}>
-        <span className="material-symbols-outlined">login</span>{t('forgot_password.return_to_login')}
+        <span className="material-symbols-outlined">login</span>
+        {t('forgot_password.return_to_login')}
       </Link>
     </form>
   );

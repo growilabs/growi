@@ -11,7 +11,10 @@ export const EmptyTrashModalLazyLoaded = (): JSX.Element => {
 
   const EmptyTrashModal = useLazyLoader<EmptyTrashModalProps>(
     'empty-trash-modal',
-    () => import('./EmptyTrashModal').then(mod => ({ default: mod.EmptyTrashModal })),
+    () =>
+      import('./EmptyTrashModal').then((mod) => ({
+        default: mod.EmptyTrashModal,
+      })),
     status?.isOpened ?? false,
   );
 

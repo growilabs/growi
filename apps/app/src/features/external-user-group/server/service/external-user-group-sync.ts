@@ -50,7 +50,7 @@ abstract class ExternalUserGroupSyncService implements S2sMessageHandlable {
 
   syncStatus: SyncStatus = { isExecutingSync: false, totalCount: 0, count: 0 };
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+  // biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
   constructor(
     groupProviderType: ExternalGroupProviderType,
     s2sMessagingService: S2sMessagingService | null,

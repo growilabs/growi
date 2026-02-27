@@ -1,12 +1,9 @@
-import type React from 'react';
 import type { JSX, ReactNode } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
-import EventEmitter from 'node:events';
 import { isIPageInfo } from '@growi/core';
-import { isClient } from '@growi/core/dist/utils';
 
 // biome-ignore-start lint/style/noRestrictedImports: no-problem lazy loaded components
 import { DescendantsPageListModalLazyLoaded } from '~/client/components/DescendantsPageListModal';
@@ -39,10 +36,7 @@ import { getServerSideCommonEachProps } from '../common-props';
 import { useInitialCSRFetch } from '../general-page';
 import { useHydrateGeneralPageConfigurationAtoms } from '../general-page/hydrate';
 import { registerPageToShowRevisionWithMeta } from '../general-page/superjson';
-import {
-  detectNextjsRoutingType,
-  NextjsRoutingType,
-} from '../utils/nextjs-routing-utils';
+import { NextjsRoutingType } from '../utils/nextjs-routing-utils';
 import { useCustomTitleForPage } from '../utils/page-title-customization';
 import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
 import { NEXT_JS_ROUTING_PAGE } from './consts';
@@ -99,11 +93,8 @@ const EditablePageEffects = dynamic(
 
 type Props = EachProps | InitialProps;
 
-const isInitialProps = (props: Props): props is InitialProps => {
-  return (
-    'isNextjsRoutingTypeInitial' in props && props.isNextjsRoutingTypeInitial
-  );
-};
+const isInitialProps = (props: Props): props is InitialProps =>
+  props.nextjsRoutingType !== NextjsRoutingType.SAME_ROUTE;
 
 const Page: NextPageWithLayout<Props> = (props: Props) => {
   // Initialize Jotai atoms with initial data - must be called unconditionally
@@ -111,7 +102,8 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
   const pageMeta = isInitialProps(props) ? props.pageWithMeta?.meta : undefined;
 
   useHydratePageAtoms(pageData, pageMeta, {
-    redirectFrom: props.redirectFrom ?? undefined,
+    redirectFrom: props.redirectFrom,
+    isIdenticalPath: props.isIdenticalPathPage,
     templateTags: props.templateTagData,
     templateBody: props.templateBodyData,
   });
@@ -132,8 +124,11 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
   useSameRouteNavigation();
   useShallowRouting(props);
 
-  // If initial props and skipSSR, fetch page data on client-side
-  useInitialCSRFetch(isInitialProps(props) && props.skipSSR);
+  // Fetch page data on client-side when SSR is skipped or navigating from outside
+  useInitialCSRFetch({
+    nextjsRoutingType: props.nextjsRoutingType,
+    skipSSR: isInitialProps(props) ? props.skipSSR : false,
+  });
 
   useEffect(() => {
     // Initialize editing markdown only when page path changes
@@ -152,7 +147,11 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
 
   // If the data on the page changes without router.push, pageWithMeta remains old because getServerSideProps() is not executed
   // So preferentially take page data from useSWRxCurrentPage
-  const pagePath = currentPagePath ?? props.currentPathname;
+  // Note: Memoize to prevent unnecessary re-renders of PageView
+  const pagePath = useMemo(
+    () => currentPagePath ?? props.currentPathname,
+    [currentPagePath, props.currentPathname],
+  );
 
   const title = useCustomTitleForPage(pagePath);
 
@@ -267,18 +266,12 @@ export const getServerSideProps: GetServerSideProps<Props> = async (
   // STAGE 2
   //
 
-  // detect Next.js routing type
-  const nextjsRoutingType = detectNextjsRoutingType(
-    context,
-    NEXT_JS_ROUTING_PAGE,
-  );
-
   // Merge all results in a type-safe manner (using sequential merging)
   return mergeGetServerSidePropsResults(
     commonEachPropsResult,
-    nextjsRoutingType === NextjsRoutingType.INITIAL
-      ? await getServerSidePropsForInitial(context)
-      : await getServerSidePropsForSameRoute(context),
+    commonEachProps.nextjsRoutingType === NextjsRoutingType.SAME_ROUTE
+      ? await getServerSidePropsForSameRoute(context)
+      : await getServerSidePropsForInitial(context),
   );
 };
 
