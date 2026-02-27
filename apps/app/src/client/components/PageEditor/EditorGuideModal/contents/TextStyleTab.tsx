@@ -2,23 +2,6 @@ import React from 'react';
 
 import { useTranslation } from 'react-i18next';
 
-
-export const ExternalLinkIcon = () => {
-  return (
-    <span
-      className="material-symbols-outlined"
-      style={{
-        fontSize: '16px',
-        color: '#ABB2BF',
-        verticalAlign: 'middle',
-        marginLeft: '4px',
-      }}
-    >
-      open_in_new
-    </span>
-  );
-};
-
 const GuideRow = ({
   title,
   code,
@@ -183,7 +166,7 @@ export const TextStyleTab: React.FC = () => {
           onClick={e => e.stopPropagation()}
         >
           {t(`${i18nKey}.link_growi`)}
-          <ExternalLinkIcon />
+          <span className="material-symbols-outlined">open_in_new</span>
         </a>
       ),
     },
@@ -199,7 +182,7 @@ export const TextStyleTab: React.FC = () => {
           onClick={e => e.stopPropagation()}
         >
           {t(`${i18nKey}.link_sandbox`)}
-          <ExternalLinkIcon />
+          <span className="material-symbols-outlined">open_in_new</span>
         </a>
       ),
     },

@@ -2,35 +2,6 @@ import React, { useState, useMemo } from 'react';
 
 import { useTranslation } from 'react-i18next';
 
-export const ExternalLinkIcon = () => {
-  return (
-    <span
-      className="material-symbols-outlined align-middle ms-1 text-secondary"
-    >
-      open_in_new
-    </span>
-  );
-};
-export const ChatIcon = () => {
-  return (
-    <span
-      className="material-symbols-outlined align-middle fs-6"
-    >
-      chat
-    </span>
-  );
-};
-
-export const ErrorIcon = () => {
-  return (
-    <span
-      className="material-symbols-outlined align-middle fs-6"
-    >
-      Error
-    </span>
-  );
-};
-
 interface LayoutGuideItem {
   id: string;
   title: string;
@@ -132,7 +103,7 @@ export const DecorationTab: React.FC = () => {
     return {
       colorName: currentStyle,
       displayName: isPrimary ? 'Primary' : 'Danger',
-      IconComponent: isPrimary ? ChatIcon : ErrorIcon,
+      iconName: isPrimary ? 'chat' : 'error',
       alertPrefix: isPrimary ? '[!IMPORTANT]' : '[!CAUTION]',
       alertLabel: isPrimary ? t(`${i18nKey}.important_label`) : t(`${i18nKey}.caution_label`),
       alertText: isPrimary ? t(`${i18nKey}.important_text`) : t(`${i18nKey}.caution_text`),
@@ -153,7 +124,9 @@ export const DecorationTab: React.FC = () => {
           <div className="d-flex flex-column justify-content-center">
             <div className={`d-flex align-items-center fw-bold text-${styleConfig.colorName} mb-1`}>
               <span className="me-2 d-flex align-items-center">
-                <styleConfig.IconComponent />
+                <span className="material-symbols-outlined align-middle fs-6">
+                  {styleConfig.iconName}
+                </span>
               </span>
               <span style={{ lineHeight: 1 }}>{styleConfig.alertLabel}</span>
             </div>
@@ -208,7 +181,9 @@ export const DecorationTab: React.FC = () => {
             aria-expanded={isOpen}
             style={{ minWidth: '160px', textAlign: 'left' }}
           >
-            <styleConfig.IconComponent />
+            <span className="material-symbols-outlined align-middle fs-6">
+              {styleConfig.iconName}
+            </span>
             <span className="flex-grow-1">{styleConfig.displayName}</span>
           </button>
           <ul
@@ -229,7 +204,7 @@ export const DecorationTab: React.FC = () => {
                 }}
                 style={currentStyle === 'primary' ? { backgroundColor: 'var(--bs-primary)', color: 'white' } : {}}
               >
-                <ChatIcon /> Primary
+                <span className="material-symbols-outlined">chat</span> Primary
               </button>
             </li>
             <li>
@@ -241,7 +216,7 @@ export const DecorationTab: React.FC = () => {
                   setIsOpen(false);
                 }}
               >
-                <ErrorIcon /> Danger
+                <span className="material-symbols-outlined">Error</span> Danger
               </button>
             </li>
           </ul>
@@ -272,7 +247,7 @@ export const DecorationTab: React.FC = () => {
               className="text-decoration-none text-secondary small d-flex align-items-center"
             >
               {t(`${i18nKey}.docs_${key}`)}
-              <ExternalLinkIcon />
+              <span className="material-symbols-outlined">open_in_new</span>
             </a>
           ))}
         </div>
