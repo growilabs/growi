@@ -4,7 +4,7 @@ import { getISOWeek } from 'date-fns/getISOWeek';
 import { getISOWeekYear } from 'date-fns/getISOWeekYear';
 import { setISOWeek } from 'date-fns/setISOWeek';
 import { setISOWeekYear } from 'date-fns/setISOWeekYear';
-import { startOfWeek } from 'date-fns/startOfWeek';
+import { startOfISOWeek } from 'date-fns/startOfISOWeek';
 import { subWeeks } from 'date-fns/subWeeks';
 
 import type { IContributionDay } from '../interfaces/contribution-graph';
@@ -29,7 +29,7 @@ export const getDaysDifference = (
 
 export const getCurrentWeekStart = (date: Date = new Date()): Date => {
   const utcDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
-  return startOfWeek(utcDate, { weekStartsOn: 1 });
+  return startOfISOWeek(utcDate);
 };
 
 export const getUTCMidnightToday = () => {
