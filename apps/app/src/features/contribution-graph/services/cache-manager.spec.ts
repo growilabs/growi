@@ -197,27 +197,15 @@ describe('Contribution Cache Manager Integration Test', () => {
       expect(secondCount).toBe(1);
     });
 
-    it('should throw error if user doesnt exist', async () => {
+    it('should throw error if user and contribution cache doesnt exist', async () => {
       const userId = createMockId();
-      const nonExistingUserId = createMockId();
 
-      // A recent date
       const newDate = new Date();
       newDate.setUTCDate(newDate.getUTCDate() - 7);
-      const newDateStr = formatDateKey(newDate);
 
-      await ContributionCache.create({
-        userId,
-        lastUpdated: new Date(newDateStr),
-        currentWeekData: [],
-        permanentWeeks: {
-          weekId: [],
-        },
-      });
-
-      await expect(
-        cacheManager.getUpdatedCache(nonExistingUserId),
-      ).rejects.toThrowError('User does not exist.');
+      await expect(cacheManager.getUpdatedCache(userId)).rejects.toThrowError(
+        'User does not exist.',
+      );
     });
 
     it('should return contribution cache if user exists', async () => {
@@ -239,7 +227,22 @@ describe('Contribution Cache Manager Integration Test', () => {
       });
 
       const result = await cacheManager.getUpdatedCache(userId);
+
       expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      expect(result).toBeTruthy();
+    });
+
+    it('should return contribution cache if user exists but no contribution cache exist', async () => {
+      const userId = createMockId();
+      const User = mongoose.model('User');
+      await User.create({ _id: userId, status: 1, username: 'testuser' });
+
+      const result = await cacheManager.getUpdatedCache(userId);
+
+      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      expect(result).toBeTruthy();
     });
   });
 });
