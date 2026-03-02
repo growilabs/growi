@@ -1,14 +1,11 @@
-import {
-  differenceInDays,
-  format,
-  getISOWeek,
-  getISOWeekYear,
-  setISOWeek,
-  setISOWeekYear,
-  startOfISOWeek,
-  startOfWeek,
-  subWeeks,
-} from 'date-fns';
+import { differenceInDays } from 'date-fns/differenceInDays';
+import { format } from 'date-fns/format';
+import { getISOWeek } from 'date-fns/getISOWeek';
+import { getISOWeekYear } from 'date-fns/getISOWeekYear';
+import { setISOWeek } from 'date-fns/setISOWeek';
+import { setISOWeekYear } from 'date-fns/setISOWeekYear';
+import { startOfWeek } from 'date-fns/startOfWeek';
+import { subWeeks } from 'date-fns/subWeeks';
 
 import type { IContributionDay } from '../interfaces/contribution-graph';
 
