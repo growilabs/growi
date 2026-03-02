@@ -1,3 +1,7 @@
+import mongoose from 'mongoose';
+
+import User from '~/server/models/user';
+
 import type {
   IContributionDay,
   IWeeksToFreeze,
@@ -17,6 +21,7 @@ import {
   cacheIsFresh,
   getContributionCache,
   updateContributionCache,
+  userExists,
 } from './cache-data-service';
 
 export class ContributionCacheManager {
@@ -35,7 +40,12 @@ export class ContributionCacheManager {
   public async getUpdatedCache(userId: string) {
     const contributionCache = await getContributionCache(userId);
 
-    // null for not existing and error
+    if (!contributionCache) {
+      const validUser = await userExists(userId);
+      if (!validUser) {
+        throw new Error('User does not exist.');
+      }
+    }
 
     const isFresh = contributionCache
       ? cacheIsFresh(contributionCache.lastUpdated)

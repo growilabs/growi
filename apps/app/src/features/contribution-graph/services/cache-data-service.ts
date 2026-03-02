@@ -14,14 +14,24 @@ import { getUTCMidnight } from '../utils/contribution-graph-utils';
 
 type SetFields = IContributionDay[] | Date;
 
+export async function userExists(userId: string): Promise<boolean> {
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return false;
+  }
+
+  const User = mongoose.model('User');
+  const result = await User.exists({ _id: userId, status: 1 });
+  return !!result;
+}
+
 export async function getContributionCache(
   userId: string,
 ): Promise<ContributionGraphDocument | null> {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return null;
-    }
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new Error(`Invalid User ID format: ${userId}`);
+  }
 
+  try {
     const contributionCache = await ContributionCache.findOne({
       userId,
     }).exec();
