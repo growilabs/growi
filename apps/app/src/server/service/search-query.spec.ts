@@ -5,6 +5,7 @@ import { configManager } from '~/server/service/config-manager/config-manager';
 import NamedQuery from '../models/named-query';
 import SearchService from './search';
 
+// Mock NamedQuery
 vi.mock('~/server/models/named-query', () => {
   const mockModel = {
     findOne: vi.fn(),
@@ -15,7 +16,7 @@ vi.mock('~/server/models/named-query', () => {
   };
 });
 
-// Intercept the singleton import inside the search service
+// Mock config manager
 vi.mock('~/server/service/config-manager/config-manager', () => {
   return {
     default: {
@@ -27,31 +28,27 @@ vi.mock('~/server/service/config-manager/config-manager', () => {
   };
 });
 
+class TestSearchService extends SearchService {
+  override generateFullTextSearchDelegator() {
+    return { init: vi.fn() } as any;
+  }
+  override generateNQDelegators() {
+    return {} as any;
+  }
+  override registerUpdateEvent() {}
+  override get isConfigured() {
+    return false;
+  }
+}
+
 describe('searchParseQuery()', () => {
-  let searchService: SearchService;
+  let searchService: TestSearchService;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Mock the internal generators to skip constructor side-effects
-    vi.spyOn(
-      SearchService.prototype,
-      'generateFullTextSearchDelegator',
-    ).mockReturnValue({
-      init: vi.fn(),
-    } as any);
-    vi.spyOn(SearchService.prototype, 'generateNQDelegators').mockReturnValue(
-      {} as any,
-    );
-    vi.spyOn(SearchService.prototype, 'registerUpdateEvent').mockImplementation(
-      () => {},
-    );
-    vi.spyOn(SearchService.prototype, 'isConfigured', 'get').mockReturnValue(
-      false,
-    );
-
     const mockCrowi = { configManager } as any;
-    searchService = new SearchService(mockCrowi);
+    searchService = new TestSearchService(mockCrowi);
   });
 
   it('should contain /user in the not_prefix query when user pages are disabled', async () => {
