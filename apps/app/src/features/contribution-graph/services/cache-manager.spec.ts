@@ -30,6 +30,8 @@ describe('Contribution Cache Manager Integration Test', () => {
 
   beforeEach(async () => {
     await ContributionCache.deleteMany({});
+    const User = mongoose.model('User');
+    await User.deleteMany({});
   });
 
   describe('getUpdatedCache()', () => {
@@ -158,7 +160,6 @@ describe('Contribution Cache Manager Integration Test', () => {
 
     it('should freeze weeks between start of the graph until last week', async () => {
       const userId = createMockId();
-
       const User = mongoose.model('User');
       await User.create({ _id: userId, status: 1, username: 'testuser' });
 
@@ -217,6 +218,28 @@ describe('Contribution Cache Manager Integration Test', () => {
       await expect(
         cacheManager.getUpdatedCache(nonExistingUserId),
       ).rejects.toThrowError('User does not exist.');
+    });
+
+    it('should return contribution cache if user exists', async () => {
+      const userId = createMockId();
+      const User = mongoose.model('User');
+      await User.create({ _id: userId, status: 1, username: 'testuser' });
+
+      const newDate = new Date();
+      newDate.setUTCDate(newDate.getUTCDate() - 7);
+      const newDateStr = formatDateKey(newDate);
+
+      await ContributionCache.create({
+        userId,
+        lastUpdated: new Date(newDateStr),
+        currentWeekData: [],
+        permanentWeeks: {
+          weekId: [],
+        },
+      });
+
+      const result = await cacheManager.getUpdatedCache(userId);
+      expect(result).toBeDefined();
     });
   });
 });
