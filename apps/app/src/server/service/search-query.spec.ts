@@ -1,9 +1,14 @@
 import { vi } from 'vitest';
+import { type MockProxy, mock } from 'vitest-mock-extended';
 
+import { SearchDelegatorName } from '~/interfaces/named-query';
+import type Crowi from '~/server/crowi';
 import { configManager } from '~/server/service/config-manager/config-manager';
 
+import type { SearchDelegator } from '../interfaces/search';
 import NamedQuery from '../models/named-query';
 import SearchService from './search';
+import type ElasticsearchDelegator from './search-delegator/elasticsearch';
 
 // Mock NamedQuery
 vi.mock('~/server/models/named-query', () => {
@@ -29,25 +34,35 @@ vi.mock('~/server/service/config-manager/config-manager', () => {
 });
 
 class TestSearchService extends SearchService {
-  override generateFullTextSearchDelegator() {
-    return { init: vi.fn() } as any;
+  override generateFullTextSearchDelegator(): ElasticsearchDelegator {
+    return mock<ElasticsearchDelegator>();
   }
-  override generateNQDelegators() {
-    return {} as any;
+
+  override generateNQDelegators(): {
+    [key in SearchDelegatorName]: SearchDelegator;
+  } {
+    return {
+      [SearchDelegatorName.DEFAULT]: mock<SearchDelegator>(),
+      [SearchDelegatorName.PRIVATE_LEGACY_PAGES]: mock<SearchDelegator>(),
+    };
   }
-  override registerUpdateEvent() {}
-  override get isConfigured() {
+
+  override registerUpdateEvent(): void {}
+
+  override get isConfigured(): boolean {
     return false;
   }
 }
 
 describe('searchParseQuery()', () => {
   let searchService: TestSearchService;
+  let mockCrowi: MockProxy<Crowi>;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    const mockCrowi = { configManager } as any;
+    mockCrowi = mock<Crowi>();
+    mockCrowi.configManager = configManager;
     searchService = new TestSearchService(mockCrowi);
   });
 
