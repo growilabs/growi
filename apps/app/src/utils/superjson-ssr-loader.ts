@@ -11,7 +11,7 @@
  *   const __getServerSideProps__: ... = async (ctx) => { ... };
  *   export const getServerSideProps = __withSuperJSONProps__(__getServerSideProps__);
  */
-module.exports = function superjsonSsrLoader(source) {
+function superjsonSsrLoader(source: string): string {
   if (!/export\s+const\s+getServerSideProps\b/.test(source)) {
     return source;
   }
@@ -29,4 +29,7 @@ module.exports = function superjsonSsrLoader(source) {
     renamed +
     '\nexport const getServerSideProps = __withSuperJSONProps__(__getServerSideProps__);\n'
   );
-};
+}
+
+// biome-ignore lint/style/noDefaultExport: webpack loaders require a default export
+export default superjsonSsrLoader;

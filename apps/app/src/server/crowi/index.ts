@@ -554,8 +554,16 @@ class Crowi {
     await this.buildServer();
 
     // setup Next.js
+    // Save ts-node's .ts extension hook before Next.js prepare() destroys it.
+    // Next.js 15's next.config.ts transpiler registers/deregisters its own require hooks,
+    // and deregisterHook() deletes require.extensions['.ts'] instead of restoring the previous hook.
+    const savedTsHook = require.extensions['.ts'];
     this.nextApp = next({ dev });
     await this.nextApp.prepare();
+    // Restore ts-node's .ts hook if Next.js removed it
+    if (savedTsHook && !require.extensions['.ts']) {
+      require.extensions['.ts'] = savedTsHook;
+    }
 
     // setup CrowiDev
     if (dev) {

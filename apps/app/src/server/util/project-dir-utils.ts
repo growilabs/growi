@@ -3,7 +3,9 @@ import path from 'node:path';
 import process from 'node:process';
 import { isServer } from '@growi/core/dist/utils/browser-utils';
 
-const isCurrentDirRoot = isServer() && fs.existsSync('./next.config.js');
+const isCurrentDirRoot =
+  isServer() &&
+  (fs.existsSync('./next.config.ts') || fs.existsSync('./next.config.js'));
 
 export const projectRoot = isCurrentDirRoot
   ? process.cwd()

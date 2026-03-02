@@ -5,16 +5,23 @@
  * See: https://github.com/vercel/next.js/discussions/35969#discussioncomment-2522954
  */
 
-const path = require('node:path');
-
-const {
+import type { NextConfig } from 'next';
+import {
   PHASE_PRODUCTION_BUILD,
   PHASE_PRODUCTION_SERVER,
-} = require('next/constants');
+} from 'next/constants';
+import path from 'node:path';
+import bundleAnalyzer from '@next/bundle-analyzer';
 
-const getTranspilePackages = () => {
-  const { listPrefixedPackages } = require('./src/utils/next.config.utils');
+import nextI18nConfig from './config/next-i18next.config';
+import {
+  createChunkModuleStatsPlugin,
+  listPrefixedPackages,
+} from './src/utils/next.config.utils';
 
+const { i18n, localePath } = nextI18nConfig;
+
+const getTranspilePackages = (): string[] => {
   const packages = [
     // listing ESM packages until experimental.esmExternals works correctly to avoid ERR_REQUIRE_ESM
     'react-markdown',
@@ -68,18 +75,10 @@ const getTranspilePackages = () => {
     ]),
   ];
 
-  // const eazyLogger = require('eazy-logger');
-  // const logger = eazyLogger.Logger({
-  //   prefix: '[{green:next.config.js}] ',
-  //   useLevelPrefixes: false,
-  // });
-  // logger.info('{bold:Listing scoped packages for transpiling:}');
-  // logger.unprefixed('info', `{grey:${JSON.stringify(packages, null, 2)}}`);
-
   return packages;
 };
 
-const optimizePackageImports = [
+const optimizePackageImports: string[] = [
   '@growi/core',
   '@growi/editor',
   '@growi/pluginkit',
@@ -93,11 +92,9 @@ const optimizePackageImports = [
   '@growi/ui',
 ];
 
-module.exports = (phase) => {
-  const { i18n, localePath } = require('./config/next-i18next.config');
-
+export default (phase: string): NextConfig => {
   /** @type {import('next').NextConfig} */
-  const nextConfig = {
+  const nextConfig: NextConfig = {
     reactStrictMode: true,
     poweredByHeader: false,
     pageExtensions: ['page.tsx', 'page.ts', 'page.jsx', 'page.js'],
@@ -121,23 +118,22 @@ module.exports = (phase) => {
       optimizePackageImports,
     },
 
-    /** @param config {import('next').NextConfig} */
     webpack(config, options) {
       // Auto-wrap getServerSideProps with superjson serialization (replaces next-superjson SWC plugin)
       if (options.isServer) {
-        config.module.rules.push({
+        config.module!.rules!.push({
           test: /\.page\.(tsx|ts)$/,
-          use: [path.resolve(__dirname, 'src/utils/superjson-ssr-loader.js')],
+          use: [path.resolve(__dirname, 'src/utils/superjson-ssr-loader.ts')],
         });
       }
 
       if (!options.isServer) {
         // Avoid "Module not found: Can't resolve 'fs'"
         // See: https://stackoverflow.com/a/68511591
-        config.resolve.fallback.fs = false;
+        config.resolve!.fallback = { ...config.resolve!.fallback, fs: false };
 
         // exclude packages from the output bundles
-        config.module.rules.push(
+        config.module!.rules!.push(
           ...[
             /dtrace-provider/,
             /mongoose/,
@@ -157,7 +153,7 @@ module.exports = (phase) => {
 
       // extract sourcemap
       if (options.dev) {
-        config.module.rules.push({
+        config.module!.rules!.push({
           test: /.(c|m)?js$/,
           exclude: [/node_modules/, path.resolve(__dirname)],
           enforce: 'pre',
@@ -168,15 +164,13 @@ module.exports = (phase) => {
       // setup i18next-hmr
       if (!options.isServer && options.dev) {
         const { I18NextHMRPlugin } = require('i18next-hmr/webpack');
-        config.plugins.push(new I18NextHMRPlugin({ localesDir: localePath }));
+        config.plugins!.push(new I18NextHMRPlugin({ localesDir: localePath }));
       }
 
       // Log eager vs lazy module counts for dev compilation analysis
       if (!options.isServer && options.dev) {
-        const {
-          createChunkModuleStatsPlugin,
-        } = require('./src/utils/next.config.utils');
-        config.plugins.push(createChunkModuleStatsPlugin());
+        // biome-ignore lint/suspicious/noExplicitAny: webpack plugin type compatibility
+        config.plugins!.push(createChunkModuleStatsPlugin() as any);
       }
 
       return config;
@@ -188,7 +182,7 @@ module.exports = (phase) => {
     return nextConfig;
   }
 
-  const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  const withBundleAnalyzer = bundleAnalyzer({
     enabled:
       phase === PHASE_PRODUCTION_BUILD &&
       (process.env.ANALYZE === 'true' || process.env.ANALYZE === '1'),
