@@ -10,7 +10,7 @@ import {
   ContributionCache,
   type ContributionGraphDocument,
 } from '../models/contribution-cache-model';
-import { getUTCMidnightToday } from '../utils/contribution-graph-utils';
+import { getUTCMidnight } from '../utils/contribution-graph-utils';
 
 type SetFields = IContributionDay[] | Date;
 
@@ -41,7 +41,7 @@ export function cacheIsFresh(lastUpdated: Date | string | number): boolean {
   if (!lastUpdated) return false;
 
   const lastUpdatedDate = new Date(lastUpdated).getTime();
-  const todaysDate = getUTCMidnightToday().getTime();
+  const todaysDate = getUTCMidnight(new Date()).getTime();
 
   return lastUpdatedDate >= todaysDate;
 }

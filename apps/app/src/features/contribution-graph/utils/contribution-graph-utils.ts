@@ -32,15 +32,9 @@ export const getCurrentWeekStart = (date: Date = new Date()): Date => {
   return startOfISOWeek(utcDate);
 };
 
-export const getUTCMidnightToday = () => {
-  const currentTime = new Date();
-
+export const getUTCMidnight = (date: Date) => {
   return new Date(
-    Date.UTC(
-      currentTime.getUTCFullYear(),
-      currentTime.getUTCMonth(),
-      currentTime.getUTCDate(),
-    ),
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
   );
 };
 

@@ -10,6 +10,7 @@ import {
   getExpiredWeekIds,
   getISOWeekId,
   getStartDateFromISOWeek,
+  getUTCMidnight,
 } from '../utils/contribution-graph-utils';
 import { ContributionAggregationService } from './aggregation-service';
 import {
@@ -34,6 +35,8 @@ export class ContributionCacheManager {
   public async getUpdatedCache(userId: string) {
     const contributionCache = await getContributionCache(userId);
 
+    // null for not existing and error
+
     const isFresh = contributionCache
       ? cacheIsFresh(contributionCache.lastUpdated)
       : false;
@@ -44,7 +47,7 @@ export class ContributionCacheManager {
 
     let aggregationStartDate: Date;
     if (contributionCache) {
-      aggregationStartDate = contributionCache.lastUpdated;
+      aggregationStartDate = getUTCMidnight(contributionCache.lastUpdated);
     } else {
       aggregationStartDate = new Date();
       aggregationStartDate.setUTCFullYear(
