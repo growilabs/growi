@@ -14,7 +14,10 @@ interface Opts {
 
 const defaultOpts: Opts = { ignorePackageNames: [] };
 
-export const listScopedPackages = (scopes: string[], opts: Opts = defaultOpts): string[] => {
+export const listScopedPackages = (
+  scopes: string[],
+  opts: Opts = defaultOpts,
+): string[] => {
   const scopedPackages: string[] = [];
 
   nodeModulesPaths.forEach((nodeModulesPath) => {
@@ -31,7 +34,9 @@ export const listScopedPackages = (scopes: string[], opts: Opts = defaultOpts): 
               'package.json',
             );
             if (fs.existsSync(packageJsonPath)) {
-              const { name } = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')) as { name: string };
+              const { name } = JSON.parse(
+                fs.readFileSync(packageJsonPath, 'utf-8'),
+              ) as { name: string };
               if (!opts.ignorePackageNames.includes(name)) {
                 scopedPackages.push(name);
               }
@@ -91,7 +96,11 @@ export const createChunkModuleStatsPlugin = () => ({
           (id) => !initialModuleIds.has(id),
         );
 
-        const analyzeModuleSet = (moduleIds: Set<string> | string[], title: string, filename: string): void => {
+        const analyzeModuleSet = (
+          moduleIds: Set<string> | string[],
+          title: string,
+          filename: string,
+        ): void => {
           const packageCounts: Record<string, number> = {};
           const appModules: string[] = [];
           for (const rawId of moduleIds) {
@@ -114,7 +123,9 @@ export const createChunkModuleStatsPlugin = () => ({
             (a, b) => b[1] - a[1],
           );
           const lines = [`# ${title}`, ''];
-          const totalCount = Array.isArray(moduleIds) ? moduleIds.length : moduleIds.size;
+          const totalCount = Array.isArray(moduleIds)
+            ? moduleIds.length
+            : moduleIds.size;
           lines.push(`Total modules: ${totalCount}`);
           lines.push(`App modules (non-node_modules): ${appModules.length}`);
           lines.push(`node_modules packages: ${sorted.length}`);
@@ -154,7 +165,10 @@ export const createChunkModuleStatsPlugin = () => ({
   },
 });
 
-export const listPrefixedPackages = (prefixes: string[], opts: Opts = defaultOpts): string[] => {
+export const listPrefixedPackages = (
+  prefixes: string[],
+  opts: Opts = defaultOpts,
+): string[] => {
   const prefixedPackages: string[] = [];
 
   nodeModulesPaths.forEach((nodeModulesPath) => {
@@ -168,7 +182,9 @@ export const listPrefixedPackages = (prefixes: string[], opts: Opts = defaultOpt
           'package.json',
         );
         if (fs.existsSync(packageJsonPath)) {
-          const { name } = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')) as { name: string };
+          const { name } = JSON.parse(
+            fs.readFileSync(packageJsonPath, 'utf-8'),
+          ) as { name: string };
           if (!opts.ignorePackageNames.includes(name)) {
             prefixedPackages.push(name);
           }

@@ -31,8 +31,5 @@ function superjsonSsrLoader(source: string): string {
   );
 }
 
-// Webpack loaders require CommonJS exports.
-// ts-node (configured in tsconfig.json with module: CommonJS) handles CJS compilation at runtime.
-module.exports = superjsonSsrLoader;
-
-export {};
+// biome-ignore lint/style/noDefaultExport: webpack loaders require a default export
+export default superjsonSsrLoader;

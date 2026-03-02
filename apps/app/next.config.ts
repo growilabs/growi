@@ -5,14 +5,19 @@
  * See: https://github.com/vercel/next.js/discussions/35969#discussioncomment-2522954
  */
 
-import path from 'node:path';
-
-import bundleAnalyzer from '@next/bundle-analyzer';
 import type { NextConfig } from 'next';
-import { PHASE_PRODUCTION_BUILD, PHASE_PRODUCTION_SERVER } from 'next/constants';
+import {
+  PHASE_PRODUCTION_BUILD,
+  PHASE_PRODUCTION_SERVER,
+} from 'next/constants';
+import path from 'node:path';
+import bundleAnalyzer from '@next/bundle-analyzer';
 
-import { createChunkModuleStatsPlugin, listPrefixedPackages } from './src/utils/next.config.utils';
 import nextI18nConfig from './config/next-i18next.config';
+import {
+  createChunkModuleStatsPlugin,
+  listPrefixedPackages,
+} from './src/utils/next.config.utils';
 
 const { i18n, localePath } = nextI18nConfig;
 
@@ -158,7 +163,6 @@ export default (phase: string): NextConfig => {
 
       // setup i18next-hmr
       if (!options.isServer && options.dev) {
-        // biome-ignore lint/suspicious/noRequireImports: lazy load dev-only plugin
         const { I18NextHMRPlugin } = require('i18next-hmr/webpack');
         config.plugins!.push(new I18NextHMRPlugin({ localesDir: localePath }));
       }
