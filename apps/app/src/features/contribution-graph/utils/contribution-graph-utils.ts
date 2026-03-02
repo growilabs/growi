@@ -31,7 +31,8 @@ export const getDaysDifference = (
 };
 
 export const getCurrentWeekStart = (date: Date = new Date()): Date => {
-  return startOfWeek(date, { weekStartsOn: 1 });
+  const utcDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+  return startOfWeek(utcDate, { weekStartsOn: 1 });
 };
 
 export const getUTCMidnightToday = () => {
