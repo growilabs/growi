@@ -141,18 +141,9 @@ describe('Contribution Cache Manager Integration Test', () => {
       const newDay = result.find((d) => d.date === newDateStr);
 
       const updatedCache = await ContributionCache.findOne({ userId });
+      const hasOldWeekInDb = !!updatedCache?.permanentWeeks?.[weekIdToDelete];
 
-      let hasOldWeek: boolean;
-      if (updatedCache) {
-        hasOldWeek =
-          updatedCache.permanentWeeks instanceof Map
-            ? updatedCache.permanentWeeks.has(weekIdToDelete)
-            : weekIdToDelete in updatedCache.permanentWeeks;
-      } else {
-        hasOldWeek = false;
-      }
-
-      expect(hasOldWeek).toBe(false);
+      expect(hasOldWeekInDb).toBe(false);
       expect(result.length).toBe(365);
       expect(oldDay).toBeUndefined();
       expect(newDay).toBeDefined();
