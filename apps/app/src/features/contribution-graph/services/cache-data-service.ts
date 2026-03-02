@@ -28,7 +28,7 @@ export async function getContributionCache(
   userId: string,
 ): Promise<ContributionGraphDocument | null> {
   if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error(`Invalid User ID format: ${userId}`);
+    return null;
   }
 
   try {
