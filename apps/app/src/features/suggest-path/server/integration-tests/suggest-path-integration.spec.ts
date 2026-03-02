@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import request from 'supertest';
 
+import type { ContentAnalysis } from '~/features/suggest-path/interfaces/suggest-path-types';
 import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
@@ -345,7 +346,7 @@ describe('POST /suggest-path integration', () => {
 
     // Helper: set up full pipeline success with optional overrides
     const setupFullPipeline = (overrides?: {
-      analysis?: typeof stockAnalysis;
+      analysis?: ContentAnalysis;
       candidates?: typeof searchCandidates;
       evaluated?: typeof singleEvaluated;
       category?: typeof categorySuggestionFixture | null;

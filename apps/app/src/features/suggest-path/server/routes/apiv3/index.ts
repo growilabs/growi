@@ -71,8 +71,8 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         const { searchService } = crowi;
         assert(
           searchService != null &&
-            typeof (searchService as Record<string, unknown>).searchKeyword ===
-              'function',
+            typeof (searchService as unknown as Record<string, unknown>)
+              .searchKeyword === 'function',
           'searchService must have searchKeyword method',
         );
         const typedSearchService = searchService as unknown as SearchService;
