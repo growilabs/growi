@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
+import userFactory from '~/server/models/user';
 
 import { ContributionCache } from '../models/contribution-cache-model';
 import { formatDateKey, getISOWeekId } from '../utils/contribution-graph-utils';
@@ -18,6 +19,7 @@ describe('Contribution Cache Manager Integration Test', () => {
     mongod = await MongoMemoryServer.create();
     const uri = mongod.getUri();
     await mongoose.connect(uri);
+    userFactory(null);
   });
 
   afterAll(async () => {
@@ -229,6 +231,29 @@ describe('Contribution Cache Manager Integration Test', () => {
 
       expect(frozenCurrentWeekDate).toBeDefined();
       expect(frozenCurrentWeekDate?.count).toBe(1);
+    });
+
+    it('should throw error if user doesnt exist', async () => {
+      const userId = createMockId();
+      const nonExistingUserId = createMockId();
+
+      // A recent date
+      const newDate = new Date();
+      newDate.setUTCDate(newDate.getUTCDate() - 7);
+      const newDateStr = formatDateKey(newDate);
+
+      await ContributionCache.create({
+        userId,
+        lastUpdated: new Date(newDateStr),
+        currentWeekData: [],
+        permanentWeeks: {
+          weekId: [],
+        },
+      });
+
+      await expect(
+        cacheManager.getUpdatedCache(nonExistingUserId),
+      ).rejects.toThrowError('User does not exist.');
     });
   });
 });
