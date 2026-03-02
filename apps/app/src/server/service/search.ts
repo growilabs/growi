@@ -332,38 +332,30 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const disableUserPages = configManager.getConfig(
       'security:disableUserPages',
     );
-
     const queryString = normalizeQueryString(_queryString);
-
     const terms = this.parseQueryString(queryString);
 
-    if (nqName == null) {
-      if (disableUserPages) {
-        excludeUserPagesFromQuery(terms);
+    let parsedQuery: ParsedQuery = { queryString, terms };
+
+    if (nqName != null) {
+      const nq = await NamedQuery.findOne({ name: normalizeNQName(nqName) });
+
+      if (nq != null) {
+        const { aliasOf, delegatorName } = nq;
+
+        if (aliasOf != null) {
+          parsedQuery = {
+            queryString: normalizeQueryString(aliasOf),
+            terms: this.parseQueryString(aliasOf),
+          };
+        } else {
+          parsedQuery = { queryString, terms, delegatorName };
+        }
+      } else {
+        logger.debug(
+          `Delegated to full-text search since a named query document did not found. (nqName="${nqName}")`,
+        );
       }
-      return { queryString, terms };
-    }
-
-    const nq = await NamedQuery.findOne({ name: normalizeNQName(nqName) });
-
-    // will delegate to full-text search
-    if (nq == null) {
-      logger.debug(
-        `Delegated to full-text search since a named query document did not found. (nqName="${nqName}")`,
-      );
-      return { queryString, terms };
-    }
-
-    const { aliasOf, delegatorName } = nq;
-
-    let parsedQuery: ParsedQuery;
-    if (aliasOf != null) {
-      parsedQuery = {
-        queryString: normalizeQueryString(aliasOf),
-        terms: this.parseQueryString(aliasOf),
-      };
-    } else {
-      parsedQuery = { queryString, terms, delegatorName };
     }
 
     if (disableUserPages) {
