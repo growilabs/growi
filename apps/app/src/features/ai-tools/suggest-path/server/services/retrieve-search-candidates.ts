@@ -14,14 +14,11 @@ export type RetrieveSearchCandidatesOptions = {
   scoreThreshold?: number;
 };
 
-function stripHtmlTags(html: string): string {
-  let previous: string;
-  let result = html;
-  do {
-    previous = result;
-    result = result.replace(/<[^>]*>/g, '');
-  } while (result !== previous);
-  return result;
+// Elasticsearch highlights use <em class='highlighted-keyword'> and </em>
+const ES_HIGHLIGHT_TAG_REGEX = /<\/?em[^>]*>/g;
+
+function stripHighlightTags(text: string): string {
+  return text.replace(ES_HIGHLIGHT_TAG_REGEX, '');
 }
 
 function extractSnippet(item: SearchResultItem): string {
@@ -36,7 +33,7 @@ function extractSnippet(item: SearchResultItem): string {
     return '';
   }
 
-  return stripHtmlTags(fragments.join(' ... '));
+  return stripHighlightTags(fragments.join(' ... '));
 }
 
 export const retrieveSearchCandidates = async (

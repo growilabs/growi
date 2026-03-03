@@ -272,15 +272,13 @@ describe('retrieveSearchCandidates', () => {
       expect(result[0].snippet).toBe('React hooks ... custom hooks pattern');
     });
 
-    it('should strip all HTML tags from snippets', async () => {
+    it('should strip ES highlight tags from snippets', async () => {
       const searchResult = createSearchResult([
         {
           path: '/tech/React/hooks',
           score: 15,
           highlight: {
-            body: [
-              "<em class='highlighted-keyword'>React</em> <strong>hooks</strong>",
-            ],
+            body: ["<em class='highlighted-keyword'>React</em> hooks"],
           },
         },
       ]);
