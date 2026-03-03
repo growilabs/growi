@@ -1,4 +1,4 @@
-import { type JSX, useCallback, useRef } from 'react';
+import { type JSX, useRef } from 'react';
 
 import { useCurrentPageData } from '~/states/page';
 import { useDeviceLargerThanSm } from '~/states/ui/device';
@@ -17,22 +17,6 @@ export const PageHeader = (): JSX.Element => {
   const [isLargerThanSm] = useDeviceLargerThanSm();
   const pageHeaderRef = useRef<HTMLDivElement>(null);
 
-  const calcMaxWidth = useCallback(() => {
-    if (pageHeaderRef.current == null) {
-      return;
-    }
-
-    const pageHeaderX = pageHeaderRef.current.getBoundingClientRect().x;
-    const maxWidth = !isLargerThanSm
-      ? window.innerWidth - pageHeaderX
-      : pageControlsX != null
-        ? pageControlsX - pageHeaderX
-        : 300;
-
-    // Update the style directly if needed, or use state management
-    // setMaxWidth(maxWidth);
-  }, [isLargerThanSm, pageControlsX]);
-
   if (currentPage == null) {
     return <></>;
   }
@@ -46,17 +30,9 @@ export const PageHeader = (): JSX.Element => {
 
   return (
     <div className={`${moduleClass} w-100`} ref={pageHeaderRef}>
-      <PagePathHeader
-        currentPage={currentPage}
-        maxWidth={maxWidth}
-        onRenameTerminated={calcMaxWidth}
-      />
+      <PagePathHeader currentPage={currentPage} maxWidth={maxWidth} />
       <div className="mt-0 mt-md-1">
-        <PageTitleHeader
-          currentPage={currentPage}
-          maxWidth={maxWidth}
-          onMoveTerminated={calcMaxWidth}
-        />
+        <PageTitleHeader currentPage={currentPage} maxWidth={maxWidth} />
       </div>
     </div>
   );
