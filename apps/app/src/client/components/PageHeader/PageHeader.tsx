@@ -30,7 +30,8 @@ export const PageHeader = (): JSX.Element => {
         ? window.innerWidth - pageHeaderX
         : pageControlsX != null
           ? pageControlsX - pageHeaderX
-          : 300,
+          : // Length that allows users to use PageHeader functionality.
+            300,
     );
   }, [isLargerThanSm, pageControlsX]);
 
