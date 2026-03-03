@@ -34,7 +34,7 @@ import type {
   OnPutBackedFunction,
   OnRenamedFunction,
 } from '~/interfaces/ui';
-import LinkedPagePath from '~/models/linked-page-path';
+import { LinkedPagePath } from '~/models/linked-page-path';
 import { useDeviceLargerThanLg } from '~/states/ui/device';
 import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
 import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate';

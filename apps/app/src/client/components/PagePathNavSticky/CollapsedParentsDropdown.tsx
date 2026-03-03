@@ -7,7 +7,7 @@ import {
   UncontrolledDropdown,
 } from 'reactstrap';
 
-import type LinkedPagePath from '~/models/linked-page-path';
+import type { LinkedPagePath } from '~/models/linked-page-path';
 
 import styles from './CollapsedParentsDropdown.module.scss';
 

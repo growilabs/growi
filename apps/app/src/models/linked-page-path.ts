@@ -6,27 +6,36 @@ const { isTrashPage } = pagePathUtils;
 /**
  * Linked Array Structured PagePath Model
  */
-export default class LinkedPagePath {
-  constructor(path) {
+export class LinkedPagePath {
+  readonly path: string;
+
+  readonly pathName: string;
+
+  readonly parent?: LinkedPagePath;
+
+  constructor(path: string) {
     const pagePath = new DevidedPagePath(path);
 
     this.path = path;
     this.pathName = pagePath.latter;
-    this.isRoot = pagePath.isRoot;
     this.parent = pagePath.isRoot
-      ? null
-      : new LinkedPagePath(pagePath.former, true);
+      ? undefined
+      : new LinkedPagePath(pagePath.former);
   }
 
-  get href() {
-    if (this.isRoot) {
-      return '';
+  get isRoot(): boolean {
+    return this.parent == null;
+  }
+
+  get href(): string {
+    if (this.parent == null) {
+      return '/';
     }
 
     return pathUtils.normalizePath(`${this.parent.href}/${this.pathName}`);
   }
 
-  get isInTrash() {
+  get isInTrash(): boolean {
     return isTrashPage(this.path);
   }
 }
