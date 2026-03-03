@@ -23,8 +23,8 @@
   - _Requirements: 4.1, 4.2, 4.3_
 
 - [ ] 2.2 Verify typecheck and lint pass after renames
-  - Run `turbo run lint:typecheck --filter @growi/app` to confirm TypeScript accepts the renamed files
-  - Run `turbo run lint:biome --filter @growi/app` to confirm no lint regressions
+  - Run `pnpm lint:typecheck` in apps/app directory to confirm TypeScript accepts the renamed files
+  - Run `pnpm lint:biome` in apps/app directory to confirm no lint regressions
   - Fix any type errors that surface from stricter checking on newly-typed files (if any)
   - _Requirements: 8.3_
 
@@ -62,8 +62,7 @@
   - _Requirements: 8.2_
 
 - [ ] 6.2 Run typecheck and lint to confirm build integrity
-  - Execute `turbo run lint:typecheck --filter @growi/app`
-  - Execute `turbo run lint:biome --filter @growi/app`
+  - Execute `turbo run lint --filter @growi/app`
   - _Requirements: 8.3_
 
 - [ ] 6.3 Verify dev server launch in CI mode
