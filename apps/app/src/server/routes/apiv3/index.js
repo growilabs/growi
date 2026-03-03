@@ -1,3 +1,4 @@
+import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3';
 import growiPlugin from '~/features/growi-plugin/server/routes/apiv3/admin';
 import { factory as openaiRouteFactory } from '~/features/openai/server/routes';
 import { allreadyInstalledMiddleware } from '~/server/middlewares/application-not-installed';
@@ -7,7 +8,6 @@ import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import injectUserRegistrationOrderByTokenMiddleware from '../../middlewares/inject-user-registration-order-by-token-middleware';
 import * as loginFormValidator from '../../middlewares/login-form-validator';
 import * as registerFormValidator from '../../middlewares/register-form-validator';
-import { factory as aiToolsRouteFactory } from './ai-tools';
 import g2gTransfer from './g2g-transfer';
 import importRoute from './import';
 import pageListing from './page-listing';

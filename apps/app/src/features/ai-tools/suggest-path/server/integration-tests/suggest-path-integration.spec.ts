@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import request from 'supertest';
 
-import type { ContentAnalysis } from '~/features/suggest-path/interfaces/suggest-path-types';
+import type { ContentAnalysis } from '~/features/ai-tools/suggest-path/interfaces/suggest-path-types';
 import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
