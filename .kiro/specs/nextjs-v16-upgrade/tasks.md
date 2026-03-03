@@ -75,7 +75,7 @@
   - Confirm all 7 null-loader rules, superjson-ssr-loader, I18NextHMRPlugin, ChunkModuleStatsPlugin, and source-map-loader are active
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 7.5, 7.6_
 
-- [ ] 6.3 Measure post-upgrade module counts and document results
+- [x] 6.3 Measure post-upgrade module counts and document results
   - Run the updated measurement shell script to capture post-upgrade module counts
   - Compare initial, async-only, and total module counts with the pre-upgrade baseline
   - Verify initial modules are within ±5% of 895 (target range: 850–940)

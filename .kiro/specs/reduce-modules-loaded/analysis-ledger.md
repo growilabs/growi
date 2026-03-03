@@ -207,3 +207,23 @@ Client bundle module paths extracted from `.next/static/chunks/` — 6,822 uniqu
 - **Module count decreased only 12**: Dynamic imports still count as modules in the webpack graph, but they're compiled into separate chunks (lazy). The "10,054 modules" includes the lazy chunks' modules in the count.
 - **Compile time decreased ~14%**: The significant improvement suggests webpack's per-module overhead is not uniform — mermaid (with chevrotain parser generator) and react-syntax-highlighter (with highlight.js language definitions) are particularly expensive to compile despite their module count.
 - **date-fns subpath imports**: Contributed to the module count reduction but likely minimal time impact (consistent with Phase 1 findings).
+
+## Next.js v16 Upgrade: Post-Upgrade Measurement (2026-03-03)
+
+### Baseline vs Post-Upgrade (ChunkModuleStats)
+
+| Metric | Pre-upgrade (v15.5.12) | Post-upgrade (v16.1.6) | Delta | Tolerance | Status |
+|--------|----------------------|----------------------|-------|-----------|--------|
+| **initial** | 895 | 863 | -32 (-3.6%) | ±5% (850–940) | **PASS** |
+| **async-only** | 4,775 | 4,784 | +9 (+0.2%) | ±10% | **PASS** |
+| **total** | 5,670 | 5,647 | -23 (-0.4%) | ±10% | **PASS** |
+
+### Raw Output
+
+```
+[ChunkModuleStats] initial: 863, async-only: 4784, total: 5647
+```
+
+### Conclusion
+
+All module count metrics are within tolerance after the Next.js v16 upgrade. The initial module count actually **decreased** by 3.6% (895 → 863), indicating that v16's webpack bundling is slightly more efficient at tree-shaking or module deduplication. All custom webpack configuration (null-loader rules, superjson-ssr-loader, I18NextHMRPlugin, ChunkModuleStatsPlugin, source-map-loader) is fully preserved and functional.
