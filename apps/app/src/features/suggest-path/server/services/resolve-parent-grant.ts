@@ -1,4 +1,5 @@
 import { PageGrant } from '@growi/core';
+import { pathUtils } from '@growi/core/dist/utils';
 import mongoose, { type Model } from 'mongoose';
 
 type PageWithGrant = { grant: number };
@@ -30,7 +31,7 @@ const findGrantInAncestors = async (
 
 export const resolveParentGrant = async (dirPath: string): Promise<number> => {
   const Page = mongoose.model('Page');
-  const pagePath = dirPath.replace(/\/$/, '') || '/';
+  const pagePath = pathUtils.removeTrailingSlash(dirPath);
 
   const grant = await findGrantInAncestors(Page, pagePath);
   return grant ?? PageGrant.GRANT_OWNER;
