@@ -118,29 +118,41 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
     }
 
-    // REMINDER: values I need
-    // - The user's latest edit was on current page or not
-    // - Time since last edit on current page (5 min)
-    // - If it is the first edit
+    const suppressEditWindow = 5 * 60 * 1000; // 5 minutes
+    const minimumRevisionForActivity = 2;
 
-    // persist activity
-    const creator =
-      updatedPage.creator != null
-        ? getIdForRef(updatedPage.creator)
-        : undefined;
-    const parameters = {
-      targetModel: SupportedTargetModel.MODEL_PAGE,
-      target: updatedPage,
-      action: SupportedAction.ACTION_PAGE_UPDATE,
-    };
-    const activityEvent = crowi.events.activity;
-    activityEvent.emit(
-      'update',
-      res.locals.activity._id,
-      parameters,
-      { path: updatedPage.path, creator },
-      preNotifyService.generatePreNotify,
-    );
+    const isLastUpdatedUser =
+      updatedPage.lastUpdateUser?.toString() === req.user.toString();
+
+    const timeSinceLastUpdate =
+      (Date.now() - updatedPage.updatedAt.getTime()) / (1000 * 60);
+
+    const isOutsideSuppressionWindow = timeSinceLastUpdate > suppressEditWindow;
+    const hasEnoughRevisions = updatedPage.__v > minimumRevisionForActivity;
+
+    const shouldGenerateUpdateActivity =
+      !isLastUpdatedUser || (isOutsideSuppressionWindow && hasEnoughRevisions);
+
+    if (shouldGenerateUpdateActivity) {
+      // persist activity
+      const creator =
+        updatedPage.creator != null
+          ? getIdForRef(updatedPage.creator)
+          : undefined;
+      const parameters = {
+        targetModel: SupportedTargetModel.MODEL_PAGE,
+        target: updatedPage,
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+      };
+      const activityEvent = crowi.events.activity;
+      activityEvent.emit(
+        'update',
+        res.locals.activity._id,
+        parameters,
+        { path: updatedPage.path, creator },
+        preNotifyService.generatePreNotify,
+      );
+    }
 
     // global notification
     try {
