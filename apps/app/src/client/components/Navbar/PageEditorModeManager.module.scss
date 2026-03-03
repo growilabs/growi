@@ -1,6 +1,6 @@
 // @mixin page-editor-mode-manager($textColor, $borderColor, $bgColorHoverAndActive, $bgColor: white) {
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
-@use '~/styles/mixins';
+@use 'styles/mixins';
 
 .grw-page-editor-mode-manager :global {
   .btn {

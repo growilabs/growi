@@ -151,6 +151,18 @@ pnpm run version:prerelease
 pnpm run version:preminor
 ```
 
+## Build Measurement
+
+```bash
+# Measure module count KPI (cleans .next, starts next dev, triggers compilation)
+./bin/measure-chunk-stats.sh           # default port 3099
+./bin/measure-chunk-stats.sh 3001      # custom port
+```
+
+Output: `[ChunkModuleStats] initial: N, async-only: N, total: N`
+
+For details on module optimization and baselines, see the `build-optimization` skill.
+
 ## Production
 
 ```bash

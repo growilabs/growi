@@ -407,16 +407,58 @@ const nextConfig = {
 
 | Blocker | Severity | Mitigation |
 |---------|----------|------------|
-| `next-superjson` SWC plugin broken in v15 | Critical | Research alternatives: manual superjson in getServerSideProps, or use `superjson` directly without SWC plugin |
+| `next-superjson` SWC plugin broken in v15 | Critical | **Resolved** — custom webpack loader (`superjson-ssr-loader.js`) replaces the SWC plugin with a simple regex-based source transform; see SuperJSON Migration section below |
 | `I18NextHMRPlugin` (webpack plugin) | Medium | Only affects dev HMR for i18n; can use `--webpack` flag for dev |
 | React 19 peer dependency | Low | Pages Router has React 18 backward compat in v15 |
 | `@next/font` removal | Low | Codemod available; switch to `next/font` |
+
+##### SuperJSON Migration: Custom Webpack Loader Approach
+
+The `next-superjson` SWC plugin is replaced by a custom webpack loader that achieves the same transparent auto-wrapping of `getServerSideProps` without any SWC/Babel dependency.
+
+**Architecture**:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Build Time (webpack)                                            │
+│                                                                 │
+│  .page.tsx files ──► superjson-ssr-loader.js ──► bundled output │
+│                      (auto-wraps getServerSideProps             │
+│                       with withSuperJSONProps)                  │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ Runtime                                                         │
+│                                                                 │
+│  Server: getServerSideProps → superjson.serialize(props)        │
+│  Client: _app.page.tsx → deserializeSuperJSONProps(pageProps)   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Components**:
+
+| File | Role |
+|------|------|
+| `src/utils/superjson-ssr-loader.js` | Webpack loader — regex-based source transform that auto-wraps `getServerSideProps` exports |
+| `src/pages/utils/superjson-ssr.ts` | Runtime helpers — `withSuperJSONProps()` (server) and `deserializeSuperJSONProps()` (client) |
+| `_app.page.tsx` | Centralized client-side deserialization via `deserializeSuperJSONProps()` |
+| `next.config.js` | Loader registration targeting `.page.{ts,tsx}` files |
+
+**Why this approach over per-page wrapping**:
+- Zero per-page file changes (38 fewer files modified vs manual wrapping)
+- New pages automatically get superjson serialization without manual wrapping
+- Closer to the original `next-superjson` DX (config-only, transparent to page authors)
+- Webpack loader API is stable across Next.js versions — no SWC ABI fragility
+
+**Why not `next-superjson` v1.0.8**:
+- v1.0.8 achieves "v15 support" by pinning `@swc/core@1.4.17` (March 2024) and running a separate SWC compilation pass — fragile binary pinning with double compilation
+- Depends on unmaintained `next-superjson-plugin` v0.6.3 WASM binary
+- See `research.md` for detailed assessment
 
 **Implementation Notes**
 - Run codemod first: `npx @next/codemod@canary upgrade latest`
 - Test with `--webpack` flag to isolate bundler-related issues from framework issues
 - The `bundlePagesRouterDependencies: true` setting is the highest-value v15 feature for this spec — it automatically bundles server-side deps, which combined with `serverExternalPackages` provides fine-grained control
-- Research `next-superjson` alternatives during Phase 1 to have a mitigation ready
 
 ## Testing Strategy
 

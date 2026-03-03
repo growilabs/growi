@@ -554,8 +554,18 @@ class Crowi {
     await this.buildServer();
 
     // setup Next.js
-    this.nextApp = next({ dev });
+    // Save ts-node's .ts extension hook before Next.js prepare() destroys it.
+    // Next.js's next.config.ts transpiler registers/deregisters its own require hooks,
+    // and deregisterHook() deletes require.extensions['.ts'] instead of restoring the previous hook.
+    const savedTsHook = require.extensions['.ts'];
+    // Use webpack: true to opt out of Turbopack (default in Next.js 16+)
+    // so that all custom webpack loaders/plugins in next.config.ts remain active
+    this.nextApp = next({ dev, webpack: true });
     await this.nextApp.prepare();
+    // Restore ts-node's .ts hook if Next.js removed it
+    if (savedTsHook && !require.extensions['.ts']) {
+      require.extensions['.ts'] = savedTsHook;
+    }
 
     // setup CrowiDev
     if (dev) {

@@ -1,5 +1,5 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
-@use '~/styles/variables' as var;
+@use 'styles/variables' as var;
 
 .grw-sidebar-nav :global {
   width: var.$grw-sidebar-nav-width;

@@ -1,6 +1,6 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
-@use '~/styles/mixins';
-@use '~/styles/variables' as var;
+@use 'styles/mixins';
+@use 'styles/variables' as var;
 
 
 $subnavigation-height: 50px;

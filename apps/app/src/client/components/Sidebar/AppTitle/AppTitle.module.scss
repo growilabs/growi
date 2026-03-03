@@ -1,8 +1,8 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 @use '@growi/core-styles/scss/variables/growi-official-colors';
-@use '~/styles/variables' as var;
+@use 'styles/variables' as var;
 @use '../button-styles';
-@use '~/styles/mixins';
+@use 'styles/mixins';
 
 // GROWI Logo
 .grw-app-title :global {
