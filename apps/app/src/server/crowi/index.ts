@@ -621,6 +621,12 @@ class Crowi {
         expressBunyanLogger({
           logger: bunyanLogger,
           excludes: ['*'],
+          parseUA: false,
+          format: (res) => {
+            const ua = res.req.headers['user-agent'] || '';
+            const safeUA = ua.length > 512 ? ua.substring(0, 512) : ua;
+            return `User-Agent: ${safeUA}`;
+          },
         }),
       );
     }
