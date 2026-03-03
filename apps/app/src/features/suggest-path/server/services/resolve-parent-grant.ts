@@ -30,7 +30,7 @@ const findGrantInAncestors = async (
 };
 
 export const resolveParentGrant = async (dirPath: string): Promise<number> => {
-  const Page = mongoose.model('Page');
+  const Page = mongoose.model<PageWithGrant>('Page');
   const pagePath = pathUtils.removeTrailingSlash(dirPath);
 
   const grant = await findGrantInAncestors(Page, pagePath);
