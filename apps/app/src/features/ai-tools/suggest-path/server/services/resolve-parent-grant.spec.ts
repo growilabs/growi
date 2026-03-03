@@ -1,9 +1,10 @@
-import { resolveParentGrant } from './resolve-parent-grant';
+import { getAncestorPaths, resolveParentGrant } from './resolve-parent-grant';
 
 const mocks = vi.hoisted(() => {
   const leanMock = vi.fn();
-  const findOneMock = vi.fn().mockReturnValue({ lean: leanMock });
-  return { findOneMock, leanMock };
+  const selectMock = vi.fn().mockReturnValue({ lean: leanMock });
+  const findMock = vi.fn().mockReturnValue({ select: selectMock });
+  return { findMock, selectMock, leanMock };
 });
 
 vi.mock('@growi/core', () => ({
@@ -18,7 +19,7 @@ vi.mock('@growi/core', () => ({
 vi.mock('mongoose', () => ({
   default: {
     model: () => ({
-      findOne: mocks.findOneMock,
+      find: mocks.findMock,
     }),
   },
 }));
@@ -27,29 +28,60 @@ const GRANT_PUBLIC = 1;
 const GRANT_OWNER = 4;
 const GRANT_USER_GROUP = 5;
 
+describe('getAncestorPaths', () => {
+  it('should return ancestors from child to root', () => {
+    expect(getAncestorPaths('/a/b/c')).toEqual(['/a/b/c', '/a/b', '/a', '/']);
+  });
+
+  it('should return path and root for single-level path', () => {
+    expect(getAncestorPaths('/tech-notes')).toEqual(['/tech-notes', '/']);
+  });
+
+  it('should return only root for root path', () => {
+    expect(getAncestorPaths('/')).toEqual(['/']);
+  });
+
+  it('should respect max depth guard', () => {
+    const deepSegments = Array.from({ length: 60 }, (_, i) => `level${i}`);
+    const deepPath = `/${deepSegments.join('/')}`;
+
+    const result = getAncestorPaths(deepPath);
+    // 50 ancestors + root = 51 max
+    expect(result.length).toBeLessThanOrEqual(51);
+    expect(result[result.length - 1]).toBe('/');
+  });
+});
+
 describe('resolveParentGrant', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.findOneMock.mockReturnValue({ lean: mocks.leanMock });
+    mocks.findMock.mockReturnValue({ select: mocks.selectMock });
+    mocks.selectMock.mockReturnValue({ lean: mocks.leanMock });
   });
 
   describe('when parent page exists', () => {
     it('should return GRANT_PUBLIC when page has public grant', async () => {
-      mocks.leanMock.mockResolvedValue({ grant: GRANT_PUBLIC });
+      mocks.leanMock.mockResolvedValue([
+        { path: '/tech-notes', grant: GRANT_PUBLIC },
+      ]);
 
-      const result = await resolveParentGrant('/tech-notes/React/');
+      const result = await resolveParentGrant('/tech-notes/');
       expect(result).toBe(GRANT_PUBLIC);
     });
 
     it('should return GRANT_OWNER when page has owner grant', async () => {
-      mocks.leanMock.mockResolvedValue({ grant: GRANT_OWNER });
+      mocks.leanMock.mockResolvedValue([
+        { path: '/user/alice/memo', grant: GRANT_OWNER },
+      ]);
 
       const result = await resolveParentGrant('/user/alice/memo/');
       expect(result).toBe(GRANT_OWNER);
     });
 
     it('should return GRANT_USER_GROUP when page has user group grant', async () => {
-      mocks.leanMock.mockResolvedValue({ grant: GRANT_USER_GROUP });
+      mocks.leanMock.mockResolvedValue([
+        { path: '/team/engineering', grant: GRANT_USER_GROUP },
+      ]);
 
       const result = await resolveParentGrant('/team/engineering/');
       expect(result).toBe(GRANT_USER_GROUP);
@@ -57,15 +89,10 @@ describe('resolveParentGrant', () => {
   });
 
   describe('ancestor path traversal', () => {
-    it('should find ancestor grant when direct parent does not exist', async () => {
-      // /tech-notes/React/state-management → null, /tech-notes/React → found
-      mocks.findOneMock.mockImplementation((query: { path: string }) => ({
-        lean: vi
-          .fn()
-          .mockResolvedValue(
-            query.path === '/tech-notes/React' ? { grant: GRANT_PUBLIC } : null,
-          ),
-      }));
+    it('should find closest ancestor grant when direct parent does not exist', async () => {
+      mocks.leanMock.mockResolvedValue([
+        { path: '/tech-notes/React', grant: GRANT_PUBLIC },
+      ]);
 
       const result = await resolveParentGrant(
         '/tech-notes/React/state-management/',
@@ -73,108 +100,100 @@ describe('resolveParentGrant', () => {
       expect(result).toBe(GRANT_PUBLIC);
     });
 
-    it('should traverse multiple levels to find ancestor grant', async () => {
-      // /a/b/c/d → null, /a/b/c → null, /a/b → null, /a → found
-      mocks.findOneMock.mockImplementation((query: { path: string }) => ({
-        lean: vi
-          .fn()
-          .mockResolvedValue(
-            query.path === '/a' ? { grant: GRANT_USER_GROUP } : null,
-          ),
-      }));
+    it('should find grant from deeply nested ancestor', async () => {
+      mocks.leanMock.mockResolvedValue([
+        { path: '/a', grant: GRANT_USER_GROUP },
+      ]);
 
       const result = await resolveParentGrant('/a/b/c/d/');
       expect(result).toBe(GRANT_USER_GROUP);
     });
 
     it('should find root page grant when no intermediate ancestor exists', async () => {
-      // /nonexistent/deep → null, /nonexistent → null, / → found
-      mocks.findOneMock.mockImplementation((query: { path: string }) => ({
-        lean: vi
-          .fn()
-          .mockResolvedValue(
-            query.path === '/' ? { grant: GRANT_PUBLIC } : null,
-          ),
-      }));
+      mocks.leanMock.mockResolvedValue([{ path: '/', grant: GRANT_PUBLIC }]);
 
       const result = await resolveParentGrant('/nonexistent/deep/');
       expect(result).toBe(GRANT_PUBLIC);
     });
 
     it('should return GRANT_OWNER when no ancestor exists at any level', async () => {
-      mocks.findOneMock.mockImplementation(() => ({
-        lean: vi.fn().mockResolvedValue(null),
-      }));
+      mocks.leanMock.mockResolvedValue([]);
 
       const result = await resolveParentGrant('/nonexistent/deep/path/');
       expect(result).toBe(GRANT_OWNER);
     });
 
-    it('should stop at direct parent when it exists without further traversal', async () => {
-      mocks.findOneMock.mockImplementation((query: { path: string }) => ({
-        lean: vi
-          .fn()
-          .mockResolvedValue(
-            query.path === '/tech-notes/React/hooks'
-              ? { grant: GRANT_USER_GROUP }
-              : { grant: GRANT_PUBLIC },
-          ),
-      }));
+    it('should prefer closest ancestor when multiple ancestors exist', async () => {
+      mocks.leanMock.mockResolvedValue([
+        { path: '/tech-notes', grant: GRANT_PUBLIC },
+        { path: '/tech-notes/React/hooks', grant: GRANT_USER_GROUP },
+      ]);
 
       const result = await resolveParentGrant('/tech-notes/React/hooks/');
       expect(result).toBe(GRANT_USER_GROUP);
-      expect(mocks.findOneMock).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('when no ancestor page exists', () => {
     it('should return GRANT_OWNER (4) as safe default', async () => {
-      mocks.findOneMock.mockImplementation(() => ({
-        lean: vi.fn().mockResolvedValue(null),
-      }));
+      mocks.leanMock.mockResolvedValue([]);
 
       const result = await resolveParentGrant('/memo/bob/');
       expect(result).toBe(GRANT_OWNER);
     });
   });
 
-  describe('recursion depth guard', () => {
-    it('should return GRANT_OWNER when path exceeds maximum depth without finding ancestor', async () => {
-      // Create a deeply nested path that exceeds the max depth guard
-      const deepSegments = Array.from({ length: 60 }, (_, i) => `level${i}`);
-      const deepPath = `/${deepSegments.join('/')}/`;
+  describe('query optimization', () => {
+    it('should use a single $in query instead of multiple findOne calls', async () => {
+      mocks.leanMock.mockResolvedValue([{ path: '/a', grant: GRANT_PUBLIC }]);
 
-      mocks.findOneMock.mockImplementation(() => ({
-        lean: vi.fn().mockResolvedValue(null),
-      }));
+      await resolveParentGrant('/a/b/c/d/');
 
-      const result = await resolveParentGrant(deepPath);
-      expect(result).toBe(GRANT_OWNER);
-      // Should not recurse more than MAX_DEPTH times (50)
-      expect(mocks.findOneMock.mock.calls.length).toBeLessThanOrEqual(51);
+      expect(mocks.findMock).toHaveBeenCalledTimes(1);
+      expect(mocks.findMock).toHaveBeenCalledWith({
+        path: { $in: ['/a/b/c/d', '/a/b/c', '/a/b', '/a', '/'] },
+      });
+    });
+
+    it('should select only path and grant fields', async () => {
+      mocks.leanMock.mockResolvedValue([]);
+
+      await resolveParentGrant('/tech-notes/');
+
+      expect(mocks.selectMock).toHaveBeenCalledWith('path grant');
     });
   });
 
   describe('path normalization', () => {
     it('should strip trailing slash for database lookup', async () => {
-      mocks.leanMock.mockResolvedValue({ grant: GRANT_PUBLIC });
+      mocks.leanMock.mockResolvedValue([
+        { path: '/tech-notes', grant: GRANT_PUBLIC },
+      ]);
 
       await resolveParentGrant('/tech-notes/');
-      expect(mocks.findOneMock).toHaveBeenCalledWith({ path: '/tech-notes' });
+      expect(mocks.findMock).toHaveBeenCalledWith({
+        path: { $in: ['/tech-notes', '/'] },
+      });
     });
 
     it('should handle path without trailing slash', async () => {
-      mocks.leanMock.mockResolvedValue({ grant: GRANT_PUBLIC });
+      mocks.leanMock.mockResolvedValue([
+        { path: '/tech-notes', grant: GRANT_PUBLIC },
+      ]);
 
       await resolveParentGrant('/tech-notes');
-      expect(mocks.findOneMock).toHaveBeenCalledWith({ path: '/tech-notes' });
+      expect(mocks.findMock).toHaveBeenCalledWith({
+        path: { $in: ['/tech-notes', '/'] },
+      });
     });
 
-    it('should use root path when trailing slash is stripped from root', async () => {
-      mocks.leanMock.mockResolvedValue({ grant: GRANT_PUBLIC });
+    it('should handle root path', async () => {
+      mocks.leanMock.mockResolvedValue([{ path: '/', grant: GRANT_PUBLIC }]);
 
       await resolveParentGrant('/');
-      expect(mocks.findOneMock).toHaveBeenCalledWith({ path: '/' });
+      expect(mocks.findMock).toHaveBeenCalledWith({
+        path: { $in: ['/'] },
+      });
     });
   });
 });

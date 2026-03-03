@@ -1,38 +1,43 @@
 import { PageGrant } from '@growi/core';
 import { pathUtils } from '@growi/core/dist/utils';
-import mongoose, { type Model } from 'mongoose';
+import mongoose from 'mongoose';
 
-type PageWithGrant = { grant: number };
+type PageWithGrant = { path: string; grant: number };
 
 const MAX_ANCESTOR_DEPTH = 50;
 
-const findGrantInAncestors = async (
-  Page: Model<PageWithGrant>,
-  path: string,
-  depth: number = 0,
-): Promise<number | null> => {
-  if (depth >= MAX_ANCESTOR_DEPTH) {
-    return null;
+export function getAncestorPaths(pagePath: string): string[] {
+  const paths: string[] = [];
+  let current = pagePath;
+  let depth = 0;
+
+  while (current !== '/' && depth < MAX_ANCESTOR_DEPTH) {
+    paths.push(current);
+    current = pathUtils.getParentPath(current);
+    depth++;
   }
 
-  const page = await Page.findOne({ path }).lean();
-
-  if (page != null) {
-    return page.grant;
-  }
-
-  if (path === '/') {
-    return null;
-  }
-
-  const parentPath = path.slice(0, path.lastIndexOf('/')) || '/';
-  return findGrantInAncestors(Page, parentPath, depth + 1);
-};
+  paths.push('/');
+  return paths;
+}
 
 export const resolveParentGrant = async (dirPath: string): Promise<number> => {
   const Page = mongoose.model<PageWithGrant>('Page');
   const pagePath = pathUtils.removeTrailingSlash(dirPath);
 
-  const grant = await findGrantInAncestors(Page, pagePath);
-  return grant ?? PageGrant.GRANT_OWNER;
+  const ancestorPaths = getAncestorPaths(pagePath);
+
+  const pages = await Page.find({ path: { $in: ancestorPaths } })
+    .select('path grant')
+    .lean();
+
+  // Find the closest ancestor (ancestorPaths is ordered from child to root)
+  for (const ancestorPath of ancestorPaths) {
+    const page = pages.find((p) => p.path === ancestorPath);
+    if (page != null) {
+      return page.grant;
+    }
+  }
+
+  return PageGrant.GRANT_OWNER;
 };
