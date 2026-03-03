@@ -1,5 +1,5 @@
-@use '~/styles/variables' as var;
-@use '~/styles/mixins';
+@use 'styles/variables' as var;
+@use 'styles/mixins';
 
 .grw-navbar-bottom :global {
   // apply transition

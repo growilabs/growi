@@ -114,6 +114,9 @@ export default (phase: string): NextConfig => {
     },
     transpilePackages:
       phase !== PHASE_PRODUCTION_SERVER ? getTranspilePackages() : undefined,
+    sassOptions: {
+      loadPaths: [path.resolve(__dirname, 'src')],
+    },
     experimental: {
       optimizePackageImports,
     },
