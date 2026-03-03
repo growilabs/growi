@@ -1,6 +1,7 @@
 import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import { convertMessages } from '@mastra/core/agent';
 import type { Request, RequestHandler } from 'express';
 import { param, type ValidationChain } from 'express-validator';
 
@@ -58,11 +59,25 @@ export const getMessagesHandlersFactory: GetMessagesHandlersFactory = (
           );
         }
 
+        const thread = await memory.getThreadById({ threadId });
+        if (thread == null) {
+          return res.apiv3Err(new ErrorV3('Thread not found'), 404);
+        }
+
+        if (thread.resourceId !== req.user._id.toString()) {
+          return res.apiv3Err(
+            new ErrorV3('You are not authorized to view these messages'),
+            403,
+          );
+        }
+
         // TODO: Pagination
-        const messages = await memory.recall({
+        const recallResult = await memory.recall({
           threadId,
           resourceId: req.user._id.toString(),
         });
+
+        const messages = convertMessages(recallResult.messages).to('AIV5.UI');
 
         return res.apiv3({ messages });
       } catch (err) {

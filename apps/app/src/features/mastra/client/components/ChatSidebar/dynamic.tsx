@@ -1,11 +1,12 @@
 import { type FC, memo } from 'react';
 
 import { useLazyLoader } from '~/components/utils/use-lazy-loader';
-import { useAiAssistantSidebarStatus } from '~/features/openai/client/states';
+
+import { useChatSidebarStatus } from '../../status/chat-sidebar';
 
 export const ChatSidebarLazyLoaded: FC = memo(() => {
-  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
-  const isOpened = aiAssistantSidebarData?.isOpened ?? false;
+  const chatSidebarStatus = useChatSidebarStatus();
+  const isOpened = chatSidebarStatus?.isOpened ?? false;
 
   const ComponentToRender = useLazyLoader(
     'chat-sidebar',
@@ -16,7 +17,7 @@ export const ChatSidebarLazyLoaded: FC = memo(() => {
     isOpened,
   );
 
-  if (ComponentToRender == null) {
+  if (ComponentToRender == null || !isOpened) {
     return null;
   }
 

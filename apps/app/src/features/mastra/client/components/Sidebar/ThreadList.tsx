@@ -4,14 +4,14 @@ import { useTranslation } from 'react-i18next';
 
 import InfiniteScroll from '~/client/components/InfiniteScroll';
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import {
-  useAiAssistantSidebarActions,
-  useAiAssistantSidebarStatus,
-} from '~/features/openai/client/states';
 import { useSWRxAiAssistants } from '~/features/openai/client/stores/ai-assistant';
 import loggerFactory from '~/utils/logger';
 
 import { deleteThread } from '../../services/thread';
+import {
+  useChatSidebarActions,
+  useChatSidebarStatus,
+} from '../../status/chat-sidebar';
 import { useSWRINFxRecentThreads } from '../../stores/thread';
 
 const logger = loggerFactory('growi:openai:client:components:ThreadList');
@@ -20,11 +20,9 @@ export const ThreadList: React.FC = () => {
   const swrInfiniteThreads = useSWRINFxRecentThreads();
   const { t } = useTranslation();
   const { data, mutate: mutateRecentThreads } = swrInfiniteThreads;
-  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
-  const { openChat, close: closeAiAssistantSidebar } =
-    useAiAssistantSidebarActions();
-  const { data: aiAssistants, mutate: mutateAiAssistants } =
-    useSWRxAiAssistants();
+  const { openChat, close: closeChatSidebar } = useChatSidebarActions();
+  const chatSidebarStatus = useChatSidebarStatus();
+  const { data: aiAssistants } = useSWRxAiAssistants();
 
   const isEmpty = data?.[0]?.total === 0;
   const isReachingEnd =
@@ -38,23 +36,30 @@ export const ThreadList: React.FC = () => {
           t('ai_assistant_substance.toaster.thread_deleted_success'),
         );
 
-        mutateRecentThreads();
-
         // TODO:　After moving useAiAssistantSidebarStatus to the features/mastra directory, we plan to address this.
         // Promise.all([mutateAssistantThreadData(), mutateRecentThreads()]);
-        // // Close if the thread to be deleted is open in right sidebar
-        // if (
-        //   aiAssistantSidebarData?.isOpened &&
-        //   aiAssistantSidebarData?.threadData?._id === threadRelationId
-        // ) {
-        //   closeAiAssistantSidebar();
-        // }
+        mutateRecentThreads();
+
+        // Close if the thread to be deleted is open in right sidebars
+        if (
+          chatSidebarStatus?.isOpened &&
+          chatSidebarStatus?.threadId === threadId
+        ) {
+          closeChatSidebar();
+        }
       } catch (err) {
         logger.error(err);
         toastError(t('ai_assistant_substance.toaster.thread_deleted_failed'));
       }
     },
-    [mutateRecentThreads, t],
+    [
+      mutateRecentThreads,
+      t,
+      chatSidebarStatus?.isOpened,
+      chatSidebarStatus?.threadId,
+      closeChatSidebar,
+      chatSidebarStatus,
+    ],
   );
 
   const findAiAssistantById = useCallback(
@@ -71,10 +76,10 @@ export const ThreadList: React.FC = () => {
   );
 
   const handleOpenChat = useCallback(
-    (aiAssistantId: string) => {
+    (aiAssistantId: string, threadId: string) => {
       const aiAssistant = findAiAssistantById(aiAssistantId);
       if (aiAssistant != null) {
-        openChat(aiAssistant);
+        openChat(aiAssistant, threadId);
       }
     },
     [findAiAssistantById, openChat],
@@ -95,7 +100,7 @@ export const ThreadList: React.FC = () => {
                 className="btn btn-link list-group-item-action border-0 d-flex align-items-center rounded-1"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleOpenChat(thread.metadata.aiAssistantId);
+                  handleOpenChat(thread.metadata.aiAssistantId, thread.id);
                 }}
                 onMouseDown={(e) => {
                   e.preventDefault();

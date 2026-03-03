@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { CopyIcon, GlobeIcon, RefreshCcwIcon } from 'lucide-react';
@@ -44,7 +44,10 @@ import {
   SourcesContent,
   SourcesTrigger,
 } from '~/components/ai-elements/sources';
-import { useAiAssistantSidebarStatus } from '~/features/openai/client/states/ai-assistant-sidebar';
+
+import { useChatSidebarStatus } from '../../status/chat-sidebar';
+import { useSWRxMessages } from '../../stores/message';
+import { useSWRINFxRecentThreads } from '../../stores/thread';
 
 import styles from './ChatSidebar.module.scss';
 
@@ -65,11 +68,23 @@ export const ChatSidebar = (): JSX.Element => {
   const [input, setInput] = useState('');
   const [model, setModel] = useState<string>(models[0].value);
   const [webSearch, setWebSearch] = useState(false);
-  const { messages, sendMessage, status, regenerate } = useChat({
+
+  const chatSidebarStatus = useChatSidebarStatus();
+  const threadId = chatSidebarStatus?.threadId;
+
+  const { data: savedMessages } = useSWRxMessages(threadId);
+  const swrInfiniteThreads = useSWRINFxRecentThreads();
+  const { mutate: mutateRecentThreads } = swrInfiniteThreads;
+
+  const { messages, sendMessage, status, regenerate, setMessages } = useChat({
+    id: threadId ?? 'new',
     transport: new DefaultChatTransport({ api: '/_api/v3/mastra/message' }),
   });
 
-  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
+  useEffect(() => {
+    if (savedMessages == null) return;
+    setMessages(savedMessages);
+  }, [savedMessages, setMessages]);
 
   const handleSubmit = (message: PromptInputMessage) => {
     sendMessage(
@@ -79,11 +94,14 @@ export const ChatSidebar = (): JSX.Element => {
       },
       {
         body: {
-          aiAssistantId: aiAssistantSidebarData?.aiAssistantData?._id,
+          aiAssistantId: chatSidebarStatus?.aiAssistantData?._id,
+          threadId,
         },
       },
     );
     setInput('');
+
+    mutateRecentThreads();
   };
 
   return (

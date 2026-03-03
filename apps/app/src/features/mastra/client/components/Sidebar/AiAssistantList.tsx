@@ -10,7 +10,6 @@ import {
   deleteAiAssistant,
   setDefaultAiAssistant,
 } from '~/features/openai/client/services/ai-assistant';
-import { useAiAssistantSidebarActions } from '~/features/openai/client/states';
 import { useAiAssistantManagementModalActions } from '~/features/openai/client/states/modal/ai-assistant-management';
 import { getShareScopeIcon } from '~/features/openai/client/utils/get-share-scope-Icon';
 import type { AiAssistantHasId } from '~/features/openai/interfaces/ai-assistant';
@@ -19,6 +18,7 @@ import { determineShareScope } from '~/features/openai/utils/determine-share-sco
 import { useCurrentUser } from '~/states/global';
 import loggerFactory from '~/utils/logger';
 
+import { useChatSidebarActions } from '../../status/chat-sidebar';
 import { DeleteAiAssistantModalLazyLoaded } from './DeleteAiAssistantModal';
 
 const logger = loggerFactory('growi:openai:client:components:AiAssistantList');
@@ -171,7 +171,7 @@ export const AiAssistantList: React.FC<AiAssistantListProps> = ({
   onCollapsed,
 }) => {
   const { t } = useTranslation();
-  const { openChat } = useAiAssistantSidebarActions();
+  const { openChat } = useChatSidebarActions();
   const currentUser = useCurrentUser();
   const { open: openAiAssistantManagementModal } =
     useAiAssistantManagementModalActions();
