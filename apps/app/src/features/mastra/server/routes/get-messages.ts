@@ -59,6 +59,18 @@ export const getMessagesHandlersFactory: GetMessagesHandlersFactory = (
           );
         }
 
+        const thread = await memory.getThreadById({ threadId });
+        if (thread == null) {
+          return res.apiv3Err(new ErrorV3('Thread not found'), 404);
+        }
+
+        if (thread.resourceId !== req.user._id.toString()) {
+          return res.apiv3Err(
+            new ErrorV3('You are not authorized to view these messages'),
+            403,
+          );
+        }
+
         // TODO: Pagination
         const recallResult = await memory.recall({
           threadId,
