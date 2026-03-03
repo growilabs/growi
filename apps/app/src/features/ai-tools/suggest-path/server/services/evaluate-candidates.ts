@@ -1,16 +1,11 @@
-import type { OpenaiServiceType } from '~/features/openai/interfaces/ai';
 import { instructionsForInformationTypes } from '~/features/openai/server/services/assistant/instructions/commons';
-import {
-  getClient,
-  isStreamResponse,
-} from '~/features/openai/server/services/client-delegator';
-import { configManager } from '~/server/service/config-manager';
 
 import type {
   ContentAnalysis,
   EvaluatedSuggestion,
   SearchCandidate,
 } from '../../interfaces/suggest-path-types';
+import { callLlmForJson } from './call-llm-for-json';
 
 const SYSTEM_PROMPT = [
   'You are a page save location evaluator for a wiki system. ',
@@ -96,62 +91,25 @@ const isValidEvaluatedSuggestion = (
   return true;
 };
 
-export const evaluateCandidates = async (
+const isValidEvaluatedSuggestionArray = (
+  parsed: unknown,
+): parsed is EvaluatedSuggestion[] => {
+  if (!Array.isArray(parsed)) {
+    return false;
+  }
+  return parsed.every(isValidEvaluatedSuggestion);
+};
+
+export const evaluateCandidates = (
   body: string,
   analysis: ContentAnalysis,
   candidates: SearchCandidate[],
 ): Promise<EvaluatedSuggestion[]> => {
-  const openaiServiceType = configManager.getConfig(
-    'openai:serviceType',
-  ) as OpenaiServiceType;
-  const client = getClient({ openaiServiceType });
-
   const userMessage = buildUserMessage(body, analysis, candidates);
-
-  const completion = await client.chatCompletion({
-    model: 'gpt-4.1-nano',
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: userMessage },
-    ],
-  });
-
-  if (isStreamResponse(completion)) {
-    throw new Error('Unexpected streaming response from chatCompletion');
-  }
-
-  const choice = completion.choices[0];
-  if (choice == null) {
-    throw new Error('No choices returned from chatCompletion');
-  }
-
-  const content = choice.message.content;
-  if (content == null) {
-    throw new Error('No content returned from chatCompletion');
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    throw new Error(
-      `Failed to parse LLM response as JSON: ${content.slice(0, 200)}`,
-    );
-  }
-
-  if (!Array.isArray(parsed)) {
-    throw new Error(
-      'Invalid candidate evaluation response: expected JSON array',
-    );
-  }
-
-  for (const item of parsed) {
-    if (!isValidEvaluatedSuggestion(item)) {
-      throw new Error(
-        'Invalid suggestion in evaluation response: each item must have path (ending with /), label, and description',
-      );
-    }
-  }
-
-  return parsed as EvaluatedSuggestion[];
+  return callLlmForJson(
+    SYSTEM_PROMPT,
+    userMessage,
+    isValidEvaluatedSuggestionArray,
+    'Invalid candidate evaluation response: each item must have path (ending with /), label, and description',
+  );
 };

@@ -1,15 +1,10 @@
-import type { OpenaiServiceType } from '~/features/openai/interfaces/ai';
 import { instructionsForInformationTypes } from '~/features/openai/server/services/assistant/instructions/commons';
-import {
-  getClient,
-  isStreamResponse,
-} from '~/features/openai/server/services/client-delegator';
-import { configManager } from '~/server/service/config-manager';
 
 import type {
   ContentAnalysis,
   InformationType,
 } from '../../interfaces/suggest-path-types';
+import { callLlmForJson } from './call-llm-for-json';
 
 const VALID_INFORMATION_TYPES: readonly InformationType[] = ['flow', 'stock'];
 
@@ -46,50 +41,11 @@ const isValidContentAnalysis = (parsed: unknown): parsed is ContentAnalysis => {
   return true;
 };
 
-export const analyzeContent = async (
-  body: string,
-): Promise<ContentAnalysis> => {
-  const openaiServiceType = configManager.getConfig(
-    'openai:serviceType',
-  ) as OpenaiServiceType;
-  const client = getClient({ openaiServiceType });
-
-  const completion = await client.chatCompletion({
-    model: 'gpt-4.1-nano',
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: body },
-    ],
-  });
-
-  if (isStreamResponse(completion)) {
-    throw new Error('Unexpected streaming response from chatCompletion');
-  }
-
-  const choice = completion.choices[0];
-  if (choice == null) {
-    throw new Error('No choices returned from chatCompletion');
-  }
-
-  const content = choice.message.content;
-  if (content == null) {
-    throw new Error('No content returned from chatCompletion');
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    throw new Error(
-      `Failed to parse LLM response as JSON: ${content.slice(0, 200)}`,
-    );
-  }
-
-  if (!isValidContentAnalysis(parsed)) {
-    throw new Error(
-      'Invalid content analysis response: expected { keywords: string[], informationType: "flow" | "stock" }',
-    );
-  }
-
-  return parsed;
+export const analyzeContent = (body: string): Promise<ContentAnalysis> => {
+  return callLlmForJson(
+    SYSTEM_PROMPT,
+    body,
+    isValidContentAnalysis,
+    'Invalid content analysis response: expected { keywords: string[], informationType: "flow" | "stock" }',
+  );
 };
