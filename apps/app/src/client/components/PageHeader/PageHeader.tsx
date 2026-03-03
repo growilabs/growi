@@ -1,4 +1,4 @@
-import { type JSX, useRef } from 'react';
+import { type JSX, useEffect, useRef, useState } from 'react';
 
 import { useCurrentPageData } from '~/states/page';
 import { useDeviceLargerThanSm } from '~/states/ui/device';
@@ -17,16 +17,26 @@ export const PageHeader = (): JSX.Element => {
   const [isLargerThanSm] = useDeviceLargerThanSm();
   const pageHeaderRef = useRef<HTMLDivElement>(null);
 
+  const [maxWidth, setMaxWidth] = useState<number>(300);
+
+  useEffect(() => {
+    if (pageHeaderRef.current == null) {
+      return;
+    }
+
+    const pageHeaderX = pageHeaderRef.current.getBoundingClientRect().x;
+    setMaxWidth(
+      !isLargerThanSm
+        ? window.innerWidth - pageHeaderX
+        : pageControlsX != null
+          ? pageControlsX - pageHeaderX
+          : 300,
+    );
+  }, [isLargerThanSm, pageControlsX]);
+
   if (currentPage == null) {
     return <></>;
   }
-
-  const pageHeaderX = pageHeaderRef.current?.getBoundingClientRect().x ?? 0;
-  const maxWidth = !isLargerThanSm
-    ? window.innerWidth - pageHeaderX
-    : pageControlsX != null
-      ? pageControlsX - pageHeaderX
-      : 300;
 
   return (
     <div className={`${moduleClass} w-100`} ref={pageHeaderRef}>
