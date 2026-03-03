@@ -95,13 +95,7 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
                 searchService: typedSearchService,
               }),
             evaluateCandidates,
-            generateCategorySuggestion: (keywords, u, groups) =>
-              generateCategorySuggestion(
-                keywords,
-                u,
-                groups,
-                typedSearchService,
-              ),
+            generateCategorySuggestion,
             resolveParentGrant,
           },
         );

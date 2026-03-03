@@ -96,11 +96,7 @@ describe('generateSuggestions', () => {
       >(),
     generateCategorySuggestion:
       vi.fn<
-        (
-          keywords: string[],
-          user: IUserHasId,
-          userGroups: unknown,
-        ) => Promise<PathSuggestion | null>
+        (candidates: SearchCandidate[]) => Promise<PathSuggestion | null>
       >(),
     resolveParentGrant: vi.fn<(path: string) => Promise<number>>(),
   });
@@ -209,13 +205,11 @@ describe('generateSuggestions', () => {
       );
     });
 
-    it('should pass keywords from content analysis to generateCategorySuggestion', async () => {
+    it('should pass candidates to generateCategorySuggestion', async () => {
       await callGenerateSuggestions();
 
       expect(mockDeps.generateCategorySuggestion).toHaveBeenCalledWith(
-        ['React', 'hooks'],
-        mockUser,
-        mockUserGroups,
+        mockCandidates,
       );
     });
   });
@@ -244,16 +238,15 @@ describe('generateSuggestions', () => {
       expect(mocks.loggerErrorMock).toHaveBeenCalled();
     });
 
-    it('should return memo + category when search candidate retrieval fails', async () => {
+    it('should fall back to memo only when search candidate retrieval fails', async () => {
       mockDeps.analyzeContent.mockResolvedValue(mockAnalysis);
       mockDeps.retrieveSearchCandidates.mockRejectedValue(
         new Error('Search service down'),
       );
-      mockDeps.generateCategorySuggestion.mockResolvedValue(categorySuggestion);
 
       const result = await callGenerateSuggestions();
 
-      expect(result).toEqual([memoSuggestion, categorySuggestion]);
+      expect(result).toEqual([memoSuggestion]);
       expect(mocks.loggerErrorMock).toHaveBeenCalled();
     });
 
@@ -294,9 +287,6 @@ describe('generateSuggestions', () => {
       mockDeps.retrieveSearchCandidates.mockRejectedValue(
         new Error('Search down'),
       );
-      mockDeps.generateCategorySuggestion.mockRejectedValue(
-        new Error('Category failed'),
-      );
 
       const result = await callGenerateSuggestions();
 
@@ -306,11 +296,11 @@ describe('generateSuggestions', () => {
     it('should skip search suggestions when no candidates pass threshold (empty array)', async () => {
       mockDeps.analyzeContent.mockResolvedValue(mockAnalysis);
       mockDeps.retrieveSearchCandidates.mockResolvedValue([]);
-      mockDeps.generateCategorySuggestion.mockResolvedValue(categorySuggestion);
+      mockDeps.generateCategorySuggestion.mockResolvedValue(null);
 
       const result = await callGenerateSuggestions();
 
-      expect(result).toEqual([memoSuggestion, categorySuggestion]);
+      expect(result).toEqual([memoSuggestion]);
       expect(mockDeps.evaluateCandidates).not.toHaveBeenCalled();
     });
 
@@ -348,10 +338,11 @@ describe('generateSuggestions', () => {
   });
 
   describe('parallel execution', () => {
-    it('should run search-evaluate pipeline and category generation independently', async () => {
+    it('should run evaluate pipeline and category generation independently', async () => {
       mockDeps.analyzeContent.mockResolvedValue(mockAnalysis);
-      mockDeps.retrieveSearchCandidates.mockRejectedValue(
-        new Error('Search down'),
+      mockDeps.retrieveSearchCandidates.mockResolvedValue(mockCandidates);
+      mockDeps.evaluateCandidates.mockRejectedValue(
+        new Error('Evaluate failed'),
       );
       mockDeps.generateCategorySuggestion.mockResolvedValue(categorySuggestion);
 

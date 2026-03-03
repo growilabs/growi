@@ -28,9 +28,7 @@ export type GenerateSuggestionsDeps = {
     candidates: SearchCandidate[],
   ) => Promise<EvaluatedSuggestion[]>;
   generateCategorySuggestion: (
-    keywords: string[],
-    user: IUserHasId,
-    userGroups: unknown,
+    candidates: SearchCandidate[],
   ) => Promise<PathSuggestion | null>;
   resolveParentGrant: (path: string) => Promise<number>;
 };
@@ -52,47 +50,57 @@ export const generateSuggestions = async (
     return [memoSuggestion];
   }
 
-  // Run search-evaluate pipeline and category generation in parallel
-  const [searchResult, categoryResult] = await Promise.allSettled([
-    // Search-evaluate pipeline: search → evaluate → grant resolution
-    (async (): Promise<PathSuggestion[]> => {
-      const candidates = await deps.retrieveSearchCandidates(
-        analysis.keywords,
-        user,
-        userGroups,
-      );
-      if (candidates.length === 0) {
-        return [];
-      }
-      const evaluated = await deps.evaluateCandidates(
-        body,
-        analysis,
-        candidates,
-      );
-      return Promise.all(
-        evaluated.map(async (s): Promise<PathSuggestion> => {
-          const grant = await deps.resolveParentGrant(s.path);
-          return {
-            type: SuggestionType.SEARCH,
-            path: s.path,
-            label: s.label,
-            description: s.description,
-            grant,
-            informationType: analysis.informationType,
-          };
-        }),
-      );
-    })(),
-    // Category generation (parallel, independent)
-    deps.generateCategorySuggestion(analysis.keywords, user, userGroups),
+  // Retrieve search candidates (single ES query, shared by evaluate and category)
+  let candidates: SearchCandidate[];
+  try {
+    candidates = await deps.retrieveSearchCandidates(
+      analysis.keywords,
+      user,
+      userGroups,
+    );
+  } catch (err) {
+    logger.error(
+      'Search candidate retrieval failed, falling back to memo only:',
+      err,
+    );
+    return [memoSuggestion];
+  }
+
+  // Run evaluate pipeline and category generation in parallel
+  const [evaluateResult, categoryResult] = await Promise.allSettled([
+    // Evaluate pipeline: evaluate → grant resolution (skip if no candidates)
+    candidates.length > 0
+      ? (async (): Promise<PathSuggestion[]> => {
+          const evaluated = await deps.evaluateCandidates(
+            body,
+            analysis,
+            candidates,
+          );
+          return Promise.all(
+            evaluated.map(async (s): Promise<PathSuggestion> => {
+              const grant = await deps.resolveParentGrant(s.path);
+              return {
+                type: SuggestionType.SEARCH,
+                path: s.path,
+                label: s.label,
+                description: s.description,
+                grant,
+                informationType: analysis.informationType,
+              };
+            }),
+          );
+        })()
+      : Promise.resolve([]),
+    // Category generation (uses same candidates, no extra ES query)
+    deps.generateCategorySuggestion(candidates),
   ]);
 
   const suggestions: PathSuggestion[] = [memoSuggestion];
 
-  if (searchResult.status === 'fulfilled') {
-    suggestions.push(...searchResult.value);
+  if (evaluateResult.status === 'fulfilled') {
+    suggestions.push(...evaluateResult.value);
   } else {
-    logger.error('Search-evaluate pipeline failed:', searchResult.reason);
+    logger.error('Evaluate pipeline failed:', evaluateResult.reason);
   }
 
   if (categoryResult.status === 'fulfilled' && categoryResult.value != null) {

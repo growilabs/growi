@@ -1,65 +1,37 @@
-import type { IUserHasId } from '@growi/core/dist/interfaces';
-
 import type {
   PathSuggestion,
-  SearchService,
+  SearchCandidate,
 } from '../../interfaces/suggest-path-types';
 import { SuggestionType } from '../../interfaces/suggest-path-types';
 import { resolveParentGrant } from './resolve-parent-grant';
 
 const CATEGORY_LABEL = 'Save under category';
-const SEARCH_RESULT_LIMIT = 10;
 
-export function extractTopLevelSegment(pagePath: string): string {
+export function extractTopLevelSegmentName(pagePath: string): string | null {
   const segments = pagePath.split('/').filter(Boolean);
-  if (segments.length === 0) {
-    return '/';
-  }
-  return `/${segments[0]}/`;
-}
-
-export function generateCategoryDescription(topLevelSegment: string): string {
-  return `Top-level category: ${topLevelSegment}`;
+  return segments[0] ?? null;
 }
 
 export const generateCategorySuggestion = async (
-  keywords: string[],
-  user: IUserHasId,
-  userGroups: unknown,
-  searchService: SearchService,
+  candidates: SearchCandidate[],
 ): Promise<PathSuggestion | null> => {
-  const keyword = keywords.join(' ');
-
-  const [searchResult] = await searchService.searchKeyword(
-    keyword,
-    null,
-    user,
-    userGroups,
-    { limit: SEARCH_RESULT_LIMIT },
-  );
-
-  const results = searchResult.data;
-  if (results.length === 0) {
+  if (candidates.length === 0) {
     return null;
   }
 
-  const topResult = results[0];
-  const topLevelPath = extractTopLevelSegment(topResult._source.path);
-
-  // Extract segment name (strip leading/trailing slashes)
-  const segmentName = topLevelPath.replace(/^\/|\/$/g, '');
-  if (segmentName === '') {
+  const segmentName = extractTopLevelSegmentName(candidates[0].pagePath);
+  if (segmentName == null) {
     return null;
   }
 
-  const description = generateCategoryDescription(segmentName);
+  const topLevelPath = `/${segmentName}/`;
   const grant = await resolveParentGrant(topLevelPath);
 
   return {
     type: SuggestionType.CATEGORY,
     path: topLevelPath,
     label: CATEGORY_LABEL,
-    description,
+    description: `Top-level category: ${segmentName}`,
     grant,
   };
 };
