@@ -83,8 +83,6 @@ export const PagePathHierarchicalLink: FC<PagePathHierarchicalLinkProps> = memo(
     const isParentRoot = linkedPagePath.parent?.isRoot;
     const isSeparatorRequired = isParentExists && !isParentRoot;
 
-    const shouldDangerouslySetInnerHTML = linkedPagePathByHtml != null;
-
     const href = encodeURI(urljoin(basePath || '/', linkedPagePath.href));
 
     return (
@@ -102,19 +100,16 @@ export const PagePathHierarchicalLink: FC<PagePathHierarchicalLinkProps> = memo(
         {isSeparatorRequired && (
           <span className={`separator ${styles.separator}`}>/</span>
         )}
-        <Link href={href} prefetch={false} legacyBehavior>
-          {shouldDangerouslySetInnerHTML ? (
-            // biome-ignore-start lint/a11y/useValidAnchor: ignore
-            <a
-              className="page-segment"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: ignore
+        <Link href={href} prefetch={false} className="page-segment">
+          {linkedPagePathByHtml != null ? (
+            <span
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight markup is sanitized
               dangerouslySetInnerHTML={{
                 __html: linkedPagePathByHtml.pathName,
               }}
-            ></a>
+            />
           ) : (
-            <a className="page-segment">{linkedPagePath.pathName}</a>
-            // biome-ignore-end lint/a11y/useValidAnchor: ignore
+            linkedPagePath.pathName
           )}
         </Link>
       </RootElm>
