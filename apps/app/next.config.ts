@@ -117,6 +117,42 @@ export default (phase: string): NextConfig => {
       optimizePackageImports,
     },
 
+    turbopack: {
+      rules: {
+        // Server-only: auto-wrap getServerSideProps with SuperJSON serialization
+        '*.page.ts': [
+          {
+            condition: { not: 'browser' },
+            loaders: [
+              path.resolve(__dirname, 'src/utils/superjson-ssr-loader.ts'),
+            ],
+            as: '*.ts',
+          },
+        ],
+        '*.page.tsx': [
+          {
+            condition: { not: 'browser' },
+            loaders: [
+              path.resolve(__dirname, 'src/utils/superjson-ssr-loader.ts'),
+            ],
+            as: '*.tsx',
+          },
+        ],
+      },
+      resolveAlias: {
+        // Exclude fs from client bundle
+        fs: { browser: './src/lib/empty-module.ts' },
+        // Exclude server-only packages from client bundle
+        'dtrace-provider': { browser: './src/lib/empty-module.ts' },
+        mongoose: { browser: './src/lib/empty-module.ts' },
+        'mathjax-full': { browser: './src/lib/empty-module.ts' },
+        'i18next-fs-backend': { browser: './src/lib/empty-module.ts' },
+        bunyan: { browser: './src/lib/empty-module.ts' },
+        'bunyan-format': { browser: './src/lib/empty-module.ts' },
+        'core-js': { browser: './src/lib/empty-module.ts' },
+      },
+    },
+
     webpack(config, options) {
       // Auto-wrap getServerSideProps with superjson serialization (replaces next-superjson SWC plugin)
       if (options.isServer) {
