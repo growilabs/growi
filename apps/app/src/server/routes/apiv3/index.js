@@ -135,6 +135,8 @@ module.exports = (crowi, app) => {
     ),
   );
 
+  router.use('/contributions', require('./contributions')(crowi));
+
   router.use('/statistics', require('./statistics')(crowi));
 
   router.use('/search', require('./search')(crowi));
