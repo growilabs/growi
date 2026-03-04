@@ -1,31 +1,37 @@
 import type { UpdateQuery } from 'mongoose';
 import mongoose from 'mongoose';
 
-import type { IContributionDay } from '~/features/contribution-graph/interfaces/contribution-graph';
+import type {
+  IContributionDay,
+  SetContributionCachePayload,
+} from '~/features/contribution-graph/interfaces/contribution-graph';
 
 import {
   ContributionCache,
   type ContributionGraphDocument,
 } from '../models/contribution-cache-model';
-import { getUTCMidnightToday } from '../utils/contribution-graph-utils';
-
-export interface SetContributionCachePayload {
-  userId: string;
-  newCurrentWeek: IContributionDay[];
-  weeksToFreeze?: { id: string; data: IContributionDay[] }[];
-  weekIdsToDelete?: string[];
-}
+import { getUTCMidnight } from '../utils/contribution-graph-utils';
 
 type SetFields = IContributionDay[] | Date;
+
+export async function userExists(userId: string): Promise<boolean> {
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return false;
+  }
+
+  const User = mongoose.model('User');
+  const result = await User.exists({ _id: userId, status: 1 });
+  return !!result;
+}
 
 export async function getContributionCache(
   userId: string,
 ): Promise<ContributionGraphDocument | null> {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return null;
-    }
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return null;
+  }
 
+  try {
     const contributionCache = await ContributionCache.findOne({
       userId,
     }).exec();
@@ -45,7 +51,7 @@ export function cacheIsFresh(lastUpdated: Date | string | number): boolean {
   if (!lastUpdated) return false;
 
   const lastUpdatedDate = new Date(lastUpdated).getTime();
-  const todaysDate = getUTCMidnightToday().getTime();
+  const todaysDate = getUTCMidnight(new Date()).getTime();
 
   return lastUpdatedDate >= todaysDate;
 }
