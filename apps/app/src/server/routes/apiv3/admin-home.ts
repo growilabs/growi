@@ -96,7 +96,7 @@ module.exports = (crowi: Crowi) => {
       const { getRuntimeVersions } = await import(
         '~/server/util/runtime-versions'
       );
-      const runtimeVersions = await getRuntimeVersions();
+      const runtimeVersions = getRuntimeVersions();
 
       const adminHomeParams: IResAdminHome = {
         growiVersion: getGrowiVersion(),
