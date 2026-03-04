@@ -1,4 +1,4 @@
-import { type JSX, useState } from 'react';
+import { type JSX, Suspense, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import { RecentActivity } from '~/client/components/RecentActivity/RecentActivity';
@@ -6,6 +6,7 @@ import { RecentCreated } from '~/client/components/RecentCreated/RecentCreated';
 import { useCurrentUser } from '~/states/global';
 
 import { BookmarkFolderTree } from './Bookmarks/BookmarkFolderTree';
+import { ContributionGraph } from './ContributionGraph/ContributionGraph';
 import {
   BOOKMARKS_LIST_ID,
   RECENT_ACTIVITY_LIST_ID,
