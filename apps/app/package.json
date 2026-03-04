@@ -10,7 +10,7 @@
     "build:client": "next build --webpack",
     "build:server": "cross-env NODE_ENV=production tspc -p tsconfig.build.server.json",
     "postbuild:server": "shx echo \"Listing files under transpiled\" && shx ls transpiled && shx rm -rf dist && shx mv transpiled/src dist && shx rm -rf transpiled",
-    "clean": "shx rm -rf dist transpiled",
+    "clean": "shx rm -rf dist transpiled .next",
     "server": "cross-env NODE_ENV=production node -r dotenv-flow/config dist/server/app.js",
     "server:ci": "pnpm run server --ci",
     "preserver": "cross-env NODE_ENV=production pnpm run migrate",
