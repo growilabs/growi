@@ -4,90 +4,90 @@
 $slack-work-space-name-card-background: #fff5ff;
 $slack-work-space-name-card-border: #efc1f6;
 
-.admin-page :global {
-  .admin-user-menu {
-    .dropdown-menu {
+.admin-page {
+  :global(.admin-user-menu) {
+    :global(.dropdown-menu) {
       right: 0;
       left: auto;
       width: 400px;
     }
   }
 
-  .admin-group-menu {
-    .dropdown-menu {
+  :global(.admin-group-menu) {
+    :global(.dropdown-menu) {
       right: 0;
       left: auto;
     }
   }
 
-  .admin-customize {
-    .ss-container img {
+  :global(.admin-customize) {
+    :global(.ss-container img) {
       padding: 0.5em;
       background-color: $gray-300;
     }
 
-    .table-user-list {
-      .label-admin {
+    :global(.table-user-list) {
+      :global(.label-admin) {
         margin-left: 1em;
       }
     }
   }
 
-  .admin-setting-header {
+  :global(.admin-setting-header) {
     margin-bottom: 20px;
     border-bottom: 1px solid transparent;
   }
 
-  .custom-card {
+  :global(.custom-card) {
     padding: 8px 16px;
-    ul {
+    :global(ul) {
       margin-bottom: 0;
     }
   }
 
-  .admin-security {
-    .passport-logo {
+  :global(.admin-security) {
+    :global(.passport-logo) {
       height: 32px;
       padding: 3px;
       margin-top: -0.5em;
       background-color: black;
     }
 
-    .auth-mechanism-configurations {
+    :global(.auth-mechanism-configurations) {
       min-height: 80vh;
     }
   }
 
-  .admin-customize-sidebar-icon {
-    svg {
+  :global(.admin-customize-sidebar-icon) {
+    :global(svg) {
       width: 20px;
       height: 20px;
     }
   }
 
-  .admin-notification {
-    table .admin-notif-list {
-      td {
+  :global(.admin-notification) {
+    :global(table .admin-notif-list) {
+      :global(td) {
         vertical-align: middle;
       }
-      .td-abs-center {
+      :global(.td-abs-center) {
         width: 1px; // to keep the cell small
         text-align: center;
       }
     }
   }
 
-  .admin-importer {
-    table.table-mapping {
-      th,
-      td {
+  :global(.admin-importer) {
+    :global(table.table-mapping) {
+      :global(th),
+      :global(td) {
         text-align: center;
       }
     }
   }
 
-  .admin-export {
-    .progress {
+  :global(.admin-export) {
+    :global(.progress) {
       height: 8px;
     }
   }
@@ -95,58 +95,58 @@ $slack-work-space-name-card-border: #efc1f6;
   /*
   Slack Integration
   */
-  .selecting-bot-type {
-    .supplementary-bot-name {
+  :global(.selecting-bot-type) {
+    :global(.supplementary-bot-name) {
       font-size: 1rem;
     }
-    .bg-info {
+    :global(.bg-info) {
       font-size: 0.6rem;
     }
-    .admin-bot-card {
+    :global(.admin-bot-card) {
       min-width: 300px;
       max-width: 500px;
       border-radius: 8px !important;
-      .grw-botcard-title-active {
+      :global(.grw-botcard-title-active) {
         color: $gray-200;
       }
     }
-    .border-primary {
+    :global(.border-primary) {
       border-width: 2px;
     }
   }
 
   // TODO: change to utility class on Bootstrap 5
-  .slack-connection-log {
-    .slack-connection-log-title {
+  :global(.slack-connection-log) {
+    :global(.slack-connection-log-title) {
       border-left: 2px solid;
     }
-    .slack-connection-log-body {
+    :global(.slack-connection-log-body) {
       border: 2px solid;
     }
   }
 
-  .admin-slack-integration {
-    .admin-setting-header {
-      .btn-link {
+  :global(.admin-slack-integration) {
+    :global(.admin-setting-header) {
+      :global(.btn-link) {
         font-size: 1rem;
       }
     }
   }
 
-  .bot-integration {
-    .admin-bot-card {
+  :global(.bot-integration) {
+    :global(.admin-bot-card) {
       border-radius: 8px !important;
     }
-    .admin-border-failed {
+    :global(.admin-border-failed) {
       border-style: dashed;
       border-width: 2px;
     }
-    .admin-border-success {
+    :global(.admin-border-success) {
       border-width: 3px;
     }
 
-    .grw-bridge-proxy-circle {
-      .circle {
+    :global(.grw-bridge-proxy-circle) {
+      :global(.circle) {
         inset: 0;
         width: 100px;
         height: 100px;
@@ -159,20 +159,20 @@ $slack-work-space-name-card-border: #efc1f6;
         }
       }
 
-      .circle-inner {
+      :global(.circle-inner) {
         transform: translate(-50%, 25%);
       }
-      .circle-inner.grw-proxy-server-name {
+      :global(.circle-inner.grw-proxy-server-name) {
         margin-top: 55px;
         transform: translate(-50%, -25%);
       }
     }
 
     // switch layout for Bridge component
-    .grw-bridge-container {
+    :global(.grw-bridge-container) {
       // with ProxyCircle
-      &.with-proxy {
-        .hr-container {
+      &:global(.with-proxy) {
+        :global(.hr-container) {
           margin-top: 40px;
 
           @include media-breakpoint-up(lg) {
@@ -182,7 +182,7 @@ $slack-work-space-name-card-border: #efc1f6;
       }
     }
 
-    .slack-work-space-name-card {
+    :global(.slack-work-space-name-card) {
       background-color: $slack-work-space-name-card-background;
       border: 1px solid $slack-work-space-name-card-border;
     }
@@ -223,20 +223,20 @@ $slack-work-space-name-card-border: #efc1f6;
   //   }
   // }
 
-  .admin-audit-log {
-    .select-action-dropdown {
+  :global(.admin-audit-log) {
+    :global(.select-action-dropdown) {
       max-height: 500px;
       overflow-y: auto;
     }
-    .date-range-picker {
+    :global(.date-range-picker) {
       width: 188px;
       height: auto;
     }
-    .jump-page-input {
+    :global(.jump-page-input) {
       width: 50px;
     }
 
-    .table-bordered {
+    :global(.table-bordered) {
       table-layout: fixed;
     }
 
@@ -245,17 +245,17 @@ $slack-work-space-name-card-border: #efc1f6;
 
 
 
-  .settings-table {
+  :global(.settings-table) {
 
-    .item-name {
+    :global(.item-name) {
       width: 150px;
     }
 
-    td.unused {
+    :global(td.unused) {
       opacity: 0.5;
     }
 
-    &.use-only-env-vars .from-env-vars {
+    &:global(.use-only-env-vars .from-env-vars) {
       background-color: rgba($info, 0.1);
     }
   }

@@ -1,33 +1,33 @@
-.revision-head :global {
-  a {
+.revision-head {
+  :global(a) {
     text-decoration: none;
   }
 
-  .revision-head-link {
+  :global(.revision-head-link) {
     left: -1em;
     width: 1em;
     user-select: none;
     opacity: 0;
   }
-  .revision-head-edit-button{
+  :global(.revision-head-edit-button){
     margin-left: 0.5em;
     font-size: 16px;
     user-select: none;
     opacity: 0;
-    .material-symbols-outlined{
+    :global(.material-symbols-outlined){
       vertical-align: middle;
     }
   }
 }
 
-.revision-head:hover :global {
-  .revision-head-link, .revision-head-edit-button {
+.revision-head:hover {
+  :global(.revision-head-link), :global(.revision-head-edit-button) {
     opacity: 0.5;
   }
-  .revision-head-link:hover {
+  :global(.revision-head-link:hover) {
     opacity: 1;
   }
-  .revision-head-edit-button:hover {
+  :global(.revision-head-edit-button:hover) {
     opacity: 1;
   }
 }

@@ -3,25 +3,25 @@
 @use 'styles/mixins';
 
 @include mixins.at-editing() {
-  .grw-editor-navbar-bottom :global {
-    .grw-grant-selector {
+  .grw-editor-navbar-bottom {
+    :global(.grw-grant-selector) {
       max-width: 250px;
-      .material-symbols-outlined  {
+      :global(.material-symbols-outlined)  {
         padding-bottom: 2px;
         font-size: 19px;
       }
     }
-    .btn-submit {
+    :global(.btn-submit) {
       width: 100px;
     }
 
-    .btn-expand {
+    :global(.btn-expand) {
       // rotate icon
-      i {
+      :global(i) {
         display: inline-block;
         transition: transform 200ms;
       }
-      &.expand i {
+      &:global(.expand i) {
         transform: rotate(-180deg);
       }
     }

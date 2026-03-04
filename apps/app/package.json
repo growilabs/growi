@@ -7,7 +7,7 @@
     "//// for production": "",
     "build": "run-p build:*",
     "start": "next start",
-    "build:client": "next build --webpack",
+    "build:client": "next build",
     "build:server": "cross-env NODE_ENV=production tspc -p tsconfig.build.server.json",
     "postbuild:server": "shx echo \"Listing files under transpiled\" && shx ls transpiled && shx rm -rf dist && shx mv transpiled/src dist && shx rm -rf transpiled",
     "clean": "shx rm -rf dist transpiled .next",

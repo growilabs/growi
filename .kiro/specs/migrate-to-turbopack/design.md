@@ -11,6 +11,8 @@
 ### Goals
 - Enable Turbopack as the default bundler for `next dev` with the custom Express server
 - Migrate all 6 webpack customizations to Turbopack-compatible equivalents
+- Convert all global CSS imports to vendor CSS Module wrappers for Turbopack compliance
+- Convert all `:global` block form syntax in CSS Modules to function form for Turbopack compatibility
 - Maintain webpack fallback via environment variable during the transition period
 - Enable Turbopack for production `next build` after dev stability is confirmed
 
@@ -20,6 +22,7 @@
 - Rewriting the custom Express server architecture
 - Achieving feature parity for dev module analysis tooling (deferred)
 - Implementing i18n HMR under Turbopack (acceptable tradeoff)
+- Refactoring CSS architecture beyond the mechanical syntax conversion
 
 ## Architecture
 
@@ -83,8 +86,9 @@ graph TB
 - Selected pattern: Feature-flag phased migration with dual configuration
 - Domain boundaries: Build configuration layer only — no changes to application code, server logic, or page components
 - Existing patterns preserved: Express custom server, Pages Router, SuperJSON SSR, server-client boundary
-- New components: Empty module file, Turbopack config block, env-based bundler selection
+- New components: Empty module file, Turbopack config block, env-based bundler selection, vendor CSS Module wrappers
 - Steering compliance: Maintains server-client boundary enforcement; aligns with existing build optimization strategy
+- CSS compatibility: All `:global` block form syntax converted to function form; all global CSS imports wrapped in CSS Modules
 
 ### Technology Stack
 
@@ -153,9 +157,18 @@ sequenceDiagram
 | 6.3 | Production tests pass | BuildConfig | Test suite | - |
 | 7.1 | Alternative module analysis | Deferred | - | - |
 | 7.2 | DUMP_INITIAL_MODULES report | Deferred | - | - |
-| 8.1 | Switch via env var or CLI flag | BundlerSwitch | USE_WEBPACK env | Dev startup |
-| 8.2 | Webpack mode fully functional | WebpackFallback | webpack() hook | - |
-| 8.3 | Dual config in next.config.ts | NextConfigDual | Both configs | - |
+| 8.1 | Vendor CSS Module wrappers for imports | VendorCSSWrappers | .module.scss files | - |
+| 8.2 | Convert all direct global CSS imports | VendorCSSWrappers | Component imports | - |
+| 8.3 | Naming convention vendor-*.module.scss | VendorCSSWrappers | File naming | - |
+| 8.4 | Stylelint override for vendor wrappers | VendorCSSWrappers | .stylelintrc.json | - |
+| 9.1 | Function form `:global(...)` syntax | GlobalSyntaxConversion | 128 files | - |
+| 9.2 | Identical CSS output after conversion | GlobalSyntaxConversion | Compilation | - |
+| 9.3 | Nested blocks converted correctly | GlobalSyntaxConversion | Nested selectors | - |
+| 9.4 | No Ambiguous CSS errors under Turbopack | GlobalSyntaxConversion | Dev startup | Dev startup |
+| 9.5 | webpack fallback works with function form | GlobalSyntaxConversion | USE_WEBPACK | - |
+| 10.1 | Switch via env var or CLI flag | BundlerSwitch | USE_WEBPACK env | Dev startup |
+| 10.2 | Webpack mode fully functional | WebpackFallback | webpack() hook | - |
+| 10.3 | Dual config in next.config.ts | NextConfigDual | Both configs | - |
 
 ## Components and Interfaces
 
@@ -166,8 +179,10 @@ sequenceDiagram
 | ResolveAliasConfig | Config | Alias server-only packages and fs in browser | 2.1, 2.2, 2.3 | empty-module.ts (P0) | - |
 | EmptyModule | Util | Provide empty export file for resolveAlias | 2.1, 2.2 | None | - |
 | I18nConfig | Config | Remove HMR plugins when Turbopack is active | 5.1, 5.2, 5.3 | next-i18next (P1) | - |
-| BuildScripts | Config | Update package.json scripts for Turbopack | 6.1, 6.2, 8.1 | package.json (P0) | - |
-| WebpackFallback | Config | Maintain webpack() hook for fallback | 8.2, 8.3 | next.config.ts (P0) | - |
+| VendorCSSWrappers | CSS | Wrap third-party global CSS imports in CSS Modules | 8.1, 8.2, 8.3, 8.4 | Component imports (P0) | - |
+| GlobalSyntaxConversion | CSS | Convert `:global` block form to function form | 9.1, 9.2, 9.3, 9.4, 9.5 | 128 .module.scss files (P0) | - |
+| BuildScripts | Config | Update package.json scripts for Turbopack | 6.1, 6.2, 10.1 | package.json (P0) | - |
+| WebpackFallback | Config | Maintain webpack() hook for fallback | 10.2, 10.3 | next.config.ts (P0) | - |
 
 ### Configuration Layer
 
@@ -330,6 +345,75 @@ interface ResolveAliasConfig {
 - Phase 1: Only server initialization changes. Build scripts remain unchanged.
 - Phase 2: Remove `--webpack` from `build:client` after Turbopack build verification.
 
+### CSS Compatibility Layer
+
+#### VendorCSSWrappers — Global CSS Import Migration
+
+| Field | Detail |
+|-------|--------|
+| Intent | Wrap third-party global CSS imports in CSS Module files to comply with Turbopack's strict global CSS import rule |
+| Requirements | 8.1, 8.2, 8.3, 8.4 |
+
+**Responsibilities & Constraints**
+- Create `vendor-{library}.module.scss` wrapper files for each third-party CSS import
+- Use `:global { @import 'package/style.css'; }` pattern to preserve global scope
+- Replace direct `import 'package/style.css'` statements in components with `import './vendor-{library}.module.scss'`
+- Add stylelint override in `.stylelintrc.json` for `vendor-*.module.scss` to suppress `no-invalid-position-at-import-rule`
+
+**Affected Imports (13 total in 12 files)**
+- `@growi/remark-lsx`, `@growi/remark-attachment-refs` (renderer service)
+- `@growi/editor` (PageEditor)
+- `handsontable` (HandsontableModal)
+- `katex` (PageView)
+- `react-datepicker` (AuditLog)
+- `diff2html` (PageHistory)
+- `@growi/editor` (PageComment)
+- `drawio` (ReactMarkdownComponents)
+- `react-image-crop` (Common)
+- `simplebar-react` (Sidebar)
+- `reveal.js`, `highlight.js` (Presentation)
+
+**Implementation Notes**
+- Naming convention: `vendor-{short-library-name}.module.scss`
+- Each wrapper imports exactly one third-party CSS file
+- Multiple CSS imports from the same component directory are combined into one wrapper when possible
+
+#### GlobalSyntaxConversion — `:global` Block-to-Function Form
+
+| Field | Detail |
+|-------|--------|
+| Intent | Convert all `:global` block form syntax to function form for Turbopack CSS Modules compatibility |
+| Requirements | 9.1, 9.2, 9.3, 9.4, 9.5 |
+
+**Responsibilities & Constraints**
+- Convert 128 `.module.scss` files containing 255 occurrences of `:global` block form
+- The conversion is mechanical — each block form has an exact function form equivalent
+- Both webpack and Turbopack support the function form, so no behavioral change
+
+**Conversion Patterns**
+
+| # | Block Form (Before) | Function Form (After) |
+|---|---|---|
+| 1 | `.parent :global { .child { color: red; } }` | `.parent { :global(.child) { color: red; } }` |
+| 2 | `.parent :global { .a { } .b { } }` | `.parent { :global(.a) { } :global(.b) { } }` |
+| 3 | `.parent :global { .child { .nested { } } }` | `.parent { :global(.child) { :global(.nested) { } } }` |
+| 4 | `&:global { &.modifier { } }` | `&:global(.modifier) { }` |
+| 5 | `:global { .class { } }` (top-level) | `:global(.class) { }` |
+| 6 | `.parent :global { .child { &.modifier { } } }` | `.parent { :global(.child) { &:global(.modifier) { } } }` |
+
+**Implementation Strategy**
+- Perform conversion file-by-file using AST-aware or regex-based transformation
+- Each converted file must produce identical CSS output
+- Verify with stylelint and visual diff after conversion
+- webpack fallback (`USE_WEBPACK=1`) must continue to work with function form syntax
+
+**Dependencies**
+- None — pure syntax transformation, no runtime or build tool changes
+
+**Risks**
+- Complex nested structures may require manual attention
+- The vendor wrapper files (`vendor-*.module.scss`) use `:global { @import }` which is a different pattern — these are NOT affected by this conversion since they use the top-level `:global` block as a CSS Modules scoping mechanism for imported stylesheets
+
 ## Error Handling
 
 ### Error Strategy
@@ -345,6 +429,10 @@ Build-time errors from Turbopack migration are the primary concern. All errors s
 **Runtime Errors**: `SuperJSON deserialization failed` — indicates loader transform produced different output. Fix: compare webpack and Turbopack loader output for affected pages.
 
 **i18n Errors**: `Cannot find module 'i18next-hmr'` or HMR plugin crash — indicates HMR plugin loaded in Turbopack mode. Fix: guard HMR plugin loading with env var check.
+
+**Global CSS Import Errors**: `Global CSS cannot be imported from files other than your Custom <App>` — indicates a direct global CSS import from a non-`_app` file. Fix: create a `vendor-*.module.scss` wrapper and change the import.
+
+**CSS Modules Syntax Errors**: `Ambiguous CSS module class not supported` — indicates `:global` block form usage. Fix: convert the block form to function form `:global(...)`.
 
 ## Testing Strategy
 
@@ -376,17 +464,21 @@ flowchart LR
     A[Add turbopack config] --> B[Add empty-module.ts]
     B --> C[Update crowi/index.ts]
     C --> D[Guard i18n HMR plugins]
-    D --> E[Smoke test Turbopack dev]
-    E --> F[Smoke test webpack fallback]
-    F --> G[Merge to dev branch]
+    D --> E[Vendor CSS wrappers]
+    E --> F[Convert :global syntax]
+    F --> G[Smoke test Turbopack dev]
+    G --> H[Smoke test webpack fallback]
+    H --> I[Merge to dev branch]
 ```
 
 1. Add `turbopack` configuration block to `next.config.ts` (rules + resolveAlias)
 2. Create `src/lib/empty-module.ts`
 3. Update `src/server/crowi/index.ts`: replace `webpack: true` with `USE_WEBPACK` env var check
 4. Guard `HMRPlugin` in `next-i18next.config.js` with env var check
-5. Run smoke tests with both Turbopack and webpack modes
-6. Merge — all developers now use Turbopack by default for dev
+5. Create vendor CSS Module wrappers for all third-party global CSS imports
+6. Convert all `:global` block form syntax to function form across 128 `.module.scss` files
+7. Run smoke tests with both Turbopack and webpack modes
+8. Merge — all developers now use Turbopack by default for dev
 
 ### Phase 2: Production Build Migration (After Verification)
 

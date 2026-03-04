@@ -104,7 +104,44 @@ GROWI uses a custom Express server with `next({ dev, webpack: true })` to initia
 2. When `DUMP_INITIAL_MODULES=1` is set, the analysis tooling shall output module breakdown reports comparable to the current `initial-modules-analysis.md` format.
 3. If no Turbopack-compatible analysis tooling is feasible, this requirement may be deferred and documented as a known limitation.
 
-### Requirement 8: Incremental Migration Path
+### Requirement 8: Global CSS Import Restriction Compliance
+
+**Objective:** As a developer, I want third-party CSS files to be properly wrapped for Turbopack, so that no "Global CSS cannot be imported from files other than your Custom `<App>`" errors occur.
+
+#### Background
+
+Turbopack strictly enforces the Pages Router rule that global CSS can only be imported from `_app.page.tsx`. Under webpack, this rule was not enforced — components could freely `import 'package/style.css'`. Turbopack rejects these imports at compile time.
+
+#### Acceptance Criteria
+
+1. When a component imports third-party CSS (e.g., `handsontable`, `katex`, `diff2html`), the import shall use a vendor CSS Module wrapper (`.module.scss` with `:global { @import '...' }`) instead of a direct global CSS import.
+2. All existing direct global CSS imports from non-`_app` files shall be converted to vendor CSS Module wrappers.
+3. The vendor CSS Module wrapper files shall follow the naming convention `vendor-{library}.module.scss`.
+4. Stylelint shall not report errors on vendor CSS Module wrappers (override `no-invalid-position-at-import-rule` for `vendor-*.module.scss`).
+
+### Requirement 9: CSS Modules `:global` Syntax Compatibility
+
+**Objective:** As a developer, I want all CSS Module files to use Turbopack-compatible `:global` syntax, so that no "Ambiguous CSS module class not supported" errors occur.
+
+#### Background
+
+Turbopack's CSS Modules implementation does not support the block form of `:global { ... }` — it only supports the function form `:global(...)`. The GROWI codebase uses the block form extensively (128 files, 255 occurrences). This is a mechanical syntax difference:
+
+| Pattern (webpack) | Equivalent (Turbopack) |
+|---|---|
+| `.parent :global { .child { } }` | `.parent { :global(.child) { } }` |
+| `&:global { &.modifier { } }` | `&:global(.modifier) { }` |
+| `:global { .class { } }` (standalone) | `:global(.class) { }` |
+
+#### Acceptance Criteria
+
+1. All `.module.scss` and `.module.css` files shall use the function form `:global(...)` instead of the block form `:global { ... }`.
+2. The conversion shall be mechanical and preserve the exact same CSS output (class name scoping behavior unchanged).
+3. Nested `:global` blocks (e.g., `.parent :global { .child { .grandchild { } } }`) shall be converted to nested `:global(...)` selectors.
+4. When the dev server starts with Turbopack, no "Ambiguous CSS module class" errors shall appear.
+5. When the dev server starts with webpack (`USE_WEBPACK=1`), the converted syntax shall produce identical behavior (webpack supports both block and function forms).
+
+### Requirement 10: Incremental Migration Path
 
 **Objective:** As a developer, I want the ability to switch between Turbopack and webpack during the migration period, so that I can fall back to webpack if Turbopack issues are discovered.
 
@@ -113,5 +150,6 @@ GROWI uses a custom Express server with `next({ dev, webpack: true })` to initia
 1. The Next.js build system shall support switching between Turbopack and webpack via an environment variable or CLI flag (e.g., `--webpack`).
 2. When webpack mode is selected, all existing webpack customizations shall remain functional without modification.
 3. The `next.config.ts` shall maintain both `webpack()` hook and `turbopack` configuration simultaneously during the migration period.
-4. When the migration is complete and verified, the build system shall remove the webpack fallback configuration in a follow-up cleanup.
+4. When the migration is complete and verified, the build system shall remove the webpack fallback configuration in a follow-up cleanup (Phase 3).
+5. The converted CSS Modules syntax (function form `:global(...)`) shall work identically under both Turbopack and webpack modes.
 
