@@ -100,10 +100,6 @@ export default (phase: string): NextConfig => {
     pageExtensions: ['page.tsx', 'page.ts', 'page.jsx', 'page.js'],
     i18n,
 
-    // Bundle server-side dependencies for Pages Router (Next.js 15+)
-    // Matches App Router behavior: all deps are bundled except those in serverExternalPackages
-    // Auto-excluded: mongoose, mongodb, express, sharp, and 68 other packages with native bindings
-    bundlePagesRouterDependencies: true,
     serverExternalPackages: [
       'handsontable', // Legacy v6.2.2 requires @babel/polyfill which is unavailable; client-only via dynamic import
     ],
