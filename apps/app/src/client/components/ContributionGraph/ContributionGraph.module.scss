@@ -1,0 +1,69 @@
+.contribution-box {
+  display: inline-block;
+  padding: 16px;
+  background-color: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+}
+
+.month-labels {
+  display: grid;
+  grid-template-columns: repeat(53, 12px);
+  gap: 3px;
+  margin-bottom: 4px;
+  font-size: 10px;
+  color: #57606a;
+
+  span {
+    grid-column: span 4;
+    text-align: left;
+  }
+}
+
+.graph-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 12px);
+  grid-template-columns: repeat(53, 12px);
+  grid-auto-flow: column;
+  gap: 3px;
+}
+
+.graph-square {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  outline: 1px solid rgba(27, 31, 35, 0.06);
+  outline-offset: -1px;
+
+  &.level-0 { background-color: #ebedf0; }
+  &.level-1 { background-color: #9be9a8; }
+  &.level-2 { background-color: #40c463; }
+  &.level-3 { background-color: #30a14e; }
+  &.level-4 { background-color: #216e39; }
+}
+
+.info-bar {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: #57606a;
+}
+
+.color-guide {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #57606a;
+}
+
+.total-contributions {
+  display: flex;
+  align-items: center;
+  align-self: flex-end;
+  justify-content: flex-start;
+  font-size: 16px;
+}

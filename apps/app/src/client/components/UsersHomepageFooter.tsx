@@ -91,6 +91,12 @@ export const UsersHomepageFooter = (
         <div className={`page-list ${styles['page-list']}`}>
           <RecentActivity userId={creatorId} />
         </div>
+
+        <div>
+          <Suspense fallback={<div>Loading contribution graph...</div>}>
+            <ContributionGraph userId={creatorId} />
+          </Suspense>
+        </div>
       </div>
     </div>
   );
