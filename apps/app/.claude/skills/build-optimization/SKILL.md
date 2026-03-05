@@ -1,57 +1,109 @@
 ---
 name: build-optimization
-description: GROWI apps/app webpack configuration, module optimization, and build measurement tooling. Auto-invoked when working in apps/app.
-user-invocable: false
+description: GROWI apps/app Turbopack configuration, module optimization, and build measurement tooling. Auto-invoked when working in apps/app.
+user-invokable: false
 ---
 
 # Build Optimization (apps/app)
 
-## Next.js Version & Bundler Strategy
+## Next.js Version & Bundler
 
-- **Next.js 16** (`^16.0.0`) with **Webpack** bundler (not Turbopack)
-- Turbopack is the default in v16, but GROWI opts out via `--webpack` flag due to custom webpack configuration
-- Build: `next build --webpack`; Dev: Express server calls `next({ dev })` which uses webpack when `webpack()` config exists
+- **Next.js 16** (`^16.0.0`) with **Turbopack** bundler (default)
+- Build: `next build`; Dev: Express server calls `next({ dev })` which uses Turbopack by default
 - React stays at `^18.2.0` — Pages Router has full React 18 support in v16
+- Webpack has been fully removed (no `webpack()` hook, no `--webpack` flag)
 
-## Custom Webpack Configuration
+## Turbopack Configuration
 
-| Component | File | Purpose |
-|-----------|------|---------|
-| **superjson-ssr-loader** | `src/utils/superjson-ssr-loader.js` | Auto-wraps `getServerSideProps` with SuperJSON serialization |
-| **null-loader rules** (7) | `next.config.ts` | Exclude server-only packages from client bundle |
-| **I18NextHMRPlugin** | `next.config.ts` | i18n hot module replacement in dev mode |
-| **ChunkModuleStatsPlugin** | `src/utils/next.config.utils.js` | Dev-time module count analysis (initial/async-only/total) |
-| **source-map-loader** | `next.config.ts` | Source map extraction in dev builds |
+### Custom Loader Rules (`turbopack.rules`)
 
-### null-loader Rules
+| Rule | Pattern | Condition | Purpose |
+|------|---------|-----------|---------|
+| superjson-ssr-loader | `*.page.ts`, `*.page.tsx` | `{ not: 'browser' }` (server-only) | Auto-wraps `getServerSideProps` with SuperJSON serialization |
 
-7 packages excluded from client bundle: `dtrace-provider`, `mongoose`, `mathjax-full`, `i18next-fs-backend`, `bunyan`, `bunyan-format`, `core-js`
+- Loaders are registered in `next.config.ts` under `turbopack.rules`
+- `condition: { not: 'browser' }` restricts the loader to server-side compilation only
+- `as: '*.ts'` / `as: '*.tsx'` tells Turbopack to continue processing the transformed output as TypeScript
 
-**Important**: Any changes to these loaders/plugins must be verified against the module count baseline.
+### Resolve Aliases (`turbopack.resolveAlias`)
+
+7 server-only packages + `fs` are aliased to `./src/lib/empty-module.ts` in browser context:
+
+| Package | Reason |
+|---------|--------|
+| `fs` | Node.js built-in, not available in browser |
+| `dtrace-provider` | Native module, server-only |
+| `mongoose` | MongoDB driver, server-only |
+| `i18next-fs-backend` | File-system i18n loader, server-only |
+| `bunyan` | Server-side logger |
+| `bunyan-format` | Server-side logger formatter |
+| `core-js` | Server-side polyfills |
+
+- Uses conditional `{ browser: './src/lib/empty-module.ts' }` syntax so server-side resolution is unaffected
+- `resolveAlias` requires **relative paths** (e.g., `./src/lib/empty-module.ts`), not absolute paths — absolute paths cause "server relative imports are not implemented yet" errors
+- If a new server-only package leaks into the client bundle, add it to `resolveAlias` with the same pattern
 
 ## SuperJSON Serialization Architecture
 
-The `next-superjson` SWC plugin was replaced by a custom webpack loader:
+The `next-superjson` SWC plugin was replaced by a custom loader:
 
-- **Build time**: `superjson-ssr-loader.js` auto-wraps `getServerSideProps` in `.page.{ts,tsx}` files with `withSuperJSONProps()`
+- **Build time**: `superjson-ssr-loader.ts` auto-wraps `getServerSideProps` in `.page.{ts,tsx}` files with `withSuperJSONProps()` via Turbopack `rules`
 - **Runtime (server)**: `withSuperJSONProps()` in `src/pages/utils/superjson-ssr.ts` serializes props via superjson
 - **Runtime (client)**: `_app.page.tsx` calls `deserializeSuperJSONProps()` for centralized deserialization
 - **No per-page changes needed** — new pages automatically get superjson serialization
 - Custom serializers registered in `_app.page.tsx` (ObjectId, PageRevisionWithMeta)
+
+## CSS Modules Turbopack Compatibility
+
+### `:global` Syntax
+
+Turbopack only supports the **function form** `:global(...)`. The block form `:global { ... }` is NOT supported:
+
+```scss
+// WRONG — Turbopack rejects this
+.parent :global {
+  .child { color: red; }
+}
+
+// CORRECT — function form
+.parent {
+  :global(.child) { color: red; }
+}
+```
+
+Nested blocks must also use function form:
+
+```scss
+// WRONG
+.parent :global {
+  .child {
+    .grandchild { }
+  }
+}
+
+// CORRECT
+.parent {
+  :global(.child) {
+    :global(.grandchild) { }
+  }
+}
+```
+
+### Other Turbopack CSS Restrictions
+
+- **Standalone `:local` / `&:local`**: Not supported. Inside `:global(...)`, properties are locally scoped by default — remove `&:local` wrappers
+- **`@extend` with `:global()`**: `@extend .class` fails when target is wrapped in `:global(.class)` — Sass doesn't match them as the same selector. Use shared selector groups (comma-separated selectors) instead
+- **IE CSS hacks**: `*zoom:1`, `*display:inline`, `filter:alpha()` cannot be parsed by Turbopack's CSS parser (lightningcss). Avoid CSS files containing these hacks
+
+### Vendor CSS Imports
+
+Global CSS cannot be imported from files other than `_app.page.tsx` under Turbopack Pages Router. See the `vendor-styles-components` skill for the precompilation system that handles per-component vendor CSS.
 
 ## Module Optimization Configuration
 
 - `bundlePagesRouterDependencies: true` — bundles server-side dependencies for Pages Router
 - `serverExternalPackages: ['handsontable']` — packages excluded from server-side bundling
 - `optimizePackageImports` — 11 `@growi/*` packages configured (expansion to third-party packages was tested and reverted — it increased dev module count)
-
-## Module Count Measurement
-
-KPI: `[ChunkModuleStats] initial: N, async-only: N, total: N`
-
-- `initial` = modules in eager (initial) chunks — the primary reduction target
-- Measured via `bin/measure-chunk-stats.sh` (cleans `.next`, starts `next dev`, triggers compilation)
-- Any changes to webpack config or import patterns should be verified against the `initial` count
 
 ## Effective Module Reduction Techniques
 
@@ -63,7 +115,7 @@ Techniques that have proven effective for reducing module count, ordered by typi
 | `next/dynamic({ ssr: false })` | Client-only heavy components (e.g., Mermaid diagrams, interactive editors) |
 | Subpath imports | Packages with large barrel exports (e.g., `date-fns/format` instead of `date-fns`) |
 | Deep ESM imports | Packages that re-export multiple engines via barrel (e.g., `react-syntax-highlighter/dist/esm/prism-async-light`) |
-| null-loader | Server-only packages leaking into client bundle via transitive imports |
+| resolveAlias | Server-only packages leaking into client bundle via transitive imports |
 | Lightweight replacements | Replace large libraries used for a single feature (e.g., `tinykeys` instead of `react-hotkeys`, regex instead of `validator`) |
 
 ### Techniques That Did NOT Work
@@ -71,11 +123,6 @@ Techniques that have proven effective for reducing module count, ordered by typi
 - **Expanding `optimizePackageImports` to third-party packages** — In dev mode, this resolves individual sub-module files instead of barrel, resulting in MORE module entries. Reverted.
 - **Refactoring internal barrel exports** — Internal barrels (`states/`, `features/`) are small and well-scoped; refactoring had no measurable impact.
 
-## Turbopack Migration Path (Future)
+## i18n HMR
 
-Turbopack adoption is deferred. Key blockers:
-
-- `webpack()` config not supported — null-loader rules need `turbopack.resolveAlias` migration
-- Custom loaders (superjson-ssr-loader) need Turbopack rules testing
-- I18NextHMRPlugin has no Turbopack equivalent
-- Use `--webpack` flag in both dev and build until migration is complete
+`I18NextHMRPlugin` was removed during the Turbopack migration. Translation file changes require a manual browser refresh. The performance gain from Turbopack (faster Fast Refresh overall) outweighs the loss of i18n-specific HMR. Monitor if `i18next-hmr` adds Turbopack support in the future.
