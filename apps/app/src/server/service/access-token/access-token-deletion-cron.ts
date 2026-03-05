@@ -7,14 +7,15 @@ import loggerFactory from '~/utils/logger';
 const logger = loggerFactory('growi:service:access-token-deletion-cron');
 
 export class AccessTokenDeletionCronService {
-
   cronJob: nodeCron.ScheduledTask;
 
   // Default execution at midnight
   accessTokenDeletionCronExpression = '0 15 * * *';
 
   startCron(): void {
-    const cronExp = configManager.getConfig('accessToken:deletionCronExpression');
+    const cronExp = configManager.getConfig(
+      'accessToken:deletionCronExpression',
+    );
     if (cronExp != null) {
       this.accessTokenDeletionCronExpression = cronExp;
     }
@@ -30,23 +31,26 @@ export class AccessTokenDeletionCronService {
     try {
       await AccessToken.deleteExpiredToken();
       logger.info('Expired access tokens have been deleted');
-    }
-    catch (e) {
+    } catch (e) {
       logger.error('Failed to delete expired access tokens:', e);
     }
   }
 
   private generateCronJob() {
-    return nodeCron.schedule(this.accessTokenDeletionCronExpression, async() => {
-      try {
-        await this.executeJob();
-      }
-      catch (e) {
-        logger.error('Error occurred during access token deletion cron job:', e);
-      }
-    });
+    return nodeCron.schedule(
+      this.accessTokenDeletionCronExpression,
+      async () => {
+        try {
+          await this.executeJob();
+        } catch (e) {
+          logger.error(
+            'Error occurred during access token deletion cron job:',
+            e,
+          );
+        }
+      },
+    );
   }
-
 }
 
 export const startCron = (): void => {

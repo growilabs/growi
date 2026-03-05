@@ -1,5 +1,4 @@
 import React, { type JSX } from 'react';
-
 import type { IPageInfoForEntity, IPageWithMeta } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
@@ -7,24 +6,28 @@ import { useTranslation } from 'next-i18next';
 import type { OnDeletedFunction, OnPutBackedFunction } from '~/interfaces/ui';
 
 import type { ForceHideMenuItems } from '../Common/Dropdown/PageItemControl';
-
 import { PageListItemL } from './PageListItemL';
 
 import styles from './PageList.module.scss';
 
 type Props<M extends IPageInfoForEntity> = {
-  pages: IPageWithMeta<M>[],
-  isEnableActions?: boolean,
-  isReadOnlyUser: boolean,
-  forceHideMenuItems?: ForceHideMenuItems,
-  onPagesDeleted?: OnDeletedFunction,
-  onPagePutBacked?: OnPutBackedFunction,
-}
+  pages: IPageWithMeta<M>[];
+  isEnableActions?: boolean;
+  isReadOnlyUser: boolean;
+  forceHideMenuItems?: ForceHideMenuItems;
+  onPagesDeleted?: OnDeletedFunction;
+  onPagePutBacked?: OnPutBackedFunction;
+};
 
 const PageList = (props: Props<IPageInfoForEntity>): JSX.Element => {
   const { t } = useTranslation();
   const {
-    pages, isEnableActions, isReadOnlyUser, forceHideMenuItems, onPagesDeleted, onPagePutBacked,
+    pages,
+    isEnableActions,
+    isReadOnlyUser,
+    forceHideMenuItems,
+    onPagesDeleted,
+    onPagePutBacked,
   } = props;
 
   if (pages == null) {
@@ -37,7 +40,7 @@ const PageList = (props: Props<IPageInfoForEntity>): JSX.Element => {
     );
   }
 
-  const pageList = pages.map(page => (
+  const pageList = pages.map((page) => (
     <PageListItemL
       key={page.data._id}
       page={page}
@@ -59,9 +62,7 @@ const PageList = (props: Props<IPageInfoForEntity>): JSX.Element => {
 
   return (
     <div className={`page-list ${styles['page-list']}`}>
-      <ul className="page-list-ul list-group list-group-flush">
-        {pageList}
-      </ul>
+      <ul className="page-list-ul list-group list-group-flush">{pageList}</ul>
     </div>
   );
 };

@@ -13,7 +13,6 @@ states/
 │   ├── untitled-page.ts            # 無題ページ状態 ✅
 │   ├── page-abilities.ts           # ページ権限判定状態 ✅ DERIVED ATOM!
 │   ├── unsaved-warning.ts          # 未保存警告状態 ✅ JOTAI PATTERN!
-│   ├── page-tree-desc-count-map.ts # ページツリー子孫カウント ✅ JOTAI PATTERN!
 │   └── modal/                      # 個別モーダルファイル ✅
 │       ├── page-create.ts          # ページ作成モーダル ✅
 │       ├── page-delete.ts          # ページ削除モーダル ✅
@@ -45,6 +44,25 @@ states/
             └── states/             # OpenAI専用状態 ✅
                 ├── index.ts        # exports ✅
                 └── unified-merge-view.ts # UnifiedMergeView状態 ✅
+
+features/                           # Feature Directory Pattern ✅
+└── page-tree/                      # ページツリー機能 ✅ (NEW!)
+    ├── index.ts                    # メインエクスポート
+    ├── client/
+    │   ├── components/             # 汎用UIコンポーネント
+    │   │   ├── SimplifiedItemsTree.tsx
+    │   │   ├── TreeItemLayout.tsx
+    │   │   └── SimpleItemContent.tsx
+    │   ├── hooks/                  # 汎用フック
+    │   │   ├── use-data-loader.ts
+    │   │   └── use-scroll-to-selected-item.ts
+    │   ├── interfaces/             # インターフェース定義
+    │   │   └── index.ts            # TreeItemProps, TreeItemToolProps
+    │   └── states/                 # Jotai状態 ✅
+    │       ├── page-tree-update.ts # ツリー更新状態
+    │       └── page-tree-desc-count-map.ts # 子孫カウント状態
+    └── constants/
+        └── index.ts                # ROOT_PAGE_VIRTUAL_ID
 ```
 
 ## 📋 ファイル配置ルール
@@ -60,9 +78,36 @@ states/
 - **グローバル状態**: `global/` ディレクトリ
 - **通信系**: `socket-io/` ディレクトリ
 
-### 機能別専用states (`states/features/`)
-- **OpenAI機能**: `features/openai/client/states/`
-- **将来の機能**: `features/{feature-name}/client/states/`
+### 機能別専用states (`states/features/` および `features/`)
+
+**OpenAI機能**: `states/features/openai/client/states/`
+**ページツリー機能**: `features/page-tree/client/states/` ✅ (Feature Directory Pattern)
+
+### Feature Directory Pattern (新パターン) ✅
+
+`features/{feature-name}/` パターンは、特定機能に関連するコンポーネント、フック、状態、定数をすべて一箇所に集約する構造。
+
+**適用例**: `features/page-tree/`
+```
+features/page-tree/
+├── index.ts           # 全エクスポートの集約
+├── client/
+│   ├── components/    # UIコンポーネント
+│   ├── hooks/         # カスタムフック
+│   ├── interfaces/    # 型定義
+│   └── states/        # Jotai状態
+└── constants/         # 定数
+```
+
+**インポート方法**:
+```typescript
+import { 
+  SimplifiedItemsTree,
+  TreeItemLayout,
+  usePageTreeInformationUpdate,
+  ROOT_PAGE_VIRTUAL_ID 
+} from '~/features/page-tree';
+```
 
 ## 🏷️ ファイル命名規則
 
@@ -119,13 +164,29 @@ states/context.ts → _atomsForDerivedAbilities
 ## 🎯 今後の拡張指針
 
 ### 新規機能追加時
-1. **機能専用度評価**: 汎用 → `states/ui/`、専用 → `states/features/`
+1. **機能専用度評価**: 汎用 → `states/ui/`、専用 → `features/{feature-name}/client/states/`
 2. **複雑度評価**: シンプル → 単一ファイル、複雑 → ディレクトリ
 3. **依存関係確認**: 既存atomの活用可能性
 4. **命名規則遵守**: 確立された命名パターンに従う
+5. **Feature Directory Pattern検討**: 複数のコンポーネント・フック・状態が関連する場合は `features/` 配下に集約
 
 ### ディレクトリ構造維持
 - **責務単一原則**: 1ファイル = 1機能・責務
 - **依存関係最小化**: 循環参照の回避
 - **拡張性**: 将来の機能追加を考慮した構造
 - **検索性**: ファイル名から機能が推測できる命名
+
+### Feature Directory Pattern 採用基準
+以下の条件を満たす場合は `features/` 配下に配置:
+- 複数のUIコンポーネントが関連している
+- 専用のカスタムフックがある
+- 専用のJotai状態がある
+- 機能として独立性が高い
+
+**例**: `features/page-tree/` は SimplifiedItemsTree, TreeItemLayout, useDataLoader, page-tree-update.ts などが密接に関連
+
+---
+
+## 📝 最終更新日
+
+2025-11-28 (Feature Directory Pattern 追加)

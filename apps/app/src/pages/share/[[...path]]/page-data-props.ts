@@ -1,12 +1,17 @@
 import type { GetServerSidePropsContext, GetServerSidePropsResult } from 'next';
 import type { IPage } from '@growi/core';
 import { getIdStringForRef } from '@growi/core';
+import {
+  isUserPage,
+  isUsersTopPage,
+} from '@growi/core/dist/utils/page-path-utils';
 import type { model } from 'mongoose';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type { IShareLink } from '~/interfaces/share-link';
 import type { PageModel } from '~/server/models/page';
 import type { ShareLinkModel } from '~/server/models/share-link';
+import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
 
 import type { ShareLinkPageStatesProps } from './types';
 
@@ -34,7 +39,7 @@ export const getPageDataForInitial = async (
 ): Promise<GetServerSidePropsResult<ShareLinkPageStatesProps>> => {
   const req = context.req as CrowiRequest;
   const { crowi, params } = req;
-  const { pageService, configManager } = crowi;
+  const { pageService, pageGrantService, configManager } = crowi;
 
   if (mongooseModel == null) {
     mongooseModel = (await import('mongoose')).model;
@@ -56,16 +61,37 @@ export const getPageDataForInitial = async (
   }
 
   const pageId = getIdStringForRef(shareLink.relatedPage);
-  const pageWithMeta = await pageService.findPageAndMetaDataByViewer(
-    pageId,
-    null,
-    undefined, // no user for share link
-    true, // isSharedPage
+  const pageWithMeta = await findPageAndMetaDataByViewer(
+    pageService,
+    pageGrantService,
+    { pageId, path: null, isSharedPage: true },
   );
 
   // not found
   if (pageWithMeta.data == null) {
     return notFoundProps;
+  }
+
+  const disableUserPages = configManager.getConfig('security:disableUserPages');
+  if (
+    disableUserPages &&
+    (isUserPage(pageWithMeta.data.path) ||
+      isUsersTopPage(pageWithMeta.data.path))
+  ) {
+    return {
+      props: {
+        isNotFound: true,
+        pageWithMeta: {
+          data: null,
+          meta: {
+            isNotFound: true,
+            isForbidden: true,
+          },
+        },
+        isExpired: undefined,
+        shareLink: undefined,
+      },
+    };
   }
 
   // expired

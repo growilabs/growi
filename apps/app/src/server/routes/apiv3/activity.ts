@@ -7,6 +7,8 @@ import { query } from 'express-validator';
 
 import type { IActivity, ISearchFilter } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
@@ -173,10 +175,8 @@ const validator = {
  */
 
 module.exports = (crowi: Crowi): Router => {
-  const adminRequired = require('../../middlewares/admin-required')(crowi);
-  const loginRequiredStrictly = require('../../middlewares/login-required')(
-    crowi,
-  );
+  const adminRequired = adminRequiredFactory(crowi);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   const router = express.Router();
 

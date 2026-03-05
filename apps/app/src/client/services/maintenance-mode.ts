@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-
 import { useSetAtom } from 'jotai';
 
 import { _atomsForMaintenanceMode } from '../../states/global';

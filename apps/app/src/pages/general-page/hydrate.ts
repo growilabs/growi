@@ -5,6 +5,7 @@ import {
   aiEnabledAtom,
   defaultIndentSizeAtom,
   disableLinkSharingAtom,
+  disableUserPagesAtom,
   drawioUriAtom,
   elasticsearchMaxBodyLengthToIndexAtom,
   isAclEnabledAtom,
@@ -25,6 +26,7 @@ import {
   rendererConfigAtom,
   showPageSideAuthorsAtom,
 } from '~/states/server-configurations';
+import { createAtomTuple } from '~/utils/jotai-utils';
 
 import type { ServerConfigurationProps } from './types';
 
@@ -36,54 +38,79 @@ export const useHydrateGeneralPageConfigurationAtoms = (
   serverConfig: ServerConfigurationProps['serverConfig'] | undefined,
   rendererConfigs: RendererConfig | undefined,
 ): void => {
-  // Hydrate server configuration atoms with server-side data
-  useHydrateAtoms(
+  const tuples =
     serverConfig == null || rendererConfigs == null
       ? []
       : [
-          [aiEnabledAtom, serverConfig.aiEnabled],
-          [
+          createAtomTuple(aiEnabledAtom, serverConfig.aiEnabled),
+          createAtomTuple(
             limitLearnablePageCountPerAssistantAtom,
             serverConfig.limitLearnablePageCountPerAssistant,
-          ],
-          [
+          ),
+          createAtomTuple(
             isUsersHomepageDeletionEnabledAtom,
             serverConfig.isUsersHomepageDeletionEnabled,
-          ],
-          [defaultIndentSizeAtom, serverConfig.adminPreferredIndentSize],
-          [
+          ),
+          createAtomTuple(
+            defaultIndentSizeAtom,
+            serverConfig.adminPreferredIndentSize,
+          ),
+          createAtomTuple(
             elasticsearchMaxBodyLengthToIndexAtom,
             serverConfig.elasticsearchMaxBodyLengthToIndex,
-          ],
-          [
+          ),
+          createAtomTuple(
             isRomUserAllowedToCommentAtom,
             serverConfig.isRomUserAllowedToComment,
-          ],
-          [drawioUriAtom, serverConfig.drawioUri],
-          [isAllReplyShownAtom, serverConfig.isAllReplyShown],
-          [showPageSideAuthorsAtom, serverConfig.showPageSideAuthors],
-          [isContainerFluidAtom, serverConfig.isContainerFluid],
-          [
+          ),
+          createAtomTuple(drawioUriAtom, serverConfig.drawioUri),
+          createAtomTuple(isAllReplyShownAtom, serverConfig.isAllReplyShown),
+          createAtomTuple(
+            showPageSideAuthorsAtom,
+            serverConfig.showPageSideAuthors,
+          ),
+          createAtomTuple(isContainerFluidAtom, serverConfig.isContainerFluid),
+          createAtomTuple(
             isEnabledStaleNotificationAtom,
             serverConfig.isEnabledStaleNotification,
-          ],
-          [disableLinkSharingAtom, serverConfig.disableLinkSharing],
-          [isIndentSizeForcedAtom, serverConfig.isIndentSizeForced],
-          [
+          ),
+          createAtomTuple(
+            disableLinkSharingAtom,
+            serverConfig.disableLinkSharing,
+          ),
+          createAtomTuple(
+            isIndentSizeForcedAtom,
+            serverConfig.isIndentSizeForced,
+          ),
+          createAtomTuple(
             isEnabledAttachTitleHeaderAtom,
             serverConfig.isEnabledAttachTitleHeader,
-          ],
-          [isSlackConfiguredAtom, serverConfig.isSlackConfigured],
-          [isAclEnabledAtom, serverConfig.isAclEnabled],
-          [isUploadAllFileAllowedAtom, serverConfig.isUploadAllFileAllowed],
-          [isUploadEnabledAtom, serverConfig.isUploadEnabled],
-          [isBulkExportPagesEnabledAtom, serverConfig.isBulkExportPagesEnabled],
-          [isPdfBulkExportEnabledAtom, serverConfig.isPdfBulkExportEnabled],
-          [
+          ),
+          createAtomTuple(
+            isSlackConfiguredAtom,
+            serverConfig.isSlackConfigured,
+          ),
+          createAtomTuple(isAclEnabledAtom, serverConfig.isAclEnabled),
+          createAtomTuple(
+            isUploadAllFileAllowedAtom,
+            serverConfig.isUploadAllFileAllowed,
+          ),
+          createAtomTuple(isUploadEnabledAtom, serverConfig.isUploadEnabled),
+          createAtomTuple(
+            isBulkExportPagesEnabledAtom,
+            serverConfig.isBulkExportPagesEnabled,
+          ),
+          createAtomTuple(
+            isPdfBulkExportEnabledAtom,
+            serverConfig.isPdfBulkExportEnabled,
+          ),
+          createAtomTuple(
             isLocalAccountRegistrationEnabledAtom,
             serverConfig.isLocalAccountRegistrationEnabled,
-          ],
-          [rendererConfigAtom, rendererConfigs],
-        ],
-  );
+          ),
+          createAtomTuple(rendererConfigAtom, rendererConfigs),
+          createAtomTuple(disableUserPagesAtom, serverConfig.disableUserPages),
+        ];
+
+  useHydrateAtoms(tuples);
 };

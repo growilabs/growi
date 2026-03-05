@@ -16,7 +16,7 @@ vi.mock('../../models/config', () => ({
 describe('ConfigLoader', () => {
   let configLoader: ConfigLoader;
 
-  beforeEach(async() => {
+  beforeEach(async () => {
     configLoader = new ConfigLoader();
     vi.clearAllMocks();
   });
@@ -30,8 +30,9 @@ describe('ConfigLoader', () => {
         mockExec.mockResolvedValue(mockDocs);
       });
 
-      it('should return null for value', async() => {
-        const config: RawConfigData<ConfigKey, ConfigValues> = await configLoader.loadFromDB();
+      it('should return null for value', async () => {
+        const config: RawConfigData<ConfigKey, ConfigValues> =
+          await configLoader.loadFromDB();
         expect(config['app:referrerPolicy'].value).toBe(null);
       });
     });
@@ -44,8 +45,9 @@ describe('ConfigLoader', () => {
         mockExec.mockResolvedValue(mockDocs);
       });
 
-      it('should return null for value', async() => {
-        const config: RawConfigData<ConfigKey, ConfigValues> = await configLoader.loadFromDB();
+      it('should return null for value', async () => {
+        const config: RawConfigData<ConfigKey, ConfigValues> =
+          await configLoader.loadFromDB();
         expect(config['app:referrerPolicy'].value).toBe(null);
       });
     });
@@ -54,13 +56,17 @@ describe('ConfigLoader', () => {
       const validJson = { key: 'value' };
       beforeEach(() => {
         const mockDocs = [
-          { key: 'app:referrerPolicy' as ConfigKey, value: JSON.stringify(validJson) },
+          {
+            key: 'app:referrerPolicy' as ConfigKey,
+            value: JSON.stringify(validJson),
+          },
         ];
         mockExec.mockResolvedValue(mockDocs);
       });
 
-      it('should return parsed value', async() => {
-        const config: RawConfigData<ConfigKey, ConfigValues> = await configLoader.loadFromDB();
+      it('should return parsed value', async () => {
+        const config: RawConfigData<ConfigKey, ConfigValues> =
+          await configLoader.loadFromDB();
         expect(config['app:referrerPolicy'].value).toEqual(validJson);
       });
     });
@@ -73,8 +79,9 @@ describe('ConfigLoader', () => {
         mockExec.mockResolvedValue(mockDocs);
       });
 
-      it('should return null for value', async() => {
-        const config: RawConfigData<ConfigKey, ConfigValues> = await configLoader.loadFromDB();
+      it('should return null for value', async () => {
+        const config: RawConfigData<ConfigKey, ConfigValues> =
+          await configLoader.loadFromDB();
         expect(config['app:referrerPolicy'].value).toBe(null);
       });
     });

@@ -6,8 +6,7 @@ import { Revision } from '../models/revision';
 import ApiResponse from '../util/apiResponse';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi, app) => {
-  const activityEvent = crowi.event('activity');
+module.exports = (crowi, _app) => {
   const actions = {};
   const api = {};
 
@@ -117,9 +116,9 @@ module.exports = (crowi, app) => {
    * @apiParam {array} tags
    */
   api.update = async (req, res) => {
-    const Page = crowi.model('Page');
-    const User = crowi.model('User');
-    const tagEvent = crowi.event('tag');
+    const { Page, User } = crowi.models;
+    const tagEvent = crowi.events.tag;
+    const activityEvent = crowi.events.activity;
     const pageId = req.body.pageId;
     const tags = req.body.tags;
     const userId = req.user._id;
@@ -128,7 +127,7 @@ module.exports = (crowi, app) => {
     const result = {};
     try {
       // TODO GC-1921 consider permission
-      const page = await Page.findById(pageId);
+      const page = await Page.findOne({ _id: { $eq: pageId } });
       const user = await User.findById(userId);
 
       if (!(await Page.isAccessiblePageByViewer(page._id, user))) {
@@ -137,7 +136,9 @@ module.exports = (crowi, app) => {
         );
       }
 
-      const previousRevision = await Revision.findById(revisionId);
+      const previousRevision = await Revision.findOne({
+        _id: { $eq: revisionId },
+      });
       result.savedPage = await crowi.pageService.updatePage(
         page,
         previousRevision.body,

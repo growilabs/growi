@@ -1,7 +1,4 @@
-import React, {
-  useState, useCallback, useEffect, type JSX,
-} from 'react';
-
+import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import type { IPageHasId } from '@growi/core';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
@@ -14,11 +11,10 @@ import PaginationWrapper from '../PaginationWrapper';
 const logger = loggerFactory('growi:RecentCreated');
 
 type RecentCreatedProps = {
-  userId: string,
-}
+  userId: string;
+};
 
 export const RecentCreated = (props: RecentCreatedProps): JSX.Element => {
-
   const { userId } = props;
 
   const [pages, setPages] = useState<IPageHasId[]>([]);
@@ -26,42 +22,45 @@ export const RecentCreated = (props: RecentCreatedProps): JSX.Element => {
   const [totalPages, setTotalPages] = useState(0);
   const [pagingLimit, setPagingLimit] = useState(10);
 
-  const getMyRecentCreatedList = useCallback(async(selectedPage) => {
-    const page = selectedPage;
+  const getMyRecentCreatedList = useCallback(
+    async (selectedPage) => {
+      const page = selectedPage;
 
-    try {
-      const res = await apiv3Get(`/users/${userId}/recent`, { page });
-      const { totalCount, pages, limit } = res.data;
+      try {
+        const res = await apiv3Get(`/users/${userId}/recent`, { page });
+        const { totalCount, pages, limit } = res.data;
 
-      setPages(pages);
-      setActivePage(selectedPage);
-      setTotalPages(totalCount);
-      setPagingLimit(limit);
-    }
-    catch (error) {
-      logger.error('failed to fetch data', error);
-      toastError(error);
-    }
-  }, [userId]);
+        setPages(pages);
+        setActivePage(selectedPage);
+        setTotalPages(totalCount);
+        setPagingLimit(limit);
+      } catch (error) {
+        logger.error('failed to fetch data', error);
+        toastError(error);
+      }
+    },
+    [userId],
+  );
 
   useEffect(() => {
     getMyRecentCreatedList(1);
   }, [getMyRecentCreatedList]);
 
-  const handlePage = useCallback(async(selectedPage) => {
-    await getMyRecentCreatedList(selectedPage);
-  }, [getMyRecentCreatedList]);
+  const handlePage = useCallback(
+    async (selectedPage) => {
+      await getMyRecentCreatedList(selectedPage);
+    },
+    [getMyRecentCreatedList],
+  );
 
   return (
     <div className="page-list-container-create">
       <ul className="page-list-ul page-list-ul-flat mb-3">
-
-        {pages.map(page => (
+        {pages.map((page) => (
           <li key={`recent-created:list-view:${page._id}`} className="mt-4">
             <PageListItemS page={page} />
           </li>
         ))}
-
       </ul>
       <PaginationWrapper
         activePage={activePage}
@@ -73,5 +72,4 @@ export const RecentCreated = (props: RecentCreatedProps): JSX.Element => {
       />
     </div>
   );
-
 };

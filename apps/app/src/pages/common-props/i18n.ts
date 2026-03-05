@@ -1,6 +1,9 @@
 import type { GetServerSidePropsContext, GetServerSidePropsResult } from 'next';
 import { AllLang } from '@growi/core';
 import type { SSRConfig } from 'next-i18next';
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
+
+import nextI18NextConfig from '^/config/next-i18next.config';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import { getLangAtServerSide } from '~/pages/utils/locale';
@@ -11,13 +14,6 @@ async function createNextI18NextConfig(
   namespacesRequired?: string[],
   preloadAllLang = false,
 ): Promise<SSRConfig> {
-  const { serverSideTranslations } = await import(
-    'next-i18next/serverSideTranslations'
-  );
-
-  // Import configuration to fix the error
-  const nextI18NextConfig = await import('^/config/next-i18next.config');
-
   // Determine language from request context
   const req: CrowiRequest = context.req as CrowiRequest;
   const lang = getLangAtServerSide(req);

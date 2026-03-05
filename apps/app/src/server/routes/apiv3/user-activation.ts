@@ -122,7 +122,7 @@ export const completeRegistrationAction = (crowi: Crowi) => {
     IUser,
     { isEmailValid; isRegisterable; createUserByEmailAndPassword; findAdmins }
   >('User');
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
   const { aclService, appService, mailService } = crowi;
 
   return async (req, res) => {

@@ -1,6 +1,4 @@
-
 import React from 'react';
-
 import { format as dateFnsFormat } from 'date-fns/format';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
@@ -11,9 +9,9 @@ const ExternalAccountRow = (props) => {
 
   return (
     <tr>
-      <td>{ account.providerType }</td>
+      <td>{account.providerType}</td>
       <td>
-        <strong>{ account.accountId }</strong>
+        <strong>{account.accountId}</strong>
       </td>
       <td>{dateFnsFormat(account.createdAt, 'yyyy-MM-dd')}</td>
       <td className="text-center">
@@ -23,7 +21,7 @@ const ExternalAccountRow = (props) => {
           onClick={() => props.openDisassociateModal(account)}
         >
           <span className="material-symbols-outlined">link_off</span>
-          { t('Disassociate') }
+          {t('Disassociate')}
         </button>
       </td>
     </tr>

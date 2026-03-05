@@ -1,6 +1,10 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 
+import type { IResAdminHome } from '~/interfaces/res/admin/admin-home';
+import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import { getGrowiVersion } from '~/utils/growi-version';
 
@@ -59,12 +63,9 @@ const router = express.Router();
  *            type: object
  *            description: installed plugins
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
-  const loginRequiredStrictly = require('../../middlewares/login-required')(
-    crowi,
-  );
-  const adminRequired = require('../../middlewares/admin-required')(crowi);
+module.exports = (crowi: Crowi) => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
 
   /**
    * @swagger
@@ -91,13 +92,13 @@ module.exports = (crowi) => {
     accessTokenParser([SCOPE.READ.ADMIN.TOP]),
     loginRequiredStrictly,
     adminRequired,
-    async (req, res) => {
+    async (_req, res) => {
       const { getRuntimeVersions } = await import(
         '~/server/util/runtime-versions'
       );
       const runtimeVersions = await getRuntimeVersions();
 
-      const adminHomeParams = {
+      const adminHomeParams: IResAdminHome = {
         growiVersion: getGrowiVersion(),
         nodeVersion: runtimeVersions.node ?? '-',
         npmVersion: runtimeVersions.npm ?? '-',

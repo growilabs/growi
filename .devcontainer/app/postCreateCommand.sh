@@ -27,3 +27,6 @@ pnpm install @anthropic-ai/claude-code --global
 
 # Install dependencies
 turbo run bootstrap
+
+# Install Lefthook git hooks
+pnpm lefthook install

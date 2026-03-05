@@ -22,10 +22,9 @@ class CheckPageBulkExportJobInProgressCronService extends CronService {
   }
 
   override async executeJob(): Promise<void> {
-    // TODO: remove growiCloudUri condition when bulk export can be relased for GROWI.cloud (https://redmine.weseek.co.jp/issues/163220)
-    const isBulkExportPagesEnabled =
-      configManager.getConfig('app:isBulkExportPagesEnabled') &&
-      configManager.getConfig('app:growiCloudUri') == null;
+    const isBulkExportPagesEnabled = configManager.getConfig(
+      'app:isBulkExportPagesEnabled',
+    );
     if (!isBulkExportPagesEnabled) return;
 
     const pageBulkExportJobInProgress = await PageBulkExportJob.findOne({

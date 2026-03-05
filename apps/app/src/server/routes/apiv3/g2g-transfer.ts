@@ -1,14 +1,16 @@
+import { createReadStream } from 'node:fs';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { NextFunction, Request, Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
-import { createReadStream } from 'fs';
 import multer from 'multer';
-import path from 'path';
+import path from 'pathe';
 
 import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { isG2GTransferError } from '~/server/models/vo/g2g-transfer-error';
 import { configManager } from '~/server/service/config-manager';
 import { exportService } from '~/server/service/export';
@@ -22,6 +24,7 @@ import { TransferKey } from '~/utils/vo/transfer-key';
 import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import { Attachment } from '../../models/attachment';
+import { isPathWithinBase } from '../../util/safe-path-utils';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 interface AuthorizedRequest extends Request {
@@ -130,10 +133,8 @@ module.exports = (crowi: Crowi): Router => {
 
   const isInstalled = configManager.getConfig('app:installed');
 
-  const adminRequired = require('../../middlewares/admin-required')(crowi);
-  const loginRequiredStrictly = require('../../middlewares/login-required')(
-    crowi,
-  );
+  const adminRequired = adminRequiredFactory(crowi);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   // Middleware
   const adminRequiredIfInstalled = (
@@ -511,7 +512,31 @@ module.exports = (crowi: Crowi): Router => {
         );
       }
 
-      const fileStream = createReadStream(file.path, {
+      // Validate file path to prevent path traversal attack
+      const importService = getImportService();
+      if (importService == null) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'Import service is not available.',
+            'service_unavailable',
+          ),
+          500,
+        );
+      }
+      // Normalize the path to prevent path traversal attacks
+      const resolvedFilePath = path.resolve(file.path);
+      if (!isPathWithinBase(resolvedFilePath, importService.baseDir)) {
+        logger.error('Path traversal attack detected', {
+          filePath: resolvedFilePath,
+          baseDir: importService.baseDir,
+        });
+        return res.apiv3Err(
+          new ErrorV3('Invalid file path.', 'invalid_path'),
+          400,
+        );
+      }
+
+      const fileStream = createReadStream(resolvedFilePath, {
         flags: 'r',
         mode: 0o666,
         autoClose: true,

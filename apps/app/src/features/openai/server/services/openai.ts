@@ -1,4 +1,7 @@
 import assert from 'node:assert';
+import fs from 'node:fs';
+import { Readable, Transform, Writable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import type { IPage, IUser, Lang, Nullable, Ref } from '@growi/core';
 import {
   getIdForRef,
@@ -10,13 +13,11 @@ import {
 import { deepEquals } from '@growi/core/dist/utils';
 import { isGlobPatternPath } from '@growi/core/dist/utils/page-path-utils';
 import escapeStringRegexp from 'escape-string-regexp';
-import fs from 'fs';
 import createError from 'http-errors';
 import mongoose, { type HydratedDocument, type Types } from 'mongoose';
-import { type OpenAI, toFile } from 'openai';
+import type { OpenAI } from 'openai';
+import { toFile } from 'openai';
 import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
-import { Readable, Transform, Writable } from 'stream';
-import { pipeline } from 'stream/promises';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import ThreadRelationModel, {
@@ -97,6 +98,7 @@ export interface IOpenaiService {
   ): Promise<ThreadRelationDocument>;
   getThreadsByAiAssistantId(
     aiAssistantId: string,
+    userId?: string,
   ): Promise<ThreadRelationDocument[]>;
   deleteThread(threadRelationId: string): Promise<ThreadRelationDocument>;
   deleteExpiredThreads(limit: number, apiCallInterval: number): Promise<void>; // for CronJob
@@ -289,12 +291,21 @@ class OpenaiService implements IOpenaiService {
 
   async getThreadsByAiAssistantId(
     aiAssistantId: string,
+    userId?: string,
     type: ThreadType = ThreadType.KNOWLEDGE,
   ): Promise<ThreadRelationDocument[]> {
-    const threadRelations = await ThreadRelationModel.find({
+    const query: { aiAssistant: string; type: ThreadType; userId?: string } = {
       aiAssistant: aiAssistantId,
       type,
-    }).sort({ updatedAt: -1 });
+    };
+
+    if (userId != null) {
+      query.userId = userId;
+    }
+
+    const threadRelations = await ThreadRelationModel.find(query).sort({
+      updatedAt: -1,
+    });
     return threadRelations;
   }
 

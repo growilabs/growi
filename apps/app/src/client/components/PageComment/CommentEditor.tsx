@@ -1,83 +1,90 @@
-import type { ReactNode, JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 import React, {
-  useCallback, useState, useEffect, useLayoutEffect,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
   useMemo,
+  useState,
 } from 'react';
-
+import dynamic from 'next/dynamic';
 import { GlobalCodeMirrorEditorKey, useSetResolvedTheme } from '@growi/editor';
 import { CodeMirrorEditorComment } from '@growi/editor/dist/client/components/CodeMirrorEditorComment';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
-import dynamic from 'next/dynamic';
-import {
-  TabContent, TabPane,
-} from 'reactstrap';
-
+import { TabContent, TabPane } from 'reactstrap';
 
 import { uploadAttachments } from '~/client/services/upload-attachments';
 import { toastError } from '~/client/util/toastr';
 import { useCurrentUser } from '~/states/global';
 import { useCurrentPagePath } from '~/states/page';
-import { isSlackConfiguredAtom, useAcceptedUploadFileType } from '~/states/server-configurations';
+import {
+  isSlackConfiguredAtom,
+  useAcceptedUploadFileType,
+} from '~/states/server-configurations';
 import { useIsSlackEnabled } from '~/states/ui/editor';
 import { useCommentEditorsDirtyMap } from '~/states/ui/unsaved-warning';
-import { useNextThemes } from '~/stores-universal/use-next-themes';
 import { useSWRxPageComment } from '~/stores/comment';
-import { useSWRxSlackChannels, useEditorSettings } from '~/stores/editor';
+import { useEditorSettings, useSWRxSlackChannels } from '~/stores/editor';
+import { useNextThemes } from '~/stores-universal/use-next-themes';
 import loggerFactory from '~/utils/logger';
 
 import { NotAvailableForGuest } from '../NotAvailableForGuest';
 import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '../NotAvailableForReadOnlyUser';
-
 import { CommentPreview } from './CommentPreview';
 import { SwitchingButtonGroup } from './SwitchingButtonGroup';
 
-
 import '@growi/editor/dist/style.css';
-import styles from './CommentEditor.module.scss';
 
+import styles from './CommentEditor.module.scss';
 
 const logger = loggerFactory('growi:components:CommentEditor');
 
+const SlackNotification = dynamic(
+  () => import('../SlackNotification').then((mod) => mod.SlackNotification),
+  { ssr: false },
+);
 
-const SlackNotification = dynamic(() => import('../SlackNotification').then(mod => mod.SlackNotification), { ssr: false });
-
-
-const CommentEditorLayout = ({ children }: { children: ReactNode }): JSX.Element => {
+const CommentEditorLayout = ({
+  children,
+}: {
+  children: ReactNode;
+}): JSX.Element => {
   return (
     <div className={`${styles['comment-editor-styles']} form`}>
       <div className="comment-form">
-        <div className="bg-comment rounded">
-          {children}
-        </div>
+        <div className="bg-comment rounded">{children}</div>
       </div>
     </div>
   );
 };
 
-
 type CommentEditorProps = {
-  pageId: string,
-  replyTo?: string,
-  revisionId: string,
-  currentCommentId?: string,
-  commentBody?: string,
-  onCanceled?: () => void,
-  onCommented?: () => void,
-}
+  pageId: string;
+  replyTo?: string;
+  revisionId: string;
+  currentCommentId?: string;
+  commentBody?: string;
+  onCanceled?: () => void;
+  onCommented?: () => void;
+};
 
 export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
-
   const {
-    pageId, replyTo, revisionId,
-    currentCommentId, commentBody, onCanceled, onCommented,
+    pageId,
+    replyTo,
+    revisionId,
+    currentCommentId,
+    commentBody,
+    onCanceled,
+    onCommented,
   } = props;
 
   const currentUser = useCurrentUser();
   const currentPagePath = useCurrentPagePath();
-  const { update: updateComment, post: postComment } = useSWRxPageComment(pageId);
+  const { update: updateComment, post: postComment } =
+    useSWRxPageComment(pageId);
   const [isSlackEnabled, setIsSlackEnabled] = useIsSlackEnabled();
   const acceptedUploadFileType = useAcceptedUploadFileType();
   const { data: slackChannelsData } = useSWRxSlackChannels(currentPagePath);
@@ -139,7 +146,6 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
     setError(undefined);
 
     initializeSlackEnabled();
-
   }, [editorKey, markClean, initializeSlackEnabled]);
 
   const cancelButtonClickedHandler = useCallback(() => {
@@ -154,8 +160,7 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
       if (currentCommentId != null) {
         // update current comment
         await updateComment(commentBodyToPost, revisionId, currentCommentId);
-      }
-      else {
+      } else {
         // post new comment
         const postCommentArgs = {
           commentForm: {
@@ -177,39 +182,54 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
 
       // Insert empty string as new comment editor is opened after comment
       codeMirrorEditor?.initDoc('');
-    }
-    catch (err) {
-      const errorMessage = err.message || 'An unknown error occured when posting comment';
+    } catch (err) {
+      const errorMessage =
+        err.message || 'An unknown error occured when posting comment';
       setError(errorMessage);
     }
-    // eslint-disable-next-line max-len
-  }, [currentCommentId, initializeEditor, onCommented, codeMirrorEditor, updateComment, revisionId, replyTo, isSlackEnabled, slackChannels, postComment]);
+  }, [
+    currentCommentId,
+    initializeEditor,
+    onCommented,
+    codeMirrorEditor,
+    updateComment,
+    revisionId,
+    replyTo,
+    isSlackEnabled,
+    slackChannels,
+    postComment,
+  ]);
 
   // the upload event handler
-  const uploadHandler = useCallback((files: File[]) => {
-    uploadAttachments(pageId, files, {
-      onUploaded: (attachment) => {
-        const fileName = attachment.originalName;
+  const uploadHandler = useCallback(
+    (files: File[]) => {
+      uploadAttachments(pageId, files, {
+        onUploaded: (attachment) => {
+          const fileName = attachment.originalName;
 
-        const prefix = attachment.fileFormat.startsWith('image/')
-          ? '!' // use "![fileName](url)" syntax when image
-          : '';
-        const insertText = `${prefix}[${fileName}](${attachment.filePathProxied})\n`;
+          const prefix = attachment.fileFormat.startsWith('image/')
+            ? '!' // use "![fileName](url)" syntax when image
+            : '';
+          const insertText = `${prefix}[${fileName}](${attachment.filePathProxied})\n`;
 
-        codeMirrorEditor?.insertText(insertText);
-      },
-      onError: (error) => {
-        toastError(error);
-      },
-    });
-  }, [codeMirrorEditor, pageId]);
-
-  const cmProps = useMemo(() => ({
-    onChange: (value: string) => {
-      markDirty(editorKey, value);
+          codeMirrorEditor?.insertText(insertText);
+        },
+        onError: (error) => {
+          toastError(error);
+        },
+      });
     },
-  }), [editorKey, markDirty]);
+    [codeMirrorEditor, pageId],
+  );
 
+  const cmProps = useMemo(
+    () => ({
+      onChange: (value: string) => {
+        markDirty(editorKey, value);
+      },
+    }),
+    [editorKey, markDirty],
+  );
 
   // initialize CodeMirrorEditor
   useEffect(() => {
@@ -225,16 +245,22 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
     codeMirrorEditor?.focus();
   }, [codeMirrorEditor, showPreview]);
 
-  const errorMessage = useMemo(() => <span className="text-danger text-end me-2">{error}</span>, [error]);
-  const cancelButton = useMemo(() => (
-    <button
-      type="button"
-      className="btn btn-outline-neutral-secondary"
-      onClick={cancelButtonClickedHandler}
-    >
-      {t('Cancel')}
-    </button>
-  ), [cancelButtonClickedHandler, t]);
+  const errorMessage = useMemo(
+    () => <span className="text-danger text-end me-2">{error}</span>,
+    [error],
+  );
+  const cancelButton = useMemo(
+    () => (
+      <button
+        type="button"
+        className="btn btn-outline-neutral-secondary"
+        onClick={cancelButtonClickedHandler}
+      >
+        {t('Cancel')}
+      </button>
+    ),
+    [cancelButtonClickedHandler, t],
+  );
   const submitButton = useMemo(() => {
     return (
       <button
@@ -256,9 +282,14 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
             <UserPicture user={currentUser} noLink noTooltip />
             <p className="ms-2 mb-0">{t('page_comment.add_a_comment')}</p>
           </div>
-          <SwitchingButtonGroup showPreview={showPreview} onSelected={handleSelect} />
+          <SwitchingButtonGroup
+            showPreview={showPreview}
+            onSelected={handleSelect}
+          />
         </div>
-        <TabContent activeTab={showPreview ? 'comment_preview' : 'comment_editor'}>
+        <TabContent
+          activeTab={showPreview ? 'comment_preview' : 'comment_editor'}
+        >
           <TabPane tabId="comment_editor">
             <CodeMirrorEditorComment
               editorKey={editorKey}
@@ -271,7 +302,9 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
           </TabPane>
           <TabPane tabId="comment_preview">
             <div className="comment-preview-container">
-              <CommentPreview markdown={codeMirrorEditor?.getDocString() ?? ''} />
+              <CommentPreview
+                markdown={codeMirrorEditor?.getDocString() ?? ''}
+              />
             </div>
           </TabPane>
         </TabContent>
@@ -280,40 +313,39 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
       <div className="comment-submit px-4 pb-3 mb-2">
         <div className="d-flex">
           <span className="flex-grow-1" />
-          <span className="d-none d-sm-inline">{errorMessage && errorMessage}</span>
+          <span className="d-none d-sm-inline">
+            {errorMessage && errorMessage}
+          </span>
 
-          {isSlackConfigured && isSlackEnabled != null
-            && (
-              <div className="align-self-center me-md-3">
-                <SlackNotification
-                  isSlackEnabled={isSlackEnabled}
-                  slackChannels={slackChannels}
-                  onEnabledFlagChange={isSlackEnabledToggleHandler}
-                  onChannelChange={slackChannelsChangedHandler}
-                  id="idForComment"
-                />
-              </div>
-            )
-          }
+          {isSlackConfigured && isSlackEnabled != null && (
+            <div className="align-self-center me-md-3">
+              <SlackNotification
+                isSlackEnabled={isSlackEnabled}
+                slackChannels={slackChannels}
+                onEnabledFlagChange={isSlackEnabledToggleHandler}
+                onChannelChange={slackChannelsChangedHandler}
+                id="idForComment"
+              />
+            </div>
+          )}
           <div className="d-none d-sm-block">
-            <span className="me-2">{cancelButton}</span><span>{submitButton}</span>
+            <span className="me-2">{cancelButton}</span>
+            <span>{submitButton}</span>
           </div>
         </div>
         <div className="d-block d-sm-none mt-2">
           <div className="d-flex justify-content-end">
             {error && errorMessage}
-            <span className="me-2">{cancelButton}</span><span>{submitButton}</span>
+            <span className="me-2">{cancelButton}</span>
+            <span>{submitButton}</span>
           </div>
         </div>
       </div>
     </CommentEditorLayout>
   );
-
 };
 
-
 export const CommentEditorPre = (props: CommentEditorProps): JSX.Element => {
-
   const { onCommented, onCanceled, ...rest } = props;
 
   const currentUser = useCurrentUser();
@@ -338,8 +370,15 @@ export const CommentEditorPre = (props: CommentEditorProps): JSX.Element => {
               onClick={() => setIsReadyToUse(true)}
               data-testid="open-comment-editor-button"
             >
-              <UserPicture user={currentUser} noLink noTooltip className="me-3" />
-              <span className="material-symbols-outlined me-1 fs-5">add_comment</span>
+              <UserPicture
+                user={currentUser}
+                noLink
+                noTooltip
+                className="me-3"
+              />
+              <span className="material-symbols-outlined me-1 fs-5">
+                add_comment
+              </span>
               <small>{t('page_comment.add_a_comment')}...</small>
             </button>
           </NotAvailableIfReadOnlyUserNotAllowedToComment>
@@ -348,19 +387,19 @@ export const CommentEditorPre = (props: CommentEditorProps): JSX.Element => {
     );
   }, [currentUser, t]);
 
-  return isReadyToUse
-    ? (
-      <CommentEditor
-        onCommented={() => {
-          onCommented?.();
-          setIsReadyToUse(false);
-        }}
-        onCanceled={() => {
-          onCanceled?.();
-          setIsReadyToUse(false);
-        }}
-        {...rest}
-      />
-    )
-    : render();
+  return isReadyToUse ? (
+    <CommentEditor
+      onCommented={() => {
+        onCommented?.();
+        setIsReadyToUse(false);
+      }}
+      onCanceled={() => {
+        onCanceled?.();
+        setIsReadyToUse(false);
+      }}
+      {...rest}
+    />
+  ) : (
+    render()
+  );
 };

@@ -29,11 +29,8 @@ type SelectValue = {
 };
 
 type SendCommandBody = {
-  // eslint-disable-next-line camelcase
   trigger_id: string;
-  // eslint-disable-next-line camelcase
   channel_id: string;
-  // eslint-disable-next-line camelcase
   channel_name: string;
 };
 
@@ -123,7 +120,6 @@ export class SelectGrowiService
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleInteraction(
     interactionPayloadAccessor: InteractionPayloadAccessor,
   ): boolean {
@@ -135,7 +131,6 @@ export class SelectGrowiService
   }
 
   async processInteraction(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     authorizeResult: AuthorizeResult,
     interactionPayload: any,
     interactionPayloadAccessor: InteractionPayloadAccessor,
@@ -160,9 +155,7 @@ export class SelectGrowiService
     return interactionHandledResult as InteractionHandledResult<SelectedGrowiInformation>;
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   async handleSelectInteraction(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     authorizeResult: AuthorizeResult,
     interactionPayload: any,
     interactionPayloadAccessor: InteractionPayloadAccessor,
@@ -214,9 +207,9 @@ export class SelectGrowiService
       authorizeResult.enterpriseId || authorizeResult.teamId;
     let installation: Installation | undefined;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       installation =
         await this.installationRepository.findByTeamIdOrEnterpriseId(
+          // biome-ignore lint/style/noNonNullAssertion: installationId must be set --- IGNORE ---
           installationId!,
         );
     } catch (err) {
