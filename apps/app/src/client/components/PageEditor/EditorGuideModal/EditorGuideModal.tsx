@@ -1,5 +1,5 @@
 import {
-  useState, useEffect, useLayoutEffect, type JSX, type RefObject, useMemo,
+  type JSX, type RefObject, useEffect, useLayoutEffect, useMemo, useState
 } from 'react';
 
 
@@ -37,22 +37,23 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   const [activeTab, setActiveTab] = useState<TabType>('textstyle');
-  const navTabMapping = useMemo((): Record<TabType, { i18n: string, Content: () => JSX.Element }> => {
+  const navTabMapping = useMemo(() => {
     return {
       textstyle: {
         i18n: t('editor_guide.tabs.textstyle'),
-        Content: () => <TextStyleTab />,
+        Content: TextStyleTab,
       },
       layout: {
         i18n: t('editor_guide.tabs.layout'),
-        Content: () => <LayoutTab />,
+        Content: LayoutTab,
       },
       decoration: {
         i18n: t('editor_guide.tabs.decoration'),
-        Content: () => <DecorationTab />,
+        Content: DecorationTab,
       },
     };
   }, [t]);
+
 
   // Get rect on open and on resize
   useLayoutEffect(() => {

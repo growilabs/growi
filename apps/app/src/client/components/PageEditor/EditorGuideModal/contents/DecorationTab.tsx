@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
-
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 
 interface LayoutGuideItem {
   id: string;
@@ -22,7 +22,7 @@ const GuideRow = ({
   const { t } = useTranslation();
   const handleCopy = async () => {
     await navigator.clipboard.writeText(code);
-    alert(t('editor_guide.textstyle.copy_done'));
+    toast.success(t('editor_guide.textstyle.copy_done'));
   };
 
   const isFullWidth = minWidth === '100%' || !preview;
@@ -35,15 +35,17 @@ const GuideRow = ({
         </h3>
       )}
       <div className="d-flex flex-row flex-wrap align-items-center gap-4 py-1">
-        <div
+        <button
+          type="button"
           onClick={handleCopy}
+          className="flex-grow-0 flex-shrink-0 border-0 p-0 bg-transparent text-start"
           style={{
             cursor: 'pointer',
             flex: isFullWidth ? '1 0 100%' : '0 0 auto',
             width: isFullWidth ? '100%' : 'fit-content',
             minWidth: isFullWidth ? '100%' : minWidth,
+            display: 'block',
           }}
-          className="flex-grow-0 flex-shrink-0"
         >
           <div
             className={`text-light p-2 ps-3 pe-5 rounded position-relative ${isFullWidth ? 'w-100' : ''}`}
@@ -67,7 +69,7 @@ const GuideRow = ({
               Click
             </small>
           </div>
-        </div>
+        </button>
 
         {preview && (
           <div
@@ -109,7 +111,7 @@ export const DecorationTab: React.FC = () => {
       alertText: isPrimary ? t(`${i18nKey}.important_text`) : t(`${i18nKey}.caution_text`),
       icon: isPrimary ? 'bi-chat-left-text' : 'bi-exclamation-circle',
     };
-  }, [currentStyle, t, i18nKey]);
+  }, [currentStyle, t]);
 
   const LAYOUT_GUIDES: LayoutGuideItem[] = useMemo(() => [
     {
@@ -161,7 +163,7 @@ export const DecorationTab: React.FC = () => {
       code: `<div class="alert alert-${styleConfig.colorName}" role="alert">\n  ${t(`${i18nKey}.placeholder`)}\n</div>`,
       underContent: <div className={`alert alert-${styleConfig.colorName} m-0`}>{t(`${i18nKey}.placeholder`)}</div>,
     },
-  ], [styleConfig, t, i18nKey]);
+  ], [styleConfig, t]);
 
   return (
     <div
