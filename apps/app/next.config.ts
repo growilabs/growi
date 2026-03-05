@@ -145,7 +145,6 @@ export default (phase: string): NextConfig => {
         // Exclude server-only packages from client bundle
         'dtrace-provider': { browser: './src/lib/empty-module.ts' },
         mongoose: { browser: './src/lib/empty-module.ts' },
-        'mathjax-full': { browser: './src/lib/empty-module.ts' },
         'i18next-fs-backend': { browser: './src/lib/empty-module.ts' },
         bunyan: { browser: './src/lib/empty-module.ts' },
         'bunyan-format': { browser: './src/lib/empty-module.ts' },
@@ -172,7 +171,6 @@ export default (phase: string): NextConfig => {
           ...[
             /dtrace-provider/,
             /mongoose/,
-            /mathjax-full/, // required from marp
             /i18next-fs-backend/, // server-only filesystem translation backend (leaks via next-i18next)
             /\/bunyan\//, // server-only logging (client uses browser-bunyan via universal-bunyan)
             /bunyan-format/, // server-only log formatter (client uses @browser-bunyan/console-formatted-stream)

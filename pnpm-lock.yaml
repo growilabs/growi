@@ -9,6 +9,11 @@ overrides:
   '@lykmapipo/common>mime': 3.0.0
   '@lykmapipo/common>parse-json': 5.2.0
 
+patchedDependencies:
+  '@marp-team/marp-core':
+    hash: 9339c96cb1f7b7d331a5faf3719935af8d4f5415f1f8b88ee73aad42627c5dd4
+    path: packages/presentation/patches/@marp-team__marp-core.patch
+
 importers:
 
   .:
@@ -1425,7 +1430,7 @@ importers:
     devDependencies:
       '@marp-team/marp-core':
         specifier: ^3.9.1
-        version: 3.9.1
+        version: 3.9.1(patch_hash=9339c96cb1f7b7d331a5faf3719935af8d4f5415f1f8b88ee73aad42627c5dd4)
       '@marp-team/marpit':
         specifier: ^2.6.1
         version: 2.6.1
@@ -17255,7 +17260,7 @@ snapshots:
 
   '@marijn/find-cluster-break@1.0.2': {}
 
-  '@marp-team/marp-core@3.9.1':
+  '@marp-team/marp-core@3.9.1(patch_hash=9339c96cb1f7b7d331a5faf3719935af8d4f5415f1f8b88ee73aad42627c5dd4)':
     dependencies:
       '@marp-team/marpit': 2.6.1
       '@marp-team/marpit-svg-polyfill': 2.1.0(@marp-team/marpit@2.6.1)
