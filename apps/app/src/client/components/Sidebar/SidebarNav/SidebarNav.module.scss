@@ -1,11 +1,11 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 @use 'styles/variables' as var;
 
-.grw-sidebar-nav :global {
+.grw-sidebar-nav {
   width: var.$grw-sidebar-nav-width;
   border-right : 1px solid var(--bs-border-color);
 
-  .grw-sidebar-nav-secondary-container {
+  :global(.grw-sidebar-nav-secondary-container) {
     position: fixed;
     bottom: 1.5rem;
   }
@@ -14,13 +14,13 @@
 
 // == Colors
 @include bs.color-mode(light) {
-  .grw-sidebar-nav :global {
+  .grw-sidebar-nav {
     background-color: var(--grw-sidebar-nav-bg, var(--grw-highlight-100));
   }
 }
 
 @include bs.color-mode(dark) {
-  .grw-sidebar-nav :global {
+  .grw-sidebar-nav {
     background-color: var(--grw-sidebar-nav-bg, var(--grw-highlight-800));
   }
 }

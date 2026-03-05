@@ -3,7 +3,8 @@ import { forwardRef, useCallback } from 'react';
 import { addDays } from 'date-fns/addDays';
 import { format } from 'date-fns/format';
 import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+
+import './DateRangePicker.vendor-styles.prebuilt';
 
 type CustomInputProps = {
   value?: string;

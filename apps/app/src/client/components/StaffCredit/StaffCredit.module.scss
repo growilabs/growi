@@ -1,5 +1,5 @@
 // Staff Credit
-.staff-credit :global {
+.staff-credit {
   // attached !important for updating from .modal-dialog class style
   width: 80vw !important;
   max-width: unset !important;
@@ -8,14 +8,14 @@
   margin: 10vh 10vw !important;
 
   // see https://css-tricks.com/old-timey-terminal-styling/
-  .credit-curtain {
+  :global(.credit-curtain) {
     padding-top: 80vh;
     text-shadow: 0 0 10px #c8c8c8;
     background-color: black;
     background-image: radial-gradient(rgba(50, 100, 100, 75%), black 120%);
   }
 
-  .background {
+  :global(.background) {
     position: absolute;
     top: 0;
     left: 0;
@@ -25,44 +25,44 @@
     background: repeating-linear-gradient(0deg, rgba(black, 0.15), rgba(black, 0.15) 2px, transparent 2px, transparent 4px);
   }
 
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6,
-  .dev-position,
-  .dev-name {
+  :global(h1),
+  :global(h2),
+  :global(h3),
+  :global(h4),
+  :global(h5),
+  :global(h6),
+  :global(.dev-position),
+  :global(.dev-name) {
     color: white;
   }
 
   $credit-length: -240em;
 
-  h1 {
+  :global(h1) {
     font-size: 3em;
   }
 
-  h2 {
+  :global(h2) {
     font-size: 2.2em;
   }
 
-  .dev-position {
+  :global(.dev-position) {
     font-size: 1em;
   }
 
-  .dev-name {
+  :global(.dev-name) {
     font-size: 1.8em;
   }
 
-  .staff-credit-mt-10rem {
+  :global(.staff-credit-mt-10rem) {
     margin-top: 10rem;
   }
 
-  .staff-credit-mb-6rem {
+  :global(.staff-credit-mb-6rem) {
     margin-bottom: 6rem;
   }
 
-  .staff-credit-content {
+  :global(.staff-credit-content) {
     padding-bottom: 40vh;
   }
 }

@@ -558,9 +558,7 @@ class Crowi {
     // Next.js's next.config.ts transpiler registers/deregisters its own require hooks,
     // and deregisterHook() deletes require.extensions['.ts'] instead of restoring the previous hook.
     const savedTsHook = require.extensions['.ts'];
-    // Use webpack: true to opt out of Turbopack (default in Next.js 16+)
-    // so that all custom webpack loaders/plugins in next.config.ts remain active
-    this.nextApp = next({ dev, webpack: true });
+    this.nextApp = next({ dev });
     await this.nextApp.prepare();
     // Restore ts-node's .ts hook if Next.js removed it
     if (savedTsHook && !require.extensions['.ts']) {
@@ -637,7 +635,12 @@ class Crowi {
     // use morgan
     else {
       const morgan = require('morgan');
-      express.use(morgan('dev'));
+      express.use(
+        morgan('dev', {
+          // supress logging for Next.js static files
+          skip: (req) => req.url?.startsWith('/_next/static/'),
+        }),
+      );
     }
 
     this.express = express;

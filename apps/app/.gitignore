@@ -1,6 +1,7 @@
 # next.js
 /.next/
 /out/
+next-env.d.ts
 
 # test
 .reg
@@ -9,10 +10,12 @@
 /build/
 /dist/
 /transpiled/
+/public/static/fonts
 /public/static/js
 /public/static/styles
 /public/uploads
 /src/styles/prebuilt
+/src/**/*.vendor-styles.prebuilt.js
 /tmp/
 
 # cache

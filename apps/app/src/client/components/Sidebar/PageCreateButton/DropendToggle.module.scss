@@ -1,13 +1,13 @@
 @use 'styles/variables' as var;
 @use '../button-styles';
 
-.btn-toggle :global {
+.btn-toggle {
   @extend %btn-basis;
 
   left: 12px;
   padding: 0;
 
-  .icon {
+  :global(.icon) {
     top: 50%;
     right: 0;
     font-size: 22px;
@@ -17,7 +17,7 @@
 
 // no caret
 .btn-toggle {
-  &:global {
+  & {
     // no caret
     &::after {
       display: none !important;
@@ -26,8 +26,8 @@
 }
 
 // hitarea
-.btn-toggle :global {
-  .hitarea {
+.btn-toggle {
+  :global(.hitarea) {
     inset: 0 -10px 0 0;
   }
 }
@@ -37,20 +37,20 @@
   background-color: transparent !important;
 }
 
-.btn-toggle :global {
-  svg {
+.btn-toggle {
+  :global(svg) {
     fill: var(--grw-primary-400);
   }
 }
 
-.btn-toggle:hover :global {
-  svg {
+.btn-toggle:hover {
+  :global(svg) {
     fill: var(--grw-primary-400);
   }
 }
 
-.btn-toggle:active :global {
-  svg {
+.btn-toggle:active {
+  :global(svg) {
     fill: var(--grw-primary-600);
   }
 }

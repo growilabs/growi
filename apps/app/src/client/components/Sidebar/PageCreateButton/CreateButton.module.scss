@@ -1,11 +1,11 @@
 @use 'styles/variables' as var;
 @use '../button-styles';
 
-.btn-create :global {
+.btn-create {
   @extend %btn-basis;
 
   // centering
-  .icon {
+  :global(.icon) {
     top: 50%;
     left: 50%;
     transform: translateX(-50%) translateY(-50%);
@@ -13,10 +13,10 @@
 }
 
 // pointer-events
-.btn-create :global {
+.btn-create {
   pointer-events: none;
 
-  svg .background {
+  :global(svg .background) {
     pointer-events: fill;
   }
 }
@@ -26,20 +26,20 @@
   background-color: transparent !important;
 }
 
-.btn-create :global {
-  svg {
+.btn-create {
+  :global(svg) {
     fill: var(--bs-btn-bg);
   }
 }
 
-.btn-create:hover :global {
-  svg {
+.btn-create:hover {
+  :global(svg) {
     fill: var(--bs-btn-hover-bg);
   }
 }
 
-.btn-create:active :global {
-  svg {
+.btn-create:active {
+  :global(svg) {
     fill: var(--bs-btn-active-bg);
   }
 }

@@ -1,11 +1,11 @@
 @use 'styles/mixins';
 
 /* stylelint-disable-next-line block-no-empty */
-.search-result-content :global {
+.search-result-content {
 }
 
-.fluid-layout :global {
-  .grw-container-convertible {
+.fluid-layout {
+  :global(.grw-container-convertible) {
     @include mixins.fluid-layout();
   }
 }

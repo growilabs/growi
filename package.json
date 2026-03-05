@@ -114,7 +114,13 @@
     ],
     "onlyBuiltDependencies": [
       "lefthook"
-    ]
+    ],
+    "// comments for patchedDependencies": {
+      "@marp-team/marp-core": "The patch excludes mathjax-full from the dependency graph of Marp Core."
+    },
+    "patchedDependencies": {
+      "@marp-team/marp-core": "packages/presentation/patches/@marp-team__marp-core.patch"
+    }
   },
   "engines": {
     "node": "^24"
