@@ -282,10 +282,17 @@ class AwsFileUploader extends AbstractFileUploader {
         `File upload completed successfully: fileName=${attachment.fileName}`,
       );
     } catch (error) {
-      logger.error(
-        `File upload failed: fileName=${attachment.fileName}`,
-        error,
-      );
+      // Handle timeout error specifically
+      if (error.name === 'AbortError') {
+        logger.warn(`Upload timeout: fileName=${attachment.fileName}`, error);
+      } else {
+        logger.error(
+          `File upload failed: fileName=${attachment.fileName}`,
+          error,
+        );
+      }
+      // Re-throw the error to be handled by the caller.
+      // The pipeline automatically handles stream cleanup on error.
       throw error;
     } finally {
       clearTimeout(timeoutId);
