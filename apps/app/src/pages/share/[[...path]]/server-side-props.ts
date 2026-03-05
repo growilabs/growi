@@ -1,11 +1,17 @@
 import type { GetServerSidePropsContext, GetServerSidePropsResult } from 'next';
 
 import {
+  SupportedAction,
+  type SupportedActionType,
+} from '~/interfaces/activity';
+import type { IShareLinkHasId } from '~/interfaces/share-link';
+
+import {
+  getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
 } from '../../common-props';
 import {
-  getActivityAction,
   getServerSideGeneralPageProps,
   getServerSideRendererConfigProps,
   isValidGeneralPageInitialProps,
@@ -23,16 +29,33 @@ const basisProps = {
   },
 };
 
+function getActivityAction(props: {
+  isExpired: boolean | undefined;
+  shareLink: IShareLinkHasId | undefined;
+}): SupportedActionType {
+  if (props.isExpired) {
+    return SupportedAction.ACTION_SHARE_LINK_EXPIRED_PAGE_VIEW;
+  }
+
+  if (props.shareLink == null) {
+    return SupportedAction.ACTION_SHARE_LINK_NOT_FOUND;
+  }
+
+  return SupportedAction.ACTION_SHARE_LINK_PAGE_VIEW;
+}
+
 export async function getServerSidePropsForInitial(
   context: GetServerSidePropsContext,
 ): Promise<GetServerSidePropsResult<Stage2InitialProps>> {
   const [
+    commonEachResult,
     commonInitialResult,
     generalPageResult,
     rendererConfigResult,
     i18nPropsResult,
     pageDataResult,
   ] = await Promise.all([
+    getServerSideCommonEachProps(context),
     getServerSideCommonInitialProps(context),
     getServerSideGeneralPageProps(context),
     getServerSideRendererConfigProps(context),
@@ -42,14 +65,17 @@ export async function getServerSidePropsForInitial(
 
   // Merge all results in a type-safe manner (using sequential merging)
   const mergedResult = mergeGetServerSidePropsResults(
-    commonInitialResult,
+    commonEachResult,
     mergeGetServerSidePropsResults(
-      generalPageResult,
+      commonInitialResult,
       mergeGetServerSidePropsResults(
-        rendererConfigResult,
+        generalPageResult,
         mergeGetServerSidePropsResults(
-          i18nPropsResult,
-          mergeGetServerSidePropsResults(pageDataResult, basisProps),
+          rendererConfigResult,
+          mergeGetServerSidePropsResults(
+            i18nPropsResult,
+            mergeGetServerSidePropsResults(pageDataResult, basisProps),
+          ),
         ),
       ),
     ),
@@ -67,6 +93,8 @@ export async function getServerSidePropsForInitial(
     throw new Error('Invalid merged props structure');
   }
 
-  await addActivity(context, getActivityAction(mergedProps));
+  // Persist activity
+  addActivity(context, getActivityAction(mergedProps));
+
   return mergedResult;
 }

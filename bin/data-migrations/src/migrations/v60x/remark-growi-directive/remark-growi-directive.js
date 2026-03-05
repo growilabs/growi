@@ -25,10 +25,15 @@ module.exports = [
         // 1. Previous line contains an HTML tag (ends with >)
         // 2. Previous line is not empty
         // 3. Previous line is not a directive line
-        const isPrevLineHtmlTag = prevLine.match(/>[^\n]*$/) && !prevLine.match(directivePattern);
+        const isPrevLineHtmlTag =
+          prevLine.match(/>[^\n]*$/) && !prevLine.match(directivePattern);
         const isNotAfterDirective = i - 1 !== lastDirectiveLineIndex;
 
-        if (isPrevLineHtmlTag && prevLine.trim() !== '' && isNotAfterDirective) {
+        if (
+          isPrevLineHtmlTag &&
+          prevLine.trim() !== '' &&
+          isNotAfterDirective
+        ) {
           lines.splice(i, 0, '');
           i++;
         }

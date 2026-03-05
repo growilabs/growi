@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react';
 import { LoadingSpinner } from '@growi/ui/dist/components';
+import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import {
   DropdownItem,
@@ -35,6 +36,7 @@ import type { PageMigrationErrorData } from '~/interfaces/websocket';
 import { SocketEventName } from '~/interfaces/websocket';
 import { useIsAdmin } from '~/states/context';
 import { useSearchKeyword, useSetSearchKeyword } from '~/states/search';
+import { disableUserPagesAtom } from '~/states/server-configurations';
 import { useGlobalSocket } from '~/states/socket-io';
 import type { ILegacyPrivatePage } from '~/states/ui/modal/private-legacy-pages-migration';
 import { usePrivateLegacyPagesMigrationModalActions } from '~/states/ui/modal/private-legacy-pages-migration';
@@ -268,6 +270,8 @@ const PrivateLegacyPages = (): JSX.Element => {
   const keyword = useSearchKeyword();
   const setSearchKeyword = useSetSearchKeyword('/_private-legacy-pages');
 
+  const disableUserPages = useAtomValue(disableUserPagesAtom);
+
   const [offset, setOffset] = useState<number>(0);
   const [limit, setLimit] = useState<number>(INITIAL_PAGING_SIZE);
   const [isOpenConvertModal, setOpenConvertModal] = useState<boolean>(false);
@@ -280,6 +284,11 @@ const PrivateLegacyPages = (): JSX.Element => {
   const searchPageBaseRef = useRef<
     (ISelectableAll & IReturnSelectedPageIds) | null
   >(null);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only run on mount
+  useEffect(() => {
+    setSearchKeyword(initQ);
+  }, []);
 
   const { data, conditions, mutate } = useSWRxSearch(
     keyword,
@@ -496,7 +505,6 @@ const PrivateLegacyPages = (): JSX.Element => {
         {isAdmin && renderOpenModalButton()}
       </div>
     );
-    // eslint-disable-next-line max-len
   }, [
     convertMenuItemClickedHandler,
     deleteAllButtonClickedHandler,
@@ -511,6 +519,7 @@ const PrivateLegacyPages = (): JSX.Element => {
   const searchControl = useMemo(() => {
     return (
       <SearchControl
+        disableUserPages={disableUserPages}
         isEnableSort={false}
         isEnableFilter={false}
         initialSearchConditions={{ keyword: initQ, limit: INITIAL_PAGING_SIZE }}
@@ -518,7 +527,7 @@ const PrivateLegacyPages = (): JSX.Element => {
         extraControls={extraControls}
       />
     );
-  }, [searchInvokedHandler, extraControls]);
+  }, [searchInvokedHandler, extraControls, disableUserPages]);
 
   const searchResultListHead = useMemo(() => {
     if (data == null) {

@@ -8,7 +8,7 @@ import { renameDuplicateRootPages } from './rename-duplicate-root-pages';
 
 const logger = loggerFactory('growi:service:NormalizeData');
 
-export const normalizeData = async(): Promise<void> => {
+export const normalizeData = async (): Promise<void> => {
   await renameDuplicateRootPages();
   await convertRevisionPageIdToObjectId();
   await normalizeExpiredAtForThreadRelations();

@@ -2,6 +2,7 @@ import { isIPageInfo } from '@growi/core/dist/interfaces';
 
 import loggerFactory from '~/utils/logger';
 
+import { NextjsRoutingType } from '../utils/nextjs-routing-utils';
 import type { GeneralPageInitialProps } from './types';
 
 const logger = loggerFactory('growi:pages:general-page:type-guards');
@@ -17,10 +18,10 @@ export function isValidGeneralPageInitialProps(
 
   // Then validate GeneralPageInitialProps-specific properties
   // CommonPageInitialProps
-  if (p.isNextjsRoutingTypeInitial !== true) {
+  if (p.nextjsRoutingType === NextjsRoutingType.SAME_ROUTE) {
     logger.warn(
-      'isValidGeneralPageInitialProps: isNextjsRoutingTypeInitial is not true',
-      { isNextjsRoutingTypeInitial: p.isNextjsRoutingTypeInitial },
+      'isValidGeneralPageInitialProps: nextjsRoutingType must be equal to NextjsRoutingType.INITIAL or NextjsRoutingType.FROM_OUTSIDE',
+      { nextjsRoutingType: p.nextjsRoutingType },
     );
     return false;
   }

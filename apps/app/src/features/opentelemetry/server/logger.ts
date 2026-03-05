@@ -29,7 +29,6 @@ class DiagLoggerBunyanAdapter implements DiagLogger {
 
     // merge additional data
     if (args.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const argsData = (args as any).reduce((acc, arg) => {
         if (typeof arg === 'string') {
           try {

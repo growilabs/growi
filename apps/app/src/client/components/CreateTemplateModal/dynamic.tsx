@@ -8,12 +8,21 @@ type CreateTemplateModalProps = {
   onClose: () => void;
 };
 
-export const CreateTemplateModalLazyLoaded = (props: CreateTemplateModalProps): JSX.Element => {
+export const CreateTemplateModalLazyLoaded = (
+  props: CreateTemplateModalProps,
+): JSX.Element => {
   const CreateTemplateModal = useLazyLoader<CreateTemplateModalProps>(
     'create-template-modal',
-    () => import('./CreateTemplateModal').then(mod => ({ default: mod.CreateTemplateModal })),
+    () =>
+      import('./CreateTemplateModal').then((mod) => ({
+        default: mod.CreateTemplateModal,
+      })),
     props.isOpen,
   );
 
-  return CreateTemplateModal != null ? <CreateTemplateModal {...props} /> : <></>;
+  return CreateTemplateModal != null ? (
+    <CreateTemplateModal {...props} />
+  ) : (
+    <></>
+  );
 };

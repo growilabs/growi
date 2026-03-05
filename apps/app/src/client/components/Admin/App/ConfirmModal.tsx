@@ -1,21 +1,20 @@
 import type { FC } from 'react';
 import React from 'react';
-
 import { useTranslation } from 'next-i18next';
-import {
-  Modal, ModalHeader, ModalBody, ModalFooter,
-} from 'reactstrap';
+import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 type ConfirmModalProps = {
-  isModalOpen: boolean
-  warningMessage: string
-  supplymentaryMessage: string | null
-  confirmButtonTitle: string
-  onConfirm?: () => Promise<void>
-  onCancel?: () => void
+  isModalOpen: boolean;
+  warningMessage: string;
+  supplymentaryMessage: string | null;
+  confirmButtonTitle: string;
+  onConfirm?: () => Promise<void>;
+  onCancel?: () => void;
 };
 
-export const ConfirmModal: FC<ConfirmModalProps> = (props: ConfirmModalProps) => {
+export const ConfirmModal: FC<ConfirmModalProps> = (
+  props: ConfirmModalProps,
+) => {
   const { t } = useTranslation();
 
   const onCancel = () => {
@@ -38,20 +37,18 @@ export const ConfirmModal: FC<ConfirmModalProps> = (props: ConfirmModalProps) =>
       </ModalHeader>
       <ModalBody>
         {props.warningMessage}
-        {
-          props.supplymentaryMessage != null && (
-            <>
-              <br />
-              <br />
-              <span className="text-warning">
-                <>
-                  <span className="material-symbols-outlined">error</span>
-                  {props.supplymentaryMessage}
-                </>
-              </span>
-            </>
-          )
-        }
+        {props.supplymentaryMessage != null && (
+          <>
+            <br />
+            <br />
+            <span className="text-warning">
+              <>
+                <span className="material-symbols-outlined">error</span>
+                {props.supplymentaryMessage}
+              </>
+            </span>
+          </>
+        )}
       </ModalBody>
       <ModalFooter>
         <button

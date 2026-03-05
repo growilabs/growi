@@ -1,0 +1,7 @@
+// Drag line indicator for drag and drop
+.tree-drag-line {
+  position: relative;
+  height: 3px;
+  pointer-events: none;
+  background-color: var(--bs-list-group-active-border-color);
+}

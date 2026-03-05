@@ -9,7 +9,6 @@ import { CONFIG_DEFINITIONS } from './config-definition';
 const logger = loggerFactory('growi:service:ConfigLoader');
 
 export class ConfigLoader implements IConfigLoader<ConfigKey, ConfigValues> {
-
   async loadFromEnv(): Promise<RawConfigData<ConfigKey, ConfigValues>> {
     const envConfig = {} as RawConfigData<ConfigKey, ConfigValues>;
 
@@ -19,7 +18,10 @@ export class ConfigLoader implements IConfigLoader<ConfigKey, ConfigValues> {
       if (metadata.envVarName != null) {
         const envVarValue = process.env[metadata.envVarName];
         if (envVarValue != null) {
-          configValue = this.parseEnvValue(envVarValue, typeof metadata.defaultValue) as ConfigValues[ConfigKey];
+          configValue = this.parseEnvValue(
+            envVarValue,
+            typeof metadata.defaultValue,
+          ) as ConfigValues[ConfigKey];
         }
       }
 
@@ -43,15 +45,20 @@ export class ConfigLoader implements IConfigLoader<ConfigKey, ConfigValues> {
 
     for (const doc of docs) {
       dbConfig[doc.key as ConfigKey] = {
-        definition: (doc.key in CONFIG_DEFINITIONS) ? CONFIG_DEFINITIONS[doc.key as ConfigKey] : undefined,
-        value: doc.value != null ? (() => {
-          try {
-            return JSON.parse(doc.value);
-          }
-          catch {
-            return null;
-          }
-        })() : null,
+        definition:
+          doc.key in CONFIG_DEFINITIONS
+            ? CONFIG_DEFINITIONS[doc.key as ConfigKey]
+            : undefined,
+        value:
+          doc.value != null
+            ? (() => {
+                try {
+                  return JSON.parse(doc.value);
+                } catch {
+                  return null;
+                }
+              })()
+            : null,
       };
     }
 
@@ -70,13 +77,11 @@ export class ConfigLoader implements IConfigLoader<ConfigKey, ConfigValues> {
       case 'object':
         try {
           return JSON.parse(value);
-        }
-        catch {
+        } catch {
           return null;
         }
       default:
         return value;
     }
   }
-
 }

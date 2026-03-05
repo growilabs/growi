@@ -1,5 +1,4 @@
 import { PassThrough } from 'stream';
-
 import type { Entry } from 'unzip-stream';
 
 export const tapStreamDataByPromise = (entry: Entry): Promise<Buffer> => {
@@ -15,8 +14,6 @@ export const tapStreamDataByPromise = (entry: Entry): Promise<Buffer> => {
       })
       .on('error', reject);
 
-    entry
-      .pipe(entryContentGetterStream)
-      .on('error', reject);
+    entry.pipe(entryContentGetterStream).on('error', reject);
   });
 };

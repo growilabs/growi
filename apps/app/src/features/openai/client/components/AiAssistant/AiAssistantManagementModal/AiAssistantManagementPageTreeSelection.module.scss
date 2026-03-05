@@ -3,9 +3,10 @@
     width: 30%;
   }
 
-  .page-tree-item {
-    .list-group-item {
-      padding: 0.4rem 1rem !important;
-    }
+  .page-tree-container {
+    min-height: 200px;
+    max-height: 50vh;
+    overflow-y: auto;
   }
 }
+

@@ -1,32 +1,31 @@
 import type { FC, JSX } from 'react';
-import {
-  Suspense, useState, useCallback, useMemo,
-} from 'react';
-
-import nodePath from 'path';
-
-import { pathUtils } from '@growi/core/dist/utils';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'next-i18next';
-import {
-  Modal, ModalHeader, ModalBody, ModalFooter, Button,
-} from 'reactstrap';
-import SimpleBar from 'simplebar-react';
+import { dirname } from 'pathe';
+import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import type { IPageForItem } from '~/interfaces/page';
+import { ItemsTree } from '~/features/page-tree/components';
 import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
 import { useCurrentPageData } from '~/states/page';
-import { usePageSelectModalStatus, usePageSelectModalActions } from '~/states/ui/modal/page-select';
+import {
+  usePageSelectModalActions,
+  usePageSelectModalStatus,
+  useSelectedPageInModal,
+} from '~/states/ui/modal/page-select';
 
-import { ItemsTree } from '../ItemsTree';
 import ItemsTreeContentSkeleton from '../ItemsTree/ItemsTreeContentSkeleton';
-
-import { TreeItemForModal } from './TreeItemForModal';
+import { TreeItemForModal, treeItemForModalSize } from './TreeItemForModal';
 
 const PageSelectModalSubstance: FC = () => {
   const { close: closeModal } = usePageSelectModalActions();
 
-  const [clickedParentPage, setClickedParentPage] = useState<IPageForItem | null>(null);
   const [isIncludeSubPage, setIsIncludeSubPage] = useState(true);
+  const [scrollerElem, setScrollerElem] = useState<HTMLDivElement | null>(null);
+
+  // Callback ref to capture the scroller element and trigger re-render
+  const scrollerRefCallback = useCallback((node: HTMLDivElement | null) => {
+    setScrollerElem(node);
+  }, []);
 
   const { t } = useTranslation();
 
@@ -35,41 +34,37 @@ const PageSelectModalSubstance: FC = () => {
   const currentPage = useCurrentPageData();
   const { opts } = usePageSelectModalStatus();
 
-  const isHierarchicalSelectionMode = opts?.isHierarchicalSelectionMode ?? false;
+  // Get selected page from atom
+  const selectedPage = useSelectedPageInModal();
 
-  const onClickTreeItem = useCallback((page: IPageForItem) => {
-    const parentPagePath = page.path;
-
-    if (parentPagePath == null) {
-      return;
-    }
-
-    setClickedParentPage(page);
-  }, []);
+  const isHierarchicalSelectionMode =
+    opts?.isHierarchicalSelectionMode ?? false;
 
   const onClickCancel = useCallback(() => {
-    setClickedParentPage(null);
     closeModal();
   }, [closeModal]);
 
   const { onSelected } = opts ?? {};
   const onClickDone = useCallback(() => {
-    if (clickedParentPage != null) {
-      onSelected?.(clickedParentPage, isIncludeSubPage);
+    if (selectedPage != null) {
+      onSelected?.(selectedPage, isIncludeSubPage);
     }
 
     closeModal();
-  }, [clickedParentPage, closeModal, isIncludeSubPage, onSelected]);
+  }, [selectedPage, closeModal, isIncludeSubPage, onSelected]);
 
-  // Memoize heavy calculation
-  const parentPagePath = useMemo(() => (
-    pathUtils.addTrailingSlash(nodePath.dirname(currentPage?.path ?? ''))
-  ), [currentPage?.path]);
+  // Memoize heavy calculation - parent page path without trailing slash for matching
+  const parentPagePath = useMemo(() => {
+    const dn = dirname(currentPage?.path ?? '');
+    // Ensure root path is '/' not ''
+    return dn === '' ? '/' : dn;
+  }, [currentPage?.path]);
 
-  // Memoize target path calculation (avoid duplication)
-  const targetPath = useMemo(() => (
-    clickedParentPage?.path || parentPagePath
-  ), [clickedParentPage?.path, parentPagePath]);
+  // Memoize target path calculation
+  const targetPath = useMemo(
+    () => selectedPage?.path || parentPagePath,
+    [selectedPage?.path, parentPagePath],
+  );
 
   // Memoize checkbox handler
   const handleIncludeSubPageChange = useCallback(() => {
@@ -82,25 +77,33 @@ const PageSelectModalSubstance: FC = () => {
 
   return (
     <>
-      <ModalHeader toggle={closeModal}>{t('page_select_modal.select_page_location')}</ModalHeader>
+      <ModalHeader toggle={closeModal}>
+        {t('page_select_modal.select_page_location')}
+      </ModalHeader>
       <ModalBody className="p-0">
         <Suspense fallback={<ItemsTreeContentSkeleton />}>
-          <SimpleBar style={{ maxHeight: 'calc(85vh - 133px)' }}> {/* 133px = 63px(ModalHeader) + 70px(ModalFooter) */}
-            <div className="p-3">
+          {/* 133px = 63px(ModalHeader) + 70px(ModalFooter) */}
+          <div
+            ref={scrollerRefCallback}
+            className="p-3"
+            style={{ maxHeight: 'calc(85vh - 133px)', overflowY: 'auto' }}
+          >
+            {scrollerElem && (
               <ItemsTree
                 CustomTreeItem={TreeItemForModal}
                 isEnableActions={!isGuestUser}
                 isReadOnlyUser={!!isReadOnlyUser}
                 targetPath={targetPath}
                 targetPathOrId={targetPath}
-                onClickTreeItem={onClickTreeItem}
+                estimateTreeItemSize={() => treeItemForModalSize}
+                scrollerElem={scrollerElem}
               />
-            </div>
-          </SimpleBar>
+            )}
+          </div>
         </Suspense>
       </ModalBody>
       <ModalFooter className="border-top d-flex flex-column">
-        { isHierarchicalSelectionMode && (
+        {isHierarchicalSelectionMode && (
           <div className="form-check form-check-info align-self-start ms-4">
             <input
               type="checkbox"
@@ -119,8 +122,12 @@ const PageSelectModalSubstance: FC = () => {
           </div>
         )}
         <div className="d-flex gap-2 align-self-end">
-          <Button color="secondary" onClick={onClickCancel}>{t('Cancel')}</Button>
-          <Button color="primary" onClick={onClickDone}>{t('Done')}</Button>
+          <Button color="secondary" onClick={onClickCancel}>
+            {t('Cancel')}
+          </Button>
+          <Button color="primary" onClick={onClickDone}>
+            {t('Done')}
+          </Button>
         </div>
       </ModalFooter>
     </>

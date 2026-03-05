@@ -1,8 +1,6 @@
 import React, { type JSX } from 'react';
-
 import DefaultErrorPage from 'next/error';
 import { useTranslation } from 'react-i18next';
-
 
 export const ForbiddenPage = (): JSX.Element => {
   const { t } = useTranslation('admin');

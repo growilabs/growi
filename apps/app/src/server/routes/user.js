@@ -45,8 +45,8 @@
  *            example: 2010-01-01T00:00:00.000Z
  */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi, app) => {
-  const User = crowi.model('User');
+module.exports = (crowi, _app) => {
+  const { User } = crowi.models;
   const ApiResponse = require('../util/apiResponse');
 
   const actions = {};

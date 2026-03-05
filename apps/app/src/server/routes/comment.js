@@ -58,16 +58,15 @@ import { preNotifyService } from '../service/pre-notify';
  */
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi, app) => {
+module.exports = (crowi, _app) => {
   const logger = loggerFactory('growi:routes:comment');
-  const User = crowi.model('User');
-  const Page = crowi.model('Page');
+  const { User, Page } = crowi.models;
   const ApiResponse = require('../util/apiResponse');
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
-  const globalNotificationService = crowi.getGlobalNotificationService();
-  const userNotificationService = crowi.getUserNotificationService();
+  const globalNotificationService = crowi.globalNotificationService;
+  const userNotificationService = crowi.userNotificationService;
 
   const { body } = require('express-validator');
   const mongoose = require('mongoose');
@@ -279,7 +278,7 @@ module.exports = (crowi, app) => {
     }
     // update page
     const page = await Page.findOneAndUpdate(
-      { _id: pageId },
+      { _id: { $eq: pageId } },
       {
         lastUpdateUser: req.user,
         updatedAt: new Date(),
@@ -422,7 +421,7 @@ module.exports = (crowi, app) => {
 
     let updatedComment;
     try {
-      const comment = await Comment.findById(commentId).exec();
+      const comment = await Comment.findOne({ _id: { $eq: commentId } }).exec();
 
       if (comment == null) {
         throw new Error('This comment does not exist.');
@@ -442,7 +441,7 @@ module.exports = (crowi, app) => {
       }
 
       updatedComment = await Comment.findOneAndUpdate(
-        { _id: commentId },
+        { _id: { $eq: commentId } },
         { $set: { comment: commentStr, revision } },
       );
       commentEvent.emit(CommentEvent.UPDATE, updatedComment);
@@ -506,7 +505,7 @@ module.exports = (crowi, app) => {
 
     try {
       /** @type {import('mongoose').HydratedDocument<import('~/interfaces/comment').IComment>} */
-      const comment = await Comment.findById(commentId).exec();
+      const comment = await Comment.findOne({ _id: { $eq: commentId } }).exec();
 
       if (comment == null) {
         throw new Error('This comment does not exist.');

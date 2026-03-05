@@ -1,21 +1,23 @@
 import React, { type JSX } from 'react';
-
 import { Disable } from 'react-disable';
 import type { UncontrolledTooltipProps } from 'reactstrap';
 import { UncontrolledTooltip } from 'reactstrap';
 
 type NotAvailableProps = {
-  children: JSX.Element
-  isDisabled: boolean
-  title: string
-  classNamePrefix?: string
-  placement?: UncontrolledTooltipProps['placement']
-}
+  children: JSX.Element;
+  isDisabled: boolean;
+  title: string;
+  classNamePrefix?: string;
+  placement?: UncontrolledTooltipProps['placement'];
+};
 
 export const NotAvailable = ({
-  children, isDisabled, title, classNamePrefix = 'grw-not-available', placement = 'top',
+  children,
+  isDisabled,
+  title,
+  classNamePrefix = 'grw-not-available',
+  placement = 'top',
 }: NotAvailableProps): JSX.Element => {
-
   if (!isDisabled) {
     return children;
   }
@@ -25,11 +27,11 @@ export const NotAvailable = ({
   return (
     <>
       <div id={id}>
-        <Disable disabled={isDisabled}>
-          {children}
-        </Disable>
+        <Disable disabled={isDisabled}>{children}</Disable>
       </div>
-      <UncontrolledTooltip placement={placement} target={id}>{title}</UncontrolledTooltip>
+      <UncontrolledTooltip placement={placement} target={id}>
+        {title}
+      </UncontrolledTooltip>
     </>
   );
 };

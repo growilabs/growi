@@ -15,7 +15,7 @@ export const useCurrentPageYjsDataAutoLoadEffect = (): void => {
   const pageId = useCurrentPageId();
   const currentPage = useCurrentPageData();
   const isGuestUser = useIsGuestUser();
-  const isNotFound = usePageNotFound();
+  const isNotFound = usePageNotFound(false);
 
   // Optimized effects with minimal dependencies
   useEffect(() => {

@@ -11,15 +11,24 @@ import type { CommonEachProps } from '../common-props';
 export const useShallowRouting = (props: CommonEachProps): void => {
   const router = useRouter();
   const lastPathnameRef = useRef<string>();
+  const lastBrowserUrlRef = useRef<string>();
 
   // Sync pathname by Shallow Routing with performance optimization
   useEffect(() => {
     if (!isClient() || !props.currentPathname) return;
 
-    // Skip if pathname hasn't changed (prevents unnecessary operations)
-    if (lastPathnameRef.current === props.currentPathname) return;
-
     const currentURL = decodeURI(window.location.pathname);
+
+    // Skip if both props.currentPathname and browser URL haven't changed
+    // This handles the case where:
+    // 1. props.currentPathname is the same (e.g., /${pageId})
+    // 2. But browser URL changed via navigation (e.g., /path/to/page)
+    if (
+      lastPathnameRef.current === props.currentPathname &&
+      lastBrowserUrlRef.current === currentURL
+    ) {
+      return;
+    }
 
     // Only update if URLs actually differ
     if (currentURL !== props.currentPathname) {
@@ -29,7 +38,8 @@ export const useShallowRouting = (props: CommonEachProps): void => {
       });
     }
 
-    // Update reference for next comparison
+    // Update references for next comparison
     lastPathnameRef.current = props.currentPathname;
+    lastBrowserUrlRef.current = currentURL;
   }, [props.currentPathname, router]);
 };

@@ -1,6 +1,7 @@
 import { useHydrateAtoms } from 'jotai/utils';
 
 import { showPageLimitationXLAtom } from '~/states/server-configurations';
+import { createAtomTuple } from '~/utils/jotai-utils';
 
 import type { ServerConfigurationProps } from './types';
 
@@ -11,10 +12,15 @@ import type { ServerConfigurationProps } from './types';
 export const useHydrateServerConfigurationAtoms = (
   serverConfig: ServerConfigurationProps['serverConfig'] | undefined,
 ): void => {
-  // Hydrate server configuration atoms with server-side data
-  useHydrateAtoms(
+  const tuples =
     serverConfig == null
       ? []
-      : [[showPageLimitationXLAtom, serverConfig.showPageLimitationXL]],
-  );
+      : [
+          createAtomTuple(
+            showPageLimitationXLAtom,
+            serverConfig.showPageLimitationXL,
+          ),
+        ];
+
+  useHydrateAtoms(tuples);
 };

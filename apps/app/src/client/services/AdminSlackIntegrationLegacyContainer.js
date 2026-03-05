@@ -8,7 +8,6 @@ import { apiv3Get, apiv3Put } from '../util/apiv3-client';
  * @extends {Container} unstated Container
  */
 export default class AdminSlackIntegrationLegacyContainer extends Container {
-
   constructor(appContainer) {
     super();
 
@@ -26,7 +25,6 @@ export default class AdminSlackIntegrationLegacyContainer extends Container {
       isIncomingWebhookPrioritized: false,
       slackToken: '',
     };
-
   }
 
   /**
@@ -46,7 +44,8 @@ export default class AdminSlackIntegrationLegacyContainer extends Container {
     this.setState({
       isSlackbotConfigured: slackIntegrationParams.isSlackbotConfigured,
       webhookUrl: slackIntegrationParams.webhookUrl,
-      isIncomingWebhookPrioritized: slackIntegrationParams.isIncomingWebhookPrioritized,
+      isIncomingWebhookPrioritized:
+        slackIntegrationParams.isIncomingWebhookPrioritized,
       slackToken: slackIntegrationParams.slackToken,
     });
   }
@@ -69,7 +68,9 @@ export default class AdminSlackIntegrationLegacyContainer extends Container {
    * Switch incomingWebhookPrioritized
    */
   switchIsIncomingWebhookPrioritized() {
-    this.setState({ isIncomingWebhookPrioritized: !this.state.isIncomingWebhookPrioritized });
+    this.setState({
+      isIncomingWebhookPrioritized: !this.state.isIncomingWebhookPrioritized,
+    });
   }
 
   /**
@@ -92,5 +93,4 @@ export default class AdminSlackIntegrationLegacyContainer extends Container {
 
     return response;
   }
-
 }

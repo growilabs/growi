@@ -166,8 +166,7 @@ export const SearchResultContent: FC<Props> = (props: Props) => {
 
   const duplicateItemClickedHandler = useCallback(
     async (pageToDuplicate) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const duplicatedHandler: OnDuplicatedFunction = (fromPath, toPath) => {
+      const duplicatedHandler: OnDuplicatedFunction = (fromPath, _toPath) => {
         toastSuccess(t('duplicated_pages', { fromPath }));
 
         mutatePageTree();

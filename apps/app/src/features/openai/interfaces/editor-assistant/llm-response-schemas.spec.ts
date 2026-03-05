@@ -425,7 +425,6 @@ Line 3: Fixed indentation`,
       const realWorldDiff = {
         search:
           'function getUserData(id) {\n  return users.find(u => u.id === id);\n}',
-        // eslint-disable-next-line max-len, no-template-curly-in-string
         replace:
           'async function getUserData(id) {\n  const user = await userService.findById(id);\n  if (!user) {\n    throw new Error(`User not found: \\${id}`);\n  }\n  return user;\n}',
         startLine: 15,

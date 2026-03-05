@@ -2,24 +2,28 @@ import type { GetServerSidePropsContext, GetServerSidePropsResult } from 'next';
 import type {
   IDataWithRequiredMeta,
   IPage,
+  IPageInfoBasic,
   IPageNotFoundInfo,
   IUser,
-} from '@growi/core/dist/interfaces';
-import { isIPageInfo, isIPageNotFoundInfo } from '@growi/core/dist/interfaces';
+} from '@growi/core';
+import { isIPageInfo, isIPageNotFoundInfo } from '@growi/core';
 import {
   isPermalink as _isPermalink,
   isTopPage,
+  isUserPage,
+  isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import assert from 'assert';
 import type { HydratedDocument, model } from 'mongoose';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { PageModel } from '~/server/models/page';
+import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageRedirect,
   PageRedirectModel,
 } from '~/server/models/page-redirect';
+import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
 
 import type { CommonEachProps } from '../common-props';
 import type {
@@ -131,7 +135,7 @@ export async function getPageDataForInitial(
   let pathFromUrl = `/${pathFromQuery.join('/')}`;
   pathFromUrl = pathFromUrl === '//' ? '/' : pathFromUrl;
 
-  const { pageService, configManager } = crowi;
+  const { pageService, pageGrantService, configManager } = crowi;
 
   const pageId = _isPermalink(pathFromUrl)
     ? removeHeadingSlash(pathFromUrl)
@@ -154,11 +158,36 @@ export async function getPageDataForInitial(
   }
 
   // Get full page data
-  const pageWithMeta = await pageService.findPageAndMetaDataByViewer(
-    pageId,
-    resolvedPagePath,
-    user,
+  const pageWithMeta = await findPageAndMetaDataByViewer(
+    pageService,
+    pageGrantService,
+    { pageId, path: resolvedPagePath, user },
   );
+
+  const disableUserPages = configManager.getConfig('security:disableUserPages');
+
+  if (disableUserPages && pageWithMeta.data != null) {
+    const pagePath = pageWithMeta.data.path;
+    const isTargetUserPage = isUserPage(pagePath) || isUsersTopPage(pagePath);
+
+    if (isTargetUserPage) {
+      return {
+        props: {
+          currentPathname: resolvedPagePath,
+          isIdenticalPathPage: false,
+          pageWithMeta: {
+            data: null,
+            meta: {
+              isNotFound: true,
+              isForbidden: true,
+            },
+          } satisfies IDataWithRequiredMeta<null, IPageNotFoundInfo>,
+          skipSSR: false,
+          redirectFrom,
+        },
+      };
+    }
+  }
 
   // Handle URL conversion
   const currentPathname = resolveFinalizedPathname(
@@ -191,11 +220,6 @@ export async function getPageDataForInitial(
           redirectFrom,
         },
       };
-    }
-
-    // Add user to seen users
-    if (user != null) {
-      await page.seen(user);
     }
 
     // Handle existing page with valid meta that is not IPageNotFoundInfo
@@ -250,17 +274,18 @@ export async function getPageDataForInitial(
 // Page data retrieval for same-route navigation
 export async function getPageDataForSameRoute(
   context: GetServerSidePropsContext,
-): Promise<
-  GetServerSidePropsResult<
-    Pick<CommonEachProps, 'currentPathname'> &
-      Pick<
-        EachProps,
-        'currentPathname' | 'isIdenticalPathPage' | 'redirectFrom'
-      >
-  >
-> {
+): Promise<{
+  props: Pick<CommonEachProps, 'currentPathname'> &
+    Pick<EachProps, 'currentPathname' | 'isIdenticalPathPage' | 'redirectFrom'>;
+  internalProps?: {
+    pageWithMeta?:
+      | IDataWithRequiredMeta<PageDocument, IPageInfoBasic>
+      | IDataWithRequiredMeta<null, IPageNotFoundInfo>;
+  };
+}> {
   const req: CrowiRequest = context.req as CrowiRequest;
-  const { user } = req;
+  const { crowi, user } = req;
+  const { pageService, pageGrantService } = crowi;
 
   const pathname = decodeURIComponent(
     context.resolvedUrl?.split('?')[0] ?? '/',
@@ -282,13 +307,15 @@ export async function getPageDataForSameRoute(
   }
 
   // For same route access, do minimal page lookup
-  const basicPageInfo = await Page.findOne(
-    isPermalink ? { _id: pageId } : { path: resolvedPagePath },
-  ).exec();
+  const pageWithMetaBasicOnly = await findPageAndMetaDataByViewer(
+    pageService,
+    pageGrantService,
+    { pageId, path: resolvedPagePath, user, basicOnly: true },
+  );
 
   const currentPathname = resolveFinalizedPathname(
     resolvedPagePath,
-    basicPageInfo,
+    pageWithMetaBasicOnly.data,
     isPermalink,
   );
 
@@ -297,6 +324,14 @@ export async function getPageDataForSameRoute(
       currentPathname,
       isIdenticalPathPage: false,
       redirectFrom,
+    },
+    internalProps: {
+      pageWithMeta: pageWithMetaBasicOnly.data?.isEmpty
+        ? {
+            data: null,
+            meta: { isNotFound: true, isForbidden: false },
+          }
+        : pageWithMetaBasicOnly,
     },
   };
 }

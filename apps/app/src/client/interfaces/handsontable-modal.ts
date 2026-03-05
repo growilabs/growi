@@ -1,4 +1,4 @@
 export type LaunchHandsonTableModalEventDetail = {
-  bol: number,
-  eol: number,
-}
+  bol: number;
+  eol: number;
+};

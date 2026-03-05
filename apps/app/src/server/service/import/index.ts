@@ -2,7 +2,6 @@ import type Crowi from '~/server/crowi';
 
 import { ImportService } from './import';
 
-
 let instance: ImportService;
 
 export const initializeImportService = (crowi: Crowi): void => {

@@ -1,6 +1,0 @@
-@use '../tree-item-variables';
-
-.new-page-input-container {
-  width: calc(100% - tree-item-variables.$btn-triangle-min-width);
-  padding-left: 24px;
-}
