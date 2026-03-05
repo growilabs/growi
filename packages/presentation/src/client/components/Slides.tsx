@@ -22,7 +22,16 @@ export const Slides = (props: SlidesProps): JSX.Element => {
   return (
     <div className={`${styles['slides-styles']}`}>
       {hasMarpFlag ? (
-        <Suspense fallback={<div>Loading...</div>}>
+        <Suspense
+          fallback={
+            <div className="d-flex flex-column justify-content-center align-items-center py-5">
+              <output className="spinner-border text-secondary">
+                <span className="visually-hidden">Loading...</span>
+              </output>
+              <span className="mt-3 small text-secondary">Loading Marp...</span>
+            </div>
+          }
+        >
           <MarpSlides presentation={presentation}>{children}</MarpSlides>
         </Suspense>
       ) : (
