@@ -13,6 +13,7 @@
 /public/static/styles
 /public/uploads
 /src/styles/prebuilt
+/src/**/*.vendor-styles.prebuilt.js
 /tmp/
 
 # cache

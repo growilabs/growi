@@ -105,6 +105,24 @@
   - `optimizePackageImports` (experimental) is also supported under Turbopack
 - **Implications**: Keep `transpilePackages` config as-is initially. Test removing entries incrementally after migration verified.
 
+### Vendor CSS Handling under Turbopack Pages Router
+- **Context**: Turbopack Pages Router strictly enforces that global CSS can only be imported from `_app.page.tsx`. Components importing vendor CSS (e.g., `import 'katex/dist/katex.min.css'`) fail to compile. Need a strategy that avoids centralizing all vendor CSS in `_app` (which would degrade FCP for pages that don't need those styles).
+- **Sources Consulted**:
+  - [Next.js CSS Modules Docs](https://nextjs.org/docs/app/getting-started/css#css-modules)
+  - [Vite CSS ?inline Suffix](https://vite.dev/guide/features.html#disabling-css-injection-into-the-page)
+  - Implementation experiments in this repository
+- **Approaches Evaluated**:
+  1. **Centralize in `_app.page.tsx`** — Move all vendor CSS imports to `_app`. Simple but degrades FCP for pages that don't need those styles.
+  2. **CSS Module wrappers** (`:global { @import '...' }`) — Create `vendor-*.module.scss` files wrapping vendor CSS in `:global {}`. Failed because Turbopack rejects `:global` block form entirely.
+  3. **Vite precompilation with `?inline`** — Create `*.vendor-styles.ts` entry points that import CSS via Vite's `?inline` suffix (inlines CSS as a string), then inject into `document.head` via `<style>` tags at runtime. Components import the prebuilt `.js` output instead of raw CSS.
+- **Findings**:
+  - Approach 2 failed: Turbopack does not support `:global` block form in CSS Modules — not just for selectors but also for `@import` wrappers
+  - Approach 3 works: Vite `?inline` converts CSS to a JS string export. The prebuilt JS file contains no CSS imports, so Turbopack sees it as a regular JS module
+  - `handsontable/dist/handsontable.full.min.css` contains IE CSS hacks (`*zoom:1`, `filter:alpha()`) that Turbopack's CSS parser (lightningcss) cannot parse. Switched to `handsontable/dist/handsontable.css` (non-full, non-minified variant)
+  - Vite's `?inline` approach runs at prebuild time (before Turbopack/Next.js), fitting naturally into the existing Turborepo task pipeline alongside `pre:styles-commons`
+  - SSR caveat: CSS injected via `<style>` tags is not available during SSR. Most consuming components already use `next/dynamic` with `ssr: false`, so FOUC is not a practical concern
+- **Implications**: Selected Approach 3. Two-track vendor CSS system: commons track (`vendor.scss` for globally shared CSS like `simplebar-react`) and components track (`*.vendor-styles.ts` for component-specific CSS precompiled by Vite).
+
 ## Architecture Pattern Evaluation
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
@@ -147,6 +165,17 @@
 - **Rationale**: Explicit, documented, easy to understand. Works reliably with conditional browser aliasing.
 - **Trade-offs**: One extra file in the codebase.
 - **Follow-up**: Verify all 7 null-loader targets work correctly with the alias approach.
+
+### Decision: Vite Precompilation for Vendor CSS
+- **Context**: Turbopack Pages Router rejects global CSS imports outside `_app.page.tsx`. Need per-component vendor CSS without centralizing everything in `_app`.
+- **Alternatives Considered**:
+  1. Centralize all vendor CSS in `_app.page.tsx` — simple but degrades FCP
+  2. CSS Module wrappers with `:global { @import }` — Turbopack rejects `:global` block form
+  3. Vite precompilation with `?inline` suffix — CSS inlined into JS at prebuild time
+- **Selected Approach**: Option 3 — Vite precompilation
+- **Rationale**: Keeps CSS co-located with consuming components (no FCP penalty for unrelated pages). Fits naturally into the existing Turborepo prebuild pipeline (parallel to `pre:styles-commons`). No Turbopack restrictions apply since the output is pure JS.
+- **Trade-offs**: Additional prebuild step (fast in practice). Runtime CSS injection means styles are not available during SSR (acceptable since most consuming components use `ssr: false`).
+- **Naming Convention**: `{ComponentName}.vendor-styles.ts` → `{ComponentName}.vendor-styles.prebuilt.js`
 
 ## Risks & Mitigations
 - **Risk 1**: next-i18next may have runtime issues under Turbopack (not just HMR) — **Mitigation**: Test i18n routing and SSR early; maintain webpack fallback flag

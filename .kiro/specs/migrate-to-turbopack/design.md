@@ -11,7 +11,7 @@
 ### Goals
 - Enable Turbopack as the default bundler for `next dev` with the custom Express server
 - Migrate all 6 webpack customizations to Turbopack-compatible equivalents
-- Convert all global CSS imports to vendor CSS Module wrappers for Turbopack compliance
+- Precompile all vendor CSS into JS modules via Vite for Turbopack compliance
 - Convert all `:global` block form syntax in CSS Modules to function form for Turbopack compatibility
 - Maintain webpack fallback via environment variable during the transition period
 - Enable Turbopack for production `next build` after dev stability is confirmed
@@ -86,9 +86,9 @@ graph TB
 - Selected pattern: Feature-flag phased migration with dual configuration
 - Domain boundaries: Build configuration layer only — no changes to application code, server logic, or page components
 - Existing patterns preserved: Express custom server, Pages Router, SuperJSON SSR, server-client boundary
-- New components: Empty module file, Turbopack config block, env-based bundler selection, vendor CSS Module wrappers
+- New components: Empty module file, Turbopack config block, env-based bundler selection, Vite vendor CSS precompilation
 - Steering compliance: Maintains server-client boundary enforcement; aligns with existing build optimization strategy
-- CSS compatibility: All `:global` block form syntax converted to function form; all global CSS imports wrapped in CSS Modules
+- CSS compatibility: All `:global` block form syntax converted to function form; all vendor CSS precompiled via Vite into JS modules
 
 ### Technology Stack
 
@@ -157,10 +157,11 @@ sequenceDiagram
 | 6.3 | Production tests pass | BuildConfig | Test suite | - |
 | 7.1 | Alternative module analysis | Deferred | - | - |
 | 7.2 | DUMP_INITIAL_MODULES report | Deferred | - | - |
-| 8.1 | Vendor CSS Module wrappers for imports | VendorCSSWrappers | .module.scss files | - |
-| 8.2 | Convert all direct global CSS imports | VendorCSSWrappers | Component imports | - |
-| 8.3 | Naming convention vendor-*.module.scss | VendorCSSWrappers | File naming | - |
-| 8.4 | Stylelint override for vendor wrappers | VendorCSSWrappers | .stylelintrc.json | - |
+| 8.1 | Vendor CSS precompiled via Vite ?inline | VendorCSSPrecompilation | .vendor-styles.ts files | - |
+| 8.2 | All direct CSS imports migrated | VendorCSSPrecompilation | Component imports | - |
+| 8.3 | Naming convention *.vendor-styles.ts | VendorCSSPrecompilation | File naming | - |
+| 8.4 | Turborepo pre:styles-components tasks | VendorCSSPrecompilation | turbo.json | - |
+| 8.5 | Prebuilt files git-ignored | VendorCSSPrecompilation | .gitignore | - |
 | 9.1 | Function form `:global(...)` syntax | GlobalSyntaxConversion | 128 files | - |
 | 9.2 | Identical CSS output after conversion | GlobalSyntaxConversion | Compilation | - |
 | 9.3 | Nested blocks converted correctly | GlobalSyntaxConversion | Nested selectors | - |
@@ -179,7 +180,7 @@ sequenceDiagram
 | ResolveAliasConfig | Config | Alias server-only packages and fs in browser | 2.1, 2.2, 2.3 | empty-module.ts (P0) | - |
 | EmptyModule | Util | Provide empty export file for resolveAlias | 2.1, 2.2 | None | - |
 | I18nConfig | Config | Remove HMR plugins when Turbopack is active | 5.1, 5.2, 5.3 | next-i18next (P1) | - |
-| VendorCSSWrappers | CSS | Wrap third-party global CSS imports in CSS Modules | 8.1, 8.2, 8.3, 8.4 | Component imports (P0) | - |
+| VendorCSSPrecompilation | CSS/Build | Precompile third-party CSS into JS via Vite | 8.1, 8.2, 8.3, 8.4, 8.5 | Vite, Turborepo (P0) | - |
 | GlobalSyntaxConversion | CSS | Convert `:global` block form to function form | 9.1, 9.2, 9.3, 9.4, 9.5 | 128 .module.scss files (P0) | - |
 | BuildScripts | Config | Update package.json scripts for Turbopack | 6.1, 6.2, 10.1 | package.json (P0) | - |
 | WebpackFallback | Config | Maintain webpack() hook for fallback | 10.2, 10.3 | next.config.ts (P0) | - |
@@ -347,36 +348,50 @@ interface ResolveAliasConfig {
 
 ### CSS Compatibility Layer
 
-#### VendorCSSWrappers — Global CSS Import Migration
+#### VendorCSSPrecompilation — Global CSS Import Migration via Vite
 
 | Field | Detail |
 |-------|--------|
-| Intent | Wrap third-party global CSS imports in CSS Module files to comply with Turbopack's strict global CSS import rule |
-| Requirements | 8.1, 8.2, 8.3, 8.4 |
+| Intent | Precompile third-party CSS into JS modules via Vite to comply with Turbopack's strict global CSS import rule |
+| Requirements | 8.1, 8.2, 8.3, 8.4, 8.5 |
 
 **Responsibilities & Constraints**
-- Create `vendor-{library}.module.scss` wrapper files for each third-party CSS import
-- Use `:global { @import 'package/style.css'; }` pattern to preserve global scope
-- Replace direct `import 'package/style.css'` statements in components with `import './vendor-{library}.module.scss'`
-- Add stylelint override in `.stylelintrc.json` for `vendor-*.module.scss` to suppress `no-invalid-position-at-import-rule`
+- Create `{ComponentName}.vendor-styles.ts` entry point files using Vite's `?inline` CSS import suffix
+- Each entry point imports CSS as inline strings and injects them into `document.head` via `<style>` tag at runtime
+- Vite precompiles these into `{ComponentName}.vendor-styles.prebuilt.js` files (git-ignored, regenerated by Turborepo)
+- Components import the prebuilt `.js` file instead of raw CSS
+- Two-track system: commons track (`vendor.scss` for globally shared CSS) and components track (`*.vendor-styles.ts` for component-specific CSS)
 
-**Affected Imports (13 total in 12 files)**
-- `@growi/remark-lsx`, `@growi/remark-attachment-refs` (renderer service)
-- `@growi/editor` (PageEditor)
-- `handsontable` (HandsontableModal)
-- `katex` (PageView)
-- `react-datepicker` (AuditLog)
-- `diff2html` (PageHistory)
-- `@growi/editor` (PageComment)
-- `drawio` (ReactMarkdownComponents)
-- `react-image-crop` (Common)
-- `simplebar-react` (Sidebar)
-- `reveal.js`, `highlight.js` (Presentation)
+**Vite Build Configuration** (`vite.vendor-styles-components.ts`)
+- Collects all `src/**/*.vendor-styles.ts` as entry points via `fs.globSync`
+- Outputs to `src/` preserving directory structure, with `.vendor-styles.prebuilt.js` suffix
+- Uses `rollupOptions.input` (not `lib.entry`) for multi-entry compilation
+
+**Turborepo Integration**
+- `pre:styles-components` / `dev:pre:styles-components` tasks added as dependencies of `build` and `dev`
+- Inputs: `vite.vendor-styles-components.ts`, `src/**/*.vendor-styles.ts`, `package.json`
+- Outputs: `src/**/*.vendor-styles.prebuilt.js`
+
+**Vendor-Styles Entry Points (8 files covering 13 CSS imports)**
+
+| Entry Point | CSS Sources | Consuming Components |
+|---|---|---|
+| `Renderer.vendor-styles.ts` | `@growi/remark-lsx`, `@growi/remark-attachment-refs`, `katex` | renderer.tsx |
+| `GrowiEditor.vendor-styles.ts` | `@growi/editor` | PageEditor, CommentEditor |
+| `HandsontableModal.vendor-styles.ts` | `handsontable` (non-full variant) | HandsontableModal |
+| `DateRangePicker.vendor-styles.ts` | `react-datepicker` | DateRangePicker |
+| `RevisionDiff.vendor-styles.ts` | `diff2html` | RevisionDiff |
+| `DrawioViewerWithEditButton.vendor-styles.ts` | `@growi/remark-drawio` | DrawioViewerWithEditButton |
+| `ImageCropModal.vendor-styles.ts` | `react-image-crop` | ImageCropModal |
+| `Presentation.vendor-styles.ts` | `@growi/presentation` | Presentation, Slides |
+
+**Note**: `simplebar-react` CSS is handled by the commons track (`src/styles/vendor.scss`) — its direct import was simply removed from `Sidebar.tsx`.
 
 **Implementation Notes**
-- Naming convention: `vendor-{short-library-name}.module.scss`
-- Each wrapper imports exactly one third-party CSS file
-- Multiple CSS imports from the same component directory are combined into one wrapper when possible
+- Entry points use `// @ts-nocheck` since `?inline` is a Vite-specific import suffix not understood by TypeScript
+- Multiple CSS imports for the same component are combined in a single entry point (e.g., `Renderer.vendor-styles.ts` imports 3 CSS files)
+- Shared entry points (e.g., `GrowiEditor.vendor-styles.ts`) are referenced from multiple components via relative path
+- SSR note: CSS is injected at runtime via `<style>` tags, so it is not available during SSR. Most consuming components already use `next/dynamic` with `ssr: false`, avoiding FOUC
 
 #### GlobalSyntaxConversion — `:global` Block-to-Function Form
 
@@ -430,7 +445,7 @@ Build-time errors from Turbopack migration are the primary concern. All errors s
 
 **i18n Errors**: `Cannot find module 'i18next-hmr'` or HMR plugin crash — indicates HMR plugin loaded in Turbopack mode. Fix: guard HMR plugin loading with env var check.
 
-**Global CSS Import Errors**: `Global CSS cannot be imported from files other than your Custom <App>` — indicates a direct global CSS import from a non-`_app` file. Fix: create a `vendor-*.module.scss` wrapper and change the import.
+**Global CSS Import Errors**: `Global CSS cannot be imported from files other than your Custom <App>` — indicates a direct global CSS import from a non-`_app` file. Fix: create a `{Component}.vendor-styles.ts` entry point, run `pre:styles-components`, and import the prebuilt `.js` file instead.
 
 **CSS Modules Syntax Errors**: `Ambiguous CSS module class not supported` — indicates `:global` block form usage. Fix: convert the block form to function form `:global(...)`.
 
@@ -464,7 +479,7 @@ flowchart LR
     A[Add turbopack config] --> B[Add empty-module.ts]
     B --> C[Update crowi/index.ts]
     C --> D[Guard i18n HMR plugins]
-    D --> E[Vendor CSS wrappers]
+    D --> E[Vendor CSS precompilation]
     E --> F[Convert :global syntax]
     F --> G[Smoke test Turbopack dev]
     G --> H[Smoke test webpack fallback]
@@ -475,7 +490,7 @@ flowchart LR
 2. Create `src/lib/empty-module.ts`
 3. Update `src/server/crowi/index.ts`: replace `webpack: true` with `USE_WEBPACK` env var check
 4. Guard `HMRPlugin` in `next-i18next.config.js` with env var check
-5. Create vendor CSS Module wrappers for all third-party global CSS imports
+5. Precompile vendor CSS via Vite `?inline` into `.vendor-styles.prebuilt.js` files
 6. Convert all `:global` block form syntax to function form across 128 `.module.scss` files
 7. Run smoke tests with both Turbopack and webpack modes
 8. Merge — all developers now use Turbopack by default for dev

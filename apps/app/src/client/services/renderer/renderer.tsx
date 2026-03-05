@@ -43,8 +43,7 @@ import loggerFactory from '~/utils/logger';
 
 // import EasyGrid from './PreProcessor/EasyGrid';
 
-import '@growi/remark-lsx/dist/client/style.css';
-import '@growi/remark-attachment-refs/dist/client/style.css';
+import './Renderer.vendor-styles.prebuilt';
 
 const logger = loggerFactory('growi:cli:services:renderer');
 

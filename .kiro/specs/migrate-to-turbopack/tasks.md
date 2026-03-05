@@ -41,17 +41,22 @@
   - Translation file changes under Turbopack require a manual browser refresh (documented tradeoff)
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [x] 4. Centralize vendor CSS imports in _app.page.tsx for Turbopack compatibility
-- [x] 4.1 Move all vendor CSS imports from component files to _app.page.tsx
-  - Turbopack Pages Router only allows global CSS imports from `_app`. The `:global { @import }` wrapper approach also failed because Turbopack rejects `:global` block form entirely.
-  - Moved 13 vendor CSS imports from 12 component files to `_app.page.tsx`
-  - Switched `handsontable/dist/handsontable.full.min.css` to `handsontable/dist/handsontable.css` (non-full, non-minified) to avoid IE CSS hack parse errors in Turbopack
-  - Removed all `vendor-*.module.scss` wrapper files (approach abandoned)
-  - _Requirements: 8.1, 8.2, 8.3_
+- [x] 4. Precompile vendor CSS via Vite for Turbopack compatibility
+- [x] 4.1 Create Vite config and Turborepo tasks for vendor CSS precompilation
+  - Created `vite.vendor-styles-components.ts` — collects all `src/**/*.vendor-styles.ts` as entry points, precompiles via Vite `?inline` suffix
+  - Added `pre:styles-components` / `dev:pre:styles-components` tasks to `turbo.json` as dependencies of `build` and `dev`
+  - Added corresponding npm scripts to `package.json`
+  - Added `/src/**/*.vendor-styles.prebuilt.js` to `.gitignore`
+  - _Requirements: 8.3, 8.4, 8.5_
 
-- [x] 4.2 Clean up stale stylelint overrides
-  - Removed `vendor-*.module.scss` override from `.stylelintrc.json` (files no longer exist)
-  - _Requirements: 8.4_
+- [x] 4.2 Create vendor-styles entry points and migrate CSS imports from components
+  - Created 8 `*.vendor-styles.ts` entry point files covering 13 vendor CSS imports from 12 component files
+  - Each entry point uses `?inline` CSS import and injects into `document.head` via `<style>` tag
+  - Replaced direct CSS imports in components with `.vendor-styles.prebuilt` JS imports
+  - Switched `handsontable/dist/handsontable.full.min.css` to `handsontable/dist/handsontable.css` (non-full, non-minified) to avoid IE CSS hack parse errors in Turbopack
+  - `simplebar-react` CSS handled by commons track (`vendor.scss`) — direct import simply removed from `Sidebar.tsx`
+  - `katex` CSS added to `Renderer.vendor-styles.ts` (used by `rehype-katex` in the renderer)
+  - _Requirements: 8.1, 8.2, 8.3_
 
 - [x] 5. Convert `:global` block form to function form in CSS Modules
 - [x] 5.1 (P) Convert all `:global` block form syntax to function form across all `.module.scss` files
@@ -117,7 +122,7 @@
 ## Implementation Notes (Discovered During Phase 1)
 
 - **resolveAlias paths**: Turbopack `resolveAlias` requires **relative paths** (e.g., `./src/lib/empty-module.ts`), not absolute paths from `path.resolve()`. Absolute paths cause "server relative imports are not implemented yet" errors.
-- **Vendor CSS centralized in _app.page.tsx**: The `vendor-*.module.scss` wrapper approach (`:global { @import }`) failed because Turbopack rejects `:global` block form entirely. All 13 vendor CSS imports were moved to `_app.page.tsx` — the only file where Turbopack Pages Router allows global CSS imports.
+- **Vendor CSS precompiled via Vite**: The `vendor-*.module.scss` wrapper approach (`:global { @import }`) failed because Turbopack rejects `:global` block form entirely. The `_app.page.tsx` centralization approach was also rejected due to FCP degradation. Final solution: Vite precompilation with `?inline` suffix — 8 `*.vendor-styles.ts` entry points covering 13 vendor CSS imports, precompiled into `.vendor-styles.prebuilt.js` files by Turborepo `pre:styles-components` task.
 - **`:global` block form**: Turbopack's CSS Modules implementation only supports the function form `:global(...)`. The block form `:global { }` (supported by webpack) causes "Ambiguous CSS module class not supported" errors. Conversion is mechanical — 128 files, 255 occurrences.
 - **Standalone `:local`**: Turbopack doesn't support standalone `:local` or `&:local` in CSS Modules. Inside `:global(...)` function form, properties are already locally scoped by default, so `&:local` wrappers can simply be removed.
 - **Sass `@extend` in CSS Modules**: `@extend .class` fails when the target is wrapped in `:global(.class)` — Sass doesn't match them as the same selector. Replace with shared selector groups (comma-separated selectors).

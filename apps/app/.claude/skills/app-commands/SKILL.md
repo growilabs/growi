@@ -101,10 +101,12 @@ Generated specs output to `tmp/openapi-spec-apiv3.json`.
 
 ```bash
 # Development mode
-pnpm run dev:pre:styles
+pnpm run dev:pre:styles-commons
+pnpm run dev:pre:styles-components
 
 # Production mode
-pnpm run pre:styles
+pnpm run pre:styles-commons
+pnpm run pre:styles-commons-components
 ```
 
 Pre-builds SCSS styles into CSS bundles using Vite.
