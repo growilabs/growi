@@ -635,7 +635,12 @@ class Crowi {
     // use morgan
     else {
       const morgan = require('morgan');
-      express.use(morgan('dev'));
+      express.use(
+        morgan('dev', {
+          // supress logging for Next.js static files
+          skip: (req) => req.url?.startsWith('/_next/static/'),
+        }),
+      );
     }
 
     this.express = express;
