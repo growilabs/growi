@@ -24,7 +24,7 @@ export type AuditLogBulkExportJobStatus =
   (typeof AuditLogBulkExportJobStatus)[keyof typeof AuditLogBulkExportJobStatus];
 
 export interface IAuditLogBulkExportFilters {
-  users?: Array<Ref<IUser>>;
+  usernames?: string[];
   actions?: SupportedActionType[];
   dateFrom?: Date;
   dateTo?: Date;

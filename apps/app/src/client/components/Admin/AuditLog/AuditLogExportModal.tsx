@@ -32,7 +32,7 @@ const AuditLogExportModalSubstance = ({
 
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
-  const [_selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
+  const [selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
   const [actionMap, setActionMap] = useState(
     () =>
       new Map<SupportedActionType, boolean>(
@@ -79,8 +79,10 @@ const AuditLogExportModalSubstance = ({
       .map((v) => v[0]);
 
     const filters: IAuditLogBulkExportFilters = {};
-    // TODO: Add users filter after implementing username-to-userId conversion
 
+    if (selectedUsernames.length > 0) {
+      filters.usernames = selectedUsernames;
+    }
     if (selectedActionList.length > 0) {
       filters.actions = selectedActionList;
     }
@@ -92,7 +94,7 @@ const AuditLogExportModalSubstance = ({
     }
 
     return filters;
-  }, [actionMap, startDate, endDate]);
+  }, [actionMap, selectedUsernames, startDate, endDate]);
 
   const {
     isExporting,

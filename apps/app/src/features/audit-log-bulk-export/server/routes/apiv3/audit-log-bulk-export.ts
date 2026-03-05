@@ -24,7 +24,7 @@ const router = Router();
 
 interface AuditLogExportReqBody {
   filters: {
-    users?: string[];
+    usernames?: string[];
     actions?: SupportedActionType[];
     dateFrom?: Date;
     dateTo?: Date;
@@ -46,8 +46,8 @@ export const factory = (crowi: Crowi): Router => {
   const validators = {
     auditLogBulkExport: [
       body('filters').exists({ checkFalsy: true }).isObject(),
-      body('filters.users').optional({ nullable: true }).isArray(),
-      body('filters.users.*').optional({ nullable: true }).isMongoId(),
+      body('filters.usernames').optional({ nullable: true }).isArray(),
+      body('filters.usernames.*').optional({ nullable: true }).isString(),
       body('filters.actions').optional({ nullable: true }).isArray(),
       body('filters.actions.*')
         .optional({ nullable: true })

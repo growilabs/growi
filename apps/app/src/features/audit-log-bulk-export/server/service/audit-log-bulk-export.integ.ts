@@ -100,10 +100,11 @@ describe('AuditLogBulkExportService', () => {
       });
 
       it('should create a job with user filters', async () => {
-        const filters: { users: string[]; actions: SupportedActionType[] } = {
-          users: [user._id.toString()],
-          actions: ['PAGE_CREATE'],
-        };
+        const filters: { usernames: string[]; actions: SupportedActionType[] } =
+          {
+            usernames: [user.username],
+            actions: ['PAGE_CREATE'],
+          };
 
         const jobId = await auditLogBulkExportService.createOrResetExportJob(
           filters,
@@ -113,9 +114,7 @@ describe('AuditLogBulkExportService', () => {
 
         const createdJob = await AuditLogBulkExportJob.findById(jobId);
         expect(createdJob?.filters.actions).toEqual(['PAGE_CREATE']);
-        expect(createdJob?.filters.users?.map(String)).toEqual([
-          user._id.toString(),
-        ]);
+        expect(createdJob?.filters.usernames).toEqual([user.username]);
       });
 
       it('should reset existing job when restartJob is true', async () => {
@@ -275,18 +274,17 @@ describe('AuditLogBulkExportService', () => {
 
   describe('filter canonicalization', () => {
     it('should generate same job for logically equivalent filters', async () => {
-      const validUserId1 = new mongoose.Types.ObjectId().toString();
-      const validUserId2 = new mongoose.Types.ObjectId().toString();
+      const filters1: { actions: SupportedActionType[]; usernames: string[] } =
+        {
+          actions: ['PAGE_VIEW', 'PAGE_CREATE'],
+          usernames: ['alice', 'bob'],
+        };
 
-      const filters1: { actions: SupportedActionType[]; users: string[] } = {
-        actions: ['PAGE_VIEW', 'PAGE_CREATE'],
-        users: [validUserId1, validUserId2],
-      };
-
-      const filters2: { actions: SupportedActionType[]; users: string[] } = {
-        actions: ['PAGE_CREATE', 'PAGE_VIEW'],
-        users: [validUserId2, validUserId1],
-      };
+      const filters2: { actions: SupportedActionType[]; usernames: string[] } =
+        {
+          actions: ['PAGE_CREATE', 'PAGE_VIEW'],
+          usernames: ['bob', 'alice'],
+        };
 
       await auditLogBulkExportService.createOrResetExportJob(
         filters1,

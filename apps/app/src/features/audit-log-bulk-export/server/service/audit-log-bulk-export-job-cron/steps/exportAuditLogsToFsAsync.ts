@@ -100,16 +100,11 @@ export async function exportAuditLogsToFsAsync(
       query.createdAt.$lte = new Date(filters.dateTo);
     }
   }
-  if (filters.users && filters.users.length > 0) {
+  if (filters.usernames && filters.usernames.length > 0) {
     const User = mongoose.model<IUser>('User');
     const userIds = await User.find({
-      _id: { $in: filters.users },
+      username: { $in: filters.usernames },
     }).distinct('_id');
-    if (userIds.length === 0) {
-      throw new Error(
-        `No users found with userIDs: ${filters.users.join(', ')}`,
-      );
-    }
     query.user = { $in: userIds };
   }
 
