@@ -88,7 +88,9 @@ const AuditLogExportModalSubstance = ({
       filters.dateFrom = startDate;
     }
     if (endDate != null) {
-      filters.dateTo = endDate;
+      const endOfDay = new Date(endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      filters.dateTo = endOfDay;
     }
 
     return filters;
