@@ -34,6 +34,7 @@
     "lint:openapi:apiv3": "node node_modules/swagger2openapi/oas-validate tmp/openapi-spec-apiv3.json",
     "lint:openapi:apiv1": "node node_modules/swagger2openapi/oas-validate tmp/openapi-spec-apiv1.json",
     "lint": "run-p lint:**",
+    "prelint:typecheck": "next typegen",
     "prelint:openapi:apiv3": "pnpm run openapi:generate-spec:apiv3",
     "prelint:openapi:apiv1": "pnpm run openapi:generate-spec:apiv1",
     "test": "vitest run",
