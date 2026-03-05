@@ -578,7 +578,7 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
 
   describe('4. Error Handling', () => {
     describe('4-1. Nonexistent Users Filter', () => {
-      it('should complete with no results for nonexistent usernames', async () => {
+      it('should fail with no results for nonexistent usernames', async () => {
         const job = await AuditLogBulkExportJob.create({
           user: testUser._id,
           filters: {
@@ -594,11 +594,11 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
         await cronService.proceedBulkExportJob(job);
         await waitForCondition(async () => {
           const updatedJob = await AuditLogBulkExportJob.findById(job._id);
-          return updatedJob?.status === AuditLogBulkExportJobStatus.completed;
+          return updatedJob?.status === AuditLogBulkExportJobStatus.failed;
         });
 
         const updatedJob = await AuditLogBulkExportJob.findById(job._id);
-        expect(updatedJob?.status).toBe(AuditLogBulkExportJobStatus.completed);
+        expect(updatedJob?.status).toBe(AuditLogBulkExportJobStatus.failed);
       });
     });
 
