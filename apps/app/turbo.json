@@ -14,6 +14,7 @@
       "outputLogs": "new-only"
     },
     "pre:styles-components": {
+      "dependsOn": ["^build"],
       "outputs": ["src/**/*.vendor-styles.prebuilt.js"],
       "inputs": [
         "vite.vendor-styles-components.ts",
@@ -54,6 +55,7 @@
       "outputLogs": "new-only"
     },
     "dev:pre:styles-components": {
+      "dependsOn": ["^dev"],
       "outputs": ["src/**/*.vendor-styles.prebuilt.js"],
       "inputs": [
         "vite.vendor-styles-components.ts",
