@@ -34,19 +34,20 @@ function moveAssetsToPublic(): Plugin {
       }
       fs.rmdirSync(srcDir);
 
-      // Rewrite /assets/ -> /static/fonts/ in prebuilt JS files
+      // Rewrite /assets/ -> /static/fonts/ and prepend // @ts-nocheck in prebuilt JS files
       const prebuiltFiles = fs.globSync('src/**/*.vendor-styles.prebuilt.js', {
         cwd: __dirname,
       });
       for (const file of prebuiltFiles) {
         const filePath = path.resolve(__dirname, file);
-        const content = fs.readFileSync(filePath, 'utf-8');
+        let content = fs.readFileSync(filePath, 'utf-8');
         if (content.includes('/assets/')) {
-          fs.writeFileSync(
-            filePath,
-            content.replaceAll('/assets/', '/static/fonts/'),
-          );
+          content = content.replaceAll('/assets/', '/static/fonts/');
         }
+        if (!content.startsWith('// @ts-nocheck')) {
+          content = `// @ts-nocheck\n${content}`;
+        }
+        fs.writeFileSync(filePath, content);
       }
     },
   };
