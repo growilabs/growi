@@ -1,7 +1,8 @@
 import type React from 'react';
 import { useMemo, useState } from 'react';
-import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
+
+import { toastSuccess } from '~/client/util/toastr';
 
 interface LayoutGuideItem {
   id: string;
@@ -23,7 +24,7 @@ const GuideRow = ({
   const { t } = useTranslation();
   const handleCopy = async () => {
     await navigator.clipboard.writeText(code);
-    toast.success(t('editor_guide.textstyle.copy_done'));
+    toastSuccess(t('editor_guide.textstyle.copy_done'));
   };
 
   const isFullWidth = minWidth === '100%' || !preview;
