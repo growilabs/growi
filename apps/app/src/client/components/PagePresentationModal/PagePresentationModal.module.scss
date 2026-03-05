@@ -2,7 +2,7 @@
 
 .grw-presentation-modal {
   /* stylelint-disable-next-line length-zero-no-unit */
-  @include modal.expand-modal-fullscreen(false, false, 0px);
+  @include modal.expand-modal-fullscreen(false, false, 0px, $css-modules: true);
 
   :global(.modal-content) {
     background-color: transparent;
