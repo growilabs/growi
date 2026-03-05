@@ -9,6 +9,7 @@
 /build/
 /dist/
 /transpiled/
+/public/static/fonts
 /public/static/js
 /public/static/styles
 /public/uploads

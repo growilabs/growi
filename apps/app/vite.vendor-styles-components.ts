@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Plugin } from 'vite';
 import { defineConfig } from 'vite';
 
 // Collect all src/**/*.vendor-styles.ts as entry points
@@ -16,8 +17,44 @@ const entries = fs
     {} as Record<string, string>,
   );
 
+// Move emitted font assets from src/assets/ to public/static/fonts/
+// and rewrite URL references in prebuilt JS files
+function moveAssetsToPublic(): Plugin {
+  return {
+    name: 'move-assets-to-public',
+    closeBundle() {
+      const srcDir = path.resolve(__dirname, 'src/assets');
+      const destDir = path.resolve(__dirname, 'public/static/fonts');
+      if (!fs.existsSync(srcDir)) return;
+
+      // Move font files
+      fs.mkdirSync(destDir, { recursive: true });
+      for (const file of fs.readdirSync(srcDir)) {
+        fs.renameSync(path.join(srcDir, file), path.join(destDir, file));
+      }
+      fs.rmdirSync(srcDir);
+
+      // Rewrite /assets/ -> /static/fonts/ in prebuilt JS files
+      const prebuiltFiles = fs.globSync('src/**/*.vendor-styles.prebuilt.js', {
+        cwd: __dirname,
+      });
+      for (const file of prebuiltFiles) {
+        const filePath = path.resolve(__dirname, file);
+        const content = fs.readFileSync(filePath, 'utf-8');
+        if (content.includes('/assets/')) {
+          fs.writeFileSync(
+            filePath,
+            content.replaceAll('/assets/', '/static/fonts/'),
+          );
+        }
+      }
+    },
+  };
+}
+
 export default defineConfig({
   publicDir: false,
+  plugins: [moveAssetsToPublic()],
   build: {
     outDir: 'src',
     emptyOutDir: false,

@@ -44,9 +44,11 @@
 - [x] 4. Precompile vendor CSS via Vite for Turbopack compatibility
 - [x] 4.1 Create Vite config and Turborepo tasks for vendor CSS precompilation
   - Created `vite.vendor-styles-components.ts` — collects all `src/**/*.vendor-styles.ts` as entry points, precompiles via Vite `?inline` suffix
+  - Includes `moveAssetsToPublic` plugin: moves Vite-emitted font files from `src/assets/` to `public/static/fonts/` and rewrites URL references in prebuilt JS (`/assets/` → `/static/fonts/`)
+  - Fonts served at `/static/fonts/*` via existing `express.static(crowi.publicDir)` — no additional Express route needed
   - Added `pre:styles-components` / `dev:pre:styles-components` tasks to `turbo.json` as dependencies of `build` and `dev`
   - Added corresponding npm scripts to `package.json`
-  - Added `/src/**/*.vendor-styles.prebuilt.js` to `.gitignore`
+  - Added `/src/**/*.vendor-styles.prebuilt.js` and `/public/static/fonts` to `.gitignore`
   - _Requirements: 8.3, 8.4, 8.5_
 
 - [x] 4.2 Create vendor-styles entry points and migrate CSS imports from components
@@ -127,3 +129,4 @@
 - **Standalone `:local`**: Turbopack doesn't support standalone `:local` or `&:local` in CSS Modules. Inside `:global(...)` function form, properties are already locally scoped by default, so `&:local` wrappers can simply be removed.
 - **Sass `@extend` in CSS Modules**: `@extend .class` fails when the target is wrapped in `:global(.class)` — Sass doesn't match them as the same selector. Replace with shared selector groups (comma-separated selectors).
 - **handsontable CSS**: `handsontable.full.min.css` contains IE CSS star hacks (`*zoom:1`, `*display:inline`) and `filter:alpha()` that Turbopack's CSS parser (lightningcss) cannot parse. Use `handsontable/dist/handsontable.css` (non-full, non-minified) instead — the "full" variant includes Pikaday which is unused.
+- **Vendor CSS font handling**: When Vite precompiles CSS that references external assets (e.g., KaTeX `@font-face` with `url(fonts/KaTeX_*.woff2)`), it emits asset files to `src/assets/` and rewrites URLs to `/assets/...`. Since `src/assets/` is not served by Express, a `moveAssetsToPublic` Vite plugin was added to relocate fonts to `public/static/fonts/` and rewrite URL references to `/static/fonts/...` in prebuilt JS. This aligns with the existing `public/static/` convention (`/public/static/js`, `/public/static/styles`).
