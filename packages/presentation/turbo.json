@@ -1,0 +1,24 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "generate:marpit-base-css": {
+      "inputs": [
+        "scripts/extract-marpit-css.ts",
+        "package.json"
+      ],
+      "outputs": ["src/client/consts/marpit-base-css.ts"],
+      "outputLogs": "new-only"
+    },
+    "build": {
+      "dependsOn": ["generate:marpit-base-css"],
+      "outputs": ["dist/**"],
+      "outputLogs": "new-only"
+    },
+    "dev": {
+      "dependsOn": ["generate:marpit-base-css"],
+      "outputs": ["dist/**"],
+      "outputLogs": "new-only"
+    }
+  }
+}
