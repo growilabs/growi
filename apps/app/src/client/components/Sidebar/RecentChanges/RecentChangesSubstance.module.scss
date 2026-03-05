@@ -1,52 +1,52 @@
 @use 'styles/mixins' as *;
 
-.grw-recent-changes-resize-button :global {
+.grw-recent-changes-resize-button {
   line-height: normal;
   transform: translateY(-2px);
 }
 
-.list-group-item :global {
+.list-group-item {
   font-size: 12px;
 
-  h6 {
+  :global(h6) {
     font-size: 14px;
   }
 
-  .grw-recent-changes-skeleton-small {
+  :global(.grw-recent-changes-skeleton-small) {
     @include grw-skeleton-text($font-size: 14px, $line-height: 16px);
 
     max-width: 120px;
   }
 
-  .grw-recent-changes-skeleton-h5 {
+  :global(.grw-recent-changes-skeleton-h5) {
     @include grw-skeleton-h5;
 
     max-width: 120px;
   }
 
-  .grw-recent-changes-skeleton-date {
+  :global(.grw-recent-changes-skeleton-date) {
     @include grw-skeleton-text($font-size: 10px, $line-height: 12px);
 
     width: 80px;
   }
 
   // For truncate-text
-  .flex-grow-1 {
+  :global(.flex-grow-1) {
     min-width: 0;
   }
 
-  .truncate-text {
+  :global(.truncate-text) {
     max-width: fit-content;
   }
 }
 
-.grw-recent-changes-item-lower :global {
+.grw-recent-changes-item-lower {
   font-size: 12px;
 
-  .material-symbols-outlined {
+  :global(.material-symbols-outlined) {
     font-size: 14px;
   }
-  .grw-formatted-distance-date {
+  :global(.grw-formatted-distance-date) {
     font-size: 10px;
   }
 }
@@ -55,13 +55,13 @@
 .grw-former-link a {
   --bs-link-opacity: 0.5;
 
-  &:global {
+  & {
     &:hover {
       --bs-link-opacity: 1;
     }
   }
 }
 
-.grw-recent-changes-item-lower :global {
+.grw-recent-changes-item-lower {
   color: var(--bs-gray-500);
 }

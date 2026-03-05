@@ -2,31 +2,31 @@
 @use 'styles/variables' as var;
 @use './comment-inheritance';
 
-.comment-styles :global {
+.comment-styles {
 
-  .page-comment {
+  :global(.page-comment) {
     position: relative;
     pointer-events: none;
     scroll-margin-top: var.$grw-scroll-margin-top-in-view;
 
     // background
-    .bg-comment {
+    :global(.bg-comment) {
       @extend %bg-comment;
     }
 
     // user icon
-    .user-picture {
+    :global(.user-picture) {
       @extend %user-picture;
     }
 
     // comment section
-    .page-comment-main {
+    :global(.page-comment-main) {
       @extend %comment-section;
 
       pointer-events: auto;
 
       // delete button
-      .page-comment-control {
+      :global(.page-comment-control) {
         position: absolute;
         top: 0;
         right: 0;
@@ -39,9 +39,9 @@
     }
 
     // comment body
-    .page-comment-body {
+    :global(.page-comment-body) {
       word-wrap: break-word;
-      .wiki p {
+      :global(.wiki p) {
         margin: 8px 0;
       }
     }
@@ -51,7 +51,7 @@
     // }
 
     // newer comments
-    &.page-comment-newer {
+    &:global(.page-comment-newer) {
       opacity: 0.7;
 
       &:hover {
@@ -59,15 +59,15 @@
       }
     }
 
-    .page-comment-revision {
-      .material-symbols-outlined {
+    :global(.page-comment-revision) {
+      :global(.material-symbols-outlined) {
         font-size: 16px;
         vertical-align: middle;
       }
     }
 
 
-    .page-comment-meta {
+    :global(.page-comment-meta) {
       display: flex;
       justify-content: flex-end;
       font-size: 0.9em;
@@ -77,7 +77,7 @@
   }
 
   // TODO: Refacotr Soft-coding
-  .page-comment-comment-body-skeleton {
+  :global(.page-comment-comment-body-skeleton) {
     position: relative;
     height: 66px;
     padding: 1em;
@@ -91,8 +91,8 @@
 
 // // Light mode color
 @include bs.color-mode(light) {
-  .comment-styles :global {
-    .page-comment-revision {
+  .comment-styles {
+    :global(.page-comment-revision) {
       color: bs.$gray-500;
     }
   }
@@ -100,8 +100,8 @@
 
 // // Dark mode color
 @include bs.color-mode(dark) {
-  .comment-styles :global {
-    .page-comment-revision {
+  .comment-styles {
+    :global(.page-comment-revision) {
       color: bs.$gray-600;
     }
   }

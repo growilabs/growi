@@ -6,9 +6,7 @@ See: `.claude/skills/tech-stack/SKILL.md` (auto-loaded by Claude Code)
 
 ### Bundler Strategy (Project-Wide Decision)
 
-GROWI uses **Webpack** (not Turbopack) across all Next.js applications. Turbopack is the default in Next.js 16, but GROWI opts out via `--webpack` flag due to custom webpack configuration that Turbopack does not support.
-
-Turbopack migration is deferred as a separate initiative. See `apps/app/.claude/skills/build-optimization/SKILL.md` for details and blockers.
+GROWI uses **Turbopack** (Next.js 16 default) for development. Webpack fallback is available via `USE_WEBPACK=1` environment variable for debugging. Production builds still use `next build --webpack`. All custom webpack loaders/plugins have been migrated to Turbopack equivalents (`turbopack.rules`, `turbopack.resolveAlias`). See `apps/app/.claude/skills/build-optimization/SKILL.md` for details.
 
 ### Import Optimization Principles
 

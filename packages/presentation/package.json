@@ -30,6 +30,7 @@
   },
   "scripts": {
     "build": "vite build",
+    "build:vendor-styles": "vite build --config vite.vendor-styles.ts",
     "clean": "shx rm -rf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",

@@ -1,7 +1,7 @@
 @use 'styles/organisms/wiki-custom-sidebar.scss';
 
-.grw-custom-sidebar-content :global {
-  .wiki {
+.grw-custom-sidebar-content {
+  :global(.wiki) {
     @extend %grw-custom-sidebar-content;
   }
 }

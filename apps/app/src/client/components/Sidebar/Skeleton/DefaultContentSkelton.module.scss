@@ -1,16 +1,15 @@
 @use 'styles/mixins';
 
-.grw-default-content-skelton :global {
-  .grw-skeleton-text {
+.grw-default-content-skelton {
+  :global(.grw-skeleton-text),
+  :global(.grw-skeleton-text-full) {
     @include mixins.grw-skeleton-text($font-size:15px, $line-height:21.42px);
 
     max-width: 160px;
     margin: 15px 0;
   }
 
-  .grw-skeleton-text-full {
-    @extend .grw-skeleton-text;
-
+  :global(.grw-skeleton-text-full) {
     max-width: 100%;
   }
 }
