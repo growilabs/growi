@@ -1,3 +1,3 @@
 export interface IInAppNotificationOpenable {
-  open: () => void,
+  open: () => void;
 }

@@ -1,11 +1,22 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Mock the logger module - use vi.hoisted to ensure mock is available before imports
+const { mockLoggerError } = vi.hoisted(() => ({
+  mockLoggerError: vi.fn(),
+}));
+vi.mock('~/utils/logger', () => ({
+  default: () => ({
+    error: mockLoggerError,
+  }),
+}));
+
 import { clearComponentCache, useLazyLoader } from './use-lazy-loader';
 
 describe('useLazyLoader', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLoggerError.mockClear();
     // Clear the global component cache to ensure test isolation
     clearComponentCache();
   });
@@ -253,9 +264,6 @@ describe('useLazyLoader', () => {
   describe('Error handling', () => {
     it('should handle import failure gracefully', async () => {
       // Arrange
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
       const mockError = new Error('Import failed');
       const mockImport = vi.fn().mockRejectedValue(mockError);
 
@@ -274,8 +282,6 @@ describe('useLazyLoader', () => {
 
       // Component should still be null after error
       expect(result.current).toBeNull();
-
-      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -355,9 +361,6 @@ describe('useLazyLoader', () => {
 
     it('should handle import function returning null', async () => {
       // Arrange
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
       const mockImport = vi.fn().mockResolvedValue(null);
 
       // Act
@@ -375,18 +378,13 @@ describe('useLazyLoader', () => {
 
       // Component should be null since the import resolved to null
       expect(result.current).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(mockLoggerError).toHaveBeenCalledWith(
         expect.stringContaining('Module or default export is missing'),
       );
-
-      consoleErrorSpy.mockRestore();
     });
 
     it('should handle import function returning object without default property', async () => {
       // Arrange
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
       const mockImport = vi
         .fn()
         .mockResolvedValue({ notDefault: () => <div>Wrong</div> });
@@ -405,11 +403,9 @@ describe('useLazyLoader', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(result.current).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(mockLoggerError).toHaveBeenCalledWith(
         expect.stringContaining('Module or default export is missing'),
       );
-
-      consoleErrorSpy.mockRestore();
     });
 
     it('should handle rapid isActive toggling', async () => {

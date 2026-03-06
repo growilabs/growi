@@ -18,7 +18,7 @@ export const batchProcessPromiseAll = async <I, O>(
   for (let start = 0; start < items.length; start += limit) {
     const end = Math.min(start + limit, items.length);
 
-    // eslint-disable-next-line no-await-in-loop
+    // biome-ignore lint/performance/noAwaitInLoops: Allow for memory consumption control
     const slicedResults = await Promise.allSettled(
       items.slice(start, end).map(fn),
     );

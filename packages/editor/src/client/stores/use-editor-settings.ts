@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Extension } from '@codemirror/state';
 import { Prec } from '@codemirror/state';
 import {
@@ -93,12 +93,21 @@ const useKeymapExtension = (
     undefined,
   );
 
+  // Use ref for onSave to prevent keymap extension recreation on callback changes
+  // This is critical for Vim mode to preserve insert mode state
+  const onSaveRef = useRef(onSave);
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
+
   useEffect(() => {
     const settingKeyMap = async (name?: KeyMapMode) => {
-      setKeymapExtension(await getKeymap(name, onSave));
+      // Pass a stable wrapper function that delegates to the ref
+      const stableOnSave = () => onSaveRef.current?.();
+      setKeymapExtension(await getKeymap(name, stableOnSave));
     };
     settingKeyMap(keymapMode);
-  }, [keymapMode, onSave]);
+  }, [keymapMode]);
 
   useEffect(() => {
     if (keymapExtension == null) {

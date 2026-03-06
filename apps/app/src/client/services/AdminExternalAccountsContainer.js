@@ -5,16 +5,13 @@ import loggerFactory from '~/utils/logger';
 
 import { apiv3Delete, apiv3Get } from '../util/apiv3-client';
 
-
-// eslint-disable-next-line no-unused-vars
-const logger = loggerFactory('growi:services:AdminexternalaccountsContainer');
+const _logger = loggerFactory('growi:services:AdminexternalaccountsContainer');
 
 /**
  * Service container for admin external-accounts page (ManageExternalAccountsContainer.jsx)
  * @extends {Container} unstated Container
  */
 export default class AdminExternalAccountsContainer extends Container {
-
   constructor() {
     super();
 
@@ -28,7 +25,6 @@ export default class AdminExternalAccountsContainer extends Container {
       activePage: 1,
       pagingLimit: Infinity,
     };
-
   }
 
   /**
@@ -38,28 +34,29 @@ export default class AdminExternalAccountsContainer extends Container {
     return 'AdminExternalAccountsContainer';
   }
 
-
   /**
    * syncExternalAccounts of selectedPage
    * @memberOf AdminExternalAccountsContainer
    * @param {number} selectedPage
    */
   async retrieveExternalAccountsByPagingNum(selectedPage) {
-
     const params = { page: selectedPage };
     const { data } = await apiv3Get('/users/external-accounts', params);
 
     if (data.paginateResult == null) {
-      throw new Error('data must conclude \'paginateResult\' property.');
+      throw new Error("data must conclude 'paginateResult' property.");
     }
-    const { docs: externalAccounts, totalDocs: totalAccounts, limit: pagingLimit } = data.paginateResult;
+    const {
+      docs: externalAccounts,
+      totalDocs: totalAccounts,
+      limit: pagingLimit,
+    } = data.paginateResult;
     this.setState({
       externalAccounts,
       totalAccounts,
       pagingLimit,
       activePage: selectedPage,
     });
-
   }
 
   /**
@@ -69,10 +66,11 @@ export default class AdminExternalAccountsContainer extends Container {
    * @param {string} externalAccountId id of the External Account to be removed
    */
   async removeExternalAccountById(externalAccountId) {
-    const res = await apiv3Delete(`/users/external-accounts/${externalAccountId}/remove`);
+    const res = await apiv3Delete(
+      `/users/external-accounts/${externalAccountId}/remove`,
+    );
     const deletedUserData = res.data.externalAccount;
     await this.retrieveExternalAccountsByPagingNum(this.state.activePage);
     return deletedUserData.accountId;
   }
-
 }

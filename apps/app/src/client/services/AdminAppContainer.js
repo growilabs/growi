@@ -8,7 +8,6 @@ import { apiv3Get, apiv3Post, apiv3Put } from '../util/apiv3-client';
  * @extends {Container} unstated Container
  */
 export default class AdminAppContainer extends Container {
-
   constructor() {
     super();
 
@@ -22,7 +21,7 @@ export default class AdminAppContainer extends Container {
       confidential: '',
       globalLang: '',
       isEmailPublishedForNewUser: true,
-      fileUpload: '',
+      isReadOnlyForNewUser: false,
 
       isV5Compatible: null,
       siteUrl: '',
@@ -40,12 +39,13 @@ export default class AdminAppContainer extends Container {
       sesAccessKeyId: '',
       sesSecretAccessKey: '',
 
+      oauth2ClientId: '',
+      oauth2ClientSecret: '',
+      oauth2RefreshToken: '',
+      oauth2User: '',
+
       isMaintenanceMode: false,
-
-      // TODO: remove this property when bulk export can be relased for cloud (https://redmine.weseek.co.jp/issues/163220)
-      isBulkExportDisabledForCloud: false,
     };
-
   }
 
   /**
@@ -67,7 +67,7 @@ export default class AdminAppContainer extends Container {
       confidential: appSettingsParams.confidential,
       globalLang: appSettingsParams.globalLang,
       isEmailPublishedForNewUser: appSettingsParams.isEmailPublishedForNewUser,
-      fileUpload: appSettingsParams.fileUpload,
+      isReadOnlyForNewUser: appSettingsParams.isReadOnlyForNewUser,
       isV5Compatible: appSettingsParams.isV5Compatible,
       siteUrl: appSettingsParams.siteUrl,
       siteUrlUseOnlyEnvVars: appSettingsParams.siteUrlUseOnlyEnvVars,
@@ -83,10 +83,12 @@ export default class AdminAppContainer extends Container {
       sesAccessKeyId: appSettingsParams.sesAccessKeyId,
       sesSecretAccessKey: appSettingsParams.sesSecretAccessKey,
 
-      isMaintenanceMode: appSettingsParams.isMaintenanceMode,
+      oauth2ClientId: appSettingsParams.oauth2ClientId,
+      oauth2ClientSecret: appSettingsParams.oauth2ClientSecret,
+      oauth2RefreshToken: appSettingsParams.oauth2RefreshToken,
+      oauth2User: appSettingsParams.oauth2User,
 
-      // TODO: remove this property when bulk export can be relased for cloud (https://redmine.weseek.co.jp/issues/163220)
-      isBulkExportDisabledForCloud: appSettingsParams.isBulkExportDisabledForCloud,
+      isMaintenanceMode: appSettingsParams.isMaintenanceMode,
     });
   }
 
@@ -119,10 +121,10 @@ export default class AdminAppContainer extends Container {
   }
 
   /**
-   * Change fileUpload
+   * Change isReadOnlyForNewUser
    */
-  changeFileUpload(fileUpload) {
-    this.setState({ fileUpload });
+  changeIsReadOnlyForNewUserShow(isReadOnlyForNewUser) {
+    this.setState({ isReadOnlyForNewUser });
   }
 
   /**
@@ -138,7 +140,6 @@ export default class AdminAppContainer extends Container {
   changeSiteUrl(siteUrl) {
     this.setState({ siteUrl });
   }
-
 
   /**
    * Change from address
@@ -197,6 +198,34 @@ export default class AdminAppContainer extends Container {
   }
 
   /**
+   * Change oauth2ClientId
+   */
+  changeOAuth2ClientId(oauth2ClientId) {
+    this.setState({ oauth2ClientId });
+  }
+
+  /**
+   * Change oauth2ClientSecret
+   */
+  changeOAuth2ClientSecret(oauth2ClientSecret) {
+    this.setState({ oauth2ClientSecret });
+  }
+
+  /**
+   * Change oauth2RefreshToken
+   */
+  changeOAuth2RefreshToken(oauth2RefreshToken) {
+    this.setState({ oauth2RefreshToken });
+  }
+
+  /**
+   * Change oauth2User
+   */
+  changeOAuth2User(oauth2User) {
+    this.setState({ oauth2User });
+  }
+
+  /**
    * Update app setting
    * @memberOf AdminAppContainer
    * @return {Array} Appearance
@@ -207,12 +236,11 @@ export default class AdminAppContainer extends Container {
       confidential: this.state.confidential,
       globalLang: this.state.globalLang,
       isEmailPublishedForNewUser: this.state.isEmailPublishedForNewUser,
-      fileUpload: this.state.fileUpload,
+      isReadOnlyForNewUser: this.state.isReadOnlyForNewUser,
     });
     const { appSettingParams } = response.data;
     return appSettingParams;
   }
-
 
   /**
    * Update site url setting
@@ -235,6 +263,9 @@ export default class AdminAppContainer extends Container {
   updateMailSettingHandler() {
     if (this.state.transmissionMethod === 'smtp') {
       return this.updateSmtpSetting();
+    }
+    if (this.state.transmissionMethod === 'oauth2') {
+      return this.updateOAuth2Setting();
     }
     return this.updateSesSetting();
   }
@@ -276,6 +307,25 @@ export default class AdminAppContainer extends Container {
   }
 
   /**
+   * Update OAuth 2.0 setting
+   * @memberOf AdminAppContainer
+   * @return {Array} Appearance
+   */
+  async updateOAuth2Setting() {
+    const response = await apiv3Put('/app-settings/oauth2-setting', {
+      fromAddress: this.state.fromAddress,
+      transmissionMethod: this.state.transmissionMethod,
+      oauth2ClientId: this.state.oauth2ClientId,
+      oauth2ClientSecret: this.state.oauth2ClientSecret,
+      oauth2RefreshToken: this.state.oauth2RefreshToken,
+      oauth2User: this.state.oauth2User,
+    });
+    const { mailSettingParams } = response.data;
+    this.setState({ isMailerSetup: mailSettingParams.isMailerSetup });
+    return mailSettingParams;
+  }
+
+  /**
    * send test e-mail
    * @memberOf AdminAppContainer
    */
@@ -300,5 +350,4 @@ export default class AdminAppContainer extends Container {
   async endMaintenanceMode() {
     await apiv3Post('/app-settings/maintenance-mode', { flag: false });
   }
-
 }

@@ -4,19 +4,15 @@ import { useCommentPreviewOptions } from '~/stores/renderer';
 
 import RevisionRenderer from '../../../components/PageView/RevisionRenderer';
 
-
 import styles from './CommentPreview.module.scss';
-
 
 const moduleClass = styles['grw-comment-preview'] ?? '';
 
-
 type CommentPreviewPorps = {
-  markdown: string,
-}
+  markdown: string;
+};
 
 export const CommentPreview = (props: CommentPreviewPorps): JSX.Element => {
-
   const { markdown } = props;
 
   const { data: rendererOptions } = useCommentPreviewOptions();
@@ -34,5 +30,4 @@ export const CommentPreview = (props: CommentPreviewPorps): JSX.Element => {
       />
     </div>
   );
-
 };

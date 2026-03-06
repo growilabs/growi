@@ -1,13 +1,14 @@
-/* eslint-disable react/no-danger */
 import React, { useCallback } from 'react';
-
 import { useTranslation } from 'next-i18next';
 import {
-  UncontrolledDropdown, DropdownToggle, DropdownMenu, DropdownItem,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
+  UncontrolledDropdown,
 } from 'reactstrap';
 
 import AdminMarkDownContainer from '~/client/services/AdminMarkDownContainer';
-import { toastSuccess, toastError } from '~/client/util/toastr';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import loggerFactory from '~/utils/logger';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
@@ -15,24 +16,30 @@ import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 
 const logger = loggerFactory('growi:importer');
 
-
 type Props = {
   adminMarkDownContainer: AdminMarkDownContainer;
-}
+};
 
 const IndentForm = (props: Props) => {
   const { t } = useTranslation('admin');
 
-  const onClickSubmit = useCallback(async(props) => {
-    try {
-      await props.adminMarkDownContainer.updateIndentSetting();
-      toastSuccess(t('toaster.update_successed', { target: t('markdown_settings.indent_header'), ns: 'commons' }));
-    }
-    catch (err) {
-      toastError(err);
-      logger.error(err);
-    }
-  }, [t]);
+  const onClickSubmit = useCallback(
+    async (props) => {
+      try {
+        await props.adminMarkDownContainer.updateIndentSetting();
+        toastSuccess(
+          t('toaster.update_successed', {
+            target: t('markdown_settings.indent_header'),
+            ns: 'commons',
+          }),
+        );
+      } catch (err) {
+        toastError(err);
+        logger.error(err);
+      }
+    },
+    [t],
+  );
 
   const renderIndentSizeOption = (props) => {
     const { adminMarkDownContainer } = props;
@@ -41,9 +48,14 @@ const IndentForm = (props: Props) => {
     return (
       <div className="col">
         <div>
-          <label htmlFor="adminPreferredIndentSize" className="form-label">{t('markdown_settings.indent_options.indentSize')}</label>
+          <label htmlFor="adminPreferredIndentSize" className="form-label">
+            {t('markdown_settings.indent_options.indentSize')}
+          </label>
           <UncontrolledDropdown id="adminPreferredIndentSize">
-            <DropdownToggle caret className="col-3 col-sm-2 col-md-5 col-lg-5 col-xl-3 text-end">
+            <DropdownToggle
+              caret
+              className="col-3 col-sm-2 col-md-5 col-lg-5 col-xl-3 text-end"
+            >
               <span className="float-start">
                 {adminPreferredIndentSize || 4}
               </span>
@@ -51,8 +63,14 @@ const IndentForm = (props: Props) => {
             <DropdownMenu className="dropdown-menu" role="menu">
               {[2, 4].map((num) => {
                 return (
-                  <DropdownItem key={num} role="presentation" onClick={() => adminMarkDownContainer.setAdminPreferredIndentSize(num)}>
-                    <a role="menuitem">{num}</a>
+                  <DropdownItem
+                    key={num}
+                    role="presentation"
+                    onClick={() =>
+                      adminMarkDownContainer.setAdminPreferredIndentSize(num)
+                    }
+                  >
+                    <span>{num}</span>
                   </DropdownItem>
                 );
               })}
@@ -70,7 +88,9 @@ const IndentForm = (props: Props) => {
     const { adminMarkDownContainer } = props;
     const { isIndentSizeForced } = adminMarkDownContainer.state;
 
-    const helpIndentInComment = { __html: t('markdown_settings.indent_options.disallow_indent_change_desc') };
+    const helpIndentInComment = {
+      __html: t('markdown_settings.indent_options.disallow_indent_change_desc'),
+    };
 
     return (
       <div className="col">
@@ -81,14 +101,23 @@ const IndentForm = (props: Props) => {
             id="isIndentSizeForced"
             checked={isIndentSizeForced || false}
             onChange={() => {
-              adminMarkDownContainer.setState({ isIndentSizeForced: !isIndentSizeForced });
+              adminMarkDownContainer.setState({
+                isIndentSizeForced: !isIndentSizeForced,
+              });
             }}
           />
-          <label className="form-label form-check-label" htmlFor="isIndentSizeForced">
+          <label
+            className="form-label form-check-label"
+            htmlFor="isIndentSizeForced"
+          >
             {t('markdown_settings.indent_options.disallow_indent_change')}
           </label>
         </div>
-        <p className="form-text text-muted" dangerouslySetInnerHTML={helpIndentInComment} />
+        <p
+          className="form-text text-muted"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
+          dangerouslySetInnerHTML={helpIndentInComment}
+        />
       </div>
     );
   };
@@ -101,7 +130,10 @@ const IndentForm = (props: Props) => {
         {renderIndentSizeOption(props)}
         {renderIndentForceOption(props)}
       </fieldset>
-      <AdminUpdateButtonRow onClick={() => onClickSubmit(props)} disabled={adminMarkDownContainer.state.retrieveError != null} />
+      <AdminUpdateButtonRow
+        onClick={() => onClickSubmit(props)}
+        disabled={adminMarkDownContainer.state.retrieveError != null}
+      />
     </React.Fragment>
   );
 };
@@ -109,6 +141,8 @@ const IndentForm = (props: Props) => {
 /**
  * Wrapper component for using unstated
  */
-const IndentFormWrapper = withUnstatedContainers(IndentForm, [AdminMarkDownContainer]);
+const IndentFormWrapper = withUnstatedContainers(IndentForm, [
+  AdminMarkDownContainer,
+]);
 
 export default IndentFormWrapper;

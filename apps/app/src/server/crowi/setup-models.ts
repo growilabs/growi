@@ -7,7 +7,6 @@ import type Crowi from '.';
 const logger = loggerFactory('growi:crowi:setup-models');
 
 export type ModelsMapDependentOnCrowi = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [modelName: string]: Model<any>;
 };
 

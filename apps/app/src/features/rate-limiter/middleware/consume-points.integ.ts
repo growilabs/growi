@@ -1,3 +1,5 @@
+/** biome-ignore-all lint/performance/noAwaitInLoops: Allow in tests */
+
 import { faker } from '@faker-js/faker';
 
 const testRateLimitErrorWhenExceedingMaxRequests = async (
@@ -12,7 +14,6 @@ const testRateLimitErrorWhenExceedingMaxRequests = async (
   try {
     for (let i = 1; i <= maxRequests + 1; i++) {
       count += 1;
-      // eslint-disable-next-line no-await-in-loop
       const res = await consumePoints(method, key, { method, maxRequests });
       if (count === maxRequests) {
         // Expect consumedPoints to be equal to maxRequest when maxRequest is reached

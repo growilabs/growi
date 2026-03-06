@@ -6,8 +6,8 @@ export type ZipFileStat = {
   zipFilePath: string;
   fileStat: Stats;
   innerFileStats: {
-      fileName: string;
-      collectionName: string;
-      size: number;
+    fileName: string;
+    collectionName: string;
+    size: number;
   }[];
-}
+};

@@ -10,7 +10,10 @@ export const ConflictDiffModalLazyLoaded = (): JSX.Element => {
 
   const ConflictDiffModal = useLazyLoader<ConflictDiffModalProps>(
     'conflict-diff-modal',
-    () => import('./ConflictDiffModal').then(mod => ({ default: mod.ConflictDiffModal })),
+    () =>
+      import('./ConflictDiffModal').then((mod) => ({
+        default: mod.ConflictDiffModal,
+      })),
     status?.isOpened ?? false,
   );
 

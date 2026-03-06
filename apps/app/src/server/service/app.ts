@@ -4,7 +4,6 @@ import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
 import S2sMessage from '../models/vo/s2s-message';
-
 import { configManager } from './config-manager';
 import type { S2sMessagingService } from './s2s-messaging/base';
 import type { S2sMessageHandlable } from './s2s-messaging/handlable';
@@ -14,7 +13,6 @@ const logger = loggerFactory('growi:service:AppService');
  * the service class of AppService
  */
 export default class AppService implements S2sMessageHandlable {
-
   crowi: Crowi;
 
   s2sMessagingService: S2sMessagingService;
@@ -64,12 +62,13 @@ export default class AppService implements S2sMessageHandlable {
 
       try {
         await s2sMessagingService.publish(s2sMessage);
-      }
-      catch (e) {
-        logger.error('Failed to publish post installation message with S2sMessagingService: ', e.message);
+      } catch (e) {
+        logger.error(
+          'Failed to publish post installation message with S2sMessagingService: ',
+          e.message,
+        );
       }
     }
-
   }
 
   getAppTitle() {
@@ -108,5 +107,4 @@ export default class AppService implements S2sMessageHandlable {
   async endMaintenanceMode(): Promise<void> {
     await configManager.updateConfig('app:isMaintenanceMode', false);
   }
-
 }

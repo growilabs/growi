@@ -746,6 +746,11 @@
       "updatedAt": "마지막 업데이트일"
     }
   },
+  "help_dropdown": {
+    "show_shortcuts": "단축키 표시",
+    "growi_cloud_help": "GROWI.cloud 도움말",
+    "growi_version": "GROWI 버전"
+  },
   "private_legacy_pages": {
     "title": "비공개 레거시 페이지",
     "bulk_operation": "대량 작업",
@@ -1058,6 +1063,54 @@
       "all_important": "이 텍스트는 모두\n중요합니다",
       "sub_text": "아래 첨자",
       "sup_text": "위 첨자"
+    },
+    "layout": {
+      "copy_done": "복사되었습니다!",
+      "header": "헤더",
+      "header_text": "제목",
+      "list": "글머리 기호 목록",
+      "list_text": "목록 항목입니다",
+      "ordered_list": "번호 매기기 목록",
+      "ordered_list_text": "번호 항목입니다",
+      "checkbox": "체크박스",
+      "task": "할 일 ",
+      "quote": "인용구",
+      "quote_text": "인용",
+      "multi_quote": "중첩 인용",
+      "hr": "가로줄",
+      "br": "줄바꿈",
+      "br_code": "스페이스를 두 번 입력하면  줄바꿈을\n할 수 있습니다",
+      "br_preview_1": "스페이스를 두 번 입력하면",
+      "br_preview_2": "줄바꿈을 할 수 있습니다",
+      "code_block": "코드 블록",
+      "code_block_text": "여기에 코드를 추가하세요",
+      "table": "표",
+      "left": "왼쪽 정렬",
+      "right": "오른쪽 정렬",
+      "center": "가운데 정렬",
+      "row_text": "이 열은",
+      "row_display": "됩니다",
+      "footnote": "각주",
+      "footnote_label": "각주가 있는 텍스트",
+      "footnote_desc": "주석은 이와 같이 작성합니다"
+    },
+    "decoration": {
+      "copy_done": "클립보드에 복사되었습니다!",
+      "style": "스타일",
+      "alert": "알림",
+      "badge": "배지",
+      "text_color": "텍스트 색상",
+      "back_color": "배경 색상",
+      "alert_block": "알림 블록",
+      "important_label": "Important",
+      "important_text": "중요한 정보",
+      "caution_label": "Caution",
+      "caution_text": "금지 사항 및 경고",
+      "placeholder": "텍스트가 입력됩니다",
+      "docs_title": "Bootstrap 5 공식 문서",
+      "docs_badge": "배지 상세 정보",
+      "docs_color": "색상 상세 정보",
+      "docs_alert": "알림 블록 상세 정보"
     }
   }
 }

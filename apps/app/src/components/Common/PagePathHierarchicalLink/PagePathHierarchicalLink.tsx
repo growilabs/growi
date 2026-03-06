@@ -29,7 +29,6 @@ export const PagePathHierarchicalLink: FC<PagePathHierarchicalLinkProps> = memo(
 
     const isIconHidden = props.isIconHidden ?? false;
 
-    // eslint-disable-next-line react/prop-types
     const RootElm = useCallback(
       ({ children }) => {
         return isInnerElem ? (

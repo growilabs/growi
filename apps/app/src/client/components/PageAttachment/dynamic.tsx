@@ -10,7 +10,10 @@ export const DeleteAttachmentModalLazyLoaded = (): JSX.Element => {
 
   const DeleteAttachmentModal = useLazyLoader<DeleteAttachmentModalProps>(
     'delete-attachment-modal',
-    () => import('./DeleteAttachmentModal').then(mod => ({ default: mod.DeleteAttachmentModal })),
+    () =>
+      import('./DeleteAttachmentModal').then((mod) => ({
+        default: mod.DeleteAttachmentModal,
+      })),
     status?.isOpened ?? false,
   );
 

@@ -28,7 +28,6 @@ export const getServerSideRendererConfigProps: GetServerSideProps<
         isIndentSizeForced: configManager.getConfig(
           'markdown:isIndentSizeForced',
         ),
-
         drawioUri: configManager.getConfig('app:drawioUri'),
         plantumlUri: configManager.getConfig('app:plantumlUri'),
 
@@ -102,10 +101,9 @@ export const getServerSideGeneralPageProps: GetServerSideProps<
         isUploadAllFileAllowed: fileUploadService.getFileUploadEnabled(),
         isUploadEnabled: fileUploadService.getIsUploadable(),
 
-        // TODO: remove growiCloudUri condition when bulk export can be relased for GROWI.cloud (https://redmine.weseek.co.jp/issues/163220)
-        isBulkExportPagesEnabled:
-          configManager.getConfig('app:isBulkExportPagesEnabled') &&
-          configManager.getConfig('app:growiCloudUri') == null,
+        isBulkExportPagesEnabled: configManager.getConfig(
+          'app:isBulkExportPagesEnabled',
+        ),
         isPdfBulkExportEnabled:
           configManager.getConfig('app:pageBulkExportPdfConverterUri') != null,
         isLocalAccountRegistrationEnabled:
@@ -122,6 +120,7 @@ export const getServerSideGeneralPageProps: GetServerSideProps<
         isEnabledAttachTitleHeader: configManager.getConfig(
           'customize:isEnabledAttachTitleHeader',
         ),
+        disableUserPages: configManager.getConfig('security:disableUserPages'),
       },
     },
   };

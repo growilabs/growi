@@ -1,11 +1,8 @@
-import React, {
-  useEffect, useMemo, useRef, type JSX,
-} from 'react';
-
+import React, { type JSX, useEffect, useMemo, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import type { IRevisionHasId } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
-import dynamic from 'next/dynamic';
 import { debounce } from 'throttle-debounce';
 
 import { useCurrentUser } from '~/states/global';
@@ -13,25 +10,28 @@ import { useIsTrashPage } from '~/states/page';
 import { useSWRxPageComment } from '~/stores/comment';
 import { useSWRMUTxPageInfo } from '~/stores/page';
 
-
 const { isTopPage } = pagePathUtils;
 
-
-const PageComment = dynamic(() => import('~/client/components/PageComment').then(mod => mod.PageComment), { ssr: false });
-const CommentEditorPre = dynamic(() => import('./PageComment/CommentEditor').then(mod => mod.CommentEditorPre), { ssr: false });
+const PageComment = dynamic(
+  () =>
+    import('~/client/components/PageComment').then((mod) => mod.PageComment),
+  { ssr: false },
+);
+const CommentEditorPre = dynamic(
+  () =>
+    import('./PageComment/CommentEditor').then((mod) => mod.CommentEditorPre),
+  { ssr: false },
+);
 
 type CommentsProps = {
-  pageId: string,
-  pagePath: string,
-  revision: IRevisionHasId,
-  onLoaded?: () => void,
-}
+  pageId: string;
+  pagePath: string;
+  revision: IRevisionHasId;
+  onLoaded?: () => void;
+};
 
 export const Comments = (props: CommentsProps): JSX.Element => {
-
-  const {
-    pageId, pagePath, revision, onLoaded,
-  } = props;
+  const { pageId, pagePath, revision, onLoaded } = props;
 
   const { t } = useTranslation('');
 
@@ -42,7 +42,10 @@ export const Comments = (props: CommentsProps): JSX.Element => {
 
   const pageCommentParentRef = useRef<HTMLDivElement>(null);
 
-  const onLoadedDebounced = useMemo(() => debounce(500, () => onLoaded?.()), [onLoaded]);
+  const onLoadedDebounced = useMemo(
+    () => debounce(500, () => onLoaded?.()),
+    [onLoaded],
+  );
 
   useEffect(() => {
     const parent = pageCommentParentRef.current;
@@ -73,7 +76,11 @@ export const Comments = (props: CommentsProps): JSX.Element => {
   return (
     <div className="page-comments-row mt-5 py-4 border-top d-edit-none d-print-none">
       <h4 className="mb-3">{t('page_comment.comments')}</h4>
-      <div id="page-comments-list" className="page-comments-list" ref={pageCommentParentRef}>
+      <div
+        id="page-comments-list"
+        className="page-comments-list"
+        ref={pageCommentParentRef}
+      >
         <PageComment
           pageId={pageId}
           pagePath={pagePath}
@@ -93,5 +100,4 @@ export const Comments = (props: CommentsProps): JSX.Element => {
       )}
     </div>
   );
-
 };

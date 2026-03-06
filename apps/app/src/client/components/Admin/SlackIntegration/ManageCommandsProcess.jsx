@@ -1,13 +1,15 @@
 import React, { useCallback, useState } from 'react';
-
-import { defaultSupportedCommandsNameForBroadcastUse, defaultSupportedCommandsNameForSingleUse, defaultSupportedSlackEventActions } from '@growi/slack';
+import {
+  defaultSupportedCommandsNameForBroadcastUse,
+  defaultSupportedCommandsNameForSingleUse,
+  defaultSupportedSlackEventActions,
+} from '@growi/slack';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
 import { apiv3Put } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import loggerFactory from '~/utils/logger';
-
 
 const logger = loggerFactory('growi:SlackIntegration:ManageCommandsProcess');
 
@@ -26,13 +28,14 @@ const EventTypes = {
   LINK_SHARING: 'linkSharing',
 };
 
-
 // A utility function that returns the new state but identical to the previous state
 const getUpdatedChannelsList = (prevState, commandName, value) => {
   // string to array
   const allowedChannelsArray = value.split(',');
   // trim whitespace from all elements
-  const trimedAllowedChannelsArray = allowedChannelsArray.map(channelName => channelName.trim());
+  const trimedAllowedChannelsArray = allowedChannelsArray.map((channelName) =>
+    channelName.trim(),
+  );
 
   prevState[commandName] = trimedAllowedChannelsArray;
   return prevState;
@@ -71,15 +74,23 @@ const getPermissionTypeFromValue = (value) => {
 };
 
 const PermissionSettingForEachPermissionTypeComponent = ({
-  keyName, onUpdatePermissions, onUpdateChannels, singleCommandDescription, allowedChannelsDescription, currentPermissionType, permissionSettings,
+  keyName,
+  onUpdatePermissions,
+  onUpdateChannels,
+  singleCommandDescription,
+  allowedChannelsDescription,
+  currentPermissionType,
+  permissionSettings,
 }) => {
   const { t } = useTranslation();
-  const hiddenClass = currentPermissionType === PermissionTypes.ALLOW_SPECIFIED ? '' : 'd-none';
+  const hiddenClass =
+    currentPermissionType === PermissionTypes.ALLOW_SPECIFIED ? '' : 'd-none';
 
   const permission = permissionSettings[keyName];
   if (permission === undefined) logger.error('Must be implemented');
-  const textareaDefaultValue = Array.isArray(permission) ? permission.join(',') : '';
-
+  const textareaDefaultValue = Array.isArray(permission)
+    ? permission.join(',')
+    : '';
 
   return (
     <div className="my-1 mb-2">
@@ -88,7 +99,7 @@ const PermissionSettingForEachPermissionTypeComponent = ({
           <strong className="text-capitalize">{keyName}</strong>
           {singleCommandDescription && (
             <small className="form-text text-muted small">
-              { singleCommandDescription }
+              {singleCommandDescription}
             </small>
           )}
         </p>
@@ -102,12 +113,12 @@ const PermissionSettingForEachPermissionTypeComponent = ({
             aria-expanded="true"
           >
             <span className="float-start">
-              {currentPermissionType === PermissionTypes.ALLOW_ALL
-              && t('admin:slack_integration.accordion.allow_all')}
-              {currentPermissionType === PermissionTypes.DENY_ALL
-              && t('admin:slack_integration.accordion.deny_all')}
-              {currentPermissionType === PermissionTypes.ALLOW_SPECIFIED
-              && t('admin:slack_integration.accordion.allow_specified')}
+              {currentPermissionType === PermissionTypes.ALLOW_ALL &&
+                t('admin:slack_integration.accordion.allow_all')}
+              {currentPermissionType === PermissionTypes.DENY_ALL &&
+                t('admin:slack_integration.accordion.deny_all')}
+              {currentPermissionType === PermissionTypes.ALLOW_SPECIFIED &&
+                t('admin:slack_integration.accordion.allow_specified')}
             </span>
           </button>
           <div className="dropdown-menu">
@@ -170,17 +181,80 @@ PermissionSettingForEachPermissionTypeComponent.propTypes = {
   permissionSettings: PropTypes.object,
 };
 
+const PermissionSettingsForEachCategoryComponent = ({
+  currentPermissionTypes,
+  usageType,
+  menuItem,
+  permissionSettings,
+}) => {
+  const {
+    title,
+    description,
+    defaultCommandsName,
+    singleCommandDescription,
+    updatePermissionsHandler,
+    updateChannelsHandler,
+    allowedChannelsDescription,
+  } = menuItem;
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+  return (
+    <>
+      {(title || description) && (
+        <div className="row">
+          <div className="col-md-7 offset-md-2">
+            {title && <p className="fw-bold mb-1">{title}</p>}
+            {description && <p className="text-muted">{description}</p>}
+          </div>
+        </div>
+      )}
+
+      <div className="form-check">
+        <div className="row mb-5 d-block">
+          {defaultCommandsName.map((keyName) => (
+            <PermissionSettingForEachPermissionTypeComponent
+              key={`${keyName}-component`}
+              keyName={keyName}
+              usageType={usageType}
+              permissionSettings={permissionSettings}
+              currentPermissionType={currentPermissionTypes[keyName]}
+              singleCommandDescription={singleCommandDescription}
+              onUpdatePermissions={updatePermissionsHandler}
+              onUpdateChannels={updateChannelsHandler}
+              allowedChannelsDescription={allowedChannelsDescription}
+            />
+          ))}
+        </div>
+      </div>
+    </>
+  );
+};
+
+PermissionSettingsForEachCategoryComponent.propTypes = {
+  currentPermissionTypes: PropTypes.object,
+  usageType: PropTypes.string,
+  menuItem: PropTypes.object,
+  permissionSettings: PropTypes.object,
+};
+
+// biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
 const ManageCommandsProcess = ({
-  slackAppIntegrationId, permissionsForBroadcastUseCommands, permissionsForSingleUseCommands, permissionsForSlackEventActions,
+  slackAppIntegrationId,
+  permissionsForBroadcastUseCommands,
+  permissionsForSingleUseCommands,
+  permissionsForSlackEventActions,
 }) => {
   const { t } = useTranslation();
 
-  const [permissionsForBroadcastUseCommandsState, setPermissionsForBroadcastUseCommandsState] = useState({
+  const [
+    permissionsForBroadcastUseCommandsState,
+    setPermissionsForBroadcastUseCommandsState,
+  ] = useState({
     search: permissionsForBroadcastUseCommands.search,
   });
-  const [permissionsForSingleUseCommandsState, setPermissionsForSingleUseCommandsState] = useState({
+  const [
+    permissionsForSingleUseCommandsState,
+    setPermissionsForSingleUseCommandsState,
+  ] = useState({
     note: permissionsForSingleUseCommands.note,
     keep: permissionsForSingleUseCommands.keep,
   });
@@ -204,11 +278,12 @@ const ManageCommandsProcess = ({
     return initialState;
   });
 
-
   const handleUpdateSingleUsePermissions = useCallback((e) => {
     const { target } = e;
     const { name: commandName, value } = target;
-    setPermissionsForSingleUseCommandsState(prev => getUpdatedPermissionSettings(prev, commandName, value));
+    setPermissionsForSingleUseCommandsState((prev) =>
+      getUpdatedPermissionSettings(prev, commandName, value),
+    );
     setCurrentPermissionTypes((prevState) => {
       const newState = { ...prevState };
       newState[commandName] = value;
@@ -219,7 +294,9 @@ const ManageCommandsProcess = ({
   const handleUpdateBroadcastUsePermissions = useCallback((e) => {
     const { target } = e;
     const { name: commandName, value } = target;
-    setPermissionsForBroadcastUseCommandsState(prev => getUpdatedPermissionSettings(prev, commandName, value));
+    setPermissionsForBroadcastUseCommandsState((prev) =>
+      getUpdatedPermissionSettings(prev, commandName, value),
+    );
     setCurrentPermissionTypes((prevState) => {
       const newState = { ...prevState };
       newState[commandName] = value;
@@ -230,7 +307,9 @@ const ManageCommandsProcess = ({
   const handleUpdateEventsPermissions = useCallback((e) => {
     const { target } = e;
     const { name: commandName, value } = target;
-    setPermissionsForEventsState(prev => getUpdatedPermissionSettings(prev, commandName, value));
+    setPermissionsForEventsState((prev) =>
+      getUpdatedPermissionSettings(prev, commandName, value),
+    );
     setCurrentPermissionTypes((prevState) => {
       const newState = { ...prevState };
       newState[commandName] = value;
@@ -241,107 +320,66 @@ const ManageCommandsProcess = ({
   const handleUpdateSingleUseChannels = useCallback((e) => {
     const { target } = e;
     const { name: commandName, value } = target;
-    setPermissionsForSingleUseCommandsState(prev => getUpdatedChannelsList(prev, commandName, value));
+    setPermissionsForSingleUseCommandsState((prev) =>
+      getUpdatedChannelsList(prev, commandName, value),
+    );
   }, []);
 
   const handleUpdateBroadcastUseChannels = useCallback((e) => {
     const { target } = e;
     const { name: commandName, value } = target;
-    setPermissionsForBroadcastUseCommandsState(prev => getUpdatedChannelsList(prev, commandName, value));
+    setPermissionsForBroadcastUseCommandsState((prev) =>
+      getUpdatedChannelsList(prev, commandName, value),
+    );
   }, []);
 
   const handleUpdateEventsChannels = useCallback((e) => {
     const { target } = e;
     const { name: commandName, value } = target;
-    setPermissionsForEventsState(prev => getUpdatedChannelsList(prev, commandName, value));
+    setPermissionsForEventsState((prev) =>
+      getUpdatedChannelsList(prev, commandName, value),
+    );
   }, []);
 
-
-  const updateSettingsHandler = async(e) => {
+  const updateSettingsHandler = async (e) => {
     try {
       // TODO: add new attribute 78975
-      await apiv3Put(`/slack-integration-settings/slack-app-integrations/${slackAppIntegrationId}/permissions`, {
-        permissionsForBroadcastUseCommands: permissionsForBroadcastUseCommandsState,
-        permissionsForSingleUseCommands: permissionsForSingleUseCommandsState,
-        permissionsForSlackEventActions: permissionsForEventsState,
-      });
-      toastSuccess(t('toaster.update_successed', { target: 'Token', ns: 'commons' }));
-    }
-    catch (err) {
+      await apiv3Put(
+        `/slack-integration-settings/slack-app-integrations/${slackAppIntegrationId}/permissions`,
+        {
+          permissionsForBroadcastUseCommands:
+            permissionsForBroadcastUseCommandsState,
+          permissionsForSingleUseCommands: permissionsForSingleUseCommandsState,
+          permissionsForSlackEventActions: permissionsForEventsState,
+        },
+      );
+      toastSuccess(
+        t('toaster.update_successed', { target: 'Token', ns: 'commons' }),
+      );
+    } catch (err) {
       toastError(err);
       logger.error(err);
     }
   };
 
-  const PermissionSettingsForEachCategoryComponent = ({
-    currentPermissionTypes,
-    usageType,
-    menuItem,
-  }) => {
-    const permissionMap = {
-      broadcastUse: permissionsForBroadcastUseCommandsState,
-      singleUse: permissionsForSingleUseCommandsState,
-      linkSharing: permissionsForEventsState,
-    };
-
-    const {
-      title,
-      description,
-      defaultCommandsName,
-      singleCommandDescription,
-      updatePermissionsHandler,
-      updateChannelsHandler,
-      allowedChannelsDescription,
-    } = menuItem;
-
-    return (
-      <>
-        {(title || description) && (
-          <div className="row">
-            <div className="col-md-7 offset-md-2">
-              { title && <p className="fw-bold mb-1">{title}</p> }
-              { description && <p className="text-muted">{description}</p> }
-            </div>
-          </div>
-        )}
-
-        <div className="form-check">
-          <div className="row mb-5 d-block">
-            {defaultCommandsName.map(keyName => (
-              <PermissionSettingForEachPermissionTypeComponent
-                key={`${keyName}-component`}
-                keyName={keyName}
-                usageType={usageType}
-                permissionSettings={permissionMap[usageType]}
-                currentPermissionType={currentPermissionTypes[keyName]}
-                singleCommandDescription={singleCommandDescription}
-                onUpdatePermissions={updatePermissionsHandler}
-                onUpdateChannels={updateChannelsHandler}
-                allowedChannelsDescription={allowedChannelsDescription}
-              />
-            ))}
-          </div>
-        </div>
-      </>
-    );
-  };
-
-
-  PermissionSettingsForEachCategoryComponent.propTypes = {
-    currentPermissionTypes: PropTypes.object,
-    usageType: PropTypes.string,
-    menuItem: PropTypes.object,
+  const permissionMap = {
+    broadcastUse: permissionsForBroadcastUseCommandsState,
+    singleUse: permissionsForSingleUseCommandsState,
+    linkSharing: permissionsForEventsState,
   };
 
   // Using i18n in allowedChannelsDescription will cause interpolation error
   const menuMap = {
     broadcastUse: {
       title: 'Multiple GROWI',
-      description: t('admin:slack_integration.accordion.multiple_growi_command'),
+      description: t(
+        'admin:slack_integration.accordion.multiple_growi_command',
+      ),
       defaultCommandsName: defaultSupportedCommandsNameForBroadcastUse,
       updatePermissionsHandler: handleUpdateBroadcastUsePermissions,
       updateChannelsHandler: handleUpdateBroadcastUseChannels,
-      allowedChannelsDescription: 'admin:slack_integration.accordion.allowed_channels_description',
+      allowedChannelsDescription:
+        'admin:slack_integration.accordion.allowed_channels_description',
     },
     singleUse: {
       title: 'Single GROWI',
@@ -349,28 +387,35 @@ const ManageCommandsProcess = ({
       defaultCommandsName: defaultSupportedCommandsNameForSingleUse,
       updatePermissionsHandler: handleUpdateSingleUsePermissions,
       updateChannelsHandler: handleUpdateSingleUseChannels,
-      allowedChannelsDescription: 'admin:slack_integration.accordion.allowed_channels_description',
+      allowedChannelsDescription:
+        'admin:slack_integration.accordion.allowed_channels_description',
     },
     linkSharing: {
       defaultCommandsName: defaultSupportedSlackEventActions,
       updatePermissionsHandler: handleUpdateEventsPermissions,
       updateChannelsHandler: handleUpdateEventsChannels,
-      singleCommandDescription: t('admin:slack_integration.accordion.unfurl_description'),
-      allowedChannelsDescription: 'admin:slack_integration.accordion.unfurl_allowed_channels_description',
+      singleCommandDescription: t(
+        'admin:slack_integration.accordion.unfurl_description',
+      ),
+      allowedChannelsDescription:
+        'admin:slack_integration.accordion.unfurl_allowed_channels_description',
     },
   };
 
   return (
     <div className="py-4 px-5">
-      <p className="mb-4 fw-bold">{t('admin:slack_integration.accordion.growi_commands')}</p>
+      <p className="mb-4 fw-bold">
+        {t('admin:slack_integration.accordion.growi_commands')}
+      </p>
       <div className="row d-flex flex-column align-items-center">
         <div className="col-8">
-          {Object.values(CommandUsageTypes).map(commandUsageType => (
+          {Object.values(CommandUsageTypes).map((commandUsageType) => (
             <PermissionSettingsForEachCategoryComponent
               key={commandUsageType}
               currentPermissionTypes={currentPermissionTypes}
               usageType={commandUsageType}
               menuItem={menuMap[commandUsageType]}
+              permissionSettings={permissionMap[commandUsageType]}
             />
           ))}
         </div>
@@ -379,12 +424,13 @@ const ManageCommandsProcess = ({
       <p className="mb-4 fw-bold">Events</p>
       <div className="row d-flex flex-column align-items-center">
         <div className="col-8">
-          {Object.values(EventTypes).map(EventType => (
+          {Object.values(EventTypes).map((EventType) => (
             <PermissionSettingsForEachCategoryComponent
               key={EventType}
               currentPermissionTypes={currentPermissionTypes}
               usageType={EventType}
               menuItem={menuMap[EventType]}
+              permissionSettings={permissionMap[EventType]}
             />
           ))}
         </div>
@@ -396,7 +442,7 @@ const ManageCommandsProcess = ({
           className="btn btn-primary mx-auto"
           onClick={updateSettingsHandler}
         >
-          { t('Update') }
+          {t('Update')}
         </button>
       </div>
     </div>

@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 
-import { useSearchModalStatus, useSearchModalActions } from '~/features/search/client/states/modal/search';
+import {
+  useSearchModalActions,
+  useSearchModalStatus,
+} from '~/features/search/client/states/modal/search';
 import { useIsEditable } from '~/states/page';
-
 
 const FocusToGlobalSearch = (props) => {
   const isEditable = useIsEditable();
@@ -20,7 +22,6 @@ const FocusToGlobalSearch = (props) => {
       // remove this
       props.onDeleteRender();
     }
-
   }, [isEditable, openSearchModal, props, searchModalData.isOpened]);
 
   return null;

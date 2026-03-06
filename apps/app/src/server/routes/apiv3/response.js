@@ -3,8 +3,8 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import { toArrayIfNot } from '~/utils/array-utils';
 
 const addCustomFunctionToResponse = (express) => {
-
-  express.response.apiv3 = function(obj = {}, status = 200) { // not arrow function
+  express.response.apiv3 = function (obj = {}, status = 200) {
+    // not arrow function
     // obj must be object
     if (typeof obj !== 'object' || obj instanceof Array) {
       throw new Error('invalid value supplied to res.apiv3');
@@ -13,7 +13,8 @@ const addCustomFunctionToResponse = (express) => {
     this.status(status).json(obj);
   };
 
-  express.response.apiv3Err = function(_err, status = 400, info) { // not arrow function
+  express.response.apiv3Err = function (_err, status = 400, info) {
+    // not arrow function
     if (!Number.isInteger(status)) {
       throw new Error('invalid status supplied to res.apiv3Err');
     }

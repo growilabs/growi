@@ -4,6 +4,7 @@ import {
   registrationWhitelistAtom,
   showPageLimitationXLAtom,
 } from '~/states/server-configurations';
+import { createAtomTuple } from '~/utils/jotai-utils';
 
 import type { ServerConfigurationProps } from './types';
 
@@ -14,13 +15,19 @@ import type { ServerConfigurationProps } from './types';
 export const useHydrateServerConfigurationAtoms = (
   serverConfig: ServerConfigurationProps['serverConfig'] | undefined,
 ): void => {
-  // Hydrate server configuration atoms with server-side data
-  useHydrateAtoms(
+  const tuples =
     serverConfig == null
       ? []
       : [
-          [showPageLimitationXLAtom, serverConfig.showPageLimitationXL],
-          [registrationWhitelistAtom, serverConfig.registrationWhitelist],
-        ],
-  );
+          createAtomTuple(
+            showPageLimitationXLAtom,
+            serverConfig.showPageLimitationXL,
+          ),
+          createAtomTuple(
+            registrationWhitelistAtom,
+            serverConfig.registrationWhitelist,
+          ),
+        ];
+
+  useHydrateAtoms(tuples);
 };

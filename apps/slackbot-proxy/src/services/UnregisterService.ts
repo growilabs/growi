@@ -47,9 +47,9 @@ export class UnregisterService
     // get growi urls
     const installationId =
       authorizeResult.enterpriseId || authorizeResult.teamId;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const installation =
       await this.installationRepository.findByTeamIdOrEnterpriseId(
+        // biome-ignore lint/style/noNonNullAssertion: installationId must be set --- IGNORE ---
         installationId!,
       );
     const relations = await this.relationRepository
@@ -110,7 +110,6 @@ export class UnregisterService
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   shouldHandleInteraction(
     interactionPayloadAccessor: InteractionPayloadAccessor,
   ): boolean {
@@ -122,7 +121,6 @@ export class UnregisterService
   }
 
   async processInteraction(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     authorizeResult: AuthorizeResult,
     interactionPayload: any,
     interactionPayloadAccessor: InteractionPayloadAccessor,
@@ -162,9 +160,9 @@ export class UnregisterService
     return interactionHandledResult as InteractionHandledResult<void>;
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+  // biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
   async handleUnregisterInteraction(
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+    // biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
     authorizeResult: AuthorizeResult,
     interactionPayload: any,
     interactionPayloadAccessor: InteractionPayloadAccessor,
@@ -193,9 +191,9 @@ export class UnregisterService
       authorizeResult.enterpriseId || authorizeResult.teamId;
     let installation: Installation | undefined;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       installation =
         await this.installationRepository.findByTeamIdOrEnterpriseId(
+          // biome-ignore lint/style/noNonNullAssertion: installationId must be set --- IGNORE ---
           installationId!,
         );
     } catch (err) {
@@ -241,7 +239,7 @@ export class UnregisterService
     return;
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+  // biome-ignore lint:*:noExplicitModuleBoundaryTypes: Temporary Alternative to @typescript-eslint/explicit-module-boundary-types
   async handleUnregisterCancelInteraction(
     interactionPayloadAccessor: InteractionPayloadAccessor,
   ): Promise<void> {

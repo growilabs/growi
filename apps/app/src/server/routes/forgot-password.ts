@@ -4,13 +4,13 @@ import createError from 'http-errors';
 import { forgotPasswordErrorCode } from '~/interfaces/errors/forgot-password';
 import loggerFactory from '~/utils/logger';
 
+import type Crowi from '../crowi';
 import type { IPasswordResetOrder } from '../models/password-reset-order';
 
 const logger = loggerFactory('growi:routes:forgot-password');
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any
 export const checkForgotPasswordEnabledMiddlewareFactory = (
-  crowi: any,
+  crowi: Crowi,
   forApi = false,
 ) => {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -38,11 +38,6 @@ export const checkForgotPasswordEnabledMiddlewareFactory = (
 
     next();
   };
-};
-
-type Crowi = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  nextApp: any;
 };
 
 type CrowiReq = Request & {
