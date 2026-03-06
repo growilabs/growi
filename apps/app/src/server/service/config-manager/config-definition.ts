@@ -1041,7 +1041,7 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: false,
   }),
   'customize:isEnabledMarp': defineConfig<boolean>({
-    defaultValue: false,
+    defaultValue: true,
   }),
   'customize:isSidebarCollapsedMode': defineConfig<boolean>({
     defaultValue: false,
