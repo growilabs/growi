@@ -2,7 +2,9 @@ import type { MarpOptions } from '@marp-team/marp-core';
 import { Marp } from '@marp-team/marp-core';
 import { Element } from '@marp-team/marpit';
 
-export const MARP_CONTAINER_CLASS_NAME = 'marpit';
+import { MARP_CONTAINER_CLASS_NAME } from '../consts';
+
+export { MARP_CONTAINER_CLASS_NAME };
 
 // Add data-line to Marp slide.
 // https://github.com/marp-team/marp-vscode/blob/d9af184ed12b65bb28c0f328e250955d548ac1d1/src/plugins/line-number.ts
@@ -12,6 +14,7 @@ const lineNumber = (md) => {
     md.renderer.rules;
 
   // Enable line sync by per slides
+  // biome-ignore lint/nursery/useMaxParams: Allows 5 parameters for marpit renderer rules
   md.renderer.rules.marpit_slide_containers_open = (tks, i, opts, env, slf) => {
     const slide = tks.slice(i + 1).find((t) => t.type === 'marpit_slide_open');
 
