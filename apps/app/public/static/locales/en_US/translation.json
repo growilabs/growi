@@ -1134,6 +1134,24 @@
       "footnote": "Footnotes",
       "footnote_label": "Footnote text",
       "footnote_desc": "Write the note content like this"
+    },
+    "decoration": {
+      "copy_done": "Copied to clipboard!",
+      "style": "Style",
+      "alert": "Alert",
+      "badge": "Badge",
+      "text_color": "Text Color",
+      "back_color": "Background Color",
+      "alert_block": "Alert Block",
+      "important_label": "Important",
+      "important_text": "Important information",
+      "caution_label": "Caution",
+      "caution_text": "Prohibited items or warnings",
+      "placeholder": "Sample text goes here",
+      "docs_title": "Bootstrap 5 Official Documentation",
+      "docs_badge": "Learn more about Badges",
+      "docs_color": "Learn more about Colors",
+      "docs_alert": "Learn more about Alert Blocks"
     }
   }
 }

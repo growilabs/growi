@@ -1167,6 +1167,24 @@
       "footnote": "脚注",
       "footnote_label": "脚注つきテキスト",
       "footnote_desc": "注記はこのように書きます"
+    },
+    "decoration": {
+      "copy_done": "コピーしました！",
+      "style": "スタイル",
+      "alert": "アラート",
+      "badge": "バッジ",
+      "text_color": "テキストカラー",
+      "back_color": "背景色",
+      "alert_block": "アラートブロック",
+      "important_label": "Important",
+      "important_text": "重要な情報",
+      "caution_label": "Caution",
+      "caution_text": "禁止事項や警告",
+      "placeholder": "テキストが入ります",
+      "docs_title": "Bootstrap5 公式ドキュメント",
+      "docs_badge": "バッジの詳細はこちら",
+      "docs_color": "カラーの詳細はこちら",
+      "docs_alert": "アラートブロックの詳細はこちら"
     }
   }
 }
