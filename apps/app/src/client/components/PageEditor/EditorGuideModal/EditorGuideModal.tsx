@@ -28,6 +28,10 @@ const isTabType = (key: string): key is TabType => {
   return (TAB_TYPES as readonly string[]).includes(key);
 };
 
+const TextStyleTabPane = (): React.JSX.Element => <TextStyleTab />;
+const LayoutTabPane = (): React.JSX.Element => <LayoutTab />;
+const DecorationTabPane = (): React.JSX.Element => <DecorationTab />;
+
 /**
  * EditorGuideModal
  *
@@ -46,15 +50,15 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
     return {
       textstyle: {
         i18n: t('editor_guide.tabs.textstyle'),
-        Content: TextStyleTab,
+        Content: TextStyleTabPane,
       },
       layout: {
         i18n: t('editor_guide.tabs.layout'),
-        Content: LayoutTab,
+        Content: LayoutTabPane,
       },
       decoration: {
         i18n: t('editor_guide.tabs.decoration'),
-        Content: DecorationTab,
+        Content: DecorationTabPane,
       },
     };
   }, [t]);
