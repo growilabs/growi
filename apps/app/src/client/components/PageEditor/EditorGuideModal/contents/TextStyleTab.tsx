@@ -7,11 +7,7 @@ const GuideRow = ({
   title,
   code,
   preview,
-}: {
-  title: string;
-  code: string;
-  preview: React.ReactNode;
-}) => {
+}: GuideRowProps) => {
   const { t } = useTranslation();
   const handleCopy = async () => {
     await navigator.clipboard.writeText(code);
@@ -74,7 +70,7 @@ export const TextStyleTab: React.FC = () => {
   const { t } = useTranslation();
   const i18nKey = 'editor_guide.textstyle';
 
-  const TEXT_STYLE_GUIDES = [
+  const TEXT_STYLE_GUIDES: TextStyleGuideItem[] = [
     {
       id: 'bold',
       title: t(`${i18nKey}.bold`),
@@ -196,8 +192,10 @@ export const TextStyleTab: React.FC = () => {
           target="_blank"
           rel="noreferrer"
           className="text-secondary text-decoration-underline"
+
           style={{ color: '#777570' }}
           onClick={(e) => e.stopPropagation()}
+
         >
           {t(`${i18nKey}.link_growi`)}
           <span className="material-symbols-outlined">open_in_new</span>
@@ -212,8 +210,10 @@ export const TextStyleTab: React.FC = () => {
         <a
           href="/Sandbox"
           className="text-secondary text-decoration-underline"
+
           style={{ color: '#777570' }}
           onClick={(e) => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
         >
           {t(`${i18nKey}.link_sandbox`)}
           <span className="material-symbols-outlined">open_in_new</span>
