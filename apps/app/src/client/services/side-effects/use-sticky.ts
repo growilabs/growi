@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 // Custom hook that accepts a selector string as an argument
 // and returns a boolean indicating whether the selected element is currently sticky.

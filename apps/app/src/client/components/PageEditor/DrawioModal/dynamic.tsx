@@ -1,10 +1,8 @@
 import type { JSX } from 'react';
-
 import { useDrawioModalForEditorStatus } from '@growi/editor/dist/states/modal/drawio-for-editor';
 
 import { useLazyLoader } from '~/components/utils/use-lazy-loader';
 import { useDrawioModalStatus } from '~/states/ui/modal/drawio';
-
 
 type DrawioModalProps = Record<string, unknown>;
 
@@ -17,7 +15,7 @@ export const DrawioModalLazyLoaded = (): JSX.Element => {
 
   const DrawioModal = useLazyLoader<DrawioModalProps>(
     'drawio-modal',
-    () => import('./DrawioModal').then(mod => ({ default: mod.DrawioModal })),
+    () => import('./DrawioModal').then((mod) => ({ default: mod.DrawioModal })),
     isOpened || isOpenedInEditor,
   );
 

@@ -23,11 +23,11 @@ const devSocketIOPlugin = (): Plugin => ({
     // setup socket.io
     const io = new Server(server.httpServer);
     io.on('connection', (socket) => {
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: Allow to use
       console.log('Client connected');
 
       socket.on('disconnect', () => {
-        // eslint-disable-next-line no-console
+        // biome-ignore lint/suspicious/noConsole: Allow to use
         console.log('Client disconnected');
       });
     });

@@ -4,8 +4,7 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:service:yjs:create-indexes');
 
-export const createIndexes = async(collectionName: string): Promise<void> => {
-
+export const createIndexes = async (collectionName: string): Promise<void> => {
   const collection = mongoose.connection.collection(collectionName);
 
   try {
@@ -35,8 +34,7 @@ export const createIndexes = async(collectionName: string): Promise<void> => {
         },
       },
     ]);
-  }
-  catch (err) {
+  } catch (err) {
     logger.error('Failed to create Index', err);
     throw err;
   }

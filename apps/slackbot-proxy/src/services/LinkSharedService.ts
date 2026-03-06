@@ -7,7 +7,6 @@ import { Inject, Service } from '@tsed/di';
 import axios from 'axios';
 
 // needed to import class (not type) for injection
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { RelationRepository } from '~/repositories/relation';
 import loggerFactory from '~/utils/logger';
 
@@ -25,7 +24,6 @@ type TokenPtoG = string;
 export type LinkSharedRequestEvent = {
   channel: string;
 
-  // eslint-disable-next-line camelcase
   message_ts: string;
 
   links: LinkSharedEventLink[];

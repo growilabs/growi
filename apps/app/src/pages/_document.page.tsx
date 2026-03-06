@@ -1,6 +1,7 @@
-/* eslint-disable @next/next/google-font-display */
-import React, { type JSX } from 'react';
+import type { JSX } from 'react';
+// biome-ignore lint/suspicious/noDocumentImportInPage: This project uses _document.page.tsx instead of _document.tsx
 import type { DocumentContext, DocumentInitialProps } from 'next/document';
+// biome-ignore lint/suspicious/noDocumentImportInPage: This project uses _document.page.tsx instead of _document.tsx
 import Document, { Head, Html, Main, NextScript } from 'next/document';
 import type { Locale } from '@growi/core/dist/interfaces';
 
@@ -10,7 +11,7 @@ import loggerFactory from '~/utils/logger';
 
 import { getLocaleAtServerSide } from './utils/locale';
 
-const logger = loggerFactory('growi:page:_document');
+const _logger = loggerFactory('growi:page:_document');
 
 type HeadersForGrowiPluginProps = {
   pluginResourceEntries: GrowiPluginResourceEntries;
@@ -24,13 +25,11 @@ const HeadersForGrowiPlugin = (
     <>
       {pluginResourceEntries.map(([installedPath, href]) => {
         if (href.endsWith('.js')) {
-          // eslint-disable-next-line @next/next/no-sync-scripts
           return (
             <script type="module" key={`script_${installedPath}`} src={href} />
           );
         }
         if (href.endsWith('.css')) {
-          // eslint-disable-next-line @next/next/no-sync-scripts
           return (
             <link rel="stylesheet" key={`link_${installedPath}`} href={href} />
           );

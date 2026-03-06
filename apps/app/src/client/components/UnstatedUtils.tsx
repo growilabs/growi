@@ -1,9 +1,5 @@
-/* eslint-disable import/prefer-default-export */
-
 import React from 'react';
-
-import { Provider, Subscribe } from 'unstated';
-
+import { type Container, Subscribe } from 'unstated';
 
 /**
  * generate K/V object by specified instances
@@ -45,16 +41,35 @@ function generateAutoNamedProps(instances) {
  *    )}
  *  </Subscribe>
  */
-export function withUnstatedContainers<T, P>(Component, containerClasses): React.ForwardRefExoticComponent<React.PropsWithoutRef<P> & React.RefAttributes<T>> {
-  const unstatedContainer = React.forwardRef<T, P>((props, ref) => (
-    // wrap with <Subscribe></Subscribe>
-    <Subscribe to={containerClasses}>
-      { (...containers) => {
-        const propsForContainers = generateAutoNamedProps(containers);
-        return <Component {...props} {...propsForContainers} ref={ref} />;
-      }}
-    </Subscribe>
-  ));
+export function withUnstatedContainers<
+  ExternalProps extends Record<string, unknown>,
+  InternalProps extends ExternalProps = ExternalProps,
+>(
+  Component: React.ComponentType<InternalProps>,
+  containerClasses: (typeof Container)[],
+): React.ForwardRefExoticComponent<
+  React.PropsWithoutRef<ExternalProps> & React.RefAttributes<unknown>
+> {
+  const unstatedContainer = React.forwardRef<unknown, ExternalProps>(
+    (props, ref) => (
+      // wrap with <Subscribe></Subscribe>
+      <Subscribe to={containerClasses}>
+        {(...containers) => {
+          // Container props are dynamically generated based on class names
+          const propsForContainers = generateAutoNamedProps(containers) as Omit<
+            InternalProps,
+            keyof ExternalProps
+          >;
+          const mergedProps = {
+            ...props,
+            ...propsForContainers,
+            ref,
+          } as InternalProps & { ref: typeof ref };
+          return <Component {...mergedProps} />;
+        }}
+      </Subscribe>
+    ),
+  );
   unstatedContainer.displayName = 'unstatedContainer';
   return unstatedContainer;
 }

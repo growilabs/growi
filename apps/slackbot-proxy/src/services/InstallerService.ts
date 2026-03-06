@@ -67,7 +67,7 @@ export class InstallerService {
         fetchInstallation: async (installQuery: InstallationQuery<boolean>) => {
           const id = installQuery.enterpriseId || installQuery.teamId;
 
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          // biome-ignore lint/style/noNonNullAssertion: id must be set --- IGNORE ---
           const installation = await repository.findByTeamIdOrEnterpriseId(id!);
 
           if (installation == null) {

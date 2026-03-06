@@ -10,7 +10,10 @@ export const PagePresentationModalLazyLoaded = (): JSX.Element => {
 
   const PagePresentationModal = useLazyLoader<PagePresentationModalProps>(
     'page-presentation-modal',
-    () => import('./PagePresentationModal').then(mod => ({ default: mod.PagePresentationModal })),
+    () =>
+      import('./PagePresentationModal').then((mod) => ({
+        default: mod.PagePresentationModal,
+      })),
     status?.isOpened ?? false,
   );
 

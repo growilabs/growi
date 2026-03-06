@@ -1,12 +1,11 @@
 import React, { type JSX } from 'react';
-
-import { Modal, ModalHeader, ModalBody } from 'reactstrap';
+import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 type ErrorViewerProps = {
-  isOpen: boolean,
-  errors: any[],
-  onClose: () => void,
-}
+  isOpen: boolean;
+  errors: any[];
+  onClose: () => void;
+};
 
 const ErrorViewer = (props: ErrorViewerProps): JSX.Element => {
   const { errors } = props;
@@ -25,7 +24,13 @@ const ErrorViewer = (props: ErrorViewerProps): JSX.Element => {
         Errors
       </ModalHeader>
       <ModalBody>
-        <textarea className="form-control" rows={8} readOnly wrap="off" defaultValue={value}></textarea>
+        <textarea
+          className="form-control"
+          rows={8}
+          readOnly
+          wrap="off"
+          defaultValue={value}
+        ></textarea>
       </ModalBody>
     </Modal>
   );

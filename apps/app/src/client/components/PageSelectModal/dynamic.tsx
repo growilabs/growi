@@ -10,7 +10,10 @@ export const PageSelectModalLazyLoaded = (): JSX.Element => {
 
   const PageSelectModal = useLazyLoader<PageSelectModalProps>(
     'page-select-modal',
-    () => import('./PageSelectModal').then(mod => ({ default: mod.PageSelectModal })),
+    () =>
+      import('./PageSelectModal').then((mod) => ({
+        default: mod.PageSelectModal,
+      })),
     status?.isOpened ?? false,
   );
 

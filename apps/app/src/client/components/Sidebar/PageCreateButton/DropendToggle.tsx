@@ -1,14 +1,11 @@
 import type { JSX } from 'react';
-
 import { DropdownToggle } from 'reactstrap';
 
 import { Hexagon } from './Hexagon';
 
 import styles from './DropendToggle.module.scss';
 
-
 const moduleClass = styles['btn-toggle'];
-
 
 export const DropendToggle = (): JSX.Element => {
   return (
@@ -21,7 +18,9 @@ export const DropendToggle = (): JSX.Element => {
     >
       <Hexagon className="pe-none" />
       <div className="hitarea position-absolute" />
-      <span className="icon material-symbols-outlined position-absolute">chevron_right</span>
+      <span className="icon material-symbols-outlined position-absolute">
+        chevron_right
+      </span>
     </DropdownToggle>
   );
 };

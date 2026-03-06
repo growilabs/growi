@@ -1,5 +1,4 @@
-import type { IncomingMessage } from 'http';
-
+import type { IncomingMessage } from 'node:http';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import expressSession from 'express-session';
 import passport from 'passport';
@@ -10,13 +9,12 @@ import { SocketEventName } from '~/interfaces/websocket';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
+import adminRequiredFactory from '../../middlewares/admin-required';
+import loginRequiredFactory from '../../middlewares/login-required';
 import { configManager } from '../config-manager';
-
-import { RoomPrefix, getRoomNameWithId } from './helper';
-
+import { getRoomNameWithId, RoomPrefix } from './helper';
 
 const logger = loggerFactory('growi:service:socket-io');
-
 
 type RequestWithUser = IncomingMessage & { user: IUserHasId };
 
@@ -24,7 +22,6 @@ type RequestWithUser = IncomingMessage & { user: IUserHasId };
  * Serve socket.io for server-to-client messaging
  */
 export class SocketIoService {
-
   crowi: Crowi;
 
   guestClients: Set<string>;
@@ -33,14 +30,13 @@ export class SocketIoService {
 
   adminNamespace: Namespace;
 
-
   constructor(crowi: Crowi) {
     this.crowi = crowi;
     this.guestClients = new Set();
   }
 
   get isInitialized(): boolean {
-    return (this.io != null);
+    return this.io != null;
   }
 
   // Since the Order is important, attachServer() should be async
@@ -95,13 +91,17 @@ export class SocketIoService {
    * use loginRequired middleware
    */
   setupLoginRequiredMiddleware() {
-    const loginRequired = require('../../middlewares/login-required')(this.crowi, true, (req, res, next) => {
-      next(new Error('Login is required to connect.'));
-    });
+    const loginRequired = loginRequiredFactory(
+      this.crowi,
+      true,
+      (req, res, next) => {
+        next(new Error('Login is required to connect.'));
+      },
+    );
 
     // convert Connect/Express middleware to Socket.io middleware
     this.io.use((socket, next) => {
-      loginRequired(socket.request, {}, next);
+      loginRequired(socket.request as any, {} as any, next as any);
     });
   }
 
@@ -109,13 +109,13 @@ export class SocketIoService {
    * use adminRequired middleware
    */
   setupAdminRequiredMiddleware() {
-    const adminRequired = require('../../middlewares/admin-required')(this.crowi, (req, res, next) => {
+    const adminRequired = adminRequiredFactory(this.crowi, (req, res, next) => {
       next(new Error('Admin priviledge is required to connect.'));
     });
 
     // convert Connect/Express middleware to Socket.io middleware
     this.getAdminSocket().use((socket, next) => {
-      adminRequired(socket.request, {}, next);
+      adminRequired(socket.request as any, {} as any, next as any);
     });
   }
 
@@ -175,9 +175,11 @@ export class SocketIoService {
       const clients = await this.getAdminSocket().fetchSockets();
       const clientsCount = clients.length;
 
-      logger.debug('Current count of clients for \'/admin\':', clientsCount);
+      logger.debug("Current count of clients for '/admin':", clientsCount);
 
-      const limit = configManager.getConfig('s2cMessagingPubsub:connectionsLimitForAdmin');
+      const limit = configManager.getConfig(
+        's2cMessagingPubsub:connectionsLimitForAdmin',
+      );
       if (limit <= clientsCount) {
         const msg = `The connection was refused because the current count of clients for '/admin' is ${clientsCount} and exceeds the limit`;
         logger.warn(msg);
@@ -190,13 +192,14 @@ export class SocketIoService {
   }
 
   async checkConnectionLimitsForGuest(socket, next) {
-
     if (socket.request.user == null) {
       const clientsCount = this.guestClients.size;
 
       logger.debug('Current count of clients for guests:', clientsCount);
 
-      const limit = configManager.getConfig('s2cMessagingPubsub:connectionsLimitForGuest');
+      const limit = configManager.getConfig(
+        's2cMessagingPubsub:connectionsLimitForGuest',
+      );
       if (limit <= clientsCount) {
         const msg = `The connection was refused because the current count of clients for guests is ${clientsCount} and exceeds the limit`;
         logger.warn(msg);
@@ -221,9 +224,11 @@ export class SocketIoService {
     const clients = await this.getDefaultSocket().fetchSockets();
     const clientsCount = clients.length;
 
-    logger.debug('Current count of clients for \'/\':', clientsCount);
+    logger.debug("Current count of clients for '/':", clientsCount);
 
-    const limit = configManager.getConfig('s2cMessagingPubsub:connectionsLimit');
+    const limit = configManager.getConfig(
+      's2cMessagingPubsub:connectionsLimit',
+    );
     if (limit <= clientsCount) {
       const msg = `The connection was refused because the current count of clients for '/' is ${clientsCount} and exceeds the limit`;
       logger.warn(msg);
@@ -233,5 +238,4 @@ export class SocketIoService {
 
     next();
   }
-
 }

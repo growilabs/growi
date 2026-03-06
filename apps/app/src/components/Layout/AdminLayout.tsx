@@ -20,11 +20,6 @@ const PageCreateModal = dynamic(
   () => import('~/client/components/PageCreateModal'),
   { ssr: false },
 );
-const SystemVersion = dynamic(
-  // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/SystemVersion'),
-  { ssr: false },
-);
 const HotkeysManager = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
   () => import('~/client/components/Hotkeys/HotkeysManager'),
@@ -60,7 +55,6 @@ const AdminLayout = ({ children, componentTitle }: Props): JSX.Element => {
         </div>
 
         <PageCreateModal />
-        <SystemVersion />
       </div>
 
       <HotkeysManager />

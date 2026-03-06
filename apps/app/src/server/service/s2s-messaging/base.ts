@@ -5,11 +5,9 @@ import loggerFactory from '~/utils/logger';
 
 import type { S2sMessageHandlable } from './handlable';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const logger = loggerFactory('growi:service:s2s-messaging:base');
+const _logger = loggerFactory('growi:service:s2s-messaging:base');
 
 export interface S2sMessagingService {
-
   uid: number;
 
   uri: string;
@@ -37,11 +35,11 @@ export interface S2sMessagingService {
    * @param handlable
    */
   removeMessageHandler(handlable: S2sMessageHandlable): void;
-
 }
 
-export abstract class AbstractS2sMessagingService implements S2sMessagingService {
-
+export abstract class AbstractS2sMessagingService
+  implements S2sMessagingService
+{
   uid: number;
 
   uri: string;
@@ -84,7 +82,6 @@ export abstract class AbstractS2sMessagingService implements S2sMessagingService
    * @param handlable
    */
   removeMessageHandler(handlable: S2sMessageHandlable): void {
-    this.handlableList = this.handlableList.filter(h => h !== handlable);
+    this.handlableList = this.handlableList.filter((h) => h !== handlable);
   }
-
 }

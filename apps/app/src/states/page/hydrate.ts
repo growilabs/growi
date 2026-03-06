@@ -2,15 +2,17 @@ import {
   type IPageInfo,
   type IPageNotFoundInfo,
   type IPagePopulatedToShowRevision,
-  isIPageInfo,
+  isIPageInfoForEmpty,
   isIPageNotFoundInfo,
 } from '@growi/core';
 import { useHydrateAtoms } from 'jotai/utils';
 
 import {
   currentPageDataAtom,
-  currentPageIdAtom,
+  currentPageEmptyIdAtom,
+  currentPageEntityIdAtom,
   isForbiddenAtom,
+  isIdenticalPathAtom,
   pageNotFoundAtom,
   redirectFromAtom,
   remoteRevisionBodyAtom,
@@ -50,21 +52,21 @@ export const useHydratePageAtoms = (
     redirectFrom?: string;
     templateTags?: string[];
     templateBody?: string;
+    isIdenticalPath?: boolean;
   },
 ): void => {
   useHydrateAtoms([
     // Core page state - automatically extract from page object
-    [currentPageIdAtom, page?._id],
+    [currentPageEntityIdAtom, page?._id],
     [currentPageDataAtom, page ?? undefined],
-    [
-      pageNotFoundAtom,
-      isIPageInfo(pageMeta)
-        ? pageMeta.isNotFound
-        : page == null || page.isEmpty,
-    ],
+    [pageNotFoundAtom, isIPageNotFoundInfo(pageMeta)],
     [
       isForbiddenAtom,
       isIPageNotFoundInfo(pageMeta) ? pageMeta.isForbidden : false,
+    ],
+    [
+      currentPageEmptyIdAtom,
+      isIPageInfoForEmpty(pageMeta) ? pageMeta.emptyPageId : undefined,
     ],
 
     // Remote revision data - used by ConflictDiffModal
@@ -78,6 +80,7 @@ export const useHydratePageAtoms = (
       [shareLinkIdAtom, options?.shareLinkId],
 
       [redirectFromAtom, options?.redirectFrom ?? undefined],
+      [isIdenticalPathAtom, options?.isIdenticalPath ?? false],
 
       // Template data - from options (not auto-extracted from page)
       [templateTagsAtom, options?.templateTags ?? []],

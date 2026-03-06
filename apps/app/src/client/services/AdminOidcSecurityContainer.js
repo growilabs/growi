@@ -13,7 +13,6 @@ const logger = loggerFactory('growi:services:AdminLdapSecurityContainer');
  * @extends {Container} unstated Container
  */
 export default class AdminOidcSecurityContainer extends Container {
-
   constructor(appContainer) {
     super();
 
@@ -44,7 +43,6 @@ export default class AdminOidcSecurityContainer extends Container {
       isSameUsernameTreatedAsIdenticalUser: false,
       isSameEmailTreatedAsIdenticalUser: false,
     };
-
   }
 
   /**
@@ -71,11 +69,12 @@ export default class AdminOidcSecurityContainer extends Container {
         oidcAttrMapUserName: oidcAuth.oidcAttrMapUserName,
         oidcAttrMapName: oidcAuth.oidcAttrMapName,
         oidcAttrMapEmail: oidcAuth.oidcAttrMapEmail,
-        isSameUsernameTreatedAsIdenticalUser: oidcAuth.isSameUsernameTreatedAsIdenticalUser,
-        isSameEmailTreatedAsIdenticalUser: oidcAuth.isSameEmailTreatedAsIdenticalUser,
+        isSameUsernameTreatedAsIdenticalUser:
+          oidcAuth.isSameUsernameTreatedAsIdenticalUser,
+        isSameEmailTreatedAsIdenticalUser:
+          oidcAuth.isSameEmailTreatedAsIdenticalUser,
       });
-    }
-    catch (err) {
+    } catch (err) {
       this.setState({ retrieveError: err });
       logger.error(err);
       throw new Error('Failed to fetch data');
@@ -93,59 +92,72 @@ export default class AdminOidcSecurityContainer extends Container {
    * Switch sameUsernameTreatedAsIdenticalUser
    */
   switchIsSameUsernameTreatedAsIdenticalUser() {
-    this.setState({ isSameUsernameTreatedAsIdenticalUser: !this.state.isSameUsernameTreatedAsIdenticalUser });
+    this.setState({
+      isSameUsernameTreatedAsIdenticalUser:
+        !this.state.isSameUsernameTreatedAsIdenticalUser,
+    });
   }
 
   /**
    * Switch sameEmailTreatedAsIdenticalUser
    */
   switchIsSameEmailTreatedAsIdenticalUser() {
-    this.setState({ isSameEmailTreatedAsIdenticalUser: !this.state.isSameEmailTreatedAsIdenticalUser });
+    this.setState({
+      isSameEmailTreatedAsIdenticalUser:
+        !this.state.isSameEmailTreatedAsIdenticalUser,
+    });
   }
 
   /**
    * Update OpenID Connect
    */
   async updateOidcSetting(formData) {
-    let requestParams = formData != null ? {
-      oidcProviderName: formData.oidcProviderName,
-      oidcIssuerHost: formData.oidcIssuerHost,
-      oidcAuthorizationEndpoint: formData.oidcAuthorizationEndpoint,
-      oidcTokenEndpoint: formData.oidcTokenEndpoint,
-      oidcRevocationEndpoint: formData.oidcRevocationEndpoint,
-      oidcIntrospectionEndpoint: formData.oidcIntrospectionEndpoint,
-      oidcUserInfoEndpoint: formData.oidcUserInfoEndpoint,
-      oidcEndSessionEndpoint: formData.oidcEndSessionEndpoint,
-      oidcRegistrationEndpoint: formData.oidcRegistrationEndpoint,
-      oidcJWKSUri: formData.oidcJWKSUri,
-      oidcClientId: formData.oidcClientId,
-      oidcClientSecret: formData.oidcClientSecret,
-      oidcAttrMapId: formData.oidcAttrMapId,
-      oidcAttrMapUserName: formData.oidcAttrMapUserName,
-      oidcAttrMapName: formData.oidcAttrMapName,
-      oidcAttrMapEmail: formData.oidcAttrMapEmail,
-      isSameUsernameTreatedAsIdenticalUser: formData.isSameUsernameTreatedAsIdenticalUser,
-      isSameEmailTreatedAsIdenticalUser: formData.isSameEmailTreatedAsIdenticalUser,
-    } : {
-      oidcProviderName: this.state.oidcProviderName,
-      oidcIssuerHost: this.state.oidcIssuerHost,
-      oidcAuthorizationEndpoint: this.state.oidcAuthorizationEndpoint,
-      oidcTokenEndpoint: this.state.oidcTokenEndpoint,
-      oidcRevocationEndpoint: this.state.oidcRevocationEndpoint,
-      oidcIntrospectionEndpoint: this.state.oidcIntrospectionEndpoint,
-      oidcUserInfoEndpoint: this.state.oidcUserInfoEndpoint,
-      oidcEndSessionEndpoint: this.state.oidcEndSessionEndpoint,
-      oidcRegistrationEndpoint: this.state.oidcRegistrationEndpoint,
-      oidcJWKSUri: this.state.oidcJWKSUri,
-      oidcClientId: this.state.oidcClientId,
-      oidcClientSecret: this.state.oidcClientSecret,
-      oidcAttrMapId: this.state.oidcAttrMapId,
-      oidcAttrMapUserName: this.state.oidcAttrMapUserName,
-      oidcAttrMapName: this.state.oidcAttrMapName,
-      oidcAttrMapEmail: this.state.oidcAttrMapEmail,
-      isSameUsernameTreatedAsIdenticalUser: this.state.isSameUsernameTreatedAsIdenticalUser,
-      isSameEmailTreatedAsIdenticalUser: this.state.isSameEmailTreatedAsIdenticalUser,
-    };
+    let requestParams =
+      formData != null
+        ? {
+            oidcProviderName: formData.oidcProviderName,
+            oidcIssuerHost: formData.oidcIssuerHost,
+            oidcAuthorizationEndpoint: formData.oidcAuthorizationEndpoint,
+            oidcTokenEndpoint: formData.oidcTokenEndpoint,
+            oidcRevocationEndpoint: formData.oidcRevocationEndpoint,
+            oidcIntrospectionEndpoint: formData.oidcIntrospectionEndpoint,
+            oidcUserInfoEndpoint: formData.oidcUserInfoEndpoint,
+            oidcEndSessionEndpoint: formData.oidcEndSessionEndpoint,
+            oidcRegistrationEndpoint: formData.oidcRegistrationEndpoint,
+            oidcJWKSUri: formData.oidcJWKSUri,
+            oidcClientId: formData.oidcClientId,
+            oidcClientSecret: formData.oidcClientSecret,
+            oidcAttrMapId: formData.oidcAttrMapId,
+            oidcAttrMapUserName: formData.oidcAttrMapUserName,
+            oidcAttrMapName: formData.oidcAttrMapName,
+            oidcAttrMapEmail: formData.oidcAttrMapEmail,
+            isSameUsernameTreatedAsIdenticalUser:
+              formData.isSameUsernameTreatedAsIdenticalUser,
+            isSameEmailTreatedAsIdenticalUser:
+              formData.isSameEmailTreatedAsIdenticalUser,
+          }
+        : {
+            oidcProviderName: this.state.oidcProviderName,
+            oidcIssuerHost: this.state.oidcIssuerHost,
+            oidcAuthorizationEndpoint: this.state.oidcAuthorizationEndpoint,
+            oidcTokenEndpoint: this.state.oidcTokenEndpoint,
+            oidcRevocationEndpoint: this.state.oidcRevocationEndpoint,
+            oidcIntrospectionEndpoint: this.state.oidcIntrospectionEndpoint,
+            oidcUserInfoEndpoint: this.state.oidcUserInfoEndpoint,
+            oidcEndSessionEndpoint: this.state.oidcEndSessionEndpoint,
+            oidcRegistrationEndpoint: this.state.oidcRegistrationEndpoint,
+            oidcJWKSUri: this.state.oidcJWKSUri,
+            oidcClientId: this.state.oidcClientId,
+            oidcClientSecret: this.state.oidcClientSecret,
+            oidcAttrMapId: this.state.oidcAttrMapId,
+            oidcAttrMapUserName: this.state.oidcAttrMapUserName,
+            oidcAttrMapName: this.state.oidcAttrMapName,
+            oidcAttrMapEmail: this.state.oidcAttrMapEmail,
+            isSameUsernameTreatedAsIdenticalUser:
+              this.state.isSameUsernameTreatedAsIdenticalUser,
+            isSameEmailTreatedAsIdenticalUser:
+              this.state.isSameEmailTreatedAsIdenticalUser,
+          };
 
     requestParams = await removeNullPropertyFromObject(requestParams);
     const response = await apiv3Put('/security-setting/oidc', requestParams);
@@ -154,10 +166,12 @@ export default class AdminOidcSecurityContainer extends Container {
     this.setState({
       oidcProviderName: securitySettingParams.oidcProviderName,
       oidcIssuerHost: securitySettingParams.oidcIssuerHost,
-      oidcAuthorizationEndpoint: securitySettingParams.oidcAuthorizationEndpoint,
+      oidcAuthorizationEndpoint:
+        securitySettingParams.oidcAuthorizationEndpoint,
       oidcTokenEndpoint: securitySettingParams.oidcTokenEndpoint,
       oidcRevocationEndpoint: securitySettingParams.oidcRevocationEndpoint,
-      oidcIntrospectionEndpoint: securitySettingParams.oidcIntrospectionEndpoint,
+      oidcIntrospectionEndpoint:
+        securitySettingParams.oidcIntrospectionEndpoint,
       oidcUserInfoEndpoint: securitySettingParams.oidcUserInfoEndpoint,
       oidcEndSessionEndpoint: securitySettingParams.oidcEndSessionEndpoint,
       oidcRegistrationEndpoint: securitySettingParams.oidcRegistrationEndpoint,
@@ -168,10 +182,11 @@ export default class AdminOidcSecurityContainer extends Container {
       oidcAttrMapUserName: securitySettingParams.oidcAttrMapUserName,
       oidcAttrMapName: securitySettingParams.oidcAttrMapName,
       oidcAttrMapEmail: securitySettingParams.oidcAttrMapEmail,
-      isSameUsernameTreatedAsIdenticalUser: securitySettingParams.isSameUsernameTreatedAsIdenticalUser,
-      isSameEmailTreatedAsIdenticalUser: securitySettingParams.isSameEmailTreatedAsIdenticalUser,
+      isSameUsernameTreatedAsIdenticalUser:
+        securitySettingParams.isSameUsernameTreatedAsIdenticalUser,
+      isSameEmailTreatedAsIdenticalUser:
+        securitySettingParams.isSameEmailTreatedAsIdenticalUser,
     });
     return response;
   }
-
 }

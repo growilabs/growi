@@ -1,6 +1,6 @@
 import type { EditorView, KeyBinding } from '@codemirror/view';
-import type { KeyMapMode } from 'src/consts';
 
+import type { KeyMapMode } from '../../../../../consts';
 import { useInsertMarkdownElements } from '../insert-markdown-elements';
 import { generateAddMarkdownSymbolCommand } from './generate-add-markdown-symbol-command';
 

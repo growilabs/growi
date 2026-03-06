@@ -2,12 +2,14 @@ import { expect, type Page } from '@playwright/test';
 
 export const collapseSidebar = async (
   page: Page,
-  isCollapsed: boolean,
+  collapse: boolean,
 ): Promise<void> => {
-  const isSidebarContentsHidden = !(await page
-    .getByTestId('grw-sidebar-contents')
+  await expect(page.getByTestId('grw-sidebar')).toBeVisible();
+
+  const isSidebarCollapsed = !(await page
+    .locator('.grw-sidebar-dock')
     .isVisible());
-  if (isSidebarContentsHidden === isCollapsed) {
+  if (isSidebarCollapsed === collapse) {
     return;
   }
 
@@ -15,7 +17,7 @@ export const collapseSidebar = async (
   await expect(collapseSidebarToggle).toBeVisible();
   await collapseSidebarToggle.click();
 
-  if (isCollapsed) {
+  if (collapse) {
     await expect(page.locator('.grw-sidebar-dock')).not.toBeVisible();
   } else {
     await expect(page.locator('.grw-sidebar-dock')).toBeVisible();

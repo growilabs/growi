@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 import type { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult } from '~/interfaces/search';
 

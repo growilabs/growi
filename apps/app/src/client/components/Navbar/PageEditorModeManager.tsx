@@ -1,37 +1,29 @@
-import React, {
-  type ReactNode, useCallback, useMemo, type JSX,
-} from 'react';
-
-import { Origin } from '@growi/core';
-import { getParentPath } from '@growi/core/dist/utils/path-utils';
+import React, { type JSX, type ReactNode, useCallback, useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import { useCreatePage } from '~/client/services/create-page';
+import { useStartEditing } from '~/client/services/use-start-editing';
 import { toastError } from '~/client/util/toastr';
 import { useCurrentPageYjsData } from '~/features/collaborative-editor/states';
-import { usePageNotFound } from '~/states/page';
 import { useDeviceLargerThanMd } from '~/states/ui/device';
-import { useEditorMode, EditorMode } from '~/states/ui/editor';
-
-import { shouldCreateWipPage } from '../../../utils/should-create-wip-page';
-
+import { EditorMode, useEditorMode } from '~/states/ui/editor';
 
 import styles from './PageEditorModeManager.module.scss';
 
-
 type PageEditorModeButtonProps = {
-  currentEditorMode: EditorMode,
-  editorMode: EditorMode,
-  children?: ReactNode,
-  isBtnDisabled?: boolean,
-  onClick?: () => void,
-}
+  currentEditorMode: EditorMode;
+  editorMode: EditorMode;
+  children?: ReactNode;
+  isBtnDisabled?: boolean;
+  onClick?: () => void;
+};
 const PageEditorModeButton = React.memo((props: PageEditorModeButtonProps) => {
-  const {
-    currentEditorMode, isBtnDisabled, editorMode, children, onClick,
-  } = props;
+  const { currentEditorMode, isBtnDisabled, editorMode, children, onClick } =
+    props;
 
-  const classNames = ['btn py-1 px-2 d-flex align-items-center justify-content-center'];
+  const classNames = [
+    'btn py-1 px-2 d-flex align-items-center justify-content-center',
+  ];
   if (currentEditorMode === editorMode) {
     classNames.push('active');
   }
@@ -52,48 +44,30 @@ const PageEditorModeButton = React.memo((props: PageEditorModeButtonProps) => {
 });
 
 type Props = {
-  editorMode: EditorMode | undefined,
-  isBtnDisabled: boolean,
-  path?: string,
-}
+  editorMode: EditorMode | undefined;
+  isBtnDisabled: boolean;
+  path?: string;
+};
 
 export const PageEditorModeManager = (props: Props): JSX.Element => {
-  const {
-    editorMode = EditorMode.View,
-    isBtnDisabled,
-    path,
-  } = props;
+  const { editorMode = EditorMode.View, isBtnDisabled, path } = props;
 
   const { t } = useTranslation('commons');
 
-  const isNotFound = usePageNotFound();
   const { setEditorMode } = useEditorMode();
   const [isDeviceLargerThanMd] = useDeviceLargerThanMd();
   const currentPageYjsData = useCurrentPageYjsData();
+  const startEditing = useStartEditing();
 
-  const { isCreating, create } = useCreatePage();
+  const { isCreating } = useCreatePage();
 
   const editButtonClickedHandler = useCallback(async () => {
-    if (!isNotFound) {
-      setEditorMode(EditorMode.Editor);
-      return;
-    }
-
-    // Create a new page if it does not exist and transit to the editor mode
     try {
-      const parentPath = path != null ? getParentPath(path) : undefined; // does not have to exist
-      await create(
-        {
-          path, parentPath, wip: shouldCreateWipPage(path), origin: Origin.View,
-        },
-      );
-
-      setEditorMode(EditorMode.Editor);
-    }
-    catch (err) {
+      await startEditing(path);
+    } catch (err) {
       toastError(t('toaster.create_failed', { target: path }));
     }
-  }, [create, isNotFound, setEditorMode, path, t]);
+  }, [startEditing, path, t]);
 
   const _isBtnDisabled = isCreating || isBtnDisabled;
 
@@ -109,9 +83,8 @@ export const PageEditorModeManager = (props: Props): JSX.Element => {
 
   return (
     <>
-      <div
+      <fieldset
         className={`btn-group grw-page-editor-mode-manager ${styles['grw-page-editor-mode-manager']}`}
-        role="group"
         aria-label="page-editor-mode-manager"
         id="grw-page-editor-mode-manager"
         data-testid="grw-page-editor-mode-manager"
@@ -123,7 +96,8 @@ export const PageEditorModeManager = (props: Props): JSX.Element => {
             isBtnDisabled={_isBtnDisabled}
             onClick={() => setEditorMode(EditorMode.View)}
           >
-            <span className="material-symbols-outlined fs-4">play_arrow</span>{t('View')}
+            <span className="material-symbols-outlined fs-4">play_arrow</span>
+            {t('View')}
           </PageEditorModeButton>
         )}
         {(isDeviceLargerThanMd || editorMode === EditorMode.View) && (
@@ -133,12 +107,18 @@ export const PageEditorModeManager = (props: Props): JSX.Element => {
             isBtnDisabled={_isBtnDisabled}
             onClick={editButtonClickedHandler}
           >
-            <span className="material-symbols-outlined me-1 fs-5">edit_square</span>{t('Edit')}
-            {circleColor != null && <span className={`position-absolute top-0 start-100 translate-middle p-1 rounded-circle ${circleColor}`} />}
+            <span className="material-symbols-outlined me-1 fs-5">
+              edit_square
+            </span>
+            {t('Edit')}
+            {circleColor != null && (
+              <span
+                className={`position-absolute top-0 start-100 translate-middle p-1 rounded-circle ${circleColor}`}
+              />
+            )}
           </PageEditorModeButton>
         )}
-      </div>
+      </fieldset>
     </>
   );
-
 };

@@ -11,6 +11,8 @@
  *        print-memory-consumption.ts [--port=9229] [--host=localhost] [--json]
  */
 
+/** biome-ignore-all lint/suspicious/noConsole: Allow printing to console */
+
 import { get } from 'node:http';
 import WebSocket from 'ws';
 

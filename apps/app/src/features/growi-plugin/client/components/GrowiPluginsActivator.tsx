@@ -6,7 +6,6 @@ import {
 } from '../utils/growi-facade-utils';
 
 declare global {
-  // eslint-disable-next-line vars-on-top, no-var
   var pluginActivators: {
     [key: string]: {
       activate: () => void;

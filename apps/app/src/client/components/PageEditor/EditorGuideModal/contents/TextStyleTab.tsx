@@ -1,44 +1,33 @@
-import React from 'react';
+import type React from 'react';
 import { useTranslation } from 'react-i18next';
 
-interface TextStyleGuideItem {
-  id: string;
-  title: string;
-  code: string;
-  preview: React.ReactNode;
-}
-
-export const ExternalLinkIcon = () => {
-  return (
-    <span
-      className="material-symbols-outlined align-middle ms-1 text-muted"
-      style={{
-        fontSize: '16px',
-      }}
-    >
-      open_in_new
-    </span>
-  );
-};
-
-type GuideRowProps = Omit<TextStyleGuideItem, 'id'>;
+import { toastSuccess } from '~/client/util/toastr';
 
 const GuideRow = ({
   title,
   code,
   preview,
-}: GuideRowProps) => {
+}: {
+  title: string;
+  code: string;
+  preview: React.ReactNode;
+}) => {
   const { t } = useTranslation();
   const handleCopy = async () => {
     await navigator.clipboard.writeText(code);
-    alert(t('editor_guide.textstyle.copy_done'));
+    toastSuccess(t('editor_guide.textstyle.copy_done'));
   };
 
   return (
     <section className={title !== '' ? 'mt-4 mb-1' : 'mb-1'}>
       {title !== '' && <h3 className="h6 fw-bold mb-2">{title}</h3>}
       <div className="d-flex flex-row align-items-center gap-3 py-1 flex-nowrap">
-        <div onClick={handleCopy} style={{ cursor: 'pointer' }} className="flex-shrink-0">
+        <button
+          type="button"
+          onClick={handleCopy}
+          style={{ cursor: 'pointer' }}
+          className="flex-shrink-0 border-0 p-0 bg-transparent text-start"
+        >
           <div
             className="bg-dark text-light p-2 ps-2 pe-4 rounded position-relative"
             style={{
@@ -57,11 +46,14 @@ const GuideRow = ({
             >
               {code}
             </pre>
-            <small className="position-absolute badge bg-secondary opacity-50" style={{ fontSize: '0.4rem', top: '2px', right: '4px' }}>
+            <small
+              className="position-absolute badge bg-secondary opacity-50"
+              style={{ fontSize: '0.4rem', top: '2px', right: '4px' }}
+            >
               Click
             </small>
           </div>
-        </div>
+        </button>
         <div className="flex-grow-1" style={{ whiteSpace: 'nowrap' }}>
           <div
             className="wiki-content"
@@ -78,33 +70,40 @@ const GuideRow = ({
   );
 };
 
-
 export const TextStyleTab: React.FC = () => {
   const { t } = useTranslation();
   const i18nKey = 'editor_guide.textstyle';
 
-  const TEXT_STYLE_GUIDES: TextStyleGuideItem[] = [
+  const TEXT_STYLE_GUIDES = [
     {
       id: 'bold',
       title: t(`${i18nKey}.bold`),
-      code: `${
-        t(`${i18nKey}.this`)} **${t(`${i18nKey}.bold`)}** ${t(`${i18nKey}.is`)}\n${t(`${i18nKey}.this`)} __${t(`${i18nKey}.bold`)}__ ${t(`${i18nKey}.is`)}`,
+      code: `${t(
+        `${i18nKey}.this`,
+      )} **${t(`${i18nKey}.bold`)}** ${t(`${i18nKey}.is`)}\n${t(`${i18nKey}.this`)} __${t(`${i18nKey}.bold`)}__ ${t(`${i18nKey}.is`)}`,
       preview: (
         <div className="lh-base">
-          {t(`${i18nKey}.this`)} <strong>{t(`${i18nKey}.bold`)}</strong> {t(`${i18nKey}.is`)}<br />
-          {t(`${i18nKey}.this`)} <strong>{t(`${i18nKey}.bold`)}</strong> {t(`${i18nKey}.is`)}
+          {t(`${i18nKey}.this`)} <strong>{t(`${i18nKey}.bold`)}</strong>{' '}
+          {t(`${i18nKey}.is`)}
+          <br />
+          {t(`${i18nKey}.this`)} <strong>{t(`${i18nKey}.bold`)}</strong>{' '}
+          {t(`${i18nKey}.is`)}
         </div>
       ),
     },
     {
       id: 'italic',
       title: t(`${i18nKey}.italic`),
-      code: `${
-        t(`${i18nKey}.this`)} *${t(`${i18nKey}.italic`)}*${t(`${i18nKey}.is`)}\n${t(`${i18nKey}.this`)} _${t(`${i18nKey}.italic`)}_${t(`${i18nKey}.is`)}`,
+      code: `${t(
+        `${i18nKey}.this`,
+      )} *${t(`${i18nKey}.italic`)}*${t(`${i18nKey}.is`)}\n${t(`${i18nKey}.this`)} _${t(`${i18nKey}.italic`)}_${t(`${i18nKey}.is`)}`,
       preview: (
         <div className="lh-base">
-          {t(`${i18nKey}.this`)} <em>{t(`${i18nKey}.italic`)}</em> {t(`${i18nKey}.is`)}<br />
-          {t(`${i18nKey}.this`)} <em>{t(`${i18nKey}.italic`)}</em> {t(`${i18nKey}.is`)}
+          {t(`${i18nKey}.this`)} <em>{t(`${i18nKey}.italic`)}</em>{' '}
+          {t(`${i18nKey}.is`)}
+          <br />
+          {t(`${i18nKey}.this`)} <em>{t(`${i18nKey}.italic`)}</em>{' '}
+          {t(`${i18nKey}.is`)}
         </div>
       ),
     },
@@ -149,7 +148,11 @@ export const TextStyleTab: React.FC = () => {
       id: 'bold-italic',
       title: t(`${i18nKey}.bold_italic`),
       code: `***${t(`${i18nKey}.all_important`)}***`,
-      preview: <strong><u>{t(`${i18nKey}.all_important`).replace('\n', '')}</u></strong>,
+      preview: (
+        <strong>
+          <u>{t(`${i18nKey}.all_important`).replace('\n', '')}</u>
+        </strong>
+      ),
     },
     {
       id: 'emoji',
@@ -160,14 +163,28 @@ export const TextStyleTab: React.FC = () => {
     {
       id: 'sub',
       title: t(`${i18nKey}.sub_sup`),
-      code: t(`${i18nKey}.is_text`, { val: `<sub>${t(`${i18nKey}.sub_text`)}</sub>` }),
-      preview: <span>{t(`${i18nKey}.this`)} <sub>{t(`${i18nKey}.sub_text`)}</sub> {t(`${i18nKey}.is`)}</span>,
+      code: t(`${i18nKey}.is_text`, {
+        val: `<sub>${t(`${i18nKey}.sub_text`)}</sub>`,
+      }),
+      preview: (
+        <span>
+          {t(`${i18nKey}.this`)} <sub>{t(`${i18nKey}.sub_text`)}</sub>{' '}
+          {t(`${i18nKey}.is`)}
+        </span>
+      ),
     },
     {
       id: 'sup',
       title: '',
-      code: t(`${i18nKey}.is_text`, { val: `<sup>${t(`${i18nKey}.sup_text`)}</sup>` }),
-      preview: <span>{t(`${i18nKey}.this`)} <sup>{t(`${i18nKey}.sup_text`)}</sup> {t(`${i18nKey}.is`)}</span>,
+      code: t(`${i18nKey}.is_text`, {
+        val: `<sup>${t(`${i18nKey}.sup_text`)}</sup>`,
+      }),
+      preview: (
+        <span>
+          {t(`${i18nKey}.this`)} <sup>{t(`${i18nKey}.sup_text`)}</sup>{' '}
+          {t(`${i18nKey}.is`)}
+        </span>
+      ),
     },
     {
       id: 'link-docs',
@@ -179,10 +196,11 @@ export const TextStyleTab: React.FC = () => {
           target="_blank"
           rel="noreferrer"
           className="text-secondary text-decoration-underline"
-          onClick={e => e.stopPropagation()}
+          style={{ color: '#777570' }}
+          onClick={(e) => e.stopPropagation()}
         >
           {t(`${i18nKey}.link_growi`)}
-          <ExternalLinkIcon />
+          <span className="material-symbols-outlined">open_in_new</span>
         </a>
       ),
     },
@@ -194,17 +212,18 @@ export const TextStyleTab: React.FC = () => {
         <a
           href="/Sandbox"
           className="text-secondary text-decoration-underline"
-          onClick={e => e.stopPropagation()}
+          style={{ color: '#777570' }}
+          onClick={(e) => e.stopPropagation()}
         >
           {t(`${i18nKey}.link_sandbox`)}
-          <ExternalLinkIcon />
+          <span className="material-symbols-outlined">open_in_new</span>
         </a>
       ),
     },
   ];
   return (
     <div className="px-4 py-2 overflow-y-auto" style={{ maxHeight: '80vh' }}>
-      {TEXT_STYLE_GUIDES.map(item => (
+      {TEXT_STYLE_GUIDES.map((item) => (
         <GuideRow
           key={item.id}
           title={item.title}

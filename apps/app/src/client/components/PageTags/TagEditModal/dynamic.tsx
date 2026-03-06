@@ -10,7 +10,8 @@ export const TagEditModalLazyLoaded = (): JSX.Element => {
 
   const TagEditModal = useLazyLoader<TagEditModalProps>(
     'tag-edit-modal',
-    () => import('./TagEditModal').then(mod => ({ default: mod.TagEditModal })),
+    () =>
+      import('./TagEditModal').then((mod) => ({ default: mod.TagEditModal })),
     status?.isOpen ?? false,
   );
 
