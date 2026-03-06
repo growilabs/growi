@@ -209,17 +209,8 @@ class PageBulkExportJobCronService
       } else if (
         pageBulkExportJob.status === PageBulkExportJobStatus.uploading
       ) {
-        logger.info(
-          'proceedBulkExportJob: calling compressAndUpload (not awaited)',
-        );
-        compressAndUpload
-          .bind(this)(user, pageBulkExportJob)
-          .catch((err) => {
-            logger.error(
-              'proceedBulkExportJob: unhandled compressAndUpload error',
-              err,
-            );
-          });
+        logger.info('proceedBulkExportJob: calling compressAndUpload');
+        await compressAndUpload.bind(this)(user, pageBulkExportJob);
       }
     } catch (err) {
       logger.error(err);
