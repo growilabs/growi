@@ -1093,6 +1093,24 @@
       "footnote": "각주",
       "footnote_label": "각주가 있는 텍스트",
       "footnote_desc": "주석은 이와 같이 작성합니다"
+    },
+    "decoration": {
+      "copy_done": "클립보드에 복사되었습니다!",
+      "style": "스타일",
+      "alert": "알림",
+      "badge": "배지",
+      "text_color": "텍스트 색상",
+      "back_color": "배경 색상",
+      "alert_block": "알림 블록",
+      "important_label": "Important",
+      "important_text": "중요한 정보",
+      "caution_label": "Caution",
+      "caution_text": "금지 사항 및 경고",
+      "placeholder": "텍스트가 입력됩니다",
+      "docs_title": "Bootstrap 5 공식 문서",
+      "docs_badge": "배지 상세 정보",
+      "docs_color": "색상 상세 정보",
+      "docs_alert": "알림 블록 상세 정보"
     }
   }
 }

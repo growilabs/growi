@@ -69,11 +69,11 @@ import {
   useConflictEffect,
   useConflictResolver,
 } from './conflict';
+import { EditorGuideModalLazyLoaded } from './EditorGuideModal/dynamic';
 import { EditorNavbar } from './EditorNavbar';
 import { EditorNavbarBottom } from './EditorNavbarBottom';
 import Preview from './Preview';
 import { useScrollSync } from './ScrollSyncHelper';
-
 import '@growi/editor/dist/style.css';
 
 const logger = loggerFactory('growi:PageEditor');
