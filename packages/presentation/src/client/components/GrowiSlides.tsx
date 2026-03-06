@@ -6,7 +6,7 @@ import { MARP_CONTAINER_CLASS_NAME, type PresentationOptions } from '../consts';
 import {
   PRESENTATION_MARPIT_CSS,
   SLIDE_MARPIT_CSS,
-} from '../consts/marpit-base-css';
+} from '../consts/marpit-base-css.vendor-styles.prebuilt';
 import * as extractSections from '../services/renderer/extract-sections';
 import {
   PresentationRichSlideSection,

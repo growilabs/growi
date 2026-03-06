@@ -7,7 +7,7 @@
         "scripts/extract-marpit-css.ts",
         "package.json"
       ],
-      "outputs": ["src/client/consts/marpit-base-css.ts"],
+      "outputs": ["src/client/consts/marpit-base-css.vendor-styles.prebuilt.ts"],
       "outputLogs": "new-only"
     },
     "build": {

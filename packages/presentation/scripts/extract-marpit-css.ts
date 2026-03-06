@@ -60,7 +60,10 @@ export const SLIDE_MARPIT_CSS = ${JSON.stringify(slideCss)};
 export const PRESENTATION_MARPIT_CSS = ${JSON.stringify(presentationCss)};
 `;
 
-const outPath = resolve(__dirname, '../src/client/consts/marpit-base-css.ts');
+const outPath = resolve(
+  __dirname,
+  '../src/client/consts/marpit-base-css.vendor-styles.prebuilt.ts',
+);
 writeFileSync(outPath, output, 'utf-8');
 
 // biome-ignore lint/suspicious/noConsole: Allows console output for script

@@ -14,6 +14,7 @@ const lineNumber = (md) => {
     md.renderer.rules;
 
   // Enable line sync by per slides
+  // biome-ignore lint/nursery/useMaxParams: Allows 5 parameters for marpit renderer rules
   md.renderer.rules.marpit_slide_containers_open = (tks, i, opts, env, slf) => {
     const slide = tks.slice(i + 1).find((t) => t.type === 'marpit_slide_open');
 
