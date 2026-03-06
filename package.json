@@ -45,7 +45,7 @@
     "@changesets/changelog-github": "^0.5.0",
     "@changesets/cli": "^2.27.3",
     "@faker-js/faker": "^9.0.1",
-    "@playwright/test": "^1.49.1",
+    "@playwright/test": "^1.58.2",
     "@swc-node/register": "^1.10.9",
     "@swc/core": "^1.5.25",
     "@swc/helpers": "^0.5.18",
