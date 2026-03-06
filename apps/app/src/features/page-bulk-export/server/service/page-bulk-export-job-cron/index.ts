@@ -196,6 +196,10 @@ class PageBulkExportJobCronService
       pageBulkExportJob.statusOnPreviousCronExec = pageBulkExportJob.status;
       await pageBulkExportJob.save();
 
+      logger.info(
+        `proceedBulkExportJob: status=${pageBulkExportJob.status}, jobId=${pageBulkExportJob._id}`,
+      );
+
       if (pageBulkExportJob.status === PageBulkExportJobStatus.initializing) {
         await createPageSnapshotsAsync.bind(this)(user, pageBulkExportJob);
       } else if (
@@ -205,7 +209,8 @@ class PageBulkExportJobCronService
       } else if (
         pageBulkExportJob.status === PageBulkExportJobStatus.uploading
       ) {
-        compressAndUpload.bind(this)(user, pageBulkExportJob);
+        logger.info('proceedBulkExportJob: calling compressAndUpload');
+        await compressAndUpload.bind(this)(user, pageBulkExportJob);
       }
     } catch (err) {
       logger.error(err);
@@ -225,10 +230,14 @@ class PageBulkExportJobCronService
     err: Error | null,
     pageBulkExportJob: PageBulkExportJobDocument,
   ) {
+    logger.info('handleError: called', {
+      errType: err?.constructor.name,
+      errMessage: err?.message,
+    });
     if (err == null) return;
 
     if (err instanceof BulkExportJobExpiredError) {
-      logger.error(err);
+      logger.error('handleError: BulkExportJobExpiredError', err);
       await this.notifyExportResultAndCleanUp(
         SupportedAction.ACTION_PAGE_BULK_EXPORT_JOB_EXPIRED,
         pageBulkExportJob,
