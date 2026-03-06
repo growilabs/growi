@@ -208,13 +208,13 @@ describe('POST /_api/v3/audit-log-bulk-export', () => {
       expect(res.body?.errors).toBeDefined();
     });
 
-    it('returns 400 when users contains invalid ObjectId', async () => {
+    it('returns 400 when usernames contains non-string values', async () => {
       const app = buildApp();
       const res = await request(app)
         .post('/_api/v3/audit-log-bulk-export')
         .send({
           filters: {
-            users: ['invalid-objectid'],
+            usernames: [123, 456],
           },
         });
 

@@ -30,8 +30,8 @@ export interface IAuditLogBulkExportService {
 function canonicalizeFilters(filters: IAuditLogBulkExportFilters) {
   const normalized: Record<string, unknown> = {};
 
-  if (filters.users?.length) {
-    normalized.users = filters.users.map(String).sort();
+  if (filters.usernames?.length) {
+    normalized.usernames = [...filters.usernames].sort();
   }
   if (filters.actions?.length) {
     normalized.actions = [...filters.actions].sort();

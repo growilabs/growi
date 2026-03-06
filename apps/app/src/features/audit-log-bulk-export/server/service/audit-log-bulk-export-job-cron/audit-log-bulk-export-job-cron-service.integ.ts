@@ -578,11 +578,11 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
 
   describe('4. Error Handling', () => {
     describe('4-1. Nonexistent Users Filter', () => {
-      it('should throw error for nonexistent users', async () => {
+      it('should fail with no results for nonexistent usernames', async () => {
         const job = await AuditLogBulkExportJob.create({
           user: testUser._id,
           filters: {
-            users: [new mongoose.Types.ObjectId().toString()],
+            usernames: ['nonexistent-user-xyz-999'],
           },
           format: AuditLogBulkExportFormat.json,
           status: AuditLogBulkExportJobStatus.exporting,
@@ -591,19 +591,14 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
           totalExportedCount: 0,
         });
 
-        try {
-          await cronService.proceedBulkExportJob(job);
-          await waitForCondition(async () => {
-            const updatedJob = await AuditLogBulkExportJob.findById(job._id);
-            return updatedJob?.status === AuditLogBulkExportJobStatus.failed;
-          });
-        } catch (_error) {}
+        await cronService.proceedBulkExportJob(job);
+        await waitForCondition(async () => {
+          const updatedJob = await AuditLogBulkExportJob.findById(job._id);
+          return updatedJob?.status === AuditLogBulkExportJobStatus.failed;
+        });
 
         const updatedJob = await AuditLogBulkExportJob.findById(job._id);
-        expect([
-          AuditLogBulkExportJobStatus.exporting,
-          AuditLogBulkExportJobStatus.failed,
-        ]).toContain(updatedJob?.status);
+        expect(updatedJob?.status).toBe(AuditLogBulkExportJobStatus.failed);
       });
     });
 
