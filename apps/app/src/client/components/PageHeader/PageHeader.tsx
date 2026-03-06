@@ -1,4 +1,4 @@
-import { type JSX, useEffect, useRef, useState } from 'react';
+import { type JSX, useCallback, useEffect, useRef, useState } from 'react';
 
 import { useCurrentPageData } from '~/states/page';
 import { useDeviceLargerThanSm } from '~/states/ui/device';
@@ -19,7 +19,7 @@ export const PageHeader = (): JSX.Element => {
 
   const [maxWidth, setMaxWidth] = useState<number>(300);
 
-  useEffect(() => {
+  const calcMaxWidth = useCallback(() => {
     if (pageHeaderRef.current == null) {
       return;
     }
@@ -35,15 +35,27 @@ export const PageHeader = (): JSX.Element => {
     );
   }, [isLargerThanSm, pageControlsX]);
 
+  useEffect(() => {
+    calcMaxWidth();
+  }, [calcMaxWidth]);
+
   if (currentPage == null) {
     return <></>;
   }
 
   return (
     <div className={`${moduleClass} w-100`} ref={pageHeaderRef}>
-      <PagePathHeader currentPage={currentPage} maxWidth={maxWidth} />
+      <PagePathHeader
+        currentPage={currentPage}
+        maxWidth={maxWidth}
+        onRenameTerminated={calcMaxWidth}
+      />
       <div className="mt-0 mt-md-1">
-        <PageTitleHeader currentPage={currentPage} maxWidth={maxWidth} />
+        <PageTitleHeader
+          currentPage={currentPage}
+          maxWidth={maxWidth}
+          onMoveTerminated={calcMaxWidth}
+        />
       </div>
     </div>
   );
