@@ -6,14 +6,12 @@ import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle';
 import type { RendererConfig } from '~/interfaces/services/renderer';
 import type { IShareLinkHasId } from '~/interfaces/share-link';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
-import { generateSSRViewOptions } from '~/services/renderer/renderer';
 import { useCurrentPageData, usePageNotFound } from '~/states/page';
 import { useViewOptions } from '~/stores/renderer';
 import loggerFactory from '~/utils/logger';
 
 import { PageContentFooter } from '../PageView/PageContentFooter';
 import { PageViewLayout } from '../PageView/PageViewLayout';
-import RevisionRenderer from '../PageView/RevisionRenderer';
 import ShareLinkAlert from './ShareLinkAlert';
 
 const logger = loggerFactory('growi:components:ShareLinkPageView');
@@ -36,6 +34,13 @@ const SlideRenderer = dynamic(
       (mod) => mod.SlideRenderer,
     ),
   { ssr: false },
+);
+const PageContentRenderer = dynamic(
+  () =>
+    import('../PageView/PageContentRenderer').then(
+      (mod) => mod.PageContentRenderer,
+    ),
+  { ssr: true },
 );
 // biome-ignore-end lint/style/noRestrictedImports: no-problem dynamic import
 
@@ -103,14 +108,17 @@ export const ShareLinkPageView = memo((props: Props): JSX.Element => {
       );
     }
 
-    const rendererOptions =
-      viewOptions ?? generateSSRViewOptions(rendererConfig, pagePath);
     const markdown = page.revision.body;
 
     return isSlide != null ? (
       <SlideRenderer marp={isSlide.marp} markdown={markdown} />
     ) : (
-      <RevisionRenderer rendererOptions={rendererOptions} markdown={markdown} />
+      <PageContentRenderer
+        rendererOptions={viewOptions}
+        rendererConfig={rendererConfig}
+        pagePath={pagePath}
+        markdown={markdown}
+      />
     );
   }, [
     isExpired,

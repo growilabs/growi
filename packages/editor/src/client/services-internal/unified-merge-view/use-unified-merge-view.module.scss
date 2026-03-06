@@ -1,6 +1,6 @@
 // Change buttons layout for @codemirror/merge
-.codemirror-editor :global {
-  .cm-chunkButtons {
+.codemirror-editor {
+  :global(.cm-chunkButtons) {
     // reverse order
     display: flex;
     flex-direction: row-reverse;
@@ -8,9 +8,9 @@
 }
 
 // Change button size
-.codemirror-editor :global {
-  .cm-chunkButtons {
-    button {
+.codemirror-editor {
+  :global(.cm-chunkButtons) {
+    :global(button) {
       --bs-btn-padding-y: .1rem;
       --bs-btn-padding-x: .5rem;
       --bs-btn-font-size: 1rem;
@@ -19,9 +19,9 @@
 }
 
 // Override button style with Bootstrap variables
-.codemirror-editor :global {
-  .cm-chunkButtons {
-    button {
+.codemirror-editor {
+  :global(.cm-chunkButtons) {
+    :global(button) {
       color: var(--bs-btn-color) !important;
       background: var(--bs-btn-bg) !important;
       border: var(--bs-btn-border-width) solid var(--bs-btn-border-color) !important;

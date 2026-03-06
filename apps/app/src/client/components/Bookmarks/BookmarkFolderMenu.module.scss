@@ -1,10 +1,10 @@
-.grw-bookmark-folder-menu  :global {
+.grw-bookmark-folder-menu {
   max-width: 65%;
 
-  .grw-bookmark-folder-menu-item-folder-first {
+  :global(.grw-bookmark-folder-menu-item-folder-first) {
     padding-left: 40px;
   }
-  .grw-bookmark-folder-menu-item-folder-second {
+  :global(.grw-bookmark-folder-menu-item-folder-second) {
     padding-left: 60px;
   }
 }

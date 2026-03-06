@@ -1,5 +1,5 @@
-.attachment :global {
-  .attachment-icon {
+.attachment {
+  :global(.attachment-icon) {
     flex-shrink: 0;
     width: 35px;
     height: 35px;

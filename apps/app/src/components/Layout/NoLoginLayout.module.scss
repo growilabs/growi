@@ -4,59 +4,59 @@
 @use '@growi/core-styles/scss/variables/growi-official-colors' as var;
 
 
-.nologin :global {
+.nologin {
   height: 100vh;
 
-  .nologin-header,
-  .nologin-dialog {
+  :global(.nologin-header),
+  :global(.nologin-dialog) {
     max-width: 480px;
   }
 
   // layout
-  .main {
+  :global(.main) {
     width: 100vw;
 
-    .nologin-header {
+    :global(.nologin-header) {
       padding-top: 30px;
       padding-bottom: 10px;
-      svg {
+      :global(svg) {
         fill: white;
       }
     }
 
-    .growi-logo-type {
+    :global(.growi-logo-type) {
       margin-left: 7px;
     }
 
   }
 
   // styles
-  .alert {
+  :global(.alert) {
     padding: 0.5em 1em 0.5em 2em;
   }
 
-  .input-group {
+  :global(.input-group) {
     margin-bottom: 16px;
 
-    .input-group-text {
+    :global(.input-group-text) {
       text-align: center;
     }
   }
 
-  .input-group:not(.has-error) {
-    .form-control {
+  :global(.input-group:not(.has-error)) {
+    :global(.form-control) {
       border: transparent;
     }
   }
 
   // footer link text
-  .link-growi-org {
+  :global(.link-growi-org) {
     font-size: smaller;
     font-weight: bold;
 
     &,
-    .growi,
-    .org {
+    :global(.growi),
+    :global(.org) {
       transition: color 0.8s;
     }
   }
@@ -79,7 +79,7 @@
 
 // Light mode color
 @include bs.color-mode(light) {
-  .nologin :global {
+  .nologin {
     // background color
     $color-gradient: #3c465c;
 
@@ -87,13 +87,13 @@
       linear-gradient(135deg, var.$growi-green 10%, hsla(225deg, 95%, 50%, 0%) 70%), linear-gradient(225deg, var.$growi-blue 10%, hsla(140deg, 90%, 50%, 0%) 80%),
       linear-gradient(315deg, darken($color-gradient, 25%) 100%, hsla(35deg, 95%, 55%, 0%) 70%);
 
-    .nologin-header {
+    :global(.nologin-header) {
       background-color: rgba(white, 0.3);
     }
 
-    .nologin-dialog {
+    :global(.nologin-dialog) {
       background-color: rgba(white, 0.3);
-      .link-switch {
+      :global(.link-switch) {
         color: #1939b8;
         &:hover {
           color: lighten(#1939b8,20%);
@@ -101,8 +101,8 @@
       }
     }
 
-    .input-group {
-      .form-control {
+    :global(.input-group) {
+      :global(.form-control) {
         color: bs.$gray-800;
         background-color: white;
         box-shadow: unset;
@@ -113,18 +113,18 @@
       }
     }
 
-    .link-growi-org {
+    :global(.link-growi-org) {
       color: rgba(white, 0.4);
 
       &:hover,
-      &.focus {
+      &:global(.focus) {
         color: white;
 
-        .growi {
+        :global(.growi) {
           color: darken(var.$growi-blue, 10%);
         }
 
-        .org {
+        :global(.org) {
           color: darken(var.$growi-green, 10%);
         }
       }
@@ -134,7 +134,7 @@
 
 // Dark mode color
 @include bs.color-mode(dark) {
-  .nologin :global {
+  .nologin {
     // background color
     $color-gradient: #3c465c;
 
@@ -142,13 +142,13 @@
       linear-gradient(135deg, var.$growi-green 10%, hsla(225deg, 95%, 50%, 0%) 70%), linear-gradient(225deg, var.$growi-blue 10%, hsla(140deg, 90%, 50%, 0%) 80%),
       linear-gradient(315deg, darken($color-gradient, 25%) 100%, hsla(35deg, 95%, 55%, 0%) 70%);
 
-    .nologin-header {
+    :global(.nologin-header) {
       background-color: rgba(black, 0.3);
     }
 
-    .nologin-dialog {
+    :global(.nologin-dialog) {
       background-color: rgba(black, 0.3);
-      .link-switch {
+      :global(.link-switch) {
         color: #7b9bd5;
         &:hover {
           color: lighten(#7b9bd5,10%);
@@ -156,8 +156,8 @@
       }
     }
 
-    .input-group {
-      .form-control {
+    :global(.input-group) {
+      :global(.form-control) {
         color: white;
         background-color: rgba(#505050, 0.7);
         box-shadow: unset;
@@ -168,18 +168,18 @@
       }
     }
 
-    .link-growi-org {
+    :global(.link-growi-org) {
       color: rgba(white, 0.4);
 
       &:hover,
-      &.focus {
+      &:global(.focus) {
         color: rgba(white, 0.7);
 
-        .growi {
+        :global(.growi) {
           color: darken(var.$growi-blue, 5%);
         }
 
-        .org {
+        :global(.org) {
           color: darken(var.$growi-green, 5%);
         }
       }

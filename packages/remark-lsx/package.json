@@ -56,7 +56,7 @@
     "unist-util-visit": "^5.0.0"
   },
   "peerDependencies": {
-    "next": "^14",
+    "next": "^16",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   }

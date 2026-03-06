@@ -60,7 +60,7 @@ jobs:
     - name: Assembling all dependencies
       run: |
         rm -rf out
-        pnpm deploy out --prod --filter @growi/app
+        pnpm deploy out --prod --legacy --filter @growi/app
         rm -rf apps/app/node_modules && mv out/node_modules apps/app/node_modules
 
     - name: Archive production files
