@@ -57,7 +57,7 @@ jobs:
         RELEASED_VERSION: ${{ steps.package-json.outputs.packageVersion }}
 
     - name: Commit, Tag and Push
-      uses: stefanzweifel/git-auto-commit-action@v5
+      uses: stefanzweifel/git-auto-commit-action@v7
       with:
         branch: ${{ github.event.pull_request.base.ref }}
         commit_message: Release v${{ steps.package-json.outputs.packageVersion }}
