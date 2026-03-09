@@ -134,7 +134,7 @@ export async function compressAndUpload(
     logger.info('postProcess completed');
   } catch (e) {
     logger.error('error caught', e);
-    this.handleError(e, pageBulkExportJob);
+    await this.handleError(e, pageBulkExportJob);
   } finally {
     logger.info('finally block, cleaning up');
     // Clean up temp file
