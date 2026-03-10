@@ -1,14 +1,11 @@
-import {
-  differenceInDays,
-  format,
-  getISOWeek,
-  getISOWeekYear,
-  setISOWeek,
-  setISOWeekYear,
-  startOfISOWeek,
-  startOfWeek,
-  subWeeks,
-} from 'date-fns';
+import { differenceInDays } from 'date-fns/differenceInDays';
+import { format } from 'date-fns/format';
+import { getISOWeek } from 'date-fns/getISOWeek';
+import { getISOWeekYear } from 'date-fns/getISOWeekYear';
+import { setISOWeek } from 'date-fns/setISOWeek';
+import { setISOWeekYear } from 'date-fns/setISOWeekYear';
+import { startOfISOWeek } from 'date-fns/startOfISOWeek';
+import { subWeeks } from 'date-fns/subWeeks';
 
 import type { IContributionDay } from '../interfaces/contribution-graph';
 
@@ -31,18 +28,13 @@ export const getDaysDifference = (
 };
 
 export const getCurrentWeekStart = (date: Date = new Date()): Date => {
-  return startOfWeek(date, { weekStartsOn: 1 });
+  const utcDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+  return startOfISOWeek(utcDate);
 };
 
-export const getUTCMidnightToday = () => {
-  const currentTime = new Date();
-
+export const getUTCMidnight = (date: Date) => {
   return new Date(
-    Date.UTC(
-      currentTime.getUTCFullYear(),
-      currentTime.getUTCMonth(),
-      currentTime.getUTCDate(),
-    ),
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
   );
 };
 
