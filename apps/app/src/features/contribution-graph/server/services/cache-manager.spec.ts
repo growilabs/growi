@@ -6,8 +6,11 @@ import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 import userFactory from '~/server/models/user';
 
+import {
+  formatDateKey,
+  getISOWeekId,
+} from '../../utils/contribution-graph-utils';
 import { ContributionCache } from '../models/contribution-cache-model';
-import { formatDateKey, getISOWeekId } from '../utils/contribution-graph-utils';
 import { ContributionCacheManager } from './cache-manager';
 
 const createMockId = () => new mongoose.Types.ObjectId().toString();

@@ -3,20 +3,21 @@ import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
 
-import { ContributionCacheManager } from '~/features/contribution-graph/services/cache-manager';
+import { ContributionCacheManager } from '~/features/contribution-graph/server/services/cache-manager';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import type Crowi from '../../../../server/crowi';
+import { apiV3FormValidator } from '../../../../server/middlewares/apiv3-form-validator';
+import type { ApiV3Response } from '../../../../server/routes/apiv3/interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
 
 const validator = {
   list: [
     query('targetUserId')
-      .optional()
+      .notEmpty()
+      .withMessage('user ID is required')
       .isMongoId()
       .withMessage('user ID must be a MongoDB ID'),
   ],
@@ -37,17 +38,10 @@ module.exports = (crowi: Crowi): Router => {
     validator.list,
     apiV3FormValidator,
     async (req: AuthorizedRequest, res: ApiV3Response) => {
-      let targetUserId = req.query.targetUserId;
+      const targetUserId = req.query.targetUserId;
 
-      if (typeof targetUserId !== 'string') {
-        targetUserId = req.user?._id;
-      }
-
-      if (!targetUserId) {
-        return res.apiv3Err(
-          'Target user ID is missing and authenticated user ID is unavailable.',
-          400,
-        );
+      if (!targetUserId || typeof targetUserId !== 'string') {
+        return res.apiv3Err('Target user ID is missing or invalid.', 400);
       }
 
       try {

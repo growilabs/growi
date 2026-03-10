@@ -6,11 +6,11 @@ import type {
   SetContributionCachePayload,
 } from '~/features/contribution-graph/interfaces/contribution-graph';
 
+import { getUTCMidnight } from '../../utils/contribution-graph-utils';
 import {
   ContributionCache,
   type ContributionGraphDocument,
 } from '../models/contribution-cache-model';
-import { getUTCMidnight } from '../utils/contribution-graph-utils';
 
 type SetFields = IContributionDay[] | Date;
 
