@@ -1593,6 +1593,9 @@ importers:
 
   packages/remark-drawio:
     dependencies:
+      '@growi/core':
+        specifier: workspace:^
+        version: link:../core
       react:
         specifier: ^18.2.0
         version: 18.2.0
@@ -1600,9 +1603,6 @@ importers:
         specifier: ^18.2.0
         version: 18.2.0(react@18.2.0)
     devDependencies:
-      '@growi/core':
-        specifier: workspace:^
-        version: link:../core
       '@types/hast':
         specifier: ^3.0.4
         version: 3.0.4
