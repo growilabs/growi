@@ -16,7 +16,7 @@
   "tablet": "Tablette",
   "Click to copy": "Cliquer pour copier",
   "Rename": "Renommer",
-  "Move/Rename": "Déplacer/renommer",
+  "Move/Rename": "Déplacer",
   "Redirected": "Redirigé",
   "Unlinked": "Délié",
   "unlink_redirection": "Délier la redirection",
@@ -39,11 +39,11 @@
   "Category": "Catégorie",
   "User": "Utilisateur",
   "account_id": "Identifiant de compte",
-  "Update": "Mettre à jour",
+  "Update": "Enregistrer",
   "Update Page": "Mettre à jour la page",
   "Error": "Erreur",
   "Warning": "Avertissement",
-  "Sign in": "Se connecter",
+  "Sign in": "Connexion",
   "Sign in with External auth": "Se connecter avec {{signin}}",
   "Sign up is here": "Inscription",
   "Sign in is here": "Connexion",
@@ -61,15 +61,14 @@
   "History": "Historique",
   "attachment_data": "Pièces jointes",
   "No_attachments_yet": "Aucune pièce jointe.",
-  "Presentation Mode": "Mode présentation",
+  "Presentation Mode": "Présentation",
   "Not available for guest": "Indisponible pour les invités",
   "Not available in this version": "Indisponible dans cette version",
   "Not available when \"anyone with the link\" is selected": "Si \"Tous les utilisateurs disposant du lien\" est sélectionné, la portée ne peut pas être modifiée",
-  "No users have liked this yet": "Aucun utilisateur n'a aimé cette page",
   "No users have liked this yet.": "Aucun utilisateur n'a aimé cette page.",
   "No users have bookmarked yet": "Aucun utilisateur n'a mis en favoris cette page",
   "Create Archive Page": "Créer page d'archive",
-  "Create Sidebar Page": "Créer page <strong>/Sidebar</strong>",
+  "Create Sidebar Page": "Créer la page <strong>/Sidebar</strong>",
   "File type": "Type de fichier",
   "Target page": "Page cible",
   "Include Attachment File": "Inclure le fichier de pièces jointes",
@@ -87,7 +86,7 @@
   "Create/Edit Template": "Créer/Modifier page modèle",
   "Go to this version": "Voir cette version",
   "View diff": "Voir le diff",
-  "No diff": "Aucune différences",
+  "No diff": "Aucune différence",
   "Latest": "Dernière version",
   "User ID": "Identifiant utilisateur",
   "User Settings": "Paramètres utilisateur",
@@ -123,6 +122,8 @@
   "UserGroup": "Groupe utilisateur",
   "Basic Settings": "Paramètres de base",
   "The contents entered here will be shown in the header etc": "Le contenu entré ici sera visible dans l'en-tête",
+  "Browsing of this page is restricted": "Le contenu de cette page est restreint.",
+  "Forbidden": "Accès interdit",
   "Public": "Tout le monde",
   "Anyone with the link": "Tous les utilisateurs disposant du lien",
   "Specified users only": "Utilisateurs spécifiés",
@@ -230,7 +231,7 @@
     "notice": {
       "apitoken_issued": "Aucun jeton d'API existant.",
       "update_token1": "Un nouveau jeton peut être généré.",
-      "update_token2": "Modifiez le jeton aux endroits où celui-ci est utilisé."
+      "update_token2": "Modifiez le jeton aux endroits où celui-ci est utilisé, car l'ancien sera invalide."
     },
     "form_help": {}
   },
@@ -295,17 +296,17 @@
   "Other Settings": "Autres paramètres",
   "in_app_notification_settings": {
     "in_app_notification_settings": "Notifications",
-    "subscribe_settings": "Paramètres d'abonnement automatique aux notifications de pages",
+    "subscribe_settings": "Notifications d'application",
     "default_subscribe_rules": {
-      "page_create": "S'abonner aux modifications d'une page lors de sa création."
+      "page_create": "Abonne systématiquement aux notifications de modification d'une page lors de sa création."
     }
   },
   "ui_settings": {
     "ui_settings": "Interface",
     "side_bar_mode": {
       "settings": "Paramètres navigation latérale",
-      "side_bar_mode_setting": "Épingler la navigation latérale",
-      "description": "Activer pour toujours afficher la barre de navigation latérale lorsque l'écran est large. Si la largeur d'écran est faible, le cas inverse est applicable."
+      "side_bar_mode_setting": "Épingler la barre latérale",
+      "description": "Épingle sur l'écran la barre de navigation latérale. Si la résolution de l'écran est trop faible, la barre latérale ne sera plus épinglée."
     }
   },
   "color_mode_settings": {
@@ -368,7 +369,7 @@
     "keymap": "Raccourcis",
     "indent": "Indentation",
     "paste": {
-      "title": "Comportement du collage",
+      "title": "Collage",
       "both": "Texte et fichier",
       "text": "Texte seulement",
       "file": "Fichier seulement"
@@ -377,7 +378,7 @@
     "editor_assistant": "Assistant d'édition",
     "Show active line": "Surligner la ligne active",
     "auto_format_table": "Formatter les tableaux",
-    "overwrite_scopes": "{{operation}} et écraser les scopes des pages enfants",
+    "overwrite_scopes": "{{operation}} et écraser les permissions des pages enfants",
     "notice": {
       "conflict": "Sauvegarde impossible, la page est en cours de modification par un autre utilisateur. Recharger la page."
     },
@@ -385,10 +386,10 @@
   },
   "page_comment": {
     "comments": "Commentaires",
-    "comment": "Commmenter",
-    "preview": "Prévisualiser",
-    "write": "Écrire",
-    "add_a_comment": "Ajouter un commentaire",
+    "comment": "Créer",
+    "preview": "Visualiser",
+    "write": "Rédaction",
+    "add_a_comment": "Nouveau commentaire",
     "display_the_page_when_posting_this_comment": "Afficher la page en postant le commentaire",
     "no_user_found": "Aucun utilisateur trouvé",
     "reply": "Répondre",
@@ -408,22 +409,22 @@
     "revision": "Révision",
     "comparing_source": "Source",
     "comparing_target": "Cible",
-    "comparing_revisions": "Comparer les modifications",
+    "comparing_revisions": "Historique des modifications",
     "compare_latest": "Comparer avec la version la plus récente",
     "compare_previous": "Comparer avec la version précédente"
   },
   "modal_rename": {
     "label": {
-      "Move/Rename page": "Déplacer/renommer page",
-      "New page name": "Nouveau chemin",
+      "Move/Rename page": "Déplacer ou renommer la page",
+      "New page name": "Nouvel emplacement",
       "Failed to get subordinated pages": "échec de récupération des pages subordinnées",
       "Failed to get exist path": "échec de la récupération du chemin",
-      "Current page name": "Chemin actuel",
+      "Current page name": "Emplacement actuel",
       "Rename this page only": "Renommer cette page",
       "Force rename all child pages": "Forcer le renommage des pages",
       "Other options": "Autres options",
-      "Do not update metadata": "Ne pas modifier les métadonnées",
-      "Redirect": "Redirection automatique"
+      "Do not update metadata": "Conserver les métadonnées",
+      "Redirect": "Redirection"
     },
     "help": {
       "redirect": "Redirige automatiquement vers le nouveau chemin de la page.",
@@ -456,18 +457,18 @@
   },
   "modal_duplicate": {
     "label": {
-      "Duplicate page": "Dupliquer",
-      "New page name": "Nom de la page",
+      "Duplicate page": "Dupliquer la page",
+      "New page name": "Emplacement de la nouvelle page",
       "Failed to get subordinated pages": "échec de récupération des pages subordinnées",
-      "Current page name": "Nom de la page courante",
-      "Recursively": "Récursivement",
+      "Current page name": "Emplacement actuel",
+      "Recursively": "Récursif",
       "Duplicate without exist path": "Dupliquer sans le chemin existant",
       "Same page already exists": "Une page avec ce chemin existe déjà",
-      "Only duplicate user related pages": "Seul les pages dupliquées auquelles vous avez accès"
+      "Only duplicate user related pages": "Hériter les permissions"
     },
     "help": {
-      "recursive": "Dupliquer les pages enfants récursivement",
-      "only_inherit_user_related_groups": "Si la page est configuré en \"Seulement dans le groupe\", les groupes auxquels vous n'appartenez pas perdront l'accès aux pages dupliquées"
+      "recursive": "Duplique également les pages enfants.",
+      "only_inherit_user_related_groups": "Les pages restreintes a un groupe hériteront des permissions assignées."
     }
   },
   "duplicated_pages": "{{fromPath}} dupliquée",
@@ -704,20 +705,20 @@
   "template": {
     "modal_label": {
       "Select template": "Sélectionner modèle",
-      "Create/Edit Template Page": "Créer/modifier page modèle",
+      "Create/Edit Template Page": "Créer un modèle",
       "Create template under": "Créer une page modèle enfant"
     },
     "option_label": {
-      "create/edit": "Créer/modifier page modèle",
+      "create/edit": "Modèle",
       "select": "Sélectionner type de page modèle"
     },
     "children": {
       "label": "Modèle pour page enfant",
-      "desc": "Applicable aux pages de même niveau que la page modèle"
+      "desc": "Le modèle est appliqué aux pages du même niveau dans l'arbre."
     },
-    "decendants": {
+    "descendants": {
       "label": "Modèle pour descendants",
-      "desc": "Applicable aux page descendantes"
+      "desc": "Le modèle est appliqué à toutes les pages enfants."
     }
   },
   "sandbox": {
@@ -836,14 +837,14 @@
   "page_export": {
     "failed_to_export": "Échec de l'export",
     "failed_to_count_pages": "Échec du compte des pages",
-    "export_page_markdown": "Exporter la page en Markdown",
+    "export_page_markdown": "Exporter",
     "export_page_pdf": "Exporter la page en PDF",
-    "bulk_export": "Exporter la page et toutes les pages enfants",
+    "bulk_export": "Exporter les pages enfants",
     "bulk_export_download_explanation": "Une notification sera envoyée lorsque l’exportation sera terminée. Pour télécharger le fichier exporté, cliquez sur la notification.",
     "bulk_export_exec_time_warning": "Si le nombre de pages est important, l'exportation peut prendre un certain temps.",
-    "large_bulk_export_warning": "Pour préserver les ressources du système, veuillez éviter d'exporter un grand nombre de pages consécutivement",
+    "large_bulk_export_warning": "Pour préserver les ressources du système, veuillez éviter d'exporter un grand nombre de pages consécutivement.",
     "markdown": "Markdown",
-    "choose_export_format": "Sélectionnez le format d'exportation",
+    "choose_export_format": "Format de l'export",
     "bulk_export_started": "Patientez s'il-vous-plait...",
     "bulk_export_download_expired": "La période de téléchargement a expiré",
     "bulk_export_job_expired": "Le traitement a été interrompu car le temps d'exportation était trop long",
@@ -978,7 +979,7 @@
     }
   },
   "tooltip": {
-    "like": "Like!",
+    "like": "Aimer",
     "cancel_like": "Annuler",
     "bookmark": "Ajouter aux favoris",
     "cancel_bookmark": "Retirer des favoris",
@@ -998,8 +999,8 @@
   },
   "user_home_page": {
     "bookmarks": "Favoris",
-    "recently_created": "Page récentes",
-    "recent_activity": "Activité récente",
+    "recently_created": "Pages récentes",
+    "recent_activity": "Modifications récentes",
     "unknown_action": "a effectué une modification non spécifiée",
     "page_create": "a créé une page",
     "page_update": "a mis à jour une page",
@@ -1034,7 +1035,7 @@
   },
   "tag_edit_modal": {
     "edit_tags": "Étiquettes",
-    "done": "Mettre à jour",
+    "done": "Assigner",
     "tags_input": {
       "tag_name": "Choisir ou créer une étiquette"
     }
@@ -1049,24 +1050,24 @@
     "select_page_location": "Sélectionner emplacement de la page"
   },
   "wip_page": {
-    "save_as_wip": "Sauvegarder comme brouillon",
+    "save_as_wip": "Enregistrer comme brouillon",
     "success_save_as_wip": "Sauvegardée en tant que brouillon",
     "fail_save_as_wip": "Échec de la sauvegarde du brouillon",
-    "alert": "Page en cours d'écriture",
-    "publish_page": "Publier page",
+    "alert": "Page en cours d'écriture.",
+    "publish_page": "Publier",
     "success_publish_page": "Page publiée",
     "fail_publish_page": "Échec de publication de la page"
   },
   "sidebar_header": {
-    "show_wip_page": "Voir brouillon",
+    "show_wip_page": "Inclure les brouillons",
     "compact_view": "Vue compacte"
   },
   "sync-latest-revision-body": {
     "menuitem": "Synchroniser avec la dernière révision",
-    "confirm": "Supprime les données en brouillon et synchronise avec la dernière révision. Synchroniser?",
-    "alert": "Il se peut que le texte le plus récent n'ait pas été synchronisé. Veuillez recharger et vérifier à nouveau.",
-    "success-toaster": "Dernier texte synchronisé",
-    "skipped-toaster": "L'éditeur n'est pas actif. Synchronisation annulée.",
+    "confirm": "Le contenu non enregistré sera écrasé. Synchroniser?",
+    "alert": "Certaines modifications n'ont pas été enregistrées. Veuillez rafraîchir votre onglet de navigateur.",
+    "success-toaster": "Dernière révision synchronisée",
+    "skipped-toaster": "Le mode édition doit être activé pour déclencher la synchronisation. Synchronisation annulée.",
     "error-toaster": "Synchronisation échouée"
   }
 }
