@@ -4,7 +4,13 @@ import type { Code, Node, Paragraph } from 'mdast';
 import type { Plugin } from 'unified';
 import { visit } from 'unist-util-visit';
 
-const SUPPORTED_ATTRIBUTES = ['diagramIndex', 'bol', 'eol', 'isDarkMode'];
+const SUPPORTED_ATTRIBUTES = [
+  'diagramIndex',
+  'bol',
+  'eol',
+  'isDarkMode',
+  'data-growi-rendering',
+];
 
 interface Data {
   hName?: string;
@@ -34,6 +40,7 @@ function rewriteNode(node: Node, index: number, isDarkMode?: boolean) {
     eol: node.position?.end.line,
     isDarkMode: isDarkMode ? 'true' : 'false',
     key: `drawio-${index}`,
+    'data-growi-rendering': 'true',
   };
 }
 

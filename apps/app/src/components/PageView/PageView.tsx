@@ -143,23 +143,68 @@ const PageViewComponent = (props: Props): JSX.Element => {
     if (contentContainer == null) return;
 
     const targetId = decodeURIComponent(hash.slice(1));
-    const target = document.getElementById(targetId);
-    if (target != null) {
+
+    const scrollToTarget = (): boolean => {
+      const target = document.getElementById(targetId);
+      if (target == null) return false;
       target.scrollIntoView();
-      return;
+      return true;
+    };
+
+    // After the initial scroll, watch for data-growi-rendering elements to
+    // appear and then fully disappear. Components such as DrawioViewer may be
+    // mounted AFTER this effect runs (lazy / remark-plugin rendering), so we
+    // cannot just check synchronously — we must observe the full lifecycle.
+    const watchRenderingCompletion = () => {
+      let everSawRendering = false;
+
+      const renderingObserver = new MutationObserver(() => {
+        const hasRendering =
+          contentContainer.querySelector('[data-growi-rendering]') != null;
+
+        if (hasRendering) {
+          // At least one component is still rendering
+          everSawRendering = true;
+          return;
+        }
+
+        if (everSawRendering) {
+          // All rendering-in-progress elements have finished — scroll to the
+          // correct (post-render) position and stop observing
+          scrollToTarget();
+          renderingObserver.disconnect();
+        }
+      });
+
+      renderingObserver.observe(contentContainer, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-growi-rendering'],
+      });
+
+      return renderingObserver;
+    };
+
+    // Wait for the target heading element to appear in DOM first
+    if (!scrollToTarget()) {
+      const targetObserver = new MutationObserver(() => {
+        if (scrollToTarget()) {
+          targetObserver.disconnect();
+          watchRenderingCompletion();
+        }
+      });
+
+      targetObserver.observe(contentContainer, {
+        childList: true,
+        subtree: true,
+      });
+
+      return () => targetObserver.disconnect();
     }
 
-    const observer = new MutationObserver(() => {
-      const target = document.getElementById(targetId);
-      if (target != null) {
-        target.scrollIntoView();
-        observer.disconnect();
-      }
-    });
-
-    observer.observe(contentContainer, { childList: true, subtree: true });
-
-    return () => observer.disconnect();
+    const renderingObserver = watchRenderingCompletion();
+    return () => renderingObserver.disconnect();
   }, [currentPageId, contentContainerId]);
 
   // *******************************  end  *******************************

@@ -127,6 +127,7 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
   useEffect(() => {
     if (error != null) {
       onRenderingUpdated?.(null);
+      drawioContainerRef.current?.removeAttribute('data-growi-rendering');
     }
   }, [error, onRenderingUpdated]);
 
@@ -143,6 +144,7 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
         if (mxgraphData != null) {
           const mxgraph = JSON.parse(mxgraphData);
           onRenderingUpdated?.(mxgraph.xml);
+          drawioContainerRef.current?.removeAttribute('data-growi-rendering');
         }
       }
     };
@@ -182,6 +184,7 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
       className={`drawio-viewer ${styles['drawio-viewer']} p-2`}
       data-begin-line-number-of-markdown={bol}
       data-end-line-number-of-markdown={eol}
+      data-growi-rendering="true"
     >
       {/* show error */}
       {error != null && (
