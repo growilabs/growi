@@ -18,4 +18,5 @@
 # cache
 /.swc/
 
+# prisma
 /generated/prisma
