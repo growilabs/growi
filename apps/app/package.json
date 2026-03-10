@@ -109,7 +109,6 @@
     "browser-bunyan": "^1.8.0",
     "bson-objectid": "^2.0.4",
     "bunyan": "^1.8.15",
-    "check-node-version": "^4.2.1",
     "compression": "^1.7.4",
     "connect-flash": "~0.1.1",
     "connect-mongo": "^4.6.0",
