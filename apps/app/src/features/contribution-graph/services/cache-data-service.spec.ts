@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { SetContributionCachePayload } from '../interfaces/contribution-graph';
 import { ContributionCache } from '../models/contribution-cache-model';
-import { getUTCMidnightToday } from '../utils/contribution-graph-utils';
+import { getUTCMidnight } from '../utils/contribution-graph-utils';
 import {
   cacheIsFresh,
   getContributionCache,
@@ -187,7 +187,7 @@ describe('cacheIsFresh()', () => {
   });
 
   it('should return false if cache is exactly one second before today midnight', () => {
-    const todayMidnight = getUTCMidnightToday();
+    const todayMidnight = getUTCMidnight(new Date());
     const oneSecondBefore = new Date(todayMidnight.getTime() - 1000);
     const result = cacheIsFresh(oneSecondBefore);
 
