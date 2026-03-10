@@ -49,7 +49,9 @@
         "mongodb.mongodb-vscode",
         // Debug
         "msjsdiag.debugger-for-chrome",
-        "firefox-devtools.vscode-firefox-debug"
+        "firefox-devtools.vscode-firefox-debug",
+        // prisma
+        "Prisma.prisma@6.19.0"
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "bash"
