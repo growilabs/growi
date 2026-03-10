@@ -8,6 +8,10 @@ import {
   useRef,
 } from 'react';
 import dynamic from 'next/dynamic';
+import {
+  GROWI_RENDERING_ATTR,
+  GROWI_RENDERING_ATTR_SELECTOR,
+} from '@growi/core/dist/consts';
 import { isDeepEquals } from '@growi/core/dist/utils/is-deep-equals';
 import { isUsersHomepage } from '@growi/core/dist/utils/page-path-utils';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
@@ -160,7 +164,7 @@ const PageViewComponent = (props: Props): JSX.Element => {
 
       const renderingObserver = new MutationObserver(() => {
         const hasRendering =
-          contentContainer.querySelector('[data-growi-rendering]') != null;
+          contentContainer.querySelector(GROWI_RENDERING_ATTR_SELECTOR) != null;
 
         if (hasRendering) {
           // At least one component is still rendering
@@ -180,7 +184,7 @@ const PageViewComponent = (props: Props): JSX.Element => {
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ['data-growi-rendering'],
+        attributeFilter: [GROWI_RENDERING_ATTR],
       });
 
       return renderingObserver;
