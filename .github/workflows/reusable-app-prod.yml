@@ -63,6 +63,14 @@ jobs:
         pnpm deploy out --prod --legacy --filter @growi/app
         rm -rf apps/app/node_modules && mv out/node_modules apps/app/node_modules
 
+    - name: Resolve .next/node_modules symlinks
+      run: |
+        if [ -d apps/app/.next/node_modules ]; then
+          cp -rL apps/app/.next/node_modules apps/app/.next/node_modules_resolved
+          rm -rf apps/app/.next/node_modules
+          mv apps/app/.next/node_modules_resolved apps/app/.next/node_modules
+        fi
+
     - name: Archive production files
       id: archive-prod-files
       run: |
@@ -215,14 +223,14 @@ jobs:
       with:
         name: Production Files (node${{ inputs.node-version }})
 
-    - name: Extract procution files
+    - name: Extract production files to isolated directory
       run: |
-        tar -xf ${{ needs.build-prod.outputs.PROD_FILES }}
+        mkdir -p /tmp/growi-prod
+        tar -xf ${{ needs.build-prod.outputs.PROD_FILES }} -C /tmp/growi-prod
 
     - name: Copy dotenv file for ci
-      working-directory: ./apps/app
       run: |
-        cat config/ci/.env.local.for-ci >> .env.production.local
+        cat apps/app/config/ci/.env.local.for-ci >> /tmp/growi-prod/apps/app/.env.production.local
 
     - name: Playwright Run (--project=chromium/installer)
       if: ${{ matrix.browser == 'chromium' }}
@@ -232,13 +240,13 @@ jobs:
       env:
         DEBUG: pw:api
         HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
+        GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
         MONGO_URI: mongodb://mongodb:27017/growi-playwright-installer
         ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
 
     - name: Copy dotenv file for automatic installation
-      working-directory: ./apps/app
       run: |
-        cat config/ci/.env.local.for-auto-install >> .env.production.local
+        cat apps/app/config/ci/.env.local.for-auto-install >> /tmp/growi-prod/apps/app/.env.production.local
 
     - name: Playwright Run
       working-directory: ./apps/app
@@ -247,13 +255,13 @@ jobs:
       env:
         DEBUG: pw:api
         HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
+        GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
         MONGO_URI: mongodb://mongodb:27017/growi-playwright
         ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
 
     - name: Copy dotenv file for automatic installation with allowing guest mode
-      working-directory: ./apps/app
       run: |
-        cat config/ci/.env.local.for-auto-install-with-allowing-guest >> .env.production.local
+        cat apps/app/config/ci/.env.local.for-auto-install-with-allowing-guest >> /tmp/growi-prod/apps/app/.env.production.local
 
     - name: Playwright Run (--project=${browser}/guest-mode)
       working-directory: ./apps/app
@@ -262,6 +270,7 @@ jobs:
       env:
         DEBUG: pw:api
         HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
+        GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
         MONGO_URI: mongodb://mongodb:27017/growi-playwright-guest-mode
         ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
 

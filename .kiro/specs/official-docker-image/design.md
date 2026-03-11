@@ -39,7 +39,7 @@
 
 **Main issues:**
 - `COPY . .` includes the entire monorepo in the build layer
-- pnpm version is hardcoded (`PNPM_VERSION="10.4.1"`)
+- pnpm version is hardcoded (`PNPM_VERSION="10.32.1"`)
 - Typo in `---frozen-lockfile`
 - Base image is node:20-slim (prone to CVE accumulation)
 - No memory management flags

@@ -6,12 +6,8 @@
  */
 
 import type { NextConfig } from 'next';
-import {
-  PHASE_PRODUCTION_BUILD,
-  PHASE_PRODUCTION_SERVER,
-} from 'next/constants';
+import { PHASE_PRODUCTION_SERVER } from 'next/constants';
 import path from 'node:path';
-import bundleAnalyzer from '@next/bundle-analyzer';
 
 import nextI18nConfig from './config/next-i18next.config';
 import { listPrefixedPackages } from './src/utils/next.config.utils';
@@ -150,16 +146,5 @@ export default (phase: string): NextConfig => {
     },
   };
 
-  // production server — skip bundle analyzer
-  if (phase === PHASE_PRODUCTION_SERVER) {
-    return nextConfig;
-  }
-
-  const withBundleAnalyzer = bundleAnalyzer({
-    enabled:
-      phase === PHASE_PRODUCTION_BUILD &&
-      (process.env.ANALYZE === 'true' || process.env.ANALYZE === '1'),
-  });
-
-  return withBundleAnalyzer(nextConfig);
+  return nextConfig;
 };

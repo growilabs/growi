@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
   apt-get update && apt-get install -y ca-certificates wget --no-install-recommends
 
 # install pnpm
-RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" PNPM_VERSION="10.4.1" sh -
+RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" PNPM_VERSION="10.32.1" sh -
 ENV PNPM_HOME=$PNPM_HOME
 ENV PATH="$PNPM_HOME:$PATH"
 
