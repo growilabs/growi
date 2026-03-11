@@ -68,6 +68,18 @@ export const watchRenderingAndReScroll = (
  * Auto-scroll to the URL hash target when the page loads.
  * Handles lazy-rendered content by polling for `data-growi-rendering`
  * elements and re-scrolling after they finish.
+ *
+ * Flow:
+ *   1. Guard: skip if pageId is null, hash is empty, or container not found
+ *   2. Decode the hash and define scrollToTarget()
+ *   3. If the target element already exists in the DOM:
+ *      a. scrollIntoView() immediately
+ *      b. Start watchRenderingAndReScroll() to compensate for layout shifts
+ *   4. If the target element does NOT exist yet:
+ *      a. Set up a MutationObserver on the container to wait for it
+ *      b. When the target appears → scrollIntoView() + start watchRenderingAndReScroll()
+ *      c. Give up after WATCH_TIMEOUT_MS (10s)
+ *   5. Cleanup: disconnect observers, clear timers, stop rendering watch
  */
 export const useHashAutoScroll = (
   pageId: string | undefined | null,
