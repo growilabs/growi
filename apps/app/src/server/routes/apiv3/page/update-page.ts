@@ -110,6 +110,7 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     res: ApiV3Response,
     updatedPage: HydratedDocument<PageDocument>,
     previousRevision: IRevisionHasId | null,
+    lastUpdatedAtBeforeUpdate: Date,
   ) {
     // Reflect the updates in ydoc
     const origin = req.body.origin;
@@ -118,17 +119,31 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
     }
 
-    const suppressEditWindow = 5 * 60 * 1000; // 5 minutes
+    // REMINDER: Need implementation for situation where user edits the page, edits another page, then goes back to edit the same page again within the time limit
     const minimumRevisionForActivity = 2;
+    const suppressUpdateWindow = 5 * 60 * 1000; // 5 min
 
-    const isLastUpdatedUser =
-      updatedPage.lastUpdateUser?.toString() === req.user.toString();
+    const Revision = mongoose.model<IRevisionHasId>('Revision');
 
-    const timeSinceLastUpdate =
-      (Date.now() - updatedPage.updatedAt.getTime()) / (1000 * 60);
+    const revisionCount = await Revision.countDocuments({
+      pageId: updatedPage._id,
+    });
+    const hasEnoughRevisions = revisionCount > minimumRevisionForActivity;
 
-    const isOutsideSuppressionWindow = timeSinceLastUpdate > suppressEditWindow;
-    const hasEnoughRevisions = updatedPage.__v > minimumRevisionForActivity;
+    const timeSinceLastUpdateMs =
+      Date.now() - lastUpdatedAtBeforeUpdate.getTime();
+
+    const isOutsideSuppressionWindow =
+      timeSinceLastUpdateMs > suppressUpdateWindow;
+
+    let isLastUpdatedUser: boolean;
+    if (updatedPage.lastUpdateUser) {
+      isLastUpdatedUser =
+        getIdForRef(updatedPage.lastUpdateUser).toString() ===
+        req.user._id.toString();
+    } else {
+      isLastUpdatedUser = false;
+    }
 
     const shouldGenerateUpdateActivity =
       !isLastUpdatedUser || (isOutsideSuppressionWindow && hasEnoughRevisions);
@@ -297,7 +312,7 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
           409,
         );
       }
-
+      const lastUpdatedAtBeforeUpdate = currentPage.updatedAt;
       let updatedPage: HydratedDocument<PageDocument>;
       let previousRevision: IRevisionHasId | null;
       try {
@@ -367,7 +382,13 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
 
       res.apiv3(result, 201);
 
-      postAction(req, res, updatedPage, previousRevision);
+      postAction(
+        req,
+        res,
+        updatedPage,
+        previousRevision,
+        lastUpdatedAtBeforeUpdate,
+      );
     },
   ];
 };
