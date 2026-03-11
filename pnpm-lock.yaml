@@ -489,6 +489,9 @@ importers:
       mongoose-unique-validator:
         specifier: ^2.0.3
         version: 2.0.3(mongoose@6.13.8(@aws-sdk/client-sso-oidc@3.600.0))
+      motion:
+        specifier: ^12.35.0
+        version: 12.35.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       multer:
         specifier: ~1.4.0
         version: 1.4.4
@@ -594,9 +597,6 @@ importers:
       react-multiline-clamp:
         specifier: ^2.0.0
         version: 2.0.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      react-scroll:
-        specifier: ^1.8.7
-        version: 1.9.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       react-stickynode:
         specifier: ^4.1.1
         version: 4.1.1(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -820,9 +820,6 @@ importers:
       '@types/react-input-autosize':
         specifier: ^2.2.4
         version: 2.2.4
-      '@types/react-scroll':
-        specifier: ^1.8.4
-        version: 1.8.10
       '@types/react-stickynode':
         specifier: ^4.0.3
         version: 4.0.3
@@ -5622,9 +5619,6 @@ packages:
   '@types/react-input-autosize@2.2.4':
     resolution: {integrity: sha512-7O028jRZHZo3mj63h3HSvB0WpvPXNWN86sajHTi0+CtjA4Ym+DFzO9RzrSbfFURe5ZWsq6P72xk7MInI6aGWJA==}
 
-  '@types/react-scroll@1.8.10':
-    resolution: {integrity: sha512-RD4Z7grbdNGOKwKnUBKar6zNxqaW3n8m9QSrfvljW+gmkj1GArb8AFBomVr6xMOgHPD3v1uV3BrIf01py57daQ==}
-
   '@types/react-stickynode@4.0.3':
     resolution: {integrity: sha512-K7YkwdhXQE4YVxIVweix4nkpdG4onm/dcnKK+qCj0vgUrNiKng+09zOfjF5AlOcC1HQkg5yxVLwp/0AzT84R0w==}
 
@@ -8593,6 +8587,20 @@ packages:
     resolution: {integrity: sha512-buRG0fpBtRHSTCOASe6hD258tEubFoRLb4ZNA6NxMVHNw2gOcwHo9wyablzMzOA5z9xA9L1KNjk/Nt6MT9aYow==}
     engines: {node: '>= 0.6'}
 
+  framer-motion@12.35.0:
+    resolution: {integrity: sha512-w8hghCMQ4oq10j6aZh3U2yeEQv5K69O/seDI/41PK4HtgkLrcBovUNc0ayBC3UyyU7V1mrY2yLzvYdWJX9pGZQ==}
+    peerDependencies:
+      '@emotion/is-prop-valid': '*'
+      react: ^18.0.0 || ^19.0.0
+      react-dom: ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      '@emotion/is-prop-valid':
+        optional: true
+      react:
+        optional: true
+      react-dom:
+        optional: true
+
   fresh@0.5.2:
     resolution: {integrity: sha512-zJ2mQYM18rEFOudeV4GShTGIQ7RbzA7ozbU9I/XBpm7kqgMywgmylMwXHxZJmkVoYkna9d2pVXVXPdYTP9ej8Q==}
     engines: {node: '>= 0.6'}
@@ -10812,6 +10820,26 @@ packages:
     resolution: {integrity: sha512-AbegBVI4sh6El+1gNwvD5YIck7nSA36weD7xvIxG4in80j/UoK8AEGaWnnz8v1GxonMCltmlNs5ZKbGvl9b1XQ==}
     engines: {node: '>= 0.8.0'}
 
+  motion-dom@12.35.0:
+    resolution: {integrity: sha512-FFMLEnIejK/zDABn+vqGVAUN4T0+3fw+cVAY8MMT65yR+j5uMuvWdd4npACWhh94OVWQs79CrBBuwOwGRZAQiA==}
+
+  motion-utils@12.29.2:
+    resolution: {integrity: sha512-G3kc34H2cX2gI63RqU+cZq+zWRRPSsNIOjpdl9TN4AQwC4sgwYPl/Q/Obf/d53nOm569T0fYK+tcoSV50BWx8A==}
+
+  motion@12.35.0:
+    resolution: {integrity: sha512-BQUhNUIGvUcwXCzwmnT1JpjUqab34lIwxHnXUyWRht1WC1vAyp7/4qgMiUXxN3K6hgUhyoR+HNnLeQMwUZjVjw==}
+    peerDependencies:
+      '@emotion/is-prop-valid': '*'
+      react: ^18.0.0 || ^19.0.0
+      react-dom: ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      '@emotion/is-prop-valid':
+        optional: true
+      react:
+        optional: true
+      react-dom:
+        optional: true
+
   move-file@2.1.0:
     resolution: {integrity: sha512-i9qLW6gqboJ5Ht8bauZi7KlTnQ3QFpBCvMvFfEcHADKgHGeJ9BZMO7SFCTwHPV9Qa0du9DYY1Yx3oqlGt30nXA==}
     engines: {node: '>=10.17'}
@@ -12052,12 +12080,6 @@ packages:
     peerDependencies:
       react: ^16.14.0 || ^17.0.0 || ^18.0.0
       react-dom: ^16.14.0 || ^17.0.0 || ^18.0.0
-
-  react-scroll@1.9.0:
-    resolution: {integrity: sha512-mamNcaX9Ng+JeSbBu97nWwRhYvL2oba+xR2GxvyXsbDeGP+gkYIKZ+aDMMj/n20TbV9SCWm/H7nyuNTSiXA6yA==}
-    peerDependencies:
-      react: ^15.5.4 || ^16.0.0 || ^17.0.0 || ^18.0.0
-      react-dom: ^15.5.4 || ^16.0.0 || ^17.0.0 || ^18.0.0
 
   react-stickynode@4.1.1:
     resolution: {integrity: sha512-+Xp3xantrxbFjqNiSbpvsZwCqZYiPq0njKTA+QsIZdmEHih1H/lOV9/LpS37d+v92iSydJJTZMeRaENWeqGeIA==}
@@ -20231,10 +20253,6 @@ snapshots:
     dependencies:
       '@types/react': 18.3.3
 
-  '@types/react-scroll@1.8.10':
-    dependencies:
-      '@types/react': 18.3.3
-
   '@types/react-stickynode@4.0.3':
     dependencies:
       '@types/react': 18.3.3
@@ -23346,6 +23364,15 @@ snapshots:
 
   forwarded@0.2.0: {}
 
+  framer-motion@12.35.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
+    dependencies:
+      motion-dom: 12.35.0
+      motion-utils: 12.29.2
+      tslib: 2.8.1
+    optionalDependencies:
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+
   fresh@0.5.2: {}
 
   fs-constants@1.0.0: {}
@@ -26031,6 +26058,20 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  motion-dom@12.35.0:
+    dependencies:
+      motion-utils: 12.29.2
+
+  motion-utils@12.29.2: {}
+
+  motion@12.35.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
+    dependencies:
+      framer-motion: 12.35.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      tslib: 2.8.1
+    optionalDependencies:
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+
   move-file@2.1.0:
     dependencies:
       path-exists: 4.0.0
@@ -27403,13 +27444,6 @@ snapshots:
 
   react-resizable-panels@2.0.10(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
     dependencies:
-      react: 18.2.0
-      react-dom: 18.2.0(react@18.2.0)
-
-  react-scroll@1.9.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
-    dependencies:
-      lodash.throttle: 4.1.1
-      prop-types: 15.8.1
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
 
