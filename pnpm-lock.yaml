@@ -986,6 +986,9 @@ importers:
       swagger2openapi:
         specifier: ^7.0.8
         version: 7.0.8(encoding@0.1.13)
+      umzug:
+        specifier: ^3.8.2
+        version: 3.8.2(@types/node@25.2.3)
       unist-util-is:
         specifier: ^6.0.0
         version: 6.0.0
@@ -8058,6 +8061,10 @@ packages:
   electron-to-chromium@1.5.267:
     resolution: {integrity: sha512-0Drusm6MVRXSOJpGbaSVgcQsuB4hEkMpHXaVstcPmhu5LIedxs1xNK/nIxmQIU/RPC0+1/o0AVZfBTkTNJOdUw==}
 
+  emittery@0.13.1:
+    resolution: {integrity: sha512-DeWwawk6r5yR9jFgnDKYt4sLS0LmHJJi3ZOnb5/JdbYwj3nW+FxQnHIjhBKz8YLC7oRNPVM9NQ47I3CVx34eqQ==}
+    engines: {node: '>=12'}
+
   emoji-mart@5.6.0:
     resolution: {integrity: sha512-eJp3QRe79pjwa+duv+n7+5YsNhRcMl812EcFVwrnRvYKoNPoQb5qxU8DG6Bgwji0akHdp6D4Ln6tYLG58MFSow==}
 
@@ -11661,6 +11668,10 @@ packages:
     resolution: {integrity: sha512-PxkIc/2ZpLiEzQXu5YRDOUgBlfGYBY8156HY5ZcRAwwonMk5W/MrJP2LLkG/hF7GEQzaHo2aS7ho6ZLCOvf+6g==}
     engines: {node: '>=12.0.0'}
 
+  pony-cause@2.1.11:
+    resolution: {integrity: sha512-M7LhCsdNbNgiLYiP4WjsfLUuFmCfnjdF6jKe2R9NKl4WFN+HZPGHJZ9lnLP7f9ZnKe3U9nuWD0szirmj+migUg==}
+    engines: {node: '>=12.0.0'}
+
   portscanner@2.2.0:
     resolution: {integrity: sha512-IFroCz/59Lqa2uBvzK3bKDbDDIEaAY8XJ1jFxcLWTqosrsc32//P4VuSB2vZXoHiHqOmx8B5L5hnKOxL/7FlPw==}
     engines: {node: '>=0.4', npm: '>=1.0.0'}
@@ -13873,6 +13884,10 @@ packages:
 
   uid2@0.0.4:
     resolution: {integrity: sha512-IevTus0SbGwQzYh3+fRsAMTVVPOoIVufzacXcHPmdlle1jUpq7BRL+mw3dgeLanvGZdwwbWhRV6XrcFNdBmjWA==}
+
+  umzug@3.8.2:
+    resolution: {integrity: sha512-BEWEF8OJjTYVC56GjELeHl/1XjFejrD7aHzn+HldRJTx+pL1siBrKHZC8n4K/xL3bEzVA9o++qD1tK2CpZu4KA==}
+    engines: {node: '>=12'}
 
   unbox-primitive@1.0.2:
     resolution: {integrity: sha512-61pPlCD9h51VoreyJ0BReideM3MDKMKnh6+V9L08331ipq6Q8OFXZYiqP6n/tbHx4s5I9uRhcye6BrbkizkBDw==}
@@ -18464,6 +18479,17 @@ snapshots:
     optionalDependencies:
       '@types/node': 20.19.17
 
+  '@rushstack/node-core-library@4.0.2(@types/node@25.2.3)':
+    dependencies:
+      fs-extra: 7.0.1
+      import-lazy: 4.0.0
+      jju: 1.4.0
+      resolve: 1.22.8
+      semver: 7.5.4
+      z-schema: 5.0.6
+    optionalDependencies:
+      '@types/node': 25.2.3
+
   '@rushstack/rig-package@0.5.2':
     dependencies:
       resolve: 1.22.8
@@ -18476,9 +18502,25 @@ snapshots:
     optionalDependencies:
       '@types/node': 20.19.17
 
+  '@rushstack/terminal@0.10.0(@types/node@25.2.3)':
+    dependencies:
+      '@rushstack/node-core-library': 4.0.2(@types/node@25.2.3)
+      supports-color: 8.1.1
+    optionalDependencies:
+      '@types/node': 25.2.3
+
   '@rushstack/ts-command-line@4.19.1(@types/node@20.19.17)':
     dependencies:
       '@rushstack/terminal': 0.10.0(@types/node@20.19.17)
+      '@types/argparse': 1.0.38
+      argparse: 1.0.10
+      string-argv: 0.3.2
+    transitivePeerDependencies:
+      - '@types/node'
+
+  '@rushstack/ts-command-line@4.19.1(@types/node@25.2.3)':
+    dependencies:
+      '@rushstack/terminal': 0.10.0(@types/node@25.2.3)
       '@types/argparse': 1.0.38
       argparse: 1.0.10
       string-argv: 0.3.2
@@ -22847,6 +22889,8 @@ snapshots:
 
   electron-to-chromium@1.5.267: {}
 
+  emittery@0.13.1: {}
+
   emoji-mart@5.6.0: {}
 
   emoji-regex@10.4.0: {}
@@ -27210,6 +27254,8 @@ snapshots:
 
   pony-cause@1.1.1: {}
 
+  pony-cause@2.1.11: {}
+
   portscanner@2.2.0:
     dependencies:
       async: 2.6.4
@@ -29819,6 +29865,16 @@ snapshots:
       random-bytes: 1.0.0
 
   uid2@0.0.4: {}
+
+  umzug@3.8.2(@types/node@25.2.3):
+    dependencies:
+      '@rushstack/ts-command-line': 4.19.1(@types/node@25.2.3)
+      emittery: 0.13.1
+      fast-glob: 3.3.2
+      pony-cause: 2.1.11
+      type-fest: 4.41.0
+    transitivePeerDependencies:
+      - '@types/node'
 
   unbox-primitive@1.0.2:
     dependencies:

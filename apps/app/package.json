@@ -342,6 +342,7 @@
     "source-map-loader": "^4.0.1",
     "supertest": "^7.1.4",
     "swagger2openapi": "^7.0.8",
+    "umzug": "^3.8.2",
     "unist-util-is": "^6.0.0",
     "unist-util-visit-parents": "^6.0.0"
   }
