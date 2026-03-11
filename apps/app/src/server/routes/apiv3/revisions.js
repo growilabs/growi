@@ -12,6 +12,7 @@ import {
 } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import loggerFactory from '~/utils/logger';
 
+import { PrismaClient } from '../../../../generated/prisma/client';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 
 const logger = loggerFactory('growi:routes:apiv3:pages');
@@ -19,6 +20,8 @@ const logger = loggerFactory('growi:routes:apiv3:pages');
 const { query, param } = require('express-validator');
 
 const router = express.Router();
+
+const prisma = new PrismaClient();
 
 /**
  * @swagger
@@ -131,6 +134,12 @@ module.exports = (crowi) => {
     validator.retrieveRevisions,
     apiV3FormValidator,
     async (req, res) => {
+      const revisions = await prisma.revisions.findMany({
+        where: {
+          pageId: req.query.pageId,
+        },
+      });
+      console.log(revisions);
       const pageId = req.query.pageId;
       const limit =
         req.query.limit ||
