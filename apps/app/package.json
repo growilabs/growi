@@ -272,7 +272,6 @@
     "@handsontable/react": "=2.1.0",
     "@headless-tree/core": "^1.5.3",
     "@headless-tree/react": "^1.5.3",
-    "@next/bundle-analyzer": "^16.0.0",
     "@popperjs/core": "^2.11.8",
     "@tanstack/react-virtual": "^3.13.12",
     "@testing-library/jest-dom": "^6.5.0",
