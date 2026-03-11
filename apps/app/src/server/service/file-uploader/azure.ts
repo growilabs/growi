@@ -345,7 +345,7 @@ class AzureFileUploader extends AbstractFileUploader {
 
       const isDownload = opts?.download ?? false;
       const contentHeaders = createContentHeaders(attachment, {
-        inline: !isDownload,
+        forceAttachment: isDownload,
       });
 
       // https://github.com/Azure/azure-sdk-for-js/blob/d4d55f73/sdk/storage/storage-blob/src/ContainerSASPermissions.ts#L24
