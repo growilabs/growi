@@ -63,6 +63,14 @@ jobs:
         pnpm deploy out --prod --legacy --filter @growi/app
         rm -rf apps/app/node_modules && mv out/node_modules apps/app/node_modules
 
+    - name: Resolve .next/node_modules symlinks
+      run: |
+        if [ -d apps/app/.next/node_modules ]; then
+          cp -rL apps/app/.next/node_modules apps/app/.next/node_modules_resolved
+          rm -rf apps/app/.next/node_modules
+          mv apps/app/.next/node_modules_resolved apps/app/.next/node_modules
+        fi
+
     - name: Archive production files
       id: archive-prod-files
       run: |
