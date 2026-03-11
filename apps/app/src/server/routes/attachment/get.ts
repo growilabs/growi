@@ -135,7 +135,7 @@ const respondForRelayMode = async (
   // apply content-* headers before response
   const isDownload = opts?.download ?? false;
   const contentHeaders = createContentHeaders(attachment, {
-    inline: !isDownload,
+    forceAttachment: isDownload,
   });
   applyHeaders(res, contentHeaders);
 
