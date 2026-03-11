@@ -124,29 +124,21 @@ jobs:
           discovery.type: single-node
 
     steps:
-    - uses: actions/checkout@v4
-
-    - uses: pnpm/action-setup@v4
-
     - uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
-        cache: 'pnpm'
-
-    # avoid setup-node cache failure; see: https://github.com/actions/setup-node/issues/1137
-    - name: Verify PNPM Cache Directory
-      run: |
-        PNPM_STORE_PATH="$( pnpm store path --silent )"
-        [ -d "$PNPM_STORE_PATH" ] || mkdir -vp "$PNPM_STORE_PATH"
 
     - name: Download production files artifact
       uses: actions/download-artifact@v4
       with:
         name: Production Files (node${{ inputs.node-version }})
 
-    - name: Extract procution files
+    - name: Extract production files
       run: |
         tar -xf ${{ needs.build-prod.outputs.PROD_FILES }}
+
+    # Run after extraction so pnpm/action-setup@v4 can read packageManager from package.json
+    - uses: pnpm/action-setup@v4
 
     - name: pnpm run server:ci
       working-directory: ./apps/app
