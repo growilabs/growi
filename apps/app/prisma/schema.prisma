@@ -9,8 +9,8 @@ datasource db {
 }
 
 type ActivitiesSnapshot {
-  /// Field referred in an index, but found no data to define the type.
-  username Json?
+  id       String @map("_id") @db.ObjectId
+  username String
 }
 
 type AiassistantsGrantedGroupsForAccessScope {
@@ -53,17 +53,16 @@ model accesstokens {
 }
 
 model activities {
-  id        String              @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  action    Json?
-  /// Field referred in an index, but found no data to define the type.
-  createdAt Json?
-  /// Field referred in an index, but found no data to define the type.
-  snapshot  ActivitiesSnapshot?
-  /// Field referred in an index, but found no data to define the type.
-  target    Json?
-  /// Field referred in an index, but found no data to define the type.
-  user      Json?
+  id          String             @id @default(auto()) @map("_id") @db.ObjectId
+  v           Int                @map("__v")
+  action      String
+  createdAt   DateTime           @db.Date
+  endpoint    String
+  ip          String
+  snapshot    ActivitiesSnapshot
+  target      String?            @db.ObjectId
+  targetModel String?
+  user        String?            @db.ObjectId
 
   @@unique([user, target, action, createdAt], map: "user_1_target_1_action_1_createdAt_1")
   @@index([user], map: "user_1")
@@ -96,6 +95,14 @@ model attachments {
   @@index([creator], map: "creator_1")
 }
 
+model bookmarkfolders {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  /// Field referred in an index, but found no data to define the type.
+  owner Json?
+
+  @@index([owner], map: "owner_1")
+}
+
 model bookmarks {
   id   String @id @default(auto()) @map("_id") @db.ObjectId
   /// Field referred in an index, but found no data to define the type.
@@ -124,11 +131,15 @@ model comments {
 
 model configs {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  v         Int      @map("__v")
+  v         Int?     @map("__v")
   createdAt DateTime @db.Date
   key       String   @unique(map: "key_1")
   updatedAt DateTime @db.Date
   value     String
+}
+
+model editorsettings {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 }
 
 model externalaccounts {
@@ -256,31 +267,36 @@ model pageredirects {
 }
 
 model pages {
-  id            String              @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  createdAt     Json?
-  /// Field referred in an index, but found no data to define the type.
-  creator       Json?
-  /// Field referred in an index, but found no data to define the type.
-  grant         Json?
-  /// Field referred in an index, but found no data to define the type.
-  grantedGroups PagesGrantedGroups?
-  /// Field referred in an index, but found no data to define the type.
-  parent        Json?
-  /// Field referred in an index, but found no data to define the type.
-  path          Json?
-  /// Field referred in an index, but found no data to define the type.
-  status        Json?
-  /// Field referred in an index, but found no data to define the type.
-  ttlTimestamp  Json?
-  /// Field referred in an index, but found no data to define the type.
-  updatedAt     Json?
+  id                       String      @id @default(auto()) @map("_id") @db.ObjectId
+  v                        Int         @map("__v")
+  commentCount             Int
+  createdAt                DateTime    @db.Date
+  creator                  String?     @db.ObjectId
+  descendantCount          Int
+  grant                    Int
+  /// Nested objects had no data in the sample dataset to introspect a nested type.
+  grantedGroups            Json?
+  /// Could not determine type: the field only had null or empty values in the sample set.
+  grantedUsers             Json?
+  isEmpty                  Boolean
+  lastUpdateUser           String?     @db.ObjectId
+  latestRevisionBodyLength Int?
+  /// Could not determine type: the field only had null or empty values in the sample set.
+  liker                    Json?
+  parent                   String?     @db.ObjectId
+  path                     String
+  revision                 String?     @db.ObjectId
+  seenUsers                String[]
+  status                   String
+  ttlTimestamp             DateTime?   @db.Date
+  updatedAt                DateTime    @db.Date
+  wip                      Boolean?
+  revisions                revisions[]
 
   @@index([parent], map: "parent_1")
   @@index([path], map: "path_1")
   @@index([status], map: "status_1")
   @@index([grant], map: "grant_1")
-  @@index([grantedGroups.item], map: "grantedGroups.item_1")
   @@index([creator], map: "creator_1")
   @@index([createdAt], map: "createdAt_1")
   @@index([updatedAt], map: "updatedAt_1")
@@ -309,9 +325,16 @@ model passwordresetorders {
 }
 
 model revisions {
-  id     String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  pageId Json?
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  v         Int      @map("__v")
+  author    String   @db.ObjectId
+  body      String
+  createdAt DateTime @db.Date
+  format    String
+  origin    String?
+  pageId    String   @db.ObjectId
+
+  page pages @relation(fields: [pageId], references: [id])
 
   @@index([pageId], map: "pageId_1")
 }
@@ -393,15 +416,22 @@ model updateposts {
 }
 
 model usergrouprelations {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  v            Int      @map("__v")
+  createdAt    DateTime @db.Date
+  relatedGroup String   @db.ObjectId
+  relatedUser  String   @db.ObjectId
 }
 
 model usergroups {
-  id     String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  name   Json?  @unique(map: "name_1")
-  /// Field referred in an index, but found no data to define the type.
-  parent Json?
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  v           Int      @map("__v")
+  createdAt   DateTime @db.Date
+  description String
+  name        String   @unique(map: "name_1")
+  /// Could not determine type: the field only had null or empty values in the sample set.
+  parent      Json?
+  updatedAt   DateTime @db.Date
 
   @@index([parent], map: "parent_1")
 }
@@ -413,23 +443,28 @@ model userregistrationorders {
 }
 
 model users {
-  id            String @id @default(auto()) @map("_id") @db.ObjectId
+  id                      String   @id @default(auto()) @map("_id") @db.ObjectId
+  v                       Int      @map("__v")
+  admin                   Boolean
   /// Field referred in an index, but found no data to define the type.
-  admin         Json?
+  apiToken                Json?
+  createdAt               DateTime @db.Date
+  email                   String   @unique(map: "email_1")
+  imageUrlCached          String
+  isEmailPublished        Boolean
+  isGravatarEnabled       Boolean
+  isInvitationEmailSended Boolean
+  lang                    String
   /// Field referred in an index, but found no data to define the type.
-  apiToken      Json?
+  lastLoginAt             Json?
+  name                    String
+  password                String
+  readOnly                Boolean
   /// Field referred in an index, but found no data to define the type.
-  email         Json?  @unique(map: "email_1")
-  /// Field referred in an index, but found no data to define the type.
-  lastLoginAt   Json?
-  /// Field referred in an index, but found no data to define the type.
-  name          Json?
-  /// Field referred in an index, but found no data to define the type.
-  slackMemberId Json?  @unique(map: "slackMemberId_1")
-  /// Field referred in an index, but found no data to define the type.
-  status        Json?
-  /// Field referred in an index, but found no data to define the type.
-  username      Json?  @unique(map: "username_1")
+  slackMemberId           Json?    @unique(map: "slackMemberId_1")
+  status                  Int
+  updatedAt               DateTime @db.Date
+  username                String   @unique(map: "username_1")
 
   @@index([name], map: "name_1")
   @@index([apiToken], map: "apiToken_1")
@@ -463,19 +498,16 @@ model vectorstores {
 }
 
 model yjs_writings {
-  id      String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  action  Json?
-  /// Field referred in an index, but found no data to define the type.
-  clock   Json?
-  /// Field referred in an index, but found no data to define the type.
-  docName Json?
-  /// Field referred in an index, but found no data to define the type.
-  metaKey Json?
+  id      String  @id @default(auto()) @map("_id") @db.ObjectId
+  action  String?
+  clock   Int?
+  docName String
+  metaKey String?
   /// Field referred in an index, but found no data to define the type.
   part    Json?
-  /// Field referred in an index, but found no data to define the type.
-  version Json?
+  /// Multiple data types found: Float: 33.3%, Binary: 66.7% out of 3 sampled entries
+  value   Json
+  version String
 
   @@index([version, docName, action, clock, part], map: "version_1_docName_1_action_1_clock_1_part_1")
   @@index([version, docName, metaKey], map: "version_1_docName_1_metaKey_1")
