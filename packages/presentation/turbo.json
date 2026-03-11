@@ -19,6 +19,9 @@
       "dependsOn": ["generate:marpit-base-css"],
       "outputs": ["dist/**"],
       "outputLogs": "new-only"
+    },
+    "lint": {
+      "dependsOn": ["generate:marpit-base-css"]
     }
   }
 }
