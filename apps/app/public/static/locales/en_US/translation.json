@@ -1004,6 +1004,7 @@
   },
   "user_home_page": {
     "bookmarks": "Bookmarks",
+    "contribution_graph": "Contribution Graph",
     "recently_created": "Recently Created",
     "recent_activity": "Recent Activity",
     "unknown_action": "made an unspecified change",

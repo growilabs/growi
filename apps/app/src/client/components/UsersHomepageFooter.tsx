@@ -9,6 +9,7 @@ import { BookmarkFolderTree } from './Bookmarks/BookmarkFolderTree';
 import { ContributionGraph } from './ContributionGraph/ContributionGraph';
 import {
   BOOKMARKS_LIST_ID,
+  CONTRIBUTION_GRAPH_ID,
   RECENT_ACTIVITY_LIST_ID,
   RECENTLY_CREATED_LIST_ID,
 } from './UsersHomepageFooter.consts';
@@ -69,6 +70,20 @@ export const UsersHomepageFooter = (
           />
         </div>
       </div>
+
+      <h2
+        id={CONTRIBUTION_GRAPH_ID}
+        className="grw-user-page-header border-bottom pb-2 mb-3 d-flex"
+      >
+        <span className="material-symbols-outlined me-2">dataset</span>
+        {t('user_home_page.contribution_graph')}
+      </h2>
+      <div>
+        <Suspense fallback={<div>Loading contribution graph...</div>}>
+          <ContributionGraph userId={creatorId} />
+        </Suspense>
+      </div>
+
       <div className="grw-user-page-list-m mt-5 d-edit-none">
         <h2
           id={RECENTLY_CREATED_LIST_ID}
@@ -90,12 +105,6 @@ export const UsersHomepageFooter = (
         </h2>
         <div className={`page-list ${styles['page-list']}`}>
           <RecentActivity userId={creatorId} />
-        </div>
-
-        <div>
-          <Suspense fallback={<div>Loading contribution graph...</div>}>
-            <ContributionGraph userId={creatorId} />
-          </Suspense>
         </div>
       </div>
     </div>
