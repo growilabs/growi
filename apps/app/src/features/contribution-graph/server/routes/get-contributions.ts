@@ -1,5 +1,5 @@
-import type { Request, Router } from 'express';
-import express from 'express';
+import type { Request, RequestHandler } from 'express';
+import type { ValidationChain } from 'express-validator';
 import { query } from 'express-validator';
 
 import { ContributionCacheManager } from '~/features/contribution-graph/server/services/cache-manager';
@@ -23,26 +23,25 @@ type ContributionRequest = Request<
   ReqQuery
 >;
 
-const validator = [
-  query('targetUserId')
-    .notEmpty()
-    .withMessage('user ID is required')
-    .isMongoId()
-    .withMessage('user ID must be a MongoDB ID'),
-];
-
-module.exports = (crowi: Crowi): Router => {
+export const getContributionsHandlerFactory = (
+  crowi: Crowi,
+): RequestHandler[] => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
-  const router = express.Router();
+  const validator: ValidationChain[] = [
+    query('targetUserId')
+      .notEmpty()
+      .withMessage('user ID is required')
+      .isMongoId()
+      .withMessage('user ID must be a MongoDB ID'),
+  ];
 
-  router.get(
-    '/',
+  return [
     loginRequiredStrictly,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: ContributionRequest, res: ApiV3Response) => {
-      const targetUserId = req.query.targetUserId;
+      const { targetUserId } = req.query;
 
       try {
         const cacheManager = new ContributionCacheManager();
@@ -54,7 +53,5 @@ module.exports = (crowi: Crowi): Router => {
         return res.apiv3Err(err, 500);
       }
     },
-  );
-
-  return router;
+  ];
 };
