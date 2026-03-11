@@ -1,60 +1,66 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
 .contribution-box {
   display: inline-block;
   padding: 16px;
-  background-color: #ffffff;
-  border: 1px solid #d0d7de;
   border-radius: 6px;
   scale: 0.9;
-}
 
-.graph-and-days {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
+  :global([data-bs-theme="light"]) & {
+    background-color: var(--bs-body-bg, #ffffff);
+    border: 1px solid #a6acb3;
+    --text-main: #434951;
+    --sq-outline: rgba(27, 31, 35, 0.06);
+    --lvl-0: #ebedf0;
+    --lvl-1: #9be9a8;
+    --lvl-2: #40c463;
+    --lvl-3: #30a14e;
+    --lvl-4: #216e39;
+  }
 
-.month-labels {
-  display: grid;
-  grid-template-columns: repeat(53, 12px);
-  gap: 3px;
-  margin-bottom: 4px;
-  font-size: 10px;
-  color: #57606a;
-
-  span {
-    grid-row: 1;
-    justify-self: start;
-    font-size: 14px;
-    white-space: nowrap;
+  :global([data-bs-theme="dark"]) & {
+    background-color: var(--bs-body-bg, #0d1117);
+    border: 1px solid #60666d;
+    --text-main: #bbc3cb;
+    --sq-outline: rgba(255, 255, 255, 0.05);
+    --lvl-0: #1d232b;
+    --lvl-1: #0e4429;
+    --lvl-2: #006d32;
+    --lvl-3: #26a641;
+    --lvl-4: #39d353;
   }
 }
 
-.color-guide {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-
-  span {
-    margin: 0 4px;
-  }
+.graph-square {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  outline: 1px solid var(--sq-outline, rgba(27, 31, 35, 0.06));
+  outline-offset: -1px;
 }
 
-.day-labels {
-  display: grid;
-  grid-template-rows: repeat(7, 12px);
-  gap: 3px;
-  margin-top: 1px;
+.level-0 { background-color: var(--lvl-0, #ebedf0) !important; }
+.level-1 { background-color: var(--lvl-1, #9be9a8) !important; }
+.level-2 { background-color: var(--lvl-2, #40c463) !important; }
+.level-3 { background-color: var(--lvl-3) !important; }
+.level-4 { background-color: var(--lvl-4) !important; }
 
-  span {
-    font-size: 14px;
-    line-height: 12px;
-    color: #57606a;
-
-    &:nth-child(odd) {
-      visibility: hidden;
-    }
-  }
+.month-labels, .day-labels, .info-bar {
+  color: var(--text-main, #57606a);
 }
+
+// Fallback
+.level-0 { background-color: var(--lvl-0, #ebedf0) !important; }
+.level-1 { background-color: var(--lvl-1, #9be9a8) !important; }
+.level-2 { background-color: var(--lvl-2, #40c463) !important; }
+.level-3 { background-color: var(--lvl-3, #30a14e) !important; }
+.level-4 { background-color: var(--lvl-4, #216e39) !important; }
+
+.month-labels, .day-labels, .info-bar {
+  color: var(--text-main, #57606a);
+}
+
+.graph-and-days { display: flex; gap: 8px; align-items: flex-start; }
 
 .graph-grid {
   display: grid;
@@ -64,18 +70,30 @@
   gap: 3px;
 }
 
-.graph-square {
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
-  outline: 1px solid rgba(27, 31, 35, 0.06);
-  outline-offset: -1px;
+.month-labels {
+  display: grid;
+  grid-template-columns: repeat(53, 12px);
+  gap: 3px;
+  margin-bottom: 4px;
+  font-size: 10px;
+  span {
+    grid-row: 1;
+    justify-self: start;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+}
 
-  &.level-0 { background-color: #ebedf0; }
-  &.level-1 { background-color: #9be9a8; }
-  &.level-2 { background-color: #40c463; }
-  &.level-3 { background-color: #30a14e; }
-  &.level-4 { background-color: #216e39; }
+.day-labels {
+  display: grid;
+  grid-template-rows: repeat(7, 12px);
+  gap: 3px;
+  margin-top: 1px;
+  span {
+    font-size: 14px;
+    line-height: 12px;
+    &:nth-child(odd) { visibility: hidden; }
+  }
 }
 
 .info-bar {
@@ -83,7 +101,12 @@
   align-items: center;
   justify-content: space-between;
   margin-top: 12px;
-  font-size: 16px;
-  color: #57606a;
+  font-size: 14px;
 }
 
+.color-guide {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  span { margin: 0 4px; }
+}
