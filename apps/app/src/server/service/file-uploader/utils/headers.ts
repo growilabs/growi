@@ -3,6 +3,9 @@ import type { Response } from 'express';
 import type { ExpressHttpHeader } from '~/server/interfaces/attachment';
 import type { IAttachmentDocument } from '~/server/models/attachment';
 
+import { configManager } from '../../config-manager';
+import { defaultContentDispositionSettings } from './security';
+
 type ContentHeaderField =
   | 'Content-Type'
   | 'Content-Security-Policy'
@@ -10,13 +13,47 @@ type ContentHeaderField =
   | 'Content-Length';
 type ContentHeader = ExpressHttpHeader<ContentHeaderField>;
 
+export const determineDisposition = (
+  fileFormat: string,
+): 'inline' | 'attachment' => {
+  const inlineMimeTypes = configManager.getConfig(
+    'attachments:contentDisposition:inlineMimeTypes',
+  ).inlineMimeTypes;
+  const attachmentMimeTypes = configManager.getConfig(
+    'attachments:contentDisposition:attachmentMimeTypes',
+  ).attachmentMimeTypes;
+
+  const normalizedFileFormat = fileFormat.toLowerCase();
+
+  if (
+    attachmentMimeTypes.some(
+      (mimeType) => mimeType.toLowerCase() === normalizedFileFormat,
+    )
+  ) {
+    return 'attachment';
+  }
+  if (
+    inlineMimeTypes.some(
+      (mimeType) => mimeType.toLowerCase() === normalizedFileFormat,
+    )
+  ) {
+    return 'inline';
+  }
+  const defaultSetting =
+    defaultContentDispositionSettings[normalizedFileFormat];
+  if (defaultSetting != null) {
+    return defaultSetting;
+  }
+  return 'attachment';
+};
+
 /**
  * Factory function to generate content headers.
  * This approach avoids creating a class instance for each call, improving memory efficiency.
  */
 export const createContentHeaders = (
   attachment: IAttachmentDocument,
-  opts?: { inline?: boolean },
+  opts?: { forceAttachment?: boolean },
 ): ContentHeader[] => {
   const headers: ContentHeader[] = [];
 
@@ -34,9 +71,12 @@ export const createContentHeaders = (
   });
 
   // Content-Disposition
+  const disposition = opts?.forceAttachment
+    ? 'attachment'
+    : determineDisposition(attachment.fileFormat);
   headers.push({
     field: 'Content-Disposition',
-    value: `${opts?.inline ? 'inline' : 'attachment'};filename*=UTF-8''${encodeURIComponent(attachment.originalName)}`,
+    value: `${disposition};filename*=UTF-8''${encodeURIComponent(attachment.originalName)}`,
   });
 
   // Content-Length
