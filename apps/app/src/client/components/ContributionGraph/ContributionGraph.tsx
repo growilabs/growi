@@ -138,7 +138,7 @@ export const ContributionGraph = ({ userId }: { userId: string }) => {
               <div
                 key={day.date}
                 className={`${styles['graph-square']} ${styles[levelClass]}`}
-                title={`${day.count} contributions on ${day.date}`}
+                data-tooltip={`${day.count} contributions on ${day.date}`}
               />
             );
           })}
