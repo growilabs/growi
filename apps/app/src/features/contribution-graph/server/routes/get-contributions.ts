@@ -27,6 +27,7 @@ export const getContributionsHandlerFactory = (
   crowi: Crowi,
 ): RequestHandler[] => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const cacheManager = new ContributionCacheManager();
 
   const validator: ValidationChain[] = [
     query('targetUserId')
@@ -44,7 +45,6 @@ export const getContributionsHandlerFactory = (
       const { targetUserId } = req.query;
 
       try {
-        const cacheManager = new ContributionCacheManager();
         const contributions = await cacheManager.getUpdatedCache(targetUserId);
 
         return res.apiv3({ contributions });
