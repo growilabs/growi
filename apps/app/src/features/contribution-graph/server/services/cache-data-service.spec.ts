@@ -2,9 +2,9 @@ import { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import type { SetContributionCachePayload } from '../interfaces/contribution-graph';
+import type { SetContributionCachePayload } from '../../interfaces/contribution-graph';
+import { getUTCMidnight } from '../../utils/contribution-graph-utils';
 import { ContributionCache } from '../models/contribution-cache-model';
-import { getUTCMidnight } from '../utils/contribution-graph-utils';
 import {
   cacheIsFresh,
   getContributionCache,
