@@ -1,6 +1,4 @@
-import { createReadStream, createWriteStream } from 'node:fs';
-import fs from 'node:fs/promises';
-import path from 'node:path';
+import { PassThrough } from 'node:stream';
 import type { Archiver } from 'archiver';
 import archiver from 'archiver';
 
@@ -57,13 +55,10 @@ async function postProcess(
 /**
  * Compress page files into a tar.gz archive and upload to cloud storage.
  *
- * Uses a temporary file instead of streaming directly to avoid two issues with AWS S3:
- * 1. archiver's readable-stream (npm) fails AWS SDK's `instanceof Readable` check against Node.js built-in stream
- * 2. PutObjectCommand sends `Transfer-Encoding: chunked` for streams without Content-Length, which S3 rejects with 501
- *
- * Writing to a temp file and using createReadStream resolves both:
- * - createReadStream returns a native ReadStream (passes instanceof check)
- * - AWS SDK auto-detects file size from ReadStream.path via lstatSync, setting Content-Length
+ * Wraps archiver output with PassThrough to provide a Node.js native Readable,
+ * since archiver uses npm's readable-stream which fails AWS SDK's instanceof check.
+ * The Content-Length / Transfer-Encoding issue is resolved by aws/index.ts using
+ * the Upload class from @aws-sdk/lib-storage.
  */
 export async function compressAndUpload(
   this: IPageBulkExportJobCronService,
@@ -85,59 +80,30 @@ export async function compressAndUpload(
   );
 
   const fileUploadService: FileUploader = this.crowi.fileUploadService;
-  // Place temp file in the parent directory to avoid archiver picking it up
-  // (archiver.directory() scans getTmpOutputDir asynchronously via glob)
-  const tmpFilePath = path.join(
-    this.getTmpOutputDir(pageBulkExportJob),
-    '..',
-    `${originalName}.tmp`,
-  );
 
-  logger.info('starting');
+  // Wrap with Node.js native PassThrough so that AWS SDK recognizes the stream as a native Readable
+  const uploadStream = new PassThrough();
+  pageArchiver.pipe(uploadStream);
 
   pageArchiver.on('error', (err) => {
     logger.error('pageArchiver error', err);
-    // Do not call pageArchiver.destroy() here: it corrupts internal state
-    // while the async queue is still processing, causing uncaught exceptions.
-    // The error is propagated via the Promise rejection below.
+    uploadStream.destroy(err);
   });
 
   pageArchiver.directory(this.getTmpOutputDir(pageBulkExportJob), false);
   pageArchiver.finalize();
-  logger.info('finalize called');
 
-  this.setStreamsInExecution(pageBulkExportJob._id, pageArchiver);
+  this.setStreamsInExecution(pageBulkExportJob._id, pageArchiver, uploadStream);
 
   try {
-    // Write compressed archive to temp file using .pipe() (not pipeline() which auto-destroys streams)
-    await new Promise<void>((resolve, reject) => {
-      const writeStream = createWriteStream(tmpFilePath);
-      pageArchiver.pipe(writeStream);
-      writeStream.on('close', resolve);
-      writeStream.on('error', reject);
-      pageArchiver.on('error', reject);
-    });
-    logger.info('archive written to temp file');
-
-    // Get file size for Content-Length
-    const stat = await fs.stat(tmpFilePath);
-    attachment.fileSize = stat.size;
-    logger.info(`temp file size: ${stat.size}`);
-
-    // Upload using createReadStream (native ReadStream with .path property)
-    logger.info('starting upload');
-    const readStream = createReadStream(tmpFilePath);
-    await fileUploadService.uploadAttachment(readStream, attachment);
-    logger.info('upload completed, running postProcess');
-
-    await postProcess.bind(this)(pageBulkExportJob, attachment, stat.size);
-    logger.info('postProcess completed');
+    await fileUploadService.uploadAttachment(uploadStream, attachment);
+    await postProcess.bind(this)(
+      pageBulkExportJob,
+      attachment,
+      pageArchiver.pointer(),
+    );
   } catch (e) {
-    logger.error('error caught', e);
+    logger.error(e);
     await this.handleError(e, pageBulkExportJob);
-  } finally {
-    logger.info('finally block, cleaning up');
-    // Clean up temp file
-    await fs.unlink(tmpFilePath).catch(() => {});
   }
 }
