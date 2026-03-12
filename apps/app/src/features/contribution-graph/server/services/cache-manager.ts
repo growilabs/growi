@@ -5,8 +5,7 @@ import User from '~/server/models/user';
 import type {
   IContributionDay,
   IWeeksToFreeze,
-} from '../interfaces/contribution-graph';
-import type { ContributionGraphDocument } from '../models/contribution-cache-model';
+} from '../../interfaces/contribution-graph';
 import {
   formatDateKey,
   getCurrentWeekStart,
@@ -15,7 +14,8 @@ import {
   getISOWeekId,
   getStartDateFromISOWeek,
   getUTCMidnight,
-} from '../utils/contribution-graph-utils';
+} from '../../utils/contribution-graph-utils';
+import type { ContributionGraphDocument } from '../models/contribution-cache-model';
 import { ContributionAggregationService } from './aggregation-service';
 import {
   cacheIsFresh,
