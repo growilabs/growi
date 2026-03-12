@@ -19,7 +19,7 @@ export const contributionDataAtom = atom<Promise<IContributionDay[]>>(
       });
       return response.data.contributions;
     } catch (err) {
-      throw new Error(err);
+      return { error: err.message || 'Failed to load contributions' };
     }
   },
 );
