@@ -476,6 +476,33 @@ class ElasticsearchDelegator
     }
   }
 
+  async createUsersIndex(index: string) {
+    if (isES7ClientDelegator(this.client)) {
+      const { mappings } = await import('./mappings/mappings-users-es7');
+      return this.client.indices.create({
+        index,
+        body: {
+          ...mappings,
+        },
+      });
+    }
+
+    if (isES8ClientDelegator(this.client)) {
+      const { mappings } = await import('./mappings/mappings-users-es8');
+      return this.client.indices.create({
+        index,
+        ...mappings,
+      });
+    }
+
+    if (isES9ClientDelegator(this.client)) {
+      const { mappings } = await import('./mappings/mappings-users-es9');
+      return this.client.indices.create({
+        index,
+        ...mappings,
+      });
+    }
+  }
   /**
    * generate object that is related to page.grant*
    */
@@ -550,6 +577,83 @@ class ElasticsearchDelegator
     });
   }
 
+  async addAllUsers(): Promise<void> {
+    const User = this.getUserModel();
+    const users = await User.find();
+
+    const body = users.flatMap((user) => [
+      { index: { _index: 'users', _id: user._id } },
+      { username: user.username, status: user.status },
+    ]);
+
+    await this.client.bulk({ body });
+  }
+
+  async searchUsersByUsername(
+    username: string,
+    statuses: number[],
+    offset: number,
+    limit: number,
+  ) {
+    if (isES7ClientDelegator(this.client)) {
+      const result = await this.client.search({
+        index: 'users',
+        from: offset,
+        size: limit,
+        body: {
+          query: {
+            bool: {
+              should: [
+                { wildcard: { username: { value: `*${username}*` } } },
+                { fuzzy: { username: { value: username, fuzziness: 'AUTO' } } },
+              ],
+              filter: {
+                terms: { status: statuses },
+              },
+            },
+          },
+        },
+      });
+      const usernames = result.hits.hits.map(
+        (hit) => (hit._source as { username: string })?.username,
+      );
+      const totalCount =
+        typeof result.hits.total === 'number'
+          ? result.hits.total
+          : (result.hits.total?.value ?? 0);
+      return { usernames, totalCount };
+    }
+
+    if (
+      isES8ClientDelegator(this.client) ||
+      isES9ClientDelegator(this.client)
+    ) {
+      const result = await this.client.search({
+        index: 'users',
+        from: offset,
+        size: limit,
+        query: {
+          bool: {
+            should: [
+              { wildcard: { username: { value: `*${username}*` } } },
+              { fuzzy: { username: { value: username, fuzziness: 'AUTO' } } },
+            ],
+            filter: {
+              terms: { status: statuses },
+            },
+          },
+        },
+      });
+      const usernames = result.hits.hits.map(
+        (hit) => (hit._source as { username: string })?.username,
+      );
+      const totalCount =
+        typeof result.hits.total === 'number'
+          ? result.hits.total
+          : (result.hits.total?.value ?? 0);
+      return { usernames, totalCount };
+    }
+  }
   updateOrInsertPageById(pageId) {
     const Page = this.getPageModel();
     return this.updateOrInsertPages(() => Page.findById(pageId));
@@ -684,7 +788,7 @@ class ElasticsearchDelegator
     await this.client.bulk({
       body: [
         { index: { _index: 'users', _id: user._id } },
-        { username: user.username },
+        { username: user.username, status: user.status },
       ],
     });
   }

@@ -323,7 +323,19 @@ class SearchService implements SearchQueryParser, SearchResolver {
   async updateOrInsertUser(user: IUserHasId) {
     return this.fullTextSearchDelegator.updateOrInsertUser(user);
   }
-
+  async searchUsersByUsername(
+    username: string,
+    statuses: number[],
+    offset: number,
+    limit: number,
+  ) {
+    return this.fullTextSearchDelegator.searchUsersByUsername(
+      username,
+      statuses,
+      offset,
+      limit,
+    );
+  }
   async rebuildIndex() {
     return this.fullTextSearchDelegator.rebuildIndex();
   }

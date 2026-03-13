@@ -337,6 +337,19 @@ module.exports = (crowi) => {
       // Search from input
       const searchText = req.query.searchText || '';
       const searchWord = new RegExp(escapeStringRegexp(searchText));
+      let usernamesFromES = null;
+      if (searchText) {
+        const esResult = await crowi.searchService.searchUsersByUsername(
+          searchText,
+          statusNoList,
+          0,
+          1000,
+        );
+        usernamesFromES = esResult?.usernames;
+      }
+      const orConditions = usernamesFromES
+        ? [{ username: { $in: usernamesFromES } }]
+        : [{ name: { $in: searchWord } }, { username: { $in: searchWord } }];
       // Sort
       const { sort, sortOrder } = req.query;
       const sortOutput = {
@@ -344,11 +357,6 @@ module.exports = (crowi) => {
       };
 
       //  For more information about the external specification of the User API, see here (https://dev.growi.org/5fd7466a31d89500488248e3)
-
-      const orConditions = [
-        { name: { $in: searchWord } },
-        { username: { $in: searchWord } },
-      ];
 
       const query = {
         $and: [
@@ -1531,17 +1539,15 @@ module.exports = (crowi) => {
           options.isIncludeActiveUser
         ) {
           const activeUserData =
-            await User.findUserByUsernameRegexWithTotalCount(
+            await crowi.searchService.searchUsersByUsername(
               q,
               [UserStatus.STATUS_ACTIVE],
-              { offset, limit },
+              offset,
+              limit,
             );
-          const activeUsernames = activeUserData.users.map(
-            (user) => user.username,
-          );
           Object.assign(data, {
             activeUser: {
-              usernames: activeUsernames,
+              usernames: activeUserData.usernames,
               totalCount: activeUserData.totalCount,
             },
           });
@@ -1554,17 +1560,15 @@ module.exports = (crowi) => {
             UserStatus.STATUS_INVITED,
           ];
           const inactiveUserData =
-            await User.findUserByUsernameRegexWithTotalCount(
+            await crowi.searchService.searchUsersByUsername(
               q,
               inactiveUserStates,
-              { offset, limit },
+              offset,
+              limit,
             );
-          const inactiveUsernames = inactiveUserData.users.map(
-            (user) => user.username,
-          );
           Object.assign(data, {
             inactiveUser: {
-              usernames: inactiveUsernames,
+              usernames: inactiveUserData.usernames,
               totalCount: inactiveUserData.totalCount,
             },
           });
