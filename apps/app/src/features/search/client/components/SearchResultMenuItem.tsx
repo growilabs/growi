@@ -3,6 +3,7 @@ import { PagePathLabel, UserPicture } from '@growi/ui/dist/components';
 import { useDebounce } from 'usehooks-ts';
 
 import { useSWRxSearch } from '~/stores/search';
+import { useSWRxUsernames } from '~/stores/user';
 
 import type { GetItemProps } from '../interfaces/downshift';
 import { SearchMenuItem } from './SearchMenuItem';
@@ -36,7 +37,12 @@ export const SearchResultMenuItem = (props: Props): JSX.Element => {
     },
     [isEmptyKeyword],
   );
-
+  const { data: usernameResult } = useSWRxUsernames(
+    isEmptyKeyword ? '' : debouncedKeyword,
+    0,
+    5,
+    { isIncludeActiveUser: true, isIncludeInactiveUser: true },
+  );
   if (isLoading) {
     return (
       <>
@@ -46,10 +52,14 @@ export const SearchResultMenuItem = (props: Props): JSX.Element => {
     );
   }
 
+  const hasUsernameResult =
+    (usernameResult?.activeUser?.usernames.length ?? 0) > 0 ||
+    (usernameResult?.inactiveUser?.usernames.length ?? 0) > 0;
+
   if (
     isEmptyKeyword ||
-    searchResult == null ||
-    searchResult.data.length === 0
+    ((searchResult == null || searchResult.data.length === 0) &&
+      !hasUsernameResult)
   ) {
     return <></>;
   }
@@ -77,6 +87,24 @@ export const SearchResultMenuItem = (props: Props): JSX.Element => {
             </span>
             <span className="fs-6">{item.data.seenUsers.length}</span>
           </span>
+        </SearchMenuItem>
+      ))}
+      {[
+        ...(usernameResult?.activeUser?.usernames ?? []),
+        ...(usernameResult?.inactiveUser?.usernames ?? []),
+      ].map((username, index) => (
+        <SearchMenuItem
+          key={username}
+          index={getFiexdIndex((searchResult?.data.length ?? 0) + index)}
+          isActive={
+            getFiexdIndex((searchResult?.data.length ?? 0) + index) ===
+            activeIndex
+          }
+          getItemProps={getItemProps}
+          url={`/user/${username}`}
+        >
+          <span className="material-symbols-outlined">person</span>
+          <span className="ms-3">{username}</span>
         </SearchMenuItem>
       ))}
     </div>
