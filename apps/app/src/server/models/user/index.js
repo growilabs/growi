@@ -84,7 +84,13 @@ const factory = (crowi) => {
   );
   userSchema.plugin(mongoosePaginate);
   userSchema.plugin(uniqueValidator);
-
+  userSchema.post('save', async (userData) => {
+    try {
+      await crowi.searchService.updateOrInsertUser(userData);
+    } catch (err) {
+      logger.error('Failed to sync user to elasticsearch', err);
+    }
+  });
   function validateCrowi() {
     if (crowi == null) {
       throw new Error(

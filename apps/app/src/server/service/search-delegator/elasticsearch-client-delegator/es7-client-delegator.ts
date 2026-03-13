@@ -118,4 +118,7 @@ export class ES7ClientDelegator {
   async search(params: ES7SearchQuery): Promise<estypes.SearchResponse> {
     return (await this.client.search<estypes.SearchResponse>(params)).body;
   }
+  async count(params: RequestParams.Count): Promise<estypes.CountResponse> {
+    return (await this.client.count(params)).body as estypes.CountResponse;
+  }
 }

@@ -1,4 +1,4 @@
-import { getIdStringForRef, type IPage } from '@growi/core';
+import { getIdStringForRef, type IPage, type IUserHasId } from '@growi/core';
 import gc from 'expose-gc/function';
 import mongoose from 'mongoose';
 import { Transform, Writable } from 'stream';
@@ -401,6 +401,46 @@ class ElasticsearchDelegator
         index: indexName,
       });
     }
+    // normalize users indices
+    await this.normalizeUsersIndices();
+  }
+
+  async normalizeUsersIndices(): Promise<void> {
+    const { client } = this;
+    const indexName = 'users';
+    const tmpIndexName = 'users-tmp';
+    const aliasName = 'users';
+
+    // remove tmp index
+    const isExistsUsersTmpIndex = await client.indices.exists({
+      index: tmpIndexName,
+    });
+    if (isExistsUsersTmpIndex) {
+      await client.indices.delete({ index: tmpIndexName });
+    }
+
+    // create index
+    const isExistsUsersIndex = await client.indices.exists({
+      index: indexName,
+    });
+    if (!isExistsUsersIndex) {
+      await this.createUsersIndex(indexName);
+      await this.addAllUsers();
+    }
+
+    const userCount = await mongoose.model('User').countDocuments();
+    const esCount = (await client.count({ index: indexName })).count;
+    if (userCount !== esCount) {
+      await this.addAllUsers();
+    }
+    // create alias
+    const isExistsAlias = await client.indices.existsAlias({
+      name: aliasName,
+      index: indexName,
+    });
+    if (!isExistsAlias) {
+      await client.indices.putAlias({ name: aliasName, index: indexName });
+    }
   }
 
   async createIndex(index: string) {
@@ -638,6 +678,15 @@ class ElasticsearchDelegator
     });
 
     return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
+  }
+
+  async updateOrInsertUser(user: IUserHasId): Promise<void> {
+    await this.client.bulk({
+      body: [
+        { index: { _index: 'users', _id: user._id } },
+        { username: user.username },
+      ],
+    });
   }
 
   deletePages(pages) {

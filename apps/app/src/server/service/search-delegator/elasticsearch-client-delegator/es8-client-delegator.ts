@@ -92,4 +92,7 @@ export class ES8ClientDelegator {
   search(params: estypes.SearchRequest): Promise<estypes.SearchResponse> {
     return this.client.search(params);
   }
+  count(params: estypes.CountRequest): Promise<estypes.CountResponse> {
+    return this.client.count(params);
+  }
 }

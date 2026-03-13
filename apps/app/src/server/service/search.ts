@@ -1,4 +1,4 @@
-import type { IPage, IPageHasId, IUser } from '@growi/core';
+import type { IPage, IPageHasId, IUser, IUserHasId } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
@@ -318,6 +318,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
   async normalizeIndices() {
     return this.fullTextSearchDelegator.normalizeIndices();
+  }
+
+  async updateOrInsertUser(user: IUserHasId) {
+    return this.fullTextSearchDelegator.updateOrInsertUser(user);
   }
 
   async rebuildIndex() {
