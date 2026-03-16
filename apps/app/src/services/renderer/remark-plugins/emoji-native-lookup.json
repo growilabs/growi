@@ -1,0 +1,13092 @@
+{
+  "100": {
+    "skins": [
+      {
+        "native": "💯"
+      }
+    ]
+  },
+  "1234": {
+    "skins": [
+      {
+        "native": "🔢"
+      }
+    ]
+  },
+  "grinning": {
+    "skins": [
+      {
+        "native": "😀"
+      }
+    ]
+  },
+  "smiley": {
+    "skins": [
+      {
+        "native": "😃"
+      }
+    ]
+  },
+  "smile": {
+    "skins": [
+      {
+        "native": "😄"
+      }
+    ]
+  },
+  "grin": {
+    "skins": [
+      {
+        "native": "😁"
+      }
+    ]
+  },
+  "laughing": {
+    "skins": [
+      {
+        "native": "😆"
+      }
+    ]
+  },
+  "sweat_smile": {
+    "skins": [
+      {
+        "native": "😅"
+      }
+    ]
+  },
+  "rolling_on_the_floor_laughing": {
+    "skins": [
+      {
+        "native": "🤣"
+      }
+    ]
+  },
+  "joy": {
+    "skins": [
+      {
+        "native": "😂"
+      }
+    ]
+  },
+  "slightly_smiling_face": {
+    "skins": [
+      {
+        "native": "🙂"
+      }
+    ]
+  },
+  "upside_down_face": {
+    "skins": [
+      {
+        "native": "🙃"
+      }
+    ]
+  },
+  "melting_face": {
+    "skins": [
+      {
+        "native": "🫠"
+      }
+    ]
+  },
+  "wink": {
+    "skins": [
+      {
+        "native": "😉"
+      }
+    ]
+  },
+  "blush": {
+    "skins": [
+      {
+        "native": "😊"
+      }
+    ]
+  },
+  "innocent": {
+    "skins": [
+      {
+        "native": "😇"
+      }
+    ]
+  },
+  "smiling_face_with_3_hearts": {
+    "skins": [
+      {
+        "native": "🥰"
+      }
+    ]
+  },
+  "heart_eyes": {
+    "skins": [
+      {
+        "native": "😍"
+      }
+    ]
+  },
+  "star-struck": {
+    "skins": [
+      {
+        "native": "🤩"
+      }
+    ]
+  },
+  "kissing_heart": {
+    "skins": [
+      {
+        "native": "😘"
+      }
+    ]
+  },
+  "kissing": {
+    "skins": [
+      {
+        "native": "😗"
+      }
+    ]
+  },
+  "relaxed": {
+    "skins": [
+      {
+        "native": "☺️"
+      }
+    ]
+  },
+  "kissing_closed_eyes": {
+    "skins": [
+      {
+        "native": "😚"
+      }
+    ]
+  },
+  "kissing_smiling_eyes": {
+    "skins": [
+      {
+        "native": "😙"
+      }
+    ]
+  },
+  "smiling_face_with_tear": {
+    "skins": [
+      {
+        "native": "🥲"
+      }
+    ]
+  },
+  "yum": {
+    "skins": [
+      {
+        "native": "😋"
+      }
+    ]
+  },
+  "stuck_out_tongue": {
+    "skins": [
+      {
+        "native": "😛"
+      }
+    ]
+  },
+  "stuck_out_tongue_winking_eye": {
+    "skins": [
+      {
+        "native": "😜"
+      }
+    ]
+  },
+  "zany_face": {
+    "skins": [
+      {
+        "native": "🤪"
+      }
+    ]
+  },
+  "stuck_out_tongue_closed_eyes": {
+    "skins": [
+      {
+        "native": "😝"
+      }
+    ]
+  },
+  "money_mouth_face": {
+    "skins": [
+      {
+        "native": "🤑"
+      }
+    ]
+  },
+  "hugging_face": {
+    "skins": [
+      {
+        "native": "🤗"
+      }
+    ]
+  },
+  "face_with_hand_over_mouth": {
+    "skins": [
+      {
+        "native": "🤭"
+      }
+    ]
+  },
+  "face_with_open_eyes_and_hand_over_mouth": {
+    "skins": [
+      {
+        "native": "🫢"
+      }
+    ]
+  },
+  "face_with_peeking_eye": {
+    "skins": [
+      {
+        "native": "🫣"
+      }
+    ]
+  },
+  "shushing_face": {
+    "skins": [
+      {
+        "native": "🤫"
+      }
+    ]
+  },
+  "thinking_face": {
+    "skins": [
+      {
+        "native": "🤔"
+      }
+    ]
+  },
+  "saluting_face": {
+    "skins": [
+      {
+        "native": "🫡"
+      }
+    ]
+  },
+  "zipper_mouth_face": {
+    "skins": [
+      {
+        "native": "🤐"
+      }
+    ]
+  },
+  "face_with_raised_eyebrow": {
+    "skins": [
+      {
+        "native": "🤨"
+      }
+    ]
+  },
+  "neutral_face": {
+    "skins": [
+      {
+        "native": "😐"
+      }
+    ]
+  },
+  "expressionless": {
+    "skins": [
+      {
+        "native": "😑"
+      }
+    ]
+  },
+  "no_mouth": {
+    "skins": [
+      {
+        "native": "😶"
+      }
+    ]
+  },
+  "dotted_line_face": {
+    "skins": [
+      {
+        "native": "🫥"
+      }
+    ]
+  },
+  "face_in_clouds": {
+    "skins": [
+      {
+        "native": "😶‍🌫️"
+      }
+    ]
+  },
+  "smirk": {
+    "skins": [
+      {
+        "native": "😏"
+      }
+    ]
+  },
+  "unamused": {
+    "skins": [
+      {
+        "native": "😒"
+      }
+    ]
+  },
+  "face_with_rolling_eyes": {
+    "skins": [
+      {
+        "native": "🙄"
+      }
+    ]
+  },
+  "grimacing": {
+    "skins": [
+      {
+        "native": "😬"
+      }
+    ]
+  },
+  "face_exhaling": {
+    "skins": [
+      {
+        "native": "😮‍💨"
+      }
+    ]
+  },
+  "lying_face": {
+    "skins": [
+      {
+        "native": "🤥"
+      }
+    ]
+  },
+  "shaking_face": {
+    "skins": [
+      {
+        "native": "🫨"
+      }
+    ]
+  },
+  "relieved": {
+    "skins": [
+      {
+        "native": "😌"
+      }
+    ]
+  },
+  "pensive": {
+    "skins": [
+      {
+        "native": "😔"
+      }
+    ]
+  },
+  "sleepy": {
+    "skins": [
+      {
+        "native": "😪"
+      }
+    ]
+  },
+  "drooling_face": {
+    "skins": [
+      {
+        "native": "🤤"
+      }
+    ]
+  },
+  "sleeping": {
+    "skins": [
+      {
+        "native": "😴"
+      }
+    ]
+  },
+  "mask": {
+    "skins": [
+      {
+        "native": "😷"
+      }
+    ]
+  },
+  "face_with_thermometer": {
+    "skins": [
+      {
+        "native": "🤒"
+      }
+    ]
+  },
+  "face_with_head_bandage": {
+    "skins": [
+      {
+        "native": "🤕"
+      }
+    ]
+  },
+  "nauseated_face": {
+    "skins": [
+      {
+        "native": "🤢"
+      }
+    ]
+  },
+  "face_vomiting": {
+    "skins": [
+      {
+        "native": "🤮"
+      }
+    ]
+  },
+  "sneezing_face": {
+    "skins": [
+      {
+        "native": "🤧"
+      }
+    ]
+  },
+  "hot_face": {
+    "skins": [
+      {
+        "native": "🥵"
+      }
+    ]
+  },
+  "cold_face": {
+    "skins": [
+      {
+        "native": "🥶"
+      }
+    ]
+  },
+  "woozy_face": {
+    "skins": [
+      {
+        "native": "🥴"
+      }
+    ]
+  },
+  "dizzy_face": {
+    "skins": [
+      {
+        "native": "😵"
+      }
+    ]
+  },
+  "face_with_spiral_eyes": {
+    "skins": [
+      {
+        "native": "😵‍💫"
+      }
+    ]
+  },
+  "exploding_head": {
+    "skins": [
+      {
+        "native": "🤯"
+      }
+    ]
+  },
+  "face_with_cowboy_hat": {
+    "skins": [
+      {
+        "native": "🤠"
+      }
+    ]
+  },
+  "partying_face": {
+    "skins": [
+      {
+        "native": "🥳"
+      }
+    ]
+  },
+  "disguised_face": {
+    "skins": [
+      {
+        "native": "🥸"
+      }
+    ]
+  },
+  "sunglasses": {
+    "skins": [
+      {
+        "native": "😎"
+      }
+    ]
+  },
+  "nerd_face": {
+    "skins": [
+      {
+        "native": "🤓"
+      }
+    ]
+  },
+  "face_with_monocle": {
+    "skins": [
+      {
+        "native": "🧐"
+      }
+    ]
+  },
+  "confused": {
+    "skins": [
+      {
+        "native": "😕"
+      }
+    ]
+  },
+  "face_with_diagonal_mouth": {
+    "skins": [
+      {
+        "native": "🫤"
+      }
+    ]
+  },
+  "worried": {
+    "skins": [
+      {
+        "native": "😟"
+      }
+    ]
+  },
+  "slightly_frowning_face": {
+    "skins": [
+      {
+        "native": "🙁"
+      }
+    ]
+  },
+  "white_frowning_face": {
+    "skins": [
+      {
+        "native": "☹️"
+      }
+    ]
+  },
+  "open_mouth": {
+    "skins": [
+      {
+        "native": "😮"
+      }
+    ]
+  },
+  "hushed": {
+    "skins": [
+      {
+        "native": "😯"
+      }
+    ]
+  },
+  "astonished": {
+    "skins": [
+      {
+        "native": "😲"
+      }
+    ]
+  },
+  "flushed": {
+    "skins": [
+      {
+        "native": "😳"
+      }
+    ]
+  },
+  "pleading_face": {
+    "skins": [
+      {
+        "native": "🥺"
+      }
+    ]
+  },
+  "face_holding_back_tears": {
+    "skins": [
+      {
+        "native": "🥹"
+      }
+    ]
+  },
+  "frowning": {
+    "skins": [
+      {
+        "native": "😦"
+      }
+    ]
+  },
+  "anguished": {
+    "skins": [
+      {
+        "native": "😧"
+      }
+    ]
+  },
+  "fearful": {
+    "skins": [
+      {
+        "native": "😨"
+      }
+    ]
+  },
+  "cold_sweat": {
+    "skins": [
+      {
+        "native": "😰"
+      }
+    ]
+  },
+  "disappointed_relieved": {
+    "skins": [
+      {
+        "native": "😥"
+      }
+    ]
+  },
+  "cry": {
+    "skins": [
+      {
+        "native": "😢"
+      }
+    ]
+  },
+  "sob": {
+    "skins": [
+      {
+        "native": "😭"
+      }
+    ]
+  },
+  "scream": {
+    "skins": [
+      {
+        "native": "😱"
+      }
+    ]
+  },
+  "confounded": {
+    "skins": [
+      {
+        "native": "😖"
+      }
+    ]
+  },
+  "persevere": {
+    "skins": [
+      {
+        "native": "😣"
+      }
+    ]
+  },
+  "disappointed": {
+    "skins": [
+      {
+        "native": "😞"
+      }
+    ]
+  },
+  "sweat": {
+    "skins": [
+      {
+        "native": "😓"
+      }
+    ]
+  },
+  "weary": {
+    "skins": [
+      {
+        "native": "😩"
+      }
+    ]
+  },
+  "tired_face": {
+    "skins": [
+      {
+        "native": "😫"
+      }
+    ]
+  },
+  "yawning_face": {
+    "skins": [
+      {
+        "native": "🥱"
+      }
+    ]
+  },
+  "triumph": {
+    "skins": [
+      {
+        "native": "😤"
+      }
+    ]
+  },
+  "rage": {
+    "skins": [
+      {
+        "native": "😡"
+      }
+    ]
+  },
+  "angry": {
+    "skins": [
+      {
+        "native": "😠"
+      }
+    ]
+  },
+  "face_with_symbols_on_mouth": {
+    "skins": [
+      {
+        "native": "🤬"
+      }
+    ]
+  },
+  "smiling_imp": {
+    "skins": [
+      {
+        "native": "😈"
+      }
+    ]
+  },
+  "imp": {
+    "skins": [
+      {
+        "native": "👿"
+      }
+    ]
+  },
+  "skull": {
+    "skins": [
+      {
+        "native": "💀"
+      }
+    ]
+  },
+  "skull_and_crossbones": {
+    "skins": [
+      {
+        "native": "☠️"
+      }
+    ]
+  },
+  "hankey": {
+    "skins": [
+      {
+        "native": "💩"
+      }
+    ]
+  },
+  "clown_face": {
+    "skins": [
+      {
+        "native": "🤡"
+      }
+    ]
+  },
+  "japanese_ogre": {
+    "skins": [
+      {
+        "native": "👹"
+      }
+    ]
+  },
+  "japanese_goblin": {
+    "skins": [
+      {
+        "native": "👺"
+      }
+    ]
+  },
+  "ghost": {
+    "skins": [
+      {
+        "native": "👻"
+      }
+    ]
+  },
+  "alien": {
+    "skins": [
+      {
+        "native": "👽"
+      }
+    ]
+  },
+  "space_invader": {
+    "skins": [
+      {
+        "native": "👾"
+      }
+    ]
+  },
+  "robot_face": {
+    "skins": [
+      {
+        "native": "🤖"
+      }
+    ]
+  },
+  "smiley_cat": {
+    "skins": [
+      {
+        "native": "😺"
+      }
+    ]
+  },
+  "smile_cat": {
+    "skins": [
+      {
+        "native": "😸"
+      }
+    ]
+  },
+  "joy_cat": {
+    "skins": [
+      {
+        "native": "😹"
+      }
+    ]
+  },
+  "heart_eyes_cat": {
+    "skins": [
+      {
+        "native": "😻"
+      }
+    ]
+  },
+  "smirk_cat": {
+    "skins": [
+      {
+        "native": "😼"
+      }
+    ]
+  },
+  "kissing_cat": {
+    "skins": [
+      {
+        "native": "😽"
+      }
+    ]
+  },
+  "scream_cat": {
+    "skins": [
+      {
+        "native": "🙀"
+      }
+    ]
+  },
+  "crying_cat_face": {
+    "skins": [
+      {
+        "native": "😿"
+      }
+    ]
+  },
+  "pouting_cat": {
+    "skins": [
+      {
+        "native": "😾"
+      }
+    ]
+  },
+  "see_no_evil": {
+    "skins": [
+      {
+        "native": "🙈"
+      }
+    ]
+  },
+  "hear_no_evil": {
+    "skins": [
+      {
+        "native": "🙉"
+      }
+    ]
+  },
+  "speak_no_evil": {
+    "skins": [
+      {
+        "native": "🙊"
+      }
+    ]
+  },
+  "love_letter": {
+    "skins": [
+      {
+        "native": "💌"
+      }
+    ]
+  },
+  "cupid": {
+    "skins": [
+      {
+        "native": "💘"
+      }
+    ]
+  },
+  "gift_heart": {
+    "skins": [
+      {
+        "native": "💝"
+      }
+    ]
+  },
+  "sparkling_heart": {
+    "skins": [
+      {
+        "native": "💖"
+      }
+    ]
+  },
+  "heartpulse": {
+    "skins": [
+      {
+        "native": "💗"
+      }
+    ]
+  },
+  "heartbeat": {
+    "skins": [
+      {
+        "native": "💓"
+      }
+    ]
+  },
+  "revolving_hearts": {
+    "skins": [
+      {
+        "native": "💞"
+      }
+    ]
+  },
+  "two_hearts": {
+    "skins": [
+      {
+        "native": "💕"
+      }
+    ]
+  },
+  "heart_decoration": {
+    "skins": [
+      {
+        "native": "💟"
+      }
+    ]
+  },
+  "heavy_heart_exclamation_mark_ornament": {
+    "skins": [
+      {
+        "native": "❣️"
+      }
+    ]
+  },
+  "broken_heart": {
+    "skins": [
+      {
+        "native": "💔"
+      }
+    ]
+  },
+  "heart_on_fire": {
+    "skins": [
+      {
+        "native": "❤️‍🔥"
+      }
+    ]
+  },
+  "mending_heart": {
+    "skins": [
+      {
+        "native": "❤️‍🩹"
+      }
+    ]
+  },
+  "heart": {
+    "skins": [
+      {
+        "native": "❤️"
+      }
+    ]
+  },
+  "pink_heart": {
+    "skins": [
+      {
+        "native": "🩷"
+      }
+    ]
+  },
+  "orange_heart": {
+    "skins": [
+      {
+        "native": "🧡"
+      }
+    ]
+  },
+  "yellow_heart": {
+    "skins": [
+      {
+        "native": "💛"
+      }
+    ]
+  },
+  "green_heart": {
+    "skins": [
+      {
+        "native": "💚"
+      }
+    ]
+  },
+  "blue_heart": {
+    "skins": [
+      {
+        "native": "💙"
+      }
+    ]
+  },
+  "light_blue_heart": {
+    "skins": [
+      {
+        "native": "🩵"
+      }
+    ]
+  },
+  "purple_heart": {
+    "skins": [
+      {
+        "native": "💜"
+      }
+    ]
+  },
+  "brown_heart": {
+    "skins": [
+      {
+        "native": "🤎"
+      }
+    ]
+  },
+  "black_heart": {
+    "skins": [
+      {
+        "native": "🖤"
+      }
+    ]
+  },
+  "grey_heart": {
+    "skins": [
+      {
+        "native": "🩶"
+      }
+    ]
+  },
+  "white_heart": {
+    "skins": [
+      {
+        "native": "🤍"
+      }
+    ]
+  },
+  "kiss": {
+    "skins": [
+      {
+        "native": "💋"
+      }
+    ]
+  },
+  "anger": {
+    "skins": [
+      {
+        "native": "💢"
+      }
+    ]
+  },
+  "boom": {
+    "skins": [
+      {
+        "native": "💥"
+      }
+    ]
+  },
+  "dizzy": {
+    "skins": [
+      {
+        "native": "💫"
+      }
+    ]
+  },
+  "sweat_drops": {
+    "skins": [
+      {
+        "native": "💦"
+      }
+    ]
+  },
+  "dash": {
+    "skins": [
+      {
+        "native": "💨"
+      }
+    ]
+  },
+  "hole": {
+    "skins": [
+      {
+        "native": "🕳️"
+      }
+    ]
+  },
+  "speech_balloon": {
+    "skins": [
+      {
+        "native": "💬"
+      }
+    ]
+  },
+  "eye-in-speech-bubble": {
+    "skins": [
+      {
+        "native": "👁️‍🗨️"
+      }
+    ]
+  },
+  "left_speech_bubble": {
+    "skins": [
+      {
+        "native": "🗨️"
+      }
+    ]
+  },
+  "right_anger_bubble": {
+    "skins": [
+      {
+        "native": "🗯️"
+      }
+    ]
+  },
+  "thought_balloon": {
+    "skins": [
+      {
+        "native": "💭"
+      }
+    ]
+  },
+  "zzz": {
+    "skins": [
+      {
+        "native": "💤"
+      }
+    ]
+  },
+  "wave": {
+    "skins": [
+      {
+        "native": "👋"
+      }
+    ]
+  },
+  "raised_back_of_hand": {
+    "skins": [
+      {
+        "native": "🤚"
+      }
+    ]
+  },
+  "raised_hand_with_fingers_splayed": {
+    "skins": [
+      {
+        "native": "🖐️"
+      }
+    ]
+  },
+  "hand": {
+    "skins": [
+      {
+        "native": "✋"
+      }
+    ]
+  },
+  "spock-hand": {
+    "skins": [
+      {
+        "native": "🖖"
+      }
+    ]
+  },
+  "rightwards_hand": {
+    "skins": [
+      {
+        "native": "🫱"
+      }
+    ]
+  },
+  "leftwards_hand": {
+    "skins": [
+      {
+        "native": "🫲"
+      }
+    ]
+  },
+  "palm_down_hand": {
+    "skins": [
+      {
+        "native": "🫳"
+      }
+    ]
+  },
+  "palm_up_hand": {
+    "skins": [
+      {
+        "native": "🫴"
+      }
+    ]
+  },
+  "leftwards_pushing_hand": {
+    "skins": [
+      {
+        "native": "🫷"
+      }
+    ]
+  },
+  "rightwards_pushing_hand": {
+    "skins": [
+      {
+        "native": "🫸"
+      }
+    ]
+  },
+  "ok_hand": {
+    "skins": [
+      {
+        "native": "👌"
+      }
+    ]
+  },
+  "pinched_fingers": {
+    "skins": [
+      {
+        "native": "🤌"
+      }
+    ]
+  },
+  "pinching_hand": {
+    "skins": [
+      {
+        "native": "🤏"
+      }
+    ]
+  },
+  "v": {
+    "skins": [
+      {
+        "native": "✌️"
+      }
+    ]
+  },
+  "crossed_fingers": {
+    "skins": [
+      {
+        "native": "🤞"
+      }
+    ]
+  },
+  "hand_with_index_finger_and_thumb_crossed": {
+    "skins": [
+      {
+        "native": "🫰"
+      }
+    ]
+  },
+  "i_love_you_hand_sign": {
+    "skins": [
+      {
+        "native": "🤟"
+      }
+    ]
+  },
+  "the_horns": {
+    "skins": [
+      {
+        "native": "🤘"
+      }
+    ]
+  },
+  "call_me_hand": {
+    "skins": [
+      {
+        "native": "🤙"
+      }
+    ]
+  },
+  "point_left": {
+    "skins": [
+      {
+        "native": "👈"
+      }
+    ]
+  },
+  "point_right": {
+    "skins": [
+      {
+        "native": "👉"
+      }
+    ]
+  },
+  "point_up_2": {
+    "skins": [
+      {
+        "native": "👆"
+      }
+    ]
+  },
+  "middle_finger": {
+    "skins": [
+      {
+        "native": "🖕"
+      }
+    ]
+  },
+  "point_down": {
+    "skins": [
+      {
+        "native": "👇"
+      }
+    ]
+  },
+  "point_up": {
+    "skins": [
+      {
+        "native": "☝️"
+      }
+    ]
+  },
+  "index_pointing_at_the_viewer": {
+    "skins": [
+      {
+        "native": "🫵"
+      }
+    ]
+  },
+  "+1": {
+    "skins": [
+      {
+        "native": "👍"
+      }
+    ]
+  },
+  "-1": {
+    "skins": [
+      {
+        "native": "👎"
+      }
+    ]
+  },
+  "fist": {
+    "skins": [
+      {
+        "native": "✊"
+      }
+    ]
+  },
+  "facepunch": {
+    "skins": [
+      {
+        "native": "👊"
+      }
+    ]
+  },
+  "left-facing_fist": {
+    "skins": [
+      {
+        "native": "🤛"
+      }
+    ]
+  },
+  "right-facing_fist": {
+    "skins": [
+      {
+        "native": "🤜"
+      }
+    ]
+  },
+  "clap": {
+    "skins": [
+      {
+        "native": "👏"
+      }
+    ]
+  },
+  "raised_hands": {
+    "skins": [
+      {
+        "native": "🙌"
+      }
+    ]
+  },
+  "heart_hands": {
+    "skins": [
+      {
+        "native": "🫶"
+      }
+    ]
+  },
+  "open_hands": {
+    "skins": [
+      {
+        "native": "👐"
+      }
+    ]
+  },
+  "palms_up_together": {
+    "skins": [
+      {
+        "native": "🤲"
+      }
+    ]
+  },
+  "handshake": {
+    "skins": [
+      {
+        "native": "🤝"
+      }
+    ]
+  },
+  "pray": {
+    "skins": [
+      {
+        "native": "🙏"
+      }
+    ]
+  },
+  "writing_hand": {
+    "skins": [
+      {
+        "native": "✍️"
+      }
+    ]
+  },
+  "nail_care": {
+    "skins": [
+      {
+        "native": "💅"
+      }
+    ]
+  },
+  "selfie": {
+    "skins": [
+      {
+        "native": "🤳"
+      }
+    ]
+  },
+  "muscle": {
+    "skins": [
+      {
+        "native": "💪"
+      }
+    ]
+  },
+  "mechanical_arm": {
+    "skins": [
+      {
+        "native": "🦾"
+      }
+    ]
+  },
+  "mechanical_leg": {
+    "skins": [
+      {
+        "native": "🦿"
+      }
+    ]
+  },
+  "leg": {
+    "skins": [
+      {
+        "native": "🦵"
+      }
+    ]
+  },
+  "foot": {
+    "skins": [
+      {
+        "native": "🦶"
+      }
+    ]
+  },
+  "ear": {
+    "skins": [
+      {
+        "native": "👂"
+      }
+    ]
+  },
+  "ear_with_hearing_aid": {
+    "skins": [
+      {
+        "native": "🦻"
+      }
+    ]
+  },
+  "nose": {
+    "skins": [
+      {
+        "native": "👃"
+      }
+    ]
+  },
+  "brain": {
+    "skins": [
+      {
+        "native": "🧠"
+      }
+    ]
+  },
+  "anatomical_heart": {
+    "skins": [
+      {
+        "native": "🫀"
+      }
+    ]
+  },
+  "lungs": {
+    "skins": [
+      {
+        "native": "🫁"
+      }
+    ]
+  },
+  "tooth": {
+    "skins": [
+      {
+        "native": "🦷"
+      }
+    ]
+  },
+  "bone": {
+    "skins": [
+      {
+        "native": "🦴"
+      }
+    ]
+  },
+  "eyes": {
+    "skins": [
+      {
+        "native": "👀"
+      }
+    ]
+  },
+  "eye": {
+    "skins": [
+      {
+        "native": "👁️"
+      }
+    ]
+  },
+  "tongue": {
+    "skins": [
+      {
+        "native": "👅"
+      }
+    ]
+  },
+  "lips": {
+    "skins": [
+      {
+        "native": "👄"
+      }
+    ]
+  },
+  "biting_lip": {
+    "skins": [
+      {
+        "native": "🫦"
+      }
+    ]
+  },
+  "baby": {
+    "skins": [
+      {
+        "native": "👶"
+      }
+    ]
+  },
+  "child": {
+    "skins": [
+      {
+        "native": "🧒"
+      }
+    ]
+  },
+  "boy": {
+    "skins": [
+      {
+        "native": "👦"
+      }
+    ]
+  },
+  "girl": {
+    "skins": [
+      {
+        "native": "👧"
+      }
+    ]
+  },
+  "adult": {
+    "skins": [
+      {
+        "native": "🧑"
+      }
+    ]
+  },
+  "person_with_blond_hair": {
+    "skins": [
+      {
+        "native": "👱"
+      }
+    ]
+  },
+  "man": {
+    "skins": [
+      {
+        "native": "👨"
+      }
+    ]
+  },
+  "bearded_person": {
+    "skins": [
+      {
+        "native": "🧔"
+      }
+    ]
+  },
+  "man_with_beard": {
+    "skins": [
+      {
+        "native": "🧔‍♂️"
+      }
+    ]
+  },
+  "woman_with_beard": {
+    "skins": [
+      {
+        "native": "🧔‍♀️"
+      }
+    ]
+  },
+  "red_haired_man": {
+    "skins": [
+      {
+        "native": "👨‍🦰"
+      }
+    ]
+  },
+  "curly_haired_man": {
+    "skins": [
+      {
+        "native": "👨‍🦱"
+      }
+    ]
+  },
+  "white_haired_man": {
+    "skins": [
+      {
+        "native": "👨‍🦳"
+      }
+    ]
+  },
+  "bald_man": {
+    "skins": [
+      {
+        "native": "👨‍🦲"
+      }
+    ]
+  },
+  "woman": {
+    "skins": [
+      {
+        "native": "👩"
+      }
+    ]
+  },
+  "red_haired_woman": {
+    "skins": [
+      {
+        "native": "👩‍🦰"
+      }
+    ]
+  },
+  "red_haired_person": {
+    "skins": [
+      {
+        "native": "🧑‍🦰"
+      }
+    ]
+  },
+  "curly_haired_woman": {
+    "skins": [
+      {
+        "native": "👩‍🦱"
+      }
+    ]
+  },
+  "curly_haired_person": {
+    "skins": [
+      {
+        "native": "🧑‍🦱"
+      }
+    ]
+  },
+  "white_haired_woman": {
+    "skins": [
+      {
+        "native": "👩‍🦳"
+      }
+    ]
+  },
+  "white_haired_person": {
+    "skins": [
+      {
+        "native": "🧑‍🦳"
+      }
+    ]
+  },
+  "bald_woman": {
+    "skins": [
+      {
+        "native": "👩‍🦲"
+      }
+    ]
+  },
+  "bald_person": {
+    "skins": [
+      {
+        "native": "🧑‍🦲"
+      }
+    ]
+  },
+  "blond-haired-woman": {
+    "skins": [
+      {
+        "native": "👱‍♀️"
+      }
+    ]
+  },
+  "blond-haired-man": {
+    "skins": [
+      {
+        "native": "👱‍♂️"
+      }
+    ]
+  },
+  "older_adult": {
+    "skins": [
+      {
+        "native": "🧓"
+      }
+    ]
+  },
+  "older_man": {
+    "skins": [
+      {
+        "native": "👴"
+      }
+    ]
+  },
+  "older_woman": {
+    "skins": [
+      {
+        "native": "👵"
+      }
+    ]
+  },
+  "person_frowning": {
+    "skins": [
+      {
+        "native": "🙍"
+      }
+    ]
+  },
+  "man-frowning": {
+    "skins": [
+      {
+        "native": "🙍‍♂️"
+      }
+    ]
+  },
+  "woman-frowning": {
+    "skins": [
+      {
+        "native": "🙍‍♀️"
+      }
+    ]
+  },
+  "person_with_pouting_face": {
+    "skins": [
+      {
+        "native": "🙎"
+      }
+    ]
+  },
+  "man-pouting": {
+    "skins": [
+      {
+        "native": "🙎‍♂️"
+      }
+    ]
+  },
+  "woman-pouting": {
+    "skins": [
+      {
+        "native": "🙎‍♀️"
+      }
+    ]
+  },
+  "no_good": {
+    "skins": [
+      {
+        "native": "🙅"
+      }
+    ]
+  },
+  "man-gesturing-no": {
+    "skins": [
+      {
+        "native": "🙅‍♂️"
+      }
+    ]
+  },
+  "woman-gesturing-no": {
+    "skins": [
+      {
+        "native": "🙅‍♀️"
+      }
+    ]
+  },
+  "ok_woman": {
+    "skins": [
+      {
+        "native": "🙆"
+      }
+    ]
+  },
+  "man-gesturing-ok": {
+    "skins": [
+      {
+        "native": "🙆‍♂️"
+      }
+    ]
+  },
+  "woman-gesturing-ok": {
+    "skins": [
+      {
+        "native": "🙆‍♀️"
+      }
+    ]
+  },
+  "information_desk_person": {
+    "skins": [
+      {
+        "native": "💁"
+      }
+    ]
+  },
+  "man-tipping-hand": {
+    "skins": [
+      {
+        "native": "💁‍♂️"
+      }
+    ]
+  },
+  "woman-tipping-hand": {
+    "skins": [
+      {
+        "native": "💁‍♀️"
+      }
+    ]
+  },
+  "raising_hand": {
+    "skins": [
+      {
+        "native": "🙋"
+      }
+    ]
+  },
+  "man-raising-hand": {
+    "skins": [
+      {
+        "native": "🙋‍♂️"
+      }
+    ]
+  },
+  "woman-raising-hand": {
+    "skins": [
+      {
+        "native": "🙋‍♀️"
+      }
+    ]
+  },
+  "deaf_person": {
+    "skins": [
+      {
+        "native": "🧏"
+      }
+    ]
+  },
+  "deaf_man": {
+    "skins": [
+      {
+        "native": "🧏‍♂️"
+      }
+    ]
+  },
+  "deaf_woman": {
+    "skins": [
+      {
+        "native": "🧏‍♀️"
+      }
+    ]
+  },
+  "bow": {
+    "skins": [
+      {
+        "native": "🙇"
+      }
+    ]
+  },
+  "man-bowing": {
+    "skins": [
+      {
+        "native": "🙇‍♂️"
+      }
+    ]
+  },
+  "woman-bowing": {
+    "skins": [
+      {
+        "native": "🙇‍♀️"
+      }
+    ]
+  },
+  "face_palm": {
+    "skins": [
+      {
+        "native": "🤦"
+      }
+    ]
+  },
+  "man-facepalming": {
+    "skins": [
+      {
+        "native": "🤦‍♂️"
+      }
+    ]
+  },
+  "woman-facepalming": {
+    "skins": [
+      {
+        "native": "🤦‍♀️"
+      }
+    ]
+  },
+  "shrug": {
+    "skins": [
+      {
+        "native": "🤷"
+      }
+    ]
+  },
+  "man-shrugging": {
+    "skins": [
+      {
+        "native": "🤷‍♂️"
+      }
+    ]
+  },
+  "woman-shrugging": {
+    "skins": [
+      {
+        "native": "🤷‍♀️"
+      }
+    ]
+  },
+  "health_worker": {
+    "skins": [
+      {
+        "native": "🧑‍⚕️"
+      }
+    ]
+  },
+  "male-doctor": {
+    "skins": [
+      {
+        "native": "👨‍⚕️"
+      }
+    ]
+  },
+  "female-doctor": {
+    "skins": [
+      {
+        "native": "👩‍⚕️"
+      }
+    ]
+  },
+  "student": {
+    "skins": [
+      {
+        "native": "🧑‍🎓"
+      }
+    ]
+  },
+  "male-student": {
+    "skins": [
+      {
+        "native": "👨‍🎓"
+      }
+    ]
+  },
+  "female-student": {
+    "skins": [
+      {
+        "native": "👩‍🎓"
+      }
+    ]
+  },
+  "teacher": {
+    "skins": [
+      {
+        "native": "🧑‍🏫"
+      }
+    ]
+  },
+  "male-teacher": {
+    "skins": [
+      {
+        "native": "👨‍🏫"
+      }
+    ]
+  },
+  "female-teacher": {
+    "skins": [
+      {
+        "native": "👩‍🏫"
+      }
+    ]
+  },
+  "judge": {
+    "skins": [
+      {
+        "native": "🧑‍⚖️"
+      }
+    ]
+  },
+  "male-judge": {
+    "skins": [
+      {
+        "native": "👨‍⚖️"
+      }
+    ]
+  },
+  "female-judge": {
+    "skins": [
+      {
+        "native": "👩‍⚖️"
+      }
+    ]
+  },
+  "farmer": {
+    "skins": [
+      {
+        "native": "🧑‍🌾"
+      }
+    ]
+  },
+  "male-farmer": {
+    "skins": [
+      {
+        "native": "👨‍🌾"
+      }
+    ]
+  },
+  "female-farmer": {
+    "skins": [
+      {
+        "native": "👩‍🌾"
+      }
+    ]
+  },
+  "cook": {
+    "skins": [
+      {
+        "native": "🧑‍🍳"
+      }
+    ]
+  },
+  "male-cook": {
+    "skins": [
+      {
+        "native": "👨‍🍳"
+      }
+    ]
+  },
+  "female-cook": {
+    "skins": [
+      {
+        "native": "👩‍🍳"
+      }
+    ]
+  },
+  "mechanic": {
+    "skins": [
+      {
+        "native": "🧑‍🔧"
+      }
+    ]
+  },
+  "male-mechanic": {
+    "skins": [
+      {
+        "native": "👨‍🔧"
+      }
+    ]
+  },
+  "female-mechanic": {
+    "skins": [
+      {
+        "native": "👩‍🔧"
+      }
+    ]
+  },
+  "factory_worker": {
+    "skins": [
+      {
+        "native": "🧑‍🏭"
+      }
+    ]
+  },
+  "male-factory-worker": {
+    "skins": [
+      {
+        "native": "👨‍🏭"
+      }
+    ]
+  },
+  "female-factory-worker": {
+    "skins": [
+      {
+        "native": "👩‍🏭"
+      }
+    ]
+  },
+  "office_worker": {
+    "skins": [
+      {
+        "native": "🧑‍💼"
+      }
+    ]
+  },
+  "male-office-worker": {
+    "skins": [
+      {
+        "native": "👨‍💼"
+      }
+    ]
+  },
+  "female-office-worker": {
+    "skins": [
+      {
+        "native": "👩‍💼"
+      }
+    ]
+  },
+  "scientist": {
+    "skins": [
+      {
+        "native": "🧑‍🔬"
+      }
+    ]
+  },
+  "male-scientist": {
+    "skins": [
+      {
+        "native": "👨‍🔬"
+      }
+    ]
+  },
+  "female-scientist": {
+    "skins": [
+      {
+        "native": "👩‍🔬"
+      }
+    ]
+  },
+  "technologist": {
+    "skins": [
+      {
+        "native": "🧑‍💻"
+      }
+    ]
+  },
+  "male-technologist": {
+    "skins": [
+      {
+        "native": "👨‍💻"
+      }
+    ]
+  },
+  "female-technologist": {
+    "skins": [
+      {
+        "native": "👩‍💻"
+      }
+    ]
+  },
+  "singer": {
+    "skins": [
+      {
+        "native": "🧑‍🎤"
+      }
+    ]
+  },
+  "male-singer": {
+    "skins": [
+      {
+        "native": "👨‍🎤"
+      }
+    ]
+  },
+  "female-singer": {
+    "skins": [
+      {
+        "native": "👩‍🎤"
+      }
+    ]
+  },
+  "artist": {
+    "skins": [
+      {
+        "native": "🧑‍🎨"
+      }
+    ]
+  },
+  "male-artist": {
+    "skins": [
+      {
+        "native": "👨‍🎨"
+      }
+    ]
+  },
+  "female-artist": {
+    "skins": [
+      {
+        "native": "👩‍🎨"
+      }
+    ]
+  },
+  "pilot": {
+    "skins": [
+      {
+        "native": "🧑‍✈️"
+      }
+    ]
+  },
+  "male-pilot": {
+    "skins": [
+      {
+        "native": "👨‍✈️"
+      }
+    ]
+  },
+  "female-pilot": {
+    "skins": [
+      {
+        "native": "👩‍✈️"
+      }
+    ]
+  },
+  "astronaut": {
+    "skins": [
+      {
+        "native": "🧑‍🚀"
+      }
+    ]
+  },
+  "male-astronaut": {
+    "skins": [
+      {
+        "native": "👨‍🚀"
+      }
+    ]
+  },
+  "female-astronaut": {
+    "skins": [
+      {
+        "native": "👩‍🚀"
+      }
+    ]
+  },
+  "firefighter": {
+    "skins": [
+      {
+        "native": "🧑‍🚒"
+      }
+    ]
+  },
+  "male-firefighter": {
+    "skins": [
+      {
+        "native": "👨‍🚒"
+      }
+    ]
+  },
+  "female-firefighter": {
+    "skins": [
+      {
+        "native": "👩‍🚒"
+      }
+    ]
+  },
+  "cop": {
+    "skins": [
+      {
+        "native": "👮"
+      }
+    ]
+  },
+  "male-police-officer": {
+    "skins": [
+      {
+        "native": "👮‍♂️"
+      }
+    ]
+  },
+  "female-police-officer": {
+    "skins": [
+      {
+        "native": "👮‍♀️"
+      }
+    ]
+  },
+  "sleuth_or_spy": {
+    "skins": [
+      {
+        "native": "🕵️"
+      }
+    ]
+  },
+  "male-detective": {
+    "skins": [
+      {
+        "native": "🕵️‍♂️"
+      }
+    ]
+  },
+  "female-detective": {
+    "skins": [
+      {
+        "native": "🕵️‍♀️"
+      }
+    ]
+  },
+  "guardsman": {
+    "skins": [
+      {
+        "native": "💂"
+      }
+    ]
+  },
+  "male-guard": {
+    "skins": [
+      {
+        "native": "💂‍♂️"
+      }
+    ]
+  },
+  "female-guard": {
+    "skins": [
+      {
+        "native": "💂‍♀️"
+      }
+    ]
+  },
+  "ninja": {
+    "skins": [
+      {
+        "native": "🥷"
+      }
+    ]
+  },
+  "construction_worker": {
+    "skins": [
+      {
+        "native": "👷"
+      }
+    ]
+  },
+  "male-construction-worker": {
+    "skins": [
+      {
+        "native": "👷‍♂️"
+      }
+    ]
+  },
+  "female-construction-worker": {
+    "skins": [
+      {
+        "native": "👷‍♀️"
+      }
+    ]
+  },
+  "person_with_crown": {
+    "skins": [
+      {
+        "native": "🫅"
+      }
+    ]
+  },
+  "prince": {
+    "skins": [
+      {
+        "native": "🤴"
+      }
+    ]
+  },
+  "princess": {
+    "skins": [
+      {
+        "native": "👸"
+      }
+    ]
+  },
+  "man_with_turban": {
+    "skins": [
+      {
+        "native": "👳"
+      }
+    ]
+  },
+  "man-wearing-turban": {
+    "skins": [
+      {
+        "native": "👳‍♂️"
+      }
+    ]
+  },
+  "woman-wearing-turban": {
+    "skins": [
+      {
+        "native": "👳‍♀️"
+      }
+    ]
+  },
+  "man_with_gua_pi_mao": {
+    "skins": [
+      {
+        "native": "👲"
+      }
+    ]
+  },
+  "person_with_headscarf": {
+    "skins": [
+      {
+        "native": "🧕"
+      }
+    ]
+  },
+  "person_in_tuxedo": {
+    "skins": [
+      {
+        "native": "🤵"
+      }
+    ]
+  },
+  "man_in_tuxedo": {
+    "skins": [
+      {
+        "native": "🤵‍♂️"
+      }
+    ]
+  },
+  "woman_in_tuxedo": {
+    "skins": [
+      {
+        "native": "🤵‍♀️"
+      }
+    ]
+  },
+  "bride_with_veil": {
+    "skins": [
+      {
+        "native": "👰"
+      }
+    ]
+  },
+  "man_with_veil": {
+    "skins": [
+      {
+        "native": "👰‍♂️"
+      }
+    ]
+  },
+  "woman_with_veil": {
+    "skins": [
+      {
+        "native": "👰‍♀️"
+      }
+    ]
+  },
+  "pregnant_woman": {
+    "skins": [
+      {
+        "native": "🤰"
+      }
+    ]
+  },
+  "pregnant_man": {
+    "skins": [
+      {
+        "native": "🫃"
+      }
+    ]
+  },
+  "pregnant_person": {
+    "skins": [
+      {
+        "native": "🫄"
+      }
+    ]
+  },
+  "breast-feeding": {
+    "skins": [
+      {
+        "native": "🤱"
+      }
+    ]
+  },
+  "woman_feeding_baby": {
+    "skins": [
+      {
+        "native": "👩‍🍼"
+      }
+    ]
+  },
+  "man_feeding_baby": {
+    "skins": [
+      {
+        "native": "👨‍🍼"
+      }
+    ]
+  },
+  "person_feeding_baby": {
+    "skins": [
+      {
+        "native": "🧑‍🍼"
+      }
+    ]
+  },
+  "angel": {
+    "skins": [
+      {
+        "native": "👼"
+      }
+    ]
+  },
+  "santa": {
+    "skins": [
+      {
+        "native": "🎅"
+      }
+    ]
+  },
+  "mrs_claus": {
+    "skins": [
+      {
+        "native": "🤶"
+      }
+    ]
+  },
+  "mx_claus": {
+    "skins": [
+      {
+        "native": "🧑‍🎄"
+      }
+    ]
+  },
+  "superhero": {
+    "skins": [
+      {
+        "native": "🦸"
+      }
+    ]
+  },
+  "male_superhero": {
+    "skins": [
+      {
+        "native": "🦸‍♂️"
+      }
+    ]
+  },
+  "female_superhero": {
+    "skins": [
+      {
+        "native": "🦸‍♀️"
+      }
+    ]
+  },
+  "supervillain": {
+    "skins": [
+      {
+        "native": "🦹"
+      }
+    ]
+  },
+  "male_supervillain": {
+    "skins": [
+      {
+        "native": "🦹‍♂️"
+      }
+    ]
+  },
+  "female_supervillain": {
+    "skins": [
+      {
+        "native": "🦹‍♀️"
+      }
+    ]
+  },
+  "mage": {
+    "skins": [
+      {
+        "native": "🧙"
+      }
+    ]
+  },
+  "male_mage": {
+    "skins": [
+      {
+        "native": "🧙‍♂️"
+      }
+    ]
+  },
+  "female_mage": {
+    "skins": [
+      {
+        "native": "🧙‍♀️"
+      }
+    ]
+  },
+  "fairy": {
+    "skins": [
+      {
+        "native": "🧚"
+      }
+    ]
+  },
+  "male_fairy": {
+    "skins": [
+      {
+        "native": "🧚‍♂️"
+      }
+    ]
+  },
+  "female_fairy": {
+    "skins": [
+      {
+        "native": "🧚‍♀️"
+      }
+    ]
+  },
+  "vampire": {
+    "skins": [
+      {
+        "native": "🧛"
+      }
+    ]
+  },
+  "male_vampire": {
+    "skins": [
+      {
+        "native": "🧛‍♂️"
+      }
+    ]
+  },
+  "female_vampire": {
+    "skins": [
+      {
+        "native": "🧛‍♀️"
+      }
+    ]
+  },
+  "merperson": {
+    "skins": [
+      {
+        "native": "🧜"
+      }
+    ]
+  },
+  "merman": {
+    "skins": [
+      {
+        "native": "🧜‍♂️"
+      }
+    ]
+  },
+  "mermaid": {
+    "skins": [
+      {
+        "native": "🧜‍♀️"
+      }
+    ]
+  },
+  "elf": {
+    "skins": [
+      {
+        "native": "🧝"
+      }
+    ]
+  },
+  "male_elf": {
+    "skins": [
+      {
+        "native": "🧝‍♂️"
+      }
+    ]
+  },
+  "female_elf": {
+    "skins": [
+      {
+        "native": "🧝‍♀️"
+      }
+    ]
+  },
+  "genie": {
+    "skins": [
+      {
+        "native": "🧞"
+      }
+    ]
+  },
+  "male_genie": {
+    "skins": [
+      {
+        "native": "🧞‍♂️"
+      }
+    ]
+  },
+  "female_genie": {
+    "skins": [
+      {
+        "native": "🧞‍♀️"
+      }
+    ]
+  },
+  "zombie": {
+    "skins": [
+      {
+        "native": "🧟"
+      }
+    ]
+  },
+  "male_zombie": {
+    "skins": [
+      {
+        "native": "🧟‍♂️"
+      }
+    ]
+  },
+  "female_zombie": {
+    "skins": [
+      {
+        "native": "🧟‍♀️"
+      }
+    ]
+  },
+  "troll": {
+    "skins": [
+      {
+        "native": "🧌"
+      }
+    ]
+  },
+  "massage": {
+    "skins": [
+      {
+        "native": "💆"
+      }
+    ]
+  },
+  "man-getting-massage": {
+    "skins": [
+      {
+        "native": "💆‍♂️"
+      }
+    ]
+  },
+  "woman-getting-massage": {
+    "skins": [
+      {
+        "native": "💆‍♀️"
+      }
+    ]
+  },
+  "haircut": {
+    "skins": [
+      {
+        "native": "💇"
+      }
+    ]
+  },
+  "man-getting-haircut": {
+    "skins": [
+      {
+        "native": "💇‍♂️"
+      }
+    ]
+  },
+  "woman-getting-haircut": {
+    "skins": [
+      {
+        "native": "💇‍♀️"
+      }
+    ]
+  },
+  "walking": {
+    "skins": [
+      {
+        "native": "🚶"
+      }
+    ]
+  },
+  "man-walking": {
+    "skins": [
+      {
+        "native": "🚶‍♂️"
+      }
+    ]
+  },
+  "woman-walking": {
+    "skins": [
+      {
+        "native": "🚶‍♀️"
+      }
+    ]
+  },
+  "standing_person": {
+    "skins": [
+      {
+        "native": "🧍"
+      }
+    ]
+  },
+  "man_standing": {
+    "skins": [
+      {
+        "native": "🧍‍♂️"
+      }
+    ]
+  },
+  "woman_standing": {
+    "skins": [
+      {
+        "native": "🧍‍♀️"
+      }
+    ]
+  },
+  "kneeling_person": {
+    "skins": [
+      {
+        "native": "🧎"
+      }
+    ]
+  },
+  "man_kneeling": {
+    "skins": [
+      {
+        "native": "🧎‍♂️"
+      }
+    ]
+  },
+  "woman_kneeling": {
+    "skins": [
+      {
+        "native": "🧎‍♀️"
+      }
+    ]
+  },
+  "person_with_probing_cane": {
+    "skins": [
+      {
+        "native": "🧑‍🦯"
+      }
+    ]
+  },
+  "man_with_probing_cane": {
+    "skins": [
+      {
+        "native": "👨‍🦯"
+      }
+    ]
+  },
+  "woman_with_probing_cane": {
+    "skins": [
+      {
+        "native": "👩‍🦯"
+      }
+    ]
+  },
+  "person_in_motorized_wheelchair": {
+    "skins": [
+      {
+        "native": "🧑‍🦼"
+      }
+    ]
+  },
+  "man_in_motorized_wheelchair": {
+    "skins": [
+      {
+        "native": "👨‍🦼"
+      }
+    ]
+  },
+  "woman_in_motorized_wheelchair": {
+    "skins": [
+      {
+        "native": "👩‍🦼"
+      }
+    ]
+  },
+  "person_in_manual_wheelchair": {
+    "skins": [
+      {
+        "native": "🧑‍🦽"
+      }
+    ]
+  },
+  "man_in_manual_wheelchair": {
+    "skins": [
+      {
+        "native": "👨‍🦽"
+      }
+    ]
+  },
+  "woman_in_manual_wheelchair": {
+    "skins": [
+      {
+        "native": "👩‍🦽"
+      }
+    ]
+  },
+  "runner": {
+    "skins": [
+      {
+        "native": "🏃"
+      }
+    ]
+  },
+  "man-running": {
+    "skins": [
+      {
+        "native": "🏃‍♂️"
+      }
+    ]
+  },
+  "woman-running": {
+    "skins": [
+      {
+        "native": "🏃‍♀️"
+      }
+    ]
+  },
+  "dancer": {
+    "skins": [
+      {
+        "native": "💃"
+      }
+    ]
+  },
+  "man_dancing": {
+    "skins": [
+      {
+        "native": "🕺"
+      }
+    ]
+  },
+  "man_in_business_suit_levitating": {
+    "skins": [
+      {
+        "native": "🕴️"
+      }
+    ]
+  },
+  "dancers": {
+    "skins": [
+      {
+        "native": "👯"
+      }
+    ]
+  },
+  "men-with-bunny-ears-partying": {
+    "skins": [
+      {
+        "native": "👯‍♂️"
+      }
+    ]
+  },
+  "women-with-bunny-ears-partying": {
+    "skins": [
+      {
+        "native": "👯‍♀️"
+      }
+    ]
+  },
+  "person_in_steamy_room": {
+    "skins": [
+      {
+        "native": "🧖"
+      }
+    ]
+  },
+  "man_in_steamy_room": {
+    "skins": [
+      {
+        "native": "🧖‍♂️"
+      }
+    ]
+  },
+  "woman_in_steamy_room": {
+    "skins": [
+      {
+        "native": "🧖‍♀️"
+      }
+    ]
+  },
+  "person_climbing": {
+    "skins": [
+      {
+        "native": "🧗"
+      }
+    ]
+  },
+  "man_climbing": {
+    "skins": [
+      {
+        "native": "🧗‍♂️"
+      }
+    ]
+  },
+  "woman_climbing": {
+    "skins": [
+      {
+        "native": "🧗‍♀️"
+      }
+    ]
+  },
+  "fencer": {
+    "skins": [
+      {
+        "native": "🤺"
+      }
+    ]
+  },
+  "horse_racing": {
+    "skins": [
+      {
+        "native": "🏇"
+      }
+    ]
+  },
+  "skier": {
+    "skins": [
+      {
+        "native": "⛷️"
+      }
+    ]
+  },
+  "snowboarder": {
+    "skins": [
+      {
+        "native": "🏂"
+      }
+    ]
+  },
+  "golfer": {
+    "skins": [
+      {
+        "native": "🏌️"
+      }
+    ]
+  },
+  "man-golfing": {
+    "skins": [
+      {
+        "native": "🏌️‍♂️"
+      }
+    ]
+  },
+  "woman-golfing": {
+    "skins": [
+      {
+        "native": "🏌️‍♀️"
+      }
+    ]
+  },
+  "surfer": {
+    "skins": [
+      {
+        "native": "🏄"
+      }
+    ]
+  },
+  "man-surfing": {
+    "skins": [
+      {
+        "native": "🏄‍♂️"
+      }
+    ]
+  },
+  "woman-surfing": {
+    "skins": [
+      {
+        "native": "🏄‍♀️"
+      }
+    ]
+  },
+  "rowboat": {
+    "skins": [
+      {
+        "native": "🚣"
+      }
+    ]
+  },
+  "man-rowing-boat": {
+    "skins": [
+      {
+        "native": "🚣‍♂️"
+      }
+    ]
+  },
+  "woman-rowing-boat": {
+    "skins": [
+      {
+        "native": "🚣‍♀️"
+      }
+    ]
+  },
+  "swimmer": {
+    "skins": [
+      {
+        "native": "🏊"
+      }
+    ]
+  },
+  "man-swimming": {
+    "skins": [
+      {
+        "native": "🏊‍♂️"
+      }
+    ]
+  },
+  "woman-swimming": {
+    "skins": [
+      {
+        "native": "🏊‍♀️"
+      }
+    ]
+  },
+  "person_with_ball": {
+    "skins": [
+      {
+        "native": "⛹️"
+      }
+    ]
+  },
+  "man-bouncing-ball": {
+    "skins": [
+      {
+        "native": "⛹️‍♂️"
+      }
+    ]
+  },
+  "woman-bouncing-ball": {
+    "skins": [
+      {
+        "native": "⛹️‍♀️"
+      }
+    ]
+  },
+  "weight_lifter": {
+    "skins": [
+      {
+        "native": "🏋️"
+      }
+    ]
+  },
+  "man-lifting-weights": {
+    "skins": [
+      {
+        "native": "🏋️‍♂️"
+      }
+    ]
+  },
+  "woman-lifting-weights": {
+    "skins": [
+      {
+        "native": "🏋️‍♀️"
+      }
+    ]
+  },
+  "bicyclist": {
+    "skins": [
+      {
+        "native": "🚴"
+      }
+    ]
+  },
+  "man-biking": {
+    "skins": [
+      {
+        "native": "🚴‍♂️"
+      }
+    ]
+  },
+  "woman-biking": {
+    "skins": [
+      {
+        "native": "🚴‍♀️"
+      }
+    ]
+  },
+  "mountain_bicyclist": {
+    "skins": [
+      {
+        "native": "🚵"
+      }
+    ]
+  },
+  "man-mountain-biking": {
+    "skins": [
+      {
+        "native": "🚵‍♂️"
+      }
+    ]
+  },
+  "woman-mountain-biking": {
+    "skins": [
+      {
+        "native": "🚵‍♀️"
+      }
+    ]
+  },
+  "person_doing_cartwheel": {
+    "skins": [
+      {
+        "native": "🤸"
+      }
+    ]
+  },
+  "man-cartwheeling": {
+    "skins": [
+      {
+        "native": "🤸‍♂️"
+      }
+    ]
+  },
+  "woman-cartwheeling": {
+    "skins": [
+      {
+        "native": "🤸‍♀️"
+      }
+    ]
+  },
+  "wrestlers": {
+    "skins": [
+      {
+        "native": "🤼"
+      }
+    ]
+  },
+  "man-wrestling": {
+    "skins": [
+      {
+        "native": "🤼‍♂️"
+      }
+    ]
+  },
+  "woman-wrestling": {
+    "skins": [
+      {
+        "native": "🤼‍♀️"
+      }
+    ]
+  },
+  "water_polo": {
+    "skins": [
+      {
+        "native": "🤽"
+      }
+    ]
+  },
+  "man-playing-water-polo": {
+    "skins": [
+      {
+        "native": "🤽‍♂️"
+      }
+    ]
+  },
+  "woman-playing-water-polo": {
+    "skins": [
+      {
+        "native": "🤽‍♀️"
+      }
+    ]
+  },
+  "handball": {
+    "skins": [
+      {
+        "native": "🤾"
+      }
+    ]
+  },
+  "man-playing-handball": {
+    "skins": [
+      {
+        "native": "🤾‍♂️"
+      }
+    ]
+  },
+  "woman-playing-handball": {
+    "skins": [
+      {
+        "native": "🤾‍♀️"
+      }
+    ]
+  },
+  "juggling": {
+    "skins": [
+      {
+        "native": "🤹"
+      }
+    ]
+  },
+  "man-juggling": {
+    "skins": [
+      {
+        "native": "🤹‍♂️"
+      }
+    ]
+  },
+  "woman-juggling": {
+    "skins": [
+      {
+        "native": "🤹‍♀️"
+      }
+    ]
+  },
+  "person_in_lotus_position": {
+    "skins": [
+      {
+        "native": "🧘"
+      }
+    ]
+  },
+  "man_in_lotus_position": {
+    "skins": [
+      {
+        "native": "🧘‍♂️"
+      }
+    ]
+  },
+  "woman_in_lotus_position": {
+    "skins": [
+      {
+        "native": "🧘‍♀️"
+      }
+    ]
+  },
+  "bath": {
+    "skins": [
+      {
+        "native": "🛀"
+      }
+    ]
+  },
+  "sleeping_accommodation": {
+    "skins": [
+      {
+        "native": "🛌"
+      }
+    ]
+  },
+  "people_holding_hands": {
+    "skins": [
+      {
+        "native": "🧑‍🤝‍🧑"
+      }
+    ]
+  },
+  "two_women_holding_hands": {
+    "skins": [
+      {
+        "native": "👭"
+      }
+    ]
+  },
+  "man_and_woman_holding_hands": {
+    "skins": [
+      {
+        "native": "👫"
+      }
+    ]
+  },
+  "two_men_holding_hands": {
+    "skins": [
+      {
+        "native": "👬"
+      }
+    ]
+  },
+  "couplekiss": {
+    "skins": [
+      {
+        "native": "💏"
+      }
+    ]
+  },
+  "woman-kiss-man": {
+    "skins": [
+      {
+        "native": "👩‍❤️‍💋‍👨"
+      }
+    ]
+  },
+  "man-kiss-man": {
+    "skins": [
+      {
+        "native": "👨‍❤️‍💋‍👨"
+      }
+    ]
+  },
+  "woman-kiss-woman": {
+    "skins": [
+      {
+        "native": "👩‍❤️‍💋‍👩"
+      }
+    ]
+  },
+  "couple_with_heart": {
+    "skins": [
+      {
+        "native": "💑"
+      }
+    ]
+  },
+  "woman-heart-man": {
+    "skins": [
+      {
+        "native": "👩‍❤️‍👨"
+      }
+    ]
+  },
+  "man-heart-man": {
+    "skins": [
+      {
+        "native": "👨‍❤️‍👨"
+      }
+    ]
+  },
+  "woman-heart-woman": {
+    "skins": [
+      {
+        "native": "👩‍❤️‍👩"
+      }
+    ]
+  },
+  "family": {
+    "skins": [
+      {
+        "native": "👪"
+      }
+    ]
+  },
+  "man-woman-boy": {
+    "skins": [
+      {
+        "native": "👨‍👩‍👦"
+      }
+    ]
+  },
+  "man-woman-girl": {
+    "skins": [
+      {
+        "native": "👨‍👩‍👧"
+      }
+    ]
+  },
+  "man-woman-girl-boy": {
+    "skins": [
+      {
+        "native": "👨‍👩‍👧‍👦"
+      }
+    ]
+  },
+  "man-woman-boy-boy": {
+    "skins": [
+      {
+        "native": "👨‍👩‍👦‍👦"
+      }
+    ]
+  },
+  "man-woman-girl-girl": {
+    "skins": [
+      {
+        "native": "👨‍👩‍👧‍👧"
+      }
+    ]
+  },
+  "man-man-boy": {
+    "skins": [
+      {
+        "native": "👨‍👨‍👦"
+      }
+    ]
+  },
+  "man-man-girl": {
+    "skins": [
+      {
+        "native": "👨‍👨‍👧"
+      }
+    ]
+  },
+  "man-man-girl-boy": {
+    "skins": [
+      {
+        "native": "👨‍👨‍👧‍👦"
+      }
+    ]
+  },
+  "man-man-boy-boy": {
+    "skins": [
+      {
+        "native": "👨‍👨‍👦‍👦"
+      }
+    ]
+  },
+  "man-man-girl-girl": {
+    "skins": [
+      {
+        "native": "👨‍👨‍👧‍👧"
+      }
+    ]
+  },
+  "woman-woman-boy": {
+    "skins": [
+      {
+        "native": "👩‍👩‍👦"
+      }
+    ]
+  },
+  "woman-woman-girl": {
+    "skins": [
+      {
+        "native": "👩‍👩‍👧"
+      }
+    ]
+  },
+  "woman-woman-girl-boy": {
+    "skins": [
+      {
+        "native": "👩‍👩‍👧‍👦"
+      }
+    ]
+  },
+  "woman-woman-boy-boy": {
+    "skins": [
+      {
+        "native": "👩‍👩‍👦‍👦"
+      }
+    ]
+  },
+  "woman-woman-girl-girl": {
+    "skins": [
+      {
+        "native": "👩‍👩‍👧‍👧"
+      }
+    ]
+  },
+  "man-boy": {
+    "skins": [
+      {
+        "native": "👨‍👦"
+      }
+    ]
+  },
+  "man-boy-boy": {
+    "skins": [
+      {
+        "native": "👨‍👦‍👦"
+      }
+    ]
+  },
+  "man-girl": {
+    "skins": [
+      {
+        "native": "👨‍👧"
+      }
+    ]
+  },
+  "man-girl-boy": {
+    "skins": [
+      {
+        "native": "👨‍👧‍👦"
+      }
+    ]
+  },
+  "man-girl-girl": {
+    "skins": [
+      {
+        "native": "👨‍👧‍👧"
+      }
+    ]
+  },
+  "woman-boy": {
+    "skins": [
+      {
+        "native": "👩‍👦"
+      }
+    ]
+  },
+  "woman-boy-boy": {
+    "skins": [
+      {
+        "native": "👩‍👦‍👦"
+      }
+    ]
+  },
+  "woman-girl": {
+    "skins": [
+      {
+        "native": "👩‍👧"
+      }
+    ]
+  },
+  "woman-girl-boy": {
+    "skins": [
+      {
+        "native": "👩‍👧‍👦"
+      }
+    ]
+  },
+  "woman-girl-girl": {
+    "skins": [
+      {
+        "native": "👩‍👧‍👧"
+      }
+    ]
+  },
+  "speaking_head_in_silhouette": {
+    "skins": [
+      {
+        "native": "🗣️"
+      }
+    ]
+  },
+  "bust_in_silhouette": {
+    "skins": [
+      {
+        "native": "👤"
+      }
+    ]
+  },
+  "busts_in_silhouette": {
+    "skins": [
+      {
+        "native": "👥"
+      }
+    ]
+  },
+  "people_hugging": {
+    "skins": [
+      {
+        "native": "🫂"
+      }
+    ]
+  },
+  "footprints": {
+    "skins": [
+      {
+        "native": "👣"
+      }
+    ]
+  },
+  "monkey_face": {
+    "skins": [
+      {
+        "native": "🐵"
+      }
+    ]
+  },
+  "monkey": {
+    "skins": [
+      {
+        "native": "🐒"
+      }
+    ]
+  },
+  "gorilla": {
+    "skins": [
+      {
+        "native": "🦍"
+      }
+    ]
+  },
+  "orangutan": {
+    "skins": [
+      {
+        "native": "🦧"
+      }
+    ]
+  },
+  "dog": {
+    "skins": [
+      {
+        "native": "🐶"
+      }
+    ]
+  },
+  "dog2": {
+    "skins": [
+      {
+        "native": "🐕"
+      }
+    ]
+  },
+  "guide_dog": {
+    "skins": [
+      {
+        "native": "🦮"
+      }
+    ]
+  },
+  "service_dog": {
+    "skins": [
+      {
+        "native": "🐕‍🦺"
+      }
+    ]
+  },
+  "poodle": {
+    "skins": [
+      {
+        "native": "🐩"
+      }
+    ]
+  },
+  "wolf": {
+    "skins": [
+      {
+        "native": "🐺"
+      }
+    ]
+  },
+  "fox_face": {
+    "skins": [
+      {
+        "native": "🦊"
+      }
+    ]
+  },
+  "raccoon": {
+    "skins": [
+      {
+        "native": "🦝"
+      }
+    ]
+  },
+  "cat": {
+    "skins": [
+      {
+        "native": "🐱"
+      }
+    ]
+  },
+  "cat2": {
+    "skins": [
+      {
+        "native": "🐈"
+      }
+    ]
+  },
+  "black_cat": {
+    "skins": [
+      {
+        "native": "🐈‍⬛"
+      }
+    ]
+  },
+  "lion_face": {
+    "skins": [
+      {
+        "native": "🦁"
+      }
+    ]
+  },
+  "tiger": {
+    "skins": [
+      {
+        "native": "🐯"
+      }
+    ]
+  },
+  "tiger2": {
+    "skins": [
+      {
+        "native": "🐅"
+      }
+    ]
+  },
+  "leopard": {
+    "skins": [
+      {
+        "native": "🐆"
+      }
+    ]
+  },
+  "horse": {
+    "skins": [
+      {
+        "native": "🐴"
+      }
+    ]
+  },
+  "moose": {
+    "skins": [
+      {
+        "native": "🫎"
+      }
+    ]
+  },
+  "donkey": {
+    "skins": [
+      {
+        "native": "🫏"
+      }
+    ]
+  },
+  "racehorse": {
+    "skins": [
+      {
+        "native": "🐎"
+      }
+    ]
+  },
+  "unicorn_face": {
+    "skins": [
+      {
+        "native": "🦄"
+      }
+    ]
+  },
+  "zebra_face": {
+    "skins": [
+      {
+        "native": "🦓"
+      }
+    ]
+  },
+  "deer": {
+    "skins": [
+      {
+        "native": "🦌"
+      }
+    ]
+  },
+  "bison": {
+    "skins": [
+      {
+        "native": "🦬"
+      }
+    ]
+  },
+  "cow": {
+    "skins": [
+      {
+        "native": "🐮"
+      }
+    ]
+  },
+  "ox": {
+    "skins": [
+      {
+        "native": "🐂"
+      }
+    ]
+  },
+  "water_buffalo": {
+    "skins": [
+      {
+        "native": "🐃"
+      }
+    ]
+  },
+  "cow2": {
+    "skins": [
+      {
+        "native": "🐄"
+      }
+    ]
+  },
+  "pig": {
+    "skins": [
+      {
+        "native": "🐷"
+      }
+    ]
+  },
+  "pig2": {
+    "skins": [
+      {
+        "native": "🐖"
+      }
+    ]
+  },
+  "boar": {
+    "skins": [
+      {
+        "native": "🐗"
+      }
+    ]
+  },
+  "pig_nose": {
+    "skins": [
+      {
+        "native": "🐽"
+      }
+    ]
+  },
+  "ram": {
+    "skins": [
+      {
+        "native": "🐏"
+      }
+    ]
+  },
+  "sheep": {
+    "skins": [
+      {
+        "native": "🐑"
+      }
+    ]
+  },
+  "goat": {
+    "skins": [
+      {
+        "native": "🐐"
+      }
+    ]
+  },
+  "dromedary_camel": {
+    "skins": [
+      {
+        "native": "🐪"
+      }
+    ]
+  },
+  "camel": {
+    "skins": [
+      {
+        "native": "🐫"
+      }
+    ]
+  },
+  "llama": {
+    "skins": [
+      {
+        "native": "🦙"
+      }
+    ]
+  },
+  "giraffe_face": {
+    "skins": [
+      {
+        "native": "🦒"
+      }
+    ]
+  },
+  "elephant": {
+    "skins": [
+      {
+        "native": "🐘"
+      }
+    ]
+  },
+  "mammoth": {
+    "skins": [
+      {
+        "native": "🦣"
+      }
+    ]
+  },
+  "rhinoceros": {
+    "skins": [
+      {
+        "native": "🦏"
+      }
+    ]
+  },
+  "hippopotamus": {
+    "skins": [
+      {
+        "native": "🦛"
+      }
+    ]
+  },
+  "mouse": {
+    "skins": [
+      {
+        "native": "🐭"
+      }
+    ]
+  },
+  "mouse2": {
+    "skins": [
+      {
+        "native": "🐁"
+      }
+    ]
+  },
+  "rat": {
+    "skins": [
+      {
+        "native": "🐀"
+      }
+    ]
+  },
+  "hamster": {
+    "skins": [
+      {
+        "native": "🐹"
+      }
+    ]
+  },
+  "rabbit": {
+    "skins": [
+      {
+        "native": "🐰"
+      }
+    ]
+  },
+  "rabbit2": {
+    "skins": [
+      {
+        "native": "🐇"
+      }
+    ]
+  },
+  "chipmunk": {
+    "skins": [
+      {
+        "native": "🐿️"
+      }
+    ]
+  },
+  "beaver": {
+    "skins": [
+      {
+        "native": "🦫"
+      }
+    ]
+  },
+  "hedgehog": {
+    "skins": [
+      {
+        "native": "🦔"
+      }
+    ]
+  },
+  "bat": {
+    "skins": [
+      {
+        "native": "🦇"
+      }
+    ]
+  },
+  "bear": {
+    "skins": [
+      {
+        "native": "🐻"
+      }
+    ]
+  },
+  "polar_bear": {
+    "skins": [
+      {
+        "native": "🐻‍❄️"
+      }
+    ]
+  },
+  "koala": {
+    "skins": [
+      {
+        "native": "🐨"
+      }
+    ]
+  },
+  "panda_face": {
+    "skins": [
+      {
+        "native": "🐼"
+      }
+    ]
+  },
+  "sloth": {
+    "skins": [
+      {
+        "native": "🦥"
+      }
+    ]
+  },
+  "otter": {
+    "skins": [
+      {
+        "native": "🦦"
+      }
+    ]
+  },
+  "skunk": {
+    "skins": [
+      {
+        "native": "🦨"
+      }
+    ]
+  },
+  "kangaroo": {
+    "skins": [
+      {
+        "native": "🦘"
+      }
+    ]
+  },
+  "badger": {
+    "skins": [
+      {
+        "native": "🦡"
+      }
+    ]
+  },
+  "feet": {
+    "skins": [
+      {
+        "native": "🐾"
+      }
+    ]
+  },
+  "turkey": {
+    "skins": [
+      {
+        "native": "🦃"
+      }
+    ]
+  },
+  "chicken": {
+    "skins": [
+      {
+        "native": "🐔"
+      }
+    ]
+  },
+  "rooster": {
+    "skins": [
+      {
+        "native": "🐓"
+      }
+    ]
+  },
+  "hatching_chick": {
+    "skins": [
+      {
+        "native": "🐣"
+      }
+    ]
+  },
+  "baby_chick": {
+    "skins": [
+      {
+        "native": "🐤"
+      }
+    ]
+  },
+  "hatched_chick": {
+    "skins": [
+      {
+        "native": "🐥"
+      }
+    ]
+  },
+  "bird": {
+    "skins": [
+      {
+        "native": "🐦"
+      }
+    ]
+  },
+  "penguin": {
+    "skins": [
+      {
+        "native": "🐧"
+      }
+    ]
+  },
+  "dove_of_peace": {
+    "skins": [
+      {
+        "native": "🕊️"
+      }
+    ]
+  },
+  "eagle": {
+    "skins": [
+      {
+        "native": "🦅"
+      }
+    ]
+  },
+  "duck": {
+    "skins": [
+      {
+        "native": "🦆"
+      }
+    ]
+  },
+  "swan": {
+    "skins": [
+      {
+        "native": "🦢"
+      }
+    ]
+  },
+  "owl": {
+    "skins": [
+      {
+        "native": "🦉"
+      }
+    ]
+  },
+  "dodo": {
+    "skins": [
+      {
+        "native": "🦤"
+      }
+    ]
+  },
+  "feather": {
+    "skins": [
+      {
+        "native": "🪶"
+      }
+    ]
+  },
+  "flamingo": {
+    "skins": [
+      {
+        "native": "🦩"
+      }
+    ]
+  },
+  "peacock": {
+    "skins": [
+      {
+        "native": "🦚"
+      }
+    ]
+  },
+  "parrot": {
+    "skins": [
+      {
+        "native": "🦜"
+      }
+    ]
+  },
+  "wing": {
+    "skins": [
+      {
+        "native": "🪽"
+      }
+    ]
+  },
+  "black_bird": {
+    "skins": [
+      {
+        "native": "🐦‍⬛"
+      }
+    ]
+  },
+  "goose": {
+    "skins": [
+      {
+        "native": "🪿"
+      }
+    ]
+  },
+  "frog": {
+    "skins": [
+      {
+        "native": "🐸"
+      }
+    ]
+  },
+  "crocodile": {
+    "skins": [
+      {
+        "native": "🐊"
+      }
+    ]
+  },
+  "turtle": {
+    "skins": [
+      {
+        "native": "🐢"
+      }
+    ]
+  },
+  "lizard": {
+    "skins": [
+      {
+        "native": "🦎"
+      }
+    ]
+  },
+  "snake": {
+    "skins": [
+      {
+        "native": "🐍"
+      }
+    ]
+  },
+  "dragon_face": {
+    "skins": [
+      {
+        "native": "🐲"
+      }
+    ]
+  },
+  "dragon": {
+    "skins": [
+      {
+        "native": "🐉"
+      }
+    ]
+  },
+  "sauropod": {
+    "skins": [
+      {
+        "native": "🦕"
+      }
+    ]
+  },
+  "t-rex": {
+    "skins": [
+      {
+        "native": "🦖"
+      }
+    ]
+  },
+  "whale": {
+    "skins": [
+      {
+        "native": "🐳"
+      }
+    ]
+  },
+  "whale2": {
+    "skins": [
+      {
+        "native": "🐋"
+      }
+    ]
+  },
+  "dolphin": {
+    "skins": [
+      {
+        "native": "🐬"
+      }
+    ]
+  },
+  "seal": {
+    "skins": [
+      {
+        "native": "🦭"
+      }
+    ]
+  },
+  "fish": {
+    "skins": [
+      {
+        "native": "🐟"
+      }
+    ]
+  },
+  "tropical_fish": {
+    "skins": [
+      {
+        "native": "🐠"
+      }
+    ]
+  },
+  "blowfish": {
+    "skins": [
+      {
+        "native": "🐡"
+      }
+    ]
+  },
+  "shark": {
+    "skins": [
+      {
+        "native": "🦈"
+      }
+    ]
+  },
+  "octopus": {
+    "skins": [
+      {
+        "native": "🐙"
+      }
+    ]
+  },
+  "shell": {
+    "skins": [
+      {
+        "native": "🐚"
+      }
+    ]
+  },
+  "coral": {
+    "skins": [
+      {
+        "native": "🪸"
+      }
+    ]
+  },
+  "jellyfish": {
+    "skins": [
+      {
+        "native": "🪼"
+      }
+    ]
+  },
+  "snail": {
+    "skins": [
+      {
+        "native": "🐌"
+      }
+    ]
+  },
+  "butterfly": {
+    "skins": [
+      {
+        "native": "🦋"
+      }
+    ]
+  },
+  "bug": {
+    "skins": [
+      {
+        "native": "🐛"
+      }
+    ]
+  },
+  "ant": {
+    "skins": [
+      {
+        "native": "🐜"
+      }
+    ]
+  },
+  "bee": {
+    "skins": [
+      {
+        "native": "🐝"
+      }
+    ]
+  },
+  "beetle": {
+    "skins": [
+      {
+        "native": "🪲"
+      }
+    ]
+  },
+  "ladybug": {
+    "skins": [
+      {
+        "native": "🐞"
+      }
+    ]
+  },
+  "cricket": {
+    "skins": [
+      {
+        "native": "🦗"
+      }
+    ]
+  },
+  "cockroach": {
+    "skins": [
+      {
+        "native": "🪳"
+      }
+    ]
+  },
+  "spider": {
+    "skins": [
+      {
+        "native": "🕷️"
+      }
+    ]
+  },
+  "spider_web": {
+    "skins": [
+      {
+        "native": "🕸️"
+      }
+    ]
+  },
+  "scorpion": {
+    "skins": [
+      {
+        "native": "🦂"
+      }
+    ]
+  },
+  "mosquito": {
+    "skins": [
+      {
+        "native": "🦟"
+      }
+    ]
+  },
+  "fly": {
+    "skins": [
+      {
+        "native": "🪰"
+      }
+    ]
+  },
+  "worm": {
+    "skins": [
+      {
+        "native": "🪱"
+      }
+    ]
+  },
+  "microbe": {
+    "skins": [
+      {
+        "native": "🦠"
+      }
+    ]
+  },
+  "bouquet": {
+    "skins": [
+      {
+        "native": "💐"
+      }
+    ]
+  },
+  "cherry_blossom": {
+    "skins": [
+      {
+        "native": "🌸"
+      }
+    ]
+  },
+  "white_flower": {
+    "skins": [
+      {
+        "native": "💮"
+      }
+    ]
+  },
+  "lotus": {
+    "skins": [
+      {
+        "native": "🪷"
+      }
+    ]
+  },
+  "rosette": {
+    "skins": [
+      {
+        "native": "🏵️"
+      }
+    ]
+  },
+  "rose": {
+    "skins": [
+      {
+        "native": "🌹"
+      }
+    ]
+  },
+  "wilted_flower": {
+    "skins": [
+      {
+        "native": "🥀"
+      }
+    ]
+  },
+  "hibiscus": {
+    "skins": [
+      {
+        "native": "🌺"
+      }
+    ]
+  },
+  "sunflower": {
+    "skins": [
+      {
+        "native": "🌻"
+      }
+    ]
+  },
+  "blossom": {
+    "skins": [
+      {
+        "native": "🌼"
+      }
+    ]
+  },
+  "tulip": {
+    "skins": [
+      {
+        "native": "🌷"
+      }
+    ]
+  },
+  "hyacinth": {
+    "skins": [
+      {
+        "native": "🪻"
+      }
+    ]
+  },
+  "seedling": {
+    "skins": [
+      {
+        "native": "🌱"
+      }
+    ]
+  },
+  "potted_plant": {
+    "skins": [
+      {
+        "native": "🪴"
+      }
+    ]
+  },
+  "evergreen_tree": {
+    "skins": [
+      {
+        "native": "🌲"
+      }
+    ]
+  },
+  "deciduous_tree": {
+    "skins": [
+      {
+        "native": "🌳"
+      }
+    ]
+  },
+  "palm_tree": {
+    "skins": [
+      {
+        "native": "🌴"
+      }
+    ]
+  },
+  "cactus": {
+    "skins": [
+      {
+        "native": "🌵"
+      }
+    ]
+  },
+  "ear_of_rice": {
+    "skins": [
+      {
+        "native": "🌾"
+      }
+    ]
+  },
+  "herb": {
+    "skins": [
+      {
+        "native": "🌿"
+      }
+    ]
+  },
+  "shamrock": {
+    "skins": [
+      {
+        "native": "☘️"
+      }
+    ]
+  },
+  "four_leaf_clover": {
+    "skins": [
+      {
+        "native": "🍀"
+      }
+    ]
+  },
+  "maple_leaf": {
+    "skins": [
+      {
+        "native": "🍁"
+      }
+    ]
+  },
+  "fallen_leaf": {
+    "skins": [
+      {
+        "native": "🍂"
+      }
+    ]
+  },
+  "leaves": {
+    "skins": [
+      {
+        "native": "🍃"
+      }
+    ]
+  },
+  "empty_nest": {
+    "skins": [
+      {
+        "native": "🪹"
+      }
+    ]
+  },
+  "nest_with_eggs": {
+    "skins": [
+      {
+        "native": "🪺"
+      }
+    ]
+  },
+  "mushroom": {
+    "skins": [
+      {
+        "native": "🍄"
+      }
+    ]
+  },
+  "grapes": {
+    "skins": [
+      {
+        "native": "🍇"
+      }
+    ]
+  },
+  "melon": {
+    "skins": [
+      {
+        "native": "🍈"
+      }
+    ]
+  },
+  "watermelon": {
+    "skins": [
+      {
+        "native": "🍉"
+      }
+    ]
+  },
+  "tangerine": {
+    "skins": [
+      {
+        "native": "🍊"
+      }
+    ]
+  },
+  "lemon": {
+    "skins": [
+      {
+        "native": "🍋"
+      }
+    ]
+  },
+  "banana": {
+    "skins": [
+      {
+        "native": "🍌"
+      }
+    ]
+  },
+  "pineapple": {
+    "skins": [
+      {
+        "native": "🍍"
+      }
+    ]
+  },
+  "mango": {
+    "skins": [
+      {
+        "native": "🥭"
+      }
+    ]
+  },
+  "apple": {
+    "skins": [
+      {
+        "native": "🍎"
+      }
+    ]
+  },
+  "green_apple": {
+    "skins": [
+      {
+        "native": "🍏"
+      }
+    ]
+  },
+  "pear": {
+    "skins": [
+      {
+        "native": "🍐"
+      }
+    ]
+  },
+  "peach": {
+    "skins": [
+      {
+        "native": "🍑"
+      }
+    ]
+  },
+  "cherries": {
+    "skins": [
+      {
+        "native": "🍒"
+      }
+    ]
+  },
+  "strawberry": {
+    "skins": [
+      {
+        "native": "🍓"
+      }
+    ]
+  },
+  "blueberries": {
+    "skins": [
+      {
+        "native": "🫐"
+      }
+    ]
+  },
+  "kiwifruit": {
+    "skins": [
+      {
+        "native": "🥝"
+      }
+    ]
+  },
+  "tomato": {
+    "skins": [
+      {
+        "native": "🍅"
+      }
+    ]
+  },
+  "olive": {
+    "skins": [
+      {
+        "native": "🫒"
+      }
+    ]
+  },
+  "coconut": {
+    "skins": [
+      {
+        "native": "🥥"
+      }
+    ]
+  },
+  "avocado": {
+    "skins": [
+      {
+        "native": "🥑"
+      }
+    ]
+  },
+  "eggplant": {
+    "skins": [
+      {
+        "native": "🍆"
+      }
+    ]
+  },
+  "potato": {
+    "skins": [
+      {
+        "native": "🥔"
+      }
+    ]
+  },
+  "carrot": {
+    "skins": [
+      {
+        "native": "🥕"
+      }
+    ]
+  },
+  "corn": {
+    "skins": [
+      {
+        "native": "🌽"
+      }
+    ]
+  },
+  "hot_pepper": {
+    "skins": [
+      {
+        "native": "🌶️"
+      }
+    ]
+  },
+  "bell_pepper": {
+    "skins": [
+      {
+        "native": "🫑"
+      }
+    ]
+  },
+  "cucumber": {
+    "skins": [
+      {
+        "native": "🥒"
+      }
+    ]
+  },
+  "leafy_green": {
+    "skins": [
+      {
+        "native": "🥬"
+      }
+    ]
+  },
+  "broccoli": {
+    "skins": [
+      {
+        "native": "🥦"
+      }
+    ]
+  },
+  "garlic": {
+    "skins": [
+      {
+        "native": "🧄"
+      }
+    ]
+  },
+  "onion": {
+    "skins": [
+      {
+        "native": "🧅"
+      }
+    ]
+  },
+  "peanuts": {
+    "skins": [
+      {
+        "native": "🥜"
+      }
+    ]
+  },
+  "beans": {
+    "skins": [
+      {
+        "native": "🫘"
+      }
+    ]
+  },
+  "chestnut": {
+    "skins": [
+      {
+        "native": "🌰"
+      }
+    ]
+  },
+  "ginger_root": {
+    "skins": [
+      {
+        "native": "🫚"
+      }
+    ]
+  },
+  "pea_pod": {
+    "skins": [
+      {
+        "native": "🫛"
+      }
+    ]
+  },
+  "bread": {
+    "skins": [
+      {
+        "native": "🍞"
+      }
+    ]
+  },
+  "croissant": {
+    "skins": [
+      {
+        "native": "🥐"
+      }
+    ]
+  },
+  "baguette_bread": {
+    "skins": [
+      {
+        "native": "🥖"
+      }
+    ]
+  },
+  "flatbread": {
+    "skins": [
+      {
+        "native": "🫓"
+      }
+    ]
+  },
+  "pretzel": {
+    "skins": [
+      {
+        "native": "🥨"
+      }
+    ]
+  },
+  "bagel": {
+    "skins": [
+      {
+        "native": "🥯"
+      }
+    ]
+  },
+  "pancakes": {
+    "skins": [
+      {
+        "native": "🥞"
+      }
+    ]
+  },
+  "waffle": {
+    "skins": [
+      {
+        "native": "🧇"
+      }
+    ]
+  },
+  "cheese_wedge": {
+    "skins": [
+      {
+        "native": "🧀"
+      }
+    ]
+  },
+  "meat_on_bone": {
+    "skins": [
+      {
+        "native": "🍖"
+      }
+    ]
+  },
+  "poultry_leg": {
+    "skins": [
+      {
+        "native": "🍗"
+      }
+    ]
+  },
+  "cut_of_meat": {
+    "skins": [
+      {
+        "native": "🥩"
+      }
+    ]
+  },
+  "bacon": {
+    "skins": [
+      {
+        "native": "🥓"
+      }
+    ]
+  },
+  "hamburger": {
+    "skins": [
+      {
+        "native": "🍔"
+      }
+    ]
+  },
+  "fries": {
+    "skins": [
+      {
+        "native": "🍟"
+      }
+    ]
+  },
+  "pizza": {
+    "skins": [
+      {
+        "native": "🍕"
+      }
+    ]
+  },
+  "hotdog": {
+    "skins": [
+      {
+        "native": "🌭"
+      }
+    ]
+  },
+  "sandwich": {
+    "skins": [
+      {
+        "native": "🥪"
+      }
+    ]
+  },
+  "taco": {
+    "skins": [
+      {
+        "native": "🌮"
+      }
+    ]
+  },
+  "burrito": {
+    "skins": [
+      {
+        "native": "🌯"
+      }
+    ]
+  },
+  "tamale": {
+    "skins": [
+      {
+        "native": "🫔"
+      }
+    ]
+  },
+  "stuffed_flatbread": {
+    "skins": [
+      {
+        "native": "🥙"
+      }
+    ]
+  },
+  "falafel": {
+    "skins": [
+      {
+        "native": "🧆"
+      }
+    ]
+  },
+  "egg": {
+    "skins": [
+      {
+        "native": "🥚"
+      }
+    ]
+  },
+  "fried_egg": {
+    "skins": [
+      {
+        "native": "🍳"
+      }
+    ]
+  },
+  "shallow_pan_of_food": {
+    "skins": [
+      {
+        "native": "🥘"
+      }
+    ]
+  },
+  "stew": {
+    "skins": [
+      {
+        "native": "🍲"
+      }
+    ]
+  },
+  "fondue": {
+    "skins": [
+      {
+        "native": "🫕"
+      }
+    ]
+  },
+  "bowl_with_spoon": {
+    "skins": [
+      {
+        "native": "🥣"
+      }
+    ]
+  },
+  "green_salad": {
+    "skins": [
+      {
+        "native": "🥗"
+      }
+    ]
+  },
+  "popcorn": {
+    "skins": [
+      {
+        "native": "🍿"
+      }
+    ]
+  },
+  "butter": {
+    "skins": [
+      {
+        "native": "🧈"
+      }
+    ]
+  },
+  "salt": {
+    "skins": [
+      {
+        "native": "🧂"
+      }
+    ]
+  },
+  "canned_food": {
+    "skins": [
+      {
+        "native": "🥫"
+      }
+    ]
+  },
+  "bento": {
+    "skins": [
+      {
+        "native": "🍱"
+      }
+    ]
+  },
+  "rice_cracker": {
+    "skins": [
+      {
+        "native": "🍘"
+      }
+    ]
+  },
+  "rice_ball": {
+    "skins": [
+      {
+        "native": "🍙"
+      }
+    ]
+  },
+  "rice": {
+    "skins": [
+      {
+        "native": "🍚"
+      }
+    ]
+  },
+  "curry": {
+    "skins": [
+      {
+        "native": "🍛"
+      }
+    ]
+  },
+  "ramen": {
+    "skins": [
+      {
+        "native": "🍜"
+      }
+    ]
+  },
+  "spaghetti": {
+    "skins": [
+      {
+        "native": "🍝"
+      }
+    ]
+  },
+  "sweet_potato": {
+    "skins": [
+      {
+        "native": "🍠"
+      }
+    ]
+  },
+  "oden": {
+    "skins": [
+      {
+        "native": "🍢"
+      }
+    ]
+  },
+  "sushi": {
+    "skins": [
+      {
+        "native": "🍣"
+      }
+    ]
+  },
+  "fried_shrimp": {
+    "skins": [
+      {
+        "native": "🍤"
+      }
+    ]
+  },
+  "fish_cake": {
+    "skins": [
+      {
+        "native": "🍥"
+      }
+    ]
+  },
+  "moon_cake": {
+    "skins": [
+      {
+        "native": "🥮"
+      }
+    ]
+  },
+  "dango": {
+    "skins": [
+      {
+        "native": "🍡"
+      }
+    ]
+  },
+  "dumpling": {
+    "skins": [
+      {
+        "native": "🥟"
+      }
+    ]
+  },
+  "fortune_cookie": {
+    "skins": [
+      {
+        "native": "🥠"
+      }
+    ]
+  },
+  "takeout_box": {
+    "skins": [
+      {
+        "native": "🥡"
+      }
+    ]
+  },
+  "crab": {
+    "skins": [
+      {
+        "native": "🦀"
+      }
+    ]
+  },
+  "lobster": {
+    "skins": [
+      {
+        "native": "🦞"
+      }
+    ]
+  },
+  "shrimp": {
+    "skins": [
+      {
+        "native": "🦐"
+      }
+    ]
+  },
+  "squid": {
+    "skins": [
+      {
+        "native": "🦑"
+      }
+    ]
+  },
+  "oyster": {
+    "skins": [
+      {
+        "native": "🦪"
+      }
+    ]
+  },
+  "icecream": {
+    "skins": [
+      {
+        "native": "🍦"
+      }
+    ]
+  },
+  "shaved_ice": {
+    "skins": [
+      {
+        "native": "🍧"
+      }
+    ]
+  },
+  "ice_cream": {
+    "skins": [
+      {
+        "native": "🍨"
+      }
+    ]
+  },
+  "doughnut": {
+    "skins": [
+      {
+        "native": "🍩"
+      }
+    ]
+  },
+  "cookie": {
+    "skins": [
+      {
+        "native": "🍪"
+      }
+    ]
+  },
+  "birthday": {
+    "skins": [
+      {
+        "native": "🎂"
+      }
+    ]
+  },
+  "cake": {
+    "skins": [
+      {
+        "native": "🍰"
+      }
+    ]
+  },
+  "cupcake": {
+    "skins": [
+      {
+        "native": "🧁"
+      }
+    ]
+  },
+  "pie": {
+    "skins": [
+      {
+        "native": "🥧"
+      }
+    ]
+  },
+  "chocolate_bar": {
+    "skins": [
+      {
+        "native": "🍫"
+      }
+    ]
+  },
+  "candy": {
+    "skins": [
+      {
+        "native": "🍬"
+      }
+    ]
+  },
+  "lollipop": {
+    "skins": [
+      {
+        "native": "🍭"
+      }
+    ]
+  },
+  "custard": {
+    "skins": [
+      {
+        "native": "🍮"
+      }
+    ]
+  },
+  "honey_pot": {
+    "skins": [
+      {
+        "native": "🍯"
+      }
+    ]
+  },
+  "baby_bottle": {
+    "skins": [
+      {
+        "native": "🍼"
+      }
+    ]
+  },
+  "glass_of_milk": {
+    "skins": [
+      {
+        "native": "🥛"
+      }
+    ]
+  },
+  "coffee": {
+    "skins": [
+      {
+        "native": "☕"
+      }
+    ]
+  },
+  "teapot": {
+    "skins": [
+      {
+        "native": "🫖"
+      }
+    ]
+  },
+  "tea": {
+    "skins": [
+      {
+        "native": "🍵"
+      }
+    ]
+  },
+  "sake": {
+    "skins": [
+      {
+        "native": "🍶"
+      }
+    ]
+  },
+  "champagne": {
+    "skins": [
+      {
+        "native": "🍾"
+      }
+    ]
+  },
+  "wine_glass": {
+    "skins": [
+      {
+        "native": "🍷"
+      }
+    ]
+  },
+  "cocktail": {
+    "skins": [
+      {
+        "native": "🍸"
+      }
+    ]
+  },
+  "tropical_drink": {
+    "skins": [
+      {
+        "native": "🍹"
+      }
+    ]
+  },
+  "beer": {
+    "skins": [
+      {
+        "native": "🍺"
+      }
+    ]
+  },
+  "beers": {
+    "skins": [
+      {
+        "native": "🍻"
+      }
+    ]
+  },
+  "clinking_glasses": {
+    "skins": [
+      {
+        "native": "🥂"
+      }
+    ]
+  },
+  "tumbler_glass": {
+    "skins": [
+      {
+        "native": "🥃"
+      }
+    ]
+  },
+  "pouring_liquid": {
+    "skins": [
+      {
+        "native": "🫗"
+      }
+    ]
+  },
+  "cup_with_straw": {
+    "skins": [
+      {
+        "native": "🥤"
+      }
+    ]
+  },
+  "bubble_tea": {
+    "skins": [
+      {
+        "native": "🧋"
+      }
+    ]
+  },
+  "beverage_box": {
+    "skins": [
+      {
+        "native": "🧃"
+      }
+    ]
+  },
+  "mate_drink": {
+    "skins": [
+      {
+        "native": "🧉"
+      }
+    ]
+  },
+  "ice_cube": {
+    "skins": [
+      {
+        "native": "🧊"
+      }
+    ]
+  },
+  "chopsticks": {
+    "skins": [
+      {
+        "native": "🥢"
+      }
+    ]
+  },
+  "knife_fork_plate": {
+    "skins": [
+      {
+        "native": "🍽️"
+      }
+    ]
+  },
+  "fork_and_knife": {
+    "skins": [
+      {
+        "native": "🍴"
+      }
+    ]
+  },
+  "spoon": {
+    "skins": [
+      {
+        "native": "🥄"
+      }
+    ]
+  },
+  "hocho": {
+    "skins": [
+      {
+        "native": "🔪"
+      }
+    ]
+  },
+  "jar": {
+    "skins": [
+      {
+        "native": "🫙"
+      }
+    ]
+  },
+  "amphora": {
+    "skins": [
+      {
+        "native": "🏺"
+      }
+    ]
+  },
+  "earth_africa": {
+    "skins": [
+      {
+        "native": "🌍"
+      }
+    ]
+  },
+  "earth_americas": {
+    "skins": [
+      {
+        "native": "🌎"
+      }
+    ]
+  },
+  "earth_asia": {
+    "skins": [
+      {
+        "native": "🌏"
+      }
+    ]
+  },
+  "globe_with_meridians": {
+    "skins": [
+      {
+        "native": "🌐"
+      }
+    ]
+  },
+  "world_map": {
+    "skins": [
+      {
+        "native": "🗺️"
+      }
+    ]
+  },
+  "japan": {
+    "skins": [
+      {
+        "native": "🗾"
+      }
+    ]
+  },
+  "compass": {
+    "skins": [
+      {
+        "native": "🧭"
+      }
+    ]
+  },
+  "snow_capped_mountain": {
+    "skins": [
+      {
+        "native": "🏔️"
+      }
+    ]
+  },
+  "mountain": {
+    "skins": [
+      {
+        "native": "⛰️"
+      }
+    ]
+  },
+  "volcano": {
+    "skins": [
+      {
+        "native": "🌋"
+      }
+    ]
+  },
+  "mount_fuji": {
+    "skins": [
+      {
+        "native": "🗻"
+      }
+    ]
+  },
+  "camping": {
+    "skins": [
+      {
+        "native": "🏕️"
+      }
+    ]
+  },
+  "beach_with_umbrella": {
+    "skins": [
+      {
+        "native": "🏖️"
+      }
+    ]
+  },
+  "desert": {
+    "skins": [
+      {
+        "native": "🏜️"
+      }
+    ]
+  },
+  "desert_island": {
+    "skins": [
+      {
+        "native": "🏝️"
+      }
+    ]
+  },
+  "national_park": {
+    "skins": [
+      {
+        "native": "🏞️"
+      }
+    ]
+  },
+  "stadium": {
+    "skins": [
+      {
+        "native": "🏟️"
+      }
+    ]
+  },
+  "classical_building": {
+    "skins": [
+      {
+        "native": "🏛️"
+      }
+    ]
+  },
+  "building_construction": {
+    "skins": [
+      {
+        "native": "🏗️"
+      }
+    ]
+  },
+  "bricks": {
+    "skins": [
+      {
+        "native": "🧱"
+      }
+    ]
+  },
+  "rock": {
+    "skins": [
+      {
+        "native": "🪨"
+      }
+    ]
+  },
+  "wood": {
+    "skins": [
+      {
+        "native": "🪵"
+      }
+    ]
+  },
+  "hut": {
+    "skins": [
+      {
+        "native": "🛖"
+      }
+    ]
+  },
+  "house_buildings": {
+    "skins": [
+      {
+        "native": "🏘️"
+      }
+    ]
+  },
+  "derelict_house_building": {
+    "skins": [
+      {
+        "native": "🏚️"
+      }
+    ]
+  },
+  "house": {
+    "skins": [
+      {
+        "native": "🏠"
+      }
+    ]
+  },
+  "house_with_garden": {
+    "skins": [
+      {
+        "native": "🏡"
+      }
+    ]
+  },
+  "office": {
+    "skins": [
+      {
+        "native": "🏢"
+      }
+    ]
+  },
+  "post_office": {
+    "skins": [
+      {
+        "native": "🏣"
+      }
+    ]
+  },
+  "european_post_office": {
+    "skins": [
+      {
+        "native": "🏤"
+      }
+    ]
+  },
+  "hospital": {
+    "skins": [
+      {
+        "native": "🏥"
+      }
+    ]
+  },
+  "bank": {
+    "skins": [
+      {
+        "native": "🏦"
+      }
+    ]
+  },
+  "hotel": {
+    "skins": [
+      {
+        "native": "🏨"
+      }
+    ]
+  },
+  "love_hotel": {
+    "skins": [
+      {
+        "native": "🏩"
+      }
+    ]
+  },
+  "convenience_store": {
+    "skins": [
+      {
+        "native": "🏪"
+      }
+    ]
+  },
+  "school": {
+    "skins": [
+      {
+        "native": "🏫"
+      }
+    ]
+  },
+  "department_store": {
+    "skins": [
+      {
+        "native": "🏬"
+      }
+    ]
+  },
+  "factory": {
+    "skins": [
+      {
+        "native": "🏭"
+      }
+    ]
+  },
+  "japanese_castle": {
+    "skins": [
+      {
+        "native": "🏯"
+      }
+    ]
+  },
+  "european_castle": {
+    "skins": [
+      {
+        "native": "🏰"
+      }
+    ]
+  },
+  "wedding": {
+    "skins": [
+      {
+        "native": "💒"
+      }
+    ]
+  },
+  "tokyo_tower": {
+    "skins": [
+      {
+        "native": "🗼"
+      }
+    ]
+  },
+  "statue_of_liberty": {
+    "skins": [
+      {
+        "native": "🗽"
+      }
+    ]
+  },
+  "church": {
+    "skins": [
+      {
+        "native": "⛪"
+      }
+    ]
+  },
+  "mosque": {
+    "skins": [
+      {
+        "native": "🕌"
+      }
+    ]
+  },
+  "hindu_temple": {
+    "skins": [
+      {
+        "native": "🛕"
+      }
+    ]
+  },
+  "synagogue": {
+    "skins": [
+      {
+        "native": "🕍"
+      }
+    ]
+  },
+  "shinto_shrine": {
+    "skins": [
+      {
+        "native": "⛩️"
+      }
+    ]
+  },
+  "kaaba": {
+    "skins": [
+      {
+        "native": "🕋"
+      }
+    ]
+  },
+  "fountain": {
+    "skins": [
+      {
+        "native": "⛲"
+      }
+    ]
+  },
+  "tent": {
+    "skins": [
+      {
+        "native": "⛺"
+      }
+    ]
+  },
+  "foggy": {
+    "skins": [
+      {
+        "native": "🌁"
+      }
+    ]
+  },
+  "night_with_stars": {
+    "skins": [
+      {
+        "native": "🌃"
+      }
+    ]
+  },
+  "cityscape": {
+    "skins": [
+      {
+        "native": "🏙️"
+      }
+    ]
+  },
+  "sunrise_over_mountains": {
+    "skins": [
+      {
+        "native": "🌄"
+      }
+    ]
+  },
+  "sunrise": {
+    "skins": [
+      {
+        "native": "🌅"
+      }
+    ]
+  },
+  "city_sunset": {
+    "skins": [
+      {
+        "native": "🌆"
+      }
+    ]
+  },
+  "city_sunrise": {
+    "skins": [
+      {
+        "native": "🌇"
+      }
+    ]
+  },
+  "bridge_at_night": {
+    "skins": [
+      {
+        "native": "🌉"
+      }
+    ]
+  },
+  "hotsprings": {
+    "skins": [
+      {
+        "native": "♨️"
+      }
+    ]
+  },
+  "carousel_horse": {
+    "skins": [
+      {
+        "native": "🎠"
+      }
+    ]
+  },
+  "playground_slide": {
+    "skins": [
+      {
+        "native": "🛝"
+      }
+    ]
+  },
+  "ferris_wheel": {
+    "skins": [
+      {
+        "native": "🎡"
+      }
+    ]
+  },
+  "roller_coaster": {
+    "skins": [
+      {
+        "native": "🎢"
+      }
+    ]
+  },
+  "barber": {
+    "skins": [
+      {
+        "native": "💈"
+      }
+    ]
+  },
+  "circus_tent": {
+    "skins": [
+      {
+        "native": "🎪"
+      }
+    ]
+  },
+  "steam_locomotive": {
+    "skins": [
+      {
+        "native": "🚂"
+      }
+    ]
+  },
+  "railway_car": {
+    "skins": [
+      {
+        "native": "🚃"
+      }
+    ]
+  },
+  "bullettrain_side": {
+    "skins": [
+      {
+        "native": "🚄"
+      }
+    ]
+  },
+  "bullettrain_front": {
+    "skins": [
+      {
+        "native": "🚅"
+      }
+    ]
+  },
+  "train2": {
+    "skins": [
+      {
+        "native": "🚆"
+      }
+    ]
+  },
+  "metro": {
+    "skins": [
+      {
+        "native": "🚇"
+      }
+    ]
+  },
+  "light_rail": {
+    "skins": [
+      {
+        "native": "🚈"
+      }
+    ]
+  },
+  "station": {
+    "skins": [
+      {
+        "native": "🚉"
+      }
+    ]
+  },
+  "tram": {
+    "skins": [
+      {
+        "native": "🚊"
+      }
+    ]
+  },
+  "monorail": {
+    "skins": [
+      {
+        "native": "🚝"
+      }
+    ]
+  },
+  "mountain_railway": {
+    "skins": [
+      {
+        "native": "🚞"
+      }
+    ]
+  },
+  "train": {
+    "skins": [
+      {
+        "native": "🚋"
+      }
+    ]
+  },
+  "bus": {
+    "skins": [
+      {
+        "native": "🚌"
+      }
+    ]
+  },
+  "oncoming_bus": {
+    "skins": [
+      {
+        "native": "🚍"
+      }
+    ]
+  },
+  "trolleybus": {
+    "skins": [
+      {
+        "native": "🚎"
+      }
+    ]
+  },
+  "minibus": {
+    "skins": [
+      {
+        "native": "🚐"
+      }
+    ]
+  },
+  "ambulance": {
+    "skins": [
+      {
+        "native": "🚑"
+      }
+    ]
+  },
+  "fire_engine": {
+    "skins": [
+      {
+        "native": "🚒"
+      }
+    ]
+  },
+  "police_car": {
+    "skins": [
+      {
+        "native": "🚓"
+      }
+    ]
+  },
+  "oncoming_police_car": {
+    "skins": [
+      {
+        "native": "🚔"
+      }
+    ]
+  },
+  "taxi": {
+    "skins": [
+      {
+        "native": "🚕"
+      }
+    ]
+  },
+  "oncoming_taxi": {
+    "skins": [
+      {
+        "native": "🚖"
+      }
+    ]
+  },
+  "car": {
+    "skins": [
+      {
+        "native": "🚗"
+      }
+    ]
+  },
+  "oncoming_automobile": {
+    "skins": [
+      {
+        "native": "🚘"
+      }
+    ]
+  },
+  "blue_car": {
+    "skins": [
+      {
+        "native": "🚙"
+      }
+    ]
+  },
+  "pickup_truck": {
+    "skins": [
+      {
+        "native": "🛻"
+      }
+    ]
+  },
+  "truck": {
+    "skins": [
+      {
+        "native": "🚚"
+      }
+    ]
+  },
+  "articulated_lorry": {
+    "skins": [
+      {
+        "native": "🚛"
+      }
+    ]
+  },
+  "tractor": {
+    "skins": [
+      {
+        "native": "🚜"
+      }
+    ]
+  },
+  "racing_car": {
+    "skins": [
+      {
+        "native": "🏎️"
+      }
+    ]
+  },
+  "racing_motorcycle": {
+    "skins": [
+      {
+        "native": "🏍️"
+      }
+    ]
+  },
+  "motor_scooter": {
+    "skins": [
+      {
+        "native": "🛵"
+      }
+    ]
+  },
+  "manual_wheelchair": {
+    "skins": [
+      {
+        "native": "🦽"
+      }
+    ]
+  },
+  "motorized_wheelchair": {
+    "skins": [
+      {
+        "native": "🦼"
+      }
+    ]
+  },
+  "auto_rickshaw": {
+    "skins": [
+      {
+        "native": "🛺"
+      }
+    ]
+  },
+  "bike": {
+    "skins": [
+      {
+        "native": "🚲"
+      }
+    ]
+  },
+  "scooter": {
+    "skins": [
+      {
+        "native": "🛴"
+      }
+    ]
+  },
+  "skateboard": {
+    "skins": [
+      {
+        "native": "🛹"
+      }
+    ]
+  },
+  "roller_skate": {
+    "skins": [
+      {
+        "native": "🛼"
+      }
+    ]
+  },
+  "busstop": {
+    "skins": [
+      {
+        "native": "🚏"
+      }
+    ]
+  },
+  "motorway": {
+    "skins": [
+      {
+        "native": "🛣️"
+      }
+    ]
+  },
+  "railway_track": {
+    "skins": [
+      {
+        "native": "🛤️"
+      }
+    ]
+  },
+  "oil_drum": {
+    "skins": [
+      {
+        "native": "🛢️"
+      }
+    ]
+  },
+  "fuelpump": {
+    "skins": [
+      {
+        "native": "⛽"
+      }
+    ]
+  },
+  "wheel": {
+    "skins": [
+      {
+        "native": "🛞"
+      }
+    ]
+  },
+  "rotating_light": {
+    "skins": [
+      {
+        "native": "🚨"
+      }
+    ]
+  },
+  "traffic_light": {
+    "skins": [
+      {
+        "native": "🚥"
+      }
+    ]
+  },
+  "vertical_traffic_light": {
+    "skins": [
+      {
+        "native": "🚦"
+      }
+    ]
+  },
+  "octagonal_sign": {
+    "skins": [
+      {
+        "native": "🛑"
+      }
+    ]
+  },
+  "construction": {
+    "skins": [
+      {
+        "native": "🚧"
+      }
+    ]
+  },
+  "anchor": {
+    "skins": [
+      {
+        "native": "⚓"
+      }
+    ]
+  },
+  "ring_buoy": {
+    "skins": [
+      {
+        "native": "🛟"
+      }
+    ]
+  },
+  "boat": {
+    "skins": [
+      {
+        "native": "⛵"
+      }
+    ]
+  },
+  "canoe": {
+    "skins": [
+      {
+        "native": "🛶"
+      }
+    ]
+  },
+  "speedboat": {
+    "skins": [
+      {
+        "native": "🚤"
+      }
+    ]
+  },
+  "passenger_ship": {
+    "skins": [
+      {
+        "native": "🛳️"
+      }
+    ]
+  },
+  "ferry": {
+    "skins": [
+      {
+        "native": "⛴️"
+      }
+    ]
+  },
+  "motor_boat": {
+    "skins": [
+      {
+        "native": "🛥️"
+      }
+    ]
+  },
+  "ship": {
+    "skins": [
+      {
+        "native": "🚢"
+      }
+    ]
+  },
+  "airplane": {
+    "skins": [
+      {
+        "native": "✈️"
+      }
+    ]
+  },
+  "small_airplane": {
+    "skins": [
+      {
+        "native": "🛩️"
+      }
+    ]
+  },
+  "airplane_departure": {
+    "skins": [
+      {
+        "native": "🛫"
+      }
+    ]
+  },
+  "airplane_arriving": {
+    "skins": [
+      {
+        "native": "🛬"
+      }
+    ]
+  },
+  "parachute": {
+    "skins": [
+      {
+        "native": "🪂"
+      }
+    ]
+  },
+  "seat": {
+    "skins": [
+      {
+        "native": "💺"
+      }
+    ]
+  },
+  "helicopter": {
+    "skins": [
+      {
+        "native": "🚁"
+      }
+    ]
+  },
+  "suspension_railway": {
+    "skins": [
+      {
+        "native": "🚟"
+      }
+    ]
+  },
+  "mountain_cableway": {
+    "skins": [
+      {
+        "native": "🚠"
+      }
+    ]
+  },
+  "aerial_tramway": {
+    "skins": [
+      {
+        "native": "🚡"
+      }
+    ]
+  },
+  "satellite": {
+    "skins": [
+      {
+        "native": "🛰️"
+      }
+    ]
+  },
+  "rocket": {
+    "skins": [
+      {
+        "native": "🚀"
+      }
+    ]
+  },
+  "flying_saucer": {
+    "skins": [
+      {
+        "native": "🛸"
+      }
+    ]
+  },
+  "bellhop_bell": {
+    "skins": [
+      {
+        "native": "🛎️"
+      }
+    ]
+  },
+  "luggage": {
+    "skins": [
+      {
+        "native": "🧳"
+      }
+    ]
+  },
+  "hourglass": {
+    "skins": [
+      {
+        "native": "⌛"
+      }
+    ]
+  },
+  "hourglass_flowing_sand": {
+    "skins": [
+      {
+        "native": "⏳"
+      }
+    ]
+  },
+  "watch": {
+    "skins": [
+      {
+        "native": "⌚"
+      }
+    ]
+  },
+  "alarm_clock": {
+    "skins": [
+      {
+        "native": "⏰"
+      }
+    ]
+  },
+  "stopwatch": {
+    "skins": [
+      {
+        "native": "⏱️"
+      }
+    ]
+  },
+  "timer_clock": {
+    "skins": [
+      {
+        "native": "⏲️"
+      }
+    ]
+  },
+  "mantelpiece_clock": {
+    "skins": [
+      {
+        "native": "🕰️"
+      }
+    ]
+  },
+  "clock12": {
+    "skins": [
+      {
+        "native": "🕛"
+      }
+    ]
+  },
+  "clock1230": {
+    "skins": [
+      {
+        "native": "🕧"
+      }
+    ]
+  },
+  "clock1": {
+    "skins": [
+      {
+        "native": "🕐"
+      }
+    ]
+  },
+  "clock130": {
+    "skins": [
+      {
+        "native": "🕜"
+      }
+    ]
+  },
+  "clock2": {
+    "skins": [
+      {
+        "native": "🕑"
+      }
+    ]
+  },
+  "clock230": {
+    "skins": [
+      {
+        "native": "🕝"
+      }
+    ]
+  },
+  "clock3": {
+    "skins": [
+      {
+        "native": "🕒"
+      }
+    ]
+  },
+  "clock330": {
+    "skins": [
+      {
+        "native": "🕞"
+      }
+    ]
+  },
+  "clock4": {
+    "skins": [
+      {
+        "native": "🕓"
+      }
+    ]
+  },
+  "clock430": {
+    "skins": [
+      {
+        "native": "🕟"
+      }
+    ]
+  },
+  "clock5": {
+    "skins": [
+      {
+        "native": "🕔"
+      }
+    ]
+  },
+  "clock530": {
+    "skins": [
+      {
+        "native": "🕠"
+      }
+    ]
+  },
+  "clock6": {
+    "skins": [
+      {
+        "native": "🕕"
+      }
+    ]
+  },
+  "clock630": {
+    "skins": [
+      {
+        "native": "🕡"
+      }
+    ]
+  },
+  "clock7": {
+    "skins": [
+      {
+        "native": "🕖"
+      }
+    ]
+  },
+  "clock730": {
+    "skins": [
+      {
+        "native": "🕢"
+      }
+    ]
+  },
+  "clock8": {
+    "skins": [
+      {
+        "native": "🕗"
+      }
+    ]
+  },
+  "clock830": {
+    "skins": [
+      {
+        "native": "🕣"
+      }
+    ]
+  },
+  "clock9": {
+    "skins": [
+      {
+        "native": "🕘"
+      }
+    ]
+  },
+  "clock930": {
+    "skins": [
+      {
+        "native": "🕤"
+      }
+    ]
+  },
+  "clock10": {
+    "skins": [
+      {
+        "native": "🕙"
+      }
+    ]
+  },
+  "clock1030": {
+    "skins": [
+      {
+        "native": "🕥"
+      }
+    ]
+  },
+  "clock11": {
+    "skins": [
+      {
+        "native": "🕚"
+      }
+    ]
+  },
+  "clock1130": {
+    "skins": [
+      {
+        "native": "🕦"
+      }
+    ]
+  },
+  "new_moon": {
+    "skins": [
+      {
+        "native": "🌑"
+      }
+    ]
+  },
+  "waxing_crescent_moon": {
+    "skins": [
+      {
+        "native": "🌒"
+      }
+    ]
+  },
+  "first_quarter_moon": {
+    "skins": [
+      {
+        "native": "🌓"
+      }
+    ]
+  },
+  "moon": {
+    "skins": [
+      {
+        "native": "🌔"
+      }
+    ]
+  },
+  "full_moon": {
+    "skins": [
+      {
+        "native": "🌕"
+      }
+    ]
+  },
+  "waning_gibbous_moon": {
+    "skins": [
+      {
+        "native": "🌖"
+      }
+    ]
+  },
+  "last_quarter_moon": {
+    "skins": [
+      {
+        "native": "🌗"
+      }
+    ]
+  },
+  "waning_crescent_moon": {
+    "skins": [
+      {
+        "native": "🌘"
+      }
+    ]
+  },
+  "crescent_moon": {
+    "skins": [
+      {
+        "native": "🌙"
+      }
+    ]
+  },
+  "new_moon_with_face": {
+    "skins": [
+      {
+        "native": "🌚"
+      }
+    ]
+  },
+  "first_quarter_moon_with_face": {
+    "skins": [
+      {
+        "native": "🌛"
+      }
+    ]
+  },
+  "last_quarter_moon_with_face": {
+    "skins": [
+      {
+        "native": "🌜"
+      }
+    ]
+  },
+  "thermometer": {
+    "skins": [
+      {
+        "native": "🌡️"
+      }
+    ]
+  },
+  "sunny": {
+    "skins": [
+      {
+        "native": "☀️"
+      }
+    ]
+  },
+  "full_moon_with_face": {
+    "skins": [
+      {
+        "native": "🌝"
+      }
+    ]
+  },
+  "sun_with_face": {
+    "skins": [
+      {
+        "native": "🌞"
+      }
+    ]
+  },
+  "ringed_planet": {
+    "skins": [
+      {
+        "native": "🪐"
+      }
+    ]
+  },
+  "star": {
+    "skins": [
+      {
+        "native": "⭐"
+      }
+    ]
+  },
+  "star2": {
+    "skins": [
+      {
+        "native": "🌟"
+      }
+    ]
+  },
+  "stars": {
+    "skins": [
+      {
+        "native": "🌠"
+      }
+    ]
+  },
+  "milky_way": {
+    "skins": [
+      {
+        "native": "🌌"
+      }
+    ]
+  },
+  "cloud": {
+    "skins": [
+      {
+        "native": "☁️"
+      }
+    ]
+  },
+  "partly_sunny": {
+    "skins": [
+      {
+        "native": "⛅"
+      }
+    ]
+  },
+  "thunder_cloud_and_rain": {
+    "skins": [
+      {
+        "native": "⛈️"
+      }
+    ]
+  },
+  "mostly_sunny": {
+    "skins": [
+      {
+        "native": "🌤️"
+      }
+    ]
+  },
+  "barely_sunny": {
+    "skins": [
+      {
+        "native": "🌥️"
+      }
+    ]
+  },
+  "partly_sunny_rain": {
+    "skins": [
+      {
+        "native": "🌦️"
+      }
+    ]
+  },
+  "rain_cloud": {
+    "skins": [
+      {
+        "native": "🌧️"
+      }
+    ]
+  },
+  "snow_cloud": {
+    "skins": [
+      {
+        "native": "🌨️"
+      }
+    ]
+  },
+  "lightning": {
+    "skins": [
+      {
+        "native": "🌩️"
+      }
+    ]
+  },
+  "tornado": {
+    "skins": [
+      {
+        "native": "🌪️"
+      }
+    ]
+  },
+  "fog": {
+    "skins": [
+      {
+        "native": "🌫️"
+      }
+    ]
+  },
+  "wind_blowing_face": {
+    "skins": [
+      {
+        "native": "🌬️"
+      }
+    ]
+  },
+  "cyclone": {
+    "skins": [
+      {
+        "native": "🌀"
+      }
+    ]
+  },
+  "rainbow": {
+    "skins": [
+      {
+        "native": "🌈"
+      }
+    ]
+  },
+  "closed_umbrella": {
+    "skins": [
+      {
+        "native": "🌂"
+      }
+    ]
+  },
+  "umbrella": {
+    "skins": [
+      {
+        "native": "☂️"
+      }
+    ]
+  },
+  "umbrella_with_rain_drops": {
+    "skins": [
+      {
+        "native": "☔"
+      }
+    ]
+  },
+  "umbrella_on_ground": {
+    "skins": [
+      {
+        "native": "⛱️"
+      }
+    ]
+  },
+  "zap": {
+    "skins": [
+      {
+        "native": "⚡"
+      }
+    ]
+  },
+  "snowflake": {
+    "skins": [
+      {
+        "native": "❄️"
+      }
+    ]
+  },
+  "snowman": {
+    "skins": [
+      {
+        "native": "☃️"
+      }
+    ]
+  },
+  "snowman_without_snow": {
+    "skins": [
+      {
+        "native": "⛄"
+      }
+    ]
+  },
+  "comet": {
+    "skins": [
+      {
+        "native": "☄️"
+      }
+    ]
+  },
+  "fire": {
+    "skins": [
+      {
+        "native": "🔥"
+      }
+    ]
+  },
+  "droplet": {
+    "skins": [
+      {
+        "native": "💧"
+      }
+    ]
+  },
+  "ocean": {
+    "skins": [
+      {
+        "native": "🌊"
+      }
+    ]
+  },
+  "jack_o_lantern": {
+    "skins": [
+      {
+        "native": "🎃"
+      }
+    ]
+  },
+  "christmas_tree": {
+    "skins": [
+      {
+        "native": "🎄"
+      }
+    ]
+  },
+  "fireworks": {
+    "skins": [
+      {
+        "native": "🎆"
+      }
+    ]
+  },
+  "sparkler": {
+    "skins": [
+      {
+        "native": "🎇"
+      }
+    ]
+  },
+  "firecracker": {
+    "skins": [
+      {
+        "native": "🧨"
+      }
+    ]
+  },
+  "sparkles": {
+    "skins": [
+      {
+        "native": "✨"
+      }
+    ]
+  },
+  "balloon": {
+    "skins": [
+      {
+        "native": "🎈"
+      }
+    ]
+  },
+  "tada": {
+    "skins": [
+      {
+        "native": "🎉"
+      }
+    ]
+  },
+  "confetti_ball": {
+    "skins": [
+      {
+        "native": "🎊"
+      }
+    ]
+  },
+  "tanabata_tree": {
+    "skins": [
+      {
+        "native": "🎋"
+      }
+    ]
+  },
+  "bamboo": {
+    "skins": [
+      {
+        "native": "🎍"
+      }
+    ]
+  },
+  "dolls": {
+    "skins": [
+      {
+        "native": "🎎"
+      }
+    ]
+  },
+  "flags": {
+    "skins": [
+      {
+        "native": "🎏"
+      }
+    ]
+  },
+  "wind_chime": {
+    "skins": [
+      {
+        "native": "🎐"
+      }
+    ]
+  },
+  "rice_scene": {
+    "skins": [
+      {
+        "native": "🎑"
+      }
+    ]
+  },
+  "red_envelope": {
+    "skins": [
+      {
+        "native": "🧧"
+      }
+    ]
+  },
+  "ribbon": {
+    "skins": [
+      {
+        "native": "🎀"
+      }
+    ]
+  },
+  "gift": {
+    "skins": [
+      {
+        "native": "🎁"
+      }
+    ]
+  },
+  "reminder_ribbon": {
+    "skins": [
+      {
+        "native": "🎗️"
+      }
+    ]
+  },
+  "admission_tickets": {
+    "skins": [
+      {
+        "native": "🎟️"
+      }
+    ]
+  },
+  "ticket": {
+    "skins": [
+      {
+        "native": "🎫"
+      }
+    ]
+  },
+  "medal": {
+    "skins": [
+      {
+        "native": "🎖️"
+      }
+    ]
+  },
+  "trophy": {
+    "skins": [
+      {
+        "native": "🏆"
+      }
+    ]
+  },
+  "sports_medal": {
+    "skins": [
+      {
+        "native": "🏅"
+      }
+    ]
+  },
+  "first_place_medal": {
+    "skins": [
+      {
+        "native": "🥇"
+      }
+    ]
+  },
+  "second_place_medal": {
+    "skins": [
+      {
+        "native": "🥈"
+      }
+    ]
+  },
+  "third_place_medal": {
+    "skins": [
+      {
+        "native": "🥉"
+      }
+    ]
+  },
+  "soccer": {
+    "skins": [
+      {
+        "native": "⚽"
+      }
+    ]
+  },
+  "baseball": {
+    "skins": [
+      {
+        "native": "⚾"
+      }
+    ]
+  },
+  "softball": {
+    "skins": [
+      {
+        "native": "🥎"
+      }
+    ]
+  },
+  "basketball": {
+    "skins": [
+      {
+        "native": "🏀"
+      }
+    ]
+  },
+  "volleyball": {
+    "skins": [
+      {
+        "native": "🏐"
+      }
+    ]
+  },
+  "football": {
+    "skins": [
+      {
+        "native": "🏈"
+      }
+    ]
+  },
+  "rugby_football": {
+    "skins": [
+      {
+        "native": "🏉"
+      }
+    ]
+  },
+  "tennis": {
+    "skins": [
+      {
+        "native": "🎾"
+      }
+    ]
+  },
+  "flying_disc": {
+    "skins": [
+      {
+        "native": "🥏"
+      }
+    ]
+  },
+  "bowling": {
+    "skins": [
+      {
+        "native": "🎳"
+      }
+    ]
+  },
+  "cricket_bat_and_ball": {
+    "skins": [
+      {
+        "native": "🏏"
+      }
+    ]
+  },
+  "field_hockey_stick_and_ball": {
+    "skins": [
+      {
+        "native": "🏑"
+      }
+    ]
+  },
+  "ice_hockey_stick_and_puck": {
+    "skins": [
+      {
+        "native": "🏒"
+      }
+    ]
+  },
+  "lacrosse": {
+    "skins": [
+      {
+        "native": "🥍"
+      }
+    ]
+  },
+  "table_tennis_paddle_and_ball": {
+    "skins": [
+      {
+        "native": "🏓"
+      }
+    ]
+  },
+  "badminton_racquet_and_shuttlecock": {
+    "skins": [
+      {
+        "native": "🏸"
+      }
+    ]
+  },
+  "boxing_glove": {
+    "skins": [
+      {
+        "native": "🥊"
+      }
+    ]
+  },
+  "martial_arts_uniform": {
+    "skins": [
+      {
+        "native": "🥋"
+      }
+    ]
+  },
+  "goal_net": {
+    "skins": [
+      {
+        "native": "🥅"
+      }
+    ]
+  },
+  "golf": {
+    "skins": [
+      {
+        "native": "⛳"
+      }
+    ]
+  },
+  "ice_skate": {
+    "skins": [
+      {
+        "native": "⛸️"
+      }
+    ]
+  },
+  "fishing_pole_and_fish": {
+    "skins": [
+      {
+        "native": "🎣"
+      }
+    ]
+  },
+  "diving_mask": {
+    "skins": [
+      {
+        "native": "🤿"
+      }
+    ]
+  },
+  "running_shirt_with_sash": {
+    "skins": [
+      {
+        "native": "🎽"
+      }
+    ]
+  },
+  "ski": {
+    "skins": [
+      {
+        "native": "🎿"
+      }
+    ]
+  },
+  "sled": {
+    "skins": [
+      {
+        "native": "🛷"
+      }
+    ]
+  },
+  "curling_stone": {
+    "skins": [
+      {
+        "native": "🥌"
+      }
+    ]
+  },
+  "dart": {
+    "skins": [
+      {
+        "native": "🎯"
+      }
+    ]
+  },
+  "yo-yo": {
+    "skins": [
+      {
+        "native": "🪀"
+      }
+    ]
+  },
+  "kite": {
+    "skins": [
+      {
+        "native": "🪁"
+      }
+    ]
+  },
+  "gun": {
+    "skins": [
+      {
+        "native": "🔫"
+      }
+    ]
+  },
+  "8ball": {
+    "skins": [
+      {
+        "native": "🎱"
+      }
+    ]
+  },
+  "crystal_ball": {
+    "skins": [
+      {
+        "native": "🔮"
+      }
+    ]
+  },
+  "magic_wand": {
+    "skins": [
+      {
+        "native": "🪄"
+      }
+    ]
+  },
+  "video_game": {
+    "skins": [
+      {
+        "native": "🎮"
+      }
+    ]
+  },
+  "joystick": {
+    "skins": [
+      {
+        "native": "🕹️"
+      }
+    ]
+  },
+  "slot_machine": {
+    "skins": [
+      {
+        "native": "🎰"
+      }
+    ]
+  },
+  "game_die": {
+    "skins": [
+      {
+        "native": "🎲"
+      }
+    ]
+  },
+  "jigsaw": {
+    "skins": [
+      {
+        "native": "🧩"
+      }
+    ]
+  },
+  "teddy_bear": {
+    "skins": [
+      {
+        "native": "🧸"
+      }
+    ]
+  },
+  "pinata": {
+    "skins": [
+      {
+        "native": "🪅"
+      }
+    ]
+  },
+  "mirror_ball": {
+    "skins": [
+      {
+        "native": "🪩"
+      }
+    ]
+  },
+  "nesting_dolls": {
+    "skins": [
+      {
+        "native": "🪆"
+      }
+    ]
+  },
+  "spades": {
+    "skins": [
+      {
+        "native": "♠️"
+      }
+    ]
+  },
+  "hearts": {
+    "skins": [
+      {
+        "native": "♥️"
+      }
+    ]
+  },
+  "diamonds": {
+    "skins": [
+      {
+        "native": "♦️"
+      }
+    ]
+  },
+  "clubs": {
+    "skins": [
+      {
+        "native": "♣️"
+      }
+    ]
+  },
+  "chess_pawn": {
+    "skins": [
+      {
+        "native": "♟️"
+      }
+    ]
+  },
+  "black_joker": {
+    "skins": [
+      {
+        "native": "🃏"
+      }
+    ]
+  },
+  "mahjong": {
+    "skins": [
+      {
+        "native": "🀄"
+      }
+    ]
+  },
+  "flower_playing_cards": {
+    "skins": [
+      {
+        "native": "🎴"
+      }
+    ]
+  },
+  "performing_arts": {
+    "skins": [
+      {
+        "native": "🎭"
+      }
+    ]
+  },
+  "frame_with_picture": {
+    "skins": [
+      {
+        "native": "🖼️"
+      }
+    ]
+  },
+  "art": {
+    "skins": [
+      {
+        "native": "🎨"
+      }
+    ]
+  },
+  "thread": {
+    "skins": [
+      {
+        "native": "🧵"
+      }
+    ]
+  },
+  "sewing_needle": {
+    "skins": [
+      {
+        "native": "🪡"
+      }
+    ]
+  },
+  "yarn": {
+    "skins": [
+      {
+        "native": "🧶"
+      }
+    ]
+  },
+  "knot": {
+    "skins": [
+      {
+        "native": "🪢"
+      }
+    ]
+  },
+  "eyeglasses": {
+    "skins": [
+      {
+        "native": "👓"
+      }
+    ]
+  },
+  "dark_sunglasses": {
+    "skins": [
+      {
+        "native": "🕶️"
+      }
+    ]
+  },
+  "goggles": {
+    "skins": [
+      {
+        "native": "🥽"
+      }
+    ]
+  },
+  "lab_coat": {
+    "skins": [
+      {
+        "native": "🥼"
+      }
+    ]
+  },
+  "safety_vest": {
+    "skins": [
+      {
+        "native": "🦺"
+      }
+    ]
+  },
+  "necktie": {
+    "skins": [
+      {
+        "native": "👔"
+      }
+    ]
+  },
+  "shirt": {
+    "skins": [
+      {
+        "native": "👕"
+      }
+    ]
+  },
+  "jeans": {
+    "skins": [
+      {
+        "native": "👖"
+      }
+    ]
+  },
+  "scarf": {
+    "skins": [
+      {
+        "native": "🧣"
+      }
+    ]
+  },
+  "gloves": {
+    "skins": [
+      {
+        "native": "🧤"
+      }
+    ]
+  },
+  "coat": {
+    "skins": [
+      {
+        "native": "🧥"
+      }
+    ]
+  },
+  "socks": {
+    "skins": [
+      {
+        "native": "🧦"
+      }
+    ]
+  },
+  "dress": {
+    "skins": [
+      {
+        "native": "👗"
+      }
+    ]
+  },
+  "kimono": {
+    "skins": [
+      {
+        "native": "👘"
+      }
+    ]
+  },
+  "sari": {
+    "skins": [
+      {
+        "native": "🥻"
+      }
+    ]
+  },
+  "one-piece_swimsuit": {
+    "skins": [
+      {
+        "native": "🩱"
+      }
+    ]
+  },
+  "briefs": {
+    "skins": [
+      {
+        "native": "🩲"
+      }
+    ]
+  },
+  "shorts": {
+    "skins": [
+      {
+        "native": "🩳"
+      }
+    ]
+  },
+  "bikini": {
+    "skins": [
+      {
+        "native": "👙"
+      }
+    ]
+  },
+  "womans_clothes": {
+    "skins": [
+      {
+        "native": "👚"
+      }
+    ]
+  },
+  "folding_hand_fan": {
+    "skins": [
+      {
+        "native": "🪭"
+      }
+    ]
+  },
+  "purse": {
+    "skins": [
+      {
+        "native": "👛"
+      }
+    ]
+  },
+  "handbag": {
+    "skins": [
+      {
+        "native": "👜"
+      }
+    ]
+  },
+  "pouch": {
+    "skins": [
+      {
+        "native": "👝"
+      }
+    ]
+  },
+  "shopping_bags": {
+    "skins": [
+      {
+        "native": "🛍️"
+      }
+    ]
+  },
+  "school_satchel": {
+    "skins": [
+      {
+        "native": "🎒"
+      }
+    ]
+  },
+  "thong_sandal": {
+    "skins": [
+      {
+        "native": "🩴"
+      }
+    ]
+  },
+  "mans_shoe": {
+    "skins": [
+      {
+        "native": "👞"
+      }
+    ]
+  },
+  "athletic_shoe": {
+    "skins": [
+      {
+        "native": "👟"
+      }
+    ]
+  },
+  "hiking_boot": {
+    "skins": [
+      {
+        "native": "🥾"
+      }
+    ]
+  },
+  "womans_flat_shoe": {
+    "skins": [
+      {
+        "native": "🥿"
+      }
+    ]
+  },
+  "high_heel": {
+    "skins": [
+      {
+        "native": "👠"
+      }
+    ]
+  },
+  "sandal": {
+    "skins": [
+      {
+        "native": "👡"
+      }
+    ]
+  },
+  "ballet_shoes": {
+    "skins": [
+      {
+        "native": "🩰"
+      }
+    ]
+  },
+  "boot": {
+    "skins": [
+      {
+        "native": "👢"
+      }
+    ]
+  },
+  "hair_pick": {
+    "skins": [
+      {
+        "native": "🪮"
+      }
+    ]
+  },
+  "crown": {
+    "skins": [
+      {
+        "native": "👑"
+      }
+    ]
+  },
+  "womans_hat": {
+    "skins": [
+      {
+        "native": "👒"
+      }
+    ]
+  },
+  "tophat": {
+    "skins": [
+      {
+        "native": "🎩"
+      }
+    ]
+  },
+  "mortar_board": {
+    "skins": [
+      {
+        "native": "🎓"
+      }
+    ]
+  },
+  "billed_cap": {
+    "skins": [
+      {
+        "native": "🧢"
+      }
+    ]
+  },
+  "military_helmet": {
+    "skins": [
+      {
+        "native": "🪖"
+      }
+    ]
+  },
+  "helmet_with_white_cross": {
+    "skins": [
+      {
+        "native": "⛑️"
+      }
+    ]
+  },
+  "prayer_beads": {
+    "skins": [
+      {
+        "native": "📿"
+      }
+    ]
+  },
+  "lipstick": {
+    "skins": [
+      {
+        "native": "💄"
+      }
+    ]
+  },
+  "ring": {
+    "skins": [
+      {
+        "native": "💍"
+      }
+    ]
+  },
+  "gem": {
+    "skins": [
+      {
+        "native": "💎"
+      }
+    ]
+  },
+  "mute": {
+    "skins": [
+      {
+        "native": "🔇"
+      }
+    ]
+  },
+  "speaker": {
+    "skins": [
+      {
+        "native": "🔈"
+      }
+    ]
+  },
+  "sound": {
+    "skins": [
+      {
+        "native": "🔉"
+      }
+    ]
+  },
+  "loud_sound": {
+    "skins": [
+      {
+        "native": "🔊"
+      }
+    ]
+  },
+  "loudspeaker": {
+    "skins": [
+      {
+        "native": "📢"
+      }
+    ]
+  },
+  "mega": {
+    "skins": [
+      {
+        "native": "📣"
+      }
+    ]
+  },
+  "postal_horn": {
+    "skins": [
+      {
+        "native": "📯"
+      }
+    ]
+  },
+  "bell": {
+    "skins": [
+      {
+        "native": "🔔"
+      }
+    ]
+  },
+  "no_bell": {
+    "skins": [
+      {
+        "native": "🔕"
+      }
+    ]
+  },
+  "musical_score": {
+    "skins": [
+      {
+        "native": "🎼"
+      }
+    ]
+  },
+  "musical_note": {
+    "skins": [
+      {
+        "native": "🎵"
+      }
+    ]
+  },
+  "notes": {
+    "skins": [
+      {
+        "native": "🎶"
+      }
+    ]
+  },
+  "studio_microphone": {
+    "skins": [
+      {
+        "native": "🎙️"
+      }
+    ]
+  },
+  "level_slider": {
+    "skins": [
+      {
+        "native": "🎚️"
+      }
+    ]
+  },
+  "control_knobs": {
+    "skins": [
+      {
+        "native": "🎛️"
+      }
+    ]
+  },
+  "microphone": {
+    "skins": [
+      {
+        "native": "🎤"
+      }
+    ]
+  },
+  "headphones": {
+    "skins": [
+      {
+        "native": "🎧"
+      }
+    ]
+  },
+  "radio": {
+    "skins": [
+      {
+        "native": "📻"
+      }
+    ]
+  },
+  "saxophone": {
+    "skins": [
+      {
+        "native": "🎷"
+      }
+    ]
+  },
+  "accordion": {
+    "skins": [
+      {
+        "native": "🪗"
+      }
+    ]
+  },
+  "guitar": {
+    "skins": [
+      {
+        "native": "🎸"
+      }
+    ]
+  },
+  "musical_keyboard": {
+    "skins": [
+      {
+        "native": "🎹"
+      }
+    ]
+  },
+  "trumpet": {
+    "skins": [
+      {
+        "native": "🎺"
+      }
+    ]
+  },
+  "violin": {
+    "skins": [
+      {
+        "native": "🎻"
+      }
+    ]
+  },
+  "banjo": {
+    "skins": [
+      {
+        "native": "🪕"
+      }
+    ]
+  },
+  "drum_with_drumsticks": {
+    "skins": [
+      {
+        "native": "🥁"
+      }
+    ]
+  },
+  "long_drum": {
+    "skins": [
+      {
+        "native": "🪘"
+      }
+    ]
+  },
+  "maracas": {
+    "skins": [
+      {
+        "native": "🪇"
+      }
+    ]
+  },
+  "flute": {
+    "skins": [
+      {
+        "native": "🪈"
+      }
+    ]
+  },
+  "iphone": {
+    "skins": [
+      {
+        "native": "📱"
+      }
+    ]
+  },
+  "calling": {
+    "skins": [
+      {
+        "native": "📲"
+      }
+    ]
+  },
+  "phone": {
+    "skins": [
+      {
+        "native": "☎️"
+      }
+    ]
+  },
+  "telephone_receiver": {
+    "skins": [
+      {
+        "native": "📞"
+      }
+    ]
+  },
+  "pager": {
+    "skins": [
+      {
+        "native": "📟"
+      }
+    ]
+  },
+  "fax": {
+    "skins": [
+      {
+        "native": "📠"
+      }
+    ]
+  },
+  "battery": {
+    "skins": [
+      {
+        "native": "🔋"
+      }
+    ]
+  },
+  "low_battery": {
+    "skins": [
+      {
+        "native": "🪫"
+      }
+    ]
+  },
+  "electric_plug": {
+    "skins": [
+      {
+        "native": "🔌"
+      }
+    ]
+  },
+  "computer": {
+    "skins": [
+      {
+        "native": "💻"
+      }
+    ]
+  },
+  "desktop_computer": {
+    "skins": [
+      {
+        "native": "🖥️"
+      }
+    ]
+  },
+  "printer": {
+    "skins": [
+      {
+        "native": "🖨️"
+      }
+    ]
+  },
+  "keyboard": {
+    "skins": [
+      {
+        "native": "⌨️"
+      }
+    ]
+  },
+  "three_button_mouse": {
+    "skins": [
+      {
+        "native": "🖱️"
+      }
+    ]
+  },
+  "trackball": {
+    "skins": [
+      {
+        "native": "🖲️"
+      }
+    ]
+  },
+  "minidisc": {
+    "skins": [
+      {
+        "native": "💽"
+      }
+    ]
+  },
+  "floppy_disk": {
+    "skins": [
+      {
+        "native": "💾"
+      }
+    ]
+  },
+  "cd": {
+    "skins": [
+      {
+        "native": "💿"
+      }
+    ]
+  },
+  "dvd": {
+    "skins": [
+      {
+        "native": "📀"
+      }
+    ]
+  },
+  "abacus": {
+    "skins": [
+      {
+        "native": "🧮"
+      }
+    ]
+  },
+  "movie_camera": {
+    "skins": [
+      {
+        "native": "🎥"
+      }
+    ]
+  },
+  "film_frames": {
+    "skins": [
+      {
+        "native": "🎞️"
+      }
+    ]
+  },
+  "film_projector": {
+    "skins": [
+      {
+        "native": "📽️"
+      }
+    ]
+  },
+  "clapper": {
+    "skins": [
+      {
+        "native": "🎬"
+      }
+    ]
+  },
+  "tv": {
+    "skins": [
+      {
+        "native": "📺"
+      }
+    ]
+  },
+  "camera": {
+    "skins": [
+      {
+        "native": "📷"
+      }
+    ]
+  },
+  "camera_with_flash": {
+    "skins": [
+      {
+        "native": "📸"
+      }
+    ]
+  },
+  "video_camera": {
+    "skins": [
+      {
+        "native": "📹"
+      }
+    ]
+  },
+  "vhs": {
+    "skins": [
+      {
+        "native": "📼"
+      }
+    ]
+  },
+  "mag": {
+    "skins": [
+      {
+        "native": "🔍"
+      }
+    ]
+  },
+  "mag_right": {
+    "skins": [
+      {
+        "native": "🔎"
+      }
+    ]
+  },
+  "candle": {
+    "skins": [
+      {
+        "native": "🕯️"
+      }
+    ]
+  },
+  "bulb": {
+    "skins": [
+      {
+        "native": "💡"
+      }
+    ]
+  },
+  "flashlight": {
+    "skins": [
+      {
+        "native": "🔦"
+      }
+    ]
+  },
+  "izakaya_lantern": {
+    "skins": [
+      {
+        "native": "🏮"
+      }
+    ]
+  },
+  "diya_lamp": {
+    "skins": [
+      {
+        "native": "🪔"
+      }
+    ]
+  },
+  "notebook_with_decorative_cover": {
+    "skins": [
+      {
+        "native": "📔"
+      }
+    ]
+  },
+  "closed_book": {
+    "skins": [
+      {
+        "native": "📕"
+      }
+    ]
+  },
+  "book": {
+    "skins": [
+      {
+        "native": "📖"
+      }
+    ]
+  },
+  "green_book": {
+    "skins": [
+      {
+        "native": "📗"
+      }
+    ]
+  },
+  "blue_book": {
+    "skins": [
+      {
+        "native": "📘"
+      }
+    ]
+  },
+  "orange_book": {
+    "skins": [
+      {
+        "native": "📙"
+      }
+    ]
+  },
+  "books": {
+    "skins": [
+      {
+        "native": "📚"
+      }
+    ]
+  },
+  "notebook": {
+    "skins": [
+      {
+        "native": "📓"
+      }
+    ]
+  },
+  "ledger": {
+    "skins": [
+      {
+        "native": "📒"
+      }
+    ]
+  },
+  "page_with_curl": {
+    "skins": [
+      {
+        "native": "📃"
+      }
+    ]
+  },
+  "scroll": {
+    "skins": [
+      {
+        "native": "📜"
+      }
+    ]
+  },
+  "page_facing_up": {
+    "skins": [
+      {
+        "native": "📄"
+      }
+    ]
+  },
+  "newspaper": {
+    "skins": [
+      {
+        "native": "📰"
+      }
+    ]
+  },
+  "rolled_up_newspaper": {
+    "skins": [
+      {
+        "native": "🗞️"
+      }
+    ]
+  },
+  "bookmark_tabs": {
+    "skins": [
+      {
+        "native": "📑"
+      }
+    ]
+  },
+  "bookmark": {
+    "skins": [
+      {
+        "native": "🔖"
+      }
+    ]
+  },
+  "label": {
+    "skins": [
+      {
+        "native": "🏷️"
+      }
+    ]
+  },
+  "moneybag": {
+    "skins": [
+      {
+        "native": "💰"
+      }
+    ]
+  },
+  "coin": {
+    "skins": [
+      {
+        "native": "🪙"
+      }
+    ]
+  },
+  "yen": {
+    "skins": [
+      {
+        "native": "💴"
+      }
+    ]
+  },
+  "dollar": {
+    "skins": [
+      {
+        "native": "💵"
+      }
+    ]
+  },
+  "euro": {
+    "skins": [
+      {
+        "native": "💶"
+      }
+    ]
+  },
+  "pound": {
+    "skins": [
+      {
+        "native": "💷"
+      }
+    ]
+  },
+  "money_with_wings": {
+    "skins": [
+      {
+        "native": "💸"
+      }
+    ]
+  },
+  "credit_card": {
+    "skins": [
+      {
+        "native": "💳"
+      }
+    ]
+  },
+  "receipt": {
+    "skins": [
+      {
+        "native": "🧾"
+      }
+    ]
+  },
+  "chart": {
+    "skins": [
+      {
+        "native": "💹"
+      }
+    ]
+  },
+  "email": {
+    "skins": [
+      {
+        "native": "✉️"
+      }
+    ]
+  },
+  "e-mail": {
+    "skins": [
+      {
+        "native": "📧"
+      }
+    ]
+  },
+  "incoming_envelope": {
+    "skins": [
+      {
+        "native": "📨"
+      }
+    ]
+  },
+  "envelope_with_arrow": {
+    "skins": [
+      {
+        "native": "📩"
+      }
+    ]
+  },
+  "outbox_tray": {
+    "skins": [
+      {
+        "native": "📤"
+      }
+    ]
+  },
+  "inbox_tray": {
+    "skins": [
+      {
+        "native": "📥"
+      }
+    ]
+  },
+  "package": {
+    "skins": [
+      {
+        "native": "📦"
+      }
+    ]
+  },
+  "mailbox": {
+    "skins": [
+      {
+        "native": "📫"
+      }
+    ]
+  },
+  "mailbox_closed": {
+    "skins": [
+      {
+        "native": "📪"
+      }
+    ]
+  },
+  "mailbox_with_mail": {
+    "skins": [
+      {
+        "native": "📬"
+      }
+    ]
+  },
+  "mailbox_with_no_mail": {
+    "skins": [
+      {
+        "native": "📭"
+      }
+    ]
+  },
+  "postbox": {
+    "skins": [
+      {
+        "native": "📮"
+      }
+    ]
+  },
+  "ballot_box_with_ballot": {
+    "skins": [
+      {
+        "native": "🗳️"
+      }
+    ]
+  },
+  "pencil2": {
+    "skins": [
+      {
+        "native": "✏️"
+      }
+    ]
+  },
+  "black_nib": {
+    "skins": [
+      {
+        "native": "✒️"
+      }
+    ]
+  },
+  "lower_left_fountain_pen": {
+    "skins": [
+      {
+        "native": "🖋️"
+      }
+    ]
+  },
+  "lower_left_ballpoint_pen": {
+    "skins": [
+      {
+        "native": "🖊️"
+      }
+    ]
+  },
+  "lower_left_paintbrush": {
+    "skins": [
+      {
+        "native": "🖌️"
+      }
+    ]
+  },
+  "lower_left_crayon": {
+    "skins": [
+      {
+        "native": "🖍️"
+      }
+    ]
+  },
+  "memo": {
+    "skins": [
+      {
+        "native": "📝"
+      }
+    ]
+  },
+  "briefcase": {
+    "skins": [
+      {
+        "native": "💼"
+      }
+    ]
+  },
+  "file_folder": {
+    "skins": [
+      {
+        "native": "📁"
+      }
+    ]
+  },
+  "open_file_folder": {
+    "skins": [
+      {
+        "native": "📂"
+      }
+    ]
+  },
+  "card_index_dividers": {
+    "skins": [
+      {
+        "native": "🗂️"
+      }
+    ]
+  },
+  "date": {
+    "skins": [
+      {
+        "native": "📅"
+      }
+    ]
+  },
+  "calendar": {
+    "skins": [
+      {
+        "native": "📆"
+      }
+    ]
+  },
+  "spiral_note_pad": {
+    "skins": [
+      {
+        "native": "🗒️"
+      }
+    ]
+  },
+  "spiral_calendar_pad": {
+    "skins": [
+      {
+        "native": "🗓️"
+      }
+    ]
+  },
+  "card_index": {
+    "skins": [
+      {
+        "native": "📇"
+      }
+    ]
+  },
+  "chart_with_upwards_trend": {
+    "skins": [
+      {
+        "native": "📈"
+      }
+    ]
+  },
+  "chart_with_downwards_trend": {
+    "skins": [
+      {
+        "native": "📉"
+      }
+    ]
+  },
+  "bar_chart": {
+    "skins": [
+      {
+        "native": "📊"
+      }
+    ]
+  },
+  "clipboard": {
+    "skins": [
+      {
+        "native": "📋"
+      }
+    ]
+  },
+  "pushpin": {
+    "skins": [
+      {
+        "native": "📌"
+      }
+    ]
+  },
+  "round_pushpin": {
+    "skins": [
+      {
+        "native": "📍"
+      }
+    ]
+  },
+  "paperclip": {
+    "skins": [
+      {
+        "native": "📎"
+      }
+    ]
+  },
+  "linked_paperclips": {
+    "skins": [
+      {
+        "native": "🖇️"
+      }
+    ]
+  },
+  "straight_ruler": {
+    "skins": [
+      {
+        "native": "📏"
+      }
+    ]
+  },
+  "triangular_ruler": {
+    "skins": [
+      {
+        "native": "📐"
+      }
+    ]
+  },
+  "scissors": {
+    "skins": [
+      {
+        "native": "✂️"
+      }
+    ]
+  },
+  "card_file_box": {
+    "skins": [
+      {
+        "native": "🗃️"
+      }
+    ]
+  },
+  "file_cabinet": {
+    "skins": [
+      {
+        "native": "🗄️"
+      }
+    ]
+  },
+  "wastebasket": {
+    "skins": [
+      {
+        "native": "🗑️"
+      }
+    ]
+  },
+  "lock": {
+    "skins": [
+      {
+        "native": "🔒"
+      }
+    ]
+  },
+  "unlock": {
+    "skins": [
+      {
+        "native": "🔓"
+      }
+    ]
+  },
+  "lock_with_ink_pen": {
+    "skins": [
+      {
+        "native": "🔏"
+      }
+    ]
+  },
+  "closed_lock_with_key": {
+    "skins": [
+      {
+        "native": "🔐"
+      }
+    ]
+  },
+  "key": {
+    "skins": [
+      {
+        "native": "🔑"
+      }
+    ]
+  },
+  "old_key": {
+    "skins": [
+      {
+        "native": "🗝️"
+      }
+    ]
+  },
+  "hammer": {
+    "skins": [
+      {
+        "native": "🔨"
+      }
+    ]
+  },
+  "axe": {
+    "skins": [
+      {
+        "native": "🪓"
+      }
+    ]
+  },
+  "pick": {
+    "skins": [
+      {
+        "native": "⛏️"
+      }
+    ]
+  },
+  "hammer_and_pick": {
+    "skins": [
+      {
+        "native": "⚒️"
+      }
+    ]
+  },
+  "hammer_and_wrench": {
+    "skins": [
+      {
+        "native": "🛠️"
+      }
+    ]
+  },
+  "dagger_knife": {
+    "skins": [
+      {
+        "native": "🗡️"
+      }
+    ]
+  },
+  "crossed_swords": {
+    "skins": [
+      {
+        "native": "⚔️"
+      }
+    ]
+  },
+  "bomb": {
+    "skins": [
+      {
+        "native": "💣"
+      }
+    ]
+  },
+  "boomerang": {
+    "skins": [
+      {
+        "native": "🪃"
+      }
+    ]
+  },
+  "bow_and_arrow": {
+    "skins": [
+      {
+        "native": "🏹"
+      }
+    ]
+  },
+  "shield": {
+    "skins": [
+      {
+        "native": "🛡️"
+      }
+    ]
+  },
+  "carpentry_saw": {
+    "skins": [
+      {
+        "native": "🪚"
+      }
+    ]
+  },
+  "wrench": {
+    "skins": [
+      {
+        "native": "🔧"
+      }
+    ]
+  },
+  "screwdriver": {
+    "skins": [
+      {
+        "native": "🪛"
+      }
+    ]
+  },
+  "nut_and_bolt": {
+    "skins": [
+      {
+        "native": "🔩"
+      }
+    ]
+  },
+  "gear": {
+    "skins": [
+      {
+        "native": "⚙️"
+      }
+    ]
+  },
+  "compression": {
+    "skins": [
+      {
+        "native": "🗜️"
+      }
+    ]
+  },
+  "scales": {
+    "skins": [
+      {
+        "native": "⚖️"
+      }
+    ]
+  },
+  "probing_cane": {
+    "skins": [
+      {
+        "native": "🦯"
+      }
+    ]
+  },
+  "link": {
+    "skins": [
+      {
+        "native": "🔗"
+      }
+    ]
+  },
+  "chains": {
+    "skins": [
+      {
+        "native": "⛓️"
+      }
+    ]
+  },
+  "hook": {
+    "skins": [
+      {
+        "native": "🪝"
+      }
+    ]
+  },
+  "toolbox": {
+    "skins": [
+      {
+        "native": "🧰"
+      }
+    ]
+  },
+  "magnet": {
+    "skins": [
+      {
+        "native": "🧲"
+      }
+    ]
+  },
+  "ladder": {
+    "skins": [
+      {
+        "native": "🪜"
+      }
+    ]
+  },
+  "alembic": {
+    "skins": [
+      {
+        "native": "⚗️"
+      }
+    ]
+  },
+  "test_tube": {
+    "skins": [
+      {
+        "native": "🧪"
+      }
+    ]
+  },
+  "petri_dish": {
+    "skins": [
+      {
+        "native": "🧫"
+      }
+    ]
+  },
+  "dna": {
+    "skins": [
+      {
+        "native": "🧬"
+      }
+    ]
+  },
+  "microscope": {
+    "skins": [
+      {
+        "native": "🔬"
+      }
+    ]
+  },
+  "telescope": {
+    "skins": [
+      {
+        "native": "🔭"
+      }
+    ]
+  },
+  "satellite_antenna": {
+    "skins": [
+      {
+        "native": "📡"
+      }
+    ]
+  },
+  "syringe": {
+    "skins": [
+      {
+        "native": "💉"
+      }
+    ]
+  },
+  "drop_of_blood": {
+    "skins": [
+      {
+        "native": "🩸"
+      }
+    ]
+  },
+  "pill": {
+    "skins": [
+      {
+        "native": "💊"
+      }
+    ]
+  },
+  "adhesive_bandage": {
+    "skins": [
+      {
+        "native": "🩹"
+      }
+    ]
+  },
+  "crutch": {
+    "skins": [
+      {
+        "native": "🩼"
+      }
+    ]
+  },
+  "stethoscope": {
+    "skins": [
+      {
+        "native": "🩺"
+      }
+    ]
+  },
+  "x-ray": {
+    "skins": [
+      {
+        "native": "🩻"
+      }
+    ]
+  },
+  "door": {
+    "skins": [
+      {
+        "native": "🚪"
+      }
+    ]
+  },
+  "elevator": {
+    "skins": [
+      {
+        "native": "🛗"
+      }
+    ]
+  },
+  "mirror": {
+    "skins": [
+      {
+        "native": "🪞"
+      }
+    ]
+  },
+  "window": {
+    "skins": [
+      {
+        "native": "🪟"
+      }
+    ]
+  },
+  "bed": {
+    "skins": [
+      {
+        "native": "🛏️"
+      }
+    ]
+  },
+  "couch_and_lamp": {
+    "skins": [
+      {
+        "native": "🛋️"
+      }
+    ]
+  },
+  "chair": {
+    "skins": [
+      {
+        "native": "🪑"
+      }
+    ]
+  },
+  "toilet": {
+    "skins": [
+      {
+        "native": "🚽"
+      }
+    ]
+  },
+  "plunger": {
+    "skins": [
+      {
+        "native": "🪠"
+      }
+    ]
+  },
+  "shower": {
+    "skins": [
+      {
+        "native": "🚿"
+      }
+    ]
+  },
+  "bathtub": {
+    "skins": [
+      {
+        "native": "🛁"
+      }
+    ]
+  },
+  "mouse_trap": {
+    "skins": [
+      {
+        "native": "🪤"
+      }
+    ]
+  },
+  "razor": {
+    "skins": [
+      {
+        "native": "🪒"
+      }
+    ]
+  },
+  "lotion_bottle": {
+    "skins": [
+      {
+        "native": "🧴"
+      }
+    ]
+  },
+  "safety_pin": {
+    "skins": [
+      {
+        "native": "🧷"
+      }
+    ]
+  },
+  "broom": {
+    "skins": [
+      {
+        "native": "🧹"
+      }
+    ]
+  },
+  "basket": {
+    "skins": [
+      {
+        "native": "🧺"
+      }
+    ]
+  },
+  "roll_of_paper": {
+    "skins": [
+      {
+        "native": "🧻"
+      }
+    ]
+  },
+  "bucket": {
+    "skins": [
+      {
+        "native": "🪣"
+      }
+    ]
+  },
+  "soap": {
+    "skins": [
+      {
+        "native": "🧼"
+      }
+    ]
+  },
+  "bubbles": {
+    "skins": [
+      {
+        "native": "🫧"
+      }
+    ]
+  },
+  "toothbrush": {
+    "skins": [
+      {
+        "native": "🪥"
+      }
+    ]
+  },
+  "sponge": {
+    "skins": [
+      {
+        "native": "🧽"
+      }
+    ]
+  },
+  "fire_extinguisher": {
+    "skins": [
+      {
+        "native": "🧯"
+      }
+    ]
+  },
+  "shopping_trolley": {
+    "skins": [
+      {
+        "native": "🛒"
+      }
+    ]
+  },
+  "smoking": {
+    "skins": [
+      {
+        "native": "🚬"
+      }
+    ]
+  },
+  "coffin": {
+    "skins": [
+      {
+        "native": "⚰️"
+      }
+    ]
+  },
+  "headstone": {
+    "skins": [
+      {
+        "native": "🪦"
+      }
+    ]
+  },
+  "funeral_urn": {
+    "skins": [
+      {
+        "native": "⚱️"
+      }
+    ]
+  },
+  "nazar_amulet": {
+    "skins": [
+      {
+        "native": "🧿"
+      }
+    ]
+  },
+  "hamsa": {
+    "skins": [
+      {
+        "native": "🪬"
+      }
+    ]
+  },
+  "moyai": {
+    "skins": [
+      {
+        "native": "🗿"
+      }
+    ]
+  },
+  "placard": {
+    "skins": [
+      {
+        "native": "🪧"
+      }
+    ]
+  },
+  "identification_card": {
+    "skins": [
+      {
+        "native": "🪪"
+      }
+    ]
+  },
+  "atm": {
+    "skins": [
+      {
+        "native": "🏧"
+      }
+    ]
+  },
+  "put_litter_in_its_place": {
+    "skins": [
+      {
+        "native": "🚮"
+      }
+    ]
+  },
+  "potable_water": {
+    "skins": [
+      {
+        "native": "🚰"
+      }
+    ]
+  },
+  "wheelchair": {
+    "skins": [
+      {
+        "native": "♿"
+      }
+    ]
+  },
+  "mens": {
+    "skins": [
+      {
+        "native": "🚹"
+      }
+    ]
+  },
+  "womens": {
+    "skins": [
+      {
+        "native": "🚺"
+      }
+    ]
+  },
+  "restroom": {
+    "skins": [
+      {
+        "native": "🚻"
+      }
+    ]
+  },
+  "baby_symbol": {
+    "skins": [
+      {
+        "native": "🚼"
+      }
+    ]
+  },
+  "wc": {
+    "skins": [
+      {
+        "native": "🚾"
+      }
+    ]
+  },
+  "passport_control": {
+    "skins": [
+      {
+        "native": "🛂"
+      }
+    ]
+  },
+  "customs": {
+    "skins": [
+      {
+        "native": "🛃"
+      }
+    ]
+  },
+  "baggage_claim": {
+    "skins": [
+      {
+        "native": "🛄"
+      }
+    ]
+  },
+  "left_luggage": {
+    "skins": [
+      {
+        "native": "🛅"
+      }
+    ]
+  },
+  "warning": {
+    "skins": [
+      {
+        "native": "⚠️"
+      }
+    ]
+  },
+  "children_crossing": {
+    "skins": [
+      {
+        "native": "🚸"
+      }
+    ]
+  },
+  "no_entry": {
+    "skins": [
+      {
+        "native": "⛔"
+      }
+    ]
+  },
+  "no_entry_sign": {
+    "skins": [
+      {
+        "native": "🚫"
+      }
+    ]
+  },
+  "no_bicycles": {
+    "skins": [
+      {
+        "native": "🚳"
+      }
+    ]
+  },
+  "no_smoking": {
+    "skins": [
+      {
+        "native": "🚭"
+      }
+    ]
+  },
+  "do_not_litter": {
+    "skins": [
+      {
+        "native": "🚯"
+      }
+    ]
+  },
+  "non-potable_water": {
+    "skins": [
+      {
+        "native": "🚱"
+      }
+    ]
+  },
+  "no_pedestrians": {
+    "skins": [
+      {
+        "native": "🚷"
+      }
+    ]
+  },
+  "no_mobile_phones": {
+    "skins": [
+      {
+        "native": "📵"
+      }
+    ]
+  },
+  "underage": {
+    "skins": [
+      {
+        "native": "🔞"
+      }
+    ]
+  },
+  "radioactive_sign": {
+    "skins": [
+      {
+        "native": "☢️"
+      }
+    ]
+  },
+  "biohazard_sign": {
+    "skins": [
+      {
+        "native": "☣️"
+      }
+    ]
+  },
+  "arrow_up": {
+    "skins": [
+      {
+        "native": "⬆️"
+      }
+    ]
+  },
+  "arrow_upper_right": {
+    "skins": [
+      {
+        "native": "↗️"
+      }
+    ]
+  },
+  "arrow_right": {
+    "skins": [
+      {
+        "native": "➡️"
+      }
+    ]
+  },
+  "arrow_lower_right": {
+    "skins": [
+      {
+        "native": "↘️"
+      }
+    ]
+  },
+  "arrow_down": {
+    "skins": [
+      {
+        "native": "⬇️"
+      }
+    ]
+  },
+  "arrow_lower_left": {
+    "skins": [
+      {
+        "native": "↙️"
+      }
+    ]
+  },
+  "arrow_left": {
+    "skins": [
+      {
+        "native": "⬅️"
+      }
+    ]
+  },
+  "arrow_upper_left": {
+    "skins": [
+      {
+        "native": "↖️"
+      }
+    ]
+  },
+  "arrow_up_down": {
+    "skins": [
+      {
+        "native": "↕️"
+      }
+    ]
+  },
+  "left_right_arrow": {
+    "skins": [
+      {
+        "native": "↔️"
+      }
+    ]
+  },
+  "leftwards_arrow_with_hook": {
+    "skins": [
+      {
+        "native": "↩️"
+      }
+    ]
+  },
+  "arrow_right_hook": {
+    "skins": [
+      {
+        "native": "↪️"
+      }
+    ]
+  },
+  "arrow_heading_up": {
+    "skins": [
+      {
+        "native": "⤴️"
+      }
+    ]
+  },
+  "arrow_heading_down": {
+    "skins": [
+      {
+        "native": "⤵️"
+      }
+    ]
+  },
+  "arrows_clockwise": {
+    "skins": [
+      {
+        "native": "🔃"
+      }
+    ]
+  },
+  "arrows_counterclockwise": {
+    "skins": [
+      {
+        "native": "🔄"
+      }
+    ]
+  },
+  "back": {
+    "skins": [
+      {
+        "native": "🔙"
+      }
+    ]
+  },
+  "end": {
+    "skins": [
+      {
+        "native": "🔚"
+      }
+    ]
+  },
+  "on": {
+    "skins": [
+      {
+        "native": "🔛"
+      }
+    ]
+  },
+  "soon": {
+    "skins": [
+      {
+        "native": "🔜"
+      }
+    ]
+  },
+  "top": {
+    "skins": [
+      {
+        "native": "🔝"
+      }
+    ]
+  },
+  "place_of_worship": {
+    "skins": [
+      {
+        "native": "🛐"
+      }
+    ]
+  },
+  "atom_symbol": {
+    "skins": [
+      {
+        "native": "⚛️"
+      }
+    ]
+  },
+  "om_symbol": {
+    "skins": [
+      {
+        "native": "🕉️"
+      }
+    ]
+  },
+  "star_of_david": {
+    "skins": [
+      {
+        "native": "✡️"
+      }
+    ]
+  },
+  "wheel_of_dharma": {
+    "skins": [
+      {
+        "native": "☸️"
+      }
+    ]
+  },
+  "yin_yang": {
+    "skins": [
+      {
+        "native": "☯️"
+      }
+    ]
+  },
+  "latin_cross": {
+    "skins": [
+      {
+        "native": "✝️"
+      }
+    ]
+  },
+  "orthodox_cross": {
+    "skins": [
+      {
+        "native": "☦️"
+      }
+    ]
+  },
+  "star_and_crescent": {
+    "skins": [
+      {
+        "native": "☪️"
+      }
+    ]
+  },
+  "peace_symbol": {
+    "skins": [
+      {
+        "native": "☮️"
+      }
+    ]
+  },
+  "menorah_with_nine_branches": {
+    "skins": [
+      {
+        "native": "🕎"
+      }
+    ]
+  },
+  "six_pointed_star": {
+    "skins": [
+      {
+        "native": "🔯"
+      }
+    ]
+  },
+  "khanda": {
+    "skins": [
+      {
+        "native": "🪯"
+      }
+    ]
+  },
+  "aries": {
+    "skins": [
+      {
+        "native": "♈"
+      }
+    ]
+  },
+  "taurus": {
+    "skins": [
+      {
+        "native": "♉"
+      }
+    ]
+  },
+  "gemini": {
+    "skins": [
+      {
+        "native": "♊"
+      }
+    ]
+  },
+  "cancer": {
+    "skins": [
+      {
+        "native": "♋"
+      }
+    ]
+  },
+  "leo": {
+    "skins": [
+      {
+        "native": "♌"
+      }
+    ]
+  },
+  "virgo": {
+    "skins": [
+      {
+        "native": "♍"
+      }
+    ]
+  },
+  "libra": {
+    "skins": [
+      {
+        "native": "♎"
+      }
+    ]
+  },
+  "scorpius": {
+    "skins": [
+      {
+        "native": "♏"
+      }
+    ]
+  },
+  "sagittarius": {
+    "skins": [
+      {
+        "native": "♐"
+      }
+    ]
+  },
+  "capricorn": {
+    "skins": [
+      {
+        "native": "♑"
+      }
+    ]
+  },
+  "aquarius": {
+    "skins": [
+      {
+        "native": "♒"
+      }
+    ]
+  },
+  "pisces": {
+    "skins": [
+      {
+        "native": "♓"
+      }
+    ]
+  },
+  "ophiuchus": {
+    "skins": [
+      {
+        "native": "⛎"
+      }
+    ]
+  },
+  "twisted_rightwards_arrows": {
+    "skins": [
+      {
+        "native": "🔀"
+      }
+    ]
+  },
+  "repeat": {
+    "skins": [
+      {
+        "native": "🔁"
+      }
+    ]
+  },
+  "repeat_one": {
+    "skins": [
+      {
+        "native": "🔂"
+      }
+    ]
+  },
+  "arrow_forward": {
+    "skins": [
+      {
+        "native": "▶️"
+      }
+    ]
+  },
+  "fast_forward": {
+    "skins": [
+      {
+        "native": "⏩"
+      }
+    ]
+  },
+  "black_right_pointing_double_triangle_with_vertical_bar": {
+    "skins": [
+      {
+        "native": "⏭️"
+      }
+    ]
+  },
+  "black_right_pointing_triangle_with_double_vertical_bar": {
+    "skins": [
+      {
+        "native": "⏯️"
+      }
+    ]
+  },
+  "arrow_backward": {
+    "skins": [
+      {
+        "native": "◀️"
+      }
+    ]
+  },
+  "rewind": {
+    "skins": [
+      {
+        "native": "⏪"
+      }
+    ]
+  },
+  "black_left_pointing_double_triangle_with_vertical_bar": {
+    "skins": [
+      {
+        "native": "⏮️"
+      }
+    ]
+  },
+  "arrow_up_small": {
+    "skins": [
+      {
+        "native": "🔼"
+      }
+    ]
+  },
+  "arrow_double_up": {
+    "skins": [
+      {
+        "native": "⏫"
+      }
+    ]
+  },
+  "arrow_down_small": {
+    "skins": [
+      {
+        "native": "🔽"
+      }
+    ]
+  },
+  "arrow_double_down": {
+    "skins": [
+      {
+        "native": "⏬"
+      }
+    ]
+  },
+  "double_vertical_bar": {
+    "skins": [
+      {
+        "native": "⏸️"
+      }
+    ]
+  },
+  "black_square_for_stop": {
+    "skins": [
+      {
+        "native": "⏹️"
+      }
+    ]
+  },
+  "black_circle_for_record": {
+    "skins": [
+      {
+        "native": "⏺️"
+      }
+    ]
+  },
+  "eject": {
+    "skins": [
+      {
+        "native": "⏏️"
+      }
+    ]
+  },
+  "cinema": {
+    "skins": [
+      {
+        "native": "🎦"
+      }
+    ]
+  },
+  "low_brightness": {
+    "skins": [
+      {
+        "native": "🔅"
+      }
+    ]
+  },
+  "high_brightness": {
+    "skins": [
+      {
+        "native": "🔆"
+      }
+    ]
+  },
+  "signal_strength": {
+    "skins": [
+      {
+        "native": "📶"
+      }
+    ]
+  },
+  "wireless": {
+    "skins": [
+      {
+        "native": "🛜"
+      }
+    ]
+  },
+  "vibration_mode": {
+    "skins": [
+      {
+        "native": "📳"
+      }
+    ]
+  },
+  "mobile_phone_off": {
+    "skins": [
+      {
+        "native": "📴"
+      }
+    ]
+  },
+  "female_sign": {
+    "skins": [
+      {
+        "native": "♀️"
+      }
+    ]
+  },
+  "male_sign": {
+    "skins": [
+      {
+        "native": "♂️"
+      }
+    ]
+  },
+  "transgender_symbol": {
+    "skins": [
+      {
+        "native": "⚧️"
+      }
+    ]
+  },
+  "heavy_multiplication_x": {
+    "skins": [
+      {
+        "native": "✖️"
+      }
+    ]
+  },
+  "heavy_plus_sign": {
+    "skins": [
+      {
+        "native": "➕"
+      }
+    ]
+  },
+  "heavy_minus_sign": {
+    "skins": [
+      {
+        "native": "➖"
+      }
+    ]
+  },
+  "heavy_division_sign": {
+    "skins": [
+      {
+        "native": "➗"
+      }
+    ]
+  },
+  "heavy_equals_sign": {
+    "skins": [
+      {
+        "native": "🟰"
+      }
+    ]
+  },
+  "infinity": {
+    "skins": [
+      {
+        "native": "♾️"
+      }
+    ]
+  },
+  "bangbang": {
+    "skins": [
+      {
+        "native": "‼️"
+      }
+    ]
+  },
+  "interrobang": {
+    "skins": [
+      {
+        "native": "⁉️"
+      }
+    ]
+  },
+  "question": {
+    "skins": [
+      {
+        "native": "❓"
+      }
+    ]
+  },
+  "grey_question": {
+    "skins": [
+      {
+        "native": "❔"
+      }
+    ]
+  },
+  "grey_exclamation": {
+    "skins": [
+      {
+        "native": "❕"
+      }
+    ]
+  },
+  "exclamation": {
+    "skins": [
+      {
+        "native": "❗"
+      }
+    ]
+  },
+  "wavy_dash": {
+    "skins": [
+      {
+        "native": "〰️"
+      }
+    ]
+  },
+  "currency_exchange": {
+    "skins": [
+      {
+        "native": "💱"
+      }
+    ]
+  },
+  "heavy_dollar_sign": {
+    "skins": [
+      {
+        "native": "💲"
+      }
+    ]
+  },
+  "medical_symbol": {
+    "skins": [
+      {
+        "native": "⚕️"
+      }
+    ]
+  },
+  "recycle": {
+    "skins": [
+      {
+        "native": "♻️"
+      }
+    ]
+  },
+  "fleur_de_lis": {
+    "skins": [
+      {
+        "native": "⚜️"
+      }
+    ]
+  },
+  "trident": {
+    "skins": [
+      {
+        "native": "🔱"
+      }
+    ]
+  },
+  "name_badge": {
+    "skins": [
+      {
+        "native": "📛"
+      }
+    ]
+  },
+  "beginner": {
+    "skins": [
+      {
+        "native": "🔰"
+      }
+    ]
+  },
+  "o": {
+    "skins": [
+      {
+        "native": "⭕"
+      }
+    ]
+  },
+  "white_check_mark": {
+    "skins": [
+      {
+        "native": "✅"
+      }
+    ]
+  },
+  "ballot_box_with_check": {
+    "skins": [
+      {
+        "native": "☑️"
+      }
+    ]
+  },
+  "heavy_check_mark": {
+    "skins": [
+      {
+        "native": "✔️"
+      }
+    ]
+  },
+  "x": {
+    "skins": [
+      {
+        "native": "❌"
+      }
+    ]
+  },
+  "negative_squared_cross_mark": {
+    "skins": [
+      {
+        "native": "❎"
+      }
+    ]
+  },
+  "curly_loop": {
+    "skins": [
+      {
+        "native": "➰"
+      }
+    ]
+  },
+  "loop": {
+    "skins": [
+      {
+        "native": "➿"
+      }
+    ]
+  },
+  "part_alternation_mark": {
+    "skins": [
+      {
+        "native": "〽️"
+      }
+    ]
+  },
+  "eight_spoked_asterisk": {
+    "skins": [
+      {
+        "native": "✳️"
+      }
+    ]
+  },
+  "eight_pointed_black_star": {
+    "skins": [
+      {
+        "native": "✴️"
+      }
+    ]
+  },
+  "sparkle": {
+    "skins": [
+      {
+        "native": "❇️"
+      }
+    ]
+  },
+  "copyright": {
+    "skins": [
+      {
+        "native": "©️"
+      }
+    ]
+  },
+  "registered": {
+    "skins": [
+      {
+        "native": "®️"
+      }
+    ]
+  },
+  "tm": {
+    "skins": [
+      {
+        "native": "™️"
+      }
+    ]
+  },
+  "hash": {
+    "skins": [
+      {
+        "native": "#️⃣"
+      }
+    ]
+  },
+  "keycap_star": {
+    "skins": [
+      {
+        "native": "*️⃣"
+      }
+    ]
+  },
+  "zero": {
+    "skins": [
+      {
+        "native": "0️⃣"
+      }
+    ]
+  },
+  "one": {
+    "skins": [
+      {
+        "native": "1️⃣"
+      }
+    ]
+  },
+  "two": {
+    "skins": [
+      {
+        "native": "2️⃣"
+      }
+    ]
+  },
+  "three": {
+    "skins": [
+      {
+        "native": "3️⃣"
+      }
+    ]
+  },
+  "four": {
+    "skins": [
+      {
+        "native": "4️⃣"
+      }
+    ]
+  },
+  "five": {
+    "skins": [
+      {
+        "native": "5️⃣"
+      }
+    ]
+  },
+  "six": {
+    "skins": [
+      {
+        "native": "6️⃣"
+      }
+    ]
+  },
+  "seven": {
+    "skins": [
+      {
+        "native": "7️⃣"
+      }
+    ]
+  },
+  "eight": {
+    "skins": [
+      {
+        "native": "8️⃣"
+      }
+    ]
+  },
+  "nine": {
+    "skins": [
+      {
+        "native": "9️⃣"
+      }
+    ]
+  },
+  "keycap_ten": {
+    "skins": [
+      {
+        "native": "🔟"
+      }
+    ]
+  },
+  "capital_abcd": {
+    "skins": [
+      {
+        "native": "🔠"
+      }
+    ]
+  },
+  "abcd": {
+    "skins": [
+      {
+        "native": "🔡"
+      }
+    ]
+  },
+  "symbols": {
+    "skins": [
+      {
+        "native": "🔣"
+      }
+    ]
+  },
+  "abc": {
+    "skins": [
+      {
+        "native": "🔤"
+      }
+    ]
+  },
+  "a": {
+    "skins": [
+      {
+        "native": "🅰️"
+      }
+    ]
+  },
+  "ab": {
+    "skins": [
+      {
+        "native": "🆎"
+      }
+    ]
+  },
+  "b": {
+    "skins": [
+      {
+        "native": "🅱️"
+      }
+    ]
+  },
+  "cl": {
+    "skins": [
+      {
+        "native": "🆑"
+      }
+    ]
+  },
+  "cool": {
+    "skins": [
+      {
+        "native": "🆒"
+      }
+    ]
+  },
+  "free": {
+    "skins": [
+      {
+        "native": "🆓"
+      }
+    ]
+  },
+  "information_source": {
+    "skins": [
+      {
+        "native": "ℹ️"
+      }
+    ]
+  },
+  "id": {
+    "skins": [
+      {
+        "native": "🆔"
+      }
+    ]
+  },
+  "m": {
+    "skins": [
+      {
+        "native": "Ⓜ️"
+      }
+    ]
+  },
+  "new": {
+    "skins": [
+      {
+        "native": "🆕"
+      }
+    ]
+  },
+  "ng": {
+    "skins": [
+      {
+        "native": "🆖"
+      }
+    ]
+  },
+  "o2": {
+    "skins": [
+      {
+        "native": "🅾️"
+      }
+    ]
+  },
+  "ok": {
+    "skins": [
+      {
+        "native": "🆗"
+      }
+    ]
+  },
+  "parking": {
+    "skins": [
+      {
+        "native": "🅿️"
+      }
+    ]
+  },
+  "sos": {
+    "skins": [
+      {
+        "native": "🆘"
+      }
+    ]
+  },
+  "up": {
+    "skins": [
+      {
+        "native": "🆙"
+      }
+    ]
+  },
+  "vs": {
+    "skins": [
+      {
+        "native": "🆚"
+      }
+    ]
+  },
+  "koko": {
+    "skins": [
+      {
+        "native": "🈁"
+      }
+    ]
+  },
+  "sa": {
+    "skins": [
+      {
+        "native": "🈂️"
+      }
+    ]
+  },
+  "u6708": {
+    "skins": [
+      {
+        "native": "🈷️"
+      }
+    ]
+  },
+  "u6709": {
+    "skins": [
+      {
+        "native": "🈶"
+      }
+    ]
+  },
+  "u6307": {
+    "skins": [
+      {
+        "native": "🈯"
+      }
+    ]
+  },
+  "ideograph_advantage": {
+    "skins": [
+      {
+        "native": "🉐"
+      }
+    ]
+  },
+  "u5272": {
+    "skins": [
+      {
+        "native": "🈹"
+      }
+    ]
+  },
+  "u7121": {
+    "skins": [
+      {
+        "native": "🈚"
+      }
+    ]
+  },
+  "u7981": {
+    "skins": [
+      {
+        "native": "🈲"
+      }
+    ]
+  },
+  "accept": {
+    "skins": [
+      {
+        "native": "🉑"
+      }
+    ]
+  },
+  "u7533": {
+    "skins": [
+      {
+        "native": "🈸"
+      }
+    ]
+  },
+  "u5408": {
+    "skins": [
+      {
+        "native": "🈴"
+      }
+    ]
+  },
+  "u7a7a": {
+    "skins": [
+      {
+        "native": "🈳"
+      }
+    ]
+  },
+  "congratulations": {
+    "skins": [
+      {
+        "native": "㊗️"
+      }
+    ]
+  },
+  "secret": {
+    "skins": [
+      {
+        "native": "㊙️"
+      }
+    ]
+  },
+  "u55b6": {
+    "skins": [
+      {
+        "native": "🈺"
+      }
+    ]
+  },
+  "u6e80": {
+    "skins": [
+      {
+        "native": "🈵"
+      }
+    ]
+  },
+  "red_circle": {
+    "skins": [
+      {
+        "native": "🔴"
+      }
+    ]
+  },
+  "large_orange_circle": {
+    "skins": [
+      {
+        "native": "🟠"
+      }
+    ]
+  },
+  "large_yellow_circle": {
+    "skins": [
+      {
+        "native": "🟡"
+      }
+    ]
+  },
+  "large_green_circle": {
+    "skins": [
+      {
+        "native": "🟢"
+      }
+    ]
+  },
+  "large_blue_circle": {
+    "skins": [
+      {
+        "native": "🔵"
+      }
+    ]
+  },
+  "large_purple_circle": {
+    "skins": [
+      {
+        "native": "🟣"
+      }
+    ]
+  },
+  "large_brown_circle": {
+    "skins": [
+      {
+        "native": "🟤"
+      }
+    ]
+  },
+  "black_circle": {
+    "skins": [
+      {
+        "native": "⚫"
+      }
+    ]
+  },
+  "white_circle": {
+    "skins": [
+      {
+        "native": "⚪"
+      }
+    ]
+  },
+  "large_red_square": {
+    "skins": [
+      {
+        "native": "🟥"
+      }
+    ]
+  },
+  "large_orange_square": {
+    "skins": [
+      {
+        "native": "🟧"
+      }
+    ]
+  },
+  "large_yellow_square": {
+    "skins": [
+      {
+        "native": "🟨"
+      }
+    ]
+  },
+  "large_green_square": {
+    "skins": [
+      {
+        "native": "🟩"
+      }
+    ]
+  },
+  "large_blue_square": {
+    "skins": [
+      {
+        "native": "🟦"
+      }
+    ]
+  },
+  "large_purple_square": {
+    "skins": [
+      {
+        "native": "🟪"
+      }
+    ]
+  },
+  "large_brown_square": {
+    "skins": [
+      {
+        "native": "🟫"
+      }
+    ]
+  },
+  "black_large_square": {
+    "skins": [
+      {
+        "native": "⬛"
+      }
+    ]
+  },
+  "white_large_square": {
+    "skins": [
+      {
+        "native": "⬜"
+      }
+    ]
+  },
+  "black_medium_square": {
+    "skins": [
+      {
+        "native": "◼️"
+      }
+    ]
+  },
+  "white_medium_square": {
+    "skins": [
+      {
+        "native": "◻️"
+      }
+    ]
+  },
+  "black_medium_small_square": {
+    "skins": [
+      {
+        "native": "◾"
+      }
+    ]
+  },
+  "white_medium_small_square": {
+    "skins": [
+      {
+        "native": "◽"
+      }
+    ]
+  },
+  "black_small_square": {
+    "skins": [
+      {
+        "native": "▪️"
+      }
+    ]
+  },
+  "white_small_square": {
+    "skins": [
+      {
+        "native": "▫️"
+      }
+    ]
+  },
+  "large_orange_diamond": {
+    "skins": [
+      {
+        "native": "🔶"
+      }
+    ]
+  },
+  "large_blue_diamond": {
+    "skins": [
+      {
+        "native": "🔷"
+      }
+    ]
+  },
+  "small_orange_diamond": {
+    "skins": [
+      {
+        "native": "🔸"
+      }
+    ]
+  },
+  "small_blue_diamond": {
+    "skins": [
+      {
+        "native": "🔹"
+      }
+    ]
+  },
+  "small_red_triangle": {
+    "skins": [
+      {
+        "native": "🔺"
+      }
+    ]
+  },
+  "small_red_triangle_down": {
+    "skins": [
+      {
+        "native": "🔻"
+      }
+    ]
+  },
+  "diamond_shape_with_a_dot_inside": {
+    "skins": [
+      {
+        "native": "💠"
+      }
+    ]
+  },
+  "radio_button": {
+    "skins": [
+      {
+        "native": "🔘"
+      }
+    ]
+  },
+  "white_square_button": {
+    "skins": [
+      {
+        "native": "🔳"
+      }
+    ]
+  },
+  "black_square_button": {
+    "skins": [
+      {
+        "native": "🔲"
+      }
+    ]
+  },
+  "checkered_flag": {
+    "skins": [
+      {
+        "native": "🏁"
+      }
+    ]
+  },
+  "triangular_flag_on_post": {
+    "skins": [
+      {
+        "native": "🚩"
+      }
+    ]
+  },
+  "crossed_flags": {
+    "skins": [
+      {
+        "native": "🎌"
+      }
+    ]
+  },
+  "waving_black_flag": {
+    "skins": [
+      {
+        "native": "🏴"
+      }
+    ]
+  },
+  "waving_white_flag": {
+    "skins": [
+      {
+        "native": "🏳️"
+      }
+    ]
+  },
+  "rainbow-flag": {
+    "skins": [
+      {
+        "native": "🏳️‍🌈"
+      }
+    ]
+  },
+  "transgender_flag": {
+    "skins": [
+      {
+        "native": "🏳️‍⚧️"
+      }
+    ]
+  },
+  "pirate_flag": {
+    "skins": [
+      {
+        "native": "🏴‍☠️"
+      }
+    ]
+  },
+  "flag-ac": {
+    "skins": [
+      {
+        "native": "🇦🇨"
+      }
+    ]
+  },
+  "flag-ad": {
+    "skins": [
+      {
+        "native": "🇦🇩"
+      }
+    ]
+  },
+  "flag-ae": {
+    "skins": [
+      {
+        "native": "🇦🇪"
+      }
+    ]
+  },
+  "flag-af": {
+    "skins": [
+      {
+        "native": "🇦🇫"
+      }
+    ]
+  },
+  "flag-ag": {
+    "skins": [
+      {
+        "native": "🇦🇬"
+      }
+    ]
+  },
+  "flag-ai": {
+    "skins": [
+      {
+        "native": "🇦🇮"
+      }
+    ]
+  },
+  "flag-al": {
+    "skins": [
+      {
+        "native": "🇦🇱"
+      }
+    ]
+  },
+  "flag-am": {
+    "skins": [
+      {
+        "native": "🇦🇲"
+      }
+    ]
+  },
+  "flag-ao": {
+    "skins": [
+      {
+        "native": "🇦🇴"
+      }
+    ]
+  },
+  "flag-aq": {
+    "skins": [
+      {
+        "native": "🇦🇶"
+      }
+    ]
+  },
+  "flag-ar": {
+    "skins": [
+      {
+        "native": "🇦🇷"
+      }
+    ]
+  },
+  "flag-as": {
+    "skins": [
+      {
+        "native": "🇦🇸"
+      }
+    ]
+  },
+  "flag-at": {
+    "skins": [
+      {
+        "native": "🇦🇹"
+      }
+    ]
+  },
+  "flag-au": {
+    "skins": [
+      {
+        "native": "🇦🇺"
+      }
+    ]
+  },
+  "flag-aw": {
+    "skins": [
+      {
+        "native": "🇦🇼"
+      }
+    ]
+  },
+  "flag-ax": {
+    "skins": [
+      {
+        "native": "🇦🇽"
+      }
+    ]
+  },
+  "flag-az": {
+    "skins": [
+      {
+        "native": "🇦🇿"
+      }
+    ]
+  },
+  "flag-ba": {
+    "skins": [
+      {
+        "native": "🇧🇦"
+      }
+    ]
+  },
+  "flag-bb": {
+    "skins": [
+      {
+        "native": "🇧🇧"
+      }
+    ]
+  },
+  "flag-bd": {
+    "skins": [
+      {
+        "native": "🇧🇩"
+      }
+    ]
+  },
+  "flag-be": {
+    "skins": [
+      {
+        "native": "🇧🇪"
+      }
+    ]
+  },
+  "flag-bf": {
+    "skins": [
+      {
+        "native": "🇧🇫"
+      }
+    ]
+  },
+  "flag-bg": {
+    "skins": [
+      {
+        "native": "🇧🇬"
+      }
+    ]
+  },
+  "flag-bh": {
+    "skins": [
+      {
+        "native": "🇧🇭"
+      }
+    ]
+  },
+  "flag-bi": {
+    "skins": [
+      {
+        "native": "🇧🇮"
+      }
+    ]
+  },
+  "flag-bj": {
+    "skins": [
+      {
+        "native": "🇧🇯"
+      }
+    ]
+  },
+  "flag-bl": {
+    "skins": [
+      {
+        "native": "🇧🇱"
+      }
+    ]
+  },
+  "flag-bm": {
+    "skins": [
+      {
+        "native": "🇧🇲"
+      }
+    ]
+  },
+  "flag-bn": {
+    "skins": [
+      {
+        "native": "🇧🇳"
+      }
+    ]
+  },
+  "flag-bo": {
+    "skins": [
+      {
+        "native": "🇧🇴"
+      }
+    ]
+  },
+  "flag-bq": {
+    "skins": [
+      {
+        "native": "🇧🇶"
+      }
+    ]
+  },
+  "flag-br": {
+    "skins": [
+      {
+        "native": "🇧🇷"
+      }
+    ]
+  },
+  "flag-bs": {
+    "skins": [
+      {
+        "native": "🇧🇸"
+      }
+    ]
+  },
+  "flag-bt": {
+    "skins": [
+      {
+        "native": "🇧🇹"
+      }
+    ]
+  },
+  "flag-bv": {
+    "skins": [
+      {
+        "native": "🇧🇻"
+      }
+    ]
+  },
+  "flag-bw": {
+    "skins": [
+      {
+        "native": "🇧🇼"
+      }
+    ]
+  },
+  "flag-by": {
+    "skins": [
+      {
+        "native": "🇧🇾"
+      }
+    ]
+  },
+  "flag-bz": {
+    "skins": [
+      {
+        "native": "🇧🇿"
+      }
+    ]
+  },
+  "flag-ca": {
+    "skins": [
+      {
+        "native": "🇨🇦"
+      }
+    ]
+  },
+  "flag-cc": {
+    "skins": [
+      {
+        "native": "🇨🇨"
+      }
+    ]
+  },
+  "flag-cd": {
+    "skins": [
+      {
+        "native": "🇨🇩"
+      }
+    ]
+  },
+  "flag-cf": {
+    "skins": [
+      {
+        "native": "🇨🇫"
+      }
+    ]
+  },
+  "flag-cg": {
+    "skins": [
+      {
+        "native": "🇨🇬"
+      }
+    ]
+  },
+  "flag-ch": {
+    "skins": [
+      {
+        "native": "🇨🇭"
+      }
+    ]
+  },
+  "flag-ci": {
+    "skins": [
+      {
+        "native": "🇨🇮"
+      }
+    ]
+  },
+  "flag-ck": {
+    "skins": [
+      {
+        "native": "🇨🇰"
+      }
+    ]
+  },
+  "flag-cl": {
+    "skins": [
+      {
+        "native": "🇨🇱"
+      }
+    ]
+  },
+  "flag-cm": {
+    "skins": [
+      {
+        "native": "🇨🇲"
+      }
+    ]
+  },
+  "cn": {
+    "skins": [
+      {
+        "native": "🇨🇳"
+      }
+    ]
+  },
+  "flag-co": {
+    "skins": [
+      {
+        "native": "🇨🇴"
+      }
+    ]
+  },
+  "flag-cp": {
+    "skins": [
+      {
+        "native": "🇨🇵"
+      }
+    ]
+  },
+  "flag-cr": {
+    "skins": [
+      {
+        "native": "🇨🇷"
+      }
+    ]
+  },
+  "flag-cu": {
+    "skins": [
+      {
+        "native": "🇨🇺"
+      }
+    ]
+  },
+  "flag-cv": {
+    "skins": [
+      {
+        "native": "🇨🇻"
+      }
+    ]
+  },
+  "flag-cw": {
+    "skins": [
+      {
+        "native": "🇨🇼"
+      }
+    ]
+  },
+  "flag-cx": {
+    "skins": [
+      {
+        "native": "🇨🇽"
+      }
+    ]
+  },
+  "flag-cy": {
+    "skins": [
+      {
+        "native": "🇨🇾"
+      }
+    ]
+  },
+  "flag-cz": {
+    "skins": [
+      {
+        "native": "🇨🇿"
+      }
+    ]
+  },
+  "de": {
+    "skins": [
+      {
+        "native": "🇩🇪"
+      }
+    ]
+  },
+  "flag-dg": {
+    "skins": [
+      {
+        "native": "🇩🇬"
+      }
+    ]
+  },
+  "flag-dj": {
+    "skins": [
+      {
+        "native": "🇩🇯"
+      }
+    ]
+  },
+  "flag-dk": {
+    "skins": [
+      {
+        "native": "🇩🇰"
+      }
+    ]
+  },
+  "flag-dm": {
+    "skins": [
+      {
+        "native": "🇩🇲"
+      }
+    ]
+  },
+  "flag-do": {
+    "skins": [
+      {
+        "native": "🇩🇴"
+      }
+    ]
+  },
+  "flag-dz": {
+    "skins": [
+      {
+        "native": "🇩🇿"
+      }
+    ]
+  },
+  "flag-ea": {
+    "skins": [
+      {
+        "native": "🇪🇦"
+      }
+    ]
+  },
+  "flag-ec": {
+    "skins": [
+      {
+        "native": "🇪🇨"
+      }
+    ]
+  },
+  "flag-ee": {
+    "skins": [
+      {
+        "native": "🇪🇪"
+      }
+    ]
+  },
+  "flag-eg": {
+    "skins": [
+      {
+        "native": "🇪🇬"
+      }
+    ]
+  },
+  "flag-eh": {
+    "skins": [
+      {
+        "native": "🇪🇭"
+      }
+    ]
+  },
+  "flag-er": {
+    "skins": [
+      {
+        "native": "🇪🇷"
+      }
+    ]
+  },
+  "es": {
+    "skins": [
+      {
+        "native": "🇪🇸"
+      }
+    ]
+  },
+  "flag-et": {
+    "skins": [
+      {
+        "native": "🇪🇹"
+      }
+    ]
+  },
+  "flag-eu": {
+    "skins": [
+      {
+        "native": "🇪🇺"
+      }
+    ]
+  },
+  "flag-fi": {
+    "skins": [
+      {
+        "native": "🇫🇮"
+      }
+    ]
+  },
+  "flag-fj": {
+    "skins": [
+      {
+        "native": "🇫🇯"
+      }
+    ]
+  },
+  "flag-fk": {
+    "skins": [
+      {
+        "native": "🇫🇰"
+      }
+    ]
+  },
+  "flag-fm": {
+    "skins": [
+      {
+        "native": "🇫🇲"
+      }
+    ]
+  },
+  "flag-fo": {
+    "skins": [
+      {
+        "native": "🇫🇴"
+      }
+    ]
+  },
+  "fr": {
+    "skins": [
+      {
+        "native": "🇫🇷"
+      }
+    ]
+  },
+  "flag-ga": {
+    "skins": [
+      {
+        "native": "🇬🇦"
+      }
+    ]
+  },
+  "gb": {
+    "skins": [
+      {
+        "native": "🇬🇧"
+      }
+    ]
+  },
+  "flag-gd": {
+    "skins": [
+      {
+        "native": "🇬🇩"
+      }
+    ]
+  },
+  "flag-ge": {
+    "skins": [
+      {
+        "native": "🇬🇪"
+      }
+    ]
+  },
+  "flag-gf": {
+    "skins": [
+      {
+        "native": "🇬🇫"
+      }
+    ]
+  },
+  "flag-gg": {
+    "skins": [
+      {
+        "native": "🇬🇬"
+      }
+    ]
+  },
+  "flag-gh": {
+    "skins": [
+      {
+        "native": "🇬🇭"
+      }
+    ]
+  },
+  "flag-gi": {
+    "skins": [
+      {
+        "native": "🇬🇮"
+      }
+    ]
+  },
+  "flag-gl": {
+    "skins": [
+      {
+        "native": "🇬🇱"
+      }
+    ]
+  },
+  "flag-gm": {
+    "skins": [
+      {
+        "native": "🇬🇲"
+      }
+    ]
+  },
+  "flag-gn": {
+    "skins": [
+      {
+        "native": "🇬🇳"
+      }
+    ]
+  },
+  "flag-gp": {
+    "skins": [
+      {
+        "native": "🇬🇵"
+      }
+    ]
+  },
+  "flag-gq": {
+    "skins": [
+      {
+        "native": "🇬🇶"
+      }
+    ]
+  },
+  "flag-gr": {
+    "skins": [
+      {
+        "native": "🇬🇷"
+      }
+    ]
+  },
+  "flag-gs": {
+    "skins": [
+      {
+        "native": "🇬🇸"
+      }
+    ]
+  },
+  "flag-gt": {
+    "skins": [
+      {
+        "native": "🇬🇹"
+      }
+    ]
+  },
+  "flag-gu": {
+    "skins": [
+      {
+        "native": "🇬🇺"
+      }
+    ]
+  },
+  "flag-gw": {
+    "skins": [
+      {
+        "native": "🇬🇼"
+      }
+    ]
+  },
+  "flag-gy": {
+    "skins": [
+      {
+        "native": "🇬🇾"
+      }
+    ]
+  },
+  "flag-hk": {
+    "skins": [
+      {
+        "native": "🇭🇰"
+      }
+    ]
+  },
+  "flag-hm": {
+    "skins": [
+      {
+        "native": "🇭🇲"
+      }
+    ]
+  },
+  "flag-hn": {
+    "skins": [
+      {
+        "native": "🇭🇳"
+      }
+    ]
+  },
+  "flag-hr": {
+    "skins": [
+      {
+        "native": "🇭🇷"
+      }
+    ]
+  },
+  "flag-ht": {
+    "skins": [
+      {
+        "native": "🇭🇹"
+      }
+    ]
+  },
+  "flag-hu": {
+    "skins": [
+      {
+        "native": "🇭🇺"
+      }
+    ]
+  },
+  "flag-ic": {
+    "skins": [
+      {
+        "native": "🇮🇨"
+      }
+    ]
+  },
+  "flag-id": {
+    "skins": [
+      {
+        "native": "🇮🇩"
+      }
+    ]
+  },
+  "flag-ie": {
+    "skins": [
+      {
+        "native": "🇮🇪"
+      }
+    ]
+  },
+  "flag-il": {
+    "skins": [
+      {
+        "native": "🇮🇱"
+      }
+    ]
+  },
+  "flag-im": {
+    "skins": [
+      {
+        "native": "🇮🇲"
+      }
+    ]
+  },
+  "flag-in": {
+    "skins": [
+      {
+        "native": "🇮🇳"
+      }
+    ]
+  },
+  "flag-io": {
+    "skins": [
+      {
+        "native": "🇮🇴"
+      }
+    ]
+  },
+  "flag-iq": {
+    "skins": [
+      {
+        "native": "🇮🇶"
+      }
+    ]
+  },
+  "flag-ir": {
+    "skins": [
+      {
+        "native": "🇮🇷"
+      }
+    ]
+  },
+  "flag-is": {
+    "skins": [
+      {
+        "native": "🇮🇸"
+      }
+    ]
+  },
+  "it": {
+    "skins": [
+      {
+        "native": "🇮🇹"
+      }
+    ]
+  },
+  "flag-je": {
+    "skins": [
+      {
+        "native": "🇯🇪"
+      }
+    ]
+  },
+  "flag-jm": {
+    "skins": [
+      {
+        "native": "🇯🇲"
+      }
+    ]
+  },
+  "flag-jo": {
+    "skins": [
+      {
+        "native": "🇯🇴"
+      }
+    ]
+  },
+  "jp": {
+    "skins": [
+      {
+        "native": "🇯🇵"
+      }
+    ]
+  },
+  "flag-ke": {
+    "skins": [
+      {
+        "native": "🇰🇪"
+      }
+    ]
+  },
+  "flag-kg": {
+    "skins": [
+      {
+        "native": "🇰🇬"
+      }
+    ]
+  },
+  "flag-kh": {
+    "skins": [
+      {
+        "native": "🇰🇭"
+      }
+    ]
+  },
+  "flag-ki": {
+    "skins": [
+      {
+        "native": "🇰🇮"
+      }
+    ]
+  },
+  "flag-km": {
+    "skins": [
+      {
+        "native": "🇰🇲"
+      }
+    ]
+  },
+  "flag-kn": {
+    "skins": [
+      {
+        "native": "🇰🇳"
+      }
+    ]
+  },
+  "flag-kp": {
+    "skins": [
+      {
+        "native": "🇰🇵"
+      }
+    ]
+  },
+  "kr": {
+    "skins": [
+      {
+        "native": "🇰🇷"
+      }
+    ]
+  },
+  "flag-kw": {
+    "skins": [
+      {
+        "native": "🇰🇼"
+      }
+    ]
+  },
+  "flag-ky": {
+    "skins": [
+      {
+        "native": "🇰🇾"
+      }
+    ]
+  },
+  "flag-kz": {
+    "skins": [
+      {
+        "native": "🇰🇿"
+      }
+    ]
+  },
+  "flag-la": {
+    "skins": [
+      {
+        "native": "🇱🇦"
+      }
+    ]
+  },
+  "flag-lb": {
+    "skins": [
+      {
+        "native": "🇱🇧"
+      }
+    ]
+  },
+  "flag-lc": {
+    "skins": [
+      {
+        "native": "🇱🇨"
+      }
+    ]
+  },
+  "flag-li": {
+    "skins": [
+      {
+        "native": "🇱🇮"
+      }
+    ]
+  },
+  "flag-lk": {
+    "skins": [
+      {
+        "native": "🇱🇰"
+      }
+    ]
+  },
+  "flag-lr": {
+    "skins": [
+      {
+        "native": "🇱🇷"
+      }
+    ]
+  },
+  "flag-ls": {
+    "skins": [
+      {
+        "native": "🇱🇸"
+      }
+    ]
+  },
+  "flag-lt": {
+    "skins": [
+      {
+        "native": "🇱🇹"
+      }
+    ]
+  },
+  "flag-lu": {
+    "skins": [
+      {
+        "native": "🇱🇺"
+      }
+    ]
+  },
+  "flag-lv": {
+    "skins": [
+      {
+        "native": "🇱🇻"
+      }
+    ]
+  },
+  "flag-ly": {
+    "skins": [
+      {
+        "native": "🇱🇾"
+      }
+    ]
+  },
+  "flag-ma": {
+    "skins": [
+      {
+        "native": "🇲🇦"
+      }
+    ]
+  },
+  "flag-mc": {
+    "skins": [
+      {
+        "native": "🇲🇨"
+      }
+    ]
+  },
+  "flag-md": {
+    "skins": [
+      {
+        "native": "🇲🇩"
+      }
+    ]
+  },
+  "flag-me": {
+    "skins": [
+      {
+        "native": "🇲🇪"
+      }
+    ]
+  },
+  "flag-mf": {
+    "skins": [
+      {
+        "native": "🇲🇫"
+      }
+    ]
+  },
+  "flag-mg": {
+    "skins": [
+      {
+        "native": "🇲🇬"
+      }
+    ]
+  },
+  "flag-mh": {
+    "skins": [
+      {
+        "native": "🇲🇭"
+      }
+    ]
+  },
+  "flag-mk": {
+    "skins": [
+      {
+        "native": "🇲🇰"
+      }
+    ]
+  },
+  "flag-ml": {
+    "skins": [
+      {
+        "native": "🇲🇱"
+      }
+    ]
+  },
+  "flag-mm": {
+    "skins": [
+      {
+        "native": "🇲🇲"
+      }
+    ]
+  },
+  "flag-mn": {
+    "skins": [
+      {
+        "native": "🇲🇳"
+      }
+    ]
+  },
+  "flag-mo": {
+    "skins": [
+      {
+        "native": "🇲🇴"
+      }
+    ]
+  },
+  "flag-mp": {
+    "skins": [
+      {
+        "native": "🇲🇵"
+      }
+    ]
+  },
+  "flag-mq": {
+    "skins": [
+      {
+        "native": "🇲🇶"
+      }
+    ]
+  },
+  "flag-mr": {
+    "skins": [
+      {
+        "native": "🇲🇷"
+      }
+    ]
+  },
+  "flag-ms": {
+    "skins": [
+      {
+        "native": "🇲🇸"
+      }
+    ]
+  },
+  "flag-mt": {
+    "skins": [
+      {
+        "native": "🇲🇹"
+      }
+    ]
+  },
+  "flag-mu": {
+    "skins": [
+      {
+        "native": "🇲🇺"
+      }
+    ]
+  },
+  "flag-mv": {
+    "skins": [
+      {
+        "native": "🇲🇻"
+      }
+    ]
+  },
+  "flag-mw": {
+    "skins": [
+      {
+        "native": "🇲🇼"
+      }
+    ]
+  },
+  "flag-mx": {
+    "skins": [
+      {
+        "native": "🇲🇽"
+      }
+    ]
+  },
+  "flag-my": {
+    "skins": [
+      {
+        "native": "🇲🇾"
+      }
+    ]
+  },
+  "flag-mz": {
+    "skins": [
+      {
+        "native": "🇲🇿"
+      }
+    ]
+  },
+  "flag-na": {
+    "skins": [
+      {
+        "native": "🇳🇦"
+      }
+    ]
+  },
+  "flag-nc": {
+    "skins": [
+      {
+        "native": "🇳🇨"
+      }
+    ]
+  },
+  "flag-ne": {
+    "skins": [
+      {
+        "native": "🇳🇪"
+      }
+    ]
+  },
+  "flag-nf": {
+    "skins": [
+      {
+        "native": "🇳🇫"
+      }
+    ]
+  },
+  "flag-ng": {
+    "skins": [
+      {
+        "native": "🇳🇬"
+      }
+    ]
+  },
+  "flag-ni": {
+    "skins": [
+      {
+        "native": "🇳🇮"
+      }
+    ]
+  },
+  "flag-nl": {
+    "skins": [
+      {
+        "native": "🇳🇱"
+      }
+    ]
+  },
+  "flag-no": {
+    "skins": [
+      {
+        "native": "🇳🇴"
+      }
+    ]
+  },
+  "flag-np": {
+    "skins": [
+      {
+        "native": "🇳🇵"
+      }
+    ]
+  },
+  "flag-nr": {
+    "skins": [
+      {
+        "native": "🇳🇷"
+      }
+    ]
+  },
+  "flag-nu": {
+    "skins": [
+      {
+        "native": "🇳🇺"
+      }
+    ]
+  },
+  "flag-nz": {
+    "skins": [
+      {
+        "native": "🇳🇿"
+      }
+    ]
+  },
+  "flag-om": {
+    "skins": [
+      {
+        "native": "🇴🇲"
+      }
+    ]
+  },
+  "flag-pa": {
+    "skins": [
+      {
+        "native": "🇵🇦"
+      }
+    ]
+  },
+  "flag-pe": {
+    "skins": [
+      {
+        "native": "🇵🇪"
+      }
+    ]
+  },
+  "flag-pf": {
+    "skins": [
+      {
+        "native": "🇵🇫"
+      }
+    ]
+  },
+  "flag-pg": {
+    "skins": [
+      {
+        "native": "🇵🇬"
+      }
+    ]
+  },
+  "flag-ph": {
+    "skins": [
+      {
+        "native": "🇵🇭"
+      }
+    ]
+  },
+  "flag-pk": {
+    "skins": [
+      {
+        "native": "🇵🇰"
+      }
+    ]
+  },
+  "flag-pl": {
+    "skins": [
+      {
+        "native": "🇵🇱"
+      }
+    ]
+  },
+  "flag-pm": {
+    "skins": [
+      {
+        "native": "🇵🇲"
+      }
+    ]
+  },
+  "flag-pn": {
+    "skins": [
+      {
+        "native": "🇵🇳"
+      }
+    ]
+  },
+  "flag-pr": {
+    "skins": [
+      {
+        "native": "🇵🇷"
+      }
+    ]
+  },
+  "flag-ps": {
+    "skins": [
+      {
+        "native": "🇵🇸"
+      }
+    ]
+  },
+  "flag-pt": {
+    "skins": [
+      {
+        "native": "🇵🇹"
+      }
+    ]
+  },
+  "flag-pw": {
+    "skins": [
+      {
+        "native": "🇵🇼"
+      }
+    ]
+  },
+  "flag-py": {
+    "skins": [
+      {
+        "native": "🇵🇾"
+      }
+    ]
+  },
+  "flag-qa": {
+    "skins": [
+      {
+        "native": "🇶🇦"
+      }
+    ]
+  },
+  "flag-re": {
+    "skins": [
+      {
+        "native": "🇷🇪"
+      }
+    ]
+  },
+  "flag-ro": {
+    "skins": [
+      {
+        "native": "🇷🇴"
+      }
+    ]
+  },
+  "flag-rs": {
+    "skins": [
+      {
+        "native": "🇷🇸"
+      }
+    ]
+  },
+  "ru": {
+    "skins": [
+      {
+        "native": "🇷🇺"
+      }
+    ]
+  },
+  "flag-rw": {
+    "skins": [
+      {
+        "native": "🇷🇼"
+      }
+    ]
+  },
+  "flag-sa": {
+    "skins": [
+      {
+        "native": "🇸🇦"
+      }
+    ]
+  },
+  "flag-sb": {
+    "skins": [
+      {
+        "native": "🇸🇧"
+      }
+    ]
+  },
+  "flag-sc": {
+    "skins": [
+      {
+        "native": "🇸🇨"
+      }
+    ]
+  },
+  "flag-sd": {
+    "skins": [
+      {
+        "native": "🇸🇩"
+      }
+    ]
+  },
+  "flag-se": {
+    "skins": [
+      {
+        "native": "🇸🇪"
+      }
+    ]
+  },
+  "flag-sg": {
+    "skins": [
+      {
+        "native": "🇸🇬"
+      }
+    ]
+  },
+  "flag-sh": {
+    "skins": [
+      {
+        "native": "🇸🇭"
+      }
+    ]
+  },
+  "flag-si": {
+    "skins": [
+      {
+        "native": "🇸🇮"
+      }
+    ]
+  },
+  "flag-sj": {
+    "skins": [
+      {
+        "native": "🇸🇯"
+      }
+    ]
+  },
+  "flag-sk": {
+    "skins": [
+      {
+        "native": "🇸🇰"
+      }
+    ]
+  },
+  "flag-sl": {
+    "skins": [
+      {
+        "native": "🇸🇱"
+      }
+    ]
+  },
+  "flag-sm": {
+    "skins": [
+      {
+        "native": "🇸🇲"
+      }
+    ]
+  },
+  "flag-sn": {
+    "skins": [
+      {
+        "native": "🇸🇳"
+      }
+    ]
+  },
+  "flag-so": {
+    "skins": [
+      {
+        "native": "🇸🇴"
+      }
+    ]
+  },
+  "flag-sr": {
+    "skins": [
+      {
+        "native": "🇸🇷"
+      }
+    ]
+  },
+  "flag-ss": {
+    "skins": [
+      {
+        "native": "🇸🇸"
+      }
+    ]
+  },
+  "flag-st": {
+    "skins": [
+      {
+        "native": "🇸🇹"
+      }
+    ]
+  },
+  "flag-sv": {
+    "skins": [
+      {
+        "native": "🇸🇻"
+      }
+    ]
+  },
+  "flag-sx": {
+    "skins": [
+      {
+        "native": "🇸🇽"
+      }
+    ]
+  },
+  "flag-sy": {
+    "skins": [
+      {
+        "native": "🇸🇾"
+      }
+    ]
+  },
+  "flag-sz": {
+    "skins": [
+      {
+        "native": "🇸🇿"
+      }
+    ]
+  },
+  "flag-ta": {
+    "skins": [
+      {
+        "native": "🇹🇦"
+      }
+    ]
+  },
+  "flag-tc": {
+    "skins": [
+      {
+        "native": "🇹🇨"
+      }
+    ]
+  },
+  "flag-td": {
+    "skins": [
+      {
+        "native": "🇹🇩"
+      }
+    ]
+  },
+  "flag-tf": {
+    "skins": [
+      {
+        "native": "🇹🇫"
+      }
+    ]
+  },
+  "flag-tg": {
+    "skins": [
+      {
+        "native": "🇹🇬"
+      }
+    ]
+  },
+  "flag-th": {
+    "skins": [
+      {
+        "native": "🇹🇭"
+      }
+    ]
+  },
+  "flag-tj": {
+    "skins": [
+      {
+        "native": "🇹🇯"
+      }
+    ]
+  },
+  "flag-tk": {
+    "skins": [
+      {
+        "native": "🇹🇰"
+      }
+    ]
+  },
+  "flag-tl": {
+    "skins": [
+      {
+        "native": "🇹🇱"
+      }
+    ]
+  },
+  "flag-tm": {
+    "skins": [
+      {
+        "native": "🇹🇲"
+      }
+    ]
+  },
+  "flag-tn": {
+    "skins": [
+      {
+        "native": "🇹🇳"
+      }
+    ]
+  },
+  "flag-to": {
+    "skins": [
+      {
+        "native": "🇹🇴"
+      }
+    ]
+  },
+  "flag-tr": {
+    "skins": [
+      {
+        "native": "🇹🇷"
+      }
+    ]
+  },
+  "flag-tt": {
+    "skins": [
+      {
+        "native": "🇹🇹"
+      }
+    ]
+  },
+  "flag-tv": {
+    "skins": [
+      {
+        "native": "🇹🇻"
+      }
+    ]
+  },
+  "flag-tw": {
+    "skins": [
+      {
+        "native": "🇹🇼"
+      }
+    ]
+  },
+  "flag-tz": {
+    "skins": [
+      {
+        "native": "🇹🇿"
+      }
+    ]
+  },
+  "flag-ua": {
+    "skins": [
+      {
+        "native": "🇺🇦"
+      }
+    ]
+  },
+  "flag-ug": {
+    "skins": [
+      {
+        "native": "🇺🇬"
+      }
+    ]
+  },
+  "flag-um": {
+    "skins": [
+      {
+        "native": "🇺🇲"
+      }
+    ]
+  },
+  "flag-un": {
+    "skins": [
+      {
+        "native": "🇺🇳"
+      }
+    ]
+  },
+  "us": {
+    "skins": [
+      {
+        "native": "🇺🇸"
+      }
+    ]
+  },
+  "flag-uy": {
+    "skins": [
+      {
+        "native": "🇺🇾"
+      }
+    ]
+  },
+  "flag-uz": {
+    "skins": [
+      {
+        "native": "🇺🇿"
+      }
+    ]
+  },
+  "flag-va": {
+    "skins": [
+      {
+        "native": "🇻🇦"
+      }
+    ]
+  },
+  "flag-vc": {
+    "skins": [
+      {
+        "native": "🇻🇨"
+      }
+    ]
+  },
+  "flag-ve": {
+    "skins": [
+      {
+        "native": "🇻🇪"
+      }
+    ]
+  },
+  "flag-vg": {
+    "skins": [
+      {
+        "native": "🇻🇬"
+      }
+    ]
+  },
+  "flag-vi": {
+    "skins": [
+      {
+        "native": "🇻🇮"
+      }
+    ]
+  },
+  "flag-vn": {
+    "skins": [
+      {
+        "native": "🇻🇳"
+      }
+    ]
+  },
+  "flag-vu": {
+    "skins": [
+      {
+        "native": "🇻🇺"
+      }
+    ]
+  },
+  "flag-wf": {
+    "skins": [
+      {
+        "native": "🇼🇫"
+      }
+    ]
+  },
+  "flag-ws": {
+    "skins": [
+      {
+        "native": "🇼🇸"
+      }
+    ]
+  },
+  "flag-xk": {
+    "skins": [
+      {
+        "native": "🇽🇰"
+      }
+    ]
+  },
+  "flag-ye": {
+    "skins": [
+      {
+        "native": "🇾🇪"
+      }
+    ]
+  },
+  "flag-yt": {
+    "skins": [
+      {
+        "native": "🇾🇹"
+      }
+    ]
+  },
+  "flag-za": {
+    "skins": [
+      {
+        "native": "🇿🇦"
+      }
+    ]
+  },
+  "flag-zm": {
+    "skins": [
+      {
+        "native": "🇿🇲"
+      }
+    ]
+  },
+  "flag-zw": {
+    "skins": [
+      {
+        "native": "🇿🇼"
+      }
+    ]
+  },
+  "flag-england": {
+    "skins": [
+      {
+        "native": "🏴󠁧󠁢󠁥󠁮󠁧󠁿"
+      }
+    ]
+  },
+  "flag-scotland": {
+    "skins": [
+      {
+        "native": "🏴󠁧󠁢󠁳󠁣󠁴󠁿"
+      }
+    ]
+  },
+  "flag-wales": {
+    "skins": [
+      {
+        "native": "🏴󠁧󠁢󠁷󠁬󠁳󠁿"
+      }
+    ]
+  }
+}

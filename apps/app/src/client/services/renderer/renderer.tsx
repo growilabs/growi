@@ -17,7 +17,6 @@ import type { Pluggable } from 'unified';
 
 import { DrawioViewerWithEditButton } from '~/client/components/ReactMarkdownComponents/DrawioViewerWithEditButton';
 import { Header } from '~/client/components/ReactMarkdownComponents/Header';
-import { LightBox } from '~/client/components/ReactMarkdownComponents/LightBox';
 import { RichAttachment } from '~/client/components/ReactMarkdownComponents/RichAttachment';
 import { TableWithEditButton } from '~/client/components/ReactMarkdownComponents/TableWithEditButton';
 import * as callout from '~/features/callout';
@@ -48,6 +47,16 @@ import './Renderer.vendor-styles.prebuilt';
 const logger = loggerFactory('growi:cli:services:renderer');
 
 assert(isClient(), 'This module must be loaded only from client modules.');
+
+// fslightbox-react is interactive-only (opens on user click, uses document.body portal).
+// Loading it client-only keeps fslightbox-react out of .next/node_modules/ so it can stay in devDependencies.
+const LightBox = dynamic(
+  () =>
+    import('~/client/components/ReactMarkdownComponents/LightBox').then(
+      (mod) => mod.LightBox,
+    ),
+  { ssr: false },
+);
 
 const MermaidViewer = dynamic(
   () =>
