@@ -189,6 +189,9 @@ importers:
       '@browser-bunyan/console-formatted-stream':
         specifier: ^1.8.0
         version: 1.8.0
+      '@codemirror/state':
+        specifier: ^6.5.2
+        version: 6.5.4
       '@cspell/dynamic-import':
         specifier: ^8.15.4
         version: 8.15.4
@@ -201,6 +204,9 @@ importers:
       '@elastic/elasticsearch9':
         specifier: npm:@elastic/elasticsearch@^9.0.3
         version: '@elastic/elasticsearch@9.1.0'
+      '@emoji-mart/data':
+        specifier: ^1.2.1
+        version: 1.2.1
       '@godaddy/terminus':
         specifier: ^4.9.0
         version: 4.12.1
@@ -240,6 +246,15 @@ importers:
       '@growi/slack':
         specifier: workspace:^
         version: link:../../packages/slack
+      '@handsontable/react':
+        specifier: '=2.1.0'
+        version: 2.1.0(handsontable@6.2.2)
+      '@headless-tree/core':
+        specifier: ^1.5.3
+        version: 1.6.3
+      '@headless-tree/react':
+        specifier: ^1.5.3
+        version: 1.6.3(@headless-tree/core@1.6.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@keycloak/keycloak-admin-client':
         specifier: ^18.0.0
         version: 18.0.2
@@ -276,6 +291,9 @@ importers:
       '@slack/webhook':
         specifier: ^6.0.0
         version: 6.1.0
+      '@tanstack/react-virtual':
+        specifier: ^3.13.12
+        version: 3.13.12(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@types/async':
         specifier: ^3.2.24
         version: 3.2.24
@@ -306,6 +324,9 @@ importers:
       body-parser:
         specifier: ^1.20.3
         version: 1.20.3
+      bootstrap:
+        specifier: '=5.3.2'
+        version: 5.3.2(@popperjs/core@2.11.8)
       browser-bunyan:
         specifier: ^1.8.0
         version: 1.8.0
@@ -351,12 +372,18 @@ importers:
       diff:
         specifier: ^5.0.0
         version: 5.2.0
+      diff2html:
+        specifier: ^3.4.47
+        version: 3.4.48
       diff_match_patch:
         specifier: ^0.1.1
         version: 0.1.1
       dotenv-flow:
         specifier: ^3.2.0
         version: 3.2.0
+      downshift:
+        specifier: ^8.2.3
+        version: 8.5.0(react@18.2.0)
       ejs:
         specifier: ^3.1.10
         version: 3.1.10
@@ -384,9 +411,15 @@ importers:
       extensible-custom-error:
         specifier: ^0.0.7
         version: 0.0.7
+      fastest-levenshtein:
+        specifier: ^1.0.16
+        version: 1.0.16
       form-data:
         specifier: ^4.0.4
         version: 4.0.4
+      fslightbox-react:
+        specifier: ^1.7.6
+        version: 1.7.6(prop-types@15.8.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       graceful-fs:
         specifier: ^4.1.11
         version: 4.2.11
@@ -408,6 +441,12 @@ importers:
       i18next:
         specifier: ^23.16.5
         version: 23.16.5
+      i18next-http-backend:
+        specifier: ^2.6.2
+        version: 2.6.2(encoding@0.1.13)
+      i18next-localstorage-backend:
+        specifier: ^4.2.0
+        version: 4.2.0
       i18next-resources-to-backend:
         specifier: ^1.2.1
         version: 1.2.1
@@ -552,6 +591,9 @@ importers:
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
+      pretty-bytes:
+        specifier: ^6.1.1
+        version: 6.1.1
       prop-types:
         specifier: ^15.8.1
         version: 15.8.1
@@ -570,24 +612,42 @@ importers:
       react-card-flip:
         specifier: ^1.0.10
         version: 1.2.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      react-copy-to-clipboard:
+        specifier: ^5.0.1
+        version: 5.1.0(react@18.2.0)
       react-datepicker:
         specifier: ^4.7.0
         version: 4.25.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       react-disable:
         specifier: ^0.1.1
         version: 0.1.1(react@18.2.0)
+      react-dnd:
+        specifier: ^14.0.5
+        version: 14.0.5(@types/hoist-non-react-statics@3.3.5)(@types/node@25.2.3)(@types/react@18.3.3)(react@18.2.0)
+      react-dnd-html5-backend:
+        specifier: ^14.1.0
+        version: 14.1.0
       react-dom:
         specifier: ^18.2.0
         version: 18.2.0(react@18.2.0)
+      react-dropzone:
+        specifier: ^14.2.3
+        version: 14.2.3(react@18.2.0)
       react-error-boundary:
         specifier: ^3.1.4
         version: 3.1.4(react@18.2.0)
+      react-hook-form:
+        specifier: ^7.45.4
+        version: 7.52.0(react@18.2.0)
       react-i18next:
         specifier: ^15.1.1
         version: 15.1.1(i18next@23.16.5)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       react-image-crop:
         specifier: ^8.3.0
         version: 8.6.12(react@18.2.0)
+      react-input-autosize:
+        specifier: ^3.0.0
+        version: 3.0.0(react@18.2.0)
       react-markdown:
         specifier: ^9.0.1
         version: 9.0.1(@types/react@18.3.3)(react@18.2.0)
@@ -603,6 +663,9 @@ importers:
       react-syntax-highlighter:
         specifier: ^16.1.0
         version: 16.1.0(react@18.2.0)
+      react-toastify:
+        specifier: ^9.1.3
+        version: 9.1.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       react-use-ripple:
         specifier: ^1.5.2
         version: 1.5.2(react@18.2.0)
@@ -666,7 +729,13 @@ importers:
       sanitize-filename:
         specifier: ^1.6.3
         version: 1.6.3
+      simplebar-react:
+        specifier: ^2.3.6
+        version: 2.4.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       socket.io:
+        specifier: ^4.7.5
+        version: 4.8.3
+      socket.io-client:
         specifier: ^4.7.5
         version: 4.8.3
       string-width:
@@ -745,12 +814,6 @@ importers:
       '@apidevtools/swagger-parser':
         specifier: ^10.1.1
         version: 10.1.1(openapi-types@12.1.3)
-      '@codemirror/state':
-        specifier: ^6.5.2
-        version: 6.5.4
-      '@emoji-mart/data':
-        specifier: ^1.2.1
-        version: 1.2.1
       '@growi/core-styles':
         specifier: workspace:^
         version: link:../../packages/core-styles
@@ -763,21 +826,9 @@ importers:
       '@growi/ui':
         specifier: workspace:^
         version: link:../../packages/ui
-      '@handsontable/react':
-        specifier: '=2.1.0'
-        version: 2.1.0(handsontable@6.2.2)
-      '@headless-tree/core':
-        specifier: ^1.5.3
-        version: 1.6.3
-      '@headless-tree/react':
-        specifier: ^1.5.3
-        version: 1.6.3(@headless-tree/core@1.6.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@popperjs/core':
         specifier: ^2.11.8
         version: 2.11.8
-      '@tanstack/react-virtual':
-        specifier: ^3.13.12
-        version: 3.13.12(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@testing-library/jest-dom':
         specifier: ^6.5.0
         version: 6.9.1
@@ -853,30 +904,15 @@ importers:
       babel-loader:
         specifier: ^8.2.5
         version: 8.3.0(@babel/core@7.24.6)(webpack@5.92.1(@swc/core@1.10.7(@swc/helpers@0.5.18)))
-      bootstrap:
-        specifier: '=5.3.2'
-        version: 5.3.2(@popperjs/core@2.11.8)
       commander:
         specifier: ^14.0.0
         version: 14.0.0
       connect-browser-sync:
         specifier: ^2.1.0
         version: 2.1.0(browser-sync@3.0.2)
-      diff2html:
-        specifier: ^3.4.47
-        version: 3.4.48
-      downshift:
-        specifier: ^8.2.3
-        version: 8.5.0(react@18.2.0)
       eazy-logger:
         specifier: ^3.1.0
         version: 3.1.0
-      fastest-levenshtein:
-        specifier: ^1.0.16
-        version: 1.0.16
-      fslightbox-react:
-        specifier: ^1.7.6
-        version: 1.7.6(prop-types@15.8.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       handsontable:
         specifier: '=6.2.2'
         version: 6.2.2
@@ -886,12 +922,6 @@ importers:
       i18next-chained-backend:
         specifier: ^4.6.2
         version: 4.6.2
-      i18next-http-backend:
-        specifier: ^2.6.2
-        version: 2.6.2(encoding@0.1.13)
-      i18next-localstorage-backend:
-        specifier: ^4.2.0
-        version: 4.2.0
       jotai-devtools:
         specifier: ^0.11.0
         version: 0.11.0(@types/react@18.3.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(redux@4.2.1)
@@ -918,31 +948,7 @@ importers:
         version: 1.10.0
       openapi-typescript:
         specifier: ^7.8.0
-        version: 7.8.0(typescript@5.0.4)
-      pretty-bytes:
-        specifier: ^6.1.1
-        version: 6.1.1
-      react-copy-to-clipboard:
-        specifier: ^5.0.1
-        version: 5.1.0(react@18.2.0)
-      react-dnd:
-        specifier: ^14.0.5
-        version: 14.0.5(@types/hoist-non-react-statics@3.3.5)(@types/node@25.2.3)(@types/react@18.3.3)(react@18.2.0)
-      react-dnd-html5-backend:
-        specifier: ^14.1.0
-        version: 14.1.0
-      react-dropzone:
-        specifier: ^14.2.3
-        version: 14.2.3(react@18.2.0)
-      react-hook-form:
-        specifier: ^7.45.4
-        version: 7.52.0(react@18.2.0)
-      react-input-autosize:
-        specifier: ^3.0.0
-        version: 3.0.0(react@18.2.0)
-      react-toastify:
-        specifier: ^9.1.3
-        version: 9.1.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 7.8.0(typescript@5.4.2)
       rehype-rewrite:
         specifier: ^4.0.2
         version: 4.0.2
@@ -952,12 +958,6 @@ importers:
       sass:
         specifier: ^1.53.0
         version: 1.77.6
-      simplebar-react:
-        specifier: ^2.3.6
-        version: 2.4.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      socket.io-client:
-        specifier: ^4.7.5
-        version: 4.8.3
       supertest:
         specifier: ^7.1.4
         version: 7.1.4
@@ -1032,17 +1032,17 @@ importers:
         version: 4.21.0
       puppeteer:
         specifier: ^23.1.1
-        version: 23.6.1(typescript@5.0.4)
+        version: 23.6.1(typescript@5.4.2)
       puppeteer-cluster:
         specifier: ^0.24.0
-        version: 0.24.0(puppeteer@23.6.1(typescript@5.0.4))
+        version: 0.24.0(puppeteer@23.6.1(typescript@5.4.2))
       tslib:
         specifier: ^2.8.0
         version: 2.8.1
     devDependencies:
       '@swc-node/register':
         specifier: ^1.10.9
-        version: 1.10.9(@swc/core@1.10.7(@swc/helpers@0.5.18))(@swc/types@0.1.17)(typescript@5.0.4)
+        version: 1.10.9(@swc/core@1.10.7(@swc/helpers@0.5.18))(@swc/types@0.1.17)(typescript@5.4.2)
       '@swc/core':
         specifier: ^1.9.2
         version: 1.10.7(@swc/helpers@0.5.18)
@@ -1686,7 +1686,7 @@ importers:
         version: 7.2.4
       type-coverage:
         specifier: ^2.0.0
-        version: 2.29.0(typescript@5.0.4)
+        version: 2.29.0(typescript@5.4.2)
       unist-util-remove-position:
         specifier: ^5.0.0
         version: 5.0.0
@@ -9763,6 +9763,7 @@ packages:
     resolution: {integrity: sha512-Quz3MvAwHxVYNXsOByL7xI5EB2WYOeFswqaHIA3qOK3isRWTxiplBEocmmru6XmxDB2L7jDNYtYA4FyimoAFEw==}
     engines: {node: '>=8.17.0'}
     hasBin: true
+    bundledDependencies: []
 
   jsonfile@3.0.1:
     resolution: {integrity: sha512-oBko6ZHlubVB5mRFkur5vgYR1UyqX+S6Y/oCfLhqNdcc2fYFlDpIoNc7AfKS1KOGcnNAkvsr0grLck9ANM815w==}
@@ -19251,6 +19252,21 @@ snapshots:
       - '@swc/types'
       - supports-color
 
+  '@swc-node/register@1.10.9(@swc/core@1.10.7(@swc/helpers@0.5.18))(@swc/types@0.1.17)(typescript@5.4.2)':
+    dependencies:
+      '@swc-node/core': 1.13.3(@swc/core@1.10.7(@swc/helpers@0.5.18))(@swc/types@0.1.17)
+      '@swc-node/sourcemap-support': 0.5.1
+      '@swc/core': 1.10.7(@swc/helpers@0.5.18)
+      colorette: 2.0.20
+      debug: 4.4.3(supports-color@10.0.0)
+      oxc-resolver: 1.12.0
+      pirates: 4.0.6
+      tslib: 2.8.1
+      typescript: 5.4.2
+    transitivePeerDependencies:
+      - '@swc/types'
+      - supports-color
+
   '@swc-node/sourcemap-support@0.5.1':
     dependencies:
       source-map-support: 0.5.21
@@ -21952,6 +21968,15 @@ snapshots:
       parse-json: 5.2.0
     optionalDependencies:
       typescript: 5.0.4
+
+  cosmiconfig@9.0.0(typescript@5.4.2):
+    dependencies:
+      env-paths: 2.2.1
+      import-fresh: 3.3.1
+      js-yaml: 4.1.1
+      parse-json: 5.2.0
+    optionalDependencies:
+      typescript: 5.4.2
 
   cp-file@9.1.0:
     dependencies:
@@ -26481,14 +26506,14 @@ snapshots:
 
   openapi-types@12.1.3: {}
 
-  openapi-typescript@7.8.0(typescript@5.0.4):
+  openapi-typescript@7.8.0(typescript@5.4.2):
     dependencies:
       '@redocly/openapi-core': 1.34.5(supports-color@10.0.0)
       ansi-colors: 4.1.3
       change-case: 5.4.4
       parse-json: 8.3.0
       supports-color: 10.0.0
-      typescript: 5.0.4
+      typescript: 5.4.2
       yargs-parser: 21.1.1
 
   openapi3-ts@4.2.2:
@@ -27090,10 +27115,10 @@ snapshots:
     dependencies:
       escape-goat: 4.0.0
 
-  puppeteer-cluster@0.24.0(puppeteer@23.6.1(typescript@5.0.4)):
+  puppeteer-cluster@0.24.0(puppeteer@23.6.1(typescript@5.4.2)):
     dependencies:
       debug: 4.4.3(supports-color@10.0.0)
-      puppeteer: 23.6.1(typescript@5.0.4)
+      puppeteer: 23.6.1(typescript@5.4.2)
     transitivePeerDependencies:
       - supports-color
 
@@ -27110,11 +27135,11 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  puppeteer@23.6.1(typescript@5.0.4):
+  puppeteer@23.6.1(typescript@5.4.2):
     dependencies:
       '@puppeteer/browsers': 2.4.0
       chromium-bidi: 0.8.0(devtools-protocol@0.0.1354347)
-      cosmiconfig: 9.0.0(typescript@5.0.4)
+      cosmiconfig: 9.0.0(typescript@5.4.2)
       devtools-protocol: 0.0.1354347
       puppeteer-core: 23.6.1
       typed-query-selector: 2.12.0
@@ -29314,10 +29339,10 @@ snapshots:
 
   tsscmp@1.0.6: {}
 
-  tsutils@3.21.0(typescript@5.0.4):
+  tsutils@3.21.0(typescript@5.4.2):
     dependencies:
       tslib: 1.14.1
-      typescript: 5.0.4
+      typescript: 5.4.2
 
   ttf2eot@3.1.0:
     dependencies:
@@ -29387,20 +29412,20 @@ snapshots:
     dependencies:
       prelude-ls: 1.2.1
 
-  type-coverage-core@2.28.1(typescript@5.0.4):
+  type-coverage-core@2.28.1(typescript@5.4.2):
     dependencies:
       fast-glob: 3.3.2
       minimatch: 9.0.5
       normalize-path: 3.0.0
       tslib: 2.8.1
-      tsutils: 3.21.0(typescript@5.0.4)
-      typescript: 5.0.4
+      tsutils: 3.21.0(typescript@5.4.2)
+      typescript: 5.4.2
 
-  type-coverage@2.29.0(typescript@5.0.4):
+  type-coverage@2.29.0(typescript@5.4.2):
     dependencies:
       chalk: 4.1.2
       minimist: 1.2.8
-      type-coverage-core: 2.28.1(typescript@5.0.4)
+      type-coverage-core: 2.28.1(typescript@5.4.2)
     transitivePeerDependencies:
       - typescript
 

@@ -14,7 +14,7 @@
 
 - [ ] 1. Move all 23 Turbopack-externalised packages from `devDependencies` to `dependencies`
 
-- [ ] 1.1 Edit `apps/app/package.json` to reclassify all 23 packages
+- [x] 1.1 Edit `apps/app/package.json` to reclassify all 23 packages
   - Move the following entries from the `devDependencies` section to the `dependencies` section, preserving alphabetical order within each section: `@codemirror/state`, `@emoji-mart/data`, `@handsontable/react`, `@headless-tree/core`, `@headless-tree/react`, `@tanstack/react-virtual`, `bootstrap`, `diff2html`, `downshift`, `fastest-levenshtein`, `fslightbox-react`, `i18next-http-backend`, `i18next-localstorage-backend`, `pretty-bytes`, `react-copy-to-clipboard`, `react-dnd`, `react-dnd-html5-backend`, `react-dropzone`, `react-hook-form`, `react-input-autosize`, `react-toastify`, `simplebar-react`, `socket.io-client`
   - Run `pnpm install --frozen-lockfile` from the monorepo root after editing to verify the lock file remains valid; if it fails (lock file mismatch), run `pnpm install` to regenerate it
   - _Requirements: 1.1_
