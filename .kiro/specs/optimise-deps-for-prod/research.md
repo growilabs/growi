@@ -139,3 +139,60 @@
 - pnpm deploy documentation — `pnpm deploy` flags and node-linker behaviour
 - Next.js Pages Router SSR — all pages render server-side by default; `dynamic({ ssr: false })` is the only opt-out
 - Turbopack externalisation — packages in `.next/node_modules/` are loaded at runtime, not bundled
+
+---
+
+## Session 2: Production Implementation Discoveries
+
+### Finding: `ssr: false` does NOT prevent Turbopack externalisation
+
+**Pre-implementation assumption**: Wrapping a component with `dynamic({ ssr: false })` would remove its package dependencies from `.next/node_modules/`.
+
+**Reality**: Turbopack performs static import analysis on the dynamically-loaded file and still externalises packages found there. `ssr: false` only skips HTML rendering — it does not affect which packages are added to `.next/node_modules/`. This invalidated the entire Phase 3 plan (wrapping `diff2html`, `react-dnd`, `@handsontable/react` with `ssr: false`).
+
+**Only two techniques actually remove a package from `.next/node_modules/`**:
+1. Replace the static import with `import()` inside `useEffect` and ensure no other static import path exists in the SSR code graph (e.g., `socket.io-client` in `admin/states/socket-io.ts`).
+2. Replace the runtime package with a bundled static alternative (e.g., `@emoji-mart/data` → `emoji-native-lookup.json`).
+
+**Exception**: `fslightbox-react` remains in `.next/node_modules/` as a broken symlink but is harmless — `useEffect` never runs during SSR, so the broken symlink is never accessed.
+
+---
+
+### Finding: Initial survey of 23 packages was incomplete
+
+The design identified 23 packages to move from `devDependencies` to `dependencies`. During implementation, 19 additional packages were found in `.next/node_modules/`:
+
+- `@codemirror/*` (multiple packages), `codemirror`, `codemirror-emacs`, `codemirror-vim`, `codemirror-vscode-keymap`
+- `@lezer/highlight`
+- `@marp-team/marp-core`, `@marp-team/marpit`
+- `@emoji-mart/react`
+- `reveal.js`, `pako`, `cm6-theme-basic-light`, `y-codemirror.next`
+
+All 42 packages (23 + 19) were moved to `dependencies`. Lesson: always run the Level 1 check (`ls apps/app/.next/node_modules/`) after a production build to get the authoritative list.
+
+---
+
+### Finding: `assemble-prod.sh` had two bugs
+
+1. **`set -e` + `[ ... ] && ...` pattern**: Under `set -e`, a `[ condition ] && command` expression exits the script with failure when the condition is false (exit code 1). Fixed by wrapping in `if/then`.
+2. **`.next/node_modules/` symlink rewrite was missing**: The script rewrote `apps/app/node_modules/` symlinks but did not rewrite `.next/node_modules/` symlinks. These still pointed to `../../../../node_modules/.pnpm/` (workspace root), which does not exist in production. Both rewrites are now present.
+
+---
+
+### Finding: Packages successfully reverted to `devDependencies`
+
+Only 3 of the 23 originally moved packages were successfully reverted:
+
+| Package | Technique |
+|---------|-----------|
+| `@emoji-mart/data` | Replaced with bundled `emoji-native-lookup.json` extracted at build time |
+| `fslightbox-react` | Replaced static import with `import()` inside `useEffect` in `LightBox.tsx` |
+| `socket.io-client` | Replaced static import with `await import()` inside `useEffect` in `admin/states/socket-io.ts` |
+
+All other packages remain in `dependencies` because either `ssr: false` wrapping failed to remove them from `.next/node_modules/` or they are genuinely needed at SSR runtime.
+
+---
+
+### Finding: CI symlink integrity check added
+
+`check-next-symlinks.sh` was added to the `build-prod` CI job (runs after `assemble-prod.sh`) to detect broken symlinks in `.next/node_modules/` automatically. This prevents future classification regressions regardless of which code paths are exercised at runtime by `server:ci`. The `fslightbox-react` exception is hardcoded in the script.
