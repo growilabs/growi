@@ -1,25 +1,17 @@
-import { atom } from 'jotai';
+import type { SWRResponse } from 'swr';
+import useSWR from 'swr';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
 import type { IContributionDay } from '~/features/contribution-graph/interfaces/contribution-graph';
 
-export const targetUserIdAtom = atom<string | null>(null);
+export const useSWRxContributions = (
+  userId: string | null,
+): SWRResponse<IContributionDay[], Error> => {
+  const key = userId ? `/user/contributions?targetUserId=${userId}` : null;
 
-export const contributionDataAtom = atom<Promise<IContributionDay[]>>(
-  async (get) => {
-    const userId = get(targetUserIdAtom);
-
-    if (!userId) {
-      return [];
-    }
-
-    try {
-      const response = await apiv3Get('/contributions', {
-        targetUserId: userId,
-      });
+  return useSWR(key, (endpoint) =>
+    apiv3Get(endpoint).then((response) => {
       return response.data.contributions;
-    } catch (err) {
-      return { error: err.message || 'Failed to load contributions' };
-    }
-  },
-);
+    }),
+  );
+};
