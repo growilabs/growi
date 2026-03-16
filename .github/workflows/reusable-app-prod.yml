@@ -60,6 +60,9 @@ jobs:
     - name: Assemble production artifacts
       run: bash apps/app/bin/assemble-prod.sh
 
+    - name: Check for broken symlinks in .next/node_modules
+      run: bash apps/app/bin/check-next-symlinks.sh
+
     - name: Archive production files
       id: archive-prod-files
       run: |

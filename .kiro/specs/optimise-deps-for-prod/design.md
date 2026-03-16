@@ -340,7 +340,7 @@ bash apps/app/bin/assemble-prod.sh
 
 > **注意**:
 > - `assemble-prod.sh` は `apps/app/next.config.ts` を削除する。**`next.config.ts` はサーバーテスト完了後（Step 6）に復元すること。** サーバー起動前に復元すると、Next.js が起動時に TypeScript インストールを試みて pnpm install が走り、`apps/app/node_modules` の symlink が上書きされ HTTP 500 となる。
-> - ワークスペースルートの `node_modules` は **削除・リネームしないこと**。workspace パッケージ（`@growi/core` 等）の `node_modules/` 内シンボリックリンクがワークスペースルート `node_modules` を参照しており、削除すると `MODULE_NOT_FOUND` でサーバーが起動しない。Docker 本番環境でも `packages/` ディレクトリごと COPY されるためこれは正常な挙動。
+> - `pnpm deploy` はサイドエフェクトとしてワークスペースルートの `node_modules` を再作成する。Docker の release stage では `apps/app/node_modules/` のみ COPY され、ワークスペースルートの `node_modules` は含まれない。`pnpm deploy --prod --legacy` が workspace パッケージ（`@growi/core` 等）を `.pnpm/` ローカルストアの実体ディレクトリとしてデプロイするため、`apps/app/node_modules/` は自己完結している。より正確な production 再現テストを行う場合は `mv node_modules node_modules.bak` でワークスペースルートを退避してからサーバーを起動し、テスト後に `mv node_modules.bak node_modules` で復元すること。
 
 **Step 3 — プロダクションサーバー起動**（`apps/app/` から実行）
 
