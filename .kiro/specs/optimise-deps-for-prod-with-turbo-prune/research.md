@@ -4,7 +4,7 @@
 - Feature: `optimise-deps-for-prod-with-turbo-prune`
 - Discovery Scope: Extension (modifying existing build pipeline)
 - Key Findings:
-  1. `pnpm deploy --prod --legacy` creates top-level symlinks pointing to the **workspace-root** `.pnpm/` store (not the deploy output's local `.pnpm/`). Removing `--legacy` creates self-contained relative symlinks within the deploy output directory.
+  1. **pnpm v10**: `pnpm deploy --prod --legacy` creates self-contained symlinks within the deploy output's local `.pnpm/` store (verified: `out/node_modules/react` → `.pnpm/react@18.2.0/node_modules/react`). The `--legacy` flag no longer causes workspace-root-pointing symlinks. Without `--legacy`, pnpm v10 requires `inject-workspace-packages=true` and also produces self-contained symlinks — but introduces an extra config dependency. Keeping `--legacy` is the simpler choice.
   2. Turbopack-generated `.next/node_modules/` symlinks for non-scoped packages use `../../node_modules/.pnpm/` path (2 levels up from `.next/node_modules/` = `apps/app/node_modules/`). After step [2] rewrite: same result. If `node_modules/` is placed at workspace root (4 levels up from `.next/node_modules/` = original Turbopack output `../../../../node_modules/.pnpm/`), no rewrite is needed.
   3. The existing Dockerfile already uses `turbo prune @growi/app @growi/pdf-converter --docker` in the `pruner` stage. The `assemble-prod.sh` runs inside the Docker `builder` stage after `turbo run build`. The workspace root in Docker is `$OPT_DIR` (e.g. `/opt/`).
 
@@ -20,13 +20,14 @@
   - Original Turbopack output (pre-rewrite): `../../../../node_modules/.pnpm/` (4 levels up from `.next/node_modules/` = Docker workspace root `/opt/node_modules/`)
 - Implications: If workspace root's `node_modules/` contains prod deps, the original Turbopack symlinks resolve correctly WITHOUT any rewriting
 
-### Topic: `pnpm deploy` symlink behavior with and without `--legacy`
+### Topic: `pnpm deploy` symlink behavior with and without `--legacy` (pnpm v10)
 - Context: Understanding why step [1b] rewrites `apps/app/node_modules/` symlinks
 - Findings:
-  - With `--legacy`: creates "hoisted" node_modules where top-level symlinks reference the workspace root's `.pnpm/` store (not local). After `mv out/node_modules apps/app/node_modules`, these symlinks are broken in production.
-  - Without `--legacy`: pnpm's default isolated linker creates symlinks relative to the deploy output's local `.pnpm/` store. Verified: development `apps/app/node_modules/@codemirror/state` → `../.pnpm/@codemirror+state@6.5.4/node_modules/@codemirror/state` (relative, self-contained).
+  - **pnpm v10 + `--legacy`**: produces a pnpm-native `.pnpm/` structure with self-contained relative symlinks. Verified in pnpm v10.32.1: `out/node_modules/react` → `.pnpm/react@18.2.0/node_modules/react`; `out/node_modules/@codemirror/state` → `../.pnpm/@codemirror+state@6.5.4/node_modules/@codemirror/state`. The `--legacy` flag now only bypasses the `inject-workspace-packages` gate introduced in pnpm v10; it does NOT produce hoisted/workspace-root-pointing symlinks.
+  - **pnpm v10 without `--legacy`**: fails with `ERR_PNPM_DEPLOY_NONINJECTED_WORKSPACE` unless `inject-workspace-packages=true` is set in `.npmrc`. When set, it also produces self-contained symlinks — identical output to `--legacy`. Introduces an extra config dependency with no practical benefit over keeping `--legacy`.
+  - **Legacy assumption (pre-pnpm v10)**: Earlier pnpm versions with `--legacy` created symlinks referencing the workspace-root `.pnpm/` store, which required step [1b] to rewrite them after `mv`. This assumption is no longer valid in pnpm v10.
   - `pnpm deploy` (with or without `--legacy`) physically INJECTS workspace packages (copies, not symlinks) into the deploy output.
-- Implications: Removing `--legacy` eliminates the need for step [1b] entirely.
+- Implications: Step [1b] is no longer needed in pnpm v10 regardless of `--legacy`. The real root cause of step [1b] was placing the deploy output at `apps/app/` (not `--legacy` itself). Changing the placement to workspace root eliminates both step [1b] and step [2].
 
 ### Topic: `apps/app/node_modules` compatibility symlink for migration scripts
 - Context: The `migrate` script in `apps/app/package.json` uses path `node_modules/migrate-mongo/bin/migrate-mongo` (relative to `apps/app/`)
@@ -61,21 +62,20 @@
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
 |--------|-------------|-----------|---------------------|-------|
-| A: Remove `--legacy` only | Drop `--legacy` from `pnpm deploy`, keep `apps/app/node_modules/` placement | Minimal change; step [1b] eliminated | Step [2] still required | Partial improvement |
+| A: Remove `--legacy` only | Drop `--legacy` from `pnpm deploy`, keep `apps/app/node_modules/` placement | Minimal change | Step [2] still required; pnpm v10 requires `inject-workspace-packages=true` | Partial improvement; adds config dependency |
 | B: `pnpm install --prod` post-build | After build, run `pnpm install --prod --frozen-lockfile` in pruned context | Conceptually clean | Workspace packages remain as symlinks (need `packages/` in release) | Requires larger release image |
-| C: `pnpm deploy --prod` (no `--legacy`) + workspace-root staging | Remove `--legacy`, place deploy output at workspace root, create `apps/app/node_modules` symlink | Eliminates BOTH step [1b] AND step [2]; workspace packages still injected (no `packages/` needed) | Need to verify pnpm deploy without `--legacy` creates self-contained `.pnpm/` store | **Selected** |
+| C: Keep `--legacy` + workspace-root staging | Keep `--legacy`, place deploy output at workspace root, create `apps/app/node_modules` symlink | Eliminates BOTH step [1b] AND step [2]; workspace packages still injected (no `packages/` needed); no `.npmrc` changes | `--legacy` flag remains (cosmetically); pnpm v10 behavior verified | **Selected** |
 
 ## Design Decisions
 
-### Decision: Remove `--legacy` from `pnpm deploy` (eliminates step [1b])
-- Context: `--legacy` linker creates symlinks pointing to workspace-root `.pnpm/`, requiring step [1b] rewriting
+### Decision: Keep `--legacy` in `pnpm deploy`; eliminate step [1b] by changing placement (not by removing `--legacy`)
+- Context: The original assumption was that `--legacy` caused workspace-root-pointing symlinks, requiring step [1b]. Verified in pnpm v10: `--legacy` produces self-contained `.pnpm/` symlinks — step [1b] is unnecessary regardless of `--legacy`.
 - Alternatives:
-  1. Keep `--legacy`, rewrite symlinks (current approach)
-  2. Remove `--legacy`, symlinks become self-contained (selected)
-- Selected Approach: Remove `--legacy`
-- Rationale: Without `--legacy`, pnpm's default isolated linker creates relative symlinks within the deploy output. No rewriting needed after `mv`.
-- Trade-offs: Need to verify behavior with current pnpm version. `--legacy` was possibly added as a workaround for an older issue; removing it requires testing.
-- Follow-up: Verify `out/node_modules/react` symlink target after `pnpm deploy out --prod --filter @growi/app` in devcontainer
+  1. Remove `--legacy` — requires `inject-workspace-packages=true` in pnpm v10 (extra config); same symlink output
+  2. Keep `--legacy` — works in pnpm v10 without any `.npmrc` changes (selected)
+- Selected Approach: Keep `--legacy`; eliminate step [1b] by changing placement from `apps/app/` to workspace root
+- Rationale: The true root cause of step [1b] was placing the deploy output at `apps/app/` (misaligned with Turbopack's symlink base), not `--legacy` itself. Fixing placement eliminates both step [1b] and step [2] without requiring `.npmrc` changes.
+- Trade-offs: `--legacy` flag remains in the script. It is now a pnpm v10 gate-bypass, not a linker-mode selector.
 
 ### Decision: Place deploy output at workspace root, not `apps/app/` (eliminates step [2])
 - Context: Turbopack generates `.next/node_modules/` symlinks pointing to `../../../../node_modules/.pnpm/` (workspace root in Docker). Step [2] rewrites these to point to `apps/app/node_modules/.pnpm/`.
@@ -92,12 +92,12 @@
 - Alternatives:
   1. `pnpm install --prod --frozen-lockfile` — modifies existing workspace node_modules
   2. `pnpm deploy out --prod` — creates clean deploy output (selected)
-- Selected Approach: `pnpm deploy out --prod --filter @growi/app` without `--legacy`
+- Selected Approach: `pnpm deploy out --prod --legacy --filter @growi/app`
 - Rationale: `pnpm deploy` handles workspace package injection (physically copies `@growi/*` packages into deploy output, no `packages/` directory needed in release image). `pnpm install --prod` would leave `node_modules/@growi/core` as a symlink requiring `packages/core/` to exist in release.
 - Trade-offs: `pnpm deploy` takes slightly longer than `pnpm install --prod`. Both produce prod-only node_modules.
 
 ## Risks & Mitigations
-- pnpm version compatibility: `pnpm deploy` without `--legacy` might behave differently across pnpm versions — Mitigation: pin pnpm version in Dockerfile; verify in CI before merging
+- pnpm version compatibility: `--legacy` behavior changed between pnpm v9 and v10 (v9: hoisted symlinks; v10: self-contained). The implementation assumes pnpm v10+ behavior. — Mitigation: verify in CI with the same pnpm version as the Dockerfile; if downgrading pnpm, step [1b] may need to be reinstated.
 - `apps/app/node_modules` symlink + Docker COPY: Docker BuildKit COPY should preserve symlinks, but must be verified — Mitigation: add a verification step in CI that checks symlink integrity in release image
 - `rm -rf node_modules` in `assemble-prod.sh`: destroys workspace root `node_modules/` locally (dev workflow change) — Mitigation: document updated local testing procedure; developers must run `pnpm install` to restore after local testing
 

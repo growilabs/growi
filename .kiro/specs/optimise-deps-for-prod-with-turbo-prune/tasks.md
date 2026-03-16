@@ -4,36 +4,37 @@
 
 | Phase | Major Task | Sub-tasks | Requirements |
 |-------|-----------|-----------|--------------|
-| 1 | Verify `pnpm deploy` (without `--legacy`) symlink behavior | 1.1 | 2.1, 2.2, 2.3 |
+| 1 | Verify `pnpm deploy --legacy` symlink behavior in pnpm v10 | 1.1 | 2.1, 2.2, 2.3 |
 | 2 | Simplify `assemble-prod.sh` | 2.1, 2.2 | 1.1–1.4, 2.1, 2.4, 3.1–3.3, 5.4, 5.5 |
 | 3 | Update Dockerfile staging | — | 3.1, 3.3, 5.1–5.3 |
 | 4 | Validate end-to-end | 4.1, 4.2, 4.3 | 1.1–1.4, 2.3, 2.4, 3.2, 3.4, 4.1–4.5, 6.1–6.4 |
 
 ---
 
-- [ ] 1. Verify `pnpm deploy` (without `--legacy`) creates self-contained symlinks
+- [x] 1. Verify `pnpm deploy --legacy` creates self-contained symlinks in pnpm v10
 
-- [ ] 1.1 Run `pnpm deploy out --prod --filter @growi/app` (without `--legacy`) and inspect top-level symlinks in `out/node_modules/`
-  - From workspace root, run `rm -rf out && pnpm deploy out --prod --filter @growi/app`
+- [x] 1.1 Run `pnpm deploy out --prod --legacy --filter @growi/app` and inspect top-level symlinks in `out/node_modules/`
+  - From workspace root, run `rm -rf out && pnpm deploy out --prod --legacy --filter @growi/app`
   - Inspect a non-scoped top-level symlink: `readlink out/node_modules/react` — expected result starts with `.pnpm/react@` (e.g. `.pnpm/react@18.2.0/node_modules/react`), NOT `../../../node_modules/.pnpm/`
   - Inspect a scoped top-level symlink: `readlink out/node_modules/@codemirror/state` — expected result starts with `../.pnpm/@codemirror`
-  - If either symlink points to `../../../node_modules/.pnpm/` or `../../../../node_modules/.pnpm/`, the isolated-linker assumption is wrong and the design requires revision before proceeding
+  - If either symlink points to `../../../node_modules/.pnpm/` or `../../../../node_modules/.pnpm/`, pnpm version is pre-v10 and step [1b] must be retained; do not proceed with removal
   - Verify `out/node_modules/.pnpm/` exists and contains physical package directories (not symlinks to the workspace-root `.pnpm/` store)
   - Clean up: `rm -rf out`
+  - **Verified in pnpm v10.32.1**: `react` → `.pnpm/react@18.2.0/node_modules/react`; `@codemirror/state` → `../.pnpm/@codemirror+state@6.5.4/node_modules/@codemirror/state` ✓
   - _Requirements: 2.1, 2.2, 2.3_
 
 ---
 
-- [ ] 2. Simplify `assemble-prod.sh` by removing `--legacy`, both symlink-rewrite steps, and restructuring node_modules placement
+- [x] 2. Simplify `assemble-prod.sh` by deleting both symlink-rewrite steps and restructuring node_modules placement
 
-- [ ] 2.1 Remove `--legacy` from `pnpm deploy` and delete the step [1b] bash block
-  - In `apps/app/bin/assemble-prod.sh`, change `pnpm deploy out --prod --legacy --filter @growi/app` to `pnpm deploy out --prod --filter @growi/app` (drop `--legacy`)
+- [x] 2.1 Delete the step [1b] bash block (keep `--legacy`)
+  - In `apps/app/bin/assemble-prod.sh`, keep `pnpm deploy out --prod --legacy --filter @growi/app` unchanged
   - Delete the entire step [1b/4] block: the `echo "[1b/4]..."` line, the `find apps/app/node_modules -maxdepth 2 -type l | while read ...` loop, and the closing `echo "[1b/4] Done."` line
-  - Without `--legacy`, pnpm's isolated linker creates top-level symlinks that are self-contained relative to the deploy output directory; no rewriting is needed
-  - Update the progress step count in remaining echo messages to reflect removal of step [1b] (if desired; otherwise just delete the [1b] lines)
+  - In pnpm v10, `--legacy` already creates self-contained `.pnpm/` symlinks; step [1b] rewriting is no longer needed
+  - Update the progress step count in remaining echo messages to reflect removal of step [1b]
   - _Requirements: 1.1, 1.3, 2.1_
 
-- [ ] 2.2 Replace node_modules placement with workspace-root staging, add compatibility symlink, and remove step [2] bash block
+- [x] 2.2 Replace node_modules placement with workspace-root staging, add compatibility symlink, and remove step [2] bash block
   - Replace `rm -rf apps/app/node_modules` + `mv out/node_modules apps/app/node_modules` with the following sequence:
     1. `rm -rf node_modules` — remove the workspace-root full-deps `node_modules/` (the pnpm install output)
     2. `mv out/node_modules node_modules` — place the prod-only deploy output at workspace root
@@ -48,7 +49,7 @@
 
 ---
 
-- [ ] 3. (P) Update Dockerfile `builder`-stage artifact staging to include workspace-root `node_modules/`
+- [x] 3. (P) Update Dockerfile `builder`-stage artifact staging to include workspace-root `node_modules/`
   - In `apps/app/docker/Dockerfile`, in the `builder` stage `RUN mkdir -p /tmp/release/apps/app && cp ...` step, add `cp -a node_modules /tmp/release/ && \` immediately before the `cp -a apps/app/.next ...` line to copy the workspace-root prod `node_modules/` into the release artifact
   - The existing `apps/app/node_modules` entry in the long `cp -a` list continues to be correct: `cp -a` uses `-d`/`-P` (no symlink dereferencing), so the symlink created by `assemble-prod.sh` is copied as a symlink, not dereferenced
   - The resulting `/tmp/release/` structure will be: `node_modules/` (workspace root, prod-only) + `apps/app/.next/` + `apps/app/node_modules` (symlink to `../../node_modules`)

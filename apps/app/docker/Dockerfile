@@ -96,6 +96,7 @@ RUN bash apps/app/bin/assemble-prod.sh
 # Stage artifacts into a clean directory for COPY --from
 RUN mkdir -p /tmp/release/apps/app && \
   cp package.json /tmp/release/ && \
+  cp -a node_modules /tmp/release/ && \
   cp -a apps/app/.next apps/app/config apps/app/dist apps/app/public \
        apps/app/resource apps/app/tmp \
        apps/app/package.json apps/app/node_modules \

@@ -9,9 +9,9 @@ The GROWI production Docker build uses a multi-stage Dockerfile: `pruner` → `d
 
 Both steps exist because of two coupled design decisions: (1) the `--legacy` flag in `pnpm deploy`, and (2) placing the deploy output at `apps/app/node_modules/` instead of the workspace root.
 
-This design removes both root causes: dropping `--legacy` makes `pnpm deploy` create self-contained relative symlinks (eliminating step [1b]); staging the deploy output at workspace root instead of `apps/app/` means Turbopack's original symlink targets already resolve correctly (eliminating step [2]).
+This design removes both root causes: in pnpm v10, `pnpm deploy --legacy` already creates self-contained relative symlinks (eliminating step [1b]); staging the deploy output at workspace root instead of `apps/app/` means Turbopack's original symlink targets already resolve correctly (eliminating step [2]).
 
-**Purpose**: Eliminate fragile bash symlink manipulation from the production assembly pipeline, replacing it with a structure that exploits the self-contained properties of `turbo prune` + `pnpm deploy` (without `--legacy`).
+**Purpose**: Eliminate fragile bash symlink manipulation from the production assembly pipeline, replacing it with a structure that exploits the self-contained properties of `turbo prune` + `pnpm deploy --legacy` in pnpm v10.
 
 **Users**: Release engineers and CI/CD pipelines maintaining the production Docker build.
 
@@ -71,7 +71,7 @@ assemble-prod.sh (current):
 ```
 
 Root causes of steps [1b] and [2]:
-- **[1b] root cause**: `--legacy` linker creates top-level symlinks pointing to the workspace-root `.pnpm/` store, not the deploy output's local `.pnpm/`
+- **[1b] root cause**: Deploy output is placed at `apps/app/`, but in pnpm v10 `--legacy` already creates self-contained symlinks — step [1b] is no longer needed. (Historical root cause in pre-v10 pnpm: `--legacy` produced workspace-root-pointing symlinks requiring rewriting.)
 - **[2] root cause**: Deploy output is placed at `apps/app/`, but Turbopack builds `.next/node_modules/` symlinks relative to the workspace root (4 levels up)
 
 ### Architecture Pattern & Boundary Map
@@ -83,7 +83,7 @@ graph TB
         FullDepsNM[node_modules full deps]
         Build[turbo run build]
         NextOut[apps/app/.next node_modules symlinks to 4-levels-up]
-        Deploy[pnpm deploy out --prod no legacy]
+        Deploy[pnpm deploy out --prod --legacy]
         ProdNM[out/node_modules prod-only self-contained]
         Replace[rm node_modules mv out/node_modules node_modules]
         Symlink[ln -sfn apps/app/node_modules]
@@ -116,7 +116,7 @@ graph TB
 ```
 
 **Key decisions**:
-- Drop `--legacy`: isolated linker creates self-contained `out/node_modules/` with relative `.pnpm/` symlinks — no step [1b] needed
+- Keep `--legacy`: in pnpm v10 it creates self-contained `out/node_modules/` with relative `.pnpm/` symlinks — no step [1b] needed. Removing `--legacy` would require `inject-workspace-packages=true` with no practical benefit.
 - Place deploy output at workspace root: Turbopack's `../../../../node_modules/.pnpm/` symlinks already point to workspace root — no step [2] needed
 - `apps/app/node_modules` → symlink `../../node_modules` for `migrate-mongo` script compatibility and Node.js `require()` traversal
 
@@ -125,7 +125,7 @@ graph TB
 | Layer | Choice | Role | Notes |
 |-------|--------|------|-------|
 | Build orchestration | Turborepo `turbo prune --docker` | Generates minimal monorepo subset for Docker | `pruner` stage — unchanged |
-| Package manager | pnpm (current version) | `pnpm deploy --prod` (no `--legacy`) | Removes `--legacy`; isolated linker |
+| Package manager | pnpm v10+ | `pnpm deploy --prod --legacy` | Keeps `--legacy`; pnpm v10 produces self-contained symlinks regardless |
 | Build assembly | `assemble-prod.sh` | Simplified: deploy → stage (2 ops remain) | Removes steps [1b] and [2] |
 | Container | Docker BuildKit `COPY` | Copies symlinks intact | Requires BuildKit (already in use) |
 
@@ -147,7 +147,7 @@ graph TB
     end
 
     subgraph New
-        N1[pnpm deploy --prod no legacy]
+        N1[pnpm deploy --prod --legacy]
         N2[rm node_modules mv out/node_modules node_modules]
         N3[ln apps/app/node_modules to ws root]
         N4[rm cache next.config.ts]
@@ -194,7 +194,7 @@ graph LR
 
 **Responsibilities & Constraints**
 - Run from workspace root (same CWD as current usage)
-- Deploy production dependencies using `pnpm deploy out --prod --filter @growi/app` (no `--legacy`)
+- Deploy production dependencies using `pnpm deploy out --prod --legacy --filter @growi/app`
 - Replace workspace root `node_modules/` (full deps) with deploy output (prod-only)
 - Create `apps/app/node_modules` as a symlink to `../../node_modules` for migration script and Node.js resolution compatibility
 - Remove `.next/cache` to reduce release image size
@@ -218,9 +218,9 @@ graph LR
 - Idempotency: Re-runnable; `rm -rf out` at start cleans previous output
 
 **Implementation Notes**
-- Integration: Replaces `pnpm deploy out --prod --legacy` with `pnpm deploy out --prod` and changes `mv out/node_modules apps/app/node_modules` to `rm -rf node_modules && mv out/node_modules node_modules && ln -sfn ../../node_modules apps/app/node_modules`; removes step [1b] and step [2] bash blocks entirely
-- Validation: Verify that `out/node_modules/react` symlink target starts with `.pnpm/` (not `../../../node_modules/.pnpm/`) after running `pnpm deploy out --prod --filter @growi/app`
-- Risks: pnpm version may affect isolated linker behavior — if `pnpm deploy` without `--legacy` still creates workspace-root-pointing symlinks, step [1b] would need to be reinstated. Document pnpm version requirement.
+- Integration: Keeps `pnpm deploy out --prod --legacy` and changes `mv out/node_modules apps/app/node_modules` to `rm -rf node_modules && mv out/node_modules node_modules && ln -sfn ../../node_modules apps/app/node_modules`; removes step [1b] and step [2] bash blocks entirely
+- Validation: Verify that `out/node_modules/react` symlink target starts with `.pnpm/` (not `../../../node_modules/.pnpm/`) after running `pnpm deploy out --prod --legacy --filter @growi/app` — confirmed in pnpm v10.32.1
+- Risks: pnpm version may affect `--legacy` behavior — pnpm v9 with `--legacy` produced workspace-root-pointing symlinks (step [1b] was needed); pnpm v10 does not. If downgrading pnpm below v10, step [1b] may need to be reinstated.
 
 ---
 
@@ -384,7 +384,7 @@ graph LR
 
 **Rollback**: Each phase modifies only `assemble-prod.sh` and/or the Dockerfile staging step. Rolling back is a targeted revert of those two files. The production build pipeline (turbo prune, deps install, turbo build) is unchanged.
 
-**Phase 1 gate**: `readlink out/node_modules/react` must start with `.pnpm/` after `pnpm deploy out --prod --filter @growi/app` (without `--legacy`). If it starts with `../../../node_modules/`, the `--legacy` behavior is still present and the approach needs adjustment.
+**Phase 1 gate**: `readlink out/node_modules/react` must start with `.pnpm/` after `pnpm deploy out --prod --legacy --filter @growi/app`. Verified in pnpm v10.32.1: result is `.pnpm/react@18.2.0/node_modules/react`. If upgrading/downgrading pnpm, re-verify this output.
 
 ---
 
@@ -401,5 +401,5 @@ graph LR
   ```
 
 ### Production Server Failures
-- **`ERR_MODULE_NOT_FOUND`**: Package in `dependencies` was not included in `pnpm deploy` output, or `pnpm deploy` without `--legacy` behaves unexpectedly. Re-add `--legacy` as rollback.
+- **`ERR_MODULE_NOT_FOUND`**: Package in `dependencies` was not included in `pnpm deploy` output. Check whether the package is listed in `dependencies` (not `devDependencies`) in `apps/app/package.json`.
 - **`TypeError: Cannot read properties of null (reading 'useContext')`**: Broken symlink in `node_modules/` (React resolved from wrong location). Verify `apps/app/node_modules` symlink integrity.
