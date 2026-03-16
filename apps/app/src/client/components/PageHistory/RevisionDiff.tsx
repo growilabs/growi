@@ -1,4 +1,4 @@
-import { type JSX, useEffect, useMemo, useState } from 'react';
+import { type JSX, useMemo } from 'react';
 import Link from 'next/link';
 import type { IRevisionHasId } from '@growi/core';
 import { GrowiThemeSchemeType } from '@growi/core';
@@ -6,12 +6,10 @@ import { returnPathForURL } from '@growi/core/dist/utils/path-utils';
 import { PresetThemesMetadatas } from '@growi/preset-themes';
 import { createPatch } from 'diff';
 import type { Diff2HtmlConfig } from 'diff2html';
+import { html } from 'diff2html';
+import { ColorSchemeType } from 'diff2html/lib/types';
 import { useTranslation } from 'next-i18next';
 import urljoin from 'url-join';
-
-// Replicate ColorSchemeType locally so diff2html stays out of the SSR bundle
-const ColorSchemeType = { AUTO: 'auto', DARK: 'dark', LIGHT: 'light' } as const;
-type ColorSchemeType = (typeof ColorSchemeType)[keyof typeof ColorSchemeType];
 
 import { Themes, useNextThemes } from '~/stores-universal/use-next-themes';
 
