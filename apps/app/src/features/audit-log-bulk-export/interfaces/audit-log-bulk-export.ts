@@ -23,8 +23,14 @@ export const AuditLogBulkExportJobStatus = {
 export type AuditLogBulkExportJobStatus =
   (typeof AuditLogBulkExportJobStatus)[keyof typeof AuditLogBulkExportJobStatus];
 
-export interface IAuditLogBulkExportFilters {
+export interface IAuditLogBulkExportRequestFilters {
   usernames?: string[];
+  actions?: SupportedActionType[];
+  dateFrom?: Date;
+  dateTo?: Date;
+}
+export interface IAuditLogBulkExportFilters {
+  users?: Array<Ref<IUser>>;
   actions?: SupportedActionType[];
   dateFrom?: Date;
   dateTo?: Date;

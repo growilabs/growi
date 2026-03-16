@@ -1,8 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pipeline, Writable } from 'node:stream';
-import type { IUser } from '@growi/core';
-import mongoose, { type FilterQuery } from 'mongoose';
+import type { FilterQuery } from 'mongoose';
 
 import { AuditLogBulkExportJobStatus } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import { SupportedAction } from '~/interfaces/activity';
@@ -100,12 +99,8 @@ export async function exportAuditLogsToFsAsync(
       query.createdAt.$lte = new Date(filters.dateTo);
     }
   }
-  if (filters.usernames && filters.usernames.length > 0) {
-    const User = mongoose.model<IUser>('User');
-    const userIds = await User.find({
-      username: { $in: filters.usernames },
-    }).distinct('_id');
-    query.user = { $in: userIds };
+  if (filters.users && filters.users.length > 0) {
+    query.user = { $in: filters.users };
   }
 
   // If the previous export was incomplete, resume from the last exported ID by adding it to the query filter

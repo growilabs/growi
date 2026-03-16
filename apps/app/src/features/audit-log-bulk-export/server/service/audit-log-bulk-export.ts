@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
+import mongoose from 'mongoose';
 
 import type {
   AuditLogBulkExportFormat,
   IAuditLogBulkExportFilters,
+  IAuditLogBulkExportRequestFilters,
 } from '../../interfaces/audit-log-bulk-export';
 import {
   AuditLogBulkExportJobInProgressJobStatus,
@@ -13,7 +15,7 @@ import AuditLogBulkExportJob from '../models/audit-log-bulk-export-job';
 
 export interface IAuditLogBulkExportService {
   createOrResetExportJob: (
-    filters: IAuditLogBulkExportFilters,
+    requestFilters: IAuditLogBulkExportRequestFilters,
     format: AuditLogBulkExportFormat,
     currentUser,
     restartJob?: boolean,
@@ -30,8 +32,8 @@ export interface IAuditLogBulkExportService {
 function canonicalizeFilters(filters: IAuditLogBulkExportFilters) {
   const normalized: Record<string, unknown> = {};
 
-  if (filters.usernames?.length) {
-    normalized.usernames = [...filters.usernames].sort();
+  if (filters.users?.length) {
+    normalized.users = filters.users.map(String).sort();
   }
   if (filters.actions?.length) {
     normalized.actions = [...filters.actions].sort();
@@ -72,11 +74,24 @@ class AuditLogBulkExportService implements IAuditLogBulkExportService {
    * Create a new audit-log bulk export job or reset the existing one
    */
   async createOrResetExportJob(
-    filters: IAuditLogBulkExportFilters,
+    requestFilters: IAuditLogBulkExportRequestFilters,
     format: AuditLogBulkExportFormat,
     currentUser,
     restartJob?: boolean,
   ): Promise<string> {
+    const filters: IAuditLogBulkExportFilters = {
+      actions: requestFilters.actions,
+      dateFrom: requestFilters.dateFrom,
+      dateTo: requestFilters.dateTo,
+    };
+    if (requestFilters.usernames?.length) {
+      const User = mongoose.model('User');
+      const userIds = await User.find({
+        username: { $in: requestFilters.usernames },
+      }).distinct('_id');
+      filters.users = userIds;
+    }
+
     const normalizedFilters = canonicalizeFilters(filters);
     const filterHash = sha256(JSON.stringify(normalizedFilters));
 
@@ -99,7 +114,7 @@ class AuditLogBulkExportService implements IAuditLogBulkExportService {
 
     const createdJob = await AuditLogBulkExportJob.create({
       user: currentUser,
-      filters: normalizedFilters,
+      filters,
       filterHash,
       format,
       status: AuditLogBulkExportJobStatus.exporting,

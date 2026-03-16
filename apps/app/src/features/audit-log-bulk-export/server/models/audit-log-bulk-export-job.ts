@@ -20,7 +20,7 @@ const auditLogBulkExportJobSchema = new Schema<IAuditLogBulkExportJob>(
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     filters: {
       type: {
-        usernames: [{ type: String }],
+        users: [{ type: Schema.Types.ObjectId, ref: 'User' }],
         actions: [{ type: String, enum: AllSupportedActions }],
         dateFrom: { type: Date },
         dateTo: { type: Date },

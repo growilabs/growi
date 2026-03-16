@@ -582,7 +582,7 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
         const job = await AuditLogBulkExportJob.create({
           user: testUser._id,
           filters: {
-            usernames: ['nonexistent-user-xyz-999'],
+            users: [new mongoose.Types.ObjectId()],
           },
           format: AuditLogBulkExportFormat.json,
           status: AuditLogBulkExportJobStatus.exporting,

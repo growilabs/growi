@@ -74,7 +74,7 @@ describe('AuditLogBulkExportService', () => {
         expect(createdJob?.status).toBe(AuditLogBulkExportJobStatus.exporting);
         expect(createdJob?.totalExportedCount).toBe(0);
         expect(createdJob?.filters).toMatchObject({
-          actions: ['PAGE_CREATE', 'PAGE_VIEW'],
+          actions: ['PAGE_VIEW', 'PAGE_CREATE'],
           dateFrom: new Date('2023-01-01T00:00:00.000Z'),
           dateTo: new Date('2023-12-31T00:00:00.000Z'),
         });
@@ -114,7 +114,9 @@ describe('AuditLogBulkExportService', () => {
 
         const createdJob = await AuditLogBulkExportJob.findById(jobId);
         expect(createdJob?.filters.actions).toEqual(['PAGE_CREATE']);
-        expect(createdJob?.filters.usernames).toEqual([user.username]);
+        expect(createdJob?.filters.users?.map(String)).toContain(
+          user._id.toString(),
+        );
       });
 
       it('should reset existing job when restartJob is true', async () => {

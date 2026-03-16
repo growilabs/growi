@@ -4,7 +4,7 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import type { IAuditLogBulkExportFilters } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
+import type { IAuditLogBulkExportRequestFilters } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import type { SupportedActionType } from '~/interfaces/activity';
 import { auditLogAvailableActionsAtom } from '~/states/server-configurations';
 
@@ -78,7 +78,7 @@ const AuditLogExportModalSubstance = ({
       .filter((v) => v[1])
       .map((v) => v[0]);
 
-    const filters: IAuditLogBulkExportFilters = {};
+    const filters: IAuditLogBulkExportRequestFilters = {};
 
     if (selectedUsernames.length > 0) {
       filters.usernames = selectedUsernames;
