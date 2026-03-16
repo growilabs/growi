@@ -97,7 +97,7 @@ RUN bash apps/app/bin/assemble-prod.sh
 RUN mkdir -p /tmp/release/apps/app && \
   cp package.json /tmp/release/ && \
   cp -a apps/app/.next apps/app/config apps/app/dist apps/app/public \
-       apps/app/resource apps/app/tmp apps/app/next.config.js \
+       apps/app/resource apps/app/tmp \
        apps/app/package.json apps/app/node_modules \
        /tmp/release/apps/app/ && \
   (cp apps/app/.env.production* /tmp/release/apps/app/ 2>/dev/null || true)
