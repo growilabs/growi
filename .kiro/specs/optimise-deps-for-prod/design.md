@@ -169,49 +169,29 @@ Each phase gate requires: production server starts without errors + `GET /` retu
 - Any package appearing in `.next/node_modules/` after a production build must be in `dependencies`, not `devDependencies`.
 - Changes propagate to all consumers of the monorepo lock file; `pnpm install --frozen-lockfile` must remain valid.
 
-**Phase 1 changes — move all 23 to `dependencies`**:
+**Final classification** (all packages in `dependencies`; 3 successfully reverted to `devDependencies`):
 
-| Package | Current | Target | Rationale |
-|---------|---------|--------|-----------|
-| `@codemirror/state` | devDep | dep | Used in editor components (SSR'd) |
-| `@emoji-mart/data` | devDep | dep | Static import in remark plugin (server-side) |
-| `@handsontable/react` | devDep | dep | Used in HandsontableModal (SSR'd unless wrapped) |
-| `@headless-tree/core` | devDep | dep | Used in PageTree hooks (SSR'd) |
-| `@headless-tree/react` | devDep | dep | Used in ItemsTree (SSR'd) |
-| `@tanstack/react-virtual` | devDep | dep | Used in ItemsTree (layout-critical, SSR'd) |
-| `bootstrap` | devDep | dep | Dynamic JS import in `_app.page.tsx` (Phase 4 to verify) |
-| `diff2html` | devDep | dep | Used in RevisionDiff (SSR'd) |
-| `downshift` | devDep | dep | Used in SearchModal (SSR'd) |
-| `fastest-levenshtein` | devDep | dep | Used in openai client service (SSR'd) |
-| `fslightbox-react` | devDep | dep | Used in LightBox (SSR'd) |
-| `i18next-http-backend` | devDep | dep | Present in `.next/node_modules/`; source unknown (Phase 4 to verify) |
-| `i18next-localstorage-backend` | devDep | dep | Present in `.next/node_modules/`; source unknown (Phase 4 to verify) |
-| `pretty-bytes` | devDep | dep | Used in RichAttachment (SSR'd) |
-| `react-copy-to-clipboard` | devDep | dep | Used in multiple inline components (SSR'd) |
-| `react-dnd` | devDep | dep | Used in PageTree drag-drop (SSR'd) |
-| `react-dnd-html5-backend` | devDep | dep | Used in PageTree drag-drop (SSR'd) |
-| `react-dropzone` | devDep | dep | Present in `.next/node_modules/`; source unknown (Phase 4 to verify) |
-| `react-hook-form` | devDep | dep | Used in forms across app (SSR'd) |
-| `react-input-autosize` | devDep | dep | Used in form inputs (SSR'd) |
-| `react-toastify` | devDep | dep | Static import in `toastr.ts` (SSR'd) |
-| `simplebar-react` | devDep | dep | Used in Sidebar, AiAssistant (layout-critical, SSR'd) |
-| `socket.io-client` | devDep | dep | Static import in admin socket atom (Phase 4 refactor) |
-
-**Phase 2–4 revert candidates** (move back to `devDependencies` if conditions met):
-
-| Package | Condition for revert | Phase |
-|---------|----------------------|-------|
-| `@emoji-mart/data` | Server-side import removed or replaced with static file | 2 |
-| `fslightbox-react` | Wrapped with `dynamic({ ssr: false })`; no longer in `.next/node_modules/` | 3 |
-| `diff2html` | Wrapped with `dynamic({ ssr: false })`; no longer in `.next/node_modules/` | 3 |
-| `react-dnd` | DnD-specific components wrapped with `dynamic({ ssr: false })` | 3 |
-| `react-dnd-html5-backend` | Same as `react-dnd` | 3 |
-| `@handsontable/react` | Confirmed `dynamic({ ssr: false })` in HandsontableModal | 3 |
-| `socket.io-client` | Admin socket refactored to dynamic import | 4 |
-| `bootstrap` | Confirmed `import()` is browser-only (inside `useEffect`) | 4 |
-| `i18next-http-backend` | Confirmed absent from `.next/node_modules/` post-Phase-1 | 4 |
-| `i18next-localstorage-backend` | Confirmed absent from `.next/node_modules/` post-Phase-1 | 4 |
-| `react-dropzone` | Confirmed absent from `.next/node_modules/` post-Phase-1 | 4 |
+| Package | Final classification | Rationale |
+|---------|---------------------|-----------|
+| `@codemirror/state` + 18 others (`codemirror`, `codemirror-emacs/vim/vscode-keymap`, `@lezer/highlight`, `@marp-team/*`, `@emoji-mart/react`, `reveal.js`, `pako`, `cm6-theme-basic-light`, `y-codemirror.next`) | `dependencies` | Found in `.next/node_modules/` via transitive imports; not in initial 23 — discovered during implementation |
+| `@handsontable/react` | `dependencies` | Still externalised despite `useEffect` dynamic import; `ssr: false` does not prevent Turbopack externalisation |
+| `@headless-tree/core`, `@headless-tree/react` | `dependencies` | Used in PageTree hooks (SSR'd) |
+| `@tanstack/react-virtual` | `dependencies` | Used in ItemsTree (layout-critical, SSR'd) |
+| `bootstrap` | `dependencies` | Still externalised despite `useEffect`-guarded `import()`; transitive imports cause externalisation |
+| `diff2html` | `dependencies` | Still externalised despite `ssr: false` on RevisionDiff; static import analysis reaches it |
+| `downshift` | `dependencies` | Used in SearchModal (SSR'd) |
+| `fastest-levenshtein` | `dependencies` | Used in openai client service (SSR'd) |
+| `i18next-http-backend`, `i18next-localstorage-backend`, `react-dropzone` | `dependencies` | Still in `.next/node_modules/` via transitive imports despite no direct `src/` imports |
+| `pretty-bytes` | `dependencies` | Used in RichAttachment (SSR'd) |
+| `react-copy-to-clipboard` | `dependencies` | Used in multiple inline components (SSR'd) |
+| `react-dnd`, `react-dnd-html5-backend` | `dependencies` | Still externalised despite DnD provider wrapped with `ssr: false` |
+| `react-hook-form` | `dependencies` | Used in forms across app (SSR'd) |
+| `react-input-autosize` | `dependencies` | Used in form inputs (SSR'd) |
+| `react-toastify` | `dependencies` | Static `{ toast }` import in `toastr.ts`; async refactor would change API surface |
+| `simplebar-react` | `dependencies` | Used in Sidebar, AiAssistant (layout-critical, SSR'd) |
+| **`@emoji-mart/data`** | **`devDependencies`** | Replaced with bundled `emoji-native-lookup.json`; no runtime package needed |
+| **`fslightbox-react`** | **`devDependencies`** | `import()` inside `useEffect`; broken symlink in `.next/node_modules/` is harmless (SSR never accesses it) |
+| **`socket.io-client`** | **`devDependencies`** | `await import()` inside `useEffect` in `admin/states/socket-io.ts`; no static SSR import path |
 
 **Contracts**: State [x]
 
@@ -465,26 +445,3 @@ done
 
 ---
 
-## Migration Strategy
-
-The five phases are executed sequentially. Each phase is independently deployable and verifiable.
-
-```mermaid
-graph LR
-    P1[Phase 1\nBaseline fix\nall 23 to deps]
-    P2[Phase 2\n@emoji-mart/data\nserver import]
-    P3[Phase 3\nssr:false\nGroup 1 candidates]
-    P4[Phase 4\nAmbiguous\npackages]
-    P5[Phase 5\nValidation\ndocumentation]
-
-    P1 --> P2
-    P2 --> P3
-    P3 --> P4
-    P4 --> P5
-```
-
-**Rollback**: Each phase modifies only `package.json` and/or one source file. Rolling back is a targeted revert of those changes; the production build pipeline (`assemble-prod.sh`, Dockerfile) is unchanged throughout.
-
-**Phase 1 rollback trigger**: Production server fails to start or CI `launch-prod` fails → revert `package.json` changes.
-
-**Phase 3/4 rollback trigger**: Hydration error or functional regression detected → revert the specific `dynamic()` wrapping or import refactor; package remains in `dependencies`.
