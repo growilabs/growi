@@ -123,19 +123,20 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     const minimumRevisionForActivity = 2;
     const suppressUpdateWindow = 5 * 60 * 1000; // 5 min
 
+    // Check revision count
     const Revision = mongoose.model<IRevisionHasId>('Revision');
-
     const revisionCount = await Revision.countDocuments({
       pageId: updatedPage._id,
     });
     const hasEnoughRevisions = revisionCount > minimumRevisionForActivity;
 
+    // Check if within suppresion limit
     const timeSinceLastUpdateMs =
       Date.now() - lastUpdatedAtBeforeUpdate.getTime();
-
     const isOutsideSuppressionWindow =
       timeSinceLastUpdateMs > suppressUpdateWindow;
 
+    // Check if last updated user
     let isLastUpdatedUser: boolean;
     if (updatedPage.lastUpdateUser) {
       isLastUpdatedUser =
