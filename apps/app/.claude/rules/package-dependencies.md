@@ -47,12 +47,9 @@ These were successfully removed from production artifact by eliminating their SS
 
 ## Verifying the Production Artifact
 
-Use the lightest check that fits the situation.
+### Level 1 — Externalisation check (30–60 s, local, incremental)
 
-### Level 1 — Externalisation check (30–60 s, incremental)
-
-Just want to know if a package gets externalised by Turbopack? Only a build is needed.
-`assemble-prod.sh` and server startup are not required.
+Just want to know if a package gets externalised by Turbopack?
 
 ```bash
 turbo run build --filter @growi/app
@@ -63,34 +60,15 @@ ls apps/app/.next/node_modules/ | grep <package-name>
 
 Turbopack build is incremental via cache, so subsequent runs after the first are fast.
 
-### Level 2 — Symlink integrity check (adds ~30 s)
+### Level 2 — CI (`reusable-app-prod.yml`, authoritative)
 
-Want to confirm all `.next/node_modules/` symlinks resolve (no broken links)?
+Trigger via `workflow_dispatch` before merging. Runs two jobs:
 
-```bash
-bash apps/app/bin/assemble-prod.sh
+1. **`build-prod`**: `turbo run build` → `assemble-prod.sh` → **`check-next-symlinks.sh`** → archives production tarball
+2. **`launch-prod`**: extracts the tarball into a clean isolated directory (no workspace-root `node_modules`), runs `pnpm run server:ci`
 
-cd apps/app && find .next/node_modules -maxdepth 2 -type l | while read link; do
-  linkdir=$(dirname "$link"); target=$(readlink "$link")
-  resolved=$(cd "$linkdir" 2>/dev/null && realpath -m "$target" 2>/dev/null || echo "UNRESOLVABLE")
-  { [ "$resolved" = "UNRESOLVABLE" ] || [ ! -e "$resolved" ]; } && echo "BROKEN: $link"
-done
-# Zero output (except fslightbox-react which is intentionally broken but harmless)
+`check-next-symlinks.sh` scans every symlink in `.next/node_modules/` and fails the build if any are broken (except `fslightbox-react` which is intentionally broken but harmless). This catches classification errors regardless of which code paths are exercised at runtime.
 
-git show HEAD:apps/app/next.config.ts > apps/app/next.config.ts
-```
+`server:ci` = `node dist/server/app.js --ci`: the server starts fully (loading all modules), then immediately exits with code 0. If any module fails to load (`ERR_MODULE_NOT_FOUND`), the process exits with code 1, failing the CI job.
 
-### Level 3 — Full server smoke test (adds ~60 s, for release gate only)
-
-```bash
-# assemble-prod.sh already run in Level 2; do NOT restore next.config.ts yet
-cd apps/app && pnpm run server > /tmp/server.log 2>&1 &
-timeout 90 bash -c 'until grep -q "Express server is listening" /tmp/server.log; do sleep 2; done'
-
-# Use / not /login — /login returns 200 even when SSR is broken
-curl -s -o /tmp/res.html -w "%{http_code}" http://localhost:3000/
-grep -c "ERR_MODULE_NOT_FOUND" /tmp/server.log  # must be 0
-
-kill $(lsof -ti:3000)
-git show HEAD:apps/app/next.config.ts > apps/app/next.config.ts
-```
+This exactly matches Docker production (no workspace fallback). A `build-prod` or `launch-prod` failure definitively means a missing `dependencies` entry.
