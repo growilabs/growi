@@ -603,10 +603,18 @@ class ElasticsearchDelegator
         body: {
           query: {
             bool: {
-              should: [
-                { wildcard: { username: { value: `*${username}*` } } },
-                { fuzzy: { username: { value: username, fuzziness: 'AUTO' } } },
-              ],
+              must: {
+                bool: {
+                  should: [
+                    { wildcard: { username: { value: `*${username}*` } } },
+                    {
+                      fuzzy: {
+                        username: { value: username, fuzziness: 'AUTO' },
+                      },
+                    },
+                  ],
+                },
+              },
               filter: {
                 terms: { status: statuses },
               },
