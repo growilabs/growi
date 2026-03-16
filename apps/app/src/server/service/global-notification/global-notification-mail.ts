@@ -91,6 +91,16 @@ class GlobalNotificationMailService {
     { comment, oldPath }: GlobalNotificationEventVars,
   ): MailOption {
     let locale = configManager.getConfig('app:globalLang');
+
+    const SUPPORTED_LOCALES = ['en_US', 'ja_JP', 'zh_CN'];
+
+    if (!SUPPORTED_LOCALES.includes(locale)) {
+      _logger.warn(
+        `Invalid or untrusted locale detected in DB: '${locale}'. Falling back to 'en_US' for safety.`,
+      );
+      locale = 'en_US';
+    }
+
     // validate for all events
     if (event == null || page == null || triggeredBy == null) {
       throw new Error(
@@ -111,6 +121,16 @@ class GlobalNotificationMailService {
       this.crowi.localeDir,
       `${locale}/notifications/${event}.ejs`,
     );
+
+    const normalizedTemplatePath = nodePath.resolve(template);
+    const baseDir = nodePath.resolve(this.crowi.localeDir);
+
+    if (!normalizedTemplatePath.startsWith(baseDir)) {
+      _logger.error(
+        `Security Alert: Path traversal attempted! Resolved path: ${normalizedTemplatePath}`,
+      );
+      throw new Error('Path traversal detected! Blocking template access.');
+    }
 
     const path = page.path;
     const appTitle = this.crowi.appService.getAppTitle();

@@ -585,6 +585,14 @@ module.exports = (crowi: Crowi) => {
     async (req, res) => {
       const { globalLang } = req.body;
       if (globalLang != null) {
+        const SUPPORTED_LOCALES = ['en_US', 'ja_JP', 'zh_CN'];
+
+        if (!SUPPORTED_LOCALES.includes(globalLang)) {
+          const msg = `Invalid global language settings: '${globalLang}' is not supported.`;
+          logger.error(msg, { globalLang });
+          return res.apiv3Err(new ErrorV3(msg, 'invalid-globalLang'));
+        }
+
         if (!isFileNameSafeForBaseDir(globalLang, crowi.localeDir)) {
           const msg =
             'Invalid global language settings: path traversal detected.';
