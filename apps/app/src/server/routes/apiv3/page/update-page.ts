@@ -110,7 +110,6 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     res: ApiV3Response,
     updatedPage: HydratedDocument<PageDocument>,
     previousRevision: IRevisionHasId | null,
-    lastUpdatedAtBeforeUpdate: Date,
   ) {
     // Reflect the updates in ydoc
     const origin = req.body.origin;
@@ -119,35 +118,48 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
     }
 
-    // REMINDER: Need implementation for situation where user edits the page, edits another page, then goes back to edit the same page again within the time limit
     const minimumRevisionForActivity = 2;
     const suppressUpdateWindow = 5 * 60 * 1000; // 5 min
+    const targetPageId = updatedPage._id.toString();
+    const Activity = mongoose.model('Activity');
 
-    // Check revision count
-    const Revision = mongoose.model<IRevisionHasId>('Revision');
-    const revisionCount = await Revision.countDocuments({
-      pageId: updatedPage._id,
-    });
-    const hasEnoughRevisions = revisionCount > minimumRevisionForActivity;
+    // Get most recent UPDATE or CREATE activity
+    const lastContentActivity = await Activity.findOne({
+      target: targetPageId,
+      action: {
+        $in: [
+          SupportedAction.ACTION_PAGE_CREATE,
+          SupportedAction.ACTION_PAGE_UPDATE,
+        ],
+      },
+      _id: { $ne: res.locals.activity?._id },
+    }).sort({ createdAt: -1 });
 
-    // Check if within suppresion limit
-    const timeSinceLastUpdateMs =
-      Date.now() - lastUpdatedAtBeforeUpdate.getTime();
-    const isOutsideSuppressionWindow =
-      timeSinceLastUpdateMs > suppressUpdateWindow;
+    // Check if last updated user is me
+    const isLastActivityByMe =
+      lastContentActivity &&
+      lastContentActivity.user._id.toString() === req.user._id.toString();
 
-    // Check if last updated user
-    let isLastUpdatedUser: boolean;
-    if (updatedPage.lastUpdateUser) {
-      isLastUpdatedUser =
-        getIdForRef(updatedPage.lastUpdateUser).toString() ===
-        req.user._id.toString();
+    // Get time since activity
+    const lastActivityTime = lastContentActivity
+      ? lastContentActivity.createdAt.getTime()
+      : 0;
+    const timeSinceLastActivityMs = Date.now() - lastActivityTime;
+
+    // Decide if UPDATE activity should generate
+    let shouldGenerateUpdateActivity: boolean;
+    if (!isLastActivityByMe) {
+      shouldGenerateUpdateActivity = true;
+    } else if (timeSinceLastActivityMs < suppressUpdateWindow) {
+      shouldGenerateUpdateActivity = false;
     } else {
-      isLastUpdatedUser = false;
-    }
+      const Revision = mongoose.model<IRevisionHasId>('Revision');
+      const revisionCount = await Revision.countDocuments({
+        pageId: updatedPage._id,
+      });
 
-    const shouldGenerateUpdateActivity =
-      !isLastUpdatedUser || (isOutsideSuppressionWindow && hasEnoughRevisions);
+      shouldGenerateUpdateActivity = revisionCount > minimumRevisionForActivity;
+    }
 
     if (shouldGenerateUpdateActivity) {
       // persist activity
@@ -313,7 +325,6 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
           409,
         );
       }
-      const lastUpdatedAtBeforeUpdate = currentPage.updatedAt;
       let updatedPage: HydratedDocument<PageDocument>;
       let previousRevision: IRevisionHasId | null;
       try {
@@ -383,13 +394,7 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
 
       res.apiv3(result, 201);
 
-      postAction(
-        req,
-        res,
-        updatedPage,
-        previousRevision,
-        lastUpdatedAtBeforeUpdate,
-      );
+      postAction(req, res, updatedPage, previousRevision);
     },
   ];
 };
