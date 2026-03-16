@@ -20,7 +20,7 @@ if [ -d apps/app/.next/node_modules ]; then
   find apps/app/.next/node_modules -maxdepth 2 -type l | while read -r link; do
     target=$(readlink "$link")
     new_target=$(echo "$target" | sed 's|../../../../node_modules/\.pnpm/|../../node_modules/.pnpm/|')
-    [ "$target" != "$new_target" ] && ln -sfn "$new_target" "$link"
+    if [ "$target" != "$new_target" ]; then ln -sfn "$new_target" "$link"; fi
   done
 else
   echo "[2/4] Skipped (no .next/node_modules directory)."
@@ -32,7 +32,7 @@ rm -rf apps/app/.next/cache
 echo "[3/4] Done."
 
 # Remove next.config.ts to prevent Next.js from attempting to install TypeScript at server startup,
-# which would corrupt node_modules (e.g. @growi/core). The compiled next.config.js is used instead.
+# which would corrupt node_modules (e.g. @growi/core).
 echo "[4/4] Removing next.config.ts..."
 rm -f apps/app/next.config.ts
 echo "[4/4] Done."
