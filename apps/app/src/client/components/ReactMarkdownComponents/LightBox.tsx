@@ -1,7 +1,5 @@
-import type React from 'react';
-import type { DetailedHTMLProps, ImgHTMLAttributes, JSX } from 'react';
-import { useMemo, useState } from 'react';
-import FsLightbox from 'fslightbox-react';
+import type { ComponentType, DetailedHTMLProps, ImgHTMLAttributes, JSX } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 type Props = DetailedHTMLProps<
@@ -9,22 +7,23 @@ type Props = DetailedHTMLProps<
   HTMLImageElement
 >;
 
+type FsLightboxProps = {
+  toggler: boolean;
+  sources: (string | undefined)[];
+  alt: string | undefined;
+  type: string;
+  exitFullscreenOnClose: boolean;
+};
+
 export const LightBox = (props: Props): JSX.Element => {
   const [toggler, setToggler] = useState(false);
+  // Dynamically import fslightbox-react so it stays out of the SSR bundle
+  const [FsLightbox, setFsLightbox] = useState<ComponentType<FsLightboxProps> | null>(null);
   const { alt, ...rest } = props;
 
-  const lightboxPortal = useMemo(() => {
-    return createPortal(
-      <FsLightbox
-        toggler={toggler}
-        sources={[props.src]}
-        alt={alt}
-        type="image"
-        exitFullscreenOnClose
-      />,
-      document.body,
-    );
-  }, [alt, props.src, toggler]);
+  useEffect(() => {
+    import('fslightbox-react').then(m => setFsLightbox(() => m.default));
+  }, []);
 
   return (
     <>
@@ -37,7 +36,16 @@ export const LightBox = (props: Props): JSX.Element => {
         <img alt={alt} {...rest} />
       </button>
 
-      {lightboxPortal}
+      {FsLightbox != null && createPortal(
+        <FsLightbox
+          toggler={toggler}
+          sources={[props.src]}
+          alt={alt}
+          type="image"
+          exitFullscreenOnClose
+        />,
+        document.body,
+      )}
     </>
   );
 };

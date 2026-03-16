@@ -10,6 +10,19 @@ rm -rf apps/app/node_modules
 mv out/node_modules apps/app/node_modules
 echo "[1/4] Done."
 
+# Rewrite apps/app/node_modules/ top-level symlinks from workspace root to the local .pnpm/ store.
+# pnpm deploy creates symlinks that point to ../../../../node_modules/.pnpm/ (workspace root),
+# which will not exist in production. Rewrite to point within apps/app/node_modules/.pnpm/ instead.
+echo "[1b/4] Rewriting apps/app/node_modules symlinks..."
+find apps/app/node_modules -maxdepth 2 -type l | while read -r link; do
+  target=$(readlink "$link")
+  # Scoped packages (@scope/pkg, maxdepth 2): ../../../../node_modules/.pnpm/ → ../.pnpm/
+  # Non-scoped packages (maxdepth 1): ../../../node_modules/.pnpm/ → .pnpm/
+  new_target=$(echo "$target" | sed 's|../../../../node_modules/\.pnpm/|../.pnpm/|; s|../../../node_modules/\.pnpm/|.pnpm/|')
+  if [ "$target" != "$new_target" ]; then ln -sfn "$new_target" "$link"; fi
+done
+echo "[1b/4] Done."
+
 # Redirect .next/node_modules/ symlinks from workspace root to deployed apps/app/node_modules/.pnpm/.
 # Turbopack generates symlinks pointing to ../../../../node_modules/.pnpm/ (workspace root),
 # which will not exist in production environments.

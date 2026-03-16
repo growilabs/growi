@@ -49,15 +49,23 @@ turbo run build
 assemble-prod.sh
   ├─ pnpm deploy out --prod --legacy   → out/node_modules/ (pnpm-native: .pnpm/ + symlinks)
   ├─ rm + mv out/node_modules → apps/app/node_modules/
+  ├─ [1b] symlink rewrite in apps/app/node_modules/:
+  │     non-scoped: ../../../node_modules/.pnpm/ → .pnpm/
+  │     scoped:    ../../../../node_modules/.pnpm/ → ../.pnpm/
   ├─ rm -rf .next/cache
   ├─ next.config.ts removal
-  └─ symlink rewrite: ../../../../ → ../../ in .next/node_modules/
+  └─ [2] symlink rewrite in .next/node_modules/:
+        ../../../../node_modules/.pnpm/ → ../../node_modules/.pnpm/
 
 cp -a to /tmp/release/           → preserves pnpm symlinks intact
 COPY --from=builder /tmp/release/ → release image
 ```
 
-The symlink rewrite step is essential: `.next/node_modules/` symlinks point to the workspace-root `.pnpm/` (4 levels up), which does not exist in the release image. After rewriting to 2 levels up, they resolve to `apps/app/node_modules/.pnpm/` (included in the deploy output), preserving pnpm's sibling-resolution for transitive dependencies.
+Two symlink rewrite steps are required:
+
+1. **`apps/app/node_modules/` rewrite** (`[1b]`): `pnpm deploy --prod` generates top-level symlinks in `out/node_modules/` pointing to the workspace-root `.pnpm/`. After `mv out/node_modules apps/app/node_modules`, these symlinks still reference the workspace-root path, which does not exist in production. Rewriting them to point within `apps/app/node_modules/.pnpm/` makes the deploy self-contained.
+
+2. **`.next/node_modules/` rewrite** (`[2]`): Turbopack generates symlinks in `.next/node_modules/` pointing to `../../../../node_modules/.pnpm/` (workspace root). After rewriting to `../../node_modules/.pnpm/`, they resolve to `apps/app/node_modules/.pnpm/`, preserving pnpm's sibling-resolution for transitive dependencies.
 
 ### Architecture Pattern & Boundary Map
 
@@ -130,7 +138,7 @@ graph TB
     P4 --> P5
 ```
 
-Each phase gate requires: production server starts without errors + login page returns HTTP 200.
+Each phase gate requires: production server starts without errors + `GET /` returns HTTP 200 with expected content (body contains `内部仕様や仕様策定中の議論の内容をメモしていく Wiki です。`) + zero `ERR_MODULE_NOT_FOUND` in server log. **Do NOT use `/login` as the smoke test URL** — it returns HTTP 200 even when SSR is broken because the login page does not render editor components.
 
 ---
 
@@ -307,7 +315,7 @@ These are not new components; they are targeted wrapping of existing imports usi
 
 **Implementation Notes**
 - Apply `dynamic` wrapping to the specific consuming component file, not to the package entry point.
-- Validation per component: (a) build with package removed from `dependencies`, (b) confirm it disappears from `.next/node_modules/`, (c) confirm no hydration warnings in browser console.
+- Validation per component: (a) build with package removed from `dependencies`, (b) confirm it disappears from `.next/node_modules/`, (c) run Production Server Startup Procedure and assert `GET /` returns HTTP 200 with expected content, (d) confirm no hydration warnings in browser console.
 - Risks: Wrapping components that render visible content may cause flash of missing content (FOMC); test on slow connections.
 
 ---
@@ -318,45 +326,61 @@ These are not new components; they are targeted wrapping of existing imports usi
 
 以下の手順でプロダクションサーバーを起動する。devcontainer 環境での検証を想定している。
 
-**Step 1 — クリーンビルド**
+**Step 1 — クリーンビルド**（ワークスペースルートから実行）
 
 ```bash
-cd /workspace/growi/apps/app
-pnpm run build
+turbo run build --filter @growi/app
 ```
 
-**Step 2 — プロダクション用アセンブル**
+**Step 2 — プロダクション用アセンブル**（ワークスペースルートから実行）
 
 ```bash
-bash bin/assemble-prod.sh
+bash apps/app/bin/assemble-prod.sh
 ```
 
-> **注意**: `assemble-prod.sh` は `apps/app/next.config.ts` を削除する。次回の開発ビルドを実行する前に必ず復元すること。
+> **注意**:
+> - `assemble-prod.sh` は `apps/app/next.config.ts` を削除する。**`next.config.ts` はサーバーテスト完了後（Step 6）に復元すること。** サーバー起動前に復元すると、Next.js が起動時に TypeScript インストールを試みて pnpm install が走り、`apps/app/node_modules` の symlink が上書きされ HTTP 500 となる。
+> - ワークスペースルートの `node_modules` は **削除・リネームしないこと**。workspace パッケージ（`@growi/core` 等）の `node_modules/` 内シンボリックリンクがワークスペースルート `node_modules` を参照しており、削除すると `MODULE_NOT_FOUND` でサーバーが起動しない。Docker 本番環境でも `packages/` ディレクトリごと COPY されるためこれは正常な挙動。
 
-**Step 3 — プロダクションサーバー起動**
-
-`.env.production.local` が存在しない場合は作成する:
-
-```
-MONGO_URI=mongodb://mongo/growi-dev-wiki
-```
-
-サーバーを起動する:
+**Step 3 — プロダクションサーバー起動**（`apps/app/` から実行）
 
 ```bash
-cd /workspace/growi/apps/app
-pnpm run server
+cd apps/app && pnpm run server > /tmp/server.log 2>&1 &
 ```
 
-**Step 4 — 開発環境の復元**（検証後）
+起動完了を待つ:
+
+```bash
+timeout 60 bash -c 'until grep -q "Express server is listening" /tmp/server.log; do sleep 2; done'
+```
+
+> **注意**: `preserver` スクリプトが `pnpm run migrate` を実行するため、起動に数十秒かかる。**Do NOT use mongosh/mongo** for DB connectivity checks — check server logs instead.
+
+**Step 4 — 検証**
+
+```bash
+# HTTP ステータスとコンテンツ確認
+HTTP_CODE=$(curl -s -o /tmp/response.html -w "%{http_code}" http://localhost:3000/)
+echo "HTTP: $HTTP_CODE"  # → 200 であること
+grep -c "内部仕様や仕様策定中の議論の内容をメモしていく Wiki です。" /tmp/response.html  # → 1 以上であること
+
+# ERR_MODULE_NOT_FOUND がないことを確認
+grep -c "ERR_MODULE_NOT_FOUND" /tmp/server.log  # → 0 であること
+```
+
+> **検証 URL は `/` を使うこと。`/login` は不可。** `/login` は SSR が壊れていても HTTP 200 を返すため正常動作の確認にならない。`/` はエディタ関連コンポーネントを SSR するため、パッケージが欠損すると HTTP 500 になる。
+
+**Step 5 — サーバー停止**
+
+```bash
+kill $(lsof -ti:3000)
+```
+
+**Step 6 — 開発環境の復元**（検証後）
 
 ```bash
 # next.config.ts を復元
 git show HEAD:apps/app/next.config.ts > apps/app/next.config.ts
-
-# node_modules を復元
-cd /workspace/growi
-pnpm install
 ```
 
 ---
@@ -365,43 +389,55 @@ pnpm install
 
 プロダクションサーバー起動後、以下のコマンドで SSR の正常動作を確認する。
 
-**基本確認（HTTP 200 チェック）**
+**検証コマンド（Production Server Startup Procedure の Step 5 参照）**
 
 ```bash
-curl -o /dev/null -s -w "%{http_code}\n" http://localhost:3000/login
-# → 200 が返れば OK
-```
-
-**モジュール解決エラーのチェック**
-
-サーバーのログに `ERR_MODULE_NOT_FOUND` が出ていないことを確認する。バックグラウンド起動した場合:
-
-```bash
-grep -c "ERR_MODULE_NOT_FOUND" /tmp/growi-prod.log
-# → 0 が返れば OK
+# URL は / を使うこと（/login は不可）
+HTTP_CODE=$(curl -s -o /tmp/response.html -w "%{http_code}" http://localhost:3000/)
+echo "HTTP: $HTTP_CODE"  # → 200
+grep -c "内部仕様や仕様策定中の議論の内容をメモしていく Wiki です。" /tmp/response.html  # → 1 以上
+grep -c "ERR_MODULE_NOT_FOUND" /tmp/server.log  # → 0
 ```
 
 **破損シンボリックリンクの確認**
 
-`assemble-prod.sh` 実行後、`.next/node_modules/` 内にシンボリックリンクが存在するが、そのすべてが致命的なエラーを引き起こすわけではない。以下の 2 種類に分類される。
+`assemble-prod.sh` 実行後、`.next/node_modules/` および `apps/app/node_modules/` 内のシンボリックリンクがすべて解決可能であることを確認する。
 
-| カテゴリ | 説明 | サーバーへの影響 |
-|---------|------|----------------|
-| **既存の破損リンク** | 元々 devDependencies だったパッケージのリンク（変更前から存在） | なし（サーバーが実際に `require()` しないため） |
-| **新規の破損リンク** | 今回の変更で devDependencies に移動したパッケージのリンク | `dynamic({ ssr: false })` で正しくラップされていれば無害 |
+```bash
+# .next/node_modules/ の確認
+cd apps/app && find .next/node_modules -maxdepth 2 -type l | while read link; do
+  linkdir=$(dirname "$link"); target=$(readlink "$link")
+  resolved=$(cd "$linkdir" 2>/dev/null && realpath -m "$target" 2>/dev/null || echo "UNRESOLVABLE")
+  [ "$resolved" = "UNRESOLVABLE" ] || [ ! -e "$resolved" ] && echo "BROKEN: $link"
+done
 
-Turbopack は SSR 静的解析時に `dynamic({ ssr: false })` 境界の内側のパッケージについても `.next/node_modules/` エントリを作成する。破損シンボリックリンクが存在すること自体は問題ではなく、サーバーが実際にそのパッケージを `require()` するかどうかが判断基準となる。
+# apps/app/node_modules/ の確認（ワークスペースルートの node_modules をリネーム後に実行）
+find apps/app/node_modules -maxdepth 2 -type l | while read link; do
+  linkdir=$(dirname "$link"); target=$(readlink "$link")
+  resolved=$(cd "$linkdir" 2>/dev/null && realpath -m "$target" 2>/dev/null || echo "UNRESOLVABLE")
+  [ "$resolved" = "UNRESOLVABLE" ] || [ ! -e "$resolved" ] && echo "BROKEN: $link"
+done
+```
 
-**devcontainer における再現性の注意事項**
+> **注意**: `@growi/*` パッケージは `../../../../packages/` を指すシンボリックリンクだが、`packages/` はワークスペースルート直下に存在するため問題ない。
 
-devcontainer では `pnpm deploy --prod` 後もワークスペースルートの `node_modules/` が残存するため、`.next/` を経由しないモジュール解決パス（例: `../../node_modules/foo`）では誤って green と判定される可能性がある。ただし `.next/node_modules/` 内のシンボリックリンクは直接ファイルシステムパスによる解決であり、Docker 本番環境と同じ挙動を示す。そのため Turbopack の外部化（externalisation）検証においては devcontainer テストで十分な精度が得られる。
+**devDependencies 逆入り確認**
+
+```bash
+# devDependencies に列挙されているパッケージが .next/node_modules/ に現れないことを確認
+# （あれば Classification regression）
+```
+
+**devcontainer における再現性について**
+
+`pnpm deploy --prod` 後もワークスペースルートの `node_modules/` が残存するため、**必ず `mv node_modules node_modules.bak` を実施してからサーバーを起動すること**。この手順を省略すると `apps/app/node_modules/` の壊れたシンボリックリンクがワークスペースルートの `node_modules/` によって補完され、誤って green と判定される。
 
 ---
 
 ### Phase 1 — Smoke Test (Req 1.3, 1.4, 1.5)
 
 - 上記「Production Server Startup Procedure」に従いサーバーを起動し、stdout に `ERR_MODULE_NOT_FOUND` が出力されないことを確認する。
-- HTTP GET `/login`: assert 200 response and absence of SSR error log lines.
+- **HTTP GET `/`** (not `/login`): assert HTTP 200, body contains `内部仕様や仕様策定中の議論の内容をメモしていく Wiki です。`, zero `ERR_MODULE_NOT_FOUND` in server log.
 - Run `launch-prod` CI job: assert job passes against MongoDB 6.0 and 8.0.
 
 ### Phase 2 — Emoji Rendering (Req 2.2)
@@ -411,18 +447,21 @@ devcontainer では `pnpm deploy --prod` 後もワークスペースルートの
 
 ### Phase 3 — Hydration Integrity (Req 3.3)
 
+- Per-package smoke test: for each package moved to devDependencies, run Production Server Startup Procedure and assert `GET /` HTTP 200 with expected content.
 - Per-component browser test: load page containing the wrapped component; assert no React hydration warnings in browser console.
 - Visual regression: screenshot comparison of affected pages before and after `ssr: false` wrapping.
 
 ### Phase 4 — Admin Socket and Bootstrap (Req 4.2, 4.3)
 
+- Per-package smoke test: for each package moved to devDependencies, run Production Server Startup Procedure and assert `GET /` HTTP 200 with expected content.
 - Admin socket: open admin panel in browser; assert Socket.IO connection established (WebSocket upgrade in browser DevTools Network tab).
 - Bootstrap: assert Bootstrap dropdown/modal JavaScript functions correctly in browser after confirming `import()` placement.
 
 ### Phase 5 — Final Coverage Check (Req 5.1, 5.3)
 
-- Automated check (add to `assemble-prod.sh` or CI): after deploy, assert that every symlink in `apps/app/.next/node_modules/` resolves to an existing file in `apps/app/node_modules/.pnpm/`.
+- After deploy, assert that every symlink in `apps/app/.next/node_modules/` AND `apps/app/node_modules/` resolves to an existing file (zero broken symlinks, verified with workspace-root `node_modules` renamed).
 - Assert no package listed in `devDependencies` appears in `apps/app/.next/node_modules/` after a production build.
+- Run Production Server Startup Procedure (including `mv node_modules node_modules.bak`) and assert `GET /` HTTP 200 with expected content.
 
 ---
 

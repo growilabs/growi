@@ -45,37 +45,41 @@
 
 ---
 
-- [x] 3. Apply `dynamic({ ssr: false })` to eligible Group 1 components
+- [ ] 3. Apply `dynamic({ ssr: false })` to eligible Group 1 components
 
 - [x] 3.1 (P) Wrap `LightBox.tsx` import with `dynamic({ ssr: false })` and verify `fslightbox-react` leaves `dependencies`
-  - Applied `dynamic({ ssr: false })` in `apps/app/src/client/services/renderer/renderer.tsx`
+  - Replaced static `import FsLightbox from 'fslightbox-react'` in `LightBox.tsx` with `import('fslightbox-react')` inside `useEffect` (true runtime dynamic import, same pattern as socket.io-client in task 4.2)
   - Moved `fslightbox-react` from `dependencies` to `devDependencies`
-  - Server test: HTTP 200 on `/login`, no `ERR_MODULE_NOT_FOUND`
+  - **Validation**: `GET /` → HTTP 200, zero `ERR_MODULE_NOT_FOUND`. Turbopack still creates a `.next/node_modules/fslightbox-react` symlink, but SSR never executes `useEffect`, so the broken symlink is never accessed.
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [x] 3.2 (P) Wrap `RevisionDiff.tsx` import with `dynamic({ ssr: false })` and verify `diff2html` leaves `dependencies`
+- [ ] 3.2 (P) Wrap `RevisionDiff.tsx` import with `dynamic({ ssr: false })` and verify `diff2html` leaves `dependencies`
   - Applied `dynamic({ ssr: false })` in `apps/app/src/client/components/RevisionComparer/RevisionComparer.tsx`
   - Moved `diff2html` from `dependencies` to `devDependencies`
+  - **GOAL NOT ACHIEVED**: `diff2html` still appears in `.next/node_modules/` after production build. Package was moved back to `dependencies` in task 5.1.
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [x] 3.3 (P) Wrap the DnD provider in `PageTree` with `dynamic({ ssr: false })` and verify `react-dnd` / `react-dnd-html5-backend` leave `dependencies`
+- [ ] 3.3 (P) Wrap the DnD provider in `PageTree` with `dynamic({ ssr: false })` and verify `react-dnd` / `react-dnd-html5-backend` leave `dependencies`
   - Created `apps/app/src/client/components/Sidebar/PageTree/PageTreeWithDnD.tsx` wrapper
   - Updated `PageTree.tsx` to load `PageTreeWithDnD` via `dynamic({ ssr: false })`
   - Moved `react-dnd` and `react-dnd-html5-backend` from `dependencies` to `devDependencies`
+  - **GOAL NOT ACHIEVED**: Both packages still appear in `.next/node_modules/` after production build. Moved back to `dependencies` in task 5.1.
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [x] 3.4 (P) Confirm `HandsontableModal` already uses a `dynamic` import and verify `@handsontable/react` leave `dependencies`
+- [ ] 3.4 (P) Confirm `HandsontableModal` already uses a `dynamic` import and verify `@handsontable/react` leave `dependencies`
   - Confirmed: `HandsontableModal.tsx` is loaded via `useLazyLoader` with `import('./HandsontableModal')` inside `useEffect` — browser-only dynamic import
   - Moved `@handsontable/react` from `dependencies` to `devDependencies`
+  - **GOAL NOT ACHIEVED**: `@handsontable/react` still appears in `.next/node_modules/` after production build. Moved back to `dependencies` in task 5.1.
   - _Requirements: 3.1, 3.2, 3.4, 3.5_
 
-- [x] 3.5 Run a consolidated production build verification after all Group 1 wrapping changes
-  - Ran `assemble-prod.sh` + `pnpm run server`: HTTP 200 on `/login`, no `ERR_MODULE_NOT_FOUND` errors
+- [ ] 3.5 Run a consolidated production build verification after all Group 1 wrapping changes
+  - ~~Ran `assemble-prod.sh` + `pnpm run server`: HTTP 200 on `/login`, no `ERR_MODULE_NOT_FOUND` errors~~ ← **invalid test** (`/login` returns 200 even when SSR is broken)
+  - **GOAL NOT ACHIEVED**: All Phase 3 packages remain in `.next/node_modules/` and must stay in `dependencies`. The `ssr: false` approach does not prevent Turbopack from externalising packages.
   - _Requirements: 3.3, 3.4, 3.5_
 
 ---
 
-- [x] 4. Resolve ambiguous and phantom package classifications
+- [ ] 4. Resolve ambiguous and phantom package classifications
 
 - [x] 4.1 (P) Confirm `react-toastify` must remain in `dependencies`
   - `toastr.ts` has static import `import { toast } from 'react-toastify'`; reachable from SSR client components (e.g., `features/page-tree/hooks/use-page-rename.tsx`)
@@ -90,20 +94,22 @@
   - All consumers already guard for `null` socket (no breaking changes)
   - _Requirements: 4.2_
 
-- [x] 4.3 (P) Verify whether `bootstrap` JS `import()` is browser-only and classify accordingly
+- [ ] 4.3 (P) Verify whether `bootstrap` JS `import()` is browser-only and classify accordingly
   - Confirmed: `import('bootstrap/dist/js/bootstrap')` is inside `useEffect` in `_app.page.tsx` — browser-only
   - Moved `bootstrap` from `dependencies` to `devDependencies`
+  - **GOAL NOT ACHIEVED**: `bootstrap` still appears in `.next/node_modules/` after production build. Moved back to `dependencies` in task 5.1. (`useEffect`-guarded dynamic import does not prevent Turbopack externalisation.)
   - _Requirements: 4.3_
 
-- [x] 4.4 (P) Investigate phantom packages and remove or reclassify them
+- [ ] 4.4 (P) Investigate phantom packages and remove or reclassify them
   - `i18next-http-backend`, `i18next-localstorage-backend`, `react-dropzone`: no direct imports in `apps/app/src/`
   - All three moved from `dependencies` to `devDependencies`
+  - **GOAL NOT ACHIEVED**: All three still appear in `.next/node_modules/` (reached via transitive imports). Moved back to `dependencies` in task 5.1.
   - _Requirements: 4.4_
 
-- [x] 4.5 Apply all Phase 4 package.json classification changes and run consolidated verification
-  - All Phase 4 changes applied to `apps/app/package.json`
-  - `pnpm install` run to verify lock file integrity
-  - `assemble-prod.sh` + server start: HTTP 200 on `/login`, no `ERR_MODULE_NOT_FOUND`
+- [ ] 4.5 Apply all Phase 4 package.json classification changes and run consolidated verification
+  - ~~All Phase 4 changes applied to `apps/app/package.json`~~
+  - ~~`assemble-prod.sh` + server start: HTTP 200 on `/login`, no `ERR_MODULE_NOT_FOUND`~~ ← **invalid test**
+  - **GOAL NOT ACHIEVED**: Tasks 4.3 and 4.4 goals were not achieved; their packages remain in `dependencies`. Phase 4 classification is therefore incomplete.
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
 ---
@@ -111,10 +117,31 @@
 - [ ] 5. Final validation and documentation
 
 - [ ] 5.1 Verify that every `.next/node_modules/` symlink resolves correctly in the release artifact
-  - Run `bash apps/app/bin/assemble-prod.sh` to produce the final artifact
-  - Enumerate every symlink under `apps/app/.next/node_modules/` with `find apps/app/.next/node_modules -maxdepth 2 -type l` and assert that each target path exists under `apps/app/node_modules/.pnpm/` (no broken symlinks)
+  - Run `turbo run build --filter @growi/app` to produce a fresh build
+  - Run `bash apps/app/bin/assemble-prod.sh` to produce the release artifact
+    - **IMPORTANT**: `pnpm deploy --prod` generates `apps/app/node_modules/` symlinks that point to the workspace-root `node_modules/.pnpm/` (e.g. `../../../node_modules/.pnpm/react@18.2.0/...`). `assemble-prod.sh` step [1b/4] rewrites these to point within `apps/app/node_modules/.pnpm/` instead (e.g. `.pnpm/react@18.2.0/...` for non-scoped, `../.pnpm/react@18.2.0/...` for scoped). Without this rewrite, the production server fails with `TypeError: Cannot read properties of null (reading 'useContext')` when the workspace-root `node_modules` is absent.
+  - **DO NOT restore `next.config.ts` before the server test.** If `next.config.ts` is present at server startup, Next.js attempts to install TypeScript via pnpm, which overwrites `apps/app/node_modules/` symlinks back to workspace-root paths, causing HTTP 500. Restore `next.config.ts` only after killing the server.
+  - **DO NOT rename/remove workspace-root `node_modules`.** Workspace packages (`@growi/core` etc.) in `packages/*/node_modules/` have symlinks pointing to the workspace-root `node_modules`. Removing it causes `MODULE_NOT_FOUND` for server-side deps (e.g. `bson-objectid`). In Docker production, `packages/` is `COPY`'d with the full workspace structure, so the workspace-root `node_modules` is present there too.
+  - **Broken-symlink check for `.next/node_modules/`**: from workspace root, run the following and assert zero output (except `fslightbox-react` if task 3.1 is done):
+    ```bash
+    cd apps/app && find .next/node_modules -maxdepth 2 -type l | while read link; do
+      linkdir=$(dirname "$link"); target=$(readlink "$link")
+      resolved=$(cd "$linkdir" 2>/dev/null && realpath -m "$target" 2>/dev/null || echo "UNRESOLVABLE")
+      [ "$resolved" = "UNRESOLVABLE" ] || [ ! -e "$resolved" ] && echo "BROKEN: $link"
+    done
+    ```
   - Assert that no package listed in `devDependencies` in `apps/app/package.json` appears in `apps/app/.next/node_modules/` (no classification regression)
-  - Start `pnpm run server` and confirm HTTP 200 on `/login` with no SSR errors in the server log
+  - Start the production server in background: `cd apps/app && pnpm run server > /tmp/server.log 2>&1 &`
+    - **Do NOT run mongosh/mongo for DB connectivity checks** — the server will connect automatically; check logs instead
+    - Wait for log line: `Express server is listening on port 3000`
+  - **HTTP check — use root URL, NOT /login**: `curl -s -o /tmp/response.html -w "%{http_code}" http://localhost:3000/`
+    - `/login` is not a valid smoke test: it returns HTTP 200 even when SSR is broken
+    - The root page `/` triggers SSR of editor-related components and fails with HTTP 500 when packages are missing
+    - Assert HTTP 200, response body contains `内部仕様や仕様策定中の議論の内容をメモしていく Wiki です。`, and zero `ERR_MODULE_NOT_FOUND` lines in `/tmp/server.log`
+  - Kill the server after verification: `kill $(lsof -ti:3000)`
+  - Restore `next.config.ts`: `git show HEAD:apps/app/next.config.ts > apps/app/next.config.ts`
+  - **Result**: PENDING RE-VERIFICATION.
+  - **Root-cause summary**: The spec's Phase 2–4 assumption that `ssr: false` wrapping removes packages from `.next/node_modules/` was incorrect — Turbopack still externalises them. Additionally, the initial survey of 23 packages was incomplete; 19 further transitive packages (all `@codemirror/*`, `codemirror`, `codemirror-emacs/vim/vscode-keymap`, `@lezer/highlight`, `@marp-team/*`, `@emoji-mart/react`, `reveal.js`, `pako`, `cm6-theme-basic-light`, `y-codemirror.next`) also appear in `.next/node_modules/`. All 29 missing packages were added/moved to `dependencies`. Two `assemble-prod.sh` bugs were fixed: (1) `[ ... ] && ...` under `set -e`; (2) missing rewrite of `apps/app/node_modules/` symlinks from workspace-root paths to local `.pnpm/` paths.
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
 - [x] 5.2 Add Turbopack externalisation rule documentation
