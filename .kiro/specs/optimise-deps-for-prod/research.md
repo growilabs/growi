@@ -196,3 +196,57 @@ All other packages remain in `dependencies` because either `ssr: false` wrapping
 ### Finding: CI symlink integrity check added
 
 `check-next-symlinks.sh` was added to the `build-prod` CI job (runs after `assemble-prod.sh`) to detect broken symlinks in `.next/node_modules/` automatically. This prevents future classification regressions regardless of which code paths are exercised at runtime by `server:ci`. The `fslightbox-react` exception is hardcoded in the script.
+
+---
+
+## Session 3: Assembly Pipeline Simplification
+
+### Finding: pnpm v10 `--legacy` creates self-contained symlinks (step [1b] eliminated)
+
+**Verification** — `pnpm deploy out --prod --legacy --filter @growi/app` in pnpm v10.32.1:
+- `out/node_modules/react` → `.pnpm/react@18.2.0/node_modules/react` (self-contained ✓)
+- `out/node_modules/@codemirror/state` → `../.pnpm/@codemirror+state@6.5.4/node_modules/@codemirror/state` ✓
+
+**NOT** `../../../node_modules/.pnpm/...` (workspace-root-pointing) as in pre-v10 pnpm.
+
+**Implication**: Step [1b] is no longer needed. The root cause of step [1b] was placing the deploy output at `apps/app/` (not `--legacy` itself). Removing `--legacy` would require `inject-workspace-packages=true` in `.npmrc` with no practical benefit — keeping `--legacy` is the simpler choice.
+
+**pnpm version sensitivity**: If downgrading below pnpm v10, `--legacy` may again produce workspace-root-pointing symlinks requiring step [1b] to be reinstated. Verify with `readlink out/node_modules/react` — must start with `.pnpm/`.
+
+---
+
+### Finding: `.next/node_modules/` symlink path analysis (step [2] eliminated)
+
+**Analysis of actual `.next/node_modules/` contents** (Turbopack original output, before any rewrite):
+- Non-scoped packages: `../../../../node_modules/.pnpm/<pkg>/...` (4 levels up from `.next/node_modules/` = Docker workspace root)
+- Scoped packages (`@scope/pkg`): `../../../../../node_modules/.pnpm/<pkg>/...`
+
+Step [2] in the old `assemble-prod.sh` rewrote these from `../../../../` to `../../` to point to `apps/app/node_modules/`. If the workspace-root `node_modules/` contains the prod deps instead, the original Turbopack symlinks resolve correctly without any rewriting.
+
+**Implication**: Placing the deploy output at workspace root eliminates step [2] entirely.
+
+---
+
+### Design Decisions
+
+#### Decision: Workspace-root staging (eliminates step [2])
+
+- **Alternatives**:
+  1. Keep `apps/app/node_modules/` placement, apply step [2] rewrite (old approach)
+  2. `pnpm install --prod` post-build — workspace packages remain as symlinks, requiring `packages/` in release image
+  3. Place deploy output at workspace root, no rewrite needed (selected)
+- **Selected**: `rm -rf node_modules && mv out/node_modules node_modules` + `ln -sfn ../../node_modules apps/app/node_modules`
+- **Rationale**: Turbopack's original symlink targets (`../../../../node_modules/.pnpm/`) already point to workspace root. Preserving this structure requires no rewriting.
+- **Trade-off**: `rm -rf node_modules` destroys the full-deps workspace root `node_modules/` locally — developers must run `pnpm install` to restore after local testing.
+
+#### Decision: Keep `--legacy` in `pnpm deploy` (eliminates step [1b])
+
+- **Context**: In pnpm v10, `--legacy` produces self-contained `.pnpm/` symlinks regardless. The `--legacy` flag is now a pnpm v10 gate-bypass (skips `inject-workspace-packages` check), not a linker-mode selector.
+- **Alternatives**: Remove `--legacy` — requires `inject-workspace-packages=true` in `.npmrc`; same symlink output but adds config dependency.
+- **Selected**: Keep `--legacy` (no `.npmrc` changes required).
+
+#### Decision: `apps/app/node_modules` as a symlink to `../../node_modules`
+
+- **Context**: The `migrate` script in `apps/app/package.json` uses path `node_modules/migrate-mongo/...` relative to `apps/app/`. With deploy output at workspace root, this direct path would fail without the symlink.
+- **Selected**: `ln -sfn ../../node_modules apps/app/node_modules`
+- **Rationale**: Satisfies migration script path + Node.js `require()` traversal without duplicating the `.pnpm/` store. `cp -a` and Docker BuildKit `COPY` both preserve symlinks correctly.

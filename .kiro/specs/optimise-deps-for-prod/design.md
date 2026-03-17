@@ -38,65 +38,76 @@ This feature corrects the `devDependencies` / `dependencies` classification in `
 
 ## Architecture
 
-### Existing Architecture Analysis
+### Current Architecture Analysis
 
-The production assembly pipeline is:
+The production assembly pipeline:
 
 ```
 turbo run build
   └─ Turbopack build → .next/ (with .next/node_modules/ symlinks → ../../../../node_modules/.pnpm/)
 
-assemble-prod.sh
-  ├─ pnpm deploy out --prod --legacy   → out/node_modules/ (pnpm-native: .pnpm/ + symlinks)
-  ├─ rm + mv out/node_modules → apps/app/node_modules/
-  ├─ [1b] symlink rewrite in apps/app/node_modules/:
-  │     non-scoped: ../../../node_modules/.pnpm/ → .pnpm/
-  │     scoped:    ../../../../node_modules/.pnpm/ → ../.pnpm/
-  ├─ rm -rf .next/cache
-  ├─ next.config.ts removal
-  └─ [2] symlink rewrite in .next/node_modules/:
-        ../../../../node_modules/.pnpm/ → ../../node_modules/.pnpm/
+assemble-prod.sh (current — no symlink rewriting):
+  [1]   pnpm deploy out --prod --legacy --filter @growi/app
+        └─ out/node_modules/<pkg> → .pnpm/<pkg>/...  (self-contained in pnpm v10 ✓)
+  [mv]  rm -rf node_modules && mv out/node_modules node_modules
+        └─ workspace-root node_modules/ is now prod-only ✓
+  [ln]  rm -rf apps/app/node_modules && ln -sfn ../../node_modules apps/app/node_modules
+        └─ apps/app/node_modules → ../../node_modules ✓
+  [3]   rm -rf .next/cache
+  [4]   rm -f next.config.ts
 
-cp -a to /tmp/release/           → preserves pnpm symlinks intact
+cp -a node_modules /tmp/release/   → workspace-root prod node_modules
+cp -a apps/app/.next ...           → preserves pnpm symlinks intact
 COPY --from=builder /tmp/release/ → release image
 ```
 
-Two symlink rewrite steps are required:
-
-1. **`apps/app/node_modules/` rewrite** (`[1b]`): `pnpm deploy --prod` generates top-level symlinks in `out/node_modules/` pointing to the workspace-root `.pnpm/`. After `mv out/node_modules apps/app/node_modules`, these symlinks still reference the workspace-root path, which does not exist in production. Rewriting them to point within `apps/app/node_modules/.pnpm/` makes the deploy self-contained.
-
-2. **`.next/node_modules/` rewrite** (`[2]`): Turbopack generates symlinks in `.next/node_modules/` pointing to `../../../../node_modules/.pnpm/` (workspace root). After rewriting to `../../node_modules/.pnpm/`, they resolve to `apps/app/node_modules/.pnpm/`, preserving pnpm's sibling-resolution for transitive dependencies.
+The `.next/node_modules/` symlinks (pointing `../../../../node_modules/.pnpm/`) resolve naturally to the workspace-root `node_modules/` — no symlink rewriting is needed. In pnpm v10, `--legacy` produces self-contained `.pnpm/` symlinks within the deploy output (step [1b] is unnecessary); placing the output at workspace root means Turbopack's original symlink targets already resolve (step [2] is unnecessary).
 
 ### Architecture Pattern & Boundary Map
 
 ```mermaid
 graph TB
-    subgraph BuildEnv
-        TurboBuild[turbo run build]
-        NextModules[.next/node_modules symlinks]
-        AssembleScript[assemble-prod.sh]
-        DeployOut[pnpm deploy out]
-        AppNodeModules[apps/app/node_modules .pnpm + symlinks]
-        RewriteStep[symlink rewrite step]
+    subgraph DockerBuilder
+        PrunedRoot[Pruned workspace root]
+        FullDepsNM[node_modules full deps]
+        Build[turbo run build]
+        NextOut[apps/app/.next node_modules symlinks to 4-levels-up]
+        Deploy[pnpm deploy out --prod --legacy]
+        ProdNM[out/node_modules prod-only self-contained]
+        Replace[rm node_modules mv out/node_modules node_modules]
+        Symlink[ln -sfn apps/app/node_modules]
+        Clean[rm cache next.config.ts]
+        Stage[Stage to tmp/release]
     end
 
     subgraph ReleaseImage
-        ReleaseDist[release artifact]
-        ProdServer[pnpm run server]
+        WsRoot[workspace root node_modules prod-only]
+        AppNext[apps/app/.next symlinks resolve naturally]
+        AppNMLink[apps/app/node_modules symlink to ws root]
+        Server[pnpm run server]
     end
 
-    TurboBuild --> NextModules
-    AssembleScript --> DeployOut
-    DeployOut --> AppNodeModules
-    AssembleScript --> RewriteStep
-    RewriteStep --> NextModules
-    AppNodeModules --> ReleaseDist
-    NextModules --> ReleaseDist
-    ReleaseDist --> ProdServer
+    PrunedRoot --> FullDepsNM
+    FullDepsNM --> Build
+    Build --> NextOut
+    Build --> Deploy
+    Deploy --> ProdNM
+    ProdNM --> Replace
+    Replace --> Symlink
+    Symlink --> Clean
+    Clean --> Stage
+    Stage --> WsRoot
+    Stage --> AppNext
+    Stage --> AppNMLink
+    WsRoot --> AppNext
+    AppNMLink --> WsRoot
+    WsRoot --> Server
 ```
 
 **Key decisions**:
-- Symlink rewrite (not `cp -rL`) preserves pnpm's sibling resolution for transitive deps (see `research.md` — Decision: Symlink Rewrite over cp -rL).
+- Workspace-root staging (not `apps/app/` staging): Turbopack's `.next/node_modules/` symlinks point `../../../../node_modules/.pnpm/` (workspace root). Placing the deploy output at workspace root means these symlinks resolve naturally — no step [2] rewriting needed (see `research.md` — Session 3: Decision: workspace-root staging).
+- Keep `--legacy` in `pnpm deploy`: In pnpm v10, `--legacy` produces self-contained `.pnpm/` symlinks within the deploy output — step [1b] rewriting is no longer needed (see `research.md` — Session 3).
+- `apps/app/node_modules` as a symlink to `../../node_modules`: satisfies `migrate-mongo` script path and Node.js `require()` traversal without duplicating the `.pnpm/` store.
 - `pnpm deploy --prod` (not `--dev`) is the correct scope; only runtime packages belong in the artifact.
 
 ### Technology Stack
@@ -104,7 +115,7 @@ graph TB
 | Layer | Choice | Role | Notes |
 |-------|--------|------|-------|
 | Package manifest | `apps/app/package.json` | Declares runtime vs build-time deps | 23 entries move from `devDependencies` to `dependencies` |
-| Build assembly | `apps/app/bin/assemble-prod.sh` | Produces self-contained release artifact | Already contains symlink rewrite; no changes needed in Phase 1 |
+| Build assembly | `apps/app/bin/assemble-prod.sh` | Produces self-contained release artifact | No symlink rewriting; workspace-root staging + `apps/app/node_modules` symlink (pnpm v10) |
 | Bundler | Turbopack (Next.js 16) | Externalises packages to `.next/node_modules/` | Externalisation heuristic: static module-level imports in SSR code paths |
 | Package manager | pnpm v10 with `--legacy` deploy | Produces pnpm-native `node_modules` with `.pnpm/` virtual store | `inject-workspace-packages` not required with `--legacy` |
 
@@ -319,8 +330,9 @@ bash apps/app/bin/assemble-prod.sh
 ```
 
 > **注意**:
-> - `assemble-prod.sh` は `apps/app/next.config.ts` を削除する。**`next.config.ts` はサーバーテスト完了後（Step 6）に復元すること。** サーバー起動前に復元すると、Next.js が起動時に TypeScript インストールを試みて pnpm install が走り、`apps/app/node_modules` の symlink が上書きされ HTTP 500 となる。
-> - `pnpm deploy` はサイドエフェクトとしてワークスペースルートの `node_modules` を再作成する。Docker の release stage では `apps/app/node_modules/` のみ COPY され、ワークスペースルートの `node_modules` は含まれない。`pnpm deploy --prod --legacy` が workspace パッケージ（`@growi/core` 等）を `.pnpm/` ローカルストアの実体ディレクトリとしてデプロイするため、`apps/app/node_modules/` は自己完結している。より正確な production 再現テストを行う場合は `mv node_modules node_modules.bak` でワークスペースルートを退避してからサーバーを起動し、テスト後に `mv node_modules.bak node_modules` で復元すること。
+> - `assemble-prod.sh` は `apps/app/next.config.ts` を削除する。**`next.config.ts` はサーバーテスト完了後（Step 6）に復元すること。** サーバー起動前に復元すると、Next.js が起動時に TypeScript インストールを試みて pnpm install が走り、`apps/app/node_modules` symlink が上書きされ HTTP 500 となる。
+> - `assemble-prod.sh` は `rm -rf node_modules && mv out/node_modules node_modules` を実行するため、ワークスペースルートの `node_modules/` が prod-only に置き換わる。**`mv node_modules node_modules.bak` は不要**（新アプローチではワークスペースルートが自動的に prod-only になる）。テスト後は `pnpm install` で開発環境を復元すること。
+> - `apps/app/node_modules` は `../../node_modules` へのシンボリックリンクになる。Docker release image でもこの構造が再現される。
 
 **Step 3 — プロダクションサーバー起動**（`apps/app/` から実行）
 
@@ -410,7 +422,7 @@ done
 
 **devcontainer における再現性について**
 
-`pnpm deploy --prod` 後もワークスペースルートの `node_modules/` が残存するため、**必ず `mv node_modules node_modules.bak` を実施してからサーバーを起動すること**。この手順を省略すると `apps/app/node_modules/` の壊れたシンボリックリンクがワークスペースルートの `node_modules/` によって補完され、誤って green と判定される。
+`assemble-prod.sh` は `rm -rf node_modules && mv out/node_modules node_modules` を実行するため、ワークスペースルートの `node_modules/` が prod-only の deploy 出力に置き換わる。**`mv node_modules node_modules.bak` は不要**（以前のアプローチでは必要だったが、現アプローチでは `assemble-prod.sh` がワークスペースルートを自動的に prod-only にする）。テスト完了後は `pnpm install` で開発環境を復元すること。
 
 ---
 
@@ -439,9 +451,9 @@ done
 
 ### Phase 5 — Final Coverage Check (Req 5.1, 5.3)
 
-- After deploy, assert that every symlink in `apps/app/.next/node_modules/` AND `apps/app/node_modules/` resolves to an existing file (zero broken symlinks, verified with workspace-root `node_modules` renamed).
+- After deploy, assert that every symlink in `apps/app/.next/node_modules/` AND `apps/app/node_modules/` resolves to an existing file (zero broken symlinks; `apps/app/node_modules` is a symlink to `../../node_modules` which is the prod-only workspace-root `node_modules/`).
 - Assert no package listed in `devDependencies` appears in `apps/app/.next/node_modules/` after a production build.
-- Run Production Server Startup Procedure (including `mv node_modules node_modules.bak`) and assert `GET /` HTTP 200 with expected content.
+- Run Production Server Startup Procedure and assert `GET /` HTTP 200 with expected content.
 
 ---
 
