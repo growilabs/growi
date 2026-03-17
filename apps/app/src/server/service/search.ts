@@ -325,6 +325,14 @@ class SearchService implements SearchQueryParser, SearchResolver {
     return this.fullTextSearchDelegator.updateOrInsertAuditlog(activity);
   }
 
+  async searchAuditlogs(username: string, offset: number, limit: number) {
+    return this.fullTextSearchDelegator.searchAuditlogs(
+      username,
+      offset,
+      limit,
+    );
+  }
+
   async rebuildIndex() {
     return this.fullTextSearchDelegator.rebuildIndex();
   }

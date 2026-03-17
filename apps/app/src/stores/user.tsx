@@ -26,6 +26,18 @@ export const useSWRxUsersList = (
   );
 };
 
+export const useSWRxAuditlogUsernames = (
+  q: string,
+  offset?: number,
+  limit?: number,
+): SWRResponse<usernameResult, Error> => {
+  return useSWR(
+    q != null ? ['/activity/usernames', q, offset, limit] : null,
+    ([endpoint, q, offset, limit]) =>
+      apiv3Get(endpoint, { q, offset, limit }).then((result) => result.data),
+  );
+};
+
 type usernameRequestOptions = {
   isIncludeActiveUser?: boolean;
   isIncludeInactiveUser?: boolean;

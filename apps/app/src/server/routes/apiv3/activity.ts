@@ -319,5 +319,30 @@ module.exports = (crowi: Crowi): Router => {
     },
   );
 
+  router.get(
+    '/usernames',
+    accessTokenParser([SCOPE.READ.ADMIN.AUDIT_LOG], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    adminRequired,
+    async (req: Request, res: ApiV3Response) => {
+      const { q = '', offset = 0, limit = 5 } = req.query;
+      try {
+        const result = await crowi.searchService.searchAuditlogs(
+          q as string,
+          +offset,
+          +limit,
+        );
+        return res.apiv3({
+          activeUser: {
+            usernames: result?.usernames ?? [],
+            totalCount: result?.totalCount ?? 0,
+          },
+        });
+      } catch (err) {
+        logger.error('Failed to search auditlogs', err);
+        return res.apiv3Err(err, 500);
+      }
+    },
+  );
   return router;
 };

@@ -443,18 +443,6 @@ class ElasticsearchDelegator
       await client.indices.putAlias({ name: aliasName, index: indexName });
     }
   }
-
-  async addAllAuditlogs(): Promise<void> {
-    const Activity = mongoose.model('Activity');
-    const activities = await Activity.find();
-
-    const body = activities.flatMap((activity) => [
-      { index: { _index: 'auditlogs', _id: activity._id } },
-      { username: activity.snapshot?.username },
-    ]);
-
-    await this.client.bulk({ body });
-  }
   async createIndex(index: string) {
     // TODO: https://redmine.weseek.co.jp/issues/168446
     if (isES7ClientDelegator(this.client)) {
@@ -573,6 +561,22 @@ class ElasticsearchDelegator
       shouldEmitProgress: true,
       invokeGarbageCollection: true,
     });
+  }
+
+  async addAllAuditlogs(): Promise<void> {
+    const Activity = mongoose.model('Activity');
+    const activities = await Activity.find();
+
+    const body = activities.flatMap((activity) => {
+      const username = activity.snapshot?.username;
+      if (!username) return [];
+      return [
+        { index: { _index: 'auditlogs', _id: activity._id } },
+        { username },
+      ];
+    });
+
+    await this.client.bulk({ body });
   }
 
   updateOrInsertPageById(pageId) {
@@ -704,14 +708,81 @@ class ElasticsearchDelegator
 
     return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
   }
+
   async updateOrInsertAuditlog(activity: ActivityDocument): Promise<void> {
+    const username = activity.snapshot?.username;
+    if (!username) return;
     await this.client.bulk({
       body: [
         { index: { _index: 'auditlogs', _id: activity._id } },
-        { username: activity.snapshot?.username },
+        { username },
       ],
     });
   }
+
+  async searchAuditlogs(username: string, offset: number, limit: number) {
+    if (isES7ClientDelegator(this.client)) {
+      const result = await this.client.search({
+        index: 'auditlogs',
+        from: offset,
+        size: limit,
+        body: {
+          query: {
+            bool: {
+              should: [
+                { wildcard: { username: { value: `*${username}*` } } },
+                { fuzzy: { username: { value: username, fuzziness: 'AUTO' } } },
+              ],
+            },
+          },
+        },
+      });
+      const usernames = [
+        ...new Set(
+          result.hits.hits.map(
+            (hit) => (hit._source as { username: string })?.username,
+          ),
+        ),
+      ];
+      const totalCount =
+        typeof result.hits.total === 'number'
+          ? result.hits.total
+          : (result.hits.total?.value ?? 0);
+      return { usernames, totalCount };
+    }
+
+    if (
+      isES8ClientDelegator(this.client) ||
+      isES9ClientDelegator(this.client)
+    ) {
+      const result = await this.client.search({
+        index: 'auditlogs',
+        from: offset,
+        size: limit,
+        query: {
+          bool: {
+            should: [
+              { wildcard: { username: { value: `*${username}*` } } },
+              { fuzzy: { username: { value: username, fuzziness: 'AUTO' } } },
+            ],
+          },
+        },
+      });
+      const usernames = [
+        ...new Set(
+          result.hits.hits.map(
+            (hit) => (hit._source as { username: string })?.username,
+          ),
+        ),
+      ];
+      const totalCount =
+        typeof result.hits.total === 'number'
+          ? result.hits.total
+          : (result.hits.total?.value ?? 0);
+      return { usernames, totalCount };
+    }
+  }
+
   deletePages(pages) {
     const body = [];
     pages.forEach((page) => {
