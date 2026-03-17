@@ -9,6 +9,7 @@ import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 import { SocketEventName } from '~/interfaces/websocket';
+import type { ActivityDocument } from '~/server/models/activity';
 import PageTagRelation from '~/server/models/page-tag-relation';
 import type { SocketIoService } from '~/server/service/socket-io';
 import loggerFactory from '~/utils/logger';
@@ -703,7 +704,14 @@ class ElasticsearchDelegator
 
     return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
   }
-
+  async updateOrInsertAuditlog(activity: ActivityDocument): Promise<void> {
+    await this.client.bulk({
+      body: [
+        { index: { _index: 'auditlogs', _id: activity._id } },
+        { username: activity.snapshot?.username },
+      ],
+    });
+  }
   deletePages(pages) {
     const body = [];
     pages.forEach((page) => {
