@@ -622,6 +622,7 @@ class Crowi {
           logger: bunyanLogger,
           excludes: ['*'],
           parseUA: false,
+          // ReDoS protection: Limit UA to 512 chars to prevent parsing overhead.
           format: (res) => {
             const ua = res.req.headers['user-agent'] || '';
             const safeUA = ua.length > 512 ? ua.substring(0, 512) : ua;
