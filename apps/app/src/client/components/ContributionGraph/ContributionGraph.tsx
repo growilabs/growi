@@ -1,11 +1,7 @@
-import { useEffect } from 'react';
-import { useAtom, useAtomValue } from 'jotai';
+import { useMemo } from 'react';
 
-import {
-  contributionDataAtom,
-  targetUserIdAtom,
-} from '~/client/services/use-contributions';
 import type { IContributionDay } from '~/features/contribution-graph/interfaces/contribution-graph';
+import { useSWRxContributions } from '~/stores/use-contributions';
 
 import styles from './ContributionGraph.module.scss';
 
@@ -90,25 +86,22 @@ const getMonthLabels = (contributions: IContributionDay[]) => {
 };
 
 export const ContributionGraph = ({ userId }: { userId: string }) => {
-  const [, setTargetUserId] = useAtom(targetUserIdAtom);
+  const { data } = useSWRxContributions(userId);
 
-  const rawContributions = useAtomValue(contributionDataAtom);
-  const contributions = getPaddedContributions(rawContributions);
+  const contributions = useMemo(() => {
+    return data != null ? getPaddedContributions(data) : [];
+  }, [data]);
 
-  const monthLabels = getMonthLabels(contributions);
+  const monthLabels = useMemo(() => {
+    return getMonthLabels(contributions);
+  }, [contributions]);
 
-  let totalContributions = 0;
-  for (const cont of contributions) {
-    totalContributions += cont.count;
-  }
-
-  useEffect(() => {
-    setTargetUserId(userId);
-  }, [userId, setTargetUserId]);
+  const totalContributions = useMemo(() => {
+    return contributions.reduce((sum, cont) => sum + cont.count, 0);
+  }, [contributions]);
 
   return (
     <div className={styles['contribution-box']}>
-      {/* Shift months right to account for the width of the day labels */}
       <div className={styles['month-labels']} style={{ marginLeft: '32px' }}>
         {monthLabels.map((label, i) => (
           <span
