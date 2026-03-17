@@ -621,6 +621,12 @@ class Crowi {
         expressBunyanLogger({
           logger: bunyanLogger,
           excludes: ['*'],
+          parseUA: false,
+          // ReDoS protection: Limit UA to 512 chars to prevent parsing overhead.
+          format: (res) => {
+            const ua = (res.req.headers['user-agent'] || '').substring(0, 512);
+            return `User-Agent: ${ua}`;
+          },
         }),
       );
     }
