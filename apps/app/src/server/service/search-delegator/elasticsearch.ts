@@ -401,8 +401,59 @@ class ElasticsearchDelegator
         index: indexName,
       });
     }
+    await this.normalizeAuditlogIndices();
   }
 
+  async normalizeAuditlogIndices(): Promise<void> {
+    const { client } = this;
+    const indexName = 'auditlogs';
+    const tmpIndexName = 'auditlogs-tmp';
+    const aliasName = 'auditlogs';
+
+    // remove tmp index
+    const isExistsAuditlogTmpIndex = await client.indices.exists({
+      index: tmpIndexName,
+    });
+    if (isExistsAuditlogTmpIndex) {
+      await client.indices.delete({ index: tmpIndexName });
+    }
+
+    // create index
+    const isExistsAuditlogIndex = await client.indices.exists({
+      index: indexName,
+    });
+    if (!isExistsAuditlogIndex) {
+      await this.createAuditlogIndex(indexName);
+      await this.addAllAuditlogs();
+    }
+
+    // create alias
+    const auditlogCount = await mongoose.model('Activity').countDocuments();
+    const esCount = (await client.count({ index: indexName })).count;
+    if (auditlogCount !== esCount) {
+      await this.addAllAuditlogs();
+    }
+
+    const isExistsAlias = await client.indices.existsAlias({
+      name: aliasName,
+      index: indexName,
+    });
+    if (!isExistsAlias) {
+      await client.indices.putAlias({ name: aliasName, index: indexName });
+    }
+  }
+
+  async addAllAuditlogs(): Promise<void> {
+    const Activity = mongoose.model('Activity');
+    const activities = await Activity.find();
+
+    const body = activities.flatMap((activity) => [
+      { index: { _index: 'auditlogs', _id: activity._id } },
+      { username: activity.snapshot?.username },
+    ]);
+
+    await this.client.bulk({ body });
+  }
   async createIndex(index: string) {
     // TODO: https://redmine.weseek.co.jp/issues/168446
     if (isES7ClientDelegator(this.client)) {
