@@ -31,6 +31,8 @@ export default defineWorkspace([
       name: 'app-integration',
       environment: 'node',
       include: ['**/*.integ.ts'],
+      // Allow enough time for MongoMemoryServer to download the binary on first run
+      hookTimeout: 120_000,
       setupFiles: [
         './test/setup/migrate-mongo.ts',
         './test/setup/mongo/index.ts',
