@@ -4,7 +4,7 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import type { IAuditLogBulkExportFilters } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
+import type { IAuditLogBulkExportRequestFilters } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import type { SupportedActionType } from '~/interfaces/activity';
 import { auditLogAvailableActionsAtom } from '~/states/server-configurations';
 
@@ -32,7 +32,7 @@ const AuditLogExportModalSubstance = ({
 
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
-  const [_selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
+  const [selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
   const [actionMap, setActionMap] = useState(
     () =>
       new Map<SupportedActionType, boolean>(
@@ -78,9 +78,11 @@ const AuditLogExportModalSubstance = ({
       .filter((v) => v[1])
       .map((v) => v[0]);
 
-    const filters: IAuditLogBulkExportFilters = {};
-    // TODO: Add users filter after implementing username-to-userId conversion
+    const filters: IAuditLogBulkExportRequestFilters = {};
 
+    if (selectedUsernames.length > 0) {
+      filters.usernames = selectedUsernames;
+    }
     if (selectedActionList.length > 0) {
       filters.actions = selectedActionList;
     }
@@ -94,7 +96,7 @@ const AuditLogExportModalSubstance = ({
     }
 
     return filters;
-  }, [actionMap, startDate, endDate]);
+  }, [actionMap, selectedUsernames, startDate, endDate]);
 
   const {
     isExporting,
