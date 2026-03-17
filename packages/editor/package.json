@@ -39,6 +39,7 @@
     "@emoji-mart/data": "^1.2.1",
     "@emoji-mart/react": "^1.1.1",
     "@growi/core": "workspace:^",
+    "@growi/emoji-mart-data": "workspace:^",
     "@growi/core-styles": "workspace:^",
     "@lezer/highlight": "^1.2.0",
     "@popperjs/core": "^2.11.8",

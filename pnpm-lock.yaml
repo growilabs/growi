@@ -225,12 +225,6 @@ importers:
       '@elastic/elasticsearch9':
         specifier: npm:@elastic/elasticsearch@^9.0.3
         version: '@elastic/elasticsearch@9.1.0'
-      '@emoji-mart/data':
-        specifier: ^1.2.1
-        version: 1.2.1
-      '@emoji-mart/react':
-        specifier: ^1.1.1
-        version: 1.1.1(emoji-mart@5.6.0)(react@18.2.0)
       '@godaddy/terminus':
         specifier: ^4.9.0
         version: 4.12.1
@@ -240,6 +234,9 @@ importers:
       '@growi/core':
         specifier: workspace:^
         version: link:../../packages/core
+      '@growi/emoji-mart-data':
+        specifier: workspace:^
+        version: link:../../packages/emoji-mart-data
       '@growi/pdf-converter-client':
         specifier: workspace:^
         version: link:../../packages/pdf-converter-client
@@ -1338,6 +1335,9 @@ importers:
       '@growi/core-styles':
         specifier: workspace:^
         version: link:../core-styles
+      '@growi/emoji-mart-data':
+        specifier: workspace:^
+        version: link:../emoji-mart-data
       '@lezer/highlight':
         specifier: ^1.2.0
         version: 1.2.3
@@ -1437,6 +1437,12 @@ importers:
       yjs:
         specifier: ^13.6.19
         version: 13.6.19
+
+  packages/emoji-mart-data:
+    devDependencies:
+      '@emoji-mart/data':
+        specifier: ^1.2.1
+        version: 1.2.1
 
   packages/pdf-converter-client:
     dependencies:

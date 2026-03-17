@@ -1,10 +1,8 @@
+// Re-run `turbo run build --filter @growi/emoji-mart-data` whenever @emoji-mart/data is upgraded.
+import emojiNativeLookup from '@growi/emoji-mart-data';
 import type { Root } from 'mdast';
 import { findAndReplace } from 'mdast-util-find-and-replace';
 import type { Plugin } from 'unified';
-
-// Static lookup extracted from @emoji-mart/data/sets/15/native.json.
-// Re-run apps/app/bin/extract-emoji-data.cjs whenever @emoji-mart/data is upgraded.
-import emojiNativeLookup from './emoji-native-lookup.json';
 
 export const remarkPlugin: Plugin = () => {
   return (tree: Root) => {
@@ -13,12 +11,7 @@ export const remarkPlugin: Plugin = () => {
       /:(\+1|[-\w]+):/g,
 
       (_, $1: string) => {
-        const emoji = (
-          emojiNativeLookup as unknown as Record<
-            string,
-            { skins: [{ native: string }] }
-          >
-        )[$1]?.skins[0].native;
+        const emoji = emojiNativeLookup[$1]?.skins[0].native;
         return emoji ?? false;
       },
     ]);
