@@ -68,6 +68,7 @@ jobs:
       run: |
         tar -zcf production.tar.gz --exclude ./apps/app/.next/cache \
           package.json \
+          node_modules \
           apps/app/.next \
           apps/app/config \
           apps/app/dist \

@@ -36,7 +36,7 @@ This design removes both root causes: in pnpm v10, `pnpm deploy --legacy` alread
 | Requirement | Summary | Components | Flows |
 |-------------|---------|------------|-------|
 | 1.1–1.4 | Eliminate symlink rewrite steps | `assemble-prod.sh` | Assembly Flow |
-| 2.1–2.4 | `pnpm deploy --prod` (no `--legacy`) creates prod-only workspace-root `node_modules/` | `assemble-prod.sh` | Assembly Flow |
+| 2.1–2.4 | `pnpm deploy --prod --legacy` creates prod-only workspace-root `node_modules/` (self-contained in pnpm v10) | `assemble-prod.sh` | Assembly Flow |
 | 3.1–3.4 | Release artifact has `node_modules/` at workspace root; `apps/app/node_modules` is a symlink | `assemble-prod.sh`, Dockerfile staging | Assembly Flow, Release Image |
 | 4.1–4.5 | Production server starts, `GET /` returns 200, no broken symlinks | All components | Validation |
 | 5.1–5.5 | `pruner` stage unchanged; Docker layer caching preserved | Dockerfile | Build Flow |
@@ -182,6 +182,7 @@ graph LR
 | `assemble-prod.sh` | Build Assembly | Assemble prod artifact: deploy prod deps, stage symlinks, clean | 1.1–1.4, 2.1–2.4, 3.1–3.3 | pnpm, filesystem | Batch |
 | Dockerfile `builder` staging step | Container Build | Copy release artifact to `/tmp/release/` with correct structure | 3.1, 3.3, 5.1–5.3 | Docker BuildKit COPY | Batch |
 | Release image structure | Container Runtime | `node_modules/` at workspace root; `apps/app/node_modules` symlink | 3.2, 3.4, 4.1–4.4 | `assemble-prod.sh` output | State |
+| `reusable-app-prod.yml` archive step | CI Pipeline | Archive workspace-root `node_modules/` + `apps/app/node_modules` symlink for `launch-prod` and Playwright jobs | 4.3, 4.5 | `assemble-prod.sh` output, GitHub Actions `tar` | Batch |
 
 ### Build Assembly
 
@@ -293,6 +294,27 @@ The `release` stage copies `/tmp/release/` to `${appDir}` (e.g. `/opt/growi/`):
 - `.next/node_modules/react-xxx` → `../../../../node_modules/.pnpm/react@18.2.0/node_modules/react` → `/opt/growi/node_modules/.pnpm/react@18.2.0/node_modules/react` ✓
 - `apps/app/node_modules/migrate-mongo` → via symlink `../../node_modules` → `/opt/growi/node_modules/migrate-mongo` ✓
 - Node.js `require('express')` from `apps/app/dist/server/app.js` → traverses to `apps/app/node_modules/` (symlink) → `/opt/growi/node_modules/express` ✓
+
+---
+
+### CI Pipeline
+
+#### `.github/workflows/reusable-app-prod.yml` — `archive-prod-files` step
+
+| Field | Detail |
+|-------|--------|
+| Intent | Archive the complete production artifact (workspace-root `node_modules/` + `apps/app/` contents) so that `launch-prod` and `run-playwright` jobs can extract a self-contained release |
+| Requirements | 4.3, 4.5 |
+
+**Responsibilities & Constraints**
+- Include workspace-root `node_modules/` in the tarball (prod-only, from `assemble-prod.sh` output)
+- Include `apps/app/node_modules` as a symlink (preserved by `tar` default behaviour — no `--dereference`)
+- When extracted, the structure must satisfy: `apps/app/node_modules → ../../node_modules` resolves to the extracted workspace-root `node_modules/`
+
+**Implementation Notes**
+- Add `node_modules \` immediately before `apps/app/.next \` in the `tar -zcf` command
+- `tar` archives symlinks without following them by default; `apps/app/node_modules` is correctly preserved as a symlink pointing to `../../node_modules`
+- The extraction in both `launch-prod` (`tar -xf`) and `run-playwright` (`tar -xf ... -C /tmp/growi-prod`) restores the symlink; `../../node_modules` resolves correctly because workspace-root `node_modules/` is now also extracted
 
 ---
 

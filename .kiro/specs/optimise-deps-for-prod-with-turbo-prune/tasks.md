@@ -7,6 +7,7 @@
 | 1 | Verify `pnpm deploy --legacy` symlink behavior in pnpm v10 | 1.1 | 2.1, 2.2, 2.3 |
 | 2 | Simplify `assemble-prod.sh` | 2.1, 2.2 | 1.1–1.4, 2.1, 2.4, 3.1–3.3, 5.4, 5.5 |
 | 3 | Update Dockerfile staging | — | 3.1, 3.3, 5.1–5.3 |
+| 3b | Update CI workflow archive step | — | 4.3, 4.5 |
 | 4 | Validate end-to-end | 4.1, 4.2, 4.3 | 1.1–1.4, 2.3, 2.4, 3.2, 3.4, 4.1–4.5, 6.1–6.4 |
 
 ---
@@ -56,6 +57,15 @@
   - This task modifies only the Dockerfile staging `RUN` step; no changes to the `pruner`, `deps`, or `release` stages
   - Can be written concurrently with task 2 (different file); testing requires task 2 to be complete first
   - _Requirements: 3.1, 3.3, 5.1, 5.2, 5.3_
+
+---
+
+- [x] 3b. Update CI workflow archive step to include workspace-root `node_modules/`
+  - In `.github/workflows/reusable-app-prod.yml`, in the `build-prod` job `archive-prod-files` step, add `node_modules \` immediately before `apps/app/.next \` in the `tar -zcf` command
+  - With the new `assemble-prod.sh`, `apps/app/node_modules` is a symlink to `../../node_modules`. Without this change, `launch-prod` and `run-playwright` extract a broken symlink (the target `../../node_modules` is absent from the tarball)
+  - `tar` preserves symlinks by default (no `--dereference`): `apps/app/node_modules` is archived and extracted as a symlink; workspace-root `node_modules/` is archived and extracted as a real directory — `../../node_modules` resolves correctly after extraction
+  - Verify the tarball contents: `tar -tzf production.tar.gz | grep -E '^node_modules/$'` should show `node_modules/`
+  - _Requirements: 4.3, 4.5_
 
 ---
 
