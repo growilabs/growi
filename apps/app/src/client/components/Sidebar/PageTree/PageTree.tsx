@@ -5,11 +5,10 @@ import { useTranslation } from 'react-i18next';
 import ItemsTreeContentSkeleton from '../../ItemsTree/ItemsTreeContentSkeleton';
 import { PageTreeHeader } from './PageTreeSubstance';
 
-// react-dnd and react-dnd-html5-backend are browser-only; wrapping them with
-// ssr: false keeps both packages out of .next/node_modules/ so they can stay
-// in devDependencies.
+// PageTreeWithDnD uses HTML5Backend which accesses browser APIs on mount;
+// ssr: false prevents it from rendering on the server.
 const PageTreeWithDnD = dynamic(
-  () => import('./PageTreeWithDnD').then((mod) => mod.PageTreeWithDnD),
+  () => import('./PageTreeSubstance').then((mod) => mod.PageTreeWithDnD),
   { ssr: false, loading: ItemsTreeContentSkeleton },
 );
 
