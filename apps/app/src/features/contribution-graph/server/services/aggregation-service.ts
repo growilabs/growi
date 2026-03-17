@@ -1,7 +1,7 @@
 import type { Aggregate, PipelineStage } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { getUTCMidnightToday } from '~/features/contribution-graph/utils/contribution-graph-utils';
+import { getUTCMidnight } from '~/features/contribution-graph/utils/contribution-graph-utils';
 import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 
@@ -20,7 +20,7 @@ export class ContributionAggregationService {
 
   public buildPipeline(params: PipelineParams): PipelineStage[] {
     const { userId, startDate } = params;
-    const endDate = getUTCMidnightToday();
+    const endDate = getUTCMidnight(new Date());
 
     return [
       {

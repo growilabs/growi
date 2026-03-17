@@ -1,8 +1,11 @@
+import mongoose from 'mongoose';
+
+import User from '~/server/models/user';
+
 import type {
   IContributionDay,
   IWeeksToFreeze,
-} from '../interfaces/contribution-graph';
-import type { ContributionGraphDocument } from '../models/contribution-cache-model';
+} from '../../interfaces/contribution-graph';
 import {
   formatDateKey,
   getCurrentWeekStart,
@@ -10,12 +13,15 @@ import {
   getExpiredWeekIds,
   getISOWeekId,
   getStartDateFromISOWeek,
-} from '../utils/contribution-graph-utils';
+  getUTCMidnight,
+} from '../../utils/contribution-graph-utils';
+import type { ContributionGraphDocument } from '../models/contribution-cache-model';
 import { ContributionAggregationService } from './aggregation-service';
 import {
   cacheIsFresh,
   getContributionCache,
   updateContributionCache,
+  userExists,
 } from './cache-data-service';
 
 export class ContributionCacheManager {
@@ -34,6 +40,13 @@ export class ContributionCacheManager {
   public async getUpdatedCache(userId: string) {
     const contributionCache = await getContributionCache(userId);
 
+    if (!contributionCache) {
+      const validUser = await userExists(userId);
+      if (!validUser) {
+        throw new Error('User does not exist.');
+      }
+    }
+
     const isFresh = contributionCache
       ? cacheIsFresh(contributionCache.lastUpdated)
       : false;
@@ -44,7 +57,7 @@ export class ContributionCacheManager {
 
     let aggregationStartDate: Date;
     if (contributionCache) {
-      aggregationStartDate = contributionCache.lastUpdated;
+      aggregationStartDate = getUTCMidnight(contributionCache.lastUpdated);
     } else {
       aggregationStartDate = new Date();
       aggregationStartDate.setUTCFullYear(

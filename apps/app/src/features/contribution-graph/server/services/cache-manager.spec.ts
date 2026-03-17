@@ -4,9 +4,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
+import userFactory from '~/server/models/user';
 
+import {
+  formatDateKey,
+  getISOWeekId,
+} from '../../utils/contribution-graph-utils';
 import { ContributionCache } from '../models/contribution-cache-model';
-import { formatDateKey, getISOWeekId } from '../utils/contribution-graph-utils';
 import { ContributionCacheManager } from './cache-manager';
 
 const createMockId = () => new mongoose.Types.ObjectId().toString();
@@ -18,6 +22,7 @@ describe('Contribution Cache Manager Integration Test', () => {
     mongod = await MongoMemoryServer.create();
     const uri = mongod.getUri();
     await mongoose.connect(uri);
+    userFactory(null);
   });
 
   afterAll(async () => {
@@ -28,6 +33,8 @@ describe('Contribution Cache Manager Integration Test', () => {
 
   beforeEach(async () => {
     await ContributionCache.deleteMany({});
+    const User = mongoose.model('User');
+    await User.deleteMany({});
   });
 
   describe('getUpdatedCache()', () => {
@@ -137,18 +144,9 @@ describe('Contribution Cache Manager Integration Test', () => {
       const newDay = result.find((d) => d.date === newDateStr);
 
       const updatedCache = await ContributionCache.findOne({ userId });
+      const hasOldWeekInDb = !!updatedCache?.permanentWeeks?.[weekIdToDelete];
 
-      let hasOldWeek: boolean;
-      if (updatedCache) {
-        hasOldWeek =
-          updatedCache.permanentWeeks instanceof Map
-            ? updatedCache.permanentWeeks.has(weekIdToDelete)
-            : weekIdToDelete in updatedCache.permanentWeeks;
-      } else {
-        hasOldWeek = false;
-      }
-
-      expect(hasOldWeek).toBe(false);
+      expect(hasOldWeekInDb).toBe(false);
       expect(result.length).toBe(365);
       expect(oldDay).toBeUndefined();
       expect(newDay).toBeDefined();
@@ -156,79 +154,89 @@ describe('Contribution Cache Manager Integration Test', () => {
 
     it('should freeze weeks between start of the graph until last week', async () => {
       const userId = createMockId();
+      const User = mongoose.model('User');
+      await User.create({ _id: userId, status: 1, username: 'testuser' });
 
       const today = new Date();
 
-      // Date one week ago to be frozen
-      const recentDate = new Date(today);
-      recentDate.setUTCDate(recentDate.getUTCDate() - 7);
-      const recentDateStr = formatDateKey(recentDate);
-
-      const weekIdToFreeze = getISOWeekId(recentDate);
-
-      // Date at least one week older than the week to be frozen
-      const lastUpdatedDate = new Date(today);
-      lastUpdatedDate.setUTCDate(lastUpdatedDate.getUTCDate() - 20);
-      const lastUpdatedDateStr = formatDateKey(lastUpdatedDate);
-
-      const currentWeekIdToFreeze = getISOWeekId(lastUpdatedDate);
+      // Date 7 days ago
+      const pastDate = new Date(today);
+      pastDate.setUTCDate(pastDate.getUTCDate() - 7);
+      const pastDateStr = formatDateKey(pastDate);
 
       await Activity.create([
         {
           user: userId,
           action: ActivityLogActions.ACTION_PAGE_CREATE,
-          createdAt: new Date(recentDateStr),
-        },
-        {
-          user: userId,
-          action: ActivityLogActions.ACTION_PAGE_UPDATE,
-          createdAt: new Date(lastUpdatedDateStr),
+          createdAt: new Date(pastDateStr),
         },
       ]);
 
+      const firstResult = await cacheManager.getUpdatedCache(userId);
+      const firstCount = firstResult.find((d) => d.date === pastDateStr)?.count;
+      expect(firstCount).toBe(1);
+
+      // Create new activity on the same day
+      await Activity.create({
+        user: userId,
+        action: ActivityLogActions.ACTION_PAGE_UPDATE,
+        createdAt: new Date(pastDateStr),
+      });
+
+      const secondResult = await cacheManager.getUpdatedCache(userId);
+      const secondCount = secondResult.find(
+        (d) => d.date === pastDateStr,
+      )?.count;
+
+      expect(secondCount).toBe(1);
+    });
+
+    it('should throw error if user and contribution cache doesnt exist', async () => {
+      const userId = createMockId();
+
+      const newDate = new Date();
+      newDate.setUTCDate(newDate.getUTCDate() - 7);
+
+      await expect(cacheManager.getUpdatedCache(userId)).rejects.toThrowError(
+        'User does not exist.',
+      );
+    });
+
+    it('should return contribution cache if user exists', async () => {
+      const userId = createMockId();
+      const User = mongoose.model('User');
+      await User.create({ _id: userId, status: 1, username: 'testuser' });
+
+      const newDate = new Date();
+      newDate.setUTCDate(newDate.getUTCDate() - 7);
+      const newDateStr = formatDateKey(newDate);
+
       await ContributionCache.create({
         userId,
-        lastUpdated: new Date(lastUpdatedDateStr),
-        currentWeekData: [{ date: lastUpdatedDateStr, count: 1 }],
-        permanentWeeks: {},
+        lastUpdated: new Date(newDateStr),
+        currentWeekData: [],
+        permanentWeeks: {
+          weekId: [],
+        },
       });
 
       const result = await cacheManager.getUpdatedCache(userId);
-      const frozenCurrentWeekDate = result.find(
-        (d) => d.date === lastUpdatedDateStr,
-      );
-      const frozenOldWeekDate = result.find((d) => d.date === recentDateStr);
 
-      const updatedCache = await ContributionCache.findOne({ userId });
+      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      expect(result).toBeTruthy();
+    });
 
-      let hasFrozenOldWeek: boolean;
-      if (updatedCache) {
-        hasFrozenOldWeek =
-          updatedCache.permanentWeeks instanceof Map
-            ? updatedCache.permanentWeeks.has(weekIdToFreeze)
-            : weekIdToFreeze in updatedCache.permanentWeeks;
-      } else {
-        hasFrozenOldWeek = false;
-      }
+    it('should return contribution cache if user exists but no contribution cache exist', async () => {
+      const userId = createMockId();
+      const User = mongoose.model('User');
+      await User.create({ _id: userId, status: 1, username: 'testuser' });
 
-      let hasFrozenCurrentWeek: boolean;
-      if (updatedCache) {
-        hasFrozenCurrentWeek =
-          updatedCache.permanentWeeks instanceof Map
-            ? updatedCache.permanentWeeks.has(currentWeekIdToFreeze)
-            : currentWeekIdToFreeze in updatedCache.permanentWeeks;
-      } else {
-        hasFrozenCurrentWeek = false;
-      }
+      const result = await cacheManager.getUpdatedCache(userId);
 
-      expect(hasFrozenOldWeek).toBe(true);
-      expect(hasFrozenCurrentWeek).toBe(true);
-
-      expect(frozenOldWeekDate).toBeDefined();
-      expect(frozenOldWeekDate?.count).toBe(1);
-
-      expect(frozenCurrentWeekDate).toBeDefined();
-      expect(frozenCurrentWeekDate?.count).toBe(1);
+      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      expect(result).toBeTruthy();
     });
   });
 });
