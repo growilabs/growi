@@ -435,7 +435,20 @@ class ElasticsearchDelegator
       });
     }
   }
-
+  async createAuditlogIndex(index: string) {
+    if (isES7ClientDelegator(this.client)) {
+      const { mappings } = await import('./mappings/mappings-auditlog-es7');
+      return this.client.indices.create({ index, body: { ...mappings } });
+    }
+    if (isES8ClientDelegator(this.client)) {
+      const { mappings } = await import('./mappings/mappings-auditlog-es8');
+      return this.client.indices.create({ index, ...mappings });
+    }
+    if (isES9ClientDelegator(this.client)) {
+      const { mappings } = await import('./mappings/mappings-auditlog-es9');
+      return this.client.indices.create({ index, ...mappings });
+    }
+  }
   /**
    * generate object that is related to page.grant*
    */
