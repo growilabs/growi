@@ -1,89 +1,14 @@
 import { useMemo } from 'react';
 
-import type { IContributionDay } from '~/features/contribution-graph/interfaces/contribution-graph';
 import { useSWRxContributions } from '~/stores/use-contributions';
 
+import {
+  getColorLevel,
+  getMonthLabels,
+  getPaddedContributions,
+} from './utils/contribution-graph-utils';
+
 import styles from './ContributionGraph.module.scss';
-
-const months = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
-
-const getColorLevel = (count: number) => {
-  if (count === 0) return 'level-0';
-  if (count < 6) return 'level-1';
-  if (count < 13) return 'level-2';
-  if (count < 19) return 'level-3';
-  return 'level-4';
-};
-
-const getPaddedContributions = (
-  apiData: IContributionDay[],
-): IContributionDay[] => {
-  const padded: IContributionDay[] = [];
-  const dataMap = new Map(apiData.map((d) => [d.date, d.count]));
-
-  const end = new Date();
-  const daysUntilSaturday = 6 - end.getDay();
-  end.setDate(end.getDate() + daysUntilSaturday);
-
-  const start = new Date(end);
-  start.setDate(end.getDate() - 363);
-
-  const current = new Date(start);
-  while (current <= end) {
-    const dateStr = current.toISOString().split('T')[0];
-    padded.push({
-      date: dateStr,
-      count: dataMap.get(dateStr) || 0,
-    });
-    current.setDate(current.getDate() + 1);
-  }
-
-  return padded;
-};
-
-const getMonthLabels = (contributions: IContributionDay[]) => {
-  const labels: { month: string; index: number }[] = [];
-
-  contributions.forEach((day, i) => {
-    if (i % 7 === 0) {
-      const date = new Date(day.date);
-      const monthName = months[date.getMonth()];
-      const dayOfMonth = date.getDate();
-      const columnIndex = Math.floor(i / 7);
-
-      if (i === 0) {
-        labels.push({ month: monthName, index: 0 });
-        return;
-      }
-
-      if (dayOfMonth <= 7) {
-        const lastLabel = labels[labels.length - 1];
-
-        if (
-          lastLabel.month !== monthName &&
-          columnIndex - lastLabel.index > 2
-        ) {
-          labels.push({ month: monthName, index: columnIndex });
-        }
-      }
-    }
-  });
-
-  return labels;
-};
 
 export const ContributionGraph = ({ userId }: { userId: string }) => {
   const { data } = useSWRxContributions(userId);
