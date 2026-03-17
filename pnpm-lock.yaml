@@ -310,9 +310,6 @@ importers:
       bunyan:
         specifier: ^1.8.15
         version: 1.8.15
-      check-node-version:
-        specifier: ^4.2.1
-        version: 4.2.1
       compression:
         specifier: ^1.7.4
         version: 1.7.4
@@ -6584,11 +6581,6 @@ packages:
     resolution: {integrity: sha512-OAlb+T7V4Op9OwdkjmguYRqncdlx5JiofwOAUkmTF+jNdHwzTaTs4sRAGpzLF3oOz5xAyDGrPgeIDFQmDOTiJw==}
     engines: {node: '>= 16'}
 
-  check-node-version@4.2.1:
-    resolution: {integrity: sha512-YYmFYHV/X7kSJhuN/QYHUu998n/TRuDe8UenM3+m5NrkiH670lb9ILqHIvBencvJc4SDh+XcbXMR4b+TtubJiw==}
-    engines: {node: '>=8.3.0'}
-    hasBin: true
-
   cheerio-select@2.1.0:
     resolution: {integrity: sha512-9v9kG0LvzrlcungtnJtpGNxY+fzECQKhK4EGJX2vByejiMX84MFNQw4UxPJl3bFbTMw+Dfs37XaIkCwTZfLh4g==}
 
@@ -9707,6 +9699,7 @@ packages:
     resolution: {integrity: sha512-Quz3MvAwHxVYNXsOByL7xI5EB2WYOeFswqaHIA3qOK3isRWTxiplBEocmmru6XmxDB2L7jDNYtYA4FyimoAFEw==}
     engines: {node: '>=8.17.0'}
     hasBin: true
+    bundledDependencies: []
 
   jsonfile@3.0.1:
     resolution: {integrity: sha512-oBko6ZHlubVB5mRFkur5vgYR1UyqX+S6Y/oCfLhqNdcc2fYFlDpIoNc7AfKS1KOGcnNAkvsr0grLck9ANM815w==}
@@ -10224,9 +10217,6 @@ packages:
   map-obj@4.3.0:
     resolution: {integrity: sha512-hdN1wVrZbb29eBGiGjJbeP8JbKjq1urkHJ/LIP/NY48MZ1QVXUsQBV1G1zvYFHn1XE06cwjBsOI2K3Ulnj1YXQ==}
     engines: {node: '>=8'}
-
-  map-values@1.0.1:
-    resolution: {integrity: sha512-BbShUnr5OartXJe1GeccAWtfro11hhgNJg6G9/UtWKjVGvV5U4C09cg5nk8JUevhXODaXY+hQ3xxMUKSs62ONQ==}
 
   markdown-it-front-matter@0.2.4:
     resolution: {integrity: sha512-25GUs0yjS2hLl8zAemVndeEzThB1p42yxuDEKbd4JlL3jiz+jsm6e56Ya8B0VREOkNxLYB4TTwaoPJ3ElMmW+w==}
@@ -11096,9 +11086,6 @@ packages:
   object-assign@4.1.1:
     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
     engines: {node: '>=0.10.0'}
-
-  object-filter@1.0.2:
-    resolution: {integrity: sha512-NahvP2vZcy1ZiiYah30CEPw0FpDcSkSePJBMpzl5EQgCmISijiGuJm3SPYp7U+Lf2TljyaIw3E5EgkEx/TNEVA==}
 
   object-hash@2.2.0:
     resolution: {integrity: sha512-gScRMn0bS5fH+IuwyIFgnh9zBdo4DV+6GhygmWM9HyNJSgS0hScp1f5vjtm7oIIOiT9trXrShAkLFSc2IqKNgw==}
@@ -21516,15 +21503,6 @@ snapshots:
 
   check-error@2.1.1: {}
 
-  check-node-version@4.2.1:
-    dependencies:
-      chalk: 3.0.0
-      map-values: 1.0.1
-      minimist: 1.2.8
-      object-filter: 1.0.2
-      run-parallel: 1.2.0
-      semver: 6.3.1
-
   cheerio-select@2.1.0:
     dependencies:
       boolbase: 1.0.0
@@ -25239,8 +25217,6 @@ snapshots:
 
   map-obj@4.3.0: {}
 
-  map-values@1.0.1: {}
-
   markdown-it-front-matter@0.2.4: {}
 
   markdown-it@13.0.2:
@@ -26477,8 +26453,6 @@ snapshots:
   oauth@0.10.0: {}
 
   object-assign@4.1.1: {}
-
-  object-filter@1.0.2: {}
 
   object-hash@2.2.0: {}
 
