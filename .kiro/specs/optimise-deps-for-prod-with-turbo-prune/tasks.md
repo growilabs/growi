@@ -69,30 +69,24 @@
 
 ---
 
-- [ ] 4. Validate the simplified assembly pipeline end-to-end
+- [x] 4. Validate the simplified assembly pipeline end-to-end
 
-- [ ] 4.1 Run the updated `assemble-prod.sh` and verify symlink integrity
-  - From workspace root, run `turbo run build --filter @growi/app` to produce a fresh `.next/` build
-  - Run `bash apps/app/bin/assemble-prod.sh`
-  - Assert `apps/app/node_modules` is a symlink: `test -L apps/app/node_modules && echo OK`
-  - Assert the symlink resolves to workspace-root `node_modules/`: `readlink apps/app/node_modules` → `../../node_modules`
-  - Assert zero broken symlinks in `.next/node_modules/` using the broken-symlink check script from `optimise-deps-for-prod/design.md` (find + realpath loop, expect no output)
-  - Assert zero broken symlinks in workspace-root `node_modules/` (same check pattern)
-  - Assert no `devDependencies`-only package from `apps/app/package.json` appears in `apps/app/.next/node_modules/` (regression check from `optimise-deps-for-prod`)
-  - Restore `next.config.ts`: `git show HEAD:apps/app/next.config.ts > apps/app/next.config.ts`
+  Follow the **Production Server Startup Procedure** established in `optimise-deps-for-prod/design.md` (Steps 1–6).
+  Key difference from that procedure: **`mv node_modules node_modules.bak` is NOT needed** — after `assemble-prod.sh`, workspace-root `node_modules/` is already the prod-only deploy output; `apps/app/node_modules` is a symlink to `../../node_modules`.
+
+- [x] 4.1 Run the updated `assemble-prod.sh` and verify symlink integrity
+  - Follow Steps 1–2 of the Production Server Startup Procedure (build → assemble)
+  - After `assemble-prod.sh`, run additional assertions specific to this spec:
+    - `test -L apps/app/node_modules && echo OK` → `OK` (symlink, not a directory)
+    - `readlink apps/app/node_modules` → `../../node_modules`
+  - Run `bash apps/app/bin/check-next-symlinks.sh` (established tool from `optimise-deps-for-prod`) — expect `OK: All apps/app/.next/node_modules symlinks resolve correctly.`
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.3, 3.2, 6.1, 6.2, 6.3_
 
-- [ ] 4.2 Start the production server and verify HTTP 200 on root page
-  - Start server: `cd apps/app && pnpm run server > /tmp/server.log 2>&1 &`
-  - Wait for startup: `timeout 60 bash -c 'until grep -q "Express server is listening" /tmp/server.log; do sleep 2; done'`
-  - Verify HTTP 200: `HTTP_CODE=$(curl -s -o /tmp/response.html -w "%{http_code}" http://localhost:3000/); echo "HTTP: $HTTP_CODE"` → must be `200`
-  - Verify zero `ERR_MODULE_NOT_FOUND`: `grep -c "ERR_MODULE_NOT_FOUND" /tmp/server.log` → must be `0`
-  - Verify zero `Failed to load external module`: `grep -c "Failed to load external module" /tmp/server.log` → must be `0`
-  - **Use `GET /` (not `/login`) as the smoke-test URL**: `/login` returns HTTP 200 even when SSR is broken; `/` triggers SSR of editor components and will HTTP 500 if packages are missing
-  - Kill server after verification: `kill $(lsof -ti:3000)`
+- [x] 4.2 Start the production server and verify HTTP 200 on root page
+  - Follow Steps 3–5 of the Production Server Startup Procedure (start → verify → stop)
+  - Use `GET /` (not `/login`) as the smoke-test URL (established rule from `optimise-deps-for-prod`)
   - _Requirements: 3.4, 4.1, 4.2, 4.3, 4.4, 4.5, 6.3, 6.4_
 
-- [ ] 4.3 Restore the development environment after local validation
-  - Run `pnpm install` from workspace root to restore the full-deps `node_modules/` and replace the `apps/app/node_modules` symlink with the standard pnpm workspace link
-  - Verify `turbo run build --filter @growi/app` succeeds after restoration (ensures the dev environment was not permanently damaged)
+- [x] 4.3 Restore the development environment after local validation
+  - Follow Step 6 of the Production Server Startup Procedure (restore `next.config.ts`, `pnpm install`)
   - _Requirements: 5.4_
