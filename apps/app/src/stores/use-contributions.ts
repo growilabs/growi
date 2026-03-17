@@ -7,7 +7,8 @@ import type { IContributionDay } from '~/features/contribution-graph/interfaces/
 export const useSWRxContributions = (
   userId: string | null,
 ): SWRResponse<IContributionDay[], Error> => {
-  const key = userId ? `/user/contributions?targetUserId=${userId}` : null;
+  const key =
+    userId != null ? `/user/contributions?targetUserId=${userId}` : null;
 
   return useSWR(key, (endpoint) =>
     apiv3Get(endpoint).then((response) => {
