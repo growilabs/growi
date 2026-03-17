@@ -23,14 +23,15 @@ export const useFormatter = (): FormatterData => {
     // replace placeholder
     const now = new Date();
     try {
+      const [yyyy, MM, dd, HH, mm] = dateFnsFormat(now, "yyyy'|'MM'|'dd'|'HH'|'mm").split('|');
       return mustache.render(markdown, {
         title: path.basename(currentPagePath ?? '/'),
         path: currentPagePath ?? '/',
-        yyyy: dateFnsFormat(now, 'yyyy'),
-        MM: dateFnsFormat(now, 'MM'),
-        dd: dateFnsFormat(now, 'dd'),
-        HH: dateFnsFormat(now, 'HH'),
-        mm: dateFnsFormat(now, 'mm'),
+        yyyy,
+        MM,
+        dd,
+        HH,
+        mm,
       });
     } catch (err) {
       logger.warn('An error occured while ejs processing.', err);
