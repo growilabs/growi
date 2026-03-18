@@ -1,7 +1,7 @@
 ---
 name: build-optimization
 description: GROWI apps/app Turbopack configuration, module optimization, and build measurement tooling. Auto-invoked when working in apps/app.
-user-invokable: false
+user-invocable: false
 ---
 
 # Build Optimization (apps/app)
@@ -101,7 +101,6 @@ Global CSS cannot be imported from files other than `_app.page.tsx` under Turbop
 
 ## Module Optimization Configuration
 
-- `bundlePagesRouterDependencies: true` — bundles server-side dependencies for Pages Router
 - `serverExternalPackages: ['handsontable']` — packages excluded from server-side bundling
 - `optimizePackageImports` — 11 `@growi/*` packages configured (expansion to third-party packages was tested and reverted — it increased dev module count)
 

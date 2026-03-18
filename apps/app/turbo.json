@@ -27,7 +27,7 @@
       "dependsOn": ["^build", "pre:styles-commons", "pre:styles-components"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"],
       "inputs": [
-        "next.config.js",
+        "next.config.ts",
         "config/**",
         "public/**",
         "resource/**",

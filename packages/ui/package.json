@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "GROWI UI Libraries",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "keywords": [
     "growi"
   ],

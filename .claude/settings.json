@@ -24,6 +24,30 @@
       }
     ]
   },
+  "permissions": {
+    "allow": [
+      "Bash(node --version:*)",
+      "Bash(npm --version:*)",
+      "Bash(pnpm --version:*)",
+      "Bash(turbo --version:*)",
+      "Bash(turbo run build)",
+      "Bash(turbo run lint)",
+      "Bash(pnpm run lint:*)",
+      "Bash(pnpm vitest run *)",
+      "Bash(pnpm biome check *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(grep *)",
+      "Bash(git diff *)",
+      "Bash(gh issue view *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr diff *)",
+      "WebFetch(domain:github.com)",
+      "mcp__context7__*",
+      "mcp__github__*"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
   "enabledPlugins": {
     "context7@claude-plugins-official": true,
     "github@claude-plugins-official": true,

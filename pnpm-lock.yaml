@@ -189,6 +189,30 @@ importers:
       '@browser-bunyan/console-formatted-stream':
         specifier: ^1.8.0
         version: 1.8.0
+      '@codemirror/autocomplete':
+        specifier: ^6.18.4
+        version: 6.18.4
+      '@codemirror/commands':
+        specifier: ^6.8.0
+        version: 6.8.0
+      '@codemirror/lang-markdown':
+        specifier: ^6.3.2
+        version: 6.3.2
+      '@codemirror/language':
+        specifier: ^6.12.1
+        version: 6.12.1
+      '@codemirror/language-data':
+        specifier: ^6.5.1
+        version: 6.5.1
+      '@codemirror/merge':
+        specifier: ^6.8.0
+        version: 6.8.0
+      '@codemirror/state':
+        specifier: ^6.5.2
+        version: 6.5.4
+      '@codemirror/view':
+        specifier: ^6.39.14
+        version: 6.39.14
       '@cspell/dynamic-import':
         specifier: ^8.15.4
         version: 8.15.4
@@ -210,6 +234,9 @@ importers:
       '@growi/core':
         specifier: workspace:^
         version: link:../../packages/core
+      '@growi/emoji-mart-data':
+        specifier: workspace:^
+        version: link:../../packages/emoji-mart-data
       '@growi/pdf-converter-client':
         specifier: workspace:^
         version: link:../../packages/pdf-converter-client
@@ -240,9 +267,27 @@ importers:
       '@growi/slack':
         specifier: workspace:^
         version: link:../../packages/slack
+      '@handsontable/react':
+        specifier: '=2.1.0'
+        version: 2.1.0(handsontable@6.2.2)
+      '@headless-tree/core':
+        specifier: ^1.5.3
+        version: 1.6.3
+      '@headless-tree/react':
+        specifier: ^1.5.3
+        version: 1.6.3(@headless-tree/core@1.6.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@keycloak/keycloak-admin-client':
         specifier: ^18.0.0
         version: 18.0.2
+      '@lezer/highlight':
+        specifier: ^1.2.3
+        version: 1.2.3
+      '@marp-team/marp-core':
+        specifier: ^3.9.1
+        version: 3.9.1(patch_hash=9339c96cb1f7b7d331a5faf3719935af8d4f5415f1f8b88ee73aad42627c5dd4)
+      '@marp-team/marpit':
+        specifier: ^2.6.1
+        version: 2.6.1
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.0
@@ -270,12 +315,24 @@ importers:
       '@opentelemetry/semantic-conventions':
         specifier: ^1.34.0
         version: 1.36.0
+      '@replit/codemirror-emacs':
+        specifier: ^6.1.0
+        version: 6.1.0(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/search@6.5.6)(@codemirror/state@6.5.4)(@codemirror/view@6.39.14)
+      '@replit/codemirror-vim':
+        specifier: ^6.2.1
+        version: 6.2.1(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.4)(@codemirror/view@6.39.14)
+      '@replit/codemirror-vscode-keymap':
+        specifier: ^6.0.2
+        version: 6.0.2(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/language@6.12.1)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.5.4)(@codemirror/view@6.39.14)
       '@slack/web-api':
         specifier: ^6.2.4
         version: 6.12.0
       '@slack/webhook':
         specifier: ^6.0.0
         version: 6.1.0
+      '@tanstack/react-virtual':
+        specifier: ^3.13.12
+        version: 3.13.12(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@types/async':
         specifier: ^3.2.24
         version: 3.2.24
@@ -306,6 +363,9 @@ importers:
       body-parser:
         specifier: ^1.20.3
         version: 1.20.3
+      bootstrap:
+        specifier: '=5.3.2'
+        version: 5.3.2(@popperjs/core@2.11.8)
       browser-bunyan:
         specifier: ^1.8.0
         version: 1.8.0
@@ -315,6 +375,12 @@ importers:
       bunyan:
         specifier: ^1.8.15
         version: 1.8.15
+      cm6-theme-basic-light:
+        specifier: ^0.2.0
+        version: 0.2.0(@codemirror/language@6.12.1)(@codemirror/state@6.5.4)(@codemirror/view@6.39.14)(@lezer/highlight@1.2.3)
+      codemirror:
+        specifier: ^6.0.1
+        version: 6.0.1
       compression:
         specifier: ^1.7.4
         version: 1.7.4
@@ -351,12 +417,18 @@ importers:
       diff:
         specifier: ^5.0.0
         version: 5.2.0
+      diff2html:
+        specifier: ^3.4.47
+        version: 3.4.48
       diff_match_patch:
         specifier: ^0.1.1
         version: 0.1.1
       dotenv-flow:
         specifier: ^3.2.0
         version: 3.2.0
+      downshift:
+        specifier: ^8.2.3
+        version: 8.5.0(react@18.2.0)
       ejs:
         specifier: ^3.1.10
         version: 3.1.10
@@ -384,6 +456,9 @@ importers:
       extensible-custom-error:
         specifier: ^0.0.7
         version: 0.0.7
+      fastest-levenshtein:
+        specifier: ^1.0.16
+        version: 1.0.16
       form-data:
         specifier: ^4.0.4
         version: 4.0.4
@@ -408,6 +483,12 @@ importers:
       i18next:
         specifier: ^23.16.5
         version: 23.16.5
+      i18next-http-backend:
+        specifier: ^2.6.2
+        version: 2.6.2(encoding@0.1.13)
+      i18next-localstorage-backend:
+        specifier: ^4.2.0
+        version: 4.2.0
       i18next-resources-to-backend:
         specifier: ^1.2.1
         version: 1.2.1
@@ -531,6 +612,9 @@ importers:
       p-retry:
         specifier: ^4.0.0
         version: 4.6.2
+      pako:
+        specifier: ^2.1.0
+        version: 2.1.0
       passport:
         specifier: ^0.6.0
         version: 0.6.0
@@ -552,6 +636,9 @@ importers:
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
+      pretty-bytes:
+        specifier: ^6.1.1
+        version: 6.1.1
       prop-types:
         specifier: ^15.8.1
         version: 15.8.1
@@ -570,24 +657,42 @@ importers:
       react-card-flip:
         specifier: ^1.0.10
         version: 1.2.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      react-copy-to-clipboard:
+        specifier: ^5.0.1
+        version: 5.1.0(react@18.2.0)
       react-datepicker:
         specifier: ^4.7.0
         version: 4.25.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       react-disable:
         specifier: ^0.1.1
         version: 0.1.1(react@18.2.0)
+      react-dnd:
+        specifier: ^14.0.5
+        version: 14.0.5(@types/hoist-non-react-statics@3.3.5)(@types/node@25.2.3)(@types/react@18.3.3)(react@18.2.0)
+      react-dnd-html5-backend:
+        specifier: ^14.1.0
+        version: 14.1.0
       react-dom:
         specifier: ^18.2.0
         version: 18.2.0(react@18.2.0)
+      react-dropzone:
+        specifier: ^14.2.3
+        version: 14.2.3(react@18.2.0)
       react-error-boundary:
         specifier: ^3.1.4
         version: 3.1.4(react@18.2.0)
+      react-hook-form:
+        specifier: ^7.45.4
+        version: 7.52.0(react@18.2.0)
       react-i18next:
         specifier: ^15.1.1
         version: 15.1.1(i18next@23.16.5)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       react-image-crop:
         specifier: ^8.3.0
         version: 8.6.12(react@18.2.0)
+      react-input-autosize:
+        specifier: ^3.0.0
+        version: 3.0.0(react@18.2.0)
       react-markdown:
         specifier: ^9.0.1
         version: 9.0.1(@types/react@18.3.3)(react@18.2.0)
@@ -603,6 +708,9 @@ importers:
       react-syntax-highlighter:
         specifier: ^16.1.0
         version: 16.1.0(react@18.2.0)
+      react-toastify:
+        specifier: ^9.1.3
+        version: 9.1.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       react-use-ripple:
         specifier: ^1.5.2
         version: 1.5.2(react@18.2.0)
@@ -663,9 +771,15 @@ importers:
       remark-stringify:
         specifier: ^11.0.0
         version: 11.0.0
+      reveal.js:
+        specifier: ^4.4.8
+        version: 4.6.1
       sanitize-filename:
         specifier: ^1.6.3
         version: 1.6.3
+      simplebar-react:
+        specifier: ^2.3.6
+        version: 2.4.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       socket.io:
         specifier: ^4.7.5
         version: 4.8.3
@@ -729,6 +843,9 @@ importers:
       xss:
         specifier: ^1.0.15
         version: 1.0.15
+      y-codemirror.next:
+        specifier: ^0.3.5
+        version: 0.3.5(@codemirror/state@6.5.4)(@codemirror/view@6.39.14)(yjs@13.6.19)
       y-mongodb-provider:
         specifier: ^0.2.0
         version: 0.2.0(@aws-sdk/credential-providers@3.600.0(@aws-sdk/client-sso-oidc@3.600.0))(socks@2.8.3)(yjs@13.6.19)
@@ -745,12 +862,6 @@ importers:
       '@apidevtools/swagger-parser':
         specifier: ^10.1.1
         version: 10.1.1(openapi-types@12.1.3)
-      '@codemirror/state':
-        specifier: ^6.5.2
-        version: 6.5.4
-      '@emoji-mart/data':
-        specifier: ^1.2.1
-        version: 1.2.1
       '@growi/core-styles':
         specifier: workspace:^
         version: link:../../packages/core-styles
@@ -763,21 +874,9 @@ importers:
       '@growi/ui':
         specifier: workspace:^
         version: link:../../packages/ui
-      '@handsontable/react':
-        specifier: '=2.1.0'
-        version: 2.1.0(handsontable@6.2.2)
-      '@headless-tree/core':
-        specifier: ^1.5.3
-        version: 1.6.3
-      '@headless-tree/react':
-        specifier: ^1.5.3
-        version: 1.6.3(@headless-tree/core@1.6.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@popperjs/core':
         specifier: ^2.11.8
         version: 2.11.8
-      '@tanstack/react-virtual':
-        specifier: ^3.13.12
-        version: 3.13.12(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@testing-library/jest-dom':
         specifier: ^6.5.0
         version: 6.9.1
@@ -853,27 +952,15 @@ importers:
       babel-loader:
         specifier: ^8.2.5
         version: 8.3.0(@babel/core@7.24.6)(webpack@5.92.1(@swc/core@1.10.7(@swc/helpers@0.5.18)))
-      bootstrap:
-        specifier: '=5.3.2'
-        version: 5.3.2(@popperjs/core@2.11.8)
       commander:
         specifier: ^14.0.0
         version: 14.0.0
       connect-browser-sync:
         specifier: ^2.1.0
         version: 2.1.0(browser-sync@3.0.2)
-      diff2html:
-        specifier: ^3.4.47
-        version: 3.4.48
-      downshift:
-        specifier: ^8.2.3
-        version: 8.5.0(react@18.2.0)
       eazy-logger:
         specifier: ^3.1.0
         version: 3.1.0
-      fastest-levenshtein:
-        specifier: ^1.0.16
-        version: 1.0.16
       fslightbox-react:
         specifier: ^1.7.6
         version: 1.7.6(prop-types@15.8.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -886,12 +973,6 @@ importers:
       i18next-chained-backend:
         specifier: ^4.6.2
         version: 4.6.2
-      i18next-http-backend:
-        specifier: ^2.6.2
-        version: 2.6.2(encoding@0.1.13)
-      i18next-localstorage-backend:
-        specifier: ^4.2.0
-        version: 4.2.0
       jotai-devtools:
         specifier: ^0.11.0
         version: 0.11.0(@types/react@18.3.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(redux@4.2.1)
@@ -919,30 +1000,6 @@ importers:
       openapi-typescript:
         specifier: ^7.8.0
         version: 7.8.0(typescript@5.0.4)
-      pretty-bytes:
-        specifier: ^6.1.1
-        version: 6.1.1
-      react-copy-to-clipboard:
-        specifier: ^5.0.1
-        version: 5.1.0(react@18.2.0)
-      react-dnd:
-        specifier: ^14.0.5
-        version: 14.0.5(@types/hoist-non-react-statics@3.3.5)(@types/node@25.2.3)(@types/react@18.3.3)(react@18.2.0)
-      react-dnd-html5-backend:
-        specifier: ^14.1.0
-        version: 14.1.0
-      react-dropzone:
-        specifier: ^14.2.3
-        version: 14.2.3(react@18.2.0)
-      react-hook-form:
-        specifier: ^7.45.4
-        version: 7.52.0(react@18.2.0)
-      react-input-autosize:
-        specifier: ^3.0.0
-        version: 3.0.0(react@18.2.0)
-      react-toastify:
-        specifier: ^9.1.3
-        version: 9.1.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       rehype-rewrite:
         specifier: ^4.0.2
         version: 4.0.2
@@ -952,9 +1009,6 @@ importers:
       sass:
         specifier: ^1.53.0
         version: 1.77.6
-      simplebar-react:
-        specifier: ^2.3.6
-        version: 2.4.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       socket.io-client:
         specifier: ^4.7.5
         version: 4.8.3
@@ -967,6 +1021,9 @@ importers:
       tinykeys:
         specifier: ^3.0.0
         version: 3.0.0
+      typescript:
+        specifier: ~5.0.4
+        version: 5.0.4
       unist-util-is:
         specifier: ^6.0.0
         version: 6.0.0
@@ -1032,17 +1089,17 @@ importers:
         version: 4.21.0
       puppeteer:
         specifier: ^23.1.1
-        version: 23.6.1(typescript@5.0.4)
+        version: 23.6.1(typescript@5.4.2)
       puppeteer-cluster:
         specifier: ^0.24.0
-        version: 0.24.0(puppeteer@23.6.1(typescript@5.0.4))
+        version: 0.24.0(puppeteer@23.6.1(typescript@5.4.2))
       tslib:
         specifier: ^2.8.0
         version: 2.8.1
     devDependencies:
       '@swc-node/register':
         specifier: ^1.10.9
-        version: 1.10.9(@swc/core@1.10.7(@swc/helpers@0.5.18))(@swc/types@0.1.17)(typescript@5.0.4)
+        version: 1.10.9(@swc/core@1.10.7(@swc/helpers@0.5.18))(@swc/types@0.1.17)(typescript@5.4.2)
       '@swc/core':
         specifier: ^1.9.2
         version: 1.10.7(@swc/helpers@0.5.18)
@@ -1278,6 +1335,9 @@ importers:
       '@growi/core-styles':
         specifier: workspace:^
         version: link:../core-styles
+      '@growi/emoji-mart-data':
+        specifier: workspace:^
+        version: link:../emoji-mart-data
       '@lezer/highlight':
         specifier: ^1.2.0
         version: 1.2.3
@@ -1377,6 +1437,12 @@ importers:
       yjs:
         specifier: ^13.6.19
         version: 13.6.19
+
+  packages/emoji-mart-data:
+    devDependencies:
+      '@emoji-mart/data':
+        specifier: ^1.2.1
+        version: 1.2.1
 
   packages/pdf-converter-client:
     dependencies:
@@ -1686,7 +1752,7 @@ importers:
         version: 7.2.4
       type-coverage:
         specifier: ^2.0.0
-        version: 2.29.0(typescript@5.0.4)
+        version: 2.29.0(typescript@5.4.2)
       unist-util-remove-position:
         specifier: ^5.0.0
         version: 5.0.0
@@ -9763,6 +9829,7 @@ packages:
     resolution: {integrity: sha512-Quz3MvAwHxVYNXsOByL7xI5EB2WYOeFswqaHIA3qOK3isRWTxiplBEocmmru6XmxDB2L7jDNYtYA4FyimoAFEw==}
     engines: {node: '>=8.17.0'}
     hasBin: true
+    bundledDependencies: []
 
   jsonfile@3.0.1:
     resolution: {integrity: sha512-oBko6ZHlubVB5mRFkur5vgYR1UyqX+S6Y/oCfLhqNdcc2fYFlDpIoNc7AfKS1KOGcnNAkvsr0grLck9ANM815w==}
@@ -15650,7 +15717,7 @@ snapshots:
       '@azure/core-util': 1.10.0
       '@azure/logger': 1.1.2
       http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6(supports-color@10.0.0)
+      https-proxy-agent: 7.0.6
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
@@ -15752,7 +15819,7 @@ snapshots:
       '@babel/traverse': 7.24.6
       '@babel/types': 7.25.6
       convert-source-map: 2.0.0
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       gensync: 1.0.0-beta.2
       json5: 2.2.3
       semver: 6.3.1
@@ -15851,7 +15918,7 @@ snapshots:
       '@babel/helper-split-export-declaration': 7.24.6
       '@babel/parser': 7.25.6
       '@babel/types': 7.25.6
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       globals: 11.12.0
     transitivePeerDependencies:
       - supports-color
@@ -16392,7 +16459,7 @@ snapshots:
 
   '@elastic/elasticsearch@7.17.13':
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       hpagent: 0.1.2
       ms: 2.1.3
       secure-json-parse: 2.7.0
@@ -16421,7 +16488,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.0.1(@opentelemetry/api@1.9.0)
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       hpagent: 1.2.0
       ms: 2.1.3
       secure-json-parse: 3.0.2
@@ -16434,7 +16501,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.0.1(@opentelemetry/api@1.9.0)
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       hpagent: 1.2.0
       ms: 2.1.3
       secure-json-parse: 4.0.0
@@ -16617,7 +16684,7 @@ snapshots:
   '@eslint/eslintrc@2.1.4':
     dependencies:
       ajv: 6.12.6
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       espree: 9.6.1
       globals: 13.24.0
       ignore: 5.3.2
@@ -16730,7 +16797,7 @@ snapshots:
   '@humanwhocodes/config-array@0.11.14':
     dependencies:
       '@humanwhocodes/object-schema': 2.0.3
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       minimatch: 3.1.2
     transitivePeerDependencies:
       - supports-color
@@ -16763,7 +16830,7 @@ snapshots:
       '@antfu/install-pkg': 1.1.0
       '@antfu/utils': 8.1.1
       '@iconify/types': 2.0.0
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       globals: 15.15.0
       kolorist: 1.8.0
       local-pkg: 1.1.1
@@ -17282,7 +17349,7 @@ snapshots:
     dependencies:
       agent-base: 7.1.4
       http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6(supports-color@10.0.0)
+      https-proxy-agent: 7.0.6
       lru-cache: 10.4.3
       socks-proxy-agent: 8.0.4
     transitivePeerDependencies:
@@ -18060,7 +18127,7 @@ snapshots:
       ajv: 8.17.1
       chalk: 4.1.2
       compare-versions: 6.1.1
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       esbuild: 0.24.0
       esutils: 2.0.3
       fs-extra: 11.2.0
@@ -18223,7 +18290,7 @@ snapshots:
 
   '@puppeteer/browsers@2.4.0':
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       extract-zip: 2.0.1
       progress: 2.0.3
       proxy-agent: 6.4.0
@@ -19242,11 +19309,26 @@ snapshots:
       '@swc-node/sourcemap-support': 0.5.1
       '@swc/core': 1.10.7(@swc/helpers@0.5.18)
       colorette: 2.0.20
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       oxc-resolver: 1.12.0
       pirates: 4.0.6
       tslib: 2.8.1
       typescript: 5.0.4
+    transitivePeerDependencies:
+      - '@swc/types'
+      - supports-color
+
+  '@swc-node/register@1.10.9(@swc/core@1.10.7(@swc/helpers@0.5.18))(@swc/types@0.1.17)(typescript@5.4.2)':
+    dependencies:
+      '@swc-node/core': 1.13.3(@swc/core@1.10.7(@swc/helpers@0.5.18))(@swc/types@0.1.17)
+      '@swc-node/sourcemap-support': 0.5.1
+      '@swc/core': 1.10.7(@swc/helpers@0.5.18)
+      colorette: 2.0.20
+      debug: 4.4.3(supports-color@5.5.0)
+      oxc-resolver: 1.12.0
+      pirates: 4.0.6
+      tslib: 2.8.1
+      typescript: 5.4.2
     transitivePeerDependencies:
       - '@swc/types'
       - supports-color
@@ -20433,7 +20515,7 @@ snapshots:
     dependencies:
       '@ampproject/remapping': 2.3.0
       '@bcoe/v8-coverage': 0.2.3
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       istanbul-lib-coverage: 3.2.2
       istanbul-lib-report: 3.0.1
       istanbul-lib-source-maps: 5.0.6
@@ -20672,7 +20754,7 @@ snapshots:
 
   agent-base@6.0.2:
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -21845,7 +21927,7 @@ snapshots:
 
   connect-mongo@4.6.0(express-session@1.18.0)(mongodb@4.17.2(@aws-sdk/client-sso-oidc@3.600.0)):
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       express-session: 1.18.0
       kruptein: 3.0.6
       mongodb: 4.17.2(@aws-sdk/client-sso-oidc@3.600.0)
@@ -21952,6 +22034,15 @@ snapshots:
       parse-json: 5.2.0
     optionalDependencies:
       typescript: 5.0.4
+
+  cosmiconfig@9.0.0(typescript@5.4.2):
+    dependencies:
+      env-paths: 2.2.1
+      import-fresh: 3.3.1
+      js-yaml: 4.1.1
+      parse-json: 5.2.0
+    optionalDependencies:
+      typescript: 5.4.2
 
   cp-file@9.1.0:
     dependencies:
@@ -22664,7 +22755,7 @@ snapshots:
   engine.io-client@6.6.4:
     dependencies:
       '@socket.io/component-emitter': 3.1.2
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       engine.io-parser: 5.2.3
       ws: 8.18.3
       xmlhttprequest-ssl: 2.1.2
@@ -22683,7 +22774,7 @@ snapshots:
       base64id: 2.0.0
       cookie: 0.7.2
       cors: 2.8.5
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       engine.io-parser: 5.2.3
       ws: 8.18.3
     transitivePeerDependencies:
@@ -22917,7 +23008,7 @@ snapshots:
       ajv: 6.12.6
       chalk: 4.1.2
       cross-spawn: 7.0.6
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       doctrine: 3.0.0
       escape-string-regexp: 4.0.0
       eslint-scope: 7.2.2
@@ -23107,7 +23198,7 @@ snapshots:
 
   extract-zip@2.0.1:
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       get-stream: 5.2.0
       yauzl: 2.10.0
     optionalDependencies:
@@ -23289,7 +23380,7 @@ snapshots:
 
   follow-redirects@1.15.11(debug@4.4.3):
     optionalDependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
 
   for-each@0.3.3:
     dependencies:
@@ -23442,7 +23533,7 @@ snapshots:
   gaxios@6.7.1(encoding@0.1.13):
     dependencies:
       extend: 3.0.2
-      https-proxy-agent: 7.0.6(supports-color@10.0.0)
+      https-proxy-agent: 7.0.6
       is-stream: 2.0.0
       node-fetch: 2.7.0(encoding@0.1.13)
       uuid: 9.0.1
@@ -23520,7 +23611,7 @@ snapshots:
     dependencies:
       basic-ftp: 5.0.5
       data-uri-to-buffer: 6.0.2
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       fs-extra: 11.2.0
     transitivePeerDependencies:
       - supports-color
@@ -24036,14 +24127,14 @@ snapshots:
     dependencies:
       '@tootallnate/once': 2.0.0
       agent-base: 6.0.2
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
   http-proxy-agent@7.0.2:
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -24066,7 +24157,14 @@ snapshots:
   https-proxy-agent@5.0.1:
     dependencies:
       agent-base: 6.0.2
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
+    transitivePeerDependencies:
+      - supports-color
+
+  https-proxy-agent@7.0.6:
+    dependencies:
+      agent-base: 7.1.4
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -24487,7 +24585,7 @@ snapshots:
   istanbul-lib-source-maps@5.0.6:
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       istanbul-lib-coverage: 3.2.2
     transitivePeerDependencies:
       - supports-color
@@ -24584,7 +24682,7 @@ snapshots:
       decimal.js: 10.6.0
       html-encoding-sniffer: 4.0.0
       http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6(supports-color@10.0.0)
+      https-proxy-agent: 7.0.6
       is-potential-custom-element-name: 1.0.1
       nwsapi: 2.2.22
       parse5: 7.3.0
@@ -25738,7 +25836,7 @@ snapshots:
   micromark@4.0.0:
     dependencies:
       '@types/debug': 4.1.7
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       decode-named-character-reference: 1.0.2
       devlop: 1.1.0
       micromark-core-commonmark: 2.0.1
@@ -25932,10 +26030,10 @@ snapshots:
     dependencies:
       async-mutex: 0.4.1
       camelcase: 6.3.0
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       find-cache-dir: 3.3.2
       follow-redirects: 1.15.11(debug@4.4.3)
-      https-proxy-agent: 7.0.6(supports-color@10.0.0)
+      https-proxy-agent: 7.0.6
       mongodb: 5.9.2(@aws-sdk/credential-providers@3.600.0(@aws-sdk/client-sso-oidc@3.600.0))
       new-find-package-json: 2.0.0
       semver: 7.7.4
@@ -26039,7 +26137,7 @@ snapshots:
 
   mquery@4.0.3:
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -26129,7 +26227,7 @@ snapshots:
 
   new-find-package-json@2.0.0:
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -26629,10 +26727,10 @@ snapshots:
     dependencies:
       '@tootallnate/quickjs-emscripten': 0.23.0
       agent-base: 7.1.4
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       get-uri: 6.0.3
       http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6(supports-color@10.0.0)
+      https-proxy-agent: 7.0.6
       pac-resolver: 7.0.1
       socks-proxy-agent: 8.0.4
     transitivePeerDependencies:
@@ -26761,7 +26859,7 @@ snapshots:
   passport-saml@3.2.4:
     dependencies:
       '@xmldom/xmldom': 0.7.13
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       passport-strategy: 1.0.0
       xml-crypto: 2.1.5
       xml-encryption: 2.0.0
@@ -27044,9 +27142,9 @@ snapshots:
   proxy-agent@6.4.0:
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6(supports-color@10.0.0)
+      https-proxy-agent: 7.0.6
       lru-cache: 7.18.3
       pac-proxy-agent: 7.0.2
       proxy-from-env: 1.1.0
@@ -27090,10 +27188,10 @@ snapshots:
     dependencies:
       escape-goat: 4.0.0
 
-  puppeteer-cluster@0.24.0(puppeteer@23.6.1(typescript@5.0.4)):
+  puppeteer-cluster@0.24.0(puppeteer@23.6.1(typescript@5.4.2)):
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
-      puppeteer: 23.6.1(typescript@5.0.4)
+      debug: 4.4.3(supports-color@5.5.0)
+      puppeteer: 23.6.1(typescript@5.4.2)
     transitivePeerDependencies:
       - supports-color
 
@@ -27101,7 +27199,7 @@ snapshots:
     dependencies:
       '@puppeteer/browsers': 2.4.0
       chromium-bidi: 0.8.0(devtools-protocol@0.0.1354347)
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       devtools-protocol: 0.0.1354347
       typed-query-selector: 2.12.0
       ws: 8.18.3
@@ -27110,11 +27208,11 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  puppeteer@23.6.1(typescript@5.0.4):
+  puppeteer@23.6.1(typescript@5.4.2):
     dependencies:
       '@puppeteer/browsers': 2.4.0
       chromium-bidi: 0.8.0(devtools-protocol@0.0.1354347)
-      cosmiconfig: 9.0.0(typescript@5.0.4)
+      cosmiconfig: 9.0.0(typescript@5.4.2)
       devtools-protocol: 0.0.1354347
       puppeteer-core: 23.6.1
       typed-query-selector: 2.12.0
@@ -27920,7 +28018,7 @@ snapshots:
 
   require-in-the-middle@7.4.0:
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       module-details-from-path: 1.0.3
       resolve: 1.22.8
     transitivePeerDependencies:
@@ -27964,7 +28062,7 @@ snapshots:
 
   retry-request@4.2.2:
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       extend: 3.0.2
     transitivePeerDependencies:
       - supports-color
@@ -28450,7 +28548,7 @@ snapshots:
 
   socket.io-adapter@2.5.6:
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       ws: 8.18.3
     transitivePeerDependencies:
       - bufferutil
@@ -28460,7 +28558,7 @@ snapshots:
   socket.io-client@4.8.3:
     dependencies:
       '@socket.io/component-emitter': 3.1.2
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       engine.io-client: 6.6.4
       socket.io-parser: 4.2.5
     transitivePeerDependencies:
@@ -28471,7 +28569,7 @@ snapshots:
   socket.io-parser@4.2.5:
     dependencies:
       '@socket.io/component-emitter': 3.1.2
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -28480,7 +28578,7 @@ snapshots:
       accepts: 1.3.8
       base64id: 2.0.0
       cors: 2.8.5
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       engine.io: 6.6.5
       socket.io-adapter: 2.5.6
       socket.io-parser: 4.2.5
@@ -28492,7 +28590,7 @@ snapshots:
   socks-proxy-agent@7.0.0:
     dependencies:
       agent-base: 6.0.2
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       socks: 2.8.3
     transitivePeerDependencies:
       - supports-color
@@ -28500,7 +28598,7 @@ snapshots:
   socks-proxy-agent@8.0.4:
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       socks: 2.8.3
     transitivePeerDependencies:
       - supports-color
@@ -28643,7 +28741,7 @@ snapshots:
   streamroller@3.1.5:
     dependencies:
       date-format: 4.0.14
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       fs-extra: 8.1.0
     transitivePeerDependencies:
       - supports-color
@@ -28828,7 +28926,7 @@ snapshots:
       cosmiconfig: 9.0.0(typescript@5.0.4)
       css-functions-list: 3.2.2
       css-tree: 2.3.1
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       fast-glob: 3.3.2
       fastest-levenshtein: 1.0.16
       file-entry-cache: 8.0.0
@@ -28883,7 +28981,7 @@ snapshots:
     dependencies:
       component-emitter: 1.3.1
       cookiejar: 2.1.4
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       fast-safe-stringify: 2.1.1
       form-data: 4.0.4
       formidable: 3.5.4
@@ -29314,10 +29412,10 @@ snapshots:
 
   tsscmp@1.0.6: {}
 
-  tsutils@3.21.0(typescript@5.0.4):
+  tsutils@3.21.0(typescript@5.4.2):
     dependencies:
       tslib: 1.14.1
-      typescript: 5.0.4
+      typescript: 5.4.2
 
   ttf2eot@3.1.0:
     dependencies:
@@ -29387,20 +29485,20 @@ snapshots:
     dependencies:
       prelude-ls: 1.2.1
 
-  type-coverage-core@2.28.1(typescript@5.0.4):
+  type-coverage-core@2.28.1(typescript@5.4.2):
     dependencies:
       fast-glob: 3.3.2
       minimatch: 9.0.5
       normalize-path: 3.0.0
       tslib: 2.8.1
-      tsutils: 3.21.0(typescript@5.0.4)
-      typescript: 5.0.4
+      tsutils: 3.21.0(typescript@5.4.2)
+      typescript: 5.4.2
 
-  type-coverage@2.29.0(typescript@5.0.4):
+  type-coverage@2.29.0(typescript@5.4.2):
     dependencies:
       chalk: 4.1.2
       minimist: 1.2.8
-      type-coverage-core: 2.28.1(typescript@5.0.4)
+      type-coverage-core: 2.28.1(typescript@5.4.2)
     transitivePeerDependencies:
       - typescript
 
@@ -29472,7 +29570,7 @@ snapshots:
       buffer: 6.0.3
       chalk: 4.1.2
       cli-highlight: 2.1.11
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       dotenv: 8.6.0
       glob: 7.2.3
       js-yaml: 4.1.1
@@ -29882,7 +29980,7 @@ snapshots:
   vite-node@2.1.1(@types/node@20.19.17)(sass@1.77.6)(terser@5.46.0):
     dependencies:
       cac: 6.7.14
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       pathe: 1.1.2
       vite: 5.4.21(@types/node@20.19.17)(sass@1.77.6)(terser@5.46.0)
     transitivePeerDependencies:
@@ -29901,7 +29999,7 @@ snapshots:
       '@microsoft/api-extractor': 7.43.0(@types/node@20.19.17)
       '@rollup/pluginutils': 5.2.0(rollup@4.39.0)
       '@vue/language-core': 1.8.27(typescript@5.0.4)
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       kolorist: 1.8.0
       magic-string: 0.30.11
       typescript: 5.0.4
@@ -29915,7 +30013,7 @@ snapshots:
 
   vite-tsconfig-paths@5.0.1(typescript@5.0.4)(vite@5.4.21(@types/node@20.19.17)(sass@1.77.6)(terser@5.46.0)):
     dependencies:
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       globrex: 0.1.2
       tsconfck: 3.0.3(typescript@5.0.4)
     optionalDependencies:
@@ -29951,7 +30049,7 @@ snapshots:
       '@vitest/spy': 2.1.1
       '@vitest/utils': 2.1.1
       chai: 5.1.1
-      debug: 4.4.3(supports-color@10.0.0)
+      debug: 4.4.3(supports-color@5.5.0)
       magic-string: 0.30.11
       pathe: 1.1.2
       std-env: 3.7.0
