@@ -150,13 +150,13 @@ const mockEventEmitter = {
 };
 
 type MockCrowi = Pick<Crowi, 'fileUploadService'> & {
-  event: (eventName: string) => typeof mockEventEmitter;
+  events: { activity: typeof mockEventEmitter };
   activityService: typeof mockActivityService;
 };
 
 const createMockCrowi = (): MockCrowi => ({
   fileUploadService: mockFileUploadService,
-  event: vi.fn(() => mockEventEmitter),
+  events: { activity: mockEventEmitter },
   activityService: mockActivityService,
 });
 
