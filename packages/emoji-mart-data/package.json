@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Extracted emoji-mart native lookup data for GROWI",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

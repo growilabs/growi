@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A markdown editor for GROWI",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",

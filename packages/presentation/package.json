@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A package for GROWI presentation feature",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "keywords": [
     "growi",
     "growi-plugin"
