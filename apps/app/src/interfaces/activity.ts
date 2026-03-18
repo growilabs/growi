@@ -1,10 +1,4 @@
-import type {
-  HasObjectId,
-  IPageHasId,
-  IUser,
-  IUserHasId,
-  Ref,
-} from '@growi/core';
+import type { HasObjectId, IUser, IUserHasId, Ref } from '@growi/core';
 
 import type { PaginateResult } from './mongoose-utils';
 
