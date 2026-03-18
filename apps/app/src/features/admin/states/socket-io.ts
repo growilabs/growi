@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 import type { Socket } from 'socket.io-client';
 
@@ -18,29 +18,27 @@ export const useSetupAdminSocket = (): void => {
   const setSocket = useSetAtom(adminSocketAtom);
   const socket = useAtomValue(adminSocketAtom);
 
-  const initializeSocket = useCallback(async () => {
-    try {
-      const { default: io } = await import('socket.io-client');
-      const newSocket = io('/admin', { transports: ['websocket'] });
-
-      newSocket.on('connect_error', (error) => {
-        logger.error('/admin', error);
-      });
-      newSocket.on('error', (error) => {
-        logger.error('/admin', error);
-      });
-
-      setSocket(newSocket);
-    } catch (error) {
-      logger.error('Failed to initialize admin WebSocket:', error);
-    }
-  }, [setSocket]);
-
   useEffect(() => {
-    if (socket == null) {
-      initializeSocket();
-    }
-  }, [socket, initializeSocket]);
+    if (socket != null) return;
+
+    let cancelled = false;
+
+    import('socket.io-client')
+      .then(({ default: io }) => {
+        if (cancelled) return;
+        const newSocket = io('/admin', { transports: ['websocket'] });
+        newSocket.on('connect_error', (error) => logger.error('/admin', error));
+        newSocket.on('error', (error) => logger.error('/admin', error));
+        setSocket(newSocket);
+      })
+      .catch((error) =>
+        logger.error('Failed to initialize admin WebSocket:', error),
+      );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [socket, setSocket]);
 };
 
 /** Returns the admin Socket.IO instance, or null before it is initialised. */
