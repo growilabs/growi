@@ -66,7 +66,11 @@ interface IListPagesRequest
   user: IUser;
 }
 
-export const listPages = ({ excludedPaths }: { excludedPaths: string[] }) => {
+export const listPages = ({
+  getExcludedPaths,
+}: {
+  getExcludedPaths: () => string[];
+}) => {
   return async (req: IListPagesRequest, res: Response): Promise<Response> => {
     const params: LsxApiParams = {
       pagePath: removeTrailingSlash(req.query.pagePath),
@@ -92,6 +96,7 @@ export const listPages = ({ excludedPaths }: { excludedPaths: string[] }) => {
       const builder = await generateBaseQuery(params.pagePath, user);
       let query = builder.query;
 
+      const excludedPaths = getExcludedPaths();
       if (excludedPaths.length > 0) {
         const escapedPaths = excludedPaths.map((p) => {
           const cleanPath = p.startsWith('/') ? p.substring(1) : p;

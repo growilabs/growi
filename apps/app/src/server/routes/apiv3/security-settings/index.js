@@ -10,7 +10,9 @@ import { SupportedAction } from '~/interfaces/activity';
 import { PageDeleteConfigValue } from '~/interfaces/page-delete-config';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import ShareLink from '~/server/models/share-link';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
@@ -47,7 +49,7 @@ const validator = {
     body('hideRestrictedByGroup')
       .if((value) => value != null)
       .isBoolean(),
-    body('isHidingUserPages')
+    body('disableUserPages')
       .if((value) => value != null)
       .isBoolean(),
     body('isUsersHomepageDeletionEnabled')
@@ -220,7 +222,7 @@ const validator = {
  *          pageCompleteDeletionAuthority:
  *            type: string
  *            description: type of pageDeletionAuthority
- *          isHidingUserPages:
+ *          disableUserPages:
  *            type: boolean
  *            description: hide all user pages from general users
  *          hideRestrictedByOwner:
@@ -418,13 +420,11 @@ const validator = {
  */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
-  const adminRequired = require('~/server/middlewares/admin-required')(crowi);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   async function updateAndReloadStrategySettings(
     authId,
@@ -511,8 +511,8 @@ module.exports = (crowi) => {
           hideRestrictedByGroup: await configManager.getConfig(
             'security:list-policy:hideRestrictedByGroup',
           ),
-          isHidingUserPages: await configManager.getConfig(
-            'security:isHidingUserPages',
+          disableUserPages: await configManager.getConfig(
+            'security:disableUserPages',
           ),
           isUsersHomepageDeletionEnabled: await configManager.getConfig(
             'security:user-homepage-deletion:isEnabled',
@@ -1004,7 +1004,7 @@ module.exports = (crowi) => {
           req.body.hideRestrictedByOwner,
         'security:list-policy:hideRestrictedByGroup':
           req.body.hideRestrictedByGroup,
-        'security:isHidingUserPages': req.body.isHidingUserPages,
+        'security:disableUserPages': req.body.disableUserPages,
         'security:user-homepage-deletion:isEnabled':
           req.body.isUsersHomepageDeletionEnabled,
         // Validate user-homepage-deletion config
@@ -1077,8 +1077,8 @@ module.exports = (crowi) => {
           hideRestrictedByGroup: await configManager.getConfig(
             'security:list-policy:hideRestrictedByGroup',
           ),
-          isHidingUserPages: await configManager.getConfig(
-            'security:isHidingUserPages',
+          disableUserPages: await configManager.getConfig(
+            'security:disableUserPages',
           ),
           isUsersHomepageDeletionEnabled: await configManager.getConfig(
             'security:user-homepage-deletion:isEnabled',

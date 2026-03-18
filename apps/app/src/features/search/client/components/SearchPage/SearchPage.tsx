@@ -12,7 +12,7 @@ import type {
 import type { IFormattedSearchResult } from '~/interfaces/search';
 import { useSearchKeyword, useSetSearchKeyword } from '~/states/search';
 import {
-  isHidingUserPagesAtom,
+  disableUserPagesAtom,
   showPageLimitationLAtom,
 } from '~/states/server-configurations';
 import {
@@ -109,7 +109,7 @@ export const SearchPage = (): JSX.Element => {
   const keyword = useSearchKeyword();
   const setSearchKeyword = useSetSearchKeyword();
 
-  const isHidingUserPages = useAtomValue(isHidingUserPagesAtom);
+  const disableUserPages = useAtomValue(disableUserPagesAtom);
 
   const [offset, setOffset] = useState<number>(0);
   const [limit, setLimit] = useState<number>(
@@ -291,7 +291,7 @@ export const SearchPage = (): JSX.Element => {
       <SearchControl
         isEnableSort
         isEnableFilter
-        isHidingUserPages={isHidingUserPages}
+        disableUserPages={disableUserPages}
         initialSearchConditions={initialSearchConditions}
         onSearchInvoked={searchInvokedHandler}
         extraControls={extraControls}
@@ -304,7 +304,7 @@ export const SearchPage = (): JSX.Element => {
     collapseContents,
     initialSearchConditions,
     isCollapsed,
-    isHidingUserPages,
+    disableUserPages,
     searchInvokedHandler,
   ]);
 

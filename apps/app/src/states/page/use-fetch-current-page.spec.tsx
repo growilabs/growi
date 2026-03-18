@@ -8,7 +8,7 @@ import type {
   PageGrant,
   PageStatus,
 } from '@growi/core/dist/interfaces';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 // biome-ignore lint/style/noRestrictedImports: import only types
 import type { AxiosResponse } from 'axios';
 import { createStore, Provider } from 'jotai';
@@ -26,6 +26,7 @@ import {
   pageLoadingAtom,
   pageNotFoundAtom,
   remoteRevisionBodyAtom,
+  shareLinkIdAtom,
 } from '~/states/page/internal-atoms';
 import { useSWRxPageInfo } from '~/stores/page';
 
@@ -180,7 +181,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: '/new/page' });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: '/new/page' });
+    });
 
     // Assert: Wait for state updates
     await waitFor(() => {
@@ -211,7 +214,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: '/same/path' });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: '/same/path' });
+    });
 
     // Assert
     // Use a short timeout to ensure no fetch is initiated
@@ -231,7 +236,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ pageId: 'page123' });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ pageId: 'page123' });
+    });
 
     // Assert
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -261,9 +268,11 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({
-      path: '/same/path',
-      revisionId: 'rev_different',
+    await act(async () => {
+      await result.current.fetchCurrentPage({
+        path: '/same/path',
+        revisionId: 'rev_different',
+      });
     });
 
     // Assert
@@ -294,9 +303,11 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({
-      path: '/same/path',
-      revisionId: currentRevisionId,
+    await act(async () => {
+      await result.current.fetchCurrentPage({
+        path: '/same/path',
+        revisionId: currentRevisionId,
+      });
     });
 
     // Assert
@@ -327,9 +338,11 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({
-      path: '/same/path',
-      revisionId: 'rev_old',
+    await act(async () => {
+      await result.current.fetchCurrentPage({
+        path: '/same/path',
+        revisionId: 'rev_old',
+      });
     });
 
     // Assert
@@ -367,7 +380,12 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: '/same/path', force: true });
+    await act(async () => {
+      await result.current.fetchCurrentPage({
+        path: '/same/path',
+        force: true,
+      });
+    });
 
     // Assert
     await waitFor(() => {
@@ -405,7 +423,12 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ pageId: 'pageId123', force: true });
+    await act(async () => {
+      await result.current.fetchCurrentPage({
+        pageId: 'pageId123',
+        force: true,
+      });
+    });
 
     // Assert
     await waitFor(() => {
@@ -444,9 +467,11 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({
-      path: `/${permalinkId}`,
-      force: true,
+    await act(async () => {
+      await result.current.fetchCurrentPage({
+        path: `/${permalinkId}`,
+        force: true,
+      });
     });
 
     // Assert
@@ -475,7 +500,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
     mockedApiv3Get.mockResolvedValue(mockApiResponse(regularPageData));
 
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: '/some/page' });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: '/some/page' });
+    });
 
     await waitFor(() => {
       expect(store.get(currentPageEntityIdAtom)).toBe('regularPageId');
@@ -491,7 +518,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
     mockedApiv3Get.mockResolvedValue(mockApiResponse(rootPageData));
 
     // Act
-    await result.current.fetchCurrentPage({ path: '/' });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: '/' });
+    });
 
     // Assert: Navigation to root works
     await waitFor(() => {
@@ -516,7 +545,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: encodedPath });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: encodedPath });
+    });
 
     // Assert
     await waitFor(() => {
@@ -540,7 +571,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: permalink });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: permalink });
+    });
 
     // Assert
     await waitFor(() => {
@@ -567,7 +600,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: permalinkPath });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: permalinkPath });
+    });
 
     // Assert
     await waitFor(() => {
@@ -604,9 +639,11 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({
-      path: permalinkPath,
-      pageId: explicitPageId,
+    await act(async () => {
+      await result.current.fetchCurrentPage({
+        path: permalinkPath,
+        pageId: explicitPageId,
+      });
     });
 
     // Assert
@@ -640,7 +677,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: regularPath });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: regularPath });
+    });
 
     // Assert
     await waitFor(() => {
@@ -674,7 +713,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: permalinkWithHash });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: permalinkWithHash });
+    });
 
     // Assert
     await waitFor(() => {
@@ -733,7 +774,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
       // Act
       const { result } = renderHookWithProvider();
-      await result.current.fetchCurrentPage({ path: testCase.input });
+      await act(async () => {
+        await result.current.fetchCurrentPage({ path: testCase.input });
+      });
 
       // Assert
       await waitFor(() => {
@@ -769,7 +812,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
     mockedApiv3Get.mockRejectedValueOnce([notFoundError]);
 
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: '/will/not/found' });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: '/will/not/found' });
+    });
 
     // Assert
     await waitFor(() => {
@@ -794,7 +839,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
     mockedApiv3Get.mockRejectedValueOnce(unknownError);
 
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: '/any/path' });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: '/any/path' });
+    });
 
     await waitFor(() => {
       const err = store.get(pageErrorAtom);
@@ -813,7 +860,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
     mockedApiv3Get.mockRejectedValueOnce([]);
 
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: '/any/path' });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: '/any/path' });
+    });
 
     await waitFor(() => {
       const err = store.get(pageErrorAtom);
@@ -836,7 +885,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
     mockedApiv3Get.mockRejectedValueOnce([nonErrorV3]);
 
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: '/any/path' });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: '/any/path' });
+    });
 
     await waitFor(() => {
       expect(store.get(pageLoadingAtom)).toBe(false);
@@ -870,7 +921,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
     mockedApiv3Get.mockResolvedValueOnce(notFoundResponseWithEmptyPage);
 
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: '/empty/page' });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: '/empty/page' });
+    });
 
     // Assert: emptyPageId should be set from meta
     await waitFor(() => {
@@ -902,7 +955,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
     mockedApiv3Get.mockResolvedValueOnce(notFoundResponseWithoutEmptyPage);
 
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: '/regular/not/found' });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: '/regular/not/found' });
+    });
 
     // Assert: emptyPageId should be undefined
     await waitFor(() => {
@@ -930,7 +985,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: '/success/path' });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: '/success/path' });
+    });
 
     // Assert: emptyPageId should be reset to undefined
     await waitFor(() => {
@@ -945,7 +1002,6 @@ describe('useFetchCurrentPage - Integration Test', () => {
   it('should handle path with encoded Japanese characters', async () => {
     // Arrange: Path with Japanese characters
     const japanesePath = '/日本語/ページ';
-    const encodedPath = encodeURIComponent(japanesePath);
     const pageData = createPageDataMock(
       'japanesePageId',
       japanesePath,
@@ -955,7 +1011,9 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: japanesePath });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: japanesePath });
+    });
 
     // Assert: Path should be properly decoded and sent to API
     await waitFor(() => {
@@ -978,12 +1036,88 @@ describe('useFetchCurrentPage - Integration Test', () => {
 
     // Act
     const { result } = renderHookWithProvider();
-    await result.current.fetchCurrentPage({ path: '/test/path' });
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: '/test/path' });
+    });
 
     // Assert: mutatePageInfo should be called to refetch metadata
     await waitFor(() => {
       expect(mockMutatePageInfo).toHaveBeenCalled();
       expect(store.get(currentPageEntityIdAtom)).toBe('pageId123');
+    });
+  });
+
+  it('should use currentPageId when shareLinkId is present instead of path from router', async () => {
+    // Arrange: Simulate share link page where SSR is skipped and CSR fetch is triggered
+    // shareLinkIdAtom is hydrated from SSR props, currentPageEntityIdAtom is also hydrated
+    const shareLinkId = '65d4e0a0f7b7b2e5a8652e86';
+    const pageId = '58a4569921a8424d00a1aa0e';
+    store.set(shareLinkIdAtom, shareLinkId);
+    store.set(currentPageEntityIdAtom, pageId);
+
+    const pageData = createPageDataMock(
+      pageId,
+      '/actual/wiki/path',
+      'share link page content that is very long',
+    );
+    mockedApiv3Get.mockResolvedValue(mockApiResponse(pageData));
+
+    // Act: fetchCurrentPage is called with router.asPath = /share/<shareLinkId>
+    // This simulates what useInitialCsrFetch does when SSR is skipped
+    const { result } = renderHookWithProvider();
+    await act(async () => {
+      await result.current.fetchCurrentPage({
+        path: `/share/${shareLinkId}`,
+        force: true,
+      });
+    });
+
+    // Assert: API should be called with pageId (not path=/share/...) and shareLinkId
+    await waitFor(() => {
+      expect(mockedApiv3Get).toHaveBeenCalledWith(
+        '/page',
+        expect.objectContaining({
+          pageId,
+          shareLinkId,
+        }),
+      );
+      // path should NOT be sent
+      expect(mockedApiv3Get).toHaveBeenCalledWith(
+        '/page',
+        expect.not.objectContaining({ path: expect.anything() }),
+      );
+      expect(store.get(currentPageEntityIdAtom)).toBe(pageId);
+    });
+  });
+
+  it('should fall through to existing logic when shareLinkId is present but currentPageId is null', async () => {
+    // Arrange: shareLinkId is set but currentPageEntityIdAtom is not
+    const shareLinkId = '65d4e0a0f7b7b2e5a8652e86';
+    store.set(shareLinkIdAtom, shareLinkId);
+    // currentPageEntityIdAtom is NOT set (undefined)
+
+    const pageData = createPageDataMock(
+      'somePageId',
+      '/share/some-path',
+      'content',
+    );
+    mockedApiv3Get.mockResolvedValue(mockApiResponse(pageData));
+
+    // Act: fetchCurrentPage called with a path
+    const { result } = renderHookWithProvider();
+    await act(async () => {
+      await result.current.fetchCurrentPage({ path: '/some/path' });
+    });
+
+    // Assert: Falls through to path-based logic since currentPageId is null
+    await waitFor(() => {
+      expect(mockedApiv3Get).toHaveBeenCalledWith(
+        '/page',
+        expect.objectContaining({
+          path: '/some/path',
+          shareLinkId,
+        }),
+      );
     });
   });
 });

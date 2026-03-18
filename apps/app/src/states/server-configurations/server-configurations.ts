@@ -146,7 +146,7 @@ export const isPdfBulkExportEnabledAtom = atom<boolean>(false);
 /**
  * Atom for hiding user pages setting enabled
  */
-export const isHidingUserPagesAtom = atom<boolean>(false);
+export const disableUserPagesAtom = atom<boolean>(false);
 
 /**
  * Atom for local account registration enabled

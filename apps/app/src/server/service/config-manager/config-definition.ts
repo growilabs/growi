@@ -79,6 +79,10 @@ export const CONFIG_KEYS = [
   'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest',
   'app:isReadOnlyForNewUser',
 
+  // Content-Disposition settings for MIME types
+  'attachments:contentDisposition:inlineMimeTypes',
+  'attachments:contentDisposition:attachmentMimeTypes',
+
   // Security Settings
   'security:wikiMode',
   'security:sessionMaxAge',
@@ -115,7 +119,7 @@ export const CONFIG_KEYS = [
   'security:pageRecursiveDeletionAuthority',
   'security:pageRecursiveCompleteDeletionAuthority',
   'security:isAllGroupMembershipRequiredForPageCompleteDeletion',
-  'security:isHidingUserPages',
+  'security:disableUserPages',
   'security:user-homepage-deletion:isEnabled',
   'security:user-homepage-deletion:isForceDeleteUserHomepageOnUserDeletion',
   'security:isRomUserAllowedToComment',
@@ -201,6 +205,10 @@ export const CONFIG_KEYS = [
   'mail:smtpPassword',
   'mail:sesSecretAccessKey',
   'mail:sesAccessKeyId',
+  'mail:oauth2ClientId',
+  'mail:oauth2ClientSecret',
+  'mail:oauth2RefreshToken',
+  'mail:oauth2User',
 
   // Customize Settings
   'customize:isEmailPublishedForNewUser',
@@ -522,6 +530,23 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: false,
   }),
 
+  // Attachment Content-Disposition settings
+  'attachments:contentDisposition:inlineMimeTypes': defineConfig<{
+    inlineMimeTypes: string[];
+  }>({
+    defaultValue: {
+      inlineMimeTypes: [],
+    },
+  }),
+
+  'attachments:contentDisposition:attachmentMimeTypes': defineConfig<{
+    attachmentMimeTypes: string[];
+  }>({
+    defaultValue: {
+      attachmentMimeTypes: [],
+    },
+  }),
+
   // Security Settings
   'security:wikiMode': defineConfig<string | undefined>({
     envVarName: 'FORCE_WIKI_MODE',
@@ -679,7 +704,7 @@ export const CONFIG_DEFINITIONS = {
     defineConfig<boolean>({
       defaultValue: true,
     }),
-  'security:isHidingUserPages': defineConfig<boolean>({
+  'security:disableUserPages': defineConfig<boolean>({
     defaultValue: false,
   }),
   'security:user-homepage-deletion:isEnabled': defineConfig<boolean>({
@@ -936,7 +961,9 @@ export const CONFIG_DEFINITIONS = {
   'mail:from': defineConfig<string | undefined>({
     defaultValue: undefined,
   }),
-  'mail:transmissionMethod': defineConfig<'smtp' | 'ses' | undefined>({
+  'mail:transmissionMethod': defineConfig<
+    'smtp' | 'ses' | 'oauth2' | undefined
+  >({
     defaultValue: undefined,
   }),
   'mail:smtpHost': defineConfig<string | undefined>({
@@ -955,6 +982,20 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
   }),
   'mail:sesSecretAccessKey': defineConfig<string | undefined>({
+    defaultValue: undefined,
+  }),
+  'mail:oauth2ClientId': defineConfig<NonBlankString | undefined>({
+    defaultValue: undefined,
+  }),
+  'mail:oauth2ClientSecret': defineConfig<NonBlankString | undefined>({
+    defaultValue: undefined,
+    isSecret: true,
+  }),
+  'mail:oauth2RefreshToken': defineConfig<NonBlankString | undefined>({
+    defaultValue: undefined,
+    isSecret: true,
+  }),
+  'mail:oauth2User': defineConfig<NonBlankString | undefined>({
     defaultValue: undefined,
   }),
 

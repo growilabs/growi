@@ -1,84 +1,161 @@
-# GROWI Main Application Development Guide
+# GROWI Main Application (apps/app)
 
-## Overview
+The main GROWI wiki application - a full-stack Next.js application with Express.js backend and MongoDB database.
 
-This guide provides comprehensive documentation for AI coding agents working on the GROWI main application (`/apps/app/`). GROWI is a team collaboration wiki platform built with Next.js, Express, and MongoDB.
+## Technology Stack
 
-## Project Structure
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | Next.js 14 (Pages Router), React 18 |
+| **Backend** | Express.js with custom server |
+| **Database** | MongoDB with Mongoose ^6.13.6 |
+| **State** | Jotai (UI state) + SWR (server state) |
+| **API** | RESTful API v3 with OpenAPI specs |
+| **Testing** | Vitest, React Testing Library |
 
-### Main Application (`/apps/app/src/`)
+## Quick Reference
 
-#### Directory Structure Philosophy
+### Essential Commands
 
-**Feature-based Structure (Recommended for new features)**
-- `features/{feature-name}/` - Self-contained feature modules
-  - `interfaces/` - Universal TypeScript type definitions
-  - `server/` - Server-side logic (models, routes, services)
-  - `client/` - Client-side logic (components, stores, services)
-  - `utils/` - Shared utilities for this feature
-  
-**Important Directories Structure**
-- `client/` - Client-side React components and utilities
-- `server/` - Express.js backend
-- `components/` - Universal React components
-- `pages/` - Next.js Pages Router
-- `states/` - Jotai state management
-- `stores/` - SWR-based state stores
-- `stores-universal/` - Universal SWR-based state stores
-- `styles/` - SCSS stylesheets with modular architecture
-- `migrations/` - MongoDB database migration scripts
-- `interfaces/` - Universal TypeScript type definitions
-- `models/` - Universal Data model definitions
-
-### Key Technical Details
-
-**Frontend Stack**
-- **Framework**: Next.js (Pages Router) with React
-- **Language**: TypeScript (strict mode enabled)
-- **Styling**: SCSS with CSS Modules by Bootstrap 5
-- **State Management**:
-  - **Jotai** (Primary, Recommended): Atomic state management for UI and application state
-  - **SWR**: Data fetching, caching, and revalidation
-  - **Unstated**: Legacy (being phased out, replaced by Jotai)
-- **Testing**: 
-  - Vitest for unit tests (`*.spec.ts`, `*.spec.tsx`)
-  - Jest for integration tests (`*.integ.ts`)
-  - React Testing Library for component testing
-  - Playwright for E2E testing
-- **i18n**: next-i18next for internationalization
-
-**Backend Stack**
-- **Runtime**: Node.js
-- **Framework**: Express.js with TypeScript
-- **Database**: MongoDB with Mongoose ODM
-- **Migration System**: migrate-mongo
-- **Authentication**: Passport.js with multiple strategies (local, LDAP, OAuth, SAML)
-- **Real-time**: Socket.io for collaborative editing and notifications
-- **Search**: Elasticsearch integration (optional)
-- **Observability**: OpenTelemetry integration
-
-**Common Commands**
 ```bash
-# Type checking only
-cd apps/app && pnpm run lint:typecheck
+# Development
+pnpm run dev                    # Start dev server (or turbo run dev from root)
+pnpm run dev:migrate            # Run database migrations
 
-# Run specific test file
-turbo run test:vitest @apps/app -- src/path/to/test.spec.tsx
+# Quality Checks
+pnpm run lint:typecheck         # TypeScript type check
+pnpm run lint:biome             # Biome linter
+pnpm run test                   # Run tests
 
-# Check migration status
-cd apps/app && pnpm run dev:migrate:status
+# Build
+pnpm run build                  # Build for production
 
-# Start REPL with app context
-cd apps/app && pnpm run repl
+# Run Specific Tests
+pnpm vitest run yjs.integ       # Use partial file name
+pnpm vitest run helper.spec     # Vitest auto-finds matching files
 ```
 
-### Important Technical Specifications
+### Key Directories
 
-**Entry Points**
-- **Server**: `server/app.ts` - Handles OpenTelemetry initialization and Crowi server startup
-- **Client**: `pages/_app.page.tsx` - Root Next.js application component
-  - `pages/[[...path]]/` - Dynamic catch-all page routes
+```
+src/
+├── pages/                 # Next.js Pages Router (*.page.tsx)
+├── features/             # Feature modules (recommended for new code)
+│   └── {feature-name}/
+│       ├── server/       # Server-side (models, routes, services)
+│       └── client/       # Client-side (components, hooks, states)
+├── server/               # Express server (legacy structure)
+│   ├── models/           # Mongoose models
+│   ├── routes/apiv3/     # API v3 routes
+│   └── services/         # Business logic
+├── components/           # React components (legacy)
+├── states/               # Jotai atoms
+└── stores-universal/     # SWR hooks
+```
+
+## Development Guidelines
+
+### 1. Feature-Based Architecture (New Code)
+
+Create new features in `features/{feature-name}/`:
+
+```
+features/my-feature/
+├── index.ts              # Public exports
+├── interfaces/           # TypeScript types
+├── server/
+│   ├── models/           # Mongoose models
+│   ├── routes/           # Express routes
+│   └── services/         # Business logic
+└── client/
+    ├── components/       # React components
+    ├── hooks/            # Custom hooks
+    └── states/           # Jotai atoms
+```
+
+### 2. State Management
+
+- **Jotai**: UI state (modals, forms, selections)
+- **SWR**: Server data (pages, users, API responses)
+
+```typescript
+// Jotai for UI state
+import { atom } from 'jotai';
+export const isModalOpenAtom = atom(false);
+
+// SWR for server data
+import useSWR from 'swr';
+export const usePageById = (id: string) => useSWR(`/api/v3/pages/${id}`);
+```
+
+### 3. Next.js Pages
+
+Use `.page.tsx` suffix and `getLayout` pattern:
+
+```typescript
+// pages/admin/index.page.tsx
+import type { NextPageWithLayout } from '~/interfaces/next-page';
+
+const AdminPage: NextPageWithLayout = () => <AdminDashboard />;
+AdminPage.getLayout = (page) => <AdminLayout>{page}</AdminLayout>;
+export default AdminPage;
+```
+
+### 4. API Routes (Express)
+
+Add routes to `server/routes/apiv3/` with OpenAPI docs:
+
+```typescript
+/**
+ * @openapi
+ * /api/v3/pages/{id}:
+ *   get:
+ *     summary: Get page by ID
+ */
+router.get('/pages/:id', async (req, res) => {
+  const page = await PageService.findById(req.params.id);
+  res.json(page);
+});
+```
+
+### 5. Path Aliases
+
+Use `~/` for absolute imports:
+
+```typescript
+import { PageService } from '~/server/services/PageService';
+import { Button } from '~/components/Button';
+```
+
+## Before Committing
+
+```bash
+pnpm run lint:typecheck   # 1. Type check
+pnpm run lint:biome       # 2. Lint
+pnpm run test             # 3. Run tests
+pnpm run build            # 4. Verify build (optional)
+```
+
+## Key Features
+
+| Feature | Directory | Description |
+|---------|-----------|-------------|
+| Page Tree | `features/page-tree/` | Hierarchical page navigation |
+| OpenAI | `features/openai/` | AI assistant integration |
+| Search | `features/search/` | Elasticsearch full-text search |
+| Plugins | `features/growi-plugin/` | Plugin system |
+| OpenTelemetry | `features/opentelemetry/` | Monitoring/telemetry |
+
+## Skills (Auto-Loaded)
+
+When working in this directory, these skills are automatically loaded:
+
+- **app-architecture** - Directory structure, feature-based patterns
+- **app-commands** - apps/app specific commands (migrations, OpenAPI, etc.)
+- **app-specific-patterns** - Jotai/SWR/Next.js patterns, testing
+
+Plus all global skills (monorepo-overview, tech-stack).
 
 ---
 
-*This guide was compiled from project memory files to assist AI coding agents in understanding the GROWI application architecture and development practices.*
+For detailed patterns and examples, refer to the Skills in `.claude/skills/`.

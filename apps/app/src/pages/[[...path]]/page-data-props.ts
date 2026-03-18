@@ -164,11 +164,9 @@ export async function getPageDataForInitial(
     { pageId, path: resolvedPagePath, user },
   );
 
-  const isHidingUserPages = configManager.getConfig(
-    'security:isHidingUserPages',
-  );
+  const disableUserPages = configManager.getConfig('security:disableUserPages');
 
-  if (isHidingUserPages && pageWithMeta.data != null) {
+  if (disableUserPages && pageWithMeta.data != null) {
     const pagePath = pageWithMeta.data.path;
     const isTargetUserPage = isUserPage(pagePath) || isUsersTopPage(pagePath);
 

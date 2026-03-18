@@ -6,7 +6,7 @@ type Props = {
   isOpen: boolean;
   includeUserPages: boolean;
   includeTrashPages: boolean;
-  isHidingUserPages: boolean;
+  disableUserPages: boolean;
   onClose?: () => void;
   onIncludeUserPagesSwitched?: (isChecked: boolean) => void;
   onIncludeTrashPagesSwitched?: (isChecked: boolean) => void;
@@ -19,7 +19,7 @@ export const SearchOptionModal: FC<Props> = (props: Props) => {
     isOpen,
     includeUserPages,
     includeTrashPages,
-    isHidingUserPages,
+    disableUserPages,
     onClose,
     onIncludeUserPagesSwitched,
     onIncludeTrashPagesSwitched,
@@ -57,7 +57,7 @@ export const SearchOptionModal: FC<Props> = (props: Props) => {
       </ModalHeader>
       <ModalBody>
         <div className="d-flex p-2">
-          {!isHidingUserPages && (
+          {!disableUserPages && (
             <div className="me-3">
               <label className="form-label px-3 py-2 mb-0 d-flex align-items-center">
                 <input

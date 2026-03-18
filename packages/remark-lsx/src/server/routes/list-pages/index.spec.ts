@@ -53,7 +53,7 @@ describe('listPages', () => {
       createError(400, 'pagePath is required'),
     );
 
-    const handler = listPages({ excludedPaths: [] });
+    const handler = listPages({ getExcludedPaths: () => [] });
     await handler(reqMock, resMock);
 
     expect(resMock.status).toHaveBeenCalledWith(400);
@@ -96,7 +96,7 @@ describe('listPages', () => {
       resMock.status.calledWith(200).mockReturnValue(resStatusMock);
 
       // when
-      const handler = listPages({ excludedPaths: [] });
+      const handler = listPages({ getExcludedPaths: () => [] });
       await handler(reqMock, resMock);
 
       // then
@@ -130,7 +130,7 @@ describe('listPages', () => {
       resMock.status.calledWith(500).mockReturnValue(resStatusMock);
 
       // when
-      const handler = listPages({ excludedPaths: [] });
+      const handler = listPages({ getExcludedPaths: () => [] });
       await handler(reqMock, resMock);
 
       // then
@@ -160,7 +160,7 @@ describe('listPages', () => {
       resMock.status.calledWith(400).mockReturnValue(resStatusMock);
 
       // when
-      const handler = listPages({ excludedPaths: [] });
+      const handler = listPages({ getExcludedPaths: () => [] });
       await handler(reqMock, resMock);
 
       // then
@@ -286,8 +286,8 @@ describe('when excludedPaths is handled', () => {
     const resMock = mock<Response>();
     resMock.status.mockReturnValue(mock<Response>());
 
-    // excludedPaths is empty
-    const handler = listPages({ excludedPaths: [] });
+    // getExcludedPaths returns empty array
+    const handler = listPages({ getExcludedPaths: () => [] });
     await handler(reqMock, resMock);
 
     // query.and should NOT be called with a $not regex for paths
@@ -307,9 +307,9 @@ describe('when excludedPaths is handled', () => {
     const resMock = mock<Response>();
     resMock.status.mockReturnValue(mock<Response>());
 
-    // excludedPaths provided
+    // getExcludedPaths returns paths to exclude
     const excludedPaths = ['/user', '/tmp'];
-    const handler = listPages({ excludedPaths });
+    const handler = listPages({ getExcludedPaths: () => excludedPaths });
     await handler(reqMock, resMock);
 
     // check if the logic generates the correct regex: ^\/(user|tmp)(\/|$)

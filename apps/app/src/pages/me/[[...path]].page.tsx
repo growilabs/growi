@@ -92,11 +92,6 @@ const MePage: NextPageWithLayout<Props> = (props: Props) => {
 
   const targetPage = getTargetPageToRender(mePagesMap, pagePathKeys);
 
-  // // clear the cache for the current page
-  // //  in order to fix https://redmine.weseek.co.jp/issues/135811
-  // useHydratePageAtoms(undefined);
-  // useCurrentPathname('/me');
-
   const title = useCustomTitle(targetPage.title);
 
   return (

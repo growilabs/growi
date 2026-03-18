@@ -9,6 +9,7 @@ import {
   type RespondOptions,
   ResponseMode,
 } from '~/server/interfaces/attachment';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import {
   applyHeaders,
   createContentHeaders,
@@ -134,7 +135,7 @@ const respondForRelayMode = async (
   // apply content-* headers before response
   const isDownload = opts?.download ?? false;
   const contentHeaders = createContentHeaders(attachment, {
-    inline: !isDownload,
+    forceAttachment: isDownload,
   });
   applyHeaders(res, contentHeaders);
 
@@ -190,10 +191,7 @@ export type GetRequest = CrowiProperties &
 export type GetResponse = Response<any, LocalsAfterDataInjection>;
 
 export const getRouterFactory = (crowi: Crowi): Router => {
-  const loginRequired = require('../../middlewares/login-required')(
-    crowi,
-    true,
-  );
+  const loginRequired = loginRequiredFactory(crowi, true);
 
   const router = express.Router();
 

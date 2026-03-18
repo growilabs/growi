@@ -8,6 +8,7 @@ import autoReap from 'multer-autoreap';
 import { SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { Attachment } from '~/server/models/attachment';
 import {
   serializePageSecurely,
@@ -134,20 +135,14 @@ const { query, param, body } = require('express-validator');
  */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const loginRequired = require('../../middlewares/login-required')(
-    crowi,
-    true,
-  );
-  const loginRequiredStrictly = require('../../middlewares/login-required')(
-    crowi,
-  );
-  const Page = crowi.model('Page');
-  const User = crowi.model('User');
+  const loginRequired = loginRequiredFactory(crowi, true);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const { Page, User } = crowi.models;
   const { attachmentService } = crowi;
   const uploads = multer({ dest: `${crowi.tmpDir}uploads` });
   const addActivity = generateAddActivityMiddleware(crowi);
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   const validator = {
     retrieveAttachment: [

@@ -1,13 +1,14 @@
+import assert from 'node:assert';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
-import type { ValidationChain } from 'express-validator';
 import { body } from 'express-validator';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
@@ -23,18 +24,18 @@ type ReqBody = {
   initialUserMessage?: string;
 };
 
-type CreateThreadReq = Request<undefined, ApiV3Response, ReqBody> & {
-  user: IUserHasId;
+type CreateThreadReq = Request<
+  Record<string, string>,
+  ApiV3Response,
+  ReqBody
+> & {
+  user?: IUserHasId;
 };
 
-type CreateThreadFactory = (crowi: Crowi) => RequestHandler[];
+export const createThreadHandlersFactory = (crowi: Crowi): RequestHandler[] => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
-export const createThreadHandlersFactory: CreateThreadFactory = (crowi) => {
-  const loginRequiredStrictly = require('~/server/middlewares/login-required')(
-    crowi,
-  );
-
-  const validator: ValidationChain[] = [
+  const validator = [
     body('type')
       .isIn(Object.values(ThreadType))
       .withMessage('type must be one of "editor" or "knowledge"'),
@@ -54,9 +55,15 @@ export const createThreadHandlersFactory: CreateThreadFactory = (crowi) => {
     }),
     loginRequiredStrictly,
     certifyAiService,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: CreateThreadReq, res: ApiV3Response) => {
+      const { user } = req;
+      assert(
+        user != null,
+        'user is required (ensured by loginRequiredStrictly middleware)',
+      );
+
       const openaiService = getOpenaiService();
       if (openaiService == null) {
         return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
@@ -68,7 +75,7 @@ export const createThreadHandlersFactory: CreateThreadFactory = (crowi) => {
 
       try {
         const thread = await openaiService.createThread(
-          req.user._id,
+          user._id,
           type,
           aiAssistantId,
           initialUserMessage,

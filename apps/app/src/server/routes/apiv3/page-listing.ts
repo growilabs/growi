@@ -14,6 +14,7 @@ import mongoose from 'mongoose';
 
 import type { IPageForTreeItem } from '~/interfaces/page';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import type { IPageGrantService } from '~/server/service/page-grant';
 import { pageListingService } from '~/server/service/page-listing';
@@ -64,10 +65,7 @@ const validator = {
  * Routes
  */
 const routerFactory = (crowi: Crowi): Router => {
-  const loginRequired = require('../../middlewares/login-required')(
-    crowi,
-    true,
-  );
+  const loginRequired = loginRequiredFactory(crowi, true);
 
   const router = express.Router();
 
@@ -159,8 +157,8 @@ const routerFactory = (crowi: Crowi): Router => {
       const hideRestrictedByGroup = await configManager.getConfig(
         'security:list-policy:hideRestrictedByGroup',
       );
-      const hideUserPages = await configManager.getConfig(
-        'security:isHidingUserPages',
+      const disableUserPages = await configManager.getConfig(
+        'security:disableUserPages',
       );
 
       try {
@@ -172,7 +170,7 @@ const routerFactory = (crowi: Crowi): Router => {
             !hideRestrictedByGroup,
           );
 
-        if (hideUserPages === true) {
+        if (disableUserPages) {
           pages = pages.filter(
             (page) => !isUserPage(page.path) && !isUsersTopPage(page.path),
           );

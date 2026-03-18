@@ -131,11 +131,10 @@ const ApiResponse = require('../../util/apiResponse');
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 export const routesFactory = (crowi) => {
-  const Page = crowi.model('Page');
-  const User = crowi.model('User');
+  const { Page, User } = crowi.models;
   const { attachmentService } = crowi;
 
-  const activityEvent = crowi.event('activity');
+  const activityEvent = crowi.events.activity;
 
   /**
    * Check the user is accessible to the related page

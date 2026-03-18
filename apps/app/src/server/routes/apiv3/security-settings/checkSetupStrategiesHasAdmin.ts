@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
+import { UserStatus } from '~/server/models/user/conts';
 
 interface AggregateResult {
   count: number;
@@ -13,7 +14,7 @@ const checkLocalStrategyHasAdmin = async (): Promise<boolean> => {
     {
       $match: {
         admin: true,
-        status: User.STATUS_ACTIVE,
+        status: UserStatus.STATUS_ACTIVE,
         password: { $exists: true },
       },
     },
@@ -29,7 +30,7 @@ const checkExternalStrategiesHasAdmin = async (
   const User = mongoose.model('User') as any;
 
   const externalAdmins: AggregateResult[] = await User.aggregate([
-    { $match: { admin: true, status: User.STATUS_ACTIVE } },
+    { $match: { admin: true, status: UserStatus.STATUS_ACTIVE } },
     {
       $lookup: {
         from: 'externalaccounts',

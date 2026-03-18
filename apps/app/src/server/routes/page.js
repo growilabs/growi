@@ -15,19 +15,19 @@ import UpdatePost from '../models/update-post';
  */
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi, app) => {
+module.exports = (crowi, _app) => {
   const logger = loggerFactory('growi:routes:page');
 
   const { pagePathUtils } = require('@growi/core/dist/utils');
 
   /** @type {import('../models/page').PageModel} */
-  const Page = crowi.model('Page');
+  const { Page } = crowi.models;
 
   const PageRedirect = mongoose.model('PageRedirect');
 
   const ApiResponse = require('../util/apiResponse');
 
-  const globalNotificationService = crowi.getGlobalNotificationService();
+  const globalNotificationService = crowi.globalNotificationService;
 
   const actions = {};
 

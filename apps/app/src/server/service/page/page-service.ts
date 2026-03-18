@@ -21,6 +21,9 @@ import type { PageOperationDocument } from '~/server/models/page-operation';
 import type { UserGroupDocument } from '~/server/models/user-group';
 
 export interface IPageService {
+  // Page event emitter
+  pageEvent: EventEmitter;
+
   create(
     path: string,
     body: string,
@@ -188,4 +191,19 @@ export interface IPageService {
   canDeleteUserHomepageByConfig(): boolean;
 
   isUsersHomepageOwnerAbsent(path: string): Promise<boolean>;
+
+  createTtlIndex(): Promise<void>;
+
+  // Normalize parent operations
+  getParentAndFillAncestorsByUser(
+    user,
+    path: string,
+  ): Promise<HydratedDocument<PageDocument>>;
+  normalizeParentRecursivelyByPages(pages, user): Promise<void>;
+  normalizeParentByPath(path: string, user): Promise<void>;
+  normalizeParentRecursivelyMainOperation(
+    page,
+    user,
+    pageOpId: ObjectIdLike,
+  ): Promise<number>;
 }
