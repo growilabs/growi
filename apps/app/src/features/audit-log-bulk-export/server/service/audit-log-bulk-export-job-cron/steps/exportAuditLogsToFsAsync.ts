@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Readable } from 'node:stream';
 import { pipeline, Writable } from 'node:stream';
 import type { FilterQuery } from 'mongoose';
 
@@ -130,7 +131,7 @@ export async function exportAuditLogsToFsAsync(
 
   const writable = getAuditLogWritable.bind(this)(job);
 
-  this.setStreamInExecution(job._id, logsCursor);
+  this.setStreamInExecution(job._id, logsCursor as unknown as Readable);
 
   pipeline(logsCursor, writable, (err) => {
     this.handleError(err, job);

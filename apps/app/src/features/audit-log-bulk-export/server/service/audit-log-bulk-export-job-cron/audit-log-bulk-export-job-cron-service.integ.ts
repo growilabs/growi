@@ -219,7 +219,7 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
 
   beforeEach(async () => {
     crowi = createMockCrowi();
-    instanciateAuditLogBulkExportJobCronService(crowi as Crowi);
+    instanciateAuditLogBulkExportJobCronService(crowi as unknown as Crowi);
     if (!auditLogBulkExportJobCronService) {
       throw new Error('auditLogBulkExportJobCronService was not initialized');
     }
