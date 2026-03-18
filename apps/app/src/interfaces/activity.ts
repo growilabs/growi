@@ -570,6 +570,14 @@ export const ActivityLogActions = {
   ACTION_COMMENT_CREATE,
 } as const;
 
+export const ContributionGraphActions = {
+  ACTION_PAGE_CREATE,
+  ACTION_PAGE_UPDATE,
+  ACTION_PAGE_DUPLICATE,
+  ACTION_PAGE_REVERT,
+  ACTION_COMMENT_CREATE,
+} as const;
+
 /*
  * Array
  */
