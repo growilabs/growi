@@ -3,7 +3,6 @@ import express, {
   type Request,
   type Response,
 } from 'express';
-import mockRequire from 'mock-require';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -14,11 +13,11 @@ import * as ServiceModule from '../../service/audit-log-bulk-export';
 import { auditLogBulkExportService } from '../../service/audit-log-bulk-export';
 import { factory } from './audit-log-bulk-export';
 
-mockRequire('~/server/middlewares/login-required', () => {
-  return (_req: Request, _res: Response, next: NextFunction) => {
+vi.mock('~/server/middlewares/login-required', () => ({
+  default: () => (_req: Request, _res: Response, next: NextFunction) => {
     next();
-  };
-});
+  },
+}));
 
 vi.mock('~/server/middlewares/apiv3-form-validator', () => {
   const { validationResult } = require('express-validator');
