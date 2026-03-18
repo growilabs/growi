@@ -2,8 +2,13 @@ import type { FC } from 'react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
+
 export const AuditLogDisableMode: FC = () => {
   const { t } = useTranslation('admin');
+
+  const growiCloudUri = useGrowiCloudUri();
+  const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
 
   return (
     <div className="ccontainer-lg">
@@ -24,6 +29,15 @@ export const AuditLogDisableMode: FC = () => {
                   __html: t('audit_log_management.disable_mode_explanation'),
                 }}
               />
+              {growiCloudUri != null && growiAppIdForGrowiCloud != null && (
+                <a
+                  href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
+                  className="btn btn-outline-secondary mt-3"
+                >
+                  <span className="material-symbols-outlined me-1">share</span>
+                  {t('cloud_setting_management.to_cloud_settings')}
+                </a>
+              )}
             </div>
           </div>
         </div>
