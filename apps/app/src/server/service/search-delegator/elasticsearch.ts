@@ -409,7 +409,7 @@ class ElasticsearchDelegator
     const { client } = this;
     const indexName = 'auditlogs';
     const tmpIndexName = 'auditlogs-tmp';
-    const aliasName = 'auditlogs';
+    const aliasName = 'auditlogs-alias';
 
     // remove tmp index
     const isExistsAuditlogTmpIndex = await client.indices.exists({
@@ -425,16 +425,16 @@ class ElasticsearchDelegator
     });
     if (!isExistsAuditlogIndex) {
       await this.createAuditlogIndex(indexName);
+    }
+
+    // sync documents
+    const auditlogCount = await mongoose.model('Activity').countDocuments();
+    const esCount = (await client.count({ index: indexName })).count;
+    if (!isExistsAuditlogIndex || auditlogCount !== esCount) {
       await this.addAllAuditlogs();
     }
 
     // create alias
-    const auditlogCount = await mongoose.model('Activity').countDocuments();
-    const esCount = (await client.count({ index: indexName })).count;
-    if (auditlogCount !== esCount) {
-      await this.addAllAuditlogs();
-    }
-
     const isExistsAlias = await client.indices.existsAlias({
       name: aliasName,
       index: indexName,
@@ -443,6 +443,7 @@ class ElasticsearchDelegator
       await client.indices.putAlias({ name: aliasName, index: indexName });
     }
   }
+
   async createIndex(index: string) {
     // TODO: https://redmine.weseek.co.jp/issues/168446
     if (isES7ClientDelegator(this.client)) {
