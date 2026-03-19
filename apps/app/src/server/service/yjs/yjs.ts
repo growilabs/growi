@@ -6,6 +6,7 @@ import { WebSocketServer } from 'ws';
 import type { WSSharedDoc } from 'y-websocket/bin/utils';
 import { docs, setPersistence, setupWSConnection } from 'y-websocket/bin/utils';
 
+import type { SessionConfig } from '~/interfaces/session-config';
 import type { SyncLatestRevisionBody } from '~/interfaces/yjs';
 import loggerFactory from '~/utils/logger';
 
@@ -31,17 +32,6 @@ export interface IYjsService {
   ): Promise<SyncLatestRevisionBody>;
   getCurrentYdoc(pageId: string): WSSharedDoc | undefined;
 }
-
-type SessionConfig = {
-  rolling: boolean;
-  secret: string;
-  resave: boolean;
-  saveUninitialized: boolean;
-  cookie: { maxAge: number };
-  genid: (req: { path: string }) => string;
-  name?: string;
-  store?: unknown;
-};
 
 class YjsService implements IYjsService {
   private mdb: MongodbPersistence;

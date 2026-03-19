@@ -6,29 +6,21 @@ import mongoose from 'mongoose';
 import passport from 'passport';
 import type { Duplex } from 'stream';
 
+import type { SessionConfig } from '~/interfaces/session-config';
 import loggerFactory from '~/utils/logger';
 
 import type { PageModel } from '../../models/page';
 
 const logger = loggerFactory('growi:service:yjs:upgrade-handler');
 
-type SessionConfig = {
-  rolling: boolean;
-  secret: string;
-  resave: boolean;
-  saveUninitialized: boolean;
-  cookie: { maxAge: number };
-  genid: (req: { path: string }) => string;
-  name?: string;
-  store?: unknown;
-};
-
 type AuthenticatedRequest = IncomingMessage & {
   user?: IUserHasId;
 };
 
 /**
- * Run an Express-style middleware against a raw IncomingMessage
+ * Run an Express-style middleware against a raw IncomingMessage.
+ * Safe for express-session, passport.initialize(), and passport.session() which
+ * only read/write `req` properties and call `next()` — they never write to `res`.
  */
 const runMiddleware = (
   middleware: RequestHandler,
