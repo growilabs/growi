@@ -205,7 +205,7 @@ class PageBulkExportJobCronService
       } else if (
         pageBulkExportJob.status === PageBulkExportJobStatus.uploading
       ) {
-        await compressAndUpload.bind(this)(user, pageBulkExportJob);
+        compressAndUpload.bind(this)(user, pageBulkExportJob);
       }
     } catch (err) {
       logger.error(err);
