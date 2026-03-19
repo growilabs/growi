@@ -18,7 +18,7 @@ const entries = fs
   );
 
 // Move emitted font assets from src/assets/ to public/static/fonts/
-// and rewrite URL references in prebuilt JS files
+// and rewrite URL references in prebuilt TS files
 function moveAssetsToPublic(): Plugin {
   return {
     name: 'move-assets-to-public',
@@ -34,8 +34,8 @@ function moveAssetsToPublic(): Plugin {
       }
       fs.rmdirSync(srcDir);
 
-      // Rewrite /assets/ -> /static/fonts/ and prepend // @ts-nocheck in prebuilt JS files
-      const prebuiltFiles = fs.globSync('src/**/*.vendor-styles.prebuilt.js', {
+      // Rewrite /assets/ -> /static/fonts/ and prepend // @ts-nocheck in prebuilt TS files
+      const prebuiltFiles = fs.globSync('src/**/*.vendor-styles.prebuilt.ts', {
         cwd: __dirname,
       });
       for (const file of prebuiltFiles) {
@@ -63,7 +63,7 @@ export default defineConfig({
       input: entries,
       output: {
         format: 'es',
-        entryFileNames: '[name].js',
+        entryFileNames: '[name].ts',
       },
     },
   },
