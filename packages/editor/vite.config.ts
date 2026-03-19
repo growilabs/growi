@@ -5,7 +5,6 @@ import { nodeExternals } from 'rollup-plugin-node-externals';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
-import { WebSocketServer } from 'ws';
 
 const excludeFiles = [
   '**/components/playground/*',
@@ -21,6 +20,8 @@ const devWebSocketPlugin = (): Plugin => ({
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { setupWSConnection } = require('y-websocket/bin/utils');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { WebSocketServer } = require('ws');
 
     const wss = new WebSocketServer({ noServer: true });
 
