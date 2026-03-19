@@ -1,0 +1,22 @@
+{
+  "feature_name": "migrate-to-y-websocket",
+  "created_at": "2026-03-19T00:00:00.000Z",
+  "updated_at": "2026-03-19T00:00:00.000Z",
+  "language": "en",
+  "phase": "tasks-approved",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}
