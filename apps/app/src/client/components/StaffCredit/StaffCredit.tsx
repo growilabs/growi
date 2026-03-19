@@ -1,6 +1,13 @@
-import React, { type JSX, useCallback, useState } from 'react';
+import React, {
+  type JSX,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import localFont from 'next/font/local';
-import { animateScroll } from 'react-scroll';
+import type { AnimationPlaybackControls } from 'motion';
+import { animate } from 'motion';
 import { Modal, ModalBody } from 'reactstrap';
 
 import { useSWRxStaffs } from '~/stores/staff';
@@ -9,6 +16,9 @@ import loggerFactory from '~/utils/logger';
 import styles from './StaffCredit.module.scss';
 
 const _logger = loggerFactory('growi:components:StaffCredit');
+
+const SCROLL_DELAY = 200; // ms
+const SCROLL_SPEED = 300; // pixels per second
 
 // define fonts
 const pressStart2P = localFont({
@@ -27,6 +37,41 @@ const StaffCredit = (props: Props): JSX.Element => {
   const { data: contributors } = useSWRxStaffs();
 
   const [isScrolling, setScrolling] = useState(false);
+  const animationRef = useRef<AnimationPlaybackControls | null>(null);
+
+  const stopAutoScroll = useCallback(() => {
+    animationRef.current?.stop();
+    animationRef.current = null;
+    setScrolling(false);
+  }, []);
+
+  // Stop auto-scroll on wheel or scrollbar interaction
+  useEffect(() => {
+    if (!isScrolling) return;
+
+    const modalBody = document.getElementById('modalBody');
+    if (modalBody == null) return;
+
+    const handleWheel = () => {
+      stopAutoScroll();
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const scrollbarStart =
+        modalBody.getBoundingClientRect().left + modalBody.clientWidth;
+      if (event.clientX >= scrollbarStart) {
+        stopAutoScroll();
+      }
+    };
+
+    modalBody.addEventListener('wheel', handleWheel, { passive: true });
+    modalBody.addEventListener('pointerdown', handlePointerDown);
+
+    return () => {
+      modalBody.removeEventListener('wheel', handleWheel);
+      modalBody.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [isScrolling, stopAutoScroll]);
 
   const closeHandler = useCallback(() => {
     if (onClosed != null) {
@@ -36,11 +81,11 @@ const StaffCredit = (props: Props): JSX.Element => {
 
   const contentsClickedHandler = useCallback(() => {
     if (isScrolling) {
-      setScrolling(false);
+      stopAutoScroll();
     } else {
       closeHandler();
     }
-  }, [closeHandler, isScrolling]);
+  }, [closeHandler, isScrolling, stopAutoScroll]);
 
   const renderMembers = useCallback((memberGroup, keyPrefix) => {
     // construct members elements
@@ -113,19 +158,24 @@ const StaffCredit = (props: Props): JSX.Element => {
   }, [contentsClickedHandler, contributors, renderMembers]);
 
   const openedHandler = useCallback(() => {
-    // init
-    animateScroll.scrollTo(0, { containerId: 'modalBody', duration: 0 });
+    const container = document.getElementById('modalBody');
+    if (container == null) return;
 
+    container.scrollTop = 0;
     setScrolling(true);
 
-    // start scrolling
-    animateScroll.scrollToBottom({
-      containerId: 'modalBody',
-      smooth: 'linear',
-      delay: 200,
-      duration: (scrollDistanceInPx: number) => {
-        const scrollSpeed = 200;
-        return (scrollDistanceInPx / scrollSpeed) * 1000;
+    const maxScroll = container.scrollHeight - container.clientHeight;
+
+    animationRef.current = animate(0, maxScroll, {
+      duration: maxScroll / SCROLL_SPEED,
+      ease: 'linear',
+      delay: SCROLL_DELAY / 1000,
+      onUpdate: (v) => {
+        container.scrollTop = v;
+      },
+      onComplete: () => {
+        animationRef.current = null;
+        setScrolling(false);
       },
     });
   }, []);
