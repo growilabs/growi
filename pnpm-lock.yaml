@@ -849,9 +849,9 @@ importers:
       y-mongodb-provider:
         specifier: ^0.2.0
         version: 0.2.0(@aws-sdk/credential-providers@3.600.0(@aws-sdk/client-sso-oidc@3.600.0))(socks@2.8.3)(yjs@13.6.19)
-      y-socket.io:
-        specifier: ^1.1.3
-        version: 1.1.3(yjs@13.6.19)
+      y-websocket:
+        specifier: ^2.0.4
+        version: 2.1.0(yjs@13.6.19)
       yjs:
         specifier: ^13.6.18
         version: 13.6.19
@@ -1431,9 +1431,9 @@ importers:
       y-codemirror.next:
         specifier: ^0.3.5
         version: 0.3.5(@codemirror/state@6.5.4)(@codemirror/view@6.39.14)(yjs@13.6.19)
-      y-socket.io:
-        specifier: ^1.1.3
-        version: 1.1.3(yjs@13.6.19)
+      y-websocket:
+        specifier: ^2.0.4
+        version: 2.1.0(yjs@13.6.19)
       yjs:
         specifier: ^13.6.19
         version: 13.6.19
@@ -6277,6 +6277,9 @@ packages:
   async-each-series@0.1.1:
     resolution: {integrity: sha512-p4jj6Fws4Iy2m0iCmI2am2ZNZCgbdgE+P8F/8csmn2vx7ixXrO2zGcuNsD46X5uZSVecmkEy/M06X2vG8KD6dQ==}
     engines: {node: '>=0.8.0'}
+
+  async-limiter@1.0.1:
+    resolution: {integrity: sha512-csOlWGAcRFJaI6m+F2WKdnMKr4HhdhFVBk0H/QbJFMCr+uO2kwohwXQPxw/9OCxp05r5ghVBFSyioixx3gfkNQ==}
 
   async-mutex@0.4.1:
     resolution: {integrity: sha512-WfoBo4E/TbCX1G95XTjbWTE3X2XLG0m1Xbv2cwOtuPdyH9CZvnaA5nCt1ucjaKEgW2A5IF71hxrRhr83Je5xjA==}
@@ -14439,6 +14442,17 @@ packages:
     resolution: {integrity: sha512-+QU2zd6OTD8XWIJCbffaiQeH9U73qIqafo1x6V1snCWYGJf6cVE0cDR4D8xRzcEnfI21IFrUPzPGtcPf8AC+Rw==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
 
+  ws@6.2.3:
+    resolution: {integrity: sha512-jmTjYU0j60B+vHey6TfR3Z7RD61z/hmxBS3VMSGIrroOWXQEneK1zNuotOUrGyBHQj0yrpsLHPWtigEFd13ndA==}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: ^5.0.2
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   ws@8.18.3:
     resolution: {integrity: sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==}
     engines: {node: '>=10.0.0'}
@@ -14544,8 +14558,9 @@ packages:
     peerDependencies:
       yjs: ^13.0.0
 
-  y-socket.io@1.1.3:
-    resolution: {integrity: sha512-rHalJcJjHWG3TNKJN1rcvJBDsVCdDi+3ms05JQ33+JUFzQ9pseD9SvQ7bdPnT9Ztn5t7THG/0/2MxyMdjlRHXQ==}
+  y-websocket@2.1.0:
+    resolution: {integrity: sha512-WHYDRqomaGkkaujtowCDwL8KYk+t1zQCGIgKyvxvchhjTQlMgWXRHJK+FDEcWmHA7I7o/4fy0eniOrtmz0e4mA==}
+    engines: {node: '>=16.0.0', npm: '>=8.0.0'}
     hasBin: true
     peerDependencies:
       yjs: ^13.5.6
@@ -15717,7 +15732,7 @@ snapshots:
       '@azure/core-util': 1.10.0
       '@azure/logger': 1.1.2
       http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6
+      https-proxy-agent: 7.0.6(supports-color@10.0.0)
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
@@ -15819,7 +15834,7 @@ snapshots:
       '@babel/traverse': 7.24.6
       '@babel/types': 7.25.6
       convert-source-map: 2.0.0
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       gensync: 1.0.0-beta.2
       json5: 2.2.3
       semver: 6.3.1
@@ -15918,7 +15933,7 @@ snapshots:
       '@babel/helper-split-export-declaration': 7.24.6
       '@babel/parser': 7.25.6
       '@babel/types': 7.25.6
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       globals: 11.12.0
     transitivePeerDependencies:
       - supports-color
@@ -16459,7 +16474,7 @@ snapshots:
 
   '@elastic/elasticsearch@7.17.13':
     dependencies:
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       hpagent: 0.1.2
       ms: 2.1.3
       secure-json-parse: 2.7.0
@@ -16488,7 +16503,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.0.1(@opentelemetry/api@1.9.0)
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       hpagent: 1.2.0
       ms: 2.1.3
       secure-json-parse: 3.0.2
@@ -16501,7 +16516,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.0.1(@opentelemetry/api@1.9.0)
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       hpagent: 1.2.0
       ms: 2.1.3
       secure-json-parse: 4.0.0
@@ -16684,7 +16699,7 @@ snapshots:
   '@eslint/eslintrc@2.1.4':
     dependencies:
       ajv: 6.12.6
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       espree: 9.6.1
       globals: 13.24.0
       ignore: 5.3.2
@@ -16797,7 +16812,7 @@ snapshots:
   '@humanwhocodes/config-array@0.11.14':
     dependencies:
       '@humanwhocodes/object-schema': 2.0.3
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       minimatch: 3.1.2
     transitivePeerDependencies:
       - supports-color
@@ -16830,7 +16845,7 @@ snapshots:
       '@antfu/install-pkg': 1.1.0
       '@antfu/utils': 8.1.1
       '@iconify/types': 2.0.0
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       globals: 15.15.0
       kolorist: 1.8.0
       local-pkg: 1.1.1
@@ -17349,7 +17364,7 @@ snapshots:
     dependencies:
       agent-base: 7.1.4
       http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6
+      https-proxy-agent: 7.0.6(supports-color@10.0.0)
       lru-cache: 10.4.3
       socks-proxy-agent: 8.0.4
     transitivePeerDependencies:
@@ -18127,7 +18142,7 @@ snapshots:
       ajv: 8.17.1
       chalk: 4.1.2
       compare-versions: 6.1.1
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       esbuild: 0.24.0
       esutils: 2.0.3
       fs-extra: 11.2.0
@@ -18290,7 +18305,7 @@ snapshots:
 
   '@puppeteer/browsers@2.4.0':
     dependencies:
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       extract-zip: 2.0.1
       progress: 2.0.3
       proxy-agent: 6.4.0
@@ -19309,7 +19324,7 @@ snapshots:
       '@swc-node/sourcemap-support': 0.5.1
       '@swc/core': 1.10.7(@swc/helpers@0.5.18)
       colorette: 2.0.20
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       oxc-resolver: 1.12.0
       pirates: 4.0.6
       tslib: 2.8.1
@@ -19324,7 +19339,7 @@ snapshots:
       '@swc-node/sourcemap-support': 0.5.1
       '@swc/core': 1.10.7(@swc/helpers@0.5.18)
       colorette: 2.0.20
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       oxc-resolver: 1.12.0
       pirates: 4.0.6
       tslib: 2.8.1
@@ -20515,7 +20530,7 @@ snapshots:
     dependencies:
       '@ampproject/remapping': 2.3.0
       '@bcoe/v8-coverage': 0.2.3
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       istanbul-lib-coverage: 3.2.2
       istanbul-lib-report: 3.0.1
       istanbul-lib-source-maps: 5.0.6
@@ -20724,6 +20739,7 @@ snapshots:
       level-concat-iterator: 2.0.1
       level-supports: 1.0.1
       xtend: 4.0.2
+    optional: true
 
   abstract-leveldown@6.3.0:
     dependencies:
@@ -20732,6 +20748,7 @@ snapshots:
       level-concat-iterator: 2.0.1
       level-supports: 1.0.1
       xtend: 4.0.2
+    optional: true
 
   abstract-logging@2.0.1: {}
 
@@ -20754,7 +20771,7 @@ snapshots:
 
   agent-base@6.0.2:
     dependencies:
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -21009,6 +21026,9 @@ snapshots:
   async-canvas-to-blob@1.0.3: {}
 
   async-each-series@0.1.1: {}
+
+  async-limiter@1.0.1:
+    optional: true
 
   async-mutex@0.4.1:
     dependencies:
@@ -21927,7 +21947,7 @@ snapshots:
 
   connect-mongo@4.6.0(express-session@1.18.0)(mongodb@4.17.2(@aws-sdk/client-sso-oidc@3.600.0)):
     dependencies:
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       express-session: 1.18.0
       kruptein: 3.0.6
       mongodb: 4.17.2(@aws-sdk/client-sso-oidc@3.600.0)
@@ -22477,6 +22497,7 @@ snapshots:
     dependencies:
       abstract-leveldown: 6.2.3
       inherits: 2.0.4
+    optional: true
 
   define-data-property@1.1.4:
     dependencies:
@@ -22742,6 +22763,7 @@ snapshots:
       inherits: 2.0.4
       level-codec: 9.0.2
       level-errors: 2.0.1
+    optional: true
 
   encoding@0.1.13:
     dependencies:
@@ -22755,7 +22777,7 @@ snapshots:
   engine.io-client@6.6.4:
     dependencies:
       '@socket.io/component-emitter': 3.1.2
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       engine.io-parser: 5.2.3
       ws: 8.18.3
       xmlhttprequest-ssl: 2.1.2
@@ -22774,7 +22796,7 @@ snapshots:
       base64id: 2.0.0
       cookie: 0.7.2
       cors: 2.8.5
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       engine.io-parser: 5.2.3
       ws: 8.18.3
     transitivePeerDependencies:
@@ -22811,6 +22833,7 @@ snapshots:
   errno@0.1.8:
     dependencies:
       prr: 1.0.1
+    optional: true
 
   error-ex@1.3.2:
     dependencies:
@@ -23008,7 +23031,7 @@ snapshots:
       ajv: 6.12.6
       chalk: 4.1.2
       cross-spawn: 7.0.6
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       doctrine: 3.0.0
       escape-string-regexp: 4.0.0
       eslint-scope: 7.2.2
@@ -23198,7 +23221,7 @@ snapshots:
 
   extract-zip@2.0.1:
     dependencies:
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       get-stream: 5.2.0
       yauzl: 2.10.0
     optionalDependencies:
@@ -23380,7 +23403,7 @@ snapshots:
 
   follow-redirects@1.15.11(debug@4.4.3):
     optionalDependencies:
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
 
   for-each@0.3.3:
     dependencies:
@@ -23533,7 +23556,7 @@ snapshots:
   gaxios@6.7.1(encoding@0.1.13):
     dependencies:
       extend: 3.0.2
-      https-proxy-agent: 7.0.6
+      https-proxy-agent: 7.0.6(supports-color@10.0.0)
       is-stream: 2.0.0
       node-fetch: 2.7.0(encoding@0.1.13)
       uuid: 9.0.1
@@ -23611,7 +23634,7 @@ snapshots:
     dependencies:
       basic-ftp: 5.0.5
       data-uri-to-buffer: 6.0.2
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       fs-extra: 11.2.0
     transitivePeerDependencies:
       - supports-color
@@ -24127,14 +24150,14 @@ snapshots:
     dependencies:
       '@tootallnate/once': 2.0.0
       agent-base: 6.0.2
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
     transitivePeerDependencies:
       - supports-color
 
   http-proxy-agent@7.0.2:
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -24157,14 +24180,7 @@ snapshots:
   https-proxy-agent@5.0.1:
     dependencies:
       agent-base: 6.0.2
-      debug: 4.4.3(supports-color@5.5.0)
-    transitivePeerDependencies:
-      - supports-color
-
-  https-proxy-agent@7.0.6:
-    dependencies:
-      agent-base: 7.1.4
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -24241,7 +24257,8 @@ snapshots:
       pixelmatch: 5.2.1
       pngjs: 6.0.0
 
-  immediate@3.3.0: {}
+  immediate@3.3.0:
+    optional: true
 
   immer@9.0.21: {}
 
@@ -24585,7 +24602,7 @@ snapshots:
   istanbul-lib-source-maps@5.0.6:
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       istanbul-lib-coverage: 3.2.2
     transitivePeerDependencies:
       - supports-color
@@ -24682,7 +24699,7 @@ snapshots:
       decimal.js: 10.6.0
       html-encoding-sniffer: 4.0.0
       http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6
+      https-proxy-agent: 7.0.6(supports-color@10.0.0)
       is-potential-custom-element-name: 1.0.1
       nwsapi: 2.2.22
       parse5: 7.3.0
@@ -24959,18 +24976,22 @@ snapshots:
   level-codec@9.0.2:
     dependencies:
       buffer: 5.7.1
+    optional: true
 
-  level-concat-iterator@2.0.1: {}
+  level-concat-iterator@2.0.1:
+    optional: true
 
   level-errors@2.0.1:
     dependencies:
       errno: 0.1.8
+    optional: true
 
   level-iterator-stream@4.0.2:
     dependencies:
       inherits: 2.0.4
       readable-stream: 3.6.0
       xtend: 4.0.2
+    optional: true
 
   level-js@5.0.2:
     dependencies:
@@ -24978,27 +24999,32 @@ snapshots:
       buffer: 5.7.1
       inherits: 2.0.4
       ltgt: 2.2.1
+    optional: true
 
   level-packager@5.1.1:
     dependencies:
       encoding-down: 6.3.0
       levelup: 4.4.0
+    optional: true
 
   level-supports@1.0.1:
     dependencies:
       xtend: 4.0.2
+    optional: true
 
   level@6.0.1:
     dependencies:
       level-js: 5.0.2
       level-packager: 5.1.1
       leveldown: 5.6.0
+    optional: true
 
   leveldown@5.6.0:
     dependencies:
       abstract-leveldown: 6.2.3
       napi-macros: 2.0.0
       node-gyp-build: 4.1.1
+    optional: true
 
   levelup@4.4.0:
     dependencies:
@@ -25007,6 +25033,7 @@ snapshots:
       level-iterator-stream: 4.0.2
       level-supports: 1.0.1
       xtend: 4.0.2
+    optional: true
 
   leven@3.1.0: {}
 
@@ -25224,7 +25251,8 @@ snapshots:
 
   lru-cache@7.18.3: {}
 
-  ltgt@2.2.1: {}
+  ltgt@2.2.1:
+    optional: true
 
   lucene-query-parser@1.2.0: {}
 
@@ -25836,7 +25864,7 @@ snapshots:
   micromark@4.0.0:
     dependencies:
       '@types/debug': 4.1.7
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       decode-named-character-reference: 1.0.2
       devlop: 1.1.0
       micromark-core-commonmark: 2.0.1
@@ -26030,10 +26058,10 @@ snapshots:
     dependencies:
       async-mutex: 0.4.1
       camelcase: 6.3.0
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       find-cache-dir: 3.3.2
       follow-redirects: 1.15.11(debug@4.4.3)
-      https-proxy-agent: 7.0.6
+      https-proxy-agent: 7.0.6(supports-color@10.0.0)
       mongodb: 5.9.2(@aws-sdk/credential-providers@3.600.0(@aws-sdk/client-sso-oidc@3.600.0))
       new-find-package-json: 2.0.0
       semver: 7.7.4
@@ -26137,7 +26165,7 @@ snapshots:
 
   mquery@4.0.3:
     dependencies:
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -26210,7 +26238,8 @@ snapshots:
 
   nanoid@3.3.11: {}
 
-  napi-macros@2.0.0: {}
+  napi-macros@2.0.0:
+    optional: true
 
   natural-compare@1.4.0: {}
 
@@ -26227,7 +26256,7 @@ snapshots:
 
   new-find-package-json@2.0.0:
     dependencies:
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -26317,7 +26346,8 @@ snapshots:
 
   node-forge@1.3.1: {}
 
-  node-gyp-build@4.1.1: {}
+  node-gyp-build@4.1.1:
+    optional: true
 
   node-gyp@10.3.1:
     dependencies:
@@ -26727,10 +26757,10 @@ snapshots:
     dependencies:
       '@tootallnate/quickjs-emscripten': 0.23.0
       agent-base: 7.1.4
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       get-uri: 6.0.3
       http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6
+      https-proxy-agent: 7.0.6(supports-color@10.0.0)
       pac-resolver: 7.0.1
       socks-proxy-agent: 8.0.4
     transitivePeerDependencies:
@@ -26859,7 +26889,7 @@ snapshots:
   passport-saml@3.2.4:
     dependencies:
       '@xmldom/xmldom': 0.7.13
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       passport-strategy: 1.0.0
       xml-crypto: 2.1.5
       xml-encryption: 2.0.0
@@ -27142,9 +27172,9 @@ snapshots:
   proxy-agent@6.4.0:
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6
+      https-proxy-agent: 7.0.6(supports-color@10.0.0)
       lru-cache: 7.18.3
       pac-proxy-agent: 7.0.2
       proxy-from-env: 1.1.0
@@ -27154,7 +27184,8 @@ snapshots:
 
   proxy-from-env@1.1.0: {}
 
-  prr@1.0.1: {}
+  prr@1.0.1:
+    optional: true
 
   pseudomap@1.0.2: {}
 
@@ -27190,7 +27221,7 @@ snapshots:
 
   puppeteer-cluster@0.24.0(puppeteer@23.6.1(typescript@5.4.2)):
     dependencies:
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       puppeteer: 23.6.1(typescript@5.4.2)
     transitivePeerDependencies:
       - supports-color
@@ -27199,7 +27230,7 @@ snapshots:
     dependencies:
       '@puppeteer/browsers': 2.4.0
       chromium-bidi: 0.8.0(devtools-protocol@0.0.1354347)
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       devtools-protocol: 0.0.1354347
       typed-query-selector: 2.12.0
       ws: 8.18.3
@@ -28018,7 +28049,7 @@ snapshots:
 
   require-in-the-middle@7.4.0:
     dependencies:
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       module-details-from-path: 1.0.3
       resolve: 1.22.8
     transitivePeerDependencies:
@@ -28062,7 +28093,7 @@ snapshots:
 
   retry-request@4.2.2:
     dependencies:
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       extend: 3.0.2
     transitivePeerDependencies:
       - supports-color
@@ -28548,7 +28579,7 @@ snapshots:
 
   socket.io-adapter@2.5.6:
     dependencies:
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       ws: 8.18.3
     transitivePeerDependencies:
       - bufferutil
@@ -28558,7 +28589,7 @@ snapshots:
   socket.io-client@4.8.3:
     dependencies:
       '@socket.io/component-emitter': 3.1.2
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       engine.io-client: 6.6.4
       socket.io-parser: 4.2.5
     transitivePeerDependencies:
@@ -28569,7 +28600,7 @@ snapshots:
   socket.io-parser@4.2.5:
     dependencies:
       '@socket.io/component-emitter': 3.1.2
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -28578,7 +28609,7 @@ snapshots:
       accepts: 1.3.8
       base64id: 2.0.0
       cors: 2.8.5
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       engine.io: 6.6.5
       socket.io-adapter: 2.5.6
       socket.io-parser: 4.2.5
@@ -28590,7 +28621,7 @@ snapshots:
   socks-proxy-agent@7.0.0:
     dependencies:
       agent-base: 6.0.2
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       socks: 2.8.3
     transitivePeerDependencies:
       - supports-color
@@ -28598,7 +28629,7 @@ snapshots:
   socks-proxy-agent@8.0.4:
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       socks: 2.8.3
     transitivePeerDependencies:
       - supports-color
@@ -28741,7 +28772,7 @@ snapshots:
   streamroller@3.1.5:
     dependencies:
       date-format: 4.0.14
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       fs-extra: 8.1.0
     transitivePeerDependencies:
       - supports-color
@@ -28926,7 +28957,7 @@ snapshots:
       cosmiconfig: 9.0.0(typescript@5.0.4)
       css-functions-list: 3.2.2
       css-tree: 2.3.1
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       fast-glob: 3.3.2
       fastest-levenshtein: 1.0.16
       file-entry-cache: 8.0.0
@@ -28981,7 +29012,7 @@ snapshots:
     dependencies:
       component-emitter: 1.3.1
       cookiejar: 2.1.4
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       fast-safe-stringify: 2.1.1
       form-data: 4.0.4
       formidable: 3.5.4
@@ -29570,7 +29601,7 @@ snapshots:
       buffer: 6.0.3
       chalk: 4.1.2
       cli-highlight: 2.1.11
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       dotenv: 8.6.0
       glob: 7.2.3
       js-yaml: 4.1.1
@@ -29980,7 +30011,7 @@ snapshots:
   vite-node@2.1.1(@types/node@20.19.17)(sass@1.77.6)(terser@5.46.0):
     dependencies:
       cac: 6.7.14
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       pathe: 1.1.2
       vite: 5.4.21(@types/node@20.19.17)(sass@1.77.6)(terser@5.46.0)
     transitivePeerDependencies:
@@ -29999,7 +30030,7 @@ snapshots:
       '@microsoft/api-extractor': 7.43.0(@types/node@20.19.17)
       '@rollup/pluginutils': 5.2.0(rollup@4.39.0)
       '@vue/language-core': 1.8.27(typescript@5.0.4)
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       kolorist: 1.8.0
       magic-string: 0.30.11
       typescript: 5.0.4
@@ -30013,7 +30044,7 @@ snapshots:
 
   vite-tsconfig-paths@5.0.1(typescript@5.0.4)(vite@5.4.21(@types/node@20.19.17)(sass@1.77.6)(terser@5.46.0)):
     dependencies:
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       globrex: 0.1.2
       tsconfck: 3.0.3(typescript@5.0.4)
     optionalDependencies:
@@ -30049,7 +30080,7 @@ snapshots:
       '@vitest/spy': 2.1.1
       '@vitest/utils': 2.1.1
       chai: 5.1.1
-      debug: 4.4.3(supports-color@5.5.0)
+      debug: 4.4.3(supports-color@10.0.0)
       magic-string: 0.30.11
       pathe: 1.1.2
       std-env: 3.7.0
@@ -30297,6 +30328,11 @@ snapshots:
       imurmurhash: 0.1.4
       signal-exit: 4.1.0
 
+  ws@6.2.3:
+    dependencies:
+      async-limiter: 1.0.1
+    optional: true
+
   ws@8.18.3: {}
 
   x-img-diff-js@0.3.5: {}
@@ -30365,6 +30401,7 @@ snapshots:
       level: 6.0.1
       lib0: 0.2.94
       yjs: 13.6.19
+    optional: true
 
   y-mongodb-provider@0.2.0(@aws-sdk/credential-providers@3.600.0(@aws-sdk/client-sso-oidc@3.600.0))(socks@2.8.3)(yjs@13.6.19):
     dependencies:
@@ -30385,17 +30422,17 @@ snapshots:
       lib0: 0.2.94
       yjs: 13.6.19
 
-  y-socket.io@1.1.3(yjs@13.6.19):
+  y-websocket@2.1.0(yjs@13.6.19):
     dependencies:
       lib0: 0.2.94
-      socket.io: 4.8.3
-      socket.io-client: 4.8.3
-      y-leveldb: 0.1.2(yjs@13.6.19)
+      lodash.debounce: 4.0.8
       y-protocols: 1.0.6(yjs@13.6.19)
       yjs: 13.6.19
+    optionalDependencies:
+      ws: 6.2.3
+      y-leveldb: 0.1.2(yjs@13.6.19)
     transitivePeerDependencies:
       - bufferutil
-      - supports-color
       - utf-8-validate
 
   y18n@4.0.3: {}

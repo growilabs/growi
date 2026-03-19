@@ -588,7 +588,11 @@ class Crowi {
     this.socketIoService.attachServer(httpServer);
 
     // Initialization YjsService
-    initializeYjsService(this.socketIoService.io);
+    initializeYjsService(
+      httpServer,
+      this.socketIoService.io,
+      this.sessionConfig,
+    );
 
     await this.autoInstall();
 

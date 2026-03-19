@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { keymap } from '@codemirror/view';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next';
-import { SocketIOProvider } from 'y-socket.io';
+import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 
 import { userColor } from '../../consts';
@@ -30,7 +30,7 @@ export const useCollaborativeEditorMode = (
       useSecondary: reviewMode,
     }) ?? {};
 
-  const [provider, setProvider] = useState<SocketIOProvider>();
+  const [provider, setProvider] = useState<WebsocketProvider>();
 
   // reset editors
   useEffect(() => {
@@ -40,7 +40,7 @@ export const useCollaborativeEditorMode = (
 
   // Setup provider
   useEffect(() => {
-    let _provider: SocketIOProvider | undefined;
+    let _provider: WebsocketProvider | undefined;
     let providerSyncHandler: (isSync: boolean) => void;
     let updateAwarenessHandler: (update: {
       added: number[];
@@ -53,8 +53,11 @@ export const useCollaborativeEditorMode = (
         return undefined;
       }
 
-      _provider = new SocketIOProvider('/', pageId, primaryDoc, {
-        autoConnect: true,
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const serverUrl = `${wsProtocol}//${window.location.host}/yjs`;
+
+      _provider = new WebsocketProvider(serverUrl, pageId, primaryDoc, {
+        connect: true,
         resyncInterval: 3000,
       });
 
@@ -85,7 +88,6 @@ export const useCollaborativeEditorMode = (
 
       _provider.on('sync', providerSyncHandler);
 
-      // update args type see: SocketIOProvider.Awareness.awarenessUpdate
       updateAwarenessHandler = (update: {
         added: number[];
         updated: number[];

@@ -1,33 +1,27 @@
-import type { IPage, IUserHasId } from '@growi/core';
+import type http from 'node:http';
 import { YDocStatus } from '@growi/core/dist/consts';
-import type { IncomingMessage } from 'http';
 import mongoose from 'mongoose';
 import type { Server } from 'socket.io';
-import type { Document } from 'y-socket.io/dist/server';
-import { type Document as Ydoc, YSocketIO } from 'y-socket.io/dist/server';
+import { WebSocketServer } from 'ws';
+import type { WSSharedDoc } from 'y-websocket/bin/utils';
+import { docs, setPersistence, setupWSConnection } from 'y-websocket/bin/utils';
 
-import { SocketEventName } from '~/interfaces/websocket';
 import type { SyncLatestRevisionBody } from '~/interfaces/yjs';
-import {
-  getRoomNameWithId,
-  RoomPrefix,
-} from '~/server/service/socket-io/helper';
 import loggerFactory from '~/utils/logger';
 
-import type { PageModel } from '../../models/page';
 import { Revision } from '../../models/revision';
 import { normalizeLatestRevisionIfBroken } from '../revision/normalize-latest-revision-if-broken';
 import { createIndexes } from './create-indexes';
 import { createMongoDBPersistence } from './create-mongodb-persistence';
 import { MongodbPersistence } from './extended/mongodb-persistence';
 import { syncYDoc } from './sync-ydoc';
+import { createUpgradeHandler } from './upgrade-handler';
 
 const MONGODB_PERSISTENCE_COLLECTION_NAME = 'yjs-writings';
 const MONGODB_PERSISTENCE_FLUSH_SIZE = 100;
+const YJS_PATH_PREFIX = '/yjs/';
 
 const logger = loggerFactory('growi:service:yjs');
-
-type RequestWithUser = IncomingMessage & { user: IUserHasId };
 
 export interface IYjsService {
   getYDocStatus(pageId: string): Promise<YDocStatus>;
@@ -35,15 +29,28 @@ export interface IYjsService {
     pageId: string,
     editingMarkdownLength?: number,
   ): Promise<SyncLatestRevisionBody>;
-  getCurrentYdoc(pageId: string): Ydoc | undefined;
+  getCurrentYdoc(pageId: string): WSSharedDoc | undefined;
 }
 
-class YjsService implements IYjsService {
-  private ysocketio: YSocketIO;
+type SessionConfig = {
+  rolling: boolean;
+  secret: string;
+  resave: boolean;
+  saveUninitialized: boolean;
+  cookie: { maxAge: number };
+  genid: (req: { path: string }) => string;
+  name?: string;
+  store?: unknown;
+};
 
+class YjsService implements IYjsService {
   private mdb: MongodbPersistence;
 
-  constructor(io: Server) {
+  constructor(
+    httpServer: http.Server,
+    io: Server,
+    sessionConfig: SessionConfig,
+  ) {
     const mdb = new MongodbPersistence(
       {
         // TODO: Required upgrading mongoose and unifying the versions of mongodb to omit 'as any'
@@ -57,80 +64,40 @@ class YjsService implements IYjsService {
     );
     this.mdb = mdb;
 
-    // initialize YSocketIO
-    const ysocketio = new YSocketIO(io);
-    this.injectPersistence(ysocketio, mdb);
-    ysocketio.initialize();
-    this.ysocketio = ysocketio;
-
     // create indexes
     createIndexes(MONGODB_PERSISTENCE_COLLECTION_NAME);
 
-    // register middlewares
-    this.registerAccessiblePageChecker(ysocketio);
+    // setup y-websocket persistence (includes awareness bridge and sync-on-load)
+    const persistence = createMongoDBPersistence(mdb, io, syncYDoc, (pageId) =>
+      this.getYDocStatus(pageId),
+    );
+    setPersistence(persistence);
 
-    ysocketio.on('document-loaded', async (doc: Document) => {
-      const pageId = doc.name;
+    // setup WebSocket server
+    const wss = new WebSocketServer({ noServer: true });
+    const handleUpgrade = createUpgradeHandler(sessionConfig);
 
-      const ydocStatus = await this.getYDocStatus(pageId);
+    httpServer.on('upgrade', async (request, socket, head) => {
+      const url = request.url ?? '';
 
-      syncYDoc(mdb, doc, { ydocStatus });
-    });
-
-    ysocketio.on('awareness-update', async (doc: Document) => {
-      const pageId = doc.name;
-
-      if (pageId == null) return;
-
-      const awarenessStateSize = doc.awareness.states.size;
-
-      // Triggered when awareness changes
-      io.in(getRoomNameWithId(RoomPrefix.PAGE, pageId)).emit(
-        SocketEventName.YjsAwarenessStateSizeUpdated,
-        awarenessStateSize,
-      );
-
-      // Triggered when the last user leaves the editor
-      if (awarenessStateSize === 0) {
-        const ydocStatus = await this.getYDocStatus(pageId);
-        const hasYdocsNewerThanLatestRevision =
-          ydocStatus === YDocStatus.DRAFT || ydocStatus === YDocStatus.ISOLATED;
-
-        io.in(getRoomNameWithId(RoomPrefix.PAGE, pageId)).emit(
-          SocketEventName.YjsHasYdocsNewerThanLatestRevisionUpdated,
-          hasYdocsNewerThanLatestRevision,
-        );
-      }
-    });
-  }
-
-  private injectPersistence(
-    ysocketio: YSocketIO,
-    mdb: MongodbPersistence,
-  ): void {
-    const persistece = createMongoDBPersistence(mdb);
-
-    // foce set to private property
-    // biome-ignore lint/complexity/useLiteralKeys: ignore
-    ysocketio['persistence'] = persistece;
-  }
-
-  private registerAccessiblePageChecker(ysocketio: YSocketIO): void {
-    // check accessible page
-    ysocketio.nsp?.use(async (socket, next) => {
-      // extract page id from namespace
-      const pageId = socket.nsp.name.replace(/\/yjs\|/, '');
-      const user = (socket.request as RequestWithUser).user; // should be injected by SocketIOService
-
-      const Page = mongoose.model<IPage, PageModel>('Page');
-      const isAccessible = await Page.isAccessiblePageByViewer(pageId, user);
-
-      if (!isAccessible) {
-        return next(new Error('Forbidden'));
+      // Only handle /yjs/ paths; let Socket.IO and others pass through
+      if (!url.startsWith(YJS_PATH_PREFIX)) {
+        return;
       }
 
-      return next();
+      const result = await handleUpgrade(request, socket, head);
+
+      if (!result.authorized) {
+        return;
+      }
+
+      wss.handleUpgrade(result.request, socket, head, (ws) => {
+        wss.emit('connection', ws, result.request);
+        setupWSConnection(ws, result.request, { docName: result.pageId });
+      });
     });
+
+    logger.info('YjsService initialized with y-websocket');
   }
 
   public async getYDocStatus(pageId: string): Promise<YDocStatus> {
@@ -187,14 +154,14 @@ class YjsService implements IYjsService {
     pageId: string,
     editingMarkdownLength?: number,
   ): Promise<SyncLatestRevisionBody> {
-    const doc = this.ysocketio.documents.get(pageId);
+    const doc = docs.get(pageId);
 
     if (doc == null) {
       return { synced: false };
     }
 
-    const ytextLength = doc?.getText('codemirror').length;
-    syncYDoc(this.mdb, doc, true);
+    const ytextLength = doc.getText('codemirror').length;
+    await syncYDoc(this.mdb, doc, true);
 
     return {
       synced: true,
@@ -205,24 +172,31 @@ class YjsService implements IYjsService {
     };
   }
 
-  public getCurrentYdoc(pageId: string): Ydoc | undefined {
-    const currentYdoc = this.ysocketio.documents.get(pageId);
-    return currentYdoc;
+  public getCurrentYdoc(pageId: string): WSSharedDoc | undefined {
+    return docs.get(pageId);
   }
 }
 
 let _instance: YjsService;
 
-export const initializeYjsService = (io: Server): void => {
+export const initializeYjsService = (
+  httpServer: http.Server,
+  io: Server,
+  sessionConfig: SessionConfig,
+): void => {
   if (_instance != null) {
     throw new Error('YjsService is already initialized');
   }
 
-  if (io == null) {
-    throw new Error("'io' is required if initialize YjsService");
+  if (httpServer == null) {
+    throw new Error("'httpServer' is required to initialize YjsService");
   }
 
-  _instance = new YjsService(io);
+  if (io == null) {
+    throw new Error("'io' is required to initialize YjsService");
+  }
+
+  _instance = new YjsService(httpServer, io, sessionConfig);
 };
 
 export const getYjsService = (): YjsService => {
