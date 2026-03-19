@@ -2,6 +2,7 @@
 /.next/
 /out/
 next-env.d.ts
+next.config.js
 
 # test
 .reg

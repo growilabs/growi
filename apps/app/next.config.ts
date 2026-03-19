@@ -6,7 +6,6 @@
  */
 
 import type { NextConfig } from 'next';
-import { PHASE_PRODUCTION_SERVER } from 'next/constants';
 import path from 'node:path';
 
 import nextI18nConfig from './config/next-i18next.config';
@@ -85,66 +84,64 @@ const optimizePackageImports: string[] = [
   '@growi/ui',
 ];
 
-export default (phase: string): NextConfig => {
-  /** @type {import('next').NextConfig} */
-  const nextConfig: NextConfig = {
-    reactStrictMode: true,
-    poweredByHeader: false,
-    pageExtensions: ['page.tsx', 'page.ts', 'page.jsx', 'page.js'],
-    i18n,
+// This config is used at build time only (next build / next dev).
+// Production runtime uses next.config.prod.cjs (installed as next.config.js by assemble-prod.sh).
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  poweredByHeader: false,
+  pageExtensions: ['page.tsx', 'page.ts', 'page.jsx', 'page.js'],
+  i18n,
 
-    serverExternalPackages: [
-      'handsontable', // Legacy v6.2.2 requires @babel/polyfill which is unavailable; client-only via dynamic import
-    ],
+  serverExternalPackages: [
+    'handsontable', // Legacy v6.2.2 requires @babel/polyfill which is unavailable; client-only via dynamic import
+  ],
 
-    // for build
-    typescript: {
-      tsconfigPath: 'tsconfig.build.client.json',
-    },
-    transpilePackages:
-      phase !== PHASE_PRODUCTION_SERVER ? getTranspilePackages() : undefined,
-    sassOptions: {
-      loadPaths: [path.resolve(__dirname, 'src')],
-    },
-    experimental: {
-      optimizePackageImports,
-    },
+  // for build
+  typescript: {
+    tsconfigPath: 'tsconfig.build.client.json',
+  },
+  transpilePackages: getTranspilePackages(),
+  sassOptions: {
+    loadPaths: [path.resolve(__dirname, 'src')],
+  },
+  experimental: {
+    optimizePackageImports,
+  },
 
-    turbopack: {
-      rules: {
-        // Server-only: auto-wrap getServerSideProps with SuperJSON serialization
-        '*.page.ts': [
-          {
-            condition: { not: 'browser' },
-            loaders: [
-              path.resolve(__dirname, 'src/utils/superjson-ssr-loader.ts'),
-            ],
-            as: '*.ts',
-          },
-        ],
-        '*.page.tsx': [
-          {
-            condition: { not: 'browser' },
-            loaders: [
-              path.resolve(__dirname, 'src/utils/superjson-ssr-loader.ts'),
-            ],
-            as: '*.tsx',
-          },
-        ],
-      },
-      resolveAlias: {
-        // Exclude fs from client bundle
-        fs: { browser: './src/lib/empty-module.ts' },
-        // Exclude server-only packages from client bundle
-        'dtrace-provider': { browser: './src/lib/empty-module.ts' },
-        mongoose: { browser: './src/lib/empty-module.ts' },
-        'i18next-fs-backend': { browser: './src/lib/empty-module.ts' },
-        bunyan: { browser: './src/lib/empty-module.ts' },
-        'bunyan-format': { browser: './src/lib/empty-module.ts' },
-        'core-js': { browser: './src/lib/empty-module.ts' },
-      },
+  turbopack: {
+    rules: {
+      // Server-only: auto-wrap getServerSideProps with SuperJSON serialization
+      '*.page.ts': [
+        {
+          condition: { not: 'browser' },
+          loaders: [
+            path.resolve(__dirname, 'src/utils/superjson-ssr-loader.ts'),
+          ],
+          as: '*.ts',
+        },
+      ],
+      '*.page.tsx': [
+        {
+          condition: { not: 'browser' },
+          loaders: [
+            path.resolve(__dirname, 'src/utils/superjson-ssr-loader.ts'),
+          ],
+          as: '*.tsx',
+        },
+      ],
     },
-  };
-
-  return nextConfig;
+    resolveAlias: {
+      // Exclude fs from client bundle
+      fs: { browser: './src/lib/empty-module.ts' },
+      // Exclude server-only packages from client bundle
+      'dtrace-provider': { browser: './src/lib/empty-module.ts' },
+      mongoose: { browser: './src/lib/empty-module.ts' },
+      'i18next-fs-backend': { browser: './src/lib/empty-module.ts' },
+      bunyan: { browser: './src/lib/empty-module.ts' },
+      'bunyan-format': { browser: './src/lib/empty-module.ts' },
+      'core-js': { browser: './src/lib/empty-module.ts' },
+    },
+  },
 };
+
+export default nextConfig;
