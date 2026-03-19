@@ -20,10 +20,11 @@ echo "[3/4] Removing build cache..."
 rm -rf apps/app/.next/cache
 echo "[3/4] Done."
 
-# Remove next.config.ts to prevent Next.js from attempting to install TypeScript at server startup,
-# which would corrupt node_modules (e.g. @growi/core).
-echo "[4/4] Removing next.config.ts..."
-rm -f apps/app/next.config.ts
+# Provide a CJS runtime config so the production server can load it without TypeScript.
+# next.config.js takes precedence over next.config.ts in Next.js, so the .ts file
+# is left in place but effectively ignored at runtime.
+echo "[4/4] Installing runtime next.config.js..."
+cp apps/app/next.config.prod.cjs apps/app/next.config.js
 echo "[4/4] Done."
 
 echo "Assembly complete."
