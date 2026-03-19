@@ -1,4 +1,5 @@
 import type { IPage, IUserHasId } from '@growi/core';
+import { YJS_WEBSOCKET_BASE_PATH } from '@growi/core/dist/consts';
 import type { RequestHandler } from 'express';
 import expressSession from 'express-session';
 import type { IncomingMessage, ServerResponse } from 'http';
@@ -40,7 +41,8 @@ const runMiddleware = (
  */
 const extractPageId = (url: string | undefined): string | null => {
   if (url == null) return null;
-  const match = url.match(/^\/yjs\/([a-f0-9]{24})/);
+  const pattern = new RegExp(`^${YJS_WEBSOCKET_BASE_PATH}/([a-f0-9]{24})`);
+  const match = url.match(pattern);
   return match?.[1] ?? null;
 };
 

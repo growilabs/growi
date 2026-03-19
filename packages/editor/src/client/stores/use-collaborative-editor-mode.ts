@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { keymap } from '@codemirror/view';
+import { YJS_WEBSOCKET_BASE_PATH } from '@growi/core/dist/consts';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next';
 import { WebsocketProvider } from 'y-websocket';
@@ -54,7 +55,7 @@ export const useCollaborativeEditorMode = (
       }
 
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const serverUrl = `${wsProtocol}//${window.location.host}/yjs`;
+      const serverUrl = `${wsProtocol}//${window.location.host}${YJS_WEBSOCKET_BASE_PATH}`;
 
       _provider = new WebsocketProvider(serverUrl, pageId, primaryDoc, {
         connect: true,

@@ -1,5 +1,5 @@
 import type http from 'node:http';
-import { YDocStatus } from '@growi/core/dist/consts';
+import { YDocStatus, YJS_WEBSOCKET_BASE_PATH } from '@growi/core/dist/consts';
 import mongoose from 'mongoose';
 import type { Server } from 'socket.io';
 import { WebSocketServer } from 'ws';
@@ -20,7 +20,7 @@ import { createUpgradeHandler } from './upgrade-handler';
 
 const MONGODB_PERSISTENCE_COLLECTION_NAME = 'yjs-writings';
 const MONGODB_PERSISTENCE_FLUSH_SIZE = 100;
-const YJS_PATH_PREFIX = '/yjs/';
+const YJS_PATH_PREFIX = `${YJS_WEBSOCKET_BASE_PATH}/`;
 
 const logger = loggerFactory('growi:service:yjs');
 

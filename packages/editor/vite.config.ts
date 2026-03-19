@@ -1,10 +1,13 @@
 import path from 'node:path';
+import { YJS_WEBSOCKET_BASE_PATH } from '@growi/core/dist/consts';
 import react from '@vitejs/plugin-react';
 import glob from 'glob';
 import { nodeExternals } from 'rollup-plugin-node-externals';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
+
+const YJS_PATH_PREFIX = `${YJS_WEBSOCKET_BASE_PATH}/`;
 
 const excludeFiles = [
   '**/components/playground/*',
@@ -27,9 +30,9 @@ const devWebSocketPlugin = (): Plugin => ({
 
     server.httpServer.on('upgrade', (request, socket, head) => {
       const url = request.url ?? '';
-      if (!url.startsWith('/yjs/')) return;
+      if (!url.startsWith(YJS_PATH_PREFIX)) return;
 
-      const pageId = url.slice('/yjs/'.length).split('?')[0];
+      const pageId = url.slice(YJS_PATH_PREFIX.length).split('?')[0];
 
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit('connection', ws, request);
