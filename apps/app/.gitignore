@@ -15,7 +15,7 @@ next-env.d.ts
 /public/static/styles
 /public/uploads
 /src/styles/prebuilt
-/src/**/*.vendor-styles.prebuilt.js
+/src/**/*.vendor-styles.prebuilt.*
 /tmp/
 
 # cache

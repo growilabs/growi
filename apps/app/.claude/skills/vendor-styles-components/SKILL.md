@@ -23,15 +23,15 @@ Centralizing all vendor CSS in `_app` would degrade FCP for pages that don't nee
 ### Components Track (component-specific CSS)
 
 - **For**: CSS needed only by specific components
-- **Mechanism**: Vite precompiles `*.vendor-styles.ts` entry points into `*.vendor-styles.prebuilt.js` using `?inline` CSS import suffix
+- **Mechanism**: Vite precompiles `*.vendor-styles.ts` entry points into `*.vendor-styles.prebuilt.ts` using `?inline` CSS import suffix
 - **Output**: Pure JS modules (no CSS imports) — Turbopack sees them as regular JS
 
 ## How It Works
 
 1. **Entry point** (`ComponentName.vendor-styles.ts`): imports CSS via Vite `?inline` suffix, which inlines CSS as a string
 2. **Runtime injection**: the entry point creates a `<style>` tag and appends CSS to `document.head`
-3. **Vite prebuild** (`pre:styles-components` Turborepo task): compiles entry points into `*.vendor-styles.prebuilt.js`
-4. **Component import**: imports the `.prebuilt.js` file instead of raw CSS
+3. **Vite prebuild** (`pre:styles-components` Turborepo task): compiles entry points into `*.vendor-styles.prebuilt.ts`
+4. **Component import**: imports the `.prebuilt.ts` file instead of raw CSS
 
 ### Entry Point Template
 
@@ -96,7 +96,7 @@ When vendor CSS references external assets (e.g., KaTeX `@font-face` with `url(f
 - The `moveAssetsToPublic` plugin (in `vite.vendor-styles-components.ts`) relocates them to `public/static/fonts/`
 - URL references in prebuilt JS are rewritten from `/assets/` to `/static/fonts/`
 - Fonts are served by the existing `express.static(crowi.publicDir)` middleware
-- Both `public/static/fonts/` and `src/**/*.vendor-styles.prebuilt.js` are git-ignored
+- Both `public/static/fonts/` and `src/**/*.vendor-styles.prebuilt.ts` are git-ignored
 
 ## Build Pipeline Integration
 
@@ -106,7 +106,7 @@ turbo.json tasks:
   dev:pre:styles-components  →  dev (dependency)
 
 Inputs:  vite.vendor-styles-components.ts, src/**/*.vendor-styles.ts, package.json
-Outputs: src/**/*.vendor-styles.prebuilt.js, public/static/fonts/**
+Outputs: src/**/*.vendor-styles.prebuilt.ts, public/static/fonts/**
 ```
 
 ## Important Caveats
