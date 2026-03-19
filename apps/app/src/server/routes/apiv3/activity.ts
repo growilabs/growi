@@ -333,7 +333,7 @@ module.exports = (crowi: Crowi): Router => {
           +limit,
         );
         return res.apiv3({
-          activeUser: {
+          activitySnapshotUser: {
             usernames: result?.usernames ?? [],
             totalCount: result?.totalCount ?? 0,
           },

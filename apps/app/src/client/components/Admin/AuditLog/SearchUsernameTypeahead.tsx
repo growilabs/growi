@@ -12,7 +12,7 @@ import { Menu, MenuItem, Typeahead } from 'react-bootstrap-typeahead';
 import { useTranslation } from 'react-i18next';
 
 import type { IClearable } from '~/client/interfaces/clearable';
-import { useSWRxAuditlogUsernames } from '~/stores/user';
+import { useSWRxAuditlogUsernames, useSWRxUsernames } from '~/stores/user';
 
 const Categories = {
   activeUser: 'Active User',
@@ -48,30 +48,29 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   /*
    * Fetch
    */
-  const requestOptions = {
-    isIncludeActiveUser: true,
-    isIncludeInactiveUser: true,
-    isIncludeActivitySnapshotUser: true,
-  };
   const {
     data: usernameData,
-    error,
-    isLoading: _isLoading,
+    error: usernameError,
+    isLoading: _isUsernameLoading,
+  } = useSWRxUsernames(searchKeyword, 0, 5, {
+    isIncludeActiveUser: true,
+    isIncludeInactiveUser: true,
+  });
+
+  const {
+    data: auditlogData,
+    error: auditlogError,
+    isLoading: _isAuditlogLoading,
   } = useSWRxAuditlogUsernames(searchKeyword, 0, 5);
 
-  const activeUsernames =
-    usernameData?.activeUser?.usernames != null
-      ? usernameData.activeUser.usernames
-      : [];
-  const inactiveUsernames =
-    usernameData?.inactiveUser?.usernames != null
-      ? usernameData.inactiveUser.usernames
-      : [];
+  const activeUsernames = usernameData?.activeUser?.usernames ?? [];
+  const inactiveUsernames = usernameData?.inactiveUser?.usernames ?? [];
   const activitySnapshotUsernames =
-    usernameData?.activitySnapshotUser?.usernames != null
-      ? usernameData.activitySnapshotUser.usernames
-      : [];
-  const isLoading = _isLoading === true && error == null;
+    auditlogData?.activitySnapshotUser?.usernames ?? [];
+
+  const isLoading =
+    (_isUsernameLoading === true && usernameError == null) ||
+    (_isAuditlogLoading === true && auditlogError == null);
 
   const allUser: UserDataType[] = [];
   const pushToAllUser = (usernames: string[], category: CategoryType) => {

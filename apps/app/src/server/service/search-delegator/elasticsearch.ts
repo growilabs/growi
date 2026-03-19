@@ -725,9 +725,8 @@ class ElasticsearchDelegator
     if (isES7ClientDelegator(this.client)) {
       const result = await this.client.search({
         index: 'auditlogs',
-        from: offset,
-        size: limit,
         body: {
+          size: 0,
           query: {
             bool: {
               should: [
@@ -736,15 +735,16 @@ class ElasticsearchDelegator
               ],
             },
           },
+          aggs: {
+            unique_usernames: {
+              terms: { field: 'username', size: limit },
+            },
+          },
         },
       });
-      const usernames = [
-        ...new Set(
-          result.hits.hits.map(
-            (hit) => (hit._source as { username: string })?.username,
-          ),
-        ),
-      ];
+      const buckets =
+        (result.aggregations?.unique_usernames as any)?.buckets ?? [];
+      const usernames = buckets.map((bucket) => bucket.key as string);
       const totalCount =
         typeof result.hits.total === 'number'
           ? result.hits.total
@@ -758,8 +758,7 @@ class ElasticsearchDelegator
     ) {
       const result = await this.client.search({
         index: 'auditlogs',
-        from: offset,
-        size: limit,
+        size: 0,
         query: {
           bool: {
             should: [
@@ -768,14 +767,18 @@ class ElasticsearchDelegator
             ],
           },
         },
+        aggs: {
+          unique_usernames: {
+            terms: {
+              field: 'username',
+              size: limit,
+            },
+          },
+        },
       });
-      const usernames = [
-        ...new Set(
-          result.hits.hits.map(
-            (hit) => (hit._source as { username: string })?.username,
-          ),
-        ),
-      ];
+      const buckets =
+        (result.aggregations?.unique_usernames as any)?.buckets ?? [];
+      const usernames = buckets.map((bucket) => bucket.key as string);
       const totalCount =
         typeof result.hits.total === 'number'
           ? result.hits.total
