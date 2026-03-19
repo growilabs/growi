@@ -100,6 +100,7 @@ RUN mkdir -p /tmp/release/apps/app && \
   cp -a apps/app/.next apps/app/config apps/app/dist apps/app/public \
        apps/app/resource apps/app/tmp \
        apps/app/package.json apps/app/node_modules \
+       apps/app/next.config.js \
        /tmp/release/apps/app/ && \
   (cp apps/app/.env.production* /tmp/release/apps/app/ 2>/dev/null || true)
 
