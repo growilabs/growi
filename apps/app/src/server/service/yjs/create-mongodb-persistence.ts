@@ -42,12 +42,7 @@ export const createMongoDBPersistence = (
       const diff = Y.encodeStateAsUpdate(ydoc, persistedStateVector);
 
       // store the new data in db (if there is any: empty update is an array of 0s)
-      if (
-        diff.reduce(
-          (previousValue, currentValue) => previousValue + currentValue,
-          0,
-        ) > 0
-      ) {
+      if (diff.some((b) => b !== 0)) {
         mdb.storeUpdate(docName, diff);
         mdb.setTypedMeta(docName, 'updatedAt', Date.now());
       }
@@ -69,14 +64,20 @@ export const createMongoDBPersistence = (
       });
 
       // register awareness event bridge to Socket.IO rooms
+      // Only emit when the awareness state size actually changes (cursor moves
+      // and other updates fire frequently but don't change the user count)
+      let lastEmittedSize = -1;
       ydoc.awareness.on('update', async () => {
         const pageId = docName;
         const awarenessStateSize = ydoc.awareness.getStates().size;
 
-        io.in(getRoomNameWithId(RoomPrefix.PAGE, pageId)).emit(
-          SocketEventName.YjsAwarenessStateSizeUpdated,
-          awarenessStateSize,
-        );
+        if (awarenessStateSize !== lastEmittedSize) {
+          lastEmittedSize = awarenessStateSize;
+          io.in(getRoomNameWithId(RoomPrefix.PAGE, pageId)).emit(
+            SocketEventName.YjsAwarenessStateSizeUpdated,
+            awarenessStateSize,
+          );
+        }
 
         // emit draft status when last user leaves
         if (awarenessStateSize === 0) {

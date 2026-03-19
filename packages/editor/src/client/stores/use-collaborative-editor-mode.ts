@@ -94,14 +94,14 @@ export const useCollaborativeEditorMode = (
         removed: number[];
       }) => {
         // remove the states of disconnected clients
-        update.removed.forEach((clientId) => {
-          awareness.states.delete(clientId);
-        });
+        for (const clientId of update.removed) {
+          awareness.getStates().delete(clientId);
+        }
 
         // update editor list
         if (onEditorsUpdated != null) {
           const clientList: EditingClient[] = Array.from(
-            awareness.states.values(),
+            awareness.getStates().values(),
             (value) => value.editors,
           );
           if (Array.isArray(clientList)) {
