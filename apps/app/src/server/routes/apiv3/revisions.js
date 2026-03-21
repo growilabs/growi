@@ -3,6 +3,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import express from 'express';
 
+import { PrismaClient } from '~/generated/prisma/client';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { Revision } from '~/server/models/revision';
@@ -12,7 +13,6 @@ import {
 } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import loggerFactory from '~/utils/logger';
 
-import { PrismaClient } from '../../../../generated/prisma/client';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 
 const logger = loggerFactory('growi:routes:apiv3:pages');

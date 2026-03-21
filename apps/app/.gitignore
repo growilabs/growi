@@ -19,4 +19,4 @@
 /.swc/
 
 # prisma
-/generated/prisma
+/src/generated/prisma
