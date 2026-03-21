@@ -3,7 +3,7 @@ import { config } from 'dotenv-flow';
 import { MongoClient } from 'mongodb';
 import { MongoDBStorage, Umzug } from 'umzug';
 
-import { PrismaClient } from '~/generated/prisma/client';
+import { type PrismaClient, prisma } from '~/utils/prisma';
 
 config();
 
@@ -14,8 +14,6 @@ config();
   }
   const client = new MongoClient(url);
   await client.connect();
-
-  const prisma = new PrismaClient();
 
   const umzug = new Umzug({
     migrations: { glob: resolve(__dirname, 'migrations/*.(ts|js)') },

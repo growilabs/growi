@@ -3,7 +3,6 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import express from 'express';
 
-import { PrismaClient } from '~/generated/prisma/client';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { Revision } from '~/server/models/revision';
@@ -12,6 +11,7 @@ import {
   normalizeLatestRevisionIfBroken,
 } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 
@@ -20,8 +20,6 @@ const logger = loggerFactory('growi:routes:apiv3:pages');
 const { query, param } = require('express-validator');
 
 const router = express.Router();
-
-const prisma = new PrismaClient();
 
 /**
  * @swagger
@@ -134,12 +132,6 @@ module.exports = (crowi) => {
     validator.retrieveRevisions,
     apiV3FormValidator,
     async (req, res) => {
-      const revisions = await prisma.revisions.findMany({
-        where: {
-          pageId: req.query.pageId,
-        },
-      });
-      console.log(revisions);
       const pageId = req.query.pageId;
       const limit =
         req.query.limit ||
@@ -149,6 +141,11 @@ module.exports = (crowi) => {
         10;
       const { isSharedPage } = req;
       const offset = req.query.offset || 0;
+
+      const revision = await prisma.revisions.findLatest(pageId);
+      console.log(revision);
+      console.log(revision.isPlain);
+      console.log(revision.isMarkdown());
 
       // check whether accessible
       if (
