@@ -3,25 +3,25 @@
   100% {opacity: .9}
 }
 
-.attachment-refs :global {
-  .attachement-refs-blink {
+.attachment-refs {
+  :global(.attachement-refs-blink) {
     animation: attachement-refs-fade-in 1s ease 0s infinite alternate;
   }
 
-  li.attachment {
+  :global(li.attachment) {
     list-style: none;
   }
 
-  .attachment-userpicture {
+  :global(.attachment-userpicture) {
     line-height: 1.7em;
     vertical-align: bottom;
   }
 
-  .page-meta {
+  :global(.page-meta) {
     font-size: 0.95em;
   }
 
-  .attachment-filetype {
+  :global(.attachment-filetype) {
     padding: 1px 5px;
     margin: 0 0 0 4px;
     font-weight: normal;

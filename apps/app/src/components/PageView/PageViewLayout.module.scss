@@ -1,26 +1,26 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
-@use '~/styles/mixins';
-@use '~/styles/variables' as var;
+@use 'styles/mixins';
+@use 'styles/variables' as var;
 
 
 $subnavigation-height: 50px;
 $page-view-layout-margin-top: 32px;
 
-.page-view-layout :global {
+.page-view-layout {
   $page-content-footer-min-heigh: 130px;
 
   min-height: calc(100vh - #{$subnavigation-height + $page-view-layout-margin-top + $page-content-footer-min-heigh});
 }
 
 // fluid layout
-.fluid-layout :global {
-  .grw-container-convertible {
+.fluid-layout {
+  :global(.grw-container-convertible) {
     @include mixins.fluid-layout();
   }
 }
 
-.page-view-layout :global {
-  .grw-side-contents-container {
+.page-view-layout {
+  :global(.grw-side-contents-container) {
     margin-bottom: 1rem;
 
     @include bs.media-breakpoint-up(lg) {
@@ -41,8 +41,8 @@ $page-view-layout-margin-top: 32px;
 }
 
 // sticky side contents
-.page-view-layout :global {
-  .grw-side-contents-sticky-container {
+.page-view-layout {
+  :global(.grw-side-contents-sticky-container) {
     position: sticky;
 
     $page-path-nav-height: 99px;

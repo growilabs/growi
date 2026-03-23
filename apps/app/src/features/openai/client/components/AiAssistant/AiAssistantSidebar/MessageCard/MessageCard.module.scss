@@ -2,9 +2,9 @@
 @use '@growi/core-styles/scss/variables/growi-official-colors';
 
 // remove margin from last child
-.message-card :global {
-  .card-body {
-    p:last-child {
+.message-card {
+  :global(.card-body) {
+    :global(p:last-child) {
       margin-bottom: 0;
     }
   }
@@ -14,23 +14,23 @@
 /*************************
  * AssistantMessageCard
  ************************/
-.assistant-message-card :global {
-  .card-body {
+.assistant-message-card {
+  :global(.card-body) {
     --bs-card-spacer-x: 0;
     --bs-card-spacer-y: 0.8rem;
   }
 }
 
-.assistant-message-card :global {
-  .grw-ai-icon {
+.assistant-message-card {
+  :global(.grw-ai-icon) {
     padding: 0.4em;
   }
 }
 
 // text animation
 // refs: https://web.dev/articles/speedy-css-tip-animated-gradient-text?hl=ja
-.assistant-message-card :global {
-  .text-thinking {
+.assistant-message-card {
+  :global(.text-thinking) {
     --bg-size: 400%;
     --color-one: var(--bs-tertiary-color);
     --color-two: var(--grw-highlight-300);
@@ -46,10 +46,8 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .text-thinking {
-      &:local {
-        animation: move-bg 6s linear infinite;
-      }
+    :global(.text-thinking) {
+      animation: move-bg 6s linear infinite;
     }
     @keyframes move-bg {
       from {
@@ -64,15 +62,15 @@
  * UserMessageCard
  *******************/
 
-.user-message-card :global {
-  .card-body {
+.user-message-card {
+  :global(.card-body) {
     --bs-card-spacer-x: 1.25rem;
     --bs-card-spacer-y: 0.8rem;
   }
 }
 
 // baloon style
-.user-message-card :global {
+.user-message-card {
   border: 0;
 
   --bs-card-border-radius: var(--bs-border-radius-xxl);
@@ -80,7 +78,7 @@
 }
 
 // max width
-.user-message-card :global {
+.user-message-card {
   max-width: 85%;
   @include bs.media-breakpoint-up(lg) {
     max-width: 75%;
@@ -90,8 +88,8 @@
 
 
 // == Colors
-.assistant-message-card :global {
-  .grw-ai-icon {
+.assistant-message-card {
+  :global(.grw-ai-icon) {
     color: white;
     background-color: growi-official-colors.$growi-ai-purple;
   }
