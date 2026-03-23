@@ -1,5 +1,7 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
+
 export const SuggestionType = {
   MEMO: 'memo',
   SEARCH: 'search',
@@ -54,7 +56,7 @@ export type SearchService = {
     keyword: string,
     nqName: string | null,
     user: IUserHasId,
-    userGroups: unknown,
+    userGroups: ObjectIdLike[],
     opts: Record<string, unknown>,
   ): Promise<[{ data: SearchResultItem[] }, unknown]>;
 };

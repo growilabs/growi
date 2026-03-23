@@ -16,12 +16,7 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 
 import type { SearchService } from '../../../interfaces/suggest-path-types';
-import { analyzeContent } from '../../services/analyze-content';
-import { evaluateCandidates } from '../../services/evaluate-candidates';
-import { generateCategorySuggestion } from '../../services/generate-category-suggestion';
 import { generateSuggestions } from '../../services/generate-suggestions';
-import { resolveParentGrant } from '../../services/resolve-parent-grant';
-import { retrieveSearchCandidates } from '../../services/retrieve-search-candidates';
 
 const logger = loggerFactory('growi:features:suggest-path:routes');
 
@@ -88,16 +83,7 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
           user,
           req.body.body,
           userGroups,
-          {
-            analyzeContent,
-            retrieveSearchCandidates: (keywords, u, groups) =>
-              retrieveSearchCandidates(keywords, u, groups, {
-                searchService: typedSearchService,
-              }),
-            evaluateCandidates,
-            generateCategorySuggestion,
-            resolveParentGrant,
-          },
+          typedSearchService,
         );
         return res.apiv3({ suggestions });
       } catch (err) {

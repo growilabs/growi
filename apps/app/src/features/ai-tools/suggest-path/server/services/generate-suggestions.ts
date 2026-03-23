@@ -1,50 +1,38 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
 import type {
   ContentAnalysis,
-  EvaluatedSuggestion,
   PathSuggestion,
   SearchCandidate,
+  SearchService,
 } from '../../interfaces/suggest-path-types';
 import { SuggestionType } from '../../interfaces/suggest-path-types';
+import { analyzeContent } from './analyze-content';
+import { evaluateCandidates } from './evaluate-candidates';
+import { generateCategorySuggestion } from './generate-category-suggestion';
 import { generateMemoSuggestion } from './generate-memo-suggestion';
+import { resolveParentGrant } from './resolve-parent-grant';
+import { retrieveSearchCandidates } from './retrieve-search-candidates';
 
 const logger = loggerFactory(
   'growi:features:suggest-path:generate-suggestions',
 );
 
-export type GenerateSuggestionsDeps = {
-  analyzeContent: (body: string) => Promise<ContentAnalysis>;
-  retrieveSearchCandidates: (
-    keywords: string[],
-    user: IUserHasId,
-    userGroups: unknown,
-  ) => Promise<SearchCandidate[]>;
-  evaluateCandidates: (
-    body: string,
-    analysis: ContentAnalysis,
-    candidates: SearchCandidate[],
-  ) => Promise<EvaluatedSuggestion[]>;
-  generateCategorySuggestion: (
-    candidates: SearchCandidate[],
-  ) => Promise<PathSuggestion | null>;
-  resolveParentGrant: (path: string) => Promise<number>;
-};
-
 export const generateSuggestions = async (
   user: IUserHasId,
   body: string,
-  userGroups: unknown,
-  deps: GenerateSuggestionsDeps,
+  userGroups: ObjectIdLike[],
+  searchService: SearchService,
 ): Promise<PathSuggestion[]> => {
   const memoSuggestion = await generateMemoSuggestion(user);
 
   // 1st AI call: Content analysis (keyword extraction + flow/stock classification)
   let analysis: ContentAnalysis;
   try {
-    analysis = await deps.analyzeContent(body);
+    analysis = await analyzeContent(body);
   } catch (err) {
     logger.error('Content analysis failed, falling back to memo only:', err);
     return [memoSuggestion];
@@ -53,10 +41,11 @@ export const generateSuggestions = async (
   // Retrieve search candidates (single ES query, shared by evaluate and category)
   let candidates: SearchCandidate[];
   try {
-    candidates = await deps.retrieveSearchCandidates(
+    candidates = await retrieveSearchCandidates(
       analysis.keywords,
       user,
       userGroups,
+      searchService,
     );
   } catch (err) {
     logger.error(
@@ -71,14 +60,14 @@ export const generateSuggestions = async (
     // Evaluate pipeline: evaluate → grant resolution (skip if no candidates)
     candidates.length > 0
       ? (async (): Promise<PathSuggestion[]> => {
-          const evaluated = await deps.evaluateCandidates(
+          const evaluated = await evaluateCandidates(
             body,
             analysis,
             candidates,
           );
           return Promise.all(
             evaluated.map(async (s): Promise<PathSuggestion> => {
-              const grant = await deps.resolveParentGrant(s.path);
+              const grant = await resolveParentGrant(s.path);
               return {
                 type: SuggestionType.SEARCH,
                 path: s.path,
@@ -92,7 +81,7 @@ export const generateSuggestions = async (
         })()
       : Promise.resolve([]),
     // Category generation (uses same candidates, no extra ES query)
-    deps.generateCategorySuggestion(candidates),
+    generateCategorySuggestion(candidates),
   ]);
 
   const suggestions: PathSuggestion[] = [memoSuggestion];

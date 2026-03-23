@@ -18,21 +18,6 @@ vi.mock('../../services/generate-suggestions', () => ({
   generateSuggestions: mocks.generateSuggestionsMock,
 }));
 
-// Mock modules imported by the handler for dependency injection
-vi.mock('../../services/analyze-content', () => ({ analyzeContent: vi.fn() }));
-vi.mock('../../services/evaluate-candidates', () => ({
-  evaluateCandidates: vi.fn(),
-}));
-vi.mock('../../services/generate-category-suggestion', () => ({
-  generateCategorySuggestion: vi.fn(),
-}));
-vi.mock('../../services/retrieve-search-candidates', () => ({
-  retrieveSearchCandidates: vi.fn(),
-}));
-vi.mock('../../services/resolve-parent-grant', () => ({
-  resolveParentGrant: vi.fn(),
-}));
-
 vi.mock('~/server/middlewares/login-required', () => ({
   default: mocks.loginRequiredFactoryMock,
 }));
@@ -110,7 +95,7 @@ describe('suggestPathHandlersFactory', () => {
       return { req, res };
     };
 
-    it('should call generateSuggestions with user, body, userGroups, and deps', async () => {
+    it('should call generateSuggestions with user, body, userGroups, and searchService', async () => {
       const suggestions = [
         {
           type: 'memo',
@@ -133,13 +118,7 @@ describe('suggestPathHandlersFactory', () => {
         { _id: 'user123', username: 'alice' },
         'Some page content',
         ['group1', 'extGroup1'],
-        expect.objectContaining({
-          analyzeContent: expect.any(Function),
-          retrieveSearchCandidates: expect.any(Function),
-          evaluateCandidates: expect.any(Function),
-          generateCategorySuggestion: expect.any(Function),
-          resolveParentGrant: expect.any(Function),
-        }),
+        mockSearchService,
       );
     });
 

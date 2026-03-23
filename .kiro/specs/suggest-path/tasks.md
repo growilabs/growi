@@ -103,25 +103,25 @@
 
 See `gap-analysis.md` for detailed rationale.
 
-- [ ] 8. Simplify service layer abstractions
-- [ ] 8.1 Remove `GenerateSuggestionsDeps` DI pattern from `generate-suggestions.ts`
+- [x] 8. Simplify service layer abstractions
+- [x] 8.1 Remove `GenerateSuggestionsDeps` DI pattern from `generate-suggestions.ts`
   - Remove the `GenerateSuggestionsDeps` type and `deps` parameter from `generateSuggestions()`
   - Import `analyzeContent`, `evaluateCandidates`, `generateCategorySuggestion`, `resolveParentGrant` directly
   - Accept `searchService` as a direct argument (the only true external dependency that cannot be imported)
   - Rewrite `generate-suggestions.spec.ts` to use `vi.mock()` instead of injected mock deps
   - Simplify the route handler in `routes/apiv3/index.ts` to pass `searchService` directly instead of wiring 5 callbacks
 
-- [ ] 8.2 Remove `RetrieveSearchCandidatesOptions` from `retrieve-search-candidates.ts`
+- [x] 8.2 Remove `RetrieveSearchCandidatesOptions` from `retrieve-search-candidates.ts`
   - Replace `options: RetrieveSearchCandidatesOptions` with a direct `searchService: SearchService` parameter
   - Keep `scoreThreshold` as a module-level constant (no caller overrides it)
   - Update `retrieve-search-candidates.spec.ts` accordingly
   - Update the call site in `generate-suggestions.ts` (no more lambda wrapper needed)
 
-- [ ] 8.3 Add JSDoc to `call-llm-for-json.ts`
+- [x] 8.3 Add JSDoc to `call-llm-for-json.ts`
   - Add a brief JSDoc comment explaining this utility's purpose: shared LLM client initialization, JSON parsing, and response validation
   - Document that it is consumed by `analyzeContent` and `evaluateCandidates`
 
-- [ ] 8.4 Narrow `userGroups: unknown` to `ObjectIdLike[]`
+- [x] 8.4 Narrow `userGroups: unknown` to `ObjectIdLike[]`
   - Update `SearchService` interface in `suggest-path-types.ts`: change `userGroups: unknown` to `userGroups: ObjectIdLike[]`
   - Propagate the type change to `retrieveSearchCandidates` and `generateSuggestions` signatures
   - Import `ObjectIdLike` from `@growi/core` (or the appropriate subpath)

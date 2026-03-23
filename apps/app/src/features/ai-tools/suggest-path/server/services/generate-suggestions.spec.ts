@@ -5,17 +5,43 @@ import type {
   EvaluatedSuggestion,
   PathSuggestion,
   SearchCandidate,
+  SearchService,
 } from '../../interfaces/suggest-path-types';
 
 const mocks = vi.hoisted(() => {
   return {
     generateMemoSuggestionMock: vi.fn(),
+    analyzeContentMock: vi.fn(),
+    retrieveSearchCandidatesMock: vi.fn(),
+    evaluateCandidatesMock: vi.fn(),
+    generateCategorySuggestionMock: vi.fn(),
+    resolveParentGrantMock: vi.fn(),
     loggerErrorMock: vi.fn(),
   };
 });
 
 vi.mock('./generate-memo-suggestion', () => ({
   generateMemoSuggestion: mocks.generateMemoSuggestionMock,
+}));
+
+vi.mock('./analyze-content', () => ({
+  analyzeContent: mocks.analyzeContentMock,
+}));
+
+vi.mock('./retrieve-search-candidates', () => ({
+  retrieveSearchCandidates: mocks.retrieveSearchCandidatesMock,
+}));
+
+vi.mock('./evaluate-candidates', () => ({
+  evaluateCandidates: mocks.evaluateCandidatesMock,
+}));
+
+vi.mock('./generate-category-suggestion', () => ({
+  generateCategorySuggestion: mocks.generateCategorySuggestionMock,
+}));
+
+vi.mock('./resolve-parent-grant', () => ({
+  resolveParentGrant: mocks.resolveParentGrantMock,
 }));
 
 vi.mock('~/utils/logger', () => ({
@@ -29,7 +55,14 @@ const mockUser = {
   username: 'alice',
 } as unknown as IUserHasId;
 
-const mockUserGroups = ['group1', 'group2'];
+const mockUserGroups = [
+  'group1',
+  'group2',
+] as unknown as import('~/server/interfaces/mongoose-utils').ObjectIdLike[];
+
+const mockSearchService = {
+  searchKeyword: vi.fn(),
+} as unknown as SearchService;
 
 const memoSuggestion: PathSuggestion = {
   type: 'memo',
@@ -76,37 +109,9 @@ const categorySuggestion: PathSuggestion = {
 };
 
 describe('generateSuggestions', () => {
-  const createMockDeps = () => ({
-    analyzeContent: vi.fn<(body: string) => Promise<ContentAnalysis>>(),
-    retrieveSearchCandidates:
-      vi.fn<
-        (
-          keywords: string[],
-          user: IUserHasId,
-          userGroups: unknown,
-        ) => Promise<SearchCandidate[]>
-      >(),
-    evaluateCandidates:
-      vi.fn<
-        (
-          body: string,
-          analysis: ContentAnalysis,
-          candidates: SearchCandidate[],
-        ) => Promise<EvaluatedSuggestion[]>
-      >(),
-    generateCategorySuggestion:
-      vi.fn<
-        (candidates: SearchCandidate[]) => Promise<PathSuggestion | null>
-      >(),
-    resolveParentGrant: vi.fn<(path: string) => Promise<number>>(),
-  });
-
-  let mockDeps: ReturnType<typeof createMockDeps>;
-
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.generateMemoSuggestionMock.mockResolvedValue(memoSuggestion);
-    mockDeps = createMockDeps();
   });
 
   const callGenerateSuggestions = async () => {
@@ -115,17 +120,19 @@ describe('generateSuggestions', () => {
       mockUser,
       'Some page content',
       mockUserGroups,
-      mockDeps,
+      mockSearchService,
     );
   };
 
   describe('successful full pipeline', () => {
     beforeEach(() => {
-      mockDeps.analyzeContent.mockResolvedValue(mockAnalysis);
-      mockDeps.retrieveSearchCandidates.mockResolvedValue(mockCandidates);
-      mockDeps.evaluateCandidates.mockResolvedValue(mockEvaluated);
-      mockDeps.generateCategorySuggestion.mockResolvedValue(categorySuggestion);
-      mockDeps.resolveParentGrant.mockResolvedValue(1);
+      mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
+      mocks.retrieveSearchCandidatesMock.mockResolvedValue(mockCandidates);
+      mocks.evaluateCandidatesMock.mockResolvedValue(mockEvaluated);
+      mocks.generateCategorySuggestionMock.mockResolvedValue(
+        categorySuggestion,
+      );
+      mocks.resolveParentGrantMock.mockResolvedValue(1);
     });
 
     it('should return memo + search + category suggestions when all succeed', async () => {
@@ -164,15 +171,15 @@ describe('generateSuggestions', () => {
     });
 
     it('should resolve grant for each evaluated suggestion path', async () => {
-      mockDeps.resolveParentGrant
+      mocks.resolveParentGrantMock
         .mockResolvedValueOnce(1)
         .mockResolvedValueOnce(4);
 
       const result = await callGenerateSuggestions();
 
-      expect(mockDeps.resolveParentGrant).toHaveBeenCalledTimes(2);
-      expect(mockDeps.resolveParentGrant).toHaveBeenCalledWith('/tech/React/');
-      expect(mockDeps.resolveParentGrant).toHaveBeenCalledWith(
+      expect(mocks.resolveParentGrantMock).toHaveBeenCalledTimes(2);
+      expect(mocks.resolveParentGrantMock).toHaveBeenCalledWith('/tech/React/');
+      expect(mocks.resolveParentGrantMock).toHaveBeenCalledWith(
         '/tech/React/performance/',
       );
       expect(result[1].grant).toBe(1);
@@ -182,23 +189,26 @@ describe('generateSuggestions', () => {
     it('should pass correct arguments to analyzeContent', async () => {
       await callGenerateSuggestions();
 
-      expect(mockDeps.analyzeContent).toHaveBeenCalledWith('Some page content');
+      expect(mocks.analyzeContentMock).toHaveBeenCalledWith(
+        'Some page content',
+      );
     });
 
-    it('should pass keywords from content analysis to retrieveSearchCandidates', async () => {
+    it('should pass keywords, user, userGroups, and searchService to retrieveSearchCandidates', async () => {
       await callGenerateSuggestions();
 
-      expect(mockDeps.retrieveSearchCandidates).toHaveBeenCalledWith(
+      expect(mocks.retrieveSearchCandidatesMock).toHaveBeenCalledWith(
         ['React', 'hooks'],
         mockUser,
         mockUserGroups,
+        mockSearchService,
       );
     });
 
     it('should pass body, analysis, and candidates to evaluateCandidates', async () => {
       await callGenerateSuggestions();
 
-      expect(mockDeps.evaluateCandidates).toHaveBeenCalledWith(
+      expect(mocks.evaluateCandidatesMock).toHaveBeenCalledWith(
         'Some page content',
         mockAnalysis,
         mockCandidates,
@@ -208,7 +218,7 @@ describe('generateSuggestions', () => {
     it('should pass candidates to generateCategorySuggestion', async () => {
       await callGenerateSuggestions();
 
-      expect(mockDeps.generateCategorySuggestion).toHaveBeenCalledWith(
+      expect(mocks.generateCategorySuggestionMock).toHaveBeenCalledWith(
         mockCandidates,
       );
     });
@@ -216,20 +226,20 @@ describe('generateSuggestions', () => {
 
   describe('graceful degradation', () => {
     it('should fall back to memo only when content analysis fails', async () => {
-      mockDeps.analyzeContent.mockRejectedValue(
+      mocks.analyzeContentMock.mockRejectedValue(
         new Error('AI service unavailable'),
       );
 
       const result = await callGenerateSuggestions();
 
       expect(result).toEqual([memoSuggestion]);
-      expect(mockDeps.retrieveSearchCandidates).not.toHaveBeenCalled();
-      expect(mockDeps.evaluateCandidates).not.toHaveBeenCalled();
-      expect(mockDeps.generateCategorySuggestion).not.toHaveBeenCalled();
+      expect(mocks.retrieveSearchCandidatesMock).not.toHaveBeenCalled();
+      expect(mocks.evaluateCandidatesMock).not.toHaveBeenCalled();
+      expect(mocks.generateCategorySuggestionMock).not.toHaveBeenCalled();
     });
 
     it('should log error when content analysis fails', async () => {
-      mockDeps.analyzeContent.mockRejectedValue(
+      mocks.analyzeContentMock.mockRejectedValue(
         new Error('AI service unavailable'),
       );
 
@@ -239,8 +249,8 @@ describe('generateSuggestions', () => {
     });
 
     it('should fall back to memo only when search candidate retrieval fails', async () => {
-      mockDeps.analyzeContent.mockResolvedValue(mockAnalysis);
-      mockDeps.retrieveSearchCandidates.mockRejectedValue(
+      mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
+      mocks.retrieveSearchCandidatesMock.mockRejectedValue(
         new Error('Search service down'),
       );
 
@@ -251,12 +261,14 @@ describe('generateSuggestions', () => {
     });
 
     it('should return memo + category when candidate evaluation fails', async () => {
-      mockDeps.analyzeContent.mockResolvedValue(mockAnalysis);
-      mockDeps.retrieveSearchCandidates.mockResolvedValue(mockCandidates);
-      mockDeps.evaluateCandidates.mockRejectedValue(
+      mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
+      mocks.retrieveSearchCandidatesMock.mockResolvedValue(mockCandidates);
+      mocks.evaluateCandidatesMock.mockRejectedValue(
         new Error('AI evaluation failed'),
       );
-      mockDeps.generateCategorySuggestion.mockResolvedValue(categorySuggestion);
+      mocks.generateCategorySuggestionMock.mockResolvedValue(
+        categorySuggestion,
+      );
 
       const result = await callGenerateSuggestions();
 
@@ -265,11 +277,11 @@ describe('generateSuggestions', () => {
     });
 
     it('should return memo + search when category generation fails', async () => {
-      mockDeps.analyzeContent.mockResolvedValue(mockAnalysis);
-      mockDeps.retrieveSearchCandidates.mockResolvedValue(mockCandidates);
-      mockDeps.evaluateCandidates.mockResolvedValue(mockEvaluated);
-      mockDeps.resolveParentGrant.mockResolvedValue(1);
-      mockDeps.generateCategorySuggestion.mockRejectedValue(
+      mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
+      mocks.retrieveSearchCandidatesMock.mockResolvedValue(mockCandidates);
+      mocks.evaluateCandidatesMock.mockResolvedValue(mockEvaluated);
+      mocks.resolveParentGrantMock.mockResolvedValue(1);
+      mocks.generateCategorySuggestionMock.mockRejectedValue(
         new Error('Category failed'),
       );
 
@@ -283,8 +295,8 @@ describe('generateSuggestions', () => {
     });
 
     it('should return memo only when both search pipeline and category fail', async () => {
-      mockDeps.analyzeContent.mockResolvedValue(mockAnalysis);
-      mockDeps.retrieveSearchCandidates.mockRejectedValue(
+      mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
+      mocks.retrieveSearchCandidatesMock.mockRejectedValue(
         new Error('Search down'),
       );
 
@@ -294,22 +306,22 @@ describe('generateSuggestions', () => {
     });
 
     it('should skip search suggestions when no candidates pass threshold (empty array)', async () => {
-      mockDeps.analyzeContent.mockResolvedValue(mockAnalysis);
-      mockDeps.retrieveSearchCandidates.mockResolvedValue([]);
-      mockDeps.generateCategorySuggestion.mockResolvedValue(null);
+      mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
+      mocks.retrieveSearchCandidatesMock.mockResolvedValue([]);
+      mocks.generateCategorySuggestionMock.mockResolvedValue(null);
 
       const result = await callGenerateSuggestions();
 
       expect(result).toEqual([memoSuggestion]);
-      expect(mockDeps.evaluateCandidates).not.toHaveBeenCalled();
+      expect(mocks.evaluateCandidatesMock).not.toHaveBeenCalled();
     });
 
     it('should omit category when generateCategorySuggestion returns null', async () => {
-      mockDeps.analyzeContent.mockResolvedValue(mockAnalysis);
-      mockDeps.retrieveSearchCandidates.mockResolvedValue(mockCandidates);
-      mockDeps.evaluateCandidates.mockResolvedValue(mockEvaluated);
-      mockDeps.resolveParentGrant.mockResolvedValue(1);
-      mockDeps.generateCategorySuggestion.mockResolvedValue(null);
+      mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
+      mocks.retrieveSearchCandidatesMock.mockResolvedValue(mockCandidates);
+      mocks.evaluateCandidatesMock.mockResolvedValue(mockEvaluated);
+      mocks.resolveParentGrantMock.mockResolvedValue(1);
+      mocks.generateCategorySuggestionMock.mockResolvedValue(null);
 
       const result = await callGenerateSuggestions();
 
@@ -324,11 +336,11 @@ describe('generateSuggestions', () => {
         keywords: ['meeting', 'minutes'],
         informationType: 'flow',
       };
-      mockDeps.analyzeContent.mockResolvedValue(flowAnalysis);
-      mockDeps.retrieveSearchCandidates.mockResolvedValue(mockCandidates);
-      mockDeps.evaluateCandidates.mockResolvedValue([mockEvaluated[0]]);
-      mockDeps.resolveParentGrant.mockResolvedValue(1);
-      mockDeps.generateCategorySuggestion.mockResolvedValue(null);
+      mocks.analyzeContentMock.mockResolvedValue(flowAnalysis);
+      mocks.retrieveSearchCandidatesMock.mockResolvedValue(mockCandidates);
+      mocks.evaluateCandidatesMock.mockResolvedValue([mockEvaluated[0]]);
+      mocks.resolveParentGrantMock.mockResolvedValue(1);
+      mocks.generateCategorySuggestionMock.mockResolvedValue(null);
 
       const result = await callGenerateSuggestions();
 
@@ -339,12 +351,14 @@ describe('generateSuggestions', () => {
 
   describe('parallel execution', () => {
     it('should run evaluate pipeline and category generation independently', async () => {
-      mockDeps.analyzeContent.mockResolvedValue(mockAnalysis);
-      mockDeps.retrieveSearchCandidates.mockResolvedValue(mockCandidates);
-      mockDeps.evaluateCandidates.mockRejectedValue(
+      mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
+      mocks.retrieveSearchCandidatesMock.mockResolvedValue(mockCandidates);
+      mocks.evaluateCandidatesMock.mockRejectedValue(
         new Error('Evaluate failed'),
       );
-      mockDeps.generateCategorySuggestion.mockResolvedValue(categorySuggestion);
+      mocks.generateCategorySuggestionMock.mockResolvedValue(
+        categorySuggestion,
+      );
 
       const result = await callGenerateSuggestions();
 
@@ -352,11 +366,11 @@ describe('generateSuggestions', () => {
     });
 
     it('should return search suggestions even when category fails', async () => {
-      mockDeps.analyzeContent.mockResolvedValue(mockAnalysis);
-      mockDeps.retrieveSearchCandidates.mockResolvedValue(mockCandidates);
-      mockDeps.evaluateCandidates.mockResolvedValue(mockEvaluated);
-      mockDeps.resolveParentGrant.mockResolvedValue(1);
-      mockDeps.generateCategorySuggestion.mockRejectedValue(
+      mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
+      mocks.retrieveSearchCandidatesMock.mockResolvedValue(mockCandidates);
+      mocks.evaluateCandidatesMock.mockResolvedValue(mockEvaluated);
+      mocks.resolveParentGrantMock.mockResolvedValue(1);
+      mocks.generateCategorySuggestionMock.mockRejectedValue(
         new Error('Category failed'),
       );
 

@@ -1,18 +1,15 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
+
 import type {
   SearchCandidate,
   SearchResultItem,
   SearchService,
 } from '../../interfaces/suggest-path-types';
 
-const DEFAULT_SCORE_THRESHOLD = 5.0;
+const SCORE_THRESHOLD = 5.0;
 const SEARCH_RESULT_LIMIT = 20;
-
-export type RetrieveSearchCandidatesOptions = {
-  searchService: SearchService;
-  scoreThreshold?: number;
-};
 
 // Elasticsearch highlights use <em class='highlighted-keyword'> and </em>
 const ES_HIGHLIGHT_TAG_REGEX = /<\/?em[^>]*>/g;
@@ -39,10 +36,9 @@ function extractSnippet(item: SearchResultItem): string {
 export const retrieveSearchCandidates = async (
   keywords: string[],
   user: IUserHasId,
-  userGroups: unknown,
-  options: RetrieveSearchCandidatesOptions,
+  userGroups: ObjectIdLike[],
+  searchService: SearchService,
 ): Promise<SearchCandidate[]> => {
-  const { searchService, scoreThreshold = DEFAULT_SCORE_THRESHOLD } = options;
   const keyword = keywords.join(' ');
 
   const [searchResult] = await searchService.searchKeyword(
@@ -54,7 +50,7 @@ export const retrieveSearchCandidates = async (
   );
 
   return searchResult.data
-    .filter((item) => item._score >= scoreThreshold)
+    .filter((item) => item._score >= SCORE_THRESHOLD)
     .map((item) => ({
       pagePath: item._source.path,
       snippet: extractSnippet(item),

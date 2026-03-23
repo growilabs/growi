@@ -47,7 +47,7 @@ describe('retrieveSearchCandidates', () => {
         ['React', 'hooks'],
         mockUser,
         [],
-        { searchService, scoreThreshold: 5 },
+        searchService,
       );
 
       expect(result).toHaveLength(3);
@@ -63,10 +63,12 @@ describe('retrieveSearchCandidates', () => {
       ]);
       const searchService = createMockSearchService(searchResult);
 
-      const result = await retrieveSearchCandidates(['React'], mockUser, [], {
+      const result = await retrieveSearchCandidates(
+        ['React'],
+        mockUser,
+        [],
         searchService,
-        scoreThreshold: 5,
-      });
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
@@ -78,50 +80,56 @@ describe('retrieveSearchCandidates', () => {
   });
 
   describe('threshold filtering', () => {
-    it('should include candidates above the threshold', async () => {
+    it('should include candidates above the default threshold (5.0)', async () => {
       const searchResult = createSearchResult([
         { path: '/tech/React/hooks', score: 15 },
         { path: '/tech/React/state', score: 3 },
       ]);
       const searchService = createMockSearchService(searchResult);
 
-      const result = await retrieveSearchCandidates(['React'], mockUser, [], {
+      const result = await retrieveSearchCandidates(
+        ['React'],
+        mockUser,
+        [],
         searchService,
-        scoreThreshold: 10,
-      });
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].pagePath).toBe('/tech/React/hooks');
     });
 
-    it('should exclude candidates below the threshold', async () => {
+    it('should exclude candidates below the default threshold (5.0)', async () => {
       const searchResult = createSearchResult([
         { path: '/tech/React/hooks', score: 3 },
         { path: '/tech/Vue/basics', score: 2 },
       ]);
       const searchService = createMockSearchService(searchResult);
 
-      const result = await retrieveSearchCandidates(['React'], mockUser, [], {
+      const result = await retrieveSearchCandidates(
+        ['React'],
+        mockUser,
+        [],
         searchService,
-        scoreThreshold: 10,
-      });
+      );
 
       expect(result).toHaveLength(0);
     });
 
-    it('should include candidates at exactly the threshold', async () => {
+    it('should include candidates at exactly the default threshold (5.0)', async () => {
       const searchResult = createSearchResult([
-        { path: '/tech/React/hooks', score: 10 },
+        { path: '/tech/React/hooks', score: 5 },
       ]);
       const searchService = createMockSearchService(searchResult);
 
-      const result = await retrieveSearchCandidates(['React'], mockUser, [], {
+      const result = await retrieveSearchCandidates(
+        ['React'],
+        mockUser,
+        [],
         searchService,
-        scoreThreshold: 10,
-      });
+      );
 
       expect(result).toHaveLength(1);
-      expect(result[0].score).toBe(10);
+      expect(result[0].score).toBe(5);
     });
 
     it('should filter mixed results correctly', async () => {
@@ -133,15 +141,18 @@ describe('retrieveSearchCandidates', () => {
       ]);
       const searchService = createMockSearchService(searchResult);
 
-      const result = await retrieveSearchCandidates(['React'], mockUser, [], {
+      const result = await retrieveSearchCandidates(
+        ['React'],
+        mockUser,
+        [],
         searchService,
-        scoreThreshold: 10,
-      });
+      );
 
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(3);
       expect(result.map((c) => c.pagePath)).toEqual([
         '/tech/React/hooks',
         '/tech/React/state',
+        '/guides/intro',
       ]);
     });
   });
@@ -155,7 +166,7 @@ describe('retrieveSearchCandidates', () => {
         ['nonexistent'],
         mockUser,
         [],
-        { searchService, scoreThreshold: 5 },
+        searchService,
       );
 
       expect(result).toEqual([]);
@@ -168,10 +179,12 @@ describe('retrieveSearchCandidates', () => {
       ]);
       const searchService = createMockSearchService(searchResult);
 
-      const result = await retrieveSearchCandidates(['React'], mockUser, [], {
+      const result = await retrieveSearchCandidates(
+        ['React'],
+        mockUser,
+        [],
         searchService,
-        scoreThreshold: 5,
-      });
+      );
 
       expect(result).toEqual([]);
     });
@@ -190,10 +203,12 @@ describe('retrieveSearchCandidates', () => {
       ]);
       const searchService = createMockSearchService(searchResult);
 
-      const result = await retrieveSearchCandidates(['React'], mockUser, [], {
+      const result = await retrieveSearchCandidates(
+        ['React'],
+        mockUser,
+        [],
         searchService,
-        scoreThreshold: 5,
-      });
+      );
 
       expect(result[0].snippet).toBe('Using React hooks');
     });
@@ -210,10 +225,12 @@ describe('retrieveSearchCandidates', () => {
       ]);
       const searchService = createMockSearchService(searchResult);
 
-      const result = await retrieveSearchCandidates(['React'], mockUser, [], {
+      const result = await retrieveSearchCandidates(
+        ['React'],
+        mockUser,
+        [],
         searchService,
-        scoreThreshold: 5,
-      });
+      );
 
       expect(result[0].snippet).toBe('React hooks guide');
     });
@@ -230,10 +247,12 @@ describe('retrieveSearchCandidates', () => {
       ]);
       const searchService = createMockSearchService(searchResult);
 
-      const result = await retrieveSearchCandidates(['React'], mockUser, [], {
+      const result = await retrieveSearchCandidates(
+        ['React'],
+        mockUser,
+        [],
         searchService,
-        scoreThreshold: 5,
-      });
+      );
 
       expect(result[0].snippet).toBe('Reactのフックについて');
     });
@@ -244,10 +263,12 @@ describe('retrieveSearchCandidates', () => {
       ]);
       const searchService = createMockSearchService(searchResult);
 
-      const result = await retrieveSearchCandidates(['React'], mockUser, [], {
+      const result = await retrieveSearchCandidates(
+        ['React'],
+        mockUser,
+        [],
         searchService,
-        scoreThreshold: 5,
-      });
+      );
 
       expect(result[0].snippet).toBe('');
     });
@@ -264,10 +285,12 @@ describe('retrieveSearchCandidates', () => {
       ]);
       const searchService = createMockSearchService(searchResult);
 
-      const result = await retrieveSearchCandidates(['React'], mockUser, [], {
+      const result = await retrieveSearchCandidates(
+        ['React'],
+        mockUser,
+        [],
         searchService,
-        scoreThreshold: 5,
-      });
+      );
 
       expect(result[0].snippet).toBe('React hooks ... custom hooks pattern');
     });
@@ -284,10 +307,12 @@ describe('retrieveSearchCandidates', () => {
       ]);
       const searchService = createMockSearchService(searchResult);
 
-      const result = await retrieveSearchCandidates(['React'], mockUser, [], {
+      const result = await retrieveSearchCandidates(
+        ['React'],
+        mockUser,
+        [],
         searchService,
-        scoreThreshold: 5,
-      });
+      );
 
       expect(result[0].snippet).toBe('React hooks');
     });
@@ -302,7 +327,7 @@ describe('retrieveSearchCandidates', () => {
         ['React', 'hooks', 'useState'],
         mockUser,
         [],
-        { searchService, scoreThreshold: 5 },
+        searchService,
       );
 
       expect(searchService.searchKeyword).toHaveBeenCalledWith(
@@ -317,12 +342,17 @@ describe('retrieveSearchCandidates', () => {
     it('should pass user and userGroups to searchKeyword', async () => {
       const searchResult = createSearchResult([]);
       const searchService = createMockSearchService(searchResult);
-      const mockUserGroups = ['group1', 'group2'];
+      const mockUserGroups = [
+        'group1',
+        'group2',
+      ] as unknown as import('~/server/interfaces/mongoose-utils').ObjectIdLike[];
 
-      await retrieveSearchCandidates(['React'], mockUser, mockUserGroups, {
+      await retrieveSearchCandidates(
+        ['React'],
+        mockUser,
+        mockUserGroups,
         searchService,
-        scoreThreshold: 5,
-      });
+      );
 
       expect(searchService.searchKeyword).toHaveBeenCalledWith(
         expect.any(String),

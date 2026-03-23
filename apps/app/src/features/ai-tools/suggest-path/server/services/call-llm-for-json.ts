@@ -5,6 +5,11 @@ import {
 } from '~/features/openai/server/services/client-delegator';
 import { configManager } from '~/server/service/config-manager';
 
+/**
+ * Shared utility for making LLM calls that return JSON responses.
+ * Handles OpenAI client initialization, JSON parsing, and response validation.
+ * Consumed by `analyzeContent` (1st AI call) and `evaluateCandidates` (2nd AI call).
+ */
 export const callLlmForJson = async <T>(
   systemPrompt: string,
   userMessage: string,
