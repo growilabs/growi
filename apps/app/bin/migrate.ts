@@ -1,3 +1,9 @@
+/**
+ * umzug cli
+ *
+ * Usage:
+ *   pnpm ts-node bin/migrate.ts
+ */
 import { resolve } from 'node:path';
 import { config } from 'dotenv-flow';
 import { MongoClient } from 'mongodb';
@@ -16,7 +22,7 @@ config();
   await client.connect();
 
   const umzug = new Umzug({
-    migrations: { glob: resolve(__dirname, 'migrations/*.(ts|js)') },
+    migrations: { glob: resolve(__dirname, '../prisma/migrations/*.(ts|js)') },
     context: prisma,
     storage: new MongoDBStorage({
       connection: client.db(),
