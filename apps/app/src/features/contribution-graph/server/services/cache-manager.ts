@@ -184,12 +184,6 @@ export class ContributionCacheManager {
       }
     }
 
-    for (const cache of currentWeekData) {
-      if (allCache.has(cache.date)) {
-        allCache.set(cache.date, cache.count);
-      }
-    }
-
     return Array.from(allCache.entries())
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date));
