@@ -60,6 +60,12 @@ export const useCodeMirrorEditor = (
             dropCursor: false,
             highlightActiveLine: false,
             highlightActiveLineGutter: false,
+            // Disable bracket matching to prevent a rendering bug where text
+            // visually disappears after IME composition inside brackets on
+            // non-Safari browsers (e.g. Chrome). The bracketMatching decoration
+            // (Decoration.mark) corrupts CodeMirror's DOM reconciliation when
+            // applied immediately after composition ends.
+            bracketMatching: false,
           },
           // ------- End -------
         },
