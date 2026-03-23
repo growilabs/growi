@@ -36,7 +36,7 @@ export class ContributionCacheManager {
   public async getUpdatedCache(userId: string) {
     const contributionCache = await getContributionCache(userId);
 
-    if (!contributionCache) {
+    if (contributionCache == null) {
       const validUser = await userExists(userId);
       if (!validUser) {
         throw new Error('User does not exist.');
@@ -52,7 +52,7 @@ export class ContributionCacheManager {
     }
 
     let aggregationStartDate: Date;
-    if (contributionCache) {
+    if (contributionCache != null) {
       aggregationStartDate = getUTCMidnight(contributionCache.lastUpdated);
     } else {
       aggregationStartDate = new Date();
@@ -71,10 +71,21 @@ export class ContributionCacheManager {
     const currentWeekStart = getCurrentWeekStart();
     const currentWeekStartStr = formatDateKey(currentWeekStart);
 
-    const mergedCurrentWeekSparse = contributionCache
-      ? [...contributionCache.currentWeekData]
-      : [];
+    const cachedWeekStart = contributionCache?.currentWeekData[0]?.date;
+    const isNewWeek = cachedWeekStart && cachedWeekStart < currentWeekStartStr;
+
     const weeksToFreezeMap: Record<string, IContributionDay[]> = {};
+    let mergedCurrentWeekSparse: IContributionDay[] = [];
+
+    // Add currentWeekData to be frozen if new week
+    if (isNewWeek) {
+      const oldWeekId = getISOWeekId(new Date(cachedWeekStart));
+      weeksToFreezeMap[oldWeekId] = contributionCache.currentWeekData;
+    } else {
+      mergedCurrentWeekSparse = contributionCache
+        ? [...contributionCache.currentWeekData]
+        : [];
+    }
 
     for (const contribution of freshCacheData) {
       if (contribution.date >= currentWeekStartStr) {
@@ -89,12 +100,22 @@ export class ContributionCacheManager {
           mergedCurrentWeekSparse.push(contribution);
         }
       } else {
+        // Contribution is older than current week
         const weekId = getISOWeekId(new Date(contribution.date));
 
         if (!weeksToFreezeMap[weekId]) {
           weeksToFreezeMap[weekId] = [];
         }
-        weeksToFreezeMap[weekId].push(contribution);
+
+        const existingDay = weeksToFreezeMap[weekId].find(
+          (d) => d.date === contribution.date,
+        );
+
+        if (existingDay) {
+          existingDay.count = contribution.count;
+        } else {
+          weeksToFreezeMap[weekId].push(contribution);
+        }
       }
     }
 
@@ -158,12 +179,6 @@ export class ContributionCacheManager {
     }
 
     for (const cache of combinedData) {
-      if (allCache.has(cache.date)) {
-        allCache.set(cache.date, cache.count);
-      }
-    }
-
-    for (const cache of currentWeekData) {
       if (allCache.has(cache.date)) {
         allCache.set(cache.date, cache.count);
       }
