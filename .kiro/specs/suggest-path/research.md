@@ -24,7 +24,7 @@
   - Middleware ordering: `accessTokenParser` → `loginRequiredStrictly` → validators → `apiV3FormValidator` → handler
   - Response helpers: `res.apiv3(data)` for success, `res.apiv3Err(error, status)` for errors
   - Feature-based routes use dynamic import pattern (see openai routes)
-- **Implications**: suggest-path follows the handler factory pattern. New `ai-tools` directory under `routes/apiv3/`
+- **Implications**: suggest-path follows the handler factory pattern. Route factory in `features/ai-tools/suggest-path/server/routes/apiv3/`, aggregation router in `features/ai-tools/server/routes/apiv3/`
 
 ### OpenAI Feature Structure
 
@@ -35,7 +35,7 @@
   - Dynamic imports used for route handlers
   - Dedicated middleware directory for AI-specific checks
   - Routes organized under `features/openai/` not `routes/apiv3/`
-- **Implications**: suggest-path should gate on AI-enabled config. However, since `ai-tools` is a separate namespace from `openai`, it lives under `routes/apiv3/ai-tools/` rather than `features/openai/`. The AI gating middleware can be reused or replicated.
+- **Implications**: suggest-path gates on AI-enabled config via `certifyAiService`. Code lives under `features/ai-tools/suggest-path/` with an aggregation router at `features/ai-tools/server/routes/apiv3/`.
 
 ### Grant System Constraints
 
@@ -73,7 +73,7 @@
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
 |--------|-------------|-----------|---------------------|-------|
-| Route under `routes/apiv3/ai-tools/` | New namespace in standard routes | Clean separation, follows `ai-tools` naming decision from review | New directory, needs registration in index.js | Aligns with independent access control needs |
+| Route under `features/ai-tools/` | Feature-based directory with aggregation router | Clean separation, follows features pattern and `ai-tools` naming | — | **Selected** — aligns with project architecture and independent access control |
 | Route under `features/openai/` | Extend existing AI feature module | Reuses AI infrastructure, minimal setup | Provider-specific name, harder to separate for independent access control | Rejected in review — namespace should be provider-agnostic |
 | Route under `routes/apiv3/page/` | Add to existing page routes | Close to page creation | Cannot gate independently for access control | Rejected in review — yuki requested separation |
 
@@ -86,10 +86,9 @@
   1. `/openai/suggest-path` — groups with AI features but provider-specific
   2. `/page/suggest-path` — close to page creation but cannot gate independently
   3. `/ai-tools/suggest-path` — new provider-agnostic namespace
-- **Selected Approach**: `/_api/v3/ai-tools/suggest-path` under `routes/apiv3/ai-tools/`
-- **Rationale**: Matches existing unmerged PR naming, provider-agnostic, enables independent access control
-- **Trade-offs**: Requires new directory and route registration. Namespace is tentative (pending yuki confirmation)
-- **Follow-up**: Confirm `ai-tools` namespace with yuki
+- **Selected Approach**: `/_api/v3/ai-tools/suggest-path` under `features/ai-tools/suggest-path/`
+- **Rationale**: Provider-agnostic, enables independent access control, follows features directory pattern
+- **Trade-offs**: Aggregation router at `features/ai-tools/server/routes/apiv3/` allows future ai-tools features under the same namespace
 
 ### Decision: Phase 1 Handler Simplicity
 
@@ -116,10 +115,8 @@
 
 ## Risks & Mitigations
 
-- **Namespace not finalized**: `ai-tools` is tentative. Mitigation: design for easy namespace change (single line in route registration)
-- **Large content body performance**: Sending full content for AI keyword extraction may be slow. Mitigation: Phase 1 does not require AI; Phase 2 has fallback to memo-only if extraction fails
-- **Search service dependency**: Phase 2 depends on Elasticsearch being available. Mitigation: graceful degradation — return memo suggestion if search fails
-- **GROWI AI implementation details unknown**: Keyword extraction specifics are out of scope. Mitigation: define clean interface boundary; implementation details handled separately
+- **Large content body performance**: Sending full content for AI keyword extraction may be slow. Mitigation: fallback to memo-only if extraction fails
+- **Search service dependency**: Depends on Elasticsearch being available. Mitigation: graceful degradation — return memo suggestion if search fails
 
 ## References
 
