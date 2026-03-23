@@ -1,6 +1,5 @@
 import type { IPage, IUserHasId } from '@growi/core';
 import { YJS_WEBSOCKET_BASE_PATH } from '@growi/core/dist/consts';
-import type { RequestHandler } from 'express';
 import expressSession from 'express-session';
 import type { IncomingMessage, ServerResponse } from 'http';
 import mongoose from 'mongoose';
@@ -19,17 +18,28 @@ type AuthenticatedRequest = IncomingMessage & {
 };
 
 /**
- * Run an Express-style middleware against a raw IncomingMessage.
+ * Connect-style middleware that operates on raw Node.js HTTP types.
+ * Express middleware (express-session, passport) is compatible because
+ * express.Request extends IncomingMessage and express.Response extends ServerResponse.
+ */
+type ConnectMiddleware = (
+  req: IncomingMessage,
+  res: ServerResponse,
+  next: (err?: unknown) => void,
+) => void;
+
+/**
+ * Run a Connect-style middleware against a raw IncomingMessage.
  * Safe for express-session, passport.initialize(), and passport.session() which
  * only read/write `req` properties and call `next()` — they never write to `res`.
  */
 const runMiddleware = (
-  middleware: RequestHandler,
+  middleware: ConnectMiddleware,
   req: IncomingMessage,
 ): Promise<void> =>
   new Promise((resolve, reject) => {
-    const fakeRes = {} as ServerResponse;
-    middleware(req as any, fakeRes as any, (err?: unknown) => {
+    const stubRes = {} as ServerResponse;
+    middleware(req, stubRes, (err?: unknown) => {
       if (err) return reject(err);
       resolve();
     });
@@ -85,9 +95,9 @@ export const createUpgradeHandler = (sessionConfig: SessionConfig) => {
 
     try {
       // Run session + passport middleware chain
-      await runMiddleware(sessionMiddleware as RequestHandler, request);
-      await runMiddleware(passportInit as RequestHandler, request);
-      await runMiddleware(passportSession as RequestHandler, request);
+      await runMiddleware(sessionMiddleware as ConnectMiddleware, request);
+      await runMiddleware(passportInit as ConnectMiddleware, request);
+      await runMiddleware(passportSession as ConnectMiddleware, request);
     } catch (err) {
       logger.warn('Session/passport middleware failed on upgrade', { err });
       rejectUpgrade(socket, 401, 'Unauthorized');
