@@ -43,14 +43,15 @@
 
 ### HTTP Server and WebSocket Coexistence
 - **Context**: Determine how to add raw WebSocket alongside existing Socket.IO
-- **Sources Consulted**: `apps/app/src/server/crowi/index.ts`, `apps/app/src/server/service/socket-io/socket-io.ts`
+- **Sources Consulted**: `apps/app/src/server/crowi/index.ts`, `apps/app/src/server/service/socket-io/socket-io.ts`, `engine.io@6.6.5/build/server.js`
 - **Findings**:
   - HTTP server created via `http.createServer(app)` at crowi/index.ts:582
   - Socket.IO attaches to this server and handles its own `upgrade` events for `/socket.io/` path
   - `ws@^8.17.1` already installed in apps/app
   - WebSocket.Server with `noServer: true` can coexist by handling `upgrade` events for a different path prefix
-  - Socket.IO only intercepts upgrade requests matching its path (`/socket.io/`)
-- **Implications**: Safe to add `ws.Server` with path prefix `/yjs/` on the same HTTP server
+  - **CRITICAL**: engine.io v6 defaults `destroyUpgrade: true` in its `attach()` method (server.js:657). This causes engine.io to destroy all non-Socket.IO upgrade requests after `destroyUpgradeTimeout` (default 1000ms). Without setting `destroyUpgrade: false`, any WebSocket upgrade to `/yjs/` is silently killed by engine.io before the Yjs handler can complete the handshake.
+  - The `destroyUpgrade` option must be passed via `new Server(httpServer, { destroyUpgrade: false })` in the Socket.IO constructor, which forwards it to `engine.io.attach(server, opts)`.
+- **Implications**: Safe to add `ws.Server` with path prefix `/yjs/` on the same HTTP server, **provided `destroyUpgrade: false` is set on the Socket.IO server**
 
 ### Authentication for Raw WebSocket
 - **Context**: y-socket.io piggybacks on Socket.IO middleware for session/passport; raw WebSocket needs custom auth
@@ -117,8 +118,11 @@
 ## Risks & Mitigations
 - **Risk**: y-websocket server `persistence.bindState` is not awaited before first sync → client may briefly see empty doc
   - **Mitigation**: Override `setupWSConnection` to await `doc.whenInitialized` before sending sync step 1, or ensure `bindState` completes fast (MongoDB read is typically <50ms)
+- **Risk**: engine.io `destroyUpgrade` kills non-Socket.IO WebSocket upgrades
+  - **Mitigation**: Set `destroyUpgrade: false` in Socket.IO server options. Without this, engine.io's `attach()` registers an `upgrade` listener that destroys any upgrade request not matching the Socket.IO path after a 1-second timeout, causing `/yjs/` WebSocket handshakes to fail silently (connection reset with no HTTP response).
+  - **Discovered during**: Implementation validation — `curl` WebSocket upgrade to `/yjs/{pageId}` returned "Empty reply from server"
 - **Risk**: Socket.IO and ws competing for HTTP upgrade events
-  - **Mitigation**: Socket.IO only handles `/socket.io/` path; register ws handler for `/yjs/` path with explicit path check before `handleUpgrade`
+  - **Mitigation**: Socket.IO only handles `/socket.io/` path; register ws handler for `/yjs/` path with explicit path check before `handleUpgrade`. Combined with `destroyUpgrade: false`, non-Socket.IO upgrades are left untouched by engine.io.
 - **Risk**: Session cookie parsing edge cases (SameSite, Secure flags, proxy headers)
   - **Mitigation**: Reuse existing express-session cookie parser and session store; test with the same proxy configuration
 - **Risk**: Document cleanup race when last client disconnects and a new client immediately connects

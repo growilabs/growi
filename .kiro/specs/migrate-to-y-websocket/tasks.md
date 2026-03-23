@@ -36,6 +36,7 @@
   - Call y-websocket's `setPersistence` with the adapted persistence layer from task 1.2
   - Register the HTTP `upgrade` event handler on `httpServer`, routing requests with path prefix `/yjs/` to the upgrade handler from task 2.1, then to `wss.handleUpgrade`, and finally to y-websocket's `setupWSConnection` with the extracted `pageId` as `docName`
   - Ensure Socket.IO's upgrade handling for `/socket.io/` is not affected by checking the URL path before intercepting
+  - **Set `destroyUpgrade: false`** on the Socket.IO server (`socket-io.ts`) to prevent engine.io from destroying non-Socket.IO upgrade requests (discovered during validation: engine.io v6 defaults `destroyUpgrade: true`, silently killing `/yjs/` WebSocket handshakes)
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.3_
 
 - [x] 3.2 Integrate document status API and force-sync

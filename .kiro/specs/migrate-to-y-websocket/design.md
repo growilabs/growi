@@ -229,6 +229,7 @@ interface IYjsService {
 - Replace `ysocketio['persistence'] = ...` with `setPersistence(...)` public API
 - Do NOT use `setContentInitializor` — instead, place sync-on-load logic (`syncYDoc`) inside `bindState` after persisted state is applied, to guarantee correct ordering (persistence load → YDocStatus check → syncYDoc)
 - Use `httpServer.on('upgrade', ...)` with path check for `/yjs/`
+- **CRITICAL**: Socket.IO server must be configured with `destroyUpgrade: false` to prevent engine.io from destroying non-Socket.IO upgrade requests. Without this, engine.io's default behavior kills `/yjs/` WebSocket handshakes after a 1-second timeout. Set via `new Server(httpServer, { destroyUpgrade: false })` in `socket-io.ts`.
 - Socket.IO's internal upgrade handling for `/socket.io/` is not affected because Socket.IO only intercepts its own path
 
 #### UpgradeHandler
