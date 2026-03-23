@@ -77,6 +77,7 @@ jobs:
           apps/app/tmp \
           apps/app/.env.production* \
           apps/app/node_modules \
+          apps/app/next.config.js \
           apps/app/package.json
         echo "file=production.tar.gz" >> $GITHUB_OUTPUT
 
@@ -172,7 +173,7 @@ jobs:
     container:
       # Match the Playwright version
       # https://github.com/microsoft/playwright/issues/20010
-      image: mcr.microsoft.com/playwright:v1.49.1-jammy
+      image: mcr.microsoft.com/playwright:v1.58.2-jammy
 
     strategy:
       fail-fast: false
