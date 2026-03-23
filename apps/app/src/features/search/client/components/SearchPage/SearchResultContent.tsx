@@ -4,7 +4,6 @@ import dynamic from 'next/dynamic';
 import type { IPageToDeleteWithMeta, IPageToRenameWithMeta } from '@growi/core';
 import { getIdStringForRef } from '@growi/core';
 import { useTranslation } from 'next-i18next';
-import { animateScroll } from 'react-scroll';
 import { DropdownItem } from 'reactstrap';
 import { debounce } from 'throttle-debounce';
 
@@ -14,6 +13,7 @@ import type {
 } from '~/client/components/Common/Dropdown/PageItemControl';
 import type { RevisionLoaderProps } from '~/client/components/Page/RevisionLoader';
 import { exportAsMarkdown } from '~/client/services/page-operation';
+import { scrollWithinContainer } from '~/client/util/smooth-scroll';
 import { toastSuccess } from '~/client/util/toastr';
 import { PagePathNav } from '~/components/Common/PagePathNav';
 import type { IPageWithSearchMeta } from '~/interfaces/search';
@@ -112,10 +112,7 @@ const scrollToFirstHighlightedKeyword = (scrollElement: HTMLElement): void => {
     toElem.getBoundingClientRect().top -
     scrollElement.getBoundingClientRect().top -
     SCROLL_OFFSET_TOP;
-  animateScroll.scrollMore(distance, {
-    containerId: scrollElement.id,
-    duration: 200,
-  });
+  scrollWithinContainer(scrollElement, distance);
 };
 const scrollToFirstHighlightedKeywordDebounced = debounce(
   500,

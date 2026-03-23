@@ -6,7 +6,7 @@ queue_rules:
       - check-success ~= ci-app-launch-dev
       - -check-failure ~= ci-app-
       - -check-failure ~= ci-slackbot-
-      - -check-failure ~= test-prod-node20 /
+      - -check-failure ~= test-prod-node24 /
     merge_conditions:
       - check-success ~= ci-app-lint
       - check-success ~= ci-app-test
