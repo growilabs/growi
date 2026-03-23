@@ -999,6 +999,7 @@
   },
   "user_home_page": {
     "bookmarks": "Favoris",
+    "contribution_graph": "Graphe de contribution",
     "recently_created": "Pages récentes",
     "recent_activity": "Modifications récentes",
     "unknown_action": "a effectué une modification non spécifiée",
