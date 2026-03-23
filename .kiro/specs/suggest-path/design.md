@@ -171,43 +171,25 @@ sequenceDiagram
 ### Orchestrator
 
 ```typescript
-interface SuggestPathDependencies {
-  analyzeContent: (body: string) => Promise<ContentAnalysis>;
-  retrieveSearchCandidates: (
-    keywords: string[],
-    user: IUserHasId,
-    userGroups: PopulatedGrantedGroup[],
-  ) => Promise<SearchCandidate[]>;
-  evaluateCandidates: (
-    body: string,
-    analysis: ContentAnalysis,
-    candidates: SearchCandidate[],
-  ) => Promise<EvaluatedSuggestion[]>;
-  generateCategorySuggestion: (
-    keywords: string[],
-    user: IUserHasId,
-    userGroups: PopulatedGrantedGroup[],
-  ) => Promise<PathSuggestion | null>;
-  resolveParentGrant: (path: string) => Promise<number>;
-}
-
 function generateSuggestions(
   user: IUserHasId,
   body: string,
-  deps: SuggestPathDependencies,
+  userGroups: ObjectIdLike[],
+  searchService: SearchService,
 ): Promise<PathSuggestion[]>;
 ```
 
+- **No DI pattern**: Imports service functions directly; only `searchService` is passed as a parameter (the sole external dependency that cannot be statically imported)
 - **Invariant**: Returns array with at least one suggestion (memo type), regardless of failures
 - **informationType mapping**: Attaches `ContentAnalysis.informationType` to each search-type suggestion (Req 13.1)
 
 ### Content Analyzer (1st AI Call)
 
 ```typescript
-interface ContentAnalysis {
+type ContentAnalysis = {
   keywords: string[];            // 1-5 keywords, proper nouns prioritized
   informationType: 'flow' | 'stock';
-}
+};
 
 function analyzeContent(body: string): Promise<ContentAnalysis>;
 ```
@@ -215,29 +197,32 @@ function analyzeContent(body: string): Promise<ContentAnalysis>;
 ### Search Candidate Retriever
 
 ```typescript
-interface SearchCandidate {
+type SearchCandidate = {
   pagePath: string;
   snippet: string;
   score: number;
-}
+};
 
 function retrieveSearchCandidates(
   keywords: string[],
   user: IUserHasId,
-  userGroups: PopulatedGrantedGroup[],
+  userGroups: ObjectIdLike[],
+  searchService: SearchService,
 ): Promise<SearchCandidate[]>;
 ```
 
+- `searchService` is a direct positional argument (not wrapped in an options object)
+- Score threshold is a module-level constant (`SCORE_THRESHOLD = 5.0`)
 - Filters by ES score threshold; returns empty array if no results pass
 
 ### Candidate Evaluator (2nd AI Call)
 
 ```typescript
-interface EvaluatedSuggestion {
+type EvaluatedSuggestion = {
   path: string;        // Proposed directory path with trailing /
   label: string;
   description: string; // AI-generated rationale
-}
+};
 
 function evaluateCandidates(
   body: string,
@@ -250,10 +235,21 @@ function evaluateCandidates(
 - Flow/stock alignment is a ranking factor, not a hard filter
 - Grant resolution performed by orchestrator after this returns
 
+### Category Suggestion Generator
+
+```typescript
+function generateCategorySuggestion(
+  candidates: SearchCandidate[],
+): Promise<PathSuggestion | null>;
+```
+
+- Under review — may be merged into AI evaluation approach post-discussion
+- Returns `null` when no matching top-level pages are found
+
 ### Grant Resolver
 
 ```typescript
-function resolveParentGrant(path: string): Promise<number>;
+function resolveParentGrant(dirPath: string): Promise<number>;
 ```
 
 - Traverses upward through ancestors for new paths (sibling pattern)

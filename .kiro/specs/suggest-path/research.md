@@ -118,6 +118,21 @@
 - **Large content body performance**: Sending full content for AI keyword extraction may be slow. Mitigation: fallback to memo-only if extraction fails
 - **Search service dependency**: Depends on Elasticsearch being available. Mitigation: graceful degradation — return memo suggestion if search fails
 
+## Post-Implementation Discoveries
+
+### Lesson: Avoid Testability-Motivated DI in Feature Services
+
+- **Context**: Initial Phase 2 implementation used a `GenerateSuggestionsDeps` pattern — a `deps` parameter containing 5 callback functions injected into the orchestrator for testability
+- **Problem**: The pattern was inconsistent with the rest of the codebase (other modules use `vi.mock()` for testing), added route handler boilerplate (10 lines wiring callbacks), and forced unnecessary abstractions like `RetrieveSearchCandidatesOptions`
+- **Resolution**: Removed `deps` pattern; service functions are imported directly. Only `searchService` is passed as a parameter (the sole external dependency that cannot be statically imported). Tests use `vi.mock()` — consistent with `generate-memo-suggestion` and other modules
+- **Guideline**: In this codebase, prefer `vi.mock()` over DI patterns for feature-specific service layers. Reserve DI for true cross-cutting concerns or when the dependency is a runtime-varying service instance (like `searchService`)
+
+### Lesson: Type Propagation from Legacy Code
+
+- **Context**: `searchService.searchKeyword()` in `src/server/service/search.ts` has untyped parameters (legacy JS-to-TS migration), so the suggest-path code initially used `userGroups: unknown` as a safe catch-all
+- **Resolution**: Traced the actual type from `findAllUserGroupIdsRelatedToUser()` which returns `ObjectIdLike[]` (from `@growi/core`), and propagated it through the `SearchService` interface and all service functions
+- **Guideline**: When integrating with legacy untyped services, trace the actual runtime type from the call site rather than defaulting to `unknown`
+
 ## References
 
 - [GROWI Search Internals](https://dev.growi.org/69842ea0cb3a20a69b0a1985) — Search feature internal architecture
