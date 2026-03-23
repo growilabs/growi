@@ -15,25 +15,25 @@ import {
 type SetFields = IContributionDay[] | Date;
 
 export async function userExists(userId: string): Promise<boolean> {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
+  if (typeof userId !== 'string' || !mongoose.Types.ObjectId.isValid(userId)) {
     return false;
   }
 
   const User = mongoose.model('User');
-  const result = await User.exists({ _id: userId, status: 1 });
+  const result = await User.exists({ _id: { $eq: userId }, status: 1 });
   return !!result;
 }
 
 export async function getContributionCache(
   userId: string,
 ): Promise<ContributionGraphDocument | null> {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
+  if (typeof userId !== 'string' || !mongoose.Types.ObjectId.isValid(userId)) {
     return null;
   }
 
   try {
     const contributionCache = await ContributionCache.findOne({
-      userId,
+      userId: { $eq: userId },
     }).exec();
 
     return contributionCache;
@@ -74,6 +74,13 @@ export async function updateContributionCache(
       );
     }
 
+    if (
+      typeof userId !== 'string' ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      throw new Error('Invalid userId when updating contribution cache.');
+    }
+
     const $set: Record<string, SetFields> = {
       currentWeekData: newCurrentWeek,
       lastUpdated: new Date(),
@@ -100,7 +107,7 @@ export async function updateContributionCache(
     }
 
     const updatedCache = await ContributionCache.findOneAndUpdate(
-      { userId },
+      { userId: { $eq: userId } },
       updateQuery,
       {
         new: true,
