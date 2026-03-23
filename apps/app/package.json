@@ -278,7 +278,6 @@
     "@testing-library/user-event": "^14.5.2",
     "@types/archiver": "^6.0.2",
     "@types/bunyan": "^1.8.11",
-    "@types/dotenv-flow": "^3.2.0",
     "@types/express": "^4.17.21",
     "@types/hast": "^3.0.4",
     "@types/js-cookie": "^3.0.6",

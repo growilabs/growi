@@ -53,6 +53,7 @@
     "@testing-library/react": "^16.0.1",
     "@testing-library/react-hooks": "^8.0.1",
     "@types/css-modules": "^1.0.2",
+    "@types/dotenv-flow": "^3.3.3",
     "@types/estree": "^1.0.1",
     "@types/glob": "^8.1.0",
     "@types/node": "^20.18.3",
