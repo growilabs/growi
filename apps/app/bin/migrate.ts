@@ -5,13 +5,10 @@
  *   pnpm ts-node bin/migrate.ts
  */
 import { resolve } from 'node:path';
-import { config } from 'dotenv-flow';
 import { MongoClient } from 'mongodb';
 import { MongoDBStorage, Umzug } from 'umzug';
 
 import { prisma } from '~/utils/prisma';
-
-config();
 
 (async () => {
   const url = process.env.MONGO_URI;
