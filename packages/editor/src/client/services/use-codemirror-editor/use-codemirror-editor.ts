@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { bracketMatching } from '@codemirror/language';
 import type { EditorState } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import { type UseCodeMirror, useCodeMirror } from '@uiw/react-codemirror';
@@ -60,13 +61,15 @@ export const useCodeMirrorEditor = (
             dropCursor: false,
             highlightActiveLine: false,
             highlightActiveLineGutter: false,
-            // Disable bracket matching to prevent a rendering bug where text
-            // visually disappears after IME composition inside brackets on
-            // non-Safari browsers (e.g. Chrome). The bracketMatching decoration
-            // (Decoration.mark) corrupts CodeMirror's DOM reconciliation when
-            // applied immediately after composition ends.
+            // Disable default bracketMatching and re-add with afterCursor: false
+            // to prevent a rendering bug where text visually disappears after IME
+            // composition inside brackets on non-Safari browsers (e.g. Chrome).
+            // When afterCursor is true (default), bracketMatching decorates brackets
+            // ahead of the cursor immediately after composition ends, which corrupts
+            // CodeMirror's DOM reconciliation.
             bracketMatching: false,
           },
+          extensions: [bracketMatching({ afterCursor: false })],
           // ------- End -------
         },
         props ?? {},
