@@ -16,7 +16,7 @@ next.config.js
 /public/static/styles
 /public/uploads
 /src/styles/prebuilt
-/src/**/*.vendor-styles.prebuilt.js
+/src/**/*.vendor-styles.prebuilt.*
 /tmp/
 
 # cache
