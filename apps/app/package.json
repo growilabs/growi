@@ -58,6 +58,7 @@
   "// comments for dependencies": {
     "@aws-skd/*": "fix version above 3.186.0 that is required by mongodb@4.16.0",
     "@keycloak/keycloak-admin-client": "19.0.0 or above exports only ESM.",
+    "bootstrap": "v5.3.3 has a bug. refs: https://github.com/twbs/bootstrap/issues/39798",
     "escape-string-regexp": "5.0.0 or above exports only ESM",
     "next-themes": "0.3.0 causes a type error: https://github.com/pacocoursey/next-themes/issues/122",
     "string-width": "5.0.0 or above exports only ESM."
@@ -295,10 +296,8 @@
     "zod": "^3.24.2"
   },
   "// comments for defDependencies": {
-    "bootstrap": "v5.3.3 has a bug. refs: https://github.com/twbs/bootstrap/issues/39798",
     "@handsontable/react": "v3 requires handsontable >= 7.0.0.",
-    "handsontable": "v7.0.0 or above is no loger MIT lisence.",
-    "mongodb": "mongoose which is used requires mongo@4.16.0."
+    "handsontable": "v7.0.0 or above is no loger MIT lisence."
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^10.1.1",
@@ -354,7 +353,6 @@
     "supertest": "^7.1.4",
     "swagger2openapi": "^7.0.8",
     "tinykeys": "^3.0.0",
-    "typescript": "~5.0.4",
     "unist-util-is": "^6.0.0",
     "unist-util-visit-parents": "^6.0.0"
   }
