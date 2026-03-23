@@ -34,7 +34,7 @@ import type {
   OnPutBackedFunction,
   OnRenamedFunction,
 } from '~/interfaces/ui';
-import LinkedPagePath from '~/models/linked-page-path';
+import { LinkedPagePath } from '~/models/linked-page-path';
 import { useDeviceLargerThanLg } from '~/states/ui/device';
 import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
 import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate';
@@ -230,9 +230,6 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
   // background color of list item changes when class "active" exists under 'list-group-item'
   const styleActive = isDeviceLargerThanLg && isSelected ? 'active' : '';
 
-  const shouldDangerouslySetInnerHTMLForPaths =
-    elasticSearchResult != null && elasticSearchResult.highlightedPath != null;
-
   const canRenderESSnippet =
     elasticSearchResult != null && elasticSearchResult.snippet != null;
   const canRenderRevisionSnippet = revisionShortBody != null;
@@ -288,26 +285,19 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
                     {/* Use permanent links to care for pages with the same name (Cannot use page path url) */}
                     <span className="text-break">
                       <Link
-                        legacyBehavior
                         href={returnPathForURL(pageData.path, pageData._id)}
                         prefetch={false}
+                        className="page-segment"
                       >
-                        {shouldDangerouslySetInnerHTMLForPaths ? (
-                          <a
-                            className="page-segment"
-                            href={returnPathForURL(pageData.path, pageData._id)}
+                        {elasticSearchResult?.highlightedPath != null ? (
+                          <span
                             // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight markup is sanitized
                             dangerouslySetInnerHTML={{
                               __html: linkedPagePathHighlightedLatter.pathName,
                             }}
-                          ></a>
+                          />
                         ) : (
-                          <a
-                            className="page-segment"
-                            href={returnPathForURL(pageData.path, pageData._id)}
-                          >
-                            {linkedPagePathHighlightedLatter.pathName}
-                          </a>
+                          linkedPagePathHighlightedLatter.pathName
                         )}
                       </Link>
                     </span>

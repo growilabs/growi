@@ -1,8 +1,31 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.4.5...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.4.7...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.4.7](https://github.com/growilabs/compare/v7.4.6...v7.4.7) - 2026-03-23
+
+### 💎 Features
+
+* feat: Prevent inline mime type sniffing vulnerabilities (#10087) @arvid-e
+
+### 🐛 Bug Fixes
+
+* fix(editor): Disable bracketMatching to prevent IME composition rendering corruption (#10900) @miya
+
+## [v7.4.6](https://github.com/growilabs/compare/v7.4.5...v7.4.6) - 2026-03-10
+
+### 🐛 Bug Fixes
+
+* fix: mobile editor page title display (#10712) @satof3
+* fix: Exclude user page data from search response when user pages are disabled (#10740) @arvid-e
+* fix(search): prevent Downshift from intercepting Home/End keys in search input (#10815) @yuki-takei
+* fix: Openai thread IDOR (#10806) @ryotaro-nagahara
+
+### 🧰 Maintenance
+
+* support(claude): Add SessionStart hook for Claude Code on the web (#10816) @yuki-takei
 
 ## [v7.4.5](https://github.com/growilabs/compare/v7.4.4...v7.4.5) - 2026-02-19
 

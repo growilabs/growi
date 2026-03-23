@@ -1,3 +1,4 @@
+/// <reference types="multer" />
 import assert from 'node:assert';
 import fs from 'node:fs';
 import { Readable, Transform, Writable } from 'node:stream';

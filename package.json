@@ -1,9 +1,9 @@
 {
   "name": "growi",
-  "version": "7.4.6-RC.0",
+  "version": "7.5.0-RC.0",
   "description": "Team collaboration software using markdown",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "tags": [
     "wiki",
     "communication",
@@ -20,7 +20,7 @@
   "bugs": {
     "url": "https://github.com/growilabs/growi/issues"
   },
-  "packageManager": "pnpm@10.4.1",
+  "packageManager": "pnpm@10.32.1",
   "scripts": {
     "bootstrap": "pnpm install",
     "start": "pnpm run app:server",
@@ -45,7 +45,7 @@
     "@changesets/changelog-github": "^0.5.0",
     "@changesets/cli": "^2.27.3",
     "@faker-js/faker": "^9.0.1",
-    "@playwright/test": "^1.49.1",
+    "@playwright/test": "^1.58.2",
     "@swc-node/register": "^1.10.9",
     "@swc/core": "^1.5.25",
     "@swc/helpers": "^0.5.18",
@@ -114,9 +114,15 @@
     ],
     "onlyBuiltDependencies": [
       "lefthook"
-    ]
+    ],
+    "// comments for patchedDependencies": {
+      "@marp-team/marp-core": "The patch excludes mathjax-full from the dependency graph of Marp Core."
+    },
+    "patchedDependencies": {
+      "@marp-team/marp-core": "packages/presentation/patches/@marp-team__marp-core.patch"
+    }
   },
   "engines": {
-    "node": "^18 || ^20"
+    "node": "^24"
   }
 }

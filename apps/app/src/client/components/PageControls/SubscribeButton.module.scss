@@ -2,10 +2,10 @@
 @use '@growi/ui/scss/atoms/btn-muted';
 @use './button-styles';
 
-.btn-subscribe :global {
+.btn-subscribe {
   @extend %btn-basis;
 
-  .total-counts {
+  :global(.total-counts) {
     @extend %btn-total-counts-basis;
   }
 }

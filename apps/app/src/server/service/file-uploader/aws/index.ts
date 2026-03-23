@@ -366,7 +366,7 @@ class AwsFileUploader extends AbstractFileUploader {
     // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#getSignedUrl-property
     const isDownload = opts?.download ?? false;
     const contentHeaders = createContentHeaders(attachment, {
-      inline: !isDownload,
+      forceAttachment: isDownload,
     });
     const params: GetObjectCommandInput = {
       Bucket: getS3Bucket(),
