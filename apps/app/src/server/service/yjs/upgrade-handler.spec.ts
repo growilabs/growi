@@ -1,34 +1,38 @@
 import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
+import type { IUserHasId } from '@growi/core';
 import { mock } from 'vitest-mock-extended';
 
 import { createUpgradeHandler } from './upgrade-handler';
 
-vi.mock('mongoose', () => {
-  const isAccessiblePageByViewer = vi.fn();
-  return {
-    default: {
-      model: () => ({ isAccessiblePageByViewer }),
-    },
-    __mockIsAccessible: isAccessiblePageByViewer,
-  };
-});
+type AuthenticatedIncomingMessage = IncomingMessage & { user?: IUserHasId };
+
+interface MockSocket {
+  write: ReturnType<typeof vi.fn>;
+  destroy: ReturnType<typeof vi.fn>;
+}
+
+const { isAccessibleMock } = vi.hoisted(() => ({
+  isAccessibleMock: vi.fn(),
+}));
+
+vi.mock('mongoose', () => ({
+  default: {
+    model: () => ({ isAccessiblePageByViewer: isAccessibleMock }),
+  },
+}));
 
 vi.mock('express-session', () => ({
-  default: () => (_req: any, _res: any, next: () => void) => next(),
+  default: () => (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
 vi.mock('passport', () => ({
   default: {
-    initialize: () => (_req: any, _res: any, next: () => void) => next(),
-    session: () => (_req: any, _res: any, next: () => void) => next(),
+    initialize: () => (_req: unknown, _res: unknown, next: () => void) =>
+      next(),
+    session: () => (_req: unknown, _res: unknown, next: () => void) => next(),
   },
 }));
-
-const getIsAccessibleMock = async () => {
-  const mod = await import('mongoose');
-  return (mod as any).__mockIsAccessible as ReturnType<typeof vi.fn>;
-};
 
 const sessionConfig = {
   rolling: true,
@@ -39,30 +43,34 @@ const sessionConfig = {
   genid: () => 'test-session-id',
 };
 
-const createMockRequest = (url: string): IncomingMessage => {
-  const req = mock<IncomingMessage>();
+const createMockRequest = (
+  url: string,
+  user?: IUserHasId,
+): AuthenticatedIncomingMessage => {
+  const req = mock<AuthenticatedIncomingMessage>();
   req.url = url;
   req.headers = { cookie: 'connect.sid=test-session' };
+  req.user = user;
   return req;
 };
 
-const createMockSocket = (): Duplex => {
-  const socket = mock<Duplex>();
-  socket.write = vi.fn().mockReturnValue(true);
-  socket.destroy = vi.fn();
-  return socket;
+const createMockSocket = (): Duplex & MockSocket => {
+  return {
+    write: vi.fn().mockReturnValue(true),
+    destroy: vi.fn(),
+  } as unknown as Duplex & MockSocket;
 };
 
 describe('UpgradeHandler', () => {
   const handleUpgrade = createUpgradeHandler(sessionConfig);
 
   it('should authorize a valid user with page access', async () => {
-    const isAccessible = await getIsAccessibleMock();
-    isAccessible.mockResolvedValue(true);
+    isAccessibleMock.mockResolvedValue(true);
 
-    const request = createMockRequest('/yjs/507f1f77bcf86cd799439011');
-    (request as any).user = { _id: 'user1', name: 'Test User' };
-
+    const request = createMockRequest('/yjs/507f1f77bcf86cd799439011', {
+      _id: 'user1',
+      name: 'Test User',
+    } as unknown as IUserHasId);
     const socket = createMockSocket();
     const head = Buffer.alloc(0);
 
@@ -90,12 +98,12 @@ describe('UpgradeHandler', () => {
   });
 
   it('should reject with 403 when user has no page access', async () => {
-    const isAccessible = await getIsAccessibleMock();
-    isAccessible.mockResolvedValue(false);
+    isAccessibleMock.mockResolvedValue(false);
 
-    const request = createMockRequest('/yjs/507f1f77bcf86cd799439011');
-    (request as any).user = { _id: 'user1', name: 'Test User' };
-
+    const request = createMockRequest('/yjs/507f1f77bcf86cd799439011', {
+      _id: 'user1',
+      name: 'Test User',
+    } as unknown as IUserHasId);
     const socket = createMockSocket();
     const head = Buffer.alloc(0);
 
@@ -110,12 +118,9 @@ describe('UpgradeHandler', () => {
   });
 
   it('should reject with 401 when unauthenticated user has no page access', async () => {
-    const isAccessible = await getIsAccessibleMock();
-    isAccessible.mockResolvedValue(false);
+    isAccessibleMock.mockResolvedValue(false);
 
     const request = createMockRequest('/yjs/507f1f77bcf86cd799439011');
-    (request as any).user = undefined; // explicitly unauthenticated
-
     const socket = createMockSocket();
     const head = Buffer.alloc(0);
 
@@ -128,12 +133,9 @@ describe('UpgradeHandler', () => {
   });
 
   it('should allow guest user when page allows guest access', async () => {
-    const isAccessible = await getIsAccessibleMock();
-    isAccessible.mockResolvedValue(true);
+    isAccessibleMock.mockResolvedValue(true);
 
     const request = createMockRequest('/yjs/507f1f77bcf86cd799439011');
-    (request as any).user = undefined; // guest user
-
     const socket = createMockSocket();
     const head = Buffer.alloc(0);
 
