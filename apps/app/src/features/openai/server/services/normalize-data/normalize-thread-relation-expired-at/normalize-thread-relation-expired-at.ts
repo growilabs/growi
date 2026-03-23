@@ -1,4 +1,4 @@
-import { addDays } from 'date-fns';
+import { addDays } from 'date-fns/addDays';
 
 import ThreadRelation from '../../../models/thread-relation';
 

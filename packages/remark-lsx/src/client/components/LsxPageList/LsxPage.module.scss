@@ -1,6 +1,6 @@
-.page-list-li :global {
+.page-list-li {
 
-  .lsx-page-not-exist {
+  :global(.lsx-page-not-exist) {
     opacity: 0.6;
   }
 

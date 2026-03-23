@@ -1,7 +1,3 @@
-import mongoose from 'mongoose';
-
-import User from '~/server/models/user';
-
 import type {
   IContributionDay,
   IWeeksToFreeze,

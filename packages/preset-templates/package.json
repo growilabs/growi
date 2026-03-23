@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "GROWI preset templates",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "scripts": {
     "test": "vitest run",
     "lint": "biome check"

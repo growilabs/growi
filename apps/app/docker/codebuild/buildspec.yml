@@ -12,6 +12,8 @@ phases:
     commands:
       # login to docker.io
       - echo ${DOCKER_REGISTRY_PASSWORD} | docker login --username growimoogle --password-stdin
+      # login to dhi.io (DHI uses Docker Hub credentials)
+      - echo ${DOCKER_REGISTRY_PASSWORD} | docker login dhi.io --username growimoogle --password-stdin
   build:
     commands:
       - docker build -t ${IMAGE_TAG} -f ./apps/app/docker/Dockerfile .

@@ -2,8 +2,9 @@ import type { Aggregate, PipelineStage } from 'mongoose';
 import mongoose from 'mongoose';
 
 import { getUTCMidnight } from '~/features/contribution-graph/utils/contribution-graph-utils';
-import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
+
+import { ContributionGraphActions } from '../../interfaces/supported-actions';
 
 export interface PipelineParams {
   userId: string;
@@ -26,7 +27,7 @@ export class ContributionAggregationService {
       {
         $match: {
           user: new mongoose.Types.ObjectId(userId),
-          action: { $in: Object.values(ActivityLogActions) },
+          action: { $in: Object.values(ContributionGraphActions) },
           createdAt: { $gte: startDate, $lt: endDate },
         },
       },

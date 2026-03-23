@@ -1,7 +1,7 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.tree-item-for-modal :global {
-  li {
+.tree-item-for-modal {
+  :global(li) {
     min-height: 36px;
   }
 }
@@ -9,16 +9,16 @@
 
 // == Colors
 @include bs.color-mode(light) {
-  .tree-item-for-modal :global {
-    .list-group-item-action {
+  .tree-item-for-modal {
+    :global(.list-group-item-action) {
       --bs-list-group-active-bg: var(--grw-primary-200);
     }
   }
 }
 
 @include bs.color-mode(dark) {
-  .tree-item-for-modal :global {
-    .list-group-item-action {
+  .tree-item-for-modal {
+    :global(.list-group-item-action) {
       --bs-list-group-active-bg: var(--grw-primary-700);
     }
   }

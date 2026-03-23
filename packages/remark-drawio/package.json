@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Remark plugin to draw diagrams with draw.io (diagrams.net)",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "keywords": [
     "unified",
     "remark",

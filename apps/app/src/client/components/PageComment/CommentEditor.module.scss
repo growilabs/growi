@@ -3,17 +3,17 @@
 @use '../PageEditor/page-editor-inheritance';
 
 // display cheatsheet for comment form only
-.comment-editor-styles :global {
-  .comment-form {
+.comment-editor-styles {
+  :global(.comment-form) {
     position: relative;
 
     // background
-    .bg-comment {
+    :global(.bg-comment) {
       @extend %bg-comment
     }
 
     // user icon
-    .user-picture {
+    :global(.user-picture) {
       @extend %user-picture;
     }
 
@@ -22,36 +22,36 @@
 
 
 // adjust height
-.comment-editor-styles :global {
+.comment-editor-styles {
   // Set `display: flex` instead of `display: block` to make it work with `flex: 1` of the children
   // This helps users focus on the editor by clicking on the broader area
-  .tab-pane.active {
+  :global(.tab-pane.active) {
     display: flex;
   }
 
-  .cm-editor {
+  :global(.cm-editor) {
     min-height: comment-inheritance.$codemirror-default-height !important;
     max-height: #{2 * comment-inheritance.$codemirror-default-height};
   }
-  .cm-gutters {
+  :global(.cm-gutters) {
     min-height: comment-inheritance.$codemirror-default-height !important;
   }
-  .comment-preview-container {
+  :global(.comment-preview-container) {
     min-height: page-editor-inheritance.$navbar-editor-height + comment-inheritance.$codemirror-default-height;
     padding-top: 0.5em;
   }
 }
 
 // border-radius
-.comment-editor-styles :global {
-  .cm-editor, .cm-scroller {
+.comment-editor-styles {
+  :global(.cm-editor), :global(.cm-scroller) {
     border-radius: var(--bs-border-radius);
   }
 }
 
 // remove outline
-.comment-editor-styles :global {
-  .cm-editor {
+.comment-editor-styles {
+  :global(.cm-editor) {
     outline: none;
   }
 }

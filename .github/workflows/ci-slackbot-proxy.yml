@@ -30,7 +30,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [24.x]
 
     steps:
     - uses: actions/checkout@v4
@@ -85,7 +85,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [24.x]
 
     services:
       mysql:
@@ -163,7 +163,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [24.x]
 
     services:
       mysql:
@@ -211,7 +211,7 @@ jobs:
     - name: Assembling all dependencies
       run: |
         rm -rf out
-        pnpm deploy out --prod --filter @growi/slackbot-proxy
+        pnpm deploy out --prod --legacy --filter @growi/slackbot-proxy
         rm -rf apps/slackbot-proxy/node_modules && mv out/node_modules apps/slackbot-proxy/node_modules
 
     - name: pnpm run start:prod:ci

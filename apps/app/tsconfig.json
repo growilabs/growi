@@ -27,6 +27,10 @@
     ]
   },
   "include": ["next-env.d.ts", "config", "src"],
+  "exclude": [
+    "src/**/*.vendor-styles.ts",
+    "src/**/*.vendor-styles.prebuilt.js"
+  ],
   "ts-node": {
     "transpileOnly": true,
     "swc": true,
