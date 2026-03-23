@@ -56,11 +56,12 @@ export const getColorLevel = (count: number) => {
 
 export const getPaddedContributions = (
   apiData: IContributionDay[],
+  now: Date = new Date(),
 ): IContributionDay[] => {
   const padded: IContributionDay[] = [];
   const dataMap = new Map(apiData.map((d) => [d.date, d.count]));
 
-  const end = new Date();
+  const end = new Date(now);
   const daysUntilSaturday = 6 - end.getUTCDay();
   end.setUTCDate(end.getUTCDate() + daysUntilSaturday);
 

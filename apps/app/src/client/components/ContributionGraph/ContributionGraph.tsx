@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useSWRxContributions } from '~/stores/use-contributions';
 
@@ -11,11 +11,19 @@ import {
 import styles from './ContributionGraph.module.scss';
 
 export const ContributionGraph = ({ userId }: { userId: string }) => {
+  const [isClient, setIsClient] = useState(false);
   const { data } = useSWRxContributions(userId);
 
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const contributions = useMemo(() => {
-    return data != null ? getPaddedContributions(data) : [];
-  }, [data]);
+    if (!isClient || data == null) {
+      return [];
+    }
+    return getPaddedContributions(data, new Date());
+  }, [data, isClient]);
 
   const monthLabels = useMemo(() => {
     return getMonthLabels(contributions);
