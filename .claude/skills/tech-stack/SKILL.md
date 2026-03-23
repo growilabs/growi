@@ -38,7 +38,7 @@ user-invocable: false
 ## Build & Development Tools
 
 ### Package Management
-- **pnpm** 10.4.1 - Package manager (faster, more efficient than npm/yarn)
+- **pnpm** Package manager (faster, more efficient than npm/yarn)
 
 ### Monorepo Orchestration
 - **Turborepo** ^2.1.3 - Build system with caching and parallelization

@@ -72,6 +72,16 @@ See [GROWI Docs: Admin Guide](https://docs.growi.org/en/admin-guide/) ([en](http
 
 - [GROWI Docs: Environment Variables](https://docs.growi.org/en/admin-guide/admin-cookbook/env-vars.html)
 
+#### V8 Memory Management
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `V8_MAX_HEAP_SIZE` | int (MB) | (unset) | Explicitly specify the `--max-heap-size` value for Node.js |
+| `V8_OPTIMIZE_FOR_SIZE` | `"true"` / (unset) | (unset) | Enable the `--optimize-for-size` V8 flag to reduce memory usage |
+| `V8_LITE_MODE` | `"true"` / (unset) | (unset) | Enable the `--lite-mode` V8 flag to reduce memory usage at the cost of performance |
+
+**Heap size fallback behavior**: When `V8_MAX_HEAP_SIZE` is not set, the entrypoint automatically detects the container's memory limit via cgroup (v2/v1) and sets the heap size to 60% of the limit. If no cgroup limit is detected, V8's default heap behavior is used.
+
 
 Issues
 ------

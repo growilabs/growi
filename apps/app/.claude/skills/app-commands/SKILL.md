@@ -101,10 +101,12 @@ Generated specs output to `tmp/openapi-spec-apiv3.json`.
 
 ```bash
 # Development mode
-pnpm run dev:pre:styles
+pnpm run dev:pre:styles-commons
+pnpm run dev:pre:styles-components
 
 # Production mode
-pnpm run pre:styles
+pnpm run pre:styles-commons
+pnpm run pre:styles-commons-components
 ```
 
 Pre-builds SCSS styles into CSS bundles using Vite.
@@ -139,6 +141,18 @@ pnpm run version:prerelease
 # Create preminor (e.g., 7.4.4 → 7.5.0-RC.0)
 pnpm run version:preminor
 ```
+
+## Build Measurement
+
+```bash
+# Measure module count KPI (cleans .next, starts next dev, triggers compilation)
+./bin/measure-chunk-stats.sh           # default port 3099
+./bin/measure-chunk-stats.sh 3001      # custom port
+```
+
+Output: `[ChunkModuleStats] initial: N, async-only: N, total: N`
+
+For details on module optimization and baselines, see the `build-optimization` skill.
 
 ## Production
 

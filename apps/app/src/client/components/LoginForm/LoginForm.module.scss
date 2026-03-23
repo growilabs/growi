@@ -1,7 +1,7 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
-@use '~/styles/atoms/placeholders/buttons';
+@use 'styles/atoms/placeholders/buttons';
 
-.login-form :global {
+.login-form {
   //
   // deactivated in order to fix https://redmine.weseek.co.jp/issues/143531 -- 2024.04.02 Yuki Takei
   //
@@ -12,17 +12,17 @@
   //   height: 0% !important;
   // }
 
-  .collapse-external-auth {
+  :global(.collapse-external-auth) {
     overflow: hidden;
   }
 
-  .link-growi-org {
+  :global(.link-growi-org) {
     position: absolute;
     bottom: 9px;
     z-index: 3;
   }
 
-  .text-line {
+  :global(.text-line) {
     &::before,
     &::after {
       flex-grow: 1;
@@ -34,11 +34,11 @@
   }
 
 
-  .ldap-space {
+  :global(.ldap-space) {
     padding-right: 76px;
   }
 
-  .input-ldap {
+  :global(.input-ldap) {
     position: absolute;
     top: 4px;
     right: 5px;
@@ -48,47 +48,47 @@
 
 // Button colors
 :root {
-  .login-form :global {
+  .login-form {
 
-    .btn {
+    :global(.btn) {
       @extend %btn-nologin;
     }
 
-    .btn-register {
+    :global(.btn-register) {
       @extend %btn-register;
     }
 
-    .btn-login {
+    :global(.btn-login) {
       --bs-btn-bg: #{rgba(#204986, 0.6)};
       --bs-btn-hover-bg: #{rgba(#204986, 0.8)};
       --bs-btn-active-bg: #{rgba(#204986, 0.8)};
     }
 
-    .btn-function {
+    :global(.btn-function) {
       --bs-btn-bg: #{rgba(bs.$gray-800, 0.8)};
       --bs-btn-hover-bg: #{rgba(bs.$gray-800, 0.5)};
       --bs-btn-active-bg: #{rgba(bs.$gray-800, 0.5)};
     }
 
-    .btn-auth-google {
+    :global(.btn-auth-google) {
       --bs-btn-bg: #{rgba(#4285F4, 0.4)};
       --bs-btn-hover-bg: #{rgba(#4285F4, 0.8)};
       --bs-btn-active-bg: #{rgba(#4285F4, 0.8)};
     }
 
-    .btn-auth-github {
+    :global(.btn-auth-github) {
       --bs-btn-bg: #{rgba(#403D3E, 0.4)};
       --bs-btn-hover-bg: #{rgba(#403D3E, 0.7)};
       --bs-btn-active-bg: #{rgba(#403D3E, 0.7)};
     }
 
-    .btn-auth-oidc {
+    :global(.btn-auth-oidc) {
       --bs-btn-bg: #{rgba(#835B1A, 0.4)};
       --bs-btn-hover-bg: #{rgba(#835B1A, 0.8)};
       --bs-btn-active-bg: #{rgba(#835B1A, 0.8)};
     }
 
-    .btn-auth-saml {
+    :global(.btn-auth-saml) {
       --bs-btn-bg: #{rgba(#138957, 0.4)};
       --bs-btn-hover-bg: #{rgba(#138957, 0.7)};
       --bs-btn-active-bg: #{rgba(#138957, 0.7)};

@@ -1,14 +1,14 @@
 import { type JSX, Suspense, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useTranslation } from 'react-i18next';
 
 import ItemsTreeContentSkeleton from '../../ItemsTree/ItemsTreeContentSkeleton';
 import { PageTreeHeader } from './PageTreeSubstance';
 
-const PageTreeContent = dynamic(
-  () => import('./PageTreeSubstance').then((mod) => mod.PageTreeContent),
+// PageTreeWithDnD uses HTML5Backend which accesses browser APIs on mount;
+// ssr: false prevents it from rendering on the server.
+const PageTreeWithDnD = dynamic(
+  () => import('./PageTreeSubstance').then((mod) => mod.PageTreeWithDnD),
   { ssr: false, loading: ItemsTreeContentSkeleton },
 );
 
@@ -32,9 +32,7 @@ export const PageTree = (): JSX.Element => {
       </div>
 
       <Suspense fallback={<ItemsTreeContentSkeleton />}>
-        <DndProvider backend={HTML5Backend}>
-          <PageTreeContent isWipPageShown={isWipPageShown} />
-        </DndProvider>
+        <PageTreeWithDnD isWipPageShown={isWipPageShown} />
       </Suspense>
     </div>
   );

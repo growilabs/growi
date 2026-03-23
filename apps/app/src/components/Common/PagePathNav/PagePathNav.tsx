@@ -2,7 +2,7 @@ import { type JSX, useMemo } from 'react';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { pagePathUtils } from '@growi/core/dist/utils';
 
-import LinkedPagePath from '~/models/linked-page-path';
+import { LinkedPagePath } from '~/models/linked-page-path';
 
 import { PagePathHierarchicalLink } from '../PagePathHierarchicalLink';
 import { Separator } from '.';
