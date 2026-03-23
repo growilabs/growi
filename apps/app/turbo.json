@@ -15,7 +15,7 @@
     },
     "pre:styles-components": {
       "dependsOn": ["^build"],
-      "outputs": ["src/**/*.vendor-styles.prebuilt.js"],
+      "outputs": ["src/**/*.vendor-styles.prebuilt.*"],
       "inputs": [
         "vite.vendor-styles-components.ts",
         "src/**/*.vendor-styles.ts",
@@ -27,7 +27,7 @@
       "dependsOn": ["^build", "pre:styles-commons", "pre:styles-components"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"],
       "inputs": [
-        "next.config.js",
+        "next.config.ts",
         "config/**",
         "public/**",
         "resource/**",
@@ -56,11 +56,11 @@
     },
     "dev:pre:styles-components": {
       "dependsOn": ["^dev"],
-      "outputs": ["src/**/*.vendor-styles.prebuilt.js"],
+      "outputs": ["src/**/*.vendor-styles.prebuilt.*"],
       "inputs": [
         "vite.vendor-styles-components.ts",
-        "src/**/*.vendor-styles.ts",
-        "!src/**/*.vendor-styles.prebuilt.js",
+        "src/**/*.vendor-styles.*",
+        "!src/**/*.vendor-styles.prebuilt.*",
         "package.json"
       ],
       "outputLogs": "new-only"

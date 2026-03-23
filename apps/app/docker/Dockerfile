@@ -91,25 +91,16 @@ RUN turbo run clean
 RUN turbo run build --filter @growi/app
 
 # Produce artifacts
-RUN pnpm deploy out --prod --legacy --filter @growi/app
-RUN rm -rf apps/app/node_modules && mv out/node_modules apps/app/node_modules
-RUN rm -rf apps/app/.next/cache
-
-# Resolve .next/node_modules symlinks to real files.
-# Turbopack generates symlinks pointing to the pnpm virtual store (node_modules/.pnpm/),
-# which will not exist in the release image.
-RUN if [ -d apps/app/.next/node_modules ]; then \
-      cp -rL apps/app/.next/node_modules apps/app/.next/node_modules_resolved && \
-      rm -rf apps/app/.next/node_modules && \
-      mv apps/app/.next/node_modules_resolved apps/app/.next/node_modules; \
-    fi
+RUN bash apps/app/bin/assemble-prod.sh
 
 # Stage artifacts into a clean directory for COPY --from
 RUN mkdir -p /tmp/release/apps/app && \
   cp package.json /tmp/release/ && \
+  cp -a node_modules /tmp/release/ && \
   cp -a apps/app/.next apps/app/config apps/app/dist apps/app/public \
-       apps/app/resource apps/app/tmp apps/app/next.config.js \
+       apps/app/resource apps/app/tmp \
        apps/app/package.json apps/app/node_modules \
+       apps/app/next.config.js \
        /tmp/release/apps/app/ && \
   (cp apps/app/.env.production* /tmp/release/apps/app/ 2>/dev/null || true)
 

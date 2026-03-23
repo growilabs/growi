@@ -2,7 +2,7 @@
   "name": "@growi/slackbot-proxy",
   "version": "7.5.0-slackbot-proxy.0",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "scripts": {
     "build": "tspc -p tsconfig.build.json",
     "clean": "shx rm -rf dist",

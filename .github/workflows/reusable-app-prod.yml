@@ -57,25 +57,18 @@ jobs:
       env:
         ANALYZE: 1
 
-    - name: Assembling all dependencies
-      run: |
-        rm -rf out
-        pnpm deploy out --prod --legacy --filter @growi/app
-        rm -rf apps/app/node_modules && mv out/node_modules apps/app/node_modules
+    - name: Assemble production artifacts
+      run: bash apps/app/bin/assemble-prod.sh
 
-    - name: Resolve .next/node_modules symlinks
-      run: |
-        if [ -d apps/app/.next/node_modules ]; then
-          cp -rL apps/app/.next/node_modules apps/app/.next/node_modules_resolved
-          rm -rf apps/app/.next/node_modules
-          mv apps/app/.next/node_modules_resolved apps/app/.next/node_modules
-        fi
+    - name: Check for broken symlinks in .next/node_modules
+      run: bash apps/app/bin/check-next-symlinks.sh
 
     - name: Archive production files
       id: archive-prod-files
       run: |
         tar -zcf production.tar.gz --exclude ./apps/app/.next/cache \
           package.json \
+          node_modules \
           apps/app/.next \
           apps/app/config \
           apps/app/dist \
@@ -84,6 +77,7 @@ jobs:
           apps/app/tmp \
           apps/app/.env.production* \
           apps/app/node_modules \
+          apps/app/next.config.js \
           apps/app/package.json
         echo "file=production.tar.gz" >> $GITHUB_OUTPUT
 
@@ -179,7 +173,7 @@ jobs:
     container:
       # Match the Playwright version
       # https://github.com/microsoft/playwright/issues/20010
-      image: mcr.microsoft.com/playwright:v1.49.1-jammy
+      image: mcr.microsoft.com/playwright:v1.58.2-jammy
 
     strategy:
       fail-fast: false

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A package for GROWI presentation feature",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "keywords": [
     "growi",
     "growi-plugin"
@@ -29,8 +29,8 @@
     }
   },
   "scripts": {
+    "generate:marpit-base-css": "node scripts/extract-marpit-css.ts",
     "build": "vite build",
-    "build:vendor-styles": "vite build --config vite.vendor-styles.ts",
     "clean": "shx rm -rf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
