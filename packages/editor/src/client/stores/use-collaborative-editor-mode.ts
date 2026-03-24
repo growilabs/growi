@@ -41,87 +41,78 @@ export const useCollaborativeEditorMode = (
 
   // Setup provider
   useEffect(() => {
-    let _provider: WebsocketProvider | undefined;
-    let providerSyncHandler: (isSync: boolean) => void;
-    let updateAwarenessHandler: (update: {
+    if (!isEnabled || pageId == null || primaryDoc == null) {
+      setProvider(undefined);
+      return;
+    }
+
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const serverUrl = `${wsProtocol}//${window.location.host}${YJS_WEBSOCKET_BASE_PATH}`;
+
+    const _provider = new WebsocketProvider(serverUrl, pageId, primaryDoc, {
+      connect: true,
+      resyncInterval: 3000,
+    });
+
+    const userLocalState: EditingClient = {
+      clientId: primaryDoc.clientID,
+      name: user?.name ?? `Guest User ${Math.floor(Math.random() * 100)}`,
+      userId: user?._id,
+      username: user?.username,
+      imageUrlCached: user?.imageUrlCached,
+      color: userColor.color,
+      colorLight: userColor.light,
+    };
+
+    const { awareness } = _provider;
+    awareness.setLocalStateField('editors', userLocalState);
+
+    const providerSyncHandler = (isSync: boolean) => {
+      if (isSync && onEditorsUpdated != null) {
+        const clientList: EditingClient[] = Array.from(
+          awareness.getStates().values(),
+          (value) => value.editors,
+        );
+        if (Array.isArray(clientList)) {
+          onEditorsUpdated(clientList);
+        }
+      }
+    };
+
+    _provider.on('sync', providerSyncHandler);
+
+    const updateAwarenessHandler = (update: {
       added: number[];
       updated: number[];
       removed: number[];
-    }) => void;
-
-    setProvider(() => {
-      if (!isEnabled || pageId == null || primaryDoc == null) {
-        return undefined;
+    }) => {
+      // remove the states of disconnected clients
+      for (const clientId of update.removed) {
+        awareness.getStates().delete(clientId);
       }
 
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const serverUrl = `${wsProtocol}//${window.location.host}${YJS_WEBSOCKET_BASE_PATH}`;
-
-      _provider = new WebsocketProvider(serverUrl, pageId, primaryDoc, {
-        connect: true,
-        resyncInterval: 3000,
-      });
-
-      const userLocalState: EditingClient = {
-        clientId: primaryDoc.clientID,
-        name: user?.name ?? `Guest User ${Math.floor(Math.random() * 100)}`,
-        userId: user?._id,
-        username: user?.username,
-        imageUrlCached: user?.imageUrlCached,
-        color: userColor.color,
-        colorLight: userColor.light,
-      };
-
-      const { awareness } = _provider;
-      awareness.setLocalStateField('editors', userLocalState);
-
-      providerSyncHandler = (isSync: boolean) => {
-        if (isSync && onEditorsUpdated != null) {
-          const clientList: EditingClient[] = Array.from(
-            awareness.getStates().values(),
-            (value) => value.editors,
-          );
-          if (Array.isArray(clientList)) {
-            onEditorsUpdated(clientList);
-          }
+      // update editor list
+      if (onEditorsUpdated != null) {
+        const clientList: EditingClient[] = Array.from(
+          awareness.getStates().values(),
+          (value) => value.editors,
+        );
+        if (Array.isArray(clientList)) {
+          onEditorsUpdated(clientList);
         }
-      };
+      }
+    };
 
-      _provider.on('sync', providerSyncHandler);
+    awareness.on('update', updateAwarenessHandler);
 
-      updateAwarenessHandler = (update: {
-        added: number[];
-        updated: number[];
-        removed: number[];
-      }) => {
-        // remove the states of disconnected clients
-        for (const clientId of update.removed) {
-          awareness.getStates().delete(clientId);
-        }
-
-        // update editor list
-        if (onEditorsUpdated != null) {
-          const clientList: EditingClient[] = Array.from(
-            awareness.getStates().values(),
-            (value) => value.editors,
-          );
-          if (Array.isArray(clientList)) {
-            onEditorsUpdated(clientList);
-          }
-        }
-      };
-
-      awareness.on('update', updateAwarenessHandler);
-
-      return _provider;
-    });
+    setProvider(_provider);
 
     return () => {
-      _provider?.awareness.setLocalState(null);
-      _provider?.awareness.off('update', updateAwarenessHandler);
-      _provider?.off('sync', providerSyncHandler);
-      _provider?.disconnect();
-      _provider?.destroy();
+      _provider.awareness.setLocalState(null);
+      _provider.awareness.off('update', updateAwarenessHandler);
+      _provider.off('sync', providerSyncHandler);
+      _provider.disconnect();
+      _provider.destroy();
     };
   }, [isEnabled, primaryDoc, onEditorsUpdated, pageId, user]);
 
