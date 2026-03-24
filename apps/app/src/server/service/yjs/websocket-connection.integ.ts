@@ -89,7 +89,7 @@ describe('WebSocket Connection and Sync Flow', () => {
     }
   });
 
-  describe('Task 8.1: Connection and sync flow', () => {
+  describe('Connection and sync flow', () => {
     it('should create a server-side Y.Doc on first client connection', async () => {
       const pageId = 'test-page-sync-001';
 
@@ -99,9 +99,9 @@ describe('WebSocket Connection and Sync Flow', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       const serverDoc = docs.get(pageId);
-      expect(serverDoc).toBeDefined();
-      expect(serverDoc!.name).toBe(pageId);
-      expect(serverDoc!.conns.size).toBe(1);
+      assert(serverDoc !== undefined);
+      expect(serverDoc.name).toBe(pageId);
+      expect(serverDoc.conns.size).toBe(1);
 
       ws.close();
     });
@@ -115,8 +115,8 @@ describe('WebSocket Connection and Sync Flow', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       const serverDoc = docs.get(pageId);
-      expect(serverDoc).toBeDefined();
-      expect(serverDoc!.conns.size).toBe(2);
+      assert(serverDoc !== undefined);
+      expect(serverDoc.conns.size).toBe(2);
 
       ws1.close();
       ws2.close();
@@ -137,14 +137,14 @@ describe('WebSocket Connection and Sync Flow', () => {
 
       // Server doc should still exist with client 2
       const serverDoc = docs.get(pageId);
-      expect(serverDoc).toBeDefined();
-      expect(serverDoc!.conns.size).toBe(1);
+      assert(serverDoc !== undefined);
+      expect(serverDoc.conns.size).toBe(1);
 
       ws2.close();
     });
   });
 
-  describe('Task 8.2: Concurrency - single Y.Doc per page', () => {
+  describe('Concurrency — single Y.Doc per page', () => {
     it('should create exactly one Y.Doc for simultaneous connections', async () => {
       const pageId = 'test-page-concurrent-001';
 
@@ -159,8 +159,8 @@ describe('WebSocket Connection and Sync Flow', () => {
 
       // Verify single Y.Doc instance
       const serverDoc = docs.get(pageId);
-      expect(serverDoc).toBeDefined();
-      expect(serverDoc!.conns.size).toBe(3);
+      assert(serverDoc !== undefined);
+      expect(serverDoc.conns.size).toBe(3);
 
       // Only one doc for this page
       const matchingDocs = Array.from(docs.values()).filter(
@@ -182,8 +182,8 @@ describe('WebSocket Connection and Sync Flow', () => {
 
       // Write to server doc directly
       const serverDoc = docs.get(pageId);
-      expect(serverDoc).toBeDefined();
-      serverDoc!.getText('codemirror').insert(0, 'Hello World');
+      assert(serverDoc !== undefined);
+      serverDoc.getText('codemirror').insert(0, 'Hello World');
 
       // Client 2 connects and immediately disconnects
       const ws2 = await connectClient(port, pageId);
@@ -193,11 +193,11 @@ describe('WebSocket Connection and Sync Flow', () => {
 
       // Server doc should still exist with client 1
       const docAfter = docs.get(pageId);
-      expect(docAfter).toBeDefined();
-      expect(docAfter!.conns.size).toBe(1);
+      assert(docAfter !== undefined);
+      expect(docAfter.conns.size).toBe(1);
 
       // Text should be intact
-      expect(docAfter!.getText('codemirror').toString()).toBe('Hello World');
+      expect(docAfter.getText('codemirror').toString()).toBe('Hello World');
 
       ws1.close();
     });

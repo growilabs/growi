@@ -136,7 +136,7 @@ describe('guardSocket — protection against hostile upgrade handlers', () => {
     }
   });
 
-  it('should properly restore socket methods after guard', async () => {
+  it('should allow normal close after guard is restored', async () => {
     const pageId = 'guard-test-003';
 
     const ws = await connectClient(port, pageId);
