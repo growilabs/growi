@@ -263,7 +263,7 @@
     "sanitize-filename": "^1.6.3",
     "simplebar-react": "^2.3.6",
     "socket.io": "^4.7.5",
-    "string-width": "=4.2.2",
+    "string-width": "^7.0.0",
     "superjson": "^2.2.2",
     "swagger-jsdoc": "^6.2.8",
     "swr": "^2.3.2",

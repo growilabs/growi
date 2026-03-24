@@ -781,8 +781,8 @@ importers:
         specifier: ^4.7.5
         version: 4.8.3
       string-width:
-        specifier: '=4.2.2'
-        version: 4.2.2
+        specifier: ^7.0.0
+        version: 7.2.0
       superjson:
         specifier: ^2.2.2
         version: 2.2.2
@@ -13058,10 +13058,6 @@ packages:
 
   string-template@1.0.0:
     resolution: {integrity: sha512-SLqR3GBUXuoPP5MmYtD7ompvXiG87QjT6lzOszyXjTM86Uu7At7vNnt2xgyTLq5o9T4IxTYFyGxcULqpsmsfdg==}
-
-  string-width@4.2.2:
-    resolution: {integrity: sha512-XBJbT3N4JhVumXE0eoLU9DCjcaF92KLNqTmFCnG1pf8duUxFGwtP6AD6nkjw9a3IdiRtL3E2w3JDiE/xi3vOeA==}
-    engines: {node: '>=8'}
 
   string-width@4.2.3:
     resolution: {integrity: sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==}
@@ -28795,12 +28791,6 @@ snapshots:
   string-argv@0.3.2: {}
 
   string-template@1.0.0: {}
-
-  string-width@4.2.2:
-    dependencies:
-      emoji-regex: 8.0.0
-      is-fullwidth-code-point: 3.0.0
-      strip-ansi: 6.0.1
 
   string-width@4.2.3:
     dependencies:
