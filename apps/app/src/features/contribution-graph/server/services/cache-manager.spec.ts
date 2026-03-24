@@ -295,5 +295,56 @@ describe('Contribution Cache Manager Integration Test', () => {
 
       vi.useRealTimers();
     });
+
+    it('should maintain a 365-day window and handle data rotation when the graph is full', async () => {
+      const userId = createMockId();
+
+      // Setup Dates: Today vs. 370 days ago (Older than the graph limit)
+      const now = new Date();
+      now.setUTCHours(12, 0, 0, 0);
+
+      const wayPastDate = new Date(now);
+      wayPastDate.setUTCDate(now.getUTCDate() - 370); // Out of bounds
+
+      const justInsideDate = new Date(now);
+      justInsideDate.setUTCDate(now.getUTCDate() - 360); // In bounds
+
+      const wayPastId = getISOWeekId(wayPastDate);
+      const justInsideId = getISOWeekId(justInsideDate);
+      const wayPastStr = formatDateKey(wayPastDate);
+
+      vi.useFakeTimers();
+      vi.setSystemTime(now);
+
+      // Setup Cache with a "Stale" week and a "Valid" week
+      await ContributionCache.create({
+        userId,
+        lastUpdated: new Date(now.getTime() - 86400000), // Updated yesterday
+        currentWeekData: [],
+        permanentWeeks: new Map([
+          [wayPastId, [{ date: wayPastStr, count: 10 }]], // This should be cleaned
+          [justInsideId, [{ date: formatDateKey(justInsideDate), count: 5 }]],
+        ]),
+      });
+
+      await Activity.create({
+        user: userId,
+        action: ActivityLogActions.ACTION_PAGE_CREATE,
+        createdAt: now,
+      });
+
+      await cacheManager.getUpdatedCache(userId);
+
+      const updatedDoc = await ContributionCache.findOne({ userId });
+
+      expect(updatedDoc?.permanentWeeks.has(justInsideId)).toBe(true);
+      expect(updatedDoc?.permanentWeeks.has(wayPastId)).toBe(false);
+      expect(updatedDoc?.permanentWeeks.size).toBeLessThanOrEqual(53);
+
+      const todayEntry = updatedDoc?.currentWeekData.find(
+        (d) => d.date === formatDateKey(now),
+      );
+      expect(todayEntry?.count).toBe(1);
+    });
   });
 });
