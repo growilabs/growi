@@ -1,12 +1,13 @@
 import path from 'node:path';
+import { YJS_WEBSOCKET_BASE_PATH } from '@growi/core/dist/consts';
 import react from '@vitejs/plugin-react';
 import glob from 'glob';
 import { nodeExternals } from 'rollup-plugin-node-externals';
-import { Server } from 'socket.io';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
-import { YSocketIO } from 'y-socket.io/dist/server';
+
+const YJS_PATH_PREFIX = `${YJS_WEBSOCKET_BASE_PATH}/`;
 
 const excludeFiles = [
   '**/components/playground/*',
@@ -14,27 +15,30 @@ const excludeFiles = [
   '**/vite-env.d.ts',
 ];
 
-const devSocketIOPlugin = (): Plugin => ({
-  name: 'dev-socket-io',
+const devWebSocketPlugin = (): Plugin => ({
+  name: 'dev-y-websocket',
   apply: 'serve',
   configureServer(server) {
     if (!server.httpServer) return;
 
-    // setup socket.io
-    const io = new Server(server.httpServer);
-    io.on('connection', (socket) => {
-      // biome-ignore lint/suspicious/noConsole: Allow to use
-      console.log('Client connected');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { setupWSConnection } = require('y-websocket/bin/utils');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { WebSocketServer } = require('ws');
 
-      socket.on('disconnect', () => {
-        // biome-ignore lint/suspicious/noConsole: Allow to use
-        console.log('Client disconnected');
+    const wss = new WebSocketServer({ noServer: true });
+
+    server.httpServer.on('upgrade', (request, socket, head) => {
+      const url = request.url ?? '';
+      if (!url.startsWith(YJS_PATH_PREFIX)) return;
+
+      const pageId = url.slice(YJS_PATH_PREFIX.length).split('?')[0];
+
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+        setupWSConnection(ws, request, { docName: pageId });
       });
     });
-
-    // setup y-socket.io
-    const ysocketio = new YSocketIO(io);
-    ysocketio.initialize();
   },
 });
 
@@ -42,7 +46,7 @@ const devSocketIOPlugin = (): Plugin => ({
 export default defineConfig({
   plugins: [
     react(),
-    devSocketIOPlugin(),
+    devWebSocketPlugin(),
     dts({
       entryRoot: 'src',
       exclude: [...excludeFiles],
