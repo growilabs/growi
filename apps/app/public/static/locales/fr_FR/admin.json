@@ -880,6 +880,7 @@
     "available_action_list_explanation": "Liste des actions pouvant être recherchées/vues",
     "action_list": "Liste d'actions",
     "disable_mode_explanation": "Cette fonctionnalité est désactivée. Afin de l'activer, mettre à jour <code>AUDIT_LOG_ENABLED</code> pour true.",
+    "disable_mode_explanation_cloud": "Le journal d'audit est actuellement désactivé. Pour l'activer, veuillez modifier les paramètres de l'application depuis l'écran de gestion GROWI.cloud.",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
