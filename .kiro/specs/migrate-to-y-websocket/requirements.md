@@ -77,7 +77,7 @@ This specification defines the requirements for migrating the collaborative edit
 
 1. The Yjs Service shall continue to expose `getYDocStatus(pageId)` returning the correct status (ISOLATED, NEW, DRAFT, SYNCED, OUTDATED).
 2. The Yjs Service shall continue to expose `getCurrentYdoc(pageId)` returning the in-memory Y.Doc instance if one exists.
-3. When the `document-loaded` event fires (or equivalent), the Yjs Service shall call `syncYDoc` to synchronize the document with the latest revision based on YDoc status.
+3. When a Y.Doc is loaded from persistence (within `bindState`), the Yjs Service shall call `syncYDoc` to synchronize the document with the latest revision based on YDoc status.
 4. The Yjs Service shall continue to expose `syncWithTheLatestRevisionForce(pageId)` for API-triggered force synchronization.
 
 ### Requirement 7: Development Environment Support

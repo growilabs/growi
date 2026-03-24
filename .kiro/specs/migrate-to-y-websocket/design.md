@@ -173,6 +173,7 @@ stateDiagram-v2
 |-----------|-------------|--------|-------------|-----------------|-----------|
 | YjsService | Server / Service | Orchestrates Yjs document lifecycle, exposes public API | 1.1-1.5, 2.1, 6.1-6.4 | ws (P0), y-websocket/bin/utils (P0), MongodbPersistence (P0) | Service |
 | UpgradeHandler | Server / Auth | Authenticates and authorizes WebSocket upgrade requests | 3.1-3.4, 2.3 | express-session (P0), passport (P0), Page model (P0) | Service |
+| guardSocket | Server / Util | Prevents socket closure by other upgrade handlers during async auth | 2.3 | — | Utility |
 | PersistenceAdapter | Server / Data | Bridges MongodbPersistence to y-websocket persistence interface; handles sync-on-load and awareness registration | 4.1-4.5, 6.3, 5.2, 5.3 | MongodbPersistence (P0), syncYDoc (P0), Socket.IO io (P1) | Service, Event |
 | AwarenessBridge | Server / Events | Bridges y-websocket awareness events to Socket.IO rooms | 5.2, 5.3 | Socket.IO io (P0), docs Map (P1) | Event |
 | use-collaborative-editor-mode | Client / Hook | Manages WebsocketProvider lifecycle and awareness | 2.2, 2.4, 5.1, 5.4 | y-websocket (P0), yjs (P0) | State |
@@ -240,18 +241,15 @@ interface IYjsService {
 | Requirements | 3.1, 3.2, 3.3, 3.4 |
 
 **Responsibilities & Constraints**
-- Parses session cookie from the HTTP upgrade request
-- Loads session from the session store (Redis or MongoDB)
-- Deserializes the user via passport
+- Runs express-session and passport middleware against the raw upgrade request via `runMiddleware` helper
 - Checks page access using `Page.isAccessiblePageByViewer`
 - Extracts `pageId` from the URL path (`/yjs/{pageId}`)
-- Rejects unauthorized requests before `wss.handleUpgrade`
+- Writes HTTP error responses for unauthorized requests (`writeErrorResponse`) — does NOT close the socket; socket lifecycle is managed by the caller (YjsService) to work correctly with `guardSocket`
 
 **Dependencies**
 - Inbound: YjsService — called on upgrade event (P0)
-- Outbound: Session Store (Redis/MongoDB) — session lookup (P0)
+- Outbound: express-session + passport — session/user deserialization (P0)
 - Outbound: Page model — access check (P0)
-- External: cookie (npm) — cookie parsing (P0)
 
 **Contracts**: Service [x]
 
@@ -259,31 +257,45 @@ interface IYjsService {
 
 ```typescript
 type AuthenticatedRequest = IncomingMessage & {
-  user: IUserHasId | null;
+  user?: IUserHasId;
 };
 
 type UpgradeResult =
   | { authorized: true; request: AuthenticatedRequest; pageId: string }
   | { authorized: false; statusCode: number };
 
-interface IUpgradeHandler {
-  handleUpgrade(
-    request: IncomingMessage,
-    socket: Duplex,
-    head: Buffer,
-  ): Promise<UpgradeResult>;
-}
+// Factory function — returns an async handler
+const createUpgradeHandler = (sessionConfig: SessionConfig) =>
+  async (request, socket, head): Promise<UpgradeResult> => { ... };
 ```
 
 - Preconditions: Request has valid URL matching `/yjs/{pageId}`
-- Postconditions: Returns authorized result with deserialized user and pageId, or rejection with HTTP status
-- Invariants: Never calls `wss.handleUpgrade` for unauthorized requests
+- Postconditions: Returns authorized result with deserialized user and pageId, or rejection with HTTP error written to socket
+- Invariants: Never calls `wss.handleUpgrade` for unauthorized requests; never calls `socket.destroy()` (caller responsibility)
 
 **Implementation Notes**
-- Use `cookie` package to parse `request.headers.cookie`
-- Use the session store's `get(sessionId, callback)` to load session data
-- Attach `user` to `request` object for downstream use in `setupWSConnection`
-- Guest access: if `user` is null but page allows guest access, proceed with authorization
+- Uses `runMiddleware` helper to execute Connect-style middleware (express-session, passport.initialize, passport.session) against raw `IncomingMessage` with a stub `ServerResponse`
+- `writeErrorResponse` writes HTTP status line only — socket cleanup is deferred to the caller so that `guardSocket` (see below) can intercept `socket.destroy()` during async auth
+- Guest access: if `user` is undefined but page allows guest access, proceed with authorization
+
+#### guardSocket
+
+| Field | Detail |
+|-------|--------|
+| Intent | Prevents other synchronous upgrade handlers from closing the socket during async auth |
+| Requirements | 2.3 (coexistence with other servers) |
+
+**Why this exists**: Node.js EventEmitter fires all `upgrade` listeners synchronously. When the Yjs handler (async) yields at its first `await`, Next.js's `NextCustomServer.upgradeHandler` runs and calls `socket.end()` for paths it does not recognize. This destroys the socket before Yjs auth completes. `prependListener` cannot solve this because it only changes listener order — it cannot prevent subsequent listeners from executing.
+
+**How it works**: Temporarily replaces `socket.end()` and `socket.destroy()` with no-ops before the first `await`. After auth completes, calls `restore()` to reinstate the original methods, then proceeds with either `wss.handleUpgrade` (success) or `socket.destroy()` (failure).
+
+```typescript
+const guard = guardSocket(socket);
+const result = await handleUpgrade(request, socket, head);
+guard.restore();
+```
+
+**Test coverage**: `guard-socket.spec.ts` verifies that a hostile upgrade handler calling `socket.end()` does not prevent WebSocket connection establishment.
 
 #### PersistenceAdapter
 
@@ -432,38 +444,7 @@ No changes to data models. The `yjs-writings` MongoDB collection schema, indexes
 - Log persistence errors at `error` level
 - Existing Socket.IO event monitoring unchanged
 
-## Testing Strategy
+## Security Notes
 
-### Unit Tests
-- UpgradeHandler: cookie parsing, session loading, access check for authorized/unauthorized/guest users
-- PersistenceAdapter: bindState loads and applies persisted state, writeState flushes document
-- AwarenessBridge: awareness event triggers correct Socket.IO room emission
-- WebSocket URL construction in use-collaborative-editor-mode
-
-### Integration Tests
-- Full connection flow: WebSocket upgrade → auth → document creation → sync step 1/2
-- Multi-client sync: Two clients connect, both receive each other's updates via same Y.Doc
-- Reconnection: Client disconnects and reconnects, receives updates missed during disconnection
-- Persistence round-trip: Document persisted on disconnect, restored on next connection
-
-### Concurrency Tests
-- Simultaneous connections: Multiple clients connect at the same instant — verify single Y.Doc instance (the race condition fix)
-- Disconnect during connect: Client disconnects while another is initializing — verify no document corruption
-
-## Security Considerations
-
-- **Authentication boundary**: Auth check happens in the HTTP upgrade handler BEFORE WebSocket connection is established — unauthorized clients never receive any Yjs data
-- **Session fixation**: Uses same session mechanism as the rest of GROWI; no new attack surface
-- **Data leakage**: PageId extracted from URL path is validated against `Page.isAccessiblePageByViewer` — same check as current y-socket.io middleware
-- **DoS**: WebSocket connections are subject to the same connection limits as Socket.IO (enforced at HTTP level)
-
-## Migration Strategy
-
-This is a code-level replacement, not a data migration. No changes to the `yjs-writings` MongoDB collection.
-
-**Phase 1**: Implement server-side changes (YjsService, UpgradeHandler, PersistenceAdapter, AwarenessBridge)
-**Phase 2**: Implement client-side changes (use-collaborative-editor-mode, ViteDevConfig)
-**Phase 3**: Remove y-socket.io dependency, update package.json classifications
-**Phase 4**: Test all collaborative editing scenarios
-
-Rollback: Revert the code changes; no data migration to undo.
+- Auth check happens in the HTTP upgrade handler BEFORE WebSocket connection is established — unauthorized clients never receive any Yjs data
+- Uses same session mechanism as the rest of GROWI; no new attack surface

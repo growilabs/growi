@@ -128,6 +128,28 @@
 - **Risk**: Document cleanup race when last client disconnects and a new client immediately connects
   - **Mitigation**: y-websocket's `getYDoc` atomic pattern handles this — new client gets a fresh doc if cleanup completed, or the existing doc if not yet cleaned up
 
+## Implementation Discoveries
+
+### Next.js NextCustomServer.upgradeHandler Race Condition
+- **Context**: WebSocket connections to `/yjs/{pageId}` failed with "could not establish connection" in dev mode
+- **Root Cause**: Next.js's `NextCustomServer.upgradeHandler` (in `next/dist/server/lib/router-server.js:657`) registers an `upgrade` listener on the HTTP server. When the Yjs async handler yields at `await handleUpgrade(...)`, Next.js's synchronous handler runs and calls `socket.end()` for paths it does not recognize.
+- **Evidence**: Stack trace confirmed `socket.end()` called from `NextCustomServer.upgradeHandler` during the 6ms async auth gap
+- **Solution**: `guardSocket` pattern — temporarily replace `socket.end()`/`socket.destroy()` with no-ops before the first `await`, restore after auth completes
+- **Why alternatives don't work**:
+  - `httpServer.prependListener('upgrade', ...)` — only changes listener order, cannot prevent subsequent listeners from executing
+  - Removing Next.js's listener — fragile, breaks HMR
+  - Synchronous auth — impossible (requires async MongoDB/session store queries)
+- **Test**: `guard-socket.spec.ts` reproduces the scenario with a hostile upgrade handler
+
+### React Render-Phase Violation in use-collaborative-editor-mode
+- **Context**: `Cannot update a component (EditingUsers) while rendering a different component (Y)` warning
+- **Root Cause**: Provider creation and awareness event handlers were inside `setProvider(() => { ... })` — a functional state updater that React may call during rendering. `awareness.setLocalStateField()` triggered synchronous awareness events, which called `onEditorsUpdated()`, updating `EditingUsers` state during render.
+- **Solution**: Moved all side effects (provider creation, awareness setup, event handler registration) out of the `setProvider` updater into the `useEffect` body. `setProvider(_provider)` is called with a plain value after setup completes.
+
+### writeErrorResponse Pattern (Socket Lifecycle Separation)
+- **Context**: `rejectUpgrade` originally called both `socket.write()` and `socket.destroy()`, but during `guardSocket` protection, `destroy` was a no-op — creating confusing dual-destroy semantics
+- **Solution**: Renamed to `writeErrorResponse` with only `socket.write()`. Socket cleanup (`destroy`) is exclusively managed by the caller (`yjs.ts`) after `guard.restore()`, ensuring correct behavior regardless of guard state.
+
 ## References
 - [y-websocket GitHub](https://github.com/yjs/y-websocket) — official Yjs WebSocket provider
 - [y-websocket-server GitHub](https://github.com/yjs/y-websocket-server) — server-side utilities (yjs v14)
