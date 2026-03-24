@@ -890,6 +890,7 @@
     "available_action_list_explanation": "在当前配置中可以搜索/查看的行动列表",
     "action_list": "行动清单",
     "disable_mode_explanation": "审计日志当前已禁用。 要启用它，请将环境变量 <code>AUDIT_LOG_ENABLED</code> 设置为 true。",
+    "disable_mode_explanation_cloud": "审计日志当前已禁用。要启用它，请从 GROWI.cloud 管理界面更改应用程序设置。",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
