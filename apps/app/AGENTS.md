@@ -29,6 +29,10 @@ pnpm run test                   # Run tests
 
 # Build
 pnpm run build                  # Build for production
+
+# Run Specific Tests
+pnpm vitest run yjs.integ       # Use partial file name
+pnpm vitest run helper.spec     # Vitest auto-finds matching files
 ```
 
 ### Key Directories
@@ -150,8 +154,16 @@ When working in this directory, these skills are automatically loaded:
 - **app-commands** - apps/app specific commands (migrations, OpenAPI, etc.)
 - **app-specific-patterns** - Jotai/SWR/Next.js patterns, testing
 
-Plus all global skills (monorepo-overview, tech-stack, testing-patterns-with-vitest).
+Plus all global skills (monorepo-overview, tech-stack).
 
 ---
 
 For detailed patterns and examples, refer to the Skills in `.claude/skills/`.
+
+## Rules (Always Applied)
+
+The following rules in `.claude/rules/` are always applied when working in this directory:
+
+| Rule | Description |
+|------|-------------|
+| **package-dependencies** | Turbopack dependency classification — when to use `dependencies` vs `devDependencies`, verification procedure |

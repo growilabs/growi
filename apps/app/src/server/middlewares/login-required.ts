@@ -1,5 +1,6 @@
-import type { IUserHasId } from '@growi/core';
+import type { IUser } from '@growi/core';
 import type { NextFunction, Request, Response } from 'express';
+import type { HydratedDocument } from 'mongoose';
 
 import { createRedirectToForUnauthenticated } from '~/server/util/createRedirectToForUnauthenticated';
 import loggerFactory from '~/utils/logger';
@@ -10,7 +11,7 @@ import { UserStatus } from '../models/user/conts';
 const logger = loggerFactory('growi:middleware:login-required');
 
 type RequestWithUser = Request & {
-  user?: IUserHasId;
+  user?: HydratedDocument<IUser>;
   isSharedPage?: boolean;
   isBrandLogo?: boolean;
   session?: { redirectTo?: string };

@@ -1,23 +1,38 @@
-import type { Persistence } from 'y-socket.io/dist/server';
+import { YDocStatus } from '@growi/core/dist/consts';
+import type { Server } from 'socket.io';
+import type { WSSharedDoc, YWebsocketPersistence } from 'y-websocket/bin/utils';
 import * as Y from 'yjs';
 
+import { SocketEventName } from '~/interfaces/websocket';
+import {
+  getRoomNameWithId,
+  RoomPrefix,
+} from '~/server/service/socket-io/helper';
 import loggerFactory from '~/utils/logger';
 
 import type { MongodbPersistence } from './extended/mongodb-persistence';
+import type { syncYDoc as syncYDocType } from './sync-ydoc';
 
 const logger = loggerFactory('growi:service:yjs:create-mongodb-persistence');
 
+type GetYDocStatus = (pageId: string) => Promise<YDocStatus>;
+
 /**
- * Based on the example by https://github.com/MaxNoetzold/y-mongodb-provider?tab=readme-ov-file#an-other-example
- * @param mdb
- * @returns
+ * Creates a y-websocket compatible persistence layer backed by MongoDB.
+ *
+ * bindState also handles:
+ * - sync-on-load (syncYDoc) after persisted state is applied
+ * - awareness event bridge to Socket.IO rooms
  */
 export const createMongoDBPersistence = (
   mdb: MongodbPersistence,
-): Persistence => {
-  const persistece: Persistence = {
+  io: Server,
+  syncYDoc: typeof syncYDocType,
+  getYDocStatus: GetYDocStatus,
+): YWebsocketPersistence => {
+  const persistence: YWebsocketPersistence = {
     provider: mdb,
-    bindState: async (docName, ydoc) => {
+    bindState: async (docName: string, ydoc: WSSharedDoc) => {
       logger.debug('bindState', { docName });
 
       const persistedYdoc = await mdb.getYDoc(docName);
@@ -27,12 +42,7 @@ export const createMongoDBPersistence = (
       const diff = Y.encodeStateAsUpdate(ydoc, persistedStateVector);
 
       // store the new data in db (if there is any: empty update is an array of 0s)
-      if (
-        diff.reduce(
-          (previousValue, currentValue) => previousValue + currentValue,
-          0,
-        ) > 0
-      ) {
+      if (diff.some((b) => b !== 0)) {
         mdb.storeUpdate(docName, diff);
         mdb.setTypedMeta(docName, 'updatedAt', Date.now());
       }
@@ -40,23 +50,54 @@ export const createMongoDBPersistence = (
       // send the persisted data to clients
       Y.applyUpdate(ydoc, Y.encodeStateAsUpdate(persistedYdoc));
 
+      // cleanup some memory
+      persistedYdoc.destroy();
+
+      // sync with the latest revision after persisted state is applied
+      const ydocStatus = await getYDocStatus(docName);
+      syncYDoc(mdb, ydoc, { ydocStatus });
+
       // store updates of the document in db
-      ydoc.on('update', async (update) => {
+      ydoc.on('update', (update: Uint8Array) => {
         mdb.storeUpdate(docName, update);
         mdb.setTypedMeta(docName, 'updatedAt', Date.now());
       });
 
-      // cleanup some memory
-      persistedYdoc.destroy();
-    },
-    writeState: async (docName) => {
-      logger.debug('writeState', { docName });
-      // This is called when all connections to the document are closed.
+      // register awareness event bridge to Socket.IO rooms
+      // Only emit when the awareness state size actually changes (cursor moves
+      // and other updates fire frequently but don't change the user count)
+      let lastEmittedSize = -1;
+      ydoc.awareness.on('update', async () => {
+        const pageId = docName;
+        const awarenessStateSize = ydoc.awareness.getStates().size;
 
+        if (awarenessStateSize !== lastEmittedSize) {
+          lastEmittedSize = awarenessStateSize;
+          io.in(getRoomNameWithId(RoomPrefix.PAGE, pageId)).emit(
+            SocketEventName.YjsAwarenessStateSizeUpdated,
+            awarenessStateSize,
+          );
+        }
+
+        // emit draft status when last user leaves
+        if (awarenessStateSize === 0) {
+          const status = await getYDocStatus(pageId);
+          const hasYdocsNewerThanLatestRevision =
+            status === YDocStatus.DRAFT || status === YDocStatus.ISOLATED;
+
+          io.in(getRoomNameWithId(RoomPrefix.PAGE, pageId)).emit(
+            SocketEventName.YjsHasYdocsNewerThanLatestRevisionUpdated,
+            hasYdocsNewerThanLatestRevision,
+          );
+        }
+      });
+    },
+    writeState: async (docName: string) => {
+      logger.debug('writeState', { docName });
       // flush document on close to have the smallest possible database
       await mdb.flushDocument(docName);
     },
   };
 
-  return persistece;
+  return persistence;
 };

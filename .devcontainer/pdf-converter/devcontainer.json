@@ -4,6 +4,10 @@
   "service": "pdf-converter",
   "workspaceFolder": "/workspace/growi",
 
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
   // "forwardPorts": [],
 

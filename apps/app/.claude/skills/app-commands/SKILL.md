@@ -8,6 +8,37 @@ user-invocable: false
 
 Commands specific to the main GROWI application. For global commands (turbo, pnpm), see the global `tech-stack` skill.
 
+## Quality Check Commands
+
+**IMPORTANT**: Distinguish between Turborepo tasks and package-specific scripts.
+
+### Turbo Tasks vs Package Scripts
+
+| Task | Turborepo (turbo.json) | Package Script (package.json) |
+|------|------------------------|-------------------------------|
+| `lint` | ✅ Yes | ✅ Yes (runs all lint:\*) |
+| `test` | ✅ Yes | ✅ Yes |
+| `build` | ✅ Yes | ✅ Yes |
+| `lint:typecheck` | ❌ No | ✅ Yes |
+| `lint:biome` | ❌ No | ✅ Yes |
+| `lint:styles` | ❌ No | ✅ Yes |
+
+### Recommended Commands
+
+```bash
+# Run ALL quality checks (uses Turborepo caching)
+turbo run lint --filter @growi/app
+turbo run test --filter @growi/app
+turbo run build --filter @growi/app
+
+# Run INDIVIDUAL lint checks (package-specific scripts, from apps/app directory)
+pnpm run lint:typecheck   # TypeScript only
+pnpm run lint:biome       # Biome only
+pnpm run lint:styles      # Stylelint only
+```
+
+> **Running individual test files**: See the `testing` rule (`.claude/rules/testing.md`).
+
 ## Quick Reference
 
 | Task | Command |
@@ -70,10 +101,12 @@ Generated specs output to `tmp/openapi-spec-apiv3.json`.
 
 ```bash
 # Development mode
-pnpm run dev:pre:styles
+pnpm run dev:pre:styles-commons
+pnpm run dev:pre:styles-components
 
 # Production mode
-pnpm run pre:styles
+pnpm run pre:styles-commons
+pnpm run pre:styles-commons-components
 ```
 
 Pre-builds SCSS styles into CSS bundles using Vite.
@@ -108,6 +141,18 @@ pnpm run version:prerelease
 # Create preminor (e.g., 7.4.4 → 7.5.0-RC.0)
 pnpm run version:preminor
 ```
+
+## Build Measurement
+
+```bash
+# Measure module count KPI (cleans .next, starts next dev, triggers compilation)
+./bin/measure-chunk-stats.sh           # default port 3099
+./bin/measure-chunk-stats.sh 3001      # custom port
+```
+
+Output: `[ChunkModuleStats] initial: N, async-only: N, total: N`
+
+For details on module optimization and baselines, see the `build-optimization` skill.
 
 ## Production
 
