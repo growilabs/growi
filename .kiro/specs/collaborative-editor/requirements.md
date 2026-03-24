@@ -2,13 +2,11 @@
 
 ## Introduction
 
-GROWI's collaborative editing system currently uses `y-socket.io` (v1.1.3) as the Yjs transport layer for real-time document synchronization. A critical race condition in `y-socket.io`'s `initDocument()` method causes clients to occasionally split into isolated Y.Doc instances on the server, resulting in permanent desynchronization until browser reload. The `y-socket.io` library has been unmaintained since September 2023.
-
-This specification defines the requirements for migrating the collaborative editing transport layer from `y-socket.io` to `y-websocket`, the official Yjs WebSocket provider maintained by the Yjs core team. The migration resolves the document initialization race condition while maintaining all existing collaborative editing functionality.
+GROWI provides real-time collaborative editing powered by Yjs, allowing multiple users to simultaneously edit the same wiki page with automatic conflict resolution. The collaborative editing system uses `y-websocket` as the Yjs transport layer over native WebSocket, with MongoDB persistence for draft state and Socket.IO bridging for awareness/presence events to non-editor UI components.
 
 **Scope**: Server-side Yjs document management, client-side Yjs provider, WebSocket authentication, MongoDB persistence integration, and awareness/presence tracking.
 
-**Out of Scope**: Changes to the Yjs document model itself, CodeMirror editor integration, page save/revision logic, or the global Socket.IO infrastructure used for non-Yjs events.
+**Out of Scope**: The Yjs document model itself, CodeMirror editor integration details, page save/revision logic, or the global Socket.IO infrastructure used for non-Yjs events.
 
 ## Requirements
 
@@ -26,14 +24,14 @@ This specification defines the requirements for migrating the collaborative edit
 
 ### Requirement 2: WebSocket Transport Layer
 
-**Objective:** As a system operator, I want the collaborative editing transport to use y-websocket instead of y-socket.io, so that the system benefits from active maintenance and the race-condition-free document initialization pattern.
+**Objective:** As a system operator, I want the collaborative editing transport to use y-websocket over native WebSocket, so that the system benefits from active maintenance and atomic document initialization.
 
 #### Acceptance Criteria
 
-1. The Yjs Service shall use `y-websocket` (or `@y/websocket-server`) as the server-side Yjs transport, replacing `y-socket.io`.
-2. The Editor Client shall use `y-websocket`'s `WebsocketProvider` as the client-side Yjs provider, replacing `y-socket.io`'s `SocketIOProvider`.
+1. The Yjs Service shall use `y-websocket` server utilities as the server-side Yjs transport.
+2. The Editor Client shall use `y-websocket`'s `WebsocketProvider` as the client-side Yjs provider.
 3. The WebSocket server shall coexist with the existing Socket.IO server on the same HTTP server instance without port conflicts.
-4. The Yjs Service shall support the `resyncInterval` capability (periodic state re-synchronization) to recover from any missed updates.
+4. The Yjs Service shall support `resyncInterval` (periodic state re-synchronization) to recover from any missed updates.
 
 ### Requirement 3: Authentication and Authorization
 
@@ -46,14 +44,14 @@ This specification defines the requirements for migrating the collaborative edit
 3. If an unauthenticated or unauthorized WebSocket upgrade request is received, the Yjs Service shall reject the connection with an appropriate HTTP error status.
 4. Where guest access is enabled for a page, the Yjs Service shall allow guest users to connect to that page's collaborative editing session.
 
-### Requirement 4: MongoDB Persistence Compatibility
+### Requirement 4: MongoDB Persistence
 
-**Objective:** As a system operator, I want the Yjs persistence layer to continue using the existing MongoDB storage, so that no data migration is required and existing drafts are preserved.
+**Objective:** As a system operator, I want the Yjs persistence layer to use MongoDB storage, so that draft state is preserved across server restarts and client reconnections.
 
 #### Acceptance Criteria
 
-1. The Yjs Service shall continue to use the `yjs-writings` MongoDB collection for document persistence.
-2. The Yjs Service shall maintain compatibility with the existing `MongodbPersistence` implementation (extended `y-mongodb-provider`).
+1. The Yjs Service shall use the `yjs-writings` MongoDB collection for document persistence.
+2. The Yjs Service shall use the `MongodbPersistence` implementation (extended `y-mongodb-provider`).
 3. When a Y.Doc is loaded from persistence, the Yjs Service shall apply the persisted state before sending sync messages to connecting clients.
 4. When a Y.Doc receives updates, the Yjs Service shall persist each update to MongoDB with an `updatedAt` timestamp.
 5. When all clients disconnect from a document, the Yjs Service shall flush the document state to MongoDB before destroying the in-memory instance.
@@ -71,30 +69,11 @@ This specification defines the requirements for migrating the collaborative edit
 
 ### Requirement 6: YDoc Status and Sync Integration
 
-**Objective:** As a system component, I want the YDoc status detection and force-sync mechanisms to continue functioning, so that draft detection, save operations, and revision synchronization work correctly.
+**Objective:** As a system component, I want the YDoc status detection and force-sync mechanisms to function correctly, so that draft detection, save operations, and revision synchronization work as expected.
 
 #### Acceptance Criteria
 
-1. The Yjs Service shall continue to expose `getYDocStatus(pageId)` returning the correct status (ISOLATED, NEW, DRAFT, SYNCED, OUTDATED).
-2. The Yjs Service shall continue to expose `getCurrentYdoc(pageId)` returning the in-memory Y.Doc instance if one exists.
+1. The Yjs Service shall expose `getYDocStatus(pageId)` returning the correct status (ISOLATED, NEW, DRAFT, SYNCED, OUTDATED).
+2. The Yjs Service shall expose `getCurrentYdoc(pageId)` returning the in-memory Y.Doc instance if one exists.
 3. When a Y.Doc is loaded from persistence (within `bindState`), the Yjs Service shall call `syncYDoc` to synchronize the document with the latest revision based on YDoc status.
-4. The Yjs Service shall continue to expose `syncWithTheLatestRevisionForce(pageId)` for API-triggered force synchronization.
-
-### Requirement 7: Development Environment Support
-
-**Objective:** As a developer, I want the collaborative editing to work in the local development environment, so that I can develop and test collaborative features.
-
-#### Acceptance Criteria
-
-1. The Vite dev server configuration (`packages/editor/vite.config.ts`) shall support the y-websocket-based collaborative editing setup.
-2. When running `turbo run dev`, the WebSocket endpoint for collaborative editing shall be available alongside the existing Socket.IO endpoints.
-
-### Requirement 8: Dependency Cleanup
-
-**Objective:** As a maintainer, I want the y-socket.io dependency to be completely removed after migration, so that the codebase has no dead dependencies.
-
-#### Acceptance Criteria
-
-1. When the migration is complete, the `y-socket.io` package shall be removed from all `package.json` files in the monorepo.
-2. The system shall have no remaining imports or type references to `y-socket.io` modules.
-3. The `y-websocket` (and/or `@y/websocket-server`) package shall be listed in the appropriate `dependencies` or `devDependencies` section based on the Turbopack externalisation rule.
+4. The Yjs Service shall expose `syncWithTheLatestRevisionForce(pageId)` for API-triggered force synchronization.
