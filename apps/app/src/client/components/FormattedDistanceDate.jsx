@@ -1,5 +1,6 @@
-import React from 'react';
-import { differenceInSeconds, format, formatDistanceStrict } from 'date-fns';
+import { differenceInSeconds } from 'date-fns/differenceInSeconds';
+import { format } from 'date-fns/format';
+import { formatDistanceStrict } from 'date-fns/formatDistanceStrict';
 import PropTypes from 'prop-types';
 import { UncontrolledTooltip } from 'reactstrap';
 

@@ -1,4 +1,36 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(node --version)",
+      "Bash(npm --version)",
+      "Bash(npm view *)",
+      "Bash(pnpm --version)",
+      "Bash(turbo --version)",
+      "Bash(turbo run build)",
+      "Bash(turbo run lint)",
+      "Bash(pnpm run lint:*)",
+      "Bash(pnpm vitest run *)",
+      "Bash(pnpm biome check *)",
+      "Bash(pnpm ls *)",
+      "Bash(pnpm why *)",
+      "Bash(cat *)",
+      "Bash(echo *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(git diff *)",
+      "Bash(gh issue view *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr diff *)",
+      "Bash(ls *)",
+      "WebFetch(domain:github.com)",
+      "mcp__context7__*",
+      "mcp__plugin_context7_*",
+      "mcp__github__*",
+      "WebSearch",
+      "WebFetch"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
   "hooks": {
     "SessionStart": [
       {
@@ -17,8 +49,7 @@
           {
             "type": "command",
             "command": "if [[ \"$FILE\" == */apps/* ]] || [[ \"$FILE\" == */packages/* ]]; then REPO_ROOT=$(echo \"$FILE\" | sed 's|/\\(apps\\|packages\\)/.*|/|'); cd \"$REPO_ROOT\" && pnpm biome check --write \"$FILE\" 2>/dev/null || true; fi",
-            "timeout": 30,
-            "description": "Auto-format edited files in apps/* and packages/* with Biome"
+            "timeout": 30
           }
         ]
       }

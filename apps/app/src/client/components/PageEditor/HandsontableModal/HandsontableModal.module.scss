@@ -1,23 +1,23 @@
-.grw-handsontable :global {
-  .handsontable {
+.grw-handsontable {
+  :global(.handsontable) {
     position: relative;
 
-    .handsontableInput {
+    :global(.handsontableInput) {
       max-width: 290px !important;
     }
 
-    td {
+    :global(td) {
       word-break: break-all;
     }
 
-    th {
+    :global(th) {
       text-align: inherit;
     }
   }
 
   // expand .hot-table-container (with flexbox)
-  .grw-modal-expanded {
-    .hot-table-container {
+  :global(.grw-modal-expanded) {
+    :global(.hot-table-container) {
       flex: 1;
     }
   }
@@ -27,15 +27,15 @@
   // see https://github.com/handsontable/handsontable/issues/2937#issuecomment-287390111
   // This issue fixing from Handsontable v 7.0.0
   // see: https://github.com/handsontable/handsontable/issues/2937#issuecomment-480824024
-  .modal.in .modal-dialog.handsontable-modal {
+  :global(.modal.in .modal-dialog.handsontable-modal) {
     transform: none;
 
-    .data-import-button {
+    :global(.data-import-button) {
       position: relative;
       padding-right: 35px;
       padding-left: 10px;
 
-      i::before {
+      :global(i::before) {
         position: absolute;
         top: 6px;
         right: 8px;
