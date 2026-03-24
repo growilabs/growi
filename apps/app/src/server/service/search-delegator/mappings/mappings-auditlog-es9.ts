@@ -8,6 +8,7 @@ export const mappings: Mappings = {
   mappings: {
     properties: {
       username: { type: 'keyword' },
+      endpoint: { type: 'keyword' },
     },
   },
 };
