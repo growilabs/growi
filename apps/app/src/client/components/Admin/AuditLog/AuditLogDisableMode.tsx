@@ -35,7 +35,7 @@ export const AuditLogDisableMode: FC = () => {
                   ),
                 }}
               />
-              {growiCloudUri != null && growiAppIdForGrowiCloud != null && (
+              {isCloud && (
                 <a
                   href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
                   className="btn btn-outline-secondary mt-3"

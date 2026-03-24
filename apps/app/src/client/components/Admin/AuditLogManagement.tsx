@@ -39,6 +39,8 @@ export const AuditLogManagement: FC = () => {
   const growiCloudUri = useGrowiCloudUri();
   const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
 
+  const isCloud = growiCloudUri != null && growiAppIdForGrowiCloud != null;
+
   const typeaheadRef = useRef<IClearable>(null);
 
   const auditLogAvailableActionsData = useAtomValue(
@@ -216,7 +218,7 @@ export const AuditLogManagement: FC = () => {
         )}
       </button>
 
-      {growiCloudUri != null && growiAppIdForGrowiCloud != null && (
+      {isCloud && (
         <a
           href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
           className="btn btn-outline-secondary mb-4 ms-2"
