@@ -1,9 +1,9 @@
 // @mixin page-editor-mode-manager($textColor, $borderColor, $bgColorHoverAndActive, $bgColor: white) {
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
-@use '~/styles/mixins';
+@use 'styles/mixins';
 
-.grw-page-editor-mode-manager :global {
-  .btn {
+.grw-page-editor-mode-manager {
+  :global(.btn) {
     --bs-btn-font-size: 13px;
     --bs-btn-border-width: 2px;
 
@@ -17,7 +17,7 @@
   }
 }
 
-.grw-page-editor-mode-manager-skeleton :global {
+.grw-page-editor-mode-manager-skeleton {
   width: 90px;
   height: 38px;
 
@@ -29,8 +29,8 @@
 
 // == Colors
 @include bs.color-mode(light) {
-  .grw-page-editor-mode-manager :global {
-    .btn {
+  .grw-page-editor-mode-manager {
+    :global(.btn) {
       $color: var(--grw-page-editor-mode-manager-btn-color, var(--grw-primary-700));
       $bg: var(--grw-page-editor-mode-manager-btn-bg, var(--grw-primary-100));
       $bg-rgb: var(--grw-page-editor-mode-manager-btn-bg-rgb, var(--grw-primary-100-rgb));
@@ -50,8 +50,8 @@
 }
 
 @include bs.color-mode(dark) {
-  .grw-page-editor-mode-manager :global {
-    .btn {
+  .grw-page-editor-mode-manager {
+    :global(.btn) {
       $color: var(--grw-page-editor-mode-manager-btn-color, var(--grw-primary-300));
       $bg: var(--grw-page-editor-mode-manager-btn-bg, var(--grw-primary-800));
       $bg-rgb: var(--grw-page-editor-mode-manager-btn-bg-rgb, var(--grw-primary-800-rgb));

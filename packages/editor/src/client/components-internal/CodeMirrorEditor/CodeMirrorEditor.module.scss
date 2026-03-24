@@ -1,18 +1,18 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
 
-.codemirror-editor-container :global {
+.codemirror-editor-container {
 
-  .cm-editor {
+  :global(.cm-editor) {
     width: 100%;
     height: 100%;
 
-    .cm-content {
+    :global(.cm-content) {
       font-family: var(--grw-codemirror-editor-content-font-family, monospace);
     }
 
     // Header highlight style
-    .cm-header {
+    :global(.cm-header) {
       text-decoration: none;
       &:first-of-type {
         font-style: italic;
@@ -20,22 +20,22 @@
       }
     }
 
-    .cm-header-1 {
+    :global(.cm-header-1) {
       font-size: 1.9em;
     }
-    .cm-header-2 {
+    :global(.cm-header-2) {
       font-size: 1.6em;
     }
-    .cm-header-3 {
+    :global(.cm-header-3) {
       font-size: 1.4em;
     }
-    .cm-header-4 {
+    :global(.cm-header-4) {
       font-size: 1.35em;
     }
-    .cm-header-5 {
+    :global(.cm-header-5) {
       font-size: 1.25em;
     }
-    .cm-header-6 {
+    :global(.cm-header-6) {
       font-size: 1.2em;
     }
 
@@ -54,10 +54,10 @@
   }
 }
 
-.codemirror-editor :global {
+.codemirror-editor {
 
   // overlay in .codemirror-editor
-  .overlay {
+  :global(.overlay) {
     position: absolute;
     top: 0;
     right: 0;
@@ -70,12 +70,12 @@
   }
 
   // for Dropzone
-  .dropzone {
+  :global(.dropzone) {
     position: relative; // against .overlay position: absolute
 
-    .overlay.overlay-dropzone-active {
+    :global(.overlay.overlay-dropzone-active) {
       background: rgba(255, 255, 255, 0.5);
-      .overlay-content {
+      :global(.overlay-content) {
         padding: 0.5em;
         font-size: 2.5em;
         color: bs.$gray-700;
@@ -84,52 +84,52 @@
     }
 
     // uploading
-    &.dropzone-uploading {
-      .overlay.overlay-dropzone-active {
-        .overlay-content {
+    &:global(.dropzone-uploading) {
+      :global(.overlay.overlay-dropzone-active) {
+        :global(.overlay-content) {
           @include insertMaterialSymbolAndMessage('upload_file', 'Uploading...');
         }
       }
     }
 
     // diabled
-    &.dropzone-disabled {
-      .overlay.overlay-dropzone-active {
-        .overlay-content {
+    &:global(.dropzone-disabled) {
+      :global(.overlay.overlay-dropzone-active) {
+        :global(.overlay-content) {
           @include insertMaterialSymbolAndMessage('error', 'File uploading is disabled');
         }
       }
     }
 
     // accepted
-    &.dropzone-accepted {
-      .overlay.overlay-dropzone-active {
+    &:global(.dropzone-accepted) {
+      :global(.overlay.overlay-dropzone-active) {
         // style
         color: bs.$secondary;
         background: rgba(200, 200, 200, 0.8);
         border: 4px dashed bs.$gray-300;
 
-        .overlay-content {
+        :global(.overlay-content) {
           @include insertMaterialSymbolAndMessage('cloud_upload', 'Drop here to upload');
         }
       }
     }
 
     // file type mismatch
-    &.dropzone-mismatch-picture {
-      .overlay.overlay-dropzone-active {
-        .overlay-content {
+    &:global(.dropzone-mismatch-picture) {
+      :global(.overlay.overlay-dropzone-active) {
+        :global(.overlay-content) {
           @include insertMaterialSymbolAndMessage('photo', 'Only an image file is allowed');
         }
       }
     }
 
     // rejected
-    &.dropzone-rejected {
-      .overlay.overlay-dropzone-active {
+    &:global(.dropzone-rejected) {
+      :global(.overlay.overlay-dropzone-active) {
         background: rgba(200, 200, 200, 0.8);
 
-        .overlay-content {
+        :global(.overlay-content) {
           @include insertMaterialSymbolAndMessage('error', 'This file is not allowed');
         }
 
@@ -138,7 +138,7 @@
     /* end of.dropzone */
   }
 
-  .markdown-table-activated .cm-cursor {
+  :global(.markdown-table-activated .cm-cursor) {
     &:after {
       position: relative;
       top: 0em;
@@ -152,7 +152,7 @@
     }
   }
 
-  .markdown-table-activated .cm-cursor.cm-cursor-primary {
+  :global(.markdown-table-activated .cm-cursor.cm-cursor-primary) {
     &:after {
       font-family: var(--grw-font-family-material-symbols-outlined);
       font-size: 1.5em;
