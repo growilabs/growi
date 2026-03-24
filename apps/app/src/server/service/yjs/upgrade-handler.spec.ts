@@ -94,6 +94,7 @@ describe('UpgradeHandler', () => {
       expect(result.statusCode).toBe(400);
     }
     expect(socket.write).toHaveBeenCalledWith(expect.stringContaining('400'));
+    expect(socket.destroy).not.toHaveBeenCalled();
   });
 
   it('should reject with 403 when user has no page access', async () => {
@@ -113,6 +114,7 @@ describe('UpgradeHandler', () => {
       expect(result.statusCode).toBe(403);
     }
     expect(socket.write).toHaveBeenCalledWith(expect.stringContaining('403'));
+    expect(socket.destroy).not.toHaveBeenCalled();
   });
 
   it('should reject with 401 when unauthenticated user has no page access', async () => {
@@ -128,6 +130,7 @@ describe('UpgradeHandler', () => {
     if (!result.authorized) {
       expect(result.statusCode).toBe(401);
     }
+    expect(socket.destroy).not.toHaveBeenCalled();
   });
 
   it('should allow guest user when page allows guest access', async () => {

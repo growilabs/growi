@@ -49,11 +49,11 @@ describe('YjsService', () => {
       initializeYjsService(httpServer, ioMock, sessionConfig);
     });
 
-    afterAll(async () => {
-      // flush revisions
+    afterEach(async () => {
       await Revision.deleteMany({});
+    });
 
-      // flush yjs-writings
+    afterAll(async () => {
       const yjsService = getYjsService();
       const privateMdb = getPrivateMdbInstance(yjsService);
       try {
@@ -62,7 +62,8 @@ describe('YjsService', () => {
         // Ignore errors that can occur due to async index creation:
         // - 26: NamespaceNotFound (collection not yet created)
         // - 276: IndexBuildAborted (cleanup during index creation)
-        if (error.code !== 26 && error.code !== 276) {
+        const code = (error as { code?: number }).code;
+        if (code !== 26 && code !== 276) {
           throw error;
         }
       }
