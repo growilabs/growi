@@ -52,6 +52,9 @@ interface UpdatePageRequest
   user: IUserHasId;
 }
 
+const minimumRevisionForActivity = 2;
+const suppressUpdateWindowMs = 5 * 60 * 1000; // 5 min
+
 export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
   const Page = mongoose.model<IPage, PageModel>('Page');
   const Revision = mongoose.model<IRevisionHasId>('Revision');
@@ -118,68 +121,71 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
     }
 
-    const minimumRevisionForActivity = 2;
-    const suppressUpdateWindow = 5 * 60 * 1000; // 5 min
-    const targetPageId = updatedPage._id.toString();
-    const Activity = mongoose.model('Activity');
+    // Decide if update activity should generate
+    try {
+      const targetPageId = updatedPage._id.toString();
+      const Activity = mongoose.model('Activity');
 
-    // Get most recent UPDATE or CREATE activity
-    const lastContentActivity = await Activity.findOne({
-      target: targetPageId,
-      action: {
-        $in: [
-          SupportedAction.ACTION_PAGE_CREATE,
-          SupportedAction.ACTION_PAGE_UPDATE,
-        ],
-      },
-      _id: { $ne: res.locals.activity?._id },
-    }).sort({ createdAt: -1 });
+      // Get most recent update or create activity on the page
+      const lastContentActivity = await Activity.findOne({
+        target: targetPageId,
+        action: {
+          $in: [
+            SupportedAction.ACTION_PAGE_CREATE,
+            SupportedAction.ACTION_PAGE_UPDATE,
+          ],
+        },
+        _id: { $ne: res.locals.activity?._id },
+      }).sort({ createdAt: -1 });
 
-    // Check if last updated user is me
-    const isLastActivityByMe =
-      lastContentActivity &&
-      lastContentActivity.user._id.toString() === req.user._id.toString();
+      const isLastActivityByMe =
+        req.user?._id != null &&
+        lastContentActivity?.user?._id?.toString() ===
+          req.user?._id?.toString();
 
-    // Get time since activity
-    const lastActivityTime = lastContentActivity
-      ? lastContentActivity.createdAt.getTime()
-      : 0;
-    const timeSinceLastActivityMs = Date.now() - lastActivityTime;
+      const lastActivityTime = lastContentActivity
+        ? lastContentActivity.createdAt.getTime()
+        : 0;
+      const timeSinceLastActivityMs = Date.now() - lastActivityTime;
 
-    // Decide if UPDATE activity should generate
-    let shouldGenerateUpdateActivity: boolean;
-    if (!isLastActivityByMe) {
-      shouldGenerateUpdateActivity = true;
-    } else if (timeSinceLastActivityMs < suppressUpdateWindow) {
-      shouldGenerateUpdateActivity = false;
-    } else {
-      const Revision = mongoose.model<IRevisionHasId>('Revision');
-      const revisionCount = await Revision.countDocuments({
-        pageId: updatedPage._id,
-      });
+      // Decide if update activity should generate
+      let shouldGenerateUpdateActivity: boolean;
+      if (!isLastActivityByMe) {
+        shouldGenerateUpdateActivity = true;
+      } else if (timeSinceLastActivityMs < suppressUpdateWindowMs) {
+        shouldGenerateUpdateActivity = false;
+      } else {
+        const Revision = mongoose.model<IRevisionHasId>('Revision');
+        const revisionCount = await Revision.countDocuments({
+          pageId: updatedPage._id,
+        });
 
-      shouldGenerateUpdateActivity = revisionCount > minimumRevisionForActivity;
-    }
+        shouldGenerateUpdateActivity =
+          revisionCount > minimumRevisionForActivity;
+      }
 
-    if (shouldGenerateUpdateActivity) {
-      // persist activity
-      const creator =
-        updatedPage.creator != null
-          ? getIdForRef(updatedPage.creator)
-          : undefined;
-      const parameters = {
-        targetModel: SupportedTargetModel.MODEL_PAGE,
-        target: updatedPage,
-        action: SupportedAction.ACTION_PAGE_UPDATE,
-      };
-      const activityEvent = crowi.events.activity;
-      activityEvent.emit(
-        'update',
-        res.locals.activity._id,
-        parameters,
-        { path: updatedPage.path, creator },
-        preNotifyService.generatePreNotify,
-      );
+      if (shouldGenerateUpdateActivity) {
+        // persist activity
+        const creator =
+          updatedPage.creator != null
+            ? getIdForRef(updatedPage.creator)
+            : undefined;
+        const parameters = {
+          targetModel: SupportedTargetModel.MODEL_PAGE,
+          target: updatedPage,
+          action: SupportedAction.ACTION_PAGE_UPDATE,
+        };
+        const activityEvent = crowi.events.activity;
+        activityEvent.emit(
+          'update',
+          res.locals.activity._id,
+          parameters,
+          { path: updatedPage.path, creator },
+          preNotifyService.generatePreNotify,
+        );
+      }
+    } catch (err) {
+      logger.error('Failed to generate update activity', err);
     }
 
     // global notification
