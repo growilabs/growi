@@ -161,6 +161,12 @@ class ActivityService {
       let activity: IActivity;
       try {
         activity = await Activity.createByParameters(parameters);
+
+        try {
+          await this.crowi.searchService.updateOrInsertAuditlog(activity);
+        } catch (err) {
+          logger.error('Failed to sync auditlog to elasticsearch', err);
+        }
         return activity;
       } catch (err) {
         logger.error('Create activity failed', err);
@@ -168,7 +174,6 @@ class ActivityService {
     }
     return null;
   };
-
   createTtlIndex = async function () {
     const configManager = this.crowi.configManager;
     const activityExpirationSeconds =

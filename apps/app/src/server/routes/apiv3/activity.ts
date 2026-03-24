@@ -33,6 +33,16 @@ const validator = {
       .isString()
       .withMessage('query must be a string'),
   ],
+  usernames: [
+    query('q').optional().isString().withMessage('keyword must be a string'),
+    query('offset').optional().isInt().withMessage('offset must be a number'),
+    query('offset').toInt(),
+    query('limit')
+      .optional()
+      .isInt({ max: 100 })
+      .withMessage('limit must be a number less than or equal to 100'),
+    query('limit').toInt(),
+  ],
 };
 
 /**
@@ -175,6 +185,19 @@ const validator = {
  *               nullable: true
  *               example: null
  */
+
+type UsernamesReqQuery = {
+  q?: string;
+  offset?: number;
+  limit?: number;
+};
+
+type UsernamesReq = Request<
+  Record<string, string>,
+  ApiV3Response,
+  undefined,
+  UsernamesReqQuery
+>;
 
 module.exports = (crowi: Crowi): Router => {
   const adminRequired = adminRequiredFactory(crowi);
@@ -319,5 +342,43 @@ module.exports = (crowi: Crowi): Router => {
     },
   );
 
+  router.get(
+    '/usernames',
+    accessTokenParser([SCOPE.READ.ADMIN.AUDIT_LOG], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    adminRequired,
+    validator.usernames,
+    apiV3FormValidator,
+    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+    // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
+    async (req: UsernamesReq, res: ApiV3Response) => {
+      const { q = '', offset = 0, limit = 5 } = req.query;
+
+      try {
+        const result = await crowi.searchService.searchAuditlogs(
+          q,
+          offset,
+          limit,
+        );
+        return res.apiv3({
+          activeUser: {
+            usernames: result.activeUsernames,
+            totalCount: result.activeUsernames.length,
+          },
+          inactiveUser: {
+            usernames: result.inactiveUsernames,
+            totalCount: result.inactiveUsernames.length,
+          },
+          activitySnapshotUser: {
+            usernames: result.activitySnapshotUsernames,
+            totalCount: result.activitySnapshotUsernames.length,
+          },
+        });
+      } catch (err) {
+        logger.error('Failed to search auditlogs', err);
+        return res.apiv3Err(err, 500);
+      }
+    },
+  );
   return router;
 };

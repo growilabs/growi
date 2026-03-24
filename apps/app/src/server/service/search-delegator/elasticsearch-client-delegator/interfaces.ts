@@ -40,6 +40,8 @@ export type ES7SearchQuery = RequestParams.Search<{
   query: ES7types.QueryDslQueryContainer;
   sort?: ES7types.Sort;
   highlight?: ES7types.SearchHighlight;
+  aggs?: Record<string, ES7types.AggregationsAggregationContainer>;
+  size?: number;
 }>;
 
 export interface ES8SearchQuery {
