@@ -577,10 +577,11 @@ class ElasticsearchDelegator
 
     const body = activities.flatMap((activity) => {
       const username = activity.snapshot?.username;
-      if (username == null) return [];
+      const endpoint = activity.endpoint;
+      if (username == null || endpoint == null) return [];
       return [
         { index: { _index: this.auditlogIndexName, _id: activity._id } },
-        { username },
+        { username, endpoint },
       ];
     });
 
@@ -719,11 +720,12 @@ class ElasticsearchDelegator
 
   async updateOrInsertAuditlog(activity: ActivityDocument): Promise<void> {
     const username = activity.snapshot?.username;
-    if (username == null) return;
+    const endpoint = activity.endpoint;
+    if (username == null || endpoint == null) return;
     await this.client.bulk({
       body: [
         { index: { _index: this.auditlogIndexName, _id: activity._id } },
-        { username },
+        { username, endpoint },
       ],
     });
   }
