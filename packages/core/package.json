@@ -69,12 +69,9 @@
     "lint": "npm-run-all -p lint:*",
     "test": "vitest run --coverage"
   },
-  "// comments for dependencies": {
-    "escape-string-regexp": "5.0.0 or above exports only ESM"
-  },
+  "// comments for dependencies": {},
   "dependencies": {
-    "bson-objectid": "^2.0.4",
-    "escape-string-regexp": "^4.0.0"
+    "bson-objectid": "^2.0.4"
   },
   "devDependencies": {
     "@types/express": "^4",

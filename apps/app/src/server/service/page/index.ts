@@ -18,7 +18,6 @@ import type {
 } from '@growi/core/dist/interfaces';
 import { PageGrant } from '@growi/core/dist/interfaces';
 import { pagePathUtils, pathUtils } from '@growi/core/dist/utils';
-import escapeStringRegexp from 'escape-string-regexp';
 import type EventEmitter from 'events';
 import type { Cursor, HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
@@ -941,7 +940,7 @@ class PageService implements IPageService {
   }
 
   private isRenamingToUnderTarget(fromPath: string, toPath: string): boolean {
-    const pathToTest = escapeStringRegexp(addTrailingSlash(fromPath));
+    const pathToTest = RegExp.escape(addTrailingSlash(fromPath));
     const pathToBeTested = toPath;
 
     return new RegExp(`^${pathToTest}`, 'i').test(pathToBeTested);
@@ -1245,10 +1244,7 @@ class PageService implements IPageService {
     const batchStream = createBatchStream(BULK_REINDEX_SIZE);
 
     const newPagePathPrefix = newPagePathSanitized;
-    const pathRegExp = new RegExp(
-      `^${escapeStringRegexp(targetPage.path)}`,
-      'i',
-    );
+    const pathRegExp = new RegExp(`^${RegExp.escape(targetPage.path)}`, 'i');
 
     const renameDescendants = this.renameDescendants.bind(this);
     const pageEvent = this.pageEvent;
@@ -1304,10 +1300,7 @@ class PageService implements IPageService {
     const batchStream = createBatchStream(BULK_REINDEX_SIZE);
 
     const newPagePathPrefix = newPagePathSanitized;
-    const pathRegExp = new RegExp(
-      `^${escapeStringRegexp(targetPage.path)}`,
-      'i',
-    );
+    const pathRegExp = new RegExp(`^${RegExp.escape(targetPage.path)}`, 'i');
 
     const renameDescendants = this.renameDescendants.bind(this);
     const pageEvent = this.pageEvent;
@@ -1892,7 +1885,7 @@ class PageService implements IPageService {
     const batchStream = createBatchStream(BULK_REINDEX_SIZE);
 
     const newPagePathPrefix = newPagePathSanitized;
-    const pathRegExp = new RegExp(`^${escapeStringRegexp(page.path)}`, 'i');
+    const pathRegExp = new RegExp(`^${RegExp.escape(page.path)}`, 'i');
 
     const duplicateDescendants = this.duplicateDescendants.bind(this);
     const pageEvent = this.pageEvent;
@@ -1948,7 +1941,7 @@ class PageService implements IPageService {
     const batchStream = createBatchStream(BULK_REINDEX_SIZE);
 
     const newPagePathPrefix = newPagePathSanitized;
-    const pathRegExp = new RegExp(`^${escapeStringRegexp(page.path)}`, 'i');
+    const pathRegExp = new RegExp(`^${RegExp.escape(page.path)}`, 'i');
 
     const duplicateDescendants = this.duplicateDescendants.bind(this);
     const pageEvent = this.pageEvent;
@@ -3968,7 +3961,7 @@ class PageService implements IPageService {
     const ancestorPaths = paths.flatMap((p) => collectAncestorPaths(p, []));
     // targets' descendants
     const pathAndRegExpsToNormalize: (RegExp | string)[] = paths.map(
-      (p) => new RegExp(`^${escapeStringRegexp(addTrailingSlash(p))}`, 'i'),
+      (p) => new RegExp(`^${RegExp.escape(addTrailingSlash(p))}`, 'i'),
     );
     // include targets' path
     pathAndRegExpsToNormalize.push(...paths);
@@ -4179,7 +4172,7 @@ class PageService implements IPageService {
           const parentId = parent._id;
 
           // Build filter
-          const parentPathEscaped = escapeStringRegexp(
+          const parentPathEscaped = RegExp.escape(
             parent.path === '/' ? '' : parent.path,
           ); // adjust the path for RegExp
           const filter: any = {
@@ -5148,9 +5141,7 @@ class PageService implements IPageService {
     const wasOnTree = exPage.parent != null || isTopPage(exPage.path);
     const shouldBeOnTree = currentPage.grant !== PageGrant.GRANT_RESTRICTED;
     const isChildrenExist = await Page.count({
-      path: new RegExp(
-        `^${escapeStringRegexp(addTrailingSlash(currentPage.path))}`,
-      ),
+      path: new RegExp(`^${RegExp.escape(addTrailingSlash(currentPage.path))}`),
       parent: { $ne: null },
     });
 
@@ -5282,7 +5273,7 @@ class PageService implements IPageService {
     const shouldBeOnTree = grant !== PageGrant.GRANT_RESTRICTED;
     const isChildrenExist = await Page.count({
       path: new RegExp(
-        `^${escapeStringRegexp(addTrailingSlash(clonedPageData.path))}`,
+        `^${RegExp.escape(addTrailingSlash(clonedPageData.path))}`,
       ),
       parent: { $ne: null },
     });
