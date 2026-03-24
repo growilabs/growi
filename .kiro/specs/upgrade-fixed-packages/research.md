@@ -158,3 +158,26 @@
 - [TC39 RegExp.escape() Stage 4](https://socket.dev/blog/tc39-advances-3-proposals-to-stage-4-regexp-escaping-float16array-and-redeclarable-global-eval) — ES2026
 - [Node.js require(esm) stability](https://joyeecheung.github.io/blog/2025/12/30/require-esm-in-node-js-from-experiment-to-stability/) — stable since Node.js 22.12.0
 - [Handsontable license change](https://handsontable.com/docs/javascript-data-grid/software-license/) — proprietary since v7.0.0
+
+## Final Audit Summary (2026-03-23)
+
+| Package | Previous Version | New Version | Action | Rationale |
+|---------|-----------------|-------------|--------|-----------|
+| `@aws-sdk/client-s3` | `3.454.0` | `^3.1014.0` | Upgraded | Pinning comment was misleading; S3 client is independent of mongodb constraint |
+| `@aws-sdk/s3-request-presigner` | `3.454.0` | `^3.1014.0` | Upgraded | Same as above |
+| `bootstrap` | `=5.3.2` | `^5.3.8` | Upgraded | Bug #39798 fixed in v5.3.4; SCSS compilation verified |
+| `escape-string-regexp` | `^4.0.0` | Removed | Replaced | Native `RegExp.escape()` (ES2026, Node.js 24) eliminates the dependency |
+| `string-width` | `=4.2.2` | `^7.0.0` | Upgraded | Used only in @growi/editor (ESM context, Vite-bundled) |
+| `next-themes` | `^0.2.1` | `^0.4.6` | Upgraded | Original issue #122 was misattributed; only change needed: type import path |
+| `@keycloak/keycloak-admin-client` | `^18.0.0` | Unchanged | Deferred | API breaking changes (v18→v26) require separate migration effort |
+| `handsontable` | `=6.2.2` | Unchanged | Kept | v7.0.0+ is proprietary (non-MIT license) |
+| `@handsontable/react` | `=2.1.0` | Unchanged | Kept | Requires handsontable >= 7.0.0 |
+
+### Additional Changes
+
+- Added `RegExp.escape()` TypeScript type declarations in `apps/app/src/@types/`, `packages/core/src/@types/`, and `packages/remark-lsx/src/@types/` (awaiting TypeScript built-in support)
+- Updated `tsconfig.build.client.json` to include `src/@types/**/*.d.ts` for Next.js build compatibility
+- Updated `generate-children-regexp.spec.ts` test expectations for `RegExp.escape()` output (escapes spaces as `\x20`)
+- Removed `escape-string-regexp` from `transpilePackages` in `next.config.ts`
+- Updated `bootstrap` version across 5 packages: apps/app, packages/editor, packages/core-styles, packages/preset-themes, apps/slackbot-proxy
+- Updated `// comments for dependencies` to retain only `@keycloak` entry with updated reason
