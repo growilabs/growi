@@ -36,10 +36,12 @@ const validator = {
   usernames: [
     query('q').optional().isString().withMessage('keyword must be a string'),
     query('offset').optional().isInt().withMessage('offset must be a number'),
+    query('offset').toInt(),
     query('limit')
       .optional()
       .isInt({ max: 100 })
       .withMessage('limit must be a number less than or equal to 100'),
+    query('limit').toInt(),
   ],
 };
 
@@ -183,6 +185,19 @@ const validator = {
  *               nullable: true
  *               example: null
  */
+
+type UsernamesReqQuery = {
+  q?: string;
+  offset?: number;
+  limit?: number;
+};
+
+type UsernamesReq = Request<
+  Record<string, string>,
+  ApiV3Response,
+  undefined,
+  UsernamesReqQuery
+>;
 
 module.exports = (crowi: Crowi): Router => {
   const adminRequired = adminRequiredFactory(crowi);
@@ -334,12 +349,10 @@ module.exports = (crowi: Crowi): Router => {
     adminRequired,
     validator.usernames,
     apiV3FormValidator,
-    async (req: Request, res: ApiV3Response) => {
-      const q = req.query.q != null ? (req.query.q as string) : '';
-      const offset =
-        req.query.offset != null ? parseInt(req.query.offset as string, 10) : 0;
-      const limit =
-        req.query.limit != null ? parseInt(req.query.limit as string, 10) : 5;
+    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+    // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
+    async (req: UsernamesReq, res: ApiV3Response) => {
+      const { q = '', offset = 0, limit = 5 } = req.query;
 
       try {
         const result = await crowi.searchService.searchAuditlogs(
