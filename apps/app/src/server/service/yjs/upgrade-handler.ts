@@ -57,15 +57,16 @@ const extractPageId = (url: string | undefined): string | null => {
 };
 
 /**
- * Rejects a WebSocket upgrade request with an HTTP error response.
+ * Writes an HTTP error response to the socket.
+ * Does NOT close the socket — the caller (yjs.ts) manages socket lifecycle
+ * so that guardSocket can safely intercept end/destroy during async auth.
  */
-const rejectUpgrade = (
+const writeErrorResponse = (
   socket: Duplex,
   statusCode: number,
   message: string,
 ): void => {
   socket.write(`HTTP/1.1 ${statusCode} ${message}\r\n\r\n`);
-  socket.destroy();
 };
 
 export type UpgradeResult =
@@ -89,7 +90,7 @@ export const createUpgradeHandler = (sessionConfig: SessionConfig) => {
     const pageId = extractPageId(request.url);
     if (pageId == null) {
       logger.warn('Invalid URL path for Yjs upgrade', { url: request.url });
-      rejectUpgrade(socket, 400, 'Bad Request');
+      writeErrorResponse(socket, 400, 'Bad Request');
       return { authorized: false, statusCode: 400 };
     }
 
@@ -100,7 +101,7 @@ export const createUpgradeHandler = (sessionConfig: SessionConfig) => {
       await runMiddleware(passportSession as ConnectMiddleware, request);
     } catch (err) {
       logger.warn('Session/passport middleware failed on upgrade', { err });
-      rejectUpgrade(socket, 401, 'Unauthorized');
+      writeErrorResponse(socket, 401, 'Unauthorized');
       return { authorized: false, statusCode: 401 };
     }
 
@@ -117,7 +118,7 @@ export const createUpgradeHandler = (sessionConfig: SessionConfig) => {
         pageId,
         userId: user?._id,
       });
-      rejectUpgrade(socket, statusCode, message);
+      writeErrorResponse(socket, statusCode, message);
       return { authorized: false, statusCode };
     }
 

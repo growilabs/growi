@@ -201,14 +201,6 @@ export const initializeYjsService = (
     throw new Error('YjsService is already initialized');
   }
 
-  if (httpServer == null) {
-    throw new Error("'httpServer' is required to initialize YjsService");
-  }
-
-  if (io == null) {
-    throw new Error("'io' is required to initialize YjsService");
-  }
-
   _instance = new YjsService(httpServer, io, sessionConfig);
 };
 
