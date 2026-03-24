@@ -53,6 +53,7 @@ const validator = {
       .isInt({ max: 100 })
       .toInt()
       .withMessage('limit must be a number less than or equal to 100'),
+    query('limit').toInt(),
   ],
 };
 
