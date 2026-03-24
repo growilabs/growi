@@ -1,4 +1,4 @@
-import { SCOPE } from '@growi/core/dist/interfaces';
+import { type IUser, SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { addMinutes } from 'date-fns/addMinutes';
 import { isValid } from 'date-fns/isValid';
@@ -21,6 +21,14 @@ import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
 
+type UsernamesQuery = { q?: string; offset?: number; limit?: number };
+type UsernamesReq = Request<
+  Record<string, string>,
+  ApiV3Response,
+  undefined,
+  UsernamesQuery
+> & { user?: IUser };
+
 const validator = {
   list: [
     query('limit')
@@ -35,10 +43,15 @@ const validator = {
   ],
   usernames: [
     query('q').optional().isString().withMessage('keyword must be a string'),
-    query('offset').optional().isInt().withMessage('offset must be a number'),
+    query('offset')
+      .optional()
+      .isInt()
+      .toInt()
+      .withMessage('offset must be a number'),
     query('limit')
       .optional()
       .isInt({ max: 100 })
+      .toInt()
       .withMessage('limit must be a number less than or equal to 100'),
   ],
 };
@@ -334,13 +347,12 @@ module.exports = (crowi: Crowi): Router => {
     adminRequired,
     validator.usernames,
     apiV3FormValidator,
-    async (req: Request, res: ApiV3Response) => {
-      const q = req.query.q != null ? (req.query.q as string) : '';
-      const offset =
-        req.query.offset != null ? parseInt(req.query.offset as string, 10) : 0;
-      const limit =
-        req.query.limit != null ? parseInt(req.query.limit as string, 10) : 5;
-
+    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+    // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
+    async (req: UsernamesReq, res: ApiV3Response) => {
+      const q = req.query.q ?? '';
+      const offset = req.query.offset ?? 0;
+      const limit = req.query.limit ?? 5;
       try {
         const result = await crowi.searchService.searchAuditlogs(
           q,

@@ -335,7 +335,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
       limit,
     );
 
-    const User = mongoose.model('User');
+    const User = mongoose.model<IUser>('User');
     const users = await User.find({ username: { $in: usernames } });
     const userMap = new Map(users.map((u) => [u.username, u.status]));
 
