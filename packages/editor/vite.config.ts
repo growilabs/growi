@@ -47,6 +47,29 @@ export default defineConfig({
       entryRoot: 'src',
       exclude: [...excludeFiles],
       copyDtsFiles: true,
+      // Fix TS2345/TS2719 "Two different types with this name exist" errors
+      // during declaration file generation.
+      //
+      // vite-plugin-dts internally creates its own TypeScript program, which
+      // resolves @codemirror/state and @codemirror/view through different pnpm
+      // symlink chains depending on whether the import originates from
+      // @growi/editor source or from @uiw/react-codemirror's re-exports.
+      // Although both chains point to the same physical package, TypeScript
+      // treats them as distinct types because private fields (e.g.
+      // SelectionRange#flags) create nominal type identity per declaration.
+      //
+      // Pinning paths here forces vite-plugin-dts to resolve these packages
+      // to a single location regardless of the import origin.
+      compilerOptions: {
+        paths: {
+          '@codemirror/state': [
+            path.resolve(__dirname, 'node_modules/@codemirror/state'),
+          ],
+          '@codemirror/view': [
+            path.resolve(__dirname, 'node_modules/@codemirror/view'),
+          ],
+        },
+      },
     }),
     {
       ...nodeExternals({
