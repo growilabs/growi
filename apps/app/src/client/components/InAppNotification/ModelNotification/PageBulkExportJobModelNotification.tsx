@@ -1,11 +1,10 @@
-import React from 'react';
 import { type HasObjectId, isPopulated } from '@growi/core';
 import { useTranslation } from 'react-i18next';
 
 import type { IPageBulkExportJobHasId } from '~/features/page-bulk-export/interfaces/page-bulk-export';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IInAppNotification } from '~/interfaces/in-app-notification';
-import * as pageBulkExportJobSerializers from '~/models/serializers/in-app-notification-snapshot/page-bulk-export-job';
+import * as pageBulkExportJobSerializers from '~/models/serializers/in-app-notification-snapshot/page-bulk-export-job-client';
 
 import type { ModelNotificationUtils } from '.';
 import { ModelNotification } from './ModelNotification';

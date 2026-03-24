@@ -1,6 +1,6 @@
 // TODO: https://redmine.weseek.co.jp/issues/142208
-.conflict-diff-modal :global {
-  .cm-editor {
+.conflict-diff-modal {
+  :global(.cm-editor) {
     height: 400px !important;
   }
 }

@@ -51,6 +51,18 @@ module.exports = {
         name: 'x-growi-transfer-key',
       },
     },
+    parameters: {
+      MimeTypePathParam: {
+        name: 'mimeType',
+        in: 'path',
+        required: true,
+        description: 'The MIME type to configure.',
+        schema: {
+          type: 'string',
+          example: 'image/png',
+        },
+      },
+    },
   },
   'x-tagGroups': [
     {
@@ -66,21 +78,11 @@ module.exports = {
         'ShareLinks',
         'Users',
         'UserUISettings',
-        '',
       ],
     },
     {
       name: 'User Personal Settings API',
-      tags: [
-        'GeneralSetting',
-        'EditorSetting',
-        'InAppNotificationSettings',
-        '',
-        '',
-        '',
-        '',
-        '',
-      ],
+      tags: ['GeneralSetting', 'EditorSetting', 'InAppNotificationSettings'],
     },
     {
       name: 'System Management API',
