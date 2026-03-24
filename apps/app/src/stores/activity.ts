@@ -27,3 +27,28 @@ export const useSWRxActivity = (
       }).then((result) => result.data.serializedPaginationResult),
   );
 };
+
+type auditlogUsernameData = {
+  usernames: string[];
+  totalCount: number;
+};
+
+type auditlogUsernameResult = {
+  activeUser?: auditlogUsernameData;
+  inactiveUser?: auditlogUsernameData;
+  activitySnapshotUser?: auditlogUsernameData;
+};
+
+export const useSWRxAuditlogUsernames = (
+  q: string,
+  offset?: number,
+  limit?: number,
+): SWRResponse<auditlogUsernameResult, Error> => {
+  return useSWRImmutable(
+    q != null && q.trim() !== ''
+      ? ['/activity/usernames', q, offset, limit]
+      : null,
+    ([endpoint, q, offset, limit]) =>
+      apiv3Get(endpoint, { q, offset, limit }).then((result) => result.data),
+  );
+};
