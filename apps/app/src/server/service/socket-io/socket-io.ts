@@ -43,6 +43,9 @@ export class SocketIoService {
   async attachServer(server) {
     this.io = new Server(server, {
       serveClient: false,
+      // Allow non-Socket.IO WebSocket upgrade requests (e.g. /yjs/) to pass through
+      // without being destroyed by engine.io's default timeout handler
+      destroyUpgrade: false,
     });
 
     // create namespace for admin
