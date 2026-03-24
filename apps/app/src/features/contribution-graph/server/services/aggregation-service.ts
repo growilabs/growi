@@ -21,14 +21,13 @@ export class ContributionAggregationService {
 
   public buildPipeline(params: PipelineParams): PipelineStage[] {
     const { userId, startDate } = params;
-    const endDate = getUTCMidnight(new Date());
 
     return [
       {
         $match: {
           user: new mongoose.Types.ObjectId(userId),
           action: { $in: Object.values(ContributionGraphActions) },
-          createdAt: { $gte: startDate, $lt: endDate },
+          createdAt: { $gte: startDate },
         },
       },
       {
