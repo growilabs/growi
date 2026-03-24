@@ -22,8 +22,14 @@ vi.mock('mongoose', () => ({
   },
 }));
 
+const { sessionMiddlewareMock } = vi.hoisted(() => ({
+  sessionMiddlewareMock: vi.fn(
+    (_req: unknown, _res: unknown, next: () => void) => next(),
+  ),
+}));
+
 vi.mock('express-session', () => ({
-  default: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  default: () => sessionMiddlewareMock,
 }));
 
 vi.mock('passport', () => ({
@@ -130,6 +136,7 @@ describe('UpgradeHandler', () => {
     if (!result.authorized) {
       expect(result.statusCode).toBe(401);
     }
+    expect(socket.write).toHaveBeenCalledWith(expect.stringContaining('401'));
     expect(socket.destroy).not.toHaveBeenCalled();
   });
 
@@ -146,5 +153,25 @@ describe('UpgradeHandler', () => {
     if (result.authorized) {
       expect(result.pageId).toBe('507f1f77bcf86cd799439011');
     }
+  });
+
+  it('should reject with 401 when session middleware fails', async () => {
+    sessionMiddlewareMock.mockImplementationOnce(
+      (_req: unknown, _res: unknown, next: (err?: unknown) => void) =>
+        next(new Error('session store unavailable')),
+    );
+
+    const request = createMockRequest('/yjs/507f1f77bcf86cd799439011');
+    const socket = createMockSocket();
+    const head = Buffer.alloc(0);
+
+    const result = await handleUpgrade(request, socket, head);
+
+    expect(result.authorized).toBe(false);
+    if (!result.authorized) {
+      expect(result.statusCode).toBe(401);
+    }
+    expect(socket.write).toHaveBeenCalledWith(expect.stringContaining('401'));
+    expect(socket.destroy).not.toHaveBeenCalled();
   });
 });
