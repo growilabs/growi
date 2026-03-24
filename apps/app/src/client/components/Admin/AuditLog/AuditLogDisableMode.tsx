@@ -10,6 +10,8 @@ export const AuditLogDisableMode: FC = () => {
   const growiCloudUri = useGrowiCloudUri();
   const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
 
+  const isCloud = growiCloudUri != null && growiAppIdForGrowiCloud != null;
+
   return (
     <div className="ccontainer-lg">
       <div className="container">
@@ -26,7 +28,11 @@ export const AuditLogDisableMode: FC = () => {
               <h3
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                 dangerouslySetInnerHTML={{
-                  __html: t('audit_log_management.disable_mode_explanation'),
+                  __html: t(
+                    isCloud
+                      ? 'audit_log_management.disable_mode_explanation_cloud'
+                      : 'audit_log_management.disable_mode_explanation',
+                  ),
                 }}
               />
               {growiCloudUri != null && growiAppIdForGrowiCloud != null && (
