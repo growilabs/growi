@@ -15,6 +15,7 @@ import { normalizeLatestRevisionIfBroken } from '../revision/normalize-latest-re
 import { createIndexes } from './create-indexes';
 import { createMongoDBPersistence } from './create-mongodb-persistence';
 import { MongodbPersistence } from './extended/mongodb-persistence';
+import { guardSocket } from './guard-socket';
 import { syncYDoc } from './sync-ydoc';
 import { createUpgradeHandler } from './upgrade-handler';
 
@@ -75,16 +76,38 @@ class YjsService implements IYjsService {
         return;
       }
 
-      const result = await handleUpgrade(request, socket, head);
+      // Guard the socket against being closed by other upgrade handlers
+      // (e.g. Next.js's NextCustomServer.upgradeHandler) that run synchronously
+      // after this async handler yields at the first await.
+      const guard = guardSocket(socket);
 
-      if (!result.authorized) {
-        return;
+      try {
+        const result = await handleUpgrade(request, socket, head);
+
+        // Restore original socket methods now that all synchronous
+        // upgrade handlers have finished
+        guard.restore();
+
+        if (!result.authorized) {
+          // rejectUpgrade already wrote the HTTP error response but
+          // socket.destroy() was a no-op during the guard; clean up now
+          socket.destroy();
+          return;
+        }
+
+        wss.handleUpgrade(result.request, socket, head, (ws) => {
+          wss.emit('connection', ws, result.request);
+          setupWSConnection(ws, result.request, { docName: result.pageId });
+        });
+      } catch (err) {
+        guard.restore();
+
+        logger.error('Yjs upgrade handler failed unexpectedly', { url, err });
+        if (socket.writable) {
+          socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
+        }
+        socket.destroy();
       }
-
-      wss.handleUpgrade(result.request, socket, head, (ws) => {
-        wss.emit('connection', ws, result.request);
-        setupWSConnection(ws, result.request, { docName: result.pageId });
-      });
     });
 
     logger.info('YjsService initialized with y-websocket');

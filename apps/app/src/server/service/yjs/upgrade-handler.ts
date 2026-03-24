@@ -49,10 +49,10 @@ const runMiddleware = (
  * Extracts pageId from upgrade request URL.
  * Expected format: /yjs/{pageId}
  */
+const pageIdPattern = new RegExp(`^${YJS_WEBSOCKET_BASE_PATH}/([a-f0-9]{24})`);
 const extractPageId = (url: string | undefined): string | null => {
   if (url == null) return null;
-  const pattern = new RegExp(`^${YJS_WEBSOCKET_BASE_PATH}/([a-f0-9]{24})`);
-  const match = url.match(pattern);
+  const match = url.match(pageIdPattern);
   return match?.[1] ?? null;
 };
 
