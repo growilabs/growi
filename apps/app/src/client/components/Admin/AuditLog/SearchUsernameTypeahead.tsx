@@ -12,6 +12,7 @@ import { AsyncTypeahead, Menu, MenuItem } from 'react-bootstrap-typeahead';
 import { useTranslation } from 'react-i18next';
 
 import type { IClearable } from '~/client/interfaces/clearable';
+import { useSWRxAuditlogUsernames } from '~/stores/activity';
 import { useSWRxUsernames } from '~/stores/user';
 
 const Categories = {
@@ -48,29 +49,27 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   /*
    * Fetch
    */
-  const requestOptions = {
-    isIncludeActiveUser: true,
-    isIncludeInactiveUser: true,
-    isIncludeActivitySnapshotUser: true,
-  };
   const {
     data: usernameData,
-    error,
-    isLoading: _isLoading,
-  } = useSWRxUsernames(searchKeyword, 0, 5, requestOptions);
-  const activeUsernames =
-    usernameData?.activeUser?.usernames != null
-      ? usernameData.activeUser.usernames
-      : [];
-  const inactiveUsernames =
-    usernameData?.inactiveUser?.usernames != null
-      ? usernameData.inactiveUser.usernames
-      : [];
+    error: usernameError,
+    isLoading: _isUsernameLoading,
+  } = useSWRxUsernames(searchKeyword, 0, 5, {
+    isIncludeActiveUser: true,
+    isIncludeInactiveUser: true,
+  });
+
+  const {
+    data: auditlogData,
+    error: auditlogError,
+    isLoading: _isAuditlogLoading,
+  } = useSWRxAuditlogUsernames(searchKeyword, 0, 5);
+
+  const activeUsernames = auditlogData?.activeUser?.usernames ?? [];
+  const inactiveUsernames = auditlogData?.inactiveUser?.usernames ?? [];
   const activitySnapshotUsernames =
-    usernameData?.activitySnapshotUser?.usernames != null
-      ? usernameData.activitySnapshotUser.usernames
-      : [];
-  const isLoading = _isLoading === true && error == null;
+    auditlogData?.activitySnapshotUser?.usernames ?? [];
+
+  const isLoading = _isAuditlogLoading === true && auditlogError == null;
 
   const allUser: UserDataType[] = [];
   const pushToAllUser = (usernames: string[], category: CategoryType) => {
@@ -139,6 +138,7 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
       <span className="input-group-text">
         <span className="material-symbols-outlined">person</span>
       </span>
+
       <AsyncTypeahead
         ref={typeaheadRef}
         id="search-username-typeahead-asynctypeahead"
@@ -152,6 +152,7 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
         onChange={changeHandler}
         renderMenu={renderMenu}
         labelKey={(option: UserDataType) => `${option.username}`}
+        filterBy={() => true}
       />
     </div>
   );

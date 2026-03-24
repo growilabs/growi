@@ -1,3 +1,5 @@
+import type { estypes as estypes7 } from '@elastic/elasticsearch7';
+import type { estypes as estypes9 } from '@elastic/elasticsearch9';
 import { getIdStringForRef, type IPage } from '@growi/core';
 import gc from 'expose-gc/function';
 import mongoose from 'mongoose';
@@ -9,6 +11,7 @@ import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 import { SocketEventName } from '~/interfaces/websocket';
+import type { ActivityDocument } from '~/server/models/activity';
 import PageTagRelation from '~/server/models/page-tag-relation';
 import type { SocketIoService } from '~/server/service/socket-io';
 import loggerFactory from '~/utils/logger';
@@ -96,6 +99,9 @@ class ElasticsearchDelegator
   private pageModel?: PageModel;
 
   private userModel?: typeof mongoose.Model;
+
+  private readonly auditlogIndexName = 'auditlogs';
+  private readonly auditlogAliasName = 'auditlogs-alias';
 
   constructor(socketIoService: SocketIoService) {
     this.name = SearchDelegatorName.DEFAULT;
@@ -401,6 +407,48 @@ class ElasticsearchDelegator
         index: indexName,
       });
     }
+    await this.normalizeAuditlogIndices();
+  }
+
+  async normalizeAuditlogIndices(): Promise<void> {
+    const {
+      client,
+      auditlogIndexName: indexName,
+      auditlogAliasName: aliasName,
+    } = this;
+
+    const tmpIndexName = `${indexName}-tmp`;
+    // remove tmp index
+    const isExistsAuditlogTmpIndex = await client.indices.exists({
+      index: tmpIndexName,
+    });
+    if (isExistsAuditlogTmpIndex) {
+      await client.indices.delete({ index: tmpIndexName });
+    }
+
+    // create index
+    const isExistsAuditlogIndex = await client.indices.exists({
+      index: indexName,
+    });
+    if (!isExistsAuditlogIndex) {
+      await this.createAuditlogIndex(indexName);
+    }
+
+    // sync documents
+    const auditlogCount = await mongoose.model('Activity').countDocuments();
+    const esCount = (await client.count({ index: indexName })).count;
+    if (!isExistsAuditlogIndex || auditlogCount !== esCount) {
+      await this.addAllAuditlogs();
+    }
+
+    // create alias
+    const isExistsAlias = await client.indices.existsAlias({
+      name: aliasName,
+      index: indexName,
+    });
+    if (!isExistsAlias) {
+      await client.indices.putAlias({ name: aliasName, index: indexName });
+    }
   }
 
   async createIndex(index: string) {
@@ -435,7 +483,20 @@ class ElasticsearchDelegator
       });
     }
   }
-
+  async createAuditlogIndex(index: string) {
+    if (isES7ClientDelegator(this.client)) {
+      const { mappings } = await import('./mappings/mappings-auditlog-es7');
+      return this.client.indices.create({ index, body: { ...mappings } });
+    }
+    if (isES8ClientDelegator(this.client)) {
+      const { mappings } = await import('./mappings/mappings-auditlog-es8');
+      return this.client.indices.create({ index, ...mappings });
+    }
+    if (isES9ClientDelegator(this.client)) {
+      const { mappings } = await import('./mappings/mappings-auditlog-es9');
+      return this.client.indices.create({ index, ...mappings });
+    }
+  }
   /**
    * generate object that is related to page.grant*
    */
@@ -508,6 +569,22 @@ class ElasticsearchDelegator
       shouldEmitProgress: true,
       invokeGarbageCollection: true,
     });
+  }
+
+  async addAllAuditlogs(): Promise<void> {
+    const Activity = mongoose.model('Activity');
+    const activities = await Activity.find();
+
+    const body = activities.flatMap((activity) => {
+      const username = activity.snapshot?.username;
+      if (username == null) return [];
+      return [
+        { index: { _index: this.auditlogIndexName, _id: activity._id } },
+        { username },
+      ];
+    });
+
+    await this.client.bulk({ body });
   }
 
   updateOrInsertPageById(pageId) {
@@ -638,6 +715,78 @@ class ElasticsearchDelegator
     });
 
     return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
+  }
+
+  async updateOrInsertAuditlog(activity: ActivityDocument): Promise<void> {
+    const username = activity.snapshot?.username;
+    if (username == null) return;
+    await this.client.bulk({
+      body: [
+        { index: { _index: this.auditlogIndexName, _id: activity._id } },
+        { username },
+      ],
+    });
+  }
+
+  async searchAuditlogs(username: string, offset: number, limit: number) {
+    if (isES7ClientDelegator(this.client)) {
+      const result = await this.client.search({
+        index: this.auditlogIndexName,
+        body: {
+          size: 0,
+          query: {
+            bool: {
+              should: [
+                { wildcard: { username: { value: `*${username}*` } } },
+                { fuzzy: { username: { value: username, fuzziness: 'AUTO' } } },
+              ],
+            },
+          },
+          aggs: {
+            unique_usernames: {
+              terms: { field: 'username', size: limit },
+            },
+          },
+        },
+      });
+      const agg = result.aggregations?.unique_usernames as
+        | estypes7.AggregationsStringTermsAggregate
+        | undefined;
+      const buckets = (agg?.buckets ??
+        []) as estypes7.AggregationsStringTermsBucket[];
+      return buckets.map((bucket) => bucket.key as string);
+    }
+
+    if (
+      isES8ClientDelegator(this.client) ||
+      isES9ClientDelegator(this.client)
+    ) {
+      const result = await this.client.search({
+        index: this.auditlogIndexName,
+        size: 0,
+        query: {
+          bool: {
+            should: [
+              { wildcard: { username: { value: `*${username}*` } } },
+              { fuzzy: { username: { value: username, fuzziness: 'AUTO' } } },
+            ],
+          },
+        },
+        aggs: {
+          unique_usernames: {
+            terms: { field: 'username', size: limit },
+          },
+        },
+      });
+      const agg = result.aggregations?.unique_usernames as
+        | estypes9.AggregationsStringTermsAggregate
+        | undefined;
+      const buckets = (agg?.buckets ??
+        []) as estypes9.AggregationsStringTermsBucket[];
+      return buckets.map((bucket) => bucket.key as string);
+    }
+
+    return [];
   }
 
   deletePages(pages) {
