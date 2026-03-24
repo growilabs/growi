@@ -179,7 +179,7 @@ const ContentDispositionSettings: React.FC = () => {
                 <button
                   className="btn btn-primary px-3 flex-shrink-0 rounded-3 fw-bold"
                   type="button"
-                  onClick={(e) => handleSetMimeType('inline', e)}
+                  onClick={() => handleSetMimeType('inline')}
                   disabled={!currentInput.trim() || isUpdating}
                 >
                   {t(
@@ -189,7 +189,7 @@ const ContentDispositionSettings: React.FC = () => {
                 <button
                   className="btn btn-primary text-white px-3 flex-shrink-0 rounded-3 fw-bold"
                   type="button"
-                  onClick={(e) => handleSetMimeType('attachment', e)}
+                  onClick={() => handleSetMimeType('attachment')}
                   disabled={!currentInput.trim() || isUpdating}
                 >
                   {t(
