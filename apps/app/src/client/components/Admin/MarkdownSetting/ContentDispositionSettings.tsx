@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 
@@ -70,7 +70,6 @@ const ContentDispositionSettings: React.FC = () => {
 
   const [currentInput, setCurrentInput] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const isManualSubmit = useRef(false);
 
   const {
     handleSubmit,
@@ -95,10 +94,7 @@ const ContentDispositionSettings: React.FC = () => {
   const attachmentMimeTypes = watch('attachmentMimeTypes');
 
   const handleSetMimeType = useCallback(
-    (disposition: 'inline' | 'attachment', event: React.MouseEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-
+    (disposition: 'inline' | 'attachment') => {
       const mimeType = normalizeMimeType(currentInput);
       if (!mimeType) return;
 
@@ -139,10 +135,6 @@ const ContentDispositionSettings: React.FC = () => {
   );
 
   const onSubmit = async (data: ContentDispositionSettingsType) => {
-    if (!isManualSubmit.current) {
-      return;
-    }
-
     try {
       setError(null);
       await updateSettings(data);
@@ -164,7 +156,7 @@ const ContentDispositionSettings: React.FC = () => {
   if (isLoading && !currentSettings) return <div>Loading...</div>;
 
   return (
-    <form className="row" onSubmit={handleSubmit(onSubmit)}>
+    <div className="row">
       <div className="col-12">
         <h2 className="mb-4 border-0">
           {t('markdown_settings.content-disposition_header')}
@@ -183,11 +175,6 @@ const ContentDispositionSettings: React.FC = () => {
                   value={currentInput}
                   onChange={(e) => setCurrentInput(e.target.value)}
                   placeholder="e.g. image/png"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                    }
-                  }}
                 />
                 <button
                   className="btn btn-primary px-3 flex-shrink-0 rounded-3 fw-bold"
@@ -251,14 +238,11 @@ const ContentDispositionSettings: React.FC = () => {
         </div>
 
         <AdminUpdateButtonRow
-          onClick={() => {
-            isManualSubmit.current = true;
-            handleSubmit(onSubmit)();
-          }}
+          onClick={handleSubmit(onSubmit)}
           disabled={!isDirty || isUpdating}
         />
       </div>
-    </form>
+    </div>
   );
 };
 
