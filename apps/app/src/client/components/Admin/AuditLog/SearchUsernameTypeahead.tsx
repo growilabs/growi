@@ -8,11 +8,12 @@ import React, {
   useState,
 } from 'react';
 import type { TypeaheadRef } from 'react-bootstrap-typeahead';
-import { Menu, MenuItem, Typeahead } from 'react-bootstrap-typeahead';
+import { AsyncTypeahead, Menu, MenuItem } from 'react-bootstrap-typeahead';
 import { useTranslation } from 'react-i18next';
 
 import type { IClearable } from '~/client/interfaces/clearable';
-import { useSWRxAuditlogUsernames, useSWRxUsernames } from '~/stores/user';
+import { useSWRxAuditlogUsernames } from '~/stores/activity';
+import { useSWRxUsernames } from '~/stores/user';
 
 const Categories = {
   activeUser: 'Active User',
@@ -63,14 +64,12 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
     isLoading: _isAuditlogLoading,
   } = useSWRxAuditlogUsernames(searchKeyword, 0, 5);
 
-  const activeUsernames = usernameData?.activeUser?.usernames ?? [];
-  const inactiveUsernames = usernameData?.inactiveUser?.usernames ?? [];
+  const activeUsernames = auditlogData?.activeUser?.usernames ?? [];
+  const inactiveUsernames = auditlogData?.inactiveUser?.usernames ?? [];
   const activitySnapshotUsernames =
     auditlogData?.activitySnapshotUser?.usernames ?? [];
 
-  const isLoading =
-    (_isUsernameLoading === true && usernameError == null) ||
-    (_isAuditlogLoading === true && auditlogError == null);
+  const isLoading = _isAuditlogLoading === true && auditlogError == null;
 
   const allUser: UserDataType[] = [];
   const pushToAllUser = (usernames: string[], category: CategoryType) => {
@@ -139,15 +138,17 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
       <span className="input-group-text">
         <span className="material-symbols-outlined">person</span>
       </span>
-      <Typeahead
+
+      <AsyncTypeahead
         ref={typeaheadRef}
         id="search-username-typeahead-asynctypeahead"
         multiple
+        delay={400}
         minLength={0}
         placeholder={t('admin:audit_log_management.username')}
         isLoading={isLoading}
         options={allUser}
-        onInputChange={searchHandler}
+        onSearch={searchHandler}
         onChange={changeHandler}
         renderMenu={renderMenu}
         labelKey={(option: UserDataType) => `${option.username}`}

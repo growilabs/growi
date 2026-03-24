@@ -1,3 +1,5 @@
+import type { estypes as estypes7 } from '@elastic/elasticsearch7';
+import type { estypes as estypes9 } from '@elastic/elasticsearch9';
 import { getIdStringForRef, type IPage } from '@growi/core';
 import gc from 'expose-gc/function';
 import mongoose from 'mongoose';
@@ -97,6 +99,9 @@ class ElasticsearchDelegator
   private pageModel?: PageModel;
 
   private userModel?: typeof mongoose.Model;
+
+  private readonly auditlogIndexName = 'auditlogs';
+  private readonly auditlogAliasName = 'auditlogs-alias';
 
   constructor(socketIoService: SocketIoService) {
     this.name = SearchDelegatorName.DEFAULT;
@@ -406,11 +411,13 @@ class ElasticsearchDelegator
   }
 
   async normalizeAuditlogIndices(): Promise<void> {
-    const { client } = this;
-    const indexName = 'auditlogs';
-    const tmpIndexName = 'auditlogs-tmp';
-    const aliasName = 'auditlogs-alias';
+    const {
+      client,
+      auditlogIndexName: indexName,
+      auditlogAliasName: aliasName,
+    } = this;
 
+    const tmpIndexName = `${indexName}-tmp`;
     // remove tmp index
     const isExistsAuditlogTmpIndex = await client.indices.exists({
       index: tmpIndexName,
@@ -570,9 +577,9 @@ class ElasticsearchDelegator
 
     const body = activities.flatMap((activity) => {
       const username = activity.snapshot?.username;
-      if (!username) return [];
+      if (username == null) return [];
       return [
-        { index: { _index: 'auditlogs', _id: activity._id } },
+        { index: { _index: this.auditlogIndexName, _id: activity._id } },
         { username },
       ];
     });
@@ -712,10 +719,10 @@ class ElasticsearchDelegator
 
   async updateOrInsertAuditlog(activity: ActivityDocument): Promise<void> {
     const username = activity.snapshot?.username;
-    if (!username) return;
+    if (username == null) return;
     await this.client.bulk({
       body: [
-        { index: { _index: 'auditlogs', _id: activity._id } },
+        { index: { _index: this.auditlogIndexName, _id: activity._id } },
         { username },
       ],
     });
@@ -724,7 +731,7 @@ class ElasticsearchDelegator
   async searchAuditlogs(username: string, offset: number, limit: number) {
     if (isES7ClientDelegator(this.client)) {
       const result = await this.client.search({
-        index: 'auditlogs',
+        index: this.auditlogIndexName,
         body: {
           size: 0,
           query: {
@@ -742,14 +749,12 @@ class ElasticsearchDelegator
           },
         },
       });
-      const buckets =
-        (result.aggregations?.unique_usernames as any)?.buckets ?? [];
-      const usernames = buckets.map((bucket) => bucket.key as string);
-      const totalCount =
-        typeof result.hits.total === 'number'
-          ? result.hits.total
-          : (result.hits.total?.value ?? 0);
-      return { usernames, totalCount };
+      const agg = result.aggregations?.unique_usernames as
+        | estypes7.AggregationsStringTermsAggregate
+        | undefined;
+      const buckets = (agg?.buckets ??
+        []) as estypes7.AggregationsStringTermsBucket[];
+      return buckets.map((bucket) => bucket.key as string);
     }
 
     if (
@@ -757,7 +762,7 @@ class ElasticsearchDelegator
       isES9ClientDelegator(this.client)
     ) {
       const result = await this.client.search({
-        index: 'auditlogs',
+        index: this.auditlogIndexName,
         size: 0,
         query: {
           bool: {
@@ -769,22 +774,19 @@ class ElasticsearchDelegator
         },
         aggs: {
           unique_usernames: {
-            terms: {
-              field: 'username',
-              size: limit,
-            },
+            terms: { field: 'username', size: limit },
           },
         },
       });
-      const buckets =
-        (result.aggregations?.unique_usernames as any)?.buckets ?? [];
-      const usernames = buckets.map((bucket) => bucket.key as string);
-      const totalCount =
-        typeof result.hits.total === 'number'
-          ? result.hits.total
-          : (result.hits.total?.value ?? 0);
-      return { usernames, totalCount };
+      const agg = result.aggregations?.unique_usernames as
+        | estypes9.AggregationsStringTermsAggregate
+        | undefined;
+      const buckets = (agg?.buckets ??
+        []) as estypes9.AggregationsStringTermsBucket[];
+      return buckets.map((bucket) => bucket.key as string);
     }
+
+    return [];
   }
 
   deletePages(pages) {

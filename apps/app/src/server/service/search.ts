@@ -14,7 +14,10 @@ import type {
   IPageWithSearchMeta,
   ISearchResult,
 } from '~/interfaces/search';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
+import {
+  USER_FIELDS_EXCEPT_CONFIDENTIAL,
+  UserStatus,
+} from '~/server/models/user/conts';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
@@ -326,11 +329,25 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   async searchAuditlogs(username: string, offset: number, limit: number) {
-    return this.fullTextSearchDelegator.searchAuditlogs(
+    const usernames = await this.fullTextSearchDelegator.searchAuditlogs(
       username,
       offset,
       limit,
     );
+
+    const User = mongoose.model('User');
+    const users = await User.find({ username: { $in: usernames } });
+    const userMap = new Map(users.map((u) => [u.username, u.status]));
+
+    const activeUsernames = usernames.filter(
+      (u) => userMap.get(u) === UserStatus.STATUS_ACTIVE,
+    );
+    const inactiveUsernames = usernames.filter(
+      (u) => userMap.has(u) && userMap.get(u) !== UserStatus.STATUS_ACTIVE,
+    );
+    const activitySnapshotUsernames = usernames;
+
+    return { activeUsernames, inactiveUsernames, activitySnapshotUsernames };
   }
 
   async rebuildIndex() {

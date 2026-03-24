@@ -33,6 +33,14 @@ const validator = {
       .isString()
       .withMessage('query must be a string'),
   ],
+  usernames: [
+    query('q').optional().isString().withMessage('keyword must be a string'),
+    query('offset').optional().isInt().withMessage('offset must be a number'),
+    query('limit')
+      .optional()
+      .isInt({ max: 100 })
+      .withMessage('limit must be a number less than or equal to 100'),
+  ],
 };
 
 /**
@@ -324,18 +332,33 @@ module.exports = (crowi: Crowi): Router => {
     accessTokenParser([SCOPE.READ.ADMIN.AUDIT_LOG], { acceptLegacy: true }),
     loginRequiredStrictly,
     adminRequired,
+    validator.usernames,
+    apiV3FormValidator,
     async (req: Request, res: ApiV3Response) => {
-      const { q = '', offset = 0, limit = 5 } = req.query;
+      const q = req.query.q != null ? (req.query.q as string) : '';
+      const offset =
+        req.query.offset != null ? parseInt(req.query.offset as string, 10) : 0;
+      const limit =
+        req.query.limit != null ? parseInt(req.query.limit as string, 10) : 5;
+
       try {
         const result = await crowi.searchService.searchAuditlogs(
-          q as string,
-          +offset,
-          +limit,
+          q,
+          offset,
+          limit,
         );
         return res.apiv3({
+          activeUser: {
+            usernames: result.activeUsernames,
+            totalCount: result.activeUsernames.length,
+          },
+          inactiveUser: {
+            usernames: result.inactiveUsernames,
+            totalCount: result.inactiveUsernames.length,
+          },
           activitySnapshotUser: {
-            usernames: result?.usernames ?? [],
-            totalCount: result?.totalCount ?? 0,
+            usernames: result.activitySnapshotUsernames,
+            totalCount: result.activitySnapshotUsernames.length,
           },
         });
       } catch (err) {
