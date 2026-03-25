@@ -1,7 +1,6 @@
 import type { IUser } from '@growi/core';
 import { OptionParser } from '@growi/core/dist/remark-plugins';
 import { pathUtils } from '@growi/core/dist/utils';
-import escapeStringRegexp from 'escape-string-regexp';
 import type { Request, Response } from 'express';
 import createError, { isHttpError } from 'http-errors';
 
@@ -31,16 +30,16 @@ export function addFilterCondition(
     );
   }
 
-  const pagePathForRegexp = escapeStringRegexp(addTrailingSlash(pagePath));
+  const pagePathForRegexp = RegExp.escape(addTrailingSlash(pagePath));
 
   let filterPath: RegExp;
   try {
     if (optionsFilter.charAt(0) === '^') {
       // move '^' to the first of path
-      const escapedFilter = escapeStringRegexp(optionsFilter.slice(1));
+      const escapedFilter = RegExp.escape(optionsFilter.slice(1));
       filterPath = new RegExp(`^${pagePathForRegexp}${escapedFilter}`);
     } else {
-      const escapedFilter = escapeStringRegexp(optionsFilter);
+      const escapedFilter = RegExp.escape(optionsFilter);
       filterPath = new RegExp(`^${pagePathForRegexp}.*${escapedFilter}`);
     }
   } catch (err) {
@@ -100,7 +99,7 @@ export const listPages = ({
       if (excludedPaths.length > 0) {
         const escapedPaths = excludedPaths.map((p) => {
           const cleanPath = p.startsWith('/') ? p.substring(1) : p;
-          return escapeStringRegexp(cleanPath);
+          return RegExp.escape(cleanPath);
         });
 
         const regex = new RegExp(`^\\/(${escapedPaths.join('|')})(\\/|$)`);

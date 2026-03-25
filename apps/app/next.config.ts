@@ -28,7 +28,6 @@ const getTranspilePackages = (): string[] => {
     'decode-named-character-reference',
     'devlop',
     'fault',
-    'escape-string-regexp',
     'hastscript',
     'html-void-elements',
     'is-absolute-url',

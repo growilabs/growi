@@ -12,5 +12,9 @@ In full-stack packages (e.g., `apps/app`), server-side code (`src/server/`, mode
 
 For apps/app-specific examples and build tooling details, see `apps/app/.claude/skills/build-optimization/SKILL.md`.
 
+### The positioning of @growi/core.
+
+See: `.claude/skills/monorepo-overview/SKILL.md` — "@growi/core — Domain & Utilities Hub" section
+
 ---
-_Updated: 2026-03-03. apps/app details moved to `apps/app/.claude/skills/build-optimization/SKILL.md`._
+_Updated: 2026-03-24. @growi/core details moved to monorepo-overview SKILL.md (auto-loaded)._
