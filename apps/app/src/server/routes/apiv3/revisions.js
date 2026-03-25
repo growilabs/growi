@@ -11,7 +11,6 @@ import {
   normalizeLatestRevisionIfBroken,
 } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import loggerFactory from '~/utils/logger';
-import { prisma } from '~/utils/prisma';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 
@@ -141,11 +140,6 @@ module.exports = (crowi) => {
         10;
       const { isSharedPage } = req;
       const offset = req.query.offset || 0;
-
-      const revision = await prisma.revisions.findLatest(pageId);
-      console.log(revision);
-      console.log(revision.isPlain);
-      console.log(revision.isMarkdown());
 
       // check whether accessible
       if (
