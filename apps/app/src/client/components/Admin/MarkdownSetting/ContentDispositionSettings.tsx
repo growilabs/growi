@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 
+import { toastError, toastSuccess } from '~/client/util/toastr';
+
 import {
   type ContentDispositionSettings as ContentDispositionSettingsType,
   useContentDisposition,
@@ -136,9 +138,18 @@ const ContentDispositionSettings: React.FC = () => {
     try {
       setError(null);
       await updateSettings(data);
+
+      toastSuccess(
+        t('toaster.update_successed', {
+          target: t('markdown_settings.content-disposition_header'),
+          ns: 'commons',
+        }),
+      );
+
       reset(data);
     } catch (err) {
       setError((err as Error).message);
+      toastError(err);
     }
   };
 

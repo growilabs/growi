@@ -99,10 +99,27 @@ This enables better code splitting and prevents server-only code from being bund
 
 Common code should be extracted to `packages/`:
 
-- **core**: Utilities, constants, type definitions
+- **core**: Domain hub (see below)
 - **ui**: Reusable React components
 - **editor**: Markdown editor
 - **pluginkit**: Plugin system framework
+
+#### @growi/core — Domain & Utilities Hub
+
+`@growi/core` is the foundational shared package depended on by all other packages (10 consumers). Its responsibilities:
+
+- **Domain type definitions** — Single source of truth for cross-package interfaces (`IPage`, `IUser`, `IRevision`, `Ref<T>`, `HasObjectId`, etc.)
+- **Cross-cutting utilities** — Pure functions for page path validation, ObjectId checks, serialization (e.g., `serializeUserSecurely()`)
+- **System constants** — File types, plugin configs, scope enums
+- **Global type augmentations** — Runtime/polyfill type declarations visible to all consumers (e.g., `RegExp.escape()` via `declare global` in `index.ts`)
+
+Key patterns:
+
+1. **Shared types and global augmentations go in `@growi/core`** — Not duplicated per-package. `declare global` in `index.ts` propagates to all consumers through the module graph.
+2. **Subpath exports for granular imports** — `@growi/core/dist/utils/page-path-utils` instead of barrel imports from root.
+3. **Minimal runtime dependencies** — Only `bson-objectid`; ~70% types. Safe to import from both server and client contexts.
+4. **Server-specific interfaces are namespaced** — Under `interfaces/server/`.
+5. **Dual format (ESM + CJS)** — Built via Vite with `preserveModules: true` and `vite-plugin-dts` (`copyDtsFiles: true`).
 
 ## Version Management with Changeset
 

@@ -14,6 +14,7 @@ import { initializeOpenaiService } from '~/features/openai/server/services/opena
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
 import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
+import type { SessionConfig } from '~/interfaces/session-config';
 import { startCron as startAccessTokenCron } from '~/server/service/access-token';
 import { projectRoot } from '~/server/util/project-dir-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
@@ -83,19 +84,6 @@ type ActivityServiceType = any;
 type CommentServiceType = any;
 type SyncPageStatusServiceType = any;
 type CrowiDevType = any;
-
-interface SessionConfig {
-  rolling: boolean;
-  secret: string;
-  resave: boolean;
-  saveUninitialized: boolean;
-  cookie: {
-    maxAge: number;
-  };
-  genid: (req: { path: string }) => string;
-  name?: string;
-  store?: unknown;
-}
 
 interface CrowiEvents {
   user: UserEvent;
@@ -588,7 +576,11 @@ class Crowi {
     this.socketIoService.attachServer(httpServer);
 
     // Initialization YjsService
-    initializeYjsService(this.socketIoService.io);
+    initializeYjsService(
+      httpServer,
+      this.socketIoService.io,
+      this.sessionConfig,
+    );
 
     await this.autoInstall();
 
