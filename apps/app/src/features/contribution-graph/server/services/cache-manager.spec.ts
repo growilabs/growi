@@ -240,36 +240,34 @@ describe('Contribution Cache Manager Integration Test', () => {
     });
 
     it('should transition currentWeekData to permanentWeeks when the week shifts to Monday', async () => {
+      // Setup predictable time (Wednesday)
+      const mockNow = new Date('2026-03-25T12:00:00Z');
+      vi.useFakeTimers();
+      vi.setSystemTime(mockNow);
+
       const userId = createMockId();
       const User = mongoose.model('User');
       await User.create({ _id: userId, status: 1, username: 'week-tester' });
 
-      // Setup Relative Dates
+      // Setup Relative Dates based on the mocked now date
       const now = new Date();
-      now.setUTCHours(12, 0, 0, 0);
-
       const yesterday = new Date(now);
       yesterday.setUTCDate(now.getUTCDate() - 1);
-
       const lastWeekDate = new Date(now);
       lastWeekDate.setUTCDate(now.getUTCDate() - 7);
-
-      vi.useFakeTimers();
-      vi.setSystemTime(now);
 
       const todayStr = formatDateKey(now);
       const lastWeekDateStr = formatDateKey(lastWeekDate);
       const lastWeekId = getISOWeekId(lastWeekDate);
 
-      // Setup Cache (Last Updated Yesterday, but containing data from Last Week)
       await ContributionCache.create({
         userId,
-        lastUpdated: yesterday,
+        lastUpdated: yesterday, // Tuesday
         currentWeekData: [{ date: lastWeekDateStr, count: 5 }],
         permanentWeeks: new Map(),
       });
 
-      // Create Activity for "Now"
+      // Create Activity for Today (Wednesday)
       await Activity.create({
         user: userId,
         action: ActivityLogActions.ACTION_PAGE_CREATE,
@@ -280,14 +278,14 @@ describe('Contribution Cache Manager Integration Test', () => {
 
       const updatedDoc = await ContributionCache.findOne({ userId });
 
-      // The old week (Last Week) should be in permanent storage
+      // March 18th data should have been moved to permanentWeeks
       const archivedWeek = updatedDoc?.permanentWeeks.get(lastWeekId);
       expect(archivedWeek).toBeDefined();
       expect(archivedWeek?.find((d) => d.date === lastWeekDateStr)?.count).toBe(
         5,
       );
 
-      // Verify today's activity is counted in the new current week
+      // March 25th data should be in the fresh currentWeekData
       const todayEntry = updatedDoc?.currentWeekData.find(
         (d) => d.date === todayStr,
       );
