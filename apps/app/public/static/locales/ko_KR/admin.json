@@ -1147,6 +1147,7 @@
   "ai_integration": {
     "ai_integration": "AI 통합",
     "disable_mode_explanation": "현재 AI 통합이 비활성화되어 있습니다. 활성화하려면 <code>AI_ENABLED</code> 환경 변수와 필요한 추가 변수를 구성하십시오.<br><br>자세한 내용은 <a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>문서</a>를 참조하십시오.",
+    "disable_mode_explanation_cloud": "현재 AI 통합이 비활성화되어 있습니다. 활성화하려면 GROWI.cloud 관리 화면에서 앱 설정을 변경하십시오.",
     "ai_search_management": "AI 검색 관리"
   }
 }

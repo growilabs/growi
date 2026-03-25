@@ -1156,6 +1156,7 @@
   "ai_integration": {
     "ai_integration": "AI 集成",
     "disable_mode_explanation": "目前，AI 集成已被禁用。若要启用，请配置 <code>AI_ENABLED</code> 环境变量以及其他必要的变量。<br><br>详细信息请参考<a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>文档</a>。",
+    "disable_mode_explanation_cloud": "目前，AI 集成已被禁用。要启用它，请从 GROWI.cloud 管理界面更改应用程序设置。",
     "ai_search_management": "AI 搜索管理"
   }
 }
