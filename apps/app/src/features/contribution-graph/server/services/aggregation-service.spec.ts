@@ -96,4 +96,51 @@ describe('ContributionAggregationService (Essential)', () => {
 
     vi.useRealTimers();
   });
+
+  it('should correctly separate activities occurring seconds apart across the midnight boundary', async () => {
+    const userId = new mongoose.Types.ObjectId();
+
+    // Define the midnight boundary
+    const tuesdayLastSecond = new Date('2026-03-24T23:59:59Z');
+    const wednesdayFirstSecond = new Date('2026-03-25T00:00:01Z');
+
+    // Set "Now" to Wednesday afternoon for the test environment
+    const mockNow = new Date('2026-03-25T15:00:00Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(mockNow);
+
+    // Insert activities on both sides of the midnight boundary
+    await Activity.insertMany([
+      {
+        user: userId,
+        action: ActivityLogActions.ACTION_PAGE_CREATE,
+        createdAt: tuesdayLastSecond,
+      },
+      {
+        user: userId,
+        action: ActivityLogActions.ACTION_PAGE_UPDATE,
+        createdAt: wednesdayFirstSecond,
+      },
+    ]);
+
+    // Run the pipeline starting from Monday
+    const results = await service.runAggregationPipeline({
+      userId: userId.toString(),
+      startDate: new Date('2026-03-23T00:00:00Z'),
+    });
+
+    // We expect two distinct entries in the results
+    const tuesdayEntry = results.find((r) => r.date === '2026-03-24');
+    const wednesdayEntry = results.find((r) => r.date === '2026-03-25');
+
+    expect(tuesdayEntry).toBeDefined();
+    expect(tuesdayEntry?.count).toBe(1);
+
+    expect(wednesdayEntry).toBeDefined();
+    expect(wednesdayEntry?.count).toBe(1);
+
+    expect(results.length).toBe(2);
+
+    vi.useRealTimers();
+  });
 });
