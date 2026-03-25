@@ -1,7 +1,7 @@
 {
   "$schema": "http://json.schemastore.org/tsconfig",
   "extends": "./tsconfig.json",
-  "include": [".next/types/**/*.ts"],
+  "include": [".next/types/**/*.ts", "src/@types/**/*.d.ts"],
   "compilerOptions": {
     "strict": false,
     "strictNullChecks": true,

@@ -888,6 +888,7 @@
     "duplicate_export_confirm": "An export with the same conditions is already in progress. Do you want to restart it?",
     "restart_export": "Restart Export",
     "confirm_export": "Confirm Export",
+    "disable_mode_explanation_cloud": "Audit log is currently disabled. To enable it, please update the app settings from the GROWI.cloud management screen.",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }

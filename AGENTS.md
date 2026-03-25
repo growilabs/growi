@@ -124,8 +124,7 @@ turbo run build --filter @growi/app
 Or from apps/app directory:
 
 ```bash
-pnpm run lint:typecheck
-pnpm run lint:biome
+pnpm run lint
 pnpm run test
 pnpm run build
 ```

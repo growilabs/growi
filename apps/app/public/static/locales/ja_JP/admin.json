@@ -897,6 +897,7 @@
     "duplicate_export_confirm": "同じ条件のエクスポートが進行中です。やり直しますか？",
     "restart_export": "やり直す",
     "confirm_export": "エクスポートの確認",
+    "disable_mode_explanation_cloud": "現在、監査ログは無効になっています。有効にするには、GROWI.cloud の管理画面からアプリの設定を変更してください。",
     "docs_url": {
       "log_type": "https://docs.growi.org/ja/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }

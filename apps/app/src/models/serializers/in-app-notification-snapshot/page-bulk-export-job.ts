@@ -5,9 +5,9 @@ import mongoose from 'mongoose';
 import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export';
 import type { PageModel } from '~/server/models/page';
 
-export interface IPageBulkExportJobSnapshot {
-  path: string;
-}
+// Re-export client-safe types and functions
+export type { IPageBulkExportJobSnapshot } from './page-bulk-export-job-client';
+export { parseSnapshot } from './page-bulk-export-job-client';
 
 export const stringifySnapshot = async (
   exportJob: IPageBulkExportJob,
@@ -22,8 +22,4 @@ export const stringifySnapshot = async (
       path: page.path,
     });
   }
-};
-
-export const parseSnapshot = (snapshot: string): IPageBulkExportJobSnapshot => {
-  return JSON.parse(snapshot);
 };

@@ -888,6 +888,7 @@
     "duplicate_export_confirm": "동일한 조건의 내보내기가 이미 진행 중입니다. 다시 시작하시겠습니까?",
     "restart_export": "내보내기 다시 시작",
     "confirm_export": "내보내기 확인",
+    "disable_mode_explanation_cloud": "현재 감사 로그가 비활성화되어 있습니다. 활성화하려면 GROWI.cloud 관리 화면에서 앱 설정을 변경하십시오.",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }

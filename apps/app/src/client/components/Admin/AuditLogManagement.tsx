@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import type { IClearable } from '~/client/interfaces/clearable';
 import { toastError } from '~/client/util/toastr';
 import type { SupportedActionType } from '~/interfaces/activity';
+import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
 import {
   auditLogAvailableActionsAtom,
   auditLogEnabledAtom,
@@ -35,6 +36,11 @@ const PAGING_LIMIT = 10;
 
 export const AuditLogManagement: FC = () => {
   const { t } = useTranslation('admin');
+
+  const growiCloudUri = useGrowiCloudUri();
+  const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
+
+  const isCloud = growiCloudUri != null && growiAppIdForGrowiCloud != null;
 
   const typeaheadRef = useRef<IClearable>(null);
 
@@ -214,6 +220,16 @@ export const AuditLogManagement: FC = () => {
           </>
         )}
       </button>
+
+      {isCloud && (
+        <a
+          href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
+          className="btn btn-outline-secondary mb-4 ms-2"
+        >
+          <span className="material-symbols-outlined me-1">share</span>
+          {t('cloud_setting_management.to_cloud_settings')}
+        </a>
+      )}
 
       <h2 className="admin-setting-header mb-3">
         <span>

@@ -897,6 +897,7 @@
     "duplicate_export_confirm": "已有相同条件的导出正在进行中。是否要重新启动它？",
     "restart_export": "重新启动导出",
     "confirm_export": "确认导出",
+    "disable_mode_explanation_cloud": "审计日志当前已禁用。要启用它，请从 GROWI.cloud 管理界面更改应用程序设置。",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }

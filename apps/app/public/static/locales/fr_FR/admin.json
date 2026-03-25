@@ -887,6 +887,7 @@
     "duplicate_export_confirm": "Une exportation avec les mêmes conditions est déjà en cours. Voulez-vous la redémarrer ?",
     "restart_export": "Redémarrer l'exportation",
     "confirm_export": "Confirmer l'exportation",
+    "disable_mode_explanation_cloud": "Le journal d'audit est actuellement désactivé. Pour l'activer, veuillez modifier les paramètres de l'application depuis l'écran de gestion GROWI.cloud.",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }

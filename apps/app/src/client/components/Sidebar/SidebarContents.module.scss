@@ -1,16 +1,16 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.grw-sidebar-contents :global {
+.grw-sidebar-contents {
   --bs-heading-color: var(--bs-tertiary-color);
   --bs-body-color: var(--bs-secondary-color);
   --bs-link-color-rgb: var(--bs-secondary-color-rgb);
   --bs-link-opacity: .75;
 
-  .list-group-item {
+  :global(.list-group-item) {
     --bs-list-group-bg: transparent;
   }
 
-  .wip-page-badge {
+  :global(.wip-page-badge) {
     --bs-badge-font-size: 0.5rem;
   }
 }
