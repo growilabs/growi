@@ -52,8 +52,8 @@ interface UpdatePageRequest
   user: IUserHasId;
 }
 
-const minimumRevisionForActivity = 2;
-const suppressUpdateWindowMs = 5 * 60 * 1000; // 5 min
+const MINIMUM_REVISION_FOR_ACTIVITY = 2;
+const SUPPRESION_UPDATE_WINDOW_MS = 5 * 60 * 1000; // 5 min
 
 export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
   const Page = mongoose.model<IPage, PageModel>('Page');
@@ -138,21 +138,20 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         _id: { $ne: res.locals.activity?._id },
       }).sort({ createdAt: -1 });
 
-      const isLastActivityByMe =
-        req.user?._id != null &&
-        lastContentActivity?.user?._id?.toString() ===
-          req.user?._id?.toString();
+      const currentUserId = req.user?._id?.toString();
 
-      const lastActivityTime = lastContentActivity
-        ? lastContentActivity.createdAt.getTime()
-        : 0;
+      const isLastActivityByMe =
+        !!currentUserId &&
+        lastContentActivity?.user?._id?.toString() === currentUserId;
+
+      const lastActivityTime = lastContentActivity?.createdAt?.getTime?.() ?? 0;
       const timeSinceLastActivityMs = Date.now() - lastActivityTime;
 
       // Decide if update activity should generate
       let shouldGenerateUpdateActivity: boolean;
       if (!isLastActivityByMe) {
         shouldGenerateUpdateActivity = true;
-      } else if (timeSinceLastActivityMs < suppressUpdateWindowMs) {
+      } else if (timeSinceLastActivityMs < SUPPRESION_UPDATE_WINDOW_MS) {
         shouldGenerateUpdateActivity = false;
       } else {
         const Revision = mongoose.model<IRevisionHasId>('Revision');
@@ -161,7 +160,7 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         });
 
         shouldGenerateUpdateActivity =
-          revisionCount > minimumRevisionForActivity;
+          revisionCount > MINIMUM_REVISION_FOR_ACTIVITY;
       }
 
       if (shouldGenerateUpdateActivity) {
