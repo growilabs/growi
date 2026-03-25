@@ -53,7 +53,12 @@ async function postProcess(
 }
 
 /**
- * Execute a pipeline that reads the page files from the temporal fs directory, compresses them, and uploads to the cloud storage
+ * Compress page files into a tar.gz archive and upload to cloud storage.
+ *
+ * Wraps archiver output with PassThrough to provide a Node.js native Readable,
+ * since archiver uses npm's readable-stream which fails AWS SDK's instanceof check.
+ * The Content-Length / Transfer-Encoding issue is resolved by aws/index.ts using
+ * the Upload class from @aws-sdk/lib-storage.
  */
 export async function compressAndUpload(
   this: IPageBulkExportJobCronService,
@@ -78,12 +83,11 @@ export async function compressAndUpload(
 
   // Wrap with Node.js native PassThrough so that AWS SDK recognizes the stream as a native Readable
   const uploadStream = new PassThrough();
-
-  // Establish pipe before finalize to ensure data flows correctly
   pageArchiver.pipe(uploadStream);
+
   pageArchiver.on('error', (err) => {
+    logger.error('pageArchiver error', err);
     uploadStream.destroy(err);
-    pageArchiver.destroy();
   });
 
   pageArchiver.directory(this.getTmpOutputDir(pageBulkExportJob), false);
@@ -100,9 +104,6 @@ export async function compressAndUpload(
     );
   } catch (e) {
     logger.error(e);
-    this.handleError(e, pageBulkExportJob);
-  } finally {
-    pageArchiver.destroy();
-    uploadStream.destroy();
+    await this.handleError(e, pageBulkExportJob);
   }
 }
