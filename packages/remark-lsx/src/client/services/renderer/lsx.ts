@@ -63,7 +63,14 @@ export const remarkPlugin: Plugin = () => (tree) => {
             firstAttrValue === '' &&
             !SUPPORTED_ATTRIBUTES.includes(firstAttrKey)
           ) {
-            attributes.prefix = firstAttrKey.trim();
+            const prefixParts: string[] = [];
+            for (const [key, value] of attrEntries) {
+              if (value !== '' || SUPPORTED_ATTRIBUTES.includes(key)) {
+                break;
+              }
+              prefixParts.push(key);
+            }
+            attributes.prefix = prefixParts.join(' ');
           }
         }
       }

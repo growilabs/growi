@@ -111,6 +111,7 @@ export function factoryAttributes(
       code !== codes.greaterThan &&
       code !== codes.graveAccent &&
       code !== codes.rightParenthesis &&
+      code !== codes.space &&
       code !== codes.comma
     ) {
       effects.consume(code);
