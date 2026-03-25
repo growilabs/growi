@@ -9,6 +9,7 @@ import loggerFactory from '~/utils/logger';
 import type Crowi from '../../../../server/crowi';
 import { apiV3FormValidator } from '../../../../server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '../../../../server/routes/apiv3/interfaces/apiv3-response';
+import { assembleEmptyGraph } from '../../utils/contribution-graph-utils';
 
 const logger = loggerFactory('growi:routes:apiv3:contribution');
 
@@ -50,7 +51,13 @@ export const getContributionsHandlerFactory = (
         return res.apiv3({ contributions });
       } catch (err) {
         logger.error('Failed to get contributions', err);
-        return res.apiv3Err(err, 500);
+
+        const fallbackGraph = assembleEmptyGraph();
+
+        return res.apiv3({
+          contributions: fallbackGraph,
+          isTemporaryUnavailable: true,
+        });
       }
     },
   ];

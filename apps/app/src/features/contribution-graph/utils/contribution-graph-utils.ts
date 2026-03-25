@@ -66,3 +66,24 @@ export function getExpiredWeekIds(
 
   return weeksArray.filter((weekId) => weekId < cutoffWeekId);
 }
+
+export function assembleEmptyGraph(): IContributionDay[] {
+  const days: IContributionDay[] = [];
+
+  const runner = new Date();
+  runner.setUTCHours(0, 0, 0, 0);
+
+  for (let i = 0; i < 365; i++) {
+    const dateCopy = new Date(runner);
+    dateCopy.setUTCDate(runner.getUTCDate() - i);
+
+    const dateKey = dateCopy.toISOString().split('T')[0];
+
+    days.unshift({
+      date: dateKey,
+      count: 0,
+    });
+  }
+
+  return days;
+}
