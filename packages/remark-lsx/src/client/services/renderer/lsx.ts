@@ -63,7 +63,7 @@ export const remarkPlugin: Plugin = () => (tree) => {
             firstAttrValue === '' &&
             !SUPPORTED_ATTRIBUTES.includes(firstAttrKey)
           ) {
-            attributes.prefix = firstAttrKey;
+            attributes.prefix = firstAttrKey.trim();
           }
         }
       }
