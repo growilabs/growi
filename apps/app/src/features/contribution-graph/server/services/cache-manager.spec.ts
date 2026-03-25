@@ -294,6 +294,42 @@ describe('Contribution Cache Manager Integration Test', () => {
       vi.useRealTimers();
     });
 
+    it('should return exactly 365 days even if the user was only active on two days', async () => {
+      const userId = createMockId();
+      const User = mongoose.model('User');
+      await User.create({ _id: userId, status: 1, username: 'week-tester' });
+
+      const today = new Date('2026-03-25T12:00:00Z');
+      vi.useFakeTimers();
+      vi.setSystemTime(today);
+
+      const oldDate = new Date(today);
+      oldDate.setUTCDate(today.getUTCDate() - 360);
+
+      await Activity.create([
+        {
+          user: userId,
+          action: ActivityLogActions.ACTION_PAGE_CREATE,
+          createdAt: oldDate, // 360 days ago
+        },
+        {
+          user: userId,
+          action: ActivityLogActions.ACTION_PAGE_CREATE,
+          createdAt: today,
+        },
+      ]);
+
+      const result = await cacheManager.getUpdatedCache(userId);
+      const activeDays = result.filter((day) => day.count > 0);
+      const emptyDays = result.filter((day) => day.count === 0);
+
+      expect(result).toHaveLength(365);
+      expect(activeDays).toHaveLength(2);
+      expect(emptyDays).toHaveLength(363);
+
+      vi.useRealTimers();
+    });
+
     it('should maintain a 365-day window and handle data rotation when the graph is full', async () => {
       const userId = createMockId();
 
