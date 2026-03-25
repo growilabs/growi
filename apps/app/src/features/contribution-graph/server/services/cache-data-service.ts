@@ -20,7 +20,10 @@ export async function userExists(userId: string): Promise<boolean> {
   }
 
   const User = mongoose.model('User');
-  const result = await User.exists({ _id: { $eq: userId }, status: 1 });
+  const result = await User.exists({
+    _id: { $eq: userId },
+    status: { $in: [1, 2] },
+  });
   return !!result;
 }
 
