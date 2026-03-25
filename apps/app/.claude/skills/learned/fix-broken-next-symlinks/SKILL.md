@@ -3,6 +3,10 @@ name: fix-broken-next-symlinks
 description: Fix broken symlinks in .next/node_modules/ — diagnose, decide allowlist vs dependencies, and verify
 ---
 
+## IMPORTANT
+
+This document is a **mandatory step-by-step procedure**. When fixing broken symlinks, execute every step in order. In particular, verification **always** requires the full 3-command sequence: `build` → `assemble-prod.sh` → `check-next-symlinks.sh`. Never skip `assemble-prod.sh` — the symlink check is only meaningful after production assembly.
+
 ## Problem
 
 Turbopack externalizes packages into `.next/node_modules/` as symlinks, even for packages imported only via dynamic `import()` inside `useEffect`. After `assemble-prod.sh` runs `pnpm deploy --prod`, `devDependencies` are excluded, breaking those symlinks. `check-next-symlinks.sh` detects these and fails the build.

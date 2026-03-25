@@ -13,7 +13,6 @@ import {
 } from '@growi/core';
 import { deepEquals } from '@growi/core/dist/utils';
 import { isGlobPatternPath } from '@growi/core/dist/utils/page-path-utils';
-import escapeStringRegexp from 'escape-string-regexp';
 import createError from 'http-errors';
 import mongoose, { type HydratedDocument, type Types } from 'mongoose';
 import type { OpenAI } from 'openai';
@@ -78,7 +77,7 @@ const convertPathPatternsToRegExp = (
   return pagePathPatterns.map((pagePathPattern) => {
     if (isGlobPatternPath(pagePathPattern)) {
       const trimedPagePathPattern = pagePathPattern.replace('/*', '');
-      const escapedPagePathPattern = escapeStringRegexp(trimedPagePathPattern);
+      const escapedPagePathPattern = RegExp.escape(trimedPagePathPattern);
       // https://regex101.com/r/x5KIZL/1
       return new RegExp(`^${escapedPagePathPattern}($|/)`);
     }

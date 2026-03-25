@@ -35,8 +35,9 @@ if [ -n "$broken" ]; then
   echo "  1. Moved from devDependencies to dependencies in apps/app/package.json"
   echo "  2. Added to ALLOWED_BROKEN in this script (if only used via useEffect + dynamic import)"
   echo ""
-  echo "See: apps/app/.claude/skills/learned/fix-broken-next-symlinks/SKILL.md"
-  echo "See also: apps/app/.claude/rules/package-dependencies.md"
+  echo "Fix: Follow the step-by-step procedure in apps/app/.claude/skills/learned/fix-broken-next-symlinks/SKILL.md"
+  echo "     You MUST execute every step in order — do NOT skip assemble-prod.sh when verifying."
+  echo "Ref: apps/app/.claude/rules/package-dependencies.md"
   exit 1
 fi
 

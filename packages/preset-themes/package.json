@@ -31,7 +31,7 @@
   "devDependencies": {
     "@growi/core": "workspace:^",
     "@growi/core-styles": "workspace:^",
-    "bootstrap": "=5.3.2",
+    "bootstrap": "^5.3.8",
     "sass": "^1.55.0"
   },
   "peerDependencies": {
