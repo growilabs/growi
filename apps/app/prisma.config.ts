@@ -1,5 +1,5 @@
 import { config } from 'dotenv-flow';
-import { defineConfig, env } from 'prisma/config';
+import { defineConfig } from 'prisma/config';
 
 config();
 
@@ -11,6 +11,6 @@ export default defineConfig({
   },
   engine: 'classic',
   datasource: {
-    url: env('MONGO_URI'),
+    url: process.env.MONGO_URI,
   },
 });
