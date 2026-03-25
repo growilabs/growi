@@ -1,9 +1,11 @@
 # syntax = docker/dockerfile:1
 
+ARG NODE_VERSION=24
+
 ##
 ## base
 ##
-FROM node:20-slim AS base
+FROM node:${NODE_VERSION}-slim AS base
 
 ENV optDir="/opt"
 
@@ -11,7 +13,7 @@ WORKDIR ${optDir}
 
 # install pnpm
 RUN apt-get update && apt-get install -y ca-certificates wget --no-install-recommends \
-  && wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" PNPM_VERSION="10.4.1" sh -
+  && wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" PNPM_VERSION="10.32.1" sh -
 ENV PNPM_HOME="/root/.local/share/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
@@ -38,7 +40,7 @@ RUN pnpm install ---frozen-lockfile
 RUN turbo run build --filter @growi/slackbot-proxy
 
 # make artifacts
-RUN pnpm deploy out --prod --filter @growi/slackbot-proxy
+RUN pnpm deploy out --prod --legacy --filter @growi/slackbot-proxy
 RUN rm -rf apps/slackbot-proxy/node_modules && mv out/node_modules apps/slackbot-proxy/node_modules
 RUN tar -zcf packages.tar.gz \
   package.json \
@@ -52,7 +54,8 @@ RUN tar -zcf packages.tar.gz \
 ##
 ## release
 ##
-FROM node:20-slim
+ARG NODE_VERSION=24
+FROM node:${NODE_VERSION}-slim
 LABEL maintainer="Yuki Takei <yuki@weseek.co.jp>"
 
 ENV NODE_ENV="production"

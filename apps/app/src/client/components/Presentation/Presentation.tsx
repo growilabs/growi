@@ -4,7 +4,7 @@ import {
   Presentation as PresentationSubstance,
 } from '@growi/presentation/dist/client';
 
-import '@growi/presentation/dist/style.css';
+import './Presentation.vendor-styles.prebuilt';
 
 export const Presentation = (props: PresentationProps): JSX.Element => {
   return <PresentationSubstance {...props} />;

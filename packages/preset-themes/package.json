@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "GROWI preset themes",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "main": "dist/libs/preset-themes.umd.js",
   "module": "dist/libs/preset-themes.mjs",
   "types": "dist/libs/index.d.ts",
@@ -31,7 +31,7 @@
   "devDependencies": {
     "@growi/core": "workspace:^",
     "@growi/core-styles": "workspace:^",
-    "bootstrap": "=5.3.2",
+    "bootstrap": "^5.3.8",
     "sass": "^1.55.0"
   },
   "peerDependencies": {

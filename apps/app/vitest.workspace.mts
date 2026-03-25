@@ -31,6 +31,8 @@ export default defineWorkspace([
       name: 'app-integration',
       environment: 'node',
       include: ['**/*.integ.ts'],
+      // Pre-download the MongoDB binary before workers start to avoid lock-file race conditions
+      globalSetup: ['./test/setup/mongo/global-setup.ts'],
       setupFiles: [
         './test/setup/migrate-mongo.ts',
         './test/setup/mongo/index.ts',

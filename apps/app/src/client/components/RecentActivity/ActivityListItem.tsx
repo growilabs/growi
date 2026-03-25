@@ -1,4 +1,4 @@
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns/formatDistanceToNow';
 import type { Locale } from 'date-fns/locale';
 import { useTranslation } from 'next-i18next';
 
@@ -7,7 +7,7 @@ import type {
   SupportedActivityActionType,
 } from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
-import { getLocale } from '~/server/util/locale-utils';
+import { getLocale } from '~/utils/locale-utils';
 
 export const ActivityActionTranslationMap: Record<
   SupportedActivityActionType,

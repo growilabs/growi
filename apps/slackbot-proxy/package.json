@@ -1,8 +1,8 @@
 {
   "name": "@growi/slackbot-proxy",
-  "version": "7.4.7-slackbot-proxy.0",
+  "version": "7.5.0-slackbot-proxy.0",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "scripts": {
     "build": "tspc -p tsconfig.build.json",
     "clean": "shx rm -rf dist",
@@ -68,8 +68,7 @@
   },
   "// comments for devDependencies": {
     "@tsed/*": "v6.133.1 causes 'TypeError: Cannot read properties of undefined (reading 'prototype')' with `@Middleware()`",
-    "@tsed/core,exceptions": "force package to local node_modules in tsconfig.json since pnpm reads wrong hoisted tsed version (https://github.com/pnpm/pnpm/issues/7158)",
-    "bootstrap": "v5.3.3 has a bug. refs: https://github.com/twbs/bootstrap/issues/39798"
+    "@tsed/core,exceptions": "force package to local node_modules in tsconfig.json since pnpm reads wrong hoisted tsed version (https://github.com/pnpm/pnpm/issues/7158)"
   },
   "devDependencies": {
     "@popperjs/core": "^2.11.8",
@@ -77,7 +76,7 @@
     "@tsed/exceptions": "=6.43.0",
     "@tsed/json-mapper": "=6.43.0",
     "@types/bunyan": "^1.8.11",
-    "bootstrap": "=5.3.2",
+    "bootstrap": "^5.3.8",
     "browser-bunyan": "^1.6.3",
     "morgan": "^1.10.0"
   }

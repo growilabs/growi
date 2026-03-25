@@ -1,11 +1,11 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
 
-.grw-slack-switch :global {
-  .input-group-text {
+.grw-slack-switch {
+  :global(.input-group-text) {
     background-color: inherit;
   }
-  .form-check-input {
+  :global(.form-check-input) {
     cursor: pointer;
     background-repeat: no-repeat;
     background-attachment:scroll;
@@ -15,14 +15,14 @@
     box-shadow: none;
     transition: all 0.4s ease-out;
   }
-  .form-control::placeholder {
+  :global(.form-control::placeholder) {
     color: bs.$gray-500
   }
 }
 
 :root[data-bs-theme='light'] {
-  .grw-slack-switch :global {
-    .form-check-input:not(:checked) {
+  .grw-slack-switch {
+    :global(.form-check-input:not(:checked)) {
       background-color: bs.$gray-200;
       background-image:
         url('/images/icons/slack/slack-logo-off.svg'),
@@ -30,7 +30,7 @@
       background-position: 15%, 5%, 50%, 50%;
     }
 
-    .form-check-input:checked {
+    :global(.form-check-input:checked) {
       background-color: #E7A9E8;
       background-image:
         url('/images/icons/slack/slack-logo-on.svg'),
@@ -41,8 +41,8 @@
 }
 
 :root[data-bs-theme='dark'] {
-  .grw-slack-switch :global {
-    .form-check-input:not(:checked) {
+  .grw-slack-switch {
+    :global(.form-check-input:not(:checked)) {
       background-color: bs.$gray-200;
       background-image:
         url('/images/icons/slack/slack-logo-dark-off.svg'),
@@ -50,7 +50,7 @@
       background-position: 14%, 4%, 50%, 50%;
     }
 
-    .form-check-input:checked {
+    :global(.form-check-input:checked) {
       background-color: #731f74;
       background-image:
         url('/images/icons/slack/slack-logo-dark-on.svg'),
