@@ -124,6 +124,7 @@ module.exports = (crowi) => {
     registered: UserStatus.STATUS_REGISTERED,
     active: UserStatus.STATUS_ACTIVE,
     suspended: UserStatus.STATUS_SUSPENDED,
+    deleted: UserStatus.STATUS_DELETED,
     invited: UserStatus.STATUS_INVITED,
   };
 
