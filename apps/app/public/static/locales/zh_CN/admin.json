@@ -790,7 +790,8 @@
       "revoke_read_only_access": "取消只读访问",
       "grant_read_only_access": "给予只读权限",
       "send_invitation_email": "发送邀请邮件",
-      "resend_invitation_email": "重发邀请函"
+      "resend_invitation_email": "重发邀请函",
+      "deleted_user": "(已删除的用户)"
     },
     "reset_password": "重置密码",
     "reset_password_modal": {

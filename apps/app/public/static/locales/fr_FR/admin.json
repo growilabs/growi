@@ -781,7 +781,8 @@
       "revoke_read_only_access": "Révoquer permission de lecture",
       "grant_read_only_access": "Permission de lecture-seule",
       "send_invitation_email": "Envoyer courriel d'invitation",
-      "resend_invitation_email": "Renvoyer courriel d'invitation"
+      "resend_invitation_email": "Renvoyer courriel d'invitation",
+      "deleted_user": "(Utilisateur supprimé)"
     },
     "reset_password": "Réinitialiser mot de passe",
     "reset_password_modal": {
