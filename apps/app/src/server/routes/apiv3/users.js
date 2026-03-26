@@ -158,7 +158,7 @@ module.exports = (crowi) => {
       'createdAt',
       'lastLoginAt',
     ]),
-    query('page').isInt({ min: 1 }),
+    query('page').isInt({ min: 1 }).toInt(),
     query('forceIncludeAttributes')
       .toArray()
       .custom((value, { req }) => {
@@ -318,7 +318,7 @@ module.exports = (crowi) => {
     validator.statusList,
     apiV3FormValidator,
     async (req, res) => {
-      const page = parseInt(req.query.page) || 1;
+      const page = req.query.page || 1;
 
       // status
       const forceIncludeAttributes = Array.isArray(
