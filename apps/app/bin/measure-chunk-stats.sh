@@ -23,12 +23,12 @@ if [ -n "$cleanup_pids" ]; then
   sleep 1
 fi
 
-# 2. Clean .next cache
-rm -rf "$(dirname "$0")/../.next"
+# 2. Clean .next dev cache (v16 uses .next/dev for isolated dev builds)
+rm -rf "$(dirname "$0")/../.next/dev"
 
-# 3. Start Next.js dev server
+# 3. Start Next.js dev server (--webpack to opt out of Turbopack default in v16)
 cd "$(dirname "$0")/.."
-npx next dev -p "$PORT" > "$LOG" 2>&1 &
+npx next dev --webpack -p "$PORT" > "$LOG" 2>&1 &
 NEXT_PID=$!
 
 # 4. Wait for server ready
