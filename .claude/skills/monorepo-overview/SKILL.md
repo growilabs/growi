@@ -64,6 +64,34 @@ turbo run test --filter @growi/app
 turbo run lint --filter @growi/core
 ```
 
+### Build Order Management
+
+Build dependencies in this monorepo are **not** declared with `dependsOn: ["^build"]` (the automatic workspace-dependency mode). Instead, they are declared **explicitly** — either in the root `turbo.json` for legacy entries, or in per-package `turbo.json` files for newer packages.
+
+**When to update**: whenever a package gains a new workspace dependency on another buildable package (one that produces a `dist/`), declare the build-order dependency explicitly. Without it, Turborepo may build in the wrong order, causing missing `dist/` files or type errors.
+
+**Pattern — per-package `turbo.json`** (preferred for new dependencies):
+
+```json
+// packages/my-package/turbo.json
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": { "dependsOn": ["@growi/some-dep#build"] },
+    "dev":   { "dependsOn": ["@growi/some-dep#dev"] }
+  }
+}
+```
+
+- `"extends": ["//"]` inherits all root task definitions; only add the extra `dependsOn`
+- Keep root `turbo.json` clean — package-level overrides live with the package that owns the dependency
+- For packages with multiple tasks (watch, lint, test), mirror the dependency in each relevant task
+
+**Existing examples**:
+- `packages/slack/turbo.json` — `build`/`dev` depend on `@growi/logger`
+- `packages/remark-attachment-refs/turbo.json` — all tasks depend on `@growi/core`, `@growi/logger`, `@growi/remark-growi-directive`, `@growi/ui`
+- Root `turbo.json` — `@growi/ui#build` depends on `@growi/core#build` (pre-dates the per-package pattern)
+
 ## Architectural Principles
 
 ### 1. Feature-Based Architecture (Recommended)
