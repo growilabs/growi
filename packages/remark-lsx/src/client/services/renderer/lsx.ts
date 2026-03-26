@@ -53,6 +53,7 @@ export const remarkPlugin: Plugin = () => (tree) => {
       //   case 1: lsx(prefix=/path..., ...)    => prefix="/path"
       //   case 2: lsx(/path, ...)              => prefix="/path"
       //   case 3: lsx(/foo, prefix=/bar ...)   => prefix="/bar"
+      //   case 4: lsx(/foo bar, ...)           => prefix="/foo bar"
       if (attributes.prefix == null) {
         const attrEntries = Object.entries(attributes);
 
