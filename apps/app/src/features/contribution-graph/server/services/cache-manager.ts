@@ -59,6 +59,7 @@ export class ContributionCacheManager {
       aggregationStartDate.setUTCFullYear(
         aggregationStartDate.getUTCFullYear() - 1,
       );
+      aggregationStartDate.setUTCHours(0, 0, 0, 0);
     }
 
     const freshCacheData = await this.aggregationService.runAggregationPipeline(
