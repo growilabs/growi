@@ -3,6 +3,7 @@ import { SubscriptionStatusType } from '@growi/core';
 import { subDays } from 'date-fns/subDays';
 import type { FilterQuery, Types, UpdateQuery } from 'mongoose';
 
+import type { IAuditLogBulkExportJob } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export';
 import { AllEssentialActions } from '~/interfaces/activity';
 import type { PaginateResult } from '~/interfaces/in-app-notification';
@@ -48,7 +49,7 @@ export default class InAppNotificationService {
       'updated',
       async (
         activity: ActivityDocument,
-        target: IUser | IPage | IPageBulkExportJob,
+        target: IUser | IPage | IPageBulkExportJob | IAuditLogBulkExportJob,
         preNotify: PreNotify,
       ) => {
         try {
@@ -224,7 +225,7 @@ export default class InAppNotificationService {
 
   createInAppNotification = async function (
     activity: ActivityDocument,
-    target: IUser | IPage | IPageBulkExportJob,
+    target: IUser | IPage | IPageBulkExportJob | IAuditLogBulkExportJob,
     preNotify: PreNotify,
   ): Promise<void> {
     const shouldNotification =
