@@ -1,4 +1,4 @@
-import { type JSX, useRef, useState } from 'react';
+import { type JSX, useId, useState } from 'react';
 import { AcceptedUploadFileType } from '@growi/core';
 import {
   Dropdown,
@@ -27,7 +27,7 @@ export const AttachmentsDropup = (props: Props): JSX.Element => {
 
   const [isOpen, setOpen] = useState(false);
 
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const id = useId();
 
   return (
     <>
@@ -38,7 +38,7 @@ export const AttachmentsDropup = (props: Props): JSX.Element => {
         className="lh-1"
       >
         <DropdownToggle
-          innerRef={buttonRef}
+          id={id}
           className={`${btnAttachmentToggleClass} btn-toolbar-button rounded-circle`}
           color="unset"
         >
@@ -79,7 +79,7 @@ export const AttachmentsDropup = (props: Props): JSX.Element => {
         </DropdownMenu>
       </Dropdown>
       {!isOpen && (
-        <UncontrolledTooltip placement="top" target={buttonRef}>
+        <UncontrolledTooltip placement="top" target={CSS.escape(id)}>
           Attachments
         </UncontrolledTooltip>
       )}

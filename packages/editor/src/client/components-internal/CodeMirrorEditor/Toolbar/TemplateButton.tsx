@@ -1,4 +1,4 @@
-import { type JSX, useCallback, useRef } from 'react';
+import { type JSX, useCallback, useId } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 
 import { useTemplateModalActions } from '../../../../states/modal/template';
@@ -11,7 +11,7 @@ type Props = {
 export const TemplateButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
 
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const id = useId();
 
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(editorKey);
   const { open: openTemplateModal } = useTemplateModalActions();
@@ -29,7 +29,7 @@ export const TemplateButton = (props: Props): JSX.Element => {
   return (
     <>
       <button
-        ref={buttonRef}
+        id={id}
         type="button"
         className="btn btn-toolbar-button"
         onClick={onClickTempleteButton}
@@ -37,7 +37,7 @@ export const TemplateButton = (props: Props): JSX.Element => {
       >
         <span className="material-symbols-outlined fs-5">file_copy</span>
       </button>
-      <UncontrolledTooltip placement="top" target={buttonRef}>
+      <UncontrolledTooltip placement="top" target={CSS.escape(id)}>
         Template
       </UncontrolledTooltip>
     </>

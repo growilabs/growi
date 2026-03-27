@@ -4,7 +4,7 @@ import {
   type JSX,
   useCallback,
   useEffect,
-  useRef,
+  useId,
   useState,
 } from 'react';
 import { Modal, UncontrolledTooltip } from 'reactstrap';
@@ -25,7 +25,7 @@ type Props = {
 export const EmojiButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
 
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const id = useId();
 
   const [isOpen, setIsOpen] = useState(false);
   const [Picker, setPicker] = useState<ComponentType<PickerProps> | null>(null);
@@ -93,14 +93,14 @@ export const EmojiButton = (props: Props): JSX.Element => {
   return (
     <>
       <button
-        ref={buttonRef}
+        id={id}
         type="button"
         className="btn btn-toolbar-button"
         onClick={toggle}
       >
         <span className="material-symbols-outlined fs-5">emoji_emotions</span>
       </button>
-      <UncontrolledTooltip placement="top" target={buttonRef}>
+      <UncontrolledTooltip placement="top" target={CSS.escape(id)}>
         Emoji
       </UncontrolledTooltip>
       {isOpen && Picker != null && emojiData != null && (
