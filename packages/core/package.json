@@ -3,6 +3,10 @@
   "version": "2.1.0",
   "description": "GROWI Core Libraries",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/growilabs/growi"
+  },
   "keywords": [
     "growi"
   ],
