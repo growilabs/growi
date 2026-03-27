@@ -11,6 +11,8 @@
       "Bash(pnpm run lint:*)",
       "Bash(pnpm vitest run *)",
       "Bash(pnpm biome check *)",
+      "Bash(pnpm ls *)",
+      "Bash(pnpm why *)",
       "Bash(cat *)",
       "Bash(echo *)",
       "Bash(find *)",
