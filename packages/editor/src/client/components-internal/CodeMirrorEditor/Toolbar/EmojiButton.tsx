@@ -4,9 +4,10 @@ import {
   type JSX,
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from 'react';
-import { Modal } from 'reactstrap';
+import { Modal, UncontrolledTooltip } from 'reactstrap';
 
 import { useResolvedTheme } from '../../../../states/ui/resolved-theme';
 import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
@@ -23,6 +24,8 @@ type Props = {
 
 export const EmojiButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
+
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const [isOpen, setIsOpen] = useState(false);
   const [Picker, setPicker] = useState<ComponentType<PickerProps> | null>(null);
@@ -89,9 +92,17 @@ export const EmojiButton = (props: Props): JSX.Element => {
 
   return (
     <>
-      <button type="button" className="btn btn-toolbar-button" onClick={toggle}>
+      <button
+        ref={buttonRef}
+        type="button"
+        className="btn btn-toolbar-button"
+        onClick={toggle}
+      >
         <span className="material-symbols-outlined fs-5">emoji_emotions</span>
       </button>
+      <UncontrolledTooltip placement="top" target={buttonRef}>
+        Emoji
+      </UncontrolledTooltip>
       {isOpen && Picker != null && emojiData != null && (
         <div className="mb-2 d-none d-md-block">
           <Modal

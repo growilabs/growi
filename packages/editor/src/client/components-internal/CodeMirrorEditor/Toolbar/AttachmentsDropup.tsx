@@ -1,10 +1,11 @@
-import { type JSX, useState } from 'react';
+import { type JSX, useRef, useState } from 'react';
 import { AcceptedUploadFileType } from '@growi/core';
 import {
   Dropdown,
   DropdownItem,
   DropdownMenu,
   DropdownToggle,
+  UncontrolledTooltip,
 } from 'reactstrap';
 
 import type { GlobalCodeMirrorEditorKey } from '../../../../consts';
@@ -26,6 +27,8 @@ export const AttachmentsDropup = (props: Props): JSX.Element => {
 
   const [isOpen, setOpen] = useState(false);
 
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
   return (
     <>
       <Dropdown
@@ -35,6 +38,7 @@ export const AttachmentsDropup = (props: Props): JSX.Element => {
         className="lh-1"
       >
         <DropdownToggle
+          innerRef={buttonRef}
           className={`${btnAttachmentToggleClass} btn-toolbar-button rounded-circle`}
           color="unset"
         >
@@ -74,6 +78,11 @@ export const AttachmentsDropup = (props: Props): JSX.Element => {
           <LinkEditButton editorKey={editorKey} />
         </DropdownMenu>
       </Dropdown>
+      {!isOpen && (
+        <UncontrolledTooltip placement="top" target={buttonRef}>
+          Attachments
+        </UncontrolledTooltip>
+      )}
     </>
   );
 };
