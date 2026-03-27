@@ -1,21 +1,21 @@
 # Implementation Plan
 
-- [ ] 1. Scaffold the @growi/logger shared package
-- [ ] 1.1 Initialize the package directory, package.json, and TypeScript configuration within the monorepo packages directory
+- [x] 1. Scaffold the @growi/logger shared package
+- [x] 1.1 Initialize the package directory, package.json, and TypeScript configuration within the monorepo packages directory
   - Create the workspace entry as `@growi/logger` with pino v9.x and minimatch as dependencies, pino-pretty as an optional peer dependency
   - Configure TypeScript with strict mode, ESM output, and appropriate path aliases
   - Set up the package entry points (main, types, browser) so that bundlers resolve the correct build for Node.js vs browser
   - Add vitest configuration for unit testing within the package
   - _Requirements: 8.5_
 
-- [ ] 1.2 Define the shared type contracts and configuration interface
+- [x] 1.2 Define the shared type contracts and configuration interface
   - Define the `LoggerConfig` type representing a namespace-pattern-to-level mapping (including a `default` key)
   - Define the `LoggerFactoryOptions` type accepted by the initialization function
   - Export the pino `Logger` type so consumers can type-annotate their logger variables without importing pino directly
   - _Requirements: 10.3_
 
-- [ ] 2. Implement environment variable parsing and level resolution
-- [ ] 2.1 (P) Build the environment variable parser
+- [x] 2. Implement environment variable parsing and level resolution
+- [x] 2.1 (P) Build the environment variable parser
   - Read the six log-level environment variables (`DEBUG`, `TRACE`, `INFO`, `WARN`, `ERROR`, `FATAL`) from the process environment
   - Split each variable's value by commas and trim whitespace to extract individual namespace patterns
   - Return a flat config map where each namespace pattern maps to its corresponding level string
@@ -23,15 +23,15 @@
   - Write unit tests covering: single variable with multiple patterns, all six variables set, no variables set, whitespace handling
   - _Requirements: 3.1, 3.4, 3.5_
 
-- [ ] 2.2 (P) Build the level resolver with glob pattern matching
+- [x] 2.2 (P) Build the level resolver with glob pattern matching
   - Accept a namespace string, a config map, and an env-override map; return the resolved level
   - Check env-override map first (using minimatch for glob matching), then config map, then fall back to the config `default` entry
   - When multiple patterns match, prefer the most specific (longest non-wildcard prefix) match
   - Write unit tests covering: exact match, glob wildcard match, env override precedence over config, fallback to default, no matching pattern
   - _Requirements: 2.1, 2.3, 2.4, 3.2, 3.3_
 
-- [ ] 3. Implement the transport factory for dev, prod, and browser environments
-- [ ] 3.1 (P) Build the Node.js transport configuration
+- [x] 3. Implement the transport factory for dev, prod, and browser environments
+- [x] 3.1 (P) Build the Node.js transport configuration
   - In development mode, produce pino-pretty transport options with human-readable timestamps, hidden pid/hostname fields, and multi-line output
   - In production mode, produce raw JSON output to stdout by default
   - When the `FORMAT_NODE_LOG` environment variable is unset or truthy in production, produce pino-pretty transport options with long-format output instead of raw JSON
@@ -39,15 +39,15 @@
   - Write unit tests verifying correct options for each combination of NODE_ENV and FORMAT_NODE_LOG
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 3.2 (P) Build the browser transport configuration
+- [x] 3.2 (P) Build the browser transport configuration
   - Detect the browser environment using window/document checks
   - In browser development mode, produce pino browser options that output to the developer console with the resolved namespace level
   - In browser production mode, produce pino browser options that default to `error` level to suppress non-critical console output
   - Write unit tests verifying browser options for dev and prod scenarios
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 4. Implement the logger factory with caching and platform detection
-- [ ] 4.1 Build the initialization and factory functions
+- [x] 4. Implement the logger factory with caching and platform detection
+- [x] 4.1 Build the initialization and factory functions
   - Implement `initializeLoggerFactory(options)` that stores the merged configuration, pre-parses environment overrides, and prepares the transport config
   - Implement `loggerFactory(name)` that checks the cache for an existing logger, resolves the level via the level resolver, creates a pino instance with appropriate transport options, caches it, and returns it
   - Detect the runtime platform (Node.js vs browser) and apply the corresponding transport configuration from the transport factory
@@ -55,8 +55,8 @@
   - Write unit tests covering: cache hit returns same instance, different namespaces return different instances, initialization stores config correctly
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 4.1, 10.1_
 
-- [ ] 5. Migrate shared packages to @growi/logger (small scope first)
-- [ ] 5.1 (P) Update packages/slack logger to use @growi/logger
+- [x] 5. Migrate shared packages to @growi/logger (small scope first)
+- [x] 5.1 (P) Update packages/slack logger to use @growi/logger
   - Replace the logger factory implementation to import from `@growi/logger` instead of universal-bunyan
   - Update the inline config (`{ default: 'info' }`) to use the @growi/logger initialization pattern
   - Replace bunyan type imports with the @growi/logger Logger type
@@ -64,15 +64,15 @@
   - Run TypeScript compilation to verify no type errors
   - _Requirements: 8.3_
 
-- [ ] 5.2 (P) Update packages/remark-attachment-refs logger to use @growi/logger
+- [x] 5.2 (P) Update packages/remark-attachment-refs logger to use @growi/logger
   - Replace the logger factory implementation to import from `@growi/logger`
   - Update configuration and type imports to match the new package
   - Add `@growi/logger` to packages/remark-attachment-refs dependencies
   - Run TypeScript compilation to verify no type errors
   - _Requirements: 8.4_
 
-- [ ] 6. Migrate apps/slackbot-proxy to @growi/logger
-- [ ] 6.1 Replace the logger factory and HTTP middleware in slackbot-proxy
+- [x] 6. Migrate apps/slackbot-proxy to @growi/logger
+- [x] 6.1 Replace the logger factory and HTTP middleware in slackbot-proxy
   - Update the slackbot-proxy logger utility to import from `@growi/logger` and call `initializeLoggerFactory` with its existing dev/prod config
   - Replace express-bunyan-logger and morgan usage in the server setup with pino-http middleware
   - Replace all `import type Logger from 'bunyan'` references with the @growi/logger Logger type
@@ -80,7 +80,7 @@
   - Run TypeScript compilation to verify no type errors
   - _Requirements: 8.2, 6.1_
 
-- [ ] 6.5 [NEXT] Fix logger factory to preserve pino's single-worker-thread performance model
+- [x] 6.5 Fix logger factory to preserve pino's single-worker-thread performance model
   - Refactor `initializeLoggerFactory` to create the pino transport (`pino.transport()`) and root pino logger **once**, storing them in module scope
   - Set the root logger's level to `'trace'` so that individual child loggers can apply their own resolved level without being silenced by the root
   - Refactor `loggerFactory(name)` to call `rootLogger.child({ name })` and then set `childLogger.level = resolvedLevel` instead of calling `pino()` + `pino.transport()` per namespace

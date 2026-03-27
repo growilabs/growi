@@ -3,6 +3,125 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initializeLoggerFactory, loggerFactory } from './logger-factory';
 import type { LoggerConfig } from './types';
 
+// ---------------------------------------------------------------------------
+// Shared-transport test: pino.transport() must be called exactly once,
+// and each namespace logger must be created via rootLogger.child(), not pino().
+// ---------------------------------------------------------------------------
+describe('shared transport — single Worker thread (Req 11)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.doUnmock('pino');
+    vi.resetModules();
+  });
+
+  it('pino() and pino.transport() are called once in initializeLoggerFactory; child() is called per namespace', async () => {
+    vi.resetModules();
+
+    const childSpy = vi.fn().mockImplementation(() => ({
+      level: 'info',
+      info: vi.fn(),
+      debug: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      trace: vi.fn(),
+      fatal: vi.fn(),
+      child: childSpy,
+    }));
+
+    const mockRootLogger = {
+      level: 'trace',
+      child: childSpy,
+      info: vi.fn(),
+      debug: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      trace: vi.fn(),
+      fatal: vi.fn(),
+    };
+
+    const transportSpy = vi.fn().mockReturnValue({});
+    const pinoSpy = vi.fn().mockReturnValue(mockRootLogger) as ReturnType<
+      typeof vi.fn
+    > & {
+      transport: ReturnType<typeof vi.fn>;
+    };
+    pinoSpy.transport = transportSpy;
+
+    vi.doMock('pino', () => ({ default: pinoSpy }));
+
+    const { initializeLoggerFactory: init, loggerFactory: factory } =
+      await import('./logger-factory');
+
+    init({ config: { default: 'info', 'growi:debug:*': 'debug' } });
+
+    // After initialization: pino() called once (root logger), transport() called once
+    expect(pinoSpy).toHaveBeenCalledTimes(1);
+    expect(transportSpy).toHaveBeenCalledTimes(1);
+
+    // Create loggers for three distinct namespaces
+    factory('growi:service:page');
+    factory('growi:service:user');
+    factory('growi:debug:something');
+
+    // pino() must NOT be called again — no new instances, no new Worker threads
+    expect(pinoSpy).toHaveBeenCalledTimes(1);
+    // transport() must NOT be called again
+    expect(transportSpy).toHaveBeenCalledTimes(1);
+    // child() must be called once per new namespace
+    expect(childSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it('re-initializing creates a new root logger (one additional pino() call)', async () => {
+    vi.resetModules();
+
+    const childSpy = vi.fn().mockImplementation(() => ({
+      level: 'info',
+      info: vi.fn(),
+      debug: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      trace: vi.fn(),
+      fatal: vi.fn(),
+      child: childSpy,
+    }));
+
+    const mockRootLogger = {
+      level: 'trace',
+      child: childSpy,
+      info: vi.fn(),
+      debug: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      trace: vi.fn(),
+      fatal: vi.fn(),
+    };
+
+    const transportSpy = vi.fn().mockReturnValue({});
+    const pinoSpy = vi.fn().mockReturnValue(mockRootLogger) as ReturnType<
+      typeof vi.fn
+    > & {
+      transport: ReturnType<typeof vi.fn>;
+    };
+    pinoSpy.transport = transportSpy;
+
+    vi.doMock('pino', () => ({ default: pinoSpy }));
+
+    const { initializeLoggerFactory: init, loggerFactory: factory } =
+      await import('./logger-factory');
+
+    init({ config: { default: 'info' } });
+    factory('growi:ns1');
+
+    const callsAfterFirst = pinoSpy.mock.calls.length; // 1
+
+    // Re-initialize — should create a new root logger
+    init({ config: { default: 'warn' } });
+    factory('growi:ns1');
+
+    expect(pinoSpy).toHaveBeenCalledTimes(callsAfterFirst + 1);
+  });
+});
+
 // Reset the module-level cache/state between tests
 beforeEach(() => {
   vi.resetModules();
