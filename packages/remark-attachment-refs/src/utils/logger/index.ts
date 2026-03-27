@@ -1,10 +1,7 @@
-import type Logger from 'bunyan';
-import { createLogger } from 'universal-bunyan';
+import type { Logger } from '@growi/logger';
+import { initializeLoggerFactory, loggerFactory } from '@growi/logger';
 
-const loggerFactory = (name: string): Logger =>
-  createLogger({
-    name,
-    config: { default: 'info' },
-  });
+initializeLoggerFactory({ config: { default: 'info' } });
 
+export type { Logger };
 export default loggerFactory;

@@ -45,19 +45,17 @@
   },
   "dependencies": {
     "@growi/core": "workspace:^",
+    "@growi/logger": "workspace:^",
     "@growi/remark-growi-directive": "workspace:^",
     "@growi/ui": "workspace:^",
     "axios": "^1.11.0",
-    "bunyan": "^1.8.15",
     "express": "^4.20.0",
     "hast-util-select": "^6.0.2",
     "mongoose": "^6.13.6",
     "swr": "^2.3.2",
-    "universal-bunyan": "^0.9.2",
     "xss": "^1.0.15"
   },
   "devDependencies": {
-    "@types/bunyan": "^1.8.11",
     "@types/hast": "^3.0.4",
     "@types/react": "^18.2.14",
     "@types/react-dom": "^18.2.6",

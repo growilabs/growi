@@ -9,9 +9,9 @@ import bodyParser from 'body-parser';
 import compress from 'compression';
 import cookieParser from 'cookie-parser';
 import type { Express } from 'express';
-import expressBunyanLogger from 'express-bunyan-logger';
 import helmet from 'helmet';
 import methodOverride from 'method-override';
+import pinoHttp from 'pino-http';
 import type { ConnectionOptions } from 'typeorm';
 import { getConnectionManager } from 'typeorm';
 
@@ -162,21 +162,8 @@ export class Server {
    * Setup logger for requests
    */
   private setupLogger(): void {
-    // use bunyan
-    if (isProduction) {
-      const logger = loggerFactory('express');
-
-      this.app.use(
-        expressBunyanLogger({
-          logger,
-          excludes: ['*'],
-        }),
-      );
-    }
-    // use morgan
-    else {
-      const morgan = require('morgan');
-      this.app.use(morgan('dev'));
-    }
+    // biome-ignore lint/suspicious/noExplicitAny: pino-http expects Logger<string> but loggerFactory returns Logger<never>; safe at runtime
+    const httpLogger = pinoHttp({ logger: loggerFactory('express') as any });
+    this.app.use(httpLogger);
   }
 }

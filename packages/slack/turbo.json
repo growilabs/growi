@@ -1,0 +1,11 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["@growi/logger#build"]
+    },
+    "dev": {
+      "dependsOn": ["@growi/logger#dev"]
+    }
+  }
+}
