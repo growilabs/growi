@@ -55,7 +55,7 @@
     "@types/css-modules": "^1.0.2",
     "@types/estree": "^1.0.1",
     "@types/glob": "^8.1.0",
-    "@types/node": "^20.18.3",
+    "@types/node": "^24.0.0",
     "@typescript/native-preview": "7.0.0-dev.20260114.1",
     "@vitejs/plugin-react": "^4.3.1",
     "@vitest/coverage-v8": "^2.1.1",
