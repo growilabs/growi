@@ -1163,7 +1163,6 @@
   "ai_integration": {
     "ai_integration": "AI 連携",
     "disable_mode_explanation": "現在、AI 連携は無効になっています。有効にする場合は環境変数 <code>AI_ENABLED</code> の他、必要な環境変数を設定してください。<br><br>詳細は<a target='blank' rel='noopener noreferrer' href={{documentationUrl}}ja/guide/features/ai-knowledge-assistant.html>ドキュメント</a>を参照してください。",
-    "disable_mode_explanation_cloud": "現在、AI 連携は無効になっています。有効にするには、GROWI.cloud の管理画面からアプリの設定を変更してください。",
     "ai_search_management": "AI 検索管理"
   }
 }

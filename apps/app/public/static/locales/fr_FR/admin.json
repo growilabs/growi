@@ -1153,7 +1153,6 @@
   "ai_integration": {
     "ai_integration": "Intégration de l'IA",
     "disable_mode_explanation": "Actuellement, l'intégration AI est désactivée. Pour l'activer, configurez la variable d'environnement <code>AI_ENABLED</code> ainsi que les autres variables nécessaires.<br><br>Pour plus de détails, veuillez consulter la <a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>documentation</a>.",
-    "disable_mode_explanation_cloud": "Actuellement, l'intégration AI est désactivée. Pour l'activer, veuillez modifier les paramètres de l'application depuis l'écran de gestion GROWI.cloud.",
     "ai_search_management": "Gestion de la recherche par l'IA"
   }
 }
