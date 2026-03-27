@@ -781,7 +781,8 @@
       "revoke_read_only_access": "Revoke read only access",
       "grant_read_only_access": "Grant read only access",
       "send_invitation_email": "Send invitation email",
-      "resend_invitation_email": "Resend invitation email"
+      "resend_invitation_email": "Resend invitation email",
+      "deleted_user": "(Deleted User)"
     },
     "reset_password": "Reset Password",
     "reset_password_modal": {
