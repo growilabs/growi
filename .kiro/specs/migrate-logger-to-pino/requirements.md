@@ -107,6 +107,16 @@ This specification covers the complete migration from bunyan to pino, replacing 
 2. When migration is complete, the monorepo shall have no references to `morgan` or `@types/morgan` in any `package.json`.
 3. When migration is complete, no source file shall contain imports or requires of the removed packages.
 
+### Requirement 11: Preserve Pino's Performance Characteristics
+
+**Objective:** As a developer, I want the logger implementation to honour pino's design philosophy of minimal overhead in the main thread, so that migrating from bunyan does not introduce performance regressions.
+
+#### Acceptance Criteria
+1. The Logger Factory shall create pino's worker-thread transport (`pino.transport()`) **at most once** per application lifetime (i.e., during `initializeLoggerFactory`), regardless of the number of unique namespaces.
+2. The Logger Factory shall create per-namespace loggers by calling `.child()` on a shared root pino instance, not by calling `pino()` and `pino.transport()` independently for each namespace.
+3. The Logger Factory shall not perform any blocking I/O or expensive computation on the hot path of each log method call (level-checking is performed by pino's internal mechanism and is acceptable).
+4. The number of active Worker threads used by the logger subsystem shall remain constant after the first call to `loggerFactory()`, regardless of how many distinct namespaces are subsequently requested.
+
 ### Requirement 10: Backward-Compatible Log API
 
 **Objective:** As a developer, I want the new logger to expose the same method signatures as the current bunyan logger, so that existing log call sites require minimal or no changes.

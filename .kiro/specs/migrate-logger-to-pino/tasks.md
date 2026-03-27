@@ -80,6 +80,14 @@
   - Run TypeScript compilation to verify no type errors
   - _Requirements: 8.2, 6.1_
 
+- [ ] 6.5 [NEXT] Fix logger factory to preserve pino's single-worker-thread performance model
+  - Refactor `initializeLoggerFactory` to create the pino transport (`pino.transport()`) and root pino logger **once**, storing them in module scope
+  - Set the root logger's level to `'trace'` so that individual child loggers can apply their own resolved level without being silenced by the root
+  - Refactor `loggerFactory(name)` to call `rootLogger.child({ name })` and then set `childLogger.level = resolvedLevel` instead of calling `pino()` + `pino.transport()` per namespace
+  - Handle browser mode separately: the root browser logger is created once in `initializeLoggerFactory`; `loggerFactory` still calls `.child({ name })` and applies the resolved level
+  - Update unit tests in `logger-factory.spec.ts` to verify that calling `loggerFactory` for N distinct namespaces does not create N independent pino instances (all children share the root transport)
+  - _Requirements: 11.1, 11.2, 11.3, 11.4_
+
 - [ ] 7. Migrate apps/app to @growi/logger (largest scope)
 - [ ] 7.1 Replace the logger factory module in apps/app
   - Update the apps/app logger utility to import from `@growi/logger` instead of `universal-bunyan`

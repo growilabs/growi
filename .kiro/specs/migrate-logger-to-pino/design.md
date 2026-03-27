@@ -108,22 +108,37 @@ graph TB
 
 ```mermaid
 sequenceDiagram
+    participant App as Application Startup
+    participant Factory as LoggerFactory
+    participant Transport as pino.transport (Worker)
+    participant Root as Root pino Logger
+
+    App->>Factory: initializeLoggerFactory(options)
+    Factory->>Transport: pino.transport(config) — spawns ONE Worker thread
+    Transport-->>Factory: transport stream
+    Factory->>Root: pino({ level: 'trace' }, transport)
+    Root-->>Factory: rootLogger stored in module scope
+```
+
+```mermaid
+sequenceDiagram
     participant Consumer as Consumer Module
     participant Factory as LoggerFactory
     participant Cache as Logger Cache
     participant Resolver as LevelResolver
-    participant Pino as pino
+    participant Root as Root pino Logger
 
     Consumer->>Factory: loggerFactory(namespace)
     Factory->>Cache: lookup(namespace)
     alt Cache hit
-        Cache-->>Factory: cached logger
+        Cache-->>Factory: cached child logger
     else Cache miss
         Factory->>Resolver: resolveLevel(namespace, config, envOverrides)
         Resolver-->>Factory: resolved level
-        Factory->>Pino: pino(options with level, name, transport)
-        Pino-->>Factory: logger instance
-        Factory->>Cache: store(namespace, logger)
+        Factory->>Root: rootLogger.child({ name: namespace })
+        Root-->>Factory: child logger (shares Worker thread)
+        Factory->>Factory: childLogger.level = resolved level
+        Factory->>Cache: store(namespace, childLogger)
     end
     Factory-->>Consumer: Logger
 ```
@@ -157,12 +172,13 @@ flowchart TD
 | 8.1–8.5 | Multi-app consistency | @growi/logger package | Package exports | — |
 | 9.1–9.3 | Dependency cleanup | — (removal task) | — | — |
 | 10.1–10.3 | Backward-compatible API | LoggerFactory | `Logger` type export | — |
+| 11.1–11.4 | Pino performance preservation | LoggerFactory | `initializeLoggerFactory`, shared root logger | Logger Creation |
 
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|-------------|--------|--------------|-----------------|-----------|
-| LoggerFactory | @growi/logger / Core | Create and cache namespace-bound pino loggers | 1, 4, 8, 10 | pino (P0), LevelResolver (P0), TransportFactory (P0) | Service |
+| LoggerFactory | @growi/logger / Core | Create and cache namespace-bound pino loggers | 1, 4, 8, 10, 11 | pino (P0), LevelResolver (P0), TransportFactory (P0) | Service |
 | LevelResolver | @growi/logger / Core | Resolve log level for a namespace from config + env | 2, 3 | minimatch (P0), EnvVarParser (P0) | Service |
 | EnvVarParser | @growi/logger / Core | Parse env vars into namespace-level map | 3 | — | Service |
 | TransportFactory | @growi/logger / Core | Create pino transport/options for Node.js and browser | 4, 5 | pino-pretty (P1) | Service |
@@ -226,6 +242,7 @@ function loggerFactory(name: string): Logger;
 - Browser detection: `typeof window !== 'undefined' && typeof window.document !== 'undefined'`
 - In browser mode, skip transport setup and use pino's built-in `browser` option
 - The factory is a module-level singleton (module scope cache + config)
+- **Performance critical**: `pino.transport()` spawns a Worker thread. It MUST be called **once** inside `initializeLoggerFactory`, not inside `loggerFactory`. Each `loggerFactory(name)` call creates a child logger via `rootLogger.child({ name })` which shares the single Worker thread. Calling `pino.transport()` per namespace would spawn N Worker threads for N namespaces, negating pino's core performance advantage.
 
 #### LevelResolver
 
