@@ -2,7 +2,6 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { userHomepagePath } from '@growi/core/dist/utils/page-path-utils';
-import escapeStringRegexp from 'escape-string-regexp';
 import express from 'express';
 import { body, query } from 'express-validator';
 import path from 'pathe';
@@ -336,7 +335,7 @@ module.exports = (crowi) => {
 
       // Search from input
       const searchText = req.query.searchText || '';
-      const searchWord = new RegExp(escapeStringRegexp(searchText));
+      const searchWord = new RegExp(RegExp.escape(searchText));
       // Sort
       const { sort, sortOrder } = req.query;
       const sortOutput = {

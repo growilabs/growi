@@ -1,4 +1,4 @@
-# Design Document: optimize-presentation
+# Design Document: presentation
 
 ## Overview
 
@@ -117,23 +117,6 @@ flowchart TD
   E --> F[Write marpit-base-css.ts with CSS constants]
   F --> G[vite build compiles all sources]
 ```
-
-## Requirements Traceability
-
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1.1 | No marp-core references in GrowiSlides build output | GrowiSlides, marpit-base-css | — | — |
-| 1.2 | Non-Marp slides render without loading Marp | Slides, GrowiSlides | — | Slide Rendering Decision |
-| 1.3 | Pre-extracted CSS constants for container styling | marpit-base-css | MarpitBaseCss | CSS Extraction |
-| 1.4 | MARP_CONTAINER_CLASS_NAME in shared consts | consts/index.ts | — | — |
-| 2.1 | Dynamic load MarpSlides for marp:true pages | Slides | — | Slide Rendering Decision |
-| 2.2 | Loading indicator during MarpSlides load | Slides | — | Slide Rendering Decision |
-| 2.3 | No MarpSlides import triggered for non-Marp | Slides | — | Slide Rendering Decision |
-| 3.1 | Build-time CSS extraction script | extract-marpit-css.mjs | ExtractScript | CSS Extraction |
-| 3.2 | Extraction runs before source compilation | package.json pre:build:src | — | CSS Extraction |
-| 3.3 | Generated file committed for dev mode | marpit-base-css.ts | — | — |
-| 4.1–4.5 | Functional equivalence across all render paths | All components | — | Both flows |
-| 5.1–5.4 | Build verification of module separation | Build outputs | — | — |
 
 ## Components and Interfaces
 
@@ -299,26 +282,3 @@ export const presentationMarpit: Marp;
 - Validation: Script exits with error if CSS extraction produces empty output
 - Risks: Marp options must stay synchronized with `growi-marpit.ts`
 
-## Testing Strategy
-
-### Unit Tests
-- Verify `GrowiSlides` renders correctly with pre-extracted CSS constants (no Marp imports in test)
-- Verify `Slides` renders `GrowiSlides` when `hasMarpFlag` is false/undefined
-- Verify `Slides` renders `MarpSlides` (via Suspense) when `hasMarpFlag` is true
-
-### Build Verification Tests
-- `GrowiSlides.js` build output contains no references to `@marp-team/marp-core` or `@marp-team/marpit`
-- `Slides.js` build output contains dynamic `import()` for MarpSlides
-- `@growi/presentation` builds without errors
-- `@growi/app` builds without errors
-
-### Integration Tests
-- Marp slide page (`marp: true`) renders correctly in inline view
-- Non-Marp slide page (`slide: true`) renders correctly in inline view
-- Presentation modal works for both Marp and non-Marp content
-
-## Performance & Scalability
-
-**Target**: Eliminate ~896KB of Marp-related JavaScript from the async chunk loaded for non-Marp slide rendering.
-
-**Measurement**: Compare the chunk contents before and after optimization using the existing `ChunkModuleStatsPlugin` or manual inspection of build output. The `initial` module count (primary KPI from build-optimization skill) is not directly affected since slides are already in async chunks, but the async chunk size is reduced.
