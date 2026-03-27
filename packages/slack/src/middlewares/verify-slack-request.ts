@@ -22,7 +22,7 @@ export const verifySlackRequest = (
 
   if (signingSecret == null) {
     const message = 'No signing secret.';
-    logger.warn(message, { body: req.body });
+    logger.warn({ body: req.body }, message);
     next(createError(400, message));
     return;
   }
@@ -33,7 +33,7 @@ export const verifySlackRequest = (
 
   if (slackSignature == null || timestamp == null) {
     const message = 'Forbidden. Enter from Slack workspace';
-    logger.warn(message, { body: req.body });
+    logger.warn({ body: req.body }, message);
     next(createError(403, message));
     return;
   }
@@ -42,7 +42,7 @@ export const verifySlackRequest = (
   const time = Math.floor(Date.now() / 1000);
   if (Math.abs(time - timestamp) > 300) {
     const message = 'Verification failed.';
-    logger.warn(message, { body: req.body });
+    logger.warn({ body: req.body }, message);
     next(createError(403, message));
     return;
   }
@@ -73,6 +73,6 @@ export const verifySlackRequest = (
   }
 
   const message = 'Verification failed.';
-  logger.warn(message, { body: req.body });
+  logger.warn({ body: req.body }, message);
   next(createError(403, message));
 };

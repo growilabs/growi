@@ -162,8 +162,7 @@ export class Server {
    * Setup logger for requests
    */
   private setupLogger(): void {
-    // biome-ignore lint/suspicious/noExplicitAny: pino-http expects Logger<string> but loggerFactory returns Logger<never>; safe at runtime
-    const httpLogger = pinoHttp({ logger: loggerFactory('express') as any });
+    const httpLogger = pinoHttp({ logger: loggerFactory('express') });
     this.app.use(httpLogger);
   }
 }

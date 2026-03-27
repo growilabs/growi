@@ -104,7 +104,7 @@ export const remarkPlugin: Plugin = () => (tree) => {
         return;
       }
 
-      logger.debug('a node detected', attributes);
+      logger.debug({ attributes }, 'a node detected');
 
       // kebab case to camel case
       attributes.maxWidth = attributes['max-width'];

@@ -101,7 +101,7 @@ export class InteractionPayloadAccessor implements IInteractionPayloadAccessor {
     try {
       parsedOriginalData = JSON.parse(originalData);
     } catch (err) {
-      logger.error('Failed to parse original data:\n', err);
+      logger.error({ err }, 'Failed to parse original data:');
       return null;
     }
 

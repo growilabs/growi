@@ -71,6 +71,19 @@
   - Run TypeScript compilation to verify no type errors
   - _Requirements: 8.4_
 
+- [x] 5.3 Fix pino-style logger call sites in packages/slack
+  - In the following files, convert all `logger.method('message', obj)` calls to the pino-canonical form `logger.method({ obj }, 'message')` (object first, message second)
+  - `src/middlewares/verify-growi-to-slack-request.ts` (lines 25, 34)
+  - `src/middlewares/verify-slack-request.ts` (lines 25, 36, 45, 76)
+  - `src/utils/interaction-payload-accessor.ts` (line 104)
+  - Run `pnpm --filter @growi/slack lint:typecheck` and confirm zero TS2769 errors
+  - _Requirements: 10.1_
+
+- [x] 5.4 Fix pino-style logger call site in packages/remark-attachment-refs
+  - In `src/client/services/renderer/refs.ts` (line 107), convert `logger.debug('message', attributes)` to `logger.debug({ attributes }, 'message')`
+  - Run `pnpm --filter @growi/remark-attachment-refs lint:typecheck` and confirm the TS2769 error is gone
+  - _Requirements: 10.1_
+
 - [x] 6. Migrate apps/slackbot-proxy to @growi/logger
 - [x] 6.1 Replace the logger factory and HTTP middleware in slackbot-proxy
   - Update the slackbot-proxy logger utility to import from `@growi/logger` and call `initializeLoggerFactory` with its existing dev/prod config
@@ -79,6 +92,20 @@
   - Add `@growi/logger` and `pino-http` to slackbot-proxy dependencies
   - Run TypeScript compilation to verify no type errors
   - _Requirements: 8.2, 6.1_
+
+- [x] 6.6 Fix pino-style logger call sites in apps/slackbot-proxy
+  - In the following files, convert all `logger.method('message', obj)` calls to `logger.method({ obj }, 'message')`
+  - `src/controllers/growi-to-slack.ts` (lines 109, 179, 231, 243, 359)
+  - `src/controllers/slack.ts` (lines 388, 586)
+  - `src/services/RegisterService.ts` (line 165)
+  - Run `pnpm --filter @growi/slackbot-proxy lint:typecheck` and confirm zero TS2769 errors
+  - _Requirements: 10.1_
+
+- [x] 6.7 Fix @growi/logger Logger type export and remove `as any` cast in slackbot-proxy
+  - In `packages/logger`, update the `loggerFactory` return type so it is compatible with `pino-http`'s `logger` option (i.e., `pino.Logger` without `<never>` narrowing, or by exporting `Logger<string>`)
+  - After the type export is fixed, remove the `as any` cast from `apps/slackbot-proxy/src/Server.ts` (line 166) and the associated `biome-ignore` comment
+  - Run `pnpm --filter @growi/slackbot-proxy lint:typecheck` to confirm no residual type errors
+  - _Requirements: 10.3_
 
 - [x] 6.5 Fix logger factory to preserve pino's single-worker-thread performance model
   - Refactor `initializeLoggerFactory` to create the pino transport (`pino.transport()`) and root pino logger **once**, storing them in module scope

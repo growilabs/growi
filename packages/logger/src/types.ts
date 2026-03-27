@@ -1,4 +1,4 @@
-import type { Logger } from 'pino';
+import type { Logger as PinoLogger } from 'pino';
 
 /**
  * Maps namespace patterns (with glob support) to log level strings.
@@ -17,5 +17,6 @@ export interface LoggerFactoryOptions {
   config: LoggerConfig;
 }
 
-// Re-export pino Logger type so consumers can type-annotate without importing pino directly
-export type { Logger };
+// Re-export pino Logger type as Logger<string> so consumers can type-annotate without importing
+// pino directly, and so the type is compatible with pino-http's logger option.
+export type Logger = PinoLogger<string>;
