@@ -35,7 +35,7 @@ import styles from './PageCreateModal.module.scss';
 const { isCreatablePage, isUsersHomepage } = pagePathUtils;
 
 const PageCreateModal: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const currentUser = useCurrentUser();
   const growiCloudUri = useGrowiCloudUri();
@@ -72,10 +72,11 @@ const PageCreateModal: React.FC = () => {
     [userHomepagePath, t, now],
   );
 
+  const templateHelpLang = i18n.language === 'ja' ? 'ja' : 'en';
   const templateHelpUrl =
     growiCloudUri != null
-      ? 'https://growi.cloud/help/ja/guide/features/template.html'
-      : 'https://docs.growi.org/ja/guide/features/template.html';
+      ? `https://growi.cloud/help/${templateHelpLang}/guide/features/template.html`
+      : `https://docs.growi.org/${templateHelpLang}/guide/features/template.html`;
 
   const [todayInput, setTodayInput] = useState('');
   const [pageNameInput, setPageNameInput] = useState(pageNameInputInitialValue);
