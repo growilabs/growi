@@ -13,7 +13,7 @@ import { Collapse } from 'reactstrap';
 import SimpleBar from 'simplebar-react';
 
 import { toastError } from '~/client/util/toastr';
-import { useGrowiCloudUri } from '~/states/global';
+import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
 import loggerFactory from '~/utils/logger';
 
 import type { AiAssistantHasId } from '../../../../interfaces/ai-assistant';
@@ -80,6 +80,8 @@ const AiAssistantSidebarSubstance: React.FC<
   // Hooks
   const { t } = useTranslation();
   const growiCloudUri = useGrowiCloudUri();
+  const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
+  const isCloud = growiCloudUri != null && growiAppIdForGrowiCloud != null;
 
   // useSWRxThreads is executed only when Substance is rendered
   const { data: threads, mutate: mutateThreads } = useSWRxThreads(
@@ -605,7 +607,24 @@ const AiAssistantSidebarSubstance: React.FC<
                   )}
                 </div>
               ) : (
-                <>{initialView}</>
+                <>
+                  {!isEditorAssistant && aiAssistantData == null && isCloud && (
+                    <div className="text-center mb-3">
+                      <a
+                        href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
+                        className="btn btn-outline-secondary"
+                      >
+                        <span className="material-symbols-outlined me-1">
+                          share
+                        </span>
+                        {t('cloud_setting_management.to_cloud_settings', {
+                          ns: 'admin',
+                        })}
+                      </a>
+                    </div>
+                  )}
+                  {initialView}
+                </>
               )}
             </div>
           </div>
