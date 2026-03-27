@@ -15,7 +15,7 @@ export const Hexagon = React.memo(
       <title>Create</title>
       <g className="background" transform="translate(0 0)">
         <path
-          d="M20.768,0l6.923,12L20.768,24H6.923L0,12,6.923,0Z"
+          d="M19.768,0.5 L25.691,10.5 A3,3 0 0,1 25.691,13.5 L19.768,23.5 A2,2 0 0,1 17.768,24 L7.923,24 A2,2 0 0,1 5.923,23.5 L0,13.5 A3,3 0 0,1 0,10.5 L5.923,0.5 A2,2 0 0,1 7.923,0 L17.768,0 A2,2 0 0,1 19.768,0.5 Z"
           transform="translate(0)"
         ></path>
       </g>
