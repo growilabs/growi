@@ -913,7 +913,8 @@
     "confirm": "Supprimer le plugin?"
   },
   "cloud_setting_management": {
-    "to_cloud_settings": "Ouvrir paramètres GROWI.cloud"
+    "to_cloud_settings": "Ouvrir paramètres GROWI.cloud",
+    "change_from_cloud": "Vous pouvez modifier les paramètres depuis le panneau d'administration GROWI.cloud."
   },
   "audit_log_action_category": {
     "Page": "Page",

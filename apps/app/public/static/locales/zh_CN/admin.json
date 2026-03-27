@@ -923,7 +923,8 @@
     "confirm": "Delete plugin?"
   },
   "cloud_setting_management": {
-    "to_cloud_settings": "進入 GROWI.cloud 的管理界面"
+    "to_cloud_settings": "進入 GROWI.cloud 的管理界面",
+    "change_from_cloud": "您可以从 GROWI.cloud 管理界面更改设置。"
   },
   "audit_log_action_category": {
     "Page": "页面",

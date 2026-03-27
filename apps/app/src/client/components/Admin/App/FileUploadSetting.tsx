@@ -5,6 +5,7 @@ import { useController, useForm } from 'react-hook-form';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import { FileUploadType } from '~/interfaces/file-uploader';
+import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
 
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 import { AwsSettingMolecule } from './AwsSetting';
@@ -15,6 +16,9 @@ import { useFileUploadSettings } from './useFileUploadSettings';
 
 const FileUploadSetting = (): JSX.Element => {
   const { t } = useTranslation(['admin', 'commons']);
+  const growiCloudUri = useGrowiCloudUri();
+  const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
+  const isCloud = growiCloudUri != null && growiAppIdForGrowiCloud != null;
   const { data, isLoading, error, updateSettings } = useFileUploadSettings();
 
   const { register, handleSubmit, control, watch, formState } =
@@ -146,6 +150,20 @@ const FileUploadSetting = (): JSX.Element => {
             />
           </p>
         )}
+        {data.isFixedFileUploadByEnvVar &&
+          (fileUploadType === 'gcs' || fileUploadType === 'azure') &&
+          isCloud && (
+            <div className="text-start offset-3 col-6 mt-2">
+              <p>{t('admin:cloud_setting_management.change_from_cloud')}</p>
+              <a
+                href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
+                className="btn btn-outline-secondary"
+              >
+                <span className="material-symbols-outlined me-1">share</span>
+                {t('admin:cloud_setting_management.to_cloud_settings')}
+              </a>
+            </div>
+          )}
       </div>
 
       {fileUploadType === 'aws' && (

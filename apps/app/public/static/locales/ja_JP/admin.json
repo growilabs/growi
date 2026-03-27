@@ -923,7 +923,8 @@
     "confirm": "プラグインを削除しますか？"
   },
   "cloud_setting_management": {
-    "to_cloud_settings": "GROWI.cloud の管理画面へ"
+    "to_cloud_settings": "GROWI.cloud の管理画面へ",
+    "change_from_cloud": "GROWI.cloud の管理画面から設定を変更できます。"
   },
   "audit_log_action_category": {
     "Page": "ページ",

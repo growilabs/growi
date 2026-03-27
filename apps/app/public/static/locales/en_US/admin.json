@@ -914,7 +914,8 @@
     "confirm": "Delete plugin?"
   },
   "cloud_setting_management": {
-    "to_cloud_settings": "Open GROWI.cloud Settings"
+    "to_cloud_settings": "Open GROWI.cloud Settings",
+    "change_from_cloud": "You can change the settings from the GROWI.cloud admin panel."
   },
   "audit_log_action_category": {
     "Page": "Page",
