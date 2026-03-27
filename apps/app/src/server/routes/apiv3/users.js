@@ -149,7 +149,6 @@ module.exports = (crowi) => {
     query('sortOrder').isIn(['asc', 'desc']),
     // validate sort : what column you will sort
     query('sort').isIn([
-      'id',
       'status',
       'username',
       'name',
@@ -340,6 +339,8 @@ module.exports = (crowi) => {
       const { sort, sortOrder } = req.query;
       const sortOutput = {
         [sort]: sortOrder === 'desc' ? -1 : 1,
+        // tiebreaker: ensure stable pagination when the primary sort key has duplicate values
+        _id: 1,
       };
 
       //  For more information about the external specification of the User API, see here (https://dev.growi.org/5fd7466a31d89500488248e3)
