@@ -23,6 +23,7 @@
       "import": "./dist/utils/index.js"
     },
     "./dist/style": {
+      "style": "./dist/style.css",
       "import": "./dist/style.css"
     },
     "./scss/*": "./scss/*.scss"
