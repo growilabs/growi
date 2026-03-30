@@ -9,7 +9,6 @@ on:
       - .github/mergify.yml
       - .github/workflows/ci-app-prod.yml
       - .github/workflows/reusable-app-prod.yml
-      - .github/workflows/reusable-app-reg-suit.yml
       - tsconfig.base.json
       - turbo.json
       - pnpm-lock.yaml
@@ -23,7 +22,6 @@ on:
       - .github/mergify.yml
       - .github/workflows/ci-app-prod.yml
       - .github/workflows/reusable-app-prod.yml
-      - .github/workflows/reusable-app-reg-suit.yml
       - tsconfig.base.json
       - pnpm-lock.yaml
       - turbo.json
