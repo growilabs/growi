@@ -123,49 +123,49 @@
   - Update unit tests in `logger-factory.spec.ts` to verify that calling `loggerFactory` for N distinct namespaces does not create N independent pino instances (all children share the root transport)
   - _Requirements: 11.1, 11.2, 11.3, 11.4_
 
-- [ ] 7. Migrate apps/app to @growi/logger (largest scope)
-- [ ] 7.1 Replace the logger factory module in apps/app
+- [x] 7. Migrate apps/app to @growi/logger (largest scope)
+- [x] 7.1 Replace the logger factory module in apps/app
   - Update the apps/app logger utility to import from `@growi/logger` instead of `universal-bunyan`
   - Call `initializeLoggerFactory` at application startup with the existing dev/prod config files (preserve current config content)
   - Re-export `loggerFactory` as the default export so all existing consumer imports continue to work unchanged
   - Add `@growi/logger` to apps/app dependencies and ensure pino-pretty is available for development formatting
   - _Requirements: 8.1, 2.2_
 
-- [ ] 7.2 Replace HTTP request logging middleware in apps/app
+- [x] 7.2 Replace HTTP request logging middleware in apps/app
   - Remove the morgan middleware (development mode) and express-bunyan-logger middleware (production mode) from the Express initialization
   - Add pino-http middleware configured with a logger from the factory using the `express` namespace
   - Configure route skipping to exclude `/_next/static/` paths in non-production mode
   - Verify the middleware produces log entries containing method, URL, status code, and response time
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 7.3 Update the OpenTelemetry diagnostic logger adapter
+- [x] 7.3 Update the OpenTelemetry diagnostic logger adapter
   - Rename the adapter class from `DiagLoggerBunyanAdapter` to `DiagLoggerPinoAdapter` and update the import to use pino types
   - Preserve the existing `parseMessage` helper logic that parses JSON strings and merges argument objects
   - Confirm the verbose-to-trace level mapping continues to work with pino's trace level
   - Update the OpenTelemetry SDK configuration to disable `@opentelemetry/instrumentation-pino` instead of `@opentelemetry/instrumentation-bunyan`
   - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ] 7.4 Update all bunyan type references in apps/app source files
+- [x] 7.4 Update all bunyan type references in apps/app source files
   - Replace `import type Logger from 'bunyan'` with the Logger type exported from `@growi/logger` across all source files in apps/app
   - Verify that pino's Logger type is compatible with all existing usage patterns (info, debug, warn, error, trace, fatal method calls)
   - Run the TypeScript compiler to confirm no type errors
   - _Requirements: 10.1, 10.2, 10.3_
 
-- [ ] 8. Remove old logging dependencies and verify cleanup
-- [ ] 8.1 Remove bunyan-related packages from all package.json files
+- [x] 8. Remove old logging dependencies and verify cleanup
+- [x] 8.1 Remove bunyan-related packages from all package.json files
   - Remove `bunyan`, `universal-bunyan`, `bunyan-format`, `express-bunyan-logger`, `browser-bunyan`, `@browser-bunyan/console-formatted-stream`, `@types/bunyan` from every package.json in the monorepo
   - Remove `morgan` and `@types/morgan` from every package.json in the monorepo
   - Run `pnpm install` to update the lockfile and verify no broken peer dependency warnings
   - _Requirements: 9.1, 9.2_
 
-- [ ] 8.2 Verify no residual references to removed packages
+- [x] 8.2 Verify no residual references to removed packages
   - Search all source files for any remaining imports or requires of the removed packages (bunyan, universal-bunyan, browser-bunyan, express-bunyan-logger, morgan, bunyan-format)
   - Search all configuration and type definition files for stale bunyan references
   - Fix any remaining references found during the search
   - _Requirements: 9.3_
 
-- [ ] 9. Run full monorepo validation
-- [ ] 9.1 Execute lint, type-check, test, and build across the monorepo
+- [x] 9. Run full monorepo validation
+- [x] 9.1 Execute lint, type-check, test, and build across the monorepo
   - Run `turbo run lint --filter @growi/app` and fix any lint errors related to the migration
   - Run `turbo run test --filter @growi/app` and verify all existing tests pass
   - Run `turbo run build --filter @growi/app` and confirm the production build succeeds

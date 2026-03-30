@@ -250,7 +250,7 @@ module.exports = (crowi: Crowi) => {
     try {
       // Add error handling to prevent resource leaks
       readable.on('error', (err) => {
-        logger.error('Readable stream error:', err);
+        logger.error({ err }, 'Readable stream error');
         readable.destroy();
         throw err;
       });

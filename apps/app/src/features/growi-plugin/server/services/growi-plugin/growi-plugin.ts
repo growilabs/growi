@@ -98,7 +98,7 @@ export class GrowiPluginService implements IGrowiPluginService {
             growiPlugin.organizationName,
           );
         } catch (err) {
-          logger.error(err);
+          logger.error({ err }, 'Plugin path validation failed');
           continue;
         }
         if (fs.existsSync(pluginPath)) {
@@ -135,12 +135,15 @@ export class GrowiPluginService implements IGrowiPluginService {
               await fs.promises.rm(unzippedReposPath, { recursive: true });
             if (fs.existsSync(pluginPath))
               await fs.promises.rm(pluginPath, { recursive: true });
-            logger.error(err);
+            logger.error({ err }, 'Failed to download plugin repository');
           }
         }
       }
     } catch (err) {
-      logger.error(err);
+      logger.error(
+        { err },
+        'Failed to download non-existent plugin repositories',
+      );
     }
   }
 
@@ -199,7 +202,7 @@ export class GrowiPluginService implements IGrowiPluginService {
       // move new repository from temporary path to storing path.
       fs.renameSync(temporaryReposPath, reposPath);
     } catch (err) {
-      logger.error(err);
+      logger.error({ err }, 'Failed to install plugin');
       throw err;
     } finally {
       // clean up
@@ -222,7 +225,7 @@ export class GrowiPluginService implements IGrowiPluginService {
         await fs.promises.rm(reposPath, { recursive: true });
       await this.deleteOldPluginDocument(installedPath);
 
-      logger.error(err);
+      logger.error({ err }, 'Failed to save plugin metadata');
       throw err;
     }
   }
@@ -253,7 +256,7 @@ export class GrowiPluginService implements IGrowiPluginService {
           }
         })
         .catch((err) => {
-          logger.error(err);
+          logger.error({ err }, 'Failed to download file');
           rejects('Failed to download file.');
         });
     });
@@ -270,7 +273,7 @@ export class GrowiPluginService implements IGrowiPluginService {
         unzipStream.Extract({ path: destPath.toString() }),
       );
     } catch (err) {
-      logger.error(err);
+      logger.error({ err }, 'Failed to unzip');
       throw new Error('Failed to unzip.');
     }
   }
@@ -345,7 +348,7 @@ export class GrowiPluginService implements IGrowiPluginService {
       plugin.meta = await generateTemplatePluginMeta(plugin, validationData);
     }
 
-    logger.info('Plugin detected => ', plugin);
+    logger.info({ plugin }, 'Plugin detected');
 
     return [plugin];
   }
@@ -371,7 +374,10 @@ export class GrowiPluginService implements IGrowiPluginService {
     try {
       await GrowiPlugin.deleteOne({ _id: pluginId });
     } catch (err) {
-      logger.error(err);
+      logger.error(
+        { err },
+        'Failed to delete plugin from GrowiPlugin documents',
+      );
       throw new Error('Failed to delete plugin from GrowiPlugin documents.');
     }
 
@@ -382,7 +388,7 @@ export class GrowiPluginService implements IGrowiPluginService {
         growiPlugins.installedPath,
       );
     } catch (err) {
-      logger.error(err);
+      logger.error({ err }, 'Invalid plugin installedPath');
       throw new Error(
         'The installedPath for the plugin is invalid, and the plugin has already been removed.',
       );
@@ -392,7 +398,7 @@ export class GrowiPluginService implements IGrowiPluginService {
       try {
         await deleteFolder(growiPluginsPath);
       } catch (err) {
-        logger.error(err);
+        logger.error({ err }, 'Failed to delete plugin repository');
         throw new Error('Failed to delete plugin repository.');
       }
     } else {
@@ -423,8 +429,8 @@ export class GrowiPluginService implements IGrowiPluginService {
       });
     } catch (e) {
       logger.error(
+        { err: e },
         `Could not find the theme '${theme}' from GrowiPlugin documents.`,
-        e,
       );
     }
 
@@ -440,7 +446,10 @@ export class GrowiPluginService implements IGrowiPluginService {
       }
       themeHref = `${PLUGIN_EXPRESS_STATIC_DIR}/${matchedPlugin.installedPath}/dist/${manifest[matchedThemeMetadata.manifestKey].file}`;
     } catch (e) {
-      logger.error(`Could not read manifest file for the theme '${theme}'`, e);
+      logger.error(
+        { err: e },
+        `Could not read manifest file for the theme '${theme}'`,
+      );
     }
 
     return {
@@ -479,11 +488,11 @@ export class GrowiPluginService implements IGrowiPluginService {
             entries.push([growiPlugin.installedPath, href]);
           }
         } catch (e) {
-          logger.warn(e);
+          logger.warn({ err: e }, 'Failed to retrieve plugin manifest');
         }
       });
     } catch (e) {
-      logger.error('Could not retrieve GrowiPlugin documents.', e);
+      logger.error({ err: e }, 'Could not retrieve GrowiPlugin documents.');
     }
 
     return entries;
