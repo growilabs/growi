@@ -64,6 +64,8 @@ export const remarkPlugin: Plugin = () => (tree) => {
             firstAttrValue === '' &&
             !SUPPORTED_ATTRIBUTES.includes(firstAttrKey)
           ) {
+            // Consecutive bare attributes are joined with spaces to restore the prefix path,
+            // because the micromark parser splits space-separated words into separate attributes.
             const prefixParts: string[] = [];
             for (const [key, value] of attrEntries) {
               if (value !== '' || SUPPORTED_ATTRIBUTES.includes(key)) {
