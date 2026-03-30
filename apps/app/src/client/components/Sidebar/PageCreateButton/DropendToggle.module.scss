@@ -29,7 +29,7 @@
 // hitarea
 .btn-toggle {
   :global(.hitarea) {
-    inset: 0 -10px 0 0;
+    inset: 0 -14px 0 0;
   }
 }
 
@@ -55,3 +55,4 @@
     fill: var(--grw-primary-600);
   }
 }
+
