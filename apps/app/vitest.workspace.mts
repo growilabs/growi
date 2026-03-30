@@ -32,6 +32,13 @@ export default defineWorkspace([
       // Prefer require (CJS) for server-side packages
       conditions: ['require', 'node', 'default'],
     },
+    ssr: {
+      resolve: {
+        // Vite 6+: SSR uses ssr.resolve.conditions (default: ['node', 'import']).
+        // Override to match resolve.conditions so CJS-only server packages resolve correctly.
+        conditions: ['require', 'node', 'default'],
+      },
+    },
     test: {
       name: 'app-integration',
       environment: 'node',
