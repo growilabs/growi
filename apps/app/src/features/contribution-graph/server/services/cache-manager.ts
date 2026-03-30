@@ -168,6 +168,10 @@ export class ContributionCacheManager {
       ...currentWeekData,
     ];
 
+    const yesterday = new Date();
+    yesterday.setUTCHours(0, 0, 0, 0);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+
     const runner = new Date();
     runner.setUTCDate(runner.getUTCDate() - 364);
 
