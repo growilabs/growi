@@ -781,7 +781,8 @@
       "revoke_read_only_access": "읽기 전용 권한 취소",
       "grant_read_only_access": "읽기 전용 권한 부여",
       "send_invitation_email": "초대 이메일 전송",
-      "resend_invitation_email": "초대 이메일 재전송"
+      "resend_invitation_email": "초대 이메일 재전송",
+      "deleted_user": "(삭제된 사용자)"
     },
     "reset_password": "비밀번호 재설정",
     "reset_password_modal": {

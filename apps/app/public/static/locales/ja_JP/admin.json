@@ -790,7 +790,8 @@
       "revoke_read_only_access": "閲覧のみアクセス権を外す",
       "grant_read_only_access": "閲覧のみアクセス権を付与する",
       "send_invitation_email": "招待メールの送信",
-      "resend_invitation_email": "招待メールの再送信"
+      "resend_invitation_email": "招待メールの再送信",
+      "deleted_user": "(削除されたユーザー)"
     },
     "reset_password": "パスワードのリセット",
     "reset_password_modal": {

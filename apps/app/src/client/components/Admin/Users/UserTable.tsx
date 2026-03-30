@@ -5,6 +5,7 @@ import { format as dateFnsFormat } from 'date-fns/format';
 import { useTranslation } from 'next-i18next';
 
 import AdminUsersContainer from '~/client/services/AdminUsersContainer';
+import { UserStatus } from '~/server/models/user/conts';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import { SortIcons } from './SortIcons';
@@ -164,7 +165,13 @@ const UserTable = (props: UserTableProps) => {
                   )}
                 </td>
                 <td>
-                  <strong>{user.username}</strong>
+                  {user.status === UserStatus.STATUS_DELETED ? (
+                    <p className="text-secondary">
+                      {t('admin:user_management.user_table.deleted_user')}
+                    </p>
+                  ) : (
+                    <strong>{user.username}</strong>
+                  )}
                 </td>
                 <td>{user.name}</td>
                 <td>{user.email}</td>
