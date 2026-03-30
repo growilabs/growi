@@ -1,8 +1,8 @@
 import assert from 'node:assert';
+import { loggerFactory } from '@growi/logger';
 
 import type { IChannel } from '../interfaces/channel';
 import type { IInteractionPayloadAccessor } from '../interfaces/request-from-slack';
-import loggerFactory from './logger';
 
 const logger = loggerFactory('@growi/slack:utils:interaction-payload-accessor');
 
