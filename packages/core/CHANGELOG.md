@@ -1,11 +1,5 @@
 # @growi/core
 
-## 2.2.0
-
-### Minor Changes
-
-- [#10889](https://github.com/growilabs/growi/pull/10889) [`d4be7e6`](https://github.com/growilabs/growi/commit/d4be7e68c497f168a5e39688ce0ef3760a62c98f) Thanks [@yuki-takei](https://github.com/yuki-takei)! - add YJS_WEBSOCKET_BASE_PATH
-
 ## 2.1.0
 
 ### Minor Changes
