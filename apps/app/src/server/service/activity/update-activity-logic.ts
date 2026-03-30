@@ -6,14 +6,14 @@ import { SupportedAction } from '~/interfaces/activity';
 type GenerateUpdatePayload = {
   currentUserId: string;
   targetPageId: string;
-  latestSupportedActivityId: string;
+  currentActivityId: string;
 };
 
 const MINIMUM_REVISION_FOR_ACTIVITY = 2;
-const SUPPRESION_UPDATE_WINDOW_MS = 1 * 10 * 1000; // 5 min
+const SUPPRESION_UPDATE_WINDOW_MS = 5 * 60 * 1000; // 5 min
 
 export const shouldGenerateUpdate = async (payload: GenerateUpdatePayload) => {
-  const { targetPageId, latestSupportedActivityId, currentUserId } = payload;
+  const { targetPageId, currentActivityId, currentUserId } = payload;
   const Activity = mongoose.model('Activity');
 
   // Get most recent update or create activity on the page
@@ -25,7 +25,7 @@ export const shouldGenerateUpdate = async (payload: GenerateUpdatePayload) => {
         SupportedAction.ACTION_PAGE_UPDATE,
       ],
     },
-    _id: { $ne: latestSupportedActivityId },
+    _id: { $ne: currentActivityId },
   }).sort({ createdAt: -1 });
 
   const isLastActivityByMe =
