@@ -1,7 +1,6 @@
 import type { Aggregate, PipelineStage } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { getUTCMidnight } from '~/features/contribution-graph/utils/contribution-graph-utils';
 import Activity from '~/server/models/activity';
 
 import { ContributionGraphActions } from '../../interfaces/supported-actions';
