@@ -24,7 +24,7 @@ ls apps/app/.next/node_modules/ | grep <package-name>
 |---|---|
 | `import foo from 'pkg'` at module level in SSR-executed code | `dependencies` |
 | `import type { Foo } from 'pkg'` only | `devDependencies` (type-erased at build) |
-| `await import('pkg')` inside `useEffect` / event handler | Check `.next/node_modules/` — may still be externalised |
+| `await import('pkg')` inside `useEffect` / event handler | Check `.next/node_modules/` — may still be externalised (see `fix-broken-next-symlinks` skill) |
 | Used only in `*.spec.ts`, build scripts, or CI | `devDependencies` |
 
 ## Common Misconceptions
