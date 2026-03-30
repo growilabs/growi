@@ -155,7 +155,7 @@ describe('Contribution Cache Manager Integration Test', () => {
     it('should freeze weeks between start of the graph until last week', async () => {
       const userId = createMockId();
       const User = mongoose.model('User');
-      await User.create({ _id: userId, status: 1, username: 'testuser' });
+      await User.create({ _id: userId, status: 2, username: 'testuser' });
 
       const today = new Date();
 
@@ -205,7 +205,7 @@ describe('Contribution Cache Manager Integration Test', () => {
     it('should return contribution cache if user exists', async () => {
       const userId = createMockId();
       const User = mongoose.model('User');
-      await User.create({ _id: userId, status: 1, username: 'testuser' });
+      await User.create({ _id: userId, status: 2, username: 'testuser' });
 
       const newDate = new Date();
       newDate.setUTCDate(newDate.getUTCDate() - 7);
@@ -230,7 +230,7 @@ describe('Contribution Cache Manager Integration Test', () => {
     it('should return contribution cache if user exists but no contribution cache exist', async () => {
       const userId = createMockId();
       const User = mongoose.model('User');
-      await User.create({ _id: userId, status: 1, username: 'testuser' });
+      await User.create({ _id: userId, status: 2, username: 'testuser' });
 
       const result = await cacheManager.getUpdatedCache(userId);
 
@@ -247,7 +247,7 @@ describe('Contribution Cache Manager Integration Test', () => {
 
       const userId = createMockId();
       const User = mongoose.model('User');
-      await User.create({ _id: userId, status: 1, username: 'week-tester' });
+      await User.create({ _id: userId, status: 2, username: 'week-tester' });
 
       // Setup Relative Dates based on the mocked now date
       const now = new Date();
@@ -297,7 +297,7 @@ describe('Contribution Cache Manager Integration Test', () => {
     it('should return exactly 365 days even if the user was only active on two days', async () => {
       const userId = createMockId();
       const User = mongoose.model('User');
-      await User.create({ _id: userId, status: 1, username: 'week-tester' });
+      await User.create({ _id: userId, status: 2, username: 'week-tester' });
 
       const today = new Date('2026-03-25T12:00:00Z');
       vi.useFakeTimers();
