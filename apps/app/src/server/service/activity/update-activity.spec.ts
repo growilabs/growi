@@ -12,6 +12,14 @@ describe('shouldGenerateUpdate()', () => {
   const ONE_HOUR = 60 * 60 * 1000;
   const date = new Date();
 
+  const targetPageId = new mongoose.Types.ObjectId().toString();
+
+  const currentUserId = new mongoose.Types.ObjectId().toString();
+  const otherUserId = new mongoose.Types.ObjectId().toString();
+
+  const currentActivityId = new mongoose.Types.ObjectId().toString();
+  const olderActivityId = new mongoose.Types.ObjectId().toString();
+
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
@@ -27,13 +35,6 @@ describe('shouldGenerateUpdate()', () => {
   });
 
   it('should generate update activity if latest update is by another user', async () => {
-    const currentUserId = new mongoose.Types.ObjectId().toString();
-    const otherUserId = new mongoose.Types.ObjectId().toString();
-    const targetPageId = new mongoose.Types.ObjectId().toString();
-
-    const currentActivityId = new mongoose.Types.ObjectId().toString();
-    const olderActivityId = new mongoose.Types.ObjectId().toString();
-
     await Activity.insertMany([
       {
         user: currentUserId,
@@ -61,11 +62,6 @@ describe('shouldGenerateUpdate()', () => {
   });
 
   it('should not generate update activity if it is the first update activity by the creator', async () => {
-    const currentUserId = new mongoose.Types.ObjectId().toString();
-    const targetPageId = new mongoose.Types.ObjectId().toString();
-    const currentActivityId = new mongoose.Types.ObjectId().toString();
-    const olderActivityId = new mongoose.Types.ObjectId().toString();
-
     await Activity.insertMany([
       {
         user: currentUserId,
@@ -110,13 +106,6 @@ describe('shouldGenerateUpdate()', () => {
   });
 
   it('should generate update activity if it is the first update activity but user is not the creator', async () => {
-    const currentUserId = new mongoose.Types.ObjectId().toString();
-    const otherUserId = new mongoose.Types.ObjectId().toString();
-
-    const targetPageId = new mongoose.Types.ObjectId().toString();
-    const currentActivityId = new mongoose.Types.ObjectId().toString();
-    const olderActivityId = new mongoose.Types.ObjectId().toString();
-
     await Activity.insertMany([
       {
         user: otherUserId,
