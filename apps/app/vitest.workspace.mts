@@ -1,13 +1,18 @@
 import react from '@vitejs/plugin-react';
 import tsconfigPaths from 'vite-tsconfig-paths';
-import { defineConfig, defineWorkspace, mergeConfig } from 'vitest/config';
+import {
+  defaultExclude,
+  defineConfig,
+  defineWorkspace,
+  mergeConfig,
+} from 'vitest/config';
 
 const configShared = defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     clearMocks: true,
     globals: true,
-    exclude: ['playwright/**'],
+    exclude: [...defaultExclude, 'playwright/**', 'tmp/**'],
   },
 });
 
