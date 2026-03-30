@@ -9,8 +9,10 @@ import { shouldGenerateUpdate } from './update-activity-logic';
 
 describe('shouldGenerateUpdate()', () => {
   let mongoServer: MongoMemoryServer;
-  const ONE_HOUR = 60 * 60 * 1000;
+
   const date = new Date();
+  const ONE_HOUR = 60 * 60 * 1000;
+  const ONE_MINUTE = 1 * 60;
 
   const targetPageId = new mongoose.Types.ObjectId().toString();
 
@@ -39,14 +41,14 @@ describe('shouldGenerateUpdate()', () => {
       {
         user: currentUserId,
         action: SupportedAction.ACTION_PAGE_CREATE,
-        createdAt: new Date('2025-10-31T23:59:59Z'),
+        createdAt: new Date(),
         target: targetPageId,
         _id: currentActivityId,
       },
       {
         user: otherUserId,
-        action: SupportedAction.ACTION_PAGE_CREATE,
-        createdAt: new Date('2025-10-30T23:59:59Z'),
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+        createdAt: new Date(date.getTime() - ONE_HOUR),
         target: targetPageId,
         _id: olderActivityId,
       },
@@ -105,10 +107,10 @@ describe('shouldGenerateUpdate()', () => {
     expect(result).toBe(false);
   });
 
-  it('should generate update activity if it is the first update activity but user is not the creator', async () => {
+  it('should generate update activity if update is made by the same user and outside the suppression window', async () => {
     await Activity.insertMany([
       {
-        user: otherUserId,
+        user: currentUserId,
         action: SupportedAction.ACTION_PAGE_CREATE,
         createdAt: new Date(date.getTime() - ONE_HOUR),
         target: targetPageId,
@@ -129,7 +131,7 @@ describe('shouldGenerateUpdate()', () => {
         pageId: targetPageId,
         body: 'Old content',
         format: 'markdown',
-        author: otherUserId,
+        author: currentUserId,
       },
       {
         _id: new mongoose.Types.ObjectId(),
@@ -147,5 +149,32 @@ describe('shouldGenerateUpdate()', () => {
     });
 
     expect(result).toBe(true);
+  });
+
+  it('should not generate update activity if update is made by the same user and within the suppression window', async () => {
+    await Activity.insertMany([
+      {
+        user: currentUserId,
+        action: SupportedAction.ACTION_PAGE_CREATE,
+        createdAt: new Date(date.getTime() - ONE_MINUTE),
+        target: targetPageId,
+        _id: olderActivityId,
+      },
+      {
+        user: currentUserId,
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+        createdAt: new Date(),
+        target: targetPageId,
+        _id: currentActivityId,
+      },
+    ]);
+
+    const result = await shouldGenerateUpdate({
+      targetPageId,
+      currentUserId,
+      currentActivityId,
+    });
+
+    expect(result).toBe(false);
   });
 });
