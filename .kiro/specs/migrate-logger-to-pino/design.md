@@ -498,3 +498,85 @@ flowchart TD
 - **Phase 7**: Final grep verification, lint, build, test across monorepo
 
 Rollback: Each phase can be reverted independently by restoring the previous `loggerFactory` implementation and dependencies.
+
+---
+
+## Addendum: Formatting Improvements (Post-Migration)
+
+> Added 2026-03-30. The core migration is complete. This section covers log output readability improvements based on operator feedback.
+
+### Background
+
+- Morgan was used in dev because bunyan's express logging was too verbose
+- Morgan's one-liner format (`GET /path 200 12ms`) was valued for readability
+- `FORMAT_NODE_LOG=true` should produce concise one-liner logs suitable for quick-glance monitoring
+- Production default should remain structured JSON (already working via `.env.production`)
+
+### Gap Summary
+
+| Gap | Issue | Resolution |
+|-----|-------|------------|
+| A | `singleLine: false` in prod FORMAT_NODE_LOG path | Change to `singleLine: true` |
+| B | `FORMAT_NODE_LOG` defaults to formatted when unset | Defer to separate PR (`.env.production` handles this) |
+| C | pino-http uses default verbose messages | Add `customSuccessMessage` / `customErrorMessage` / `customLogLevel` |
+| D | Dev and prod pino-pretty configs identical | Differentiate via `singleLine` |
+
+### Change 1: TransportFactory — Differentiated `singleLine`
+
+**File**: `packages/logger/src/transport-factory.ts`
+
+Current production + FORMAT_NODE_LOG branch uses `singleLine: false`. Change to `singleLine: true`:
+
+```
+Dev:                    singleLine: false  (unchanged — full context)
+Prod + FORMAT_NODE_LOG: singleLine: true   (concise one-liners)
+Prod default:           raw JSON           (unchanged)
+```
+
+The dev branch remains multi-line so developers see full object context. The production formatted path becomes single-line for operator readability.
+
+### Change 2: HttpLoggerMiddleware — Custom Message Format
+
+**Files**: `apps/app/src/server/crowi/index.ts`, `apps/slackbot-proxy/src/Server.ts`
+
+Add pino-http message customization to produce morgan-like output:
+
+```typescript
+const customSuccessMessage: PinoHttpOptions['customSuccessMessage'] = (req, res, responseTime) => {
+  return `${req.method} ${req.url} ${res.statusCode} - ${Math.round(responseTime)}ms`;
+};
+
+const customErrorMessage: PinoHttpOptions['customErrorMessage'] = (req, res, error) => {
+  return `${req.method} ${req.url} ${res.statusCode} - ${error.message}`;
+};
+
+const customLogLevel: PinoHttpOptions['customLogLevel'] = (_req, res, error) => {
+  if (error != null || res.statusCode >= 500) return 'error';
+  if (res.statusCode >= 400) return 'warn';
+  return 'info';
+};
+```
+
+### Output Examples
+
+**Dev** (pino-pretty, singleLine: false):
+```
+[2026-03-30 12:00:00.000] INFO (express): GET /page/path 200 - 12ms
+    req: {"method":"GET","url":"/page/path"}
+    res: {"statusCode":200}
+```
+
+**Prod + FORMAT_NODE_LOG=true** (pino-pretty, singleLine: true):
+```
+[2026-03-30 12:00:00.000] INFO (express): GET /page/path 200 - 12ms
+```
+
+**Prod default** (JSON):
+```json
+{"level":30,"time":1711792800000,"name":"express","msg":"GET /page/path 200 - 12ms","req":{"method":"GET","url":"/page/path"},"res":{"statusCode":200},"responseTime":12}
+```
+
+### Testing
+
+- `transport-factory.spec.ts`: Verify prod + FORMAT_NODE_LOG returns `singleLine: true`; dev returns `singleLine: false`
+- pino-http custom messages: Verify `customSuccessMessage` format, `customLogLevel` returns correct levels for 2xx/4xx/5xx

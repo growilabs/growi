@@ -172,3 +172,28 @@
   - Run the same checks for slackbot-proxy and any other affected packages
   - Verify the @growi/logger package's own tests pass
   - _Requirements: 1.4, 8.1, 8.2, 8.3, 8.4, 10.1, 10.2_
+
+- [ ] 10. Improve log output formatting for readability
+- [ ] 10.1 (P) Differentiate pino-pretty singleLine between dev and production FORMAT_NODE_LOG
+  - In the transport factory, change the production + FORMAT_NODE_LOG path to use `singleLine: true` for concise one-liner output
+  - Keep the development path at `singleLine: false` so developers see full multi-line context
+  - Update unit tests to verify: dev returns `singleLine: false`, production + FORMAT_NODE_LOG returns `singleLine: true`, production without FORMAT_NODE_LOG still returns no transport
+  - _Requirements: 5.1, 5.3_
+
+- [ ] 10.2 (P) Add morgan-like HTTP request message formatting to pino-http in apps/app
+  - Configure `customSuccessMessage` to produce `METHOD /url STATUS - TIMEms` format (e.g., `GET /page/path 200 - 12ms`)
+  - Configure `customErrorMessage` to include the error message alongside method, URL, and status code
+  - Configure `customLogLevel` to return `warn` for 4xx responses and `error` for 5xx or error responses, keeping `info` for successful requests
+  - Verify that `/_next/static/` path skipping in dev mode still works after the changes
+  - _Requirements: 6.1, 6.4_
+
+- [ ] 10.3 (P) Add morgan-like HTTP request message formatting to pino-http in apps/slackbot-proxy
+  - Apply the same `customSuccessMessage`, `customErrorMessage`, and `customLogLevel` configuration as apps/app
+  - _Requirements: 6.1, 6.4_
+
+- [ ] 11. Validate formatting improvements
+- [ ] 11.1 Run tests and build for affected packages
+  - Run the @growi/logger package tests to confirm transport factory changes pass
+  - Run lint and type-check for apps/app and apps/slackbot-proxy
+  - Verify the production build succeeds
+  - _Requirements: 5.1, 5.3, 6.1, 6.4_

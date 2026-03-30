@@ -150,6 +150,42 @@
 - **Missing env var behavior** — Port minimatch logic carefully with unit tests
 - **Express middleware ordering** — Ensure pino-http is added at the same point in middleware chain
 
+### Phase 2: Formatting Improvement Research
+
+#### pino-http Custom Message API (v11.0.0)
+- **Context**: Need morgan-like concise HTTP log messages instead of pino-http's verbose default
+- **Sources Consulted**: pino-http v11.0.0 type definitions (index.d.ts), source code (logger.js)
+- **Findings**:
+  - `customSuccessMessage: (req: IM, res: SR, responseTime: number) => string` — called on successful response (statusCode < 500)
+  - `customErrorMessage: (req: IM, res: SR, error: Error) => string` — called on error response
+  - `customReceivedMessage: (req: IM, res: SR) => string` — called when request received (optional, only if autoLogging enabled)
+  - `customLogLevel: (req: IM, res: SR, error?: Error) => LevelWithSilent` — dynamic log level based on status code
+  - `customSuccessObject: (req, res, val) => any` — custom fields for successful response log
+  - `customErrorObject: (req, res, error, val) => any` — custom fields for error response log
+  - `customAttributeKeys: { req?, res?, err?, reqId?, responseTime? }` — rename default keys
+  - Response time is calculated as `Date.now() - res[startTime]` in milliseconds
+  - Error conditions: error passed to handler, `res.err` set, or `res.statusCode >= 500`
+- **Implications**: `customSuccessMessage` + `customErrorMessage` + `customLogLevel` are sufficient to achieve morgan-like output format
+
+#### pino-pretty singleLine Option
+- **Context**: User wants one-liner readable logs when FORMAT_NODE_LOG=true
+- **Sources Consulted**: pino-pretty v13.x documentation
+- **Findings**:
+  - `singleLine: true` forces all log properties onto a single line
+  - `singleLine: false` (default) outputs properties on separate indented lines
+  - Combined with `ignore: 'pid,hostname'`, singleLine produces concise output
+  - The `messageFormat` option can further customize the format string
+- **Implications**: Changing `singleLine` from `false` to `true` in the production FORMAT_NODE_LOG path directly addresses the user's readability concern
+
+#### FORMAT_NODE_LOG Default Semantics Analysis
+- **Context**: `isFormattedOutputEnabled()` returns `true` when env var is unset; production JSON depends on `.env.production`
+- **Analysis**:
+  - `.env.production` sets `FORMAT_NODE_LOG=false` — this is the mechanism that ensures JSON in production
+  - CI sets `FORMAT_NODE_LOG=true` explicitly — not affected by default change
+  - If `.env.production` fails to load in a Docker override scenario, production would silently get pino-pretty
+  - However, inverting the default is a behavioral change with broader implications
+- **Decision**: Defer to separate PR. Current behavior is correct in practice (`.env.production` always loaded by Next.js dotenv-flow).
+
 ## References
 - [pino API docs](https://github.com/pinojs/pino/blob/main/docs/api.md)
 - [pino browser docs](https://github.com/pinojs/pino/blob/main/docs/browser.md)
