@@ -32,6 +32,7 @@
   "// comments for dependencies": {},
   "dependencies": {
     "@growi/core": "workspace:^",
+    "@growi/logger": "workspace:^",
     "@growi/remark-growi-directive": "workspace:^",
     "@growi/ui": "workspace:^",
     "express": "^4.20.0",

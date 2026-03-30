@@ -1745,6 +1745,9 @@ importers:
       '@growi/core':
         specifier: workspace:^
         version: link:../core
+      '@growi/logger':
+        specifier: workspace:^
+        version: link:../logger
       '@growi/remark-growi-directive':
         specifier: workspace:^
         version: link:../remark-growi-directive

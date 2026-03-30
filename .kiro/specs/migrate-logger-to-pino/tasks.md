@@ -84,7 +84,7 @@
   - Run `pnpm --filter @growi/remark-attachment-refs lint:typecheck` and confirm the TS2769 error is gone
   - _Requirements: 10.1_
 
-- [ ] 5.5 Migrate packages/remark-lsx server routes to use @growi/logger
+- [x] 5.5 Migrate packages/remark-lsx server routes to use @growi/logger
   - Add `@growi/logger` to packages/remark-lsx dependencies
   - Create `src/utils/logger/index.ts` following the same pattern as remark-attachment-refs (import from `@growi/logger`, call `initializeLoggerFactory`, re-export `loggerFactory`)
   - Replace `console.error` calls in `src/server/routes/list-pages/index.ts` (lines 89, 145-148) with proper logger calls using `loggerFactory('growi:remark-lsx:routes:list-pages')`
