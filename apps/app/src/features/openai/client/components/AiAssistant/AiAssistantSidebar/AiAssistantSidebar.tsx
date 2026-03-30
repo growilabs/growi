@@ -7,6 +7,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { useAtomValue } from 'jotai';
 import { Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Collapse } from 'reactstrap';
@@ -14,6 +15,7 @@ import SimpleBar from 'simplebar-react';
 
 import { toastError } from '~/client/util/toastr';
 import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
+import { aiEnabledAtom } from '~/states/server-configurations';
 import loggerFactory from '~/utils/logger';
 
 import type { AiAssistantHasId } from '../../../../interfaces/ai-assistant';
@@ -82,6 +84,7 @@ const AiAssistantSidebarSubstance: React.FC<
   const growiCloudUri = useGrowiCloudUri();
   const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
   const isCloud = growiCloudUri != null && growiAppIdForGrowiCloud != null;
+  const isAiEnabled = useAtomValue(aiEnabledAtom);
 
   // useSWRxThreads is executed only when Substance is rendered
   const { data: threads, mutate: mutateThreads } = useSWRxThreads(
@@ -608,7 +611,7 @@ const AiAssistantSidebarSubstance: React.FC<
                 </div>
               ) : (
                 <>
-                  {!isEditorAssistant && aiAssistantData == null && isCloud && (
+                  {!isEditorAssistant && !isAiEnabled && isCloud && (
                     <div className="text-center mb-3">
                       <a
                         href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
