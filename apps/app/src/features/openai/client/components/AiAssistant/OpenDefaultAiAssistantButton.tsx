@@ -75,7 +75,6 @@ const OpenDefaultAiAssistantButton = (): JSX.Element => {
   const popoverTargetId = 'ai-disabled-btn';
 
   if (!isAiEnabled) {
-    // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
     if (!isCloud) return <></>;
 
     const button = (
