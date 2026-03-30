@@ -6,6 +6,7 @@ import attachmentRoutes from '@growi/remark-attachment-refs/dist/server';
 import lsxRoutes from '@growi/remark-lsx/dist/server/index.cjs';
 import type { Express } from 'express';
 import mongoose from 'mongoose';
+import pinoHttp, { type Options as PinoHttpOptions } from 'pino-http';
 
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
@@ -613,27 +614,17 @@ class Crowi {
 
     require('./express-init')(this, express);
 
-    // use bunyan
-    if (env === 'production') {
-      const expressBunyanLogger = require('express-bunyan-logger');
-      const bunyanLogger = loggerFactory('express');
-      express.use(
-        expressBunyanLogger({
-          logger: bunyanLogger,
-          excludes: ['*'],
-        }),
-      );
-    }
-    // use morgan
-    else {
-      const morgan = require('morgan');
-      express.use(
-        morgan('dev', {
-          // supress logging for Next.js static files
-          skip: (req) => req.url?.startsWith('/_next/static/'),
-        }),
-      );
-    }
+    // HTTP request logging with pino-http
+    const httpLoggerOptions: PinoHttpOptions = {
+      logger: loggerFactory('express'),
+      // supress logging for Next.js static files in development mode
+      ...(env !== 'production' && {
+        autoLogging: {
+          ignore: (req) => req.url?.startsWith('/_next/static/') ?? false,
+        },
+      }),
+    };
+    express.use(pinoHttp(httpLoggerOptions));
 
     this.express = express;
   }
