@@ -32,6 +32,7 @@ import {
   serializePageSecurely,
   serializeRevisionSecurely,
 } from '~/server/models/serializers';
+import { shouldGenerateUpdate } from '~/server/service/activity/update-activity-logic';
 import { configManager } from '~/server/service/config-manager/config-manager';
 import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
@@ -124,44 +125,14 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     // Decide if update activity should generate
     try {
       const targetPageId = updatedPage._id.toString();
-      const Activity = mongoose.model('Activity');
-
-      // Get most recent update or create activity on the page
-      const lastContentActivity = await Activity.findOne({
-        target: targetPageId,
-        action: {
-          $in: [
-            SupportedAction.ACTION_PAGE_CREATE,
-            SupportedAction.ACTION_PAGE_UPDATE,
-          ],
-        },
-        _id: { $ne: res.locals.activity?._id },
-      }).sort({ createdAt: -1 });
-
+      const latestSupportedActivityId = res.locals.activity?._id.toString();
       const currentUserId = req.user?._id?.toString();
 
-      const isLastActivityByMe =
-        !!currentUserId &&
-        lastContentActivity?.user?._id?.toString() === currentUserId;
-
-      const lastActivityTime = lastContentActivity?.createdAt?.getTime?.() ?? 0;
-      const timeSinceLastActivityMs = Date.now() - lastActivityTime;
-
-      // Decide if update activity should generate
-      let shouldGenerateUpdateActivity: boolean;
-      if (!isLastActivityByMe) {
-        shouldGenerateUpdateActivity = true;
-      } else if (timeSinceLastActivityMs < SUPPRESION_UPDATE_WINDOW_MS) {
-        shouldGenerateUpdateActivity = false;
-      } else {
-        const Revision = mongoose.model<IRevisionHasId>('Revision');
-        const revisionCount = await Revision.countDocuments({
-          pageId: updatedPage._id,
-        });
-
-        shouldGenerateUpdateActivity =
-          revisionCount > MINIMUM_REVISION_FOR_ACTIVITY;
-      }
+      const shouldGenerateUpdateActivity = await shouldGenerateUpdate({
+        currentUserId,
+        targetPageId,
+        latestSupportedActivityId,
+      });
 
       if (shouldGenerateUpdateActivity) {
         // persist activity
