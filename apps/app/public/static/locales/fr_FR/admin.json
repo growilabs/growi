@@ -781,7 +781,8 @@
       "revoke_read_only_access": "Révoquer permission de lecture",
       "grant_read_only_access": "Permission de lecture-seule",
       "send_invitation_email": "Envoyer courriel d'invitation",
-      "resend_invitation_email": "Renvoyer courriel d'invitation"
+      "resend_invitation_email": "Renvoyer courriel d'invitation",
+      "deleted_user": "(Utilisateur supprimé)"
     },
     "reset_password": "Réinitialiser mot de passe",
     "reset_password_modal": {
@@ -880,6 +881,13 @@
     "available_action_list_explanation": "Liste des actions pouvant être recherchées/vues",
     "action_list": "Liste d'actions",
     "disable_mode_explanation": "Cette fonctionnalité est désactivée. Afin de l'activer, mettre à jour <code>AUDIT_LOG_ENABLED</code> pour true.",
+    "export": "Exporter",
+    "export_audit_log": "Exporter le journal d'audit",
+    "export_requested": "Demande d'exportation acceptée. Vous serez averti lorsque l'exportation sera terminée.",
+    "export_failed": "Échec du démarrage de l'exportation",
+    "duplicate_export_confirm": "Une exportation avec les mêmes conditions est déjà en cours. Voulez-vous la redémarrer ?",
+    "restart_export": "Redémarrer l'exportation",
+    "confirm_export": "Confirmer l'exportation",
     "disable_mode_explanation_cloud": "Le journal d'audit est actuellement désactivé. Pour l'activer, veuillez modifier les paramètres de l'application depuis l'écran de gestion GROWI.cloud.",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
