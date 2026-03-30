@@ -108,4 +108,55 @@ describe('shouldGenerateUpdate()', () => {
 
     expect(result).toBe(false);
   });
+
+  it('should generate update activity if it is the first update activity but user is not the creator', async () => {
+    const currentUserId = new mongoose.Types.ObjectId().toString();
+    const otherUserId = new mongoose.Types.ObjectId().toString();
+
+    const targetPageId = new mongoose.Types.ObjectId().toString();
+    const currentActivityId = new mongoose.Types.ObjectId().toString();
+    const olderActivityId = new mongoose.Types.ObjectId().toString();
+
+    await Activity.insertMany([
+      {
+        user: otherUserId,
+        action: SupportedAction.ACTION_PAGE_CREATE,
+        createdAt: new Date(date.getTime() - ONE_HOUR),
+        target: targetPageId,
+        _id: olderActivityId,
+      },
+      {
+        user: currentUserId,
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+        createdAt: new Date(),
+        target: targetPageId,
+        _id: currentActivityId,
+      },
+    ]);
+
+    await Revision.insertMany([
+      {
+        _id: new mongoose.Types.ObjectId(),
+        pageId: targetPageId,
+        body: 'Old content',
+        format: 'markdown',
+        author: otherUserId,
+      },
+      {
+        _id: new mongoose.Types.ObjectId(),
+        pageId: targetPageId,
+        body: 'Newer content',
+        format: 'markdown',
+        author: currentUserId,
+      },
+    ]);
+
+    const result = await shouldGenerateUpdate({
+      targetPageId,
+      currentUserId,
+      currentActivityId,
+    });
+
+    expect(result).toBe(true);
+  });
 });
