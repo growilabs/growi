@@ -18,11 +18,6 @@ const OpenDefaultAiAssistantButtonSubstance = (): JSX.Element => {
   const { t } = useTranslation();
   const { data: aiAssistantData } = useSWRxAiAssistants();
   const { openChat } = useAiAssistantSidebarActions();
-  const growiCloudUri = useGrowiCloudUri();
-  const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
-  const isCloud = growiCloudUri != null && growiAppIdForGrowiCloud != null;
-
-  const popoverTargetId = 'ai-assistant-btn';
 
   const defaultAiAssistant = useMemo(() => {
     if (aiAssistantData == null) {
@@ -57,36 +52,6 @@ const OpenDefaultAiAssistantButtonSubstance = (): JSX.Element => {
       </span>
     </button>
   );
-
-  if (isDisabled && isCloud) {
-    return (
-      <NotAvailableForGuest>
-        <>
-          <div id={popoverTargetId}>
-            <Disable disabled>{button}</Disable>
-          </div>
-          <UncontrolledPopover
-            trigger="hover"
-            placement="top"
-            target={popoverTargetId}
-          >
-            <PopoverBody>
-              <p className="mb-2">{t('default_ai_assistant.not_set')}</p>
-              <a href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}>
-                <span
-                  className="material-symbols-outlined me-1"
-                  style={{ fontSize: '1rem', verticalAlign: 'middle' }}
-                >
-                  share
-                </span>
-                {t('default_ai_assistant.to_cloud_settings')}
-              </a>
-            </PopoverBody>
-          </UncontrolledPopover>
-        </>
-      </NotAvailableForGuest>
-    );
-  }
 
   return (
     <NotAvailableForGuest>
