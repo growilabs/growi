@@ -84,6 +84,14 @@
   - Run `pnpm --filter @growi/remark-attachment-refs lint:typecheck` and confirm the TS2769 error is gone
   - _Requirements: 10.1_
 
+- [ ] 5.5 Migrate packages/remark-lsx server routes to use @growi/logger
+  - Add `@growi/logger` to packages/remark-lsx dependencies
+  - Create `src/utils/logger/index.ts` following the same pattern as remark-attachment-refs (import from `@growi/logger`, call `initializeLoggerFactory`, re-export `loggerFactory`)
+  - Replace `console.error` calls in `src/server/routes/list-pages/index.ts` (lines 89, 145-148) with proper logger calls using `loggerFactory('growi:remark-lsx:routes:list-pages')`
+  - Remove the `biome-ignore lint/suspicious/noConsole` comments from the replaced call sites
+  - Run `pnpm --filter @growi/remark-lsx lint:typecheck` to confirm no type errors
+  - _Requirements: 8.5_
+
 - [x] 6. Migrate apps/slackbot-proxy to @growi/logger
 - [x] 6.1 Replace the logger factory and HTTP middleware in slackbot-proxy
   - Update the slackbot-proxy logger utility to import from `@growi/logger` and call `initializeLoggerFactory` with its existing dev/prod config
