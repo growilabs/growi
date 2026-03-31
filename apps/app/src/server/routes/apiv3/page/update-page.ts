@@ -125,13 +125,13 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     // Decide if update activity should generate
     try {
       const targetPageId = updatedPage._id.toString();
-      const latestSupportedActivityId = res.locals.activity?._id.toString();
+      const currentActivityId = res.locals.activity?._id.toString();
       const currentUserId = req.user?._id?.toString();
 
       const shouldGenerateUpdateActivity = await shouldGenerateUpdate({
         currentUserId,
         targetPageId,
-        latestSupportedActivityId,
+        currentActivityId,
       });
 
       if (shouldGenerateUpdateActivity) {
