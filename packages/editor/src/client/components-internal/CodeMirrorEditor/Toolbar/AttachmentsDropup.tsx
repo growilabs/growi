@@ -1,5 +1,6 @@
 import { type JSX, useId, useState } from 'react';
 import { AcceptedUploadFileType } from '@growi/core';
+import { useTranslation } from 'react-i18next';
 import {
   Dropdown,
   DropdownItem,
@@ -28,6 +29,7 @@ export const AttachmentsDropup = (props: Props): JSX.Element => {
   const [isOpen, setOpen] = useState(false);
 
   const id = useId();
+  const { t } = useTranslation('commons');
 
   return (
     <>
@@ -80,7 +82,7 @@ export const AttachmentsDropup = (props: Props): JSX.Element => {
       </Dropdown>
       {!isOpen && (
         <UncontrolledTooltip placement="top" target={CSS.escape(id)}>
-          Attachments
+          {t('toolbar.attachments')}
         </UncontrolledTooltip>
       )}
     </>

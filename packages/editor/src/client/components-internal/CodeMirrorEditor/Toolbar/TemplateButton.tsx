@@ -1,4 +1,5 @@
 import { type JSX, useCallback, useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
 
 import { useTemplateModalActions } from '../../../../states/modal/template';
@@ -12,6 +13,7 @@ export const TemplateButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
 
   const id = useId();
+  const { t } = useTranslation('commons');
 
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(editorKey);
   const { open: openTemplateModal } = useTemplateModalActions();
@@ -38,7 +40,7 @@ export const TemplateButton = (props: Props): JSX.Element => {
         <span className="material-symbols-outlined fs-5">file_copy</span>
       </button>
       <UncontrolledTooltip placement="top" target={CSS.escape(id)}>
-        Template
+        {t('toolbar.template')}
       </UncontrolledTooltip>
     </>
   );

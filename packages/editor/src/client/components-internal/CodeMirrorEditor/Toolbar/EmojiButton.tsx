@@ -7,6 +7,7 @@ import {
   useId,
   useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal, UncontrolledTooltip } from 'reactstrap';
 
 import { useResolvedTheme } from '../../../../states/ui/resolved-theme';
@@ -26,6 +27,7 @@ export const EmojiButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
 
   const id = useId();
+  const { t } = useTranslation('commons');
 
   const [isOpen, setIsOpen] = useState(false);
   const [Picker, setPicker] = useState<ComponentType<PickerProps> | null>(null);
@@ -101,7 +103,7 @@ export const EmojiButton = (props: Props): JSX.Element => {
         <span className="material-symbols-outlined fs-5">emoji_emotions</span>
       </button>
       <UncontrolledTooltip placement="top" target={CSS.escape(id)}>
-        Emoji
+        {t('toolbar.emoji')}
       </UncontrolledTooltip>
       {isOpen && Picker != null && emojiData != null && (
         <div className="mb-2 d-none d-md-block">

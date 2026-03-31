@@ -1,4 +1,5 @@
 import { type JSX, useCallback, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Collapse, UncontrolledTooltip } from 'reactstrap';
 
 import type { GlobalCodeMirrorEditorKey } from '../../../../consts';
@@ -17,6 +18,7 @@ const TextFormatToolsToggler = (props: TogglarProps): JSX.Element => {
   const { isOpen, onClick } = props;
 
   const id = useId();
+  const { t } = useTranslation('commons');
   const activeClass = isOpen ? 'active' : '';
 
   return (
@@ -30,7 +32,7 @@ const TextFormatToolsToggler = (props: TogglarProps): JSX.Element => {
         <span className="material-symbols-outlined fs-3">match_case</span>
       </button>
       <UncontrolledTooltip placement="top" target={CSS.escape(id)}>
-        Text Formatting
+        {t('toolbar.text_formatting')}
       </UncontrolledTooltip>
     </>
   );
@@ -45,6 +47,7 @@ export const TextFormatTools = (props: TextFormatToolsType): JSX.Element => {
   const { editorKey, onTextFormatToolsCollapseChange } = props;
   const [isOpen, setOpen] = useState(false);
   const baseId = useId();
+  const { t } = useTranslation('commons');
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(editorKey);
 
   const toggle = useCallback(() => {
@@ -85,7 +88,7 @@ export const TextFormatTools = (props: TextFormatToolsType): JSX.Element => {
             placement="top"
             target={CSS.escape(`${baseId}-bold`)}
           >
-            Bold
+            {t('toolbar.bold')}
           </UncontrolledTooltip>
           <button
             id={`${baseId}-italic`}
@@ -101,7 +104,7 @@ export const TextFormatTools = (props: TextFormatToolsType): JSX.Element => {
             placement="top"
             target={CSS.escape(`${baseId}-italic`)}
           >
-            Italic
+            {t('toolbar.italic')}
           </UncontrolledTooltip>
           <button
             id={`${baseId}-strikethrough`}
@@ -117,7 +120,7 @@ export const TextFormatTools = (props: TextFormatToolsType): JSX.Element => {
             placement="top"
             target={CSS.escape(`${baseId}-strikethrough`)}
           >
-            Strikethrough
+            {t('toolbar.strikethrough')}
           </UncontrolledTooltip>
           <button
             id={`${baseId}-heading`}
@@ -132,7 +135,7 @@ export const TextFormatTools = (props: TextFormatToolsType): JSX.Element => {
             placement="top"
             target={CSS.escape(`${baseId}-heading`)}
           >
-            Heading
+            {t('toolbar.heading')}
           </UncontrolledTooltip>
           <button
             id={`${baseId}-code`}
@@ -146,7 +149,7 @@ export const TextFormatTools = (props: TextFormatToolsType): JSX.Element => {
             placement="top"
             target={CSS.escape(`${baseId}-code`)}
           >
-            Code
+            {t('toolbar.code')}
           </UncontrolledTooltip>
           <button
             id={`${baseId}-bullet-list`}
@@ -162,7 +165,7 @@ export const TextFormatTools = (props: TextFormatToolsType): JSX.Element => {
             placement="top"
             target={CSS.escape(`${baseId}-bullet-list`)}
           >
-            Bullet List
+            {t('toolbar.bullet_list')}
           </UncontrolledTooltip>
           <button
             id={`${baseId}-numbered-list`}
@@ -178,7 +181,7 @@ export const TextFormatTools = (props: TextFormatToolsType): JSX.Element => {
             placement="top"
             target={CSS.escape(`${baseId}-numbered-list`)}
           >
-            Numbered List
+            {t('toolbar.numbered_list')}
           </UncontrolledTooltip>
           <button
             id={`${baseId}-quote`}
@@ -193,7 +196,7 @@ export const TextFormatTools = (props: TextFormatToolsType): JSX.Element => {
             placement="top"
             target={CSS.escape(`${baseId}-quote`)}
           >
-            Quote
+            {t('toolbar.quote')}
           </UncontrolledTooltip>
           <button
             id={`${baseId}-checklist`}
@@ -207,7 +210,7 @@ export const TextFormatTools = (props: TextFormatToolsType): JSX.Element => {
             placement="top"
             target={CSS.escape(`${baseId}-checklist`)}
           >
-            Checklist
+            {t('toolbar.checklist')}
           </UncontrolledTooltip>
         </div>
       </Collapse>

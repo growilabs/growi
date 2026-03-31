@@ -1,4 +1,5 @@
 import { type JSX, useCallback, useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
 
 import { useHandsontableModalForEditorActions } from '../../../../states/modal/handsontable';
@@ -12,6 +13,7 @@ export const TableButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
 
   const id = useId();
+  const { t } = useTranslation('commons');
 
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(editorKey);
   const { open: openTableModal } = useHandsontableModalForEditorActions();
@@ -31,7 +33,7 @@ export const TableButton = (props: Props): JSX.Element => {
         <span className="material-symbols-outlined fs-5">table</span>
       </button>
       <UncontrolledTooltip placement="top" target={CSS.escape(id)}>
-        Table
+        {t('toolbar.table')}
       </UncontrolledTooltip>
     </>
   );

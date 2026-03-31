@@ -1,4 +1,5 @@
 import { type JSX, useCallback, useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
 
 import { useDrawioModalForEditorActions } from '../../../../states/modal/drawio-for-editor';
@@ -11,6 +12,7 @@ export const DiagramButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
   const { open: openDrawioModal } = useDrawioModalForEditorActions();
   const id = useId();
+  const { t } = useTranslation('commons');
 
   const onClickDiagramButton = useCallback(() => {
     openDrawioModal(editorKey);
@@ -28,7 +30,7 @@ export const DiagramButton = (props: Props): JSX.Element => {
         <span className="growi-custom-icons fs-6">drawer_io</span>
       </button>
       <UncontrolledTooltip placement="top" target={CSS.escape(id)}>
-        Diagram
+        {t('toolbar.diagram')}
       </UncontrolledTooltip>
     </>
   );
