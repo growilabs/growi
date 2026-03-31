@@ -1,8 +1,6 @@
 import React, { type JSX, useCallback, useMemo } from 'react';
 import { useAtomValue } from 'jotai';
-import { Disable } from 'react-disable';
 import { useTranslation } from 'react-i18next';
-import { PopoverBody, UncontrolledPopover } from 'reactstrap';
 
 import { NotAvailable } from '~/client/components/NotAvailable';
 import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest';
@@ -72,8 +70,6 @@ const OpenDefaultAiAssistantButton = (): JSX.Element => {
   const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
   const isCloud = growiCloudUri != null && growiAppIdForGrowiCloud != null;
 
-  const popoverTargetId = 'ai-disabled-btn';
-
   if (!isAiEnabled) {
     if (!isCloud) return <></>;
 
@@ -88,32 +84,27 @@ const OpenDefaultAiAssistantButton = (): JSX.Element => {
       </button>
     );
 
-    return (
+    const popoverContent = (
       <>
-        <div id={popoverTargetId}>
-          <Disable disabled>{button}</Disable>
-        </div>
-        <UncontrolledPopover
-          trigger="hover"
-          placement="top"
-          target={popoverTargetId}
-        >
-          <PopoverBody>
-            <p className="mb-2">
-              {t('default_ai_assistant.open_cloud_settings_to_enable')}
-            </p>
-            <a href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}>
-              <span
-                className="material-symbols-outlined me-1"
-                style={{ fontSize: '1rem', verticalAlign: 'middle' }}
-              >
-                share
-              </span>
-              {t('default_ai_assistant.to_cloud_settings')}
-            </a>
-          </PopoverBody>
-        </UncontrolledPopover>
+        <p className="mb-2">
+          {t('default_ai_assistant.open_cloud_settings_to_enable')}
+        </p>
+        <a href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}>
+          <span
+            className="material-symbols-outlined me-1"
+            style={{ fontSize: '1rem', verticalAlign: 'middle' }}
+          >
+            share
+          </span>
+          {t('default_ai_assistant.to_cloud_settings')}
+        </a>
       </>
+    );
+
+    return (
+      <NotAvailable isDisabled title={popoverContent}>
+        {button}
+      </NotAvailable>
     );
   }
 
