@@ -8,6 +8,7 @@ import { toArrayIfNot } from '~/utils/array-utils';
 import loggerFactory from '~/utils/logger';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
+import ContentDispositionSettings from './ContentDispositionSettings';
 import IndentForm from './IndentForm';
 import LineBreakForm from './LineBreakForm';
 import XssForm from './XssForm';
@@ -70,6 +71,9 @@ const MarkDownSettingContents = React.memo((props: Props): JSX.Element => {
         </CardBody>
       </Card>
       <XssForm />
+
+      {/* Content-Disposition Setting */}
+      <ContentDispositionSettings />
     </div>
   );
 });

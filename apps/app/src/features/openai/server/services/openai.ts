@@ -1,3 +1,4 @@
+/// <reference types="multer" />
 import assert from 'node:assert';
 import fs from 'node:fs';
 import { Readable, Transform, Writable } from 'node:stream';
@@ -12,7 +13,6 @@ import {
 } from '@growi/core';
 import { deepEquals } from '@growi/core/dist/utils';
 import { isGlobPatternPath } from '@growi/core/dist/utils/page-path-utils';
-import escapeStringRegexp from 'escape-string-regexp';
 import createError from 'http-errors';
 import mongoose, { type HydratedDocument, type Types } from 'mongoose';
 import type { OpenAI } from 'openai';
@@ -77,7 +77,7 @@ const convertPathPatternsToRegExp = (
   return pagePathPatterns.map((pagePathPattern) => {
     if (isGlobPatternPath(pagePathPattern)) {
       const trimedPagePathPattern = pagePathPattern.replace('/*', '');
-      const escapedPagePathPattern = escapeStringRegexp(trimedPagePathPattern);
+      const escapedPagePathPattern = RegExp.escape(trimedPagePathPattern);
       // https://regex101.com/r/x5KIZL/1
       return new RegExp(`^${escapedPagePathPattern}($|/)`);
     }
@@ -98,6 +98,7 @@ export interface IOpenaiService {
   ): Promise<ThreadRelationDocument>;
   getThreadsByAiAssistantId(
     aiAssistantId: string,
+    userId?: string,
   ): Promise<ThreadRelationDocument[]>;
   deleteThread(threadRelationId: string): Promise<ThreadRelationDocument>;
   deleteExpiredThreads(limit: number, apiCallInterval: number): Promise<void>; // for CronJob
@@ -290,12 +291,21 @@ class OpenaiService implements IOpenaiService {
 
   async getThreadsByAiAssistantId(
     aiAssistantId: string,
+    userId?: string,
     type: ThreadType = ThreadType.KNOWLEDGE,
   ): Promise<ThreadRelationDocument[]> {
-    const threadRelations = await ThreadRelationModel.find({
+    const query: { aiAssistant: string; type: ThreadType; userId?: string } = {
       aiAssistant: aiAssistantId,
       type,
-    }).sort({ updatedAt: -1 });
+    };
+
+    if (userId != null) {
+      query.userId = userId;
+    }
+
+    const threadRelations = await ThreadRelationModel.find(query).sort({
+      updatedAt: -1,
+    });
     return threadRelations;
   }
 

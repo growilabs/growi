@@ -1,14 +1,14 @@
-.revision-diff-container :global {
-  .link-created-at {
+.revision-diff-container {
+  :global(.link-created-at) {
     text-decoration-line: underline;
   }
 
-  .revision-history-diff {
+  :global(.revision-history-diff) {
     table-layout: fixed;
 
     // revision-history
     // to stay d2h-code-side-line-number in the revision history diff area
-    .d2h-wrapper {
+    :global(.d2h-wrapper) {
       position: relative;
     }
   }

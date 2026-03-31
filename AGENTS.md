@@ -116,8 +116,7 @@ Always execute these checks:
 
 ```bash
 # From workspace root (recommended)
-turbo run lint:typecheck --filter @growi/app
-turbo run lint:biome --filter @growi/app
+turbo run lint --filter @growi/app
 turbo run test --filter @growi/app
 turbo run build --filter @growi/app
 ```
@@ -125,8 +124,7 @@ turbo run build --filter @growi/app
 Or from apps/app directory:
 
 ```bash
-pnpm run lint:typecheck
-pnpm run lint:biome
+pnpm run lint
 pnpm run test
 pnpm run build
 ```

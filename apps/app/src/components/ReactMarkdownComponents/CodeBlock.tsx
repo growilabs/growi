@@ -1,15 +1,23 @@
-import type { JSX, ReactNode } from 'react';
-import { PrismAsyncLight } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import type { ComponentType, JSX, ReactNode } from 'react';
+import { startTransition, useEffect, useState } from 'react';
+
+import { LightweightCodeBlock } from './LightweightCodeBlock';
 
 import styles from './CodeBlock.module.scss';
 
-// remove font-family
-Object.entries<object>(oneDark).forEach(([key, value]) => {
-  if ('fontFamily' in value) {
-    delete oneDark[key].fontFamily;
+type PrismHighlighterProps = { lang: string; children: ReactNode };
+
+// Cache the loaded module so all CodeBlock instances share a single import
+let prismModulePromise: Promise<ComponentType<PrismHighlighterProps>> | null =
+  null;
+function loadPrismHighlighter(): Promise<ComponentType<PrismHighlighterProps>> {
+  if (prismModulePromise == null) {
+    prismModulePromise = import('./PrismHighlighter').then(
+      (mod) => mod.PrismHighlighter,
+    );
   }
-});
+  return prismModulePromise;
+}
 
 type InlineCodeBlockProps = {
   children: ReactNode;
@@ -42,10 +50,13 @@ function extractChildrenToIgnoreReactNode(children: ReactNode): string {
       .join('');
   }
 
-  // object
+  // React element or object with nested children
   if (typeof children === 'object') {
-    const grandChildren =
-      (children as any).children ?? (children as any).props.children;
+    const childObj = children as {
+      children?: ReactNode;
+      props?: { children?: ReactNode };
+    };
+    const grandChildren = childObj.children ?? childObj.props?.children;
     return extractChildrenToIgnoreReactNode(grandChildren);
   }
 
@@ -59,35 +70,42 @@ function CodeBlockSubstance({
   lang: string;
   children: ReactNode;
 }): JSX.Element {
+  const [Highlighter, setHighlighter] =
+    useState<ComponentType<PrismHighlighterProps> | null>(null);
+
+  useEffect(() => {
+    loadPrismHighlighter().then((comp) => {
+      startTransition(() => {
+        setHighlighter(() => comp);
+      });
+    });
+  }, []);
+
   // return alternative element
   //   in order to fix "CodeBlock string is be [object Object] if searched"
   // see: https://github.com/growilabs/growi/pull/7484
-  //
-  // Note: You can also remove this code if the user requests to see the code highlighted in Prism as-is.
-
   const isSimpleString =
     typeof children === 'string' ||
     (Array.isArray(children) &&
       children.length === 1 &&
       typeof children[0] === 'string');
-  if (!isSimpleString) {
+
+  const textContent = extractChildrenToIgnoreReactNode(children);
+
+  // SSR or loading or non-simple children: use lightweight container
+  // - SSR: Highlighter is null → styled container with content
+  // - Client hydration: matches SSR output (Highlighter still null)
+  // - After hydration: useEffect fires → import starts
+  // - Import done: startTransition swaps to Highlighter (single seamless transition)
+  if (Highlighter == null || !isSimpleString) {
     return (
-      <div style={oneDark['pre[class*="language-"]']}>
-        <code
-          className={`language-${lang}`}
-          style={oneDark['code[class*="language-"]']}
-        >
-          {children}
-        </code>
-      </div>
+      <LightweightCodeBlock lang={lang}>
+        {isSimpleString ? textContent : children}
+      </LightweightCodeBlock>
     );
   }
 
-  return (
-    <PrismAsyncLight PreTag="div" style={oneDark} language={lang}>
-      {extractChildrenToIgnoreReactNode(children)}
-    </PrismAsyncLight>
-  );
+  return <Highlighter lang={lang}>{textContent}</Highlighter>;
 }
 
 type CodeBlockProps = {
@@ -108,8 +126,8 @@ export const CodeBlock = (props: CodeBlockProps): JSX.Element => {
   }
 
   const match = /language-(\w+)(:?.+)?/.exec(className || '');
-  const lang = match?.[1] ?? '';
-  const name = match?.[2]?.slice(1) ?? null;
+  const lang = match?.[1] ? match[1] : '';
+  const name = match?.[2] ? match[2].slice(1) : null;
 
   return (
     <>

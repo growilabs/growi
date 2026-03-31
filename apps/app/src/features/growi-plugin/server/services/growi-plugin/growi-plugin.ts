@@ -174,7 +174,8 @@ export class GrowiPluginService implements IGrowiPluginService {
       reposName,
     );
 
-    if (!fs.existsSync(organizationPath)) fs.mkdirSync(organizationPath);
+    if (!fs.existsSync(organizationPath))
+      fs.mkdirSync(organizationPath, { recursive: true });
 
     let plugins: IGrowiPlugin<IGrowiPluginMeta>[];
 

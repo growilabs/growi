@@ -7,7 +7,6 @@ import {
 import { isUserPage } from '@growi/core/dist/utils/page-path-utils';
 import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import { differenceInYears } from 'date-fns/differenceInYears';
-import escapeStringRegexp from 'escape-string-regexp';
 
 import { Comment } from '~/features/comment/server/models/comment';
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
@@ -688,7 +687,7 @@ export const getPageSchema = (crowi) => {
     const regexpList = pathList.map((path) => {
       const pathWithTrailingSlash = pathUtils.addTrailingSlash(path);
       return new RegExp(
-        `^${escapeStringRegexp(pathWithTrailingSlash)}_{1,2}template$`,
+        `^${RegExp.escape(pathWithTrailingSlash)}_{1,2}template$`,
       );
     });
 

@@ -14,6 +14,7 @@ export default defineConfig({
       ...nodeExternals({
         devDeps: true,
         builtinsPrefix: 'ignore',
+        exclude: [/\.css$/],
       }),
       enforce: 'pre',
     },

@@ -2,7 +2,6 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { userHomepagePath } from '@growi/core/dist/utils/page-path-utils';
-import escapeStringRegexp from 'escape-string-regexp';
 import express from 'express';
 import { body, query } from 'express-validator';
 import path from 'pathe';
@@ -125,6 +124,7 @@ module.exports = (crowi) => {
     registered: UserStatus.STATUS_REGISTERED,
     active: UserStatus.STATUS_ACTIVE,
     suspended: UserStatus.STATUS_SUSPENDED,
+    deleted: UserStatus.STATUS_DELETED,
     invited: UserStatus.STATUS_INVITED,
   };
 
@@ -150,7 +150,6 @@ module.exports = (crowi) => {
     query('sortOrder').isIn(['asc', 'desc']),
     // validate sort : what column you will sort
     query('sort').isIn([
-      'id',
       'status',
       'username',
       'name',
@@ -158,7 +157,7 @@ module.exports = (crowi) => {
       'createdAt',
       'lastLoginAt',
     ]),
-    query('page').isInt({ min: 1 }),
+    query('page').isInt({ min: 1 }).toInt(),
     query('forceIncludeAttributes')
       .toArray()
       .custom((value, { req }) => {
@@ -318,7 +317,7 @@ module.exports = (crowi) => {
     validator.statusList,
     apiV3FormValidator,
     async (req, res) => {
-      const page = parseInt(req.query.page) || 1;
+      const page = req.query.page || 1;
 
       // status
       const forceIncludeAttributes = Array.isArray(
@@ -336,11 +335,13 @@ module.exports = (crowi) => {
 
       // Search from input
       const searchText = req.query.searchText || '';
-      const searchWord = new RegExp(escapeStringRegexp(searchText));
+      const searchWord = new RegExp(RegExp.escape(searchText));
       // Sort
       const { sort, sortOrder } = req.query;
       const sortOutput = {
         [sort]: sortOrder === 'desc' ? -1 : 1,
+        // tiebreaker: ensure stable pagination when the primary sort key has duplicate values
+        _id: 1,
       };
 
       //  For more information about the external specification of the User API, see here (https://dev.growi.org/5fd7466a31d89500488248e3)

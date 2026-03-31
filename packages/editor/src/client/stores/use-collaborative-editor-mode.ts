@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { keymap } from '@codemirror/view';
+import { YJS_WEBSOCKET_BASE_PATH } from '@growi/core/dist/consts';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next';
-import { SocketIOProvider } from 'y-socket.io';
+import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 
 import { userColor } from '../../consts';
@@ -30,7 +31,7 @@ export const useCollaborativeEditorMode = (
       useSecondary: reviewMode,
     }) ?? {};
 
-  const [provider, setProvider] = useState<SocketIOProvider>();
+  const [provider, setProvider] = useState<WebsocketProvider>();
 
   // reset editors
   useEffect(() => {
@@ -40,85 +41,70 @@ export const useCollaborativeEditorMode = (
 
   // Setup provider
   useEffect(() => {
-    let _provider: SocketIOProvider | undefined;
-    let providerSyncHandler: (isSync: boolean) => void;
-    let updateAwarenessHandler: (update: {
+    if (!isEnabled || pageId == null || primaryDoc == null) {
+      setProvider(undefined);
+      return;
+    }
+
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const serverUrl = `${wsProtocol}//${window.location.host}${YJS_WEBSOCKET_BASE_PATH}`;
+
+    const _provider = new WebsocketProvider(serverUrl, pageId, primaryDoc, {
+      connect: true,
+      resyncInterval: 3000,
+    });
+
+    const userLocalState: EditingClient = {
+      clientId: primaryDoc.clientID,
+      name: user?.name ?? `Guest User ${Math.floor(Math.random() * 100)}`,
+      userId: user?._id,
+      username: user?.username,
+      imageUrlCached: user?.imageUrlCached,
+      color: userColor.color,
+      colorLight: userColor.light,
+    };
+
+    const { awareness } = _provider;
+    awareness.setLocalStateField('editors', userLocalState);
+
+    const emitEditorList = () => {
+      if (onEditorsUpdated == null) return;
+      const clientList: EditingClient[] = Array.from(
+        awareness.getStates().values(),
+        (value) => value.editors,
+      );
+      if (Array.isArray(clientList)) {
+        onEditorsUpdated(clientList);
+      }
+    };
+
+    const providerSyncHandler = (isSync: boolean) => {
+      if (isSync) emitEditorList();
+    };
+
+    _provider.on('sync', providerSyncHandler);
+
+    const updateAwarenessHandler = (update: {
       added: number[];
       updated: number[];
       removed: number[];
-    }) => void;
-
-    setProvider(() => {
-      if (!isEnabled || pageId == null || primaryDoc == null) {
-        return undefined;
+    }) => {
+      for (const clientId of update.removed) {
+        awareness.getStates().delete(clientId);
       }
+      emitEditorList();
+    };
 
-      _provider = new SocketIOProvider('/', pageId, primaryDoc, {
-        autoConnect: true,
-        resyncInterval: 3000,
-      });
+    awareness.on('update', updateAwarenessHandler);
 
-      const userLocalState: EditingClient = {
-        clientId: primaryDoc.clientID,
-        name: user?.name ?? `Guest User ${Math.floor(Math.random() * 100)}`,
-        userId: user?._id,
-        username: user?.username,
-        imageUrlCached: user?.imageUrlCached,
-        color: userColor.color,
-        colorLight: userColor.light,
-      };
-
-      const { awareness } = _provider;
-      awareness.setLocalStateField('editors', userLocalState);
-
-      providerSyncHandler = (isSync: boolean) => {
-        if (isSync && onEditorsUpdated != null) {
-          const clientList: EditingClient[] = Array.from(
-            awareness.getStates().values(),
-            (value) => value.editors,
-          );
-          if (Array.isArray(clientList)) {
-            onEditorsUpdated(clientList);
-          }
-        }
-      };
-
-      _provider.on('sync', providerSyncHandler);
-
-      // update args type see: SocketIOProvider.Awareness.awarenessUpdate
-      updateAwarenessHandler = (update: {
-        added: number[];
-        updated: number[];
-        removed: number[];
-      }) => {
-        // remove the states of disconnected clients
-        update.removed.forEach((clientId) => {
-          awareness.states.delete(clientId);
-        });
-
-        // update editor list
-        if (onEditorsUpdated != null) {
-          const clientList: EditingClient[] = Array.from(
-            awareness.states.values(),
-            (value) => value.editors,
-          );
-          if (Array.isArray(clientList)) {
-            onEditorsUpdated(clientList);
-          }
-        }
-      };
-
-      awareness.on('update', updateAwarenessHandler);
-
-      return _provider;
-    });
+    setProvider(_provider);
 
     return () => {
-      _provider?.awareness.setLocalState(null);
-      _provider?.awareness.off('update', updateAwarenessHandler);
-      _provider?.off('sync', providerSyncHandler);
-      _provider?.disconnect();
-      _provider?.destroy();
+      _provider.awareness.setLocalState(null);
+      _provider.awareness.off('update', updateAwarenessHandler);
+      _provider.off('sync', providerSyncHandler);
+      _provider.disconnect();
+      _provider.destroy();
     };
   }, [isEnabled, primaryDoc, onEditorsUpdated, pageId, user]);
 

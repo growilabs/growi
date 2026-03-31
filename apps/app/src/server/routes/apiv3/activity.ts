@@ -1,6 +1,8 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
-import { addMinutes, isValid, parseISO } from 'date-fns';
+import { addMinutes } from 'date-fns/addMinutes';
+import { isValid } from 'date-fns/isValid';
+import { parseISO } from 'date-fns/parseISO';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';

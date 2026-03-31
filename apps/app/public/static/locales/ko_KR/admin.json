@@ -456,6 +456,18 @@
       "tag_names": "태그 이름",
       "tag_attributes": "태그 속성",
       "import_recommended": "권장 {{target}} 가져오기"
+    },
+    "content-disposition_header": "Content-Disposition 마임 타입(MIME Type) 설정",
+    "content-disposition_options": {
+      "add_header": "마임 타입 추가",
+      "note": "참고: 마임 타입을 추가하면 다른 리스트에서 자동으로 제거됩니다.",
+      "inline_header": "인라인(Inline) 마임 타입",
+      "attachment_header": "파일 첨부(Attachment) 마임 타입",
+      "inline_button": "인라인",
+      "attachment_button": "파일 첨부",
+      "no_inline": "설정된 인라인 타입이 없습니다.",
+      "no_attachment": "설정된 파일 첨부 타입이 없습니다.",
+      "remove_button": "삭제"
     }
   },
   "customize_settings": {
@@ -769,7 +781,8 @@
       "revoke_read_only_access": "읽기 전용 권한 취소",
       "grant_read_only_access": "읽기 전용 권한 부여",
       "send_invitation_email": "초대 이메일 전송",
-      "resend_invitation_email": "초대 이메일 재전송"
+      "resend_invitation_email": "초대 이메일 재전송",
+      "deleted_user": "(삭제된 사용자)"
     },
     "reset_password": "비밀번호 재설정",
     "reset_password_modal": {
@@ -869,6 +882,14 @@
     "available_action_list_explanation": "현재 설정에서 검색/볼 수 있는 작업 목록",
     "action_list": "작업 목록",
     "disable_mode_explanation": "감사 로그가 현재 비활성화되어 있습니다. 활성화하려면 환경 변수 <code>AUDIT_LOG_ENABLED</code>를 true로 설정하십시오.",
+    "export": "내보내기",
+    "export_audit_log": "감사 로그 내보내기",
+    "export_requested": "내보내기 요청이 접수되었습니다. 내보내기가 완료되면 알림을 받게 됩니다.",
+    "export_failed": "내보내기 시작에 실패했습니다",
+    "duplicate_export_confirm": "동일한 조건의 내보내기가 이미 진행 중입니다. 다시 시작하시겠습니까?",
+    "restart_export": "내보내기 다시 시작",
+    "confirm_export": "내보내기 확인",
+    "disable_mode_explanation_cloud": "현재 감사 로그가 비활성화되어 있습니다. 활성화하려면 GROWI.cloud 관리 화면에서 앱 설정을 변경하십시오.",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }

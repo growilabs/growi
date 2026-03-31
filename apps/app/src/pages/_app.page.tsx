@@ -24,6 +24,7 @@ import { isCommonInitialProps } from './common-props';
 import { getLocaleAtServerSide } from './utils/locale';
 import { useNextjsRoutingPageRegister } from './utils/nextjs-routing-utils';
 import { registerTransformerForObjectId } from './utils/objectid-transformer';
+import { deserializeSuperJSONProps } from './utils/superjson-ssr';
 
 import '~/styles/prebuilt/vendor.css';
 import '~/styles/style-app.scss';
@@ -59,10 +60,15 @@ type GrowiAppProps = AppProps<CombinedCommonProps> & {
 
 const GrowiAppSubstance = ({
   Component,
-  pageProps,
+  pageProps: rawPageProps,
   userLocale,
 }: GrowiAppProps): JSX.Element => {
   const router = useRouter();
+
+  // Deserialize superjson-serialized props from getServerSideProps
+  const pageProps = deserializeSuperJSONProps(
+    rawPageProps,
+  ) as CombinedCommonProps;
 
   // Hydrate global atoms with server-side data
   useHydrateGlobalInitialAtoms(

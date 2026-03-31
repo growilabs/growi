@@ -15,12 +15,14 @@
       "!**/.devcontainer",
       "!**/.stylelintrc.json",
       "!**/package.json",
+      "!**/*.vendor-styles.prebuilt.*",
       "!.turbo",
       "!.vscode",
       "!.claude",
       "!tsconfig.base.json",
       "!apps/app/src/styles/prebuilt",
       "!apps/app/src/styles/tailwind.css",
+      "!apps/app/next-env.d.ts",
       "!apps/app/tmp",
       "!apps/pdf-converter/specs",
       "!apps/slackbot-proxy/src/public/bootstrap",
@@ -47,9 +49,16 @@
               ":BLANK_LINE:",
               "~/**",
               ":BLANK_LINE:",
-              [":PATH:", "!**/*.css", "!**/*.scss"],
+              [
+                ":PATH:",
+                "!../**/*.css",
+                "!./*.css",
+                "!../**/*.scss",
+                "!./*.scss"
+              ],
               ":BLANK_LINE:",
-              ["**/*.css", "**/*.scss"]
+              ["../**/*.scss", "../**/*.css"],
+              ["./*.scss", "./*.css"]
             ]
           }
         }

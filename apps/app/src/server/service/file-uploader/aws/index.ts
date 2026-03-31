@@ -13,6 +13,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { NonBlankString } from '@growi/core/dist/interfaces';
 import { toNonBlankStringOrUndefined } from '@growi/core/dist/interfaces';
@@ -252,30 +253,40 @@ class AwsFileUploader extends AbstractFileUploader {
     const filePath = getFilePathOnStorage(attachment);
     const contentHeaders = createContentHeaders(attachment);
 
-    try {
-      const uploadTimeout = configManager.getConfig('app:fileUploadTimeout');
+    const uploadTimeout = configManager.getConfig('app:fileUploadTimeout');
 
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: getS3Bucket(),
-          Key: filePath,
-          Body: readable,
-          ACL: getS3PutObjectCannedAcl(),
-          // put type and the file name for reference information when uploading
-          ContentType: getContentHeaderValue(contentHeaders, 'Content-Type'),
-          ContentDisposition: getContentHeaderValue(
-            contentHeaders,
-            'Content-Disposition',
-          ),
-        }),
-        { abortSignal: AbortSignal.timeout(uploadTimeout) },
-      );
+    // Use @aws-sdk/lib-storage Upload to handle streaming uploads:
+    // - Resolves archiver's readable-stream (npm) failing AWS SDK's instanceof Readable check
+    // - Avoids Transfer-Encoding: chunked which S3 rejects with 501 (PutObjectCommand issue)
+    // - Under 5MB: falls back to PutObjectCommand internally
+    // - Over 5MB: uses multipart upload (requires s3:AbortMultipartUpload permission)
+    const upload = new Upload({
+      client: s3,
+      params: {
+        Bucket: getS3Bucket(),
+        Key: filePath,
+        Body: readable,
+        ACL: getS3PutObjectCannedAcl(),
+        ContentType: getContentHeaderValue(contentHeaders, 'Content-Type'),
+        ContentDisposition: getContentHeaderValue(
+          contentHeaders,
+          'Content-Disposition',
+        ),
+      },
+    });
+
+    const timeoutId = setTimeout(() => {
+      logger.warn(`Upload timeout: fileName=${attachment.fileName}`);
+      upload.abort();
+    }, uploadTimeout);
+
+    try {
+      await upload.done();
 
       logger.debug(
         `File upload completed successfully: fileName=${attachment.fileName}`,
       );
     } catch (error) {
-      // Handle timeout error specifically
       if (error.name === 'AbortError') {
         logger.warn(`Upload timeout: fileName=${attachment.fileName}`, error);
       } else {
@@ -284,9 +295,9 @@ class AwsFileUploader extends AbstractFileUploader {
           error,
         );
       }
-      // Re-throw the error to be handled by the caller.
-      // The pipeline automatically handles stream cleanup on error.
       throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -366,7 +377,7 @@ class AwsFileUploader extends AbstractFileUploader {
     // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#getSignedUrl-property
     const isDownload = opts?.download ?? false;
     const contentHeaders = createContentHeaders(attachment, {
-      inline: !isDownload,
+      forceAttachment: isDownload,
     });
     const params: GetObjectCommandInput = {
       Bucket: getS3Bucket(),
