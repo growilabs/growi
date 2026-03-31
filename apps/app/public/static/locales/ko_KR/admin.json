@@ -413,6 +413,7 @@
     "azure_storage_account_name": "스토리지 계정 이름",
     "azure_storage_container_name": "컨테이너 이름",
     "azure_note_for_the_only_env_option": "Azure 설정은 환경 변수 값에 의해 제한됩니다.<br>이 설정을 변경하려면 환경 변수 <code>{{env}}</code>의 값을 false로 변경하거나 삭제하십시오.",
+    "azure_note_for_the_only_env_option_cloud": "Azure 설정은 GROWI.cloud 관리 화면에서 변경할 수 있습니다.",
     "file_upload": "파일 업로드 설정용입니다. 파일 업로드 설정을 완료하면 파일 업로드 기능, 프로필 사진 기능 등이 활성화됩니다.",
     "test_connection": "메일 연결 테스트",
     "change_setting": "주의: 이 설정을 완료하지 않으면 지금까지 업로드한 파일에 접근할 수 없습니다.",
@@ -425,7 +426,8 @@
     "enable": "활성화",
     "disable": "비활성화",
     "use_env_var_if_empty": "데이터베이스 값이 비어 있으면 환경 변수 <code>{{variable}}</code>의 값이 사용됩니다.",
-    "note_for_the_only_env_option": "GCS 설정은 환경 변수 값에 의해 제한됩니다.<br>이 설정을 변경하려면 환경 변수 <code>{{env}}</code>의 값을 false로 변경하거나 삭제하십시오."
+    "note_for_the_only_env_option": "GCS 설정은 환경 변수 값에 의해 제한됩니다.<br>이 설정을 변경하려면 환경 변수 <code>{{env}}</code>의 값을 false로 변경하거나 삭제하십시오.",
+    "note_for_the_only_env_option_cloud": "GCS 설정은 GROWI.cloud 관리 화면에서 변경할 수 있습니다."
   },
   "markdown_settings": {
     "markdown_settings": "마크다운 설정",
@@ -915,7 +917,9 @@
     "confirm": "플러그인 삭제?"
   },
   "cloud_setting_management": {
-    "to_cloud_settings": "GROWI.cloud 설정 열기"
+    "to_cloud_settings": "GROWI.cloud 설정 열기",
+    "change_from_cloud": "GROWI.cloud 관리 화면에서 설정을 변경할 수 있습니다.",
+    "storage_change_from_cloud": "현재 파일 업로드 방법은 {{fileUploadType}} 입니다. 설정은 GROWI.cloud 관리 화면에서 변경할 수 있습니다."
   },
   "audit_log_action_category": {
     "Page": "페이지",
