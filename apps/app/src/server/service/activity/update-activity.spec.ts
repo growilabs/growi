@@ -208,9 +208,16 @@ describe('shouldGenerateUpdate()', () => {
       {
         user: currentUserId,
         action: SupportedAction.ACTION_PAGE_CREATE,
-        createdAt: new Date(date.getTime() - ONE_HOUR),
+        createdAt: new Date(date.getTime() - TWO_HOURS),
         target: targetPageId,
         _id: createActivityId,
+      },
+      {
+        user: currentUserId,
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+        createdAt: new Date(date.getTime() - ONE_HOUR),
+        target: targetPageId,
+        _id: olderActivityId,
       },
       {
         user: currentUserId,
@@ -259,9 +266,16 @@ describe('shouldGenerateUpdate()', () => {
       {
         user: currentUserId,
         action: SupportedAction.ACTION_PAGE_CREATE,
-        createdAt: new Date(date.getTime() - ONE_MINUTE),
+        createdAt: new Date(date.getTime() - TWO_HOURS),
         target: targetPageId,
         _id: createActivityId,
+      },
+      {
+        user: currentUserId,
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+        createdAt: new Date(date.getTime() - ONE_MINUTE),
+        target: targetPageId,
+        _id: olderActivityId,
       },
       {
         user: currentUserId,
@@ -310,9 +324,16 @@ describe('shouldGenerateUpdate()', () => {
       {
         user: currentUserId,
         action: SupportedAction.ACTION_PAGE_CREATE,
-        createdAt: new Date(date.getTime() - ONE_HOUR),
+        createdAt: new Date(date.getTime() - TWO_HOURS),
         target: targetPageId,
         _id: createActivityId,
+      },
+      {
+        user: currentUserId,
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+        createdAt: new Date(date.getTime() - ONE_HOUR),
+        target: targetPageId,
+        _id: olderActivityId,
       },
       {
         user: currentUserId,
