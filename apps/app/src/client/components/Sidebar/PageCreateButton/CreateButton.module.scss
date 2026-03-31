@@ -41,6 +41,7 @@
 .btn-create:hover {
   :global(svg) {
     fill: var(--bs-btn-hover-bg);
+    transform: scale(1.1);
   }
 }
 
