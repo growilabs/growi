@@ -14,6 +14,18 @@ interface LayoutGuideItem {
 }
 type GuideRowProps = Omit<LayoutGuideItem, 'id'>;
 
+const BOOTSTRAP_COLORS = [
+  'primary',
+  'danger',
+  'secondary',
+  'success',
+  'warning',
+  'info',
+  'light',
+  'dark',
+] as const;
+type BootstrapColor = (typeof BOOTSTRAP_COLORS)[number];
+
 const GuideRow = ({
   title,
   code,
@@ -31,7 +43,7 @@ const GuideRow = ({
 
   return (
     <section className={title !== '' ? 'mt-4 mb-2' : 'mb-2'}>
-      {title !== '' && <h3 className="fw-bold mb-2 fs-4 text-body">{title}</h3>}
+      {title !== '' && <h3 className="fw-bold mb-2 fs-5 text-body">{title}</h3>}
       <div className="d-flex flex-row flex-wrap align-items-center gap-4 py-1">
         <button
           type="button"
@@ -89,25 +101,34 @@ const GuideRow = ({
 export const DecorationTab: React.FC = () => {
   const { t } = useTranslation();
   const i18nKey = 'editor_guide.decoration';
-  const [currentStyle, setCurrentStyle] = useState<'primary' | 'danger'>(
-    'primary',
-  );
+  const [currentStyle, setCurrentStyle] = useState<BootstrapColor>('primary');
   const [isOpen, setIsOpen] = useState(false);
 
+  const colorConfigs: Record<BootstrapColor, { icon: string; prefix: string }> =
+    {
+      primary: { icon: 'chat', prefix: '[!IMPORTANT]' },
+      danger: { icon: 'error', prefix: '[!CAUTION]' },
+      secondary: { icon: 'sell', prefix: '[!NOTE]' },
+      success: { icon: 'check_circle', prefix: '[!TIP]' },
+      warning: { icon: 'warning', prefix: '[!WARNING]' },
+      info: { icon: 'info', prefix: '[!NOTE]' },
+      light: { icon: 'light_mode', prefix: '[!NOTE]' },
+      dark: { icon: 'dark_mode', prefix: '[!IMPORTANT]' },
+    };
+
   const styleConfig = useMemo(() => {
-    const isPrimary = currentStyle === 'primary';
+    const config = colorConfigs[currentStyle];
     return {
       colorName: currentStyle,
-      displayName: isPrimary ? 'Primary' : 'Danger',
-      iconName: isPrimary ? 'chat' : 'error',
-      alertPrefix: isPrimary ? '[!IMPORTANT]' : '[!CAUTION]',
-      alertLabel: isPrimary
-        ? t(`${i18nKey}.important_label`)
-        : t(`${i18nKey}.caution_label`),
-      alertText: isPrimary
-        ? t(`${i18nKey}.important_text`)
-        : t(`${i18nKey}.caution_text`),
-      icon: isPrimary ? 'bi-chat-left-text' : 'bi-exclamation-circle',
+      displayName: currentStyle.charAt(0).toUpperCase() + currentStyle.slice(1),
+      iconName: config.icon,
+      alertPrefix: config.prefix,
+      alertLabel: t(`${i18nKey}.${currentStyle}_label`, {
+        defaultValue: currentStyle.toUpperCase(),
+      }),
+      alertText: t(`${i18nKey}.${currentStyle}_text`, {
+        defaultValue: t(`${i18nKey}.placeholder`),
+      }),
     };
   }, [currentStyle, t]);
 
@@ -124,7 +145,12 @@ export const DecorationTab: React.FC = () => {
           >
             <div className="d-flex flex-column justify-content-center">
               <div
-                className={`d-flex align-items-center fw-bold text-${styleConfig.colorName} mb-1`}
+                className={`d-flex align-items-center fw-bold mb-1 ${
+                  styleConfig.colorName === 'light' ||
+                  styleConfig.colorName === 'dark'
+                    ? 'text-body'
+                    : `text-${styleConfig.colorName}`
+                }`}
               >
                 <span className="me-2 d-flex align-items-center">
                   <span className="material-symbols-outlined align-middle fs-6">
@@ -196,7 +222,7 @@ export const DecorationTab: React.FC = () => {
         <h3 className="fw-bold mb-2 fs-5">{t(`${i18nKey}.style`)}</h3>
         <div className={`dropdown ${isOpen ? 'show' : ''}`}>
           <button
-            className={`btn btn-light border dropdown-toggle d-flex align-items-center gap-2 text-${styleConfig.colorName}`}
+            className={`btn btn-light border dropdown-toggle d-flex align-items-center gap-2 text-${styleConfig.colorName === 'light' ? 'dark' : styleConfig.colorName}`}
             type="button"
             onClick={() => setIsOpen(!isOpen)}
             aria-expanded={isOpen}
@@ -213,37 +239,35 @@ export const DecorationTab: React.FC = () => {
               position: 'absolute',
               display: isOpen ? 'block' : 'none',
               marginTop: '0.125rem',
+              maxHeight: '300px',
+              overflowY: 'auto',
             }}
           >
-            <li>
-              <button
-                className={`dropdown-item d-flex align-items-center gap-2 ${currentStyle === 'primary' ? 'active' : ''}`}
-                type="button"
-                onClick={() => {
-                  setCurrentStyle('primary');
-                  setIsOpen(false);
-                }}
-                style={
-                  currentStyle === 'primary'
-                    ? { backgroundColor: 'var(--bs-primary)', color: 'white' }
-                    : {}
-                }
-              >
-                <span className="material-symbols-outlined">chat</span> Primary
-              </button>
-            </li>
-            <li>
-              <button
-                className={`dropdown-item d-flex align-items-center gap-2 ${currentStyle === 'danger' ? 'active' : ''}`}
-                type="button"
-                onClick={() => {
-                  setCurrentStyle('danger');
-                  setIsOpen(false);
-                }}
-              >
-                <span className="material-symbols-outlined">Error</span> Danger
-              </button>
-            </li>
+            {BOOTSTRAP_COLORS.map((color) => (
+              <li key={color}>
+                <button
+                  className={`dropdown-item d-flex align-items-center gap-2 ${currentStyle === color ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => {
+                    setCurrentStyle(color);
+                    setIsOpen(false);
+                  }}
+                  style={
+                    currentStyle === color
+                      ? {
+                          backgroundColor: `var(--bs-${color})`,
+                          color: color === 'light' ? 'black' : 'white',
+                        }
+                      : {}
+                  }
+                >
+                  <span className="material-symbols-outlined">
+                    {colorConfigs[color].icon}
+                  </span>
+                  {color.charAt(0).toUpperCase() + color.slice(1)}
+                </button>
+              </li>
+            ))}
           </ul>
         </div>
       </section>
