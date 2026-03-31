@@ -611,7 +611,7 @@ const AiAssistantSidebarSubstance: React.FC<
                 </div>
               ) : (
                 <>
-                  {!isEditorAssistant && !isAiEnabled && isCloud && (
+                  {!isAiEnabled && isCloud && (
                     <div className="text-center mb-3">
                       <a
                         href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
