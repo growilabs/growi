@@ -31,7 +31,7 @@ const GuideRow = ({
   }, [code, t]);
   return (
     <section className={title !== '' ? 'mt-4 mb-2' : 'mb-2'}>
-      {title !== '' && <h3 className="fw-bold mb-2 fs-4 text-body">{title}</h3>}
+      {title !== '' && <h3 className="fw-bold mb-2 fs-5 text-body">{title}</h3>}
       <div className="d-flex flex-row flex-wrap align-items-center gap-4 py-1">
         <button
           type="button"
@@ -57,7 +57,7 @@ const GuideRow = ({
               className="position-absolute badge bg-secondary opacity-50"
               style={{ fontSize: '0.4rem', top: '4px', right: '4px' }}
             >
-              Click
+              Copy
             </small>
           </div>
         </button>

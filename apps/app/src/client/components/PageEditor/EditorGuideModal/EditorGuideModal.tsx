@@ -106,10 +106,18 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
         className={`d-flex align-items-center justify-content-center z-3 pe-none fade ${isShown ? 'show' : ''}`}
         style={style}
       >
-        <div className="px-3 pe-auto">
-          <div className="card shadow-lg">
-            <div className="card-header d-flex justify-content-between align-items-center">
-              <h5 className="mb-0">Editor Guide</h5>
+        <div className="px-3 pe-auto w-100" style={{ maxWidth: '800px' }}>
+          <div
+            className="card shadow-lg border-0"
+            style={{
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column',
+              width: '100%',
+            }}
+          >
+            <div className="card-header d-flex justify-content-between align-items-center bg-white border-bottom-0 pt-3">
+              <h5 className="mb-0">{t('editor_guide.title')}</h5>
               <button
                 type="button"
                 className="btn-close"
@@ -117,7 +125,32 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
                 aria-label="Close"
               />
             </div>
-            <div className="mt-2 px-3">
+            <div className="mt-2 px-3 editor-guide-tabs-container">
+              <style>{`
+                .editor-guide-tabs-container .nav-tabs,
+                .editor-guide-tabs-container ul {
+                  display: flex !important;
+                  width: 100% !important;
+                  justify-content: space-between !important; /* 子要素の間の隙間を均等にする */
+                  flex-wrap: nowrap !important;
+                  padding: 0 !important;
+                  margin: 0 !important;
+                  list-style: none !important;
+                }
+                .editor-guide-tabs-container .nav-item,
+                .editor-guide-tabs-container li {
+                  flex: 1 1 0 !important; /* すべてのタブが同じ幅を奪い合う */
+                  text-align: center !important;
+                   min-width: 100px;
+                }
+                .editor-guide-tabs-container .nav-link,
+                .editor-guide-tabs-container button,
+                .editor-guide-tabs-container a {
+                  display: block !important;
+                  width: 100% !important;
+                  white-space: nowrap;
+                }
+              `}</style>
               <CustomNavTab
                 activeTab={activeTab}
                 navTabMapping={navTabMapping}
@@ -129,7 +162,10 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
                 hideBorderBottom
               />
             </div>
-            <div className="card-body overflow-auto">
+            <div
+              className="card-body overflow-auto pt-0"
+              style={{ flex: '1 1 auto' }}
+            >
               <CustomTabContent
                 activeTab={activeTab}
                 navTabMapping={navTabMapping}

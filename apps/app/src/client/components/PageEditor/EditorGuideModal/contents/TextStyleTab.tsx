@@ -50,7 +50,7 @@ const GuideRow = ({
               className="position-absolute badge bg-secondary opacity-50"
               style={{ fontSize: '0.4rem', top: '2px', right: '4px' }}
             >
-              Click
+              Copy
             </small>
           </div>
         </button>
