@@ -413,6 +413,7 @@
     "azure_storage_account_name": "Storage Account Name",
     "azure_storage_container_name": "Container Name",
     "azure_note_for_the_only_env_option": "The Azure Settings is limited by the value of environment variable.<br>To change this setting, please change to false or delete the value of the environment variable <code>{{env}}</code> .",
+    "azure_note_for_the_only_env_option_cloud": "Azure settings can be changed from the GROWI.cloud admin panel.",
     "file_upload": "This is for uploading file settings. If you complete file upload settings, file upload function, profile picture function etc will be enabled.",
     "test_connection": "Test connection to mail",
     "change_setting": "Caution:if you change this setting not completed, you will not be able to access files you have uploaded so far.",
@@ -425,7 +426,8 @@
     "enable": "Enable",
     "disable": "Disable",
     "use_env_var_if_empty": "If the value in the database is empty, the value of the environment variable <code>{{variable}}</code> is used.",
-    "note_for_the_only_env_option": "The GCS Settings is limited by the value of environment variable.<br>To change this setting, please change to false or delete the value of the environment variable <code>{{env}}</code> ."
+    "note_for_the_only_env_option": "The GCS Settings is limited by the value of environment variable.<br>To change this setting, please change to false or delete the value of the environment variable <code>{{env}}</code> .",
+    "note_for_the_only_env_option_cloud": "GCS settings can be changed from the GROWI.cloud admin panel."
   },
   "markdown_settings": {
     "markdown_settings": "Markdown Settings",
@@ -915,7 +917,9 @@
     "confirm": "Delete plugin?"
   },
   "cloud_setting_management": {
-    "to_cloud_settings": "Open GROWI.cloud Settings"
+    "to_cloud_settings": "Open GROWI.cloud Settings",
+    "change_from_cloud": "You can change the settings from the GROWI.cloud admin panel.",
+    "storage_change_from_cloud": "The current file upload method is {{fileUploadType}}. Settings can be changed from the GROWI.cloud admin panel."
   },
   "audit_log_action_category": {
     "Page": "Page",
