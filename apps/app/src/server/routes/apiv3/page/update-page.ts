@@ -53,9 +53,6 @@ interface UpdatePageRequest
   user: IUserHasId;
 }
 
-const MINIMUM_REVISION_FOR_ACTIVITY = 2;
-const SUPPRESION_UPDATE_WINDOW_MS = 5 * 60 * 1000; // 5 min
-
 export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
   const Page = mongoose.model<IPage, PageModel>('Page');
   const Revision = mongoose.model<IRevisionHasId>('Revision');
