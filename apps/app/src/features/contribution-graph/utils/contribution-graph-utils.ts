@@ -77,7 +77,7 @@ export function assembleEmptyGraph(): IContributionDay[] {
     const dateCopy = new Date(runner);
     dateCopy.setUTCDate(runner.getUTCDate() - i);
 
-    const dateKey = dateCopy.toISOString().split('T')[0];
+    const dateKey = formatDateKey(dateCopy);
 
     days.unshift({
       date: dateKey,
