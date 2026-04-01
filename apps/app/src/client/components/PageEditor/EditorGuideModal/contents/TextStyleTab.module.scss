@@ -1,0 +1,33 @@
+.textStyleTab {
+  max-height: 80vh;
+}
+
+.codeBlockWrapper {
+  width: fit-content;
+  background-color: #2D2E32;
+}
+
+.codeContent {
+  font-size: 14px;
+  color: #ABB2BF;
+}
+
+.copyBadge {
+  top: 2px;
+  right: 4px;
+  font-size: 0.4rem;
+}
+
+.wikiPreview {
+  font-size: 14px;
+}
+
+.inlineCodeLabel {
+  width: fit-content;
+  color: #D63384;
+  border: 1px solid #D63384;
+}
+
+.externalLink {
+  color: #777570 !important;
+}

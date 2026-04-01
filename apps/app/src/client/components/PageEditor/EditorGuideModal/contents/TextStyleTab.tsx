@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 
 import { toastSuccess } from '~/client/util/toastr';
 
+import styles from './TextStyleTab.module.scss';
+
 const GuideRow = ({
   title,
   code,
@@ -29,39 +31,22 @@ const GuideRow = ({
           className="flex-shrink-0 border-0 p-0 bg-transparent text-start"
         >
           <div
-            className="bg-dark text-light p-2 ps-2 pe-4 rounded position-relative"
-            style={{
-              backgroundColor: '#2D2E32',
-              width: 'fit-content',
-            }}
+            className={`p-2 ps-2 pe-4 rounded position-relative ${styles.codeBlockWrapper}`}
           >
             <pre
-              className="m-0 small font-monospace"
-              style={{
-                whiteSpace: 'pre',
-                color: '#ABB2BF',
-                fontWeight: 400,
-                fontSize: '14px',
-              }}
+              className={`m-0 small font-monospace fw-normal ${styles.codeContent}`}
             >
               {code}
             </pre>
             <small
-              className="position-absolute badge bg-secondary opacity-50"
-              style={{ fontSize: '0.4rem', top: '2px', right: '4px' }}
+              className={`position-absolute badge bg-secondary opacity-50 ${styles.copyBadge}`}
             >
               Copy
             </small>
           </div>
         </button>
-        <div className="flex-grow-1" style={{ whiteSpace: 'nowrap' }}>
-          <div
-            className="wiki-content"
-            style={{
-              fontWeight: 400,
-              fontSize: '14px',
-            }}
-          >
+        <div className="flex-grow-1 text-nowrap">
+          <div className={`wiki-content fw-normal ${styles.wikiPreview}`}>
             {preview}
           </div>
         </div>
@@ -120,24 +105,12 @@ export const TextStyleTab: React.FC = () => {
       preview: (
         <div className="d-flex flex-column gap-2">
           <code
-            className="rounded px-1"
-            style={{
-              width: 'fit-content',
-              color: '#D63384',
-              border: '1px solid #D63384',
-              backgroundColor: 'transparent',
-            }}
+            className={`rounded px-1 d-inline-block bg-transparent ${styles.inlineCodeLabel}`}
           >
             {t(`${i18nKey}.inline_code`)}
           </code>
           <code
-            className="rounded px-1"
-            style={{
-              width: 'fit-content',
-              color: '#D63384',
-              border: '1px solid #D63384',
-              backgroundColor: 'transparent',
-            }}
+            className={`rounded px-1 d-inline-block bg-transparent ${styles.inlineCodeLabel}`}
           >
             {t(`${i18nKey}.inline_code`)}
           </code>
@@ -222,7 +195,7 @@ export const TextStyleTab: React.FC = () => {
     },
   ];
   return (
-    <div className="px-4 py-2 overflow-y-auto" style={{ maxHeight: '80vh' }}>
+    <div className={`px-4 py-2 overflow-y-auto ${styles.textStyleTab}`}>
       {TEXT_STYLE_GUIDES.map((item) => (
         <GuideRow
           key={item.id}
