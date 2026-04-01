@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Remark plugin to add ref/refimg/refs/refsimg tags",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "keywords": [
     "growi",
     "growi-plugin"

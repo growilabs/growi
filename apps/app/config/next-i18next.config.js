@@ -1,5 +1,4 @@
 const isDev = process.env.NODE_ENV === 'development';
-
 // biome-ignore lint/style/useNodejsImportProtocol: ignore
 const path = require('path');
 
@@ -7,8 +6,6 @@ const { AllLang } = require('@growi/core');
 const { isServer } = require('@growi/core/dist/utils');
 
 const { defaultLang } = require('./i18next.config');
-
-const HMRPlugin = isDev ? require('i18next-hmr/plugin').HMRPlugin : undefined;
 
 /** @type {import('next-i18next').UserConfig} */
 module.exports = {
@@ -24,11 +21,8 @@ module.exports = {
 
   use: isDev
     ? isServer()
-      ? [new HMRPlugin({ webpack: { server: true } })]
-      : [
-          require('i18next-chained-backend').default,
-          new HMRPlugin({ webpack: { client: true } }),
-        ]
+      ? []
+      : [require('i18next-chained-backend').default]
     : [],
   backend: {
     backends: isServer()

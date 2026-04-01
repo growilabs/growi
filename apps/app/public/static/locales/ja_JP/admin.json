@@ -421,6 +421,7 @@
     "azure_storage_account_name": "ストレージアカウント名",
     "azure_storage_container_name": "コンテナ名",
     "azure_note_for_the_only_env_option": "現在Azure設定は環境変数の値によって制限されています<br>この設定を変更する場合は環境変数 <code>{{env}}</code> の値をfalseに変更もしくは削除してください",
+    "azure_note_for_the_only_env_option_cloud": "Azure の設定は GROWI.cloud の管理画面から変更できます",
     "fixed_by_env_var": "環境変数 <code>{{envKey}}={{envVar}}</code> により固定されています。",
     "file_upload": "ファイルをアップロードするための設定を行います。ファイルアップロードの設定を完了させると、ファイルアップロード機能、プロフィール写真機能などが有効になります。",
     "test_connection": "接続テスト",
@@ -434,7 +435,8 @@
     "enable": "有効",
     "disable": "無効",
     "use_env_var_if_empty": "データベース側の値が空の場合、環境変数 <code>{{variable}}</code> の値を利用します",
-    "note_for_the_only_env_option": "現在GCS設定は環境変数の値によって制限されています<br>この設定を変更する場合は環境変数 <code>{{env}}</code> の値をfalseに変更もしくは削除してください"
+    "note_for_the_only_env_option": "現在GCS設定は環境変数の値によって制限されています<br>この設定を変更する場合は環境変数 <code>{{env}}</code> の値をfalseに変更もしくは削除してください",
+    "note_for_the_only_env_option_cloud": "GCS の設定は GROWI.cloud の管理画面から変更できます"
   },
   "markdown_settings": {
     "markdown_settings": "マークダウン設定",
@@ -790,7 +792,8 @@
       "revoke_read_only_access": "閲覧のみアクセス権を外す",
       "grant_read_only_access": "閲覧のみアクセス権を付与する",
       "send_invitation_email": "招待メールの送信",
-      "resend_invitation_email": "招待メールの再送信"
+      "resend_invitation_email": "招待メールの再送信",
+      "deleted_user": "(削除されたユーザー)"
     },
     "reset_password": "パスワードのリセット",
     "reset_password_modal": {
@@ -890,6 +893,14 @@
     "available_action_list_explanation": "現在の設定で検索 / 表示 可能なアクション一覧です",
     "action_list": "アクション一覧",
     "disable_mode_explanation": "現在、監査ログは無効になっています。有効にする場合は環境変数 <code>AUDIT_LOG_ENABLED</code> を true に設定してください。",
+    "export": "エクスポート",
+    "export_audit_log": "監査ログのエクスポート",
+    "export_requested": "エクスポートリクエストを受け付けました。完了後に通知されます。",
+    "export_failed": "エクスポートの開始に失敗しました",
+    "duplicate_export_confirm": "同じ条件のエクスポートが進行中です。やり直しますか？",
+    "restart_export": "やり直す",
+    "confirm_export": "エクスポートの確認",
+    "disable_mode_explanation_cloud": "現在、監査ログは無効になっています。有効にするには、GROWI.cloud の管理画面からアプリの設定を変更してください。",
     "docs_url": {
       "log_type": "https://docs.growi.org/ja/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
@@ -915,7 +926,9 @@
     "confirm": "プラグインを削除しますか？"
   },
   "cloud_setting_management": {
-    "to_cloud_settings": "GROWI.cloud の管理画面へ"
+    "to_cloud_settings": "GROWI.cloud の管理画面へ",
+    "change_from_cloud": "GROWI.cloud の管理画面から設定を変更できます。",
+    "storage_change_from_cloud": "現在のファイルアップロード方法は {{fileUploadType}} です。変更は GROWI.cloud の管理画面から行えます。"
   },
   "audit_log_action_category": {
     "Page": "ページ",

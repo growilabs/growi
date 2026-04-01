@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import type { IClearable } from '~/client/interfaces/clearable';
 import { toastError } from '~/client/util/toastr';
 import type { SupportedActionType } from '~/interfaces/activity';
+import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
 import {
   auditLogAvailableActionsAtom,
   auditLogEnabledAtom,
@@ -18,6 +19,7 @@ import { useSWRxActivity } from '~/stores/activity';
 import PaginationWrapper from '../PaginationWrapper';
 import { ActivityTable } from './AuditLog/ActivityTable';
 import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode';
+import { AuditLogExportModal } from './AuditLog/AuditLogExportModal';
 import { AuditLogSettings } from './AuditLog/AuditLogSettings';
 import { DateRangePicker } from './AuditLog/DateRangePicker';
 import { SearchUsernameTypeahead } from './AuditLog/SearchUsernameTypeahead';
@@ -34,6 +36,11 @@ const PAGING_LIMIT = 10;
 
 export const AuditLogManagement: FC = () => {
   const { t } = useTranslation('admin');
+
+  const growiCloudUri = useGrowiCloudUri();
+  const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
+
+  const isCloud = growiCloudUri != null && growiAppIdForGrowiCloud != null;
 
   const typeaheadRef = useRef<IClearable>(null);
 
@@ -185,6 +192,8 @@ export const AuditLogManagement: FC = () => {
     setActivePageNumber(jumpPageNumber);
   }, [jumpPageNumber]);
 
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+
   const startIndex = activityList.length === 0 ? 0 : offset + 1;
   const endIndex = activityList.length === 0 ? 0 : offset + activityList.length;
 
@@ -211,6 +220,16 @@ export const AuditLogManagement: FC = () => {
           </>
         )}
       </button>
+
+      {isCloud && (
+        <a
+          href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
+          className="btn btn-outline-secondary mb-4 ms-2"
+        >
+          <span className="material-symbols-outlined me-1">share</span>
+          {t('cloud_setting_management.to_cloud_settings')}
+        </a>
+      )}
 
       <h2 className="admin-setting-header mb-3">
         <span>
@@ -267,6 +286,17 @@ export const AuditLogManagement: FC = () => {
                 {t('admin:audit_log_management.clear')}
               </button>
             </div>
+
+            <div className="col-12">
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={() => setIsExportModalOpen(true)}
+              >
+                <span className="material-symbols-outlined me-1">download</span>
+                {t('admin:audit_log_management.export')}
+              </button>
+            </div>
           </div>
 
           <p className="ms-2">
@@ -315,6 +345,15 @@ export const AuditLogManagement: FC = () => {
               </button>
             </div>
           </div>
+
+          <AuditLogExportModal
+            isOpen={isExportModalOpen}
+            onClose={() => setIsExportModalOpen(false)}
+            initialStartDate={startDate}
+            initialEndDate={endDate}
+            initialSelectedUsernames={selectedUsernames}
+            initialActionMap={actionMap}
+          />
         </>
       )}
     </div>

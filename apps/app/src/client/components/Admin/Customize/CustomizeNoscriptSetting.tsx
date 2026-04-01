@@ -1,8 +1,8 @@
-import React, { type JSX, useCallback, useEffect } from 'react';
+import { type JSX, useCallback, useEffect } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
-import { PrismAsyncLight } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import PrismAsyncLight from 'react-syntax-highlighter/dist/esm/prism-async-light';
+import oneDark from 'react-syntax-highlighter/dist/esm/styles/prism/one-dark';
 import { Card, CardBody } from 'reactstrap';
 
 import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer';

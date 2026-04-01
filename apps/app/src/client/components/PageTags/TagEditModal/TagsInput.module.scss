@@ -1,6 +1,6 @@
-.tags-input :global {
-  .rbt-token {
-    .rbt-token-label {
+.tags-input {
+  :global(.rbt-token) {
+    :global(.rbt-token-label) {
       // override to text-truncate
       overflow: hidden;
       font-size: 1rem; // adjust font-size
@@ -11,13 +11,13 @@
 }
 
 // == Colors
-.tags-input :global {
-  .rbt-token {
+.tags-input {
+  :global(.rbt-token) {
     // override to .badge color
     color: var(--bs-badge-color);
   }
 
-  .rbt-token-active {
+  :global(.rbt-token-active) {
     border-color: var(--grw-primary-400) !important;
   }
 }

@@ -1,4 +1,4 @@
-@use '~/styles/mixins';
+@use 'styles/mixins';
 
 .text-skeleton-level1 {
   @include mixins.grw-skeleton-text($font-size:16px, $line-height: 40px);
