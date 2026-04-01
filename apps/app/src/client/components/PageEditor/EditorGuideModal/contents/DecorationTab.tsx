@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 
 import { toastSuccess } from '~/client/util/toastr';
 
+import styles from './DecorationTab.module.scss';
+
 interface LayoutGuideItem {
   id: string;
   title: string;
@@ -48,33 +50,19 @@ const GuideRow = ({
         <button
           type="button"
           onClick={handleCopy}
-          className="flex-grow-0 flex-shrink-0 border-0 p-0 bg-transparent text-start"
-          style={{
-            cursor: 'pointer',
-            flex: isFullWidth ? '1 0 100%' : '0 0 auto',
-            width: isFullWidth ? '100%' : 'fit-content',
-            minWidth: isFullWidth ? '100%' : minWidth,
-            display: 'block',
-          }}
+          className={`${styles.copyButton} ${isFullWidth ? 'w-100 flex-grow-1' : 'flex-grow-0 flex-shrink-0'}`}
+          style={{ minWidth: isFullWidth ? '100%' : minWidth }}
         >
           <div
-            className={`text-light p-2 ps-3 pe-5 rounded position-relative ${isFullWidth ? 'w-100' : ''}`}
-            style={{
-              backgroundColor: 'var(--bs-dark)',
-            }}
+            className={`${styles.codeContainer} text-light p-2 ps-3 pe-5 rounded position-relative ${isFullWidth ? 'w-100' : ''}`}
           >
             <pre
-              className="m-0 small font-monospace text-white-50"
-              style={{
-                whiteSpace: isFullWidth ? 'pre-wrap' : 'pre',
-                lineHeight: '1.5',
-              }}
+              className={`small font-monospace text-white-50 ${isFullWidth ? 'text-wrap' : ''}`}
             >
               {code}
             </pre>
             <small
-              className="position-absolute badge bg-secondary opacity-50"
-              style={{ fontSize: '0.4rem', top: '4px', right: '4px' }}
+              className={`position-absolute badge bg-secondary opacity-50 ${styles.copyBadge}`}
             >
               Copy
             </small>
@@ -83,16 +71,12 @@ const GuideRow = ({
 
         {preview && (
           <div
-            className="flex-grow-0 flex-shrink-0"
-            style={{
-              flexBasis: isFullWidth ? '100%' : 'auto',
-            }}
+            className={`flex-grow-0 flex-shrink-0 ${isFullWidth ? 'w-100' : ''}`}
           >
             <div className="wiki-content small">{preview}</div>
           </div>
         )}
       </div>
-
       {underContent && <div className="mt-2 w-100">{underContent}</div>}
     </section>
   );
@@ -211,13 +195,7 @@ export const DecorationTab: React.FC = () => {
   );
 
   return (
-    <div
-      className="px-4 py-3 overflow-y-auto"
-      style={{
-        maxHeight: '80vh',
-        minWidth: '650px',
-      }}
-    >
+    <div className={`px-4 py-3 ${styles.decorationTab}`}>
       <section className="mb-4">
         <h3 className="fw-bold mb-2 fs-5">{t(`${i18nKey}.style`)}</h3>
         <div className={`dropdown ${isOpen ? 'show' : ''}`}>
@@ -226,7 +204,7 @@ export const DecorationTab: React.FC = () => {
             type="button"
             onClick={() => setIsOpen(!isOpen)}
             aria-expanded={isOpen}
-            style={{ minWidth: '160px', textAlign: 'left' }}
+            style={{ minWidth: '160px' }}
           >
             <span className="material-symbols-outlined align-middle fs-6">
               {styleConfig.iconName}
@@ -234,14 +212,7 @@ export const DecorationTab: React.FC = () => {
             <span className="flex-grow-1">{styleConfig.displayName}</span>
           </button>
           <ul
-            className={`dropdown-menu ${isOpen ? 'show' : ''}`}
-            style={{
-              position: 'absolute',
-              display: isOpen ? 'block' : 'none',
-              marginTop: '0.125rem',
-              maxHeight: '300px',
-              overflowY: 'auto',
-            }}
+            className={`dropdown-menu ${styles.dropdownMenu} ${isOpen ? 'show' : ''}`}
           >
             {BOOTSTRAP_COLORS.map((color) => (
               <li key={color}>

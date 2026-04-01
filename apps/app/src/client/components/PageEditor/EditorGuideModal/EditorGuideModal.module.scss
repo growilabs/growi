@@ -1,0 +1,53 @@
+
+.editor-guide-modal {
+
+  .modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-container {
+    pointer-events: none;
+
+    .modal-card-wrapper {
+      max-width: 800px;
+      pointer-events: auto;
+    }
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-height: 80vh;
+  }
+
+  .card-body-scrollable {
+    flex: 1 1 auto;
+    overflow-y: auto;
+  }
+
+
+  .editor-guide-tabs-container {
+    .nav-tabs, ul {
+      display: flex !important;
+      flex-wrap: nowrap !important;
+      justify-content: space-between !important;
+      width: 100% !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      list-style: none !important;
+    }
+
+    .nav-item, li {
+      flex: 1 1 0 !important;
+      min-width: 100px;
+      text-align: center !important;
+    }
+
+    .nav-link, button, a {
+      display: block !important;
+      width: 100% !important;
+      white-space: nowrap;
+    }
+  }
+}

@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
 
+import styles from './LayoutTab.module.scss';
+
 interface LayoutGuideItem {
   id: string;
   title: string;
@@ -36,39 +38,26 @@ const GuideRow = ({
         <button
           type="button"
           onClick={handleCopy}
-          className="btn-none p-0 text-start border-0 bg-transparent"
-          style={{ cursor: 'pointer' }}
+          className={`p-0 text-start border-0 bg-transparent ${styles.copyButton}`}
         >
           <div
-            className="text-light p-2 ps-3 pe-5 rounded position-relative"
-            style={{
-              backgroundColor: 'var(--bs-dark)',
-              minWidth,
-              width: 'fit-content',
-            }}
+            className={`text-light p-2 ps-3 pe-5 rounded position-relative ${styles.codeBox}`}
+            style={{ minWidth }}
           >
             <pre
-              className="m-0 small font-monospace text-white-50"
-              style={{ whiteSpace: 'pre', lineHeight: '1.5' }}
+              className={`m-0 small font-monospace text-white-50 ${styles.codePre}`}
             >
               {code}
             </pre>
             <small
-              className="position-absolute badge bg-secondary opacity-50"
-              style={{ fontSize: '0.4rem', top: '4px', right: '4px' }}
+              className={`position-absolute badge bg-secondary opacity-50 ${styles.copyBadge}`}
             >
               Copy
             </small>
           </div>
         </button>
         {preview && (
-          <div
-            className="flex-grow-1"
-            style={{
-              minWidth: '250px',
-              flexBasis: '0',
-            }}
-          >
+          <div className={`flex-grow-1 ${styles.previewContainer}`}>
             <div className="wiki-content small">{preview}</div>
           </div>
         )}
@@ -160,8 +149,7 @@ export const LayoutTab: React.FC = () => {
           </div>
           <div className="d-flex align-items-center mb-1 ps-4">
             <span
-              className="d-inline-block border border-secondary rounded me-2"
-              style={{ width: '18px', height: '18px' }}
+              className={`d-inline-block border border-secondary rounded me-2 ${styles.checkboxMock}`}
             />
             <span>{t(`${i18nKey}.task`)}1-1</span>
           </div>
@@ -238,11 +226,8 @@ export const LayoutTab: React.FC = () => {
           `${t(`${i18nKey}.center`)}${t(`${i18nKey}.row_display`)} |`,
       ].join('\n'),
       underContent: (
-        <div className="table-responsive mt-2" style={{ width: 'fit-content' }}>
-          <table
-            className="table table-sm table-bordered mb-0 small text-body"
-            style={{ minWidth: '580px' }}
-          >
+        <div className={`table-responsive mt-2 ${styles.tableContainer}`}>
+          <table className="table table-sm table-bordered mb-0 small text-body">
             <thead>
               <tr className="table-light">
                 <th className="text-start fw-bold p-2 align-middle">
@@ -300,10 +285,7 @@ export const LayoutTab: React.FC = () => {
   ];
 
   return (
-    <div
-      className="px-4 py-3 overflow-y-auto"
-      style={{ maxHeight: '80vh', minWidth: '650px' }}
-    >
+    <div className={`px-4 py-3 overflow-y-auto ${styles.layoutTabContainer}`}>
       {LAYOUT_GUIDES.map((item) => (
         <GuideRow key={item.id} {...item} />
       ))}

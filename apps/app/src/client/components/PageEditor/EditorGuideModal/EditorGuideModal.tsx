@@ -19,6 +19,8 @@ import { DecorationTab } from './contents/DecorationTab';
 import { LayoutTab } from './contents/LayoutTab';
 import { TextStyleTab } from './contents/TextStyleTab';
 
+import styles from './EditorGuideModal.module.scss';
+
 const TAB_TYPES = ['textstyle', 'layout', 'decoration'] as const;
 type TabType = (typeof TAB_TYPES)[number];
 type Props = {
@@ -86,36 +88,28 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
 
   if (!isOpened || rect == null) return <></>;
 
-  const style = {
-    position: 'fixed' as const,
-    top: rect.top,
-    left: rect.left,
-    width: rect.width,
-    height: rect.height,
+  const dynamicStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: `${rect.top}px`,
+    left: `${rect.left}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
   };
 
   return createPortal(
-    <>
+    <div className={styles['editor-guide-modal']}>
       <div
         className={`modal-backdrop fade z-2 ${isShown ? 'show' : ''}`}
-        style={style}
+        style={dynamicStyle}
         onClick={close}
         aria-hidden="true"
       />
       <div
-        className={`d-flex align-items-center justify-content-center z-3 pe-none fade ${isShown ? 'show' : ''}`}
-        style={style}
+        className={`modal-container d-flex align-items-center justify-content-center z-3 fade ${isShown ? 'show' : ''}`}
+        style={dynamicStyle}
       >
-        <div className="px-3 pe-auto w-100" style={{ maxWidth: '800px' }}>
-          <div
-            className="card shadow-lg border-0"
-            style={{
-              maxHeight: '80vh',
-              display: 'flex',
-              flexDirection: 'column',
-              width: '100%',
-            }}
-          >
+        <div className="px-3 modal-card-wrapper w-100">
+          <div className="card shadow-lg border-0">
             <div className="card-header d-flex justify-content-between align-items-center bg-transparent border-bottom-0 pt-3">
               <h5 className="mb-0 text-body">{t('editor_guide.title')}</h5>
               <button
@@ -125,32 +119,9 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
                 aria-label="Close"
               />
             </div>
-            <div className="mt-2 px-3 editor-guide-tabs-container">
-              <style>{`
-                .editor-guide-tabs-container .nav-tabs,
-                .editor-guide-tabs-container ul {
-                  display: flex !important;
-                  width: 100% !important;
-                  justify-content: space-between !important; /* 子要素の間の隙間を均等にする */
-                  flex-wrap: nowrap !important;
-                  padding: 0 !important;
-                  margin: 0 !important;
-                  list-style: none !important;
-                }
-                .editor-guide-tabs-container .nav-item,
-                .editor-guide-tabs-container li {
-                  flex: 1 1 0 !important; /* すべてのタブが同じ幅を奪い合う */
-                  text-align: center !important;
-                   min-width: 100px;
-                }
-                .editor-guide-tabs-container .nav-link,
-                .editor-guide-tabs-container button,
-                .editor-guide-tabs-container a {
-                  display: block !important;
-                  width: 100% !important;
-                  white-space: nowrap;
-                }
-              `}</style>
+            <div
+              className={`mt-2 px-3 ${styles['editor-guide-tabs-container']}`}
+            >
               <CustomNavTab
                 activeTab={activeTab}
                 navTabMapping={navTabMapping}
@@ -162,10 +133,7 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
                 hideBorderBottom
               />
             </div>
-            <div
-              className="card-body overflow-auto pt-0"
-              style={{ flex: '1 1 auto' }}
-            >
+            <div className={`card-body pt-0 ${styles['card-body-scrollable']}`}>
               <CustomTabContent
                 activeTab={activeTab}
                 navTabMapping={navTabMapping}
@@ -174,7 +142,7 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
           </div>
         </div>
       </div>
-    </>,
+    </div>,
     document.body,
   );
 };
