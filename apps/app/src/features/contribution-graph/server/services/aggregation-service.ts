@@ -26,7 +26,7 @@ export class ContributionAggregationService {
         $match: {
           user: new mongoose.Types.ObjectId(userId),
           action: { $in: Object.values(ContributionGraphActions) },
-          createdAt: { $gte: startDate },
+          createdAt: { $gte: startDate, $lte: new Date() },
         },
       },
       {
