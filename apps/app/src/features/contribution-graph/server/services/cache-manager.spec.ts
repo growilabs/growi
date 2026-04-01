@@ -379,6 +379,8 @@ describe('Contribution Cache Manager Integration Test', () => {
         (d) => d.date === formatDateKey(now),
       );
       expect(todayEntry?.count).toBe(1);
+
+      vi.useRealTimers();
     });
   });
 });
