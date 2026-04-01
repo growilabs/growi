@@ -172,7 +172,7 @@ export class ContributionCacheManager {
     yesterday.setUTCHours(0, 0, 0, 0);
     yesterday.setUTCDate(yesterday.getUTCDate() - 1);
 
-    const runner = new Date();
+    const runner = new Date(yesterday);
     runner.setUTCDate(runner.getUTCDate() - 364);
 
     const allCache = new Map();
