@@ -20,13 +20,14 @@ export class ContributionAggregationService {
 
   public buildPipeline(params: PipelineParams): PipelineStage[] {
     const { userId, startDate } = params;
+    const endDate = new Date();
 
     return [
       {
         $match: {
           user: new mongoose.Types.ObjectId(userId),
           action: { $in: Object.values(ContributionGraphActions) },
-          createdAt: { $gte: startDate, $lte: new Date() },
+          createdAt: { $gte: startDate, $lte: endDate },
         },
       },
       {
