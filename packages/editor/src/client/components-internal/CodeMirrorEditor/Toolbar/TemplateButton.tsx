@@ -13,7 +13,7 @@ export const TemplateButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
 
   const id = useId();
-  const { t } = useTranslation('commons');
+  const { t } = useTranslation('translation');
 
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(editorKey);
   const { open: openTemplateModal } = useTemplateModalActions();

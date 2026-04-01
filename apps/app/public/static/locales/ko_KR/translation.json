@@ -1037,5 +1037,22 @@
     "success-toaster": "최신 텍스트 동기화됨",
     "skipped-toaster": "편집기가 활성화되지 않아 동기화 건너뜀. 편집기를 열고 다시 시도하십시오.",
     "error-toaster": "최신 텍스트 동기화 실패"
+  },
+  "toolbar": {
+    "attachments": "첨부 파일",
+    "bold": "굵게",
+    "bullet_list": "글머리 기호 목록",
+    "checklist": "체크리스트",
+    "code": "코드",
+    "diagram": "다이어그램",
+    "emoji": "이모지",
+    "heading": "제목",
+    "italic": "기울임꼴",
+    "numbered_list": "번호 매기기 목록",
+    "quote": "인용",
+    "strikethrough": "취소선",
+    "table": "표",
+    "template": "템플릿",
+    "text_formatting": "텍스트 서식"
   }
 }

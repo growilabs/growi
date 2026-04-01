@@ -218,22 +218,5 @@
         "page_bulk_export": "授予编辑页面批量导出功能的权限。"
       }
     }
-  },
-  "toolbar": {
-    "attachments": "附件",
-    "bold": "粗体",
-    "bullet_list": "无序列表",
-    "checklist": "清单",
-    "code": "代码",
-    "diagram": "图表",
-    "emoji": "表情符号",
-    "heading": "标题",
-    "italic": "斜体",
-    "numbered_list": "有序列表",
-    "quote": "引用",
-    "strikethrough": "删除线",
-    "table": "表格",
-    "template": "模板",
-    "text_formatting": "文本格式"
   }
 }

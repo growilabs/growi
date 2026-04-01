@@ -18,7 +18,7 @@ const TextFormatToolsToggler = (props: TogglarProps): JSX.Element => {
   const { isOpen, onClick } = props;
 
   const id = useId();
-  const { t } = useTranslation('commons');
+  const { t } = useTranslation('translation');
   const activeClass = isOpen ? 'active' : '';
 
   return (
@@ -47,7 +47,7 @@ export const TextFormatTools = (props: TextFormatToolsType): JSX.Element => {
   const { editorKey, onTextFormatToolsCollapseChange } = props;
   const [isOpen, setOpen] = useState(false);
   const baseId = useId();
-  const { t } = useTranslation('commons');
+  const { t } = useTranslation('translation');
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(editorKey);
 
   const toggle = useCallback(() => {

@@ -215,22 +215,5 @@
         "page_bulk_export": "Grants permission to edit page bulk export features."
       }
     }
-  },
-  "toolbar": {
-    "attachments": "Attachments",
-    "bold": "Bold",
-    "bullet_list": "Bullet List",
-    "checklist": "Checklist",
-    "code": "Code",
-    "diagram": "Diagram",
-    "emoji": "Emoji",
-    "heading": "Heading",
-    "italic": "Italic",
-    "numbered_list": "Numbered List",
-    "quote": "Quote",
-    "strikethrough": "Strikethrough",
-    "table": "Table",
-    "template": "Template",
-    "text_formatting": "Text Formatting"
   }
 }

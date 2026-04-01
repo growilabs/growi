@@ -219,22 +219,5 @@
         "page_bulk_export": "ページの一括エクスポート機能の編集権限を付与できます。"
       }
     }
-  },
-  "toolbar": {
-    "attachments": "添付ファイル",
-    "bold": "太字",
-    "bullet_list": "箇条書きリスト",
-    "checklist": "チェックリスト",
-    "code": "コード",
-    "diagram": "ダイアグラム",
-    "emoji": "絵文字",
-    "heading": "見出し",
-    "italic": "イタリック",
-    "numbered_list": "番号付きリスト",
-    "quote": "引用",
-    "strikethrough": "取り消し線",
-    "table": "テーブル",
-    "template": "テンプレート",
-    "text_formatting": "テキスト書式"
   }
 }

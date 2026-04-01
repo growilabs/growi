@@ -29,7 +29,7 @@ export const AttachmentsDropup = (props: Props): JSX.Element => {
   const [isOpen, setOpen] = useState(false);
 
   const id = useId();
-  const { t } = useTranslation('commons');
+  const { t } = useTranslation('translation');
 
   return (
     <>

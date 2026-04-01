@@ -12,7 +12,7 @@ export const DiagramButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
   const { open: openDrawioModal } = useDrawioModalForEditorActions();
   const id = useId();
-  const { t } = useTranslation('commons');
+  const { t } = useTranslation('translation');
 
   const onClickDiagramButton = useCallback(() => {
     openDrawioModal(editorKey);

@@ -27,7 +27,7 @@ export const EmojiButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
 
   const id = useId();
-  const { t } = useTranslation('commons');
+  const { t } = useTranslation('translation');
 
   const [isOpen, setIsOpen] = useState(false);
   const [Picker, setPicker] = useState<ComponentType<PickerProps> | null>(null);
