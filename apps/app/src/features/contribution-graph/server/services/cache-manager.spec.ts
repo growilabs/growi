@@ -43,22 +43,26 @@ describe('Contribution Cache Manager Integration Test', () => {
     it('should return an array of all combined contribution cache for a user', async () => {
       const userId = createMockId();
 
-      const today = new Date();
+      // Set the fixed date
+      const mockNow = new Date('2026-04-01T12:00:00Z');
+      vi.useFakeTimers();
+      vi.setSystemTime(mockNow);
 
-      // Start of the 365-day window
-      const runner = new Date(today);
+      // Align Test Math with Service Math
+      const today = new Date(mockNow);
+      const yesterday = new Date(today);
+      yesterday.setUTCDate(today.getUTCDate() - 1);
+
+      // The window starts 364 days BEFORE yesterday
+      const runner = new Date(yesterday);
       runner.setUTCDate(runner.getUTCDate() - 364);
-      const oldestDateInWindow = formatDateKey(runner);
+      const oldestDateInWindow = formatDateKey(runner); // This will now be '2025-04-01'
 
-      // A date near the beginning of the window
       const earlyDate = new Date(runner);
       earlyDate.setUTCDate(earlyDate.getUTCDate() + 5);
       const earlyDateStr = formatDateKey(earlyDate);
 
-      // A date near the end of the window
-      const recentDate = new Date(today);
-      recentDate.setUTCDate(recentDate.getUTCDate() - 1);
-      const recentDateStr = formatDateKey(recentDate);
+      const recentDateStr = formatDateKey(yesterday);
 
       await Activity.create([
         {
@@ -82,6 +86,7 @@ describe('Contribution Cache Manager Integration Test', () => {
         },
       });
 
+      // ACT
       const result = await cacheManager.getUpdatedCache(userId);
 
       expect(result[0].date).toBe(oldestDateInWindow);
@@ -94,6 +99,8 @@ describe('Contribution Cache Manager Integration Test', () => {
       const newDay = result.find((d) => d.date === recentDateStr);
       expect(newDay).toBeDefined();
       expect(newDay?.count).toBe(1);
+
+      vi.useRealTimers();
     });
 
     it('should remove cache weeks outside range', async () => {
@@ -294,38 +301,45 @@ describe('Contribution Cache Manager Integration Test', () => {
       vi.useRealTimers();
     });
 
-    it('should return exactly 365 days even if the user was only active on two days', async () => {
+    it('should return exactly 365 days and exclude today from the results', async () => {
       const userId = createMockId();
       const User = mongoose.model('User');
-      await User.create({ _id: userId, status: 2, username: 'week-tester' });
+      await User.create({
+        _id: userId,
+        status: 2,
+        username: 'boundary-tester',
+      });
 
+      // Freeze Time (March 25, 2026)
       const today = new Date('2026-03-25T12:00:00Z');
       vi.useFakeTimers();
       vi.setSystemTime(today);
 
-      const oldDate = new Date(today);
-      oldDate.setUTCDate(today.getUTCDate() - 360);
+      const yesterday = new Date(today);
+      yesterday.setUTCDate(today.getUTCDate() - 1);
 
+      // Create activities: One inside the window, one outside
       await Activity.create([
         {
           user: userId,
           action: ActivityLogActions.ACTION_PAGE_CREATE,
-          createdAt: oldDate, // 360 days ago
+          createdAt: yesterday, // Should be visible
         },
         {
           user: userId,
           action: ActivityLogActions.ACTION_PAGE_CREATE,
-          createdAt: today,
+          createdAt: today, // Should be HIDDEN per business logic
         },
       ]);
 
       const result = await cacheManager.getUpdatedCache(userId);
+
       const activeDays = result.filter((day) => day.count > 0);
-      const emptyDays = result.filter((day) => day.count === 0);
 
       expect(result).toHaveLength(365);
-      expect(activeDays).toHaveLength(2);
-      expect(emptyDays).toHaveLength(363);
+
+      expect(activeDays).toHaveLength(1);
+      expect(activeDays[0].date).toBe('2026-03-24');
 
       vi.useRealTimers();
     });
