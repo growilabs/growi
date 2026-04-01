@@ -1,3 +1,4 @@
+import nodePath from 'node:path';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
@@ -26,6 +27,7 @@ import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import { assertFileNameSafeForBaseDir } from '../../util/safe-path-utils';
 
 const logger = loggerFactory('growi:routes:apiv3:users');
 
@@ -206,7 +208,39 @@ module.exports = (crowi) => {
   const sendEmailByUserList = async (userList) => {
     const { appService, mailService } = crowi;
     const appTitle = appService.getAppTitle();
-    const locale = configManager.getConfig('app:globalLang');
+    const SUPPORTED_LOCALES = ['en_US', 'ja_JP', 'zh_CN'];
+    let locale = configManager.getConfig('app:globalLang');
+
+    if (!SUPPORTED_LOCALES.includes(locale)) {
+      logger.warn(
+        `Invalid or untrusted locale detected: '${locale}'. Falling back to 'en_US' for safety.`,
+      );
+      locale = 'en_US';
+    }
+
+    try {
+      assertFileNameSafeForBaseDir(locale, crowi.localeDir);
+    } catch (_err) {
+      logger.error(
+        `Path traversal attempt detected in locale: '${locale}'. Fallback to 'en_US'.`,
+      );
+      locale = 'en_US';
+    }
+
+    const templatePath = path.join(
+      crowi.localeDir,
+      `${locale}/admin/userInvitation.ejs`,
+    );
+    const normalizedTemplatePath = nodePath.resolve(templatePath);
+    const baseDir = nodePath.resolve(crowi.localeDir);
+
+    if (!normalizedTemplatePath.startsWith(baseDir)) {
+      logger.error(
+        `Security Alert: Path traversal attempted! Resolved path: ${normalizedTemplatePath}`,
+      );
+      throw new Error('Path traversal detected! Blocking template access.');
+    }
+
     const failedToSendEmailList = [];
 
     for (const user of userList) {
@@ -215,10 +249,7 @@ module.exports = (crowi) => {
         await mailService.send({
           to: user.email,
           subject: `Invitation to ${appTitle}`,
-          template: path.join(
-            crowi.localeDir,
-            `${locale}/admin/userInvitation.ejs`,
-          ),
+          template: templatePath,
           vars: {
             email: user.email,
             password: user.password,
@@ -242,15 +273,43 @@ module.exports = (crowi) => {
   const sendEmailByUser = async (user) => {
     const { appService, mailService } = crowi;
     const appTitle = appService.getAppTitle();
-    const locale = configManager.getConfig('app:globalLang');
+    const SUPPORTED_LOCALES = ['en_US', 'ja_JP', 'zh_CN'];
+    let locale = configManager.getConfig('app:globalLang');
+
+    if (!SUPPORTED_LOCALES.includes(locale)) {
+      logger.warn(
+        `Invalid or untrusted locale detected: '${locale}'. Falling back to 'en_US' for safety.`,
+      );
+      locale = 'en_US';
+    }
+
+    try {
+      assertFileNameSafeForBaseDir(locale, crowi.localeDir);
+    } catch (_err) {
+      logger.error(
+        `Path traversal attempt detected in locale: '${locale}'. Fallback to 'en_US'.`,
+      );
+      locale = 'en_US';
+    }
+
+    const templatePath = path.join(
+      crowi.localeDir,
+      `${locale}/admin/userResetPassword.ejs`,
+    );
+    const normalizedTemplatePath = nodePath.resolve(templatePath);
+    const baseDir = nodePath.resolve(crowi.localeDir);
+
+    if (!normalizedTemplatePath.startsWith(baseDir)) {
+      logger.error(
+        `Security Alert: Path traversal attempted! Resolved path: ${normalizedTemplatePath}`,
+      );
+      throw new Error('Path traversal detected! Blocking template access.');
+    }
 
     await mailService.send({
       to: user.email,
       subject: `New password for ${appTitle}`,
-      template: path.join(
-        crowi.localeDir,
-        `${locale}/admin/userResetPassword.ejs`,
-      ),
+      template: templatePath,
       vars: {
         email: user.email,
         password: user.password,

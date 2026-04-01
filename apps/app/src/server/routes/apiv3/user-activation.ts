@@ -14,6 +14,8 @@ import { growiInfoService } from '~/server/service/growi-info';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
+import { assertFileNameSafeForBaseDir } from '../../util/safe-path-utils';
+
 const logger = loggerFactory('growi:routes:apiv3:user-activation');
 
 const PASSOWRD_MINIMUM_NUMBER = 8;
@@ -231,11 +233,42 @@ export const completeRegistrationAction = (crowi: Crowi) => {
             if (isMailerSetup) {
               const admins = await User.findAdmins();
               const appTitle = appService.getAppTitle();
-              const locale = configManager.getConfig('app:globalLang');
-              const template = path.join(
+              const SUPPORTED_LOCALES = ['en_US', 'ja_JP', 'zh_CN'];
+              let locale = configManager.getConfig('app:globalLang');
+
+              if (!SUPPORTED_LOCALES.includes(locale)) {
+                logger.warn(
+                  `Invalid or untrusted locale detected: '${locale}'. Falling back to 'en_US' for safety.`,
+                );
+                locale = 'en_US';
+              }
+
+              try {
+                assertFileNameSafeForBaseDir(locale, crowi.localeDir);
+              } catch (_err) {
+                logger.error(
+                  `Path traversal attempt detected in locale: '${locale}'. Fallback to 'en_US'.`,
+                );
+                locale = 'en_US';
+              }
+
+              const templatePath = path.join(
                 crowi.localeDir,
                 `${locale}/admin/userWaitingActivation.ejs`,
               );
+              const normalizedTemplatePath = path.resolve(templatePath);
+              const baseDir = path.resolve(crowi.localeDir);
+
+              if (!normalizedTemplatePath.startsWith(baseDir)) {
+                logger.error(
+                  `Security Alert: Path traversal attempted! Resolved path: ${normalizedTemplatePath}`,
+                );
+                throw new Error(
+                  'Path traversal detected! Blocking template access.',
+                );
+              }
+
+              const template = templatePath;
               const url = growiInfoService.getSiteUrl();
 
               sendEmailToAllAdmins(
@@ -312,7 +345,39 @@ async function makeRegistrationEmailToken(email, crowi: Crowi) {
     throw Error('mailService is not setup');
   }
 
-  const locale = configManager.getConfig('app:globalLang');
+  const SUPPORTED_LOCALES = ['en_US', 'ja_JP', 'zh_CN'];
+  let locale = configManager.getConfig('app:globalLang');
+
+  if (!SUPPORTED_LOCALES.includes(locale)) {
+    logger.warn(
+      `Invalid or untrusted locale detected: '${locale}'. Falling back to 'en_US' for safety.`,
+    );
+    locale = 'en_US';
+  }
+
+  try {
+    assertFileNameSafeForBaseDir(locale, localeDir);
+  } catch (_err) {
+    logger.error(
+      `Path traversal attempt detected in locale: '${locale}'. Fallback to 'en_US'.`,
+    );
+    locale = 'en_US';
+  }
+
+  const templatePath = path.join(
+    localeDir,
+    `${locale}/notifications/userActivation.ejs`,
+  );
+  const normalizedTemplatePath = path.resolve(templatePath);
+  const baseDir = path.resolve(localeDir);
+
+  if (!normalizedTemplatePath.startsWith(baseDir)) {
+    logger.error(
+      `Security Alert: Path traversal attempted! Resolved path: ${normalizedTemplatePath}`,
+    );
+    throw new Error('Path traversal detected! Blocking template access.');
+  }
+
   const appUrl = growiInfoService.getSiteUrl();
 
   const userRegistrationOrder =
@@ -329,10 +394,7 @@ async function makeRegistrationEmailToken(email, crowi: Crowi) {
   return mailService.send({
     to: email,
     subject: '[GROWI] User Activation',
-    template: path.join(
-      localeDir,
-      `${locale}/notifications/userActivation.ejs`,
-    ),
+    template: templatePath,
     vars: {
       appTitle: appService.getAppTitle(),
       email,

@@ -1,3 +1,4 @@
+import nodePath from 'node:path';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { format, subSeconds } from 'date-fns';
@@ -13,6 +14,7 @@ import loggerFactory from '~/utils/logger';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import httpErrorHandler from '../../middlewares/http-error-handler';
+import { assertFileNameSafeForBaseDir } from '../../util/safe-path-utils';
 import { checkForgotPasswordEnabledMiddlewareFactory } from '../forgot-password';
 
 const logger = loggerFactory('growi:routes:apiv3:forgotPassword');
@@ -92,13 +94,43 @@ module.exports = (crowi) => {
     url,
     expiredAt,
   ) {
+    const SUPPORTED_LOCALES = ['en_US', 'ja_JP', 'zh_CN'];
+    let safeLocale = locale;
+
+    if (!SUPPORTED_LOCALES.includes(safeLocale)) {
+      logger.warn(
+        `Invalid or untrusted locale detected: '${safeLocale}'. Falling back to 'en_US' for safety.`,
+      );
+      safeLocale = 'en_US';
+    }
+
+    try {
+      assertFileNameSafeForBaseDir(safeLocale, crowi.localeDir);
+    } catch (err) {
+      logger.error(
+        `Path traversal attempt detected in locale: '${safeLocale}'. Fallback to 'en_US'.`,
+      );
+      safeLocale = 'en_US';
+    }
+
+    const templatePath = join(
+      crowi.localeDir,
+      `${safeLocale}/notifications/${templateFileName}.ejs`,
+    );
+    const normalizedTemplatePath = nodePath.resolve(templatePath);
+    const baseDir = nodePath.resolve(crowi.localeDir);
+
+    if (!normalizedTemplatePath.startsWith(baseDir)) {
+      logger.error(
+        `Security Alert: Path traversal attempted! Resolved path: ${normalizedTemplatePath}`,
+      );
+      throw new Error('Path traversal detected! Blocking template access.');
+    }
+
     return mailService.send({
       to: email,
       subject: '[GROWI] Password Reset',
-      template: join(
-        crowi.localeDir,
-        `${locale}/notifications/${templateFileName}.ejs`,
-      ),
+      template: templatePath,
       vars: {
         appTitle: appService.getAppTitle(),
         email,
