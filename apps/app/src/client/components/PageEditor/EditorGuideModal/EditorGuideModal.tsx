@@ -109,7 +109,10 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
         style={dynamicStyle}
       >
         <div className="px-3 modal-card-wrapper w-100">
-          <div className="card shadow-lg border-0">
+          <div
+            className="card shadow-lg border-0"
+            style={{ maxHeight: rect.height - 32 }}
+          >
             <div className="card-header d-flex justify-content-between align-items-center bg-transparent border-bottom-0 pt-3">
               <h5 className="mb-0 text-body">{t('editor_guide.title')}</h5>
               <button
