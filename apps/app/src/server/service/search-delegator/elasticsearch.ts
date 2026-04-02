@@ -97,6 +97,9 @@ class ElasticsearchDelegator
 
   private userModel?: typeof mongoose.Model;
 
+  private readonly auditlogIndexName = 'auditlogs';
+  private readonly auditlogAliasName = 'auditlogs-alias';
+
   constructor(socketIoService: SocketIoService) {
     this.name = SearchDelegatorName.DEFAULT;
     this.socketIoService = socketIoService;
@@ -405,11 +408,13 @@ class ElasticsearchDelegator
   }
 
   async normalizeAuditlogIndices(): Promise<void> {
-    const { client } = this;
-    const indexName = 'auditlogs';
-    const tmpIndexName = 'auditlogs-tmp';
-    const aliasName = 'auditlogs';
+    const {
+      client,
+      auditlogIndexName: indexName,
+      auditlogAliasName: aliasName,
+    } = this;
 
+    const tmpIndexName = `${indexName}-tmp`;
     // remove tmp index
     const isExistsAuditlogTmpIndex = await client.indices.exists({
       index: tmpIndexName,
@@ -424,19 +429,19 @@ class ElasticsearchDelegator
     });
     if (!isExistsAuditlogIndex) {
       await this.createAuditlogIndex(indexName);
+    }
+
+    // sync documents
+    const auditlogCount = await mongoose.model('Activity').countDocuments();
+    const esCount = (await client.count({ index: indexName })).count;
+    if (!isExistsAuditlogIndex || auditlogCount !== esCount) {
       await this.addAllAuditlogs();
     }
 
     // create alias
-    const auditlogCount = await mongoose.model('Activity').countDocuments();
-    const esCount = (await client.count({ index: indexName })).count;
-    if (auditlogCount !== esCount) {
-      await this.addAllAuditlogs();
-    }
-
     const isExistsAlias = await client.indices.existsAlias({
-      name: aliasName,
       index: indexName,
+      name: aliasName,
     });
     if (!isExistsAlias) {
       await client.indices.putAlias({ name: aliasName, index: indexName });
@@ -447,13 +452,18 @@ class ElasticsearchDelegator
     const Activity = mongoose.model('Activity');
     const activities = await Activity.find();
 
-    const body = activities.flatMap((activity) => [
-      { index: { _index: 'auditlogs', _id: activity._id } },
-      { username: activity.snapshot?.username },
-    ]);
+    const body = activities.flatMap((activity) => {
+      const username = activity.snapshot?.username;
+      if (username == null) return [];
+      return [
+        { index: { _index: this.auditlogIndexName, _id: activity._id } },
+        { username },
+      ];
+    });
 
     await this.client.bulk({ body });
   }
+
   async createIndex(index: string) {
     // TODO: https://redmine.weseek.co.jp/issues/168446
     if (isES7ClientDelegator(this.client)) {
