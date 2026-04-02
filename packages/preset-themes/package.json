@@ -14,7 +14,7 @@
     "build": "run-p build:*",
     "build:libs": "vite -c vite.libs.config.ts build",
     "build:themes": "vite -c vite.themes.config.ts build",
-    "clean": "shx rm -rf dist",
+    "clean": "rimraf dist",
     "dev": "run-p dev:*",
     "dev:libs": "pnpm run build:libs --mode dev",
     "dev:themes": "pnpm run build:themes --mode dev",
