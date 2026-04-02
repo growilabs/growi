@@ -1,3 +1,4 @@
+import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3';
 import { factory as auditLogBulkExportRouteFactory } from '~/features/audit-log-bulk-export/server/routes/apiv3';
 import growiPlugin from '~/features/growi-plugin/server/routes/apiv3/admin';
 import { factory as mastraRouteFactory } from '~/features/mastra/server/routes';
@@ -191,6 +192,8 @@ module.exports = (crowi, app) => {
 
   router.use('/openai', openaiRouteFactory(crowi));
   router.use('/mastra', mastraRouteFactory(crowi));
+
+  router.use('/ai-tools', aiToolsRouteFactory(crowi));
 
   router.use('/user', userRouteFactory(crowi));
 

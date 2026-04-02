@@ -5,6 +5,7 @@ import { useController, useForm } from 'react-hook-form';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import { FileUploadType } from '~/interfaces/file-uploader';
+import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
 
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 import { AwsSettingMolecule } from './AwsSetting';
@@ -15,6 +16,9 @@ import { useFileUploadSettings } from './useFileUploadSettings';
 
 const FileUploadSetting = (): JSX.Element => {
   const { t } = useTranslation(['admin', 'commons']);
+  const growiCloudUri = useGrowiCloudUri();
+  const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
+  const isCloud = growiCloudUri != null && growiAppIdForGrowiCloud != null;
   const { data, isLoading, error, updateSettings } = useFileUploadSettings();
 
   const { register, handleSubmit, control, watch, formState } =
@@ -107,44 +111,63 @@ const FileUploadSetting = (): JSX.Element => {
           {t('admin:app_setting.file_upload_method')}
         </span>
 
-        <div className="col-md-6 py-2">
-          {Object.values(FileUploadType).map((type) => {
-            return (
-              <div key={type} className="form-check form-check-inline">
-                <input
-                  type="radio"
-                  className="form-check-input"
-                  name="file-upload-type"
-                  id={`file-upload-type-radio-${type}`}
-                  checked={fileUploadTypeField.value === type}
-                  disabled={data.isFixedFileUploadByEnvVar}
-                  onChange={() => fileUploadTypeField.onChange(type)}
-                />
-                <label
-                  className="form-label form-check-label"
-                  htmlFor={`file-upload-type-radio-${type}`}
-                >
-                  {t(`admin:app_setting.${type}_label`)}
-                </label>
-              </div>
-            );
-          })}
-        </div>
-        {data.isFixedFileUploadByEnvVar && (
-          <p className="alert alert-warning mt-2 text-start offset-3 col-6">
-            <span className="material-symbols-outlined">help</span>
-            <b>FIXED</b>
-            <br />
-            <b
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
-              dangerouslySetInnerHTML={{
-                __html: t('admin:app_setting.fixed_by_env_var', {
-                  envKey: 'FILE_UPLOAD',
-                  envVar: data.envFileUploadType,
-                }),
-              }}
-            />
-          </p>
+        {!isCloud && (
+          <div className="col-md-6 py-2">
+            {Object.values(FileUploadType).map((type) => {
+              return (
+                <div key={type} className="form-check form-check-inline">
+                  <input
+                    type="radio"
+                    className="form-check-input"
+                    name="file-upload-type"
+                    id={`file-upload-type-radio-${type}`}
+                    checked={fileUploadTypeField.value === type}
+                    disabled={data.isFixedFileUploadByEnvVar}
+                    onChange={() => fileUploadTypeField.onChange(type)}
+                  />
+                  <label
+                    className="form-label form-check-label"
+                    htmlFor={`file-upload-type-radio-${type}`}
+                  >
+                    {t(`admin:app_setting.${type}_label`)}
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {isCloud ? (
+          <div className="alert alert-warning mt-2 text-start offset-3 col-6">
+            <p>
+              {t('admin:cloud_setting_management.storage_change_from_cloud', {
+                fileUploadType: t(`admin:app_setting.${fileUploadType}_label`),
+              })}
+            </p>
+            <a
+              href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
+              className="btn btn-outline-secondary"
+            >
+              <span className="material-symbols-outlined me-1">share</span>
+              {t('admin:cloud_setting_management.to_cloud_settings')}
+            </a>
+          </div>
+        ) : (
+          data.isFixedFileUploadByEnvVar && (
+            <p className="alert alert-warning mt-2 text-start offset-3 col-6">
+              <span className="material-symbols-outlined">help</span>
+              <b>FIXED</b>
+              <br />
+              <b
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
+                dangerouslySetInnerHTML={{
+                  __html: t('admin:app_setting.fixed_by_env_var', {
+                    envKey: 'FILE_UPLOAD',
+                    envVar: data.envFileUploadType,
+                  }),
+                }}
+              />
+            </p>
+          )
         )}
       </div>
 
@@ -165,6 +188,7 @@ const FileUploadSetting = (): JSX.Element => {
           envGcsBucket={data.envGcsBucket}
           envGcsUploadNamespace={data.envGcsUploadNamespace}
           onChangeGcsReferenceFileWithRelayMode={gcsRelayModeField.onChange}
+          isCloud={isCloud}
         />
       )}
 
@@ -179,10 +203,11 @@ const FileUploadSetting = (): JSX.Element => {
           envAzureStorageAccountName={data.envAzureStorageAccountName}
           envAzureStorageContainerName={data.envAzureStorageContainerName}
           onChangeAzureReferenceFileWithRelayMode={azureRelayModeField.onChange}
+          isCloud={isCloud}
         />
       )}
 
-      <AdminUpdateButtonRow type="submit" disabled={isLoading} />
+      {!isCloud && <AdminUpdateButtonRow type="submit" disabled={isLoading} />}
     </form>
   );
 };

@@ -349,6 +349,10 @@ export const AuditLogManagement: FC = () => {
           <AuditLogExportModal
             isOpen={isExportModalOpen}
             onClose={() => setIsExportModalOpen(false)}
+            initialStartDate={startDate}
+            initialEndDate={endDate}
+            initialSelectedUsernames={selectedUsernames}
+            initialActionMap={actionMap}
           />
         </>
       )}

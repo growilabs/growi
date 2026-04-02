@@ -1082,5 +1082,22 @@
     "success-toaster": "Latest text synchronized",
     "skipped-toaster": "Skipped synchronizing since the editor is not activated. Please open the editor and try again.",
     "error-toaster": "Synchronization of the latest text failed"
+  },
+  "toolbar": {
+    "attachments": "Attachments",
+    "bold": "Bold",
+    "bullet_list": "Bullet List",
+    "checklist": "Checklist",
+    "code": "Code",
+    "diagram": "Diagram",
+    "emoji": "Emoji",
+    "heading": "Heading",
+    "italic": "Italic",
+    "numbered_list": "Numbered List",
+    "quote": "Quote",
+    "strikethrough": "Strikethrough",
+    "table": "Table",
+    "template": "Template",
+    "text_formatting": "Text Formatting"
   }
 }
