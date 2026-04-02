@@ -50,7 +50,7 @@ import {
 } from '../service/g2g-transfer';
 import { GrowiBridgeService } from '../service/growi-bridge';
 import { initializeImportService } from '../service/import';
-import InAppNotificationService from '../service/in-app-notification';
+import { InAppNotificationService } from '../service/in-app-notification';
 import { InstallerService } from '../service/installer';
 import { normalizeData } from '../service/normalize-data';
 import PageService from '../service/page';
