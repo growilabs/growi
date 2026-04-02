@@ -514,6 +514,18 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
       </ModalHeader>
       <ModalBody className="p-md-4 mb-3 grw-modal-body-style overflow-auto">
         {bodyContent}
+        <div className="mt-4 ps-3">
+          {/* TODO: Replace href with the dedicated keyboard shortcuts docs page once published */}
+          <a
+            href="https://docs.growi.org"
+            target="_blank"
+            rel="noreferrer"
+            className="d-inline-flex align-items-center gap-2 text-secondary"
+          >
+            <span className="material-symbols-outlined fs-5">help</span>
+            {t('modal_shortcuts.Other Shortcuts')}
+          </a>
+        </div>
       </ModalBody>
     </>
   );
