@@ -4,15 +4,13 @@
 
 // switch visibility of the edit icon
 .user-group-edit-link {
-  :global {
-    .grw-edit-icon {
+    :global(.grw-edit-icon) {
       visibility: hidden;
     }
-  }
 
-  &:global {
+  & {
     &:hover {
-      .grw-edit-icon {
+      :global(.grw-edit-icon) {
         visibility: visible;
       }
     }

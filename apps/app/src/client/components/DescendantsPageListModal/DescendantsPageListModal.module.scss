@@ -1,22 +1,22 @@
-.grw-descendants-page-list-modal :global {
-  .modal-header {
-    button.btn-close {
+.grw-descendants-page-list-modal {
+  :global(.modal-header) {
+    :global(button.btn-close) {
       margin: auto 0 auto auto;
     }
   }
 
-  .modal-body {
+  :global(.modal-body) {
     padding: 25px 30px;
   }
 
-  .grw-tab-content-style-md-down {
+  :global(.grw-tab-content-style-md-down) {
     padding-top: 25px;
   }
 
-  .grw-modal-body-style {
+  :global(.grw-modal-body-style) {
     max-height: calc(100vh - 100px);
   }
-  ul.pagination {
+  :global(ul.pagination) {
     margin-bottom: 0;
   }
 }

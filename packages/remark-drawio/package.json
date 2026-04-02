@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Remark plugin to draw diagrams with draw.io (diagrams.net)",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "keywords": [
     "unified",
     "remark",
@@ -22,7 +22,7 @@
   "typings": "dist/index.d.ts",
   "scripts": {
     "build": "vite build",
-    "clean": "shx rm -rf dist",
+    "clean": "rimraf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
     "lint:biome": "biome check",

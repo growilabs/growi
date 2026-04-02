@@ -29,6 +29,7 @@ export default defineConfig({
       }),
       name: 'ui-libs',
       formats: ['es'],
+      cssFileName: 'style',
     },
     rollupOptions: {
       output: {

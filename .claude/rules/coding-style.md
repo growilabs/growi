@@ -201,6 +201,27 @@ Implemented react-window for virtualizing page tree
 to improve performance with 10k+ pages.
 ```
 
+## Cross-Platform Compatibility
+
+GROWI must work on Windows, macOS, and Linux. Never use platform-specific shell commands in npm scripts.
+
+```json
+// ❌ WRONG: Unix-only commands in npm scripts
+"clean": "rm -rf dist",
+"copy": "cp src/foo.ts dist/foo.ts",
+"move": "mv src dist"
+
+// ✅ CORRECT: Cross-platform tools
+"clean": "rimraf dist",
+"copy": "node -e \"require('fs').cpSync('src/foo.ts','dist/foo.ts')\"",
+"move": "node -e \"require('fs').renameSync('src','dist')\""
+```
+
+**Rules**:
+- Use `rimraf` instead of `rm -rf`
+- Use Node.js one-liners or cross-platform tools (`cpy-cli`, `cpx2`) instead of `cp`, `mv`, `echo`, `ls`
+- Never assume a POSIX shell in npm scripts
+
 ## Code Quality Checklist
 
 Before marking work complete:

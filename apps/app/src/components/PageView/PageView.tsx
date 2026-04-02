@@ -7,7 +7,6 @@ import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle';
 import type { RendererConfig } from '~/interfaces/services/renderer';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
-import { generateSSRViewOptions } from '~/services/renderer/renderer';
 import {
   useCurrentPageData,
   useCurrentPageId,
@@ -22,7 +21,6 @@ import { UserInfo } from '../User/UserInfo';
 import { PageAlerts } from './PageAlerts/PageAlerts';
 import { PageContentFooter } from './PageContentFooter';
 import { PageViewLayout } from './PageViewLayout';
-import RevisionRenderer from './RevisionRenderer';
 import { useHashAutoScroll } from './use-hash-auto-scroll';
 
 // biome-ignore-start lint/style/noRestrictedImports: no-problem dynamic import
@@ -78,6 +76,10 @@ const SlideRenderer = dynamic(
       (mod) => mod.SlideRenderer,
     ),
   { ssr: false },
+);
+const PageContentRenderer = dynamic(
+  () => import('./PageContentRenderer').then((mod) => mod.PageContentRenderer),
+  { ssr: true },
 );
 // biome-ignore-end lint/style/noRestrictedImports: no-problem dynamic import
 
@@ -162,8 +164,6 @@ const PageViewComponent = (props: Props): JSX.Element => {
     }
 
     const markdown = page.revision.body;
-    const rendererOptions =
-      viewOptions ?? generateSSRViewOptions(rendererConfig, pagePath);
 
     return (
       <>
@@ -173,8 +173,10 @@ const PageViewComponent = (props: Props): JSX.Element => {
           {isSlide != null ? (
             <SlideRenderer marp={isSlide.marp} markdown={markdown} />
           ) : (
-            <RevisionRenderer
-              rendererOptions={rendererOptions}
+            <PageContentRenderer
+              rendererOptions={viewOptions}
+              rendererConfig={rendererConfig}
+              pagePath={pagePath}
               markdown={markdown}
             />
           )}

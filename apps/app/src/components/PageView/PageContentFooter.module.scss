@@ -1,15 +1,15 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.page-content-footer :global {
+.page-content-footer {
   border-top: solid 1px var(--bs-border-color);
 
-  .page-meta {
+  :global(.page-meta) {
     font-size: 0.95em;
   }
 }
 
 // TODO: Should Soft Coding see: https://github.com/growilabs/growi/pull/6404
-.page-content-footer-skeleton :global {
+.page-content-footer-skeleton {
   width: 300px;
   height: 20px;
 }

@@ -41,6 +41,11 @@ Clean up and organize specification documents for feature **$1** after implement
 - Read all core files first
 - Read other files to understand their content and value
 
+**Determine target language**:
+- Read `spec.json` and extract the `language` field (e.g., `"ja"`, `"en"`)
+- This is the language ALL spec document content must be written in
+- Note: code comments within code blocks are exempt (must stay in English per project rules)
+
 **Verify implementation status**:
 - Check that tasks are marked complete `[x]` in tasks.md
 - If implementation incomplete, warn user and ask to confirm cleanup
@@ -86,6 +91,15 @@ Clean up and organize specification documents for feature **$1** after implement
      * Known limitations
    - Check if content from other files should be migrated here
 
+5. **Language audit** (compare actual language vs. `spec.json.language`):
+   - For each markdown file, scan prose content (headings, paragraphs, list items) and detect the written language
+   - Flag any file or section whose language does **not** match the target language
+   - Exemptions — do NOT flag:
+     * Content inside fenced code blocks (` ``` `) — code comments must stay in English
+     * Inline code spans (`` `...` ``)
+     * Proper nouns, technical terms, and identifiers that are always written in English
+   - Collect flagged items into a **translation plan**: file name, approximate line range, detected language, and a brief excerpt
+
 ### Step 3: Interactive Confirmation
 
 **Present cleanup plan to user**:
@@ -109,6 +123,14 @@ For each file and section identified in Step 2, ask:
 - "design.md: Delete 'Testing Strategy' section (lines X-Y)? [Y/n]"
 - "design.md: Delete 'Security Considerations' section (lines X-Y)? [Y/n]"
 - "design.md: Keep Architecture diagrams (essential for refactoring)? [Y/n]"
+
+**Translation confirmation** (if language mismatches were found in Step 2):
+- Show summary: "Found content in language(s) other than `{target_language}` in the following files:"
+  - List each flagged file with line range and a short excerpt
+- Ask: "Translate mismatched content to `{target_language}`? [Y/n]"
+  - If Y: translate all flagged sections in Step 4
+  - If n: skip translation (leave files as-is)
+- Note: code blocks are never translated
 
 **Batch similar decisions**:
 - Group related sections (e.g., all "delete implementation details" decisions)
@@ -153,7 +175,14 @@ For each file and section identified in Step 2, ask:
    - Preserve architecture diagrams and component interfaces
    - Keep design decisions and rationale sections
 
-5. **Update spec.json metadata**:
+5. **Translate language-mismatched content** (if approved):
+   - For each flagged file and section, translate prose content to the target language
+   - **Never translate**: content inside fenced code blocks or inline code spans
+   - Preserve all Markdown formatting (headings, bold, lists, links, etc.)
+   - After translation, verify the overall document reads naturally in the target language
+   - Document translated files in the cleanup summary
+
+6. **Update spec.json metadata**:
    - Set `phase: "implementation-complete"` (if not already set)
    - Add `cleanup_completed: true` flag
    - Update `updated_at` timestamp
@@ -176,6 +205,7 @@ For each file and section identified in Step 2, ask:
 - ✅ research.md: Added Session 2 discoveries + salvaged content (180 lines added)
 - ✅ requirements.md: Simplified 6 requirements (350 lines → 180 lines)
 - ✅ design.md: Removed 4 sections, added constraints + salvaged content (250 lines removed, 100 added)
+- ✅ requirements.md: Translated mismatched sections to {target_language}
 
 ### Information Salvaged
 - Implementation discoveries from validation-report.md → research.md
@@ -196,7 +226,7 @@ For each file and section identified in Step 2, ask:
 ## Critical Constraints
 
 - **User approval required**: Never delete content without explicit confirmation
-- **Language consistency**: Use language specified in spec.json for all updates
+- **Language consistency**: All prose content must be written in the language specified in `spec.json.language`; translate any mismatched sections (code blocks exempt)
 - **Preserve history**: Don't delete discovery rationale or design decisions
 - **Balance brevity with completeness**: Remove redundancy but keep essential context
 - **Interactive workflow**: Pause for user input rather than making assumptions

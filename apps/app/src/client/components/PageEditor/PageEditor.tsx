@@ -74,7 +74,7 @@ import { EditorNavbarBottom } from './EditorNavbarBottom';
 import Preview from './Preview';
 import { useScrollSync } from './ScrollSyncHelper';
 
-import '@growi/editor/dist/style.css';
+import '../GrowiEditor.vendor-styles.prebuilt';
 
 const logger = loggerFactory('growi:PageEditor');
 
