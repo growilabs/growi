@@ -1,10 +1,12 @@
-import { type JSX, useState } from 'react';
+import { type JSX, useId, useState } from 'react';
 import { AcceptedUploadFileType } from '@growi/core';
+import { useTranslation } from 'react-i18next';
 import {
   Dropdown,
   DropdownItem,
   DropdownMenu,
   DropdownToggle,
+  UncontrolledTooltip,
 } from 'reactstrap';
 
 import type { GlobalCodeMirrorEditorKey } from '../../../../consts';
@@ -26,6 +28,9 @@ export const AttachmentsDropup = (props: Props): JSX.Element => {
 
   const [isOpen, setOpen] = useState(false);
 
+  const id = useId();
+  const { t } = useTranslation('translation');
+
   return (
     <>
       <Dropdown
@@ -35,6 +40,7 @@ export const AttachmentsDropup = (props: Props): JSX.Element => {
         className="lh-1"
       >
         <DropdownToggle
+          id={id}
           className={`${btnAttachmentToggleClass} btn-toolbar-button rounded-circle`}
           color="unset"
         >
@@ -74,6 +80,11 @@ export const AttachmentsDropup = (props: Props): JSX.Element => {
           <LinkEditButton editorKey={editorKey} />
         </DropdownMenu>
       </Dropdown>
+      {!isOpen && (
+        <UncontrolledTooltip placement="top" target={CSS.escape(id)}>
+          {t('toolbar.attachments')}
+        </UncontrolledTooltip>
+      )}
     </>
   );
 };
