@@ -1,4 +1,5 @@
 export { parseEnvLevels } from './env-var-parser';
+export { createHttpLoggerMiddleware } from './http-logger';
 export { resolveLevel } from './level-resolver';
 export { initializeLoggerFactory, loggerFactory } from './logger-factory';
 export { morganLikeFormatOptions } from './morgan-like-format-options';

@@ -618,9 +618,6 @@ importers:
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
-      pino-http:
-        specifier: ^11.0.0
-        version: 11.0.0
       pretty-bytes:
         specifier: ^6.1.1
         version: 6.1.1
@@ -1166,9 +1163,6 @@ importers:
       mysql2:
         specifier: ^2.2.5
         version: 2.3.3
-      pino-http:
-        specifier: ^11.0.0
-        version: 11.0.0
       read-pkg-up:
         specifier: ^7.0.1
         version: 7.0.1
@@ -1401,6 +1395,9 @@ importers:
       pino:
         specifier: ^9.0.0
         version: 9.14.0
+      pino-http:
+        specifier: ^11.0.0
+        version: 11.0.0
     devDependencies:
       pino-pretty:
         specifier: ^13.0.0

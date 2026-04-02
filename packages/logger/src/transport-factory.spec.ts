@@ -15,18 +15,10 @@ describe('createNodeTransportOptions', () => {
   });
 
   describe('development mode', () => {
-    it('returns pino-pretty transport config', () => {
+    it('returns bunyan-format transport config', () => {
       const opts = createNodeTransportOptions(false);
       expect(opts.transport).toBeDefined();
-      expect(opts.transport?.target).toBe('pino-pretty');
-    });
-
-    it('includes translateTime, ignore, and singleLine options', () => {
-      const opts = createNodeTransportOptions(false);
-      const popts = opts.transport?.options as Record<string, unknown>;
-      expect(popts?.translateTime).toBeTruthy();
-      expect(popts?.ignore).toContain('pid');
-      expect(popts?.ignore).toContain('hostname');
+      expect(opts.transport?.target).toContain('bunyan-format');
     });
 
     it('returns singleLine: false for full multi-line context', () => {

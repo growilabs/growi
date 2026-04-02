@@ -26,7 +26,8 @@
   },
   "dependencies": {
     "minimatch": "^9.0.0",
-    "pino": "^9.0.0"
+    "pino": "^9.0.0",
+    "pino-http": "^11.0.0"
   },
   "peerDependencies": {
     "pino-pretty": "^13.0.0"

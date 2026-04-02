@@ -60,7 +60,6 @@
     "method-override": "^3.0.0",
     "mysql2": "^2.2.5",
     "read-pkg-up": "^7.0.1",
-    "pino-http": "^11.0.0",
     "tslib": "^2.8.0",
     "typeorm": "=0.2.45"
   },

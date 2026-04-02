@@ -198,8 +198,8 @@
   - Verify the production build succeeds
   - _Requirements: 5.1, 5.3, 6.1, 6.4_
 
-- [ ] 12. Implement bunyan-like output format (development only)
-- [ ] 12.1 Create the bunyan-format custom transport module
+- [x] 12. Implement bunyan-like output format (development only)
+- [x] 12.1 Create the bunyan-format custom transport module
   - Create `packages/logger/src/transports/bunyan-format.ts` that default-exports a function returning a pino-pretty stream
   - Use `customPrettifiers.time` to format epoch as `HH:mm:ss.SSSZ` (UTC time-only, no brackets)
   - Use `customPrettifiers.level` to return `${label.padStart(5)} ${log.name}` (right-aligned 5-char level + namespace)
@@ -208,7 +208,7 @@
   - Verify the module is built to `dist/transports/bunyan-format.js` by vite's `preserveModules` config
   - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6_
 
-- [ ] 12.2 Update TransportFactory to use bunyan-format transport in dev only
+- [x] 12.2 Update TransportFactory to use bunyan-format transport in dev only
   - In the **development** branch of `createNodeTransportOptions`, change the transport target from `'pino-pretty'` to the resolved path of `bunyan-format.js` (via `import.meta.url`)
   - Remove `translateTime` and `ignore` options from the dev transport config (now handled inside the custom transport)
   - Pass `singleLine: false` for dev
@@ -217,14 +217,14 @@
   - Update unit tests in `transport-factory.spec.ts`: dev target contains `bunyan-format`; prod + FORMAT_NODE_LOG target is `'pino-pretty'`
   - _Requirements: 12.1, 12.6, 12.7, 12.8_
 
-- [ ] 12.3 Verify bunyan-format output
+- [x] 12.3 Verify bunyan-format output
   - Run the dev server and confirm log output matches the bunyan-format "short" style: `HH:mm:ss.SSSZ LEVEL name: message`
   - Confirm colorization works (DEBUG=cyan, INFO=green, WARN=yellow, ERROR=red)
   - Confirm multi-line output in dev (extra fields on subsequent lines)
   - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
-- [ ] 13. Encapsulate pino-http in @growi/logger
-- [ ] 13.1 Create HTTP logger middleware factory in @growi/logger
+- [x] 13. Encapsulate pino-http in @growi/logger
+- [x] 13.1 Create HTTP logger middleware factory in @growi/logger
   - Create `packages/logger/src/http-logger.ts` exporting `async createHttpLoggerMiddleware(options?)`
   - The function creates `pinoHttp` middleware internally with `loggerFactory(namespace)`
   - In development mode (`NODE_ENV !== 'production'`): dynamically import `morganLikeFormatOptions` via `await import('./morgan-like-format-options')` and apply to pino-http options
@@ -235,7 +235,7 @@
   - Export `createHttpLoggerMiddleware` from `packages/logger/src/index.ts`
   - _Requirements: 13.1, 13.2, 13.3, 13.5, 13.6_
 
-- [ ] 13.2 (P) Migrate apps/app to use createHttpLoggerMiddleware
+- [x] 13.2 (P) Migrate apps/app to use createHttpLoggerMiddleware
   - Replace the direct `pinoHttp` import and configuration in `apps/app/src/server/crowi/index.ts` with `await createHttpLoggerMiddleware(...)` from `@growi/logger`
   - Pass the `/_next/static/` autoLogging ignore function via the options
   - Remove `pino-http` and its type imports from the file
@@ -244,7 +244,7 @@
   - Run `pnpm --filter @growi/app lint:typecheck` to confirm no type errors
   - _Requirements: 13.4_
 
-- [ ] 13.3 (P) Migrate apps/slackbot-proxy to use createHttpLoggerMiddleware
+- [x] 13.3 (P) Migrate apps/slackbot-proxy to use createHttpLoggerMiddleware
   - Replace the direct `pinoHttp` import and configuration in `apps/slackbot-proxy/src/Server.ts` with `await createHttpLoggerMiddleware(...)` from `@growi/logger`
   - Remove `pino-http` and its type imports from the file
   - Remove `morganLikeFormatOptions` import (now applied internally in dev only)
@@ -253,8 +253,8 @@
   - Run `pnpm --filter @growi/slackbot-proxy lint:typecheck` to confirm no type errors
   - _Requirements: 13.4_
 
-- [ ] 14. Validate bunyan-format and HTTP encapsulation
-- [ ] 14.1 Run full validation
+- [x] 14. Validate bunyan-format and HTTP encapsulation
+- [x] 14.1 Run full validation
   - Run `@growi/logger` package tests
   - Run lint and type-check for apps/app and apps/slackbot-proxy
   - Run `turbo run build --filter @growi/app` to verify production build succeeds

@@ -1,3 +1,5 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { LoggerOptions, TransportSingleOptions } from 'pino';
 
 interface NodeTransportOptions {
@@ -17,20 +19,25 @@ function isFormattedOutputEnabled(): boolean {
 
 /**
  * Create pino transport/options for Node.js environment.
- * Development: pino-pretty with human-readable output.
- * Production: raw JSON by default; pino-pretty when FORMAT_NODE_LOG is truthy.
+ * Development: bunyan-format custom transport with human-readable output.
+ * Production: raw JSON by default; standard pino-pretty when FORMAT_NODE_LOG is truthy.
  */
 export function createNodeTransportOptions(
   isProduction: boolean,
 ): NodeTransportOptions {
   if (!isProduction) {
-    // Development: always use pino-pretty
+    // Development: use bunyan-format custom transport (dev only)
+    // Use path.join to resolve sibling module — avoids Vite's `new URL(…, import.meta.url)` asset transform
+    const thisDir = path.dirname(fileURLToPath(import.meta.url));
+    const bunyanFormatPath = path.join(
+      thisDir,
+      'transports',
+      'bunyan-format.js',
+    );
     return {
       transport: {
-        target: 'pino-pretty',
+        target: bunyanFormatPath,
         options: {
-          translateTime: 'SYS:standard',
-          ignore: 'pid,hostname',
           singleLine: false,
         },
       },

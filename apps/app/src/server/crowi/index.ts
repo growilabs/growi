@@ -2,12 +2,11 @@ import next from 'next';
 import http from 'node:http';
 import path from 'node:path';
 import { createTerminus } from '@godaddy/terminus';
-import { morganLikeFormatOptions } from '@growi/logger';
+import { createHttpLoggerMiddleware } from '@growi/logger';
 import attachmentRoutes from '@growi/remark-attachment-refs/dist/server';
 import lsxRoutes from '@growi/remark-lsx/dist/server/index.cjs';
 import type { Express } from 'express';
 import mongoose from 'mongoose';
-import pinoHttp, { type Options as PinoHttpOptions } from 'pino-http';
 
 import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
 import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
@@ -632,18 +631,16 @@ class Crowi {
 
     require('./express-init')(this, express);
 
-    // HTTP request logging with pino-http (morgan-like one-liner format)
-    const httpLoggerOptions: PinoHttpOptions = {
-      logger: loggerFactory('express'),
-      ...morganLikeFormatOptions,
-      // supress logging for Next.js static files in development mode
+    // HTTP request logging via @growi/logger (encapsulates pino-http)
+    const httpLogger = await createHttpLoggerMiddleware({
+      // suppress logging for Next.js static files in development mode
       ...(env !== 'production' && {
         autoLogging: {
           ignore: (req) => req.url?.startsWith('/_next/static/') ?? false,
         },
       }),
-    };
-    express.use(pinoHttp(httpLoggerOptions));
+    });
+    express.use(httpLogger);
 
     this.express = express;
   }
