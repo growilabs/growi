@@ -2,6 +2,7 @@ import next from 'next';
 import http from 'node:http';
 import path from 'node:path';
 import { createTerminus } from '@godaddy/terminus';
+import { morganLikeFormatOptions } from '@growi/logger';
 import attachmentRoutes from '@growi/remark-attachment-refs/dist/server';
 import lsxRoutes from '@growi/remark-lsx/dist/server/index.cjs';
 import type { Express } from 'express';
@@ -614,9 +615,10 @@ class Crowi {
 
     require('./express-init')(this, express);
 
-    // HTTP request logging with pino-http
+    // HTTP request logging with pino-http (morgan-like one-liner format)
     const httpLoggerOptions: PinoHttpOptions = {
       logger: loggerFactory('express'),
+      ...morganLikeFormatOptions,
       // supress logging for Next.js static files in development mode
       ...(env !== 'production' && {
         autoLogging: {

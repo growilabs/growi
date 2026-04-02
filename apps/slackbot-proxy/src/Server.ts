@@ -3,6 +3,7 @@ import '@tsed/swagger';
 import '@tsed/typeorm'; // !! DO NOT MODIFY !! -- https://github.com/tsedio/tsed/issues/1332#issuecomment-837840612
 
 import { createTerminus } from '@godaddy/terminus';
+import { morganLikeFormatOptions } from '@growi/logger';
 import { HttpServer, PlatformApplication } from '@tsed/common';
 import { Configuration, Inject, InjectorService } from '@tsed/di';
 import bodyParser from 'body-parser';
@@ -11,7 +12,7 @@ import cookieParser from 'cookie-parser';
 import type { Express } from 'express';
 import helmet from 'helmet';
 import methodOverride from 'method-override';
-import pinoHttp from 'pino-http';
+import pinoHttp, { type Options as PinoHttpOptions } from 'pino-http';
 import type { ConnectionOptions } from 'typeorm';
 import { getConnectionManager } from 'typeorm';
 
@@ -162,7 +163,11 @@ export class Server {
    * Setup logger for requests
    */
   private setupLogger(): void {
-    const httpLogger = pinoHttp({ logger: loggerFactory('express') });
+    const httpLogger = pinoHttp({
+      // Type assertion needed: @growi/logger returns Logger<string> but pino-http expects Logger<LevelWithSilent>
+      logger: loggerFactory('express') as unknown as PinoHttpOptions['logger'],
+      ...morganLikeFormatOptions,
+    });
     this.app.use(httpLogger);
   }
 }

@@ -48,7 +48,7 @@ export function createNodeTransportOptions(
       options: {
         translateTime: 'SYS:standard',
         ignore: 'pid,hostname',
-        singleLine: false,
+        singleLine: true,
       },
     },
   };

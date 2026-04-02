@@ -28,6 +28,12 @@ describe('createNodeTransportOptions', () => {
       expect(popts?.ignore).toContain('pid');
       expect(popts?.ignore).toContain('hostname');
     });
+
+    it('returns singleLine: false for full multi-line context', () => {
+      const opts = createNodeTransportOptions(false);
+      const popts = opts.transport?.options as Record<string, unknown>;
+      expect(popts?.singleLine).toBe(false);
+    });
   });
 
   describe('production mode — raw JSON', () => {
@@ -64,6 +70,13 @@ describe('createNodeTransportOptions', () => {
       const opts = createNodeTransportOptions(true);
       expect(opts.transport).toBeDefined();
       expect(opts.transport?.target).toBe('pino-pretty');
+    });
+
+    it('returns singleLine: true for concise one-liner output', () => {
+      delete process.env.FORMAT_NODE_LOG;
+      const opts = createNodeTransportOptions(true);
+      const popts = opts.transport?.options as Record<string, unknown>;
+      expect(popts?.singleLine).toBe(true);
     });
   });
 });
