@@ -717,7 +717,7 @@ class ElasticsearchDelegator
   async updateOrInsertAuditlog(activity: ActivityDocument): Promise<void> {
     await this.client.bulk({
       body: [
-        { index: { _index: 'auditlogs', _id: activity._id } },
+        { index: { _index: this.auditlogIndexName, _id: activity._id } },
         { username: activity.snapshot?.username },
       ],
     });
