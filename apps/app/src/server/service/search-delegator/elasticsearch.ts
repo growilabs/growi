@@ -454,7 +454,7 @@ class ElasticsearchDelegator
 
     const body = activities.flatMap((activity) => {
       const username = activity.snapshot?.username;
-      if (username == null) return [];
+      if (username == null || username === '') return [];
       return [
         { index: { _index: this.auditlogIndexName, _id: activity._id } },
         { username },
