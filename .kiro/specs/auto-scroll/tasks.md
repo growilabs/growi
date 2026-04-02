@@ -1,0 +1,82 @@
+# Implementation Plan
+
+- [ ] 1. Update rendering status constants in @growi/core
+  - Rename the attribute constant from the current name to `data-growi-is-content-rendering` to clearly convey boolean rendering-in-progress semantics
+  - Update the CSS selector constant to match only the in-progress state (`="true"`) rather than bare attribute presence
+  - Remove the old constants — no backward-compatibility aliases since all consumers are updated in the same change
+  - _Requirements: 4.1, 4.2, 4.6_
+
+- [ ] 2. Update remark-drawio for declarative rendering attribute protocol
+- [ ] 2.1 (P) Adopt declarative value toggling in DrawioViewer component
+  - Change rendering-complete and error paths to set the attribute value to `"false"` instead of removing the attribute entirely
+  - Update the initial JSX spread to use the renamed constant while keeping `"true"` as the initial value
+  - Verify that the wrapper component (DrawioViewerWithEditButton) continues to function without changes
+  - _Requirements: 4.3, 4.4_
+- [ ] 2.2 (P) Update remark-drawio plugin sanitization and node rewriting
+  - Replace the old constant in the supported-attributes array with the new constant name
+  - Update node rewriting to set the new attribute name with `"true"` value on drawio nodes
+  - Confirm the sanitize export still passes the new attribute through HTML sanitization
+  - _Requirements: 4.5_
+
+- [ ] 3. Add rendering attribute to MermaidViewer and Lsx
+- [ ] 3.1 (P) Add rendering-status attribute lifecycle to MermaidViewer
+  - Set the rendering-status attribute to `"true"` on the container element at initial render before the async SVG render starts
+  - Set the attribute to `"false"` after `mermaid.render()` completes and the SVG is injected into the DOM
+  - Set the attribute to `"false"` in the error/catch path as well
+  - Update the mermaid remark plugin sanitize options to include the new attribute name in the allowlist
+  - _Requirements: 4.3, 4.4, 4.5, 4.7_
+- [ ] 3.2 (P) Add rendering-status attribute lifecycle to Lsx component
+  - Set the rendering-status attribute to `"true"` on the outermost container while the SWR page list fetch is loading
+  - Set the attribute to `"false"` when data arrives — success, error, or empty result — using declarative binding from the existing `isLoading` state
+  - Update the lsx remark plugin sanitize options to include the new attribute name in the allowlist
+  - Add `@growi/core` as a dependency of `remark-lsx` (same pattern as `remark-drawio`)
+  - _Requirements: 4.3, 4.4, 4.5, 4.7_
+
+- [ ] 4. Implement shared auto-scroll hook
+- [ ] 4.1 Implement rendering watch function with safety improvements
+  - Create the `watchRenderingAndReScroll` function in the new shared hooks directory using the updated rendering-status selector
+  - Add a `stopped` boolean flag checked inside timer callbacks to prevent execution after cleanup (race condition fix from PR review)
+  - Maintain the existing non-resetting timer pattern: skip scheduling when a timer is already active
+  - When `checkAndSchedule` detects no rendering elements remain while a timer is still active, cancel the active timer immediately to avoid a redundant re-scroll after rendering has completed
+  - Enforce the 10-second hard timeout that cleans up observer and all timers regardless of remaining rendering elements
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 6.1, 6.2, 6.3_
+  - _Contracts: watchRenderingAndReScroll service interface_
+- [ ] 4.2 Implement useContentAutoScroll hook with options object API
+  - Create the hook accepting an options object with `key`, `contentContainerId`, optional `resolveTarget`, and optional `scrollTo`
+  - Implement guard logic: skip processing when key is null/undefined, hash is empty, or container element not found
+  - Implement immediate scroll path: resolve target via provided closure (default: `getElementById`), scroll via provided function (default: `scrollIntoView`), then check for rendering elements before delegating to rendering watch — skip watch entirely if no rendering elements exist
+  - Implement deferred scroll path: MutationObserver on container until target appears, then scroll and conditionally delegate to rendering watch (same check), with 10-second timeout
+  - Store `resolveTarget` and `scrollTo` callbacks in refs to avoid re-triggering the effect on callback identity changes
+  - Wire cleanup to disconnect all observers, clear all timers, and invoke rendering watch cleanup
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 5.1, 5.2, 5.3, 5.4, 5.6, 5.7, 6.1, 6.2_
+  - _Contracts: UseContentAutoScrollOptions, useContentAutoScroll service interface_
+- [ ] 4.3 (P) Write tests for watchRenderingAndReScroll
+  - Test that no timer is scheduled when no rendering elements exist
+  - Test that a re-scroll fires after the 5-second poll interval when rendering elements are present
+  - Test that the timer is not reset by intermediate DOM mutations
+  - Test that late-appearing rendering elements are detected by the observer and trigger a timer
+  - Test that only one re-scroll executes per cycle even with multiple rendering elements
+  - Test that the 10-second watch timeout cleans up all resources
+  - Test that the stopped flag prevents timer callbacks from executing after cleanup
+  - Test that an active timer is cancelled when rendering elements are removed before the timer fires
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 6.1, 6.2, 6.3_
+- [ ] 4.4 (P) Write tests for useContentAutoScroll
+  - Test guard conditions: no-op when key is null, hash is empty, or container not found
+  - Test immediate scroll when target already exists in DOM
+  - Test deferred scroll when target appears after initial render via MutationObserver
+  - Test that encoded hash values are decoded correctly before target resolution
+  - Test that a custom `resolveTarget` closure is called instead of the default
+  - Test that a custom `scrollTo` function is called instead of the default
+  - Test cleanup on key change: observers and timers from previous run are released
+  - Test cleanup on unmount: all resources are released
+  - Test rendering watch integration: re-scroll fires when rendering elements exist after initial scroll
+  - Test that rendering watch is skipped when no rendering elements exist after initial scroll
+  - Test 10-second timeout for target observation when target never appears
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 5.1, 5.2, 5.3, 5.6, 5.7, 6.1, 6.2_
+
+- [ ] 5. Integrate hook into PageView and remove old implementation
+  - Replace the import of the old hook with the new shared hook in PageView
+  - Update the call site to use the options object API with `key: currentPageId` and `contentContainerId` — no custom `resolveTarget` or `scrollTo` needed (defaults match PageView's behavior)
+  - Delete the old hook file and its test file from the PageView directory
+  - Verify that PageView auto-scroll behavior is preserved with manual testing or existing test coverage
+  - _Requirements: 5.1, 5.4, 5.5_
