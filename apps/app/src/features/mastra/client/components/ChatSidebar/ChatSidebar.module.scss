@@ -1,6 +1,6 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.grw-chat-sidebar :global {
+.grw-chat-sidebar {
   z-index: bs.$zindex-fixed + 2;
   width: 100%;
 
