@@ -125,3 +125,29 @@ This specification covers the complete migration from bunyan to pino, replacing 
 1. The pino logger shall support `.info()`, `.debug()`, `.warn()`, `.error()`, `.trace()`, and `.fatal()` methods with the same argument patterns as bunyan (message string, optional object, optional error).
 2. If bunyan-specific APIs (e.g., `logger.child()`, serializers) are used at any call sites, the pino equivalent shall be provided or the call site shall be adapted.
 3. The Logger Factory shall export a TypeScript type for the logger instance that is compatible with the pino Logger type.
+
+### Requirement 12: Bunyan-Like Output Format (Development Only)
+
+**Objective:** As a developer, I want the log output in development mode to resemble bunyan-format's "short" mode, so that the visual experience remains familiar after migration.
+
+#### Acceptance Criteria
+1. While in development mode (`NODE_ENV !== 'production'`), the Logger Factory shall output each log line in the format: `HH:mm:ss.SSSZ LEVEL name: message` (e.g., `10:06:30.419Z DEBUG growi:service:page: some message`).
+2. The level label shall be right-aligned to 5 characters (e.g., `DEBUG`, ` INFO`, ` WARN`).
+3. The timestamp shall be UTC time-only in ISO 8601 format (`HH:mm:ss.SSSZ`), without date or surrounding brackets.
+4. The logger namespace (`name` field) shall appear directly after the level label, followed by a colon and the message, without parentheses.
+5. Log lines shall be colorized by level (cyan for DEBUG, green for INFO, yellow for WARN, red for ERROR).
+6. The bunyan-like format shall be implemented as a custom pino transport module within `@growi/logger`, so that `pino.transport()` can load it in a worker thread without function serialization issues.
+7. The bunyan-format transport module shall only be imported in development mode. In production, the module shall not be imported or bundled.
+8. While in production mode with `FORMAT_NODE_LOG` enabled, the Logger Factory shall use standard pino-pretty (not the bunyan-format transport) for formatted output.
+
+### Requirement 13: HTTP Logger Middleware Encapsulation
+
+**Objective:** As a developer, I want the HTTP request logging middleware encapsulated within `@growi/logger`, so that consumer applications do not need to depend on or import `pino-http` directly.
+
+#### Acceptance Criteria
+1. The `@growi/logger` package shall export a `createHttpLoggerMiddleware(options)` function that returns Express-compatible middleware for HTTP request logging.
+2. The middleware factory shall accept options for the logger namespace (defaulting to `'express'`) and optional `autoLogging` configuration (e.g., route ignore patterns).
+3. While in development mode, the middleware shall apply morgan-like formatting (custom success/error messages, custom log levels) via dynamic import. In production mode, the morgan-like format module shall not be imported; pino-http's default message format shall be used.
+4. After the encapsulation, `apps/app` and `apps/slackbot-proxy` shall not import `pino-http` directly; all HTTP logging shall go through `@growi/logger`.
+5. The `pino-http` dependency shall move from consumer applications to `@growi/logger`'s `dependencies`.
+6. The `morganLikeFormatOptions` module shall only be imported in development mode (dynamic import). In production, the module shall not be imported or bundled.
