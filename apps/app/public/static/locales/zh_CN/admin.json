@@ -421,6 +421,7 @@
     "azure_storage_account_name": "Storage Account Name",
     "azure_storage_container_name": "Container Name",
     "azure_note_for_the_only_env_option": "The Azure Settings is limited by the value of environment variable.<br>To change this setting, please change to false or delete the value of the environment variable <code>{{env}}</code> .",
+    "azure_note_for_the_only_env_option_cloud": "Azure 设置可以从 GROWI.cloud 管理页面进行更改。",
     "fixed_by_env_var": "这是由env var 修复的 <code>{{envKey}}={{envVar}}</code>.",
     "file_upload": "This is for uploading file settings. If you complete file upload settings, file upload function, profile picture function etc will be enabled.",
     "test_connection": "测试邮件服务器连接",
@@ -434,7 +435,8 @@
     "enable": "启用",
     "disable": "停用",
     "use_env_var_if_empty": "如果数据库中的值为空，则环境变量的值 <cod>{{variable}}</code> 启用。",
-    "note_for_the_only_env_option": "The GCS settings is limited by the value of environment variable.<br>To change this setting, please change to false or delete the value of the environment variable <code>{{env}}</code> ."
+    "note_for_the_only_env_option": "The GCS settings is limited by the value of environment variable.<br>To change this setting, please change to false or delete the value of the environment variable <code>{{env}}</code> .",
+    "note_for_the_only_env_option_cloud": "GCS 设置可以从 GROWI.cloud 管理页面进行更改。"
   },
   "markdown_settings": {
     "markdown_settings": "Markdown设置",
@@ -924,7 +926,9 @@
     "confirm": "Delete plugin?"
   },
   "cloud_setting_management": {
-    "to_cloud_settings": "進入 GROWI.cloud 的管理界面"
+    "to_cloud_settings": "進入 GROWI.cloud 的管理界面",
+    "change_from_cloud": "您可以从 GROWI.cloud 管理界面更改设置。",
+    "storage_change_from_cloud": "当前文件上传方式为 {{fileUploadType}}。设置可以从 GROWI.cloud 管理页面进行更改。"
   },
   "audit_log_action_category": {
     "Page": "页面",

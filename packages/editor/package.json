@@ -58,6 +58,7 @@
     "csv-to-markdown-table": "^1.4.1",
     "emoji-mart": "^5.6.0",
     "i18next": "^23.16.5",
+    "react-i18next": "^15.1.1",
     "lib0": "^0.2.94",
     "markdown-table": "^3.0.3",
     "react-dropzone": "^14.2.3",
