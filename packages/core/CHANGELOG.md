@@ -4,7 +4,7 @@
 
 ### Minor Changes
 
-- [#10889](https://github.com/growilabs/growi/pull/10889) [`d4be7e6`](https://github.com/growilabs/growi/commit/d4be7e68c497f168a5e39688ce0ef3760a62c98f) Thanks [@yuki-takei](https://github.com/yuki-takei)! - add YJS_WEBSOCKET_BASE_PATH
+- [`ef1c8b0`](https://github.com/growilabs/growi/commit/ef1c8b0e8b605c8c84c23e7650e02bd168817ff5) Thanks [@yuki-takei](https://github.com/yuki-takei)! - add YJS_WEBSOCKET_BASE_PATH
 
 ## 2.1.0
 

@@ -91,6 +91,7 @@ export default defineConfig({
         ignore: [...excludeFiles, '**/*.spec.ts'],
       }),
       name: 'editor-libs',
+      cssFileName: 'style',
       formats: ['es'],
     },
     rollupOptions: {

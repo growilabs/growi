@@ -4,7 +4,7 @@
 
 ### Patch Changes
 
-- Updated dependencies [[`d4be7e6`](https://github.com/growilabs/growi/commit/d4be7e68c497f168a5e39688ce0ef3760a62c98f)]:
+- Updated dependencies [[`ef1c8b0`](https://github.com/growilabs/growi/commit/ef1c8b0e8b605c8c84c23e7650e02bd168817ff5)]:
   - @growi/core@2.2.0
 
 ## 1.2.1

@@ -9,6 +9,9 @@ import type { Express } from 'express';
 import mongoose from 'mongoose';
 import pinoHttp, { type Options as PinoHttpOptions } from 'pino-http';
 
+import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
+import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
+import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron';
@@ -49,7 +52,7 @@ import {
 } from '../service/g2g-transfer';
 import { GrowiBridgeService } from '../service/growi-bridge';
 import { initializeImportService } from '../service/import';
-import InAppNotificationService from '../service/in-app-notification';
+import { InAppNotificationService } from '../service/in-app-notification';
 import { InstallerService } from '../service/installer';
 import { normalizeData } from '../service/normalize-data';
 import PageService from '../service/page';
@@ -437,6 +440,20 @@ class Crowi {
       throw new Error('pageBulkExportJobCleanUpCronService is not initialized');
     }
     pageBulkExportJobCleanUpCronService.startCron();
+
+    instantiateAuditLogBulkExportJobCronService(this);
+    checkAuditLogExportJobInProgressCronService.startCron();
+
+    instantiateAuditLogBulkExportJobCleanUpCronService(this);
+    const { auditLogBulkExportJobCleanUpCronService } = await import(
+      '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron'
+    );
+    if (auditLogBulkExportJobCleanUpCronService == null) {
+      throw new Error(
+        'auditLogBulkExportJobCleanUpCronService is not initialized',
+      );
+    }
+    auditLogBulkExportJobCleanUpCronService.startCron();
 
     startOpenaiCronIfEnabled();
     startAccessTokenCron();

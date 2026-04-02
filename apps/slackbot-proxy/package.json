@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "build": "tspc -p tsconfig.build.json",
-    "clean": "shx rm -rf dist",
+    "clean": "rimraf dist",
     "cp:public": "cp -RT ./src/public ./dist/public",
     "cp:views": "cp -RT ./src/views ./dist/views",
     "cp:bootstrap": "cp -RT ./node_modules/bootstrap/dist ./dist/public/bootstrap",
