@@ -1,4 +1,3 @@
-import nodePath from 'node:path';
 import type { IUser } from '@growi/core/dist/interfaces';
 
 import type Crowi from '~/server/crowi';
@@ -12,7 +11,7 @@ import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
 
-import { assertFileNameSafeForBaseDir } from '../../util/safe-path-utils';
+import { resolveLocalePath } from '../../util/safe-path-utils';
 import type { GlobalNotificationEventVars } from './types';
 
 const _logger = loggerFactory('growi:service:GlobalNotificationMailService');
@@ -90,47 +89,27 @@ class GlobalNotificationMailService {
     triggeredBy: IUser,
     { comment, oldPath }: GlobalNotificationEventVars,
   ): MailOption {
-    let locale = configManager.getConfig('app:globalLang');
-
-    const SUPPORTED_LOCALES = ['en_US', 'ja_JP', 'zh_CN'];
-
-    if (!SUPPORTED_LOCALES.includes(locale)) {
-      _logger.warn(
-        `Invalid or untrusted locale detected in DB: '${locale}'. Falling back to 'en_US' for safety.`,
-      );
-      locale = 'en_US';
-    }
-
-    // validate for all events
     if (event == null || page == null || triggeredBy == null) {
       throw new Error(
-        `invalid vars supplied to GlobalNotificationMailService.generateOption for event ${event}`,
+        `Invalid vars supplied to GlobalNotificationMailService.generateOption: event=${event}`,
       );
     }
-
-    try {
-      assertFileNameSafeForBaseDir(locale, this.crowi.localeDir);
-    } catch (err) {
-      _logger.error(
-        `Path traversal attempt detected in app:globalLang: '${locale}'. Fallback to 'en_US'.`,
-      );
-      locale = 'en_US';
+    const validEvents = Object.values(
+      GlobalNotificationSettingEvent,
+    ) as string[];
+    if (!validEvents.includes(event)) {
+      _logger.error(`Unknown global notification event: ${event}`);
+      throw new Error(`Unknown global notification event: ${event}`);
     }
 
-    const template = nodePath.join(
+    const castedEvent =
+      event as (typeof GlobalNotificationSettingEvent)[keyof typeof GlobalNotificationSettingEvent];
+    const locale = configManager.getConfig('app:globalLang');
+    const template = resolveLocalePath(
+      locale,
       this.crowi.localeDir,
-      `${locale}/notifications/${event}.ejs`,
+      `notifications/${castedEvent}.ejs`,
     );
-
-    const normalizedTemplatePath = nodePath.resolve(template);
-    const baseDir = nodePath.resolve(this.crowi.localeDir);
-
-    if (!normalizedTemplatePath.startsWith(baseDir)) {
-      _logger.error(
-        `Security Alert: Path traversal attempted! Resolved path: ${normalizedTemplatePath}`,
-      );
-      throw new Error('Path traversal detected! Blocking template access.');
-    }
 
     const path = page.path;
     const appTitle = this.crowi.appService.getAppTitle();
@@ -145,7 +124,7 @@ class GlobalNotificationMailService {
       username: triggeredBy.username,
     };
 
-    switch (event) {
+    switch (castedEvent) {
       case GlobalNotificationSettingEvent.PAGE_CREATE:
         subject = `#${event} - ${triggeredBy.username} created ${path} at URL: ${pageUrl}`;
         break;

@@ -1,5 +1,7 @@
 import path from 'pathe';
 
+export const SUPPORTED_LOCALES = ['en_US', 'ja_JP', 'zh_CN'];
+
 /**
  * Validates that the given file path is within the base directory.
  * This prevents path traversal attacks where an attacker could use sequences
@@ -45,6 +47,25 @@ export function assertFileNameSafeForBaseDir(
   if (!isValid) {
     throw new Error('Invalid file path: path traversal detected');
   }
+}
+
+/**
+ * Resolves a locale-specific template path safely, preventing path traversal attacks.
+ * Falls back to 'en_US' if the locale is not in the supported list.
+ *
+ * @param locale - The locale string (e.g. 'en_US')
+ * @param baseDir - The base directory for locale files
+ * @param templateSubPath - The sub-path within the locale directory (e.g. 'notifications/event.ejs')
+ * @returns The template path
+ * @throws Error if path traversal is detected
+ */
+export function resolveLocalePath(
+  locale: string,
+  baseDir: string,
+  templateSubPath: string,
+): string {
+  const safeLocale = SUPPORTED_LOCALES.includes(locale) ? locale : 'en_US';
+  return path.join(baseDir, safeLocale, templateSubPath);
 }
 
 /**

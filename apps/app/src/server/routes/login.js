@@ -4,7 +4,7 @@ import loggerFactory from '~/utils/logger';
 
 import { UserStatus } from '../models/user/conts';
 import { growiInfoService } from '../service/growi-info';
-import { assertFileNameSafeForBaseDir } from '../util/safe-path-utils';
+import { resolveLocalePath } from '../util/safe-path-utils';
 
 // disable all of linting
 // because this file is a deprecated legacy of Crowi
@@ -12,7 +12,6 @@ import { assertFileNameSafeForBaseDir } from '../util/safe-path-utils';
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi, app) => {
   const logger = loggerFactory('growi:routes:login');
-  const path = require('path');
   const { User } = crowi.models;
   const { appService, aclService, mailService, activityService } = crowi;
   const activityEvent = crowi.events.activity;
@@ -23,38 +22,12 @@ module.exports = (crowi, app) => {
     // send mails to all admin users (derived from crowi) -- 2020.06.18 Yuki Takei
     const admins = await User.findAdmins();
     const appTitle = appService.getAppTitle();
-    const SUPPORTED_LOCALES = ['en_US', 'ja_JP', 'zh_CN'];
-    let locale = configManager.getConfig('app:globalLang');
-
-    if (!SUPPORTED_LOCALES.includes(locale)) {
-      logger.warn(
-        `Invalid or untrusted locale detected: '${locale}'. Falling back to 'en_US' for safety.`,
-      );
-      locale = 'en_US';
-    }
-
-    try {
-      assertFileNameSafeForBaseDir(locale, crowi.localeDir);
-    } catch (_err) {
-      logger.error(
-        `Path traversal attempt detected in locale: '${locale}'. Fallback to 'en_US'.`,
-      );
-      locale = 'en_US';
-    }
-
-    const templatePath = path.join(
+    const locale = configManager.getConfig('app:globalLang');
+    const templatePath = resolveLocalePath(
+      locale,
       crowi.localeDir,
-      `${locale}/admin/userWaitingActivation.ejs`,
+      'admin/userWaitingActivation.ejs',
     );
-    const normalizedTemplatePath = path.resolve(templatePath);
-    const baseDir = path.resolve(crowi.localeDir);
-
-    if (!normalizedTemplatePath.startsWith(baseDir)) {
-      logger.error(
-        `Security Alert: Path traversal attempted! Resolved path: ${normalizedTemplatePath}`,
-      );
-      throw new Error('Path traversal detected! Blocking template access.');
-    }
 
     const promises = admins.map((admin) => {
       return mailService.send({
