@@ -84,6 +84,7 @@ module.exports = (crowi) => {
 
   const checkPassportStrategyMiddleware =
     checkForgotPasswordEnabledMiddlewareFactory(crowi, true);
+  const ALLOWED_TEMPLATE_NAMES = ['passwordReset', 'passwordResetSuccessful'];
 
   async function sendPasswordResetEmail(
     templateFileName,
@@ -92,6 +93,9 @@ module.exports = (crowi) => {
     url,
     expiredAt,
   ) {
+    if (!ALLOWED_TEMPLATE_NAMES.includes(templateFileName)) {
+      throw new Error(`Invalid template name: ${templateFileName}`);
+    }
     const templatePath = resolveLocalePath(
       locale,
       crowi.localeDir,
