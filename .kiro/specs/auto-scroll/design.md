@@ -68,9 +68,9 @@ graph TB
 
 **Architecture Integration**:
 - Selected pattern: Custom hook with options object — idiomatic React, testable, extensible
-- Domain boundaries: Hook logic in `src/client/hooks/`, constants in `@growi/core`, attribute lifecycle in each renderer package
+- Domain boundaries: Hook logic in `src/hooks/`, constants in `@growi/core`, attribute lifecycle in each renderer package
 - Existing patterns preserved: MutationObserver + polling hybrid, timeout-based safety bounds
-- New components rationale: `src/client/hooks/` directory needed for cross-feature hooks not tied to a specific feature module
+- New components rationale: `src/hooks/` directory needed for cross-feature hooks not tied to a specific feature module
 - Steering compliance: Named exports, immutable patterns, co-located tests
 
 ### Technology Stack
@@ -203,8 +203,8 @@ function useContentAutoScroll(options: UseContentAutoScrollOptions): void;
 - Invariants: At most one target observer and one rendering watch active per hook instance
 
 **Implementation Notes**
-- File location: `apps/app/src/client/hooks/use-content-auto-scroll.ts` (no JSX — `.ts` extension)
-- Test file: `apps/app/src/client/hooks/use-content-auto-scroll.spec.ts`
+- File location: `apps/app/src/hooks/use-content-auto-scroll.ts` (no JSX — `.ts` extension)
+- Test file: `apps/app/src/hooks/use-content-auto-scroll.spec.ts`
 - The `resolveTarget` and `scrollTo` callbacks should be wrapped in `useRef` or called from a ref to avoid re-triggering the effect when callback identity changes
 - Export both `useContentAutoScroll` and `watchRenderingAndReScroll` as named exports for independent testability
 
@@ -351,7 +351,7 @@ This feature operates entirely in the browser DOM layer with no server interacti
 
 ## Testing Strategy
 
-### Unit Tests (co-located in `src/client/hooks/`)
+### Unit Tests (co-located in `src/hooks/`)
 
 1. **Guard conditions**: Verify no-op when key is null, hash is empty, or container not found (1.3–1.5)
 2. **Immediate scroll**: Target exists in DOM → `scrollTo` called once (1.1)

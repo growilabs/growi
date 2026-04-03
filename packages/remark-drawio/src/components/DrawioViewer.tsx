@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { GROWI_RENDERING_ATTR } from '@growi/core/dist/consts';
+import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import { debounce } from 'throttle-debounce';
 
 import type { IGraphViewerGlobal } from '..';
@@ -128,7 +128,10 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
   useEffect(() => {
     if (error != null) {
       onRenderingUpdated?.(null);
-      drawioContainerRef.current?.removeAttribute(GROWI_RENDERING_ATTR);
+      drawioContainerRef.current?.setAttribute(
+        GROWI_IS_CONTENT_RENDERING_ATTR,
+        'false',
+      );
     }
   }, [error, onRenderingUpdated]);
 
@@ -145,7 +148,10 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
         if (mxgraphData != null) {
           const mxgraph = JSON.parse(mxgraphData);
           onRenderingUpdated?.(mxgraph.xml);
-          drawioContainerRef.current?.removeAttribute(GROWI_RENDERING_ATTR);
+          drawioContainerRef.current?.setAttribute(
+            GROWI_IS_CONTENT_RENDERING_ATTR,
+            'false',
+          );
         }
       }
     };
@@ -185,7 +191,7 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
       className={`drawio-viewer ${styles['drawio-viewer']} p-2`}
       data-begin-line-number-of-markdown={bol}
       data-end-line-number-of-markdown={eol}
-      {...{ [GROWI_RENDERING_ATTR]: 'true' }}
+      {...{ [GROWI_IS_CONTENT_RENDERING_ATTR]: 'true' }}
     >
       {/* show error */}
       {error != null && (

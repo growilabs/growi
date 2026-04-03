@@ -1,4 +1,4 @@
-import { GROWI_RENDERING_ATTR } from '@growi/core/dist/consts';
+import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import type { Properties } from 'hast';
 import type { Schema as SanitizeOption } from 'hast-util-sanitize';
 import type { Code, Node, Paragraph } from 'mdast';
@@ -10,7 +10,7 @@ const SUPPORTED_ATTRIBUTES = [
   'bol',
   'eol',
   'isDarkMode',
-  GROWI_RENDERING_ATTR,
+  GROWI_IS_CONTENT_RENDERING_ATTR,
 ];
 
 interface Data {
@@ -41,7 +41,7 @@ function rewriteNode(node: Node, index: number, isDarkMode?: boolean) {
     eol: node.position?.end.line,
     isDarkMode: isDarkMode ? 'true' : 'false',
     key: `drawio-${index}`,
-    [GROWI_RENDERING_ATTR]: 'true',
+    [GROWI_IS_CONTENT_RENDERING_ATTR]: 'true',
   };
 }
 

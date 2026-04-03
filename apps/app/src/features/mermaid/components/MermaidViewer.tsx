@@ -1,4 +1,5 @@
 import React, { type JSX, useEffect, useRef } from 'react';
+import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import mermaid from 'mermaid';
 import { v7 as uuidV7 } from 'uuid';
 
@@ -34,15 +35,21 @@ export const MermaidViewer = React.memo(
             const id = `mermaid-${uuidV7()}`;
             const { svg } = await mermaid.render(id, value, ref.current);
             ref.current.innerHTML = svg;
+            ref.current.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'false');
           } catch (err) {
             logger.error(err);
+            ref.current?.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'false');
           }
         }
       })();
     }, [isDarkMode, value]);
 
     return value ? (
-      <div ref={ref} key={value}>
+      <div
+        ref={ref}
+        key={value}
+        {...{ [GROWI_IS_CONTENT_RENDERING_ATTR]: 'true' }}
+      >
         {value}
       </div>
     ) : (
