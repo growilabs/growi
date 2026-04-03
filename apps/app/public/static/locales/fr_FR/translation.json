@@ -1070,7 +1070,6 @@
     "skipped-toaster": "Le mode édition doit être activé pour déclencher la synchronisation. Synchronisation annulée.",
     "error-toaster": "Synchronisation échouée"
   },
-
   "editor_guide": {
     "title": "Guide de l'Éditeur",
     "tabs": {
@@ -1095,7 +1094,8 @@
       "link_sandbox": "La page bac à sable est ici",
       "all_important": "Tout ce texte est\nimportant",
       "sub_text": "indice",
-      "sup_text": "exposant"
+      "sup_text": "exposant",
+      "is_text": "Ceci est du {{val}}"
     },
     "layout": {
       "copy_done": "Copié !",

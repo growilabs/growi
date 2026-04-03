@@ -1078,7 +1078,6 @@
     "skipped-toaster": "Skipped synchronizing since the editor is not activated. Please open the editor and try again.",
     "error-toaster": "Synchronization of the latest text failed"
   },
-
   "editor_guide": {
     "title": "Editor Guide",
     "tabs": {
@@ -1103,7 +1102,8 @@
       "link_sandbox": "Sandbox page is here",
       "all_important": "This text is all\nimportant",
       "sub_text": "subscript",
-      "sup_text": "superscript"
+      "sup_text": "superscript",
+      "is_text": "This is {{val}}"
     },
     "layout": {
       "copy_done": "Copied!",

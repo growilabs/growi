@@ -1083,7 +1083,6 @@
     "skipped-toaster": "由于编辑器未激活，因此跳过同步。 请打开编辑器并重试。",
     "error-toaster": "同步最新文本失败"
   },
-
   "editor_guide": {
     "title": "编辑器指南",
     "tabs": {
@@ -1108,7 +1107,8 @@
       "link_sandbox": "沙盒页面在这里",
       "all_important": "这段文字非常\n重要",
       "sub_text": "下标",
-      "sup_text": "上标"
+      "sup_text": "上标",
+      "is_text": "这是{{val}}效果"
     },
     "layout": {
       "copy_done": "已复制！",

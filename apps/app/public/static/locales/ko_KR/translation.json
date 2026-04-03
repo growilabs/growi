@@ -1062,7 +1062,8 @@
       "link_sandbox": "연습장 페이지는 여기입니다",
       "all_important": "이 텍스트는 모두\n중요합니다",
       "sub_text": "아래 첨자",
-      "sup_text": "위 첨자"
+      "sup_text": "위 첨자",
+      "is_text": "이것은 {{val}}입니다"
     },
     "layout": {
       "copy_done": "복사되었습니다!",

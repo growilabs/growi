@@ -1,7 +1,8 @@
 import type React from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { toastSuccess } from '~/client/util/toastr';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 
 import styles from './TextStyleTab.module.scss';
 
@@ -15,10 +16,14 @@ const GuideRow = ({
   preview: React.ReactNode;
 }) => {
   const { t } = useTranslation();
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(code);
-    toastSuccess(t('editor_guide.textstyle.copy_done'));
-  };
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toastSuccess(t('editor_guide.textstyle.copy_done'));
+    } catch (_err) {
+      toastError(t('common:failed_to_copy'));
+    }
+  }, [code, t]);
 
   return (
     <section className={title !== '' ? 'mt-4 mb-1' : 'mb-1'}>
@@ -123,7 +128,7 @@ export const TextStyleTab: React.FC = () => {
       code: `***${t(`${i18nKey}.all_important`)}***`,
       preview: (
         <strong>
-          <u>{t(`${i18nKey}.all_important`).replace('\n', '')}</u>
+          <em>{t(`${i18nKey}.all_important`).replace('\n', '')}</em>
         </strong>
       ),
     },
@@ -169,7 +174,7 @@ export const TextStyleTab: React.FC = () => {
           target="_blank"
           rel="noreferrer"
           className="text-secondary text-decoration-underline"
-          style={{ color: '#777570' }}
+          style={{ color: 'var(--bs-secondary-color)' }}
           onClick={(e) => e.stopPropagation()}
         >
           {t(`${i18nKey}.link_growi`)}
@@ -185,7 +190,7 @@ export const TextStyleTab: React.FC = () => {
         <a
           href="/Sandbox"
           className="text-secondary text-decoration-underline"
-          style={{ color: '#777570' }}
+          style={{ color: 'var(--bs-secondary-color)' }}
           onClick={(e) => e.stopPropagation()}
         >
           {t(`${i18nKey}.link_sandbox`)}

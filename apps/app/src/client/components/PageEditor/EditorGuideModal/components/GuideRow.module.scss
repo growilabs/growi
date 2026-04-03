@@ -1,0 +1,25 @@
+.copyButton {
+  display: block;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  background-color: transparent;
+  border: 0;
+}
+
+.codeBox {
+  width: fit-content;
+  background-color: var(--bs-dark);
+}
+
+.codePre {
+  margin: 0;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.copyBadge {
+  top: 4px;
+  right: 4px;
+  font-size: 0.4rem;
+}

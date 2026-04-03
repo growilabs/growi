@@ -4,12 +4,12 @@
 
 .codeBlockWrapper {
   width: fit-content;
-  background-color: #2D2E32;
+  background-color: var(--bs-dark);
 }
 
 .codeContent {
   font-size: 14px;
-  color: #ABB2BF;
+  color: rgba(var(--bs-white-rgb), 0.5);
 }
 
 .copyBadge {
@@ -24,10 +24,10 @@
 
 .inlineCodeLabel {
   width: fit-content;
-  color: #D63384;
-  border: 1px solid #D63384;
+  color: var(--bs-pink);
+  border: 1px solid var(--bs-pink);
 }
 
 .externalLink {
-  color: #777570 !important;
+  color: var(--bs-secondary-color);
 }

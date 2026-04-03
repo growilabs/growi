@@ -86,6 +86,16 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
     return () => cancelAnimationFrame(id);
   }, [isOpened]);
 
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpened) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpened, close]);
+
   if (!isOpened || rect == null) return <></>;
 
   const dynamicStyle: React.CSSProperties = {

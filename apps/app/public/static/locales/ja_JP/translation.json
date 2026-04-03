@@ -1111,7 +1111,6 @@
     "skipped-toaster": "エディターがアクティブではないため、同期をスキップしました。エディターを開いて再度お試しください。",
     "error-toaster": "最新の本文の同期に失敗しました"
   },
-
   "editor_guide": {
     "title": "エディターガイド",
     "tabs": {
@@ -1136,7 +1135,8 @@
       "link_sandbox": "砂場ページはこちら",
       "all_important": "このテキストはすべて\n重要です",
       "sub_text": "下付き",
-      "sup_text": "上付き"
+      "sup_text": "上付き",
+      "is_text": "これは{{val}}です"
     },
     "layout": {
       "copy_done": "コピーしました！",

@@ -1,20 +1,11 @@
 import type React from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { toastSuccess } from '~/client/util/toastr';
+import type { LayoutGuideItem } from '../components/GuideRow';
+import { GuideRow } from '../components/GuideRow';
 
 import styles from './DecorationTab.module.scss';
-
-interface LayoutGuideItem {
-  id: string;
-  title: string;
-  code: string;
-  preview?: React.ReactNode;
-  minWidth?: string;
-  underContent?: React.ReactNode;
-}
-type GuideRowProps = Omit<LayoutGuideItem, 'id'>;
 
 const BOOTSTRAP_COLORS = [
   'primary',
@@ -28,65 +19,27 @@ const BOOTSTRAP_COLORS = [
 ] as const;
 type BootstrapColor = (typeof BOOTSTRAP_COLORS)[number];
 
-const GuideRow = ({
-  title,
-  code,
-  preview,
-  minWidth = '230px',
-  underContent,
-}: GuideRowProps) => {
-  const { t } = useTranslation();
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(code);
-    toastSuccess(t('editor_guide.textstyle.copy_done'));
-  };
-
-  const isFullWidth = minWidth === '100%' || !preview;
-
-  return (
-    <section className={title !== '' ? 'mt-4 mb-2' : 'mb-2'}>
-      {title !== '' && <h3 className="fw-bold mb-2 fs-5 text-body">{title}</h3>}
-      <div className="d-flex flex-row flex-wrap align-items-center gap-4 py-1">
-        <button
-          type="button"
-          onClick={handleCopy}
-          className={`${styles.copyButton} ${isFullWidth ? 'w-100 flex-grow-1' : 'flex-grow-0 flex-shrink-0'}`}
-          style={{ minWidth: isFullWidth ? '100%' : minWidth }}
-        >
-          <div
-            className={`${styles.codeContainer} text-light p-2 ps-3 pe-5 rounded position-relative ${isFullWidth ? 'w-100' : ''}`}
-          >
-            <pre
-              className={`small font-monospace text-white-50 ${isFullWidth ? 'text-wrap' : ''}`}
-            >
-              {code}
-            </pre>
-            <small
-              className={`position-absolute badge bg-secondary opacity-50 ${styles.copyBadge}`}
-            >
-              Copy
-            </small>
-          </div>
-        </button>
-
-        {preview && (
-          <div
-            className={`flex-grow-0 flex-shrink-0 ${isFullWidth ? 'w-100' : ''}`}
-          >
-            <div className="wiki-content small">{preview}</div>
-          </div>
-        )}
-      </div>
-      {underContent && <div className="mt-2 w-100">{underContent}</div>}
-    </section>
-  );
-};
-
 export const DecorationTab: React.FC = () => {
   const { t } = useTranslation();
   const i18nKey = 'editor_guide.decoration';
   const [currentStyle, setCurrentStyle] = useState<BootstrapColor>('primary');
   const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
 
   const colorConfigs: Record<BootstrapColor, { icon: string; prefix: string }> =
     {
@@ -173,7 +126,7 @@ export const DecorationTab: React.FC = () => {
       {
         id: 'back-color',
         title: t(`${i18nKey}.back_color`),
-        code: `<p class="text-white minWidth: '100%' bg-${styleConfig.colorName}">${t(`${i18nKey}.placeholder`)}</p>`,
+        code: `<p class="text-white bg-${styleConfig.colorName}">${t(`${i18nKey}.placeholder`)}</p>`,
         underContent: (
           <p className={`text-white bg-${styleConfig.colorName} px-2 m-0`}>
             {t(`${i18nKey}.placeholder`)}
@@ -198,7 +151,7 @@ export const DecorationTab: React.FC = () => {
     <div className={`px-4 py-3 ${styles.decorationTab}`}>
       <section className="mb-4">
         <h3 className="fw-bold mb-2 fs-5">{t(`${i18nKey}.style`)}</h3>
-        <div className={`dropdown ${isOpen ? 'show' : ''}`}>
+        <div ref={dropdownRef} className={`dropdown ${isOpen ? 'show' : ''}`}>
           <button
             className={`btn btn-light border dropdown-toggle d-flex align-items-center gap-2 text-${styleConfig.colorName === 'light' ? 'dark' : styleConfig.colorName}`}
             type="button"
