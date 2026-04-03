@@ -297,6 +297,7 @@ const GROWI_IS_CONTENT_RENDERING_SELECTOR =
 - Initial JSX: `{[GROWI_IS_CONTENT_RENDERING_ATTR]: 'true'}` (unchanged pattern, new constant name)
 - Update `SUPPORTED_ATTRIBUTES` in `remark-drawio.ts` to use new constant name
 - Update sanitize option to allow the new attribute name
+- **ResizeObserver re-render cycle** (req 4.8): In the ResizeObserver handler, call `drawioContainerRef.current?.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'true')` before `renderDrawioWithDebounce()`. The existing inner MutationObserver (childList) completion path already sets the attribute back to `"false"` after each render — no additional change needed there. This ensures layout shifts from post-initial-render size adjustments are detected by the auto-scroll system.
 
 ### MermaidViewer Modification
 

@@ -11,7 +11,8 @@
   - Change rendering-complete and error paths to set the attribute value to `"false"` instead of removing the attribute entirely
   - Update the initial JSX spread to use the renamed constant while keeping `"true"` as the initial value
   - Verify that the wrapper component (DrawioViewerWithEditButton) continues to function without changes
-  - _Requirements: 4.3, 4.4_
+  - In the ResizeObserver handler, set `attr="true"` before `renderDrawioWithDebounce()` to signal re-render cycles to the auto-scroll system (req 4.8)
+  - _Requirements: 4.3, 4.4, 4.8_
 - [x] 2.2 (P) Update remark-drawio plugin sanitization and node rewriting
   - Replace the old constant in the supported-attributes array with the new constant name
   - Update node rewriting to set the new attribute name with `"true"` value on drawio nodes

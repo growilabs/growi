@@ -64,6 +64,7 @@ The following reviewer feedback is incorporated into these requirements:
 5. The attribute shall be included in the component's HTML sanitization allowlist so that it survives remark/rehype processing.
 6. The CSS selector used by the auto-scroll system shall match only the "in progress" state (e.g., `[attr="true"]`), not the completed state.
 7. The following async-rendering components shall adopt the attribute protocol in this scope: DrawioViewer, MermaidViewer, and lsx (Lsx). Other async renderers (PlantUML, attachment-refs, RichAttachment) are deferred to follow-up work.
+8. When a component triggers a secondary re-render that will cause a layout shift (e.g., via ResizeObserver detecting container size changes after initial render), the component shall reset the attribute value to `"true"` before the re-render begins and allow the existing completion path to set it back to `"false"` when done. This ensures the auto-scroll system tracks all layout-shifting render cycles, not only the initial one.
 
 ### Requirement 5: Page-Type Agnostic Design
 
