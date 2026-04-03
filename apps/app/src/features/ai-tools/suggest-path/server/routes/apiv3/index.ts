@@ -111,7 +111,7 @@ const validator = [
  *               body:
  *                 type: string
  *                 description: The page content to analyze for path suggestions
- *                 maxLength: 100000
+ *                 maxLength: 50000
  *     responses:
  *       200:
  *         description: Path suggestions generated successfully
