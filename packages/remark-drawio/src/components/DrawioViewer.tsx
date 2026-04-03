@@ -128,6 +128,7 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
   useEffect(() => {
     if (error != null) {
       onRenderingUpdated?.(null);
+      // finish rendering to allow auto-scroll system to detect the upcoming layout shift
       drawioContainerRef.current?.setAttribute(
         GROWI_IS_CONTENT_RENDERING_ATTR,
         'false',
@@ -174,6 +175,11 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
       for (const _entry of entries) {
         // setElementWidth(entry.contentRect.width);
         onRenderingStart?.();
+        // Signal re-rendering in progress so the auto-scroll system can detect the upcoming layout shift
+        drawioContainerRef.current?.setAttribute(
+          GROWI_IS_CONTENT_RENDERING_ATTR,
+          'true',
+        );
         renderDrawioWithDebounce();
       }
     });
