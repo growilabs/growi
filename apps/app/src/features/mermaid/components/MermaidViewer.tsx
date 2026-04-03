@@ -21,6 +21,8 @@ export const MermaidViewer = React.memo(
     const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+      let rafId: number | undefined;
+
       (async () => {
         if (ref.current != null && value != null) {
           mermaid.initialize({
@@ -35,13 +37,26 @@ export const MermaidViewer = React.memo(
             const id = `mermaid-${uuidV7()}`;
             const { svg } = await mermaid.render(id, value, ref.current);
             ref.current.innerHTML = svg;
-            ref.current.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'false');
+            // Delay the "done" signal to the next animation frame so the browser has a chance
+            // to compute the SVG layout before the auto-scroll system re-scrolls.
+            rafId = requestAnimationFrame(() => {
+              ref.current?.setAttribute(
+                GROWI_IS_CONTENT_RENDERING_ATTR,
+                'false',
+              );
+            });
           } catch (err) {
             logger.error(err);
             ref.current?.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'false');
           }
         }
       })();
+
+      return () => {
+        if (rafId != null) {
+          cancelAnimationFrame(rafId);
+        }
+      };
     }, [isDarkMode, value]);
 
     return value ? (
