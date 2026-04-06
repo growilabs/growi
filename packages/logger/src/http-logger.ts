@@ -1,8 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import pinoHttp, {
-  type HttpLogger,
-  type Options as PinoHttpOptions,
-} from 'pino-http';
+import type { HttpLogger, Options as PinoHttpOptions } from 'pino-http';
 
 import { loggerFactory } from './logger-factory';
 
@@ -45,5 +42,6 @@ export async function createHttpLoggerMiddleware(
     Object.assign(httpOptions, morganLikeFormatOptions);
   }
 
+  const { default: pinoHttp } = await import('pino-http');
   return pinoHttp(httpOptions);
 }
