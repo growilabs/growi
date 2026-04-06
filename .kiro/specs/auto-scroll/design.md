@@ -6,17 +6,17 @@
 
 **Users**: End users navigating to hash-linked sections benefit from reliable scroll positioning. Developers integrating the hook into new views (PageView, SearchResultContent, future views) benefit from a standardized, configurable API.
 
-**Impact**: Refactors the existing `useHashAutoScroll` hook from a PageView-specific implementation into a shared, configurable hook. Renames and updates the rendering status attribute protocol for clarity and declarative usage.
+**Impact**: Refactors the existing `useHashAutoScroll` hook from a PageView-specific implementation into a shared, configurable hook. Renames and updates the rendering status attribute protocol for clarity and declarative usage. Also integrates hash-based auto-scroll into `SearchResultContent`, where the content pane has an independent scroll container.
 
 ### Goals
 - Provide a single reusable hook for hash-based auto-scroll across all content views
 - Support customizable target resolution and scroll behavior per caller
 - Establish a clear, declarative rendering-status attribute protocol for async-rendering components
 - Maintain robust resource cleanup with timeout-based safety bounds
+- Integrate `SearchResultContent` as a second consumer with container-relative scroll strategy
 
 ### Non-Goals
 - Adding `data-growi-is-content-rendering` to attachment-refs (Ref/Refs/RefImg/RefsImg/Gallery), or RichAttachment — these also cause layout shifts but require more complex integration; deferred to follow-up
-- Replacing SearchResultContent's keyword-highlight scroll with this hook (requires separate evaluation)
 - Supporting non-browser environments (SSR) — this is a client-only hook
 
 ## Architecture
@@ -57,8 +57,8 @@ graph TB
         LSX[Lsx]
     end
 
-    PV -->|calls| HOOK
-    SRC -->|calls| HOOK
+    PV -->|calls, default scrollTo| HOOK
+    SRC -->|calls, custom scrollTo| HOOK
     HOOK -->|delegates| WATCH
     WATCH -->|queries| CONST
     DV -->|sets/toggles| CONST
@@ -137,7 +137,7 @@ Key decisions:
 | 3.1–3.6 | Re-scroll after rendering | watchRenderingAndReScroll | scrollTo callback | Auto-Scroll Lifecycle |
 | 4.1–4.7 | Rendering attribute protocol | Rendering Status Constants, DrawioViewer, MermaidViewer, PlantUmlViewer, Lsx | GROWI_IS_CONTENT_RENDERING_ATTR | — |
 | 4.8 | ResizeObserver re-render cycle | DrawioViewer | GROWI_IS_CONTENT_RENDERING_ATTR | — |
-| 5.1–5.5 | Page-type agnostic design | useContentAutoScroll | UseContentAutoScrollOptions | — |
+| 5.1–5.5 | Page-type agnostic design | useContentAutoScroll, SearchResultContent | UseContentAutoScrollOptions | — |
 | 5.6, 5.7, 6.1–6.3 | Cleanup and safety | useContentAutoScroll, watchRenderingAndReScroll | cleanup functions | — |
 
 ## Components and Interfaces
@@ -151,6 +151,7 @@ Key decisions:
 | MermaidViewer (modification) | features/mermaid | Add rendering-status attribute lifecycle to async SVG render | 4.3, 4.4, 4.7 | Rendering Status Constants (P0) | State |
 | PlantUmlViewer (new) | features/plantuml | Wrap PlantUML `<img>` to provide rendering-status attribute lifecycle | 4.3, 4.4, 4.7 | Rendering Status Constants (P0) | State |
 | Lsx (modification) | remark-lsx | Add rendering-status attribute lifecycle to async page list fetch | 4.3, 4.4, 4.7 | Rendering Status Constants (P0) | State |
+| SearchResultContent (modification) | features/search | Integrate useContentAutoScroll with container-relative scrollTo; suppress keyword scroll when hash is present | 5.1, 5.2, 5.3, 5.5 | useContentAutoScroll (P0), scrollWithinContainer (P0) | State |
 
 ### Client Hooks
 
@@ -366,6 +367,77 @@ const GROWI_IS_CONTENT_RENDERING_SELECTOR =
 - The lsx remark plugin sanitize options must be updated to include the new attribute name
 - `@growi/core` must be added as a dependency of `remark-lsx` (same pattern as `remark-drawio`)
 - **SWR cache hit behavior**: When SWR returns a cached result immediately (`isLoading=false` on first render), the attribute starts at `"false"` and no re-scroll is triggered. This is correct: a cached result means the list renders without a layout shift, so no compensation is needed. The re-scroll mechanism only activates when `isLoading` starts as `"true"` (no cache) and transitions to `"false"` after the fetch completes.
+
+---
+
+### SearchResultContent Integration
+
+#### SearchResultContent (modification)
+
+| Field | Detail |
+|-------|--------|
+| Intent | Integrate `useContentAutoScroll` for hash-based navigation within the search result content pane; coordinate with the existing keyword-highlight scroll to prevent position conflicts |
+| Requirements | 5.1, 5.2, 5.3, 5.5 |
+
+**Background**: `SearchResultContent` renders page content inside a div with `overflow-y-scroll` (`#search-result-content-body-container`). It already has a separate keyword-highlight scroll mechanism — a `useEffect` with no dependency array that uses `MutationObserver` to scroll to the first `.highlighted-keyword` element using `scrollWithinContainer`. These two scroll mechanisms must coexist without overriding each other.
+
+**Container-Relative Scroll Problem**
+
+`element.scrollIntoView()` (the hook's default `scrollTo`) scrolls the viewport, not the scrolling container. Since `#search-result-content-body-container` is the scrolling unit, a custom `scrollTo` is required:
+
+```
+scrollTo(target):
+  distance = target.getBoundingClientRect().top
+            - container.getBoundingClientRect().top
+            - SCROLL_OFFSET_TOP
+  scrollWithinContainer(container, distance)
+```
+
+The `container` reference is obtained via `scrollElementRef.current` (the existing React ref already present in the component). The `SCROLL_OFFSET_TOP = 30` constant is reused from the keyword scroll for visual consistency.
+
+**Scroll Conflict Resolution**
+
+When a URL hash is present, both mechanisms would fire:
+1. `useContentAutoScroll` → scroll to the hash target element
+2. Keyword MutationObserver → scroll to the first `.highlighted-keyword` element (500ms debounced)
+
+This creates a race condition where the keyword scroll overrides the hash scroll. Resolution strategy:
+
+> **When `window.location.hash` is non-empty, the keyword-highlight `useEffect` returns early.** Hash-based scroll takes priority.
+
+Concretely, the existing keyword-scroll `useEffect` gains a guard at the top:
+
+```
+if (window.location.hash.length > 0) return;
+```
+
+When no hash is present, keyword scroll proceeds exactly as before — no behavior change for the common case.
+
+**Hook Call Site**
+
+```typescript
+const scrollTo = useCallback((target: HTMLElement) => {
+  const container = scrollElementRef.current;
+  if (container == null) return;
+  const distance =
+    target.getBoundingClientRect().top -
+    container.getBoundingClientRect().top -
+    SCROLL_OFFSET_TOP;
+  scrollWithinContainer(container, distance);
+}, []);
+
+useContentAutoScroll({
+  key: page._id,
+  contentContainerId: 'search-result-content-body-container',
+  scrollTo,
+});
+```
+
+- `resolveTarget` defaults to `document.getElementById` — heading elements have `id` attributes set by the remark processing pipeline, so the default resolver works without customization.
+- `scrollTo` uses the existing `scrollElementRef` directly to avoid redundant `getElementById` lookup.
+- `useCallback` with empty deps array ensures callback identity is stable across renders (the hook wraps it in a ref internally, but stable identity avoids any risk of spurious re-renders).
+
+**File**: `apps/app/src/features/search/client/components/SearchPage/SearchResultContent.tsx`
 
 ---
 

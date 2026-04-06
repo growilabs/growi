@@ -23,11 +23,15 @@
 - **Sources**: `apps/app/src/features/search/client/components/SearchPage/SearchResultContent.tsx`
 - **Findings**:
   - Container ID: `search-result-content-body-container`
-  - Uses MutationObserver to find `.highlighted-keyword` elements and scroll to the first one
-  - Debounced at 500ms
-  - Does NOT use URL hash for scrolling — scrolls to highlighted search terms
-  - No cleanup function (intentional, per inline comment)
-- **Implications**: SearchResultContent's scroll target is NOT hash-based. The auto-scroll hook must accept a custom target resolver to support non-hash targets. The two scroll mechanisms (hash-based and keyword-based) may coexist or the keyword-based one may be replaced by the generalized hook.
+  - Container has `overflow-y-scroll` — is the scroll unit, not the viewport
+  - Uses MutationObserver to find `.highlighted-keyword` elements and scroll to the first one using `scrollWithinContainer`
+  - Debounced at 500ms; `SCROLL_OFFSET_TOP = 30`
+  - Does NOT use URL hash — scrolls to highlighted search terms
+  - `useEffect` has no dependency array (fires on every render); no cleanup (intentional per inline comment)
+- **Implications (updated)**:
+  - `scrollIntoView()` default is inappropriate; custom `scrollTo` using `scrollWithinContainer` is required
+  - When `window.location.hash` is non-empty, the keyword scroll overrides hash scroll after 500ms debounce — must be suppressed via early return guard
+  - The `resolveTarget` default (`document.getElementById`) works correctly; heading `id` attributes are set by the remark pipeline
 
 ### DrawioViewer Rendering Attribute Pattern
 - **Context**: Requirement 4.4 mandates declarative true/false toggling
@@ -90,7 +94,8 @@
 - **Rationale**: With declarative true/false toggling, bare `[attr]` matches both states; value selector is required
 
 ## Risks & Mitigations
-- **Risk**: SearchResultContent's existing scroll logic may conflict with the generalized hook — **Mitigation**: Allow callers to provide custom `resolveTarget` so SearchResultContent can resolve its keyword target independently
+- **Risk**: SearchResultContent's existing keyword-highlight scroll may conflict with hash-based scroll — **Mitigation**: Guard the keyword-scroll `useEffect` with `if (window.location.hash.length > 0) return;` so hash scroll takes priority when a hash is present; keyword scroll proceeds unchanged otherwise
+- **Risk**: `scrollIntoView()` default scrolls the viewport when SearchResultContent's container has `overflow-y-scroll` — **Mitigation**: Provide a custom `scrollTo` closure using `scrollWithinContainer` with offset from the container's bounding rect
 - **Risk**: Renaming the attribute requires coordinated changes across `@growi/core`, `remark-drawio`, and consuming apps — **Mitigation**: Constants are centralized; single constant rename propagates via imports
 - **Risk**: MutationObserver on `subtree: true` may be expensive on large pages — **Mitigation**: Retained 10s maximum watch timeout from current implementation
 
