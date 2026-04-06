@@ -88,7 +88,8 @@ describe('bunyan-format transport', () => {
 
     const output = chunks.join('');
     expect(output).toContain('hello');
-    expect(output).toContain('\n    {"extra":"value"}');
+    // pino-pretty formats extra fields as `key: "value"` on a new indented line
+    expect(output).toContain('\n    extra: "value"');
   });
 
   it('appends extra fields inline when singleLine is true', async () => {
