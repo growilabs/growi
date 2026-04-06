@@ -118,7 +118,10 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
         className={`modal-container d-flex align-items-center justify-content-center z-3 fade ${isShown ? 'show' : ''}`}
         style={dynamicStyle}
       >
-        <div className="px-3 modal-card-wrapper w-100">
+        <div
+          className="px-3 modal-card-wrapper w-100"
+          style={{ maxWidth: '700px' }}
+        >
           <div
             className="card shadow-lg border-0"
             style={{ maxHeight: rect.height - 32 }}
