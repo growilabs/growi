@@ -1,6 +1,6 @@
+import { AllLang } from '@growi/core';
 import path from 'pathe';
-
-export const SUPPORTED_LOCALES = ['en_US', 'ja_JP', 'zh_CN'];
+export { AllLang as SUPPORTED_LOCALES };
 
 /**
  * Validates that the given file path is within the base directory.
@@ -64,7 +64,7 @@ export function resolveLocalePath(
   baseDir: string,
   templateSubPath: string,
 ): string {
-  const safeLocale = SUPPORTED_LOCALES.includes(locale) ? locale : 'en_US';
+  const safeLocale = (AllLang as string[]).includes(locale) ? locale : 'en_US';
   return path.join(baseDir, safeLocale, templateSubPath);
 }
 
