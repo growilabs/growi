@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest';
 
 import { morganLikeFormatOptions } from './morgan-like-format-options';
 
+// Strip ANSI escape codes for plain-text assertions (avoids control-char lint rule)
+const ANSI_RE = new RegExp(`${String.fromCharCode(27)}\\[\\d+m`, 'g');
+const strip = (s: string) => s.replace(ANSI_RE, '');
+
 function fakeReq(method: string, url: string): IncomingMessage {
   return { method, url } as IncomingMessage;
 }
@@ -19,7 +23,7 @@ describe('morganLikeFormatOptions', () => {
         fakeRes(200),
         12.4,
       );
-      expect(msg).toBe('GET /page/path 200 - 12ms');
+      expect(strip(msg)).toBe('GET /page/path 200 - 12ms');
     });
 
     it('rounds responseTime to nearest integer', () => {
@@ -28,7 +32,7 @@ describe('morganLikeFormatOptions', () => {
         fakeRes(201),
         0.7,
       );
-      expect(msg).toBe('POST /api 201 - 1ms');
+      expect(strip(msg)).toBe('POST /api 201 - 1ms');
     });
   });
 
@@ -39,7 +43,7 @@ describe('morganLikeFormatOptions', () => {
         fakeRes(500),
         new Error('db timeout'),
       );
-      expect(msg).toBe('PUT /data 500 - db timeout');
+      expect(strip(msg)).toBe('PUT /data 500 - db timeout');
     });
   });
 

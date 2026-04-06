@@ -10,6 +10,18 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
  *   pinoHttp({ ...morganLikeFormatOptions, logger })
  */
 
+const NO_COLOR = Boolean(process.env.NO_COLOR);
+const RESET = NO_COLOR ? '' : '\x1b[0m';
+const DIM = NO_COLOR ? '' : '\x1b[2m';
+
+function statusAnsi(status: number): string {
+  if (NO_COLOR) return '';
+  if (status >= 500) return '\x1b[31m'; // red
+  if (status >= 400) return '\x1b[33m'; // yellow
+  if (status >= 300) return '\x1b[36m'; // cyan
+  return '\x1b[32m'; // green
+}
+
 type CustomSuccessMessage = (
   req: IncomingMessage,
   res: ServerResponse,
@@ -36,11 +48,13 @@ export const morganLikeFormatOptions: {
   customLogLevel: CustomLogLevel;
 } = {
   customSuccessMessage: (req, res, responseTime) => {
-    return `${req.method} ${req.url} ${res.statusCode} - ${Math.round(responseTime)}ms`;
+    const sc = statusAnsi(res.statusCode);
+    return `${req.method} ${RESET}${req.url} ${sc}${res.statusCode}${RESET} - ${DIM}${Math.round(responseTime)}ms${RESET}`;
   },
 
   customErrorMessage: (req, res, error) => {
-    return `${req.method} ${req.url} ${res.statusCode} - ${error.message}`;
+    const sc = statusAnsi(res.statusCode);
+    return `${req.method} ${RESET}${req.url} ${sc}${res.statusCode}${RESET} - ${error.message}`;
   },
 
   customLogLevel: (_req, res, error) => {
