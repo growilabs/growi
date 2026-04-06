@@ -256,6 +256,8 @@ function watchRenderingAndReScroll(
 - Add a `stopped` boolean flag checked inside timer callbacks to prevent race conditions between cleanup and queued timer execution
 - When `checkAndSchedule` detects that no rendering elements remain and a timer is currently active, cancel the active timer immediately — avoids a redundant re-scroll after rendering has already completed
 - The MutationObserver watches `childList`, `subtree`, and `attributes` (filtered to the rendering-status attribute) — the `childList` + `subtree` combination is what detects late-mounting async renderers
+- **Performance trade-off**: The function is always started regardless of whether rendering elements exist at call time. This means one MutationObserver + one 10s cleanup timeout run for every hash navigation, even on pages with no async renderers. The initial `checkAndSchedule()` call returns early if no rendering elements are present, so no poll timer is ever scheduled in that case — the only cost is the MO observation and the 10s cleanup timeout itself, which is acceptable.
+- **`querySelector` frequency**: The `checkAndSchedule` callback fires on every `childList` mutation (in addition to attribute changes). Each invocation runs `querySelector(GROWI_IS_CONTENT_RENDERING_SELECTOR)` on the container. This call is O(n) on the subtree but stops at the first match and is bounded by the 10s timeout, making it acceptable even for content-heavy pages.
 
 ---
 
@@ -363,6 +365,7 @@ const GROWI_IS_CONTENT_RENDERING_SELECTOR =
 - File: `packages/remark-lsx/src/client/components/Lsx.tsx`
 - The lsx remark plugin sanitize options must be updated to include the new attribute name
 - `@growi/core` must be added as a dependency of `remark-lsx` (same pattern as `remark-drawio`)
+- **SWR cache hit behavior**: When SWR returns a cached result immediately (`isLoading=false` on first render), the attribute starts at `"false"` and no re-scroll is triggered. This is correct: a cached result means the list renders without a layout shift, so no compensation is needed. The re-scroll mechanism only activates when `isLoading` starts as `"true"` (no cache) and transitions to `"false"` after the fetch completes.
 
 ---
 
@@ -390,6 +393,7 @@ This feature operates entirely in the browser DOM layer with no server interacti
 4. **Custom resolveTarget**: Provided closure is called instead of default `getElementById` (5.2)
 5. **Custom scrollTo**: Provided scroll function is called instead of default `scrollIntoView` (5.3)
 6. **Late-mounting renderers**: Rendering elements that appear after the initial scroll are detected and trigger a re-scroll (key scenario for Mermaid/PlantUML)
+7. **No spurious re-scroll when no renderers**: When no rendering elements ever appear, the watch times out without calling `scrollTo` again (validates always-start trade-off)
 
 ### Integration Tests (watchRenderingAndReScroll)
 
@@ -400,6 +404,12 @@ This feature operates entirely in the browser DOM layer with no server interacti
 5. **Multiple rendering elements**: Only one re-scroll per cycle (6.3)
 6. **Watch timeout**: All resources cleaned up after 10s (3.6, 6.2)
 7. **Cleanup prevents post-cleanup execution**: Stopped flag prevents race (6.1)
+8. **Rendering completes before first timer**: Immediate re-scroll fires via wasRendering path, no extra scroll after that
+
+### MermaidViewer Tests
+
+1. **rAF cleanup on unmount**: When component unmounts during the async render, the pending `requestAnimationFrame` is cancelled — no `setAttribute` call after unmount
+2. **isDarkMode change re-renders correctly**: Attribute resets to `"true"` on re-render and transitions to `"false"` via rAF after the new render completes
 
 ### Hook Lifecycle Tests
 
