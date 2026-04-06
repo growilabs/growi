@@ -37,7 +37,7 @@ export default (opts: BunyanFormatOptions) => {
 
   const pretty = prettyFactory({
     colorize: opts.colorize ?? !process.env.NO_COLOR,
-    ignore: 'pid,hostname,name',
+    ignore: 'pid,hostname,name,req,res,responseTime',
     translateTime: false,
     singleLine,
     // Suppress pino-pretty's default time and level rendering; we handle them in messageFormat
