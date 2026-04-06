@@ -104,11 +104,9 @@
 
 ---
 
-## Phase 2: Architecture Refactoring (Next Session)
+## Phase 2: Module Reorganization
 
-> **Context**: Tasks 6.1–6.3 were implemented but are architecturally incorrect. `useContentAutoScroll` is URL-hash–driven and never activates on the search page (`/search?q=foo`). The actual need is to re-scroll to `.highlighted-keyword` after async renderers (drawio, mermaid) cause layout shifts. See `research.md` § "Post-Implementation Finding" for full analysis.
->
-> **Recommended model**: Opus — this phase requires design decisions on hook decomposition.
+> **Context**: Tasks 1–7 delivered all functional requirements. Task 8 reorganizes modules for co-location: each hook moves next to its consumer, and the shared rendering watch utility moves to `src/client/util/`. No behavior changes — pure structural improvement.
 
 - [x] 7. Fix SearchResultContent: replace `useContentAutoScroll` with `watchRenderingAndReScroll`
 - [x] 7.1 Wire `watchRenderingAndReScroll` into keyword-scroll effect
@@ -124,16 +122,33 @@
   - Add tests that `watchRenderingAndReScroll` re-scrolls to `.highlighted-keyword` after a rendering element settles
   - Update MutationObserver suppression test: remove the hash-guard test (guard will be gone)
 
-- [ ] 8. (Design required) Extract shared `useRenderingRescroll` hook
-  - **Design this task in the next session before implementing**
-  - Goal: provide a reusable React hook that wraps `watchRenderingAndReScroll` with `useEffect` lifecycle management, composable by both `useContentAutoScroll` (hash path) and `SearchResultContent` (keyword path)
-  - Key design questions to resolve (see research.md):
-    1. Hook vs. plain function — who owns the `useEffect`?
-    2. Is adding `[page._id]` deps + cleanup to the keyword-scroll effect safe given the original intentional no-cleanup design?
-    3. Should the hash guard on keyword-scroll be removed entirely?
-  - Proposed dependency graph after refactor:
-    ```
-    useContentAutoScroll  ─┐
-                            ├── useRenderingRescroll ── watchRenderingAndReScroll
-    SearchResultContent   ─┘
-    ```
+- [ ] 8. Reorganize auto-scroll modules by co-locating hooks with their consumers
+- [ ] 8.1 Move the rendering watch utility to the shared utility directory
+  - Move the rendering watch function and its test file from the shared hooks directory to the client utility directory, alongside the existing smooth-scroll utility
+  - Update the import path in the hash-based auto-scroll hook to reference the new location
+  - Update the import path in SearchResultContent to reference the new location
+  - Run existing tests to verify no regressions from the path change
+  - _Requirements: 5.4, 5.5_
+- [ ] 8.2 Rename and move the hash-based auto-scroll hook next to PageView
+  - Rename the hook and its options type to reflect its hash-navigation–specific purpose (not a generic "content auto-scroll")
+  - Move the hook file and its test file to the PageView component directory
+  - Update PageView's import to use the co-located hook with the new name
+  - Update the hook's internal import of the rendering watch utility to use the path established in 8.1
+  - Run existing tests to verify the rename and move introduce no regressions
+  - _Requirements: 5.4, 5.5_
+- [ ] 8.3 Extract the keyword-scroll effect from SearchResultContent into a co-located hook
+  - Create a new hook that encapsulates the MutationObserver-based keyword detection, debounced scroll, and rendering watch integration currently inlined in the component
+  - Accept a ref to the scrollable container and a trigger key as inputs
+  - Move the scroll helper functions (container-relative scroll calculation, first-highlighted-keyword lookup) into the hook file if they are used only by this logic
+  - Replace the inline useEffect in SearchResultContent with a single call to the new hook
+  - _Requirements: 5.4, 5.5, 6.1_
+- [ ] 8.4 (P) Write tests for the extracted keyword-rescroll hook
+  - Migrate rendering watch assertions from SearchResultContent tests into the new hook's test file
+  - Add tests for keyword scroll behavior: MutationObserver setup, debounced scroll to the first highlighted keyword, cleanup on key change and unmount
+  - Simplify SearchResultContent tests to verify the hook is called with the correct container ref and key, without re-testing internal scroll behavior
+  - _Requirements: 6.1, 6.2_
+- [ ] 8.5 (P) Remove the old shared hooks directory and verify no stale imports
+  - Delete the now-empty auto-scroll hooks directory
+  - Search the codebase for any remaining references to the old directory path and fix them
+  - Run the full test suite and type check to confirm the reorganization is complete
+  - _Requirements: 5.5_

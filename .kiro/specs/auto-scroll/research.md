@@ -178,6 +178,68 @@ SearchResultContent   ─┘
 2. The current keyword-scroll `useEffect` has no dependency array (fires every render) and no cleanup — intentional per inline comment. Adding `[page._id]` deps and a cleanup changes this behavior. Is that safe?
 3. Should the hash guard on the keyword-scroll `useEffect` be removed once `useContentAutoScroll` is also removed from `SearchResultContent`?
 
+## Task 8 Analysis: useRenderingRescroll Hook Extraction
+
+### Investigation (2026-04-06)
+
+**Objective**: Determine whether extracting a shared `useRenderingRescroll` hook is architecturally beneficial after tasks 1–7 completion.
+
+**Method**: Code review of current implementations — `useContentAutoScroll` (108 lines), `watchRenderingAndReScroll` (85 lines), `SearchResultContent` keyword-scroll effect (lines 133–161).
+
+### Findings
+
+**1. Hook extraction is architecturally infeasible for `useContentAutoScroll`**
+
+`useContentAutoScroll` calls `watchRenderingAndReScroll` conditionally inside its `useEffect`:
+- On the immediate path: only after `scrollToTarget()` returns true (line 77)
+- On the deferred path: only after the MutationObserver detects the target element (line 91)
+
+React hooks cannot be called conditionally or inside callbacks. A `useRenderingRescroll` hook would need an "enabled" flag pattern, adding complexity without simplification.
+
+**2. Co-located cleanup in SearchResultContent prevents separation**
+
+The keyword-scroll `useEffect` in `SearchResultContent` (lines 135–160) combines:
+- MutationObserver for keyword highlight detection
+- `watchRenderingAndReScroll` for async renderer compensation
+- Single cleanup return that handles both
+
+Extracting the watch into a separate hook would split cleanup across two effects, making the lifecycle harder to reason about.
+
+**3. All three design questions from the original research are resolved**
+
+| Question | Resolution | How |
+|----------|------------|-----|
+| Hook vs. function | Plain function | Conditional call inside effect prevents hook usage |
+| `[page._id]` deps + cleanup safe? | Yes, safe | Implemented in task 7.1, working correctly |
+| Hash guard removal | Already done | Removed in task 7.1 alongside `useContentAutoScroll` removal |
+
+**4. Current architecture is already optimal**
+
+`watchRenderingAndReScroll` as a plain function returning a cleanup closure is the correct abstraction level:
+- Composable into any `useEffect` (conditional or unconditional)
+- No React runtime coupling (testable without `renderHook`)
+- Clean dependency graph with two independent consumers
+
+### Initial Recommendation (superseded)
+
+Initially recommended closing Task 8 without code changes. However, after discussion the scope was revised from "hook extraction" to "module reorganization" — see below.
+
+### Revised Direction: Module Reorganization (2026-04-06)
+
+**Context**: The user observed that while a shared `useRenderingRescroll` hook adds no value (confirmed by analysis above), the current file layout is inconsistent:
+
+1. `useContentAutoScroll` lives in `src/client/hooks/` (shared) but is PageView-specific (hash-dependent)
+2. `watchRenderingAndReScroll` lives next to that hook as if internal, but is the actual shared primitive
+3. SearchResultContent's scroll logic is inlined rather than extracted
+
+**Revised approach**:
+- Move `watchRenderingAndReScroll` to `src/client/util/` — co-located with `smooth-scroll.ts` (both are DOM scroll utilities)
+- Rename `useContentAutoScroll` → `useHashAutoScroll` and move next to `PageView.tsx`
+- Extract keyword-scroll effect from `SearchResultContent` into co-located `useKeywordRescroll` hook
+- Delete `src/client/hooks/use-content-auto-scroll/` directory
+
+**Rationale**: Module co-location over shared directory. Each hook lives next to its only consumer. Only the truly shared primitive (`watchRenderingAndReScroll`) stays in a shared directory — and it moves from `hooks/` to `util/` since it's a plain function, not a hook.
+
 ## References
 - [MutationObserver API](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver) — core browser API used for DOM observation
 - [Element.scrollIntoView()](https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView) — default scroll behavior

@@ -441,6 +441,119 @@ useContentAutoScroll({
 
 ---
 
+## Task 8 Design: Module Reorganization
+
+### Background
+
+After tasks 1–7, the auto-scroll modules are functional but organizationally misaligned:
+
+- `useContentAutoScroll` lives in a shared hooks directory (`src/client/hooks/use-content-auto-scroll/`) but is effectively PageView-specific — it depends on `window.location.hash` and only PageView uses it
+- `watchRenderingAndReScroll` lives alongside that hook as if it were hook-internal, but it is a plain function and the actual shared primitive used by both PageView and SearchResultContent
+- SearchResultContent's keyword-scroll + rendering-watch logic is inlined in the component, not extracted into a testable hook
+
+### Goals
+
+- Place each module where its consumer lives (co-location)
+- Move the only truly shared primitive (`watchRenderingAndReScroll`) to the shared utility directory
+- Remove the `src/client/hooks/use-content-auto-scroll/` directory — it no longer represents a shared hook
+
+### Non-Goals
+
+- Changing any scroll behavior or logic — this is a pure reorganization
+- Simplifying `useContentAutoScroll`'s generic options (`resolveTarget`, `scrollTo`) — retained for future extensibility
+
+### Architecture After Reorganization
+
+```mermaid
+graph TB
+    subgraph shared_util[src/client/util]
+        WRRS[watch-rendering-and-rescroll.ts]
+    end
+
+    subgraph page_view[src/components/PageView]
+        UHAS[use-hash-auto-scroll.ts]
+        PV[PageView.tsx]
+    end
+
+    subgraph search[features/search/.../SearchPage]
+        UKR[use-keyword-rescroll.ts]
+        SRC[SearchResultContent.tsx]
+    end
+
+    PV -->|calls| UHAS
+    UHAS -->|imports| WRRS
+    SRC -->|calls| UKR
+    UKR -->|imports| WRRS
+```
+
+### File Moves
+
+| Before | After | Change |
+|--------|-------|--------|
+| `src/client/hooks/use-content-auto-scroll/watch-rendering-and-rescroll.ts` | `src/client/util/watch-rendering-and-rescroll.ts` | Move to shared util (not a hook) |
+| `src/client/hooks/use-content-auto-scroll/watch-rendering-and-rescroll.spec.tsx` | `src/client/util/watch-rendering-and-rescroll.spec.tsx` | Co-locate test with source |
+| `src/client/hooks/use-content-auto-scroll/use-content-auto-scroll.ts` | `src/components/PageView/use-hash-auto-scroll.ts` | Rename + move next to consumer |
+| `src/client/hooks/use-content-auto-scroll/use-content-auto-scroll.spec.tsx` | `src/components/PageView/use-hash-auto-scroll.spec.tsx` | Co-locate test with source |
+| SearchResultContent.tsx (inline keyword-scroll effect) | `features/search/.../SearchPage/use-keyword-rescroll.ts` | Extract into co-located hook |
+| (new) | `features/search/.../SearchPage/use-keyword-rescroll.spec.tsx` | New test file for extracted hook |
+| `src/client/hooks/use-content-auto-scroll/` | (deleted) | Directory removed after all files moved |
+
+### Component Details
+
+#### watch-rendering-and-rescroll (move only)
+
+No code changes. Moved from `src/client/hooks/use-content-auto-scroll/` to `src/client/util/` because it is a plain function, not a React hook. Co-located with `smooth-scroll.ts` — both are DOM scroll utilities.
+
+#### use-hash-auto-scroll (rename + move)
+
+Renamed from `useContentAutoScroll` to `useHashAutoScroll`. The name reflects that this hook is hash-navigation–driven (`window.location.hash`). Logic is unchanged — the two-phase flow (target resolution → rendering watch) and generic options (`resolveTarget`, `scrollTo`) are preserved.
+
+- **Export**: `useHashAutoScroll` (named export), `UseHashAutoScrollOptions` (type export)
+- **Import update**: `watchRenderingAndReScroll` imported from `~/client/util/watch-rendering-and-rescroll`
+- **Consumer**: `PageView.tsx` updates its import path and function name
+
+#### use-keyword-rescroll (new — extracted from SearchResultContent)
+
+Extracts the keyword-scroll `useEffect` from `SearchResultContent.tsx` (lines 133–161) into a standalone hook.
+
+```typescript
+interface UseKeywordRescrollOptions {
+  /** Ref to the scrollable container element */
+  scrollElementRef: RefObject<HTMLElement | null>;
+  /** Unique key that triggers re-execution (typically page._id) */
+  key: string;
+}
+
+function useKeywordRescroll(options: UseKeywordRescrollOptions): void;
+```
+
+**Responsibilities:**
+- MutationObserver on container for keyword highlight detection (debounced 500ms)
+- `watchRenderingAndReScroll` integration for async renderer compensation
+- Cleanup of both MO and rendering watch on key change or unmount
+
+**Import**: `watchRenderingAndReScroll` from `~/client/util/watch-rendering-and-rescroll`
+
+`scrollToTargetWithinContainer` and `scrollToFirstHighlightedKeyword` helper functions move into the hook file (or stay in SearchResultContent if other code in the component also uses them).
+
+### Import Update Summary
+
+| File | Old Import | New Import |
+|------|-----------|------------|
+| `PageView.tsx` | `~/client/hooks/use-content-auto-scroll/use-content-auto-scroll` | `./use-hash-auto-scroll` |
+| `use-hash-auto-scroll.ts` | `./watch-rendering-and-rescroll` | `~/client/util/watch-rendering-and-rescroll` |
+| `use-keyword-rescroll.ts` | (inline code) | `~/client/util/watch-rendering-and-rescroll` |
+| `SearchResultContent.tsx` | `~/client/hooks/use-content-auto-scroll/watch-rendering-and-rescroll` | `./use-keyword-rescroll` |
+
+### Testing Strategy
+
+- **`watch-rendering-and-rescroll.spec.tsx`**: Move as-is; no test changes (same logic, new path)
+- **`use-hash-auto-scroll.spec.tsx`**: Move + rename imports; no test logic changes
+- **`use-keyword-rescroll.spec.tsx`**: Migrate relevant tests from `SearchResultContent.spec.tsx` (rendering watch assertions) and add hook-level tests for keyword scroll behavior
+- **`SearchResultContent.spec.tsx`**: Simplify — component tests verify that `useKeywordRescroll` is called with correct props; detailed scroll behavior tested in the hook's own spec
+
+---
+
 ## Error Handling
 
 ### Error Strategy
