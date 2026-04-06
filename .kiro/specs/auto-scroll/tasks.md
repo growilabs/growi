@@ -82,20 +82,20 @@
   - Verify that PageView auto-scroll behavior is preserved with manual testing or existing test coverage
   - _Requirements: 5.1, 5.4, 5.5_
 
-- [ ] 6. Integrate useContentAutoScroll into SearchResultContent
-- [ ] 6.1 (P) Add hash-based auto-scroll with container-relative scroll strategy
+- [x] 6. Integrate useContentAutoScroll into SearchResultContent
+- [x] 6.1 (P) Add hash-based auto-scroll with container-relative scroll strategy
   - Call `useContentAutoScroll` with `key: page._id` and `contentContainerId: 'search-result-content-body-container'`
   - Provide a custom `scrollTo` closure that calculates the target element's offset relative to the container's bounding rect and calls `scrollWithinContainer` with the same `SCROLL_OFFSET_TOP` constant already used for keyword scroll
   - Capture the container via the existing `scrollElementRef` in the closure to avoid a redundant `getElementById` lookup
   - Do not provide a custom `resolveTarget` — heading elements have `id` attributes set by the remark pipeline, so the default `getElementById` resolver works correctly
   - _Requirements: 5.1, 5.2, 5.3, 5.5_
 
-- [ ] 6.2 (P) Suppress keyword-highlight scroll when a URL hash is present
+- [x] 6.2 (P) Suppress keyword-highlight scroll when a URL hash is present
   - Add an early return guard at the top of the existing keyword-scroll `useEffect`: if `window.location.hash` is non-empty, return immediately so hash-based scroll is not overridden by the debounced keyword scroll
   - Preserve the existing keyword-scroll behavior fully when no hash is present — the MutationObserver, debounce interval, and `scrollWithinContainer` call remain unchanged
   - _Requirements: 5.1, 5.5_
 
-- [ ]* 6.3 Write tests for SearchResultContent auto-scroll integration
+- [x] 6.3 Write tests for SearchResultContent auto-scroll integration
   - Test that `useContentAutoScroll` is called with the correct `key` and `contentContainerId` when the component mounts
   - Test that the custom `scrollTo` scrolls within the container (not the viewport) by verifying `scrollWithinContainer` is called with the correct distance
   - Test that the keyword-scroll `useEffect` skips observation when `window.location.hash` is non-empty
