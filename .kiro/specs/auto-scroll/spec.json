@@ -15,7 +15,8 @@
     },
     "tasks": {
       "generated": true,
-      "approved": false
+      "approved": false,
+      "notes": "Tasks 1–7 implemented. Task 8 is Phase 2 architecture refactoring — requires design review before implementation. See research.md § Post-Implementation Finding."
     }
   },
   "ready_for_implementation": false

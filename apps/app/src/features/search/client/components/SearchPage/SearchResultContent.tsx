@@ -12,6 +12,7 @@ import type {
   ForceHideMenuItems,
 } from '~/client/components/Common/Dropdown/PageItemControl';
 import type { RevisionLoaderProps } from '~/client/components/Page/RevisionLoader';
+import { watchRenderingAndReScroll } from '~/client/hooks/use-content-auto-scroll/watch-rendering-and-rescroll';
 import { exportAsMarkdown } from '~/client/services/page-operation';
 import { scrollWithinContainer } from '~/client/util/smooth-scroll';
 import { toastSuccess } from '~/client/util/toastr';
@@ -99,20 +100,24 @@ type Props = {
   forceHideMenuItems?: ForceHideMenuItems;
 };
 
+const scrollToTargetWithinContainer = (
+  target: HTMLElement,
+  container: HTMLElement,
+): void => {
+  const distance =
+    target.getBoundingClientRect().top -
+    container.getBoundingClientRect().top -
+    SCROLL_OFFSET_TOP;
+  scrollWithinContainer(container, distance);
+};
+
 const scrollToFirstHighlightedKeyword = (scrollElement: HTMLElement): void => {
   // use querySelector to intentionally get the first element found
   const toElem = scrollElement.querySelector(
     '.highlighted-keyword',
   ) as HTMLElement | null;
-  if (toElem == null) {
-    return;
-  }
-
-  const distance =
-    toElem.getBoundingClientRect().top -
-    scrollElement.getBoundingClientRect().top -
-    SCROLL_OFFSET_TOP;
-  scrollWithinContainer(scrollElement, distance);
+  if (toElem == null) return;
+  scrollToTargetWithinContainer(toElem, scrollElement);
 };
 const scrollToFirstHighlightedKeywordDebounced = debounce(
   500,
@@ -122,34 +127,43 @@ const scrollToFirstHighlightedKeywordDebounced = debounce(
 export const SearchResultContent: FC<Props> = (props: Props) => {
   const scrollElementRef = useRef<HTMLDivElement | null>(null);
 
-  // ***************************  Auto Scroll  ***************************
+  const { pageWithMeta } = props;
+  const page = pageWithMeta.data;
+
+  // ***************************  Keyword Scroll  ***************************
+  // biome-ignore lint/correctness/useExhaustiveDependencies: page._id is a trigger dep: re-run this effect when the selected page changes
   useEffect(() => {
     const scrollElement = scrollElementRef.current;
 
     if (scrollElement == null) return;
+
+    const scrollToKeyword = (): boolean => {
+      const toElem = scrollElement.querySelector(
+        '.highlighted-keyword',
+      ) as HTMLElement | null;
+      if (toElem == null) return false;
+      scrollToTargetWithinContainer(toElem, scrollElement);
+      return true;
+    };
 
     const observer = new MutationObserver(() => {
       scrollToFirstHighlightedKeywordDebounced(scrollElement);
     });
     observer.observe(scrollElement, MUTATION_OBSERVER_CONFIG);
 
-    // no cleanup function -- 2023.07.31 Yuki Takei
-    // see: https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver/observe
-    // > You can call observe() multiple times on the same MutationObserver
-    // > to watch for changes to different parts of the DOM tree and/or different types of changes.
-  });
+    // Re-scroll to keyword after async renderers (drawio/mermaid) cause layout shifts
+    const cleanupWatch = watchRenderingAndReScroll(
+      scrollElement,
+      scrollToKeyword,
+    );
+    return cleanupWatch;
+  }, [page._id]);
   // *******************************  end  *******************************
 
-  const {
-    pageWithMeta,
-    highlightKeywords,
-    showPageControlDropdown,
-    forceHideMenuItems,
-  } = props;
+  const { highlightKeywords, showPageControlDropdown, forceHideMenuItems } =
+    props;
 
   const { t } = useTranslation();
-
-  const page = pageWithMeta.data;
   const { open: openDuplicateModal } = usePageDuplicateModalActions();
   const { open: openRenameModal } = usePageRenameModalActions();
   const { open: openDeleteModal } = usePageDeleteModalActions();

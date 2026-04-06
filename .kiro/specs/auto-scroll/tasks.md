@@ -101,3 +101,39 @@
   - Test that the keyword-scroll `useEffect` skips observation when `window.location.hash` is non-empty
   - Test that the keyword-scroll `useEffect` sets up the MutationObserver normally when no hash is present
   - _Requirements: 5.1, 5.2, 5.3, 5.5_
+
+---
+
+## Phase 2: Architecture Refactoring (Next Session)
+
+> **Context**: Tasks 6.1–6.3 were implemented but are architecturally incorrect. `useContentAutoScroll` is URL-hash–driven and never activates on the search page (`/search?q=foo`). The actual need is to re-scroll to `.highlighted-keyword` after async renderers (drawio, mermaid) cause layout shifts. See `research.md` § "Post-Implementation Finding" for full analysis.
+>
+> **Recommended model**: Opus — this phase requires design decisions on hook decomposition.
+
+- [x] 7. Fix SearchResultContent: replace `useContentAutoScroll` with `watchRenderingAndReScroll`
+- [x] 7.1 Wire `watchRenderingAndReScroll` into keyword-scroll effect
+  - Remove `useContentAutoScroll` import and call from `SearchResultContent.tsx`
+  - Import `watchRenderingAndReScroll` (already exported from `watch-rendering-and-rescroll.ts`)
+  - Inside the keyword-scroll `useEffect`, after setting up the MutationObserver, call `watchRenderingAndReScroll(scrollElement, scrollToKeyword)` where `scrollToKeyword` calls `scrollToTargetWithinContainer` on the first `.highlighted-keyword` element
+  - Add `[page._id]` to the dependency array (currently has no deps) and return the watch cleanup function
+  - Remove the hash guard (`if (window.location.hash.length > 0) return`) — no longer needed once `useContentAutoScroll` is removed
+  - _See research.md for proposed code sketch_
+
+- [x] 7.2 Update SearchResultContent tests
+  - Remove tests that assert `useContentAutoScroll` is called
+  - Add tests that `watchRenderingAndReScroll` re-scrolls to `.highlighted-keyword` after a rendering element settles
+  - Update MutationObserver suppression test: remove the hash-guard test (guard will be gone)
+
+- [ ] 8. (Design required) Extract shared `useRenderingRescroll` hook
+  - **Design this task in the next session before implementing**
+  - Goal: provide a reusable React hook that wraps `watchRenderingAndReScroll` with `useEffect` lifecycle management, composable by both `useContentAutoScroll` (hash path) and `SearchResultContent` (keyword path)
+  - Key design questions to resolve (see research.md):
+    1. Hook vs. plain function — who owns the `useEffect`?
+    2. Is adding `[page._id]` deps + cleanup to the keyword-scroll effect safe given the original intentional no-cleanup design?
+    3. Should the hash guard on keyword-scroll be removed entirely?
+  - Proposed dependency graph after refactor:
+    ```
+    useContentAutoScroll  ─┐
+                            ├── useRenderingRescroll ── watchRenderingAndReScroll
+    SearchResultContent   ─┘
+    ```
