@@ -151,3 +151,6 @@ This specification covers the complete migration from bunyan to pino, replacing 
 4. After the encapsulation, `apps/app` and `apps/slackbot-proxy` shall not import `pino-http` directly; all HTTP logging shall go through `@growi/logger`.
 5. The `pino-http` dependency shall move from consumer applications to `@growi/logger`'s `dependencies`.
 6. The `morganLikeFormatOptions` module shall only be imported in development mode (dynamic import). In production, the module shall not be imported or bundled.
+7. The `pino-http` module shall be imported lazily inside the `createHttpLoggerMiddleware` function body (not at module top-level), so that bundlers (e.g., Turbopack, webpack) do not include the Node.js-only `pino-http` in browser bundles when `@growi/logger` is imported by shared/universal code.
+8. While in development mode with morgan-like formatting enabled, the HTTP log output shall suppress the verbose `req` and `res` serialized objects; the `customSuccessMessage` output (method, URL, status code, response time) is sufficient for development readability.
+9. While in development mode, the morgan-like format shall colorize the HTTP status code by range (2xx=green, 3xx=cyan, 4xx=yellow, 5xx=red) and dim the response time, respecting the `NO_COLOR` environment variable.

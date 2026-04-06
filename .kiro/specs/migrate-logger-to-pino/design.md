@@ -91,6 +91,7 @@ graph TB
 - Existing patterns preserved: factory function signature, namespace conventions, config file structure
 - New components: `LevelResolver` (namespace-to-level matching), `TransportFactory` (dev/prod stream setup), `EnvVarParser` (env variable parsing)
 - Steering compliance: shared package in `packages/` follows monorepo conventions
+- **Dev-only isolation**: modules that are only used in development (`bunyan-format`, `morgan-like-format-options`) reside under `src/dev/` to make the boundary explicit; all are loaded via dynamic import, never statically bundled in production
 
 ### Technology Stack
 
@@ -355,7 +356,7 @@ function createTransportConfig(isProduction: boolean): TransportConfig;
 - Invariants: Browser options never include Node.js transports
 
 **Implementation Notes**
-- Dev transport: `{ target: '<resolved-path>/transports/bunyan-format.js', options: { singleLine: false } }` — target path resolved via `import.meta.url`
+- Dev transport: `{ target: '<resolved-path>/dev/bunyan-format.js' }` — target path resolved via `path.join(path.dirname(fileURLToPath(import.meta.url)), 'dev', 'bunyan-format.js')`; no `options` passed (singleLine defaults to false inside the module)
 - Prod with FORMAT_NODE_LOG: `{ target: 'pino-pretty', options: { translateTime: 'SYS:standard', ignore: 'pid,hostname', singleLine: true } }` — standard pino-pretty, no custom prettifiers
 - Prod without FORMAT_NODE_LOG (or false): raw JSON to stdout (no transport)
 - Browser production: `{ browser: { asObject: false }, level: 'error' }`
@@ -382,21 +383,25 @@ function createTransportConfig(isProduction: boolean): TransportConfig;
 ##### Transport Module
 
 ```typescript
-// packages/logger/src/transports/bunyan-format.ts
+// packages/logger/src/dev/bunyan-format.ts
 // Default export: function(opts) → Writable stream (pino transport protocol)
 
 interface BunyanFormatOptions {
   singleLine?: boolean;
+  colorize?: boolean;
+  destination?: NodeJS.WritableStream;
 }
 ```
 
 **Implementation Notes**
-- Internally calls `pinoPretty({ ...opts, ignore: 'pid,hostname,name', customPrettifiers: { time, level } })`
-- `customPrettifiers.time`: formats epoch → `HH:mm:ss.SSSZ` (UTC time-only, no brackets)
-- `customPrettifiers.level`: returns `${label.padStart(5)} ${log.name}` (right-aligned level + namespace, no parens)
-- pino-pretty then appends `: ` and the message, producing: `10:06:30.419Z DEBUG growi:service:page: message`
+- Uses `messageFormat` in pino-pretty to produce the full line: timestamp + level + name + message
+- `ignore: 'pid,hostname,name,req,res,responseTime'` — suppresses pino-http's verbose req/res objects in dev; the morgan-like `customSuccessMessage` already provides method/URL/status/time on the same line
+- `customPrettifiers: { time: () => '', level: () => '' }` — suppresses pino-pretty's default time/level rendering (handled inside `messageFormat`)
+- Level right-alignment and colorization are implemented inside `messageFormat` using ANSI codes
+- `singleLine` defaults to `false` inside the module; no `options` need to be passed from TransportFactory
 - Since the transport is a separate module loaded by the Worker thread, function options work (no serialization issue)
-- Vite's `preserveModules` ensures `src/transports/bunyan-format.ts` → `dist/transports/bunyan-format.js`
+- Vite's `preserveModules` ensures `src/dev/bunyan-format.ts` → `dist/dev/bunyan-format.js`
+- `NO_COLOR` environment variable is respected to disable colorization
 
 ##### Output Examples
 
@@ -405,6 +410,11 @@ interface BunyanFormatOptions {
 10:06:30.419Z DEBUG growi:service:PassportService: LdapStrategy: serverUrl is invalid
 10:06:30.420Z  WARN growi:service:PassportService: SamlStrategy: cert is not set.
     extra: {"field":"value"}
+```
+
+**Dev HTTP log** (bunyan-format + morgan-like format, req/res suppressed):
+```
+10:06:30.730Z  INFO express: GET /applicable-grant?pageId=abc 304 - 16ms
 ```
 
 **Prod + FORMAT_NODE_LOG** (standard pino-pretty, singleLine: true):
@@ -466,8 +476,9 @@ async function createHttpLoggerMiddleware(options?: HttpLoggerOptions): Promise<
 **Implementation Notes**
 - The type assertion for Logger<string> → pino-http's Logger is handled internally, hidden from consumers
 - `pino-http` moves from apps' dependencies to `@growi/logger`'s dependencies
-- `morganLikeFormatOptions` is dynamically imported (`await import('./morgan-like-format-options')`) only when `NODE_ENV !== 'production'`, ensuring the module is not loaded in production
-- The function is `async` to support the dynamic import; consumers call: `express.use(await createHttpLoggerMiddleware({ autoLogging: { ignore: ... } }))`
+- **Browser compatibility**: `pino-http` is imported lazily inside the function body (`const { default: pinoHttp } = await import('pino-http')`) rather than at the module top-level. This prevents bundlers (Turbopack/webpack) from pulling the Node.js-only `pino-http` into browser bundles when `@growi/logger` is imported by shared code
+- `morganLikeFormatOptions` is dynamically imported (`await import('./dev/morgan-like-format-options')`) only when `NODE_ENV !== 'production'`, ensuring the module is not loaded in production
+- The function is `async` to support the dynamic imports; consumers call: `express.use(await createHttpLoggerMiddleware({ autoLogging: { ignore: ... } }))`
 
 ### OpenTelemetry Layer
 
@@ -648,10 +659,10 @@ const customLogLevel: PinoHttpOptions['customLogLevel'] = (_req, res, error) => 
 
 ### Testing
 
-- `transport-factory.spec.ts`: Verify transport target is bunyan-format (not pino-pretty directly); dev returns `singleLine: false`, prod + FORMAT_NODE_LOG returns `singleLine: true`
-- `bunyan-format.spec.ts` (optional): Verify the transport module is loadable and produces expected output format
-- `http-logger.spec.ts`: Verify `createHttpLoggerMiddleware` returns middleware, applies morganLikeFormatOptions, passes autoLogging options
-- pino-http custom messages: Verify `customSuccessMessage` format, `customLogLevel` returns correct levels for 2xx/4xx/5xx
+- `transport-factory.spec.ts`: Verify transport target contains `bunyan-format` (not pino-pretty directly); dev transport passes no options (singleLine handled inside bunyan-format); prod + FORMAT_NODE_LOG returns pino-pretty with `singleLine: true`
+- `bunyan-format.spec.ts`: Verify transport module produces `HH:mm:ss.SSSZ LEVEL name: message` format; verify req/res are excluded from output
+- `http-logger.spec.ts`: Verify `createHttpLoggerMiddleware` returns middleware, applies morganLikeFormatOptions in dev, passes autoLogging options
+- `morgan-like-format-options.spec.ts`: Verify message formats using `strip()` to remove ANSI codes before assertion; verify customLogLevel returns correct levels for 2xx/4xx/5xx
 
 ---
 
@@ -672,3 +683,27 @@ const customLogLevel: PinoHttpOptions['customLogLevel'] = (_req, res, error) => 
 3. **apps/app**: Replace direct `pino-http` import with `createHttpLoggerMiddleware` from `@growi/logger`
 4. **apps/slackbot-proxy**: Same as apps/app
 5. **Cleanup**: Remove `pino-http` from apps' direct dependencies (keep in @growi/logger)
+
+---
+
+## Addendum: Dev-Only Module Isolation and Browser Compatibility (Post-Migration)
+
+> Added 2026-04-06. Restructures dev-only modules and fixes browser bundle compatibility.
+
+### Background
+
+- `bunyan-format` and `morgan-like-format-options` were mixed with production modules at the `src/` root level
+- `pino-http` imported at the module top-level caused browser bundle errors (Turbopack: `TypeError: __turbopack_context__.r(...).symbols is undefined`) when `@growi/logger` was imported by shared page code
+- HTTP request logs in dev were verbose (multi-line `req`/`res` JSON objects)
+- HTTP status codes in dev lacked visual differentiation
+
+### Changes
+
+1. **`src/dev/` directory**: All dev-only modules moved under `src/dev/`
+   - `src/transports/bunyan-format.ts` → `src/dev/bunyan-format.ts`
+   - `src/morgan-like-format-options.ts` → `src/dev/morgan-like-format-options.ts`
+   - `src/transports/` directory removed
+2. **`index.ts`**: Removed static `export { morganLikeFormatOptions }` — dev-only module must not appear in production-facing package exports
+3. **`http-logger.ts`**: `pino-http` import moved from module top-level into the async function body (`const { default: pinoHttp } = await import('pino-http')`) — prevents browser bundlers from including the Node.js-only package
+4. **`bunyan-format.ts`**: `ignore` extended to `'pid,hostname,name,req,res,responseTime'` — suppresses verbose pino-http req/res objects; morgan-like `customSuccessMessage` already provides all relevant HTTP metadata on one line
+5. **`morgan-like-format-options.ts`**: ANSI color codes added for status code (2xx=green, 3xx=cyan, 4xx=yellow, 5xx=red) and dim response time; `NO_COLOR` env var respected
