@@ -147,8 +147,7 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
 
         const mxgraphData = target.dataset.mxgraph;
         if (mxgraphData != null) {
-          const mxgraph = JSON.parse(mxgraphData);
-          onRenderingUpdated?.(mxgraph.xml);
+          onRenderingUpdated?.(JSON.parse(mxgraphData).xml);
           drawioContainerRef.current?.setAttribute(
             GROWI_IS_CONTENT_RENDERING_ATTR,
             'false',
@@ -173,7 +172,6 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
 
     const observer = new ResizeObserver((entries) => {
       for (const _entry of entries) {
-        // setElementWidth(entry.contentRect.width);
         onRenderingStart?.();
         // Signal re-rendering in progress so the auto-scroll system can detect the upcoming layout shift
         drawioContainerRef.current?.setAttribute(
