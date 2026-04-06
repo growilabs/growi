@@ -40,7 +40,7 @@ export async function createHttpLoggerMiddleware(
   // In development, dynamically import morgan-like format options
   if (process.env.NODE_ENV !== 'production') {
     const { morganLikeFormatOptions } = await import(
-      './morgan-like-format-options'
+      './dev/morgan-like-format-options'
     );
     Object.assign(httpOptions, morganLikeFormatOptions);
   }

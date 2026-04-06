@@ -29,11 +29,7 @@ export function createNodeTransportOptions(
     // Development: use bunyan-format custom transport (dev only)
     // Use path.join to resolve sibling module — avoids Vite's `new URL(…, import.meta.url)` asset transform
     const thisDir = path.dirname(fileURLToPath(import.meta.url));
-    const bunyanFormatPath = path.join(
-      thisDir,
-      'transports',
-      'bunyan-format.js',
-    );
+    const bunyanFormatPath = path.join(thisDir, 'dev', 'bunyan-format.js');
     return {
       transport: {
         target: bunyanFormatPath,
