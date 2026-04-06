@@ -179,7 +179,39 @@ describe('useContentAutoScroll', () => {
     unmount();
   });
 
-  it('should skip rendering watch when no rendering elements exist after initial scroll', () => {
+  // Poll interval is 5s, so this test needs more than 5s — extend timeout to 10s.
+  // happy-dom's MutationObserver does not fire reliably with fake timers when a
+  // setTimeout is pending in the same scope. Use real timers for this test only.
+  it('should re-scroll when rendering elements appear after initial scroll (late-mounting async renderers)', async () => {
+    vi.useRealTimers();
+
+    window.location.hash = '#heading';
+
+    const target = document.createElement('div');
+    target.id = 'heading';
+    target.scrollIntoView = vi.fn();
+    container.appendChild(target);
+
+    // No rendering elements at scroll time
+    const { unmount } = renderHook(() =>
+      useContentAutoScroll({ key: 'page-id', contentContainerId: containerId }),
+    );
+
+    expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
+
+    // Async renderer mounts after the initial scroll (simulates Mermaid/PlantUML loading)
+    const renderingEl = document.createElement('div');
+    renderingEl.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'true');
+    container.appendChild(renderingEl);
+
+    // Wait for MO to fire and the 5s poll timer to elapse
+    await new Promise<void>((resolve) => setTimeout(resolve, 5100));
+    expect(target.scrollIntoView).toHaveBeenCalledTimes(2);
+
+    unmount();
+  }, 10000);
+
+  it('should not re-scroll when no rendering elements exist after initial scroll', () => {
     window.location.hash = '#heading';
 
     const target = document.createElement('div');
@@ -193,7 +225,7 @@ describe('useContentAutoScroll', () => {
 
     expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
 
-    // No re-scroll since no rendering elements
+    // No re-scroll since no rendering elements are present
     vi.advanceTimersByTime(5000);
     expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
 

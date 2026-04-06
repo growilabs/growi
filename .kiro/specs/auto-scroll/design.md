@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Purpose**: This feature provides a reusable hash-based auto-scroll mechanism that handles lazy-rendered content across GROWI's Markdown views. It compensates for layout shifts caused by asynchronous component rendering (e.g., Drawio diagrams) by detecting in-progress renders and re-scrolling to the target.
+**Purpose**: This feature provides a reusable hash-based auto-scroll mechanism that handles lazy-rendered content across GROWI's Markdown views. It compensates for layout shifts caused by asynchronous component rendering (e.g., Drawio diagrams, Mermaid charts, PlantUML images) by detecting in-progress renders and re-scrolling to the target.
 
 **Users**: End users navigating to hash-linked sections benefit from reliable scroll positioning. Developers integrating the hook into new views (PageView, SearchResultContent, future views) benefit from a standardized, configurable API.
 
@@ -15,7 +15,7 @@
 - Maintain robust resource cleanup with timeout-based safety bounds
 
 ### Non-Goals
-- Adding `data-growi-is-content-rendering` to PlantUML, attachment-refs (Ref/Refs/RefImg/RefsImg/Gallery), or RichAttachment — these also cause layout shifts but require more complex integration (image onLoad tracking, wrapper components); deferred to follow-up
+- Adding `data-growi-is-content-rendering` to attachment-refs (Ref/Refs/RefImg/RefsImg/Gallery), or RichAttachment — these also cause layout shifts but require more complex integration; deferred to follow-up
 - Replacing SearchResultContent's keyword-highlight scroll with this hook (requires separate evaluation)
 - Supporting non-browser environments (SSR) — this is a client-only hook
 
@@ -53,16 +53,17 @@ graph TB
     subgraph renderers[Async Renderers]
         DV[DrawioViewer]
         MV[MermaidViewer]
+        PUV[PlantUmlViewer]
         LSX[Lsx]
     end
 
     PV -->|calls| HOOK
     SRC -->|calls| HOOK
     HOOK -->|delegates| WATCH
-    HOOK -->|reads| CONST
     WATCH -->|queries| CONST
     DV -->|sets/toggles| CONST
     MV -->|sets/toggles| CONST
+    PUV -->|sets/toggles| CONST
     LSX -->|sets/toggles| CONST
 ```
 
@@ -78,7 +79,7 @@ graph TB
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
 | Frontend | React 18 hooks (`useEffect`) | Hook lifecycle management | No new dependencies |
-| Browser API | MutationObserver, `setTimeout` | DOM observation and polling | Standard Web APIs |
+| Browser API | MutationObserver, `setTimeout`, `requestAnimationFrame` | DOM observation, polling, and layout timing | Standard Web APIs |
 | Shared Constants | `@growi/core` | Rendering attribute definitions | Existing package |
 
 No new external dependencies are introduced.
@@ -101,13 +102,15 @@ sequenceDiagram
         Hook->>DOM: resolveTarget
         DOM-->>Hook: HTMLElement
         Hook->>DOM: scrollTo target
-        Hook->>Watch: start rendering watch
+        Hook->>Watch: start rendering watch (always)
     else Target not yet in DOM
         Hook->>DOM: MutationObserver on container
         DOM-->>Hook: target appears
         Hook->>DOM: scrollTo target
-        Hook->>Watch: start rendering watch
+        Hook->>Watch: start rendering watch (always)
     end
+
+    Note over Watch: MutationObserver detects rendering elements,<br/>including those that mount after the initial scroll
 
     loop While rendering elements exist and within timeout
         Watch->>DOM: query rendering-status attr
@@ -119,7 +122,10 @@ sequenceDiagram
     Note over Watch: Auto-cleanup after 10s timeout
 ```
 
-Key decisions: The two-phase approach (target observation → rendering watch) runs sequentially. The rendering watch uses a non-resetting timer to prevent starvation from rapid DOM mutations.
+Key decisions:
+- The two-phase approach (target observation → rendering watch) runs sequentially.
+- The rendering watch uses a non-resetting timer to prevent starvation from rapid DOM mutations.
+- **The rendering watch always starts after the initial scroll**, regardless of whether rendering elements exist at that moment. This is necessary because async renderers (Mermaid loaded via `dynamic()`, PlantUML images) may mount into the DOM *after* the hook's effect runs. The MutationObserver inside `watchRenderingAndReScroll` (`childList: true, subtree: true`) detects these late-mounting elements.
 
 ## Requirements Traceability
 
@@ -129,7 +135,8 @@ Key decisions: The two-phase approach (target observation → rendering watch) r
 | 1.3, 1.4, 1.5 | Guard conditions | useContentAutoScroll | UseContentAutoScrollOptions.key, contentContainerId | — |
 | 2.1, 2.2, 2.3 | Deferred scroll for lazy targets | useContentAutoScroll (target observer) | — | Auto-Scroll Lifecycle |
 | 3.1–3.6 | Re-scroll after rendering | watchRenderingAndReScroll | scrollTo callback | Auto-Scroll Lifecycle |
-| 4.1–4.7 | Rendering attribute protocol | Rendering Status Constants, DrawioViewer, MermaidViewer, Lsx | GROWI_IS_CONTENT_RENDERING_ATTR | — |
+| 4.1–4.7 | Rendering attribute protocol | Rendering Status Constants, DrawioViewer, MermaidViewer, PlantUmlViewer, Lsx | GROWI_IS_CONTENT_RENDERING_ATTR | — |
+| 4.8 | ResizeObserver re-render cycle | DrawioViewer | GROWI_IS_CONTENT_RENDERING_ATTR | — |
 | 5.1–5.5 | Page-type agnostic design | useContentAutoScroll | UseContentAutoScrollOptions | — |
 | 5.6, 5.7, 6.1–6.3 | Cleanup and safety | useContentAutoScroll, watchRenderingAndReScroll | cleanup functions | — |
 
@@ -140,8 +147,9 @@ Key decisions: The two-phase approach (target observation → rendering watch) r
 | useContentAutoScroll | Client Hooks | Reusable auto-scroll hook with configurable target resolution and scroll behavior | 1, 2, 5, 6 | watchRenderingAndReScroll (P0), Rendering Status Constants (P1) | Service |
 | watchRenderingAndReScroll | Client Hooks (internal) | Polls for rendering-status attributes and re-scrolls until complete or timeout | 3, 6 | Rendering Status Constants (P0) | Service |
 | Rendering Status Constants | @growi/core | Shared attribute name, value, and selector constants | 4 | None | State |
-| DrawioViewer (modification) | remark-drawio | Declarative rendering-status attribute toggle | 4.3, 4.4, 4.7 | Rendering Status Constants (P0) | State |
+| DrawioViewer (modification) | remark-drawio | Declarative rendering-status attribute toggle | 4.3, 4.4, 4.8 | Rendering Status Constants (P0) | State |
 | MermaidViewer (modification) | features/mermaid | Add rendering-status attribute lifecycle to async SVG render | 4.3, 4.4, 4.7 | Rendering Status Constants (P0) | State |
+| PlantUmlViewer (new) | features/plantuml | Wrap PlantUML `<img>` to provide rendering-status attribute lifecycle | 4.3, 4.4, 4.7 | Rendering Status Constants (P0) | State |
 | Lsx (modification) | remark-lsx | Add rendering-status attribute lifecycle to async page list fetch | 4.3, 4.4, 4.7 | Rendering Status Constants (P0) | State |
 
 ### Client Hooks
@@ -155,13 +163,11 @@ Key decisions: The two-phase approach (target observation → rendering watch) r
 
 **Responsibilities & Constraints**
 - Orchestrates the full auto-scroll lifecycle: guard → resolve target → scroll → watch rendering
-- Before delegating to `watchRenderingAndReScroll`, checks whether any rendering-status elements exist in the container; skips the rendering watch entirely if none are present (avoids unnecessary MutationObserver + timeout on every hash navigation)
-- Delegates rendering-aware re-scrolling to `watchRenderingAndReScroll`
+- Always delegates to `watchRenderingAndReScroll` after the initial scroll — does **not** skip the watch even when no rendering elements are present at scroll time, because async renderers may mount later
 - Must not import page-specific or feature-specific modules
 
 **Dependencies**
 - Outbound: `watchRenderingAndReScroll` — rendering watch delegation (P0)
-- External: `@growi/core` rendering status constants — attribute queries (P1)
 
 **Contracts**: Service [x]
 
@@ -203,9 +209,9 @@ function useContentAutoScroll(options: UseContentAutoScrollOptions): void;
 - Invariants: At most one target observer and one rendering watch active per hook instance
 
 **Implementation Notes**
-- File location: `apps/app/src/hooks/use-content-auto-scroll.ts` (no JSX — `.ts` extension)
-- Test file: `apps/app/src/hooks/use-content-auto-scroll.spec.ts`
-- The `resolveTarget` and `scrollTo` callbacks should be wrapped in `useRef` or called from a ref to avoid re-triggering the effect when callback identity changes
+- File location: `apps/app/src/client/hooks/use-content-auto-scroll/use-content-auto-scroll.ts`
+- Test file: `apps/app/src/client/hooks/use-content-auto-scroll/use-content-auto-scroll.spec.tsx`
+- The `resolveTarget` and `scrollTo` callbacks should be wrapped in `useRef` to avoid re-triggering the effect when callback identity changes
 - Export both `useContentAutoScroll` and `watchRenderingAndReScroll` as named exports for independent testability
 
 ---
@@ -218,7 +224,7 @@ function useContentAutoScroll(options: UseContentAutoScrollOptions): void;
 | Requirements | 3.1–3.6, 6.1–6.3 |
 
 **Responsibilities & Constraints**
-- Sets up MutationObserver to detect rendering-status attribute changes
+- Sets up MutationObserver to detect rendering-status attribute changes **and** new rendering elements added to the DOM (childList + subtree)
 - Manages a non-resetting poll timer (5s interval)
 - Enforces a hard timeout (10s) to prevent unbounded observation
 - Returns a cleanup function
@@ -247,9 +253,9 @@ function watchRenderingAndReScroll(
 - Invariants: At most one poll timer active at any time; stopped flag prevents post-cleanup execution
 
 **Implementation Notes**
-- Add a `stopped` boolean flag checked inside timer callbacks to prevent race conditions between cleanup and queued timer execution (addresses PR review finding)
+- Add a `stopped` boolean flag checked inside timer callbacks to prevent race conditions between cleanup and queued timer execution
 - When `checkAndSchedule` detects that no rendering elements remain and a timer is currently active, cancel the active timer immediately — avoids a redundant re-scroll after rendering has already completed
-- The MutationObserver watches `childList`, `subtree`, and `attributes` (filtered to the rendering-status attribute)
+- The MutationObserver watches `childList`, `subtree`, and `attributes` (filtered to the rendering-status attribute) — the `childList` + `subtree` combination is what detects late-mounting async renderers
 
 ---
 
@@ -290,14 +296,16 @@ const GROWI_IS_CONTENT_RENDERING_SELECTOR =
 | Field | Detail |
 |-------|--------|
 | Intent | Adopt declarative attribute value toggling instead of imperative add/remove |
-| Requirements | 4.3, 4.4 |
+| Requirements | 4.3, 4.4, 4.8 |
 
 **Implementation Notes**
 - Replace `removeAttribute(GROWI_RENDERING_ATTR)` calls with `setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'false')`
 - Initial JSX: `{[GROWI_IS_CONTENT_RENDERING_ATTR]: 'true'}` (unchanged pattern, new constant name)
 - Update `SUPPORTED_ATTRIBUTES` in `remark-drawio.ts` to use new constant name
 - Update sanitize option to allow the new attribute name
-- **ResizeObserver re-render cycle** (req 4.8): In the ResizeObserver handler, call `drawioContainerRef.current?.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'true')` before `renderDrawioWithDebounce()`. The existing inner MutationObserver (childList) completion path already sets the attribute back to `"false"` after each render — no additional change needed there. This ensures layout shifts from post-initial-render size adjustments are detected by the auto-scroll system.
+- **ResizeObserver re-render cycle** (req 4.8): In the ResizeObserver handler, call `drawioContainerRef.current?.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'true')` before `renderDrawioWithDebounce()`. The existing inner MutationObserver (childList) completion path already sets the attribute back to `"false"` after each render.
+
+---
 
 ### MermaidViewer Modification
 
@@ -309,11 +317,33 @@ const GROWI_IS_CONTENT_RENDERING_SELECTOR =
 | Requirements | 4.3, 4.4, 4.7 |
 
 **Implementation Notes**
-- Set `data-growi-is-content-rendering="true"` on the container element at initial render (before `mermaid.render()` is called)
-- Set attribute to `"false"` after `mermaid.render()` completes and SVG is injected into the DOM
-- Set attribute to `"false"` in the error/catch path as well
+- Set `data-growi-is-content-rendering="true"` on the container element at initial render (via JSX spread before `mermaid.render()` is called)
+- After `mermaid.render()` completes and SVG is injected via `innerHTML`, delay the `"false"` signal using **`requestAnimationFrame`** so that the browser can compute the SVG layout before the auto-scroll system re-scrolls. Setting `"false"` synchronously after `innerHTML` assignment would signal completion before the browser has determined the element's final dimensions.
+- Set attribute to `"false"` immediately (without rAF) in the error/catch path, since no layout shift is expected on error
+- Cancel the pending rAF on effect cleanup to prevent state updates on unmounted components
 - File: `apps/app/src/features/mermaid/components/MermaidViewer.tsx`
 - The mermaid remark plugin sanitize options must be updated to include the new attribute name
+
+---
+
+### PlantUmlViewer (new component)
+
+#### PlantUmlViewer
+
+| Field | Detail |
+|-------|--------|
+| Intent | Wrap PlantUML image rendering in a component that signals rendering status, enabling the auto-scroll system to compensate for the layout shift when the external image loads |
+| Requirements | 4.3, 4.4, 4.7 |
+
+**Background**: PlantUML diagrams are rendered as `<img>` tags pointing to an external PlantUML server. The image load is asynchronous and causes a layout shift. The previous implementation had no `data-growi-is-content-rendering` support, so layout shifts from PlantUML images were never compensated.
+
+**Implementation Notes**
+- New component at `apps/app/src/features/plantuml/components/PlantUmlViewer.tsx`
+- Wraps `<img>` in a `<div>` container with `data-growi-is-content-rendering="true"` initially
+- Sets attribute to `"false"` via `onLoad` and `onError` handlers on the `<img>` element
+- The plantuml remark plugin (`plantuml.ts`) is updated to output a custom `<plantuml src="...">` HAST element instead of a plain `<img>`. This allows the renderer to map the `plantuml` element to the `PlantUmlViewer` React component.
+- `sanitizeOption` is exported from the plantuml service and merged in `renderer.tsx` (same pattern as drawio and mermaid)
+- `PlantUmlViewer` is registered as `components.plantuml` in all view option generators (`generateViewOptions`, `generateSimpleViewOptions`, `generatePreviewOptions`)
 
 ---
 
@@ -352,13 +382,14 @@ This feature operates entirely in the browser DOM layer with no server interacti
 
 ## Testing Strategy
 
-### Unit Tests (co-located in `src/hooks/`)
+### Unit Tests (co-located in `src/client/hooks/use-content-auto-scroll/`)
 
 1. **Guard conditions**: Verify no-op when key is null, hash is empty, or container not found (1.3–1.5)
 2. **Immediate scroll**: Target exists in DOM → `scrollTo` called once (1.1)
 3. **Encoded hash**: URI-encoded hash decoded and resolved correctly (1.2)
 4. **Custom resolveTarget**: Provided closure is called instead of default `getElementById` (5.2)
 5. **Custom scrollTo**: Provided scroll function is called instead of default `scrollIntoView` (5.3)
+6. **Late-mounting renderers**: Rendering elements that appear after the initial scroll are detected and trigger a re-scroll (key scenario for Mermaid/PlantUML)
 
 ### Integration Tests (watchRenderingAndReScroll)
 

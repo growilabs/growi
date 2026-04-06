@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { GROWI_IS_CONTENT_RENDERING_SELECTOR } from '@growi/core/dist/consts';
 
 import {
   WATCH_TIMEOUT_MS,
@@ -68,23 +67,15 @@ export const useContentAutoScroll = (
       return true;
     };
 
-    const hasRenderingElements = (): boolean => {
-      return (
-        contentContainer.querySelector(GROWI_IS_CONTENT_RENDERING_SELECTOR) !=
-        null
-      );
-    };
-
-    const startRenderingWatchIfNeeded = (): (() => void) | undefined => {
-      if (hasRenderingElements()) {
-        return watchRenderingAndReScroll(contentContainer, scrollToTarget);
-      }
-      return undefined;
+    const startRenderingWatch = (): (() => void) => {
+      // Always start regardless of current rendering elements — async renderers
+      // (Mermaid via dynamic import, PlantUML images) may mount after the initial scroll.
+      return watchRenderingAndReScroll(contentContainer, scrollToTarget);
     };
 
     // Target already in DOM — scroll and optionally watch rendering
     if (scrollToTarget()) {
-      const renderingCleanup = startRenderingWatchIfNeeded();
+      const renderingCleanup = startRenderingWatch();
       return () => {
         renderingCleanup?.();
       };
@@ -97,7 +88,7 @@ export const useContentAutoScroll = (
       if (scrollToTarget()) {
         observer.disconnect();
         window.clearTimeout(timeoutId);
-        renderingCleanup = startRenderingWatchIfNeeded();
+        renderingCleanup = startRenderingWatch();
       }
     });
 
