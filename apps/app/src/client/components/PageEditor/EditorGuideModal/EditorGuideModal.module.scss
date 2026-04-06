@@ -1,6 +1,4 @@
 .editor-guide-modal {
-  // Applied to .modal div via modalClassName.
-  // Overrides Bootstrap's full-screen fixed positioning to match containerRef area.
   position: fixed !important;
   top: var(--egm-top) !important;
   left: var(--egm-left) !important;
@@ -14,8 +12,6 @@
 }
 
 .editor-guide-backdrop {
-  // Applied to .modal-backdrop div via backdropClassName.
-  // Overrides Bootstrap's full-screen backdrop to match containerRef area.
   position: fixed !important;
   top: var(--egm-top) !important;
   left: var(--egm-left) !important;
@@ -24,8 +20,6 @@
 }
 
 .editor-guide-content {
-  // Applied to .modal-content div via contentClassName.
-  // Card provides its own visual styling, so modal-content should be transparent.
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
