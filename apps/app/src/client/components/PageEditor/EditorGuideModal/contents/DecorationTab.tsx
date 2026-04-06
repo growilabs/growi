@@ -1,6 +1,12 @@
 import type React from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
+} from 'reactstrap';
 
 import type { LayoutGuideItem } from '../components/GuideRow';
 import { GuideRow } from '../components/GuideRow';
@@ -24,22 +30,6 @@ export const DecorationTab: React.FC = () => {
   const i18nKey = 'editor_guide.decoration';
   const [currentStyle, setCurrentStyle] = useState<BootstrapColor>('primary');
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
 
   const colorConfigs: Record<BootstrapColor, { icon: string; prefix: string }> =
     {
@@ -151,49 +141,41 @@ export const DecorationTab: React.FC = () => {
     <div className={`px-4 py-3 ${styles.decorationTab}`}>
       <section className="mb-4">
         <h3 className="fw-bold mb-2 fs-5">{t(`${i18nKey}.style`)}</h3>
-        <div ref={dropdownRef} className={`dropdown ${isOpen ? 'show' : ''}`}>
-          <button
-            className={`btn btn-light border dropdown-toggle d-flex align-items-center gap-2 text-${styleConfig.colorName === 'light' ? 'dark' : styleConfig.colorName}`}
-            type="button"
-            onClick={() => setIsOpen(!isOpen)}
-            aria-expanded={isOpen}
+        <Dropdown isOpen={isOpen} toggle={() => setIsOpen(!isOpen)}>
+          <DropdownToggle
+            color="light"
+            caret
+            className={`border d-flex align-items-center gap-2 text-${styleConfig.colorName === 'light' ? 'dark' : styleConfig.colorName}`}
             style={{ minWidth: '160px' }}
           >
             <span className="material-symbols-outlined align-middle fs-6">
               {styleConfig.iconName}
             </span>
             <span className="flex-grow-1">{styleConfig.displayName}</span>
-          </button>
-          <ul
-            className={`dropdown-menu ${styles.dropdownMenu} ${isOpen ? 'show' : ''}`}
-          >
+          </DropdownToggle>
+          <DropdownMenu className={styles.dropdownMenu}>
             {BOOTSTRAP_COLORS.map((color) => (
-              <li key={color}>
-                <button
-                  className={`dropdown-item d-flex align-items-center gap-2 ${currentStyle === color ? 'active' : ''}`}
-                  type="button"
-                  onClick={() => {
-                    setCurrentStyle(color);
-                    setIsOpen(false);
-                  }}
-                  style={
-                    currentStyle === color
-                      ? {
-                          backgroundColor: `var(--bs-${color})`,
-                          color: color === 'light' ? 'black' : 'white',
-                        }
-                      : {}
-                  }
-                >
-                  <span className="material-symbols-outlined">
-                    {colorConfigs[color].icon}
-                  </span>
-                  {color.charAt(0).toUpperCase() + color.slice(1)}
-                </button>
-              </li>
+              <DropdownItem
+                key={color}
+                className={`d-flex align-items-center gap-2 ${currentStyle === color ? 'active' : ''}`}
+                onClick={() => setCurrentStyle(color)}
+                style={
+                  currentStyle === color
+                    ? {
+                        backgroundColor: `var(--bs-${color})`,
+                        color: color === 'light' ? 'black' : 'white',
+                      }
+                    : {}
+                }
+              >
+                <span className="material-symbols-outlined">
+                  {colorConfigs[color].icon}
+                </span>
+                {color.charAt(0).toUpperCase() + color.slice(1)}
+              </DropdownItem>
             ))}
-          </ul>
-        </div>
+          </DropdownMenu>
+        </Dropdown>
       </section>
 
       <hr />
