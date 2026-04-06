@@ -12,6 +12,7 @@ import {
 } from '@growi/editor/dist/states/modal/editor-guide';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { Card, CardBody, CardHeader } from 'reactstrap';
 
 import { CustomNavTab } from '../../CustomNavigation/CustomNav';
 import CustomTabContent from '../../CustomNavigation/CustomTabContent';
@@ -122,11 +123,11 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
           className="px-3 modal-card-wrapper w-100"
           style={{ maxWidth: '700px' }}
         >
-          <div
-            className="card shadow-lg border-0"
+          <Card
+            className="shadow-lg border-0"
             style={{ maxHeight: rect.height - 32 }}
           >
-            <div className="card-header d-flex justify-content-between align-items-center bg-transparent border-bottom-0 pt-3">
+            <CardHeader className="d-flex justify-content-between align-items-center bg-transparent border-bottom-0 pt-3">
               <h5 className="mb-0 text-body">{t('editor_guide.title')}</h5>
               <button
                 type="button"
@@ -134,7 +135,7 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
                 onClick={close}
                 aria-label="Close"
               />
-            </div>
+            </CardHeader>
             <div
               className={`mt-2 px-3 ${styles['editor-guide-tabs-container']}`}
             >
@@ -149,13 +150,13 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
                 hideBorderBottom
               />
             </div>
-            <div className={`card-body pt-0 ${styles['card-body-scrollable']}`}>
+            <CardBody className={`pt-0 ${styles['card-body-scrollable']}`}>
               <CustomTabContent
                 activeTab={activeTab}
                 navTabMapping={navTabMapping}
               />
-            </div>
-          </div>
+            </CardBody>
+          </Card>
         </div>
       </div>
     </div>,
