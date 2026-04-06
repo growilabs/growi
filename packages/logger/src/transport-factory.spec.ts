@@ -21,10 +21,9 @@ describe('createNodeTransportOptions', () => {
       expect(opts.transport?.target).toContain('bunyan-format');
     });
 
-    it('returns singleLine: false for full multi-line context', () => {
+    it('passes no options (singleLine defaults to false inside bunyan-format)', () => {
       const opts = createNodeTransportOptions(false);
-      const popts = opts.transport?.options as Record<string, unknown>;
-      expect(popts?.singleLine).toBe(false);
+      expect(opts.transport?.options).toBeUndefined();
     });
   });
 

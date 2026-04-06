@@ -33,9 +33,6 @@ export function createNodeTransportOptions(
     return {
       transport: {
         target: bunyanFormatPath,
-        options: {
-          singleLine: false,
-        },
       },
     };
   }
