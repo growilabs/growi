@@ -18,7 +18,6 @@ import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import { SUPPORTED_LOCALES } from '../../../util/safe-path-utils';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:app-settings');
@@ -583,14 +582,6 @@ module.exports = (crowi: Crowi) => {
     validator.appSetting,
     apiV3FormValidator,
     async (req, res) => {
-      const { globalLang } = req.body;
-      if (globalLang != null) {
-        if (!SUPPORTED_LOCALES.includes(globalLang)) {
-          const msg = `Invalid global language settings: '${globalLang}' is not supported.`;
-          logger.error(msg, { globalLang });
-          return res.apiv3Err(new ErrorV3(msg, 'invalid-globalLang'));
-        }
-      }
       const requestAppSettingParams = {
         'app:title': req.body.title,
         'app:confidential': req.body.confidential,
