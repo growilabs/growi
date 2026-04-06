@@ -186,6 +186,35 @@
   - However, inverting the default is a behavioral change with broader implications
 - **Decision**: Defer to separate PR. Current behavior is correct in practice (`.env.production` always loaded by Next.js dotenv-flow).
 
+## Phase 3: Implementation Discoveries
+
+### Browser Bundle Compatibility — pino-http Top-Level Import
+- **Context**: `pino-http` was initially imported at the module top-level in `http-logger.ts`. This caused Turbopack to include the Node.js-only module in browser bundles, producing `TypeError: __turbopack_context__.r(...).symbols is undefined`.
+- **Root cause**: `@growi/logger` is imported by shared page code that runs in both browser and server contexts. Any top-level import of a Node.js-only module (like pino-http) gets pulled into the browser bundle.
+- **Fix**: Move the `pino-http` import inside the async function body using dynamic import: `const { default: pinoHttp } = await import('pino-http')`. This defers the import to runtime when the function is actually called (server-side only).
+- **Pattern**: This is the standard pattern for Node.js-only modules in packages shared with browser code. Apply the same treatment to any future Node.js-only additions to `@growi/logger`.
+
+### Dev-Only Module Physical Isolation (`src/dev/`)
+- **Context**: `bunyan-format.ts` (custom pino transport) and `morgan-like-format-options.ts` were initially placed at `src/transports/` and `src/` root respectively, mixed with production modules.
+- **Problem**: No clear boundary between dev-only and production-safe modules; risk of accidentally importing dev modules in production paths.
+- **Fix**: Created `src/dev/` directory as the explicit boundary for development-only modules. `TransportFactory` references `./dev/bunyan-format.js` only in the dev branch — the path is never constructed in production code paths.
+- **Vite config**: `preserveModules: true` ensures `src/dev/bunyan-format.ts` builds to `dist/dev/bunyan-format.js` with the exact path that `pino.transport({ target: ... })` references at runtime.
+
+### Single Worker Thread Model — Critical Implementation Detail
+- **Context**: Initial implementation called `pino.transport()` inside `loggerFactory(name)`, spawning a new Worker thread for each namespace.
+- **Fix**: Refactored so `pino.transport()` is called **once** in `initializeLoggerFactory`, and `loggerFactory(name)` calls `rootLogger.child({ name })` to create namespace-bound loggers sharing the single Worker thread.
+- **Root logger level**: Must be set to `'trace'` (not `'info'`) so child loggers can independently set their resolved level without being silenced by the root. If the root is `'info'`, a child with `level: 'debug'` will still be filtered at the root level.
+- **Constraint for future changes**: Never call `pino.transport()` or `pino()` inside `loggerFactory()`. All transport setup belongs in `initializeLoggerFactory()`.
+
+### pino Logger Type Compatibility with pino-http
+- **Context**: `loggerFactory()` returned `pino.Logger<never>` (the default), which is not assignable to pino-http's expected `Logger` type.
+- **Fix**: Export `Logger<string>` from `@growi/logger` and type `loggerFactory` to return `Logger<string>`. This is compatible with pino-http's `logger` option.
+- **Why `<string>` not `<never>`**: pino's default generic `CustomLevels` is `never`, which makes the type incompatible with APIs expecting custom levels to potentially be strings. `Logger<string>` is the correct type for external APIs.
+
+### `@growi/logger` Package Visibility
+- **Decision**: `"private": true` is correct and intentional.
+- **Rationale**: All consumers (`apps/app`, `apps/slackbot-proxy`, `packages/slack`, etc.) are monorepo-internal packages that reference `@growi/logger` via `workspace:*` protocol. The `private` flag only prevents npm publish, not workspace usage. `@growi/logger` is logging infrastructure — there is no reason to expose it externally (unlike `@growi/core` or `@growi/pluginkit` which are published for external plugin developers).
+
 ## References
 - [pino API docs](https://github.com/pinojs/pino/blob/main/docs/api.md)
 - [pino browser docs](https://github.com/pinojs/pino/blob/main/docs/browser.md)

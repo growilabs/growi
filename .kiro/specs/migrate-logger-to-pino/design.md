@@ -58,6 +58,7 @@ graph TB
         LevelResolver[LevelResolver]
         EnvParser[EnvVarParser]
         TransportSetup[TransportFactory]
+        HttpLogger[HttpLoggerFactory]
     end
 
     subgraph External[External Packages]
@@ -68,7 +69,9 @@ graph TB
     end
 
     App --> Factory
+    App --> HttpLogger
     Slackbot --> Factory
+    Slackbot --> HttpLogger
     Slack --> Factory
     Remark --> Factory
 
@@ -80,9 +83,8 @@ graph TB
     Factory --> Pino
     TransportSetup --> PinoPretty
 
-    App --> PinoHttp
-    Slackbot --> PinoHttp
-    PinoHttp --> Factory
+    HttpLogger --> Factory
+    HttpLogger --> PinoHttp
 ```
 
 **Architecture Integration**:
@@ -540,47 +542,6 @@ Logging infrastructure must be resilient — a logger failure must never crash t
 ### Monitoring
 - Logger initialization errors are written to `process.stderr` directly (cannot use the logger itself)
 - No additional monitoring infrastructure required — this is the monitoring infrastructure
-
-## Testing Strategy
-
-### Unit Tests
-- `LevelResolver.resolveLevel()` with exact matches, glob patterns, env overrides, and fallback
-- `EnvVarParser.parseEnvLevels()` with various env var combinations
-- `TransportFactory.createTransportConfig()` for dev, prod, and browser environments
-- `LoggerFactory` caching behavior (same namespace returns same instance)
-- `DiagLoggerPinoAdapter` level mapping (verbose → trace)
-
-### Integration Tests
-- Logger factory initialization with real config files (dev and prod)
-- HTTP middleware logging with Express (verify request/response logging, route skipping)
-- End-to-end: `loggerFactory('growi:test')` produces correctly formatted output in dev mode
-
-### Migration Validation
-- Verify no imports of removed packages remain after migration
-- Verify all `package.json` files are clean of bunyan/morgan references
-- Verify existing log call sites work without modification (compile check + sample runtime test)
-
-## Migration Strategy
-
-```mermaid
-flowchart TD
-    Phase1[Phase 1: Create @growi/logger package] --> Phase2[Phase 2: Migrate apps/app]
-    Phase2 --> Phase3[Phase 3: Migrate apps/slackbot-proxy]
-    Phase3 --> Phase4[Phase 4: Migrate packages/slack and remark-attachment-refs]
-    Phase4 --> Phase5[Phase 5: Update OTel adapter]
-    Phase5 --> Phase6[Phase 6: Remove old dependencies]
-    Phase6 --> Phase7[Phase 7: Validation and cleanup]
-```
-
-- **Phase 1**: Build and test `@growi/logger` package independently
-- **Phase 2–4**: Migrate consumers one at a time; each migration is independently deployable
-- **Phase 5**: Update OTel adapter (isolated to one file + config)
-- **Phase 6**: Remove all bunyan/morgan packages from `package.json` files
-- **Phase 7**: Final grep verification, lint, build, test across monorepo
-
-Rollback: Each phase can be reverted independently by restoring the previous `loggerFactory` implementation and dependencies.
-
----
 
 ## Addendum: Formatting Improvements (Post-Migration)
 
