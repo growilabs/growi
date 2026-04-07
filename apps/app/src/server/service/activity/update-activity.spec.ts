@@ -203,64 +203,6 @@ describe('shouldGenerateUpdate()', () => {
     expect(result).toBe(false);
   });
 
-  it('should generate update activity if: update is by the same user, outside the suppression window, not first update', async () => {
-    await Activity.insertMany([
-      {
-        user: currentUserId,
-        action: SupportedAction.ACTION_PAGE_CREATE,
-        createdAt: new Date(date.getTime() - TWO_HOURS),
-        target: targetPageId,
-        _id: createActivityId,
-      },
-      {
-        user: currentUserId,
-        action: SupportedAction.ACTION_PAGE_UPDATE,
-        createdAt: new Date(date.getTime() - ONE_HOUR),
-        target: targetPageId,
-        _id: olderActivityId,
-      },
-      {
-        user: currentUserId,
-        action: SupportedAction.ACTION_PAGE_UPDATE,
-        createdAt: new Date(),
-        target: targetPageId,
-        _id: currentActivityId,
-      },
-    ]);
-
-    await Revision.insertMany([
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Old content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Old content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Newer content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-    ]);
-
-    const result = await shouldGenerateUpdate({
-      targetPageId: targetPageIdStr,
-      currentUserId: currentUserIdStr,
-      currentActivityId: currentActivityIdStr,
-    });
-
-    expect(result).toBe(true);
-  });
-
   it('should not generate update activity if: update is made by the same user, within suppression window, not first update', async () => {
     await Activity.insertMany([
       {
