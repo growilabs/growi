@@ -1,3 +1,6 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use 'sass:map';
+
 .copyButton {
   display: block;
   padding: 0;
@@ -14,12 +17,12 @@
 
 .codePre {
   margin: 0;
-  line-height: 1.5;
+  line-height: bs.$line-height-base;
   white-space: pre;
 }
 
 .copyBadge {
-  top: 4px;
-  right: 4px;
-  font-size: 0.4rem;
+  top: map.get(bs.$spacers, 1);
+  right: map.get(bs.$spacers, 1);
+  font-size: bs.$badge-font-size;
 }

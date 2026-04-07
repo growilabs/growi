@@ -1,11 +1,14 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use 'sass:map';
+
 .decorationTab {
-  min-width: 560px;
+  min-width: map.get(bs.$grid-breakpoints, 'sm');
   max-height: 80vh;
   overflow-y: auto;
 }
 
 .dropdownMenu {
   max-height: 300px;
-  margin-top: 0.125rem;
+  margin-top: bs.$dropdown-spacer;
   overflow-y: auto;
 }

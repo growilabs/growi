@@ -20,6 +20,11 @@ import { TextStyleTab } from './contents/TextStyleTab';
 
 import styles from './EditorGuideModal.module.scss';
 
+// Bootstrap $spacer (1rem = 16px) * 2 — matches calc(100% - 32px) padding on both sides
+const MODAL_MARGIN_PX = 32;
+// Bootstrap $modal-lg
+const MODAL_MAX_WIDTH = '800px';
+
 const TAB_TYPES = ['textstyle', 'layout', 'decoration'] as const;
 type TabType = (typeof TAB_TYPES)[number];
 type Props = {
@@ -93,11 +98,15 @@ export const EditorGuideModal = ({
       modalClassName={styles['editor-guide-modal']}
       backdropClassName={styles['editor-guide-backdrop']}
       contentClassName="bg-transparent border-0 shadow-none"
-      style={{ margin: 0, maxWidth: '700px', width: 'calc(100% - 32px)' }}
+      style={{
+        margin: 0,
+        maxWidth: MODAL_MAX_WIDTH,
+        width: `calc(100% - ${MODAL_MARGIN_PX}px)`,
+      }}
     >
       <Card
         className="shadow-lg border-0"
-        style={{ maxHeight: rect.height - 32 }}
+        style={{ maxHeight: rect.height - MODAL_MARGIN_PX }}
       >
         <CardHeader className="d-flex justify-content-between align-items-center bg-transparent border-bottom-0 pt-3">
           <h5 className="mb-0 text-body">{t('editor_guide.title')}</h5>

@@ -1,3 +1,6 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use 'sass:map';
+
 .textStyleTab {
   max-height: 80vh;
 }
@@ -8,18 +11,18 @@
 }
 
 .codeContent {
-  font-size: 14px;
+  font-size: bs.$font-size-sm;
   color: rgba(var(--bs-white-rgb), 0.5);
 }
 
 .copyBadge {
-  top: 2px;
-  right: 4px;
-  font-size: 0.4rem;
+  top: bs.$dropdown-spacer;
+  right: map.get(bs.$spacers, 1);
+  font-size: bs.$badge-font-size;
 }
 
 .wikiPreview {
-  font-size: 14px;
+  font-size: bs.$font-size-sm;
 }
 
 .inlineCodeLabel {

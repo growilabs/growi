@@ -36,7 +36,7 @@ const GuideRow = ({
           className="flex-shrink-0 border-0 p-0 bg-transparent text-start"
         >
           <div
-            className={`p-2 ps-2 pe-4 rounded position-relative ${styles.codeBlockWrapper}`}
+            className={`p-2 ps-2 pe-5 rounded position-relative ${styles.codeBlockWrapper}`}
           >
             <pre
               className={`m-0 small font-monospace fw-normal ${styles.codeContent}`}
