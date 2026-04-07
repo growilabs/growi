@@ -7,15 +7,13 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { useAtomValue } from 'jotai';
 import { Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Collapse } from 'reactstrap';
 import SimpleBar from 'simplebar-react';
 
 import { toastError } from '~/client/util/toastr';
-import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
-import { aiEnabledAtom } from '~/states/server-configurations';
+import { useGrowiCloudUri } from '~/states/global';
 import loggerFactory from '~/utils/logger';
 
 import type { AiAssistantHasId } from '../../../../interfaces/ai-assistant';
@@ -82,9 +80,6 @@ const AiAssistantSidebarSubstance: React.FC<
   // Hooks
   const { t } = useTranslation();
   const growiCloudUri = useGrowiCloudUri();
-  const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
-  const isCloud = growiCloudUri != null && growiAppIdForGrowiCloud != null;
-  const isAiEnabled = useAtomValue(aiEnabledAtom);
 
   // useSWRxThreads is executed only when Substance is rendered
   const { data: threads, mutate: mutateThreads } = useSWRxThreads(
@@ -610,24 +605,7 @@ const AiAssistantSidebarSubstance: React.FC<
                   )}
                 </div>
               ) : (
-                <>
-                  {!isAiEnabled && isCloud && (
-                    <div className="text-center mb-3">
-                      <a
-                        href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
-                        className="btn btn-outline-secondary"
-                      >
-                        <span className="material-symbols-outlined me-1">
-                          share
-                        </span>
-                        {t('cloud_setting_management.to_cloud_settings', {
-                          ns: 'admin',
-                        })}
-                      </a>
-                    </div>
-                  )}
-                  {initialView}
-                </>
+                <>{initialView}</>
               )}
             </div>
           </div>
