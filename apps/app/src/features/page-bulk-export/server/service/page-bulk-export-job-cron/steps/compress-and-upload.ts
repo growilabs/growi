@@ -86,7 +86,7 @@ export async function compressAndUpload(
   pageArchiver.pipe(uploadStream);
 
   pageArchiver.on('error', (err) => {
-    logger.error('pageArchiver error', err);
+    logger.error({ err }, 'pageArchiver error');
     uploadStream.destroy(err);
   });
 

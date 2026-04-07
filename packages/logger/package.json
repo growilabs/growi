@@ -1,0 +1,43 @@
+{
+  "name": "@growi/logger",
+  "version": "1.0.0",
+  "description": "Pino-based logger factory for GROWI",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "clean": "shx rm -rf dist",
+    "dev": "vite build --mode dev",
+    "watch": "pnpm run dev -w --emptyOutDir=false",
+    "lint:biome": "biome check",
+    "lint:typecheck": "tsgo --noEmit",
+    "lint": "npm-run-all -p lint:*",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "minimatch": "^9.0.0",
+    "pino": "^9.0.0",
+    "pino-http": "^11.0.0"
+  },
+  "peerDependencies": {
+    "pino-pretty": "^13.0.0"
+  },
+  "peerDependenciesMeta": {
+    "pino-pretty": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "pino-pretty": "^13.0.0"
+  }
+}
