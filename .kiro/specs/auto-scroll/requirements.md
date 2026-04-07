@@ -63,7 +63,7 @@ The following reviewer feedback is incorporated into these requirements:
 4. When the component finishes rendering or encounters an error, the component shall set the attribute value to indicate "completed" (e.g., `"false"`) rather than removing the attribute entirely — the attribute lifecycle shall be declarative (value toggle), not imperative (add/remove).
 5. The attribute shall be included in the component's HTML sanitization allowlist so that it survives remark/rehype processing.
 6. The CSS selector used by the auto-scroll system shall match only the "in progress" state (e.g., `[attr="true"]`), not the completed state.
-7. The following async-rendering components shall adopt the attribute protocol in this scope: DrawioViewer, MermaidViewer, and lsx (Lsx). Other async renderers (PlantUML, attachment-refs, RichAttachment) are deferred to follow-up work.
+7. The following async-rendering components shall adopt the attribute protocol in this scope: DrawioViewer, MermaidViewer, PlantUmlViewer (new wrapper component), and lsx (Lsx). Other async renderers (attachment-refs, RichAttachment) are deferred to follow-up work.
 8. When a component triggers a secondary re-render that will cause a layout shift (e.g., via ResizeObserver detecting container size changes after initial render), the component shall reset the attribute value to `"true"` before the re-render begins and allow the existing completion path to set it back to `"false"` when done. This ensures the auto-scroll system tracks all layout-shifting render cycles, not only the initial one.
 
 ### Requirement 5: Page-Type Agnostic Design
@@ -76,7 +76,7 @@ The following reviewer feedback is incorporated into these requirements:
 2. The hook shall accept an optional target-resolving function (closure) that returns the target `HTMLElement | null`. When not provided, the hook shall default to resolving the target via `document.getElementById` using the decoded hash.
 3. The hook shall accept an optional scroll function that defines how to scroll to the target element. When not provided, the hook shall default to `element.scrollIntoView()`. This allows callers (e.g., SearchResultContent) to supply a custom scroll strategy.
 4. The hook shall not import or depend on any page-specific state (Jotai atoms, SWR hooks, or page models).
-5. The hook shall be located in a shared directory (e.g., `src/client/hooks/`) and named to reflect its general-purpose nature — not tied to a specific page component.
+5. The shared rendering-watch utility (`watchRenderingAndReScroll`) shall be located in a shared directory (e.g., `src/client/util/`). Each consumer-specific hook shall be co-located with its consumer component and named to reflect its purpose (e.g., hash-based scroll for PageView, keyword-based re-scroll for SearchResultContent).
 6. When the key parameter changes, the hook shall clean up any active observers and timers from the previous run and re-execute the scroll logic.
 7. When the component using the hook unmounts, the hook shall clean up all MutationObservers, timers, and rendering watch resources.
 

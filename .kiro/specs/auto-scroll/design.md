@@ -17,6 +17,7 @@
 
 ### Non-Goals
 - Adding `data-growi-is-content-rendering` to attachment-refs (Ref/Refs/RefImg/RefsImg/Gallery), or RichAttachment — these also cause layout shifts but require more complex integration; deferred to follow-up
+- Replacing SearchResultContent's keyword-highlight scroll with hash-based scroll (search pages have no URL hash)
 - Supporting non-browser environments (SSR) — this is a client-only hook
 
 ## Architecture
@@ -34,19 +35,25 @@ The rendering attribute `data-growi-rendering` is defined in `@growi/core` and c
 
 ### Architecture Pattern & Boundary Map
 
+> **Note**: This diagram reflects the final architecture after Task 8 module reorganization. See "Task 8 Design" section below for the migration details.
+
 ```mermaid
 graph TB
     subgraph growi_core[growi core]
         CONST[Rendering Status Constants]
     end
 
-    subgraph apps_app[apps app - client hooks]
-        HOOK[useContentAutoScroll]
+    subgraph shared_util[src/client/util]
         WATCH[watchRenderingAndReScroll]
     end
 
-    subgraph page_views[Content Views]
+    subgraph page_view[src/components/PageView]
+        UHAS[useHashAutoScroll]
         PV[PageView]
+    end
+
+    subgraph search[features/search/.../SearchPage]
+        UKR[useKeywordRescroll]
         SRC[SearchResultContent]
     end
 
@@ -57,9 +64,10 @@ graph TB
         LSX[Lsx]
     end
 
-    PV -->|calls, default scrollTo| HOOK
-    SRC -->|calls, custom scrollTo| HOOK
-    HOOK -->|delegates| WATCH
+    PV -->|calls| UHAS
+    UHAS -->|imports| WATCH
+    SRC -->|calls| UKR
+    UKR -->|imports| WATCH
     WATCH -->|queries| CONST
     DV -->|sets/toggles| CONST
     MV -->|sets/toggles| CONST
@@ -68,10 +76,9 @@ graph TB
 ```
 
 **Architecture Integration**:
-- Selected pattern: Custom hook with options object — idiomatic React, testable, extensible
-- Domain boundaries: Hook logic in `src/hooks/`, constants in `@growi/core`, attribute lifecycle in each renderer package
+- Selected pattern: Co-located hooks per consumer + shared utility function — idiomatic React, testable, minimal coupling
+- Domain boundaries: `watchRenderingAndReScroll` (shared pure function) in `src/client/util/`, consumer-specific hooks co-located with their components, constants in `@growi/core`, attribute lifecycle in each renderer package
 - Existing patterns preserved: MutationObserver + polling hybrid, timeout-based safety bounds
-- New components rationale: `src/hooks/` directory needed for cross-feature hooks not tied to a specific feature module
 - Steering compliance: Named exports, immutable patterns, co-located tests
 
 ### Technology Stack
@@ -90,12 +97,12 @@ No new external dependencies are introduced.
 
 ```mermaid
 sequenceDiagram
-    participant Caller as Content View
-    participant Hook as useContentAutoScroll
+    participant Caller as Content View (PageView)
+    participant Hook as useHashAutoScroll
     participant DOM as DOM
     participant Watch as watchRenderingAndReScroll
 
-    Caller->>Hook: useContentAutoScroll options
+    Caller->>Hook: useHashAutoScroll options
     Hook->>Hook: Guard checks key, hash, container
 
     alt Target exists in DOM
@@ -131,55 +138,54 @@ Key decisions:
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1, 1.2 | Immediate scroll to hash target | useContentAutoScroll | UseContentAutoScrollOptions.resolveTarget | Auto-Scroll Lifecycle |
-| 1.3, 1.4, 1.5 | Guard conditions | useContentAutoScroll | UseContentAutoScrollOptions.key, contentContainerId | — |
-| 2.1, 2.2, 2.3 | Deferred scroll for lazy targets | useContentAutoScroll (target observer) | — | Auto-Scroll Lifecycle |
-| 3.1–3.6 | Re-scroll after rendering | watchRenderingAndReScroll | scrollTo callback | Auto-Scroll Lifecycle |
+| 1.1, 1.2 | Immediate scroll to hash target | useHashAutoScroll | UseHashAutoScrollOptions.resolveTarget | Auto-Scroll Lifecycle |
+| 1.3, 1.4, 1.5 | Guard conditions | useHashAutoScroll | UseHashAutoScrollOptions.key, contentContainerId | — |
+| 2.1, 2.2, 2.3 | Deferred scroll for lazy targets | useHashAutoScroll (target observer) | — | Auto-Scroll Lifecycle |
+| 3.1–3.6 | Re-scroll after rendering | watchRenderingAndReScroll | scrollToTarget callback | Auto-Scroll Lifecycle |
 | 4.1–4.7 | Rendering attribute protocol | Rendering Status Constants, DrawioViewer, MermaidViewer, PlantUmlViewer, Lsx | GROWI_IS_CONTENT_RENDERING_ATTR | — |
 | 4.8 | ResizeObserver re-render cycle | DrawioViewer | GROWI_IS_CONTENT_RENDERING_ATTR | — |
-| 5.1–5.5 | Page-type agnostic design | useContentAutoScroll, SearchResultContent | UseContentAutoScrollOptions | — |
-| 5.6, 5.7, 6.1–6.3 | Cleanup and safety | useContentAutoScroll, watchRenderingAndReScroll | cleanup functions | — |
+| 5.1–5.5 | Page-type agnostic design | watchRenderingAndReScroll (shared), useHashAutoScroll (PageView), useKeywordRescroll (Search) | — | — |
+| 5.6, 5.7, 6.1–6.3 | Cleanup and safety | useHashAutoScroll, useKeywordRescroll, watchRenderingAndReScroll | cleanup functions | — |
 
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|--------------|--------|--------------|------------------|-----------|
-| useContentAutoScroll | Client Hooks | Reusable auto-scroll hook with configurable target resolution and scroll behavior | 1, 2, 5, 6 | watchRenderingAndReScroll (P0), Rendering Status Constants (P1) | Service |
-| watchRenderingAndReScroll | Client Hooks (internal) | Polls for rendering-status attributes and re-scrolls until complete or timeout | 3, 6 | Rendering Status Constants (P0) | Service |
+| useHashAutoScroll | src/components/PageView | Hash-based auto-scroll hook for PageView with configurable target resolution and scroll behavior | 1, 2, 5, 6 | watchRenderingAndReScroll (P0), Rendering Status Constants (P1) | Service |
+| useKeywordRescroll | features/search/.../SearchPage | Keyword-highlight scroll hook with rendering watch integration for SearchResultContent | 5, 6 | watchRenderingAndReScroll (P0), scrollWithinContainer (P0) | Service |
+| watchRenderingAndReScroll | src/client/util | Shared utility: polls for rendering-status attributes and re-scrolls until complete or timeout | 3, 6 | Rendering Status Constants (P0) | Service |
 | Rendering Status Constants | @growi/core | Shared attribute name, value, and selector constants | 4 | None | State |
 | DrawioViewer (modification) | remark-drawio | Declarative rendering-status attribute toggle | 4.3, 4.4, 4.8 | Rendering Status Constants (P0) | State |
 | MermaidViewer (modification) | features/mermaid | Add rendering-status attribute lifecycle to async SVG render | 4.3, 4.4, 4.7 | Rendering Status Constants (P0) | State |
 | PlantUmlViewer (new) | features/plantuml | Wrap PlantUML `<img>` to provide rendering-status attribute lifecycle | 4.3, 4.4, 4.7 | Rendering Status Constants (P0) | State |
 | Lsx (modification) | remark-lsx | Add rendering-status attribute lifecycle to async page list fetch | 4.3, 4.4, 4.7 | Rendering Status Constants (P0) | State |
-| SearchResultContent (modification) | features/search | Integrate useContentAutoScroll with container-relative scrollTo; suppress keyword scroll when hash is present | 5.1, 5.2, 5.3, 5.5 | useContentAutoScroll (P0), scrollWithinContainer (P0) | State |
 
 ### Client Hooks
 
-#### useContentAutoScroll
+#### useHashAutoScroll
 
 | Field | Detail |
 |-------|--------|
-| Intent | Reusable hook that scrolls to a target element identified by URL hash, with support for lazy-rendered content and customizable scroll behavior |
+| Intent | Hash-based auto-scroll hook for PageView that scrolls to a target element identified by URL hash, with support for lazy-rendered content and customizable scroll behavior |
 | Requirements | 1.1–1.5, 2.1–2.3, 5.1–5.7, 6.1–6.3 |
 
 **Responsibilities & Constraints**
-- Orchestrates the full auto-scroll lifecycle: guard → resolve target → scroll → watch rendering
+- Orchestrates the full hash-based auto-scroll lifecycle: guard → resolve target → scroll → watch rendering
 - Always delegates to `watchRenderingAndReScroll` after the initial scroll — does **not** skip the watch even when no rendering elements are present at scroll time, because async renderers may mount later
-- Must not import page-specific or feature-specific modules
+- Co-located with `PageView.tsx` — this hook is hash-navigation–specific (`window.location.hash`)
 
 **Dependencies**
-- Outbound: `watchRenderingAndReScroll` — rendering watch delegation (P0)
+- Outbound: `watchRenderingAndReScroll` from `~/client/util/watch-rendering-and-rescroll` (P0)
 
 **Contracts**: Service [x]
 
 ##### Service Interface
 
 ```typescript
-/** Configuration for the auto-scroll hook */
-interface UseContentAutoScrollOptions {
+/** Configuration for the hash-based auto-scroll hook */
+interface UseHashAutoScrollOptions {
   /**
    * Unique key that triggers re-execution when changed.
-   * Typically a page ID, search query ID, or other view identifier.
    * When null/undefined, all scroll processing is skipped.
    */
   key: string | undefined | null;
@@ -202,7 +208,7 @@ interface UseContentAutoScrollOptions {
 }
 
 /** Hook signature */
-function useContentAutoScroll(options: UseContentAutoScrollOptions): void;
+function useHashAutoScroll(options: UseHashAutoScrollOptions): void;
 ```
 
 - Preconditions: Called within a React component; browser environment with `window.location.hash` available
@@ -210,10 +216,51 @@ function useContentAutoScroll(options: UseContentAutoScrollOptions): void;
 - Invariants: At most one target observer and one rendering watch active per hook instance
 
 **Implementation Notes**
-- File location: `apps/app/src/client/hooks/use-content-auto-scroll/use-content-auto-scroll.ts`
-- Test file: `apps/app/src/client/hooks/use-content-auto-scroll/use-content-auto-scroll.spec.tsx`
+- File location: `apps/app/src/components/PageView/use-hash-auto-scroll.ts`
+- Test file: `apps/app/src/components/PageView/use-hash-auto-scroll.spec.tsx`
 - The `resolveTarget` and `scrollTo` callbacks should be wrapped in `useRef` to avoid re-triggering the effect when callback identity changes
-- Export both `useContentAutoScroll` and `watchRenderingAndReScroll` as named exports for independent testability
+
+---
+
+#### useKeywordRescroll
+
+| Field | Detail |
+|-------|--------|
+| Intent | Keyword-highlight scroll hook for SearchResultContent that scrolls to the first `.highlighted-keyword` element and re-scrolls after async renderers settle |
+| Requirements | 5.1–5.7, 6.1–6.3 |
+
+**Responsibilities & Constraints**
+- MutationObserver on container for keyword highlight detection (debounced 500ms)
+- `watchRenderingAndReScroll` integration for async renderer layout shift compensation
+- Cleanup of both MO and rendering watch on key change or unmount
+- Co-located with `SearchResultContent.tsx`
+
+**Dependencies**
+- Outbound: `watchRenderingAndReScroll` from `~/client/util/watch-rendering-and-rescroll` (P0)
+- Outbound: `scrollWithinContainer` from `~/client/util/smooth-scroll` (P0)
+
+**Contracts**: Service [x]
+
+##### Service Interface
+
+```typescript
+interface UseKeywordRescrollOptions {
+  /** Ref to the scrollable container element */
+  scrollElementRef: RefObject<HTMLElement | null>;
+  /** Unique key that triggers re-execution (typically page._id) */
+  key: string;
+}
+
+function useKeywordRescroll(options: UseKeywordRescrollOptions): void;
+```
+
+- Preconditions: `scrollElementRef.current` is a mounted scroll container
+- Postconditions: On unmount or key change, MO disconnected, rendering watch cleaned up, debounce cancelled
+
+**Implementation Notes**
+- File location: `apps/app/src/features/search/client/components/SearchPage/use-keyword-rescroll.ts`
+- Test file: `apps/app/src/features/search/client/components/SearchPage/use-keyword-rescroll.spec.tsx`
+- Helper functions (`scrollToKeyword`, `scrollToTargetWithinContainer`) are defined in the hook file since only this hook uses them
 
 ---
 
@@ -221,7 +268,7 @@ function useContentAutoScroll(options: UseContentAutoScrollOptions): void;
 
 | Field | Detail |
 |-------|--------|
-| Intent | Pure function (not a hook) that monitors rendering-status attributes and periodically re-scrolls until rendering completes or timeout |
+| Intent | Pure function (not a hook) that monitors rendering-status attributes and periodically re-scrolls until rendering completes or timeout. Shared utility consumed by both `useHashAutoScroll` and `useKeywordRescroll`. |
 | Requirements | 3.1–3.6, 6.1–6.3 |
 
 **Responsibilities & Constraints**
@@ -254,6 +301,8 @@ function watchRenderingAndReScroll(
 - Invariants: At most one poll timer active at any time; stopped flag prevents post-cleanup execution
 
 **Implementation Notes**
+- File location: `apps/app/src/client/util/watch-rendering-and-rescroll.ts` (co-located with `smooth-scroll.ts`)
+- Test file: `apps/app/src/client/util/watch-rendering-and-rescroll.spec.tsx`
 - Add a `stopped` boolean flag checked inside timer callbacks to prevent race conditions between cleanup and queued timer execution
 - When `checkAndSchedule` detects that no rendering elements remain and a timer is currently active, cancel the active timer immediately — avoids a redundant re-scroll after rendering has already completed
 - The MutationObserver watches `childList`, `subtree`, and `attributes` (filtered to the rendering-status attribute) — the `childList` + `subtree` combination is what detects late-mounting async renderers
@@ -376,66 +425,24 @@ const GROWI_IS_CONTENT_RENDERING_SELECTOR =
 
 | Field | Detail |
 |-------|--------|
-| Intent | Integrate `useContentAutoScroll` for hash-based navigation within the search result content pane; coordinate with the existing keyword-highlight scroll to prevent position conflicts |
-| Requirements | 5.1, 5.2, 5.3, 5.5 |
+| Intent | Integrate rendering-watch into SearchResultContent's keyword scroll so that layout shifts from async renderers are compensated |
+| Requirements | 5.1, 5.4, 5.5, 6.1 |
 
-**Background**: `SearchResultContent` renders page content inside a div with `overflow-y-scroll` (`#search-result-content-body-container`). It already has a separate keyword-highlight scroll mechanism — a `useEffect` with no dependency array that uses `MutationObserver` to scroll to the first `.highlighted-keyword` element using `scrollWithinContainer`. These two scroll mechanisms must coexist without overriding each other.
+**Background**: `SearchResultContent` renders page content inside a div with `overflow-y-scroll` (`#search-result-content-body-container`). The keyword-highlight scroll mechanism was originally inlined as a `useEffect` with no dependency array and no cleanup.
 
-**Container-Relative Scroll Problem**
+**Post-Implementation Correction**: The initial design (tasks 6.1–6.3) attempted to integrate `useContentAutoScroll` (hash-based) into SearchResultContent. This was architecturally incorrect — search pages use `/search?q=foo` with no URL hash, so the hash-driven hook would never activate. See `research.md` "Post-Implementation Finding" for details.
 
-`element.scrollIntoView()` (the hook's default `scrollTo`) scrolls the viewport, not the scrolling container. Since `#search-result-content-body-container` is the scrolling unit, a custom `scrollTo` is required:
-
-```
-scrollTo(target):
-  distance = target.getBoundingClientRect().top
-            - container.getBoundingClientRect().top
-            - SCROLL_OFFSET_TOP
-  scrollWithinContainer(container, distance)
-```
-
-The `container` reference is obtained via `scrollElementRef.current` (the existing React ref already present in the component). The `SCROLL_OFFSET_TOP = 30` constant is reused from the keyword scroll for visual consistency.
-
-**Scroll Conflict Resolution**
-
-When a URL hash is present, both mechanisms would fire:
-1. `useContentAutoScroll` → scroll to the hash target element
-2. Keyword MutationObserver → scroll to the first `.highlighted-keyword` element (500ms debounced)
-
-This creates a race condition where the keyword scroll overrides the hash scroll. Resolution strategy:
-
-> **When `window.location.hash` is non-empty, the keyword-highlight `useEffect` returns early.** Hash-based scroll takes priority.
-
-Concretely, the existing keyword-scroll `useEffect` gains a guard at the top:
-
-```
-if (window.location.hash.length > 0) return;
-```
-
-When no hash is present, keyword scroll proceeds exactly as before — no behavior change for the common case.
+**Final Architecture**: The keyword scroll effect was extracted into a dedicated `useKeywordRescroll` hook (co-located with SearchResultContent), which directly integrates `watchRenderingAndReScroll` for rendering compensation. No hash-based scroll is used in SearchResultContent.
 
 **Hook Call Site**
 
 ```typescript
-const scrollTo = useCallback((target: HTMLElement) => {
-  const container = scrollElementRef.current;
-  if (container == null) return;
-  const distance =
-    target.getBoundingClientRect().top -
-    container.getBoundingClientRect().top -
-    SCROLL_OFFSET_TOP;
-  scrollWithinContainer(container, distance);
-}, []);
-
-useContentAutoScroll({
-  key: page._id,
-  contentContainerId: 'search-result-content-body-container',
-  scrollTo,
-});
+useKeywordRescroll({ scrollElementRef, key: page._id });
 ```
 
-- `resolveTarget` defaults to `document.getElementById` — heading elements have `id` attributes set by the remark processing pipeline, so the default resolver works without customization.
-- `scrollTo` uses the existing `scrollElementRef` directly to avoid redundant `getElementById` lookup.
-- `useCallback` with empty deps array ensures callback identity is stable across renders (the hook wraps it in a ref internally, but stable identity avoids any risk of spurious re-renders).
+- `scrollElementRef` is the existing React ref pointing to the scroll container
+- `key: page._id` triggers re-execution when the selected page changes
+- The hook internally handles MutationObserver setup, debounced keyword scroll, rendering watch, and full cleanup
 
 **File**: `apps/app/src/features/search/client/components/SearchPage/SearchResultContent.tsx`
 
@@ -570,17 +577,21 @@ This feature operates entirely in the browser DOM layer with no server interacti
 
 ## Testing Strategy
 
-### Unit Tests (co-located in `src/client/hooks/use-content-auto-scroll/`)
+### useHashAutoScroll Tests (co-located in `src/components/PageView/`)
 
 1. **Guard conditions**: Verify no-op when key is null, hash is empty, or container not found (1.3–1.5)
 2. **Immediate scroll**: Target exists in DOM → `scrollTo` called once (1.1)
 3. **Encoded hash**: URI-encoded hash decoded and resolved correctly (1.2)
 4. **Custom resolveTarget**: Provided closure is called instead of default `getElementById` (5.2)
 5. **Custom scrollTo**: Provided scroll function is called instead of default `scrollIntoView` (5.3)
-6. **Late-mounting renderers**: Rendering elements that appear after the initial scroll are detected and trigger a re-scroll (key scenario for Mermaid/PlantUML)
-7. **No spurious re-scroll when no renderers**: When no rendering elements ever appear, the watch times out without calling `scrollTo` again (validates always-start trade-off)
+6. **Late-mounting renderers**: Rendering elements that appear after the initial scroll are detected and trigger a re-scroll
+7. **No spurious re-scroll when no renderers**: When no rendering elements ever appear, the watch times out without calling `scrollTo` again
+8. **Deferred scroll**: Target appears after initial render via MutationObserver (2.1, 2.2)
+9. **Target observation timeout**: 10s timeout when target never appears (2.3)
+10. **Key change cleanup**: Observers and timers from previous run are released (5.6)
+11. **Unmount cleanup**: All resources released (5.7, 6.1)
 
-### Integration Tests (watchRenderingAndReScroll)
+### watchRenderingAndReScroll Tests (co-located in `src/client/util/`)
 
 1. **Rendering elements present**: Poll timer fires at 5s, re-scroll executes (3.1)
 2. **No rendering elements**: No timer scheduled (3.3)
@@ -590,14 +601,29 @@ This feature operates entirely in the browser DOM layer with no server interacti
 6. **Watch timeout**: All resources cleaned up after 10s (3.6, 6.2)
 7. **Cleanup prevents post-cleanup execution**: Stopped flag prevents race (6.1)
 8. **Rendering completes before first timer**: Immediate re-scroll fires via wasRendering path, no extra scroll after that
+9. **Active timer cancelled when rendering elements removed**: Avoids redundant re-scroll
+
+### useKeywordRescroll Tests (co-located in `features/search/.../SearchPage/`)
+
+1. **watchRenderingAndReScroll called with scroll container**: Correct container element passed
+2. **scrollToKeyword scrolls to first .highlighted-keyword**: Container-relative scroll calculation verified
+3. **scrollToKeyword returns false when no keyword found**: No scroll attempted
+4. **MutationObserver set up on container**: Correct observe config verified
+5. **Cleanup on unmount**: MO disconnected, rendering watch cleanup called, debounce cancelled
+6. **Key change re-runs effect**: New watch started for new key
+7. **Null container guard**: No-op when scrollElementRef.current is null
+
+### SearchResultContent Tests (co-located with component)
+
+1. **Hook integration**: `useKeywordRescroll` called with correct key and scroll container ref
+2. **Key change**: Hook re-called with new key on page change
 
 ### MermaidViewer Tests
 
-1. **rAF cleanup on unmount**: When component unmounts during the async render, the pending `requestAnimationFrame` is cancelled — no `setAttribute` call after unmount
-2. **isDarkMode change re-renders correctly**: Attribute resets to `"true"` on re-render and transitions to `"false"` via rAF after the new render completes
+1. **rAF cleanup on unmount**: Pending `requestAnimationFrame` cancelled on unmount
+2. **Rendering attribute lifecycle**: "true" initially → "false" via rAF after render → "false" immediately on error
 
-### Hook Lifecycle Tests
+### PlantUmlViewer Tests
 
-1. **Key change**: Cleanup runs, new scroll cycle starts (5.6)
-2. **Unmount**: All observers and timers cleaned up (5.7, 6.1)
-3. **Re-render with same key**: Effect does not re-trigger (stability)
+1. **Rendering attribute lifecycle**: "true" initially → "false" on img load → "false" on img error
+2. **img src**: Correct src attribute rendered
