@@ -40,9 +40,7 @@ describe('addDepthCondition()', () => {
 
       // then
       expect(caller).toThrowError(
-        new Error(
-          "The specified option 'depth' is { start: -1, end: 10 } : the start must be larger or equal than 1",
-        ),
+        "The specified option 'depth' is { start: -1, end: 10 } : the start must be larger or equal than 1",
       );
       expect(mocks.getDepthOfPathMock).not.toHaveBeenCalled();
     });
