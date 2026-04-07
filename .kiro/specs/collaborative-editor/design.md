@@ -239,6 +239,8 @@ interface YWebsocketPersistence {
 - Awareness API: `provider.awareness.setLocalStateField`, `.on('update', ...)`
 - All side effects (provider creation, awareness setup) must be outside React state updaters to avoid render-phase violations
 
+> **Note**: Client-side awareness display (EditingUserList stability, rich cursor rendering) is designed in the [`collaborative-editor-awareness`](../collaborative-editor-awareness/) spec.
+
 ## Data Models
 
 No custom data models. Uses the existing `yjs-writings` MongoDB collection via `MongodbPersistence` (extended `y-mongodb-provider`). Collection schema, indexes, and persistence interface (`bindState` / `writeState`) are unchanged.
