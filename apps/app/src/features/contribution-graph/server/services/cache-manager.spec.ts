@@ -32,9 +32,12 @@ describe('Contribution Cache Manager Integration Test', () => {
   });
 
   beforeEach(async () => {
-    await ContributionCache.deleteMany({});
     const User = mongoose.model('User');
-    await User.deleteMany({});
+    await Promise.all([
+      ContributionCache.deleteMany({}),
+      Activity.deleteMany({}),
+      User.deleteMany({}),
+    ]);
   });
 
   describe('getUpdatedCache()', () => {
