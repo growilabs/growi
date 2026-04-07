@@ -19,20 +19,7 @@
   height: var(--egm-height) !important;
 }
 
-.editor-guide-content {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-
-.card {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-}
-
 .card-body-scrollable {
-  flex: 1 1 auto;
   overflow-y: auto;
 }
 

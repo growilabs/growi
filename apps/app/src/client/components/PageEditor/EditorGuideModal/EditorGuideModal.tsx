@@ -33,14 +33,6 @@ const TextStyleTabPane = (): React.JSX.Element => <TextStyleTab />;
 const LayoutTabPane = (): React.JSX.Element => <LayoutTab />;
 const DecorationTabPane = (): React.JSX.Element => <DecorationTab />;
 
-/**
- * EditorGuideModal
- *
- * This modal overlays only the preview area (specified by containerRef),
- * not the entire screen.
- * Positioning is achieved via CSS custom properties set on document.body,
- * which are consumed by modalClassName / backdropClassName SCSS classes.
- */
 export const EditorGuideModal = ({
   containerRef,
 }: Props): JSX.Element | null => {
@@ -100,7 +92,7 @@ export const EditorGuideModal = ({
       keyboard
       modalClassName={styles['editor-guide-modal']}
       backdropClassName={styles['editor-guide-backdrop']}
-      contentClassName={styles['editor-guide-content']}
+      contentClassName="bg-transparent border-0 shadow-none"
       style={{ margin: 0, maxWidth: '700px', width: 'calc(100% - 32px)' }}
     >
       <Card
@@ -128,7 +120,9 @@ export const EditorGuideModal = ({
             hideBorderBottom
           />
         </div>
-        <CardBody className={`pt-0 ${styles['card-body-scrollable']}`}>
+        <CardBody
+          className={`pt-0 flex-fill ${styles['card-body-scrollable']}`}
+        >
           <CustomTabContent
             activeTab={activeTab}
             navTabMapping={navTabMapping}
