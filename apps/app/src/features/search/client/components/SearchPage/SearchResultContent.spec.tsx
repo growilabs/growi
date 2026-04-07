@@ -4,17 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { IPageWithSearchMeta } from '~/interfaces/search';
 
-// Mock watchRenderingAndReScroll
-vi.mock(
-  '~/client/hooks/use-content-auto-scroll/watch-rendering-and-rescroll',
-  () => ({
-    watchRenderingAndReScroll: vi.fn(() => vi.fn()), // returns a cleanup fn
-  }),
-);
-
-// Mock scrollWithinContainer
-vi.mock('~/client/util/smooth-scroll', () => ({
-  scrollWithinContainer: vi.fn(),
+// Mock useKeywordRescroll
+vi.mock('./use-keyword-rescroll', () => ({
+  useKeywordRescroll: vi.fn(),
 }));
 
 // Mock next/dynamic
@@ -60,13 +52,10 @@ vi.mock('~/components/Common/PagePathNav', () => ({
   PagePathNav: () => null,
 }));
 
-import { watchRenderingAndReScroll } from '~/client/hooks/use-content-auto-scroll/watch-rendering-and-rescroll';
-import { scrollWithinContainer } from '~/client/util/smooth-scroll';
-
 import { SearchResultContent } from './SearchResultContent';
+import { useKeywordRescroll } from './use-keyword-rescroll';
 
-const mockWatchRenderingAndReScroll = vi.mocked(watchRenderingAndReScroll);
-const mockScrollWithinContainer = vi.mocked(scrollWithinContainer);
+const mockUseKeywordRescroll = vi.mocked(useKeywordRescroll);
 
 const createMockPage = (overrides: Partial<IPageHasId> = {}): IPageHasId =>
   ({
@@ -82,9 +71,7 @@ const createMockPageWithMeta = (page: IPageHasId = createMockPage()) =>
 
 describe('SearchResultContent', () => {
   beforeEach(() => {
-    mockWatchRenderingAndReScroll.mockReset();
-    mockWatchRenderingAndReScroll.mockReturnValue(vi.fn());
-    mockScrollWithinContainer.mockReset();
+    mockUseKeywordRescroll.mockReset();
     window.location.hash = '';
   });
 
@@ -92,110 +79,48 @@ describe('SearchResultContent', () => {
     window.location.hash = '';
   });
 
-  describe('watchRenderingAndReScroll integration', () => {
-    it('should call watchRenderingAndReScroll with the scroll container element', () => {
+  describe('useKeywordRescroll integration', () => {
+    it('should call useKeywordRescroll with the correct key', () => {
       const page = createMockPage({ _id: 'page-123' });
       const pageWithMeta = createMockPageWithMeta(page);
 
       render(<SearchResultContent pageWithMeta={pageWithMeta} />);
 
-      expect(mockWatchRenderingAndReScroll).toHaveBeenCalledTimes(1);
-      const firstCall = mockWatchRenderingAndReScroll.mock.calls[0];
-      expect(firstCall).toBeDefined();
-      const containerArg = firstCall?.[0];
-      expect(containerArg).toBeInstanceOf(HTMLElement);
-      expect((containerArg as HTMLElement).id).toBe(
+      expect(mockUseKeywordRescroll).toHaveBeenCalledTimes(1);
+      const callArgs = mockUseKeywordRescroll.mock.calls[0]?.[0];
+      expect(callArgs?.key).toBe('page-123');
+    });
+
+    it('should call useKeywordRescroll with a ref to the scroll container', () => {
+      const page = createMockPage({ _id: 'page-123' });
+      const pageWithMeta = createMockPageWithMeta(page);
+
+      render(<SearchResultContent pageWithMeta={pageWithMeta} />);
+
+      const callArgs = mockUseKeywordRescroll.mock.calls[0]?.[0];
+      expect(callArgs?.scrollElementRef).toBeDefined();
+      expect(callArgs?.scrollElementRef.current).toBeInstanceOf(HTMLElement);
+      expect((callArgs?.scrollElementRef.current as HTMLElement).id).toBe(
         'search-result-content-body-container',
       );
     });
 
-    it('should pass a scrollToKeyword function as the second argument', () => {
-      const page = createMockPage();
-      const pageWithMeta = createMockPageWithMeta(page);
+    it('should re-call useKeywordRescroll with new key when page changes', () => {
+      const page1 = createMockPage({ _id: 'page-1' });
+      const pageWithMeta1 = createMockPageWithMeta(page1);
 
-      render(<SearchResultContent pageWithMeta={pageWithMeta} />);
-
-      const scrollToKeyword = mockWatchRenderingAndReScroll.mock.calls[0]?.[1];
-      expect(typeof scrollToKeyword).toBe('function');
-    });
-
-    it('scrollToKeyword should scroll to .highlighted-keyword within container', () => {
-      const page = createMockPage();
-      const pageWithMeta = createMockPageWithMeta(page);
-
-      render(<SearchResultContent pageWithMeta={pageWithMeta} />);
-
-      const firstCall = mockWatchRenderingAndReScroll.mock.calls[0];
-      expect(firstCall).toBeDefined();
-      const container = firstCall?.[0] as HTMLElement;
-      const scrollToKeyword = firstCall?.[1];
-
-      // Inject a highlighted-keyword element into the container
-      const keyword = document.createElement('span');
-      keyword.className = 'highlighted-keyword';
-      container.appendChild(keyword);
-
-      vi.spyOn(keyword, 'getBoundingClientRect').mockReturnValue({
-        top: 250,
-        bottom: 270,
-        left: 0,
-        right: 100,
-        width: 100,
-        height: 20,
-        x: 0,
-        y: 250,
-        toJSON: () => ({}),
-      });
-      vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({
-        top: 100,
-        bottom: 600,
-        left: 0,
-        right: 100,
-        width: 100,
-        height: 500,
-        x: 0,
-        y: 100,
-        toJSON: () => ({}),
-      });
-
-      const result = scrollToKeyword();
-
-      // distance = 250 - 100 - 30 = 120
-      expect(mockScrollWithinContainer).toHaveBeenCalledWith(container, 120);
-      expect(result).toBe(true);
-
-      container.removeChild(keyword);
-    });
-
-    it('scrollToKeyword should return false when no .highlighted-keyword element exists', () => {
-      const page = createMockPage();
-      const pageWithMeta = createMockPageWithMeta(page);
-
-      render(<SearchResultContent pageWithMeta={pageWithMeta} />);
-
-      const scrollToKeyword = mockWatchRenderingAndReScroll.mock.calls[0]?.[1];
-      expect(scrollToKeyword).toBeDefined();
-
-      const result = scrollToKeyword?.();
-
-      expect(result).toBe(false);
-      expect(mockScrollWithinContainer).not.toHaveBeenCalled();
-    });
-
-    it('should call watchRenderingAndReScroll cleanup when component unmounts', () => {
-      const mockCleanup = vi.fn();
-      mockWatchRenderingAndReScroll.mockReturnValue(mockCleanup);
-
-      const page = createMockPage();
-      const pageWithMeta = createMockPageWithMeta(page);
-
-      const { unmount } = render(
-        <SearchResultContent pageWithMeta={pageWithMeta} />,
+      const { rerender } = render(
+        <SearchResultContent pageWithMeta={pageWithMeta1} />,
       );
 
-      unmount();
+      const page2 = createMockPage({ _id: 'page-2' });
+      const pageWithMeta2 = createMockPageWithMeta(page2);
 
-      expect(mockCleanup).toHaveBeenCalledTimes(1);
+      rerender(<SearchResultContent pageWithMeta={pageWithMeta2} />);
+
+      // useKeywordRescroll should be called with new key on rerender
+      const lastCall = mockUseKeywordRescroll.mock.calls.at(-1)?.[0];
+      expect(lastCall?.key).toBe('page-2');
     });
   });
 });

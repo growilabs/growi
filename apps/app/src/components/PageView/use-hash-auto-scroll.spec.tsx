@@ -2,9 +2,9 @@ import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import { renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useContentAutoScroll } from './use-content-auto-scroll';
+import { useHashAutoScroll } from './use-hash-auto-scroll';
 
-describe('useContentAutoScroll', () => {
+describe('useHashAutoScroll', () => {
   const containerId = 'test-content-container';
   let container: HTMLDivElement;
 
@@ -29,7 +29,7 @@ describe('useContentAutoScroll', () => {
     container.appendChild(target);
 
     renderHook(() =>
-      useContentAutoScroll({ key: null, contentContainerId: containerId }),
+      useHashAutoScroll({ key: null, contentContainerId: containerId }),
     );
 
     expect(target.scrollIntoView).not.toHaveBeenCalled();
@@ -43,7 +43,7 @@ describe('useContentAutoScroll', () => {
     container.appendChild(target);
 
     renderHook(() =>
-      useContentAutoScroll({ key: undefined, contentContainerId: containerId }),
+      useHashAutoScroll({ key: undefined, contentContainerId: containerId }),
     );
 
     expect(target.scrollIntoView).not.toHaveBeenCalled();
@@ -57,7 +57,7 @@ describe('useContentAutoScroll', () => {
     container.appendChild(target);
 
     renderHook(() =>
-      useContentAutoScroll({ key: 'page-id', contentContainerId: containerId }),
+      useHashAutoScroll({ key: 'page-id', contentContainerId: containerId }),
     );
 
     expect(target.scrollIntoView).not.toHaveBeenCalled();
@@ -71,7 +71,7 @@ describe('useContentAutoScroll', () => {
     container.appendChild(target);
 
     renderHook(() =>
-      useContentAutoScroll({
+      useHashAutoScroll({
         key: 'page-id',
         contentContainerId: 'nonexistent-id',
       }),
@@ -88,7 +88,7 @@ describe('useContentAutoScroll', () => {
     container.appendChild(target);
 
     const { unmount } = renderHook(() =>
-      useContentAutoScroll({ key: 'page-id', contentContainerId: containerId }),
+      useHashAutoScroll({ key: 'page-id', contentContainerId: containerId }),
     );
 
     expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
@@ -105,7 +105,7 @@ describe('useContentAutoScroll', () => {
     container.appendChild(target);
 
     const { unmount } = renderHook(() =>
-      useContentAutoScroll({ key: 'page-id', contentContainerId: containerId }),
+      useHashAutoScroll({ key: 'page-id', contentContainerId: containerId }),
     );
 
     expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
@@ -120,7 +120,7 @@ describe('useContentAutoScroll', () => {
     const resolveTarget = vi.fn(() => target);
 
     const { unmount } = renderHook(() =>
-      useContentAutoScroll({
+      useHashAutoScroll({
         key: 'page-id',
         contentContainerId: containerId,
         resolveTarget,
@@ -142,7 +142,7 @@ describe('useContentAutoScroll', () => {
     const customScrollTo = vi.fn();
 
     const { unmount } = renderHook(() =>
-      useContentAutoScroll({
+      useHashAutoScroll({
         key: 'page-id',
         contentContainerId: containerId,
         scrollTo: customScrollTo,
@@ -167,7 +167,7 @@ describe('useContentAutoScroll', () => {
     container.appendChild(renderingEl);
 
     const { unmount } = renderHook(() =>
-      useContentAutoScroll({ key: 'page-id', contentContainerId: containerId }),
+      useHashAutoScroll({ key: 'page-id', contentContainerId: containerId }),
     );
 
     expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
@@ -194,7 +194,7 @@ describe('useContentAutoScroll', () => {
 
     // No rendering elements at scroll time
     const { unmount } = renderHook(() =>
-      useContentAutoScroll({ key: 'page-id', contentContainerId: containerId }),
+      useHashAutoScroll({ key: 'page-id', contentContainerId: containerId }),
     );
 
     expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
@@ -220,7 +220,7 @@ describe('useContentAutoScroll', () => {
     container.appendChild(target);
 
     const { unmount } = renderHook(() =>
-      useContentAutoScroll({ key: 'page-id', contentContainerId: containerId }),
+      useHashAutoScroll({ key: 'page-id', contentContainerId: containerId }),
     );
 
     expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
@@ -240,7 +240,7 @@ describe('useContentAutoScroll', () => {
     window.location.hash = '#deferred';
 
     const { unmount } = renderHook(() =>
-      useContentAutoScroll({ key: 'page-id', contentContainerId: containerId }),
+      useHashAutoScroll({ key: 'page-id', contentContainerId: containerId }),
     );
 
     const target = document.createElement('div');
@@ -259,7 +259,7 @@ describe('useContentAutoScroll', () => {
     window.location.hash = '#never-appears';
 
     const { unmount } = renderHook(() =>
-      useContentAutoScroll({ key: 'page-id', contentContainerId: containerId }),
+      useHashAutoScroll({ key: 'page-id', contentContainerId: containerId }),
     );
 
     // Advance past the timeout
@@ -290,7 +290,7 @@ describe('useContentAutoScroll', () => {
     container.appendChild(renderingEl);
 
     const { unmount } = renderHook(() =>
-      useContentAutoScroll({ key: 'page-id', contentContainerId: containerId }),
+      useHashAutoScroll({ key: 'page-id', contentContainerId: containerId }),
     );
 
     expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
@@ -310,8 +310,7 @@ describe('useContentAutoScroll', () => {
     container.appendChild(target);
 
     const { rerender, unmount } = renderHook(
-      ({ key }) =>
-        useContentAutoScroll({ key, contentContainerId: containerId }),
+      ({ key }) => useHashAutoScroll({ key, contentContainerId: containerId }),
       { initialProps: { key: 'page-1' as string | null } },
     );
 

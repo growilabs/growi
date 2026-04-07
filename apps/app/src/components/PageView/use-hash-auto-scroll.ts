@@ -3,10 +3,11 @@ import { useEffect, useRef } from 'react';
 import {
   WATCH_TIMEOUT_MS,
   watchRenderingAndReScroll,
-} from './watch-rendering-and-rescroll';
+  // biome-ignore lint/style/noRestrictedImports: client-only hook used in client-only component
+} from '~/client/util/watch-rendering-and-rescroll';
 
-/** Configuration for the auto-scroll hook */
-export interface UseContentAutoScrollOptions {
+/** Configuration for the hash-based auto-scroll hook */
+export interface UseHashAutoScrollOptions {
   /**
    * Unique key that triggers re-execution when changed.
    * When null/undefined, all scroll processing is skipped.
@@ -35,9 +36,7 @@ export interface UseContentAutoScrollOptions {
  * Handles lazy-rendered content by polling for rendering-status
  * attributes and re-scrolling after they finish.
  */
-export const useContentAutoScroll = (
-  options: UseContentAutoScrollOptions,
-): void => {
+export const useHashAutoScroll = (options: UseHashAutoScrollOptions): void => {
   const { key, contentContainerId } = options;
   const resolveTargetRef = useRef(options.resolveTarget);
   resolveTargetRef.current = options.resolveTarget;

@@ -4,8 +4,6 @@ import { isDeepEquals } from '@growi/core/dist/utils/is-deep-equals';
 import { isUsersHomepage } from '@growi/core/dist/utils/page-path-utils';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 
-// biome-ignore lint/style/noRestrictedImports: client-only hook used in client-only component
-import { useContentAutoScroll } from '~/client/hooks/use-content-auto-scroll';
 import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle';
 import type { RendererConfig } from '~/interfaces/services/renderer';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
@@ -23,6 +21,7 @@ import { UserInfo } from '../User/UserInfo';
 import { PageAlerts } from './PageAlerts/PageAlerts';
 import { PageContentFooter } from './PageContentFooter';
 import { PageViewLayout } from './PageViewLayout';
+import { useHashAutoScroll } from './use-hash-auto-scroll';
 
 // biome-ignore-start lint/style/noRestrictedImports: no-problem dynamic import
 const NotCreatablePage = dynamic(
@@ -124,7 +123,7 @@ const PageViewComponent = (props: Props): JSX.Element => {
   );
 
   // Auto-scroll to URL hash target, handling lazy-rendered content
-  useContentAutoScroll({ key: currentPageId, contentContainerId });
+  useHashAutoScroll({ key: currentPageId, contentContainerId });
 
   const specialContents = useMemo(() => {
     if (isIdenticalPathPage) {
