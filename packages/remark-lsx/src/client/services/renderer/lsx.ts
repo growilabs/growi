@@ -1,3 +1,4 @@
+import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import {
   addTrailingSlash,
   hasHeadingSlash,
@@ -25,6 +26,7 @@ const SUPPORTED_ATTRIBUTES = [
   'filter',
   'except',
   'isSharedPage',
+  GROWI_IS_CONTENT_RENDERING_ATTR,
 ];
 
 type DirectiveAttributes = Record<string, string>;
@@ -53,6 +55,7 @@ export const remarkPlugin: Plugin = () => (tree) => {
       //   case 1: lsx(prefix=/path..., ...)    => prefix="/path"
       //   case 2: lsx(/path, ...)              => prefix="/path"
       //   case 3: lsx(/foo, prefix=/bar ...)   => prefix="/bar"
+      //   case 4: lsx(/foo bar, ...)           => prefix="/foo bar"
       if (attributes.prefix == null) {
         const attrEntries = Object.entries(attributes);
 
@@ -63,7 +66,16 @@ export const remarkPlugin: Plugin = () => (tree) => {
             firstAttrValue === '' &&
             !SUPPORTED_ATTRIBUTES.includes(firstAttrKey)
           ) {
-            attributes.prefix = firstAttrKey;
+            // Consecutive bare attributes are joined with spaces to restore the prefix path,
+            // because the micromark parser splits space-separated words into separate attributes.
+            const prefixParts: string[] = [];
+            for (const [key, value] of attrEntries) {
+              if (value !== '' || SUPPORTED_ATTRIBUTES.includes(key)) {
+                break;
+              }
+              prefixParts.push(key);
+            }
+            attributes.prefix = prefixParts.join(' ');
           }
         }
       }

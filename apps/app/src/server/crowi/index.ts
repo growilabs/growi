@@ -2,11 +2,15 @@ import next from 'next';
 import http from 'node:http';
 import path from 'node:path';
 import { createTerminus } from '@godaddy/terminus';
+import { createHttpLoggerMiddleware } from '@growi/logger';
 import attachmentRoutes from '@growi/remark-attachment-refs/dist/server';
 import lsxRoutes from '@growi/remark-lsx/dist/server/index.cjs';
 import type { Express } from 'express';
 import mongoose from 'mongoose';
 
+import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
+import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
+import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron';
@@ -47,7 +51,7 @@ import {
 } from '../service/g2g-transfer';
 import { GrowiBridgeService } from '../service/growi-bridge';
 import { initializeImportService } from '../service/import';
-import InAppNotificationService from '../service/in-app-notification';
+import { InAppNotificationService } from '../service/in-app-notification';
 import { InstallerService } from '../service/installer';
 import { normalizeData } from '../service/normalize-data';
 import PageService from '../service/page';
@@ -436,6 +440,20 @@ class Crowi {
     }
     pageBulkExportJobCleanUpCronService.startCron();
 
+    instantiateAuditLogBulkExportJobCronService(this);
+    checkAuditLogExportJobInProgressCronService.startCron();
+
+    instantiateAuditLogBulkExportJobCleanUpCronService(this);
+    const { auditLogBulkExportJobCleanUpCronService } = await import(
+      '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron'
+    );
+    if (auditLogBulkExportJobCleanUpCronService == null) {
+      throw new Error(
+        'auditLogBulkExportJobCleanUpCronService is not initialized',
+      );
+    }
+    auditLogBulkExportJobCleanUpCronService.startCron();
+
     startOpenaiCronIfEnabled();
     startAccessTokenCron();
   }
@@ -613,27 +631,16 @@ class Crowi {
 
     require('./express-init')(this, express);
 
-    // use bunyan
-    if (env === 'production') {
-      const expressBunyanLogger = require('express-bunyan-logger');
-      const bunyanLogger = loggerFactory('express');
-      express.use(
-        expressBunyanLogger({
-          logger: bunyanLogger,
-          excludes: ['*'],
-        }),
-      );
-    }
-    // use morgan
-    else {
-      const morgan = require('morgan');
-      express.use(
-        morgan('dev', {
-          // supress logging for Next.js static files
-          skip: (req) => req.url?.startsWith('/_next/static/'),
-        }),
-      );
-    }
+    // HTTP request logging via @growi/logger (encapsulates pino-http)
+    const httpLogger = await createHttpLoggerMiddleware({
+      // suppress logging for Next.js static files in development mode
+      ...(env !== 'production' && {
+        autoLogging: {
+          ignore: (req) => req.url?.startsWith('/_next/static/') ?? false,
+        },
+      }),
+    });
+    express.use(httpLogger);
 
     this.express = express;
   }

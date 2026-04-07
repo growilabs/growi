@@ -89,7 +89,7 @@ export const createUpgradeHandler = (sessionConfig: SessionConfig) => {
   ): Promise<UpgradeResult> => {
     const pageId = extractPageId(request.url);
     if (pageId == null) {
-      logger.warn('Invalid URL path for Yjs upgrade', { url: request.url });
+      logger.warn({ url: request.url }, 'Invalid URL path for Yjs upgrade');
       writeErrorResponse(socket, 400, 'Bad Request');
       return { authorized: false, statusCode: 400 };
     }
@@ -100,7 +100,7 @@ export const createUpgradeHandler = (sessionConfig: SessionConfig) => {
       await runMiddleware(passportInit as ConnectMiddleware, request);
       await runMiddleware(passportSession as ConnectMiddleware, request);
     } catch (err) {
-      logger.warn('Session/passport middleware failed on upgrade', { err });
+      logger.warn({ err }, 'Session/passport middleware failed on upgrade');
       writeErrorResponse(socket, 401, 'Unauthorized');
       return { authorized: false, statusCode: 401 };
     }
@@ -114,10 +114,13 @@ export const createUpgradeHandler = (sessionConfig: SessionConfig) => {
     if (!isAccessible) {
       const statusCode = user == null ? 401 : 403;
       const message = user == null ? 'Unauthorized' : 'Forbidden';
-      logger.warn(`Yjs upgrade rejected: ${message}`, {
-        pageId,
-        userId: user?._id,
-      });
+      logger.warn(
+        {
+          pageId,
+          userId: user?._id,
+        },
+        `Yjs upgrade rejected: ${message}`,
+      );
       writeErrorResponse(socket, statusCode, message);
       return { authorized: false, statusCode };
     }

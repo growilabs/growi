@@ -9,7 +9,7 @@
   "module": "dist/index.js",
   "scripts": {
     "build": "tsc && vite build",
-    "clean": "shx rm -rf dist",
+    "clean": "rimraf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
     "serve": "vite",
@@ -57,8 +57,8 @@
     "codemirror": "^6.0.1",
     "csv-to-markdown-table": "^1.4.1",
     "emoji-mart": "^5.6.0",
-    "eslint-plugin-react-refresh": "^0.4.1",
     "i18next": "^23.16.5",
+    "react-i18next": "^15.1.1",
     "lib0": "^0.2.94",
     "markdown-table": "^3.0.3",
     "react-dropzone": "^14.2.3",
