@@ -12,6 +12,22 @@ import { useSWRxAiAssistants } from '../../stores/ai-assistant';
 
 import styles from './OpenDefaultAiAssistantButton.module.scss';
 
+const AiAssistantButton = ({
+  onClick,
+}: {
+  onClick?: () => void;
+}): JSX.Element => (
+  <button
+    type="button"
+    className={`btn btn-search ${styles['btn-open-default-ai-assistant']}`}
+    onClick={onClick}
+  >
+    <span className="growi-custom-icons fs-4 align-middle lh-1">
+      ai_assistant
+    </span>
+  </button>
+);
+
 const OpenDefaultAiAssistantButtonSubstance = (): JSX.Element => {
   const { t } = useTranslation();
   const { data: aiAssistantData } = useSWRxAiAssistants();
@@ -37,27 +53,13 @@ const OpenDefaultAiAssistantButtonSubstance = (): JSX.Element => {
     openChat(defaultAiAssistant);
   }, [defaultAiAssistant, openChat]);
 
-  const isDisabled = defaultAiAssistant == null;
-
-  const button = (
-    <button
-      type="button"
-      className={`btn btn-search ${styles['btn-open-default-ai-assistant']}`}
-      onClick={openDefaultAiAssistantButtonClickHandler}
-    >
-      <span className="growi-custom-icons fs-4 align-middle lh-1">
-        ai_assistant
-      </span>
-    </button>
-  );
-
   return (
     <NotAvailableForGuest>
       <NotAvailable
-        isDisabled={isDisabled}
+        isDisabled={defaultAiAssistant == null}
         title={t('default_ai_assistant.not_set')}
       >
-        {button}
+        <AiAssistantButton onClick={openDefaultAiAssistantButtonClickHandler} />
       </NotAvailable>
     </NotAvailableForGuest>
   );
@@ -73,37 +75,27 @@ const OpenDefaultAiAssistantButton = (): JSX.Element => {
   if (!isAiEnabled) {
     if (!isCloud) return <></>;
 
-    const button = (
-      <button
-        type="button"
-        className={`btn btn-search ${styles['btn-open-default-ai-assistant']}`}
-      >
-        <span className="growi-custom-icons fs-4 align-middle lh-1">
-          ai_assistant
-        </span>
-      </button>
-    );
-
-    const popoverContent = (
-      <>
-        <p className="mb-2">
-          {t('default_ai_assistant.open_cloud_settings_to_enable')}
-        </p>
-        <a href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}>
-          <span
-            className="material-symbols-outlined me-1"
-            style={{ fontSize: '1rem', verticalAlign: 'middle' }}
-          >
-            share
-          </span>
-          {t('default_ai_assistant.to_cloud_settings')}
-        </a>
-      </>
-    );
-
     return (
-      <NotAvailable isDisabled title={popoverContent}>
-        {button}
+      <NotAvailable
+        isDisabled
+        title={
+          <>
+            <p className="mb-2">
+              {t('default_ai_assistant.open_cloud_settings_to_enable')}
+            </p>
+            <a href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}>
+              <span
+                className="material-symbols-outlined me-1"
+                style={{ fontSize: '1rem', verticalAlign: 'middle' }}
+              >
+                share
+              </span>
+              {t('default_ai_assistant.to_cloud_settings')}
+            </a>
+          </>
+        }
+      >
+        <AiAssistantButton />
       </NotAvailable>
     );
   }
