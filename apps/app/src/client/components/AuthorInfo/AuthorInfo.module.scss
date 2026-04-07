@@ -3,19 +3,19 @@
 $author-font-size: 12px;
 $date-font-size: 12px;
 
-.grw-author-info :global {
+.grw-author-info {
   font-size: $author-font-size;
 
-  .text-date {
+  :global(.text-date) {
     font-size: $date-font-size;
   }
 
-  .user-picture {
+  :global(.user-picture) {
     width: 22px;
     height: 22px;
     border: 1px solid bs.$gray-300;
 
-    &.user-picture-xs {
+    &:global(.user-picture-xs) {
       width: 14px;
       height: 14px;
     }

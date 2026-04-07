@@ -1,32 +1,32 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
-@use '~/styles/variables' as var;
+@use 'styles/variables' as var;
 
-.search-menu-item :global {
-  li {
+.search-menu-item {
+  :global(li) {
     cursor: pointer;
   }
 }
 
 // == Colors
 @include bs.color-mode(light) {
-  .search-menu-item :global {
-    li.active {
+  .search-menu-item {
+    :global(li.active) {
       background-color: var(--grw-primary-100)
     }
 
-    li:hover {
+    :global(li:hover) {
       background-color: bs.$gray-200;
     }
   }
 }
 
 @include bs.color-mode(dark) {
-  .search-menu-item :global {
-    li.active {
+  .search-menu-item {
+    :global(li.active) {
       background-color: var(--grw-primary-800)
     }
 
-    li:hover {
+    :global(li:hover) {
       background-color: bs.$gray-800;
     }
   }

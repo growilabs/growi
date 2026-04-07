@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Slack integration libraries for GROWI",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.js",
@@ -40,7 +40,7 @@
   },
   "scripts": {
     "build": "vite build",
-    "clean": "shx rm -rf dist",
+    "clean": "rimraf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
     "lint:biome": "biome check",
