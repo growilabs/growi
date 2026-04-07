@@ -18,19 +18,19 @@ const scrollToTargetWithinContainer = (
   scrollWithinContainer(container, distance);
 };
 
-const scrollToFirstHighlightedKeyword = (scrollElement: HTMLElement): void => {
+/**
+ * Scroll to the first `.highlighted-keyword` element inside the given container.
+ * @returns true if an element was found and scrolled to, false otherwise.
+ */
+const scrollToKeyword = (scrollElement: HTMLElement): boolean => {
   // use querySelector to intentionally get the first element found
   const toElem = scrollElement.querySelector(
     '.highlighted-keyword',
   ) as HTMLElement | null;
-  if (toElem == null) return;
+  if (toElem == null) return false;
   scrollToTargetWithinContainer(toElem, scrollElement);
+  return true;
 };
-
-const scrollToFirstHighlightedKeywordDebounced = debounce(
-  500,
-  scrollToFirstHighlightedKeyword,
-);
 
 export interface UseKeywordRescrollOptions {
   /** Ref to the scrollable container element */
@@ -53,28 +53,23 @@ export const useKeywordRescroll = ({
 
     if (scrollElement == null) return;
 
-    const scrollToKeyword = (): boolean => {
-      const toElem = scrollElement.querySelector(
-        '.highlighted-keyword',
-      ) as HTMLElement | null;
-      if (toElem == null) return false;
-      scrollToTargetWithinContainer(toElem, scrollElement);
-      return true;
-    };
+    const scrollToKeywordDebounced = debounce(500, () => {
+      scrollToKeyword(scrollElement);
+    });
 
     const observer = new MutationObserver(() => {
-      scrollToFirstHighlightedKeywordDebounced(scrollElement);
+      scrollToKeywordDebounced();
     });
     observer.observe(scrollElement, MUTATION_OBSERVER_CONFIG);
 
     // Re-scroll to keyword after async renderers (drawio/mermaid) cause layout shifts
-    const cleanupWatch = watchRenderingAndReScroll(
-      scrollElement,
-      scrollToKeyword,
+    const cleanupWatch = watchRenderingAndReScroll(scrollElement, () =>
+      scrollToKeyword(scrollElement),
     );
 
     return () => {
       observer.disconnect();
+      scrollToKeywordDebounced.cancel();
       cleanupWatch();
     };
   }, [key]);
