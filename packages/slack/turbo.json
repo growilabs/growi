@@ -6,6 +6,12 @@
     },
     "dev": {
       "dependsOn": ["@growi/logger#dev"]
+    },
+    "lint": {
+      "dependsOn": ["@growi/logger#dev"]
+    },
+    "test": {
+      "dependsOn": ["@growi/logger#dev"]
     }
   }
 }
