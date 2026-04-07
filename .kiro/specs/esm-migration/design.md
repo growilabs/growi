@@ -21,7 +21,7 @@
 - `apps/slackbot-proxy` migration (scheduled for deprecation)
 - Refactoring the Crowi DI architecture beyond what is needed for ESM compatibility
 - Upgrading dependencies with breaking API changes (e.g., `@keycloak/keycloak-admin-client` — ESM migration enables but does not include the upgrade)
-- Converting migration files (`src/migrations/*.js`) to ESM — they remain CJS
+- Converting migration files (`src/migrations/*.js`) to ESM — they remain CJS (enforced by placing `src/migrations/package.json` with `"type": "commonjs"`)
 
 ## Architecture
 
@@ -223,6 +223,7 @@ interface ServerTsConfig {
   - `config/logger/config.prod.js` → `.cjs`
   - `packages/pdf-converter-client/orval.config.js` → `.cjs`
 - Update all references to renamed files (import paths, CLI args, nodemon config)
+- Add `src/migrations/package.json` with `{ "type": "commonjs" }` to preserve CJS semantics for 60+ migration files without renaming each to `.cjs`
 
 **Dependencies**
 - Outbound: migrate-mongo CLI, i18next, logger init code reference these files (P1)
@@ -232,6 +233,7 @@ interface ServerTsConfig {
 - `next.config.ts` (build-time config) is TypeScript and handled by Turbopack — no change needed
 - `migrate-mongo-config.js` uses conditional `require()` for dev/prod — keep as CJS; the conditional logic works identically with `.cjs` extension
 - Update `package.json` `migrate` script if it references config by name
+- Migration files: placing a `package.json` with `"type": "commonjs"` in `src/migrations/` is preferred over renaming 60+ files to `.cjs` — migrate-mongo CLI loads them via `require()` and this ensures compatibility when `apps/app/package.json` declares `"type": "module"`
 
 ### Migration Tooling
 

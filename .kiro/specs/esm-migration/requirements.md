@@ -43,7 +43,7 @@ The goal is to migrate the entire repository to native ESM, eliminating CJS outp
 
 #### Acceptance Criteria
 
-1. The server build (`tsconfig.build.server.json`) shall output ESM modules (`"module": "ESNext"` or equivalent) instead of CommonJS.
+1. The server build (`tsconfig.build.server.json`) shall output ESM modules (`"module": "NodeNext"`, `"moduleResolution": "NodeNext"`) instead of CommonJS.
 2. When migrating server code, all `module.exports` statements shall be replaced with ES `export` syntax.
 3. When migrating server code, all static `require()` calls shall be replaced with ES `import` statements.
 4. When migrating server code, all `__dirname` and `__filename` references shall be replaced with `import.meta.url`-based equivalents (e.g., `import.meta.dirname` available in Node.js 21.2+, or `fileURLToPath(import.meta.url)`).

@@ -49,7 +49,12 @@
   - Rename `config/logger/config.prod.js` → `.cjs`
   - _Requirements: 5.3_
 
-- [ ] 2.3 Update all references to renamed config files
+- [ ] 2.3 Preserve CJS semantics for migration files
+  - Add `src/migrations/package.json` with `{ "type": "commonjs" }` so that 60+ migration `.js` files continue to work with `migrate-mongo` CLI under the new `"type": "module"` root
+  - Verify `migrate-mongo` can still discover and execute migration files
+  - _Requirements: 5.3_
+
+- [ ] 2.4 Update all references to renamed config files
   - Update `package.json` `migrate` script and any CLI arguments that reference `migrate-mongo-config.js`
   - Update i18next initialization code that imports `next-i18next.config` and `i18next.config`
   - Update logger initialization that references `config.dev.js` / `config.prod.js`
@@ -57,7 +62,7 @@
   - Grep the codebase for all remaining references to old filenames and fix them
   - _Requirements: 5.3_
 
-- [ ] 2.4 Verify Phase 2 builds pass
+- [ ] 2.5 Verify Phase 2 builds pass
   - Run `turbo run build` for all workspaces
   - Verify no broken config file references at build time
   - _Requirements: 5.4_
@@ -74,8 +79,8 @@
 
 - [ ] 3.2 Write the jscodeshift custom transform for CJS → ESM conversion
   - Create a jscodeshift transform that handles all 4 CJS patterns:
-    - Pattern 1: `module.exports = (crowi, app) => { ... }` → `export default function(crowi, app) { ... }`
-    - Pattern 2: `const x = require('module')` → `import x from 'module'`
+    - Pattern 1: `module.exports = (crowi, app) => { ... }` → named export factory
+    - Pattern 2: `const x = require('module')` → ES import statement
     - Pattern 3: `require('./page')(crowi, app)` → static import + factory call
     - Pattern 4: `__dirname` → `import.meta.dirname`
   - Add `.js` extensions to all relative import specifiers
@@ -84,8 +89,8 @@
   - _Contracts: CodemodTransform Service_
 
 - [ ] 3.3 Run codemod on all server source files
-  - Execute the jscodeshift transform across `apps/app/src/server/` (82 files with `module.exports`, 179 `require()` occurrences)
-  - Focus particular attention on `routes/apiv3/index.js` (36 factory require+invoke) and `routes/index.js` (9 factory patterns)
+  - Execute the jscodeshift transform across the server source (82 files with `module.exports`, 179 `require()` occurrences)
+  - Focus particular attention on the API v3 route registry (36 factory require+invoke) and the main route registry (9 factory patterns)
   - Static imports are safe for all factory patterns — each route module is a leaf receiving `crowi` as parameter
   - _Requirements: 2.2, 2.3_
 
@@ -95,33 +100,33 @@
   - _Requirements: 2.3_
 
 - [ ] 3.5 Manually convert dynamic require patterns
-  - Convert runtime-computed `require(modulePath)` in `service/s2s-messaging/index.ts` to `await import(modulePath)`
-  - Convert runtime-computed `require(modulePath)` in `service/file-uploader/index.ts` to `await import(modulePath)`
+  - Convert runtime-computed `require(modulePath)` in the S2S messaging service to `await import(modulePath)`
+  - Convert runtime-computed `require(modulePath)` in the file uploader service to `await import(modulePath)`
   - Review conditional requires (ternary patterns) and convert to conditional `await import()`
   - Ensure wrapping functions are marked `async` where needed
   - _Requirements: 2.5_
 
-- [ ] 3.6 Update `tsconfig.build.server.json` to ESM output
-  - Change `"module": "CommonJS"` → `"module": "NodeNext"`
-  - Change `"moduleResolution": "Node"` → `"moduleResolution": "NodeNext"`
+- [ ] 3.6 Update server tsconfig to ESM output
+  - Change the server build config from `"module": "CommonJS"` → `"module": "NodeNext"` and `"moduleResolution": "Node"` → `"moduleResolution": "NodeNext"`
   - This step runs AFTER codemod because `NodeNext` rejects `require()` in ESM context
   - Verify `turbo run build --filter @growi/app` succeeds with the new config
   - _Requirements: 2.1_
   - _Contracts: ServerBuildConfig Config_
 
 - [ ] 3.7 Replace ts-node with tsx for dev server
-  - Add `tsx` to `apps/app` devDependencies
-  - Update the `ts-node` script in `package.json`: `node -r ts-node/register/transpile-only -r tsconfig-paths/register -r dotenv-flow/config` → `node --import tsx --import dotenv-flow/config`
-  - Remove the `ts-node` override section from `apps/app/tsconfig.json` (the CJS `"module": "CommonJS"` override)
+  - Add `tsx` to devDependencies
+  - Update the dev server startup script: replace `ts-node/register` + `tsconfig-paths/register` with `--import tsx`
+  - Replace `-r dotenv-flow/config` with `--import dotenv-flow/config`
+  - Remove the `ts-node` CJS override section from `tsconfig.json`
   - Verify `pnpm run dev` starts the server correctly with tsx
   - Remove `ts-node`, `tsconfig-paths` from devDependencies if no longer used elsewhere
   - _Requirements: 2.6_
   - _Contracts: DevServerConfig Config_
 
 - [ ] 3.8 Update production entry point for ESM
-  - Change production startup from `node -r dotenv-flow/config dist/server/app.js` to `node --import dotenv-flow/config dist/server/app.js`
+  - Change production startup from `-r dotenv-flow/config` to `--import dotenv-flow/config`
   - Update the command in `Dockerfile` and/or `docker-compose.yml` if applicable
-  - Verify the compiled ESM output at `dist/server/app.js` starts and serves requests
+  - Verify the compiled ESM output starts and serves requests
   - _Requirements: 2.6, 6.4, 6.5_
   - _Contracts: ProdEntryConfig Config_
 
@@ -136,13 +141,13 @@
 
 - [ ] 4. Remove transpilePackages entries and pnpm overrides
 - [ ] 4.1 Remove @growi/* packages from transpilePackages
-  - Evaluate and remove first-party @growi/* entries from `getTranspilePackages()` in `next.config.ts`
+  - Evaluate and remove first-party @growi/* entries from the transpile packages list in Next.js config
   - Verify build and SSR runtime resolution for each removed entry
   - Document any entries that must be retained with justification in code comments
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
 - [ ] 4.2 Remove unified/remark/rehype ecosystem from transpilePackages
-  - Test removing the `listPrefixedPackages()` dynamic block (remark-/rehype-/hast-/mdast-/micromark-/unist- prefixes) as a batch
+  - Test removing the dynamic prefix-based package list (remark-/rehype-/hast-/mdast-/micromark-/unist-) as a batch
   - If batch removal causes errors, fall back to incremental removal per prefix group
   - Verify Turbopack SSR resolves these ESM packages correctly without forced transpilation
   - Retain entries that cause `ERR_MODULE_NOT_FOUND` or `ERR_REQUIRE_ESM` and document
@@ -151,7 +156,7 @@
 - [ ] 4.3 Remove remaining hardcoded transpilePackages entries
   - Evaluate the ~40 hardcoded entries individually or in small groups
   - Verify build + runtime after each removal batch
-  - Confirm the final `transpilePackages` list contains only packages genuinely requiring forced transpilation
+  - Confirm the final transpilePackages list contains only packages genuinely requiring forced transpilation
   - _Requirements: 3.1, 3.4, 3.5_
 
 - [ ] 4.4 (P) Remove pnpm.overrides for `@lykmapipo/common` transitive dependencies
@@ -172,14 +177,14 @@
   - _Requirements: 6.1, 6.2, 6.3_
 
 - [ ] 5.2 Verify production assembly and runtime
-  - Run `assemble-prod.sh` and verify it produces a working artifact
+  - Run the production assembly script and verify it produces a working artifact
   - Start the production server and verify Express, Next.js SSR, and WebSocket connections function correctly
-  - Verify `check-next-symlinks.sh` passes after transpilePackages cleanup
-  - _Requirements: 6.4, 6.5_
+  - Verify the Next.js symlink check passes after transpilePackages cleanup
+  - _Requirements: 6.4, 6.5, 6.6_
 
-- [ ] 5.3 Update package.json dependency comments
-  - Remove obsolete CJS/ESM pinning notes from `// comments for dependencies` blocks
-  - Add justification comments for any remaining `transpilePackages` entries
+- [ ] 5.3 Update package.json dependency comments and transpilePackages justifications
+  - Remove obsolete CJS/ESM pinning notes from dependency comment blocks
+  - Add justification comments for any remaining transpilePackages entries
   - Document packages with special constraints (handsontable license pinning, @keycloak deferred upgrade)
   - _Requirements: 7.1, 7.2, 7.3_
 
