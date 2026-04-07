@@ -1,12 +1,4 @@
-import {
-  type JSX,
-  memo,
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-} from 'react';
+import { type JSX, memo, useCallback, useId, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { isDeepEquals } from '@growi/core/dist/utils/is-deep-equals';
 import { isUsersHomepage } from '@growi/core/dist/utils/page-path-utils';
@@ -29,6 +21,7 @@ import { UserInfo } from '../User/UserInfo';
 import { PageAlerts } from './PageAlerts/PageAlerts';
 import { PageContentFooter } from './PageContentFooter';
 import { PageViewLayout } from './PageViewLayout';
+import { useHashAutoScroll } from './use-hash-auto-scroll';
 
 // biome-ignore-start lint/style/noRestrictedImports: no-problem dynamic import
 const NotCreatablePage = dynamic(
@@ -129,42 +122,8 @@ const PageViewComponent = (props: Props): JSX.Element => {
     rendererConfig.isEnabledMarp,
   );
 
-  // ***************************  Auto Scroll  ***************************
-  useEffect(() => {
-    if (currentPageId == null) {
-      return;
-    }
-
-    // do nothing if hash is empty
-    const { hash } = window.location;
-    if (hash.length === 0) {
-      return;
-    }
-
-    const contentContainer = document.getElementById(contentContainerId);
-    if (contentContainer == null) return;
-
-    const targetId = decodeURIComponent(hash.slice(1));
-    const target = document.getElementById(targetId);
-    if (target != null) {
-      target.scrollIntoView();
-      return;
-    }
-
-    const observer = new MutationObserver(() => {
-      const target = document.getElementById(targetId);
-      if (target != null) {
-        target.scrollIntoView();
-        observer.disconnect();
-      }
-    });
-
-    observer.observe(contentContainer, { childList: true, subtree: true });
-
-    return () => observer.disconnect();
-  }, [currentPageId, contentContainerId]);
-
-  // *******************************  end  *******************************
+  // Auto-scroll to URL hash target, handling lazy-rendered content
+  useHashAutoScroll({ key: currentPageId, contentContainerId });
 
   const specialContents = useMemo(() => {
     if (isIdenticalPathPage) {
