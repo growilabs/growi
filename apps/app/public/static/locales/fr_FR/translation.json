@@ -655,7 +655,9 @@
     }
   },
   "default_ai_assistant": {
-    "not_set": "L'assistant par défaut n'est pas configuré"
+    "not_set": "L'assistant par défaut n'est pas configuré",
+    "open_cloud_settings_to_enable": "Veuillez consulter l'écran de gestion GROWI.cloud pour activer l'intégration AI",
+    "to_cloud_settings": "Ouvrir les paramètres GROWI.cloud"
   },
   "ai_assistant_substance": {
     "add_assistant": "Ajouter un assistant",
