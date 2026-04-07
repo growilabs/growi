@@ -229,9 +229,9 @@ describe('Contribution Cache Manager Integration Test', () => {
 
       const result = await cacheManager.getUpdatedCache(userId);
 
-      expect(result).toBeDefined();
-      expect(result).not.toBeNull();
-      expect(result).toBeTruthy();
+      expect(result).toHaveLength(365);
+      expect(result[0]).toHaveProperty('date');
+      expect(result[0]).toHaveProperty('count');
     });
 
     it('should return contribution cache if user exists but no contribution cache exist', async () => {
@@ -241,9 +241,9 @@ describe('Contribution Cache Manager Integration Test', () => {
 
       const result = await cacheManager.getUpdatedCache(userId);
 
-      expect(result).toBeDefined();
-      expect(result).not.toBeNull();
-      expect(result).toBeTruthy();
+      expect(result).toHaveLength(365);
+      expect(result[0]).toHaveProperty('date');
+      expect(result[0]).toHaveProperty('count');
     });
 
     it('should transition currentWeekData to permanentWeeks when the week shifts to Monday', async () => {
