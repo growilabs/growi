@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 
 import Activity from '~/server/models/activity';
 
+import type { IContributionDay } from '../../interfaces/contribution-graph';
 import { ContributionGraphActions } from '../../interfaces/supported-actions';
 
 export interface PipelineParams {
@@ -11,7 +12,9 @@ export interface PipelineParams {
 }
 
 export class ContributionAggregationService {
-  public runAggregationPipeline(params: PipelineParams): Aggregate<any[]> {
+  public runAggregationPipeline(
+    params: PipelineParams,
+  ): Aggregate<IContributionDay[]> {
     const pipeline = this.buildPipeline(params);
     const activityResults = Activity.aggregate(pipeline);
 
