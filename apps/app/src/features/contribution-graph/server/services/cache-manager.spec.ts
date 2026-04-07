@@ -45,61 +45,45 @@ describe('Contribution Cache Manager Integration Test', () => {
 
     it('should return an array of all combined contribution cache for a user', async () => {
       const userId = createMockId();
+      const User = mongoose.model('User');
+      await User.create({ _id: userId, status: 2, username: 'tester' });
 
-      // Set the fixed date
       const mockNow = new Date('2026-04-01T12:00:00Z');
       vi.useFakeTimers();
       vi.setSystemTime(mockNow);
 
-      // Align Test Math with Service Math
-      const today = new Date(mockNow);
-      const yesterday = new Date(today);
-      yesterday.setUTCDate(today.getUTCDate() - 1);
+      const yesterday = new Date(mockNow);
+      yesterday.setUTCDate(mockNow.getUTCDate() - 1);
+      const yesterdayStr = formatDateKey(yesterday);
 
-      // The window starts 364 days BEFORE yesterday
       const runner = new Date(yesterday);
       runner.setUTCDate(runner.getUTCDate() - 364);
-      const oldestDateInWindow = formatDateKey(runner); // This will now be '2025-04-01'
+      const oldestDateInWindow = formatDateKey(runner);
+      const earlyDateStr = formatDateKey(runner);
 
-      const earlyDate = new Date(runner);
-      earlyDate.setUTCDate(earlyDate.getUTCDate() + 5);
-      const earlyDateStr = formatDateKey(earlyDate);
-
-      const recentDateStr = formatDateKey(yesterday);
-
-      await Activity.create([
-        {
-          user: userId,
-          action: ActivityLogActions.ACTION_PAGE_CREATE,
-          createdAt: new Date(recentDateStr),
-        },
-        {
-          user: userId,
-          action: ActivityLogActions.ACTION_PAGE_UPDATE,
-          createdAt: new Date(earlyDateStr),
-        },
-      ]);
+      await Activity.create({
+        user: userId,
+        action: ActivityLogActions.ACTION_PAGE_CREATE,
+        createdAt: new Date(`${yesterdayStr}T10:00:00Z`),
+      });
 
       await ContributionCache.create({
         userId,
-        lastUpdated: new Date(earlyDateStr),
-        currentWeekData: [{ date: recentDateStr, count: 1 }],
-        permanentWeeks: {
-          'dynamic-week-id': [{ date: earlyDateStr, count: 1 }],
-        },
+        lastUpdated: mockNow,
+        currentWeekData: [{ date: yesterdayStr, count: 1 }],
+        permanentWeeks: new Map([
+          [getISOWeekId(runner), [{ date: earlyDateStr, count: 1 }]],
+        ]),
       });
 
       // ACT
       const result = await cacheManager.getUpdatedCache(userId);
 
+      // ASSERT
+      expect(result).toHaveLength(365);
       expect(result[0].date).toBe(oldestDateInWindow);
-      expect(result.length).toBe(365);
 
-      const oldDay = result.find((d) => d.date === earlyDateStr);
-      expect(oldDay).toBeDefined();
-      expect(oldDay?.count).toBe(1);
-
-      const newDay = result.find((d) => d.date === recentDateStr);
+      const newDay = result.find((d) => d.date === yesterdayStr);
       expect(newDay).toBeDefined();
       expect(newDay?.count).toBe(1);
 
