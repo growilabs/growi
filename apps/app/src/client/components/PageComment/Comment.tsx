@@ -1,9 +1,10 @@
-import React, { type JSX, useEffect, useMemo, useState } from 'react';
+import { type JSX, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { type IUser, isPopulated } from '@growi/core';
 import * as pathUtils from '@growi/core/dist/utils/path-utils';
 import { UserPicture } from '@growi/ui/dist/components';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns/format';
+import { parseISO } from 'date-fns/parseISO';
 import { useTranslation } from 'next-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
 import urljoin from 'url-join';

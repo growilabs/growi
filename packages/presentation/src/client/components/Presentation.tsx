@@ -4,6 +4,8 @@ import Reveal from 'reveal.js';
 import type { PresentationOptions } from '../consts';
 import { Slides } from './Slides';
 
+import 'reveal.js/dist/reveal.css';
+
 import styles from './Presentation.module.scss';
 
 const moduleClass = styles['grw-presentation'] ?? '';

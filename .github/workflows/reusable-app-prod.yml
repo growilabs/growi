@@ -16,7 +16,7 @@ on:
       node-version:
         required: true
         type: string
-        default: 22.x
+        default: 24.x
       skip-e2e-test:
         type: boolean
         default: false
@@ -57,17 +57,18 @@ jobs:
       env:
         ANALYZE: 1
 
-    - name: Assembling all dependencies
-      run: |
-        rm -rf out
-        pnpm deploy out --prod --filter @growi/app
-        rm -rf apps/app/node_modules && mv out/node_modules apps/app/node_modules
+    - name: Assemble production artifacts
+      run: bash apps/app/bin/assemble-prod.sh
+
+    - name: Check for broken symlinks in .next/node_modules
+      run: bash apps/app/bin/check-next-symlinks.sh
 
     - name: Archive production files
       id: archive-prod-files
       run: |
         tar -zcf production.tar.gz --exclude ./apps/app/.next/cache \
           package.json \
+          node_modules \
           apps/app/.next \
           apps/app/config \
           apps/app/dist \
@@ -76,6 +77,7 @@ jobs:
           apps/app/tmp \
           apps/app/.env.production* \
           apps/app/node_modules \
+          apps/app/next.config.js \
           apps/app/package.json
         echo "file=production.tar.gz" >> $GITHUB_OUTPUT
 
@@ -124,29 +126,21 @@ jobs:
           discovery.type: single-node
 
     steps:
-    - uses: actions/checkout@v4
-
-    - uses: pnpm/action-setup@v4
-
     - uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
-        cache: 'pnpm'
-
-    # avoid setup-node cache failure; see: https://github.com/actions/setup-node/issues/1137
-    - name: Verify PNPM Cache Directory
-      run: |
-        PNPM_STORE_PATH="$( pnpm store path --silent )"
-        [ -d "$PNPM_STORE_PATH" ] || mkdir -vp "$PNPM_STORE_PATH"
 
     - name: Download production files artifact
       uses: actions/download-artifact@v4
       with:
         name: Production Files (node${{ inputs.node-version }})
 
-    - name: Extract procution files
+    - name: Extract production files
       run: |
         tar -xf ${{ needs.build-prod.outputs.PROD_FILES }}
+
+    # Run after extraction so pnpm/action-setup@v4 can read packageManager from package.json
+    - uses: pnpm/action-setup@v4
 
     - name: pnpm run server:ci
       working-directory: ./apps/app
@@ -179,7 +173,7 @@ jobs:
     container:
       # Match the Playwright version
       # https://github.com/microsoft/playwright/issues/20010
-      image: mcr.microsoft.com/playwright:v1.49.1-jammy
+      image: mcr.microsoft.com/playwright:v1.58.2-jammy
 
     strategy:
       fail-fast: false
@@ -223,14 +217,14 @@ jobs:
       with:
         name: Production Files (node${{ inputs.node-version }})
 
-    - name: Extract procution files
+    - name: Extract production files to isolated directory
       run: |
-        tar -xf ${{ needs.build-prod.outputs.PROD_FILES }}
+        mkdir -p /tmp/growi-prod
+        tar -xf ${{ needs.build-prod.outputs.PROD_FILES }} -C /tmp/growi-prod
 
     - name: Copy dotenv file for ci
-      working-directory: ./apps/app
       run: |
-        cat config/ci/.env.local.for-ci >> .env.production.local
+        cat apps/app/config/ci/.env.local.for-ci >> /tmp/growi-prod/apps/app/.env.production.local
 
     - name: Playwright Run (--project=chromium/installer)
       if: ${{ matrix.browser == 'chromium' }}
@@ -240,13 +234,13 @@ jobs:
       env:
         DEBUG: pw:api
         HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
+        GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
         MONGO_URI: mongodb://mongodb:27017/growi-playwright-installer
         ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
 
     - name: Copy dotenv file for automatic installation
-      working-directory: ./apps/app
       run: |
-        cat config/ci/.env.local.for-auto-install >> .env.production.local
+        cat apps/app/config/ci/.env.local.for-auto-install >> /tmp/growi-prod/apps/app/.env.production.local
 
     - name: Playwright Run
       working-directory: ./apps/app
@@ -255,13 +249,13 @@ jobs:
       env:
         DEBUG: pw:api
         HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
+        GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
         MONGO_URI: mongodb://mongodb:27017/growi-playwright
         ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
 
     - name: Copy dotenv file for automatic installation with allowing guest mode
-      working-directory: ./apps/app
       run: |
-        cat config/ci/.env.local.for-auto-install-with-allowing-guest >> .env.production.local
+        cat apps/app/config/ci/.env.local.for-auto-install-with-allowing-guest >> /tmp/growi-prod/apps/app/.env.production.local
 
     - name: Playwright Run (--project=${browser}/guest-mode)
       working-directory: ./apps/app
@@ -270,6 +264,7 @@ jobs:
       env:
         DEBUG: pw:api
         HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
+        GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
         MONGO_URI: mongodb://mongodb:27017/growi-playwright-guest-mode
         ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
 

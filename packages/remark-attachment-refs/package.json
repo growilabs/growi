@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Remark plugin to add ref/refimg/refs/refsimg tags",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "keywords": [
     "growi",
     "growi-plugin"
@@ -30,7 +30,7 @@
     "build": "run-p build:*",
     "build:server": "vite build -c vite.server.config.ts",
     "build:client": "vite build -c vite.client.config.ts",
-    "clean": "shx rm -rf dist",
+    "clean": "rimraf dist",
     "dev": "run-p dev:*",
     "dev:server": "vite build -c vite.server.config.ts --mode dev",
     "dev:client": "vite build -c vite.client.config.ts --mode dev",
@@ -66,7 +66,7 @@
     "happy-dom": "^15.7.4",
     "hast-util-sanitize": "^5.0.1",
     "hast-util-select": "^6.0.2",
-    "npm-run-all": "^4.1.5",
+    "npm-run-all2": "^8.0.4",
     "supertest": "^7.0.0",
     "unified": "^11.0.0",
     "unist-util-visit": "^5.0.0"

@@ -117,6 +117,10 @@ module.exports = {
       ],
     },
     {
+      name: 'AI API',
+      tags: ['AI Tools'],
+    },
+    {
       name: 'Public API',
       tags: ['Healthcheck', 'Statistics', '', '', '', '', '', ''],
     },
