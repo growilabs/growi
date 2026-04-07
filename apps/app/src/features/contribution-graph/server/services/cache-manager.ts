@@ -90,15 +90,18 @@ export class ContributionCacheManager {
 
     for (const contribution of freshCacheData) {
       if (contribution.date >= currentWeekStartStr) {
-        const existingDay = mergedCurrentWeekSparse.find(
+        const index = mergedCurrentWeekSparse.findIndex(
           (d) => d.date === contribution.date,
         );
 
         // override count if the day exists
-        if (existingDay) {
-          existingDay.count = contribution.count;
+        if (index !== -1) {
+          mergedCurrentWeekSparse[index] = {
+            ...mergedCurrentWeekSparse[index],
+            count: contribution.count,
+          };
         } else {
-          mergedCurrentWeekSparse.push(contribution);
+          mergedCurrentWeekSparse.push({ ...contribution });
         }
       } else {
         // Contribution is older than current week
@@ -108,14 +111,17 @@ export class ContributionCacheManager {
           weeksToFreezeMap[weekId] = [];
         }
 
-        const existingDay = weeksToFreezeMap[weekId].find(
+        const index = weeksToFreezeMap[weekId].findIndex(
           (d) => d.date === contribution.date,
         );
 
-        if (existingDay) {
-          existingDay.count = contribution.count;
+        if (index !== -1) {
+          weeksToFreezeMap[weekId][index] = {
+            ...weeksToFreezeMap[weekId][index],
+            count: contribution.count,
+          };
         } else {
-          weeksToFreezeMap[weekId].push(contribution);
+          weeksToFreezeMap[weekId].push({ ...contribution });
         }
       }
     }
