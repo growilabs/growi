@@ -32,9 +32,12 @@ describe('Contribution Cache Manager Integration Test', () => {
   });
 
   beforeEach(async () => {
-    await ContributionCache.deleteMany({});
     const User = mongoose.model('User');
-    await User.deleteMany({});
+    await Promise.all([
+      ContributionCache.deleteMany({}),
+      Activity.deleteMany({}),
+      User.deleteMany({}),
+    ]);
   });
 
   describe('getUpdatedCache()', () => {
@@ -42,58 +45,49 @@ describe('Contribution Cache Manager Integration Test', () => {
 
     it('should return an array of all combined contribution cache for a user', async () => {
       const userId = createMockId();
+      const User = mongoose.model('User');
+      await User.create({ _id: userId, status: 2, username: 'tester' });
 
-      const today = new Date();
+      const mockNow = new Date('2026-04-01T12:00:00Z');
+      vi.useFakeTimers();
+      vi.setSystemTime(mockNow);
 
-      // Start of the 365-day window
-      const runner = new Date(today);
+      const yesterday = new Date(mockNow);
+      yesterday.setUTCDate(mockNow.getUTCDate() - 1);
+      const yesterdayStr = formatDateKey(yesterday);
+
+      const runner = new Date(yesterday);
       runner.setUTCDate(runner.getUTCDate() - 364);
       const oldestDateInWindow = formatDateKey(runner);
+      const earlyDateStr = formatDateKey(runner);
 
-      // A date near the beginning of the window
-      const earlyDate = new Date(runner);
-      earlyDate.setUTCDate(earlyDate.getUTCDate() + 5);
-      const earlyDateStr = formatDateKey(earlyDate);
-
-      // A date near the end of the window
-      const recentDate = new Date(today);
-      recentDate.setUTCDate(recentDate.getUTCDate() - 1);
-      const recentDateStr = formatDateKey(recentDate);
-
-      await Activity.create([
-        {
-          user: userId,
-          action: ActivityLogActions.ACTION_PAGE_CREATE,
-          createdAt: new Date(recentDateStr),
-        },
-        {
-          user: userId,
-          action: ActivityLogActions.ACTION_PAGE_UPDATE,
-          createdAt: new Date(earlyDateStr),
-        },
-      ]);
+      await Activity.create({
+        user: userId,
+        action: ActivityLogActions.ACTION_PAGE_CREATE,
+        createdAt: new Date(`${yesterdayStr}T10:00:00Z`),
+      });
 
       await ContributionCache.create({
         userId,
-        lastUpdated: new Date(earlyDateStr),
-        currentWeekData: [{ date: recentDateStr, count: 1 }],
-        permanentWeeks: {
-          'dynamic-week-id': [{ date: earlyDateStr, count: 1 }],
-        },
+        lastUpdated: mockNow,
+        currentWeekData: [{ date: yesterdayStr, count: 1 }],
+        permanentWeeks: new Map([
+          [getISOWeekId(runner), [{ date: earlyDateStr, count: 1 }]],
+        ]),
       });
 
+      // ACT
       const result = await cacheManager.getUpdatedCache(userId);
 
+      // ASSERT
+      expect(result).toHaveLength(365);
       expect(result[0].date).toBe(oldestDateInWindow);
-      expect(result.length).toBe(365);
 
-      const oldDay = result.find((d) => d.date === earlyDateStr);
-      expect(oldDay).toBeDefined();
-      expect(oldDay?.count).toBe(1);
-
-      const newDay = result.find((d) => d.date === recentDateStr);
+      const newDay = result.find((d) => d.date === yesterdayStr);
       expect(newDay).toBeDefined();
       expect(newDay?.count).toBe(1);
+
+      vi.useRealTimers();
     });
 
     it('should remove cache weeks outside range', async () => {
@@ -155,7 +149,7 @@ describe('Contribution Cache Manager Integration Test', () => {
     it('should freeze weeks between start of the graph until last week', async () => {
       const userId = createMockId();
       const User = mongoose.model('User');
-      await User.create({ _id: userId, status: 1, username: 'testuser' });
+      await User.create({ _id: userId, status: 2, username: 'testuser' });
 
       const today = new Date();
 
@@ -205,7 +199,7 @@ describe('Contribution Cache Manager Integration Test', () => {
     it('should return contribution cache if user exists', async () => {
       const userId = createMockId();
       const User = mongoose.model('User');
-      await User.create({ _id: userId, status: 1, username: 'testuser' });
+      await User.create({ _id: userId, status: 2, username: 'testuser' });
 
       const newDate = new Date();
       newDate.setUTCDate(newDate.getUTCDate() - 7);
@@ -222,21 +216,172 @@ describe('Contribution Cache Manager Integration Test', () => {
 
       const result = await cacheManager.getUpdatedCache(userId);
 
-      expect(result).toBeDefined();
-      expect(result).not.toBeNull();
-      expect(result).toBeTruthy();
+      expect(result).toHaveLength(365);
+      expect(result[0]).toHaveProperty('date');
+      expect(result[0]).toHaveProperty('count');
     });
 
     it('should return contribution cache if user exists but no contribution cache exist', async () => {
       const userId = createMockId();
       const User = mongoose.model('User');
-      await User.create({ _id: userId, status: 1, username: 'testuser' });
+      await User.create({ _id: userId, status: 2, username: 'testuser' });
 
       const result = await cacheManager.getUpdatedCache(userId);
 
-      expect(result).toBeDefined();
-      expect(result).not.toBeNull();
-      expect(result).toBeTruthy();
+      expect(result).toHaveLength(365);
+      expect(result[0]).toHaveProperty('date');
+      expect(result[0]).toHaveProperty('count');
+    });
+
+    it('should transition currentWeekData to permanentWeeks when the week shifts to Monday', async () => {
+      // Setup predictable time (Wednesday)
+      const mockNow = new Date('2026-03-25T12:00:00Z');
+      vi.useFakeTimers();
+      vi.setSystemTime(mockNow);
+
+      const userId = createMockId();
+      const User = mongoose.model('User');
+      await User.create({ _id: userId, status: 2, username: 'week-tester' });
+
+      // Setup Relative Dates based on the mocked now date
+      const now = new Date();
+      const yesterday = new Date(now);
+      yesterday.setUTCDate(now.getUTCDate() - 1);
+      const lastWeekDate = new Date(now);
+      lastWeekDate.setUTCDate(now.getUTCDate() - 7);
+
+      const todayStr = formatDateKey(now);
+      const lastWeekDateStr = formatDateKey(lastWeekDate);
+      const lastWeekId = getISOWeekId(lastWeekDate);
+
+      await ContributionCache.create({
+        userId,
+        lastUpdated: yesterday, // Tuesday
+        currentWeekData: [{ date: lastWeekDateStr, count: 5 }],
+        permanentWeeks: new Map(),
+      });
+
+      // Create Activity for Today (Wednesday)
+      await Activity.create({
+        user: userId,
+        action: ActivityLogActions.ACTION_PAGE_CREATE,
+        createdAt: now,
+      });
+
+      await cacheManager.getUpdatedCache(userId);
+
+      const updatedDoc = await ContributionCache.findOne({ userId });
+
+      // March 18th data should have been moved to permanentWeeks
+      const archivedWeek = updatedDoc?.permanentWeeks.get(lastWeekId);
+      expect(archivedWeek).toBeDefined();
+      expect(archivedWeek?.find((d) => d.date === lastWeekDateStr)?.count).toBe(
+        5,
+      );
+
+      // March 25th data should be in the fresh currentWeekData
+      const todayEntry = updatedDoc?.currentWeekData.find(
+        (d) => d.date === todayStr,
+      );
+      expect(todayEntry?.count).toBe(1);
+
+      vi.useRealTimers();
+    });
+
+    it('should return exactly 365 days and exclude today from the results', async () => {
+      const userId = createMockId();
+      const User = mongoose.model('User');
+      await User.create({
+        _id: userId,
+        status: 2,
+        username: 'boundary-tester',
+      });
+
+      // Freeze Time (March 25, 2026)
+      const today = new Date('2026-03-25T12:00:00Z');
+      vi.useFakeTimers();
+      vi.setSystemTime(today);
+
+      const yesterday = new Date(today);
+      yesterday.setUTCDate(today.getUTCDate() - 1);
+
+      // Create activities: One inside the window, one outside
+      await Activity.create([
+        {
+          user: userId,
+          action: ActivityLogActions.ACTION_PAGE_CREATE,
+          createdAt: yesterday, // Should be visible
+        },
+        {
+          user: userId,
+          action: ActivityLogActions.ACTION_PAGE_CREATE,
+          createdAt: today, // Should be HIDDEN per business logic
+        },
+      ]);
+
+      const result = await cacheManager.getUpdatedCache(userId);
+
+      const activeDays = result.filter((day) => day.count > 0);
+
+      expect(result).toHaveLength(365);
+
+      expect(activeDays).toHaveLength(1);
+      expect(activeDays[0].date).toBe('2026-03-24');
+
+      vi.useRealTimers();
+    });
+
+    it('should maintain a 365-day window and handle data rotation when the graph is full', async () => {
+      const userId = createMockId();
+
+      // Setup Dates: Today vs. 370 days ago (Older than the graph limit)
+      const now = new Date();
+      now.setUTCHours(12, 0, 0, 0);
+
+      const wayPastDate = new Date(now);
+      wayPastDate.setUTCDate(now.getUTCDate() - 370); // Out of bounds
+
+      const justInsideDate = new Date(now);
+      justInsideDate.setUTCDate(now.getUTCDate() - 360); // In bounds
+
+      const wayPastId = getISOWeekId(wayPastDate);
+      const justInsideId = getISOWeekId(justInsideDate);
+      const wayPastStr = formatDateKey(wayPastDate);
+
+      vi.useFakeTimers();
+      vi.setSystemTime(now);
+
+      // Setup Cache with a "Stale" week and a "Valid" week
+      await ContributionCache.create({
+        userId,
+        lastUpdated: new Date(now.getTime() - 86400000), // Updated yesterday
+        currentWeekData: [],
+        permanentWeeks: new Map([
+          [wayPastId, [{ date: wayPastStr, count: 10 }]], // This should be cleaned
+          [justInsideId, [{ date: formatDateKey(justInsideDate), count: 5 }]],
+        ]),
+      });
+
+      await Activity.create({
+        user: userId,
+        action: ActivityLogActions.ACTION_PAGE_CREATE,
+        createdAt: now,
+      });
+
+      await cacheManager.getUpdatedCache(userId);
+
+      const updatedDoc = await ContributionCache.findOne({ userId });
+
+      expect(updatedDoc?.permanentWeeks.has(justInsideId)).toBe(true);
+      expect(updatedDoc?.permanentWeeks.has(wayPastId)).toBe(false);
+      expect(updatedDoc?.permanentWeeks.size).toBeLessThanOrEqual(53);
+
+      const todayEntry = updatedDoc?.currentWeekData.find(
+        (d) => d.date === formatDateKey(now),
+      );
+      expect(todayEntry?.count).toBe(1);
+
+      vi.useRealTimers();
     });
   });
 });
