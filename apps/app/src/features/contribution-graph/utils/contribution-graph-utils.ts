@@ -70,16 +70,20 @@ export function getExpiredWeekIds(
 export function assembleEmptyGraph(): IContributionDay[] {
   const days: IContributionDay[] = [];
 
-  const runner = new Date();
-  runner.setUTCHours(0, 0, 0, 0);
+  const yesterday = new Date();
+  yesterday.setUTCHours(0, 0, 0, 0);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+
+  const runner = new Date(yesterday);
+  runner.setUTCDate(runner.getUTCDate() - 364);
 
   for (let i = 0; i < 365; i++) {
     const dateCopy = new Date(runner);
-    dateCopy.setUTCDate(runner.getUTCDate() - i);
+    dateCopy.setUTCDate(runner.getUTCDate() + i);
 
     const dateKey = formatDateKey(dateCopy);
 
-    days.unshift({
+    days.push({
       date: dateKey,
       count: 0,
     });
