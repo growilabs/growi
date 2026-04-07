@@ -78,15 +78,12 @@ export function assembleEmptyGraph(): IContributionDay[] {
   runner.setUTCDate(runner.getUTCDate() - 364);
 
   for (let i = 0; i < 365; i++) {
-    const dateCopy = new Date(runner);
-    dateCopy.setUTCDate(runner.getUTCDate() + i);
-
-    const dateKey = formatDateKey(dateCopy);
-
     days.push({
-      date: dateKey,
+      date: formatDateKey(runner),
       count: 0,
     });
+
+    runner.setUTCDate(runner.getUTCDate() + 1);
   }
 
   return days;
