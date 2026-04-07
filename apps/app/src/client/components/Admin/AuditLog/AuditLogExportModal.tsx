@@ -17,12 +17,24 @@ import { useAuditLogExport } from './useAuditLogExport';
 type Props = {
   isOpen: boolean;
   onClose: () => void;
+  initialStartDate?: Date | null;
+  initialEndDate?: Date | null;
+  initialSelectedUsernames?: string[];
+  initialActionMap?: Map<SupportedActionType, boolean>;
 };
 
 const AuditLogExportModalSubstance = ({
   onClose,
+  initialStartDate,
+  initialEndDate,
+  initialSelectedUsernames,
+  initialActionMap,
 }: {
   onClose: () => void;
+  initialStartDate?: Date | null;
+  initialEndDate?: Date | null;
+  initialSelectedUsernames?: string[];
+  initialActionMap?: Map<SupportedActionType, boolean>;
 }): JSX.Element => {
   const { t } = useTranslation('admin');
 
@@ -30,14 +42,19 @@ const AuditLogExportModalSubstance = ({
     auditLogAvailableActionsAtom,
   );
 
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
-  const [actionMap, setActionMap] = useState(
-    () =>
-      new Map<SupportedActionType, boolean>(
-        auditLogAvailableActionsData?.map((action) => [action, true]) ?? [],
-      ),
+  const [startDate, setStartDate] = useState<Date | null>(
+    initialStartDate ?? null,
+  );
+  const [endDate, setEndDate] = useState<Date | null>(initialEndDate ?? null);
+  const [selectedUsernames, setSelectedUsernames] = useState<string[]>(
+    initialSelectedUsernames ?? [],
+  );
+  const [actionMap, setActionMap] = useState(() =>
+    initialActionMap != null
+      ? new Map(initialActionMap)
+      : new Map<SupportedActionType, boolean>(
+          auditLogAvailableActionsData?.map((action) => [action, true]) ?? [],
+        ),
   );
 
   const datePickerChangedHandler = useCallback((dateList: Date[] | null[]) => {
@@ -115,7 +132,10 @@ const AuditLogExportModalSubstance = ({
       <ModalBody>
         <div className="mb-3">
           <div className="form-label">{t('audit_log_management.username')}</div>
-          <SearchUsernameTypeahead onChange={setUsernamesHandler} />
+          <SearchUsernameTypeahead
+            onChange={setUsernamesHandler}
+            initialUsernames={initialSelectedUsernames}
+          />
         </div>
 
         <div className="mb-3">
@@ -173,10 +193,22 @@ const AuditLogExportModalSubstance = ({
 export const AuditLogExportModal = ({
   isOpen,
   onClose,
+  initialStartDate,
+  initialEndDate,
+  initialSelectedUsernames,
+  initialActionMap,
 }: Props): JSX.Element => {
   return (
     <Modal isOpen={isOpen} toggle={onClose}>
-      {isOpen && <AuditLogExportModalSubstance onClose={onClose} />}
+      {isOpen && (
+        <AuditLogExportModalSubstance
+          onClose={onClose}
+          initialStartDate={initialStartDate}
+          initialEndDate={initialEndDate}
+          initialSelectedUsernames={initialSelectedUsernames}
+          initialActionMap={initialActionMap}
+        />
+      )}
     </Modal>
   );
 };
