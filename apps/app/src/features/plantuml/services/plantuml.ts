@@ -1,7 +1,7 @@
 import plantuml from '@akebifiky/remark-simple-plantuml';
 import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import type { Schema as SanitizeOption } from 'hast-util-sanitize';
-import type { Code, Image } from 'mdast';
+import type { Code, Image, Parent } from 'mdast';
 import type { Plugin } from 'unified';
 import { visit } from 'unist-util-visit';
 import urljoin from 'url-join';
@@ -36,28 +36,34 @@ export const remarkPlugin: Plugin<[PlantUMLPluginParams]> = (options) => {
     // Transform plantuml image nodes into custom <plantuml> elements that carry
     // the rendering-status attribute, allowing the auto-scroll system to detect
     // and compensate for the layout shift caused by async image loading.
-    visit(tree, 'image', (node: Image) => {
-      if (plantumlUri.length === 0 || !node.url.startsWith(baseUrl)) {
-        return;
-      }
+    visit(
+      tree,
+      'image',
+      (node: Image, index: number | undefined, parent: Parent | undefined) => {
+        if (plantumlUri.length === 0 || !node.url.startsWith(baseUrl)) {
+          return;
+        }
+        if (index == null || parent == null) {
+          return;
+        }
 
-      const src = node.url;
+        const src = node.url;
 
-      // Mutate the image node into a custom paragraph-like element.
-      // hName overrides the HTML tag; hProperties set element attributes.
-      const mutableNode = node as unknown as Record<string, unknown>;
-      mutableNode.type = 'paragraph';
-      mutableNode.children = [];
-      mutableNode.url = undefined;
-      mutableNode.alt = undefined;
-      mutableNode.data = {
-        hName: 'plantuml',
-        hProperties: {
-          src,
-          [GROWI_IS_CONTENT_RENDERING_ATTR]: 'true',
-        },
-      };
-    });
+        // Replace the image node with a custom paragraph-like element.
+        // hName overrides the HTML tag; hProperties set element attributes.
+        parent.children[index] = {
+          type: 'paragraph',
+          children: [],
+          data: {
+            hName: 'plantuml',
+            hProperties: {
+              src,
+              [GROWI_IS_CONTENT_RENDERING_ATTR]: 'true',
+            },
+          },
+        };
+      },
+    );
   };
 };
 
