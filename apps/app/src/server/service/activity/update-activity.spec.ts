@@ -54,6 +54,36 @@ describe('shouldGenerateUpdate()', () => {
     currentActivityIdStr = currentActivityId.toString();
   });
 
+  it('should not generate update activity if: a create was performed but no update made', async () => {
+    await Activity.insertMany([
+      {
+        user: currentUserId,
+        action: SupportedAction.ACTION_PAGE_CREATE,
+        createdAt: new Date(date.getTime() - TWO_HOURS),
+        target: targetPageId,
+        _id: createActivityId,
+      },
+    ]);
+
+    await Revision.insertMany([
+      {
+        _id: new mongoose.Types.ObjectId(),
+        pageId: targetPageId,
+        body: 'Old content',
+        format: 'markdown',
+        author: currentUserId,
+      },
+    ]);
+
+    const result = await shouldGenerateUpdate({
+      targetPageId: targetPageIdStr,
+      currentUserId: currentUserIdStr,
+      currentActivityId: currentActivityIdStr,
+    });
+
+    expect(result).toBe(false);
+  });
+
   it('should generate update activity if: latest update is by another user, not first update', async () => {
     await Activity.insertMany([
       // Create activity
@@ -159,7 +189,7 @@ describe('shouldGenerateUpdate()', () => {
     expect(result).toBe(true);
   });
 
-  it('should not generate update activity if: update is made by the page creator, first update', async () => {
+  it('should not generate update activity if: update is made by the page creator, outside suppression window, first update', async () => {
     await Activity.insertMany([
       {
         user: currentUserId,
@@ -203,7 +233,52 @@ describe('shouldGenerateUpdate()', () => {
     expect(result).toBe(false);
   });
 
+  it('should not generate update activity if: update is made by the page creator, within suppression window, first update', async () => {
+    await Activity.insertMany([
+      {
+        user: currentUserId,
+        action: SupportedAction.ACTION_PAGE_CREATE,
+        createdAt: new Date(date.getTime() - ONE_MINUTE),
+        target: targetPageId,
+        _id: createActivityId,
+      },
+      {
+        user: currentUserId,
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+        createdAt: new Date(),
+        target: targetPageId,
+        _id: currentActivityId,
+      },
+    ]);
+
+    await Revision.insertMany([
+      {
+        _id: new mongoose.Types.ObjectId(),
+        pageId: targetPageId,
+        body: 'Old content',
+        format: 'markdown',
+        author: currentUserId,
+      },
+      {
+        _id: new mongoose.Types.ObjectId(),
+        pageId: targetPageId,
+        body: 'Newer content',
+        format: 'markdown',
+        author: currentUserId,
+      },
+    ]);
+
+    const result = await shouldGenerateUpdate({
+      targetPageId: targetPageIdStr,
+      currentUserId: currentUserIdStr,
+      currentActivityId: currentActivityIdStr,
+    });
+
+    expect(result).toBe(false);
+  });
+
   it('should not generate update activity if: update is made by the same user, within suppression window, not first update', async () => {
+    const FOUR_MINUTES = 4 * 60 * 1000;
     await Activity.insertMany([
       {
         user: currentUserId,
@@ -215,7 +290,7 @@ describe('shouldGenerateUpdate()', () => {
       {
         user: currentUserId,
         action: SupportedAction.ACTION_PAGE_UPDATE,
-        createdAt: new Date(date.getTime() - ONE_MINUTE),
+        createdAt: new Date(date.getTime() - FOUR_MINUTES),
         target: targetPageId,
         _id: olderActivityId,
       },
@@ -262,6 +337,7 @@ describe('shouldGenerateUpdate()', () => {
   });
 
   it('should generate update activity if: update is made by the same user, outside suppression window, not first update', async () => {
+    const SIX_MINUTES = 6 * 60 * 1000;
     await Activity.insertMany([
       {
         user: currentUserId,
@@ -273,7 +349,7 @@ describe('shouldGenerateUpdate()', () => {
       {
         user: currentUserId,
         action: SupportedAction.ACTION_PAGE_UPDATE,
-        createdAt: new Date(date.getTime() - ONE_HOUR),
+        createdAt: new Date(date.getTime() - SIX_MINUTES),
         target: targetPageId,
         _id: olderActivityId,
       },
@@ -298,6 +374,69 @@ describe('shouldGenerateUpdate()', () => {
         _id: new mongoose.Types.ObjectId(),
         pageId: targetPageId,
         body: 'Old content',
+        format: 'markdown',
+        author: currentUserId,
+      },
+      {
+        _id: new mongoose.Types.ObjectId(),
+        pageId: targetPageId,
+        body: 'Newer content',
+        format: 'markdown',
+        author: currentUserId,
+      },
+    ]);
+
+    const result = await shouldGenerateUpdate({
+      targetPageId: targetPageIdStr,
+      currentUserId: currentUserIdStr,
+      currentActivityId: currentActivityIdStr,
+    });
+
+    expect(result).toBe(true);
+  });
+
+  it('should not care about edits on other pages', async () => {
+    const otherPageId = new mongoose.Types.ObjectId();
+
+    await Activity.insertMany([
+      // Create page
+      {
+        user: currentUserId,
+        action: SupportedAction.ACTION_PAGE_CREATE,
+        createdAt: new Date(date.getTime() - ONE_HOUR),
+        target: targetPageId,
+        _id: createActivityId,
+      },
+      // Update other page
+      {
+        user: currentUserId,
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+        createdAt: new Date(date.getTime() - ONE_MINUTE),
+        target: otherPageId,
+        _id: new mongoose.Types.ObjectId(),
+      },
+      // Update previously created page
+      {
+        user: currentUserId,
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+        createdAt: new Date(),
+        target: targetPageId,
+        _id: currentActivityId,
+      },
+    ]);
+
+    await Revision.insertMany([
+      {
+        _id: new mongoose.Types.ObjectId(),
+        pageId: targetPageId,
+        body: 'Old content',
+        format: 'markdown',
+        author: currentUserId,
+      },
+      {
+        _id: new mongoose.Types.ObjectId(),
+        pageId: targetPageId,
+        body: 'Newer content',
         format: 'markdown',
         author: currentUserId,
       },
