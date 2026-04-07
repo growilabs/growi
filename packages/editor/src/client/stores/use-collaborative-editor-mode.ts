@@ -69,13 +69,10 @@ export const useCollaborativeEditorMode = (
 
     const emitEditorList = () => {
       if (onEditorsUpdated == null) return;
-      const clientList: EditingClient[] = Array.from(
-        awareness.getStates().values(),
-        (value) => value.editors,
-      );
-      if (Array.isArray(clientList)) {
-        onEditorsUpdated(clientList);
-      }
+      const clientList = Array.from(awareness.getStates().values())
+        .map((value) => value.editors)
+        .filter((v): v is EditingClient => v != null);
+      onEditorsUpdated(clientList);
     };
 
     const providerSyncHandler = (isSync: boolean) => {
@@ -84,14 +81,11 @@ export const useCollaborativeEditorMode = (
 
     _provider.on('sync', providerSyncHandler);
 
-    const updateAwarenessHandler = (update: {
+    const updateAwarenessHandler = (_update: {
       added: number[];
       updated: number[];
       removed: number[];
     }) => {
-      for (const clientId of update.removed) {
-        awareness.getStates().delete(clientId);
-      }
       emitEditorList();
     };
 
