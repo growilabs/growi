@@ -14,6 +14,8 @@ import { growiInfoService } from '~/server/service/growi-info';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
+import { resolveLocalePath } from '../../util/safe-path-utils';
+
 const logger = loggerFactory('growi:routes:apiv3:user-activation');
 
 const PASSOWRD_MINIMUM_NUMBER = 8;
@@ -232,9 +234,10 @@ export const completeRegistrationAction = (crowi: Crowi) => {
               const admins = await User.findAdmins();
               const appTitle = appService.getAppTitle();
               const locale = configManager.getConfig('app:globalLang');
-              const template = path.join(
+              const template = resolveLocalePath(
+                locale,
                 crowi.localeDir,
-                `${locale}/admin/userWaitingActivation.ejs`,
+                'admin/userWaitingActivation.ejs',
               );
               const url = growiInfoService.getSiteUrl();
 
@@ -313,6 +316,12 @@ async function makeRegistrationEmailToken(email, crowi: Crowi) {
   }
 
   const locale = configManager.getConfig('app:globalLang');
+  const templatePath = resolveLocalePath(
+    locale,
+    localeDir,
+    'notifications/userActivation.ejs',
+  );
+
   const appUrl = growiInfoService.getSiteUrl();
 
   const userRegistrationOrder =
@@ -329,10 +338,7 @@ async function makeRegistrationEmailToken(email, crowi: Crowi) {
   return mailService.send({
     to: email,
     subject: '[GROWI] User Activation',
-    template: path.join(
-      localeDir,
-      `${locale}/notifications/userActivation.ejs`,
-    ),
+    template: templatePath,
     vars: {
       appTitle: appService.getAppTitle(),
       email,
