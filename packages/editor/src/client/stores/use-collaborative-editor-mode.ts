@@ -9,6 +9,7 @@ import * as Y from 'yjs';
 import { userColor } from '../../consts';
 import type { EditingClient } from '../../interfaces';
 import type { UseCodeMirrorEditor } from '../services';
+import { yRichCursors } from '../services-internal/extensions/y-rich-cursors';
 import { useSecondaryYdocs } from './use-secondary-ydocs';
 
 type Configuration = {
@@ -123,7 +124,8 @@ export const useCollaborativeEditorMode = (
 
     const extensions = [
       keymap.of(yUndoManagerKeymap),
-      yCollab(activeText, provider.awareness, { undoManager }),
+      yCollab(activeText, null, { undoManager }),
+      yRichCursors(provider.awareness),
     ];
 
     const cleanupFunctions = extensions.map((ext) =>
