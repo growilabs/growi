@@ -100,7 +100,7 @@ activitySchema.index(
 activitySchema.plugin(mongoosePaginate);
 
 activitySchema.post('save', function () {
-  logger.debug('activity has been created', this);
+  logger.debug({ activity: this }, 'activity has been created');
 });
 
 activitySchema.statics.createByParameters = async function (
