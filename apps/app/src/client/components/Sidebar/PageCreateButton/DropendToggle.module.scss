@@ -4,7 +4,7 @@
 .btn-toggle {
   @extend %btn-basis;
 
-  left: 12px;
+  left: 14px;
   padding: 0;
 
   :global(.icon) {
@@ -18,6 +18,7 @@
 // no caret
 .btn-toggle {
   & {
+
     // no caret
     &::after {
       display: none !important;
@@ -28,7 +29,7 @@
 // hitarea
 .btn-toggle {
   :global(.hitarea) {
-    inset: 0 -10px 0 0;
+    inset: 0 -14px 0 0;
   }
 }
 
@@ -54,3 +55,4 @@
     fill: var(--grw-primary-600);
   }
 }
+

@@ -19,6 +19,12 @@
   :global(svg .background) {
     pointer-events: fill;
   }
+
+  :global(.hexagon-main),
+  :global(.pencil-icon) {
+    transition: transform 0.2s ease-in-out;
+    transform-origin: 22.5px 22px;
+  }
 }
 
 // == Colors
@@ -35,11 +41,13 @@
 .btn-create:hover {
   :global(svg) {
     fill: var(--bs-btn-hover-bg);
+    transform: scale(1.1);
   }
 }
 
 .btn-create:active {
   :global(svg) {
     fill: var(--bs-btn-active-bg);
+    transform: scale(1.1);
   }
 }
