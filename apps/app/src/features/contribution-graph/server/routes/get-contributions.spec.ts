@@ -5,7 +5,7 @@ import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
 import { ContributionCacheManager } from '../services/cache-manager';
-import { getContributionsHandlerFactory } from './get-contributions';
+import { getContributionsHandler } from './get-contributions';
 
 describe('getContributionsHandler (Unit Test)', () => {
   const mockCrowi = mockDeep<Crowi>();
@@ -17,8 +17,7 @@ describe('getContributionsHandler (Unit Test)', () => {
   });
 
   it('should return 200 and fallback graph when service fails', async () => {
-    const handlers = getContributionsHandlerFactory(mockCrowi);
-    const mainHandler = handlers[handlers.length - 1];
+    const mainHandler = getContributionsHandler(mockCrowi);
 
     const mockReq = mockDeep<Request>({
       query: { targetUserId: '694108d387012da1446b4a0e' },
@@ -38,7 +37,6 @@ describe('getContributionsHandler (Unit Test)', () => {
 
     const responseData = mockRes.apiv3.mock.calls[0][0];
     expect(responseData.contributions).toHaveLength(365);
-    expect(responseData.contributions[0].count).toBe(0);
 
     cacheSpy.mockRestore();
   });

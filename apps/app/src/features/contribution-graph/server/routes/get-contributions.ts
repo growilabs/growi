@@ -24,11 +24,32 @@ type ContributionRequest = Request<
   ReqQuery
 >;
 
+export const getContributionsHandler = (crowi: Crowi): RequestHandler => {
+  const cacheManager = new ContributionCacheManager();
+
+  return async (req: ContributionRequest, res: ApiV3Response) => {
+    const { targetUserId } = req.query;
+
+    try {
+      const contributions = await cacheManager.getUpdatedCache(targetUserId);
+      return res.apiv3({ contributions });
+    } catch (err) {
+      logger.error('Failed to get contributions', err);
+
+      const fallbackGraph = assembleEmptyGraph();
+
+      return res.apiv3({
+        contributions: fallbackGraph,
+        isTemporaryUnavailable: true,
+      });
+    }
+  };
+};
+
 export const getContributionsHandlerFactory = (
   crowi: Crowi,
 ): RequestHandler[] => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
-  const cacheManager = new ContributionCacheManager();
 
   const validator: ValidationChain[] = [
     query('targetUserId')
@@ -42,23 +63,6 @@ export const getContributionsHandlerFactory = (
     loginRequiredStrictly,
     ...validator,
     apiV3FormValidator,
-    async (req: ContributionRequest, res: ApiV3Response) => {
-      const { targetUserId } = req.query;
-
-      try {
-        const contributions = await cacheManager.getUpdatedCache(targetUserId);
-
-        return res.apiv3({ contributions });
-      } catch (err) {
-        logger.error('Failed to get contributions', err);
-
-        const fallbackGraph = assembleEmptyGraph();
-
-        return res.apiv3({
-          contributions: fallbackGraph,
-          isTemporaryUnavailable: true,
-        });
-      }
-    },
+    getContributionsHandler(crowi),
   ];
 };
