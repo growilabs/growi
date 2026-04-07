@@ -33,13 +33,14 @@ export async function getApplicationResourceAttributes(): Promise<Attributes> {
         growiInfo.additionalInfo?.installedAtByOldestUser?.toISOString(),
     };
 
-    logger.info('Application resource attributes collected', { attributes });
+    logger.info({ attributes }, 'Application resource attributes collected');
 
     return attributes;
   } catch (error) {
-    logger.error('Failed to collect application resource attributes', {
-      error,
-    });
+    logger.error(
+      { err: error },
+      'Failed to collect application resource attributes',
+    );
     return {};
   }
 }

@@ -101,7 +101,6 @@
     "ignoredBuiltDependencies": [
       "@swc/core",
       "core-js",
-      "dtrace-provider",
       "esbuild",
       "leveldown",
       "protobufjs",

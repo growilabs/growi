@@ -50,7 +50,7 @@ export const generateNodeSDKConfiguration = (opts?: Option): Configuration => {
       }),
       instrumentations: [
         getNodeAutoInstrumentations({
-          '@opentelemetry/instrumentation-bunyan': {
+          '@opentelemetry/instrumentation-pino': {
             enabled: false,
           },
           // disable fs instrumentation since this generates very large amount of traces

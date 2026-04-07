@@ -1,0 +1,263 @@
+# Implementation Plan
+
+- [x] 1. Scaffold the @growi/logger shared package
+- [x] 1.1 Initialize the package directory, package.json, and TypeScript configuration within the monorepo packages directory
+  - Create the workspace entry as `@growi/logger` with pino v9.x and minimatch as dependencies, pino-pretty as an optional peer dependency
+  - Configure TypeScript with strict mode, ESM output, and appropriate path aliases
+  - Set up the package entry points (main, types, browser) so that bundlers resolve the correct build for Node.js vs browser
+  - Add vitest configuration for unit testing within the package
+  - _Requirements: 8.5_
+
+- [x] 1.2 Define the shared type contracts and configuration interface
+  - Define the `LoggerConfig` type representing a namespace-pattern-to-level mapping (including a `default` key)
+  - Define the `LoggerFactoryOptions` type accepted by the initialization function
+  - Export the pino `Logger` type so consumers can type-annotate their logger variables without importing pino directly
+  - _Requirements: 10.3_
+
+- [x] 2. Implement environment variable parsing and level resolution
+- [x] 2.1 (P) Build the environment variable parser
+  - Read the six log-level environment variables (`DEBUG`, `TRACE`, `INFO`, `WARN`, `ERROR`, `FATAL`) from the process environment
+  - Split each variable's value by commas and trim whitespace to extract individual namespace patterns
+  - Return a flat config map where each namespace pattern maps to its corresponding level string
+  - Handle edge cases: empty values, missing variables, duplicate patterns (last wins)
+  - Write unit tests covering: single variable with multiple patterns, all six variables set, no variables set, whitespace handling
+  - _Requirements: 3.1, 3.4, 3.5_
+
+- [x] 2.2 (P) Build the level resolver with glob pattern matching
+  - Accept a namespace string, a config map, and an env-override map; return the resolved level
+  - Check env-override map first (using minimatch for glob matching), then config map, then fall back to the config `default` entry
+  - When multiple patterns match, prefer the most specific (longest non-wildcard prefix) match
+  - Write unit tests covering: exact match, glob wildcard match, env override precedence over config, fallback to default, no matching pattern
+  - _Requirements: 2.1, 2.3, 2.4, 3.2, 3.3_
+
+- [x] 3. Implement the transport factory for dev, prod, and browser environments
+- [x] 3.1 (P) Build the Node.js transport configuration
+  - In development mode, produce pino-pretty transport options with human-readable timestamps, hidden pid/hostname fields, and multi-line output
+  - In production mode, produce raw JSON output to stdout by default
+  - When the `FORMAT_NODE_LOG` environment variable is unset or truthy in production, produce pino-pretty transport options with long-format output instead of raw JSON
+  - Include the logger namespace (`name` field) in all output configurations
+  - Write unit tests verifying correct options for each combination of NODE_ENV and FORMAT_NODE_LOG
+  - _Requirements: 5.1, 5.2, 5.3, 5.4_
+
+- [x] 3.2 (P) Build the browser transport configuration
+  - Detect the browser environment using window/document checks
+  - In browser development mode, produce pino browser options that output to the developer console with the resolved namespace level
+  - In browser production mode, produce pino browser options that default to `error` level to suppress non-critical console output
+  - Write unit tests verifying browser options for dev and prod scenarios
+  - _Requirements: 4.1, 4.2, 4.3, 4.4_
+
+- [x] 4. Implement the logger factory with caching and platform detection
+- [x] 4.1 Build the initialization and factory functions
+  - Implement `initializeLoggerFactory(options)` that stores the merged configuration, pre-parses environment overrides, and prepares the transport config
+  - Implement `loggerFactory(name)` that checks the cache for an existing logger, resolves the level via the level resolver, creates a pino instance with appropriate transport options, caches it, and returns it
+  - Detect the runtime platform (Node.js vs browser) and apply the corresponding transport configuration from the transport factory
+  - Ensure the module exports `loggerFactory` as the default export and `initializeLoggerFactory` as a named export for backward compatibility with existing import patterns
+  - Write unit tests covering: cache hit returns same instance, different namespaces return different instances, initialization stores config correctly
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 4.1, 10.1_
+
+- [x] 5. Migrate shared packages to @growi/logger (small scope first)
+- [x] 5.1 (P) Update packages/slack logger to use @growi/logger
+  - Replace the logger factory implementation to import from `@growi/logger` instead of universal-bunyan
+  - Update the inline config (`{ default: 'info' }`) to use the @growi/logger initialization pattern
+  - Replace bunyan type imports with the @growi/logger Logger type
+  - Add `@growi/logger` to packages/slack dependencies
+  - Run TypeScript compilation to verify no type errors
+  - _Requirements: 8.3_
+
+- [x] 5.2 (P) Update packages/remark-attachment-refs logger to use @growi/logger
+  - Replace the logger factory implementation to import from `@growi/logger`
+  - Update configuration and type imports to match the new package
+  - Add `@growi/logger` to packages/remark-attachment-refs dependencies
+  - Run TypeScript compilation to verify no type errors
+  - _Requirements: 8.4_
+
+- [x] 5.3 Fix pino-style logger call sites in packages/slack
+  - In the following files, convert all `logger.method('message', obj)` calls to the pino-canonical form `logger.method({ obj }, 'message')` (object first, message second)
+  - `src/middlewares/verify-growi-to-slack-request.ts` (lines 25, 34)
+  - `src/middlewares/verify-slack-request.ts` (lines 25, 36, 45, 76)
+  - `src/utils/interaction-payload-accessor.ts` (line 104)
+  - Run `pnpm --filter @growi/slack lint:typecheck` and confirm zero TS2769 errors
+  - _Requirements: 10.1_
+
+- [x] 5.4 Fix pino-style logger call site in packages/remark-attachment-refs
+  - In `src/client/services/renderer/refs.ts` (line 107), convert `logger.debug('message', attributes)` to `logger.debug({ attributes }, 'message')`
+  - Run `pnpm --filter @growi/remark-attachment-refs lint:typecheck` and confirm the TS2769 error is gone
+  - _Requirements: 10.1_
+
+- [x] 5.5 Migrate packages/remark-lsx server routes to use @growi/logger
+  - Add `@growi/logger` to packages/remark-lsx dependencies
+  - Create `src/utils/logger/index.ts` following the same pattern as remark-attachment-refs (import from `@growi/logger`, call `initializeLoggerFactory`, re-export `loggerFactory`)
+  - Replace `console.error` calls in `src/server/routes/list-pages/index.ts` (lines 89, 145-148) with proper logger calls using `loggerFactory('growi:remark-lsx:routes:list-pages')`
+  - Remove the `biome-ignore lint/suspicious/noConsole` comments from the replaced call sites
+  - Run `pnpm --filter @growi/remark-lsx lint:typecheck` to confirm no type errors
+  - _Requirements: 8.5_
+
+- [x] 6. Migrate apps/slackbot-proxy to @growi/logger
+- [x] 6.1 Replace the logger factory and HTTP middleware in slackbot-proxy
+  - Update the slackbot-proxy logger utility to import from `@growi/logger` and call `initializeLoggerFactory` with its existing dev/prod config
+  - Replace express-bunyan-logger and morgan usage in the server setup with pino-http middleware
+  - Replace all `import type Logger from 'bunyan'` references with the @growi/logger Logger type
+  - Add `@growi/logger` and `pino-http` to slackbot-proxy dependencies
+  - Run TypeScript compilation to verify no type errors
+  - _Requirements: 8.2, 6.1_
+
+- [x] 6.6 Fix pino-style logger call sites in apps/slackbot-proxy
+  - In the following files, convert all `logger.method('message', obj)` calls to `logger.method({ obj }, 'message')`
+  - `src/controllers/growi-to-slack.ts` (lines 109, 179, 231, 243, 359)
+  - `src/controllers/slack.ts` (lines 388, 586)
+  - `src/services/RegisterService.ts` (line 165)
+  - Run `pnpm --filter @growi/slackbot-proxy lint:typecheck` and confirm zero TS2769 errors
+  - _Requirements: 10.1_
+
+- [x] 6.7 Fix @growi/logger Logger type export and remove `as any` cast in slackbot-proxy
+  - In `packages/logger`, update the `loggerFactory` return type so it is compatible with `pino-http`'s `logger` option (i.e., `pino.Logger` without `<never>` narrowing, or by exporting `Logger<string>`)
+  - After the type export is fixed, remove the `as any` cast from `apps/slackbot-proxy/src/Server.ts` (line 166) and the associated `biome-ignore` comment
+  - Run `pnpm --filter @growi/slackbot-proxy lint:typecheck` to confirm no residual type errors
+  - _Requirements: 10.3_
+
+- [x] 6.5 Fix logger factory to preserve pino's single-worker-thread performance model
+  - Refactor `initializeLoggerFactory` to create the pino transport (`pino.transport()`) and root pino logger **once**, storing them in module scope
+  - Set the root logger's level to `'trace'` so that individual child loggers can apply their own resolved level without being silenced by the root
+  - Refactor `loggerFactory(name)` to call `rootLogger.child({ name })` and then set `childLogger.level = resolvedLevel` instead of calling `pino()` + `pino.transport()` per namespace
+  - Handle browser mode separately: the root browser logger is created once in `initializeLoggerFactory`; `loggerFactory` still calls `.child({ name })` and applies the resolved level
+  - Update unit tests in `logger-factory.spec.ts` to verify that calling `loggerFactory` for N distinct namespaces does not create N independent pino instances (all children share the root transport)
+  - _Requirements: 11.1, 11.2, 11.3, 11.4_
+
+- [x] 7. Migrate apps/app to @growi/logger (largest scope)
+- [x] 7.1 Replace the logger factory module in apps/app
+  - Update the apps/app logger utility to import from `@growi/logger` instead of `universal-bunyan`
+  - Call `initializeLoggerFactory` at application startup with the existing dev/prod config files (preserve current config content)
+  - Re-export `loggerFactory` as the default export so all existing consumer imports continue to work unchanged
+  - Add `@growi/logger` to apps/app dependencies and ensure pino-pretty is available for development formatting
+  - _Requirements: 8.1, 2.2_
+
+- [x] 7.2 Replace HTTP request logging middleware in apps/app
+  - Remove the morgan middleware (development mode) and express-bunyan-logger middleware (production mode) from the Express initialization
+  - Add pino-http middleware configured with a logger from the factory using the `express` namespace
+  - Configure route skipping to exclude `/_next/static/` paths in non-production mode
+  - Verify the middleware produces log entries containing method, URL, status code, and response time
+  - _Requirements: 6.1, 6.2, 6.3, 6.4_
+
+- [x] 7.3 Update the OpenTelemetry diagnostic logger adapter
+  - Rename the adapter class from `DiagLoggerBunyanAdapter` to `DiagLoggerPinoAdapter` and update the import to use pino types
+  - Preserve the existing `parseMessage` helper logic that parses JSON strings and merges argument objects
+  - Confirm the verbose-to-trace level mapping continues to work with pino's trace level
+  - Update the OpenTelemetry SDK configuration to disable `@opentelemetry/instrumentation-pino` instead of `@opentelemetry/instrumentation-bunyan`
+  - _Requirements: 7.1, 7.2, 7.3_
+
+- [x] 7.4 Update all bunyan type references in apps/app source files
+  - Replace `import type Logger from 'bunyan'` with the Logger type exported from `@growi/logger` across all source files in apps/app
+  - Verify that pino's Logger type is compatible with all existing usage patterns (info, debug, warn, error, trace, fatal method calls)
+  - Run the TypeScript compiler to confirm no type errors
+  - _Requirements: 10.1, 10.2, 10.3_
+
+- [x] 8. Remove old logging dependencies and verify cleanup
+- [x] 8.1 Remove bunyan-related packages from all package.json files
+  - Remove `bunyan`, `universal-bunyan`, `bunyan-format`, `express-bunyan-logger`, `browser-bunyan`, `@browser-bunyan/console-formatted-stream`, `@types/bunyan` from every package.json in the monorepo
+  - Remove `morgan` and `@types/morgan` from every package.json in the monorepo
+  - Run `pnpm install` to update the lockfile and verify no broken peer dependency warnings
+  - _Requirements: 9.1, 9.2_
+
+- [x] 8.2 Verify no residual references to removed packages
+  - Search all source files for any remaining imports or requires of the removed packages (bunyan, universal-bunyan, browser-bunyan, express-bunyan-logger, morgan, bunyan-format)
+  - Search all configuration and type definition files for stale bunyan references
+  - Fix any remaining references found during the search
+  - _Requirements: 9.3_
+
+- [x] 9. Run full monorepo validation
+- [x] 9.1 Execute lint, type-check, test, and build across the monorepo
+  - Run `turbo run lint --filter @growi/app` and fix any lint errors related to the migration
+  - Run `turbo run test --filter @growi/app` and verify all existing tests pass
+  - Run `turbo run build --filter @growi/app` and confirm the production build succeeds
+  - Run the same checks for slackbot-proxy and any other affected packages
+  - Verify the @growi/logger package's own tests pass
+  - _Requirements: 1.4, 8.1, 8.2, 8.3, 8.4, 10.1, 10.2_
+
+- [x] 10. Improve log output formatting for readability
+- [x] 10.1 (P) Differentiate pino-pretty singleLine between dev and production FORMAT_NODE_LOG
+  - In the transport factory, change the production + FORMAT_NODE_LOG path to use `singleLine: true` for concise one-liner output
+  - Keep the development path at `singleLine: false` so developers see full multi-line context
+  - Update unit tests to verify: dev returns `singleLine: false`, production + FORMAT_NODE_LOG returns `singleLine: true`, production without FORMAT_NODE_LOG still returns no transport
+  - _Requirements: 5.1, 5.3_
+
+- [x] 10.2 (P) Add morgan-like HTTP request message formatting to pino-http in apps/app
+  - Configure `customSuccessMessage` to produce `METHOD /url STATUS - TIMEms` format (e.g., `GET /page/path 200 - 12ms`)
+  - Configure `customErrorMessage` to include the error message alongside method, URL, and status code
+  - Configure `customLogLevel` to return `warn` for 4xx responses and `error` for 5xx or error responses, keeping `info` for successful requests
+  - Verify that `/_next/static/` path skipping in dev mode still works after the changes
+  - _Requirements: 6.1, 6.4_
+
+- [x] 10.3 (P) Add morgan-like HTTP request message formatting to pino-http in apps/slackbot-proxy
+  - Apply the same `customSuccessMessage`, `customErrorMessage`, and `customLogLevel` configuration as apps/app
+  - _Requirements: 6.1, 6.4_
+
+- [x] 11. Validate formatting improvements
+- [x] 11.1 Run tests and build for affected packages
+  - Run the @growi/logger package tests to confirm transport factory changes pass
+  - Run lint and type-check for apps/app and apps/slackbot-proxy
+  - Verify the production build succeeds
+  - _Requirements: 5.1, 5.3, 6.1, 6.4_
+
+- [x] 12. Implement bunyan-like output format (development only)
+- [x] 12.1 Create the bunyan-format custom transport module
+  - Create `packages/logger/src/transports/bunyan-format.ts` that default-exports a function returning a pino-pretty stream
+  - Use `customPrettifiers.time` to format epoch as `HH:mm:ss.SSSZ` (UTC time-only, no brackets)
+  - Use `customPrettifiers.level` to return `${label.padStart(5)} ${log.name}` (right-aligned 5-char level + namespace)
+  - Set `ignore: 'pid,hostname,name'` so name appears via the level prettifier, not in pino-pretty's default parens
+  - Accept `singleLine` option to pass through to pino-pretty
+  - Verify the module is built to `dist/transports/bunyan-format.js` by vite's `preserveModules` config
+  - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6_
+
+- [x] 12.2 Update TransportFactory to use bunyan-format transport in dev only
+  - In the **development** branch of `createNodeTransportOptions`, change the transport target from `'pino-pretty'` to the resolved path of `bunyan-format.js` (via `import.meta.url`)
+  - Remove `translateTime` and `ignore` options from the dev transport config (now handled inside the custom transport)
+  - Pass `singleLine: false` for dev
+  - In the **production + FORMAT_NODE_LOG** branch, keep `target: 'pino-pretty'` with standard options (`translateTime: 'SYS:standard'`, `ignore: 'pid,hostname'`, `singleLine: true`) — do NOT use bunyan-format
+  - The bunyan-format module path is only resolved in the dev code path, ensuring it is never imported in production
+  - Update unit tests in `transport-factory.spec.ts`: dev target contains `bunyan-format`; prod + FORMAT_NODE_LOG target is `'pino-pretty'`
+  - _Requirements: 12.1, 12.6, 12.7, 12.8_
+
+- [x] 12.3 Verify bunyan-format output
+  - Run the dev server and confirm log output matches the bunyan-format "short" style: `HH:mm:ss.SSSZ LEVEL name: message`
+  - Confirm colorization works (DEBUG=cyan, INFO=green, WARN=yellow, ERROR=red)
+  - Confirm multi-line output in dev (extra fields on subsequent lines)
+  - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
+
+- [x] 13. Encapsulate pino-http in @growi/logger
+- [x] 13.1 Create HTTP logger middleware factory in @growi/logger
+  - Create `packages/logger/src/http-logger.ts` exporting `async createHttpLoggerMiddleware(options?)`
+  - The function creates `pinoHttp` middleware internally with `loggerFactory(namespace)`
+  - In development mode (`NODE_ENV !== 'production'`): dynamically import `morganLikeFormatOptions` via `await import('./morgan-like-format-options')` and apply to pino-http options
+  - In production mode: use pino-http with default message formatting (no morgan-like module imported)
+  - Accept optional `namespace` (default: `'express'`) and `autoLogging` options
+  - Handle the `Logger<string>` → pino-http's expected Logger type assertion internally
+  - Add `pino-http` to `@growi/logger` package.json dependencies
+  - Export `createHttpLoggerMiddleware` from `packages/logger/src/index.ts`
+  - _Requirements: 13.1, 13.2, 13.3, 13.5, 13.6_
+
+- [x] 13.2 (P) Migrate apps/app to use createHttpLoggerMiddleware
+  - Replace the direct `pinoHttp` import and configuration in `apps/app/src/server/crowi/index.ts` with `await createHttpLoggerMiddleware(...)` from `@growi/logger`
+  - Pass the `/_next/static/` autoLogging ignore function via the options
+  - Remove `pino-http` and its type imports from the file
+  - Remove `morganLikeFormatOptions` import (now applied internally in dev only)
+  - Remove `pino-http` from `apps/app/package.json` if no longer directly used
+  - Run `pnpm --filter @growi/app lint:typecheck` to confirm no type errors
+  - _Requirements: 13.4_
+
+- [x] 13.3 (P) Migrate apps/slackbot-proxy to use createHttpLoggerMiddleware
+  - Replace the direct `pinoHttp` import and configuration in `apps/slackbot-proxy/src/Server.ts` with `await createHttpLoggerMiddleware(...)` from `@growi/logger`
+  - Remove `pino-http` and its type imports from the file
+  - Remove `morganLikeFormatOptions` import (now applied internally in dev only)
+  - Remove the `as unknown as` type assertion (now handled internally)
+  - Remove `pino-http` from `apps/slackbot-proxy/package.json` if no longer directly used
+  - Run `pnpm --filter @growi/slackbot-proxy lint:typecheck` to confirm no type errors
+  - _Requirements: 13.4_
+
+- [x] 14. Validate bunyan-format and HTTP encapsulation
+- [x] 14.1 Run full validation
+  - Run `@growi/logger` package tests
+  - Run lint and type-check for apps/app and apps/slackbot-proxy
+  - Run `turbo run build --filter @growi/app` to verify production build succeeds
+  - Verify no remaining direct `pino-http` imports in apps/app or apps/slackbot-proxy source files
+  - Verify that bunyan-format transport and morganLikeFormatOptions are NOT imported in production (grep for dynamic import pattern)
+  - _Requirements: 12.1, 12.6, 12.7, 13.4, 13.5, 13.6_
