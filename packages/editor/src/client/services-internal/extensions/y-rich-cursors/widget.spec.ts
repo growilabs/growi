@@ -10,10 +10,20 @@ import { RichCaretWidget } from './widget';
  * - Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.10
  */
 
+const opts = (
+  overrides: Partial<ConstructorParameters<typeof RichCaretWidget>[0]> = {},
+) => ({
+  color: '#ff0000',
+  name: 'Alice',
+  imageUrlCached: undefined as string | undefined,
+  isActive: false,
+  ...overrides,
+});
+
 describe('RichCaretWidget', () => {
   describe('toDOM()', () => {
     it('renders a cm-yRichCaret span with border color from the color parameter', () => {
-      const widget = new RichCaretWidget('#ff0000', 'Alice', undefined, false);
+      const widget = new RichCaretWidget(opts());
       const dom = widget.toDOM();
 
       expect(dom.className).toBe('cm-yRichCaret');
@@ -21,7 +31,7 @@ describe('RichCaretWidget', () => {
     });
 
     it('renders a flag container with position relative inside the caret element', () => {
-      const widget = new RichCaretWidget('#ff0000', 'Alice', undefined, false);
+      const widget = new RichCaretWidget(opts());
       const dom = widget.toDOM();
 
       const flag = dom.querySelector('.cm-yRichCursorFlag');
@@ -30,10 +40,7 @@ describe('RichCaretWidget', () => {
 
     it('renders an img element inside the flag when imageUrlCached is provided', () => {
       const widget = new RichCaretWidget(
-        '#ff0000',
-        'Alice',
-        '/avatar.png',
-        false,
+        opts({ imageUrlCached: '/avatar.png' }),
       );
       const dom = widget.toDOM();
 
@@ -47,7 +54,7 @@ describe('RichCaretWidget', () => {
     });
 
     it('does NOT render an img element when imageUrlCached is undefined', () => {
-      const widget = new RichCaretWidget('#ff0000', 'Alice', undefined, false);
+      const widget = new RichCaretWidget(opts());
       const dom = widget.toDOM();
 
       const img = dom.querySelector('img.cm-yRichCursorAvatar');
@@ -55,12 +62,7 @@ describe('RichCaretWidget', () => {
     });
 
     it('renders initials span inside the flag when imageUrlCached is undefined', () => {
-      const widget = new RichCaretWidget(
-        '#ff0000',
-        'Alice Bob',
-        undefined,
-        false,
-      );
+      const widget = new RichCaretWidget(opts({ name: 'Alice Bob' }));
       const dom = widget.toDOM();
 
       const flag = dom.querySelector('.cm-yRichCursorFlag');
@@ -70,7 +72,7 @@ describe('RichCaretWidget', () => {
     });
 
     it('renders initials for a single-word name', () => {
-      const widget = new RichCaretWidget('#ff0000', 'Alice', undefined, false);
+      const widget = new RichCaretWidget(opts());
       const dom = widget.toDOM();
 
       const initials = dom.querySelector('.cm-yRichCursorInitials');
@@ -79,10 +81,11 @@ describe('RichCaretWidget', () => {
 
     it('replaces img with initials span on onerror', () => {
       const widget = new RichCaretWidget(
-        '#0000ff',
-        'Bob',
-        '/broken.png',
-        false,
+        opts({
+          color: '#0000ff',
+          name: 'Bob',
+          imageUrlCached: '/broken.png',
+        }),
       );
       const dom = widget.toDOM();
 
@@ -101,7 +104,7 @@ describe('RichCaretWidget', () => {
     });
 
     it('renders a name label inside the flag container', () => {
-      const widget = new RichCaretWidget('#ff0000', 'Alice', undefined, false);
+      const widget = new RichCaretWidget(opts());
       const dom = widget.toDOM();
 
       const flag = dom.querySelector('.cm-yRichCursorFlag');
@@ -111,7 +114,7 @@ describe('RichCaretWidget', () => {
     });
 
     it('applies cm-yRichCursorActive class to the flag element when isActive is true', () => {
-      const widget = new RichCaretWidget('#ff0000', 'Alice', undefined, true);
+      const widget = new RichCaretWidget(opts({ isActive: true }));
       const dom = widget.toDOM();
 
       const flag = dom.querySelector('.cm-yRichCursorFlag');
@@ -119,7 +122,7 @@ describe('RichCaretWidget', () => {
     });
 
     it('does NOT apply cm-yRichCursorActive class to the flag when isActive is false', () => {
-      const widget = new RichCaretWidget('#ff0000', 'Alice', undefined, false);
+      const widget = new RichCaretWidget(opts());
       const dom = widget.toDOM();
 
       const flag = dom.querySelector('.cm-yRichCursorFlag');
@@ -128,44 +131,50 @@ describe('RichCaretWidget', () => {
   });
 
   describe('eq()', () => {
-    it('returns true when color, name, imageUrlCached, and isActive all match', () => {
-      const a = new RichCaretWidget('#ff0000', 'Alice', '/avatar.png', false);
-      const b = new RichCaretWidget('#ff0000', 'Alice', '/avatar.png', false);
+    it('returns true when all fields match', () => {
+      const a = new RichCaretWidget(opts({ imageUrlCached: '/avatar.png' }));
+      const b = new RichCaretWidget(opts({ imageUrlCached: '/avatar.png' }));
 
       expect(a.eq(b)).toBe(true);
     });
 
     it('returns false when color differs', () => {
-      const a = new RichCaretWidget('#ff0000', 'Alice', '/avatar.png', false);
-      const b = new RichCaretWidget('#0000ff', 'Alice', '/avatar.png', false);
+      const a = new RichCaretWidget(opts({ imageUrlCached: '/avatar.png' }));
+      const b = new RichCaretWidget(
+        opts({ color: '#0000ff', imageUrlCached: '/avatar.png' }),
+      );
 
       expect(a.eq(b)).toBe(false);
     });
 
     it('returns false when name differs', () => {
-      const a = new RichCaretWidget('#ff0000', 'Alice', '/avatar.png', false);
-      const b = new RichCaretWidget('#ff0000', 'Bob', '/avatar.png', false);
+      const a = new RichCaretWidget(opts({ imageUrlCached: '/avatar.png' }));
+      const b = new RichCaretWidget(
+        opts({ name: 'Bob', imageUrlCached: '/avatar.png' }),
+      );
 
       expect(a.eq(b)).toBe(false);
     });
 
     it('returns false when imageUrlCached differs', () => {
-      const a = new RichCaretWidget('#ff0000', 'Alice', '/avatar.png', false);
-      const b = new RichCaretWidget('#ff0000', 'Alice', '/other.png', false);
+      const a = new RichCaretWidget(opts({ imageUrlCached: '/avatar.png' }));
+      const b = new RichCaretWidget(opts({ imageUrlCached: '/other.png' }));
 
       expect(a.eq(b)).toBe(false);
     });
 
     it('returns false when one has imageUrlCached and the other does not', () => {
-      const a = new RichCaretWidget('#ff0000', 'Alice', '/avatar.png', false);
-      const b = new RichCaretWidget('#ff0000', 'Alice', undefined, false);
+      const a = new RichCaretWidget(opts({ imageUrlCached: '/avatar.png' }));
+      const b = new RichCaretWidget(opts());
 
       expect(a.eq(b)).toBe(false);
     });
 
     it('returns false when isActive differs', () => {
-      const a = new RichCaretWidget('#ff0000', 'Alice', '/avatar.png', true);
-      const b = new RichCaretWidget('#ff0000', 'Alice', '/avatar.png', false);
+      const a = new RichCaretWidget(
+        opts({ imageUrlCached: '/avatar.png', isActive: true }),
+      );
+      const b = new RichCaretWidget(opts({ imageUrlCached: '/avatar.png' }));
 
       expect(a.eq(b)).toBe(false);
     });
@@ -173,14 +182,14 @@ describe('RichCaretWidget', () => {
 
   describe('ignoreEvent()', () => {
     it('returns true', () => {
-      const widget = new RichCaretWidget('#ff0000', 'Alice', undefined, false);
+      const widget = new RichCaretWidget(opts());
       expect(widget.ignoreEvent()).toBe(true);
     });
   });
 
   describe('estimatedHeight', () => {
     it('is -1 (inline widget)', () => {
-      const widget = new RichCaretWidget('#ff0000', 'Alice', undefined, false);
+      const widget = new RichCaretWidget(opts());
       expect(widget.estimatedHeight).toBe(-1);
     });
   });

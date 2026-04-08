@@ -238,12 +238,12 @@ export class YRichCursorsPluginValue {
         value: Decoration.widget({
           side: headIndex - anchor.index > 0 ? -1 : 1,
           block: false,
-          widget: new RichCaretWidget(
-            editors.color,
-            editors.name,
-            editors.imageUrlCached,
+          widget: new RichCaretWidget({
+            color: editors.color,
+            name: editors.name,
+            imageUrlCached: editors.imageUrlCached,
             isActive,
-          ),
+          }),
         }),
       });
     });

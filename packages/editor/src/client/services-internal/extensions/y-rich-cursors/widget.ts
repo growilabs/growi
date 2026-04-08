@@ -28,6 +28,13 @@ export function createInitialsElement(
 // RichCaretWidget
 // ---------------------------------------------------------------------------
 
+export type RichCaretWidgetOptions = {
+  color: string;
+  name: string;
+  imageUrlCached: string | undefined;
+  isActive: boolean;
+};
+
 /**
  * CodeMirror WidgetType that renders a cursor caret with an overlay flag
  * containing avatar image (or initials fallback) and hover-revealed name label.
@@ -41,19 +48,27 @@ export function createInitialsElement(
  * </span>
  */
 export class RichCaretWidget extends WidgetType {
-  constructor(
-    readonly color: string,
-    readonly name: string,
-    readonly imageUrlCached: string | undefined,
-    readonly isActive: boolean,
-  ) {
+  readonly color: string;
+  readonly name: string;
+  readonly imageUrlCached: string | undefined;
+  readonly isActive: boolean;
+
+  constructor(opts: RichCaretWidgetOptions) {
     super();
+    this.color = opts.color;
+    this.name = opts.name;
+    this.imageUrlCached = opts.imageUrlCached;
+    this.isActive = opts.isActive;
   }
 
   toDOM(): HTMLElement {
     const caret = document.createElement('span');
     caret.className = 'cm-yRichCaret';
     caret.style.borderColor = this.color;
+
+    // Word Joiner: zero-width but inherits the line's font-size,
+    // so the caret border stretches to match header line heights.
+    caret.appendChild(document.createTextNode('\u2060'));
 
     const flag = document.createElement('span');
     flag.className = 'cm-yRichCursorFlag';
