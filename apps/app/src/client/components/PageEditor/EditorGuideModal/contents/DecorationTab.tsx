@@ -116,9 +116,9 @@ export const DecorationTab: React.FC = () => {
       {
         id: 'back-color',
         title: t(`${i18nKey}.back_color`),
-        code: `<p class="text-white bg-${styleConfig.colorName}">${t(`${i18nKey}.placeholder`)}</p>`,
+        code: `<p class="text-bg-${styleConfig.colorName}">${t(`${i18nKey}.placeholder`)}</p>`,
         underContent: (
-          <p className={`text-white bg-${styleConfig.colorName} px-2 m-0`}>
+          <p className={`text-bg-${styleConfig.colorName} px-2 m-0`}>
             {t(`${i18nKey}.placeholder`)}
           </p>
         ),
@@ -143,7 +143,8 @@ export const DecorationTab: React.FC = () => {
         <h3 className="fw-bold mb-2 fs-5">{t(`${i18nKey}.style`)}</h3>
         <Dropdown isOpen={isOpen} toggle={() => setIsOpen(!isOpen)}>
           <DropdownToggle
-            color="light"
+            outline
+            color="body"
             caret
             className={`border d-flex align-items-center gap-2 text-${styleConfig.colorName === 'light' ? 'dark' : styleConfig.colorName}`}
             style={{ minWidth: '160px' }}
