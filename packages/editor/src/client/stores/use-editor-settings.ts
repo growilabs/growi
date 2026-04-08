@@ -17,6 +17,7 @@ import {
   insertNewRowToMarkdownTable,
   isInTable,
 } from '../services-internal';
+import type { KeymapResult } from '../services-internal/keymaps';
 import { useEditorShortcuts } from './use-editor-shortcuts';
 
 const useStyleActiveLine = (
@@ -84,26 +85,12 @@ const useThemeExtension = (
   }, [codeMirrorEditor, themeExtension]);
 };
 
-// Emacs and Vim plugins use ViewPlugin DOM event handlers (keydown) to intercept keys.
-// They must run BEFORE CodeMirror's built-in keymap handler (Prec.default) to prevent
-// conflicts with defaultKeymap Mac Ctrl-* bindings and completionKeymap Ctrl-Space.
-// VSCode and default keymaps use keymap.of() which integrates with the keymap handler directly,
-// so Prec.low is appropriate for them.
-const getKeymapPrecedence = (
-  keymapMode?: KeyMapMode,
-): ((ext: Extension) => Extension) => {
-  if (keymapMode === 'emacs' || keymapMode === 'vim') {
-    return Prec.high;
-  }
-  return Prec.low;
-};
-
 const useKeymapExtension = (
   codeMirrorEditor?: UseCodeMirrorEditor,
   keymapMode?: KeyMapMode,
   onSave?: () => void,
-): void => {
-  const [keymapExtension, setKeymapExtension] = useState<Extension | undefined>(
+): KeymapResult | undefined => {
+  const [keymapResult, setKeymapResult] = useState<KeymapResult | undefined>(
     undefined,
   );
 
@@ -118,21 +105,22 @@ const useKeymapExtension = (
     const settingKeyMap = async (name?: KeyMapMode) => {
       // Pass a stable wrapper function that delegates to the ref
       const stableOnSave = () => onSaveRef.current?.();
-      setKeymapExtension(await getKeymap(name, stableOnSave));
+      setKeymapResult(await getKeymap(name, stableOnSave));
     };
     settingKeyMap(keymapMode);
   }, [keymapMode]);
 
   useEffect(() => {
-    if (keymapExtension == null) {
+    if (keymapResult == null) {
       return;
     }
-    const wrapWithPrecedence = getKeymapPrecedence(keymapMode);
     const cleanupFunction = codeMirrorEditor?.appendExtensions(
-      wrapWithPrecedence(keymapExtension),
+      keymapResult.precedence(keymapResult.extension),
     );
     return cleanupFunction;
-  }, [codeMirrorEditor, keymapExtension, keymapMode]);
+  }, [codeMirrorEditor, keymapResult]);
+
+  return keymapResult;
 };
 
 export const useEditorSettings = (
@@ -140,9 +128,13 @@ export const useEditorSettings = (
   editorSettings?: EditorSettings,
   onSave?: () => void,
 ): void => {
-  useEditorShortcuts(codeMirrorEditor, editorSettings?.keymapMode);
+  const keymapResult = useKeymapExtension(
+    codeMirrorEditor,
+    editorSettings?.keymapMode,
+    onSave,
+  );
+  useEditorShortcuts(codeMirrorEditor, keymapResult?.overrides);
   useStyleActiveLine(codeMirrorEditor, editorSettings?.styleActiveLine);
   useEnterKeyHandler(codeMirrorEditor, editorSettings?.autoFormatMarkdownTable);
   useThemeExtension(codeMirrorEditor, editorSettings?.theme);
-  useKeymapExtension(codeMirrorEditor, editorSettings?.keymapMode, onSave);
 };

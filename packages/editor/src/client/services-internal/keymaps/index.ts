@@ -1,21 +1,20 @@
-import type { Extension } from '@codemirror/state';
-import { keymap } from '@codemirror/view';
-
 import type { KeyMapMode } from '../../../consts';
+import type { KeymapResult } from './types';
+
+export type { KeymapFactory, KeymapResult, ShortcutCategory } from './types';
 
 export const getKeymap = async (
   keyMapName?: KeyMapMode,
   onSave?: () => void,
-): Promise<Extension> => {
+): Promise<KeymapResult> => {
   switch (keyMapName) {
     case 'vim':
       return (await import('./vim')).vimKeymap(onSave);
     case 'emacs':
-      return (await import('./emacs')).emacsKeymap();
+      return (await import('./emacs')).emacsKeymap(onSave);
     case 'vscode':
-      return keymap.of(
-        (await import('@replit/codemirror-vscode-keymap')).vscodeKeymap,
-      );
+      return (await import('./vscode')).vscodeKeymap();
+    default:
+      return (await import('./default')).defaultKeymap();
   }
-  return keymap.of((await import('@codemirror/commands')).defaultKeymap);
 };
