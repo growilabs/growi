@@ -42,8 +42,8 @@
 - [x] 5.2 Test cursor position broadcasting and remote cursor rendering in the editor view
   - _Requirements: 3.6, 3.7_
 
-- [ ] 6. Add baseTheme with Overlay Positioning, Hover, and Opacity Rules
-- [ ] 6.1 (P) Create the EditorView.baseTheme defining all cursor overlay CSS rules
+- [x] 6. Add baseTheme with Overlay Positioning, Hover, and Opacity Rules
+- [x] 6.1 (P) Create the EditorView.baseTheme defining all cursor overlay CSS rules
   - Define overlay positioning for the cursor flag element: absolute below the caret, centered on the 1px caret line
   - Set avatar and initials fallback sizes to 16×16 pixels with circular clipping
   - Set up the two-step hover cascade: pointer-events none by default on the flag, enabled on caret hover
@@ -52,15 +52,15 @@
   - Include the theme extension in the return value of the rich cursors factory function
   - _Requirements: 3.1, 3.2, 3.3, 3.8, 3.9_
 
-- [ ] 6.2 (P) Define off-screen container and indicator styles in the same baseTheme
+- [x] 6.2 (P) Define off-screen container and indicator styles in the same baseTheme
   - Define the top and bottom off-screen containers as absolute-positioned, flex-layout, pointer-events none
   - Define the off-screen indicator as flex with gap, semi-transparent by default, full opacity with the active class
   - Define the off-screen avatar and initials with 16×16 sizing matching the in-editor widget
   - Define the arrow indicator styling
   - _Requirements: 4.5, 4.7_
 
-- [ ] 7. Rework RichCaretWidget for Overlay Avatar with Activity State
-- [ ] 7.1 Rebuild the widget DOM to render as an overlay with avatar, initials fallback, and hover-revealed name label
+- [x] 7. Rework RichCaretWidget for Overlay Avatar with Activity State
+- [x] 7.1 Rebuild the widget DOM to render as an overlay with avatar, initials fallback, and hover-revealed name label
   - Restructure the widget DOM to wrap the avatar and name label inside a flag container element positioned as an overlay below the caret
   - Render the avatar image at 16×16 pixels when the image URL is available, with an error handler that swaps in the initials fallback
   - When no image URL is provided, render the initials fallback directly as a colored circle with the user's initial letters
@@ -69,7 +69,7 @@
   - Update the equality check to include the `isActive` parameter alongside color, name, and image URL
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.10_
 
-- [ ] 7.2 Add activity tracking to the ViewPlugin with per-client timers
+- [x] 7.2 Add activity tracking to the ViewPlugin with per-client timers
   - Maintain a map of each remote client's last awareness change timestamp
   - Maintain a map of per-client timer handles for the 3-second inactivity window
   - On awareness change for a remote client, record the current timestamp and reset the client's timer to dispatch a decoration rebuild after 3 seconds
@@ -78,14 +78,14 @@
   - Clear all timers on plugin destruction
   - _Requirements: 3.10_
 
-- [ ] 8. Build Off-Screen Cursor Indicators
-- [ ] 8.1 Create persistent off-screen containers attached to the editor DOM
+- [x] 8. Build Off-Screen Cursor Indicators
+- [x] 8.1 Create persistent off-screen containers attached to the editor DOM
   - Create top and bottom container elements in the ViewPlugin constructor and append them to the editor's outer DOM element
   - The containers remain in the DOM for the plugin's lifetime (empty when no off-screen cursors exist)
   - Remove both containers in the plugin's destroy method
   - _Requirements: 4.7_
 
-- [ ] 8.2 Classify remote cursors by viewport position and render off-screen indicators
+- [x] 8.2 Classify remote cursors by viewport position and render off-screen indicators
   - After computing absolute positions for all remote cursors in the update method, compare each position against the current viewport range
   - For cursors above the viewport, build an indicator element (arrow up + avatar or initials fallback) and add it to the top container
   - For cursors below the viewport, build an indicator element (arrow down + avatar or initials fallback) and add it to the bottom container
@@ -95,8 +95,8 @@
   - Rebuild containers when the viewport changes or awareness changes
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
 
-- [ ] 9. Unit Tests for Updated Widget and Off-Screen Indicators
-- [ ] 9.1 (P) Test the updated widget DOM structure, overlay flag, sizing, and isActive class behavior
+- [x] 9. Unit Tests for Updated Widget and Off-Screen Indicators
+- [x] 9.1 (P) Test the updated widget DOM structure, overlay flag, sizing, and isActive class behavior
   - Verify the widget renders a flag container with position absolute styling inside the caret element
   - Verify the avatar image renders at 16×16 when image URL is provided
   - Verify the initials fallback renders with the user's color as background when no image URL is given
@@ -106,18 +106,18 @@
   - Verify the equality check returns false when isActive differs
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.10_
 
-- [ ] 9.2 (P) Test off-screen indicator DOM construction and avatar fallback
+- [x] 9.2 (P) Test off-screen indicator DOM construction and avatar fallback
   - Verify an off-screen indicator element contains an arrow element and an avatar image when image URL is provided
   - Verify an off-screen indicator falls back to an initials element when image URL is absent
   - Verify the active CSS class is applied to the indicator element when the client is active
   - _Requirements: 4.1, 4.2, 4.4_
 
-- [ ] 10. Integration Tests for Viewport Classification and Activity Tracking
-- [ ] 10.1 Test that remote cursors outside the viewport are excluded from widget decorations
+- [x] 10. Integration Tests for Viewport Classification and Activity Tracking
+- [x] 10.1 Test that remote cursors outside the viewport are excluded from widget decorations
   - Simulate a remote client with a cursor position beyond the viewport range and verify that no widget decoration is created for that client
   - _Requirements: 4.3, 4.6_
 
-- [ ] 10.2 Test activity tracking timer lifecycle with fake timers
+- [x] 10.2 Test activity tracking timer lifecycle with fake timers
   - Simulate an awareness change for a remote client and verify the client is marked as active
   - Advance fake timers by 3 seconds and verify a decoration rebuild is triggered, resulting in the client being marked as inactive
   - Simulate a new awareness change before the timer expires and verify the timer is reset
