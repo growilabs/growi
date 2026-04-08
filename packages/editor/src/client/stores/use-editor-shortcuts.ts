@@ -19,6 +19,7 @@ const useKeyBindings = (
   view?: EditorView,
   keymapModeName?: KeyMapMode,
 ): KeyBinding[] => {
+  // Standard formatting keybindings (used for non-emacs modes)
   const makeTextBoldKeyBinding = useMakeTextBoldKeyBinding(
     view,
     keymapModeName,
@@ -27,25 +28,36 @@ const useKeyBindings = (
   const makeTextStrikethroughKeyBinding =
     useMakeTextStrikethroughKeyBinding(view);
   const makeTextCodeCommand = useMakeTextCodeKeyBinding(view);
+
+  // Shared keybindings (no conflicts with any keymap mode)
   const insertNumberedKeyBinding = useInsertNumberedKeyBinding(view);
   const insertBulletListKeyBinding = useInsertBulletListKeyBinding(view);
   const insertBlockquoteKeyBinding = useInsertBlockquoteKeyBinding(view);
-  const InsertLinkKeyBinding = useInsertLinkKeyBinding(view);
+  const insertLinkKeyBinding = useInsertLinkKeyBinding(view);
   const multiCursorKeyBindings = useAddMultiCursorKeyBindings();
 
-  const keyBindings: KeyBinding[] = [
+  const sharedKeyBindings: KeyBinding[] = [
+    insertNumberedKeyBinding,
+    insertBulletListKeyBinding,
+    insertBlockquoteKeyBinding,
+    insertLinkKeyBinding,
+    ...multiCursorKeyBindings,
+  ];
+
+  // In emacs mode, formatting keybindings (bold, italic, strikethrough, code)
+  // are registered in the emacs plugin via EmacsHandler.bindKey (C-c C-s prefix).
+  // Exclude them here to avoid conflicts with Emacs navigation keys.
+  if (keymapModeName === 'emacs') {
+    return sharedKeyBindings;
+  }
+
+  return [
     makeTextBoldKeyBinding,
     makeTextItalicKeyBinding,
     makeTextStrikethroughKeyBinding,
     makeTextCodeCommand,
-    insertNumberedKeyBinding,
-    insertBulletListKeyBinding,
-    insertBlockquoteKeyBinding,
-    InsertLinkKeyBinding,
-    ...multiCursorKeyBindings,
+    ...sharedKeyBindings,
   ];
-
-  return keyBindings;
 };
 
 export const useEditorShortcuts = (

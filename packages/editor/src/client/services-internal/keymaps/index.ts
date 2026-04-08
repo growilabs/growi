@@ -11,7 +11,7 @@ export const getKeymap = async (
     case 'vim':
       return (await import('./vim')).vimKeymap(onSave);
     case 'emacs':
-      return (await import('@replit/codemirror-emacs')).emacs();
+      return (await import('./emacs')).emacsKeymap();
     case 'vscode':
       return keymap.of(
         (await import('@replit/codemirror-vscode-keymap')).vscodeKeymap,
