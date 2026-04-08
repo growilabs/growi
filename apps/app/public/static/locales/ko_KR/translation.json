@@ -621,7 +621,9 @@
     }
   },
   "default_ai_assistant": {
-    "not_set": "기본 어시스턴트가 설정되지 않았습니다."
+    "not_set": "기본 어시스턴트가 설정되지 않았습니다.",
+    "open_cloud_settings_to_enable": "AI 통합을 활성화하려면 GROWI.cloud 관리 화면을 확인하십시오",
+    "to_cloud_settings": "GROWI.cloud 관리 화면 열기"
   },
   "ai_assistant_substance": {
     "add_assistant": "어시스턴트 추가",

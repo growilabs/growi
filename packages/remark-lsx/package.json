@@ -16,7 +16,7 @@
     "build": "run-p build:*",
     "build:client": "vite build -c vite.client.config.ts",
     "build:server": "vite build -c vite.server.config.ts",
-    "clean": "shx rm -rf dist",
+    "clean": "rimraf dist",
     "dev": "run-p dev:*",
     "dev:client": "vite build -c vite.client.config.ts --mode dev",
     "dev:server": "vite build -c vite.server.config.ts --mode dev",
@@ -32,6 +32,7 @@
   "// comments for dependencies": {},
   "dependencies": {
     "@growi/core": "workspace:^",
+    "@growi/logger": "workspace:^",
     "@growi/remark-growi-directive": "workspace:^",
     "@growi/ui": "workspace:^",
     "express": "^4.20.0",

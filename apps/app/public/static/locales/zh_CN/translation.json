@@ -652,7 +652,9 @@
     }
   },
   "default_ai_assistant": {
-    "not_set": "未设置默认助手"
+    "not_set": "未设置默认助手",
+    "open_cloud_settings_to_enable": "请查看 GROWI.cloud 管理界面以启用 AI 集成",
+    "to_cloud_settings": "前往 GROWI.cloud 管理界面"
   },
   "ai_assistant_substance": {
     "add_assistant": "添加助手",

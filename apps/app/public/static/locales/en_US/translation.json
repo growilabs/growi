@@ -661,7 +661,9 @@
     }
   },
   "default_ai_assistant": {
-    "not_set": "Default assistant is not set"
+    "not_set": "Default assistant is not set",
+    "open_cloud_settings_to_enable": "Please check the GROWI.cloud management screen to enable AI integration",
+    "to_cloud_settings": "Open GROWI.cloud Settings"
   },
   "ai_assistant_substance": {
     "add_assistant": "Add Assistant",

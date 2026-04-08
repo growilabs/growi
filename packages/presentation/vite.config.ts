@@ -27,6 +27,7 @@ export default defineConfig({
         ignore: '**/*.spec.ts',
       }),
       name: 'presentation-libs',
+      cssFileName: 'style',
       formats: ['es'],
     },
     rollupOptions: {
