@@ -84,6 +84,20 @@ const useThemeExtension = (
   }, [codeMirrorEditor, themeExtension]);
 };
 
+// Emacs and Vim plugins use ViewPlugin DOM event handlers (keydown) to intercept keys.
+// They must run BEFORE CodeMirror's built-in keymap handler (Prec.default) to prevent
+// conflicts with defaultKeymap Mac Ctrl-* bindings and completionKeymap Ctrl-Space.
+// VSCode and default keymaps use keymap.of() which integrates with the keymap handler directly,
+// so Prec.low is appropriate for them.
+const getKeymapPrecedence = (
+  keymapMode?: KeyMapMode,
+): ((ext: Extension) => Extension) => {
+  if (keymapMode === 'emacs' || keymapMode === 'vim') {
+    return Prec.high;
+  }
+  return Prec.low;
+};
+
 const useKeymapExtension = (
   codeMirrorEditor?: UseCodeMirrorEditor,
   keymapMode?: KeyMapMode,
@@ -113,11 +127,12 @@ const useKeymapExtension = (
     if (keymapExtension == null) {
       return;
     }
+    const wrapWithPrecedence = getKeymapPrecedence(keymapMode);
     const cleanupFunction = codeMirrorEditor?.appendExtensions(
-      Prec.low(keymapExtension),
+      wrapWithPrecedence(keymapExtension),
     );
     return cleanupFunction;
-  }, [codeMirrorEditor, keymapExtension]);
+  }, [codeMirrorEditor, keymapExtension, keymapMode]);
 };
 
 export const useEditorSettings = (
