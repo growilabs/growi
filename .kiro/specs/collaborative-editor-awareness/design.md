@@ -134,7 +134,7 @@ sequenceDiagram
 | 2.2–2.3 | Socket.IO awareness events (server) | Out of scope — `collaborative-editor` spec | — |
 | 2.4 | Display active editors | `EditingUserList` (unchanged) | — |
 | 3.1 | Avatar overlay below caret (no block space) | `yRichCursors` | `RichCaretWidget.toDOM()` — `position: absolute` overlay |
-| 3.2 | Avatar size 16×16px (smaller than EditingUserList to minimize interference) | `yRichCursors` | `RichCaretWidget.toDOM()` — CSS sizing |
+| 3.2 | Avatar size (`AVATAR_SIZE` in `theme.ts`) | `yRichCursors` | `RichCaretWidget.toDOM()` — CSS sizing via shared token |
 | 3.3 | Name label visible on hover only | `yRichCursors` | CSS `:hover` on `.cm-yRichCursorFlag` |
 | 3.4 | Avatar image with initials fallback | `yRichCursors` | `RichCaretWidget.toDOM()` — `<img>` onerror → initials |
 | 3.5 | Cursor caret and fallback color from `state.editors.color` | `yRichCursors` | `RichCaretWidget` constructor |
@@ -259,115 +259,39 @@ Invariants:
 ##### Widget DOM Structure
 
 ```
-<span class="cm-yRichCaret" style="border-color: {color}; position: relative;">
-  <!-- Overlay flag: positioned below the caret, does NOT consume block space -->
-  <span class="cm-yRichCursorFlag">
-    <!-- Avatar: 16×16px circular -->
-    <img class="cm-yRichCursorAvatar" src="{imageUrlCached}" alt="{name}" />
-    <!-- OR fallback when img absent or fails to load: -->
-    <span class="cm-yRichCursorInitials" style="background-color: {color}">{initials}</span>
-    <!-- Name label: hidden by default, shown on :hover -->
+<span class="cm-yRichCaret" style="border-color: {color}">
+  ⁠ <!-- Word Joiner (\u2060): inherits line font-size so caret height follows headers -->
+  <span class="cm-yRichCursorFlag [cm-yRichCursorActive]">
+    <img class="cm-yRichCursorAvatar" />  OR  <span class="cm-yRichCursorInitials" />
     <span class="cm-yRichCursorInfo" style="background-color: {color}">{name}</span>
   </span>
 </span>
 ```
 
-**CSS strategy** (applied via `EditorView.baseTheme` exported alongside the ViewPlugin):
+**CSS strategy**: Applied via `EditorView.baseTheme` in `theme.ts`, exported alongside the ViewPlugin.
 
-`:hover` pseudo-class cannot be expressed via inline styles, so a `baseTheme` is mandatory. The theme is included in the Extension array returned by `yRichCursors()`.
+Key design decisions:
+- **Caret**: Both-side 1px borders with negative margins (zero layout width). Modeled after `yRemoteSelectionsTheme` in `y-codemirror.next`.
+- **Overlay flag**: `position: absolute; top: 100%` below the caret. Always hoverable (no `pointer-events: none`), so the avatar is a direct hover target.
+- **Name label**: Positioned at `left: 0; z-index: -1` (behind the avatar). Left border-radius matches the avatar circle, creating a tab shape that flows from the avatar. Left padding clears the avatar width. Shown on `.cm-yRichCursorFlag:hover`.
+- **Opacity**: Semi-transparent at idle, full on hover or when `.cm-yRichCursorActive` is present (3-second activity window).
+- **Design tokens**: `AVATAR_SIZE` and `IDLE_OPACITY` are defined as constants at the top of `theme.ts` and shared across all cursor/off-screen styles.
 
-```css
-/* Caret line — the hover anchor */
-.cm-yRichCaret {
-  position: relative;
-}
+**Design decision — CSS-only, no React**: The overlay, sizing, and hover behavior are achievable with `position: absolute` and `:hover`. `document.createElement` in `toDOM()` avoids React's async rendering overhead and context isolation.
 
-/* Overlay flag — pointer-events: none to avoid stealing clicks from the editor.
-   Shown on caret hover so the user can then interact with the flag. */
-.cm-yRichCursorFlag {
-  position: absolute;
-  top: 100%;           /* directly below the caret line */
-  left: -8px;          /* center the 16px avatar on the 1px caret */
-  z-index: 10;
-  pointer-events: none;          /* default: pass clicks through to editor */
-}
-.cm-yRichCaret:hover .cm-yRichCursorFlag {
-  pointer-events: auto;          /* enable interaction once caret is hovered */
-}
-
-.cm-yRichCursorAvatar {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  display: block;
-}
-.cm-yRichCursorInitials {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 8px;
-  font-weight: bold;
-}
-
-/* Name label — hidden by default, shown when the flag itself is hovered */
-.cm-yRichCursorInfo {
-  display: none;
-  position: absolute;
-  top: 0;
-  left: 20px;          /* right of the 16px avatar + 4px gap */
-  white-space: nowrap;
-  padding: 2px 6px;
-  border-radius: 3px;
-  color: white;
-  font-size: 12px;
-  line-height: 16px;
-}
-.cm-yRichCursorFlag:hover .cm-yRichCursorInfo {
-  display: block;      /* shown on hover */
-}
-
-/* --- Opacity: semi-transparent by default, full on hover or active editing --- */
-.cm-yRichCursorFlag {
-  opacity: 0.4;
-  transition: opacity 0.3s ease;
-}
-.cm-yRichCaret:hover .cm-yRichCursorFlag,
-.cm-yRichCursorFlag.cm-yRichCursorActive {
-  opacity: 1;
-}
-```
-
-**Activity tracking for opacity** (JavaScript, within `YRichCursorsPluginValue`):
-- Maintain `lastActivityMap: Map<number, number>` — maps `clientId` → timestamp of last awareness cursor change
-- Maintain `activeTimers: Map<number, ReturnType<typeof setTimeout>>` — maps `clientId` → timer handle
-- On awareness `change` for remote clients:
-  - Update `lastActivityMap.set(clientId, Date.now())`
-  - Clear any existing timer for that client, set a new `setTimeout(3000)` that calls `view.dispatch()` with `yRichCursorsAnnotation` to trigger a decoration rebuild
-- In `update()`, when building decorations:
-  - Compute `isActive = (Date.now() - (lastActivityMap.get(clientId) ?? 0)) < 3000` for each remote client
-  - Pass `isActive` to `new RichCaretWidget(color, name, imageUrlCached, isActive)` — `toDOM()` applies `.cm-yRichCursorActive` when `true`
-  - Pass `isActive` when building off-screen indicator elements as well (add `.cm-yRichCursorActive` class to `.cm-offScreenIndicator`)
-- `eq()` includes `isActive`, so a state transition (active→inactive or vice versa) triggers `toDOM()` re-creation — this occurs at most twice per user per 3-second cycle, which is acceptable
-- On `destroy()`: clear all timers
-
-**Off-screen indicators** also respect the same opacity pattern: `.cm-offScreenIndicator` defaults to `opacity: 0.4` and receives `.cm-yRichCursorActive` when the remote user is active.
-
-**Pointer-events strategy**: The overlay flag uses `pointer-events: none` by default so it never intercepts clicks or text selection in the editor. When the user hovers the caret line (`.cm-yRichCaret:hover`), `pointer-events: auto` is enabled on the flag, allowing the user to then hover the avatar to reveal the name label. This two-step hover cascade ensures the editor remains fully interactive while still providing discoverability.
-
-**Design decision — CSS-only, no React**: The overlay, sizing, and hover behavior are all achievable with `position: absolute` and the `:hover` pseudo-class. No JavaScript state management is needed, so `document.createElement` remains the implementation strategy. React's `createRoot` would introduce async rendering (flash of empty container), context isolation, and per-widget overhead without any benefit.
+**Activity tracking** (JavaScript, within `YRichCursorsPluginValue`):
+- `lastActivityMap: Map<number, number>` — `clientId` → timestamp of last awareness change
+- `activeTimers: Map<number, ReturnType<typeof setTimeout>>` — per-client 3-second inactivity timers
+- On awareness `change` for remote clients: update timestamp, reset timer. Timer expiry dispatches with `yRichCursorsAnnotation` to trigger decoration rebuild.
+- `isActive` is passed to both `RichCaretWidget` and off-screen indicators. `eq()` includes `isActive` so state transitions trigger widget re-creation (at most twice per user per 3-second cycle).
 
 `RichCaretWidget` (extends `WidgetType`):
-- Constructor parameters: `color: string`, `name: string`, `imageUrlCached: string | undefined`, `isActive: boolean`
-- `toDOM()`: creates the DOM tree above using `document.createElement`; attaches `onerror` on `<img>` to replace with initials fallback; applies CSS classes via `baseTheme`; adds `.cm-yRichCursorActive` to `.cm-yRichCursorFlag` when `isActive` is `true`
-- `eq(other)`: returns `true` when `color`, `name`, `imageUrlCached`, and `isActive` all match (avoids unnecessary re-creation; activity state transitions cause at most 2 re-creations per user per 3-second cycle)
-- `estimatedHeight`: `-1` (inline widget)
-- `ignoreEvent()`: `true`
+- Constructor: `RichCaretWidgetOptions` object (`color`, `name`, `imageUrlCached`, `isActive`)
+- `toDOM()`: creates the DOM tree above; `onerror` on `<img>` replaces with initials fallback
+- `eq(other)`: true when all option fields match
+- `estimatedHeight`: `-1` (inline widget), `ignoreEvent()`: `true`
 
-Selection highlight: rendered as `Decoration.mark` on the selected range with `background-color: {colorLight}` (same as `yRemoteSelections`).
+Selection highlight: `Decoration.mark` on selected range with `background-color: {colorLight}`.
 
 ##### Off-Screen Cursor Indicators
 
@@ -386,66 +310,7 @@ view.dom (position: relative — already set by CodeMirror)
     └── .cm-offScreenIndicator (Charlie ↓)
 ```
 
-**Indicator DOM structure**:
-```html
-<span class="cm-offScreenIndicator">
-  <span class="cm-offScreenArrow">↑</span>  <!-- or ↓ -->
-  <img class="cm-offScreenAvatar" src="{imageUrlCached}" alt="{name}" />
-  <!-- OR fallback: -->
-  <span class="cm-offScreenInitials" style="background-color: {color}">{initials}</span>
-</span>
-```
-
-**CSS** (included in the same `EditorView.baseTheme`):
-```css
-.cm-offScreenTop,
-.cm-offScreenBottom {
-  position: absolute;
-  left: 0;
-  right: 0;
-  display: flex;
-  gap: 4px;
-  padding: 2px 4px;
-  pointer-events: none;
-  z-index: 10;
-}
-.cm-offScreenTop {
-  top: 0;
-}
-.cm-offScreenBottom {
-  bottom: 0;
-}
-.cm-offScreenIndicator {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  opacity: 0.4;
-  transition: opacity 0.3s ease;
-}
-.cm-offScreenIndicator.cm-yRichCursorActive {
-  opacity: 1;
-}
-.cm-offScreenArrow {
-  font-size: 10px;
-  line-height: 1;
-}
-.cm-offScreenAvatar {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-}
-.cm-offScreenInitials {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 8px;
-  font-weight: bold;
-}
-```
+**Indicator DOM structure**: Arrow (`↑` / `↓`) + avatar image (or initials fallback). Built by `createOffScreenIndicator()` in `off-screen-indicator.ts`. Sizing uses the same `AVATAR_SIZE` token from `theme.ts`. Opacity follows the same idle/active pattern as in-editor widgets.
 
 **Update cycle**:
 1. In the `update(viewUpdate)` method, after computing absolute positions for all remote cursors, classify each into: `inViewport`, `above`, or `below` based on comparison with `view.viewport.{from, to}`
@@ -497,32 +362,7 @@ type CursorState = {
 
 ## Testing Strategy
 
-### Unit Tests
-
-- `emitEditorList` filter: given awareness states `[{ editors: validClient }, {}, { editors: undefined }]`, `onEditorsUpdated` is called with only the valid client
-- `updateAwarenessHandler`: `removed` client IDs are processed without calling `awareness.getStates().delete()`
-- `RichCaretWidget.eq()`: returns `true` for same color/name/imageUrlCached, `false` for any difference
-- `RichCaretWidget.toDOM()`: when `imageUrlCached` is provided, renders `<img>` element (16×16px, circular); when undefined, renders initials `<span>` with `background-color` from `color`
-- Avatar fallback: `onerror` on `<img>` replaces the element with the initials fallback (colored circle)
-- Overlay positioning: the `.cm-yRichCursorFlag` element has `position: absolute` and `top: 100%` (does not consume block space)
-- Hover behavior (structural only): `.cm-yRichCursorInfo` exists in the DOM with no inline `display` override (the `baseTheme` sets `display: none` by default). Actual `:hover` toggle is CSS-only and cannot be simulated in happy-dom/jsdom — **deferred to E2E tests (Playwright)**
-- Activity tracking: `RichCaretWidget` constructed with `isActive: true` adds `.cm-yRichCursorActive` to the flag element; with `isActive: false` it does not. `eq()` returns `false` when `isActive` differs, triggering widget re-creation
-
-### Integration Tests
-
-- Two simulated awareness clients: both have `state.editors` set → `EditingUserList` receives two valid entries
-- One client has no `state.editors` (just connected) → `EditingUserList` receives only the client that has editors set
-- Cursor position broadcast: on selection change, `awareness.getLocalState().cursor` is updated with the correct relative position
-- Remote cursor rendering: given awareness state with `state.cursor` and `state.editors`, the editor view contains a `cm-yRichCaret` widget at the correct position
-- Off-screen classification: given a remote cursor position outside `view.viewport`, verify the cursor is not rendered as a widget decoration (widget count is zero for that client)
-
-### E2E Tests (Playwright)
-
-- `:hover` behavior on `.cm-yRichCursorFlag`: verify name label appears on hover, hidden otherwise (Req 3.3)
-- Off-screen indicator visibility: scroll the editor so a remote cursor goes off-screen; verify `.cm-offScreenTop` or `.cm-offScreenBottom` contains the expected indicator element; scroll back and verify the indicator disappears and the in-editor widget reappears (Req 4.6)
-- Pointer-events: verify that clicking on text underneath the overlay flag correctly places the editor cursor (Req 4.7)
-
-### Performance
-
-- `RichCaretWidget.eq()` prevents re-creation when awareness updates do not change user info — confirmed by CodeMirror's decoration update logic calling `eq` before `toDOM`
-- Off-screen container updates use `replaceChildren()` for efficient batch DOM mutation; containers are not removed/re-created on each update cycle
+Test files are co-located with source in `y-rich-cursors/`:
+- **Unit**: `widget.spec.ts` (DOM structure, eq, fallback), `off-screen-indicator.spec.ts` (indicator DOM, direction, fallback)
+- **Integration**: `plugin.integ.ts` (awareness filter, cursor broadcast, viewport classification, activity timers)
+- **E2E** (Playwright, deferred): hover behavior, off-screen scroll transitions, pointer-events pass-through
