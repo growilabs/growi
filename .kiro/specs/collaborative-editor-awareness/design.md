@@ -80,7 +80,7 @@ graph TB
 |-------|------------------|-----------------|-------|
 | Editor extensions | `y-codemirror.next@0.3.5` | `yCollab` for text-sync and undo; `yRemoteSelectionsTheme` for base caret CSS | No version change; `yRemoteSelections` no longer used |
 | Cursor rendering | CodeMirror `ViewPlugin` + `WidgetType` (`@codemirror/view`) | DOM-based cursor widget with avatar `<img>` | No new dependency |
-| Awareness | `y-websocket` `awareness` object | State read (`getStates`) and write (`setLocalStateField`) | Unchanged |
+| Awareness | `y-websocket` `awareness` object | State read (`getStates`) and write (`setLocalStateField`) | `Awareness` type derived via `WebsocketProvider['awareness']` — `y-protocols` is not a direct dependency |
 
 ## System Flows
 
@@ -111,10 +111,14 @@ sequenceDiagram
 
     CM->>RC: update(ViewUpdate)
     RC->>AW: setLocalStateField('cursor', {anchor, head})
-    AW-->>RC: awareness.on('change') fires
+    Note over AW,RC: awareness fires 'change' — but changeListener<br/>ignores events where only the local client changed
+    AW-->>RC: awareness.on('change') for REMOTE client
+    RC->>CM: dispatch with yRichCursorsAnnotation
+    CM->>RC: update(ViewUpdate) — triggered by annotation
     RC->>RC: rebuild decorations from state.editors + state.cursor
-    RC->>CM: dispatch with new DecorationSet
 ```
+
+**Annotation-driven update strategy**: The awareness `change` listener does not call `view.dispatch()` unconditionally — doing so would crash with "Calls to EditorView.update are not allowed while an update is in progress" because `setLocalStateField` in the `update()` method itself triggers an awareness `change` event synchronously. Instead, the listener filters by `clientID`: it dispatches (with a `yRichCursorsAnnotation`) only when at least one **remote** client's state has changed. Local-only awareness changes (from the cursor broadcast in the same `update()` cycle) are silently ignored, and the decoration set is rebuilt in the next `update()` call naturally.
 
 ## Requirements Traceability
 
@@ -204,10 +208,11 @@ sequenceDiagram
 - Selection highlight (background color from `state.editors.colorLight`) is rendered alongside the caret widget
 
 **Dependencies**
-- External: `@codemirror/view` `ViewPlugin`, `WidgetType`, `Decoration` (P0)
-- External: `@codemirror/state` `RangeSet`, `Annotation` (P0)
+- External: `@codemirror/view` `ViewPlugin`, `WidgetType`, `Decoration`, `EditorView` (P0)
+- External: `@codemirror/state` `RangeSet`, `Annotation` (P0) — `Annotation.define<number[]>()` used for `yRichCursorsAnnotation`
 - External: `yjs` `createRelativePositionFromTypeIndex`, `createAbsolutePositionFromRelativePosition` (P0)
 - External: `y-codemirror.next` `ySyncFacet` (to access `ytext` for position conversion) (P0)
+- External: `y-websocket` — `Awareness` type derived via `WebsocketProvider['awareness']` (not `y-protocols/awareness`, which is not a direct dependency) (P0)
 - Inbound: `provider.awareness` passed as parameter (P0)
 
 **Contracts**: Service [x]
@@ -234,7 +239,7 @@ Postconditions:
 
 Invariants:
 - Local client's own cursor is never rendered
-- Cursor decorations are invalidated and rebuilt on every awareness `change` event affecting cursor or editors fields
+- Cursor decorations are rebuilt when awareness `change` fires for **remote** clients (dispatched via `yRichCursorsAnnotation`); local-only changes are ignored to prevent recursive `dispatch` during an in-progress update
 - `state.cursor` field is written exclusively by `yRichCursors`; no other plugin or code path may call `awareness.setLocalStateField('cursor', ...)` to avoid data races
 
 ##### Widget DOM Structure

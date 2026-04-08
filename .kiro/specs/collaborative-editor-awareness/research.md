@@ -100,6 +100,8 @@
 - `yRichCursors` broadcasts cursor positions via `awareness.setLocalStateField('cursor', ...)` on every `update` call — same as the original `yRemoteSelections`. Throttle is not needed because Yjs awareness batches broadcasts internally.
 - Avatar `<img>` may fail to load (404, CORS) — mitigate with `onerror` handler that replaces the `<img>` with initials fallback span.
 - `awareness.getStates().delete()` removal: confirm Yjs v13 awareness `update` event fires after removing the client from the internal map (verified in Yjs source: removal happens before the event).
+- **Recursive dispatch crash** (discovered during implementation): `setLocalStateField('cursor', ...)` inside the `update()` method fires an awareness `change` event **synchronously**. If the `change` listener calls `view.dispatch()` unconditionally, CodeMirror throws "Calls to EditorView.update are not allowed while an update is in progress". Mitigated by filtering the `change` listener to dispatch only when at least one **remote** client is in the changed set (`clients.findIndex(id => id !== awareness.doc.clientID) >= 0`). This matches the same pattern used by `y-remote-selections.js` in `y-codemirror.next`.
+- **`y-protocols` not a direct dependency**: `y-protocols/awareness` exports the `Awareness` class, but neither `@growi/editor` nor `apps/app` list `y-protocols` as a direct dependency. `import type { Awareness } from 'y-protocols/awareness'` fails under strict pnpm resolution. Mitigated by deriving the type from the existing `y-websocket` dependency: `type Awareness = WebsocketProvider['awareness']`.
 
 ## References
 

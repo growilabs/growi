@@ -77,7 +77,7 @@ graph TB
 |-------|------------------|------|
 | Client Provider | `y-websocket@^2.x` (WebsocketProvider) | Yjs document sync over WebSocket |
 | Server WebSocket | `ws@^8.x` (WebSocket.Server) | Native WebSocket server, `noServer: true` mode |
-| Server Yjs Utils | `y-websocket@^2.x` (`bin/utils`) | `setupWSConnection`, `getYDoc`, `WSSharedDoc` |
+| Server Yjs Utils | `y-websocket@^2.x` (`bin/utils`) | `setupWSConnection`, `getYDoc`, `WSSharedDoc`. Server-side type declarations (`y-websocket-server.d.ts`) derive the `Awareness` type via `WebsocketProvider['awareness']` instead of importing from `y-protocols/awareness`, because `y-protocols` is not a direct dependency. |
 | Persistence | `y-mongodb-provider` (extended) | Yjs document persistence to `yjs-writings` collection |
 | Event Bridge | Socket.IO `io` instance | Awareness state broadcasting to page rooms |
 | Auth | express-session + passport | WebSocket upgrade authentication via cookie |
