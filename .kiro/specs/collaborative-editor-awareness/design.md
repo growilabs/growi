@@ -134,7 +134,7 @@ sequenceDiagram
 | 2.2–2.3 | Socket.IO awareness events (server) | Out of scope — `collaborative-editor` spec | — |
 | 2.4 | Display active editors | `EditingUserList` (unchanged) | — |
 | 3.1 | Avatar overlay below caret (no block space) | `yRichCursors` | `RichCaretWidget.toDOM()` — `position: absolute` overlay |
-| 3.2 | Avatar size 24×24px (matches EditingUserList) | `yRichCursors` | `RichCaretWidget.toDOM()` — CSS sizing |
+| 3.2 | Avatar size 16×16px (smaller than EditingUserList to minimize interference) | `yRichCursors` | `RichCaretWidget.toDOM()` — CSS sizing |
 | 3.3 | Name label visible on hover only | `yRichCursors` | CSS `:hover` on `.cm-yRichCursorFlag` |
 | 3.4 | Avatar image with initials fallback | `yRichCursors` | `RichCaretWidget.toDOM()` — `<img>` onerror → initials |
 | 3.5 | Cursor caret and fallback color from `state.editors.color` | `yRichCursors` | `RichCaretWidget` constructor |
@@ -455,7 +455,7 @@ view.dom (position: relative — already set by CodeMirror)
 5. Cursors that lack `state.cursor` or `state.editors` are excluded from both in-view and off-screen rendering
 
 **Implementation Notes**
-- Integration: file location `packages/editor/src/client/services-internal/extensions/y-rich-cursors.ts`; exported from `packages/editor/src/client/services-internal/extensions/index.ts` and consumed directly in `use-collaborative-editor-mode.ts`
+- Integration: file location `packages/editor/src/client/services-internal/extensions/y-rich-cursors/` (directory — split into `index.ts`, `plugin.ts`, `widget.ts`, `off-screen-indicator.ts`, `theme.ts`); exported from `packages/editor/src/client/services-internal/extensions/index.ts` and consumed directly in `use-collaborative-editor-mode.ts`
 - Validation: `imageUrlCached` is optional; if undefined or empty, the `<img>` element is skipped and only initials are shown
 - Risks: `ySyncFacet` must be present in the editor state when the plugin initializes; guaranteed since `yCollab` (which installs `ySyncFacet`) is added before `yRichCursors` in the extension array
 
@@ -502,7 +502,7 @@ type CursorState = {
 - `emitEditorList` filter: given awareness states `[{ editors: validClient }, {}, { editors: undefined }]`, `onEditorsUpdated` is called with only the valid client
 - `updateAwarenessHandler`: `removed` client IDs are processed without calling `awareness.getStates().delete()`
 - `RichCaretWidget.eq()`: returns `true` for same color/name/imageUrlCached, `false` for any difference
-- `RichCaretWidget.toDOM()`: when `imageUrlCached` is provided, renders `<img>` element (24×24px, circular); when undefined, renders initials `<span>` with `background-color` from `color`
+- `RichCaretWidget.toDOM()`: when `imageUrlCached` is provided, renders `<img>` element (16×16px, circular); when undefined, renders initials `<span>` with `background-color` from `color`
 - Avatar fallback: `onerror` on `<img>` replaces the element with the initials fallback (colored circle)
 - Overlay positioning: the `.cm-yRichCursorFlag` element has `position: absolute` and `top: 100%` (does not consume block space)
 - Hover behavior (structural only): `.cm-yRichCursorInfo` exists in the DOM with no inline `display` override (the `baseTheme` sets `display: none` by default). Actual `:hover` toggle is CSS-only and cannot be simulated in happy-dom/jsdom — **deferred to E2E tests (Playwright)**
