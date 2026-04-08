@@ -12,54 +12,125 @@
   - Rely on Yjs to clean up disconnected client entries before emitting the `update` event, as per the Yjs awareness contract
   - _Requirements: 1.2_
 
-- [x] 2. (P) Build the Rich Cursor Extension
+- [x] 2. Build the Rich Cursor Extension (Initial)
 - [x] 2.1 (P) Implement cursor widget DOM with name label, avatar image, and initials fallback
-  - Create a cursor widget class that renders a styled caret element containing the user's display name and profile image
-  - Use the `color` value from the awareness editors field to set the flag background and border color
-  - When `imageUrlCached` is available, render an `<img>` element; when it is undefined or empty, render a `<span>` showing the user's initials instead
-  - Attach an `onerror` handler on the image element that replaces it with the initials fallback at runtime if the image URL fails to load
-  - Implement widget equality check so that widgets with identical color, name, and image URL are not recreated unnecessarily
-  - _Requirements: 3.1, 3.2, 3.3, 3.4_
+  - _Requirements: 3.4, 3.5_
 
 - [x] 2.2 (P) Broadcast local cursor position to awareness on each selection change
-  - Inside the cursor extension's view update handler, derive the local user's cursor anchor and head positions and convert them to Yjs relative positions using the ytext reference from `ySyncFacet`
-  - Write the converted positions to the `cursor` field of the local awareness state using `setLocalStateField`
-  - _Requirements: 3.5, 3.6_
+  - _Requirements: 3.6, 3.7_
 
 - [x] 2.3 (P) Render remote cursor decorations rebuilt from awareness state changes
-  - Register a listener on awareness `change` events to rebuild the full decoration set whenever any cursor or editors field changes
-  - For each remote client (excluding the local client), read `state.editors` for user identity and `state.cursor` for position; skip clients that lack either field
-  - Create a caret widget decoration at the cursor's head position and a mark decoration over the selected range using the user's `colorLight` value for the highlight
-  - Dispatch the rebuilt decoration set to update the editor view
-  - _Requirements: 3.5, 3.6_
+  - _Requirements: 3.6, 3.7_
 
 - [x] 3. Integrate Rich Cursor Extension into the Editor Configuration
-  - Change the `yCollab` call to pass `null` as the awareness argument, which suppresses the built-in `yRemoteSelections` and `yRemoteSelectionsTheme` plugins while keeping text-sync and undo behavior intact
-  - Add the new rich cursor extension as a sibling extension alongside the `yCollab` output in the editor extension array
-  - Verify that `yUndoManagerKeymap` is not duplicated, since `yCollab` already includes it in its return array
-  - _Requirements: 1.3, 2.4, 3.5_
+  - Suppress the default cursor plugin by passing `null` as the awareness argument to `yCollab`
+  - Add the rich cursor extension as a sibling extension alongside `yCollab` output
+  - Verify `yUndoManagerKeymap` is not duplicated
+  - _Requirements: 1.3, 2.4, 3.6_
 
-- [x] 4. Unit Tests for Core Behaviors
+- [x] 4. Unit Tests for Core Behaviors (Initial)
 - [x] 4.1 (P) Test awareness state filtering and mutation-free disconnect handling in the hook
-  - Given awareness states that include one valid client, one empty state, and one state with `editors: undefined`, verify that the editor list callback receives only the valid client
-  - Given a `removed` client list in the awareness update event, verify that the awareness map is not mutated and no `.delete()` is called
   - _Requirements: 1.1, 1.2, 1.4_
 
 - [x] 4.2 (P) Test cursor widget construction, equality, and avatar fallback behavior
-  - Given a widget with a provided image URL, verify that the rendered DOM contains an `<img>` element with the correct `src` attribute
-  - Given a widget without an image URL, verify that the rendered DOM shows only initials and no `<img>` element
-  - Verify that the `onerror` handler on the image element swaps the image out for the initials fallback
-  - Verify that the equality check returns `true` only when color, name, and image URL all match
-  - _Requirements: 3.1, 3.2, 3.3, 3.4_
+  - _Requirements: 3.4, 3.5_
 
-- [x] 5. Integration Tests for Multi-Client Collaborative Scenarios
+- [x] 5. Integration Tests for Multi-Client Collaborative Scenarios (Initial)
 - [x] 5.1 Test awareness update flow to EditingUserList with multiple simulated clients
-  - Simulate two clients that both have `state.editors` set and verify that the editor list displays both users
-  - Simulate one client with `state.editors` and one client without (newly connected) and verify that only the client with editors appears in the list
-  - Verify that user presence information broadcast via `state.editors` is accessible from the awareness state
   - _Requirements: 1.3, 2.1, 2.4_
 
 - [x] 5.2 Test cursor position broadcasting and remote cursor rendering in the editor view
-  - Given a simulated selection change, verify that the local awareness state `cursor` field is updated with the expected relative positions
-  - Given a remote client's awareness state with both `state.editors` and `state.cursor` set, verify that a `cm-yRichCaret` widget appears in the editor view at the correct position
-  - _Requirements: 3.5, 3.6_
+  - _Requirements: 3.6, 3.7_
+
+- [ ] 6. Add baseTheme with Overlay Positioning, Hover, and Opacity Rules
+- [ ] 6.1 (P) Create the EditorView.baseTheme defining all cursor overlay CSS rules
+  - Define overlay positioning for the cursor flag element: absolute below the caret, centered on the 1px caret line
+  - Set avatar and initials fallback sizes to 16×16 pixels with circular clipping
+  - Set up the two-step hover cascade: pointer-events none by default on the flag, enabled on caret hover
+  - Define the name label as hidden by default, shown on flag hover
+  - Set the default opacity to semi-transparent with a smooth transition, full opacity on caret hover or when the active class is present
+  - Include the theme extension in the return value of the rich cursors factory function
+  - _Requirements: 3.1, 3.2, 3.3, 3.8, 3.9_
+
+- [ ] 6.2 (P) Define off-screen container and indicator styles in the same baseTheme
+  - Define the top and bottom off-screen containers as absolute-positioned, flex-layout, pointer-events none
+  - Define the off-screen indicator as flex with gap, semi-transparent by default, full opacity with the active class
+  - Define the off-screen avatar and initials with 16×16 sizing matching the in-editor widget
+  - Define the arrow indicator styling
+  - _Requirements: 4.5, 4.7_
+
+- [ ] 7. Rework RichCaretWidget for Overlay Avatar with Activity State
+- [ ] 7.1 Rebuild the widget DOM to render as an overlay with avatar, initials fallback, and hover-revealed name label
+  - Restructure the widget DOM to wrap the avatar and name label inside a flag container element positioned as an overlay below the caret
+  - Render the avatar image at 16×16 pixels when the image URL is available, with an error handler that swaps in the initials fallback
+  - When no image URL is provided, render the initials fallback directly as a colored circle with the user's initial letters
+  - Render the name label element inside the flag container (visibility controlled by the baseTheme hover rule)
+  - Accept an `isActive` parameter and apply the active CSS class to the flag element when true
+  - Update the equality check to include the `isActive` parameter alongside color, name, and image URL
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.10_
+
+- [ ] 7.2 Add activity tracking to the ViewPlugin with per-client timers
+  - Maintain a map of each remote client's last awareness change timestamp
+  - Maintain a map of per-client timer handles for the 3-second inactivity window
+  - On awareness change for a remote client, record the current timestamp and reset the client's timer to dispatch a decoration rebuild after 3 seconds
+  - When building decorations in the update method, compute each client's active state by comparing the current time against the last activity timestamp
+  - Pass the computed active state to the widget constructor so the DOM reflects the current activity
+  - Clear all timers on plugin destruction
+  - _Requirements: 3.10_
+
+- [ ] 8. Build Off-Screen Cursor Indicators
+- [ ] 8.1 Create persistent off-screen containers attached to the editor DOM
+  - Create top and bottom container elements in the ViewPlugin constructor and append them to the editor's outer DOM element
+  - The containers remain in the DOM for the plugin's lifetime (empty when no off-screen cursors exist)
+  - Remove both containers in the plugin's destroy method
+  - _Requirements: 4.7_
+
+- [ ] 8.2 Classify remote cursors by viewport position and render off-screen indicators
+  - After computing absolute positions for all remote cursors in the update method, compare each position against the current viewport range
+  - For cursors above the viewport, build an indicator element (arrow up + avatar or initials fallback) and add it to the top container
+  - For cursors below the viewport, build an indicator element (arrow down + avatar or initials fallback) and add it to the bottom container
+  - For cursors within the viewport, render the in-editor widget decoration as before (no off-screen indicator)
+  - Replace container children on each relevant update cycle using a batch DOM operation
+  - Apply the active CSS class to off-screen indicators when the corresponding client's activity state is active
+  - Rebuild containers when the viewport changes or awareness changes
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
+
+- [ ] 9. Unit Tests for Updated Widget and Off-Screen Indicators
+- [ ] 9.1 (P) Test the updated widget DOM structure, overlay flag, sizing, and isActive class behavior
+  - Verify the widget renders a flag container with position absolute styling inside the caret element
+  - Verify the avatar image renders at 16×16 when image URL is provided
+  - Verify the initials fallback renders with the user's color as background when no image URL is given
+  - Verify the image error handler replaces the image with the initials fallback
+  - Verify the name label element exists inside the flag container
+  - Verify the flag element receives the active CSS class when isActive is true, and does not when false
+  - Verify the equality check returns false when isActive differs
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.10_
+
+- [ ] 9.2 (P) Test off-screen indicator DOM construction and avatar fallback
+  - Verify an off-screen indicator element contains an arrow element and an avatar image when image URL is provided
+  - Verify an off-screen indicator falls back to an initials element when image URL is absent
+  - Verify the active CSS class is applied to the indicator element when the client is active
+  - _Requirements: 4.1, 4.2, 4.4_
+
+- [ ] 10. Integration Tests for Viewport Classification and Activity Tracking
+- [ ] 10.1 Test that remote cursors outside the viewport are excluded from widget decorations
+  - Simulate a remote client with a cursor position beyond the viewport range and verify that no widget decoration is created for that client
+  - _Requirements: 4.3, 4.6_
+
+- [ ] 10.2 Test activity tracking timer lifecycle with fake timers
+  - Simulate an awareness change for a remote client and verify the client is marked as active
+  - Advance fake timers by 3 seconds and verify a decoration rebuild is triggered, resulting in the client being marked as inactive
+  - Simulate a new awareness change before the timer expires and verify the timer is reset
+  - _Requirements: 3.10_
+
+- [ ]\* 11. E2E Tests for Hover, Opacity, and Off-Screen Transitions
+- [ ]\* 11.1 (P) Test hover behavior on the cursor overlay flag
+  - Hover over a remote user's caret area and verify the name label becomes visible
+  - Move the cursor away and verify the name label is hidden
+  - Verify that clicking on text underneath the overlay correctly places the editor cursor
+  - _Requirements: 3.3, 3.9_
+
+- [ ]\* 11.2 (P) Test off-screen indicator visibility on scroll
+  - Scroll the editor so a remote user's cursor goes above the viewport and verify the top off-screen container shows an indicator with the correct avatar and arrow
+  - Scroll back to reveal the cursor and verify the off-screen indicator disappears and the in-editor widget reappears
+  - _Requirements: 4.1, 4.2, 4.3, 4.6_
