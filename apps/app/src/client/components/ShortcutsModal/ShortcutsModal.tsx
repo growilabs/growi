@@ -520,7 +520,7 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
             href="https://docs.growi.org"
             target="_blank"
             rel="noreferrer"
-            className="d-inline-flex align-items-center gap-2 text-secondary"
+            className="btn btn-outline-secondary d-inline-flex align-items-center gap-2 rounded-pill"
           >
             <span className="material-symbols-outlined fs-5">help</span>
             {t('modal_shortcuts.Other Shortcuts')}
