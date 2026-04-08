@@ -1,15 +1,17 @@
 import type { Extension } from '@codemirror/state';
-import { RangeSet } from '@codemirror/state';
+import { Annotation, RangeSet } from '@codemirror/state';
+import type { DecorationSet, ViewUpdate } from '@codemirror/view';
 import {
   Decoration,
-  type DecorationSet,
+  type EditorView,
   ViewPlugin,
-  type ViewUpdate,
   WidgetType,
 } from '@codemirror/view';
 import { ySyncFacet } from 'y-codemirror.next';
-import type { Awareness } from 'y-protocols/awareness';
+import type { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
+
+type Awareness = WebsocketProvider['awareness'];
 
 import type { EditingClient } from '../../../interfaces';
 
@@ -109,24 +111,28 @@ type AwarenessState = {
   };
 };
 
+const yRichCursorsAnnotation = Annotation.define<number[]>();
+
 class YRichCursorsPluginValue {
   decorations: DecorationSet;
   private readonly awareness: Awareness;
-  private readonly changeListener: () => void;
+  private readonly changeListener: (update: {
+    added: number[];
+    updated: number[];
+    removed: number[];
+  }) => void;
 
-  constructor(
-    view: Parameters<typeof ViewPlugin.fromClass>[0] extends new (
-      v: infer V,
-    ) => unknown
-      ? V
-      : never,
-    awareness: Awareness,
-  ) {
+  constructor(view: EditorView, awareness: Awareness) {
     this.awareness = awareness;
     this.decorations = RangeSet.of([]);
 
-    this.changeListener = () => {
-      view.dispatch({ effects: [] });
+    this.changeListener = ({ added, updated, removed }) => {
+      const clients = added.concat(updated).concat(removed);
+      if (clients.findIndex((id) => id !== awareness.doc.clientID) >= 0) {
+        view.dispatch({
+          annotations: [yRichCursorsAnnotation.of([])],
+        });
+      }
     };
     this.awareness.on('change', this.changeListener);
   }
@@ -252,7 +258,7 @@ class YRichCursorsPluginValue {
  */
 export function yRichCursors(awareness: Awareness): Extension {
   return ViewPlugin.define(
-    (view) => new YRichCursorsPluginValue(view as never, awareness),
+    (view) => new YRichCursorsPluginValue(view, awareness),
     { decorations: (v) => (v as YRichCursorsPluginValue).decorations },
   );
 }
