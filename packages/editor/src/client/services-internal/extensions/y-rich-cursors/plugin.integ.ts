@@ -3,8 +3,8 @@ import { EditorView } from '@codemirror/view';
 import { yCollab } from 'y-codemirror.next';
 import * as Y from 'yjs';
 
-import type { EditingClient } from '../../../interfaces';
-import { yRichCursors } from './y-rich-cursors';
+import type { EditingClient } from '../../../../interfaces';
+import { yRichCursors } from './index';
 
 /**
  * Integration tests for collaborative awareness flow.
@@ -12,10 +12,9 @@ import { yRichCursors } from './y-rich-cursors';
  * Covers:
  * - Task 5.1: Awareness update flow to EditingUserList with multiple simulated clients
  * - Task 5.2: Cursor position broadcasting verification
- * - Requirements: 1.3, 2.1, 2.4, 3.5, 3.6
- *
- * Note: These tests exercise the awareness state management logic
- * without requiring a live WebSocket connection or a real CodeMirror view.
+ * - Task 10.1: Viewport classification (off-screen exclusion)
+ * - Task 10.2: Activity tracking timer lifecycle
+ * - Requirements: 1.3, 2.1, 2.4, 3.5, 3.6, 3.10, 4.3, 4.6
  */
 
 // ---------------------------------------------------------------------------
