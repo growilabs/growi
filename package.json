@@ -93,7 +93,7 @@
     "@lykmapipo/common>parse-json": "parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version"
   },
   "// comments for pnpm.packageExtensions": {
-    "@stoplight/json-ref-resolver": "The package extension adds lodash as a dependency of @stoplight/json-ref-resolver, which is required by @stoplight/spectral-core. This is necessary because the version of @stoplight/json-ref-resolver used by @stoplight/spectral-core does not declare lodash as a dependency, but it uses lodash in its code."
+    "@orval/core": "@orval/core bundles @stoplight/json-ref-resolver which requires lodash/get at runtime, but @orval/core does not declare lodash as a dependency"
   },
   "pnpm": {
     "overrides": {
@@ -102,7 +102,7 @@
       "@lykmapipo/common>parse-json": "5.2.0"
     },
     "packageExtensions": {
-      "@stoplight/json-ref-resolver": {
+      "@orval/core": {
         "dependencies": {
           "lodash": "*"
         }
