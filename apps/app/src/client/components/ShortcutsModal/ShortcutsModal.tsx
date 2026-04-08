@@ -14,7 +14,7 @@ import styles from './ShortcutsModal.module.scss';
  * ShortcutsModalSubstance - Presentation component (heavy logic, rendered only when isOpen)
  */
 const ShortcutsModalSubstance = (): React.JSX.Element => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { close } = useShortcutsModalActions();
 
   // Memoize OS-specific class
@@ -515,9 +515,8 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
       <ModalBody className="p-md-4 mb-3 grw-modal-body-style overflow-auto">
         {bodyContent}
         <div className="mt-4 ps-3">
-          {/* TODO: Replace href with the dedicated keyboard shortcuts docs page once published */}
           <a
-            href="https://docs.growi.org"
+            href={`https://docs.growi.org/${i18n.language?.startsWith('ja') ? 'ja' : 'en'}/guide/features/shortcut-keys`}
             target="_blank"
             rel="noreferrer"
             className="d-inline-flex align-items-center gap-2 px-3 py-2 border border-2 rounded text-secondary text-decoration-none"
