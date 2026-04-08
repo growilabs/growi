@@ -49,7 +49,7 @@ const loginRequiredFactory = (
 
     // check the route config and ACL
     if (isGuestAllowed && crowi.aclService.isGuestAllowedToRead()) {
-      logger.debug('Allowed to read: ', req.path);
+      logger.debug({ path: req.path }, 'Allowed to read');
       return next();
     }
 

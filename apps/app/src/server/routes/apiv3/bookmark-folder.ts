@@ -188,7 +188,7 @@ module.exports = (crowi: Crowi) => {
 
       try {
         const bookmarkFolder = await BookmarkFolder.createByParameters(params);
-        logger.debug('bookmark folder created', bookmarkFolder);
+        logger.debug({ bookmarkFolder }, 'bookmark folder created');
         return res.apiv3({ bookmarkFolder });
       } catch (err) {
         logger.error(err);
@@ -467,7 +467,7 @@ module.exports = (crowi: Crowi) => {
             userId,
             folderId,
           );
-        logger.debug('bookmark added to folder', bookmarkFolder);
+        logger.debug({ bookmarkFolder }, 'bookmark added to folder');
         return res.apiv3({ bookmarkFolder });
       } catch (err) {
         logger.error(err);

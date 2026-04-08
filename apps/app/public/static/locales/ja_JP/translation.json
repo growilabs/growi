@@ -693,7 +693,9 @@
     }
   },
   "default_ai_assistant": {
-    "not_set": "デフォルトアシスタントが設定されていません"
+    "not_set": "デフォルトアシスタントが設定されていません",
+    "open_cloud_settings_to_enable": "AI 連携を有効にするには GROWI.cloud の管理画面をご確認ください",
+    "to_cloud_settings": "GROWI.cloud の管理画面へ"
   },
   "ai_assistant_substance": {
     "add_assistant": "アシスタントを追加する",
