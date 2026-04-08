@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 0. 動作確認用ローカルフィードサーバーをセットアップする
-  - `/tmp/feed.json` にサンプルフィードファイルを作成する。各 `type`（`release`, `security`, `tips`, `maintenance`, `announcement`）を網羅し、`emoji`、`title`/`body` の多言語フィールド（`ja_JP`, `en_US`）、`url` あり・なし、`conditions.targetRoles`（admin のみ、全ユーザー）の両パターンを含む複数アイテムで構成する
+  - `/tmp/feed.json` にサンプルフィードファイルを作成する。`emoji` あり・なし（未設定時は 📢 フォールバック確認）、`title`/`body` の多言語フィールド（`ja_JP`, `en_US`）、`url` あり・なし、`conditions.targetRoles`（admin のみ、全ユーザー）の両パターンを含む複数アイテムで構成する
   - devcontainer 内で `cd /tmp && python3 -m http.server 8099` を起動し、`http://localhost:8099/feed.json` でアクセスできることを確認する
   - `.env` に `NEWS_FEED_URL=http://localhost:8099/feed.json` を追加する
   - 以降のタスクで cron 動作確認が必要な場合はこのサーバーを使用する
