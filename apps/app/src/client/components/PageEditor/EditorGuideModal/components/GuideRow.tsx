@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import oneDark from 'react-syntax-highlighter/dist/esm/styles/prism/one-dark';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
 
@@ -36,6 +37,10 @@ export const GuideRow = ({
 
   const isFullWidth = minWidth === '100%' || !preview;
 
+  const { background, color } = oneDark[
+    'pre[class*="language-"]'
+  ] as React.CSSProperties;
+
   return (
     <section className={title !== '' ? 'mt-4 mb-2' : 'mb-2'}>
       {title !== '' && <h3 className="fw-bold mb-2 fs-5 text-body">{title}</h3>}
@@ -47,10 +52,12 @@ export const GuideRow = ({
           style={{ minWidth: isFullWidth ? '100%' : minWidth }}
         >
           <div
-            className={`${styles.codeBox} text-light p-2 ps-3 pe-5 rounded position-relative ${isFullWidth ? 'w-100' : ''}`}
+            className={`${styles.codeBox} rounded overflow-hidden position-relative ${isFullWidth ? 'w-100' : ''}`}
+            style={{ background }}
           >
             <pre
-              className={`${styles.codePre} small font-monospace text-white-50 ${isFullWidth ? 'text-wrap' : ''}`}
+              className={`${styles.codePre} small font-monospace ${isFullWidth ? 'text-wrap' : ''}`}
+              style={{ color }}
             >
               {code}
             </pre>
