@@ -92,11 +92,21 @@
     "@lykmapipo/common>mime": "mime v4 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
     "@lykmapipo/common>parse-json": "parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version"
   },
+  "// comments for pnpm.packageExtensions": {
+    "@orval/core": "@orval/core bundles @stoplight/json-ref-resolver which requires lodash/get at runtime, but @orval/core does not declare lodash as a dependency"
+  },
   "pnpm": {
     "overrides": {
       "@lykmapipo/common>flat": "5.0.2",
       "@lykmapipo/common>mime": "3.0.0",
       "@lykmapipo/common>parse-json": "5.2.0"
+    },
+    "packageExtensions": {
+      "@orval/core": {
+        "dependencies": {
+          "lodash": "*"
+        }
+      }
     },
     "ignoredBuiltDependencies": [
       "@swc/core",
