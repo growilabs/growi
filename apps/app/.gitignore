@@ -23,6 +23,3 @@ next.config.js
 
 # cache
 /.swc/
-
-# prisma
-/src/generated/prisma
