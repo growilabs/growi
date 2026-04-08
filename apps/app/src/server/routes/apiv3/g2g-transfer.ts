@@ -464,7 +464,7 @@ module.exports = (crowi: Crowi): Router => {
           fileName.length === 0 ||
           fileName.length > 256
         ) {
-          logger.warn('Invalid fileName in attachment metadata.', { fileName });
+          logger.warn({ fileName }, 'Invalid fileName in attachment metadata.');
           return res.apiv3Err(
             new ErrorV3(
               'Invalid fileName in attachment metadata.',
@@ -478,7 +478,7 @@ module.exports = (crowi: Crowi): Router => {
           !Number.isInteger(fileSize) ||
           fileSize < 0
         ) {
-          logger.warn('Invalid fileSize in attachment metadata.', { fileSize });
+          logger.warn({ fileSize }, 'Invalid fileSize in attachment metadata.');
           return res.apiv3Err(
             new ErrorV3(
               'Invalid fileSize in attachment metadata.',
@@ -489,10 +489,10 @@ module.exports = (crowi: Crowi): Router => {
         }
         const count = await Attachment.countDocuments({ fileName, fileSize });
         if (count === 0) {
-          logger.warn('Attachment not found in collection.', {
-            fileName,
-            fileSize,
-          });
+          logger.warn(
+            { fileName, fileSize },
+            'Attachment not found in collection.',
+          );
           return res.apiv3Err(
             new ErrorV3(
               'Attachment not found in collection.',
@@ -526,10 +526,10 @@ module.exports = (crowi: Crowi): Router => {
       // Normalize the path to prevent path traversal attacks
       const resolvedFilePath = path.resolve(file.path);
       if (!isPathWithinBase(resolvedFilePath, importService.baseDir)) {
-        logger.error('Path traversal attack detected', {
-          filePath: resolvedFilePath,
-          baseDir: importService.baseDir,
-        });
+        logger.error(
+          { filePath: resolvedFilePath, baseDir: importService.baseDir },
+          'Path traversal attack detected',
+        );
         return res.apiv3Err(
           new ErrorV3('Invalid file path.', 'invalid_path'),
           400,

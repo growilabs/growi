@@ -11,6 +11,8 @@ next.config.js
 /build/
 /dist/
 /transpiled/
+/config/**/*.js
+/config/**/*.d.ts
 /public/static/fonts
 /public/static/js
 /public/static/styles

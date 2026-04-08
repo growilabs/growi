@@ -178,7 +178,7 @@ export class SocketIoService {
       const clients = await this.getAdminSocket().fetchSockets();
       const clientsCount = clients.length;
 
-      logger.debug("Current count of clients for '/admin':", clientsCount);
+      logger.debug({ clientsCount }, "Current count of clients for '/admin'");
 
       const limit = configManager.getConfig(
         's2cMessagingPubsub:connectionsLimitForAdmin',
@@ -198,7 +198,7 @@ export class SocketIoService {
     if (socket.request.user == null) {
       const clientsCount = this.guestClients.size;
 
-      logger.debug('Current count of clients for guests:', clientsCount);
+      logger.debug({ clientsCount }, 'Current count of clients for guests');
 
       const limit = configManager.getConfig(
         's2cMessagingPubsub:connectionsLimitForGuest',
@@ -227,7 +227,7 @@ export class SocketIoService {
     const clients = await this.getDefaultSocket().fetchSockets();
     const clientsCount = clients.length;
 
-    logger.debug("Current count of clients for '/':", clientsCount);
+    logger.debug({ clientsCount }, "Current count of clients for '/'");
 
     const limit = configManager.getConfig(
       's2cMessagingPubsub:connectionsLimit',

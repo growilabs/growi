@@ -236,7 +236,7 @@ jobs:
         HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
         MONGO_URI: mongodb://mongodb:27017/growi-playwright-installer
-        ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
+        ELASTICSEARCH_URI: http://elasticsearch:9200/growi
 
     - name: Copy dotenv file for automatic installation
       run: |
@@ -251,7 +251,7 @@ jobs:
         HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
         MONGO_URI: mongodb://mongodb:27017/growi-playwright
-        ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
+        ELASTICSEARCH_URI: http://elasticsearch:9200/growi
 
     - name: Copy dotenv file for automatic installation with allowing guest mode
       run: |
@@ -266,7 +266,7 @@ jobs:
         HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
         MONGO_URI: mongodb://mongodb:27017/growi-playwright-guest-mode
-        ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
+        ELASTICSEARCH_URI: http://elasticsearch:9200/growi
 
     - name: Generate shard ID
       id: shard-id
