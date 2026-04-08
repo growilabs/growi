@@ -92,11 +92,21 @@
     "@lykmapipo/common>mime": "mime v4 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
     "@lykmapipo/common>parse-json": "parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version"
   },
+  "// comments for pnpm.packageExtensions": {
+    "@stoplight/json-ref-resolver": "The package extension adds lodash as a dependency of @stoplight/json-ref-resolver, which is required by @stoplight/spectral-core. This is necessary because the version of @stoplight/json-ref-resolver used by @stoplight/spectral-core does not declare lodash as a dependency, but it uses lodash in its code."
+  },
   "pnpm": {
     "overrides": {
       "@lykmapipo/common>flat": "5.0.2",
       "@lykmapipo/common>mime": "3.0.0",
       "@lykmapipo/common>parse-json": "5.2.0"
+    },
+    "packageExtensions": {
+      "@stoplight/json-ref-resolver": {
+        "dependencies": {
+          "lodash": "*"
+        }
+      }
     },
     "ignoredBuiltDependencies": [
       "@swc/core",

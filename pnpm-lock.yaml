@@ -9,6 +9,8 @@ overrides:
   '@lykmapipo/common>mime': 3.0.0
   '@lykmapipo/common>parse-json': 5.2.0
 
+packageExtensionsChecksum: sha256-GajVZQir97Azytwy826a32eTs48BWbLbAWL76me3Lag=
+
 patchedDependencies:
   '@marp-team/marp-core':
     hash: 9339c96cb1f7b7d331a5faf3719935af8d4f5415f1f8b88ee73aad42627c5dd4
