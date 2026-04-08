@@ -1,5 +1,12 @@
 # Implementation Plan
 
+- [ ] 0. 動作確認用ローカルフィードサーバーをセットアップする
+  - `/tmp/feed.json` にサンプルフィードファイルを作成する。各 `type`（`release`, `security`, `tips`, `maintenance`, `announcement`）を網羅し、`emoji`、`title`/`body` の多言語フィールド（`ja_JP`, `en_US`）、`url` あり・なし、`conditions.targetRoles`（admin のみ、全ユーザー）の両パターンを含む複数アイテムで構成する
+  - devcontainer 内で `cd /tmp && python3 -m http.server 8099` を起動し、`http://localhost:8099/feed.json` でアクセスできることを確認する
+  - `.env` に `NEWS_FEED_URL=http://localhost:8099/feed.json` を追加する
+  - 以降のタスクで cron 動作確認が必要な場合はこのサーバーを使用する
+  - _Requirements: 1.1, 1.6_
+
 - [ ] 1. データモデルを実装する
 - [ ] 1.1 (P) NewsItem モデルを実装する
   - `externalId`（ユニークインデックス）、多言語 `title`/`body`（Map of String）、`emoji`、`url`、`publishedAt`（インデックス）、`fetchedAt`（TTL 90日インデックス）、`conditions.targetRoles` を持つ Mongoose スキーマを定義する
