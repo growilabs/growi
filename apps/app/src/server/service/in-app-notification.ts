@@ -24,7 +24,7 @@ const { STATUS_UNOPENED, STATUS_OPENED } = InAppNotificationStatuses;
 
 const logger = loggerFactory('growi:service:inAppNotification');
 
-export default class InAppNotificationService {
+export class InAppNotificationService {
   crowi!: Crowi;
 
   socketIoService!: any;
@@ -254,5 +254,3 @@ export default class InAppNotificationService {
     return;
   };
 }
-
-module.exports = InAppNotificationService;

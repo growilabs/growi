@@ -1,5 +1,11 @@
 # @growi/core
 
+## 2.3.0
+
+### Minor Changes
+
+- [#10853](https://github.com/growilabs/growi/pull/10853) [`3c50530`](https://github.com/growilabs/growi/commit/3c50530a105d85058076f31f1800c6304850f5d5) Thanks [@miya](https://github.com/miya)! - Add const for content rendering
+
 ## 2.2.0
 
 ### Minor Changes

@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import React, {
+import {
   type JSX,
   useCallback,
   useEffect,
@@ -73,7 +73,7 @@ export const StickyStretchableScroller = (
     const scrollElement = simplebarRef.current.getScrollElement();
     const newHeight = calcViewHeight(scrollElement);
 
-    logger.debug('Set new height to simplebar', newHeight);
+    logger.debug({ newHeight }, 'Set new height to simplebar');
 
     // set new height
     setSimplebarMaxHeight(newHeight);
