@@ -1,4 +1,6 @@
-module.exports = {
+import type { LoggerConfig } from '@growi/logger';
+
+const config: LoggerConfig = {
   default: 'info',
 
   // 'express-session': 'debug',
@@ -47,3 +49,5 @@ module.exports = {
   'growi:service:openai': 'debug',
   'growi:middleware:access-token-parser:access-token': 'debug',
 };
+
+export default config;

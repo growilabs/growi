@@ -203,8 +203,8 @@ class AuditLogBulkExportJobCronService
     action: SupportedActionType,
   ) {
     logger.debug(
-      'Creating activity with targetModel:',
-      SupportedTargetModel.MODEL_AUDIT_LOG_BULK_EXPORT_JOB,
+      { targetModel: SupportedTargetModel.MODEL_AUDIT_LOG_BULK_EXPORT_JOB },
+      'Creating activity with targetModel',
     );
     const activity = await this.crowi.activityService.createActivity({
       action,

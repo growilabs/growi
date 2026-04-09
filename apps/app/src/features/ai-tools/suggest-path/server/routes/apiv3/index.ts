@@ -20,6 +20,50 @@ import { generateSuggestions } from '../../services/generate-suggestions';
 
 const logger = loggerFactory('growi:features:suggest-path:routes');
 
+/**
+ * @swagger
+ *
+ * components:
+ *   schemas:
+ *     PathSuggestion:
+ *       type: object
+ *       required:
+ *         - type
+ *         - path
+ *         - label
+ *         - description
+ *         - grant
+ *       properties:
+ *         type:
+ *           type: string
+ *           enum: [memo, search, category]
+ *           description: The type of suggestion
+ *         path:
+ *           type: string
+ *           description: Suggested page path
+ *           example: "/user/alice/2026/04/01/meeting-notes"
+ *         label:
+ *           type: string
+ *           description: Human-readable label for the suggestion
+ *         description:
+ *           type: string
+ *           description: Explanation of why this path is suggested
+ *         grant:
+ *           type: integer
+ *           description: Page grant (1=public, 4=owner_only, 5=user_group)
+ *         informationType:
+ *           type: string
+ *           enum: [flow, stock]
+ *           description: Whether the content is flow (time-based) or stock (reference)
+ *     SuggestPathResponse:
+ *       type: object
+ *       properties:
+ *         suggestions:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/PathSuggestion'
+ */
+
 type ReqBody = {
   body: string;
 };
@@ -44,6 +88,40 @@ const validator = [
     .withMessage(`body must not exceed ${MAX_BODY_LENGTH} characters`),
 ];
 
+/**
+ * @swagger
+ *
+ * /ai-tools/suggest-path:
+ *   post:
+ *     summary: Suggest page paths based on content
+ *     description: Analyzes the given content and suggests appropriate page paths using keyword extraction, search, and AI evaluation.
+ *     tags: [AI Tools]
+ *     security:
+ *       - bearer: []
+ *       - accessTokenInQuery: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - body
+ *             properties:
+ *               body:
+ *                 type: string
+ *                 description: The page content to analyze for path suggestions
+ *                 maxLength: 50000
+ *     responses:
+ *       200:
+ *         description: Path suggestions generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuggestPathResponse'
+ *       500:
+ *         description: Failed to generate path suggestions
+ */
 export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 

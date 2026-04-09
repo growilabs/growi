@@ -23,7 +23,7 @@ export function createSMTPClient(
   configManager: IConfigManagerForApp,
   option?: SMTPTransport.Options,
 ): Transporter | null {
-  logger.debug('createSMTPClient option', option);
+  logger.debug('createSMTPClient called');
 
   let smtpOption: SMTPTransport.Options;
 
@@ -58,7 +58,7 @@ export function createSMTPClient(
 
   const client = nodemailer.createTransport(smtpOption);
 
-  logger.debug('mailer set up for SMTP', client);
+  logger.debug('mailer set up for SMTP');
 
   return client;
 }
