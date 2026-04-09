@@ -213,7 +213,7 @@ class NewsCronService extends CronService {
 
 **Implementation Notes**
 - Integration: `server/service/cron.ts` の `CronService` を継承。`startCron()` をアプリ起動時に呼ぶ
-- Validation: `NEWS_FEED_URL` が `https://` で始まることを確認。`growiVersionRegExps` は try-catch で個別評価し、不正 regex はスキップ
+- Validation: `NEWS_FEED_URL` の URL 検証は以下のルールで行う。`https://` で始まる URL は常に許可。`http://localhost` または `http://127.0.0.1` で始まる URL はローカル開発用として許可。それ以外の `http://` は拒否する。`growiVersionRegExps` は try-catch で個別評価し、不正 regex はスキップ
 - Risks: フィード取得タイムアウト（10秒推奨）。外部依存のため失敗を前提に設計する
 
 ---
@@ -414,7 +414,7 @@ type FilterType = 'all' | 'news' | 'notifications';
 
 **InAppNotificationContent の変更**:
 - `activeFilter` に応じて3パターンに分岐
-  - `'all'`: `useSWRINFxNews` + `useSWRINFxInAppNotifications` の結果を `publishedAt/createdAt` 降順でマージ
+  - `'all'`: `useSWRINFxNews` + `useSWRINFxInAppNotifications` の両フックを呼び、現在ロード済みの全ページデータを `publishedAt/createdAt` 降順でマージして表示する。スクロール末端で sentinel が交差したとき、終端に達していない方の `setSize` をインクリメントする。両方が終端に達したら `isReachingEnd = true` とする
   - `'news'`: `useSWRINFxNews` のみ。`NewsList` に渡す
   - `'notifications'`: `useSWRINFxInAppNotifications` のみ。既存 `InAppNotificationList` に渡す
 - 既存 `InfiniteScroll` コンポーネントを使用（`client/components/InfiniteScroll.tsx`）
