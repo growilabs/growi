@@ -414,7 +414,7 @@ type FilterType = 'all' | 'news' | 'notifications';
 
 **InAppNotificationContent の変更**:
 - `activeFilter` に応じて3パターンに分岐
-  - `'all'`: `useSWRINFxNews` + `useSWRINFxInAppNotifications` の両フックを呼び、現在ロード済みの全ページデータを `publishedAt/createdAt` 降順でマージして表示する。スクロール末端で sentinel が交差したとき、終端に達していない方の `setSize` をインクリメントする。両方が終端に達したら `isReachingEnd = true` とする
+  - `'all'`: `useSWRINFxNews` + `useSWRINFxInAppNotifications` の両フックを呼び、現在ロード済みの全ページデータを `publishedAt/createdAt` 降順でマージして表示する。`InfiniteScroll.tsx` に渡すために **合成 `swrInifiniteResponse` オブジェクト**を生成する：`setSize` は終端に達していない方のストリームをインクリメント（両方未終端なら両方インクリメント）、`isValidating` はいずれかが true なら true、とする。両ストリームが終端に達したら `isReachingEnd = true` として `InfiniteScroll` に渡す
   - `'news'`: `useSWRINFxNews` のみ。`NewsList` に渡す
   - `'notifications'`: `useSWRINFxInAppNotifications` のみ。既存 `InAppNotificationList` に渡す
 - 既存 `InfiniteScroll` コンポーネントを使用（`client/components/InfiniteScroll.tsx`）
@@ -431,10 +431,11 @@ type FilterType = 'all' | 'news' | 'notifications';
 
 **Implementation Notes**
 - 配置: `features/news/client/components/NewsItem.tsx`
+- **レイアウト**: 既存の `InAppNotificationElm` と同一カラム構成に揃える
+  - 左端: 未読ドット（`bg-primary` 8px 丸）または同幅の透明スペーサー
+  - アバター位置: `emoji` を表示（`UserPicture` が占める位置と同等）。未設定時は `📢` をフォールバック
+  - コンテンツ列: タイトル（未読時 `fw-bold`、既読時 `fw-normal`）+ 公開日時
 - ロケールフォールバック: `browserLocale → ja_JP → en_US → 最初に利用可能なキー`
-- 未読: `fw-bold` + 左端に `bg-primary` 8px 丸ドット
-- 既読: `fw-normal` + 同幅の透明スペーサー
-- `emoji` 未設定時は `📢` をフォールバック
 - クリック時: `POST /mark-read` + SWR mutate + `url` があれば新タブで開く
 
 ---
@@ -522,13 +523,7 @@ interface INewsItemWithReadStatus {
   isRead: boolean;
 }
 
-interface PaginateResult<T> {
-  docs: T[];
-  totalDocs: number;
-  limit: number;
-  offset: number;
-  hasNextPage: boolean;
-}
+// PaginateResult<T> は ~/interfaces/in-app-notification の既存型を再利用する（再定義不要）
 ```
 
 ---
@@ -587,7 +582,7 @@ interface PaginateResult<T> {
 
 - すべての `/apiv3/news/*` エンドポイントに `loginRequiredStrictly` を適用する
 - `conditions.targetRoles` のフィルタリングはサーバーサイドの `NewsService.listForUser()` で強制する。クライアントから `targetRoles` パラメータを受け付けない
-- `NEWS_FEED_URL` は `https://` のみ許可（HTTP 不可）
+- `NEWS_FEED_URL` は `https://` で始まる URL は常に許可。`http://localhost` または `http://127.0.0.1` で始まる URL はローカル開発用として許可。それ以外の `http://` は拒否する
 - フィードから取得したデータはそのまま DB に保存し、クライアントへのレスポンス時に Mongoose スキーマで型安全に扱う
 
 ## Performance & Scalability
