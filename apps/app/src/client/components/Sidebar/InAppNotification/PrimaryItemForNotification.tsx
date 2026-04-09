@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect } from 'react';
 
+import { useSWRxNewsUnreadCount } from '~/features/news/client/hooks/use-news';
 import { SidebarContentsType } from '~/interfaces/ui';
 import { useGlobalSocket } from '~/states/socket-io';
 import { useSWRxInAppNotificationStatus } from '~/stores/in-app-notification';
@@ -20,10 +21,10 @@ export const PrimaryItemForNotification = memo(
     const { data: notificationCount, mutate: mutateNotificationCount } =
       useSWRxInAppNotificationStatus();
 
-    const badgeContents =
-      notificationCount != null && notificationCount > 0
-        ? notificationCount
-        : undefined;
+    const { data: newsUnreadCount } = useSWRxNewsUnreadCount();
+
+    const totalUnread = (notificationCount ?? 0) + (newsUnreadCount ?? 0);
+    const badgeContents = totalUnread > 0 ? totalUnread : undefined;
 
     const itemHoverHandler = useCallback(
       (contents: SidebarContentsType) => {

@@ -123,6 +123,10 @@ module.exports = (crowi, app) => {
   }
 
   router.use('/in-app-notification', require('./in-app-notification')(crowi));
+  router.use(
+    '/news',
+    require('~/features/news/server/routes/news').default(crowi),
+  );
 
   router.use('/personal-setting', require('./personal-setting')(crowi));
   router.use('/user-activities', require('./user-activities')(crowi));

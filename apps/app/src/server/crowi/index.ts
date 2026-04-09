@@ -450,6 +450,12 @@ class Crowi {
 
     startOpenaiCronIfEnabled();
     startAccessTokenCron();
+
+    // News feed sync cron
+    const { NewsCronService } = await import(
+      '~/features/news/server/services/news-cron-service'
+    );
+    new NewsCronService().startCron();
   }
 
   getSlack(): unknown {

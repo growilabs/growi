@@ -1,9 +1,11 @@
-import React, { type JSX, Suspense, useState } from 'react';
+import { type JSX, Suspense, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
 
 import ItemsTreeContentSkeleton from '../../ItemsTree/ItemsTreeContentSkeleton';
 import { InAppNotificationForms } from './InAppNotificationSubstance';
+
+export type FilterType = 'all' | 'news' | 'notifications';
 
 const InAppNotificationContent = dynamic(
   () =>
@@ -18,6 +20,7 @@ export const InAppNotification = (): JSX.Element => {
 
   const [isUnopendNotificationsVisible, setUnopendNotificationsVisible] =
     useState(false);
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
 
   return (
     <div className="px-3">
@@ -30,11 +33,14 @@ export const InAppNotification = (): JSX.Element => {
         onChangeUnopendNotificationsVisible={() => {
           setUnopendNotificationsVisible(!isUnopendNotificationsVisible);
         }}
+        activeFilter={activeFilter}
+        onChangeFilter={setActiveFilter}
       />
 
       <Suspense fallback={<ItemsTreeContentSkeleton />}>
         <InAppNotificationContent
           isUnopendNotificationsVisible={isUnopendNotificationsVisible}
+          activeFilter={activeFilter}
         />
       </Suspense>
     </div>

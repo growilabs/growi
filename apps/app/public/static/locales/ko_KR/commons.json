@@ -58,7 +58,11 @@
     "unopend": "읽지 않음",
     "mark_all_as_read": "모두 읽음으로 표시",
     "no_unread_messages": "읽지 않은 메시지 없음",
-    "only_unread": "읽지 않은 메시지만"
+    "only_unread": "읽지 않은 메시지만",
+    "news": "공지사항",
+    "notifications": "알림",
+    "filter_all": "전체",
+    "no_news": "공지사항이 없습니다"
   },
   "personal_dropdown": {
     "home": "홈",

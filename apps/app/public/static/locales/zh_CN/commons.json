@@ -61,7 +61,11 @@
     "unopend": "未读",
     "mark_all_as_read": "标记为已读",
     "no_unread_messages": "no_unread_messages",
-    "only_unread": "Only unread"
+    "only_unread": "Only unread",
+    "news": "公告",
+    "notifications": "通知",
+    "filter_all": "全部",
+    "no_news": "暂无公告"
   },
   "personal_dropdown": {
     "home": "家",

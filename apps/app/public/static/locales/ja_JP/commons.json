@@ -61,7 +61,11 @@
     "unopend": "未読",
     "mark_all_as_read": "全て既読にする",
     "no_unread_messages": "未読はありません",
-    "only_unread": "未読のみ"
+    "only_unread": "未読のみ",
+    "news": "お知らせ",
+    "notifications": "通知",
+    "filter_all": "すべて",
+    "no_news": "ニュースはありません"
   },
   "personal_dropdown": {
     "home": "ホーム",

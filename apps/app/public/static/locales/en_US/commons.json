@@ -58,7 +58,11 @@
     "unopend": "Unread",
     "mark_all_as_read": "Mark all as read",
     "no_unread_messages": "no_unread_messages",
-    "only_unread": "Only unread"
+    "only_unread": "Only unread",
+    "news": "News",
+    "notifications": "Notifications",
+    "filter_all": "All",
+    "no_news": "No news available"
   },
   "personal_dropdown": {
     "home": "Home",
