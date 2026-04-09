@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { CopyIcon, GlobeIcon, RefreshCcwIcon } from 'lucide-react';
+import { CopyIcon, GlobeIcon, RefreshCcwIcon, XIcon } from 'lucide-react';
 
 import { Action, Actions } from '~/components/ai-elements/actions';
 import {
@@ -45,7 +45,10 @@ import {
   SourcesTrigger,
 } from '~/components/ai-elements/sources';
 
-import { useChatSidebarStatus } from '../../status/chat-sidebar';
+import {
+  useChatSidebarActions,
+  useChatSidebarStatus,
+} from '../../status/chat-sidebar';
 import { useSWRxMessages } from '../../stores/message';
 import { useSWRINFxRecentThreads } from '../../stores/thread';
 
@@ -70,6 +73,7 @@ export const ChatSidebar = (): JSX.Element => {
   const [webSearch, setWebSearch] = useState(false);
 
   const chatSidebarStatus = useChatSidebarStatus();
+  const { close } = useChatSidebarActions();
   const threadId = chatSidebarStatus?.threadId;
 
   const { data: savedMessages } = useSWRxMessages(threadId);
@@ -106,10 +110,24 @@ export const ChatSidebar = (): JSX.Element => {
 
   return (
     <div
-      className={`position-fixed top-0 end-0 h-100 border-start bg-body shadow-sm overflow-hidden ${moduleClass}`}
+      className={`tw-root position-fixed top-0 end-0 h-100 border-start bg-body shadow-sm overflow-hidden ${moduleClass}`}
     >
       <div className="tw:max-w-4xl tw:mx-auto tw:p-6 tw:relative tw:size-full twh-screen">
         <div className="tw:flex tw:flex-col tw:h-full">
+          <div className="tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:pb-2 tw:border-b tw:border-border">
+            <span className="growi-custom-icons fs-4">ai_assistant</span>
+            <span className="tw:flex-1 tw:font-semibold tw:truncate">
+              {chatSidebarStatus.aiAssistantData?.name ?? 'AI Assistant'}
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost tw:p-1"
+              aria-label="Close"
+              onClick={close}
+            >
+              <XIcon size={16} />
+            </button>
+          </div>
           <Conversation className="tw:h-full">
             <ConversationContent>
               {messages.map((message) => (
@@ -147,18 +165,26 @@ export const ChatSidebar = (): JSX.Element => {
                           // eslint-disable-next-line react/no-array-index-key
                           <Fragment key={`${message.id}-${i}`}>
                             <Message from={message.role}>
-                              <MessageContent>
-                                <Response>{part.text}</Response>
+                              <MessageContent variant="flat">
+                                <Response
+                                  className={
+                                    message.role === 'assistant'
+                                      ? 'tw-prose'
+                                      : undefined
+                                  }
+                                >
+                                  {part.text}
+                                </Response>
                               </MessageContent>
                             </Message>
                             {message.role === 'assistant' &&
                               i === messages.length - 1 && (
-                                <Actions className="mt-2">
+                                <Actions className="tw:mt-2">
                                   <Action
                                     onClick={() => regenerate()}
                                     label="Retry"
                                   >
-                                    <RefreshCcwIcon className="size-3" />
+                                    <RefreshCcwIcon className="tw:size-3" />
                                   </Action>
                                   <Action
                                     onClick={() =>
@@ -166,7 +192,7 @@ export const ChatSidebar = (): JSX.Element => {
                                     }
                                     label="Copy"
                                   >
-                                    <CopyIcon className="size-3" />
+                                    <CopyIcon className="tw:size-3" />
                                   </Action>
                                 </Actions>
                               )}
@@ -199,60 +225,66 @@ export const ChatSidebar = (): JSX.Element => {
             <ConversationScrollButton />
           </Conversation>
 
-          <PromptInput
-            onSubmit={handleSubmit}
-            className="tw:mt-4"
-            globalDrop
-            multiple
-          >
-            <PromptInputBody>
-              <PromptInputAttachments>
-                {(attachment) => <PromptInputAttachment data={attachment} />}
-              </PromptInputAttachments>
-              <PromptInputTextarea
-                onChange={(e) => setInput(e.target.value)}
-                value={input}
-              />
-            </PromptInputBody>
-            <PromptInputFooter>
-              <PromptInputTools>
-                <PromptInputActionMenu>
-                  <PromptInputActionMenuTrigger />
-                  <PromptInputActionMenuContent>
-                    <PromptInputActionAddAttachments />
-                  </PromptInputActionMenuContent>
-                </PromptInputActionMenu>
-                <PromptInputButton
-                  variant={webSearch ? 'default' : 'ghost'}
-                  onClick={() => setWebSearch(!webSearch)}
-                >
-                  <GlobeIcon size={16} />
-                  <span>Search</span>
-                </PromptInputButton>
-                <PromptInputModelSelect
-                  onValueChange={(value) => {
-                    setModel(value);
-                  }}
-                  value={model}
-                >
-                  <PromptInputModelSelectTrigger>
-                    <PromptInputModelSelectValue />
-                  </PromptInputModelSelectTrigger>
-                  <PromptInputModelSelectContent>
-                    {models.map((model) => (
-                      <PromptInputModelSelectItem
-                        key={model.value}
-                        value={model.value}
-                      >
-                        {model.name}
-                      </PromptInputModelSelectItem>
-                    ))}
-                  </PromptInputModelSelectContent>
-                </PromptInputModelSelect>
-              </PromptInputTools>
-              <PromptInputSubmit disabled={!input && !status} status={status} />
-            </PromptInputFooter>
-          </PromptInput>
+          <div className="tw:shrink-0 tw:pt-4">
+            <PromptInput
+              onSubmit={handleSubmit}
+              inputGroupClassName="tw:rounded-xl"
+              globalDrop
+              multiple
+            >
+              <PromptInputBody>
+                <PromptInputAttachments>
+                  {(attachment) => <PromptInputAttachment data={attachment} />}
+                </PromptInputAttachments>
+                <PromptInputTextarea
+                  onChange={(e) => setInput(e.target.value)}
+                  value={input}
+                />
+              </PromptInputBody>
+              <PromptInputFooter>
+                <PromptInputTools>
+                  <PromptInputActionMenu>
+                    <PromptInputActionMenuTrigger />
+                    <PromptInputActionMenuContent>
+                      <PromptInputActionAddAttachments />
+                    </PromptInputActionMenuContent>
+                  </PromptInputActionMenu>
+                  <PromptInputButton
+                    className="tw:rounded-full"
+                    variant={webSearch ? 'default' : 'ghost'}
+                    onClick={() => setWebSearch(!webSearch)}
+                  >
+                    <GlobeIcon size={16} />
+                    <span>Search</span>
+                  </PromptInputButton>
+                  <PromptInputModelSelect
+                    onValueChange={(value) => {
+                      setModel(value);
+                    }}
+                    value={model}
+                  >
+                    <PromptInputModelSelectTrigger>
+                      <PromptInputModelSelectValue />
+                    </PromptInputModelSelectTrigger>
+                    <PromptInputModelSelectContent>
+                      {models.map((model) => (
+                        <PromptInputModelSelectItem
+                          key={model.value}
+                          value={model.value}
+                        >
+                          {model.name}
+                        </PromptInputModelSelectItem>
+                      ))}
+                    </PromptInputModelSelectContent>
+                  </PromptInputModelSelect>
+                </PromptInputTools>
+                <PromptInputSubmit
+                  disabled={!input && !status}
+                  status={status}
+                />
+              </PromptInputFooter>
+            </PromptInput>
+          </div>
         </div>
       </div>
     </div>
