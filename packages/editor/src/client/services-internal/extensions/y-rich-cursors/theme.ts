@@ -82,15 +82,20 @@ export const richCursorsTheme = EditorView.baseTheme({
   },
 
   // --- Off-screen containers ---
-  // Height = avatar + compact arrow with no extra padding.
+  // height: 0 so the containers themselves take no layout space.
+  // Indicators use position:absolute and overflow beyond the 0-height boundary
+  // (default overflow:visible), anchored to the edge via top/bottom on the indicator.
   '.cm-offScreenTop, .cm-offScreenBottom': {
     position: 'absolute',
     left: '0',
     right: '0',
-    height: `calc(${AVATAR_SIZE} + 14px)`,
+    height: '0',
     pointerEvents: 'none',
     zIndex: '10',
   },
+  // top/bottom: 0 keeps the container at the editor's inner border edge.
+  // Indicators have z-index:10 and are children of .cm-editor, so they paint
+  // in front of .cm-editor's own border — no clipping from parent overflow:hidden.
   '.cm-offScreenTop': {
     top: '0',
   },
@@ -100,9 +105,7 @@ export const richCursorsTheme = EditorView.baseTheme({
 
   // Off-screen indicator — absolutely positioned; left/transform set by plugin
   // via requestMeasure to reflect the remote cursor's column position.
-  // Opacity is intentionally NOT set here — it lives on the avatar/initials only
-  // so the arrow always renders fully opaque (CSS opacity cannot be "cancelled"
-  // on children; mixing opaque arrow + faded avatar requires separate rules).
+  // Default anchor: top:0 (used by topContainer — arrow touches the top edge).
   '.cm-offScreenIndicator': {
     position: 'absolute',
     top: '0',
@@ -110,14 +113,40 @@ export const richCursorsTheme = EditorView.baseTheme({
     flexDirection: 'column',
     alignItems: 'center',
   },
+  // In the bottom container the indicator hangs upward from the bottom edge,
+  // so the arrow (last child) sits right at/overlapping the editor's bottom border.
+  '.cm-offScreenBottom .cm-offScreenIndicator': {
+    top: 'auto',
+    bottom: '0',
+  },
 
   // Arrow — always fully opaque; cursor color applied via inline style in JS.
+  //
+  // Material Symbols icons have ~20% internal whitespace on each side of the
+  // bounding box. clip-path trims both top and bottom simultaneously so the
+  // visible triangle is flush with both the avatar AND the editor edge.
+  // Negative margins compensate the clip so the flex layout stays correct.
   '.cm-offScreenArrow': {
     fontFamily: 'var(--grw-font-family-material-symbols-outlined)',
-    fontSize: '14px',
+    fontSize: '20px',
     lineHeight: '1',
+    display: 'block',
     userSelect: 'none',
     opacity: '1',
+  },
+  // "above" indicator: arrow (first child) → avatar (second child)
+  //   top clip  = trim the whitespace at the editor edge
+  //   bottom clip = trim the gap between arrow and avatar
+  '.cm-offScreenArrow:first-child': {
+    marginTop: '-8px',
+    marginBottom: '-8px',
+  },
+  // "below" indicator: avatar (first child) → arrow (last child)
+  //   top clip  = trim the gap between avatar and arrow
+  //   bottom clip = trim the whitespace at the editor edge
+  '.cm-offScreenArrow:last-child': {
+    marginTop: '-8px',
+    marginBottom: '-8px',
   },
 
   // Avatar and initials fade when idle; full opacity when active.
