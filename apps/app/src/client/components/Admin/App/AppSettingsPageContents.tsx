@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import AdminAppContainer from '~/client/services/AdminAppContainer';
 import { toastError } from '~/client/util/toastr';
 import { useIsMaintenanceMode } from '~/states/global';
+import { useSWRxAppSettings } from '~/stores/admin/app-settings';
 import { toArrayIfNot } from '~/utils/array-utils';
 import loggerFactory from '~/utils/logger';
 
@@ -28,7 +29,7 @@ const AppSettingsPageContents = (props: Props) => {
 
   const isMaintenanceMode = useIsMaintenanceMode();
 
-  const { isV5Compatible } = adminAppContainer.state;
+  const { data: appSettings } = useSWRxAppSettings();
 
   useEffect(() => {
     const fetchAppSettingsData = async () => {
@@ -73,7 +74,7 @@ const AppSettingsPageContents = (props: Props) => {
           </div>
         )
       }
-      {!isV5Compatible && (
+      {appSettings?.isV5Compatible === false && (
         <div className="row">
           <div className="col-lg-12">
             <h2
