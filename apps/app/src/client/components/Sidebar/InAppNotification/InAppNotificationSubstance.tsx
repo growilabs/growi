@@ -1,14 +1,18 @@
-import { type JSX, useId, useMemo } from 'react';
+import { type JSX, useId, useMemo, useState } from 'react';
 import type { HasObjectId } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
 import InAppNotificationElm from '~/client/components/InAppNotification/InAppNotificationElm';
 import InfiniteScroll from '~/client/components/InfiniteScroll';
 import { NewsItem } from '~/features/news/client/components/NewsItem';
-import { useSWRINFxNews } from '~/features/news/client/hooks/use-news';
+import {
+  useSWRINFxNews,
+  useSWRxNewsUnreadCount,
+} from '~/features/news/client/hooks/use-news';
 import type { INewsItemWithReadStatus } from '~/features/news/interfaces/news-item';
 import type { IInAppNotification } from '~/interfaces/in-app-notification';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
+import { useSidebarMode } from '~/states/ui/sidebar';
 import { useSWRINFxInAppNotifications } from '~/stores/in-app-notification';
 
 import type { FilterType } from './InAppNotification';
@@ -98,6 +102,19 @@ export const InAppNotificationContent = (
 ): JSX.Element => {
   const { isUnopendNotificationsVisible, activeFilter } = props;
   const { t } = useTranslation('commons');
+  const { isCollapsedMode } = useSidebarMode();
+
+  // Track locally-opened notifications to give instant dot removal without
+  // relying on SWR cache persistence across navigation/unmount cycles.
+  const [locallyOpenedNotifIds, setLocallyOpenedNotifIds] = useState<
+    Set<string>
+  >(new Set());
+
+  // In collapsed mode (hover panel): constrain height + own scrollbar
+  // In dock/drawer mode: no constraints — outer SimpleBar handles all scrolling
+  const collapsed = isCollapsedMode();
+  const scrollAreaClassName = collapsed ? 'overflow-auto' : undefined;
+  const scrollAreaStyle = collapsed ? { maxHeight: '60vh' } : undefined;
 
   const notificationStatus = isUnopendNotificationsVisible
     ? InAppNotificationStatuses.STATUS_UNOPENED
@@ -109,6 +126,7 @@ export const InAppNotificationContent = (
     { onlyUnread: isUnopendNotificationsVisible },
     { keepPreviousData: true },
   );
+  const { mutate: mutateNewsUnreadCount } = useSWRxNewsUnreadCount();
 
   const notificationResponse = useSWRINFxInAppNotifications(
     NEWS_PER_PAGE,
@@ -210,6 +228,15 @@ export const InAppNotificationContent = (
 
   const handleReadMutate = () => {
     newsResponse.mutate();
+    mutateNewsUnreadCount();
+  };
+
+  // Use local state to immediately remove the unread dot on click.
+  // Relying solely on SWR mutate is unreliable because useSWRInfinite per-page
+  // caches can be stale after navigation/unmount, so the dot reappears on
+  // remount even with revalidate:false.
+  const handleNotificationRead = (notificationId: string) => {
+    setLocallyOpenedNotifIds((prev) => new Set(prev).add(notificationId));
   };
 
   if (activeFilter === 'news') {
@@ -218,7 +245,7 @@ export const InAppNotificationContent = (
     }
 
     return (
-      <div className="overflow-auto" style={{ maxHeight: '60vh' }}>
+      <div className={scrollAreaClassName} style={scrollAreaStyle}>
         <InfiniteScroll
           swrInifiniteResponse={newsResponse}
           isReachingEnd={newsExhausted}
@@ -246,18 +273,29 @@ export const InAppNotificationContent = (
     }
 
     return (
-      <div className="overflow-auto" style={{ maxHeight: '60vh' }}>
+      <div className={scrollAreaClassName} style={scrollAreaStyle}>
         <InfiniteScroll
           swrInifiniteResponse={notificationResponse}
           isReachingEnd={notifExhausted}
         >
           <div className="list-group">
-            {allNotificationItems.map((notification) => (
-              <InAppNotificationElm
-                key={notification._id.toString()}
-                notification={notification}
-              />
-            ))}
+            {allNotificationItems.map((notification) => {
+              const id = notification._id.toString();
+              return (
+                <InAppNotificationElm
+                  key={id}
+                  notification={
+                    locallyOpenedNotifIds.has(id)
+                      ? {
+                          ...notification,
+                          status: InAppNotificationStatuses.STATUS_OPENED,
+                        }
+                      : notification
+                  }
+                  onUnopenedNotificationOpend={() => handleNotificationRead(id)}
+                />
+              );
+            })}
           </div>
         </InfiniteScroll>
       </div>
@@ -274,7 +312,7 @@ export const InAppNotificationContent = (
   }
 
   return (
-    <div className="overflow-auto" style={{ maxHeight: '60vh' }}>
+    <div className={scrollAreaClassName} style={scrollAreaStyle}>
       <InfiniteScroll
         swrInifiniteResponse={
           allModeSWRResponse as unknown as Parameters<
@@ -294,10 +332,19 @@ export const InAppNotificationContent = (
                 />
               );
             }
+            const id = entry.item._id.toString();
             return (
               <InAppNotificationElm
-                key={`notif-${entry.item._id.toString()}`}
-                notification={entry.item}
+                key={`notif-${id}`}
+                notification={
+                  locallyOpenedNotifIds.has(id)
+                    ? {
+                        ...entry.item,
+                        status: InAppNotificationStatuses.STATUS_OPENED,
+                      }
+                    : entry.item
+                }
+                onUnopenedNotificationOpend={() => handleNotificationRead(id)}
               />
             );
           })}

@@ -77,10 +77,16 @@ const InAppNotificationElm: FC<Props> = (props: Props) => {
           <span
             className={`${
               notification.status === InAppNotificationStatuses.STATUS_UNOPENED
-                ? 'grw-unopend-notification'
-                : 'ms-2'
+                ? 'bg-primary'
+                : ''
             } rounded-circle me-3`}
-          ></span>
+            style={{
+              width: 8,
+              height: 8,
+              minWidth: 8,
+              display: 'inline-block',
+            }}
+          />
 
           {renderActionUserPictures()}
 

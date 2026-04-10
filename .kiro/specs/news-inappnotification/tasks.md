@@ -148,3 +148,19 @@
   - フィルタタブ切り替えで表示対象が変わることを確認する（5.2 の AC カバレッジ）
   - 「未読のみ」トグルとの組み合わせで2重フィルタリングが機能することを確認する（5.3 の AC カバレッジ）
   - _Requirements: 5.2, 5.3_
+
+- [x] 12. 既存コードの不具合修正（実装後検証で発覚）
+- [x] 12.1 既存通知の未読ドットを修正する
+  - `InAppNotificationElm.tsx` の `grw-unopend-notification` クラスに対応する CSS 定義がコードベースに存在しないため、未読ドットが表示されない
+  - NewsItem と同様に `width/height/display: inline-block` のインラインスタイルを追加する
+  - _Requirements: 6.1_
+
+- [x] 12.2 全面サイドバー（② dock/drawer モード）での通知表示エリアを拡張する
+  - `InAppNotificationSubstance.tsx` の各フィルタ表示エリアに `style={{ maxHeight: '60vh' }}` が固定されており、② dock/drawer モードでもホバーパネル（①）サイズに制限される
+  - `useSidebarMode()` で collapsed モードを判定し、collapsed 時のみ `maxHeight: '60vh'` を適用する。dock/drawer モードでは制約を外し、外側の SimpleBar コンテナによるスクロールに委ねる
+  - _Requirements: 5.1_
+
+- [x] 12.3 アプリ内通知の未読ドットをクリック時に即時消去する
+  - `InAppNotificationSubstance.tsx` の `handleNotificationRead` で `useSWRInfinite` の `mutate(updater, { revalidate: false })` を使って既読状態をキャッシュに書き込もうとしていたが、ナビゲーション（`<a href>`）によってコンポーネントがアンマウントされた後に `useSWRInfinite` のページ単位キャッシュが古い状態に戻るため、ドットが再表示される
+  - `useState<Set<string>>` でローカルに開封済み通知 ID を管理し、各 `InAppNotificationElm` のレンダリング時に `status` をその場でオーバーライドすることで、SWR キャッシュに依存せず即時反映を実現する
+  - _Requirements: 6.1, 6.2_

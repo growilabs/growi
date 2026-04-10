@@ -399,6 +399,12 @@ type FilterType = 'all' | 'news' | 'notifications';
 
 ---
 
+#### InAppNotificationElm.tsx（既存・修正あり）
+
+**実装後に判明した落とし穴**: 未読ドットに使われていた CSS クラス `grw-unopend-notification` はコードベースに定義が存在せず、ドットが不可視だった。`bg-primary rounded-circle` + インラインスタイル（`width/height: 8px, display: inline-block`）に置き換えて修正済み。このコンポーネントを今後変更する場合、同クラスを再導入しないこと。
+
+---
+
 #### InAppNotificationSubstance.tsx（変更）
 
 | Field | Detail |
@@ -419,6 +425,27 @@ type FilterType = 'all' | 'news' | 'notifications';
   - `'notifications'`: `useSWRINFxInAppNotifications` のみ。既存 `InAppNotificationList` に渡す
 - 既存 `InfiniteScroll` コンポーネントを使用（`client/components/InfiniteScroll.tsx`）
 - 既存 `// TODO: Infinite scroll implemented` コメントを解消
+
+**サイドバーモード別スクロール戦略（実装後に判明した設計上の決定）**:
+
+サイドバーには2種類のモードがあり、スクロール担当コンテナが異なる。
+
+| モード | UI | スクロール担当 | コンテンツエリアの制約 |
+|---|---|---|---|
+| collapsed（ホバーパネル ①） | ベルアイコンにホバー時の小パネル | `InAppNotificationContent` 内の `overflow-auto` div | `maxHeight: 60vh` で高さを制限 |
+| dock / drawer（全面サイドバー ②） | 展開した全面パネル | 外側の `SimpleBar`（`h-100`） | 制約なし。コンテンツが自然に伸長 |
+
+collapsed モードで `overflow-auto + maxHeight` を使い、dock/drawer モードでは外していない場合、**二重スクロールコンテナ**が発生する。具体的には：
+- `overflow-auto` div がサイドバーと同高の scroll context を作る
+- スクロールバーがコンテンツ高さとほぼ同じ縦幅で出現し、わずかな余白でしか動かせなくなる（振動挙動）
+
+対策として `InAppNotificationContent` 内で `useSidebarMode()` を呼び、`isCollapsedMode()` が true のときのみ `overflow-auto` クラスと `maxHeight: 60vh` を付与する。dock/drawer モードでは div に何も付与せず、SimpleBar にスクロールを委ねる。
+
+**通知ドット即時消去のローカル state 戦略（実装後に判明した設計上の決定）**:
+
+`InAppNotificationElm` はクリック時に `apiv3Post('/in-app-notification/open')` でサーバーへ書き込みを行うが、UI への反映は SWR の再フェッチに依存する。`InAppNotificationContent` 内で `useSWRInfinite` の `mutate(updater, { revalidate: false })` を使って楽観的更新を試みたが、ナビゲーション（`<a href>`）でコンポーネントがアンマウントされると `useSWRInfinite` のページ単位キャッシュが古い状態に戻り、再マウント時にドットが復活する問題があった。
+
+対策として `InAppNotificationContent` に `useState<Set<string>>` を持ち、ユーザーがクリックした通知 ID をローカルに記録する。各 `InAppNotificationElm` のレンダリング時にこの set を参照し、ID が含まれる場合は `notification.status` を `STATUS_OPENED` にオーバーライドして渡す。これにより SWR キャッシュの状態によらず確実に即時反映される。
 
 ---
 
