@@ -1,7 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-import { appendTextToEditorUntilContains } from '../utils/AppendTextToEditorUntilContains';
-
 /**
  * Tests for Emacs keymap functionality in the editor.
  * Verifies that the registered EmacsHandler bindings produce the expected
@@ -86,10 +84,15 @@ test.describe
     test('C-c C-n should navigate cursor to the next heading (Req 9.3)', async ({
       page,
     }) => {
-      // Set up document with two headings so there is a "next" heading to navigate to
-      await appendTextToEditorUntilContains(
-        page,
-        '# First Heading\n\n## Second Heading',
+      // Set up document with two headings.
+      // Fill directly and wait for the rendered heading text (without # markers) to appear in the
+      // preview, because appendTextToEditorUntilContains checks raw text which markdown headings
+      // strip on render.
+      await page
+        .locator('.cm-content')
+        .fill('# First Heading\n\n## Second Heading');
+      await expect(page.getByTestId('page-editor-preview-body')).toContainText(
+        'Second Heading',
       );
 
       // Click on the first line to position cursor before "## Second Heading"
