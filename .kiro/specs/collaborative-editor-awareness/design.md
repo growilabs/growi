@@ -74,7 +74,7 @@ graph TB
 - `yRichCursors` is added as a separate extension alongside `yCollab`'s output; it owns all awareness-cursor interaction, including in-viewport widget rendering and off-screen indicators
 - `state.editors` remains the single source of truth for user identity data
 - `state.cursor` (anchor/head relative positions) continues to be used for cursor position broadcasting, consistent with `y-codemirror.next` convention
-- Off-screen indicators are managed within the same `yRichCursors` ViewPlugin — it compares each remote cursor's absolute position against `view.viewport` to decide between widget decoration (in-view) and DOM overlay (off-screen)
+- Off-screen indicators are managed within the same `yRichCursors` ViewPlugin — it compares each remote cursor's absolute position against `view.visibleRanges` (the actually visible content range, excluding CodeMirror's pre-render buffer) to decide between widget decoration (in-view) and DOM overlay (off-screen)
 
 ### Technology Stack
 
@@ -145,10 +145,10 @@ sequenceDiagram
 | 3.10 | Full opacity during active editing (3s) | `yRichCursors` | `lastActivityMap` + `.cm-yRichCursorActive` class + `setTimeout` |
 | 4.1 | Off-screen indicator pinned to top edge (↑) | `yRichCursors` | `offScreenContainer` top overlay |
 | 4.2 | Off-screen indicator pinned to bottom edge (↓) | `yRichCursors` | `offScreenContainer` bottom overlay |
-| 4.3 | No indicator when cursor is in viewport | `yRichCursors` | viewport comparison in `update()` |
+| 4.3 | No indicator when cursor is in viewport | `yRichCursors` | `visibleRanges` comparison in `update()` |
 | 4.4 | Same avatar/color as in-editor widget | `yRichCursors` | shared `state.editors` data |
 | 4.5 | Multiple indicators side by side | `yRichCursors` | horizontal flex layout |
-| 4.6 | Transition on scroll (indicator ↔ widget) | `yRichCursors` | `viewportChanged` check in `update()` |
+| 4.6 | Transition on scroll (indicator ↔ widget) | `yRichCursors` | `visibleRanges` check in `update()` |
 | 4.7 | Overlay positioning (no layout impact) | `yRichCursors` | `position: absolute` on `view.dom` |
 
 ## Components and Interfaces
@@ -295,7 +295,7 @@ Selection highlight: `Decoration.mark` on selected range with `background-color:
 
 ##### Off-Screen Cursor Indicators
 
-When a remote cursor's absolute position falls outside `view.viewport.from`..`view.viewport.to`, the ViewPlugin renders an off-screen indicator instead of a widget decoration.
+When a remote cursor's absolute position falls outside the actually visible content range (`view.visibleRanges`), the ViewPlugin renders an off-screen indicator instead of a widget decoration. Note: `view.viewport` includes CodeMirror's pre-render buffer and must NOT be used for visibility classification — `view.visibleRanges` returns only the ranges the user can actually see.
 
 **DOM management**: The ViewPlugin creates two persistent container elements (`topContainer`, `bottomContainer`) and appends them to `view.dom` in the `constructor`. They are removed in `destroy()`. The containers are always present in the DOM but empty (zero height) when no off-screen cursors exist in that direction.
 
@@ -313,7 +313,7 @@ view.dom (position: relative — already set by CodeMirror)
 **Indicator DOM structure**: Arrow (`↑` / `↓`) + avatar image (or initials fallback). Built by `createOffScreenIndicator()` in `off-screen-indicator.ts`. Sizing uses the same `AVATAR_SIZE` token from `theme.ts`. Opacity follows the same idle/active pattern as in-editor widgets.
 
 **Update cycle**:
-1. In the `update(viewUpdate)` method, after computing absolute positions for all remote cursors, classify each into: `inViewport`, `above`, or `below` based on comparison with `view.viewport.{from, to}`
+1. In the `update(viewUpdate)` method, after computing absolute positions for all remote cursors, classify each into: `inViewport`, `above`, or `below` based on comparison with `view.visibleRanges` (first range's `from` for top boundary, last range's `to` for bottom boundary)
 2. For `inViewport` cursors: create `Decoration.widget` (same as current behavior)
 3. For `above` / `below` cursors: rebuild `topContainer` / `bottomContainer` children via `replaceChildren()` — clear old indicator elements and append new ones
 4. Containers are rebuilt on every update where `viewportChanged` is true OR awareness has changed (same trigger as decoration rebuild)

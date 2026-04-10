@@ -85,11 +85,12 @@
   - Remove both containers in the plugin's destroy method
   - _Requirements: 4.7_
 
-- [x] 8.2 Classify remote cursors by viewport position and render off-screen indicators
-  - After computing absolute positions for all remote cursors in the update method, compare each position against the current viewport range
-  - For cursors above the viewport, build an indicator element (arrow up + avatar or initials fallback) and add it to the top container
-  - For cursors below the viewport, build an indicator element (arrow down + avatar or initials fallback) and add it to the bottom container
-  - For cursors within the viewport, render the in-editor widget decoration as before (no off-screen indicator)
+- [x] 8.2 Classify remote cursors by visible range position and render off-screen indicators
+  - After computing absolute positions for all remote cursors in the update method, compare each position against `view.visibleRanges` (NOT `view.viewport`, which includes CodeMirror's pre-render buffer beyond the visible area)
+  - Use `visibleRanges[0].from` as the top boundary and `visibleRanges[visibleRanges.length - 1].to` as the bottom boundary
+  - For cursors above the visible range, build an indicator element (arrow up + avatar or initials fallback) and add it to the top container
+  - For cursors below the visible range, build an indicator element (arrow down + avatar or initials fallback) and add it to the bottom container
+  - For cursors within the visible range, render the in-editor widget decoration as before (no off-screen indicator)
   - Replace container children on each relevant update cycle using a batch DOM operation
   - Apply the active CSS class to off-screen indicators when the corresponding client's activity state is active
   - Rebuild containers when the viewport changes or awareness changes
@@ -113,8 +114,8 @@
   - _Requirements: 4.1, 4.2, 4.4_
 
 - [x] 10. Integration Tests for Viewport Classification and Activity Tracking
-- [x] 10.1 Test that remote cursors outside the viewport are excluded from widget decorations
-  - Simulate a remote client with a cursor position beyond the viewport range and verify that no widget decoration is created for that client
+- [x] 10.1 Test that remote cursors outside the visible range are excluded from widget decorations
+  - Simulate a remote client with a cursor position beyond `view.visibleRanges` and verify that no widget decoration is created for that client
   - _Requirements: 4.3, 4.6_
 
 - [x] 10.2 Test activity tracking timer lifecycle with fake timers
