@@ -175,6 +175,7 @@ const contributors = [
           { position: 'Ambassador', name: 'Tsuyoshi Suzuki' },
           { name: 'JPCERT/CC' },
           { name: 'goofmint' },
+          { name: 'RIKEN' },
         ],
       },
       {
