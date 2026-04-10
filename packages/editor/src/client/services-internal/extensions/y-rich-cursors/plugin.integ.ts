@@ -1,10 +1,12 @@
 import { EditorState } from '@codemirror/state';
+import type { ViewUpdate } from '@codemirror/view';
 import { EditorView } from '@codemirror/view';
 import { yCollab } from 'y-codemirror.next';
 import * as Y from 'yjs';
 
 import type { EditingClient } from '../../../../interfaces';
 import { yRichCursors } from './index';
+import { YRichCursorsPluginValue } from './plugin';
 
 /**
  * Integration tests for collaborative awareness flow.
@@ -323,6 +325,68 @@ describe('Task 10.1 — Remote cursors outside the viewport are excluded from wi
     const carets = view.dom.querySelectorAll('.cm-yRichCaret');
     expect(carets.length).toBe(0);
 
+    view.destroy();
+    container.remove();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 12.2 — Off-screen indicator for cursor in viewport render buffer
+// ---------------------------------------------------------------------------
+
+describe('Task 12.2 — Off-screen indicator renders for cursor in render buffer but outside visibleRanges', () => {
+  it('places a below-indicator when cursor is inside viewport but outside visibleRanges', () => {
+    const ydoc = new Y.Doc({ guid: 'render-buffer-test' });
+    const ytext = ydoc.getText('codemirror');
+    const content = 'Hello World Foo Bar';
+    ytext.insert(0, content);
+
+    const awareness = new FakeAwareness(ydoc);
+
+    // Set remote state BEFORE creating the plugin so the change listener
+    // does not fire a real dispatch during construction.
+    const remoteClient = makeClient(99, 'BufferUser');
+    const anchor = Y.createRelativePositionFromTypeIndex(ytext, 10);
+    const head = Y.createRelativePositionFromTypeIndex(ytext, 10);
+    awareness.setRemoteClientState(99, {
+      editors: remoteClient,
+      cursor: { anchor, head },
+    });
+
+    // Build a state that includes yCollab so ySyncFacet is configured.
+    const state = EditorState.create({
+      doc: content,
+      extensions: [yCollab(ytext, null)],
+    });
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const view = new EditorView({ state, parent: container });
+
+    // Instantiate the plugin directly — one pair of containers in view.dom.
+    const plugin = new YRichCursorsPluginValue(view, awareness as never);
+
+    // Construct a mock ViewUpdate where:
+    //   viewport  covers position 10 (render buffer includes it)
+    //   visibleRanges does NOT cover position 10 (only first 5 chars visible)
+    //
+    // Before the fix (viewport):  cursor 10 ≤ vpTo 18 → widget decoration  → bottomContainer EMPTY  → test FAILS
+    // After  the fix (visibleRanges): cursor 10 > vpTo 5  → below indicator → bottomContainer has 1  → test PASSES
+    const mockViewUpdate = {
+      state: view.state,
+      view: {
+        hasFocus: false,
+        viewport: { from: 0, to: content.length },
+        visibleRanges: [{ from: 0, to: 5 }],
+      },
+    } as unknown as ViewUpdate;
+
+    plugin.update(mockViewUpdate);
+
+    const bottomContainer = view.dom.querySelector('.cm-offScreenBottom');
+    expect(bottomContainer?.children.length).toBe(1);
+
+    plugin.destroy();
     view.destroy();
     container.remove();
   });

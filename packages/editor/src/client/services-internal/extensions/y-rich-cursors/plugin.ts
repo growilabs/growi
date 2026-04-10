@@ -156,7 +156,58 @@ export class YRichCursorsPluginValue {
     const aboveIndicators: HTMLElement[] = [];
     const belowIndicators: HTMLElement[] = [];
     const localClientId = this.awareness.doc.clientID;
-    const { from: vpFrom, to: vpTo } = viewUpdate.view.viewport;
+
+    const visibleRanges = viewUpdate.view.visibleRanges;
+    const { from: viewportFrom, to: viewportTo } = viewUpdate.view.viewport;
+
+    // Three classification strategies (chosen once per update call):
+    //
+    // "ranged": visibleRanges is a true sub-range of viewport — CodeMirror's own
+    //   scroller is active (e.g. fixed-height editor in tests). Use character-
+    //   position bounds derived from visibleRanges.
+    //
+    // "coords": visibleRanges == viewport — the editor expands to full content
+    //   height and the *page* handles scrolling (GROWI's production setup). Use
+    //   the cursor's actual screen coordinates vs the editor's visible rect
+    //   (scrollDOM.getBoundingClientRect clamped to window.innerHeight).
+    //
+    // "none" (degenerate — jsdom with 0-height container): scrollRect.height == 0
+    //   so screen coordinates are unreliable. Skip all off-screen classification
+    //   and give every cursor a widget decoration, matching pre-task-12 behaviour.
+    const hasVisibleRanges = visibleRanges.length > 0;
+    // rangedMode: visibleRanges is a meaningful sub-range of viewport.
+    // Requires the visible area to be non-empty (to > from) so that a 0-height
+    // editor (jsdom degenerate) doesn't accidentally classify every cursor as
+    // off-screen via a vpTo of 0.
+    const rangedMode =
+      hasVisibleRanges &&
+      visibleRanges[visibleRanges.length - 1].to > visibleRanges[0].from &&
+      (visibleRanges[0].from > viewportFrom ||
+        visibleRanges[visibleRanges.length - 1].to < viewportTo);
+
+    // For coords mode: compute visible band once before the per-cursor loop.
+    // getBoundingClientRect() is a raw DOM call (not a CodeMirror layout read)
+    // so it is allowed during update(). lineBlockAt() uses the stored height map
+    // and is also safe during update().
+    // When scrollDOMRect.height == 0 (jsdom), screenVisibleBottom == 0 so the
+    // below/above checks never fire and every cursor falls through to a widget.
+    let scrollDOMTop = 0;
+    let scrollDOMBottom = 0;
+    let scrollTop = 0;
+    if (!rangedMode) {
+      const scrollDOMRect = viewUpdate.view.scrollDOM.getBoundingClientRect();
+      scrollDOMTop = scrollDOMRect.top;
+      scrollDOMBottom = scrollDOMRect.bottom;
+      scrollTop = viewUpdate.view.scrollDOM.scrollTop;
+    }
+    const screenVisibleTop = Math.max(scrollDOMTop, 0);
+    const screenVisibleBottom = Math.min(scrollDOMBottom, window.innerHeight);
+
+    const vpFrom = hasVisibleRanges ? visibleRanges[0].from : viewportFrom;
+    const vpTo = hasVisibleRanges
+      ? visibleRanges[visibleRanges.length - 1].to
+      : viewportTo;
+
     const now = Date.now();
 
     this.awareness.getStates().forEach((rawState, clientId) => {
@@ -191,30 +242,67 @@ export class YRichCursorsPluginValue {
       const isActive = now - (this.lastActivityMap.get(clientId) ?? 0) < 3000;
       const headIndex = head.index;
 
-      // Classify: in-viewport or off-screen
-      if (headIndex < vpFrom) {
-        aboveIndicators.push(
-          createOffScreenIndicator({
-            direction: 'above',
-            color: editors.color,
-            name: editors.name,
-            imageUrlCached: editors.imageUrlCached,
-            isActive,
-          }),
-        );
-        return;
-      }
-      if (headIndex > vpTo) {
-        belowIndicators.push(
-          createOffScreenIndicator({
-            direction: 'below',
-            color: editors.color,
-            name: editors.name,
-            imageUrlCached: editors.imageUrlCached,
-            isActive,
-          }),
-        );
-        return;
+      // Classify: off-screen (above/below) or in-viewport
+      if (rangedMode) {
+        if (headIndex < vpFrom) {
+          aboveIndicators.push(
+            createOffScreenIndicator({
+              direction: 'above',
+              color: editors.color,
+              name: editors.name,
+              imageUrlCached: editors.imageUrlCached,
+              isActive,
+            }),
+          );
+          return;
+        }
+        if (headIndex > vpTo) {
+          belowIndicators.push(
+            createOffScreenIndicator({
+              direction: 'below',
+              color: editors.color,
+              name: editors.name,
+              imageUrlCached: editors.imageUrlCached,
+              isActive,
+            }),
+          );
+          return;
+        }
+      } else {
+        // coords mode: compare screen Y of cursor against the editor's visible rect.
+        // Used when visibleRanges == viewport (page-scroll editor, e.g. GROWI).
+        //
+        // lineBlockAt() reads stored heights (safe during update).
+        // When scrollDOMRect.height == 0 (jsdom) both checks below are false
+        // so every cursor falls through to a widget decoration.
+        const lineBlock = viewUpdate.view.lineBlockAt(headIndex);
+        const cursorTop = scrollDOMTop + lineBlock.top - scrollTop;
+        const cursorBottom = scrollDOMTop + lineBlock.bottom - scrollTop;
+
+        if (cursorBottom < screenVisibleTop) {
+          aboveIndicators.push(
+            createOffScreenIndicator({
+              direction: 'above',
+              color: editors.color,
+              name: editors.name,
+              imageUrlCached: editors.imageUrlCached,
+              isActive,
+            }),
+          );
+          return;
+        }
+        if (cursorTop > screenVisibleBottom) {
+          belowIndicators.push(
+            createOffScreenIndicator({
+              direction: 'below',
+              color: editors.color,
+              name: editors.name,
+              imageUrlCached: editors.imageUrlCached,
+              isActive,
+            }),
+          );
+          return;
+        }
       }
 
       // In-viewport: render decorations

@@ -124,6 +124,17 @@
   - Simulate a new awareness change before the timer expires and verify the timer is reset
   - _Requirements: 3.10_
 
+- [x] 12. Fix Off-Screen Visibility Classification
+- [x] 12.1 Replace `view.viewport` with `view.visibleRanges` in the off-screen cursor classification logic
+  - In `plugin.ts`, replace `viewUpdate.view.viewport` with `viewUpdate.view.visibleRanges` for the top/bottom boundary comparison
+  - Use `visibleRanges[0].from` as the top boundary and `visibleRanges[visibleRanges.length - 1].to` as the bottom boundary
+  - Guard against an empty `visibleRanges` array (skip classification if empty)
+  - _Requirements: 4.1, 4.2, 4.3, 4.6_
+
+- [x] 12.2 Update integration test to assert off-screen indicator renders for cursor in the render buffer
+  - Add a test case that places a remote cursor within `view.viewport` but outside `view.visibleRanges` and verifies the off-screen container has an indicator element
+  - _Requirements: 4.3, 4.6_
+
 - [ ]\* 11. E2E Tests for Hover, Opacity, and Off-Screen Transitions
 - [ ]\* 11.1 (P) Test hover behavior on the cursor overlay flag
   - Hover over a remote user's caret area and verify the name label becomes visible
