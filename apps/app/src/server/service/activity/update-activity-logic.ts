@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import { SupportedAction } from '~/interfaces/activity';
 
 type GenerateUpdatePayload = {
-  currentUserId: string;
+  currentUserId: string | undefined;
   targetPageId: string;
   currentActivityId: string;
 };
@@ -14,9 +14,13 @@ const SUPPRESION_UPDATE_WINDOW_MS = 5 * 60 * 1000; // 5 min
 
 export const shouldGenerateUpdate = async (payload: GenerateUpdatePayload) => {
   const { targetPageId, currentActivityId, currentUserId } = payload;
-  const Activity = mongoose.model('Activity');
+
+  if (currentUserId == null) {
+    return false;
+  }
 
   // Get most recent update or create activity on the page
+  const Activity = mongoose.model('Activity');
   const lastContentActivity = await Activity.findOne({
     target: targetPageId,
     action: {
@@ -29,9 +33,7 @@ export const shouldGenerateUpdate = async (payload: GenerateUpdatePayload) => {
   }).sort({ createdAt: -1 });
 
   const isLastActivityByMe =
-    !!currentUserId &&
     lastContentActivity?.user?._id?.toString() === currentUserId;
-
   const lastActivityTime = lastContentActivity?.createdAt?.getTime?.() ?? 0;
   const timeSinceLastActivityMs = Date.now() - lastActivityTime;
 
