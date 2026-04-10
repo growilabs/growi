@@ -55,7 +55,15 @@ If `phase/new` is not present, skip the removal step and only add `phase/under-i
    cat apps/app/package.json | grep '"version"'
    ```
 3. If the reported major version matches master's major version → proceed with master-branch analysis.
-4. If versions differ → note the discrepancy in your findings, but still analyze master unless the issue is clearly version-specific.
+4. If the reported major version is **older** than master's major version → **STOP analysis** and ask the user:
+
+   > Reported version is v{X}.x, but master is v{Y}.x.
+   > Would you like me to:
+   > 1. **Check out v{X}.x tag/branch** and analyze on that version
+   > 2. **Continue on master** — the issue may still be relevant
+   > 3. **Close as outdated** — skip analysis
+
+   **Wait for the user's response before continuing to Step 3-B.**
 
 ### 3-B: Code Investigation
 
