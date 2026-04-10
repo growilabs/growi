@@ -72,10 +72,6 @@ jobs:
           pnpm add turbo --global
           pnpm install --frozen-lockfile
 
-      - name: Generate schema
-        run: |
-          pnpm run --filter @growi/app prisma:generate
-
       - name: Lint
         run: |
           turbo run lint --filter=@growi/app --filter=./packages/*
@@ -130,10 +126,6 @@ jobs:
         run: |
           pnpm add turbo --global
           pnpm install --frozen-lockfile
-
-      - name: Generate schema
-        run: |
-          pnpm run --filter @growi/app prisma:generate
 
       - name: Test
         run: |
@@ -199,10 +191,6 @@ jobs:
         run: |
           pnpm add turbo --global
           pnpm install --frozen-lockfile
-
-      - name: Generate schema
-        run: |
-          pnpm run --filter @growi/app prisma:generate
 
       - name: turbo run launch-dev:ci
         working-directory: ./apps/app
