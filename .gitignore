@@ -1,5 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Local development tools (not for production)
+/dev-local/
+
 # dependencies
 node_modules
 /.pnp

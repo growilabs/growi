@@ -93,10 +93,7 @@ export class NewsCronService extends CronService {
     }
 
     // Random sleep to distribute requests across multiple GROWI instances
-    // Skip in development/testing via GROWI_SKIP_NEWS_SLEEP=true
-    if (process.env.GROWI_SKIP_NEWS_SLEEP !== 'true') {
-      await randomSleep(MAX_RANDOM_SLEEP_MS);
-    }
+    await randomSleep(MAX_RANDOM_SLEEP_MS);
 
     let feedJson: FeedJson;
     try {
