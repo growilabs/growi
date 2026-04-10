@@ -1,5 +1,5 @@
 import type { IPage, IRevisionHasId, IUserHasId } from '@growi/core';
-import { allOrigin, getIdForRef, Origin } from '@growi/core';
+import { allOrigin, getIdForRef, getIdStringForRef, Origin } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
@@ -121,9 +121,9 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
 
     // Decide if update activity should generate
     try {
-      const targetPageId = updatedPage._id.toString();
-      const currentActivityId = res.locals.activity?._id.toString();
-      const currentUserId = req.user?._id?.toString();
+      const targetPageId = getIdStringForRef(updatedPage);
+      const currentActivityId = getIdStringForRef(res.locals.activity);
+      const currentUserId = req.user ? getIdStringForRef(req.user) : undefined;
 
       const shouldGenerateUpdateActivity = await shouldGenerateUpdate({
         currentUserId,

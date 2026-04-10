@@ -1,4 +1,5 @@
 import type { IRevisionHasId } from '@growi/core';
+import { getIdStringForRef } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { SupportedAction } from '~/interfaces/activity';
@@ -33,7 +34,7 @@ export const shouldGenerateUpdate = async (payload: GenerateUpdatePayload) => {
   }).sort({ createdAt: -1 });
 
   const isLastActivityByMe =
-    lastContentActivity?.user?._id?.toString() === currentUserId;
+    getIdStringForRef(lastContentActivity?.user) === currentUserId;
   const lastActivityTime = lastContentActivity?.createdAt?.getTime?.() ?? 0;
   const timeSinceLastActivityMs = Date.now() - lastActivityTime;
 
