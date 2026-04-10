@@ -141,7 +141,7 @@
   - Test that C-x C-s triggers save in Emacs mode and :w triggers save in Vim mode
   - _Requirements: 1.4, 3.2, 6.1_
 
-- [ ]* 10.3 (P) Add E2E tests for Emacs keybindings
+- [x] 10.3 (P) Add E2E tests for Emacs keybindings
   - Extend the existing Playwright editor test pattern to cover Emacs formatting bindings (C-c C-s b for bold, etc.)
   - Cover at least one structural binding (C-c C-l for link) and one navigation binding (C-c C-n for next heading)
   - _Requirements: 4.1, 5.2, 9.3_
