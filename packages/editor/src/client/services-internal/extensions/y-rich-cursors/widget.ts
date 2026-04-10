@@ -20,6 +20,7 @@ export function createInitialsElement(
   const el = document.createElement('span');
   el.className = 'cm-yRichCursorInitials';
   el.style.backgroundColor = color;
+  el.style.borderColor = color;
   el.textContent = toInitials(name);
   return el;
 }
@@ -81,6 +82,7 @@ export class RichCaretWidget extends WidgetType {
       img.className = 'cm-yRichCursorAvatar';
       img.src = this.imageUrlCached;
       img.alt = this.name;
+      img.style.borderColor = this.color;
       img.onerror = () => {
         const initials = createInitialsElement(this.name, this.color);
         img.replaceWith(initials);

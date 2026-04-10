@@ -378,6 +378,9 @@ describe('Task 12.2 — Off-screen indicator renders for cursor in render buffer
         hasFocus: false,
         viewport: { from: 0, to: content.length },
         visibleRanges: [{ from: 0, to: 5 }],
+        // requestMeasure is a no-op in this unit test; X positioning is
+        // checked separately in integration scenarios.
+        requestMeasure: vi.fn(),
       },
     } as unknown as ViewUpdate;
 

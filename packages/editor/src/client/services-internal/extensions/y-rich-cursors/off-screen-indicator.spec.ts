@@ -11,7 +11,7 @@ import { createOffScreenIndicator } from './off-screen-indicator';
  */
 
 describe('createOffScreenIndicator', () => {
-  it('renders an indicator with an upward arrow for direction "above"', () => {
+  it('renders an indicator with an upward Material Symbol for direction "above"', () => {
     const el = createOffScreenIndicator({
       direction: 'above',
       color: '#ff0000',
@@ -22,10 +22,11 @@ describe('createOffScreenIndicator', () => {
 
     const arrow = el.querySelector('.cm-offScreenArrow');
     expect(arrow).not.toBeNull();
-    expect(arrow?.textContent).toBe('↑');
+    expect(arrow?.textContent).toBe('arrow_drop_up');
+    expect(arrow?.classList.contains('material-symbols-outlined')).toBe(true);
   });
 
-  it('renders an indicator with a downward arrow for direction "below"', () => {
+  it('renders an indicator with a downward Material Symbol for direction "below"', () => {
     const el = createOffScreenIndicator({
       direction: 'below',
       color: '#ff0000',
@@ -35,7 +36,34 @@ describe('createOffScreenIndicator', () => {
     });
 
     const arrow = el.querySelector('.cm-offScreenArrow');
-    expect(arrow?.textContent).toBe('↓');
+    expect(arrow?.textContent).toBe('arrow_drop_down');
+    expect(arrow?.classList.contains('material-symbols-outlined')).toBe(true);
+  });
+
+  it('places the arrow before the avatar for direction "above"', () => {
+    const el = createOffScreenIndicator({
+      direction: 'above',
+      color: '#ff0000',
+      name: 'Alice',
+      imageUrlCached: undefined,
+      isActive: false,
+    });
+    const children = Array.from(el.children);
+    expect(children[0]?.classList.contains('cm-offScreenArrow')).toBe(true);
+    expect(children[1]?.classList.contains('cm-offScreenInitials')).toBe(true);
+  });
+
+  it('places the avatar before the arrow for direction "below"', () => {
+    const el = createOffScreenIndicator({
+      direction: 'below',
+      color: '#ff0000',
+      name: 'Alice',
+      imageUrlCached: undefined,
+      isActive: false,
+    });
+    const children = Array.from(el.children);
+    expect(children[0]?.classList.contains('cm-offScreenInitials')).toBe(true);
+    expect(children[1]?.classList.contains('cm-offScreenArrow')).toBe(true);
   });
 
   it('renders an avatar image when imageUrlCached is provided', () => {
@@ -95,7 +123,7 @@ describe('createOffScreenIndicator', () => {
     expect(el.classList.contains('cm-yRichCursorActive')).toBe(false);
   });
 
-  it('applies border-color from the color parameter', () => {
+  it('applies border-color on the indicator wrapper from the color parameter', () => {
     const el = createOffScreenIndicator({
       direction: 'above',
       color: '#ff0000',
@@ -105,5 +133,53 @@ describe('createOffScreenIndicator', () => {
     });
 
     expect(el.style.borderColor).toBe('#ff0000');
+  });
+
+  it('sets borderColor on the avatar img to the cursor color', () => {
+    const el = createOffScreenIndicator({
+      direction: 'above',
+      color: '#ff0000',
+      name: 'Alice',
+      imageUrlCached: '/avatar.png',
+      isActive: false,
+    });
+
+    const img = el.querySelector(
+      'img.cm-offScreenAvatar',
+    ) as HTMLImageElement | null;
+    expect(img?.style.borderColor).toBe('#ff0000');
+  });
+
+  it('sets borderColor on the initials element to the cursor color', () => {
+    const el = createOffScreenIndicator({
+      direction: 'above',
+      color: '#0000ff',
+      name: 'Alice',
+      imageUrlCached: undefined,
+      isActive: false,
+    });
+
+    const initials = el.querySelector(
+      '.cm-offScreenInitials',
+    ) as HTMLElement | null;
+    expect(initials?.style.borderColor).toBe('#0000ff');
+  });
+
+  it('sets borderColor on the onerror-fallback initials to the cursor color', () => {
+    const el = createOffScreenIndicator({
+      direction: 'below',
+      color: '#00ff00',
+      name: 'Alice',
+      imageUrlCached: '/broken.png',
+      isActive: false,
+    });
+
+    const img = el.querySelector('img.cm-offScreenAvatar') as HTMLImageElement;
+    img.dispatchEvent(new Event('error'));
+
+    const initials = el.querySelector(
+      '.cm-offScreenInitials',
+    ) as HTMLElement | null;
+    expect(initials?.style.borderColor).toBe('#00ff00');
   });
 });

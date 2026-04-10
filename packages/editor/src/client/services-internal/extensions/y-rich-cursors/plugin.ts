@@ -153,8 +153,9 @@ export class YRichCursorsPluginValue {
     }
 
     const decorations: { from: number; to: number; value: Decoration }[] = [];
-    const aboveIndicators: HTMLElement[] = [];
-    const belowIndicators: HTMLElement[] = [];
+    type IndicatorEntry = { el: HTMLElement; headIndex: number };
+    const aboveIndicators: IndicatorEntry[] = [];
+    const belowIndicators: IndicatorEntry[] = [];
     const localClientId = this.awareness.doc.clientID;
 
     const visibleRanges = viewUpdate.view.visibleRanges;
@@ -245,27 +246,29 @@ export class YRichCursorsPluginValue {
       // Classify: off-screen (above/below) or in-viewport
       if (rangedMode) {
         if (headIndex < vpFrom) {
-          aboveIndicators.push(
-            createOffScreenIndicator({
+          aboveIndicators.push({
+            el: createOffScreenIndicator({
               direction: 'above',
               color: editors.color,
               name: editors.name,
               imageUrlCached: editors.imageUrlCached,
               isActive,
             }),
-          );
+            headIndex,
+          });
           return;
         }
         if (headIndex > vpTo) {
-          belowIndicators.push(
-            createOffScreenIndicator({
+          belowIndicators.push({
+            el: createOffScreenIndicator({
               direction: 'below',
               color: editors.color,
               name: editors.name,
               imageUrlCached: editors.imageUrlCached,
               isActive,
             }),
-          );
+            headIndex,
+          });
           return;
         }
       } else {
@@ -280,27 +283,29 @@ export class YRichCursorsPluginValue {
         const cursorBottom = scrollDOMTop + lineBlock.bottom - scrollTop;
 
         if (cursorBottom < screenVisibleTop) {
-          aboveIndicators.push(
-            createOffScreenIndicator({
+          aboveIndicators.push({
+            el: createOffScreenIndicator({
               direction: 'above',
               color: editors.color,
               name: editors.name,
               imageUrlCached: editors.imageUrlCached,
               isActive,
             }),
-          );
+            headIndex,
+          });
           return;
         }
         if (cursorTop > screenVisibleBottom) {
-          belowIndicators.push(
-            createOffScreenIndicator({
+          belowIndicators.push({
+            el: createOffScreenIndicator({
               direction: 'below',
               color: editors.color,
               name: editors.name,
               imageUrlCached: editors.imageUrlCached,
               isActive,
             }),
-          );
+            headIndex,
+          });
           return;
         }
       }
@@ -337,7 +342,38 @@ export class YRichCursorsPluginValue {
     });
 
     this.decorations = Decoration.set(decorations, true);
-    this.topContainer.replaceChildren(...aboveIndicators);
-    this.bottomContainer.replaceChildren(...belowIndicators);
+    this.topContainer.replaceChildren(...aboveIndicators.map(({ el }) => el));
+    this.bottomContainer.replaceChildren(
+      ...belowIndicators.map(({ el }) => el),
+    );
+
+    // Position each indicator horizontally at the remote cursor's column.
+    // coordsAtPos reads layout so it must be deferred to the measure phase.
+    const allIndicators = [...aboveIndicators, ...belowIndicators];
+    if (allIndicators.length > 0) {
+      viewUpdate.view.requestMeasure({
+        read: (view) => {
+          const editorLeft = view.dom.getBoundingClientRect().left;
+          return allIndicators.map(({ headIndex: hi }) => {
+            const coords = view.coordsAtPos(hi, 1);
+            if (coords != null) {
+              return coords.left - editorLeft;
+            }
+            // Fallback for virtualised positions (outside CodeMirror's viewport)
+            const line = view.state.doc.lineAt(hi);
+            const col = hi - line.from;
+            const contentLeft =
+              view.contentDOM.getBoundingClientRect().left - editorLeft;
+            return contentLeft + col * view.defaultCharacterWidth;
+          });
+        },
+        write: (positions) => {
+          allIndicators.forEach(({ el }, i) => {
+            el.style.left = `${positions[i]}px`;
+            el.style.transform = 'translateX(-50%)';
+          });
+        },
+      });
+    }
   }
 }

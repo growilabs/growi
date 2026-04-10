@@ -137,19 +137,21 @@ sequenceDiagram
 | 3.2 | Avatar size (`AVATAR_SIZE` in `theme.ts`) | `yRichCursors` | `RichCaretWidget.toDOM()` — CSS sizing via shared token |
 | 3.3 | Name label visible on hover only | `yRichCursors` | CSS `:hover` on `.cm-yRichCursorFlag` |
 | 3.4 | Avatar image with initials fallback | `yRichCursors` | `RichCaretWidget.toDOM()` — `<img>` onerror → initials |
-| 3.5 | Cursor caret and fallback color from `state.editors.color` | `yRichCursors` | `RichCaretWidget` constructor |
+| 3.5 | Cursor caret color, fallback background, and avatar border from `state.editors.color` | `yRichCursors` | `RichCaretWidget` constructor + `borderColor` inline style |
 | 3.6 | Custom cursor via replacement plugin | `yRichCursors` replaces `yRemoteSelections` | `yCollab(activeText, null, { undoManager })` |
 | 3.7 | Cursor updates on awareness change | `yRichCursors` awareness change listener | `awareness.on('change', ...)` |
 | 3.8 | Default semi-transparent avatar | `yRichCursors` | CSS `opacity` on `.cm-yRichCursorFlag` |
 | 3.9 | Full opacity on hover | `yRichCursors` | CSS `:hover` rule |
 | 3.10 | Full opacity during active editing (3s) | `yRichCursors` | `lastActivityMap` + `.cm-yRichCursorActive` class + `setTimeout` |
-| 4.1 | Off-screen indicator pinned to top edge (↑) | `yRichCursors` | `offScreenContainer` top overlay |
-| 4.2 | Off-screen indicator pinned to bottom edge (↓) | `yRichCursors` | `offScreenContainer` bottom overlay |
-| 4.3 | No indicator when cursor is in viewport | `yRichCursors` | `visibleRanges` comparison in `update()` |
+| 4.1 | Off-screen indicator at top edge with `arrow_drop_up` above avatar | `yRichCursors` | `topContainer` + Material Symbol icon |
+| 4.2 | Off-screen indicator at bottom edge with `arrow_drop_down` below avatar | `yRichCursors` | `bottomContainer` + Material Symbol icon |
+| 4.3 | No indicator when cursor is in viewport | `yRichCursors` | multi-mode classification in `update()` (rangedMode / coords mode) |
 | 4.4 | Same avatar/color as in-editor widget | `yRichCursors` | shared `state.editors` data |
-| 4.5 | Multiple indicators side by side | `yRichCursors` | horizontal flex layout |
-| 4.6 | Transition on scroll (indicator ↔ widget) | `yRichCursors` | `visibleRanges` check in `update()` |
+| 4.5 | Indicators positioned at cursor's column | `yRichCursors` | `requestMeasure` → `coordsAtPos` → `left: Xpx; transform: translateX(-50%)` |
+| 4.6 | Transition on scroll (indicator ↔ widget) | `yRichCursors` | classification re-run on every `update()` |
 | 4.7 | Overlay positioning (no layout impact) | `yRichCursors` | `position: absolute` on `view.dom` |
+| 4.8 | Indicator X position derived from cursor column | `yRichCursors` | `view.coordsAtPos` (measure phase) or char-width fallback |
+| 4.9 | Arrow always fully opaque in cursor color; avatar fades when idle | `yRichCursors` | `opacity: 1` on `.cm-offScreenArrow`; `opacity: IDLE_OPACITY` on avatar/initials |
 
 ## Components and Interfaces
 
@@ -262,7 +264,8 @@ Invariants:
 <span class="cm-yRichCaret" style="border-color: {color}">
   ⁠ <!-- Word Joiner (\u2060): inherits line font-size so caret height follows headers -->
   <span class="cm-yRichCursorFlag [cm-yRichCursorActive]">
-    <img class="cm-yRichCursorAvatar" />  OR  <span class="cm-yRichCursorInitials" />
+    <img class="cm-yRichCursorAvatar" style="border-color: {color}" />
+      OR  <span class="cm-yRichCursorInitials" style="background-color: {color}; border-color: {color}" />
     <span class="cm-yRichCursorInfo" style="background-color: {color}">{name}</span>
   </span>
 </span>
@@ -274,8 +277,9 @@ Key design decisions:
 - **Caret**: Both-side 1px borders with negative margins (zero layout width). Modeled after `yRemoteSelectionsTheme` in `y-codemirror.next`.
 - **Overlay flag**: `position: absolute; top: 100%` below the caret. Always hoverable (no `pointer-events: none`), so the avatar is a direct hover target.
 - **Name label**: Positioned at `left: 0; z-index: -1` (behind the avatar). Left border-radius matches the avatar circle, creating a tab shape that flows from the avatar. Left padding clears the avatar width. Shown on `.cm-yRichCursorFlag:hover`.
-- **Opacity**: Semi-transparent at idle, full on hover or when `.cm-yRichCursorActive` is present (3-second activity window).
-- **Design tokens**: `AVATAR_SIZE` and `IDLE_OPACITY` are defined as constants at the top of `theme.ts` and shared across all cursor/off-screen styles.
+- **Opacity**: `cm-yRichCursorFlag` carries `opacity: IDLE_OPACITY` and transitions to `opacity: 1` on hover or `.cm-yRichCursorActive` (3-second activity window).
+- **Avatar border**: `1.5px solid` border in the cursor's `color` with `box-sizing: border-box` so the 20×20 outer size is preserved. Applied via inline `style.borderColor` in `toDOM()` / `createInitialsElement()`.
+- **Design tokens**: `AVATAR_SIZE = '20px'` and `IDLE_OPACITY = '0.6'` are defined at the top of `theme.ts` and shared across all cursor/off-screen styles.
 
 **Design decision — CSS-only, no React**: The overlay, sizing, and hover behavior are achievable with `position: absolute` and `:hover`. `document.createElement` in `toDOM()` avoids React's async rendering overhead and context isolation.
 
@@ -295,28 +299,52 @@ Selection highlight: `Decoration.mark` on selected range with `background-color:
 
 ##### Off-Screen Cursor Indicators
 
-When a remote cursor's absolute position falls outside the actually visible content range (`view.visibleRanges`), the ViewPlugin renders an off-screen indicator instead of a widget decoration. Note: `view.viewport` includes CodeMirror's pre-render buffer and must NOT be used for visibility classification — `view.visibleRanges` returns only the ranges the user can actually see.
+When a remote cursor's absolute position falls outside the actually visible viewport, the ViewPlugin renders an off-screen indicator instead of a widget decoration.
 
-**DOM management**: The ViewPlugin creates two persistent container elements (`topContainer`, `bottomContainer`) and appends them to `view.dom` in the `constructor`. They are removed in `destroy()`. The containers are always present in the DOM but empty (zero height) when no off-screen cursors exist in that direction.
+**Viewport classification — multi-mode strategy**: Because `view.visibleRanges` and `view.viewport` are equal in GROWI's page-scroll editor setup (the editor expands to full content height; the browser page handles scrolling), a single character-position comparison is insufficient. The plugin uses three modes, chosen once per `update()` call:
+
+| Mode | Condition | Method |
+|------|-----------|--------|
+| **rangedMode** | `visibleRanges` is a non-empty, non-trivial sub-range of `viewport` (internal-scroll editor, or jsdom tests with styled heights) | Compare `headIndex` against `visibleRanges[0].from` / `visibleRanges[last].to` |
+| **coords mode** | `visibleRanges == viewport` AND `scrollDOM.getBoundingClientRect().height > 0` (GROWI's page-scroll production setup) | `lineBlockAt(headIndex)` + `scrollDOMRect.top` vs `window.innerHeight` |
+| **degenerate** | `scrollRect.height == 0` (jsdom with 0-height container) | No off-screen classification; every cursor gets a widget decoration |
+
+`view.lineBlockAt()` reads stored height-map data (safe to call in `update()`). `scrollDOM.getBoundingClientRect()` is a raw DOM call, not restricted by CodeMirror's "Reading the editor layout isn't allowed during an update" guard.
+
+**DOM management**: The ViewPlugin creates two persistent container elements (`topContainer`, `bottomContainer`) and appends them to `view.dom` in the `constructor`. They are removed in `destroy()`. The containers are always present in the DOM but empty when no off-screen cursors exist in that direction.
 
 ```
 view.dom (position: relative — already set by CodeMirror)
 ├── .cm-scroller (managed by CM)
 │   └── .cm-content ...
-├── .cm-offScreenTop    ← topContainer (absolute, top: 0)
-│   ├── .cm-offScreenIndicator (Alice ↑)
-│   └── .cm-offScreenIndicator (Bob ↑)
-└── .cm-offScreenBottom ← bottomContainer (absolute, bottom: 0)
-    └── .cm-offScreenIndicator (Charlie ↓)
+├── .cm-offScreenTop    ← topContainer (absolute, top: 0, height: AVATAR_SIZE + 14px)
+│   ├── .cm-offScreenIndicator  style="left: {colX}px; transform: translateX(-50%)"
+│   │   ├── .cm-offScreenArrow (material-symbols-outlined) — "arrow_drop_up"
+│   │   └── .cm-offScreenAvatar / .cm-offScreenInitials
+│   └── .cm-offScreenIndicator  (another user, different column)
+└── .cm-offScreenBottom ← bottomContainer (absolute, bottom: 0, height: AVATAR_SIZE + 14px)
+    └── .cm-offScreenIndicator  style="left: {colX}px; transform: translateX(-50%)"
+        ├── .cm-offScreenAvatar / .cm-offScreenInitials
+        └── .cm-offScreenArrow (material-symbols-outlined) — "arrow_drop_down"
 ```
 
-**Indicator DOM structure**: Arrow (`↑` / `↓`) + avatar image (or initials fallback). Built by `createOffScreenIndicator()` in `off-screen-indicator.ts`. Sizing uses the same `AVATAR_SIZE` token from `theme.ts`. Opacity follows the same idle/active pattern as in-editor widgets.
+**Indicator DOM structure** (built by `createOffScreenIndicator()` in `off-screen-indicator.ts`):
+- **above**: `[arrow_drop_up icon][avatar or initials]` stacked vertically (flex-column)
+- **below**: `[avatar or initials][arrow_drop_down icon]` stacked vertically (flex-column)
+- Arrow element: `<span class="material-symbols-outlined cm-offScreenArrow" style="color: {color}">arrow_drop_up</span>` — font loaded via `var(--grw-font-family-material-symbols-outlined)` (Next.js-registered Material Symbols Outlined)
+- Avatar: same `borderColor`, `AVATAR_SIZE`, and onerror→initials fallback as in-editor widget
+- Opacity: arrow always `opacity: 1`; avatar/initials use `IDLE_OPACITY` → `1` via `.cm-yRichCursorActive` on the indicator
+
+**Horizontal positioning** (deferred to measure phase):
+After `replaceChildren()`, the plugin calls `view.requestMeasure()`:
+- **read phase**: for each indicator, call `view.coordsAtPos(headIndex, 1)` to get screen X. If null (virtualized position), fall back to `contentDOM.getBoundingClientRect().left + col * view.defaultCharacterWidth`.
+- **write phase**: set `indicator.style.left = Xpx` and `indicator.style.transform = 'translateX(-50%)'` to center the indicator on the cursor column.
 
 **Update cycle**:
-1. In the `update(viewUpdate)` method, after computing absolute positions for all remote cursors, classify each into: `inViewport`, `above`, or `below` based on comparison with `view.visibleRanges` (first range's `from` for top boundary, last range's `to` for bottom boundary)
-2. For `inViewport` cursors: create `Decoration.widget` (same as current behavior)
-3. For `above` / `below` cursors: rebuild `topContainer` / `bottomContainer` children via `replaceChildren()` — clear old indicator elements and append new ones
-4. Containers are rebuilt on every update where `viewportChanged` is true OR awareness has changed (same trigger as decoration rebuild)
+1. Classify all remote cursors (mode-dependent: rangedMode/coords/degenerate)
+2. Build `aboveIndicators: {el, headIndex}[]` and `belowIndicators: {el, headIndex}[]`
+3. `topContainer.replaceChildren(...aboveIndicators.map(i => i.el))`; same for bottom
+4. If any indicators exist, call `view.requestMeasure()` to set horizontal positions
 5. Cursors that lack `state.cursor` or `state.editors` are excluded from both in-view and off-screen rendering
 
 **Implementation Notes**

@@ -40,6 +40,9 @@ export const richCursorsTheme = EditorView.baseTheme({
     height: AVATAR_SIZE,
     borderRadius: '50%',
     display: 'block',
+    borderStyle: 'solid',
+    borderWidth: '1.5px',
+    boxSizing: 'border-box',
   },
 
   // Initials fallback
@@ -53,6 +56,9 @@ export const richCursorsTheme = EditorView.baseTheme({
     color: 'white',
     fontSize: '9px',
     fontWeight: 'bold',
+    borderStyle: 'solid',
+    borderWidth: '1.5px',
+    boxSizing: 'border-box',
   },
 
   // Name label — hidden by default, shown on hover.
@@ -76,13 +82,12 @@ export const richCursorsTheme = EditorView.baseTheme({
   },
 
   // --- Off-screen containers ---
+  // Height = avatar + compact arrow with no extra padding.
   '.cm-offScreenTop, .cm-offScreenBottom': {
     position: 'absolute',
     left: '0',
     right: '0',
-    display: 'flex',
-    gap: '4px',
-    padding: '2px 4px',
+    height: `calc(${AVATAR_SIZE} + 14px)`,
     pointerEvents: 'none',
     zIndex: '10',
   },
@@ -93,25 +98,38 @@ export const richCursorsTheme = EditorView.baseTheme({
     bottom: '0',
   },
 
-  // Off-screen indicator
+  // Off-screen indicator — absolutely positioned; left/transform set by plugin
+  // via requestMeasure to reflect the remote cursor's column position.
+  // Opacity is intentionally NOT set here — it lives on the avatar/initials only
+  // so the arrow always renders fully opaque (CSS opacity cannot be "cancelled"
+  // on children; mixing opaque arrow + faded avatar requires separate rules).
   '.cm-offScreenIndicator': {
+    position: 'absolute',
+    top: '0',
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: '2px',
-    opacity: IDLE_OPACITY,
-    transition: 'opacity 0.3s ease',
   },
-  '.cm-offScreenIndicator.cm-yRichCursorActive': {
+
+  // Arrow — always fully opaque; cursor color applied via inline style in JS.
+  '.cm-offScreenArrow': {
+    fontFamily: 'var(--grw-font-family-material-symbols-outlined)',
+    fontSize: '14px',
+    lineHeight: '1',
+    userSelect: 'none',
     opacity: '1',
   },
-  '.cm-offScreenArrow': {
-    fontSize: '10px',
-    lineHeight: '1',
-  },
+
+  // Avatar and initials fade when idle; full opacity when active.
   '.cm-offScreenAvatar': {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: '50%',
+    borderStyle: 'solid',
+    borderWidth: '1.5px',
+    boxSizing: 'border-box',
+    opacity: IDLE_OPACITY,
+    transition: 'opacity 0.3s ease',
   },
   '.cm-offScreenInitials': {
     width: AVATAR_SIZE,
@@ -123,5 +141,14 @@ export const richCursorsTheme = EditorView.baseTheme({
     color: 'white',
     fontSize: '9px',
     fontWeight: 'bold',
+    borderStyle: 'solid',
+    borderWidth: '1.5px',
+    boxSizing: 'border-box',
+    opacity: IDLE_OPACITY,
+    transition: 'opacity 0.3s ease',
   },
+  '.cm-offScreenIndicator.cm-yRichCursorActive .cm-offScreenAvatar, .cm-offScreenIndicator.cm-yRichCursorActive .cm-offScreenInitials':
+    {
+      opacity: '1',
+    },
 });

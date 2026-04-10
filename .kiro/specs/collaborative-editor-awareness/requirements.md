@@ -44,10 +44,10 @@ GROWI's collaborative editor uses Yjs awareness protocol to track which users ar
 #### Acceptance Criteria
 
 1. While multiple users are editing the same page, the Collaborative Editor Client shall render each remote user's cursor with a profile image (avatar) positioned directly below the caret line, as an overlay that does not consume block space in the editor content flow.
-2. The avatar overlay size shall be 16×16 CSS pixels (circular), smaller than `EditingUserList` to minimize interference with editor content.
+2. The avatar overlay size shall be 20×20 CSS pixels (circular), smaller than `EditingUserList` to minimize interference with editor content.
 3. While hovering over the avatar overlay, the Collaborative Editor Client shall display the user's display name in a tooltip-like label adjacent to the avatar. When not hovered, the name label shall be hidden.
 4. When `imageUrlCached` is available in the remote user's awareness state, the avatar shall display that image. If `imageUrlCached` is unavailable or fails to load, the avatar shall fall back to the user's initials rendered in a colored circle.
-5. The cursor caret color and avatar fallback background color shall match the `color` value from the user's awareness state, consistent with the color shown in `EditingUserList`.
+5. The cursor caret color, avatar fallback background color, and avatar border color shall all match the `color` value from the user's awareness state, consistent with the color shown in `EditingUserList`. A colored circular border (matching `color`) shall be applied to both avatar images and initials circles to visually associate the avatar with the cursor.
 6. The Collaborative Editor Client shall suppress the default cursor plugin by passing `null` as the awareness argument to `yCollab` (from `y-codemirror.next`), and use the separate `yRichCursors` extension for cursor rendering.
 7. When a user's awareness state changes (e.g., cursor moves), the Collaborative Editor Client shall re-render that user's cursor with up-to-date information without re-mounting the entire cursor set.
 8. The avatar overlay shall be rendered at reduced opacity (semi-transparent) by default to minimize visual distraction.
@@ -60,10 +60,12 @@ GROWI's collaborative editor uses Yjs awareness protocol to track which users ar
 
 #### Acceptance Criteria
 
-1. When a remote user's cursor is positioned above the current visible viewport, the Collaborative Editor Client shall display that user's avatar icon pinned to the top edge of the editor, accompanied by an upward arrow (↑), indicating the user is editing above the visible area.
-2. When a remote user's cursor is positioned below the current visible viewport, the Collaborative Editor Client shall display that user's avatar icon pinned to the bottom edge of the editor, accompanied by a downward arrow (↓), indicating the user is editing below the visible area.
+1. When a remote user's cursor is positioned above the current visible viewport, the Collaborative Editor Client shall display that user's avatar icon pinned to the top edge of the editor. A `arrow_drop_up` Material Symbol icon (in the cursor's color) shall be stacked above the avatar to indicate the user is editing above the visible area.
+2. When a remote user's cursor is positioned below the current visible viewport, the Collaborative Editor Client shall display that user's avatar icon pinned to the bottom edge of the editor. A `arrow_drop_down` Material Symbol icon (in the cursor's color) shall be stacked below the avatar to indicate the user is editing below the visible area.
 3. When a remote user's cursor is within the visible viewport, no off-screen indicator shall be shown for that user (the in-editor cursor widget from Requirement 3 is shown instead).
 4. The off-screen indicator shall use the same avatar image (or initials fallback) and color as the in-editor cursor widget, maintaining visual consistency.
-5. When multiple remote users are off-screen in the same direction (above or below), their indicators shall be displayed side by side (horizontally) at the corresponding edge of the editor.
+5. When multiple remote users are off-screen in the same direction (above or below), each indicator shall be independently positioned horizontally to reflect its remote cursor's column position in the document. Indicators at different columns appear at different horizontal positions within the container.
 6. When the user scrolls and a previously off-screen cursor enters the viewport, the off-screen indicator for that user shall be removed and the in-editor cursor widget shall appear instead. Conversely, when a previously visible cursor leaves the viewport due to scrolling, an off-screen indicator shall appear.
 7. The off-screen indicators shall be rendered as overlays (absolute positioning within the editor container) and shall not affect the editor's scroll height or content layout.
+8. The horizontal position of each off-screen indicator shall reflect the remote cursor's column position in the document. The `left` CSS value of the indicator shall be derived from the cursor's screen X coordinate (via `view.coordsAtPos` in the measure phase) or, for virtualized positions, approximated using character-width estimation. The indicator shall be centered on the cursor column (`transform: translateX(-50%)`).
+9. The direction arrow icon of the off-screen indicator shall always be rendered at full opacity (1.0) in the cursor's color, regardless of the idle/active state. Only the avatar image or initials element shall fade to reduced opacity (`IDLE_OPACITY`) when the user is idle, and return to full opacity when active.

@@ -53,6 +53,28 @@ describe('RichCaretWidget', () => {
       expect(img?.alt).toBe('Alice');
     });
 
+    it('sets borderColor on the avatar img to the cursor color', () => {
+      const widget = new RichCaretWidget(
+        opts({ color: '#ff0000', imageUrlCached: '/avatar.png' }),
+      );
+      const dom = widget.toDOM();
+
+      const img = dom.querySelector(
+        'img.cm-yRichCursorAvatar',
+      ) as HTMLImageElement | null;
+      expect(img?.style.borderColor).toBe('#ff0000');
+    });
+
+    it('sets borderColor on the initials element to the cursor color', () => {
+      const widget = new RichCaretWidget(opts({ color: '#00ff00' }));
+      const dom = widget.toDOM();
+
+      const initials = dom.querySelector(
+        '.cm-yRichCursorInitials',
+      ) as HTMLElement | null;
+      expect(initials?.style.borderColor).toBe('#00ff00');
+    });
+
     it('does NOT render an img element when imageUrlCached is undefined', () => {
       const widget = new RichCaretWidget(opts());
       const dom = widget.toDOM();
@@ -98,9 +120,12 @@ describe('RichCaretWidget', () => {
       img.dispatchEvent(new Event('error'));
 
       expect(dom.querySelector('img.cm-yRichCursorAvatar')).toBeNull();
-      const initials = dom.querySelector('.cm-yRichCursorInitials');
+      const initials = dom.querySelector(
+        '.cm-yRichCursorInitials',
+      ) as HTMLElement | null;
       expect(initials).not.toBeNull();
       expect(initials?.textContent).toBe('B');
+      expect(initials?.style.borderColor).toBe('#0000ff');
     });
 
     it('renders a name label inside the flag container', () => {
