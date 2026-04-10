@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
+import { useGrowiDocumentationUrl } from '~/states/context';
 import {
   useShortcutsModalActions,
   useShortcutsModalStatus,
@@ -16,6 +17,8 @@ import styles from './ShortcutsModal.module.scss';
 const ShortcutsModalSubstance = (): React.JSX.Element => {
   const { t, i18n } = useTranslation();
   const { close } = useShortcutsModalActions();
+  const documentationUrl = useGrowiDocumentationUrl();
+  const langCode = i18n.language?.startsWith('ja') ? 'ja' : 'en';
 
   // Memoize OS-specific class
   const additionalClassByOs = useMemo(() => {
@@ -516,7 +519,7 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
         {bodyContent}
         <div className="mt-4 ps-3">
           <a
-            href={`https://docs.growi.org/${i18n.language?.startsWith('ja') ? 'ja' : 'en'}/guide/features/shortcut-keys`}
+            href={`${documentationUrl}/${langCode}/guide/features/shortcut-keys`}
             target="_blank"
             rel="noreferrer"
             className="d-inline-flex align-items-center gap-2 px-3 py-2 border border-2 rounded text-secondary text-decoration-none"
