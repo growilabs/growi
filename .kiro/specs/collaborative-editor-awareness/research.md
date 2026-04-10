@@ -8,11 +8,15 @@
 ## Summary
 
 - **Feature**: `collaborative-editor-awareness`
-- **Discovery Scope**: Extension (existing collaborative editor system)
-- **Key Findings**:
+- **Discovery Scope**: Extension (existing collaborative editor system); Phase 2 adds Requirements 5 & 6 (color-matched avatars + click-to-scroll)
+- **Key Findings** (original):
   - `y-codemirror.next@0.3.5` reads `state.user` for cursor info, but GROWI sets `state.editors` — causing all cursors to render as "Anonymous" with default blue color today
   - `yCollab` in v0.3.5 does NOT support a `cursorBuilder` option; the cursor DOM is hardcoded in `YRemoteCaretWidget`
   - `awareness.getStates().delete(clientId)` in the current `updateAwarenessHandler` is an incorrect direct mutation of Yjs-managed internal state; Yjs removes stale entries before emitting `update`
+- **Key Findings** (Phase 2):
+  - `UserPicture` (`@growi/ui`) does not accept a `style` prop; dynamic border colors require a wrapper element approach
+  - `packages/editor` cannot import from `apps/app`; callback props (`onScrollToRemoteCursorReady`) are used to cross the package boundary
+  - `EditorView.scrollIntoView(pos, { y: 'center' })` (CodeMirror built-in) is sufficient for the scroll-to-cursor feature; no new dependencies required
 
 ## Research Log
 
@@ -134,9 +138,30 @@
 - **Finding**: `view.coordsAtPos()` cannot be called during `update()` (throws "Reading the editor layout" error). Horizontal positioning must be deferred.
 - **Solution**: After `replaceChildren()`, call `view.requestMeasure()` to schedule a read phase (`coordsAtPos` → screen X) and write phase (`style.left` + `transform: translateX(-50%)`). For virtualized positions (outside viewport), fall back to `contentDOM.getBoundingClientRect().left + col * view.defaultCharacterWidth`.
 
+### Phase 2 — Color-Matched Avatars & Click-to-Scroll
+
+#### UserPicture Style API Analysis
+
+- **Context**: Requirement 5.1 requires setting the border color of `UserPicture` avatars dynamically per user.
+- **Findings**: `UserPicture.tsx` in `packages/ui/src/components/UserPicture.tsx` accepts only `{ user, size, noLink, noTooltip, className }`. The `className` is applied to the `<img>` element (not the root `<span>`). There is no `style` prop forwarded to either element.
+- **Implications**: Cannot set `borderColor` via `UserPicture`'s own props. Must wrap in a parent element with an inline `border` style. The `border border-info` className on `UserPicture` is removed; the wrapper element provides the colored border.
+
+#### Cross-Package Callback Pattern
+
+- **Context**: `use-collaborative-editor-mode` (in `packages/editor`) needs to provide a scroll function to `EditingUserList` (in `apps/app`). Direct import from `apps/app` → `packages/editor` is the existing direction; reverse import is prohibited.
+- **Findings**: The existing `onEditorsUpdated` callback in `Configuration` follows exactly this pattern: `packages/editor` calls a callback provided by `apps/app`. The same pattern is appropriate for `onScrollToRemoteCursorReady`.
+- **Implications**: No new dependency or architectural mechanism needed; extend `Configuration` type with the new callback.
+
+#### CodeMirror Scroll API
+
+- **Context**: How to programmatically scroll the editor to a specific character position.
+- **Findings**: `EditorView.scrollIntoView(pos: number, options?: { y?: 'nearest' | 'start' | 'end' | 'center' })` is the standard CodeMirror API. Dispatching `{ effects: EditorView.scrollIntoView(pos, { y: 'center' }) }` scrolls the editor so the position is vertically centered. No additional plugins or dependencies required.
+- **Implications**: Scroll is a one-liner dispatch; no new package dependencies. The position is resolved from `Y.createAbsolutePositionFromRelativePosition(cursor.head, ydoc)` which is already used in `plugin.ts`.
+
 ## References
 
 - y-codemirror.next v0.3.5 source: `node_modules/.pnpm/y-codemirror.next@0.3.5_.../src/`
 - Yjs awareness protocol: https://docs.yjs.dev/api/about-awareness
 - CodeMirror WidgetType: https://codemirror.net/docs/ref/#view.WidgetType
 - CodeMirror EditorView.lineBlockAt: https://codemirror.net/docs/ref/#view.EditorView.lineBlockAt
+- CodeMirror EditorView.scrollIntoView: https://codemirror.net/docs/ref/#view.EditorView^scrollIntoView

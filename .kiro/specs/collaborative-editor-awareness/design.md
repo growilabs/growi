@@ -55,6 +55,7 @@ graph TB
         CM[CodeMirrorEditorMain]
         EUL[EditingUserList]
         ATOM[editingClientsAtom - Jotai]
+        ATOM2[scrollToRemoteCursorAtom - Jotai]
     end
 
     CM --> COLLAB
@@ -67,6 +68,8 @@ graph TB
     RICH -->|viewport comparison| RICH
     COLLAB -->|filtered clientList| ATOM
     ATOM --> EUL
+    COLLAB -->|onScrollToRemoteCursorReady| ATOM2
+    ATOM2 -->|onUserClick| EUL
 ```
 
 **Key architectural properties**:
@@ -85,6 +88,30 @@ graph TB
 | Awareness | `y-websocket` `awareness` object | State read (`getStates`) and write (`setLocalStateField`) | `Awareness` type derived via `WebsocketProvider['awareness']` — `y-protocols` is not a direct dependency |
 
 ## System Flows
+
+### Click-to-Scroll Flow (Requirement 6)
+
+```mermaid
+sequenceDiagram
+    participant EUL as EditingUserList
+    participant ATOM2 as scrollToRemoteCursorAtom
+    participant HOOK as use-collaborative-editor-mode
+    participant AW as provider.awareness
+    participant CM as CodeMirror EditorView
+
+    EUL->>ATOM2: onUserClick(clientId)
+    ATOM2->>HOOK: scrollFn(clientId)
+    HOOK->>AW: getStates().get(clientId)
+    AW-->>HOOK: AwarenessState { cursor.head }
+    Note over HOOK: cursor.head == null → return (no-op)
+    HOOK->>HOOK: createAbsolutePositionFromRelativePosition(head, activeDoc)
+    HOOK->>CM: view.dispatch(EditorView.scrollIntoView(pos.index, { y: 'center' }))
+```
+
+**Key design decisions**:
+- `scrollFn` closes over `codeMirrorEditor` (accessed lazily via `codeMirrorEditor?.view` at call time, not capture time) so late-mounted editors are handled correctly.
+- `activeDoc` (Y.Doc) is captured in the same effect that creates `scrollFn`; the function is invalidated and recreated whenever `activeDoc` or `provider` changes.
+- If `cursor.head` is absent (user connected but not focused), the click is silently ignored per requirement 6.3.
 
 ### Awareness Update → EditingUserList
 
@@ -152,13 +179,24 @@ sequenceDiagram
 | 4.7 | Overlay positioning (no layout impact) | `yRichCursors` | `position: absolute` on `view.dom` |
 | 4.8 | Indicator X position derived from cursor column | `yRichCursors` | `view.coordsAtPos` (measure phase) or char-width fallback |
 | 4.9 | Arrow always fully opaque in cursor color; avatar fades when idle | `yRichCursors` | `opacity: 1` on `.cm-offScreenArrow`; `opacity: IDLE_OPACITY` on avatar/initials |
+| 5.1 | Avatar border color = `editingClient.color` (replaces fixed `border-info`) | `EditingUserList` | Wrapper `<span>` with `style={{ border: '2px solid {color}', borderRadius: '50%' }}` |
+| 5.2 | Border weight equivalent to existing border | `EditingUserList` | 2 px solid, same as Bootstrap `border` baseline |
+| 5.3 | Color-matched border in overflow popover | `EditingUserList` | Replace `UserPictureList` with inline rendering sharing the same wrapper pattern |
+| 6.1 | Click avatar → editor scrolls to that user's cursor | `EditingUserList` + `use-collaborative-editor-mode` | `onUserClick(clientId)` → `scrollFn` → `view.dispatch(scrollIntoView)` |
+| 6.2 | Scroll centers cursor vertically | `use-collaborative-editor-mode` | `EditorView.scrollIntoView(pos, { y: 'center' })` |
+| 6.3 | No-op when cursor absent from awareness | `use-collaborative-editor-mode` | Guard: `cursor?.head == null → return` |
+| 6.4 | `cursor: pointer` on each avatar | `EditingUserList` | CSS `cursor: pointer` on the clickable wrapper element |
+| 6.5 | Overflow popover avatars also support click-to-scroll | `EditingUserList` | Inline rendering in popover body shares same `onUserClick` prop |
 
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0) | Contracts |
 |-----------|--------------|--------|--------------|----------------------|-----------|
-| `use-collaborative-editor-mode` | packages/editor — Hook | Fix awareness filter bug; compose extensions with rich cursor | 1.1–1.4, 2.1, 2.4 | `yCollab` (P0), `yRichCursors` (P0) | State |
+| `use-collaborative-editor-mode` | packages/editor — Hook | Fix awareness filter bug; compose extensions with rich cursor; expose scroll-to-remote-cursor callback | 1.1–1.4, 2.1, 2.4, 6.1–6.3 | `yCollab` (P0), `yRichCursors` (P0) | State |
 | `yRichCursors` | packages/editor — Extension | Custom ViewPlugin: broadcasts local cursor position, renders in-viewport cursors with overlay avatar+hover name+activity opacity, renders off-screen indicators at editor edges | 3.1–3.10, 4.1–4.7 | `@codemirror/view` (P0), `y-websocket awareness` (P0) | Service |
+| `CodeMirrorEditorMain` | packages/editor — Component | Bridge: passes `onScrollToRemoteCursorReady` prop from apps/app into `useCollaborativeEditorMode` | 6.1 | `useCollaborativeEditorMode` (P0) | State |
+| `scrollToRemoteCursorAtom` | apps/app — Jotai atom | Stores the scroll callback registered by `useCollaborativeEditorMode`; read by EditorNavbar | 6.1 | `jotai` (P0) | State |
+| `EditingUserList` | apps/app — Component | Renders active editor avatars with color-matched borders; handles click-to-scroll | 5.1–5.3, 6.1, 6.4–6.5 | `EditingClient[]` (P0) | View |
 
 ### packages/editor — Hook
 
@@ -167,17 +205,19 @@ sequenceDiagram
 | Field | Detail |
 |-------|--------|
 | Intent | Orchestrates WebSocket provider, awareness, and CodeMirror extension lifecycle for collaborative editing |
-| Requirements | 1.1, 1.2, 1.3, 1.4, 2.1, 2.4 |
+| Requirements | 1.1, 1.2, 1.3, 1.4, 2.1, 2.4, 6.1–6.3 |
 
 **Responsibilities & Constraints**
 - Filters `undefined` awareness entries before calling `onEditorsUpdated`
 - Does not mutate `awareness.getStates()` directly
 - Composes `yCollab(null)` + `yRichCursors(awareness)` to achieve text-sync, undo, and rich cursor rendering without the default `yRemoteSelections` plugin
+- Creates and registers a `scrollFn` callback (requirement 6) that resolves a remote user's cursor position and dispatches a CodeMirror scroll effect
 
 **Dependencies**
 - Outbound: `yCollab` from `y-codemirror.next` — text-sync and undo (P0)
 - Outbound: `yRichCursors` — rich cursor rendering (P0)
 - Outbound: `provider.awareness` — read states, set local state (P0)
+- Outbound: `EditorView.scrollIntoView` — scroll dispatch (P0)
 
 **Contracts**: State [x]
 
@@ -204,6 +244,33 @@ sequenceDiagram
 **Implementation Notes**
 - Integration: `yCollab` with `null` awareness suppresses `yRemoteSelections` and `yRemoteSelectionsTheme`. Text-sync (`ySync`) and undo (`yUndoManager`) are not affected by the null awareness value.
 - Risks: If `y-codemirror.next` is upgraded, re-verify that passing `null` awareness still suppresses only the cursor plugins.
+
+##### Configuration Type Extension (Requirement 6)
+
+```typescript
+type Configuration = {
+  user?: IUserHasId;
+  pageId?: string;
+  reviewMode?: boolean;
+  onEditorsUpdated?: (clientList: EditingClient[]) => void;
+  // NEW: called with the scroll function when provider+ydoc are ready; null on cleanup
+  onScrollToRemoteCursorReady?: (fn: ((clientId: number) => void) | null) => void;
+};
+```
+
+The `scrollFn` is created in the "Setup Ydoc Extensions" `useEffect` where both `provider` and `activeDoc` are in scope:
+
+```
+scrollFn(clientId: number):
+  1. view = codeMirrorEditor?.view          → undefined → return (editor not mounted)
+  2. rawState = awareness.getStates().get(clientId) as AwarenessState | undefined
+  3. cursor?.head == null                   → return (req 6.3: no-op)
+  4. absPos = Y.createAbsolutePositionFromRelativePosition(cursor.head, activeDoc)
+  5. absPos == null                         → return
+  6. view.dispatch({ effects: EditorView.scrollIntoView(absPos.index, { y: 'center' }) })
+```
+
+`onScrollToRemoteCursorReady(scrollFn)` is called after the function is created. On effect cleanup, `onScrollToRemoteCursorReady(null)` is called to clear the atom.
 
 ---
 
@@ -352,6 +419,115 @@ After `replaceChildren()`, the plugin calls `view.requestMeasure()`:
 - Validation: `imageUrlCached` is optional; if undefined or empty, the `<img>` element is skipped and only initials are shown
 - Risks: `ySyncFacet` must be present in the editor state when the plugin initializes; guaranteed since `yCollab` (which installs `ySyncFacet`) is added before `yRichCursors` in the extension array
 
+---
+
+### apps/app — Jotai Atom
+
+#### `scrollToRemoteCursorAtom` (new)
+
+| Field | Detail |
+|-------|--------|
+| Intent | Stores the scroll-to-remote-cursor callback registered by `useCollaborativeEditorMode`; consumed by `EditorNavbar` → `EditingUserList` |
+| Requirements | 6.1 |
+
+**File**: `apps/app/src/states/ui/editor/scroll-to-remote-cursor.ts`
+
+```typescript
+const scrollToRemoteCursorAtom = atom<((clientId: number) => void) | null>(null);
+
+/** Read the scroll callback (null when collaboration is not active) */
+export const useScrollToRemoteCursor = (): ((clientId: number) => void) | null =>
+  useAtomValue(scrollToRemoteCursorAtom);
+
+/** Register or clear the scroll callback */
+export const useSetScrollToRemoteCursor = () =>
+  useSetAtom(scrollToRemoteCursorAtom);
+```
+
+**Lifecycle**: set when `useCollaborativeEditorMode`'s extension effect runs, cleared on effect cleanup.
+
+---
+
+### apps/app — Component
+
+#### `EditingUserList` (modified)
+
+| Field | Detail |
+|-------|--------|
+| Intent | Displays active editor avatars with color-matched borders; delegates click events to parent-supplied callback |
+| Requirements | 5.1–5.3, 6.1, 6.4–6.5 |
+
+**Props change**:
+
+```typescript
+type Props = {
+  clientList: EditingClient[];
+  onUserClick?: (clientId: number) => void;  // NEW: scroll-to-cursor callback
+};
+```
+
+**Color-matched border (req 5.1–5.3)**:
+
+`UserPicture` does not accept a `style` prop (the prop is applied to the `<img>` tag, not the root element). A wrapper `<span>` with an inline border style is used instead:
+
+```
+<span
+  style={{ border: `2px solid ${editingClient.color}`, borderRadius: '50%', display: 'inline-block' }}
+>
+  <UserPicture user={editingClient} noLink />
+</span>
+```
+
+The `border border-info` className is removed from `UserPicture`.
+
+**Click-to-scroll (req 6.1, 6.4)**:
+
+Each avatar wrapper is made interactive:
+
+```
+<button
+  type="button"
+  style={{ cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
+  onClick={() => onUserClick?.(editingClient.clientId)}
+>
+  <span style={{ border: `2px solid ${editingClient.color}`, borderRadius: '50%', display: 'inline-block' }}>
+    <UserPicture user={editingClient} noLink />
+  </span>
+</button>
+```
+
+**Overflow popover (req 5.3, 6.5)**:
+
+`UserPictureList` (a generic legacy class component that does not accept `onUserClick` or color props) is replaced by inline rendering within `EditingUserList`, applying the same wrapper and button pattern to `remainingUsers`.
+
+**`EditorNavbar` wiring**:
+
+```typescript
+// EditorNavbar.tsx
+const EditingUsers = (): JSX.Element => {
+  const editingClients = useEditingClients();
+  const scrollToRemoteCursor = useScrollToRemoteCursor();
+  return (
+    <EditingUserList
+      clientList={editingClients}
+      onUserClick={scrollToRemoteCursor ?? undefined}
+    />
+  );
+};
+```
+
+**`PageEditor` wiring**:
+
+```typescript
+// PageEditor.tsx — existing hook setup
+const setScrollToRemoteCursor = useSetScrollToRemoteCursor();
+// ...
+<CodeMirrorEditorMain
+  onScrollToRemoteCursorReady={setScrollToRemoteCursor}
+  // ...existing props
+/>
+```
+
 ## Data Models
 
 ### Domain Model
@@ -387,6 +563,9 @@ type CursorState = {
 | `ySyncFacet` not installed | `yRichCursors` initialized before `yCollab` | Position conversion returns `null`; cursor is skipped for that update cycle. Extension array order in `use-collaborative-editor-mode` guarantees correct sequencing. |
 | Off-screen container detached | `view.dom` removed from DOM before `destroy()` | `destroy()` calls `remove()` on both containers; if already detached, `remove()` is a no-op |
 | Viewport not yet initialized | First `update()` before CM calculates viewport | `view.viewport` always has valid `from`/`to` from initialization; safe to compare |
+| Click-to-scroll: view not mounted | `scrollFn` called before CodeMirror mounts | `codeMirrorEditor?.view == null` guard returns early; no crash |
+| Click-to-scroll: cursor absent | Clicked user has no `cursor.head` in awareness | Guard `cursor?.head == null → return`; no-op per req 6.3 |
+| Click-to-scroll: position unresolvable | `createAbsolutePositionFromRelativePosition` returns `null` (stale document state) | Guard `absPos == null → return`; no crash |
 
 ## Testing Strategy
 
@@ -394,3 +573,15 @@ Test files are co-located with source in `y-rich-cursors/`:
 - **Unit**: `widget.spec.ts` (DOM structure, eq, fallback), `off-screen-indicator.spec.ts` (indicator DOM, direction, fallback)
 - **Integration**: `plugin.integ.ts` (awareness filter, cursor broadcast, viewport classification, activity timers)
 - **E2E** (Playwright, deferred): hover behavior, off-screen scroll transitions, pointer-events pass-through
+
+### Additional Tests for Requirements 5 & 6
+
+- **Unit — `EditingUserList.spec.tsx`** (new or extended):
+  - Renders a colored border wrapper matching `editingClient.color` (req 5.1)
+  - Does not render `border-info` class (req 5.1)
+  - Calls `onUserClick(clientId)` when avatar is clicked (req 6.1, 6.4)
+  - Overflow popover avatars also call `onUserClick` (req 6.5)
+- **Integration — `use-collaborative-editor-mode` scroll test** (added to existing integ file):
+  - `onScrollToRemoteCursorReady` is called with a function when provider is set up
+  - `scrollFn(clientId)` dispatches `scrollIntoView` to the view when cursor is available (req 6.1–6.2)
+  - `scrollFn(clientId)` is a no-op when cursor is absent (req 6.3)

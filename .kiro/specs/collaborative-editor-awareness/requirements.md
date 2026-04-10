@@ -69,3 +69,25 @@ GROWI's collaborative editor uses Yjs awareness protocol to track which users ar
 7. The off-screen indicators shall be rendered as overlays (absolute positioning within the editor container) and shall not affect the editor's scroll height or content layout.
 8. The horizontal position of each off-screen indicator shall reflect the remote cursor's column position in the document. The `left` CSS value of the indicator shall be derived from the cursor's screen X coordinate (via `view.coordsAtPos` in the measure phase) or, for virtualized positions, approximated using character-width estimation. The indicator shall be centered on the cursor column (`transform: translateX(-50%)`).
 9. The direction arrow icon of the off-screen indicator shall always be rendered at full opacity (1.0) in the cursor's color, regardless of the idle/active state. Only the avatar image or initials element shall fade to reduced opacity (`IDLE_OPACITY`) when the user is idle, and return to full opacity when active.
+
+### Requirement 5: Color-Matched User Avatars in EditingUserList
+
+**Objective:** As a wiki user editing collaboratively, I want the avatar border in `EditingUserList` to use each user's cursor color, so that I can visually associate an avatar in the list with that user's cursor in the editor.
+
+#### Acceptance Criteria
+
+1. Each `UserPicture` in `EditingUserList` shall display a border whose color equals `editingClient.color` from the user's `EditingClient` data, replacing the current fixed `border-info` color.
+2. The border width and visual weight shall be equivalent to the existing border appearance (1–2 px solid ring).
+3. The same color-matched border shall be applied to avatars in the overflow popover (the remaining users shown via the `+N` button).
+
+### Requirement 6: Scroll to Remote Cursor on Avatar Click
+
+**Objective:** As a wiki user editing collaboratively, I want to click a user's avatar in `EditingUserList` to jump to that user's cursor position in the editor, so that I can quickly navigate to where they are editing.
+
+#### Acceptance Criteria
+
+1. Clicking an avatar in `EditingUserList` shall scroll the editor viewport so that the clicked user's remote cursor becomes visible.
+2. The editor shall scroll to center the cursor vertically (`y: 'center'`).
+3. If the clicked user has no active cursor position in the awareness state, the click shall have no effect (no error or crash).
+4. Each avatar shall display a `cursor: pointer` affordance to indicate it is clickable.
+5. Both the first-4 avatars displayed directly in the navbar and the avatars in the overflow popover shall support click-to-scroll.
