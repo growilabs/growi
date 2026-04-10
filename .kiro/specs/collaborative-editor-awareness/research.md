@@ -104,8 +104,39 @@
 - **`y-protocols` not a direct dependency**: `y-protocols/awareness` exports the `Awareness` class, but neither `@growi/editor` nor `apps/app` list `y-protocols` as a direct dependency. `import type { Awareness } from 'y-protocols/awareness'` fails under strict pnpm resolution. Mitigated by deriving the type from the existing `y-websocket` dependency: `type Awareness = WebsocketProvider['awareness']`.
 - **`view.viewport` vs `view.visibleRanges`** (discovered during validation): CodeMirror's `view.viewport` returns the **rendered** content range, which includes a pre-render buffer beyond the visible area for smooth scrolling. Using it for off-screen classification causes cursors in the buffer zone to be treated as in-viewport, resulting in invisible widget decorations instead of off-screen indicators. Must use `view.visibleRanges` (the ranges actually visible to the user) for accurate classification. Precedent: `setDataLine.ts` in the same package already uses `view.visibleRanges`.
 
+## Implementation Discoveries
+
+### Multi-Mode Viewport Classification
+
+- **Context**: Off-screen cursor classification using `view.visibleRanges` worked in tests (jsdom with fixed-height containers) but failed in GROWI production.
+- **Finding**: In GROWI's page-scroll editor setup, CodeMirror's `view.visibleRanges` and `view.viewport` return the **same** range (the full document), because the editor expands to content height and scrolling is handled by the browser page — not CodeMirror's own scroller. Character-position comparison is therefore useless for off-screen detection.
+- **Solution**: Three-mode classification strategy in `plugin.ts`:
+  1. **rangedMode** (`visibleRanges < viewport`): internal-scroll editor (jsdom tests, fixed-height editors) — use character-position boundaries from `visibleRanges`
+  2. **coords mode** (`visibleRanges == viewport`, `scrollDOM.height > 0`): page-scroll editor (GROWI production) — use `view.lineBlockAt(pos)` + `scrollDOM.getBoundingClientRect()` to compute screen Y coordinates
+  3. **degenerate** (`scrollDOM.height == 0`): jsdom with 0-height container — skip classification, all cursors get widget decorations
+- **Constraint**: `view.coordsAtPos()` calls `readMeasured()` internally, which throws "Reading the editor layout isn't allowed during an update". Must use `view.lineBlockAt()` (reads stored height map, safe during update) + raw `getBoundingClientRect()` (not CodeMirror-restricted) instead.
+
+### Material Symbols Font Loading
+
+- **Context**: Off-screen indicator arrow (`arrow_drop_up`/`arrow_drop_down`) rendered as literal text instead of icon.
+- **Finding**: GROWI loads Material Symbols Outlined via Next.js `next/font` in `use-material-symbols-outlined.tsx`. Next.js registers the font with a **hashed family name** (e.g., `__MaterialSymbolsOutlined_xxxxx`), stored in the CSS variable `--grw-font-family-material-symbols-outlined`. Hardcoding `font-family: 'Material Symbols Outlined'` in CodeMirror's `baseTheme` causes a mismatch — the browser cannot find the font.
+- **Solution**: Use `fontFamily: 'var(--grw-font-family-material-symbols-outlined)'` in `theme.ts` so the hashed name is resolved at runtime.
+
+### Parent Container `overflow-y: hidden` Limitation
+
+- **Context**: Off-screen indicator arrow tip was clipped when positioned a few pixels beyond the editor border.
+- **Finding**: `.page-editor-editor-container` inherits `overflow-y: hidden` from `.flex-expand-vert` within the `.flex-expand-vh-100` context (`packages/core-styles/scss/helpers/_flex-expand.scss` + `apps/app/src/styles/scss/layout/_editor.scss`). This clips any content extending beyond `.cm-editor`'s border box. `.cm-editor` itself has no overflow restriction.
+- **Implication**: Off-screen indicators must stay within `.cm-editor`'s border box. Arrow icons use `clip-path` and negative margins to visually align with the border without extending past it.
+
+### Horizontal Positioning via `requestMeasure`
+
+- **Context**: Off-screen indicators should reflect the remote cursor's column position horizontally.
+- **Finding**: `view.coordsAtPos()` cannot be called during `update()` (throws "Reading the editor layout" error). Horizontal positioning must be deferred.
+- **Solution**: After `replaceChildren()`, call `view.requestMeasure()` to schedule a read phase (`coordsAtPos` → screen X) and write phase (`style.left` + `transform: translateX(-50%)`). For virtualized positions (outside viewport), fall back to `contentDOM.getBoundingClientRect().left + col * view.defaultCharacterWidth`.
+
 ## References
 
 - y-codemirror.next v0.3.5 source: `node_modules/.pnpm/y-codemirror.next@0.3.5_.../src/`
 - Yjs awareness protocol: https://docs.yjs.dev/api/about-awareness
 - CodeMirror WidgetType: https://codemirror.net/docs/ref/#view.WidgetType
+- CodeMirror EditorView.lineBlockAt: https://codemirror.net/docs/ref/#view.EditorView.lineBlockAt
