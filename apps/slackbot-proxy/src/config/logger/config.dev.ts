@@ -1,6 +1,6 @@
-import { UniversalBunyanConfig } from 'universal-bunyan';
+import type { LoggerConfig } from '@growi/logger';
 
-const config: UniversalBunyanConfig = {
+const config: LoggerConfig = {
   default: 'info',
 
   // 'express-session': 'debug',
