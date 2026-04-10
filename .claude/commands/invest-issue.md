@@ -124,6 +124,9 @@ List specific files and changes needed, but do NOT apply them yet.}
 
 ### 4-B: Post Comment on Issue
 
+Detect the language of the issue body (from Step 1) and write the comment **in the same language**.
+For example, if the issue is written in Japanese, write the comment in Japanese.
+
 Post the findings as a GitHub issue comment:
 
 ```bash
