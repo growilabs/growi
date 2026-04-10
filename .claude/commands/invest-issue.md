@@ -174,9 +174,21 @@ Proceed only after explicit user approval.
 gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "phase/WIP"
 ```
 
-### 5-B: Implement the Fix
+### 5-B: Create a Fix Branch
 
-- Create a fix branch if needed (follow the project's branch naming convention)
+**Always create a dedicated fix branch before touching any source files.**
+Never commit fixes to `master` or the current branch directly.
+
+Branch naming convention: `fix/{ISSUE_NUMBER}-{short-description}`
+
+```bash
+git checkout -b fix/{ISSUE_NUMBER}-{short-description}
+```
+
+Example: `fix/12345-page-title-overflow`
+
+### 5-C: Implement the Fix
+
 - Make the minimal targeted fix
 - Run lint and tests:
   ```bash
@@ -190,7 +202,7 @@ gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "phase/WIP"
   Fixes #ISSUE_NUMBER
   ```
 
-### 5-C: Open a Pull Request
+### 5-D: Open a Pull Request
 
 ```bash
 gh pr create \
