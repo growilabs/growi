@@ -21,6 +21,7 @@
       "!.claude",
       "!tsconfig.base.json",
       "!apps/app/src/styles/prebuilt",
+      "!apps/app/src/generated",
       "!apps/app/next-env.d.ts",
       "!apps/app/tmp",
       "!apps/pdf-converter/specs",
