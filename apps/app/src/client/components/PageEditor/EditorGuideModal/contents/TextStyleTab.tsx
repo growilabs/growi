@@ -32,11 +32,10 @@ const GuideRow = ({
         <button
           type="button"
           onClick={handleCopy}
-          style={{ cursor: 'pointer' }}
-          className="flex-shrink-0 border-0 p-0 bg-transparent text-start"
+          className="flex-shrink-0 border-0 p-0 bg-transparent text-start cursor-pointer"
         >
           <div
-            className={`p-2 ps-2 pe-5 rounded position-relative ${styles.codeBlockWrapper}`}
+            className={`p-2 ps-2 pe-5 rounded position-relative bg-dark ${styles.codeBlockWrapper}`}
           >
             <pre
               className={`m-0 small font-monospace fw-normal ${styles.codeContent}`}
@@ -174,7 +173,6 @@ export const TextStyleTab: React.FC = () => {
           target="_blank"
           rel="noreferrer"
           className="text-secondary text-decoration-underline"
-          style={{ color: 'var(--bs-secondary-color)' }}
           onClick={(e) => e.stopPropagation()}
         >
           {t(`${i18nKey}.link_growi`)}
@@ -190,7 +188,6 @@ export const TextStyleTab: React.FC = () => {
         <a
           href="/Sandbox"
           className="text-secondary text-decoration-underline"
-          style={{ color: 'var(--bs-secondary-color)' }}
           onClick={(e) => e.stopPropagation()}
         >
           {t(`${i18nKey}.link_sandbox`)}

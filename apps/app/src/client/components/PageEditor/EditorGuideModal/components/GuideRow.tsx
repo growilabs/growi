@@ -52,7 +52,7 @@ export const GuideRow = ({
           style={{ minWidth: isFullWidth ? '100%' : minWidth }}
         >
           <div
-            className={`${styles.codeBox} rounded overflow-hidden position-relative ${isFullWidth ? 'w-100' : ''}`}
+            className={`${styles.codeBox} p-2 ps-2 pe-5 rounded overflow-hidden position-relative ${isFullWidth ? 'w-100' : ''}`}
             style={{ background }}
           >
             <pre
