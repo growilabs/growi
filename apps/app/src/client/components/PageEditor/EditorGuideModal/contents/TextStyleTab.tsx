@@ -38,7 +38,7 @@ const GuideRow = ({
             className={`p-2 ps-2 pe-5 rounded position-relative bg-dark ${styles.codeBlockWrapper}`}
           >
             <pre
-              className={`m-0 small font-monospace fw-normal ${styles.codeContent}`}
+              className={`m-0 small font-monospace fw-normal text-white-50 ${styles.codeContent}`}
             >
               {code}
             </pre>
@@ -107,7 +107,7 @@ export const TextStyleTab: React.FC = () => {
       title: t(`${i18nKey}.inline_code`),
       code: `\`${t(`${i18nKey}.inline_code`)}\` \n~~~${t(`${i18nKey}.inline_code`)}~~~`,
       preview: (
-        <div className="d-flex flex-column gap-2">
+        <div className="d-flex flex-column gap-2 align-items-start">
           <code
             className={`rounded px-1 d-inline-block bg-transparent ${styles.inlineCodeLabel}`}
           >

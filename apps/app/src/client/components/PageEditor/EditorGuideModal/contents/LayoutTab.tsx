@@ -141,10 +141,9 @@ export const LayoutTab: React.FC = () => {
       code: `\`\`\`\n${t(`${i18nKey}.code_block_text`)}\n\`\`\``,
       preview: (
         <div
-          className="rounded p-3 w-100 font-monospace"
+          className="rounded p-3 w-100 font-monospace bg-dark"
           style={{
             minWidth: '200px',
-            backgroundColor: 'var(--bs-dark)',
           }}
         >
           <div className="small text-white-50 lh-base">

@@ -11,7 +11,6 @@
 
 .codeContent {
   font-size: bs.$font-size-sm;
-  color: rgba(var(--bs-white-rgb), 0.5);
 }
 
 .copyBadge {
@@ -25,10 +24,5 @@
 }
 
 .inlineCodeLabel {
-  color: var(--bs-pink);
-  border: 1px solid var(--bs-pink);
-}
-
-.externalLink {
-  color: var(--bs-secondary-color);
+  border: 1px solid currentColor;
 }
