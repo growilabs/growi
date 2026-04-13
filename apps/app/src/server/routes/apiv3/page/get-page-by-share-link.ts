@@ -1,13 +1,9 @@
-import { SCOPE } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 import { query } from 'express-validator';
-import type { HydratedDocument } from 'mongoose';
-import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
-import type { IPage, IPageModel } from '~/server/models/page';
 import ShareLink from '~/server/models/share-link';
 import { configManager } from '~/server/service/config-manager';
 import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
@@ -19,10 +15,12 @@ import { respondWithSinglePage } from './respond-with-single-page';
 
 const logger = loggerFactory('growi:routes:apiv3:page:get-page-by-share-link');
 
-// Extend Request to include middleware-added properties
-interface RequestWithShareLink extends Request {
-  // No authentication properties expected for this public endpoint
-}
+type ReqQuery = {
+  pageId: string;
+  shareLinkId: string;
+};
+
+type Req = Request<Record<string, string>, ApiV3Response, undefined, ReqQuery>;
 
 /**
  * @swagger
@@ -63,7 +61,6 @@ export const getPageByShareLinkHandlerFactory = (
   crowi: Crowi,
 ): RequestHandler[] => {
   const { pageService, pageGrantService } = crowi;
-  const Page = mongoose.model<IPage, IPageModel>('Page');
 
   // Define validators for req.query - both parameters required
   const validator = [
@@ -74,13 +71,8 @@ export const getPageByShareLinkHandlerFactory = (
   return [
     ...validator,
     apiV3FormValidator,
-    async (req: RequestWithShareLink, res: ApiV3Response) => {
-      const { shareLinkId, pageId } = req.query;
-
-      // Convert to strings (already validated as MongoId by express-validator)
-      const shareLinkIdString =
-        typeof shareLinkId === 'string' ? shareLinkId : String(shareLinkId);
-      const pageIdString = typeof pageId === 'string' ? pageId : String(pageId);
+    async (req: Req, res: ApiV3Response) => {
+      const { pageId, shareLinkId } = req.query;
 
       try {
         // First gate: Check if link sharing is enabled globally
@@ -97,8 +89,8 @@ export const getPageByShareLinkHandlerFactory = (
         // Validate ShareLink by ID and page ID in a single query
         const validationResult = await validateShareLink(
           ShareLink,
-          shareLinkIdString,
-          pageIdString,
+          shareLinkId,
+          pageId,
         );
 
         if (validationResult.type === 'not-found') {
@@ -121,7 +113,7 @@ export const getPageByShareLinkHandlerFactory = (
           pageService,
           pageGrantService,
           {
-            pageId: pageIdString,
+            pageId,
             path: null,
             user: undefined,
             isSharedPage: true,

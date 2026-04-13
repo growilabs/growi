@@ -56,6 +56,7 @@ import { getPageInfoHandlerFactory } from './get-page-info';
 import { getPagePathsWithDescendantCountFactory } from './get-page-paths-with-descendant-count';
 import { getYjsDataHandlerFactory } from './get-yjs-data';
 import { publishPageHandlersFactory } from './publish-page';
+import { respondWithSinglePage } from './respond-with-single-page';
 import { syncLatestRevisionBodyToYjsDraftHandlerFactory } from './sync-latest-revision-body-to-yjs-draft';
 import { unpublishPageHandlersFactory } from './unpublish-page';
 import { updatePageHandlersFactory } from './update-page';
@@ -210,67 +211,6 @@ module.exports = (crowi: Crowi) => {
         'security:disableUserPages',
       );
 
-      const respondWithSinglePage = async (
-        pageWithMeta:
-          | IDataWithMeta<HydratedDocument<PageDocument>, IPageInfoExt>
-          | IDataWithMeta<null, IPageNotFoundInfo>,
-      ) => {
-        let { data: page } = pageWithMeta;
-        const { meta } = pageWithMeta;
-
-        if (isIPageNotFoundInfo(meta)) {
-          if (meta.isForbidden) {
-            return res.apiv3Err(
-              new ErrorV3(
-                'Page is forbidden',
-                'page-is-forbidden',
-                undefined,
-                meta,
-              ),
-              403,
-            );
-          }
-          return res.apiv3Err(
-            new ErrorV3('Page is not found', 'page-not-found', undefined, meta),
-            404,
-          );
-        }
-
-        if (disableUserPages && page != null) {
-          const isTargetUserPage =
-            isUserPage(page.path) || isUsersTopPage(page.path);
-
-          if (isTargetUserPage) {
-            return res.apiv3Err(
-              new ErrorV3('Page is forbidden', 'page-is-forbidden'),
-              403,
-            );
-          }
-        }
-
-        if (page != null) {
-          try {
-            page.initLatestRevisionField(revisionId);
-
-            // populate
-            page = await page.populateDataToShowRevision();
-          } catch (err) {
-            logger.error('populate-page-failed', err);
-            return res.apiv3Err(
-              new ErrorV3(
-                'Failed to populate page',
-                'populate-page-failed',
-                undefined,
-                { err, meta },
-              ),
-              500,
-            );
-          }
-        }
-
-        return res.apiv3({ page, pages: undefined, meta });
-      };
-
       const isValid = pageId != null || path != null;
       if (!isValid) {
         return res.apiv3Err(
@@ -299,11 +239,13 @@ module.exports = (crowi: Crowi) => {
         }
 
         return respondWithSinglePage(
+          res,
           await findPageAndMetaDataByViewer(pageService, pageGrantService, {
             pageId,
             path,
             user,
           }),
+          { revisionId, disableUserPages },
         );
       } catch (err) {
         logger.error('get-page-failed', err);
