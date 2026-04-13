@@ -42,3 +42,14 @@ export const getLocale = (langCode: string): Locale => {
 
   return locale ?? enUS;
 };
+
+/**
+ * Gets the documentation site language code from an i18next language code.
+ * Only 'ja' and 'en' are supported on the GROWI documentation site.
+ * @param langCode The i18n language code (e.g., 'ja_JP').
+ * @returns 'ja' or 'en', defaulting to 'en' if not Japanese.
+ */
+export const getDocumentationLocale = (langCode: string): 'ja' | 'en' => {
+  const baseCode = langCode.split(/[-_]/)[0];
+  return baseCode === 'ja' ? 'ja' : 'en';
+};
