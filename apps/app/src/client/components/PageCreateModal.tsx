@@ -28,7 +28,7 @@ import {
   usePageCreateModalActions,
   usePageCreateModalStatus,
 } from '~/states/ui/modal/page-create';
-import { getDocumentationLocale } from '~/utils/locale-utils';
+import { getLocale } from '~/utils/locale-utils';
 
 import PagePathAutoComplete from './PagePathAutoComplete';
 
@@ -74,7 +74,7 @@ const PageCreateModal: React.FC = () => {
     [userHomepagePath, t, now],
   );
 
-  const docsLang = getDocumentationLocale(i18n.language);
+  const docsLang = getLocale(i18n.language).code === 'ja' ? 'ja' : 'en';
   const templateHelpUrl = `${documentationUrl}/${docsLang}/guide/features/template.html`;
 
   const [todayInput, setTodayInput] = useState('');
