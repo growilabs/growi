@@ -1,7 +1,7 @@
 {
   "feature_name": "sharelink-page-api",
   "created_at": "2026-04-13T00:00:00.000Z",
-  "updated_at": "2026-04-13T00:00:00.000Z",
+  "updated_at": "2026-04-13T04:24:13.508Z",
   "language": "ja",
   "phase": "tasks-generated",
   "approvals": {
@@ -15,8 +15,8 @@
     },
     "tasks": {
       "generated": true,
-      "approved": false
+      "approved": true
     }
   },
-  "ready_for_implementation": false
+  "ready_for_implementation": true
 }

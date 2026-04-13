@@ -31,7 +31,8 @@
       "Skill(kiro:spec-impl)",
       "Skill(kiro:spec-impl:*)",
       "Skill(kiro:spec-init)",
-      "Skill(kiro:spec-init:*)"
+      "Skill(kiro:spec-init:*)",
+      "Bash(node -e ':*)"
     ]
   },
   "enableAllProjectMcpServers": true,
