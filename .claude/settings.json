@@ -27,7 +27,11 @@
       "mcp__plugin_context7_*",
       "mcp__github__*",
       "WebSearch",
-      "WebFetch"
+      "WebFetch",
+      "Skill(kiro:spec-impl)",
+      "Skill(kiro:spec-impl:*)",
+      "Skill(kiro:spec-init)",
+      "Skill(kiro:spec-init:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
