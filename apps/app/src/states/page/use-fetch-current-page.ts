@@ -243,7 +243,10 @@ export const useFetchCurrentPage = (): {
         }
 
         try {
-          const { data } = await apiv3Get<FetchedPageResult>('/page', params);
+          // Use dedicated /page/shared endpoint for share link access
+          const endpoint =
+            params.shareLinkId != null ? '/page/shared' : '/page';
+          const { data } = await apiv3Get<FetchedPageResult>(endpoint, params);
           const { page: newData, meta } = data;
 
           set(currentPageDataAtom, newData ?? undefined);

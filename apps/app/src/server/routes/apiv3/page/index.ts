@@ -10,7 +10,6 @@ import type {
 import {
   AllSubscriptionStatusType,
   getIdForRef,
-  getIdStringForRef,
   isIPageNotFoundInfo,
   PageGrant,
   SCOPE,
@@ -40,7 +39,6 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { Revision } from '~/server/models/revision';
-import ShareLink from '~/server/models/share-link';
 import Subscription from '~/server/models/subscription';
 import { configManager } from '~/server/service/config-manager';
 import { exportService } from '~/server/service/export';
@@ -53,6 +51,7 @@ import loggerFactory from '~/utils/logger';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 import { checkPageExistenceHandlersFactory } from './check-page-existence';
 import { createPageHandlersFactory } from './create-page';
+import { getPageByShareLinkHandlerFactory } from './get-page-by-share-link';
 import { getPageInfoHandlerFactory } from './get-page-info';
 import { getPagePathsWithDescendantCountFactory } from './get-page-paths-with-descendant-count';
 import { getYjsDataHandlerFactory } from './get-yjs-data';
@@ -89,9 +88,6 @@ const router = express.Router();
 module.exports = (crowi: Crowi) => {
   const loginRequired = loginRequiredFactory(crowi, true);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
-  const certifySharedPage = require('../../../middlewares/certify-shared-page')(
-    crowi,
-  );
   const addActivity = generateAddActivityMiddleware();
 
   const globalNotificationService = crowi.globalNotificationService;
@@ -105,7 +101,6 @@ module.exports = (crowi: Crowi) => {
       query('pageId').isMongoId().optional().isString(),
       query('path').optional().isString(),
       query('findAll').optional().isBoolean(),
-      query('shareLinkId').optional().isMongoId(),
       query('includeEmpty').optional().isBoolean(),
     ],
     likes: [body('pageId').isString(), body('bool').isBoolean()],
@@ -204,14 +199,12 @@ module.exports = (crowi: Crowi) => {
   router.get(
     '/',
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
-    certifySharedPage,
     loginRequired,
     validator.getPage,
     apiV3FormValidator,
     async (req, res) => {
-      const { user, isSharedPage } = req;
-      const { pageId, path, findAll, revisionId, shareLinkId, includeEmpty } =
-        req.query;
+      const { user } = req;
+      const { pageId, path, findAll, revisionId, includeEmpty } = req.query;
 
       const disableUserPages = crowi.configManager.getConfig(
         'security:disableUserPages',
@@ -278,36 +271,15 @@ module.exports = (crowi: Crowi) => {
         return res.apiv3({ page, pages: undefined, meta });
       };
 
-      const isValid =
-        (shareLinkId != null && pageId != null && path == null) ||
-        (shareLinkId == null && (pageId != null || path != null));
+      const isValid = pageId != null || path != null;
       if (!isValid) {
         return res.apiv3Err(
-          new Error(
-            'Either parameter of (pageId or path) or (pageId and shareLinkId) is required.',
-          ),
+          new Error('Either pageId or path is required.'),
           400,
         );
       }
 
       try {
-        if (isSharedPage) {
-          const shareLink = await ShareLink.findOne({
-            _id: { $eq: shareLinkId },
-          });
-          if (shareLink == null) {
-            return res.apiv3Err('ShareLink is not found', 404);
-          }
-          return respondWithSinglePage(
-            await findPageAndMetaDataByViewer(pageService, pageGrantService, {
-              pageId: getIdStringForRef(shareLink.relatedPage),
-              path,
-              user,
-              isSharedPage: true,
-            }),
-          );
-        }
-
         if (findAll != null) {
           const pages = await Page.findByPathAndViewer(
             path,
@@ -586,6 +558,43 @@ module.exports = (crowi: Crowi) => {
       }
     },
   );
+
+  /**
+   * @swagger
+   *
+   *    /page/shared:
+   *      get:
+   *        tags: [Page]
+   *        summary: Get page by share link
+   *        description: Get page data via a valid share link (public endpoint, no authentication required)
+   *        parameters:
+   *          - name: shareLinkId
+   *            in: query
+   *            required: true
+   *            description: share link ID
+   *            schema:
+   *              $ref: '#/components/schemas/ObjectId'
+   *          - name: pageId
+   *            in: query
+   *            required: true
+   *            description: page ID
+   *            schema:
+   *              $ref: '#/components/schemas/ObjectId'
+   *        responses:
+   *          200:
+   *            description: Successfully retrieved page via share link
+   *            content:
+   *              application/json:
+   *                schema:
+   *                  $ref: '#/components/schemas/GetPageResponse'
+   *          403:
+   *            description: Link sharing disabled, link expired, or forbidden page
+   *          404:
+   *            description: Share link not found or page not found
+   *          400:
+   *            description: Invalid or missing parameters
+   */
+  router.get('/shared', getPageByShareLinkHandlerFactory(crowi));
 
   router.get('/info', getPageInfoHandlerFactory(crowi));
 
