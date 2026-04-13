@@ -38,14 +38,6 @@
   - ページルーターに `GET /shared` として登録し、`getPageInfoHandlerFactory` と同じパターンで組み込む
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.5, 3.1, 4.1, 4.2, 4.3, 5.1, 5.4_
 
-- [x] 3.2 エンドポイントの統合テストを実装する
-  - 有効な shareLinkId と pageId を指定したリクエストが 200 で `{ page, meta }` を返し、`isMovable: false` であることを確認する
-  - 期限切れリンクで 403 `share-link-expired` が返ることを確認する
-  - 存在しない shareLinkId または pageId 不一致で 404 `share-link-not-found` が返ることを確認する
-  - `disableLinkSharing=true` の状態で 403 `link-sharing-disabled` が返ることを確認する
-  - `shareLinkId` または `pageId` を省略したリクエストで 400 が返ることを確認する
-  - _Requirements: 1.1, 1.3, 2.1, 2.2, 2.3, 2.4, 2.5, 3.2, 3.3, 4.1_
-
 - [ ] 4. クライアント更新と既存ルートのクリーンアップ
 - [x] 4.1 share link アクセス時のページ取得 API 呼び出しを新エンドポイントに切り替える
   - `shareLinkId` が存在するかどうかで呼び出し先を `/page/shared` と `/page` に条件分岐させる

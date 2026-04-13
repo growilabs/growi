@@ -452,15 +452,6 @@ const { data } = await apiv3Get<FetchedPageResult>(endpoint, params);
 - `disableUserPages=true` でユーザーページ → 403
 - 正常ページ → `res.apiv3({ page, meta })` が呼ばれる
 
-### Integration Tests
-
-`getPageByShareLinkHandlerFactory` の統合テスト（`get-page-by-share-link.integ.ts`）：
-- 有効な `shareLinkId` + `pageId` → 200 と `{ page, meta }` を返す（`isMovable: false` を確認）
-- 期限切れリンク → 403 `share-link-expired`
-- 存在しない `shareLinkId` → 404 `share-link-not-found`
-- `disableLinkSharing=true` → 403 `link-sharing-disabled`
-- `pageId` / `shareLinkId` 未指定 → 400
-
 ### Security Considerations
 
 - **認証不要エンドポイントのデータ保護**: `validateShareLink` が全ての DB チェックを完了した後にのみ `findPageAndMetaDataByViewer` を呼び出す。バリデーション失敗時はページデータに一切アクセスしない。
