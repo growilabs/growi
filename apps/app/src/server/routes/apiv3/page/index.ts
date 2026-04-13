@@ -179,11 +179,6 @@ module.exports = (crowi: Crowi) => {
    *            description: Specific revision ID to retrieve
    *            schema:
    *              $ref: '#/components/schemas/ObjectId'
-   *          - name: shareLinkId
-   *            in: query
-   *            description: Share link ID for shared page access
-   *            schema:
-   *              $ref: '#/components/schemas/ObjectId'
    *          - name: includeEmpty
    *            in: query
    *            description: Include empty pages in results when using findAll
@@ -501,41 +496,6 @@ module.exports = (crowi: Crowi) => {
     },
   );
 
-  /**
-   * @swagger
-   *
-   *    /page/shared:
-   *      get:
-   *        tags: [Page]
-   *        summary: Get page by share link
-   *        description: Get page data via a valid share link (public endpoint, no authentication required)
-   *        parameters:
-   *          - name: shareLinkId
-   *            in: query
-   *            required: true
-   *            description: share link ID
-   *            schema:
-   *              $ref: '#/components/schemas/ObjectId'
-   *          - name: pageId
-   *            in: query
-   *            required: true
-   *            description: page ID
-   *            schema:
-   *              $ref: '#/components/schemas/ObjectId'
-   *        responses:
-   *          200:
-   *            description: Successfully retrieved page via share link
-   *            content:
-   *              application/json:
-   *                schema:
-   *                  $ref: '#/components/schemas/GetPageResponse'
-   *          403:
-   *            description: Link sharing disabled, link expired, or forbidden page
-   *          404:
-   *            description: Share link not found or page not found
-   *          400:
-   *            description: Invalid or missing parameters
-   */
   router.get('/shared', getPageByShareLinkHandlerFactory(crowi));
 
   router.get('/info', getPageInfoHandlerFactory(crowi));
