@@ -1,10 +1,10 @@
 import { type Document, type Model, Schema } from 'mongoose';
 
-import type { IContribution } from '~/interfaces/contribution';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
-import { getOrCreateModel } from '../util/mongoose-utils';
+import type { IContribution } from '../../interfaces/contribution';
 
-interface ContributionDocument extends IContribution, Document {}
+export interface ContributionDocument extends IContribution, Document {}
 interface ContributionModel extends Model<ContributionDocument> {}
 
 const contributionSchema = new Schema<ContributionDocument>(
