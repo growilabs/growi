@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A package for GROWI presentation feature",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "keywords": [
     "growi",
     "growi-plugin"
@@ -29,8 +29,9 @@
     }
   },
   "scripts": {
+    "generate:marpit-base-css": "node scripts/extract-marpit-css.ts",
     "build": "vite build",
-    "clean": "shx rm -rf dist",
+    "clean": "rimraf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
     "lint:biome": "biome check",
@@ -61,7 +62,7 @@
     "unist-util-visit": "^5.0.0"
   },
   "peerDependencies": {
-    "next": "^14",
+    "next": "^16",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   }

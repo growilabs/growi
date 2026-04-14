@@ -268,7 +268,7 @@ module.exports = (crowi: Crowi) => {
 
     const isDownload = opts?.download ?? false;
     const contentHeaders = createContentHeaders(attachment, {
-      inline: !isDownload,
+      forceAttachment: isDownload,
     });
     applyHeaders(res, [
       ...toExpressHttpHeaders(contentHeaders),

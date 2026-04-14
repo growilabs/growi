@@ -15,9 +15,9 @@ import {
   Popover,
   PopoverBody,
 } from 'reactstrap';
-import validator from 'validator';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
+import { isMongoId } from '~/client/util/mongo-id';
 import { useCurrentPagePath } from '~/states/page';
 import { usePreviewOptions } from '~/stores/renderer';
 import loggerFactory from '~/utils/logger';
@@ -149,9 +149,7 @@ const LinkEditModalSubstance: React.FC = () => {
     if (path.startsWith('/')) {
       try {
         const pathWithoutFragment = new URL(path, 'http://dummy').pathname;
-        const isPermanentLink = validator.isMongoId(
-          pathWithoutFragment.slice(1),
-        );
+        const isPermanentLink = isMongoId(pathWithoutFragment.slice(1));
         const pageId = isPermanentLink ? pathWithoutFragment.slice(1) : null;
 
         const { data } = await apiv3Get('/page', {

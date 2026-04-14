@@ -145,7 +145,7 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         req.user,
       );
     } catch (err) {
-      logger.error('Edit notification failed', err);
+      logger.error({ err }, 'Edit notification failed');
     }
 
     // user notification
@@ -163,11 +163,14 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         );
         for (const result of results) {
           if (result.status === 'rejected') {
-            logger.error('Create user notification failed', result.reason);
+            logger.error(
+              { err: result.reason },
+              'Create user notification failed',
+            );
           }
         }
       } catch (err) {
-        logger.error('Create user notification failed', err);
+        logger.error({ err }, 'Create user notification failed');
       }
     }
 
@@ -180,7 +183,7 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         const openaiService = getOpenaiService();
         await openaiService?.updateVectorStoreFileOnPageUpdate(updatedPage);
       } catch (err) {
-        logger.error('Rebuild vector store failed', err);
+        logger.error({ err }, 'Rebuild vector store failed');
       }
     }
   }
@@ -305,11 +308,14 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
           try {
             previousRevision = await Revision.findById(sanitizeRevisionId);
           } catch (error) {
-            logger.error('Failed to fetch previousRevision by revisionId', {
-              revisionId: sanitizeRevisionId,
-              pageId: currentPage._id,
-              error,
-            });
+            logger.error(
+              {
+                revisionId: sanitizeRevisionId,
+                pageId: currentPage._id,
+                err: error,
+              },
+              'Failed to fetch previousRevision by revisionId',
+            );
           }
         }
 
@@ -319,12 +325,12 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
             previousRevision = await Revision.findById(currentPage.revision);
           } catch (error) {
             logger.error(
-              'Failed to fetch previousRevision by currentPage.revision',
               {
                 pageId: currentPage._id,
                 revisionId: currentPage.revision,
-                error,
+                err: error,
               },
+              'Failed to fetch previousRevision by currentPage.revision',
             );
           }
         }
@@ -339,7 +345,7 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
           options,
         );
       } catch (err) {
-        logger.error('Error occurred while updating a page.', err);
+        logger.error({ err }, 'Error occurred while updating a page.');
         return res.apiv3Err(err);
       }
 

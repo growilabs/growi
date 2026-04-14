@@ -35,7 +35,8 @@ import ExpandOrContractButton from '../../ExpandOrContractButton';
 import { MarkdownTableDataImportForm } from '../MarkdownTableDataImportForm';
 
 import styles from './HandsontableModal.module.scss';
-import 'handsontable/dist/handsontable.full.min.css';
+
+import './HandsontableModal.vendor-styles.prebuilt';
 
 const DEFAULT_HOT_HEIGHT = 300;
 const MARKDOWNTABLE_TO_HANDSONTABLE_ALIGNMENT_SYMBOL_MAPPING = {

@@ -413,6 +413,7 @@
     "azure_storage_account_name": "Storage Account Name",
     "azure_storage_container_name": "Container Name",
     "azure_note_for_the_only_env_option": "The Azure Settings is limited by the value of environment variable.<br>To change this setting, please change to false or delete the value of the environment variable <code>{{env}}</code> .",
+    "azure_note_for_the_only_env_option_cloud": "Azure settings can be changed from the GROWI.cloud admin panel.",
     "file_upload": "This is for uploading file settings. If you complete file upload settings, file upload function, profile picture function etc will be enabled.",
     "test_connection": "Test connection to mail",
     "change_setting": "Caution:if you change this setting not completed, you will not be able to access files you have uploaded so far.",
@@ -425,7 +426,8 @@
     "enable": "Enable",
     "disable": "Disable",
     "use_env_var_if_empty": "If the value in the database is empty, the value of the environment variable <code>{{variable}}</code> is used.",
-    "note_for_the_only_env_option": "The GCS Settings is limited by the value of environment variable.<br>To change this setting, please change to false or delete the value of the environment variable <code>{{env}}</code> ."
+    "note_for_the_only_env_option": "The GCS Settings is limited by the value of environment variable.<br>To change this setting, please change to false or delete the value of the environment variable <code>{{env}}</code> .",
+    "note_for_the_only_env_option_cloud": "GCS settings can be changed from the GROWI.cloud admin panel."
   },
   "markdown_settings": {
     "markdown_settings": "Markdown Settings",
@@ -456,6 +458,18 @@
       "tag_names": "Tag names",
       "tag_attributes": "Tag attributes",
       "import_recommended": "Import recommended {{target}}"
+    },
+    "content-disposition_header": "Content-Disposition Mime Type Settings",
+    "content-disposition_options": {
+      "add_header": "Add Mime Types",
+      "note": "Note: Adding a mime type will automatically remove it from the other list.",
+      "inline_header": "Inline Mime Types",
+      "attachment_header": "Attachment Mime Types",
+      "inline_button": "Inline",
+      "attachment_button": "Attachment",
+      "no_inline": "No inline types set.",
+      "no_attachment": "No attachment types set.",
+      "remove_button": "Remove"
     }
   },
   "customize_settings": {
@@ -769,7 +783,8 @@
       "revoke_read_only_access": "Revoke read only access",
       "grant_read_only_access": "Grant read only access",
       "send_invitation_email": "Send invitation email",
-      "resend_invitation_email": "Resend invitation email"
+      "resend_invitation_email": "Resend invitation email",
+      "deleted_user": "(Deleted User)"
     },
     "reset_password": "Reset Password",
     "reset_password_modal": {
@@ -869,6 +884,14 @@
     "available_action_list_explanation": "List of actions that can be searched/viewed in the current settings",
     "action_list": "Action List",
     "disable_mode_explanation": "Audit log is currently disabled. To enable it, set the environment variable <code>AUDIT_LOG_ENABLED</code> to true.",
+    "export": "Export",
+    "export_audit_log": "Export Audit Log",
+    "export_requested": "Export request accepted. You will be notified when the export is complete.",
+    "export_failed": "Failed to start export",
+    "duplicate_export_confirm": "An export with the same conditions is already in progress. Do you want to restart it?",
+    "restart_export": "Restart Export",
+    "confirm_export": "Confirm Export",
+    "disable_mode_explanation_cloud": "Audit log is currently disabled. To enable it, please update the app settings from the GROWI.cloud management screen.",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
@@ -894,7 +917,9 @@
     "confirm": "Delete plugin?"
   },
   "cloud_setting_management": {
-    "to_cloud_settings": "Open GROWI.cloud Settings"
+    "to_cloud_settings": "Open GROWI.cloud Settings",
+    "change_from_cloud": "You can change the settings from the GROWI.cloud admin panel.",
+    "storage_change_from_cloud": "The current file upload method is {{fileUploadType}}. Settings can be changed from the GROWI.cloud admin panel."
   },
   "audit_log_action_category": {
     "Page": "Page",

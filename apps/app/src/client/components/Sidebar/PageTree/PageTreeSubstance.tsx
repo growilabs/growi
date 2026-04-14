@@ -1,5 +1,7 @@
-import React, { memo, useCallback } from 'react';
+import { memo, useCallback, useId } from 'react';
 import { useTranslation } from 'next-i18next';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 
 import { ItemsTree } from '~/features/page-tree/components';
 import { usePageTreeInformationUpdate } from '~/features/page-tree/states/page-tree-update';
@@ -12,13 +14,10 @@ import {
   useSWRxRootPage,
   useSWRxV5MigrationStatus,
 } from '~/stores/page-listing';
-import loggerFactory from '~/utils/logger';
 
 import { PageTreeItem, pageTreeItemSize } from '../PageTreeItem';
 import { SidebarHeaderReloadButton } from '../SidebarHeaderReloadButton';
 import { PrivateLegacyPagesLink } from './PrivateLegacyPagesLink';
-
-const logger = loggerFactory('growi:cli:PageTreeSubstance');
 
 type HeaderProps = {
   isWipPageShown: boolean;
@@ -28,6 +27,7 @@ type HeaderProps = {
 export const PageTreeHeader = memo(
   ({ isWipPageShown, onWipPageShownChange }: HeaderProps) => {
     const { t } = useTranslation();
+    const wipToggleId = useId();
 
     const { mutate: mutateRootPage } = useSWRxRootPage({ suspense: true });
     useSWRxV5MigrationStatus({ suspense: true });
@@ -66,7 +66,7 @@ export const PageTreeHeader = memo(
               >
                 <div className="form-check form-switch">
                   <input
-                    id="page-tree-wip-toggle"
+                    id={wipToggleId}
                     className="form-check-input pe-none"
                     type="checkbox"
                     checked={isWipPageShown}
@@ -74,7 +74,7 @@ export const PageTreeHeader = memo(
                   />
                   <label
                     className="form-check-label pe-none"
-                    htmlFor="page-tree-wip-toggle"
+                    htmlFor={wipToggleId}
                   >
                     {t('sidebar_header.show_wip_page')}
                   </label>
@@ -106,63 +106,66 @@ type PageTreeContentProps = {
   isWipPageShown: boolean;
 };
 
-export const PageTreeContent = memo(
-  ({ isWipPageShown }: PageTreeContentProps) => {
-    const isGuestUser = useIsGuestUser();
-    const isReadOnlyUser = useIsReadOnlyUser();
-    const currentPath = useCurrentPagePath();
-    const targetId = useCurrentPageId();
+const PageTreeContent = memo(({ isWipPageShown }: PageTreeContentProps) => {
+  const isGuestUser = useIsGuestUser();
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const currentPath = useCurrentPagePath();
+  const targetId = useCurrentPageId();
 
-    const { data: migrationStatus } = useSWRxV5MigrationStatus({
-      suspense: true,
-    });
+  const { data: migrationStatus } = useSWRxV5MigrationStatus({
+    suspense: true,
+  });
 
-    const targetPathOrId = targetId || currentPath;
-    const path = currentPath || '/';
+  const targetPathOrId = targetId || currentPath;
+  const path = currentPath || '/';
 
-    const sidebarScrollerElem = useSidebarScrollerElem();
+  const sidebarScrollerElem = useSidebarScrollerElem();
 
-    const estimateTreeItemSize = useCallback(() => pageTreeItemSize, []);
+  const estimateTreeItemSize = useCallback(() => pageTreeItemSize, []);
 
-    if (!migrationStatus?.isV5Compatible) {
-      return <PageTreeUnavailable />;
-    }
+  if (!migrationStatus?.isV5Compatible) {
+    return <PageTreeUnavailable />;
+  }
 
-    /*
-     * dependencies
-     */
-    if (isGuestUser == null) {
-      return null;
-    }
+  /*
+   * dependencies
+   */
+  if (isGuestUser == null) {
+    return null;
+  }
 
-    return (
-      <div className="pt-4">
-        <ItemsTree
-          enableRenaming
-          enableDragAndDrop
-          isEnableActions={!isGuestUser}
-          isReadOnlyUser={!!isReadOnlyUser}
-          isWipPageShown={isWipPageShown}
-          targetPath={path}
-          targetPathOrId={targetPathOrId}
-          CustomTreeItem={PageTreeItem}
-          estimateTreeItemSize={estimateTreeItemSize}
-          scrollerElem={sidebarScrollerElem}
-        />
+  return (
+    <div className="pt-4">
+      <ItemsTree
+        enableRenaming
+        enableDragAndDrop
+        isEnableActions={!isGuestUser}
+        isReadOnlyUser={!!isReadOnlyUser}
+        isWipPageShown={isWipPageShown}
+        targetPath={path}
+        targetPathOrId={targetPathOrId}
+        CustomTreeItem={PageTreeItem}
+        estimateTreeItemSize={estimateTreeItemSize}
+        scrollerElem={sidebarScrollerElem}
+      />
 
-        {!isGuestUser &&
-          !isReadOnlyUser &&
-          migrationStatus?.migratablePagesCount != null &&
-          migrationStatus.migratablePagesCount !== 0 && (
-            <div className="grw-pagetree-footer border-top mt-4 py-2 w-100">
-              <div className="private-legacy-pages-link px-3 py-2">
-                <PrivateLegacyPagesLink />
-              </div>
+      {!isGuestUser &&
+        !isReadOnlyUser &&
+        migrationStatus?.migratablePagesCount != null &&
+        migrationStatus.migratablePagesCount !== 0 && (
+          <div className="grw-pagetree-footer border-top mt-4 py-2 w-100">
+            <div className="private-legacy-pages-link px-3 py-2">
+              <PrivateLegacyPagesLink />
             </div>
-          )}
-      </div>
-    );
-  },
-);
-
+          </div>
+        )}
+    </div>
+  );
+});
 PageTreeContent.displayName = 'PageTreeContent';
+
+export const PageTreeWithDnD = ({ isWipPageShown }: PageTreeContentProps) => (
+  <DndProvider backend={HTML5Backend}>
+    <PageTreeContent isWipPageShown={isWipPageShown} />
+  </DndProvider>
+);

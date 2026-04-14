@@ -1,7 +1,7 @@
 import { ColorScheme } from '@growi/core';
 import { isClient } from '@growi/core/dist/utils';
+import type { ThemeProviderProps, UseThemeProps } from 'next-themes';
 import { ThemeProvider, useTheme } from 'next-themes';
-import type { ThemeProviderProps, UseThemeProps } from 'next-themes/dist/types';
 
 import { useForcedColorScheme } from '~/states/global';
 

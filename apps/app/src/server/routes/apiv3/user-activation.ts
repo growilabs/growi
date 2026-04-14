@@ -1,9 +1,10 @@
+import path from 'node:path';
 import type { IUser } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
-import { format, subSeconds } from 'date-fns';
+import { format } from 'date-fns/format';
+import { subSeconds } from 'date-fns/subSeconds';
 import { body, validationResult } from 'express-validator';
 import mongoose from 'mongoose';
-import path from 'path';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { RegistrationMode } from '~/interfaces/registration-mode';
