@@ -133,7 +133,7 @@ interface InAppNotificationService {
     mentionedUserIds: Types.ObjectId[],
     actionUserId: Types.ObjectId,
     activity: ActivityDocument,
-    snapshot: string,
+    page: IPage,
   ): Promise<void>;
 }
 ```
@@ -142,6 +142,7 @@ interface InAppNotificationService {
 
 **Implementation Notes**
 - Integration: `api.add` にて `res.json()` 送信後、`activityEvent.emit` の**後に**呼び出す
+- Snapshot: `generateSnapshot` は `in-app-notification-utils.ts` で定義されており `comment.js` からはアクセスできないため、`insertMentionNotifications` 内で `generateSnapshot(activity.targetModel, page)` を呼び出して生成する
 - Validation: `mentionedUserIds` が空の場合は早期 return
 - Risks: `insertMany` は7日ウィンドウがないため高頻度コメントで通知が増える可能性。ただしメンションは明示的操作のため許容範囲
 
@@ -152,8 +153,8 @@ interface InAppNotificationService {
 **Implementation Notes**（summary-only）
 
 - `res.json(success)` 送信後に try-catch ブロックを追加
-- `getMentionedUsers(createdComment._id)` → `insertMentionNotifications(mentionedUserIds, req.user._id, res.locals.activity, snapshot)` の順で呼び出す
-- `snapshot` は `generateSnapshot(activity.targetModel, page)` で生成
+- `getMentionedUsers(createdComment._id)` → `insertMentionNotifications(mentionedUserIds, req.user._id, res.locals.activity, page)` の順で呼び出す
+- `page` は `res.json()` 送信前に取得済みのオブジェクトをそのまま渡す
 - 失敗は `logger.error` のみ記録してサイレントフェール（コメント投稿レスポンスはすでに送信済み）
 
 ---

@@ -16,7 +16,7 @@
 
 - [ ] 1.3 コメント投稿 API にメンション通知呼び出しを組み込む
   - `api.add` 内で `res.json()` 送信後に `getMentionedUsers` を呼び出す
-  - `insertMentionNotifications` に取得したユーザー ID、投稿者 ID、アクティビティ、スナップショットを渡す
+  - `insertMentionNotifications` に取得したユーザー ID、投稿者 ID、アクティビティ、page オブジェクトを渡す
   - メンション通知の失敗がコメント投稿レスポンスをブロックしないよう try-catch でサイレントフェールさせる（`logger.error` で記録）
   - _Requirements: 1.1, 1.2, 1.3_
 
