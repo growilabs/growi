@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "//// for production": "",
+    "postinstall": "prisma generate",
     "build": "run-p build:*",
     "start": "next start",
     "build:client": "next build",
