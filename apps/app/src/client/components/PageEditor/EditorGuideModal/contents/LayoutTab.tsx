@@ -1,83 +1,12 @@
 import type React from 'react';
-import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PrismAsyncLight } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
-import { toastError, toastSuccess } from '~/client/util/toastr';
+import type { LayoutGuideItem } from '../components/GuideRow';
+import { GuideRow } from '../components/GuideRow';
 
-interface LayoutGuideItem {
-  id: string;
-  title: string;
-  code: string;
-  preview?: React.ReactNode;
-  minWidth?: string;
-  underContent?: React.ReactNode;
-}
-type GuideRowProps = Omit<LayoutGuideItem, 'id'>;
-const GuideRow = ({
-  title,
-  code,
-  preview,
-  minWidth = '230px',
-  underContent,
-}: GuideRowProps) => {
-  const { t } = useTranslation();
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-      toastSuccess(t('editor_guide.textstyle.copy_done'));
-    } catch (err) {
-      toastError(t('common:failed_to_copy'));
-    }
-  }, [code, t]);
-  return (
-    <section className={title !== '' ? 'mt-4 mb-2' : 'mb-2'}>
-      {title !== '' && <h3 className="fw-bold mb-2 fs-4 text-body">{title}</h3>}
-      <div className="d-flex flex-row flex-wrap align-items-center gap-4 py-1">
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="btn-none p-0 text-start border-0 bg-transparent"
-          style={{ cursor: 'pointer' }}
-        >
-          <div
-            className="text-light p-2 ps-3 pe-5 rounded position-relative"
-            style={{
-              backgroundColor: 'var(--bs-dark)',
-              minWidth,
-              width: 'fit-content',
-            }}
-          >
-            <pre
-              className="m-0 small font-monospace text-white-50"
-              style={{ whiteSpace: 'pre', lineHeight: '1.5' }}
-            >
-              {code}
-            </pre>
-            <small
-              className="position-absolute badge bg-secondary opacity-50"
-              style={{ fontSize: '0.4rem', top: '4px', right: '4px' }}
-            >
-              Click
-            </small>
-          </div>
-        </button>
-        {preview && (
-          <div
-            className="flex-grow-1"
-            style={{
-              minWidth: '250px',
-              flexBasis: '0',
-            }}
-          >
-            <div className="wiki-content small">{preview}</div>
-          </div>
-        )}
-      </div>
-
-      {underContent && <div className="mt-2 w-100">{underContent}</div>}
-    </section>
-  );
-};
+import styles from './LayoutTab.module.scss';
 
 export const LayoutTab: React.FC = () => {
   const { t } = useTranslation();
@@ -160,8 +89,7 @@ export const LayoutTab: React.FC = () => {
           </div>
           <div className="d-flex align-items-center mb-1 ps-4">
             <span
-              className="d-inline-block border border-secondary rounded me-2"
-              style={{ width: '18px', height: '18px' }}
+              className={`d-inline-block border border-secondary rounded me-2 ${styles.checkboxMock}`}
             />
             <span>{t(`${i18nKey}.task`)}1-1</span>
           </div>
@@ -214,17 +142,13 @@ export const LayoutTab: React.FC = () => {
       title: t(`${i18nKey}.code_block`),
       code: `\`\`\`\n${t(`${i18nKey}.code_block_text`)}\n\`\`\``,
       preview: (
-        <div
-          className="rounded p-3 w-100 font-monospace"
-          style={{
-            minWidth: '200px',
-            backgroundColor: 'var(--bs-dark)',
-          }}
+        <PrismAsyncLight
+          style={oneDark}
+          language="markdown"
+          customStyle={{ margin: 0 }}
         >
-          <div className="small text-white-50 lh-base">
-            {t(`${i18nKey}.code_block_text`)}
-          </div>
-        </div>
+          {t(`${i18nKey}.code_block_text`)}
+        </PrismAsyncLight>
       ),
     },
     {
@@ -238,11 +162,8 @@ export const LayoutTab: React.FC = () => {
           `${t(`${i18nKey}.center`)}${t(`${i18nKey}.row_display`)} |`,
       ].join('\n'),
       underContent: (
-        <div className="table-responsive mt-2" style={{ width: 'fit-content' }}>
-          <table
-            className="table table-sm table-bordered mb-0 small text-body"
-            style={{ minWidth: '580px' }}
-          >
+        <div className={`table-responsive mt-2 ${styles.tableContainer}`}>
+          <table className="table table-sm table-bordered mb-0 small text-body">
             <thead>
               <tr className="table-light">
                 <th className="text-start fw-bold p-2 align-middle">
@@ -300,10 +221,7 @@ export const LayoutTab: React.FC = () => {
   ];
 
   return (
-    <div
-      className="px-4 py-3 overflow-y-auto"
-      style={{ maxHeight: '80vh', minWidth: '650px' }}
-    >
+    <div className={`px-4 py-3 overflow-y-auto ${styles.layoutTabContainer}`}>
       {LAYOUT_GUIDES.map((item) => (
         <GuideRow key={item.id} {...item} />
       ))}

@@ -1,7 +1,12 @@
 import type React from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PrismAsyncLight } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
-import { toastSuccess } from '~/client/util/toastr';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+
+import styles from './TextStyleTab.module.scss';
 
 const GuideRow = ({
   title,
@@ -13,10 +18,14 @@ const GuideRow = ({
   preview: React.ReactNode;
 }) => {
   const { t } = useTranslation();
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(code);
-    toastSuccess(t('editor_guide.textstyle.copy_done'));
-  };
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toastSuccess(t('editor_guide.textstyle.copy_done'));
+    } catch (_err) {
+      toastError(t('common:failed_to_copy'));
+    }
+  }, [code, t]);
 
   return (
     <section className={title !== '' ? 'mt-4 mb-1' : 'mb-1'}>
@@ -25,43 +34,27 @@ const GuideRow = ({
         <button
           type="button"
           onClick={handleCopy}
-          style={{ cursor: 'pointer' }}
-          className="flex-shrink-0 border-0 p-0 bg-transparent text-start"
+          className="flex-shrink-0 border-0 p-0 bg-transparent text-start cursor-pointer"
         >
           <div
-            className="bg-dark text-light p-2 ps-2 pe-4 rounded position-relative"
-            style={{
-              backgroundColor: '#2D2E32',
-              width: 'fit-content',
-            }}
+            className={`rounded position-relative overflow-hidden ${styles.codeBlockWrapper}`}
           >
-            <pre
-              className="m-0 small font-monospace"
-              style={{
-                whiteSpace: 'pre',
-                color: '#ABB2BF',
-                fontWeight: 400,
-                fontSize: '14px',
-              }}
+            <PrismAsyncLight
+              style={oneDark}
+              language="markdown"
+              customStyle={{ margin: 0 }}
             >
               {code}
-            </pre>
+            </PrismAsyncLight>
             <small
-              className="position-absolute badge bg-secondary opacity-50"
-              style={{ fontSize: '0.4rem', top: '2px', right: '4px' }}
+              className={`position-absolute badge bg-secondary opacity-50 ${styles.copyBadge}`}
             >
-              Click
+              Copy
             </small>
           </div>
         </button>
-        <div className="flex-grow-1" style={{ whiteSpace: 'nowrap' }}>
-          <div
-            className="wiki-content"
-            style={{
-              fontWeight: 400,
-              fontSize: '14px',
-            }}
-          >
+        <div className="flex-grow-1 text-nowrap">
+          <div className={`wiki-content fw-normal ${styles.wikiPreview}`}>
             {preview}
           </div>
         </div>
@@ -118,26 +111,14 @@ export const TextStyleTab: React.FC = () => {
       title: t(`${i18nKey}.inline_code`),
       code: `\`${t(`${i18nKey}.inline_code`)}\` \n~~~${t(`${i18nKey}.inline_code`)}~~~`,
       preview: (
-        <div className="d-flex flex-column gap-2">
+        <div className="d-flex flex-column gap-2 align-items-start">
           <code
-            className="rounded px-1"
-            style={{
-              width: 'fit-content',
-              color: '#D63384',
-              border: '1px solid #D63384',
-              backgroundColor: 'transparent',
-            }}
+            className={`rounded px-1 d-inline-block bg-transparent ${styles.inlineCodeLabel}`}
           >
             {t(`${i18nKey}.inline_code`)}
           </code>
           <code
-            className="rounded px-1"
-            style={{
-              width: 'fit-content',
-              color: '#D63384',
-              border: '1px solid #D63384',
-              backgroundColor: 'transparent',
-            }}
+            className={`rounded px-1 d-inline-block bg-transparent ${styles.inlineCodeLabel}`}
           >
             {t(`${i18nKey}.inline_code`)}
           </code>
@@ -150,7 +131,7 @@ export const TextStyleTab: React.FC = () => {
       code: `***${t(`${i18nKey}.all_important`)}***`,
       preview: (
         <strong>
-          <u>{t(`${i18nKey}.all_important`).replace('\n', '')}</u>
+          <em>{t(`${i18nKey}.all_important`).replace('\n', '')}</em>
         </strong>
       ),
     },
@@ -196,7 +177,6 @@ export const TextStyleTab: React.FC = () => {
           target="_blank"
           rel="noreferrer"
           className="text-secondary text-decoration-underline"
-          style={{ color: '#777570' }}
           onClick={(e) => e.stopPropagation()}
         >
           {t(`${i18nKey}.link_growi`)}
@@ -212,7 +192,6 @@ export const TextStyleTab: React.FC = () => {
         <a
           href="/Sandbox"
           className="text-secondary text-decoration-underline"
-          style={{ color: '#777570' }}
           onClick={(e) => e.stopPropagation()}
         >
           {t(`${i18nKey}.link_sandbox`)}
@@ -222,7 +201,7 @@ export const TextStyleTab: React.FC = () => {
     },
   ];
   return (
-    <div className="px-4 py-2 overflow-y-auto" style={{ maxHeight: '80vh' }}>
+    <div className={`px-4 py-2 overflow-y-auto ${styles.textStyleTab}`}>
       {TEXT_STYLE_GUIDES.map((item) => (
         <GuideRow
           key={item.id}
