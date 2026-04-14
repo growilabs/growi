@@ -5,7 +5,7 @@
 ---
 
 ## Summary
-- **Feature**: `migrate-logger-to-pino`
+- **Feature**: `growi-logger`
 - **Discovery Scope**: Complex Integration
 - **Key Findings**:
   - Pino and bunyan share identical argument patterns (`logger.info(obj, msg)`) — no call-site changes needed

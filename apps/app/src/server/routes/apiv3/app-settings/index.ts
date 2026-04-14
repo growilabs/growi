@@ -14,6 +14,7 @@ import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
+import { createSMTPClient } from '~/server/service/mail/smtp';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
@@ -724,33 +725,13 @@ module.exports = (crowi: Crowi) => {
       throw Error('fromAddress is not setup');
     }
 
-    const smtpHost = configManager.getConfig('mail:smtpHost');
-    const smtpPort = configManager.getConfig('mail:smtpPort');
-    const smtpUser = configManager.getConfig('mail:smtpUser');
-    const smtpPassword = configManager.getConfig('mail:smtpPassword');
-
-    // Define the option object with possible 'auth' and 'secure' properties
-    const option: {
-      host: string | undefined;
-      port: string | undefined;
-      auth?: { user: string; pass: string };
-      secure?: boolean;
-    } = {
-      host: smtpHost,
-      port: smtpPort,
-    };
-    if (smtpUser && smtpPassword) {
-      option.auth = {
-        user: smtpUser,
-        pass: smtpPassword,
-      };
+    const smtpClient = createSMTPClient(configManager);
+    if (smtpClient == null) {
+      throw Error(
+        'SMTP client could not be created. Please check SMTP settings.',
+      );
     }
-    if (option.port === '465') {
-      option.secure = true;
-    }
-
-    const smtpClient = mailService.createSMTPClient(option);
-    logger.debug('mailer setup for validate SMTP setting', smtpClient);
+    logger.debug({ smtpClient }, 'mailer setup for validate SMTP setting');
 
     const mailOptions = {
       from: fromAddress,
