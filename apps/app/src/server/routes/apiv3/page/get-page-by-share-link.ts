@@ -4,10 +4,9 @@ import { query } from 'express-validator';
 
 import type Crowi from '~/server/crowi';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
-import ShareLink from '~/server/models/share-link';
+import { rejectLinkSharingDisabled } from '~/server/middlewares/reject-link-sharing-disabled';
 import { configManager } from '~/server/service/config-manager';
 import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
-import { validateShareLink } from '~/server/service/share-link';
 import loggerFactory from '~/utils/logger';
 
 import type { ApiV3Response } from '../interfaces/apiv3-response';
@@ -20,7 +19,14 @@ type ReqQuery = {
   shareLinkId: string;
 };
 
-type Req = Request<Record<string, string>, ApiV3Response, undefined, ReqQuery>;
+type Req = Request<
+  Record<string, string>,
+  ApiV3Response,
+  undefined,
+  ReqQuery
+> & {
+  isSharedPage?: boolean;
+};
 
 /**
  * @swagger
@@ -61,8 +67,10 @@ export const getPageByShareLinkHandlerFactory = (
   crowi: Crowi,
 ): RequestHandler[] => {
   const { pageService, pageGrantService } = crowi;
+  const certifySharedPage = require('../../../middlewares/certify-shared-page')(
+    crowi,
+  );
 
-  // Define validators for req.query - both parameters required
   const validator = [
     query('shareLinkId').isMongoId().withMessage('shareLinkId is required'),
     query('pageId').isMongoId().withMessage('pageId is required'),
@@ -71,44 +79,22 @@ export const getPageByShareLinkHandlerFactory = (
   return [
     ...validator,
     apiV3FormValidator,
+    rejectLinkSharingDisabled,
+    certifySharedPage,
     async (req: Req, res: ApiV3Response) => {
-      const { pageId, shareLinkId } = req.query;
+      const { pageId } = req.query;
+
+      if (!req.isSharedPage) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'Share link is not found or has expired',
+            'share-link-invalid',
+          ),
+          404,
+        );
+      }
 
       try {
-        // First gate: Check if link sharing is enabled globally
-        const disableLinkSharing = configManager.getConfig(
-          'security:disableLinkSharing',
-        );
-        if (disableLinkSharing) {
-          return res.apiv3Err(
-            new ErrorV3('Link sharing is disabled', 'link-sharing-disabled'),
-            403,
-          );
-        }
-
-        // Validate ShareLink by ID and page ID in a single query
-        const validationResult = await validateShareLink(
-          ShareLink,
-          shareLinkId,
-          pageId,
-        );
-
-        if (validationResult.type === 'not-found') {
-          return res.apiv3Err(
-            new ErrorV3('Share link not found', 'share-link-not-found'),
-            404,
-          );
-        }
-
-        if (validationResult.type === 'expired') {
-          return res.apiv3Err(
-            new ErrorV3('Share link has expired', 'share-link-expired'),
-            403,
-          );
-        }
-
-        // ShareLink is valid - fetch page data
-        // No user context for share link access - null user for public access
         const pageWithMeta = await findPageAndMetaDataByViewer(
           pageService,
           pageGrantService,
@@ -120,7 +106,6 @@ export const getPageByShareLinkHandlerFactory = (
           },
         );
 
-        // Send response with proper status codes and permission restrictions
         const disableUserPages = configManager.getConfig(
           'security:disableUserPages',
         );
