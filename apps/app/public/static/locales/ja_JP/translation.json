@@ -693,7 +693,9 @@
     }
   },
   "default_ai_assistant": {
-    "not_set": "デフォルトアシスタントが設定されていません"
+    "not_set": "デフォルトアシスタントが設定されていません",
+    "open_cloud_settings_to_enable": "AI 連携を有効にするには GROWI.cloud の管理画面をご確認ください",
+    "to_cloud_settings": "GROWI.cloud の管理画面へ"
   },
   "ai_assistant_substance": {
     "add_assistant": "アシスタントを追加する",
@@ -893,6 +895,11 @@
     "format": "形式",
     "started_on": "開始日時",
     "file_upload_not_configured": "ファイルアップロード設定が完了していません"
+  },
+  "audit_log_bulk_export": {
+    "download_expired": "ダウンロード期限が切れました",
+    "job_expired": "エクスポート時間が長すぎるため、処理が中断されました",
+    "no_results": "指定されたフィルターに一致する監査ログはありませんでした"
   },
   "message": {
     "successfully_connected": "接続に成功しました!",
@@ -1110,6 +1117,23 @@
     "success-toaster": "最新の本文を同期しました",
     "skipped-toaster": "エディターがアクティブではないため、同期をスキップしました。エディターを開いて再度お試しください。",
     "error-toaster": "最新の本文の同期に失敗しました"
+  },
+  "toolbar": {
+    "attachments": "添付ファイル",
+    "bold": "太字",
+    "bullet_list": "箇条書きリスト",
+    "checklist": "チェックリスト",
+    "code": "コード",
+    "diagram": "ダイアグラム",
+    "emoji": "絵文字",
+    "heading": "見出し",
+    "italic": "イタリック",
+    "numbered_list": "番号付きリスト",
+    "quote": "引用",
+    "strikethrough": "取り消し線",
+    "table": "テーブル",
+    "template": "テンプレート",
+    "text_formatting": "テキスト書式"
   },
   "editor_guide": {
     "title": "エディターガイド",

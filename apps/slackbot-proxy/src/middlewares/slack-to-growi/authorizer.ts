@@ -1,6 +1,6 @@
+import type { Logger } from '@growi/logger';
 import { AuthorizeResult, InstallationQuery } from '@slack/oauth';
 import { IMiddleware, Inject, Middleware, Next, Req, Res } from '@tsed/common';
-import Logger from 'bunyan';
 import createError from 'http-errors';
 
 import { SlackOauthReq } from '~/interfaces/slack-to-growi/slack-oauth-req';

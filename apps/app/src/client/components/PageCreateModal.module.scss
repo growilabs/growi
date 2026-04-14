@@ -1,8 +1,8 @@
-.grw-create-page :global {
-  .page-today-input1 {
+.grw-create-page {
+  :global(.page-today-input1) {
     width: 60px;
   }
-  .grw-btn-create-page {
+  :global(.grw-btn-create-page) {
     min-width: 90px;
   }
 }

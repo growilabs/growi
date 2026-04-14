@@ -1,6 +1,6 @@
-.grw-page-path-nav-sticky :global {
-  .sticky-inner-wrapper.active {
-    h1 {
+.grw-page-path-nav-sticky {
+  :global(.sticky-inner-wrapper.active) {
+    :global(h1) {
       font-size: 1.75rem !important;
     }
   }
