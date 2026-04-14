@@ -120,18 +120,26 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     }
 
     // Decide if update activity should generate
+    let shouldGenerateUpdateActivity = false;
     try {
       const targetPageId = getIdStringForRef(updatedPage);
       const currentActivityId = getIdStringForRef(res.locals.activity);
       const currentUserId = req.user ? getIdStringForRef(req.user) : undefined;
 
-      const shouldGenerateUpdateActivity = await shouldGenerateUpdate({
+      shouldGenerateUpdateActivity = await shouldGenerateUpdate({
         currentUserId,
         targetPageId,
         currentActivityId,
       });
+    } catch (err) {
+      logger.error(
+        'Failed to determine whether to generate update activity.',
+        err,
+      );
+    }
 
-      if (shouldGenerateUpdateActivity) {
+    if (shouldGenerateUpdateActivity) {
+      try {
         // persist activity
         const creator =
           updatedPage.creator != null
@@ -150,9 +158,9 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
           { path: updatedPage.path, creator },
           preNotifyService.generatePreNotify,
         );
+      } catch (err) {
+        logger.error('Failed to generate update activity', err);
       }
-    } catch (err) {
-      logger.error('Failed to generate update activity', err);
     }
 
     // global notification
