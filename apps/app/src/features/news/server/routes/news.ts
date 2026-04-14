@@ -25,7 +25,9 @@ const getUserRoles = (user: IUserHasId): string[] => {
  * Creates and returns the news Express router.
  * Accepts an optional Crowi instance for middleware setup.
  */
-export const createNewsRouter = (crowi?: { loginRequired?: unknown }) => {
+export const createNewsRouter = (crowi?: {
+  loginRequired?: unknown;
+}): express.Router => {
   const router = express.Router();
 
   // Use loginRequiredFactory when crowi is provided, otherwise use a pass-through middleware for testing
@@ -171,5 +173,6 @@ export const createNewsRouter = (crowi?: { loginRequired?: unknown }) => {
  * Required by the apiv3 router loader which calls require(...).default(crowi).
  */
 // biome-ignore lint/style/noDefaultExport: required by apiv3 router loader
-export default (crowi: Parameters<typeof loginRequiredFactory>[0]) =>
-  createNewsRouter({ loginRequired: crowi });
+export default (
+  crowi: Parameters<typeof loginRequiredFactory>[0],
+): express.Router => createNewsRouter({ loginRequired: crowi });

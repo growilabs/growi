@@ -135,7 +135,7 @@ export class NewsService {
     } catch (err: unknown) {
       // Ignore duplicate key errors (already read items) — ordered: false continues on duplicates
       if ((err as { code?: number }).code !== 11000) {
-        logger.error('markAllRead failed', err);
+        logger.error({ err }, 'markAllRead failed');
         throw err;
       }
     }
