@@ -1,5 +1,6 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -12,8 +13,6 @@ import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 
 const logger = loggerFactory('growi:routes:apiv3:markdown-setting');
-
-const express = require('express');
 
 const router = express.Router();
 
@@ -121,7 +120,6 @@ const validator = {
  *            type: boolean
  *            description: force indent size
  */
-
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);

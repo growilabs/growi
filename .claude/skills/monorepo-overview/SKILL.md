@@ -64,6 +64,34 @@ turbo run test --filter @growi/app
 turbo run lint --filter @growi/core
 ```
 
+### Build Order Management
+
+Build dependencies in this monorepo are **not** declared with `dependsOn: ["^build"]` (the automatic workspace-dependency mode). Instead, they are declared **explicitly** — either in the root `turbo.json` for legacy entries, or in per-package `turbo.json` files for newer packages.
+
+**When to update**: whenever a package gains a new workspace dependency on another buildable package (one that produces a `dist/`), declare the build-order dependency explicitly. Without it, Turborepo may build in the wrong order, causing missing `dist/` files or type errors.
+
+**Pattern — per-package `turbo.json`** (preferred for new dependencies):
+
+```json
+// packages/my-package/turbo.json
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": { "dependsOn": ["@growi/some-dep#build"] },
+    "dev":   { "dependsOn": ["@growi/some-dep#dev"] }
+  }
+}
+```
+
+- `"extends": ["//"]` inherits all root task definitions; only add the extra `dependsOn`
+- Keep root `turbo.json` clean — package-level overrides live with the package that owns the dependency
+- For packages with multiple tasks (watch, lint, test), mirror the dependency in each relevant task
+
+**Existing examples**:
+- `packages/slack/turbo.json` — `build`/`dev` depend on `@growi/logger`
+- `packages/remark-attachment-refs/turbo.json` — all tasks depend on `@growi/core`, `@growi/logger`, `@growi/remark-growi-directive`, `@growi/ui`
+- Root `turbo.json` — `@growi/ui#build` depends on `@growi/core#build` (pre-dates the per-package pattern)
+
 ## Architectural Principles
 
 ### 1. Feature-Based Architecture (Recommended)
@@ -99,10 +127,27 @@ This enables better code splitting and prevents server-only code from being bund
 
 Common code should be extracted to `packages/`:
 
-- **core**: Utilities, constants, type definitions
+- **core**: Domain hub (see below)
 - **ui**: Reusable React components
 - **editor**: Markdown editor
 - **pluginkit**: Plugin system framework
+
+#### @growi/core — Domain & Utilities Hub
+
+`@growi/core` is the foundational shared package depended on by all other packages (10 consumers). Its responsibilities:
+
+- **Domain type definitions** — Single source of truth for cross-package interfaces (`IPage`, `IUser`, `IRevision`, `Ref<T>`, `HasObjectId`, etc.)
+- **Cross-cutting utilities** — Pure functions for page path validation, ObjectId checks, serialization (e.g., `serializeUserSecurely()`)
+- **System constants** — File types, plugin configs, scope enums
+- **Global type augmentations** — Runtime/polyfill type declarations visible to all consumers (e.g., `RegExp.escape()` via `declare global` in `index.ts`)
+
+Key patterns:
+
+1. **Shared types and global augmentations go in `@growi/core`** — Not duplicated per-package. `declare global` in `index.ts` propagates to all consumers through the module graph.
+2. **Subpath exports for granular imports** — `@growi/core/dist/utils/page-path-utils` instead of barrel imports from root.
+3. **Minimal runtime dependencies** — Only `bson-objectid`; ~70% types. Safe to import from both server and client contexts.
+4. **Server-specific interfaces are namespaced** — Under `interfaces/server/`.
+5. **Dual format (ESM + CJS)** — Built via Vite with `preserveModules: true` and `vite-plugin-dts` (`copyDtsFiles: true`).
 
 ## Version Management with Changeset
 

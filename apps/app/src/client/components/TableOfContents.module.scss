@@ -1,29 +1,29 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.revision-toc :global {
+.revision-toc {
   // to get on the Attachment row
   z-index: 1;
   padding: 5px;
   font-size: 0.9em;
   border-bottom: 1px solid transparent;
 
-  .revision-toc-content {
-    ul {
+  :global(.revision-toc-content) {
+    :global(ul) {
       list-style-type: disc;
     }
 
-    li {
+    :global(li) {
       margin: 6px;
     }
-    > ul {
+    > :global(ul) {
       padding-left: 0;
-      ul {
+      :global(ul) {
         padding-left: 1em;
       }
     }
 
     // first level of li
-    > ul > li {
+    > :global(ul > li) {
       padding: 5px;
       margin-left: 17px;
     }
@@ -42,9 +42,9 @@
 
 
 // == Colors
-.revision-toc :global {
-  .revision-toc-content {
-    ::marker {
+.revision-toc {
+  :global(.revision-toc-content) {
+    :global(::marker) {
       color: var(--bs-tertiary-color);
     }
   }

@@ -37,7 +37,7 @@ jobs:
           type=raw,value=${{ steps.package-json.outputs.packageVersion }}.{{sha}}
 
   build-image-rc:
-    uses: growilabs/growi/.github/workflows/reusable-app-build-image.yml@master
+    uses: growilabs/growi/.github/workflows/reusable-app-build-image.yml@rc/v7.5.x-node24
     with:
       image-name: growilabs/growi
       tag-temporary: latest-rc
@@ -47,7 +47,7 @@ jobs:
   publish-image-rc:
     needs: [determine-tags, build-image-rc]
 
-    uses: growilabs/growi/.github/workflows/reusable-app-create-manifests.yml@master
+    uses: growilabs/growi/.github/workflows/reusable-app-create-manifests.yml@rc/v7.5.x-node24
     with:
       tags: ${{ needs.determine-tags.outputs.TAGS }}
       registry: docker.io

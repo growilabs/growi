@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Remark plugin to list pages",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "keywords": [
     "growi",
     "growi-plugin"
@@ -16,7 +16,7 @@
     "build": "run-p build:*",
     "build:client": "vite build -c vite.client.config.ts",
     "build:server": "vite build -c vite.server.config.ts",
-    "clean": "shx rm -rf dist",
+    "clean": "rimraf dist",
     "dev": "run-p dev:*",
     "dev:client": "vite build -c vite.client.config.ts --mode dev",
     "dev:server": "vite build -c vite.server.config.ts --mode dev",
@@ -29,14 +29,12 @@
     "lint": "run-p lint:*",
     "test": "vitest run --coverage"
   },
-  "// comments for dependencies": {
-    "escape-string-regexp": "5.0.0 or above exports only ESM"
-  },
+  "// comments for dependencies": {},
   "dependencies": {
     "@growi/core": "workspace:^",
+    "@growi/logger": "workspace:^",
     "@growi/remark-growi-directive": "workspace:^",
     "@growi/ui": "workspace:^",
-    "escape-string-regexp": "^4.0.0",
     "express": "^4.20.0",
     "express-validator": "^6.14.0",
     "http-errors": "^2.0.0",
@@ -56,7 +54,7 @@
     "unist-util-visit": "^5.0.0"
   },
   "peerDependencies": {
-    "next": "^14",
+    "next": "^16",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   }

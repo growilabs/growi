@@ -655,7 +655,9 @@
     }
   },
   "default_ai_assistant": {
-    "not_set": "L'assistant par défaut n'est pas configuré"
+    "not_set": "L'assistant par défaut n'est pas configuré",
+    "open_cloud_settings_to_enable": "Veuillez consulter l'écran de gestion GROWI.cloud pour activer l'intégration AI",
+    "to_cloud_settings": "Ouvrir les paramètres GROWI.cloud"
   },
   "ai_assistant_substance": {
     "add_assistant": "Ajouter un assistant",
@@ -855,6 +857,11 @@
     "format": "Format",
     "started_on": "Commencé le",
     "file_upload_not_configured": "Les paramètres de téléchargement de fichiers ne sont pas configurés"
+  },
+  "audit_log_bulk_export": {
+    "download_expired": "La période de téléchargement a expiré",
+    "job_expired": "Le processus d'exportation a été annulé car il a pris trop de temps",
+    "no_results": "Aucun journal d'audit ne correspondait aux filtres spécifiés"
   },
   "message": {
     "successfully_connected": "Connecté!",
@@ -1069,6 +1076,23 @@
     "success-toaster": "Dernière révision synchronisée",
     "skipped-toaster": "Le mode édition doit être activé pour déclencher la synchronisation. Synchronisation annulée.",
     "error-toaster": "Synchronisation échouée"
+  },
+  "toolbar": {
+    "attachments": "Pièces jointes",
+    "bold": "Gras",
+    "bullet_list": "Liste à puces",
+    "checklist": "Liste de contrôle",
+    "code": "Code",
+    "diagram": "Diagramme",
+    "emoji": "Emoji",
+    "heading": "Titre",
+    "italic": "Italique",
+    "numbered_list": "Liste numérotée",
+    "quote": "Citation",
+    "strikethrough": "Barré",
+    "table": "Tableau",
+    "template": "Modèle",
+    "text_formatting": "Mise en forme du texte"
   },
 
   "editor_guide": {
