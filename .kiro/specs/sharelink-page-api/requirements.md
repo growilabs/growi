@@ -6,7 +6,7 @@
 
 現行の `/_api/v3/page` ルートは、通常の認証アクセスと share link アクセスの両方を単一ルートで処理している。ミドルウェアチェーン（`accessTokenParser → certifySharedPage → loginRequired`）と handler 内の条件分岐によって混在しており、コードの可読性と保守性に課題がある。
 
-本機能では share link アクセス専用のエンドポイントを分離することで、責務を明確化する。同時に、既存のサービス関数（`findPageAndMetaDataByViewer` 等）を最大限に再利用し、ロジックの重複を最小化することを設計原則とする。
+本機能では share link アクセス専用のエンドポイントを分離することで、責務を明確化する。同時に、既存のミドルウェア・サービス関数を最大限に再利用し、ロジックの重複を最小化することを設計原則とする。
 
 ---
 
@@ -27,15 +27,13 @@
 
 ### Requirement 2: シェアリンクの検証
 
-**Objective:** As a GROWI システム, I want strict share link validation before returning any page data, so that 無効・期限切れのリンクからページデータが漏洩しない。
+**Objective:** As a GROWI システム, I want share link validation before returning any page data, so that 無効・期限切れのリンクからページデータが漏洩しない。
 
 #### Acceptance Criteria
 
-1. When a request is received, the Share Link Page API shall verify that a ShareLink document with the specified `shareLinkId` exists in the database.
-2. When a request is received, the Share Link Page API shall verify that the ShareLink's `relatedPage` field matches the specified `pageId`.
-3. If the ShareLink document does not exist, or its `relatedPage` does not match `pageId`, the Share Link Page API shall return a 404 error response without exposing any page data.
-4. If the ShareLink has an `expiredAt` value earlier than the current time, the Share Link Page API shall return a 403 error response.
-5. While link sharing is disabled via the `security:disableLinkSharing` configuration, the Share Link Page API shall return a 403 error response for all requests regardless of link validity.
+1. When a request is received, the Share Link Page API shall verify that a ShareLink document with the specified `shareLinkId` exists in the database and its `relatedPage` field matches the specified `pageId`.
+2. If the ShareLink document does not exist, its `relatedPage` does not match `pageId`, or the ShareLink has expired, the Share Link Page API shall return a 404 error response without exposing any page data.
+3. While link sharing is disabled via the `security:disableLinkSharing` configuration, the Share Link Page API shall return a 403 error response for all requests regardless of link validity.
 
 ---
 
@@ -66,11 +64,11 @@
 
 ### Requirement 5: コード重複の最小化
 
-**Objective:** As a 開発者, I want the share link endpoint to reuse existing service layer code, so that ロジックの重複による保守コストとバグリスクを低減できる。
+**Objective:** As a 開発者, I want the share link endpoint to reuse existing middleware and service layer code, so that ロジックの重複による保守コストとバグリスクを低減できる。
 
 #### Acceptance Criteria
 
 1. The Share Link Page API shall reuse the existing page data retrieval service function (e.g., `findPageAndMetaDataByViewer`) with the `isSharedPage: true` option, rather than reimplementing page fetch and metadata computation logic.
-2. Where share link validation logic currently exists in `certifySharedPage` middleware, the Share Link Page API shall extract it as a reusable function or middleware, rather than duplicating the validation inline.
-3. The Share Link Page API implementation shall not duplicate the page response serialization logic already present in the existing `/_api/v3/page` route handler.
+2. The Share Link Page API shall reuse the existing `certifySharedPage` middleware for ShareLink validation, rather than duplicating the validation logic.
+3. The Share Link Page API implementation shall not duplicate the page response serialization logic already present in the existing `/_api/v3/page` route handler. The extracted `respondWithSinglePage` utility shall be shared between both endpoints.
 4. Where applicable, common request validators (e.g., `pageId` format checks) shall be shared between the dedicated endpoint and the existing route rather than redefined.
