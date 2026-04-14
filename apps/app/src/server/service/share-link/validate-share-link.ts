@@ -27,9 +27,10 @@ export async function validateShareLink(
   pageId: string,
 ): Promise<ValidateShareLinkResult> {
   // Query with both _id and relatedPage for single-pass validation
+  // Use $eq to force literal comparisons for untrusted inputs.
   const shareLink = await shareLinkModel.findOne({
-    _id: shareLinkId,
-    relatedPage: pageId,
+    _id: { $eq: shareLinkId },
+    relatedPage: { $eq: pageId },
   });
 
   // Handle not found or page mismatch
