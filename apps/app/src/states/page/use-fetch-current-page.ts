@@ -147,7 +147,7 @@ const buildApiParams = ({
   if (fetchPageArgs?.pageId != null) {
     params.pageId = fetchPageArgs.pageId;
   }
-  // priority B: currentPageId for share link (required by certifySharedPage middleware)
+  // priority B: currentPageId for share link (required by /page/shared endpoint)
   else if (shareLinkId != null && currentPageId != null) {
     params.pageId = currentPageId;
   } else if (decodedPathname != null) {
