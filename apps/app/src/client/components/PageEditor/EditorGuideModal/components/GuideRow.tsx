@@ -10,7 +10,7 @@ import styles from './GuideRow.module.scss';
 export interface LayoutGuideItem {
   id: string;
   title?: string;
-  code: string;
+  code?: string;
   preview?: React.ReactNode;
   minWidth?: string;
   underContent?: React.ReactNode;
@@ -28,6 +28,8 @@ export const GuideRow = ({
   const { t } = useTranslation();
   const handleCopy = useCallback(async () => {
     try {
+      if (code == null) return;
+
       await navigator.clipboard.writeText(code);
       toastSuccess(t('editor_guide.textstyle.copy_done'));
     } catch (_err) {
@@ -51,22 +53,29 @@ export const GuideRow = ({
           className={`${styles.copyButton} ${isFullWidth ? 'w-100 flex-grow-1' : 'flex-grow-0 flex-shrink-0'}`}
           style={{ minWidth: isFullWidth ? '100%' : minWidth }}
         >
-          <div
-            className={`${styles.codeBox} p-2 ps-2 pe-5 rounded overflow-hidden position-relative ${isFullWidth ? 'w-100' : ''}`}
-            style={{ background }}
-          >
-            <pre
-              className={`${styles.codePre} small font-monospace ${isFullWidth ? 'text-wrap' : ''}`}
-              style={{ color }}
+          {code != null && (
+            <div
+              className={`${styles.codeBox} p-2 ps-2 pe-5 rounded overflow-hidden position-relative ${isFullWidth ? 'w-100' : ''}`}
+              style={{ background }}
             >
-              {code}
-            </pre>
-            <small
-              className={`position-absolute badge bg-secondary opacity-50 ${styles.copyBadge}`}
-            >
-              Copy
-            </small>
-          </div>
+              <pre
+                className={`${styles.codePre} small font-monospace ${isFullWidth ? 'text-wrap' : ''}`}
+                style={{ color }}
+              >
+                {code}
+              </pre>
+              <small
+                className={`position-absolute badge bg-secondary opacity-50 ${styles.copyBadge}`}
+              >
+                Copy
+              </small>
+            </div>
+          )}
+          {code == null && (
+            <span className="text-secondary">
+              ({t('editor_guide.decoration.alert_unavailable')})
+            </span>
+          )}
         </button>
 
         {preview && (

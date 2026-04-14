@@ -1133,6 +1133,7 @@
       "alert": "Alerte",
       "alert_with_custom_title": "Alerte avec étiquette",
       "alert_with_custom_title_text": "Titre personnalisé",
+      "alert_unavailable": "Non disponible pour ce style",
       "badge": "Badge",
       "text_color": "Couleur du texte",
       "back_color": "Couleur d'arrière-plan",

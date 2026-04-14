@@ -1141,6 +1141,7 @@
       "alert": "Alert",
       "alert_with_custom_title": "Alert with label",
       "alert_with_custom_title_text": "Custom Title",
+      "alert_unavailable": "Unavailable in this style",
       "badge": "Badge",
       "text_color": "Text Color",
       "back_color": "Background Color",

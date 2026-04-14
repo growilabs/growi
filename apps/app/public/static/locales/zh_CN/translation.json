@@ -1146,6 +1146,7 @@
       "alert": "提示",
       "alert_with_custom_title": "带标签的提示",
       "alert_with_custom_title_text": "自定义标题",
+      "alert_unavailable": "此样式不可用",
       "badge": "徽章",
       "text_color": "文本颜色",
       "back_color": "背景颜色",

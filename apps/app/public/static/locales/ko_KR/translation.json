@@ -1101,6 +1101,7 @@
       "alert": "알림",
       "alert_with_custom_title": "레이블이 있는 알림",
       "alert_with_custom_title_text": "사용자 정의 제목",
+      "alert_unavailable": "이 스타일에서는 사용할 수 없습니다",
       "badge": "배지",
       "text_color": "텍스트 색상",
       "back_color": "배경 색상",

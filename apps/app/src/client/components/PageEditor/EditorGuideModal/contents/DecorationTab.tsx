@@ -26,20 +26,15 @@ const BOOTSTRAP_STYLES = [
 ] as const;
 type BOOTSTRAP_STYLES = (typeof BOOTSTRAP_STYLES)[number];
 
-// exclude 'secondary' as it's not suitable for callout style
-const CALLOUT_STYLES = BOOTSTRAP_STYLES.filter(
-  (style) => style !== 'secondary',
-);
-type CALLOUT_STYLES = (typeof CALLOUT_STYLES)[number];
-
-const BOOTSTRAP_STYLES_TO_CALLOUT_CONFIGS_MAPPINGS: Record<
-  CALLOUT_STYLES,
-  { icon: string; calloutType: string }
+const BOOTSTRAP_STYLES_TO_CONFIGS_MAPPINGS: Record<
+  BOOTSTRAP_STYLES,
+  { icon: string; calloutType?: string }
 > = {
   primary: {
     icon: 'feedback',
     calloutType: 'important',
   },
+  secondary: { icon: 'label' },
   info: { icon: 'info', calloutType: 'note' },
   success: { icon: 'lightbulb', calloutType: 'tip' },
   warning: { icon: 'warning', calloutType: 'warning' },
@@ -49,90 +44,93 @@ const BOOTSTRAP_STYLES_TO_CALLOUT_CONFIGS_MAPPINGS: Record<
 export const DecorationTab: React.FC = () => {
   const { t } = useTranslation();
   const i18nKey = 'editor_guide.decoration';
-  const [currentStyle, setCurrentStyle] = useState<
-    BOOTSTRAP_STYLES | CALLOUT_STYLES
-  >('primary');
+  const [currentStyle, setCurrentStyle] = useState<BOOTSTRAP_STYLES>('primary');
   const [isOpen, setIsOpen] = useState(false);
 
   const { data: previewOptions } = usePreviewOptions();
 
-  const calloutConfig: { icon: string; calloutType: string } =
-    BOOTSTRAP_STYLES_TO_CALLOUT_CONFIGS_MAPPINGS[currentStyle];
+  const calloutConfig: { icon: string; calloutType?: string } =
+    BOOTSTRAP_STYLES_TO_CONFIGS_MAPPINGS[currentStyle];
   const displayName =
     currentStyle.charAt(0).toUpperCase() + currentStyle.slice(1);
 
   const LAYOUT_GUIDES: LayoutGuideItem[] = useMemo(
-    () => [
-      {
-        id: 'alert',
-        title: t(`${i18nKey}.alert`),
-        code: `> [!${calloutConfig.calloutType.toUpperCase()}]\n> ${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}`,
-        preview: (
-          <ReactMarkdown
-            {...previewOptions}
-          >{`> [!${calloutConfig.calloutType.toUpperCase()}]\n> ${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}`}</ReactMarkdown>
-        ),
-      },
-      {
-        id: 'alert2',
-        code: `:::${calloutConfig.calloutType}\n${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}\n:::`,
-        preview: (
-          <ReactMarkdown
-            {...previewOptions}
-          >{`:::${calloutConfig.calloutType}\n${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}\n:::`}</ReactMarkdown>
-        ),
-      },
-      {
-        id: 'alert3',
-        title: t(`${i18nKey}.alert_with_custom_title`),
-        code: `:::${calloutConfig.calloutType}[${t(`${i18nKey}.alert_with_custom_title_text`)}]\n${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}\n:::`,
-        preview: (
-          <ReactMarkdown
-            {...previewOptions}
-          >{`:::${calloutConfig.calloutType}[${t(`${i18nKey}.alert_with_custom_title_text`)}]\n${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}\n:::`}</ReactMarkdown>
-        ),
-      },
-      {
-        id: 'badge',
-        title: t(`${i18nKey}.badge`),
-        code: `<span class="badge text-bg-${currentStyle}">${t(`${i18nKey}.badge`)}</span>`,
-        preview: (
-          <span className={`badge text-bg-${currentStyle}`}>
-            {t(`${i18nKey}.badge`)}
-          </span>
-        ),
-      },
-      {
-        id: 'text-color',
-        title: t(`${i18nKey}.text_color`),
-        code: `<p class="text-${currentStyle}">${t(`${i18nKey}.placeholder`)}</p>`,
-        underContent: (
-          <p className={`text-${currentStyle} m-0`}>
-            {t(`${i18nKey}.placeholder`)}
-          </p>
-        ),
-      },
-      {
-        id: 'back-color',
-        title: t(`${i18nKey}.back_color`),
-        code: `<p class="text-bg-${currentStyle}">${t(`${i18nKey}.placeholder`)}</p>`,
-        underContent: (
-          <p className={`text-bg-${currentStyle} px-2 m-0`}>
-            {t(`${i18nKey}.placeholder`)}
-          </p>
-        ),
-      },
-      {
-        id: 'alert-block',
-        title: t(`${i18nKey}.alert_block`),
-        code: `<div class="alert alert-${currentStyle}" role="alert">\n  ${t(`${i18nKey}.placeholder`)}\n</div>`,
-        underContent: (
-          <div className={`alert alert-${currentStyle} m-0`}>
-            {t(`${i18nKey}.placeholder`)}
-          </div>
-        ),
-      },
-    ],
+    () =>
+      [
+        currentStyle !== 'secondary' && {
+          id: 'alert',
+          title: t(`${i18nKey}.alert`),
+          code: `> [!${calloutConfig.calloutType?.toUpperCase()}]\n> ${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}`,
+          preview: (
+            <ReactMarkdown
+              {...previewOptions}
+            >{`> [!${calloutConfig.calloutType?.toUpperCase()}]\n> ${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}`}</ReactMarkdown>
+          ),
+        },
+        currentStyle !== 'secondary' && {
+          id: 'alert2',
+          code: `:::${calloutConfig.calloutType}\n${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}\n:::`,
+          preview: (
+            <ReactMarkdown
+              {...previewOptions}
+            >{`:::${calloutConfig.calloutType}\n${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}\n:::`}</ReactMarkdown>
+          ),
+        },
+        currentStyle !== 'secondary' && {
+          id: 'alert3',
+          title: t(`${i18nKey}.alert_with_custom_title`),
+          code: `:::${calloutConfig.calloutType}[${t(`${i18nKey}.alert_with_custom_title_text`)}]\n${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}\n:::`,
+          preview: (
+            <ReactMarkdown
+              {...previewOptions}
+            >{`:::${calloutConfig.calloutType}[${t(`${i18nKey}.alert_with_custom_title_text`)}]\n${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}\n:::`}</ReactMarkdown>
+          ),
+        },
+        currentStyle === 'secondary' && {
+          id: 'alert_empty',
+          title: t(`${i18nKey}.alert`),
+        },
+        {
+          id: 'badge',
+          title: t(`${i18nKey}.badge`),
+          code: `<span class="badge text-bg-${currentStyle}">${t(`${i18nKey}.badge`)}</span>`,
+          preview: (
+            <span className={`badge text-bg-${currentStyle}`}>
+              {t(`${i18nKey}.badge`)}
+            </span>
+          ),
+        },
+        {
+          id: 'text-color',
+          title: t(`${i18nKey}.text_color`),
+          code: `<p class="text-${currentStyle}">${t(`${i18nKey}.placeholder`)}</p>`,
+          underContent: (
+            <p className={`text-${currentStyle} m-0`}>
+              {t(`${i18nKey}.placeholder`)}
+            </p>
+          ),
+        },
+        {
+          id: 'back-color',
+          title: t(`${i18nKey}.back_color`),
+          code: `<p class="text-bg-${currentStyle}">${t(`${i18nKey}.placeholder`)}</p>`,
+          underContent: (
+            <p className={`text-bg-${currentStyle} px-2 m-0`}>
+              {t(`${i18nKey}.placeholder`)}
+            </p>
+          ),
+        },
+        {
+          id: 'alert-block',
+          title: t(`${i18nKey}.alert_block`),
+          code: `<div class="alert alert-${currentStyle}" role="alert">\n  ${t(`${i18nKey}.placeholder`)}\n</div>`,
+          underContent: (
+            <div className={`alert alert-${currentStyle} m-0`}>
+              {t(`${i18nKey}.placeholder`)}
+            </div>
+          ),
+        },
+      ].filter((item) => item !== false) as LayoutGuideItem[],
     [currentStyle, t, previewOptions, calloutConfig.calloutType],
   );
 
@@ -156,7 +154,7 @@ export const DecorationTab: React.FC = () => {
             </span>
           </DropdownToggle>
           <DropdownMenu className={styles.dropdownMenu}>
-            {CALLOUT_STYLES.map((style) => (
+            {BOOTSTRAP_STYLES.map((style) => (
               <DropdownItem
                 key={style}
                 active={currentStyle === style}
@@ -164,7 +162,7 @@ export const DecorationTab: React.FC = () => {
                 onClick={() => setCurrentStyle(style)}
               >
                 <span className="material-symbols-outlined">
-                  {BOOTSTRAP_STYLES_TO_CALLOUT_CONFIGS_MAPPINGS[style].icon}
+                  {BOOTSTRAP_STYLES_TO_CONFIGS_MAPPINGS[style].icon}
                 </span>
                 {style.charAt(0).toUpperCase() + style.slice(1)}
               </DropdownItem>

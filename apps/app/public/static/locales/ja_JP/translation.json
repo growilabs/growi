@@ -1174,6 +1174,7 @@
       "alert": "アラート",
       "alert_with_custom_title": "ラベル付きアラート",
       "alert_with_custom_title_text": "カスタムタイトル",
+      "alert_unavailable": "このスタイルでは使用できません",
       "badge": "バッジ",
       "text_color": "テキストカラー",
       "back_color": "背景色",
