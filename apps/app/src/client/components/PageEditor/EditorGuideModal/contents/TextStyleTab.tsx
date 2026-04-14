@@ -1,6 +1,8 @@
 import type React from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PrismAsyncLight } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
 
@@ -35,13 +37,15 @@ const GuideRow = ({
           className="flex-shrink-0 border-0 p-0 bg-transparent text-start cursor-pointer"
         >
           <div
-            className={`p-2 ps-2 pe-5 rounded position-relative bg-dark ${styles.codeBlockWrapper}`}
+            className={`rounded position-relative overflow-hidden ${styles.codeBlockWrapper}`}
           >
-            <pre
-              className={`m-0 small font-monospace fw-normal text-white-50 ${styles.codeContent}`}
+            <PrismAsyncLight
+              style={oneDark}
+              language="markdown"
+              customStyle={{ margin: 0 }}
             >
               {code}
-            </pre>
+            </PrismAsyncLight>
             <small
               className={`position-absolute badge bg-secondary opacity-50 ${styles.copyBadge}`}
             >

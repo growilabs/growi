@@ -1,5 +1,7 @@
 import type React from 'react';
 import { useTranslation } from 'react-i18next';
+import { PrismAsyncLight } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
 import type { LayoutGuideItem } from '../components/GuideRow';
 import { GuideRow } from '../components/GuideRow';
@@ -140,16 +142,13 @@ export const LayoutTab: React.FC = () => {
       title: t(`${i18nKey}.code_block`),
       code: `\`\`\`\n${t(`${i18nKey}.code_block_text`)}\n\`\`\``,
       preview: (
-        <div
-          className="rounded p-3 w-100 font-monospace bg-dark"
-          style={{
-            minWidth: '200px',
-          }}
+        <PrismAsyncLight
+          style={oneDark}
+          language="markdown"
+          customStyle={{ margin: 0 }}
         >
-          <div className="small text-white-50 lh-base">
-            {t(`${i18nKey}.code_block_text`)}
-          </div>
-        </div>
+          {t(`${i18nKey}.code_block_text`)}
+        </PrismAsyncLight>
       ),
     },
     {

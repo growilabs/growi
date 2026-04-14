@@ -14,12 +14,6 @@
   width: fit-content;
 }
 
-.codePre {
-  margin: 0;
-  line-height: bs.$line-height-base;
-  white-space: pre;
-}
-
 .copyBadge {
   top: map.get(bs.$spacers, 1);
   right: map.get(bs.$spacers, 1);

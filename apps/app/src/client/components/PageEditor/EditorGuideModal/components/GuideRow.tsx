@@ -1,7 +1,8 @@
-import type React from 'react';
+import type { ReactNode } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import oneDark from 'react-syntax-highlighter/dist/esm/styles/prism/one-dark';
+import { PrismAsyncLight } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
 
@@ -11,9 +12,9 @@ export interface LayoutGuideItem {
   id: string;
   title?: string;
   code?: string;
-  preview?: React.ReactNode;
+  preview?: ReactNode;
   minWidth?: string;
-  underContent?: React.ReactNode;
+  underContent?: ReactNode;
 }
 
 export type GuideRowProps = Omit<LayoutGuideItem, 'id'>;
@@ -39,10 +40,6 @@ export const GuideRow = ({
 
   const isFullWidth = minWidth === '100%' || !preview;
 
-  const { background, color } = oneDark[
-    'pre[class*="language-"]'
-  ] as React.CSSProperties;
-
   return (
     <section className={title ? 'mt-4 mb-2' : 'mb-2'}>
       {title && <h3 className="fw-bold mb-2 fs-5 text-body">{title}</h3>}
@@ -55,15 +52,16 @@ export const GuideRow = ({
         >
           {code != null && (
             <div
-              className={`${styles.codeBox} p-2 ps-2 pe-5 rounded overflow-hidden position-relative ${isFullWidth ? 'w-100' : ''}`}
-              style={{ background }}
+              className={`${styles.codeBox} rounded overflow-hidden position-relative ${isFullWidth ? 'w-100' : ''}`}
             >
-              <pre
-                className={`${styles.codePre} small font-monospace ${isFullWidth ? 'text-wrap' : ''}`}
-                style={{ color }}
+              <PrismAsyncLight
+                style={oneDark}
+                language="markdown"
+                customStyle={{ margin: 0 }}
+                wrapLongLines={isFullWidth}
               >
                 {code}
-              </pre>
+              </PrismAsyncLight>
               <small
                 className={`position-absolute badge bg-secondary opacity-50 ${styles.copyBadge}`}
               >
