@@ -3,6 +3,7 @@ import { getIdStringForRef } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { SupportedAction } from '~/interfaces/activity';
+import Activity from '~/server/models/activity';
 
 type GenerateUpdatePayload = {
   currentUserId: string | undefined;
@@ -21,7 +22,6 @@ export const shouldGenerateUpdate = async (payload: GenerateUpdatePayload) => {
   }
 
   // Get most recent update or create activity on the page
-  const Activity = mongoose.model('Activity');
   const lastContentActivity = await Activity.findOne({
     target: targetPageId,
     action: {
@@ -34,6 +34,7 @@ export const shouldGenerateUpdate = async (payload: GenerateUpdatePayload) => {
   }).sort({ createdAt: -1 });
 
   const isLastActivityByMe =
+    lastContentActivity != null &&
     getIdStringForRef(lastContentActivity?.user) === currentUserId;
   const lastActivityTime = lastContentActivity?.createdAt?.getTime?.() ?? 0;
   const timeSinceLastActivityMs = Date.now() - lastActivityTime;
