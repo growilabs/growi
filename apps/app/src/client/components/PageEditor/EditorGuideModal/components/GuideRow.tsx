@@ -9,7 +9,7 @@ import styles from './GuideRow.module.scss';
 
 export interface LayoutGuideItem {
   id: string;
-  title: string;
+  title?: string;
   code: string;
   preview?: React.ReactNode;
   minWidth?: string;
@@ -42,8 +42,8 @@ export const GuideRow = ({
   ] as React.CSSProperties;
 
   return (
-    <section className={title !== '' ? 'mt-4 mb-2' : 'mb-2'}>
-      {title !== '' && <h3 className="fw-bold mb-2 fs-5 text-body">{title}</h3>}
+    <section className={title ? 'mt-4 mb-2' : 'mb-2'}>
+      {title && <h3 className="fw-bold mb-2 fs-5 text-body">{title}</h3>}
       <div className="d-flex flex-row flex-wrap align-items-center gap-4 py-1">
         <button
           type="button"
