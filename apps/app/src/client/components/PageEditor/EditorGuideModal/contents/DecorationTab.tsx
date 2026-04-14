@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import ReactMarkdown from 'react-markdown';
 import {
   Dropdown,
   DropdownItem,
@@ -8,97 +9,95 @@ import {
   DropdownToggle,
 } from 'reactstrap';
 
+import { usePreviewOptions } from '~/stores/renderer';
+
 import type { LayoutGuideItem } from '../components/GuideRow';
 import { GuideRow } from '../components/GuideRow';
 
 import styles from './DecorationTab.module.scss';
 
-const BOOTSTRAP_COLORS = [
+const BOOTSTRAP_STYLES = [
   'primary',
-  'danger',
   'secondary',
+  'info',
   'success',
   'warning',
-  'info',
-  'light',
-  'dark',
+  'danger',
 ] as const;
-type BootstrapColor = (typeof BOOTSTRAP_COLORS)[number];
+type BOOTSTRAP_STYLES = (typeof BOOTSTRAP_STYLES)[number];
+
+// exclude 'secondary' as it's not suitable for callout style
+const CALLOUT_STYLES = BOOTSTRAP_STYLES.filter(
+  (style) => style !== 'secondary',
+);
+type CALLOUT_STYLES = (typeof CALLOUT_STYLES)[number];
+
+const BOOTSTRAP_STYLES_TO_CALLOUT_CONFIGS_MAPPINGS: Record<
+  CALLOUT_STYLES,
+  { icon: string; calloutType: string }
+> = {
+  primary: {
+    icon: 'feedback',
+    calloutType: 'important',
+  },
+  info: { icon: 'info', calloutType: 'note' },
+  success: { icon: 'lightbulb', calloutType: 'tip' },
+  warning: { icon: 'warning', calloutType: 'warning' },
+  danger: { icon: 'report', calloutType: 'caution' },
+};
 
 export const DecorationTab: React.FC = () => {
   const { t } = useTranslation();
   const i18nKey = 'editor_guide.decoration';
-  const [currentStyle, setCurrentStyle] = useState<BootstrapColor>('primary');
+  const [currentStyle, setCurrentStyle] = useState<
+    BOOTSTRAP_STYLES | CALLOUT_STYLES
+  >('primary');
   const [isOpen, setIsOpen] = useState(false);
 
-  const colorConfigs: Record<BootstrapColor, { icon: string; prefix: string }> =
-    {
-      primary: { icon: 'chat', prefix: '[!IMPORTANT]' },
-      danger: { icon: 'error', prefix: '[!CAUTION]' },
-      secondary: { icon: 'sell', prefix: '[!NOTE]' },
-      success: { icon: 'check_circle', prefix: '[!TIP]' },
-      warning: { icon: 'warning', prefix: '[!WARNING]' },
-      info: { icon: 'info', prefix: '[!NOTE]' },
-      light: { icon: 'light_mode', prefix: '[!NOTE]' },
-      dark: { icon: 'dark_mode', prefix: '[!IMPORTANT]' },
-    };
+  const { data: previewOptions } = usePreviewOptions();
 
-  const styleConfig = useMemo(() => {
-    const config = colorConfigs[currentStyle];
-    return {
-      colorName: currentStyle,
-      displayName: currentStyle.charAt(0).toUpperCase() + currentStyle.slice(1),
-      iconName: config.icon,
-      alertPrefix: config.prefix,
-      alertLabel: t(`${i18nKey}.${currentStyle}_label`, {
-        defaultValue: currentStyle.toUpperCase(),
-      }),
-      alertText: t(`${i18nKey}.${currentStyle}_text`, {
-        defaultValue: t(`${i18nKey}.placeholder`),
-      }),
-    };
-  }, [currentStyle, t]);
+  const calloutConfig: { icon: string; calloutType: string } =
+    BOOTSTRAP_STYLES_TO_CALLOUT_CONFIGS_MAPPINGS[currentStyle];
+  const displayName =
+    currentStyle.charAt(0).toUpperCase() + currentStyle.slice(1);
 
   const LAYOUT_GUIDES: LayoutGuideItem[] = useMemo(
     () => [
       {
         id: 'alert',
         title: t(`${i18nKey}.alert`),
-        code: `> ${styleConfig.alertPrefix}\n> ${styleConfig.alertText}`,
+        code: `> [!${calloutConfig.calloutType.toUpperCase()}]\n> ${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}`,
         preview: (
-          <div
-            className={`d-flex align-items-center border-start border-4 border-${styleConfig.colorName} ps-3 py-1`}
-            style={{ minHeight: '52px' }}
-          >
-            <div className="d-flex flex-column justify-content-center">
-              <div
-                className={`d-flex align-items-center fw-bold mb-1 ${
-                  styleConfig.colorName === 'light' ||
-                  styleConfig.colorName === 'dark'
-                    ? 'text-body'
-                    : `text-${styleConfig.colorName}`
-                }`}
-              >
-                <span className="me-2 d-flex align-items-center">
-                  <span className="material-symbols-outlined align-middle fs-6">
-                    {styleConfig.iconName}
-                  </span>
-                </span>
-                <span style={{ lineHeight: 1 }}>{styleConfig.alertLabel}</span>
-              </div>
-              <div className="text-body small lh-base">
-                {styleConfig.alertText}
-              </div>
-            </div>
-          </div>
+          <ReactMarkdown
+            {...previewOptions}
+          >{`> [!${calloutConfig.calloutType.toUpperCase()}]\n> ${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}`}</ReactMarkdown>
+        ),
+      },
+      {
+        id: 'alert2',
+        code: `:::${calloutConfig.calloutType}\n${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}\n:::`,
+        preview: (
+          <ReactMarkdown
+            {...previewOptions}
+          >{`:::${calloutConfig.calloutType}\n${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}\n:::`}</ReactMarkdown>
+        ),
+      },
+      {
+        id: 'alert3',
+        title: t(`${i18nKey}.alert_with_custom_title`),
+        code: `:::${calloutConfig.calloutType}[${t(`${i18nKey}.alert_with_custom_title_text`)}]\n${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}\n:::`,
+        preview: (
+          <ReactMarkdown
+            {...previewOptions}
+          >{`:::${calloutConfig.calloutType}[${t(`${i18nKey}.alert_with_custom_title_text`)}]\n${t(`${i18nKey}.${currentStyle}_text`, { defaultValue: t(`${i18nKey}.placeholder`) })}\n:::`}</ReactMarkdown>
         ),
       },
       {
         id: 'badge',
         title: t(`${i18nKey}.badge`),
-        code: `<span class="badge text-bg-${styleConfig.colorName}">${t(`${i18nKey}.badge`)}</span>`,
+        code: `<span class="badge text-bg-${currentStyle}">${t(`${i18nKey}.badge`)}</span>`,
         preview: (
-          <span className={`badge text-bg-${styleConfig.colorName}`}>
+          <span className={`badge text-bg-${currentStyle}`}>
             {t(`${i18nKey}.badge`)}
           </span>
         ),
@@ -106,9 +105,9 @@ export const DecorationTab: React.FC = () => {
       {
         id: 'text-color',
         title: t(`${i18nKey}.text_color`),
-        code: `<p class="text-${styleConfig.colorName}" >${t(`${i18nKey}.placeholder`)}</p>`,
+        code: `<p class="text-${currentStyle}">${t(`${i18nKey}.placeholder`)}</p>`,
         underContent: (
-          <p className={`text-${styleConfig.colorName} m-0`}>
+          <p className={`text-${currentStyle} m-0`}>
             {t(`${i18nKey}.placeholder`)}
           </p>
         ),
@@ -116,9 +115,9 @@ export const DecorationTab: React.FC = () => {
       {
         id: 'back-color',
         title: t(`${i18nKey}.back_color`),
-        code: `<p class="text-bg-${styleConfig.colorName}">${t(`${i18nKey}.placeholder`)}</p>`,
+        code: `<p class="text-bg-${currentStyle}">${t(`${i18nKey}.placeholder`)}</p>`,
         underContent: (
-          <p className={`text-bg-${styleConfig.colorName} px-2 m-0`}>
+          <p className={`text-bg-${currentStyle} px-2 m-0`}>
             {t(`${i18nKey}.placeholder`)}
           </p>
         ),
@@ -126,15 +125,15 @@ export const DecorationTab: React.FC = () => {
       {
         id: 'alert-block',
         title: t(`${i18nKey}.alert_block`),
-        code: `<div class="alert alert-${styleConfig.colorName}" role="alert">\n  ${t(`${i18nKey}.placeholder`)}\n</div>`,
+        code: `<div class="alert alert-${currentStyle}" role="alert">\n  ${t(`${i18nKey}.placeholder`)}\n</div>`,
         underContent: (
-          <div className={`alert alert-${styleConfig.colorName} m-0`}>
+          <div className={`alert alert-${currentStyle} m-0`}>
             {t(`${i18nKey}.placeholder`)}
           </div>
         ),
       },
     ],
-    [styleConfig, t],
+    [currentStyle, t, previewOptions, calloutConfig.calloutType],
   );
 
   return (
@@ -146,33 +145,28 @@ export const DecorationTab: React.FC = () => {
             outline
             color="body"
             caret
-            className={`border d-flex align-items-center gap-2 text-${styleConfig.colorName === 'light' ? 'dark' : styleConfig.colorName}`}
+            className={`border d-flex align-items-center gap-2 text-${currentStyle}`}
             style={{ minWidth: '160px' }}
           >
-            <span className="material-symbols-outlined align-middle fs-6">
-              {styleConfig.iconName}
+            <span className="flex-grow-1 justify-content-start d-flex align-items-center gap-1">
+              <span className="material-symbols-outlined align-middle fs-6">
+                {calloutConfig.icon}
+              </span>
+              {displayName}
             </span>
-            <span className="flex-grow-1">{styleConfig.displayName}</span>
           </DropdownToggle>
           <DropdownMenu className={styles.dropdownMenu}>
-            {BOOTSTRAP_COLORS.map((color) => (
+            {CALLOUT_STYLES.map((style) => (
               <DropdownItem
-                key={color}
-                className={`d-flex align-items-center gap-2 ${currentStyle === color ? 'active' : ''}`}
-                onClick={() => setCurrentStyle(color)}
-                style={
-                  currentStyle === color
-                    ? {
-                        backgroundColor: `var(--bs-${color})`,
-                        color: color === 'light' ? 'black' : 'white',
-                      }
-                    : {}
-                }
+                key={style}
+                active={currentStyle === style}
+                className="d-flex align-items-center gap-2"
+                onClick={() => setCurrentStyle(style)}
               >
                 <span className="material-symbols-outlined">
-                  {colorConfigs[color].icon}
+                  {BOOTSTRAP_STYLES_TO_CALLOUT_CONFIGS_MAPPINGS[style].icon}
                 </span>
-                {color.charAt(0).toUpperCase() + color.slice(1)}
+                {style.charAt(0).toUpperCase() + style.slice(1)}
               </DropdownItem>
             ))}
           </DropdownMenu>
@@ -181,7 +175,7 @@ export const DecorationTab: React.FC = () => {
 
       <hr />
 
-      <div key={currentStyle}>
+      <div key={currentStyle} className={styles.decorationBody}>
         {LAYOUT_GUIDES.map((item) => (
           <GuideRow key={item.id} {...item} minWidth="280px" />
         ))}
