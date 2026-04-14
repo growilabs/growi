@@ -1,0 +1,21 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use 'sass:map';
+
+.decorationTab {
+  min-width: map.get(bs.$grid-breakpoints, 'sm');
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+// Override the margin of callout in the preview
+.decorationBody {
+  :global(.callout) {
+    margin: 0.2rem 0;
+  }
+}
+
+.dropdownMenu {
+  max-height: 300px;
+  margin-top: bs.$dropdown-spacer;
+  overflow-y: auto;
+}

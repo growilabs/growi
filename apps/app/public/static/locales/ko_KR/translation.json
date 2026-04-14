@@ -1062,7 +1062,8 @@
       "link_sandbox": "연습장 페이지는 여기입니다",
       "all_important": "이 텍스트는 모두\n중요합니다",
       "sub_text": "아래 첨자",
-      "sup_text": "위 첨자"
+      "sup_text": "위 첨자",
+      "is_text": "이것은 {{val}}입니다"
     },
     "layout": {
       "copy_done": "복사되었습니다!",
@@ -1098,14 +1099,13 @@
       "copy_done": "클립보드에 복사되었습니다!",
       "style": "스타일",
       "alert": "알림",
+      "alert_with_custom_title": "레이블이 있는 알림",
+      "alert_with_custom_title_text": "사용자 정의 제목",
+      "alert_unavailable": "이 스타일에서는 사용할 수 없습니다",
       "badge": "배지",
       "text_color": "텍스트 색상",
       "back_color": "배경 색상",
-      "alert_block": "알림 블록",
-      "important_label": "Important",
-      "important_text": "중요한 정보",
-      "caution_label": "Caution",
-      "caution_text": "금지 사항 및 경고",
+
       "placeholder": "텍스트가 입력됩니다",
       "docs_title": "Bootstrap 5 공식 문서",
       "docs_badge": "배지 상세 정보",
