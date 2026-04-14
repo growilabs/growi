@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PageDocument } from '~/server/models/page';
 
+import type { ApiV3Response } from '../interfaces/apiv3-response';
+
 // Mock logger to avoid path resolution issues in tests
 vi.mock('~/utils/logger', () => ({
   default: () => ({
@@ -43,7 +45,6 @@ describe('respondWithSinglePage', () => {
 
     mockPage = {
       path: '/normal-page',
-      _id: '123',
       initLatestRevisionField: vi.fn(),
       populateDataToShowRevision: vi.fn(),
     };
@@ -62,12 +63,15 @@ describe('respondWithSinglePage', () => {
         HydratedDocument<PageDocument>,
         IPageInfoExt
       > = {
-        data: mockPage as HydratedDocument<PageDocument>,
+        data: mockPage as unknown as HydratedDocument<PageDocument>,
         meta: mockMeta,
       };
 
       // Act
-      await respondWithSinglePage(mockRes, pageWithMeta);
+      await respondWithSinglePage(
+        mockRes as unknown as ApiV3Response,
+        pageWithMeta,
+      );
 
       // Assert
       expect(mockRes.apiv3).toHaveBeenCalledWith(
@@ -89,12 +93,16 @@ describe('respondWithSinglePage', () => {
         HydratedDocument<PageDocument>,
         IPageInfoExt
       > = {
-        data: mockPage as HydratedDocument<PageDocument>,
+        data: mockPage as unknown as HydratedDocument<PageDocument>,
         meta: mockMeta,
       };
 
       // Act
-      await respondWithSinglePage(mockRes, pageWithMeta, { revisionId });
+      await respondWithSinglePage(
+        mockRes as unknown as ApiV3Response,
+        pageWithMeta,
+        { revisionId },
+      );
 
       // Assert
       expect(mockPage.initLatestRevisionField).toHaveBeenCalledWith(revisionId);
@@ -114,7 +122,10 @@ describe('respondWithSinglePage', () => {
       };
 
       // Act
-      await respondWithSinglePage(mockRes, pageWithMeta);
+      await respondWithSinglePage(
+        mockRes as unknown as ApiV3Response,
+        pageWithMeta,
+      );
 
       // Assert
       expect(mockRes.apiv3Err).toHaveBeenCalledWith(
@@ -139,14 +150,18 @@ describe('respondWithSinglePage', () => {
         HydratedDocument<PageDocument>,
         IPageInfoExt
       > = {
-        data: userPageMock as HydratedDocument<PageDocument>,
+        data: userPageMock as unknown as HydratedDocument<PageDocument>,
         meta: mockMeta,
       };
 
       // Act
-      await respondWithSinglePage(mockRes, pageWithMeta, {
-        disableUserPages: true,
-      });
+      await respondWithSinglePage(
+        mockRes as unknown as ApiV3Response,
+        pageWithMeta,
+        {
+          disableUserPages: true,
+        },
+      );
 
       // Assert
       expect(mockRes.apiv3Err).toHaveBeenCalledWith(
@@ -171,14 +186,18 @@ describe('respondWithSinglePage', () => {
         HydratedDocument<PageDocument>,
         IPageInfoExt
       > = {
-        data: userTopPageMock as HydratedDocument<PageDocument>,
+        data: userTopPageMock as unknown as HydratedDocument<PageDocument>,
         meta: mockMeta,
       };
 
       // Act
-      await respondWithSinglePage(mockRes, pageWithMeta, {
-        disableUserPages: true,
-      });
+      await respondWithSinglePage(
+        mockRes as unknown as ApiV3Response,
+        pageWithMeta,
+        {
+          disableUserPages: true,
+        },
+      );
 
       // Assert
       expect(mockRes.apiv3Err).toHaveBeenCalledWith(
@@ -204,7 +223,10 @@ describe('respondWithSinglePage', () => {
       };
 
       // Act
-      await respondWithSinglePage(mockRes, pageWithMeta);
+      await respondWithSinglePage(
+        mockRes as unknown as ApiV3Response,
+        pageWithMeta,
+      );
 
       // Assert
       expect(mockRes.apiv3Err).toHaveBeenCalledWith(
