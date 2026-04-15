@@ -1,5 +1,5 @@
 import type { IPage, IRevisionHasId, IUserHasId } from '@growi/core';
-import { allOrigin, getIdForRef, Origin } from '@growi/core';
+import { allOrigin, getIdForRef, getIdStringForRef, Origin } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
@@ -32,6 +32,7 @@ import {
   serializePageSecurely,
   serializeRevisionSecurely,
 } from '~/server/models/serializers';
+import { shouldGenerateUpdate } from '~/server/service/activity/update-activity-logic';
 import { configManager } from '~/server/service/config-manager/config-manager';
 import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
@@ -118,24 +119,49 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
     }
 
-    // persist activity
-    const creator =
-      updatedPage.creator != null
-        ? getIdForRef(updatedPage.creator)
-        : undefined;
-    const parameters = {
-      targetModel: SupportedTargetModel.MODEL_PAGE,
-      target: updatedPage,
-      action: SupportedAction.ACTION_PAGE_UPDATE,
-    };
-    const activityEvent = crowi.events.activity;
-    activityEvent.emit(
-      'update',
-      res.locals.activity._id,
-      parameters,
-      { path: updatedPage.path, creator },
-      preNotifyService.generatePreNotify,
-    );
+    // Decide if update activity should generate
+    let shouldGenerateUpdateActivity = false;
+    try {
+      const targetPageId = getIdStringForRef(updatedPage);
+      const currentActivityId = getIdStringForRef(res.locals.activity);
+      const currentUserId = req.user ? getIdStringForRef(req.user) : undefined;
+
+      shouldGenerateUpdateActivity = await shouldGenerateUpdate({
+        currentUserId,
+        targetPageId,
+        currentActivityId,
+      });
+    } catch (err) {
+      logger.error(
+        'Failed to determine whether to generate update activity.',
+        err,
+      );
+    }
+
+    if (shouldGenerateUpdateActivity) {
+      try {
+        // persist activity
+        const creator =
+          updatedPage.creator != null
+            ? getIdForRef(updatedPage.creator)
+            : undefined;
+        const parameters = {
+          targetModel: SupportedTargetModel.MODEL_PAGE,
+          target: updatedPage,
+          action: SupportedAction.ACTION_PAGE_UPDATE,
+        };
+        const activityEvent = crowi.events.activity;
+        activityEvent.emit(
+          'update',
+          res.locals.activity._id,
+          parameters,
+          { path: updatedPage.path, creator },
+          preNotifyService.generatePreNotify,
+        );
+      } catch (err) {
+        logger.error('Failed to generate update activity', err);
+      }
+    }
 
     // global notification
     try {
@@ -283,7 +309,6 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
           409,
         );
       }
-
       let updatedPage: HydratedDocument<PageDocument>;
       let previousRevision: IRevisionHasId | null;
       try {

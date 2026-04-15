@@ -4,7 +4,6 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { userHomepagePath } from '@growi/core/dist/utils/page-path-utils';
 import express from 'express';
 import { body, query } from 'express-validator';
-import path from 'pathe';
 import { isEmail } from 'validator';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
@@ -25,6 +24,7 @@ import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import { resolveLocalePath } from '../../util/safe-path-utils';
 
 const logger = loggerFactory('growi:routes:apiv3:users');
 
@@ -206,6 +206,12 @@ module.exports = (crowi) => {
     const { appService, mailService } = crowi;
     const appTitle = appService.getAppTitle();
     const locale = configManager.getConfig('app:globalLang');
+    const templatePath = resolveLocalePath(
+      locale,
+      crowi.localeDir,
+      'admin/userInvitation.ejs',
+    );
+
     const failedToSendEmailList = [];
 
     for (const user of userList) {
@@ -214,10 +220,7 @@ module.exports = (crowi) => {
         await mailService.send({
           to: user.email,
           subject: `Invitation to ${appTitle}`,
-          template: path.join(
-            crowi.localeDir,
-            `${locale}/admin/userInvitation.ejs`,
-          ),
+          template: templatePath,
           vars: {
             email: user.email,
             password: user.password,
@@ -242,14 +245,16 @@ module.exports = (crowi) => {
     const { appService, mailService } = crowi;
     const appTitle = appService.getAppTitle();
     const locale = configManager.getConfig('app:globalLang');
+    const templatePath = resolveLocalePath(
+      locale,
+      crowi.localeDir,
+      'admin/userResetPassword.ejs',
+    );
 
     await mailService.send({
       to: user.email,
       subject: `New password for ${appTitle}`,
-      template: path.join(
-        crowi.localeDir,
-        `${locale}/admin/userResetPassword.ejs`,
-      ),
+      template: templatePath,
       vars: {
         email: user.email,
         password: user.password,
