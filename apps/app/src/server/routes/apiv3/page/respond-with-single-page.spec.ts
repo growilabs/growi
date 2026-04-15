@@ -23,7 +23,8 @@ vi.mock('~/utils/logger', () => ({
 
 import { respondWithSinglePage } from './respond-with-single-page';
 
-// Express Response has extensive required properties that aren't used in these tests
+// ApiV3Response extends Express Response which requires 50+ properties (status, json, send, …).
+// Only apiv3/apiv3Err are exercised in these tests, so a full implementation is impractical.
 function createMockRes(): ApiV3Response {
   return {
     apiv3: vi.fn().mockReturnValue(undefined),
@@ -31,7 +32,8 @@ function createMockRes(): ApiV3Response {
   } as unknown as ApiV3Response;
 }
 
-// HydratedDocument adds Mongoose internals that aren't relevant to these tests
+// HydratedDocument<PageDocument> inherits Mongoose Document internals (save, $isNew, toObject, …).
+// Only path / initLatestRevisionField / populateDataToShowRevision are exercised here.
 function createMockPage(path = '/normal-page'): HydratedDocument<PageDocument> {
   const page = {
     path,
