@@ -158,6 +158,34 @@
 - **Findings**: `EditorView.scrollIntoView(pos: number, options?: { y?: 'nearest' | 'start' | 'end' | 'center' })` is the standard CodeMirror API. Dispatching `{ effects: EditorView.scrollIntoView(pos, { y: 'center' }) }` scrolls the editor so the position is vertically centered. No additional plugins or dependencies required.
 - **Implications**: Scroll is a one-liner dispatch; no new package dependencies. The position is resolved from `Y.createAbsolutePositionFromRelativePosition(cursor.head, ydoc)` which is already used in `plugin.ts`.
 
+#### Jotai Function Setter Pitfall
+
+- **Context**: `scrollToRemoteCursorAtom` stores a `(clientId: number) => void` function. `useSetAtom` returns a setter that is passed as the `onScrollToRemoteCursorReady` callback.
+- **Finding**: Jotai's atom setter interprets any **function argument** as an **updater function**: `setAtom(fn)` is treated as `setAtom(prev => fn(prev))`, not `setAtom(fn_as_value)`. When `onScrollToRemoteCursorReady(scrollFn)` was called, Jotai invoked `scrollFn(null)` (current atom value) as if it were an updater, then stored `scrollFn`'s return value (`undefined`) in the atom — the scroll function was never stored.
+- **Symptom**: `[scrollToRemoteCursor] called with clientId: null` appeared in logs immediately after "scroll function registered", and the atom value flipped to `undefined`.
+- **Solution**: Wrap the function value in `useSetScrollToRemoteCursor`:
+  ```typescript
+  setAtom(() => fn);  // updater that returns the function value
+  ```
+  This pattern must be applied to any Jotai atom that stores a function value.
+- **Implication**: When designing Jotai atoms that store callbacks or any function-typed value, the setter must always use the `() => value` wrapper form. Document this in code review checklists for Jotai usage.
+
+#### AvatarWrapper Styling — UserPicture Tooltip Fragment Issue
+
+- **Context**: Wrapping `UserPicture` in a `<button>` for click handling caused visual misalignment and layout instability.
+- **Finding**: When `noTooltip` is not set, `UserPicture` uses a `withTooltip` HOC that returns a React **Fragment** (`<span><img/></span> + <UncontrolledTooltip/>`). As flex children of the `<button>`, the Fragment's two children introduced unpredictable layout. Additionally, the `<span>` as an inline element contributed ghost space from `line-height`, making the circular border appear offset.
+- **Solution**:
+  - Pass `noTooltip` to `UserPicture` to get a predictable single-child render (`<span><img/></span>`)
+  - Use Bootstrap utilities for layout: `d-inline-flex align-items-center justify-content-center p-0 bg-transparent rounded-circle`
+  - Add `line-height: 0` to `.avatar-wrapper` in the CSS module to eliminate inline ghost space
+  - Keep only the dynamic border color as inline style: `border: 2px solid ${color}`
+
+#### Smooth Scroll via scrollDOM Style
+
+- **Context**: Click-to-scroll should animate smoothly rather than jump instantly.
+- **Finding**: `EditorView.scrollIntoView` dispatches a CodeMirror state effect that CodeMirror resolves by scrolling `view.scrollDOM`. Setting `view.scrollDOM.style.scrollBehavior = 'smooth'` before the dispatch causes the browser to animate the scroll. Restoring the value after ~500 ms (typical animation window) avoids affecting other programmatic scrolls.
+- **Constraint**: This approach works when `view.scrollDOM` is the actual scrolling element. In GROWI's page-scroll setup, the effective scrolling element may be a parent container; if smooth scrolling does not animate as expected, the `scrollBehavior` may need to be set on the parent scroll container instead.
+
 ## References
 
 - y-codemirror.next v0.3.5 source: `node_modules/.pnpm/y-codemirror.next@0.3.5_.../src/`
