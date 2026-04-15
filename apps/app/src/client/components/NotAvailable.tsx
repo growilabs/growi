@@ -1,12 +1,16 @@
 import React, { type JSX } from 'react';
 import { Disable } from 'react-disable';
 import type { UncontrolledTooltipProps } from 'reactstrap';
-import { UncontrolledTooltip } from 'reactstrap';
+import {
+  PopoverBody,
+  UncontrolledPopover,
+  UncontrolledTooltip,
+} from 'reactstrap';
 
 type NotAvailableProps = {
   children: JSX.Element;
   isDisabled: boolean;
-  title: string;
+  title: string | JSX.Element;
   classNamePrefix?: string;
   placement?: UncontrolledTooltipProps['placement'];
 };
@@ -29,9 +33,15 @@ export const NotAvailable = ({
       <div id={id}>
         <Disable disabled={isDisabled}>{children}</Disable>
       </div>
-      <UncontrolledTooltip placement={placement} target={id}>
-        {title}
-      </UncontrolledTooltip>
+      {typeof title === 'string' ? (
+        <UncontrolledTooltip placement={placement} target={id}>
+          {title}
+        </UncontrolledTooltip>
+      ) : (
+        <UncontrolledPopover trigger="hover" placement={placement} target={id}>
+          <PopoverBody>{title}</PopoverBody>
+        </UncontrolledPopover>
+      )}
     </>
   );
 };

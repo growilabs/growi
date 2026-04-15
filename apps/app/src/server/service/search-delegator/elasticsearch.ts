@@ -720,7 +720,7 @@ class ElasticsearchDelegator
       this.prepareBodyForDelete(body, page);
     });
 
-    logger.debug('deletePages(): Sending Request to ES', body);
+    logger.debug({ body }, 'deletePages(): Sending Request to ES');
     return this.client.bulk({
       body,
     });
@@ -738,7 +738,7 @@ class ElasticsearchDelegator
   ): Promise<ISearchResult<ISearchResultData>> {
     // for debug
     if (process.env.NODE_ENV === 'development') {
-      logger.debug('query: ', JSON.stringify(query, null, 2));
+      logger.debug({ query }, 'query');
 
       const validateQueryResponse = await (async () => {
         if (isES7ClientDelegator(this.client)) {
@@ -774,7 +774,7 @@ class ElasticsearchDelegator
       })();
 
       // for debug
-      logger.debug('ES result: ', validateQueryResponse);
+      logger.debug({ validateQueryResponse }, 'ES result');
     }
 
     const searchResponse = await (async () => {
@@ -1108,7 +1108,7 @@ class ElasticsearchDelegator
     const count = (await User.count({})) || 1;
 
     const minScore = queryString.length * 0.1 - 1; // increase with length
-    logger.debug('min_score: ', minScore);
+    logger.debug({ minScore }, 'min_score');
 
     query.body.query = {
       function_score: {
