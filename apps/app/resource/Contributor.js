@@ -172,10 +172,15 @@ const contributors = [
         additionalClass: 'col-md-4 my-4',
         members: [
           { name: 'Crowi Team' },
-          { position: 'Ambassador', name: 'Tsuyoshi Suzuki' },
-          { name: 'JPCERT/CC' },
-          { name: 'goofmint' },
           { name: 'RIKEN' },
+          { name: 'JPCERT/CC' },
+        ],
+      },
+      {
+        additionalClass: 'col-md-6 my-4',
+        members: [
+          { position: 'Ambassador', name: 'Tsuyoshi Suzuki' },
+          { position: 'Ambassador', name: 'goofmint' },
         ],
       },
       {
