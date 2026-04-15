@@ -1,6 +1,6 @@
-import { type JSX, useId, useMemo, useState } from 'react';
-import type { HasObjectId } from '@growi/core';
+import { type JSX, useId, useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
+import type { SWRInfiniteResponse } from 'swr/infinite';
 
 import InAppNotificationElm from '~/client/components/InAppNotification/InAppNotificationElm';
 import InfiniteScroll from '~/client/components/InfiniteScroll';
@@ -10,7 +10,10 @@ import {
   useSWRxNewsUnreadCount,
 } from '~/features/news/client/hooks/use-news';
 import type { INewsItemWithReadStatus } from '~/features/news/interfaces/news-item';
-import type { IInAppNotification } from '~/interfaces/in-app-notification';
+import type {
+  IInAppNotificationHasId,
+  PaginateResult,
+} from '~/interfaces/in-app-notification';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 import { useSidebarMode } from '~/states/ui/sidebar';
 import { useSWRINFxInAppNotifications } from '~/stores/in-app-notification';
@@ -93,7 +96,7 @@ type MergedItem =
   | { type: 'news'; item: INewsItemWithReadStatus; sortKey: Date }
   | {
       type: 'notification';
-      item: IInAppNotification & HasObjectId;
+      item: IInAppNotificationHasId;
       sortKey: Date;
     };
 
@@ -103,12 +106,6 @@ export const InAppNotificationContent = (
   const { isUnopendNotificationsVisible, activeFilter } = props;
   const { t } = useTranslation('commons');
   const { isCollapsedMode } = useSidebarMode();
-
-  // Track locally-opened notifications to give instant dot removal without
-  // relying on SWR cache persistence across navigation/unmount cycles.
-  const [locallyOpenedNotifIds, setLocallyOpenedNotifIds] = useState<
-    Set<string>
-  >(new Set());
 
   // In collapsed mode (hover panel): constrain height + own scrollbar
   // In dock/drawer mode: no constraints — outer SimpleBar handles all scrolling
@@ -139,13 +136,10 @@ export const InAppNotificationContent = (
     return newsResponse.data.flatMap((page) => page.docs);
   }, [newsResponse.data]);
 
-  const allNotificationItems: (IInAppNotification & HasObjectId)[] =
-    useMemo(() => {
-      if (!notificationResponse.data) return [];
-      return notificationResponse.data.flatMap(
-        (page) => page.docs,
-      ) as (IInAppNotification & HasObjectId)[];
-    }, [notificationResponse.data]);
+  const allNotificationItems: IInAppNotificationHasId[] = useMemo(() => {
+    if (!notificationResponse.data) return [];
+    return notificationResponse.data.flatMap((page) => page.docs);
+  }, [notificationResponse.data]);
 
   // Determine if each stream has exhausted its pages
   const newsExhausted = useMemo(
@@ -165,8 +159,12 @@ export const InAppNotificationContent = (
     [notificationResponse.data],
   );
 
-  // Synthetic SWRInfiniteResponse for InfiniteScroll in 'all' mode
-  const allModeSWRResponse = useMemo(
+  // Synthetic SWRInfiniteResponse for InfiniteScroll in 'all' mode.
+  // Typed to match newsResponse's shape so InfiniteScroll<E> receives a
+  // well-typed response without `as unknown as` casts.
+  const allModeSWRResponse = useMemo<
+    SWRInfiniteResponse<PaginateResult<INewsItemWithReadStatus>, Error>
+  >(
     () => ({
       data: newsResponse.data,
       error: newsResponse.error ?? notificationResponse.error,
@@ -174,29 +172,22 @@ export const InAppNotificationContent = (
         newsResponse.isValidating || notificationResponse.isValidating,
       isLoading: newsResponse.isLoading || notificationResponse.isLoading,
       mutate: newsResponse.mutate,
-      setSize: (updater: number | ((size: number) => number)) => {
-        const promises: Promise<unknown>[] = [];
-        if (!newsExhausted) {
-          promises.push(
-            newsResponse.setSize(
-              typeof updater === 'function'
-                ? updater(newsResponse.size)
-                : updater,
-            ),
-          );
-        }
-        if (!notifExhausted) {
-          promises.push(
-            notificationResponse.setSize(
-              typeof updater === 'function'
-                ? updater(notificationResponse.size)
-                : updater,
-            ),
-          );
-        }
-        return Promise.all(promises) as unknown as Promise<
-          (typeof newsResponse.data)[]
-        >;
+      setSize: async (updater) => {
+        const nextNewsSize =
+          typeof updater === 'function' ? updater(newsResponse.size) : updater;
+        const nextNotifSize =
+          typeof updater === 'function'
+            ? updater(notificationResponse.size)
+            : updater;
+        const [newsResult] = await Promise.all([
+          newsExhausted
+            ? Promise.resolve(newsResponse.data)
+            : newsResponse.setSize(nextNewsSize),
+          notifExhausted
+            ? Promise.resolve(notificationResponse.data)
+            : notificationResponse.setSize(nextNotifSize),
+        ]);
+        return newsResult;
       },
       size: Math.max(newsResponse.size, notificationResponse.size),
     }),
@@ -231,12 +222,23 @@ export const InAppNotificationContent = (
     mutateNewsUnreadCount();
   };
 
-  // Use local state to immediately remove the unread dot on click.
-  // Relying solely on SWR mutate is unreliable because useSWRInfinite per-page
-  // caches can be stale after navigation/unmount, so the dot reappears on
-  // remount even with revalidate:false.
+  // SWR-idiomatic optimistic update: rewrite the per-page cache in place and
+  // suppress revalidation so the dot stays removed across unmount/remount.
+  // The useSWRInfinite cache is held in the global SWR provider keyed by the
+  // composite list key, so subsequent mounts read this updated cache directly.
   const handleNotificationRead = (notificationId: string) => {
-    setLocallyOpenedNotifIds((prev) => new Set(prev).add(notificationId));
+    notificationResponse.mutate(
+      (pages) =>
+        pages?.map((page) => ({
+          ...page,
+          docs: page.docs.map((doc) =>
+            doc._id.toString() === notificationId
+              ? { ...doc, status: InAppNotificationStatuses.STATUS_OPENED }
+              : doc,
+          ),
+        })),
+      { revalidate: false },
+    );
   };
 
   if (activeFilter === 'news') {
@@ -284,14 +286,7 @@ export const InAppNotificationContent = (
               return (
                 <InAppNotificationElm
                   key={id}
-                  notification={
-                    locallyOpenedNotifIds.has(id)
-                      ? {
-                          ...notification,
-                          status: InAppNotificationStatuses.STATUS_OPENED,
-                        }
-                      : notification
-                  }
+                  notification={notification}
                   onUnopenedNotificationOpend={() => handleNotificationRead(id)}
                 />
               );
@@ -314,11 +309,7 @@ export const InAppNotificationContent = (
   return (
     <div className={scrollAreaClassName} style={scrollAreaStyle}>
       <InfiniteScroll
-        swrInifiniteResponse={
-          allModeSWRResponse as unknown as Parameters<
-            typeof InfiniteScroll
-          >[0]['swrInifiniteResponse']
-        }
+        swrInifiniteResponse={allModeSWRResponse}
         isReachingEnd={newsExhausted && notifExhausted}
       >
         <div className="list-group">
@@ -336,14 +327,7 @@ export const InAppNotificationContent = (
             return (
               <InAppNotificationElm
                 key={`notif-${id}`}
-                notification={
-                  locallyOpenedNotifIds.has(id)
-                    ? {
-                        ...entry.item,
-                        status: InAppNotificationStatuses.STATUS_OPENED,
-                      }
-                    : entry.item
-                }
+                notification={entry.item}
                 onUnopenedNotificationOpend={() => handleNotificationRead(id)}
               />
             );

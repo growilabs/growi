@@ -1,6 +1,10 @@
 import type { FC } from 'react';
+import { format } from 'date-fns';
+import { useTranslation } from 'next-i18next';
 
+import unreadDotStyles from '~/client/components/InAppNotification/UnreadDot.module.scss';
 import { apiv3Post } from '~/client/util/apiv3-client';
+import { getLocale } from '~/server/util/locale-utils';
 
 import type { INewsItemWithReadStatus } from '../../interfaces/news-item';
 
@@ -24,21 +28,21 @@ const resolveTitle = (
 type Props = {
   item: INewsItemWithReadStatus;
   onReadMutate: () => void;
-  browserLanguage?: string;
 };
 
-export const NewsItem: FC<Props> = ({
-  item,
-  onReadMutate,
-  browserLanguage,
-}) => {
-  const locale =
-    browserLanguage ??
-    (typeof navigator !== 'undefined'
-      ? navigator.language.replace('-', '_')
-      : 'ja_JP');
+export const NewsItem: FC<Props> = ({ item, onReadMutate }) => {
+  const { i18n } = useTranslation();
+  const locale = i18n.language;
   const title = resolveTitle(item.title, locale);
   const emoji = item.emoji ?? DEFAULT_EMOJI;
+
+  const publishedDate =
+    item.publishedAt instanceof Date
+      ? item.publishedAt
+      : new Date(item.publishedAt);
+  const formattedDate = format(publishedDate, 'PP', {
+    locale: getLocale(locale),
+  });
 
   const handleClick = async () => {
     try {
@@ -56,37 +60,19 @@ export const NewsItem: FC<Props> = ({
   return (
     <button
       type="button"
-      className="list-group-item list-group-item-action"
-      style={{
-        cursor: 'pointer',
-        width: '100%',
-        textAlign: 'left',
-        background: 'none',
-      }}
+      className="list-group-item list-group-item-action w-100 text-start bg-transparent"
       onClick={handleClick}
     >
       <div className="d-flex align-items-center">
-        {/* Unread indicator dot or transparent spacer */}
         <span
-          className={`${item.isRead ? '' : 'bg-primary'} rounded-circle me-3`}
-          style={{ width: 8, height: 8, minWidth: 8, display: 'inline-block' }}
+          className={`${item.isRead ? '' : 'bg-primary'} rounded-circle me-3 ${unreadDotStyles['unread-dot']}`}
         />
 
-        {/* Avatar position: emoji */}
-        <span className="me-2" style={{ fontSize: '1.2rem', lineHeight: 1 }}>
-          {emoji}
-        </span>
+        <span className="me-2 fs-5 lh-1">{emoji}</span>
 
-        {/* Content column */}
         <div>
           <span className={item.isRead ? 'fw-normal' : 'fw-bold'}>{title}</span>
-          <div className="text-muted small">
-            {item.publishedAt instanceof Date
-              ? item.publishedAt.toLocaleDateString(locale.replace('_', '-'))
-              : new Date(item.publishedAt).toLocaleDateString(
-                  locale.replace('_', '-'),
-                )}
-          </div>
+          <div className="text-muted small">{formattedDate}</div>
         </div>
       </div>
     </button>

@@ -164,3 +164,24 @@
   - `InAppNotificationSubstance.tsx` の `handleNotificationRead` で `useSWRInfinite` の `mutate(updater, { revalidate: false })` を使って既読状態をキャッシュに書き込もうとしていたが、ナビゲーション（`<a href>`）によってコンポーネントがアンマウントされた後に `useSWRInfinite` のページ単位キャッシュが古い状態に戻るため、ドットが再表示される
   - `useState<Set<string>>` でローカルに開封済み通知 ID を管理し、各 `InAppNotificationElm` のレンダリング時に `status` をその場でオーバーライドすることで、SWR キャッシュに依存せず即時反映を実現する
   - _Requirements: 6.1, 6.2_
+
+- [x] 13. PR レビュー FB 対応によるコード品質改善
+- [x] 13.1 型アサーションを排除する（FB ①）
+  - `interfaces/in-app-notification.ts` に `IInAppNotificationHasId = IInAppNotification & HasObjectId` を追加
+  - `stores/in-app-notification.ts` で `apiv3Get<InAppNotificationPaginateResult>()` にジェネリクスを注入し、`response.data as ...` を削除
+  - `InAppNotificationSubstance.tsx` の `allModeSWRResponse` を `SWRInfiniteResponse<PaginateResult<INewsItemWithReadStatus>, Error>` として明示的に宣言し、`as unknown as Parameters<typeof InfiniteScroll>[0]...` を撤去
+  - `notificationResponse.data.flatMap(...) as (IInAppNotification & HasObjectId)[]` の cast を削除（型情報が自然に流れる）
+  - _Requirements: 品質改善_
+- [x] 13.2 SWR state-less による未読ドット即時消去へ差し替える（FB ②）
+  - 12.3 で採用した `useState<Set<string>>` を撤去し、`notificationResponse.mutate((pages) => ..., { revalidate: false })` による SWR ネイティブの楽観更新に置換
+  - `SWRConfig` プロバイダのキャッシュ Map がアンマウント／リマウントを跨いで保持されるため、再マウント時もドットは消えたまま（実機検証済み）
+  - SWR のキャッシュ・hook の利点を損なわない実装とする
+  - _Requirements: 品質改善, 6.1, 6.2_
+- [x] 13.3 NewsItem の言語ユーティリティと Bootstrap クラスを既存パターンに統一する（FB ③）
+  - `navigator.language` の独自ロジックを撤去し、`useTranslation()` の `i18n.language` を使用（`ActivityListItem` と同パターン）
+  - 日付表示を `date-fns` `format` + `getLocale(i18n.language)` に統一
+  - button のインラインスタイル（`cursor/width/textAlign/background`）を Bootstrap クラス `w-100 text-start bg-transparent` に置換
+  - emoji span の `fontSize/lineHeight` を `fs-5 lh-1` に置換
+  - 未読ドットのインラインスタイルを `UnreadDot.module.scss` の共通 CSS Module に抽出し、`NewsItem.tsx` と `InAppNotificationElm.tsx` の両者から参照して見た目を統一
+  - `browserLanguage` prop を廃止し、テストも i18n モックへ合わせて更新
+  - _Requirements: 品質改善_

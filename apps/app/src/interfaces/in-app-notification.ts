@@ -1,4 +1,4 @@
-import type { IUser } from '@growi/core';
+import type { HasObjectId, IUser } from '@growi/core';
 
 import type { SupportedActionType, SupportedTargetModelType } from './activity';
 
@@ -18,6 +18,9 @@ export interface IInAppNotification<T = unknown> {
   snapshot: string;
   parsedSnapshot?: any;
 }
+
+export type IInAppNotificationHasId<T = unknown> = IInAppNotification<T> &
+  HasObjectId;
 
 /*
  * Note:

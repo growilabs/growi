@@ -10,6 +10,8 @@ import { useSWRxInAppNotificationStatus } from '~/stores/in-app-notification';
 
 import { useModelNotification } from './ModelNotification';
 
+import unreadDotStyles from './UnreadDot.module.scss';
+
 interface Props {
   notification: IInAppNotification & HasObjectId;
   onUnopenedNotificationOpend?: () => void;
@@ -79,13 +81,7 @@ const InAppNotificationElm: FC<Props> = (props: Props) => {
               notification.status === InAppNotificationStatuses.STATUS_UNOPENED
                 ? 'bg-primary'
                 : ''
-            } rounded-circle me-3`}
-            style={{
-              width: 8,
-              height: 8,
-              minWidth: 8,
-              display: 'inline-block',
-            }}
+            } rounded-circle me-3 ${unreadDotStyles['unread-dot']}`}
           />
 
           {renderActionUserPictures()}

@@ -4,7 +4,8 @@ import mongoose from 'mongoose';
 const mocks = vi.hoisted(() => {
   const apiv3Post = vi.fn().mockResolvedValue({});
   const mutate = vi.fn();
-  return { apiv3Post, mutate };
+  const i18nLanguage = { current: 'ja_JP' };
+  return { apiv3Post, mutate, i18nLanguage };
 });
 
 vi.mock('~/client/util/apiv3-client', () => ({
@@ -14,7 +15,11 @@ vi.mock('~/client/util/apiv3-client', () => ({
 vi.mock('next-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
-    i18n: { language: 'ja_JP' },
+    i18n: {
+      get language() {
+        return mocks.i18nLanguage.current;
+      },
+    },
   }),
 }));
 
@@ -42,6 +47,7 @@ describe('NewsItem', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.i18nLanguage.current = 'ja_JP';
   });
 
   describe('emoji display', () => {
@@ -59,55 +65,35 @@ describe('NewsItem', () => {
   });
 
   describe('locale fallback', () => {
-    test('should display ja_JP title when browser language is ja_JP', () => {
+    test('should display ja_JP title when i18n language is ja_JP', () => {
+      mocks.i18nLanguage.current = 'ja_JP';
       const item = makeNewsItem({
         title: { ja_JP: '日本語タイトル', en_US: 'English Title' },
       });
-      render(
-        <NewsItem
-          item={item}
-          onReadMutate={onReadMutate}
-          browserLanguage="ja_JP"
-        />,
-      );
+      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
       expect(screen.getByText('日本語タイトル')).toBeTruthy();
     });
 
-    test('should fallback to ja_JP when browser language has no match', () => {
+    test('should fallback to ja_JP when i18n language has no match', () => {
+      mocks.i18nLanguage.current = 'de_DE';
       const item = makeNewsItem({
         title: { ja_JP: '日本語タイトル', en_US: 'English Title' },
       });
-      render(
-        <NewsItem
-          item={item}
-          onReadMutate={onReadMutate}
-          browserLanguage="de_DE"
-        />,
-      );
+      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
       expect(screen.getByText('日本語タイトル')).toBeTruthy();
     });
 
     test('should fallback to en_US when ja_JP is not available', () => {
+      mocks.i18nLanguage.current = 'de_DE';
       const item = makeNewsItem({ title: { en_US: 'English Only' } });
-      render(
-        <NewsItem
-          item={item}
-          onReadMutate={onReadMutate}
-          browserLanguage="de_DE"
-        />,
-      );
+      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
       expect(screen.getByText('English Only')).toBeTruthy();
     });
 
     test('should fallback to first available key when neither ja_JP nor en_US', () => {
+      mocks.i18nLanguage.current = 'de_DE';
       const item = makeNewsItem({ title: { fr_FR: 'Titre Français' } });
-      render(
-        <NewsItem
-          item={item}
-          onReadMutate={onReadMutate}
-          browserLanguage="de_DE"
-        />,
-      );
+      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
       expect(screen.getByText('Titre Français')).toBeTruthy();
     });
   });
