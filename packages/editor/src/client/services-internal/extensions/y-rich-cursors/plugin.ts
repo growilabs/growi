@@ -36,10 +36,7 @@ export class YRichCursorsPluginValue {
   private readonly topContainer: HTMLElement;
   private readonly bottomContainer: HTMLElement;
 
-  constructor(
-    private readonly view: EditorView,
-    awareness: Awareness,
-  ) {
+  constructor(view: EditorView, awareness: Awareness) {
     this.awareness = awareness;
     this.decorations = RangeSet.of([]);
 

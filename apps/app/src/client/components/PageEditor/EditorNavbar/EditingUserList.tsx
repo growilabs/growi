@@ -1,19 +1,37 @@
-import { type FC, useState } from 'react';
+import { type FC, useId, useState } from 'react';
 import type { EditingClient } from '@growi/editor';
 import { UserPicture } from '@growi/ui/dist/components';
 import { Popover, PopoverBody } from 'reactstrap';
 
-import UserPictureList from '../../Common/UserPictureList';
-
 import styles from './EditingUserList.module.scss';
 
 const userListPopoverClass = styles['user-list-popover'] ?? '';
+const avatarWrapperClass = styles['avatar-wrapper'] ?? '';
 
 type Props = {
   clientList: EditingClient[];
+  onUserClick?: (clientId: number) => void;
 };
 
-export const EditingUserList: FC<Props> = ({ clientList }) => {
+const AvatarWrapper: FC<{
+  client: EditingClient;
+  onUserClick?: (clientId: number) => void;
+}> = ({ client, onUserClick }) => {
+  return (
+    <button
+      type="button"
+      data-testid={`avatar-wrapper-${client.clientId}`}
+      className={`${avatarWrapperClass} d-inline-flex align-items-center justify-content-center p-0 bg-transparent rounded-circle`}
+      style={{ border: `2px solid ${client.color}` }}
+      onClick={() => onUserClick?.(client.clientId)}
+    >
+      <UserPicture user={client} noLink noTooltip />
+    </button>
+  );
+};
+
+export const EditingUserList: FC<Props> = ({ clientList, onUserClick }) => {
+  const popoverTargetId = useId();
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   const togglePopover = () => setIsPopoverOpen(!isPopoverOpen);
@@ -22,7 +40,7 @@ export const EditingUserList: FC<Props> = ({ clientList }) => {
   const remainingUsers = clientList.slice(4);
 
   if (clientList.length === 0) {
-    return <></>;
+    return null;
   }
 
   return (
@@ -30,11 +48,7 @@ export const EditingUserList: FC<Props> = ({ clientList }) => {
       <div className="d-flex justify-content-start justify-content-sm-end">
         {firstFourUsers.map((editingClient) => (
           <div key={editingClient.clientId} className="ms-1">
-            <UserPicture
-              user={editingClient}
-              noLink
-              className="border border-info"
-            />
+            <AvatarWrapper client={editingClient} onUserClick={onUserClick} />
           </div>
         ))}
 
@@ -42,8 +56,9 @@ export const EditingUserList: FC<Props> = ({ clientList }) => {
           <div className="ms-1">
             <button
               type="button"
-              id="btn-editing-user"
+              id={popoverTargetId}
               className="btn border-0 bg-info-subtle rounded-pill p-0"
+              onClick={togglePopover}
             >
               <span className="fw-bold text-info p-1">
                 +{remainingUsers.length}
@@ -52,12 +67,20 @@ export const EditingUserList: FC<Props> = ({ clientList }) => {
             <Popover
               placement="bottom"
               isOpen={isPopoverOpen}
-              target="btn-editing-user"
+              target={popoverTargetId}
               toggle={togglePopover}
               trigger="legacy"
             >
               <PopoverBody className={userListPopoverClass}>
-                <UserPictureList users={remainingUsers} />
+                <div className="d-flex flex-wrap gap-1">
+                  {remainingUsers.map((editingClient) => (
+                    <AvatarWrapper
+                      key={editingClient.clientId}
+                      client={editingClient}
+                      onUserClick={onUserClick}
+                    />
+                  ))}
+                </div>
               </PopoverBody>
             </Popover>
           </div>

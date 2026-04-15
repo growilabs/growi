@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { EditingClient } from '../../interfaces';
 
@@ -31,7 +31,7 @@ function emitEditorList(
 
 /** Replicates the FIXED updateAwarenessHandler logic */
 function updateAwarenessHandler(
-  update: { added: number[]; updated: number[]; removed: number[] },
+  _update: { added: number[]; updated: number[]; removed: number[] },
   awareness: { getStates: () => Map<number, AwarenessState> },
   onEditorsUpdated: (list: EditingClient[]) => void,
 ): void {
