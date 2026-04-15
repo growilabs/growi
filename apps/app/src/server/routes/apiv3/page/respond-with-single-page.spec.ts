@@ -1,5 +1,6 @@
 import type {
   IDataWithMeta,
+  IPageInfo,
   IPageInfoExt,
   IPageNotFoundInfo,
 } from '@growi/core';
@@ -22,56 +23,62 @@ vi.mock('~/utils/logger', () => ({
 
 import { respondWithSinglePage } from './respond-with-single-page';
 
-interface MockRes {
-  apiv3: ReturnType<typeof vi.fn>;
-  apiv3Err: ReturnType<typeof vi.fn>;
+// Express Response has extensive required properties that aren't used in these tests
+function createMockRes(): ApiV3Response {
+  return {
+    apiv3: vi.fn().mockReturnValue(undefined),
+    apiv3Err: vi.fn().mockReturnValue(undefined),
+  } as unknown as ApiV3Response;
 }
 
-interface MockPage {
-  path: string;
-  initLatestRevisionField: ReturnType<typeof vi.fn>;
-  populateDataToShowRevision: ReturnType<typeof vi.fn>;
+// HydratedDocument adds Mongoose internals that aren't relevant to these tests
+function createMockPage(path = '/normal-page'): HydratedDocument<PageDocument> {
+  const page = {
+    path,
+    initLatestRevisionField: vi.fn(),
+    populateDataToShowRevision: vi.fn(),
+  };
+  page.populateDataToShowRevision.mockResolvedValue(page);
+  return page as unknown as HydratedDocument<PageDocument>;
+}
+
+function createPageInfo(overrides: Partial<IPageInfo> = {}): IPageInfo {
+  return {
+    isNotFound: false,
+    isV5Compatible: true,
+    isEmpty: false,
+    isMovable: true,
+    isDeletable: true,
+    isAbleToDeleteCompletely: true,
+    isRevertible: false,
+    bookmarkCount: 0,
+    ...overrides,
+  };
 }
 
 describe('respondWithSinglePage', () => {
-  let mockRes: MockRes;
-  let mockPage: MockPage;
+  let mockRes: ApiV3Response;
+  let mockPage: HydratedDocument<PageDocument>;
 
   beforeEach(() => {
-    mockRes = {
-      apiv3: vi.fn().mockReturnValue(undefined),
-      apiv3Err: vi.fn().mockReturnValue(undefined),
-    };
-
-    mockPage = {
-      path: '/normal-page',
-      initLatestRevisionField: vi.fn(),
-      populateDataToShowRevision: vi.fn(),
-    };
-
-    // Make populateDataToShowRevision return the same object (modified in place)
-    mockPage.populateDataToShowRevision.mockImplementation(() =>
-      Promise.resolve(mockPage),
-    );
+    mockRes = createMockRes();
+    mockPage = createMockPage();
   });
 
   describe('success case', () => {
     it('should return success response with page and meta when page exists', async () => {
       // Arrange
-      const mockMeta = { isNotFound: false } as IPageInfoExt;
+      const mockMeta = createPageInfo();
       const pageWithMeta: IDataWithMeta<
         HydratedDocument<PageDocument>,
         IPageInfoExt
       > = {
-        data: mockPage as unknown as HydratedDocument<PageDocument>,
+        data: mockPage,
         meta: mockMeta,
       };
 
       // Act
-      await respondWithSinglePage(
-        mockRes as unknown as ApiV3Response,
-        pageWithMeta,
-      );
+      await respondWithSinglePage(mockRes, pageWithMeta);
 
       // Assert
       expect(mockRes.apiv3).toHaveBeenCalledWith(
@@ -88,21 +95,17 @@ describe('respondWithSinglePage', () => {
     it('should initialize revision field when revisionId is provided', async () => {
       // Arrange
       const revisionId = '507f1f77bcf86cd799439011';
-      const mockMeta = { isNotFound: false } as IPageInfoExt;
+      const mockMeta = createPageInfo();
       const pageWithMeta: IDataWithMeta<
         HydratedDocument<PageDocument>,
         IPageInfoExt
       > = {
-        data: mockPage as unknown as HydratedDocument<PageDocument>,
+        data: mockPage,
         meta: mockMeta,
       };
 
       // Act
-      await respondWithSinglePage(
-        mockRes as unknown as ApiV3Response,
-        pageWithMeta,
-        { revisionId },
-      );
+      await respondWithSinglePage(mockRes, pageWithMeta, { revisionId });
 
       // Assert
       expect(mockPage.initLatestRevisionField).toHaveBeenCalledWith(revisionId);
@@ -112,20 +115,17 @@ describe('respondWithSinglePage', () => {
   describe('forbidden case', () => {
     it('should return 403 when page meta has isForbidden=true', async () => {
       // Arrange
-      const mockMeta = {
+      const mockMeta: IPageNotFoundInfo = {
         isNotFound: true,
         isForbidden: true,
-      } as IPageNotFoundInfo;
+      };
       const pageWithMeta: IDataWithMeta<null, IPageNotFoundInfo> = {
         data: null,
         meta: mockMeta,
       };
 
       // Act
-      await respondWithSinglePage(
-        mockRes as unknown as ApiV3Response,
-        pageWithMeta,
-      );
+      await respondWithSinglePage(mockRes, pageWithMeta);
 
       // Assert
       expect(mockRes.apiv3Err).toHaveBeenCalledWith(
@@ -140,28 +140,20 @@ describe('respondWithSinglePage', () => {
 
     it('should return 403 when disableUserPages=true and page is a user page', async () => {
       // Arrange
-      const userPageMock = {
-        path: '/user/john',
-        initLatestRevisionField: vi.fn(),
-        populateDataToShowRevision: vi.fn(),
-      };
-      const mockMeta = { isNotFound: false } as IPageInfoExt;
+      const userPage = createMockPage('/user/john');
+      const mockMeta = createPageInfo();
       const pageWithMeta: IDataWithMeta<
         HydratedDocument<PageDocument>,
         IPageInfoExt
       > = {
-        data: userPageMock as unknown as HydratedDocument<PageDocument>,
+        data: userPage,
         meta: mockMeta,
       };
 
       // Act
-      await respondWithSinglePage(
-        mockRes as unknown as ApiV3Response,
-        pageWithMeta,
-        {
-          disableUserPages: true,
-        },
-      );
+      await respondWithSinglePage(mockRes, pageWithMeta, {
+        disableUserPages: true,
+      });
 
       // Assert
       expect(mockRes.apiv3Err).toHaveBeenCalledWith(
@@ -176,28 +168,20 @@ describe('respondWithSinglePage', () => {
 
     it('should return 403 when disableUserPages=true and page is a user top page', async () => {
       // Arrange
-      const userTopPageMock = {
-        path: '/user',
-        initLatestRevisionField: vi.fn(),
-        populateDataToShowRevision: vi.fn(),
-      };
-      const mockMeta = { isNotFound: false } as IPageInfoExt;
+      const userTopPage = createMockPage('/user');
+      const mockMeta = createPageInfo();
       const pageWithMeta: IDataWithMeta<
         HydratedDocument<PageDocument>,
         IPageInfoExt
       > = {
-        data: userTopPageMock as unknown as HydratedDocument<PageDocument>,
+        data: userTopPage,
         meta: mockMeta,
       };
 
       // Act
-      await respondWithSinglePage(
-        mockRes as unknown as ApiV3Response,
-        pageWithMeta,
-        {
-          disableUserPages: true,
-        },
-      );
+      await respondWithSinglePage(mockRes, pageWithMeta, {
+        disableUserPages: true,
+      });
 
       // Assert
       expect(mockRes.apiv3Err).toHaveBeenCalledWith(
@@ -213,20 +197,17 @@ describe('respondWithSinglePage', () => {
   describe('not-found case', () => {
     it('should return 404 when page meta has isForbidden=false (not-found only)', async () => {
       // Arrange
-      const mockMeta = {
+      const mockMeta: IPageNotFoundInfo = {
         isNotFound: true,
         isForbidden: false,
-      } as IPageNotFoundInfo;
+      };
       const pageWithMeta: IDataWithMeta<null, IPageNotFoundInfo> = {
         data: null,
         meta: mockMeta,
       };
 
       // Act
-      await respondWithSinglePage(
-        mockRes as unknown as ApiV3Response,
-        pageWithMeta,
-      );
+      await respondWithSinglePage(mockRes, pageWithMeta);
 
       // Assert
       expect(mockRes.apiv3Err).toHaveBeenCalledWith(
