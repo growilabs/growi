@@ -46,3 +46,45 @@
 - [ ]\* 11. E2E Tests for Hover, Opacity, and Off-Screen Transitions (deferred)
 - [ ]\* 11.1 (P) Hover behavior on cursor overlay flag — _Req 3.3, 3.9_
 - [ ]\* 11.2 (P) Off-screen indicator visibility on scroll — _Req 4.1–4.3, 4.6_
+
+---
+
+## Phase 2: Color-Matched Avatars & Click-to-Scroll (Requirements 5–6)
+
+- [ ] 13. Scroll callback infrastructure
+- [ ] 13.1 (P) Create a Jotai atom for storing the scroll-to-remote-cursor callback
+  - Define an atom that holds either a scroll function accepting a client ID or null
+  - Export a reader hook and a setter hook, following the same pattern as the existing editing-clients atom
+  - _Requirements: 6.1_
+
+- [ ] 13.2 (P) Extend the collaborative editor mode hook to create and register a scroll-to-remote-cursor function
+  - Add a new callback option to the hook's configuration that receives the scroll function when the provider and document are ready, and null on cleanup
+  - The scroll function reads the target user's cursor position from awareness, resolves the Yjs relative position to an absolute document index, and dispatches a vertically centered scroll command to the CodeMirror editor view
+  - Guard against missing cursor data and unmounted editor view by returning silently
+  - _Requirements: 6.1, 6.2, 6.3_
+
+- [ ] 14. (P) Update EditingUserList with color-matched borders and click-to-scroll
+  - Replace the fixed blue border on each avatar with a wrapper element whose border color matches the user's cursor color from the awareness state
+  - Accept a new click callback prop and wrap each avatar in a clickable element with pointer cursor styling
+  - Replace the generic UserPictureList component in the overflow popover with inline rendering so that color-matched borders and click handling apply to all avatars consistently
+  - _Requirements: 5.1, 5.2, 5.3, 6.4, 6.5_
+
+- [ ] 15. Connect all components end-to-end
+  - Bridge the scroll-ready callback through the main editor component's props into the collaborative editor mode hook
+  - Wire the page editor to store the received scroll callback in the Jotai atom
+  - Wire the editor navbar to read the atom and pass the scroll function to the editing user list as the click callback
+  - Verify that clicking an avatar scrolls the editor to that user's remote cursor position; verify no-op for users without a cursor
+  - _Requirements: 6.1, 6.5_
+
+- [ ]\* 16. Test coverage for color-matched borders and click-to-scroll
+- [ ]\* 16.1 (P) Unit tests for EditingUserList rendering and click behavior
+  - Verify that each avatar renders a colored border matching the user's cursor color instead of the fixed blue
+  - Verify that clicking an avatar invokes the callback with the correct client ID
+  - Verify that overflow popover avatars also invoke the callback on click
+  - _Requirements: 5.1, 6.4, 6.5_
+
+- [ ]\* 16.2 (P) Integration test for the scroll function in the collaborative editor mode hook
+  - Verify that the configuration callback receives a function when the provider is set up
+  - Verify that calling the scroll function with a valid remote client ID dispatches a centered scroll effect to the editor view
+  - Verify that calling the scroll function for a client without a cursor position is a silent no-op
+  - _Requirements: 6.1, 6.2, 6.3_
