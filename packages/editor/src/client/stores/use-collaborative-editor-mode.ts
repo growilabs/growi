@@ -72,6 +72,8 @@ export const createScrollToRemoteCursorFn = (
 
     setTimeout(() => {
       scrollDOM.style.scrollBehavior = prevBehavior;
+      // Re-run off-screen classification after scroll animation completes
+      view.dispatch({});
     }, 500);
   };
 };
