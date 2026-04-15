@@ -18,6 +18,7 @@ const contributors = [
           { position: 'Haberion', name: 'hakumizuki' },
           { position: 'Undefined', name: 'miya' },
           { position: 'Hoimi Slime', name: 'satof3' },
+          { position: 'Archer', name: 'Ryosei-Fukushima' },
         ],
       },
       {
