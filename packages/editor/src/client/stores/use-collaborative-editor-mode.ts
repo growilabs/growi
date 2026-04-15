@@ -61,9 +61,18 @@ export const createScrollToRemoteCursorFn = (
     const view = getView();
     if (view == null) return;
 
+    // Enable smooth scroll for this navigation, then restore
+    const { scrollDOM } = view;
+    const prevBehavior = scrollDOM.style.scrollBehavior;
+    scrollDOM.style.scrollBehavior = 'smooth';
+
     view.dispatch({
       effects: EditorView.scrollIntoView(pos.index, { y: 'center' }),
     });
+
+    setTimeout(() => {
+      scrollDOM.style.scrollBehavior = prevBehavior;
+    }, 500);
   };
 };
 

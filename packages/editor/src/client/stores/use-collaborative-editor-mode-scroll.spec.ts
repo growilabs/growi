@@ -27,6 +27,7 @@ type AwarenessState = {
 
 type FakeEditorView = {
   dispatch: ReturnType<typeof vi.fn>;
+  scrollDOM: { style: { scrollBehavior: string } };
 };
 
 // Import the pure function after it is implemented.
@@ -59,7 +60,7 @@ describe('createScrollToRemoteCursorFn — Task 16.2', () => {
       doc: ydoc,
     };
 
-    view = { dispatch: vi.fn() };
+    view = { dispatch: vi.fn(), scrollDOM: { style: { scrollBehavior: '' } } };
   });
 
   describe('Task 16.2 — configuration callback receives a scroll function', () => {
