@@ -54,7 +54,7 @@
     "@slack/web-api": "^6.2.4",
     "@types/http-errors": "^2.0.3",
     "@types/url-join": "^4.0.2",
-    "axios": "^1.11.0",
+    "axios": "^1.15.0",
     "crypto": "^1.0.1",
     "date-fns": "^3.6.0",
     "extensible-custom-error": "^0.0.7",
