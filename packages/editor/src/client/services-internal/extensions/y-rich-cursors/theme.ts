@@ -112,6 +112,7 @@ export const richCursorsTheme = EditorView.baseTheme({
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    pointerEvents: 'auto',
   },
   // In the bottom container the indicator hangs upward from the bottom edge,
   // so the arrow (last child) sits right at/overlapping the editor's bottom border.
