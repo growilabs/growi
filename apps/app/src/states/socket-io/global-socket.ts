@@ -42,16 +42,16 @@ export const useSetupGlobalSocket = (): void => {
 
       // Error handling
       newSocket.on('error', (err) => {
-        logger.error(err);
+        logger.error({ err }, 'Socket error');
       });
       newSocket.on('connect_error', (err) => {
-        logger.error('Failed to connect with websocket.', err);
+        logger.error({ err }, 'Failed to connect with websocket.');
       });
 
       // Store connection in atom
       setSocket(newSocket);
     } catch (error) {
-      logger.error('Failed to initialize WebSocket:', error);
+      logger.error({ err: error }, 'Failed to initialize WebSocket');
     }
   }, [setSocket]);
 

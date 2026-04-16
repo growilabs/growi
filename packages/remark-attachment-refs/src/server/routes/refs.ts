@@ -3,13 +3,12 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import type { AccessTokenParser } from '@growi/core/dist/interfaces/server';
 import { serializeAttachmentSecurely } from '@growi/core/dist/models/serializers';
 import { OptionParser } from '@growi/core/dist/remark-plugins';
+import { loggerFactory } from '@growi/logger';
 import type { Request } from 'express';
 import { Router } from 'express';
 import type { HydratedDocument, Model } from 'mongoose';
 import mongoose, { model, Types } from 'mongoose';
 import { FilterXSS } from 'xss';
-
-import loggerFactory from '../../utils/logger';
 
 const logger = loggerFactory('growi:remark-attachment-refs:routes:refs');
 
