@@ -133,11 +133,8 @@ const nextConfig: NextConfig = {
       // Exclude fs from client bundle
       fs: { browser: './src/lib/empty-module.ts' },
       // Exclude server-only packages from client bundle
-      'dtrace-provider': { browser: './src/lib/empty-module.ts' },
       mongoose: { browser: './src/lib/empty-module.ts' },
       'i18next-fs-backend': { browser: './src/lib/empty-module.ts' },
-      bunyan: { browser: './src/lib/empty-module.ts' },
-      'bunyan-format': { browser: './src/lib/empty-module.ts' },
       'core-js': { browser: './src/lib/empty-module.ts' },
     },
   },

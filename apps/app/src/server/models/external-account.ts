@@ -80,7 +80,7 @@ schema.statics.findOrRegister = function (
   return this.findOne({ providerType, accountId }).then((account) => {
     // ExternalAccount is found
     if (account != null) {
-      logger.debug(`ExternalAccount '${accountId}' is found `, account);
+      logger.debug({ account }, `ExternalAccount '${accountId}' is found`);
       return account;
     }
 

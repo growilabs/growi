@@ -102,7 +102,7 @@ class YjsService implements IYjsService {
       } catch (err) {
         guard.restore();
 
-        logger.error('Yjs upgrade handler failed unexpectedly', { url, err });
+        logger.error({ url, err }, 'Yjs upgrade handler failed unexpectedly');
         if (socket.writable) {
           socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
         }
@@ -116,8 +116,8 @@ class YjsService implements IYjsService {
   public async getYDocStatus(pageId: string): Promise<YDocStatus> {
     const dumpLog = (status: YDocStatus, args?: { [key: string]: unknown }) => {
       logger.debug(
-        `getYDocStatus('${pageId}') detected '${status}'`,
         args ?? {},
+        `getYDocStatus('${pageId}') detected '${status}'`,
       );
     };
 
