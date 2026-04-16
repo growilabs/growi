@@ -8,6 +8,7 @@ import path from 'path';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
+import { SUPPORTED_LOCALES } from '../util/safe-path-utils';
 import { configManager } from './config-manager';
 
 const logger = loggerFactory('growi:service:installer');
@@ -17,6 +18,11 @@ export class FailedToCreateAdminUserError extends ExtensibleCustomError {}
 export type AutoInstallOptions = {
   allowGuestMode?: boolean;
   serverDate?: Date;
+};
+
+const getSafeLang = (lang: Lang): Lang => {
+  if (SUPPORTED_LOCALES.includes(lang)) return lang;
+  return 'en_US';
 };
 
 export class InstallerService {
@@ -44,7 +50,12 @@ export class InstallerService {
     const { pageService } = this.crowi;
 
     try {
-      const markdown = fs.readFileSync(filePath);
+      const normalizedPath = path.resolve(filePath);
+      const baseDir = path.resolve(this.crowi.localeDir);
+      if (!normalizedPath.startsWith(baseDir)) {
+        throw new Error(`Path traversal detected: ${normalizedPath}`);
+      }
+      const markdown = fs.readFileSync(normalizedPath);
       return pageService.forceCreateBySystem(pagePath, markdown.toString(), {});
     } catch (err) {
       logger.error(`Failed to create ${pagePath}`, err);
@@ -56,27 +67,33 @@ export class InstallerService {
     initialPagesCreatedAt?: Date,
   ): Promise<any> {
     const { localeDir } = this.crowi;
+
+    const safeLang = getSafeLang(lang);
+
     // create /Sandbox/*
     /*
      * Keep in this order to
      *   1. avoid creating the same pages
      *   2. avoid difference for order in VRT
      */
-    await this.createPage(path.join(localeDir, lang, 'sandbox.md'), '/Sandbox');
     await this.createPage(
-      path.join(localeDir, lang, 'sandbox-markdown.md'),
+      path.join(localeDir, safeLang, 'sandbox.md'),
+      '/Sandbox',
+    );
+    await this.createPage(
+      path.join(localeDir, safeLang, 'sandbox-markdown.md'),
       '/Sandbox/Markdown',
     );
     await this.createPage(
-      path.join(localeDir, lang, 'sandbox-bootstrap5.md'),
+      path.join(localeDir, safeLang, 'sandbox-bootstrap5.md'),
       '/Sandbox/Bootstrap5',
     );
     await this.createPage(
-      path.join(localeDir, lang, 'sandbox-diagrams.md'),
+      path.join(localeDir, safeLang, 'sandbox-diagrams.md'),
       '/Sandbox/Diagrams',
     );
     await this.createPage(
-      path.join(localeDir, lang, 'sandbox-math.md'),
+      path.join(localeDir, safeLang, 'sandbox-math.md'),
       '/Sandbox/Math',
     );
 
@@ -123,11 +140,13 @@ export class InstallerService {
     globalLang: Lang,
     options?: AutoInstallOptions,
   ): Promise<void> {
+    const safeLang = getSafeLang(globalLang);
+
     await configManager.updateConfigs(
       {
         'app:installed': true,
         'app:isV5Compatible': true,
-        'app:globalLang': globalLang,
+        'app:globalLang': safeLang,
       },
       { skipPubsub: true },
     );
@@ -149,14 +168,15 @@ export class InstallerService {
     globalLang: Lang,
     options?: AutoInstallOptions,
   ): Promise<IUser> {
-    await this.initDB(globalLang, options);
+    const safeLang = getSafeLang(globalLang);
 
+    await this.initDB(safeLang, options);
     const User = mongoose.model<IUser, { createUser }>('User');
 
     // create portal page for '/' before creating admin user
     try {
       await this.createPage(
-        path.join(this.crowi.localeDir, globalLang, 'welcome.md'),
+        path.join(this.crowi.localeDir, safeLang, 'welcome.md'),
         '/',
       );
     } catch (err) {
@@ -172,12 +192,12 @@ export class InstallerService {
         username,
         email,
         password,
-        globalLang,
+        safeLang,
       );
       await (adminUser as any).asyncGrantAdmin();
 
       // create initial pages
-      await this.createInitialPages(globalLang, options?.serverDate);
+      await this.createInitialPages(safeLang, options?.serverDate);
 
       return adminUser;
     } catch (err) {

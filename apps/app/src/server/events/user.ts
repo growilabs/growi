@@ -48,10 +48,10 @@ class UserEvent extends EventEmitter {
         const body = `# ${user.username}\nThis is ${user.username}'s page`;
 
         await this.crowi.pageService.create(userHomepagePath, body, user, {});
-        logger.debug('User page created', page);
+        logger.debug({ page }, 'User page created');
       }
     } catch (err) {
-      logger.error('Failed to create user page', err);
+      logger.error({ err }, 'Failed to create user page');
     }
   }
 }
