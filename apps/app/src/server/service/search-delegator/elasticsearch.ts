@@ -751,14 +751,18 @@ class ElasticsearchDelegator
 
     return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
   }
+
   async updateOrInsertAuditlog(activity: ActivityDocument): Promise<void> {
+    const username = activity.snapshot?.username;
+    if (username == null || username === '') return;
     await this.client.bulk({
       body: [
         { index: { _index: this.auditlogIndexName, _id: activity._id } },
-        { username: activity.snapshot?.username },
+        { username },
       ],
     });
   }
+
   deletePages(pages) {
     const body = [];
     pages.forEach((page) => {
