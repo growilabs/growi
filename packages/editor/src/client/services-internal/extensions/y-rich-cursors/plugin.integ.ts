@@ -183,7 +183,8 @@ describe('Task 5.1 — Awareness update flow to EditingUserList', () => {
     awareness.setRemoteClientState(2, { editors: remoteClient });
 
     expect(onEditorsUpdated).toHaveBeenCalled();
-    const lastCall = onEditorsUpdated.mock.calls.at(-1)?.[0] as EditingClient[];
+    const calls = onEditorsUpdated.mock.calls;
+    const lastCall = calls[calls.length - 1]?.[0] as EditingClient[];
     expect(lastCall.map((c) => c.name)).toContain('Bob');
   });
 
@@ -234,13 +235,14 @@ describe('Task 5.2 — Cursor position broadcasting', () => {
 
     const stored = awareness.getLocalState()?.cursor;
     expect(stored).toBeDefined();
+    if (stored == null) throw new Error('cursor not stored');
 
     const restoredAnchor = Y.createAbsolutePositionFromRelativePosition(
-      stored?.anchor,
+      stored.anchor,
       ydoc,
     );
     const restoredHead = Y.createAbsolutePositionFromRelativePosition(
-      stored?.head,
+      stored.head,
       ydoc,
     );
 
@@ -265,14 +267,15 @@ describe('Task 5.2 — Cursor position broadcasting', () => {
     expect(remoteState?.editors).toEqual(remoteClient);
     expect(remoteState?.cursor?.anchor).toBeDefined();
     expect(remoteState?.cursor?.head).toBeDefined();
+    if (remoteState?.cursor == null) throw new Error('remote cursor not set');
 
     // Verify that positions can be reconstructed (widget would use this)
     const restoredAnchor = Y.createAbsolutePositionFromRelativePosition(
-      remoteState?.cursor?.anchor,
+      remoteState.cursor.anchor,
       ydoc,
     );
     const restoredHead = Y.createAbsolutePositionFromRelativePosition(
-      remoteState?.cursor?.head,
+      remoteState.cursor.head,
       ydoc,
     );
     expect(restoredAnchor?.index).toBe(2);
